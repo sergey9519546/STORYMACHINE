@@ -46,8 +46,15 @@ jobs:
       - name: Type check
         run: npm run lint
 
+      # --exclude-dir/--exclude mirror ci.yml's quarantine of the never-
+      # compiled v5.0 experimental "narrative OS" subsystem — see that
+      # file's comment for the full rationale.
       - name: Enforce no console.* under server/
-        run: "! grep -rn 'console\\.' server --include='*.ts'"
+        run: >-
+          ! grep -rn 'console\.' server --include='*.ts'
+          --exclude-dir=kernel --exclude-dir=quantum --exclude-dir=research
+          --exclude-dir=infinity-gate --exclude-dir=planning --exclude-dir=benchmarks
+          --exclude=ai-provider.test.ts --exclude=ai-provider-integration.test.ts
 
       - name: Run tests (keyless — analysis-only posture)
         run: npm test

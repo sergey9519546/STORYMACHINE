@@ -34,18 +34,18 @@ interface Props { onClose: () => void; }
 // ── Palette ───────────────────────────────────────────────────────────────────
 
 const KIND_META: Record<PromiseKind, { label: string; icon: string; color: string; bg: string }> = {
-  CLUE:   { label: 'Clue',         icon: '🔍', color: '#fbbf24', bg: '#1a1200' },
-  CLOCK:  { label: 'Clock',        icon: '⏱',  color: '#f87171', bg: '#1a0505' },
-  REL:    { label: 'Relationship', icon: '↔',  color: '#fb923c', bg: '#1a0c00' },
-  THEME:  { label: 'Theme',        icon: '◈',  color: '#a78bfa', bg: '#120f22' },
-  OBJECT: { label: 'Object Arc',   icon: '○',  color: '#60a5fa', bg: '#0a1520' },
+  CLUE:   { label: 'Clue',         icon: '🔍', color: 'var(--sm-warn)', bg: 'var(--sm-night-2)' },
+  CLOCK:  { label: 'Clock',        icon: '⏱',  color: 'var(--sm-stamp)', bg: 'var(--sm-night-2)' },
+  REL:    { label: 'Relationship', icon: '↔',  color: 'var(--sm-warn)', bg: 'var(--sm-night-2)' },
+  THEME:  { label: 'Theme',        icon: '◈',  color: 'var(--sm-cool)', bg: 'var(--sm-night-2)' },
+  OBJECT: { label: 'Object Arc',   icon: '○',  color: 'var(--sm-cool)', bg: 'var(--sm-night-2)' },
 };
 
 const URGENCY_META: Record<PromiseUrgency, { label: string; color: string; bg: string }> = {
-  overdue:  { label: 'OVERDUE',   color: '#f87171', bg: '#450a0a' },
-  due_soon: { label: 'DUE SOON',  color: '#fb923c', bg: '#1c0800' },
-  on_track: { label: 'ON TRACK',  color: '#4ade80', bg: '#032012' },
-  not_yet:  { label: 'NOT YET',   color: '#64748b', bg: '#1e293b' },
+  overdue:  { label: 'OVERDUE',   color: 'var(--sm-stamp)', bg: 'var(--sm-stamp-dk)' },
+  due_soon: { label: 'DUE SOON',  color: 'var(--sm-warn)', bg: 'var(--sm-night-2)' },
+  on_track: { label: 'ON TRACK',  color: 'var(--sm-ok)', bg: 'var(--sm-night-2)' },
+  not_yet:  { label: 'NOT YET',   color: 'var(--sm-ink-mute)', bg: 'var(--sm-night-2)' },
 };
 
 const ALL_KINDS: PromiseKind[] = ['CLUE', 'CLOCK', 'REL', 'THEME', 'OBJECT'];
@@ -81,45 +81,45 @@ export function ArcCompletionPanel({ onClose }: Props) {
     return true;
   }) ?? [];
 
-  const debtColor = !report ? '#64748b'
-    : report.debtScore <= 10 ? '#4ade80'
-    : report.debtScore <= 40 ? '#fb923c'
-    : '#f87171';
+  const debtColor = !report ? 'var(--sm-ink-mute)'
+    : report.debtScore <= 10 ? 'var(--sm-ok)'
+    : report.debtScore <= 40 ? 'var(--sm-warn)'
+    : 'var(--sm-stamp)';
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      border: '1px solid #334155', width: 820, maxWidth: '98vw',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      border: '1px solid var(--sm-night-line)', width: 820, maxWidth: '98vw',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 13,
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0 }}>
         <div>
           <strong style={{ fontSize: 15 }}>Arc Completion Tracker — open narrative promises</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>
             Clues · Clocks · Relationships · Themes · Object Arcs — pacing scores + completion windows
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={load} style={chipBtn('#1e293b')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 
       {/* Summary bar */}
       {report && (
-        <div style={{ display: 'flex', gap: 20, padding: '10px 18px', borderBottom: '1px solid #334155', flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Stat label="Open promises" value={String(report.openPromises.length)} color="#94a3b8" />
-          <Stat label="Resolved" value={String(report.resolvedCount)} color="#4ade80" />
-          <Stat label="Overdue" value={String(report.overdueCount)} color={report.overdueCount > 0 ? '#f87171' : '#64748b'} />
+        <div style={{ display: 'flex', gap: 20, padding: '10px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Stat label="Open promises" value={String(report.openPromises.length)} color="var(--sm-cream-mute)" />
+          <Stat label="Resolved" value={String(report.resolvedCount)} color="var(--sm-ok)" />
+          <Stat label="Overdue" value={String(report.overdueCount)} color={report.overdueCount > 0 ? 'var(--sm-stamp)' : 'var(--sm-ink-mute)'} />
           <Stat label="Arc debt" value={`${report.debtScore}%`} color={debtColor} />
-          <Stat label="Scenes" value={String(report.totalScenes)} color="#64748b" />
+          <Stat label="Scenes" value={String(report.totalScenes)} color="var(--sm-ink-mute)" />
 
           {/* Debt bar */}
           <div style={{ flex: 1, minWidth: 120 }}>
-            <div style={{ color: '#64748b', fontSize: 10, marginBottom: 3 }}>ARC DEBT</div>
-            <div style={{ background: '#1e293b', borderRadius: 4, height: 6 }}>
+            <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 3 }}>ARC DEBT</div>
+            <div style={{ background: 'var(--sm-night-2)', borderRadius: 4, height: 6 }}>
               <div style={{ background: debtColor, height: '100%', width: `${Math.min(100, report.debtScore)}%`, borderRadius: 4, transition: 'width 0.3s' }} />
             </div>
           </div>
@@ -128,14 +128,14 @@ export function ArcCompletionPanel({ onClose }: Props) {
 
       {/* Filters */}
       {report && (
-        <div style={{ display: 'flex', gap: 6, padding: '8px 16px', borderBottom: '1px solid #334155', flexShrink: 0, flexWrap: 'wrap' }}>
-          <FilterChip active={filter === 'ALL'} label="All" color="#94a3b8" onClick={() => setFilter('ALL')} />
+        <div style={{ display: 'flex', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0, flexWrap: 'wrap' }}>
+          <FilterChip active={filter === 'ALL'} label="All" color="var(--sm-cream-mute)" onClick={() => setFilter('ALL')} />
           {ALL_KINDS.map(k => (
             <FilterChip key={k} active={filter === k} label={KIND_META[k].label} color={KIND_META[k].color}
               onClick={() => setFilter(filter === k ? 'ALL' : k)}
               count={report.openPromises.filter(p => p.kind === k).length} />
           ))}
-          <div style={{ width: 1, background: '#334155', margin: '0 4px' }} />
+          <div style={{ width: 1, background: 'var(--sm-night-line)', margin: '0 4px' }} />
           {(['overdue', 'due_soon', 'on_track', 'not_yet'] as PromiseUrgency[]).map(u => (
             <FilterChip key={u} active={urgFilter === u} label={URGENCY_META[u].label} color={URGENCY_META[u].color}
               onClick={() => setUrgFilter(urgFilter === u ? 'ALL' : u)}
@@ -146,11 +146,11 @@ export function ArcCompletionPanel({ onClose }: Props) {
 
       {/* Body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
-        {loading && <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Analyzing arc promises…</div>}
-        {error && <div style={{ color: '#f87171', background: '#1e293b', borderRadius: 5, padding: 10 }}>{error}</div>}
+        {loading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 40 }}>Analyzing arc promises…</div>}
+        {error && <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>{error}</div>}
 
         {report && report.openPromises.length === 0 && (
-          <div style={{ background: '#064e3b', border: '1px solid #065f46', borderRadius: 6, padding: '14px 18px', color: '#4ade80', fontSize: 12 }}>
+          <div style={{ background: '#064e3b', border: '1px solid #065f46', borderRadius: 6, padding: '14px 18px', color: 'var(--sm-ok)', fontSize: 12 }}>
             ✓ No open narrative promises — all planted beats are resolved
           </div>
         )}
@@ -192,23 +192,23 @@ function PromiseCard({ promise: p, totalScenes }: { promise: OpenPromise; totalS
         <span style={{ background: um.bg, color: um.color, border: `1px solid ${um.color}55`, borderRadius: 3, padding: '1px 6px', fontSize: 9, fontWeight: 700 }}>
           {um.label}
         </span>
-        <span style={{ color: '#64748b', fontSize: 10, marginLeft: 'auto' }}>
+        <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginLeft: 'auto' }}>
           scene {p.openedAtScene} → [{p.targetWindow[0]}–{p.targetWindow[1]}]
         </span>
       </div>
-      <div style={{ color: '#e2e8f0', fontSize: 11, marginBottom: 6 }}>{p.description}</div>
+      <div style={{ color: 'var(--sm-cream)', fontSize: 11, marginBottom: 6 }}>{p.description}</div>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>PACING SCORE</div>
-          <div style={{ background: '#334155', borderRadius: 3, height: 4 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 9, marginBottom: 2 }}>PACING SCORE</div>
+          <div style={{ background: 'var(--sm-night-line)', borderRadius: 3, height: 4 }}>
             <div style={{
-              background: pct >= 70 ? '#4ade80' : pct >= 40 ? '#fb923c' : '#f87171',
+              background: pct >= 70 ? 'var(--sm-ok)' : pct >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)',
               height: '100%', width: `${pct}%`, borderRadius: 3,
             }} />
           </div>
         </div>
-        <span style={{ color: pct >= 70 ? '#4ade80' : pct >= 40 ? '#fb923c' : '#f87171', fontSize: 11, fontWeight: 700 }}>{pct}%</span>
-        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 3, padding: '2px 7px', fontSize: 9, color: '#94a3b8' }}>
+        <span style={{ color: pct >= 70 ? 'var(--sm-ok)' : pct >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)', fontSize: 11, fontWeight: 700 }}>{pct}%</span>
+        <div style={{ background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 3, padding: '2px 7px', fontSize: 9, color: 'var(--sm-cream-mute)' }}>
           → {p.suggestedOp}
         </div>
       </div>
@@ -230,7 +230,7 @@ function MiniTimeline({ openedAt, targetWindow, currentScene }: {
   return (
     <div style={{ marginTop: 8, position: 'relative' }}>
       {/* Track */}
-      <div style={{ background: '#334155', height: 3, borderRadius: 3, position: 'relative' }}>
+      <div style={{ background: 'var(--sm-night-line)', height: 3, borderRadius: 3, position: 'relative' }}>
         {/* Target window */}
         <div style={{
           position: 'absolute', top: 0, height: '100%',
@@ -239,13 +239,13 @@ function MiniTimeline({ openedAt, targetWindow, currentScene }: {
           background: overdue ? '#7f1d1d' : '#16532455', borderRadius: 2,
         }} />
         {/* Planted marker */}
-        <div style={{ position: 'absolute', top: -3, left: toX(openedAt), width: 2, height: 9, background: '#94a3b8', borderRadius: 1 }} />
+        <div style={{ position: 'absolute', top: -3, left: toX(openedAt), width: 2, height: 9, background: 'var(--sm-cream-mute)', borderRadius: 1 }} />
         {/* Current scene marker */}
-        <div style={{ position: 'absolute', top: -4, left: toX(currentScene), width: 2, height: 11, background: overdue ? '#f87171' : '#4ade80', borderRadius: 1 }} />
+        <div style={{ position: 'absolute', top: -4, left: toX(currentScene), width: 2, height: 11, background: overdue ? 'var(--sm-stamp)' : 'var(--sm-ok)', borderRadius: 1 }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
         <span style={{ color: '#475569', fontSize: 9 }}>0</span>
-        <span style={{ color: overdue ? '#f87171' : '#64748b', fontSize: 9 }}>
+        <span style={{ color: overdue ? 'var(--sm-stamp)' : 'var(--sm-ink-mute)', fontSize: 9 }}>
           window: {targetWindow[0]}–{targetWindow[1]}
         </span>
         <span style={{ color: '#475569', fontSize: 9 }}>scene {max}</span>
@@ -261,8 +261,8 @@ function TimelineView({ promises, totalScenes }: { promises: OpenPromise[]; tota
   const maxScene = Math.max(totalScenes + 2, ...promises.map(p => p.targetWindow[1] + 2));
 
   return (
-    <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
-      <div style={{ color: '#64748b', fontSize: 10, marginBottom: 10 }}>PROMISE TIMELINE</div>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 10 }}>PROMISE TIMELINE</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {promises.slice(0, 12).map(p => {
           const km = KIND_META[p.kind];
@@ -272,7 +272,7 @@ function TimelineView({ promises, totalScenes }: { promises: OpenPromise[]; tota
             <div key={p.promiseId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: km.color, fontSize: 11, width: 14, flexShrink: 0 }}>{km.icon}</span>
               <div style={{ flex: 1, position: 'relative' }}>
-                <div style={{ background: '#334155', height: 4, borderRadius: 3, position: 'relative' }}>
+                <div style={{ background: 'var(--sm-night-line)', height: 4, borderRadius: 3, position: 'relative' }}>
                   <div style={{
                     position: 'absolute', height: '100%',
                     left: toX(p.openedAtScene),
@@ -294,7 +294,7 @@ function TimelineView({ promises, totalScenes }: { promises: OpenPromise[]; tota
           </div>
         )}
         {/* Current scene indicator */}
-        <div style={{ color: '#64748b', fontSize: 9, textAlign: 'center', marginTop: 4 }}>
+        <div style={{ color: 'var(--sm-ink-mute)', fontSize: 9, textAlign: 'center', marginTop: 4 }}>
           ▲ current: scene {totalScenes - 1}
         </div>
       </div>
@@ -307,7 +307,7 @@ function TimelineView({ promises, totalScenes }: { promises: OpenPromise[]; tota
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <div style={{ color: '#64748b', fontSize: 10 }}>{label}</div>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{label}</div>
       <div style={{ color, fontSize: 16, fontWeight: 700 }}>{value}</div>
     </div>
   );
@@ -318,11 +318,11 @@ function FilterChip({ active, label, color, onClick, count }: {
 }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? color + '22' : '#1e293b',
-      border: `1px solid ${active ? color : '#334155'}`,
-      color: active ? color : '#64748b',
+      background: active ? color + '22' : 'var(--sm-night-2)',
+      border: `1px solid ${active ? color : 'var(--sm-night-line)'}`,
+      color: active ? color : 'var(--sm-ink-mute)',
       borderRadius: 4, padding: '2px 8px', cursor: 'pointer',
-      fontFamily: 'monospace', fontSize: 10, fontWeight: active ? 700 : 400,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 10, fontWeight: active ? 700 : 400,
       display: 'flex', alignItems: 'center', gap: 4,
     }}>
       {label}
@@ -335,8 +335,8 @@ function FilterChip({ active, label, color, onClick, count }: {
 
 function chipBtn(bg: string): React.CSSProperties {
   return {
-    background: bg, border: '1px solid #334155', borderRadius: 4,
-    color: '#e2e8f0', padding: '3px 8px', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 11,
+    background: bg, border: '1px solid var(--sm-night-line)', borderRadius: 4,
+    color: 'var(--sm-cream)', padding: '3px 8px', cursor: 'pointer',
+    fontFamily: 'var(--sm-font-mono)', fontSize: 11,
   };
 }

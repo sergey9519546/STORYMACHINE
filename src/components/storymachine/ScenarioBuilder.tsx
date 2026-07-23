@@ -41,7 +41,7 @@ interface ScenarioBuilderProps {
 }
 
 const inputClass =
-  "w-full bg-white border-2 border-black px-3 py-2 text-black focus:outline-none focus:border-[#FF4444] font-mono text-xs";
+  "w-full bg-white border-2 border-black px-3 py-2 text-black focus:outline-none focus:border-[var(--sm-stamp)] font-mono text-xs";
 const labelClass = "text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1";
 
 export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy }: ScenarioBuilderProps) {
@@ -125,7 +125,7 @@ export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy
       <motion.div
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
-        className="bg-[#f4f4f0] brutal-border-thick brutal-shadow w-full max-w-3xl max-h-[90vh] overflow-y-auto p-8 font-sans"
+        className="bg-[#f4f4f0] border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-full max-w-3xl max-h-[90vh] overflow-y-auto p-8 font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -135,14 +135,14 @@ export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy
           <button
             onClick={onLoadExample}
             disabled={busy}
-            className="text-[10px] px-3 py-2 bg-white text-black brutal-border hover:bg-black hover:text-white transition-colors uppercase font-bold tracking-widest disabled:opacity-40"
+            className="text-[10px] px-3 py-2 sm-btn sm-btn hover:bg-black hover:text-white transition-colors uppercase font-bold tracking-widest disabled:opacity-40"
           >
             Load Example
           </button>
           <button
             onClick={onClose}
             aria-label="Close scenario builder"
-            className="p-2 brutal-border hover:bg-black hover:text-white transition-colors"
+            className="p-2 sm-btn hover:bg-black hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -155,19 +155,19 @@ export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy
             <h3 className="font-bold uppercase tracking-widest text-sm flex-1">Locations</h3>
             <button
               onClick={addLocation}
-              className="text-[10px] px-2 py-1 bg-black text-white brutal-border hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest flex items-center gap-1"
+              className="text-[10px] px-2 py-1 sm-btn--ink sm-btn hover:bg-[var(--sm-stamp)] transition-colors uppercase font-bold tracking-widest flex items-center gap-1"
             >
               <Plus className="w-3 h-3" /> Add
             </button>
           </div>
           <div className="space-y-3">
             {locations.map((loc, idx) => (
-              <div key={idx} className="bg-white brutal-border p-3 space-y-2 relative">
+              <div key={idx} className="bg-white sm-btn p-3 space-y-2 relative">
                 {locations.length > 1 && (
                   <button
                     onClick={() => removeLocation(idx)}
                     aria-label={`Remove location ${idx + 1}`}
-                    className="absolute top-2 right-2 text-gray-400 hover:text-[#FF4444] transition-colors"
+                    className="absolute top-2 right-2 text-gray-400 hover:text-[var(--sm-stamp)] transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -213,19 +213,19 @@ export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy
             <h3 className="font-bold uppercase tracking-widest text-sm flex-1">Agents</h3>
             <button
               onClick={addAgent}
-              className="text-[10px] px-2 py-1 bg-black text-white brutal-border hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest flex items-center gap-1"
+              className="text-[10px] px-2 py-1 sm-btn--ink sm-btn hover:bg-[var(--sm-stamp)] transition-colors uppercase font-bold tracking-widest flex items-center gap-1"
             >
               <Plus className="w-3 h-3" /> Add
             </button>
           </div>
           <div className="space-y-4">
             {agents.map((agent, idx) => (
-              <div key={idx} className="bg-white brutal-border p-3 space-y-2 relative">
+              <div key={idx} className="bg-white sm-btn p-3 space-y-2 relative">
                 {agents.length > 2 && (
                   <button
                     onClick={() => removeAgent(idx)}
                     aria-label={`Remove agent ${idx + 1}`}
-                    className="absolute top-2 right-2 text-gray-400 hover:text-[#FF4444] transition-colors"
+                    className="absolute top-2 right-2 text-gray-400 hover:text-[var(--sm-stamp)] transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -298,7 +298,7 @@ export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy
                         max={100}
                         value={agent[field]}
                         onChange={(e) => updateAgent(idx, field, Number(e.target.value))}
-                        className="w-full accent-[#FF4444]"
+                        className="w-full accent-[var(--sm-stamp)]"
                       />
                     </div>
                   ))}
@@ -322,7 +322,7 @@ export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy
         </section>
 
         {error && (
-          <div className="mb-4 px-3 py-2 bg-[#FF4444] text-white text-xs font-bold uppercase tracking-widest">
+          <div className="mb-4 px-3 py-2 bg-[var(--sm-stamp)] text-white text-xs font-bold uppercase tracking-widest">
             {error}
           </div>
         )}
@@ -330,7 +330,7 @@ export default function ScenarioBuilder({ onSubmit, onLoadExample, onClose, busy
         <button
           onClick={handleSubmit}
           disabled={busy}
-          className="w-full py-3 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-sm brutal-shadow-hover disabled:opacity-40 flex items-center justify-center gap-2"
+          className="w-full py-3 sm-btn--ink border-[2px] border-[var(--sm-ink)] hover:bg-[var(--sm-stamp)] transition-colors uppercase font-bold tracking-widest text-sm  disabled:opacity-40 flex items-center justify-center gap-2"
         >
           <Play className="w-4 h-4" />
           {busy ? "Initializing…" : "Start Custom Scenario"}

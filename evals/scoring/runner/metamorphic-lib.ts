@@ -1,25 +1,9 @@
 // Pure helpers for the Phase B metamorphic runner. Kept free of top-level I/O
 // so unit tests can import classification without running the doctor.
 import type { MetamorphicCase, MetamorphicResult } from '../contracts/scoring-eval-case.ts';
+import { HARD_CASE_IDS, KNOWN_FAILING_CASE_IDS } from './metamorphic-cases.ts';
 
-/** Cases whose failure is a real regression — CI hard-fails on these. */
-export const HARD_CASE_IDS = new Set([
-  'identity',
-  'whitespace_reflow',
-  'rename_character',
-  'scene_shuffle',
-  'scene_reverse',
-  'scene_dup_padding',
-]);
-
-/**
- * Cases that are expected to fail under the current formula. They remain
- * runnable witnesses so the defect cannot be forgotten, but they do not fail
- * the process until a dedicated re-calibration wave flips them to HARD.
- */
-export const KNOWN_FAILING_CASE_IDS = new Set([
-  'empty_verbosity',
-]);
+export { HARD_CASE_IDS, KNOWN_FAILING_CASE_IDS } from './metamorphic-cases.ts';
 
 export function check(c: MetamorphicCase, base: number, variant: number): { passed: boolean; reason: string } {
   const d = variant - base;
@@ -32,6 +16,10 @@ export function check(c: MetamorphicCase, base: number, variant: number): { pass
 }
 
 /** Classify results into hard failures vs known-failing witnesses. Pure, testable. */
+export function exitCodeForResults(results: MetamorphicResult[]): number {
+  return classifyResults(results).hardFailures.length > 0 ? 1 : 0;
+}
+
 export function classifyResults(results: MetamorphicResult[]): {
   hardFailures: MetamorphicResult[];
   knownFailures: MetamorphicResult[];

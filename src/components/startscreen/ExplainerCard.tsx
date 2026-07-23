@@ -60,20 +60,20 @@ export function ExplainerCard({ options, selectedValue, onSelect, title, icon: I
                 onMouseEnter={() => setHoveredKey(key)}
                 onMouseLeave={() => setHoveredKey(null)}
                 onClick={() => onSelect(key)}
-                className={`text-left p-4 brutal-border-thick transition-all flex items-center justify-between group brutal-shadow-hover ${
+                className={`text-left p-4 border-[2px] border-[var(--sm-ink)] transition-all flex items-center justify-between group  ${
                   isSelected
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-black hover:border-[#FF4444]"
+                    ? "sm-btn--ink border-black"
+                    : "sm-btn hover:border-[var(--sm-stamp)]"
                 }`}
               >
                 <div className="flex items-center gap-4">
                   {isEmotionalArc && (
-                    <div className={`p-1 brutal-border ${isSelected ? 'bg-white text-black' : 'bg-black text-white'}`}>
+                    <div className={`p-1 sm-btn ${isSelected ? 'sm-btn' : 'sm-btn--ink'}`}>
                       <ArcVisual arc={key} className="w-8 h-8" />
                     </div>
                   )}
                   <div>
-                    <div className={`font-bold uppercase tracking-widest ${isSelected ? 'text-white' : 'group-hover:text-[#FF4444]'}`}>
+                    <div className={`font-bold uppercase tracking-widest ${isSelected ? 'text-white' : 'group-hover:text-[var(--sm-stamp)]'}`}>
                       {data.title}
                     </div>
                     <div className={`text-[10px] font-mono uppercase mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -81,27 +81,27 @@ export function ExplainerCard({ options, selectedValue, onSelect, title, icon: I
                     </div>
                   </div>
                 </div>
-                {isSelected && <Check className="w-5 h-5 text-[#FF4444]" />}
+                {isSelected && <Check className="w-5 h-5 text-[var(--sm-stamp)]" />}
               </button>
             );
           })}
         </div>
 
         {/* Right: Inspector */}
-        <div className="w-full lg:w-2/3 bg-gray-50 brutal-border-thick p-6 relative flex flex-col">
-          <div className="absolute top-0 right-0 bg-black text-white px-3 py-1 text-[10px] font-mono uppercase tracking-widest brutal-border-thick border-t-0 border-r-0">
+        <div className="w-full lg:w-2/3 bg-gray-50 border-[2px] border-[var(--sm-ink)] p-6 relative flex flex-col">
+          <div className="absolute top-0 right-0 sm-btn--ink px-3 py-1 text-[10px] font-mono uppercase tracking-widest border-[2px] border-[var(--sm-ink)] border-t-0 border-r-0">
             {selectedValue === activeKey ? "Selected" : "Preview"}
           </div>
 
           <div className="mb-6 pr-20 flex items-start gap-6">
             {isEmotionalArc && (
-              <div className="p-4 bg-black text-[#FF4444] brutal-border-thick shrink-0">
+              <div className="p-4 bg-black text-[var(--sm-stamp)] border-[2px] border-[var(--sm-ink)] shrink-0">
                 <ArcVisual arc={activeKey} className="w-24 h-24" />
               </div>
             )}
             <div>
               <h3 className="text-3xl md:text-4xl font-display uppercase tracking-widest mb-2 text-black leading-none">{activeData.title}</h3>
-              <span className="inline-block px-2 py-1 border-2 border-black text-xs font-mono uppercase tracking-widest text-[#FF4444] font-bold mt-2">
+              <span className="inline-block px-2 py-1 border-2 border-black text-xs font-mono uppercase tracking-widest text-[var(--sm-stamp)] font-bold mt-2">
                 {activeData.vibe}
               </span>
             </div>
@@ -125,13 +125,13 @@ export function ExplainerCard({ options, selectedValue, onSelect, title, icon: I
             </div>
 
             <div>
-              <h4 className="font-bold uppercase border-b-2 border-[#FF4444] pb-1 mb-2 text-[#FF4444]">Warning / Pitfalls</h4>
+              <h4 className="font-bold uppercase border-b-2 border-[var(--sm-stamp)] pb-1 mb-2 text-[var(--sm-stamp)]">Warning / Pitfalls</h4>
               <p className="text-gray-700 leading-relaxed">{activeData.warning}</p>
             </div>
           </div>
 
-          <div className="mt-6 bg-black text-white p-4 brutal-border-thick shrink-0">
-            <h4 className="font-bold uppercase mb-2 text-[#FF4444] text-xs tracking-widest">Cinematic References</h4>
+          <div className="mt-6 sm-btn--ink p-4 border-[2px] border-[var(--sm-ink)] shrink-0">
+            <h4 className="font-bold uppercase mb-2 text-[var(--sm-stamp)] text-xs tracking-widest">Cinematic References</h4>
             <p className="text-gray-300 font-mono text-sm">{activeData.examples}</p>
           </div>
         </div>

@@ -1967,7 +1967,19 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
 
   const dialogueLineCount = blocks.filter(b => b.type === 'dialogue' && b.text.trim() !== '').length;
   const actionLineCount = blocks.filter(b => b.type === 'action' && b.text.trim() !== '').length;
-  const wordCount = fountain.split(/\s+/).filter(w => w.length > 0).length;
+  // P0.2: score denominator must never count text the analyzer did not
+  // diagnose. For scripts at/under the scene ceiling, keep the historical
+  // full-fountain word count so calibration remains byte-compatible. For
+  // truncated scripts, count only the analyzed scene blocks — otherwise
+  // post-ceiling padding can inflate the denominator and improve health.
+  const fullWordCount = fountain.split(/\s+/).filter(w => w.length > 0).length;
+  const analyzedWordCount = rawScenes.reduce((n, s) => {
+    for (const b of s.blocks) {
+      if (b.text.trim()) n += b.text.split(/\s+/).filter(w => w.length > 0).length;
+    }
+    return n;
+  }, 0);
+  const wordCount = truncatedForAnalysis ? analyzedWordCount : fullWordCount;
 
   return {
     records, annotations, structure, characters, sceneCount, dialogueLineCount, actionLineCount, wordCount,

@@ -30,6 +30,8 @@ import { scriptDiagnostics } from './diagnostics.ts';
 export interface FountainEditorHandle {
   /** Navigate to a specific 1-indexed line number */
   navigateTo(line: number): void;
+  /** Returns the 1-based line number of the cursor, or 1 if unavailable */
+  getCurrentLine(): number;
   /** Returns the EditorView for advanced integrations */
   getView(): EditorView | null;
 }
@@ -82,8 +84,13 @@ const baseTheme = EditorView.baseTheme({
   },
   '.cm-scroller': {
     overflow: 'auto',
-    padding: '3rem 1.5rem',
-    background: '#E7E1D2', // muted canvas the page sits on (light default)
+    // Tighten horizontal padding so the page dominates more of the stage;
+    // the right gutter is now used for page furniture, not dead space.
+    padding: '4rem 1.25rem 6rem',
+    // Graded warm canvas — a soft radial pool of light behind the page plus a
+    // slightly darker desk edge, instead of one flat beige value.
+    background:
+      'radial-gradient(140% 70% at 40% 0%, #ECE5D6 0%, #E4DCC9 45%, #DCD3BD 100%)',
   },
   '.cm-content': {
     // content-box so `width` is the 60ch TEXT column and the 1in page margins
@@ -98,37 +105,49 @@ const baseTheme = EditorView.baseTheme({
     margin: '0 auto',
     padding: '1in', // industry-standard 1in top/bottom/left/right page margins
     background: '#F4F0E6', // paper (light default)
-    boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
-    caretColor: '#000',
+    // Layered depth: 1px ink hairline edge, a bright inner top highlight so the
+    // sheet catches light, and a wide tinted diffusion shadow pooled to the
+    // desk hue (design-taste: shadow tinted to background, no neutral glow).
+    border: '1px solid rgba(33,29,21,0.18)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.7), 0 1px 2px rgba(33,29,21,0.10), 0 24px 48px -20px rgba(33,29,21,0.35)',
+    caretColor: 'var(--sm-stamp, #c1301c)',
   },
   '.cm-line': { padding: '0' },
-  '.cm-placeholder': { color: '#9ca3af', fontStyle: 'normal' },
+  '.cm-placeholder': { color: '#a89e85', fontStyle: 'italic' },
   // Remove the border CM6 adds by default
   '&.cm-focused': { outline: 'none' },
   '&.cm-editor': { background: 'transparent' },
-  // Selection styling
-  '.cm-selectionBackground': { background: '#bfdbfe !important' },  // blue-100
+  // Warm ink-tinted selection instead of a cool blue that fights the paper.
+  '.cm-selectionBackground': { background: 'rgba(193,48,28,0.16) !important' },
+  '.cm-cursor': { borderLeftWidth: '2px' },
 });
 
 const darkTheme = EditorView.theme({
-  '&': { background: '#1a1a1a', color: '#e4e4e7' },
-  '.cm-scroller': { background: '#141414' },
-  '.cm-content': {
-    background: '#242424',
-    color: '#e4e4e7',
-    caretColor: '#e4e4e7',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.6)',
+  '&': { background: '#161310', color: '#e7e1d2' },
+  // Graded night desk so the dark canvas has the same depth as the light one.
+  '.cm-scroller': {
+    background:
+      'radial-gradient(120% 60% at 50% 0%, #221E17 0%, #1A1712 60%, #141109 100%)',
   },
-  '.cm-selectionBackground': { background: '#374151 !important' },
-  '.cm-activeLine': { background: '#2a2a2a' },
-  '.cm-placeholder': { color: '#6b7280' },
+  '.cm-content': {
+    background: '#211D15',
+    color: '#e7e1d2',
+    caretColor: 'var(--sm-stamp, #c1301c)',
+    border: '1px solid rgba(231,225,210,0.10)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 48px -20px rgba(0,0,0,0.65)',
+  },
+  '.cm-selectionBackground': { background: 'rgba(193,48,28,0.30) !important' },
+  '.cm-activeLine': { background: 'rgba(231,225,210,0.05)' },
+  '.cm-placeholder': { color: '#6f6553' },
 }, { dark: true });
 
 const lightTheme = EditorView.theme({
-  '&': { background: '#ffffff', color: '#18181b' },
-  '.cm-scroller': { background: '#E7E1D2' },
-  '.cm-content': { background: '#F4F0E6', color: '#18181b' },
-  '.cm-activeLine': { background: 'rgba(0, 0, 0, 0.04)' },
+  '&': { background: 'transparent', color: '#211D15' },
+  // Keep the graded canvas from baseTheme; only tint the active line warmly.
+  '.cm-content': { color: '#211D15' },
+  '.cm-activeLine': { background: 'rgba(33,29,21,0.045)' },
 });
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -187,6 +206,13 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
         });
         view.focus();
+      },
+      /** Returns the 1-based line number of the cursor, or 1 if unavailable. */
+      getCurrentLine() {
+        const view = viewRef.current;
+        if (!view) return 1;
+        const pos = view.state.selection.main.head;
+        return view.state.doc.lineAt(pos).number;
       },
       getView: () => viewRef.current,
     }));

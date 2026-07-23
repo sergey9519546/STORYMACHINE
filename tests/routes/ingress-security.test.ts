@@ -30,14 +30,20 @@ describe('ingress-security — SSRF guard unit coverage (ssrfUnsafeUrlReason)', 
     assert.notEqual(ssrfUnsafeUrlReason('http://192.168.1.5/v1'), null);
   });
 
-  it('rejects unique-local IPv6 (fc00::/7)', () => {
+  it('rejects unique-local and IPv4-mapped private IPv6 literals', () => {
     assert.notEqual(ssrfUnsafeUrlReason('http://[fd12:3456:789a::1]/v1'), null);
+    assert.notEqual(ssrfUnsafeUrlReason('http://[::ffff:127.0.0.1]/v1'), null);
+    assert.notEqual(ssrfUnsafeUrlReason('http://[::ffff:7f00:1]/v1'), null);
+    assert.notEqual(ssrfUnsafeUrlReason('http://[::ffff:a00:1]/v1'), null);
   });
 
-  it('rejects localhost and internal/.local hostnames', () => {
+  it('rejects localhost and internal/.local hostnames, including absolute DNS names', () => {
     assert.notEqual(ssrfUnsafeUrlReason('http://localhost:8080/v1'), null);
+    assert.notEqual(ssrfUnsafeUrlReason('http://localhost.:8080/v1'), null);
     assert.notEqual(ssrfUnsafeUrlReason('http://metadata.google.internal/v1'), null);
+    assert.notEqual(ssrfUnsafeUrlReason('http://metadata.google.internal./v1'), null);
     assert.notEqual(ssrfUnsafeUrlReason('http://my-router.local/v1'), null);
+    assert.notEqual(ssrfUnsafeUrlReason('http://my-router.local./v1'), null);
   });
 
   it('rejects non-http(s) schemes', () => {
@@ -47,6 +53,13 @@ describe('ingress-security — SSRF guard unit coverage (ssrfUnsafeUrlReason)', 
 
   it('rejects userinfo-in-URL', () => {
     assert.notEqual(ssrfUnsafeUrlReason('https://user:pass@api.openai.com/v1'), null);
+  });
+
+  it('private-network override only relaxes address policy, never scheme or userinfo', () => {
+    const policy = { allowPrivateNetworkTargets: true };
+    assert.equal(ssrfUnsafeUrlReason('http://127.0.0.1:11434/v1', policy), null);
+    assert.notEqual(ssrfUnsafeUrlReason('file:///etc/passwd', policy), null);
+    assert.notEqual(ssrfUnsafeUrlReason('https://user:pass@localhost/v1', policy), null);
   });
 
   it('rejects alternate numeric-IP encodings (decimal/hex for 127.0.0.1)', () => {

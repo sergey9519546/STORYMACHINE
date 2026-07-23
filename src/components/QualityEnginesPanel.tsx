@@ -60,11 +60,11 @@ interface Props { onClose: () => void; }
 
 type TabId = 'overview' | 'dialogue' | 'voice' | 'propp' | 'graph';
 const TABS: Array<{ id: TabId; label: string; color: string }> = [
-  { id: 'overview', label: 'Overview', color: '#60a5fa' },
-  { id: 'dialogue', label: 'Dialogue', color: '#fb923c' },
-  { id: 'voice', label: 'Voice & Style', color: '#a78bfa' },
+  { id: 'overview', label: 'Overview', color: 'var(--sm-cool)' },
+  { id: 'dialogue', label: 'Dialogue', color: 'var(--sm-warn)' },
+  { id: 'voice', label: 'Voice & Style', color: 'var(--sm-cool)' },
   { id: 'propp', label: "Propp's Morphology", color: '#34d399' },
-  { id: 'graph', label: 'Causal Graph', color: '#fbbf24' },
+  { id: 'graph', label: 'Causal Graph', color: 'var(--sm-warn)' },
 ];
 
 const PROPP_STAGES = ['preparation', 'complication', 'mediation', 'departure', 'ordeal', 'consequence', 'resolution'];
@@ -123,30 +123,30 @@ export function QualityEnginesPanel({ onClose }: Props) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      border: '1px solid #334155', width: 920, maxWidth: '98vw',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      border: '1px solid var(--sm-night-line)', width: 920, maxWidth: '98vw',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 13,
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0 }}>
         <div>
           <strong style={{ fontSize: 15 }}>Quality Engines — 9 narrative quality signals</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>
             Specificity · 10 Dialogue Validators · Necessity · Burrows's Delta · ArcDebt · Propp · Causal Graph
           </div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Left: scene list */}
-        <div style={{ width: 230, flexShrink: 0, borderRight: '1px solid #334155', overflowY: 'auto', padding: 10 }}>
+        <div style={{ width: 230, flexShrink: 0, borderRight: '1px solid var(--sm-night-line)', overflowY: 'auto', padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ color: '#64748b', fontSize: 10 }}>COMMITTED SCENES</span>
-            <button onClick={loadScenes} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 4, color: '#e2e8f0', padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>↺</button>
+            <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>COMMITTED SCENES</span>
+            <button onClick={loadScenes} style={{ background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 4, color: 'var(--sm-cream)', padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>↺</button>
           </div>
-          {listLoading && <div style={{ color: '#64748b', textAlign: 'center', padding: 16 }}>Loading…</div>}
+          {listLoading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 16 }}>Loading…</div>}
           {!listLoading && scenes.length === 0 && (
             <div style={{ color: '#475569', fontSize: 10, textAlign: 'center', padding: 16 }}>No committed scenes yet.</div>
           )}
@@ -154,19 +154,19 @@ export function QualityEnginesPanel({ onClose }: Props) {
             const sel = sc.commitId === selectedId;
             return (
               <div key={sc.commitId} onClick={() => inspect(sc.commitId)} style={{
-                background: sel ? '#1e2d4a' : '#1e293b',
-                border: `1px solid ${sel ? '#3b82f6' : '#334155'}`,
+                background: sel ? '#1e2d4a' : 'var(--sm-night-2)',
+                border: `1px solid ${sel ? '#3b82f6' : 'var(--sm-night-line)'}`,
                 borderRadius: 5, padding: '7px 9px', marginBottom: 5, cursor: 'pointer',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <span style={{ color: '#64748b', fontSize: 10 }}>Scene {sc.sceneIdx}</span>
-                  <span style={{ background: sc.qualityScore >= 70 ? '#064e3b' : sc.qualityScore >= 40 ? '#1c1008' : '#450a0a', color: sc.qualityScore >= 70 ? '#4ade80' : sc.qualityScore >= 40 ? '#fb923c' : '#f87171', padding: '1px 5px', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>
+                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>Scene {sc.sceneIdx}</span>
+                  <span style={{ background: sc.qualityScore >= 70 ? '#064e3b' : sc.qualityScore >= 40 ? '#1c1008' : 'var(--sm-stamp-dk)', color: sc.qualityScore >= 70 ? 'var(--sm-ok)' : sc.qualityScore >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)', padding: '1px 5px', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>
                     Q:{sc.qualityScore}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <span style={{ color: '#64748b', fontSize: 10 }}>{sc.opCount} ops</span>
-                  <span style={{ color: '#a78bfa', fontSize: 10 }}>T:{sc.tension.toFixed(0)}</span>
+                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{sc.opCount} ops</span>
+                  <span style={{ color: 'var(--sm-cool)', fontSize: 10 }}>T:{sc.tension.toFixed(0)}</span>
                 </div>
               </div>
             );
@@ -176,12 +176,12 @@ export function QualityEnginesPanel({ onClose }: Props) {
         {/* Right: quality report */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           {/* Tab bar */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #334155', padding: '0 12px', flexShrink: 0, gap: 2 }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--sm-night-line)', padding: '0 12px', flexShrink: 0, gap: 2 }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 background: 'none', border: 'none', borderBottom: `2px solid ${tab === t.id ? t.color : 'transparent'}`,
-                color: tab === t.id ? t.color : '#64748b', cursor: 'pointer', padding: '8px 10px',
-                fontSize: 11, fontFamily: 'monospace', fontWeight: tab === t.id ? 700 : 400,
+                color: tab === t.id ? t.color : 'var(--sm-ink-mute)', cursor: 'pointer', padding: '8px 10px',
+                fontSize: 11, fontFamily: 'var(--sm-font-mono)', fontWeight: tab === t.id ? 700 : 400,
                 transition: 'color 0.1s, border-color 0.1s',
               }}>{t.label}</button>
             ))}
@@ -191,8 +191,8 @@ export function QualityEnginesPanel({ onClose }: Props) {
             {!selectedId && (
               <div style={{ color: '#475569', textAlign: 'center', padding: 50 }}>← Select a scene to inspect</div>
             )}
-            {loading && <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Running quality engines…</div>}
-            {error && <div style={{ color: '#f87171', background: '#1e293b', borderRadius: 5, padding: 10 }}>{error}</div>}
+            {loading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 40 }}>Running quality engines…</div>}
+            {error && <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>{error}</div>}
             {report && tab === 'overview'  && <OverviewTab report={report} />}
             {report && tab === 'dialogue'  && <DialogueTab report={report} />}
             {report && tab === 'voice'     && <VoiceTab report={report} />}
@@ -208,27 +208,27 @@ export function QualityEnginesPanel({ onClose }: Props) {
 // ── Tab: Overview ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ report }: { report: QualitySceneReport }) {
-  const scoreColor = report.score >= 70 ? '#4ade80' : report.score >= 40 ? '#fb923c' : '#f87171';
+  const scoreColor = report.score >= 70 ? 'var(--sm-ok)' : report.score >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)';
   const warnGroups = groupBy(report.warnings, w => w.engine);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Score banner */}
-      <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 16px', display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 16px', display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ color: '#64748b', fontSize: 10 }}>QUALITY SCORE</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>QUALITY SCORE</div>
           <div style={{ color: scoreColor, fontSize: 28, fontWeight: 700 }}>{report.score}</div>
         </div>
-        <Stat label="Specificity" value={pct(report.specificity)} color={report.specificity >= 0.6 ? '#4ade80' : '#fb923c'} />
-        <Stat label="Necessity" value={pct(report.necessityScore)} color={report.necessityScore >= 0.8 ? '#4ade80' : '#fb923c'} />
-        <Stat label="Burrows δ" value={pct(report.burrowsDelta)} color={report.burrowsDelta <= 0.4 ? '#4ade80' : '#fb923c'} />
-        <Stat label="Reveal Ready" value={report.revealReady ? 'yes' : 'no'} color={report.revealReady ? '#4ade80' : '#94a3b8'} />
-        <Stat label="Warnings" value={String(report.warnings.length)} color={report.warnings.length === 0 ? '#4ade80' : '#fbbf24'} />
+        <Stat label="Specificity" value={pct(report.specificity)} color={report.specificity >= 0.6 ? 'var(--sm-ok)' : 'var(--sm-warn)'} />
+        <Stat label="Necessity" value={pct(report.necessityScore)} color={report.necessityScore >= 0.8 ? 'var(--sm-ok)' : 'var(--sm-warn)'} />
+        <Stat label="Burrows δ" value={pct(report.burrowsDelta)} color={report.burrowsDelta <= 0.4 ? 'var(--sm-ok)' : 'var(--sm-warn)'} />
+        <Stat label="Reveal Ready" value={report.revealReady ? 'yes' : 'no'} color={report.revealReady ? 'var(--sm-ok)' : 'var(--sm-cream-mute)'} />
+        <Stat label="Warnings" value={String(report.warnings.length)} color={report.warnings.length === 0 ? 'var(--sm-ok)' : 'var(--sm-warn)'} />
       </div>
 
       {/* Score bar */}
       <div>
-        <div style={{ background: '#1e293b', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--sm-night-2)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
           <div style={{ background: scoreColor, height: '100%', width: `${report.score}%`, transition: 'width 0.3s' }} />
         </div>
       </div>
@@ -236,9 +236,9 @@ function OverviewTab({ report }: { report: QualitySceneReport }) {
       {/* Arc debt */}
       {report.arcDebt.length > 0 && (
         <div>
-          <div style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Arc Debt ({report.arcDebt.length})</div>
+          <div style={{ color: 'var(--sm-warn)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Arc Debt ({report.arcDebt.length})</div>
           {report.arcDebt.map((d, i) => (
-            <div key={i} style={{ background: '#1a1200', border: '1px solid #78350f', borderRadius: 4, padding: '6px 10px', marginBottom: 4, color: '#fcd34d', fontSize: 11 }}>
+            <div key={i} style={{ background: 'var(--sm-night-2)', border: '1px solid #78350f', borderRadius: 4, padding: '6px 10px', marginBottom: 4, color: '#fcd34d', fontSize: 11 }}>
               ⚠ {d}
             </div>
           ))}
@@ -248,20 +248,20 @@ function OverviewTab({ report }: { report: QualitySceneReport }) {
       {/* Warning summary by engine */}
       {Object.entries(warnGroups).map(([engine, ws]) => (
         <div key={engine}>
-          <div style={{ color: '#64748b', fontSize: 10, marginBottom: 4 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 4 }}>
             {engine.toUpperCase().replace(/_/g, ' ')} ({ws.length} warning{ws.length !== 1 ? 's' : ''})
           </div>
           {ws.map((w, i) => (
-            <div key={i} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 4, padding: '5px 9px', marginBottom: 3, fontSize: 11, display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <div key={i} style={{ background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 4, padding: '5px 9px', marginBottom: 3, fontSize: 11, display: 'flex', gap: 8, alignItems: 'baseline' }}>
               <PenaltyChip penalty={w.penalty} />
-              <span style={{ color: '#94a3b8' }}>{w.message}</span>
+              <span style={{ color: 'var(--sm-cream-mute)' }}>{w.message}</span>
             </div>
           ))}
         </div>
       ))}
 
       {report.warnings.length === 0 && (
-        <div style={{ background: '#064e3b', border: '1px solid #065f46', borderRadius: 5, padding: '10px 14px', color: '#4ade80', fontSize: 12 }}>
+        <div style={{ background: '#064e3b', border: '1px solid #065f46', borderRadius: 5, padding: '10px 14px', color: 'var(--sm-ok)', fontSize: 12 }}>
           ✓ All quality engines pass — no warnings
         </div>
       )}
@@ -303,7 +303,7 @@ function DialogueTab({ report }: { report: QualitySceneReport }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ color: '#64748b', fontSize: 10, marginBottom: 4 }}>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 4 }}>
         {firedRules.size} of {DV_RULES.length} dialogue validators triggered
       </div>
       {DV_RULES.map(rule => {
@@ -316,14 +316,14 @@ function DialogueTab({ report }: { report: QualitySceneReport }) {
             borderRadius: 5, padding: '8px 11px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: ws.length ? 4 : 0 }}>
-              <span style={{ color: pass ? '#4ade80' : '#fb923c', fontWeight: 700, fontSize: 13 }}>{pass ? '✓' : '✗'}</span>
-              <span style={{ color: '#94a3b8', fontSize: 10, fontWeight: 700 }}>{rule}</span>
+              <span style={{ color: pass ? 'var(--sm-ok)' : 'var(--sm-warn)', fontWeight: 700, fontSize: 13 }}>{pass ? '✓' : '✗'}</span>
+              <span style={{ color: 'var(--sm-cream-mute)', fontSize: 10, fontWeight: 700 }}>{rule}</span>
               <span style={{ color: '#475569', fontSize: 10 }}>{DV_LABELS[rule]}</span>
             </div>
             {ws.map((w, i) => (
               <div key={i} style={{ marginLeft: 20, marginTop: 3, display: 'flex', gap: 8, alignItems: 'baseline' }}>
                 <PenaltyChip penalty={w.penalty} />
-                <span style={{ color: '#fb923c', fontSize: 11 }}>{w.message}</span>
+                <span style={{ color: 'var(--sm-warn)', fontSize: 11 }}>{w.message}</span>
                 {w.opIdx !== null && <span style={{ color: '#475569', fontSize: 10 }}>op[{w.opIdx}]</span>}
               </div>
             ))}
@@ -349,11 +349,11 @@ function VoiceTab({ report }: { report: QualitySceneReport }) {
       {/* Repair gaps */}
       {report.repairGaps.length > 0 && (
         <div>
-          <div style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>
+          <div style={{ color: 'var(--sm-warn)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>
             Relationship Repair Gaps ({report.repairGaps.length})
           </div>
           {report.repairGaps.map((g, i) => (
-            <div key={i} style={{ background: '#1a1200', border: '1px solid #78350f', borderRadius: 4, padding: '6px 10px', marginBottom: 4, color: '#fcd34d', fontSize: 11 }}>
+            <div key={i} style={{ background: 'var(--sm-night-2)', border: '1px solid #78350f', borderRadius: 4, padding: '6px 10px', marginBottom: 4, color: '#fcd34d', fontSize: 11 }}>
               {g}
             </div>
           ))}
@@ -361,9 +361,9 @@ function VoiceTab({ report }: { report: QualitySceneReport }) {
       )}
 
       {/* Reveal readiness detail */}
-      <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 5, padding: '10px 14px' }}>
-        <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Reveal Readiness</div>
-        <div style={{ color: report.revealReady ? '#4ade80' : '#fb923c', fontSize: 13 }}>
+      <div style={{ background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 5, padding: '10px 14px' }}>
+        <div style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Reveal Readiness</div>
+        <div style={{ color: report.revealReady ? 'var(--sm-ok)' : 'var(--sm-warn)', fontSize: 13 }}>
           {report.revealReady ? '✓ Audience is ready for a reveal' : '✗ Reveal conditions not yet met'}
         </div>
         <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>
@@ -379,20 +379,20 @@ function VoiceTab({ report }: { report: QualitySceneReport }) {
 function ProppTab({ report }: { report: QualitySceneReport }) {
   const { proppAnalysis } = report;
   const coveragePct = Math.round(proppAnalysis.coverage * 100);
-  const coverageColor = coveragePct >= 70 ? '#4ade80' : coveragePct >= 40 ? '#fb923c' : '#f87171';
+  const coverageColor = coveragePct >= 70 ? 'var(--sm-ok)' : coveragePct >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 16 }}>
         <div>
-          <div style={{ color: '#64748b', fontSize: 10 }}>COVERAGE</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>COVERAGE</div>
           <div style={{ color: coverageColor, fontSize: 24, fontWeight: 700 }}>{coveragePct}%</div>
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ color: '#64748b', fontSize: 10, marginBottom: 4 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 4 }}>
             {proppAnalysis.present.length} of 7 Proppian stages present in this scene
           </div>
-          <div style={{ background: '#334155', borderRadius: 4, height: 6 }}>
+          <div style={{ background: 'var(--sm-night-line)', borderRadius: 4, height: 6 }}>
             <div style={{ background: coverageColor, height: '100%', width: `${coveragePct}%`, borderRadius: 4 }} />
           </div>
         </div>
@@ -402,15 +402,15 @@ function ProppTab({ report }: { report: QualitySceneReport }) {
         const present = proppAnalysis.present.includes(stage);
         return (
           <div key={stage} style={{
-            background: present ? '#0a1a0a' : '#1e293b',
-            border: `1px solid ${present ? '#16532444' : '#334155'}`,
+            background: present ? '#0a1a0a' : 'var(--sm-night-2)',
+            border: `1px solid ${present ? '#16532444' : 'var(--sm-night-line)'}`,
             borderRadius: 5, padding: '8px 12px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: present ? '#4ade80' : '#475569', fontWeight: 700, fontSize: 14 }}>{present ? '✓' : '○'}</span>
-              <span style={{ color: present ? '#4ade80' : '#475569', fontSize: 11, fontWeight: 700, textTransform: 'capitalize' }}>{stage}</span>
+              <span style={{ color: present ? 'var(--sm-ok)' : '#475569', fontWeight: 700, fontSize: 14 }}>{present ? '✓' : '○'}</span>
+              <span style={{ color: present ? 'var(--sm-ok)' : '#475569', fontSize: 11, fontWeight: 700, textTransform: 'capitalize' }}>{stage}</span>
             </div>
-            <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, marginLeft: 22 }}>
+            <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginTop: 3, marginLeft: 22 }}>
               {PROPP_LABELS[stage]}
             </div>
           </div>
@@ -429,26 +429,26 @@ function GraphTab({ report }: { report: QualitySceneReport }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 14px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        <Stat label="Nodes" value={String(causalGraph.nodes.length)} color="#94a3b8" />
-        <Stat label="Causal edges" value={String(causalGraph.edges.length)} color="#60a5fa" />
-        <Stat label="Root ops" value={String(causalGraph.rootOps.length)} color="#4ade80" />
-        <Stat label="Leaf ops" value={String(causalGraph.leafOps.length)} color="#a78bfa" />
+      <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 14px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        <Stat label="Nodes" value={String(causalGraph.nodes.length)} color="var(--sm-cream-mute)" />
+        <Stat label="Causal edges" value={String(causalGraph.edges.length)} color="var(--sm-cool)" />
+        <Stat label="Root ops" value={String(causalGraph.rootOps.length)} color="var(--sm-ok)" />
+        <Stat label="Leaf ops" value={String(causalGraph.leafOps.length)} color="var(--sm-cool)" />
       </div>
 
       <div>
-        <div style={{ color: '#64748b', fontSize: 10, marginBottom: 6 }}>OP NODES</div>
+        <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 6 }}>OP NODES</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
           {causalGraph.nodes.map(n => {
             const isRoot = rootSet.has(n.opIdx);
             const isLeaf = leafSet.has(n.opIdx);
-            const bg = isRoot ? '#0c2a1a' : isLeaf ? '#1a0c2a' : '#1e293b';
-            const border = isRoot ? '#16a34a' : isLeaf ? '#7c3aed' : '#334155';
+            const bg = isRoot ? '#0c2a1a' : isLeaf ? '#1a0c2a' : 'var(--sm-night-2)';
+            const border = isRoot ? '#16a34a' : isLeaf ? '#7c3aed' : 'var(--sm-night-line)';
             const label = isRoot ? '↓ root' : isLeaf ? '↑ leaf' : '';
             return (
               <div key={n.opIdx} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 4, padding: '4px 8px', fontSize: 10 }}>
-                <span style={{ color: '#94a3b8' }}>[{n.opIdx}] </span>
-                <span style={{ color: '#e2e8f0' }}>{n.opKind}</span>
+                <span style={{ color: 'var(--sm-cream-mute)' }}>[{n.opIdx}] </span>
+                <span style={{ color: 'var(--sm-cream)' }}>{n.opKind}</span>
                 {label && <span style={{ color: border, marginLeft: 4 }}>{label}</span>}
               </div>
             );
@@ -458,12 +458,12 @@ function GraphTab({ report }: { report: QualitySceneReport }) {
 
       {causalGraph.edges.length > 0 && (
         <div>
-          <div style={{ color: '#64748b', fontSize: 10, marginBottom: 6 }}>CAUSAL EDGES</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 6 }}>CAUSAL EDGES</div>
           {causalGraph.edges.map((e, i) => (
-            <div key={i} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 4, padding: '5px 9px', marginBottom: 3, fontSize: 11, color: '#94a3b8' }}>
-              <span style={{ color: '#60a5fa' }}>{e.from}</span>
+            <div key={i} style={{ background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 4, padding: '5px 9px', marginBottom: 3, fontSize: 11, color: 'var(--sm-cream-mute)' }}>
+              <span style={{ color: 'var(--sm-cool)' }}>{e.from}</span>
               <span style={{ color: '#475569' }}> → op[</span>
-              <span style={{ color: '#e2e8f0' }}>{e.toOpIdx}</span>
+              <span style={{ color: 'var(--sm-cream)' }}>{e.toOpIdx}</span>
               <span style={{ color: '#475569' }}>]</span>
             </div>
           ))}
@@ -479,11 +479,11 @@ function GraphTab({ report }: { report: QualitySceneReport }) {
       {/* Repair gaps */}
       {report.repairGaps.length > 0 && (
         <div>
-          <div style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>
+          <div style={{ color: 'var(--sm-warn)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>
             Relationship Repair Gaps
           </div>
           {report.repairGaps.map((g, i) => (
-            <div key={i} style={{ background: '#1a1200', border: '1px solid #78350f', borderRadius: 4, padding: '6px 10px', marginBottom: 4, color: '#fcd34d', fontSize: 11 }}>{g}</div>
+            <div key={i} style={{ background: 'var(--sm-night-2)', border: '1px solid #78350f', borderRadius: 4, padding: '6px 10px', marginBottom: 4, color: '#fcd34d', fontSize: 11 }}>{g}</div>
           ))}
         </div>
       )}
@@ -496,16 +496,16 @@ function GraphTab({ report }: { report: QualitySceneReport }) {
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <div style={{ color: '#64748b', fontSize: 10 }}>{label}</div>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{label}</div>
       <div style={{ color, fontSize: 16, fontWeight: 700 }}>{value}</div>
     </div>
   );
 }
 
 function PenaltyChip({ penalty }: { penalty: number }) {
-  const color = penalty >= 25 ? '#f87171' : penalty >= 15 ? '#fb923c' : '#fbbf24';
+  const color = penalty >= 25 ? 'var(--sm-stamp)' : penalty >= 15 ? 'var(--sm-warn)' : 'var(--sm-warn)';
   return (
-    <span style={{ background: '#1e293b', border: `1px solid ${color}`, color, borderRadius: 3, padding: '0 5px', fontSize: 10, flexShrink: 0 }}>
+    <span style={{ background: 'var(--sm-night-2)', border: `1px solid ${color}`, color, borderRadius: 3, padding: '0 5px', fontSize: 10, flexShrink: 0 }}>
       -{penalty}
     </span>
   );
@@ -514,14 +514,14 @@ function PenaltyChip({ penalty }: { penalty: number }) {
 function MetricBar({ label, value, lo, hi, hint, invert }: { label: string; value: number; lo: number; hi: number; hint: string; invert?: boolean }) {
   const pctVal = Math.round(value * 100);
   const good = invert ? value <= lo : value >= lo;
-  const color = good ? '#4ade80' : value >= (invert ? hi : lo * 0.5) ? '#fb923c' : '#f87171';
+  const color = good ? 'var(--sm-ok)' : value >= (invert ? hi : lo * 0.5) ? 'var(--sm-warn)' : 'var(--sm-stamp)';
   return (
-    <div style={{ background: '#1e293b', borderRadius: 5, padding: '10px 14px' }}>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 14px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-        <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>{label}</span>
+        <span style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700 }}>{label}</span>
         <span style={{ color, fontSize: 13, fontWeight: 700 }}>{pctVal}%</span>
       </div>
-      <div style={{ background: '#334155', borderRadius: 4, height: 5, marginBottom: 6 }}>
+      <div style={{ background: 'var(--sm-night-line)', borderRadius: 4, height: 5, marginBottom: 6 }}>
         <div style={{ background: color, height: '100%', width: `${pctVal}%`, borderRadius: 4, transition: 'width 0.3s' }} />
       </div>
       <div style={{ color: '#475569', fontSize: 10 }}>{hint}</div>

@@ -33,7 +33,7 @@ export default function CharacterManager({
         <button
           onClick={onAddCharacter}
           aria-label="Add new character"
-          className="bg-black text-white px-3 py-1 text-[10px] font-bold uppercase brutal-border flex items-center gap-2"
+          className="sm-btn--ink px-3 py-1 text-[10px] font-bold uppercase sm-btn flex items-center gap-2"
         >
           <PlusCircle className="w-3 h-3" aria-hidden="true" /> Add
         </button>
@@ -49,7 +49,7 @@ export default function CharacterManager({
         {characters.map((char) => (
           <div
             key={char.id}
-            className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow space-y-3"
+            className="bg-white dark:bg-zinc-800 p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-3"
           >
             <div className="flex justify-between items-center">
               <input
@@ -88,7 +88,7 @@ export default function CharacterManager({
                     onUpdateCharacter(char.id, field, e.target.value)
                   }
                   aria-label={`${char.name || "Character"} ${label}`}
-                  className="w-full bg-gray-50 dark:bg-zinc-700 text-xs p-2 outline-none font-mono brutal-border"
+                  className="w-full bg-gray-50 dark:bg-zinc-700 text-xs p-2 outline-none font-mono sm-btn"
                 />
               </div>
             ))}

@@ -35,7 +35,7 @@ export default function AnalysisPanel({
       aria-busy={engineState.isAnalyzing ? "true" : "false"}
     >
       {/* SEMANTIC FIREWALL */}
-      <div className="bg-white border-4 border-black p-4 brutal-shadow">
+      <div className="bg-white border-4 border-black p-4 shadow-[var(--sm-shadow)]">
         <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-red-600">
           <ShieldAlert className="w-4 h-4" /> Semantic Firewall
         </h2>
@@ -60,7 +60,7 @@ export default function AnalysisPanel({
                     onClick={() => onCleanAction(block.index, block.text)}
                     disabled={isCleaning === block.index}
                     aria-label={`Clean action block with AI — ${block.text.substring(0, 40)}`}
-                    className="bg-black text-white text-[10px] px-3 py-2 uppercase font-bold hover:bg-[#FF4444] transition-colors brutal-border disabled:opacity-50 flex items-center gap-2"
+                    className="sm-btn--ink text-[10px] px-3 py-2 uppercase font-bold hover:bg-[var(--sm-stamp)] transition-colors sm-btn disabled:opacity-50 flex items-center gap-2"
                   >
                     {isCleaning === block.index ? (
                       <>
@@ -80,7 +80,7 @@ export default function AnalysisPanel({
       {/* DIALOGUE INCONSISTENCIES */}
       {engineState.currentAnalysis?.dialogueInconsistencies &&
         engineState.currentAnalysis.dialogueInconsistencies.length > 0 && (
-          <div className="bg-white border-4 border-black p-4 brutal-shadow">
+          <div className="bg-white border-4 border-black p-4 shadow-[var(--sm-shadow)]">
             <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-yellow-600">
               <ShieldAlert className="w-4 h-4" /> Dialogue Inconsistencies
             </h2>
@@ -116,7 +116,7 @@ export default function AnalysisPanel({
         )}
 
       {/* DIRECTOR ANALYSIS */}
-      <div className="bg-white border-4 border-black p-4 brutal-shadow">
+      <div className="bg-white border-4 border-black p-4 shadow-[var(--sm-shadow)]">
         <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
           <Settings2 className="w-4 h-4" /> Director Analysis
         </h2>
@@ -163,7 +163,7 @@ export default function AnalysisPanel({
 
       {/* NARRATIVE METRICS */}
       {engineState.currentAnalysis?.metrics && (
-        <div className="bg-white border-4 border-black p-4 brutal-shadow">
+        <div className="bg-white border-4 border-black p-4 shadow-[var(--sm-shadow)]">
           <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
             <Activity className="w-4 h-4" /> Narrative Metrics
           </h2>
@@ -254,7 +254,7 @@ export default function AnalysisPanel({
       )}
 
       {/* THROUGHLINES */}
-      <div className="bg-white border-4 border-black p-4 brutal-shadow">
+      <div className="bg-white border-4 border-black p-4 shadow-[var(--sm-shadow)]">
         <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
           <Activity className="w-4 h-4" /> Narrative Throughlines
         </h2>

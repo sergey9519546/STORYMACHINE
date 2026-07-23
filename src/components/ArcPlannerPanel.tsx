@@ -191,26 +191,26 @@ export function ArcPlannerPanel({ onClose }: Props) {
   }
 
   function arcColor(score: number) {
-    if (score >= 0.7) return '#4ade80';
-    if (score >= 0.4) return '#fb923c';
-    return '#f87171';
+    if (score >= 0.7) return 'var(--sm-ok)';
+    if (score >= 0.4) return 'var(--sm-warn)';
+    return 'var(--sm-stamp)';
   }
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      padding: 20, width: 740, maxWidth: '96vw', fontFamily: 'monospace',
-      fontSize: 13, border: '1px solid #334155',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      padding: 20, width: 740, maxWidth: '96vw', fontFamily: 'var(--sm-font-mono)',
+      fontSize: 13, border: '1px solid var(--sm-night-line)',
       maxHeight: '88vh', overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
         <strong style={{ fontSize: 15 }}>Arc Compiler — multi-scene convergence</strong>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>x</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
       </div>
 
       {/* Genre presets */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ color: '#64748b', fontSize: 10, marginBottom: 6, letterSpacing: '0.05em' }}>GENRE ARC PRESETS</div>
+        <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 6, letterSpacing: '0.05em' }}>GENRE ARC PRESETS</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {GENRE_PRESETS.map(preset => (
             <button
@@ -218,13 +218,13 @@ export function ArcPlannerPanel({ onClose }: Props) {
               onClick={() => setScenes(preset.scenes)}
               title={`${preset.description} · archetype: ${preset.archetype}`}
               style={{
-                background: '#1e293b', border: '1px solid #334155', borderRadius: 4,
-                color: '#94a3b8', padding: '4px 10px', cursor: 'pointer',
-                fontFamily: 'monospace', fontSize: 11,
+                background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 4,
+                color: 'var(--sm-cream-mute)', padding: '4px 10px', cursor: 'pointer',
+                fontFamily: 'var(--sm-font-mono)', fontSize: 11,
                 transition: 'border-color 0.15s',
               }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = '#7c3aed')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '#334155')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--sm-night-line)')}
             >
               {preset.label}
             </button>
@@ -233,9 +233,9 @@ export function ArcPlannerPanel({ onClose }: Props) {
             onClick={() => setScenes(DEFAULT_ARC)}
             title="Default 5-scene balanced arc"
             style={{
-              background: 'transparent', border: '1px solid #1e293b', borderRadius: 4,
+              background: 'transparent', border: '1px solid var(--sm-night-2)', borderRadius: 4,
               color: '#475569', padding: '4px 10px', cursor: 'pointer',
-              fontFamily: 'monospace', fontSize: 11,
+              fontFamily: 'var(--sm-font-mono)', fontSize: 11,
             }}
           >
             Reset
@@ -246,8 +246,8 @@ export function ArcPlannerPanel({ onClose }: Props) {
       {/* Scene list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
         {scenes.map((sc, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 80px 80px 32px', gap: 6, alignItems: 'center', background: '#1e293b', borderRadius: 5, padding: '6px 8px' }}>
-            <span style={{ color: '#64748b', textAlign: 'center' }}>{i}</span>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 80px 80px 32px', gap: 6, alignItems: 'center', background: 'var(--sm-night-2)', borderRadius: 5, padding: '6px 8px' }}>
+            <span style={{ color: 'var(--sm-ink-mute)', textAlign: 'center' }}>{i}</span>
             <select
               value={sc.sceneFunction}
               onChange={e => updateScene(i, 'sceneFunction', e.target.value as SceneFunction)}
@@ -256,11 +256,11 @@ export function ArcPlannerPanel({ onClose }: Props) {
               {SCENE_FUNCTIONS.map(f => <option key={f} value={f}>{f.replace(/_/g, ' ')}</option>)}
             </select>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ color: '#64748b', fontSize: 11 }}>T</span>
+              <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>T</span>
               <input type="number" min={0} max={100} value={sc.tensionTarget}
                 onChange={e => updateScene(i, 'tensionTarget', Number(e.target.value))}
                 style={{ ...inputStyle, width: 46 }} />
-              <span style={{ color: '#64748b', fontSize: 11 }}>Q</span>
+              <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>Q</span>
               <input type="number" min={0} max={100} value={sc.qualityTarget}
                 onChange={e => updateScene(i, 'qualityTarget', Number(e.target.value))}
                 style={{ ...inputStyle, width: 46 }} />
@@ -275,44 +275,44 @@ export function ArcPlannerPanel({ onClose }: Props) {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
         <button onClick={addScene} disabled={scenes.length >= 8}
-          style={{ ...btnStyle, background: '#1e293b', color: '#94a3b8', flex: '0 0 auto' }}>
+          style={{ ...btnStyle, background: 'var(--sm-night-2)', color: 'var(--sm-cream-mute)', flex: '0 0 auto' }}>
           + Add Scene
         </button>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: '#64748b', fontSize: 12 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--sm-ink-mute)', fontSize: 12 }}>
           <span>Max iter</span>
           <input type="number" min={1} max={6} value={maxIter} onChange={e => setMaxIter(Number(e.target.value))}
             style={{ ...inputStyle, width: 46 }} />
         </div>
         <button onClick={compile} disabled={running}
-          style={{ ...btnStyle, flex: 1, background: running ? '#334155' : '#7c3aed' }}>
+          style={{ ...btnStyle, flex: 1, background: running ? 'var(--sm-night-line)' : '#7c3aed' }}>
           {running ? (progress ?? 'Compiling…') : `Compile ${scenes.length}-Scene Arc`}
         </button>
       </div>
 
-      {error && <div style={{ color: '#f87171', marginBottom: 12 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--sm-stamp)', marginBottom: 12 }}>{error}</div>}
 
       {result && (
         <div>
           {/* Arc score banner */}
           <div style={{
-            background: '#1e293b', borderRadius: 6, padding: '10px 14px',
+            background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 14px',
             marginBottom: 14, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center',
           }}>
             <div>
-              <div style={{ color: '#64748b', fontSize: 11 }}>Arc Score</div>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>Arc Score</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: arcColor(result.arcScore) }}>
                 {(result.arcScore * 100).toFixed(0)}
               </div>
             </div>
             <div>
-              <div style={{ color: '#64748b', fontSize: 11 }}>Converged</div>
-              <div style={{ fontSize: 18, color: result.convergedCount === result.totalScenes ? '#4ade80' : '#fb923c' }}>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>Converged</div>
+              <div style={{ fontSize: 18, color: result.convergedCount === result.totalScenes ? 'var(--sm-ok)' : 'var(--sm-warn)' }}>
                 {result.convergedCount}/{result.totalScenes}
               </div>
             </div>
             <div>
-              <div style={{ color: '#64748b', fontSize: 11 }}>Mean composite</div>
-              <div style={{ fontSize: 18, color: '#60a5fa' }}>{result.meanComposite.toFixed(1)}</div>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>Mean composite</div>
+              <div style={{ fontSize: 18, color: 'var(--sm-cool)' }}>{result.meanComposite.toFixed(1)}</div>
             </div>
             {result.usedDirectorPolicy && (
               <span style={{ background: '#4c1d95', color: '#c4b5fd', padding: '2px 8px', borderRadius: 4, fontSize: 11 }}>
@@ -324,7 +324,7 @@ export function ArcPlannerPanel({ onClose }: Props) {
           {/* Per-scene results */}
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #334155' }}>
+              <tr style={{ color: 'var(--sm-ink-mute)', textAlign: 'left', borderBottom: '1px solid var(--sm-night-line)' }}>
                 <th style={{ padding: '4px 6px' }}>#</th>
                 <th style={{ padding: '4px 6px' }}>status</th>
                 <th style={{ padding: '4px 6px' }}>iter</th>
@@ -338,22 +338,22 @@ export function ArcPlannerPanel({ onClose }: Props) {
             </thead>
             <tbody>
               {result.scenes.map(s => (
-                <tr key={s.sceneIdx} style={{ borderBottom: '1px solid #1e293b' }}>
-                  <td style={{ padding: '5px 6px', color: '#94a3b8' }}>{s.sceneIdx}</td>
+                <tr key={s.sceneIdx} style={{ borderBottom: '1px solid var(--sm-night-2)' }}>
+                  <td style={{ padding: '5px 6px', color: 'var(--sm-cream-mute)' }}>{s.sceneIdx}</td>
                   <td style={{ padding: '5px 6px' }}>
-                    <span style={{ color: s.converged ? '#4ade80' : '#fb923c', fontWeight: 700 }}>
+                    <span style={{ color: s.converged ? 'var(--sm-ok)' : 'var(--sm-warn)', fontWeight: 700 }}>
                       {s.converged ? '✓' : '~'}
                     </span>
                   </td>
-                  <td style={{ padding: '5px 6px', color: '#64748b' }}>{s.iterations}</td>
-                  <td style={{ padding: '5px 6px', color: '#a78bfa' }}>{s.finalValuation.toFixed(1)}</td>
-                  <td style={{ padding: '5px 6px', color: s.finalQuality >= 65 ? '#4ade80' : s.finalQuality >= 50 ? '#fb923c' : '#f87171' }}>
+                  <td style={{ padding: '5px 6px', color: 'var(--sm-ink-mute)' }}>{s.iterations}</td>
+                  <td style={{ padding: '5px 6px', color: 'var(--sm-cool)' }}>{s.finalValuation.toFixed(1)}</td>
+                  <td style={{ padding: '5px 6px', color: s.finalQuality >= 65 ? 'var(--sm-ok)' : s.finalQuality >= 50 ? 'var(--sm-warn)' : 'var(--sm-stamp)' }}>
                     {s.finalQuality.toFixed(0)}
                   </td>
-                  <td style={{ padding: '5px 6px', color: '#60a5fa' }}>{s.finalComposite.toFixed(1)}</td>
-                  <td style={{ padding: '5px 6px', color: s.tier3Rank === 100 ? '#4ade80' : '#64748b' }}>{s.tier3Rank}</td>
-                  <td style={{ padding: '5px 6px', color: s.ghostCount > 0 ? '#f87171' : '#64748b' }}>{s.ghostCount}</td>
-                  <td style={{ padding: '5px 6px', color: '#64748b', fontSize: 11 }}>{s.sceneFunction.replace(/_/g, ' ')}</td>
+                  <td style={{ padding: '5px 6px', color: 'var(--sm-cool)' }}>{s.finalComposite.toFixed(1)}</td>
+                  <td style={{ padding: '5px 6px', color: s.tier3Rank === 100 ? 'var(--sm-ok)' : 'var(--sm-ink-mute)' }}>{s.tier3Rank}</td>
+                  <td style={{ padding: '5px 6px', color: s.ghostCount > 0 ? 'var(--sm-stamp)' : 'var(--sm-ink-mute)' }}>{s.ghostCount}</td>
+                  <td style={{ padding: '5px 6px', color: 'var(--sm-ink-mute)', fontSize: 11 }}>{s.sceneFunction.replace(/_/g, ' ')}</td>
                 </tr>
               ))}
             </tbody>
@@ -365,8 +365,8 @@ export function ArcPlannerPanel({ onClose }: Props) {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#0f172a', border: '1px solid #334155', borderRadius: 4,
-  color: '#e2e8f0', padding: '4px 6px', fontFamily: 'monospace',
+  background: 'var(--sm-night)', border: '1px solid var(--sm-night-line)', borderRadius: 4,
+  color: 'var(--sm-cream)', padding: '4px 6px', fontFamily: 'var(--sm-font-mono)',
   fontSize: 12, boxSizing: 'border-box',
 };
 
@@ -376,5 +376,5 @@ const selStyle: React.CSSProperties = {
 
 const btnStyle: React.CSSProperties = {
   padding: '7px 12px', border: 'none', borderRadius: 5,
-  color: '#fff', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12,
+  color: '#fff', cursor: 'pointer', fontFamily: 'var(--sm-font-mono)', fontSize: 12,
 };

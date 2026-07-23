@@ -69,14 +69,14 @@ export function StoryHealthPanel({ onClose }: Props) {
   if (!report && loading) return (
     <div style={panelStyle}>
       <PanelHeader onClose={onClose} onRefresh={load} />
-      <div style={{ color: '#64748b', textAlign: 'center', padding: 60 }}>Aggregating story vitals…</div>
+      <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 60 }}>Aggregating story vitals…</div>
     </div>
   );
 
   if (!report && error) return (
     <div style={panelStyle}>
       <PanelHeader onClose={onClose} onRefresh={load} />
-      <div style={{ color: '#f87171', padding: 20 }}>{error}</div>
+      <div style={{ color: 'var(--sm-stamp)', padding: 20 }}>{error}</div>
     </div>
   );
 
@@ -95,45 +95,45 @@ export function StoryHealthPanel({ onClose }: Props) {
 
         {/* Vitals grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          <VitalCard label="Proof pass rate" value={`${report.proof.passRate}%`} color={report.proof.passRate >= 80 ? '#4ade80' : report.proof.passRate >= 60 ? '#fb923c' : '#f87171'} sub="Tier 1 per scene" />
+          <VitalCard label="Proof pass rate" value={`${report.proof.passRate}%`} color={report.proof.passRate >= 80 ? 'var(--sm-ok)' : report.proof.passRate >= 60 ? 'var(--sm-warn)' : 'var(--sm-stamp)'} sub="Tier 1 per scene" />
           <VitalCard label="Avg quality" value={String(report.proof.avgQualityScore)} color={scoreColor(report.proof.avgQualityScore)} sub="Tier 2 score" />
-          <VitalCard label="Tension" value={report.currentTension.toFixed(1)} color="#60a5fa" sub="mark-to-market" />
-          <VitalCard label="Momentum" value={`${Math.round(report.momentum * 100)}%`} color={report.momentum >= 0.6 ? '#4ade80' : report.momentum >= 0.3 ? '#fb923c' : '#f87171'} sub="5-scene signal" />
+          <VitalCard label="Tension" value={report.currentTension.toFixed(1)} color="var(--sm-cool)" sub="mark-to-market" />
+          <VitalCard label="Momentum" value={`${Math.round(report.momentum * 100)}%`} color={report.momentum >= 0.6 ? 'var(--sm-ok)' : report.momentum >= 0.3 ? 'var(--sm-warn)' : 'var(--sm-stamp)'} sub="5-scene signal" />
         </div>
 
         {/* Tension sparkline */}
         {report.tensionHistory.length > 0 && (
-          <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
+          <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-              <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>Tension Curve</span>
-              <span style={{ color: '#60a5fa', fontSize: 11 }}>current: {report.currentTension.toFixed(1)}</span>
+              <span style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700 }}>Tension Curve</span>
+              <span style={{ color: 'var(--sm-cool)', fontSize: 11 }}>current: {report.currentTension.toFixed(1)}</span>
             </div>
             <TensionSparkline values={report.tensionHistory} />
           </div>
         )}
 
         {/* Topology */}
-        <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
-          <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>Emotional Arc Topology</div>
+        <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
+          <div style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>Emotional Arc Topology</div>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
-              <div style={{ color: '#64748b', fontSize: 10 }}>DOMINANT ARC</div>
-              <div style={{ color: '#a78bfa', fontSize: 16, fontWeight: 700, textTransform: 'capitalize' }}>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>DOMINANT ARC</div>
+              <div style={{ color: 'var(--sm-cool)', fontSize: 16, fontWeight: 700, textTransform: 'capitalize' }}>
                 {report.topology.dominantArc.replace(/_/g, ' ')}
               </div>
             </div>
             <div>
-              <div style={{ color: '#64748b', fontSize: 10 }}>COHERENCE</div>
-              <div style={{ color: '#fbbf24', fontSize: 16, fontWeight: 700 }}>{report.topology.coherence}</div>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>COHERENCE</div>
+              <div style={{ color: 'var(--sm-warn)', fontSize: 16, fontWeight: 700 }}>{report.topology.coherence}</div>
             </div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {report.topology.scores.map(s => (
                 <div key={s.archetype} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ color: '#64748b', fontSize: 9, width: 90, flexShrink: 0 }}>{s.archetype.replace(/_/g, ' ')}</span>
-                  <div style={{ flex: 1, background: '#334155', borderRadius: 3, height: 4 }}>
-                    <div style={{ background: s.rank === 1 ? '#a78bfa' : '#64748b', width: `${Math.round(s.similarity * 100)}%`, height: '100%', borderRadius: 3 }} />
+                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 9, width: 90, flexShrink: 0 }}>{s.archetype.replace(/_/g, ' ')}</span>
+                  <div style={{ flex: 1, background: 'var(--sm-night-line)', borderRadius: 3, height: 4 }}>
+                    <div style={{ background: s.rank === 1 ? 'var(--sm-cool)' : 'var(--sm-ink-mute)', width: `${Math.round(s.similarity * 100)}%`, height: '100%', borderRadius: 3 }} />
                   </div>
-                  <span style={{ color: s.rank === 1 ? '#a78bfa' : '#475569', fontSize: 9 }}>{Math.round(s.similarity * 100)}%</span>
+                  <span style={{ color: s.rank === 1 ? 'var(--sm-cool)' : '#475569', fontSize: 9 }}>{Math.round(s.similarity * 100)}%</span>
                 </div>
               ))}
             </div>
@@ -141,58 +141,58 @@ export function StoryHealthPanel({ onClose }: Props) {
         </div>
 
         {/* Arc completion summary */}
-        <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-            <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>Arc Completion</span>
-            <span style={{ color: report.arcCompletion.debtScore >= 40 ? '#f87171' : '#4ade80', fontSize: 11 }}>
+            <span style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700 }}>Arc Completion</span>
+            <span style={{ color: report.arcCompletion.debtScore >= 40 ? 'var(--sm-stamp)' : 'var(--sm-ok)', fontSize: 11 }}>
               debt: {report.arcCompletion.debtScore}%
             </span>
           </div>
           <div style={{ display: 'flex', gap: 16, marginBottom: report.arcCompletion.mostUrgent.length > 0 ? 10 : 0 }}>
-            <MiniStat label="Open" value={String(report.arcCompletion.openCount)} color="#94a3b8" />
-            <MiniStat label="Overdue" value={String(report.arcCompletion.overdueCount)} color={report.arcCompletion.overdueCount > 0 ? '#f87171' : '#64748b'} />
-            <MiniStat label="Resolved" value={String(report.arcCompletion.resolvedCount)} color="#4ade80" />
+            <MiniStat label="Open" value={String(report.arcCompletion.openCount)} color="var(--sm-cream-mute)" />
+            <MiniStat label="Overdue" value={String(report.arcCompletion.overdueCount)} color={report.arcCompletion.overdueCount > 0 ? 'var(--sm-stamp)' : 'var(--sm-ink-mute)'} />
+            <MiniStat label="Resolved" value={String(report.arcCompletion.resolvedCount)} color="var(--sm-ok)" />
           </div>
           {report.arcCompletion.mostUrgent.map((p, i) => (
-            <div key={i} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 4, padding: '5px 9px', marginBottom: 4 }}>
+            <div key={i} style={{ background: 'var(--sm-night)', border: '1px solid var(--sm-night-line)', borderRadius: 4, padding: '5px 9px', marginBottom: 4 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <UrgencyBadge urgency={p.urgency} />
-                <span style={{ color: '#94a3b8', fontSize: 10, fontWeight: 700 }}>{p.kind}</span>
-                <span style={{ color: '#64748b', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</span>
+                <span style={{ color: 'var(--sm-cream-mute)', fontSize: 10, fontWeight: 700 }}>{p.kind}</span>
+                <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</span>
               </div>
             </div>
           ))}
         </div>
 
         {/* Epistemic */}
-        <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
-          <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>Epistemic State</div>
+        <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
+          <div style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>Epistemic State</div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <MiniStat label="Characters" value={String(report.epistemic.characterCount)} color="#94a3b8" />
-            <MiniStat label="Beliefs" value={String(report.epistemic.totalBeliefs)} color="#60a5fa" />
-            <MiniStat label="Suspense" value={String(report.epistemic.suspense)} color={report.epistemic.suspense >= 70 ? '#f87171' : '#94a3b8'} />
-            <MiniStat label={`Clues / Payoffs`} value={`${report.epistemic.clueCount} / ${report.epistemic.payoffCount}`} color="#fbbf24" />
+            <MiniStat label="Characters" value={String(report.epistemic.characterCount)} color="var(--sm-cream-mute)" />
+            <MiniStat label="Beliefs" value={String(report.epistemic.totalBeliefs)} color="var(--sm-cool)" />
+            <MiniStat label="Suspense" value={String(report.epistemic.suspense)} color={report.epistemic.suspense >= 70 ? 'var(--sm-stamp)' : 'var(--sm-cream-mute)'} />
+            <MiniStat label={`Clues / Payoffs`} value={`${report.epistemic.clueCount} / ${report.epistemic.payoffCount}`} color="var(--sm-warn)" />
           </div>
         </div>
 
         {/* Proof failure breakdown */}
         {report.proof.tier1TopFailures && report.proof.tier1TopFailures.length > 0 && (
-          <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
-            <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
+          <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
+            <div style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
               Tier 1 Failure Breakdown
             </div>
             {report.proof.tier1TopFailures.map(({ proof, failCount }) => (
               <div key={proof} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                <span style={{ color: '#64748b', fontSize: 11 }}>{proof}</span>
+                <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{proof}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 80, background: '#334155', borderRadius: 3, height: 5 }}>
+                  <div style={{ width: 80, background: 'var(--sm-night-line)', borderRadius: 3, height: 5 }}>
                     <div style={{
-                      background: '#f87171',
+                      background: 'var(--sm-stamp)',
                       width: `${Math.min(100, Math.round((failCount / (report.commitCount || 1)) * 100))}%`,
                       height: '100%', borderRadius: 3,
                     }} />
                   </div>
-                  <span style={{ color: '#f87171', fontSize: 11, width: 22, textAlign: 'right' }}>{failCount}</span>
+                  <span style={{ color: 'var(--sm-stamp)', fontSize: 11, width: 22, textAlign: 'right' }}>{failCount}</span>
                 </div>
               </div>
             ))}
@@ -208,14 +208,14 @@ export function StoryHealthPanel({ onClose }: Props) {
 
 function PanelHeader({ onClose, onRefresh, subtitle }: { onClose: () => void; onRefresh: () => void; subtitle?: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0 }}>
       <div>
         <strong style={{ fontSize: 15 }}>Story Health Dashboard</strong>
-        {subtitle && <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
+        {subtitle && <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={onRefresh} style={btnStyle('#1e293b')}>↺ refresh</button>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button onClick={onRefresh} style={btnStyle('var(--sm-night-2)')}>↺ refresh</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
     </div>
   );
@@ -223,8 +223,8 @@ function PanelHeader({ onClose, onRefresh, subtitle }: { onClose: () => void; on
 
 function VitalCard({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
   return (
-    <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 12px' }}>
-      <div style={{ color: '#64748b', fontSize: 9, marginBottom: 4 }}>{label.toUpperCase()}</div>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 12px' }}>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 9, marginBottom: 4 }}>{label.toUpperCase()}</div>
       <div style={{ color, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{value}</div>
       <div style={{ color: '#475569', fontSize: 9, marginTop: 4 }}>{sub}</div>
     </div>
@@ -234,7 +234,7 @@ function VitalCard({ label, value, color, sub }: { label: string; value: string;
 function MiniStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <div style={{ color: '#64748b', fontSize: 9 }}>{label}</div>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 9 }}>{label}</div>
       <div style={{ color, fontSize: 14, fontWeight: 700 }}>{value}</div>
     </div>
   );
@@ -242,10 +242,10 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
 
 function UrgencyBadge({ urgency }: { urgency: string }) {
   const conf: Record<string, { color: string; bg: string }> = {
-    overdue:  { color: '#f87171', bg: '#450a0a' },
-    due_soon: { color: '#fb923c', bg: '#1c0800' },
-    on_track: { color: '#4ade80', bg: '#032012' },
-    not_yet:  { color: '#64748b', bg: '#1e293b' },
+    overdue:  { color: 'var(--sm-stamp)', bg: 'var(--sm-stamp-dk)' },
+    due_soon: { color: 'var(--sm-warn)', bg: 'var(--sm-night-2)' },
+    on_track: { color: 'var(--sm-ok)', bg: 'var(--sm-night-2)' },
+    not_yet:  { color: 'var(--sm-ink-mute)', bg: 'var(--sm-night-2)' },
   };
   const c = conf[urgency] ?? conf.not_yet;
   return (
@@ -278,7 +278,7 @@ function TensionSparkline({ values }: { values: number[] }) {
           const last = values[values.length - 1];
           const x = W;
           const y = H - ((last - min) / range) * H;
-          return <circle cx={x} cy={y} r={4} fill="#60a5fa" />;
+          return <circle cx={x} cy={y} r={4} fill="var(--sm-cool)" />;
         })()}
       </svg>
       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: 9, marginTop: 2 }}>
@@ -292,20 +292,20 @@ function TensionSparkline({ values }: { values: number[] }) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function scoreColor(s: number): string {
-  return s >= 70 ? '#4ade80' : s >= 40 ? '#fb923c' : '#f87171';
+  return s >= 70 ? 'var(--sm-ok)' : s >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)';
 }
 
 const panelStyle: React.CSSProperties = {
-  background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-  border: '1px solid #334155', width: 720, maxWidth: '98vw',
+  background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+  border: '1px solid var(--sm-night-line)', width: 720, maxWidth: '98vw',
   maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-  fontFamily: 'monospace', fontSize: 13,
+  fontFamily: 'var(--sm-font-mono)', fontSize: 13,
 };
 
 function btnStyle(bg: string): React.CSSProperties {
   return {
-    background: bg, border: '1px solid #334155', borderRadius: 4,
-    color: '#e2e8f0', padding: '3px 8px', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 11,
+    background: bg, border: '1px solid var(--sm-night-line)', borderRadius: 4,
+    color: 'var(--sm-cream)', padding: '3px 8px', cursor: 'pointer',
+    fontFamily: 'var(--sm-font-mono)', fontSize: 11,
   };
 }

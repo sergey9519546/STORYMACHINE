@@ -31,10 +31,10 @@ interface Props { onClose: () => void; }
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const GRADE_COLOR: Record<Grade, string> = {
-  A: '#4ade80', B: '#86efac', C: '#fbbf24', D: '#fb923c', F: '#f87171',
+  A: 'var(--sm-ok)', B: '#86efac', C: 'var(--sm-warn)', D: 'var(--sm-warn)', F: 'var(--sm-stamp)',
 };
 
-function gradeColor(g: Grade): string { return GRADE_COLOR[g] ?? '#94a3b8'; }
+function gradeColor(g: Grade): string { return GRADE_COLOR[g] ?? 'var(--sm-cream-mute)'; }
 
 function trendIcon(values: number[]): string {
   if (values.length < 2) return '→';
@@ -46,7 +46,7 @@ function trendIcon(values: number[]): string {
 
 function trendColor(values: number[]): string {
   const icon = trendIcon(values);
-  return icon === '↑' ? '#4ade80' : icon === '↓' ? '#f87171' : '#64748b';
+  return icon === '↑' ? 'var(--sm-ok)' : icon === '↓' ? 'var(--sm-stamp)' : 'var(--sm-ink-mute)';
 }
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function Sparkline({ values, color, width = 180, height = 40 }: {
   values: number[]; color: string; width?: number; height?: number;
 }) {
   if (values.length < 2) {
-    return <svg width={width} height={height}><rect width={width} height={height} fill="#0f172a" /></svg>;
+    return <svg width={width} height={height}><rect width={width} height={height} fill="var(--sm-night)" /></svg>;
   }
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -70,7 +70,7 @@ function Sparkline({ values, color, width = 180, height = 40 }: {
   const ly = height - ((last - min) / range) * (height - 6) - 3;
   return (
     <svg width={width} height={height} style={{ display: 'block' }}>
-      <rect width={width} height={height} fill="#0f172a" rx={3} />
+      <rect width={width} height={height} fill="var(--sm-night)" rx={3} />
       <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" opacity={0.8} />
       <circle cx={lx} cy={ly} r={3} fill={color} />
     </svg>
@@ -85,11 +85,11 @@ function MetricCard({ label, value, unit, trend, tCol, sparkValues, sparkColor }
   sparkValues: number[]; sparkColor: string;
 }) {
   return (
-    <div style={{ background: '#1e293b', borderRadius: 7, padding: '12px 14px', flex: 1 }}>
-      <div style={{ color: '#64748b', fontSize: 10, marginBottom: 4 }}>{label}</div>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 7, padding: '12px 14px', flex: 1 }}>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 4 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
-        <span style={{ color: '#e2e8f0', fontSize: 22, fontWeight: 700 }}>{value}</span>
-        {unit && <span style={{ color: '#64748b', fontSize: 11 }}>{unit}</span>}
+        <span style={{ color: 'var(--sm-cream)', fontSize: 22, fontWeight: 700 }}>{value}</span>
+        {unit && <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{unit}</span>}
         <span style={{ color: tCol, fontSize: 14, marginLeft: 'auto' }}>{trend}</span>
       </div>
       <Sparkline values={sparkValues} color={sparkColor} />
@@ -126,27 +126,27 @@ export function MomentumPanel({ onClose }: Props) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      border: '1px solid #334155', width: 860, maxWidth: '98vw',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      border: '1px solid var(--sm-night-line)', width: 860, maxWidth: '98vw',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 13,
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0 }}>
         <div>
           <strong style={{ fontSize: 15 }}>Narrative Momentum</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>
             Quality · Regression · Tension · Proofs — scene-by-scene CI history
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={load} style={chipBtn('#1e293b')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 
-      {loading && <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Replaying story momentum…</div>}
-      {error && <div style={{ color: '#f87171', background: '#1e293b', padding: 12, margin: 12, borderRadius: 5 }}>{error}</div>}
+      {loading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 40 }}>Replaying story momentum…</div>}
+      {error && <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', padding: 12, margin: 12, borderRadius: 5 }}>{error}</div>}
 
       {data && data.totalScenes === 0 && (
         <div style={{ color: '#475569', textAlign: 'center', padding: 40 }}>
@@ -165,7 +165,7 @@ export function MomentumPanel({ onClose }: Props) {
               trend={trendIcon(qVals)}
               tCol={trendColor(qVals)}
               sparkValues={qVals}
-              sparkColor="#4ade80"
+              sparkColor="var(--sm-ok)"
             />
             <MetricCard
               label="Regression Grade"
@@ -174,7 +174,7 @@ export function MomentumPanel({ onClose }: Props) {
               trend={trendIcon(regVals)}
               tCol={trendColor(regVals)}
               sparkValues={regVals}
-              sparkColor="#a78bfa"
+              sparkColor="var(--sm-cool)"
             />
             <MetricCard
               label="Tension Total"
@@ -182,7 +182,7 @@ export function MomentumPanel({ onClose }: Props) {
               trend={trendIcon(tenVals)}
               tCol={trendColor(tenVals)}
               sparkValues={tenVals}
-              sparkColor="#fb923c"
+              sparkColor="var(--sm-warn)"
             />
             <MetricCard
               label="Proof Pass Rate"
@@ -190,26 +190,26 @@ export function MomentumPanel({ onClose }: Props) {
               trend={trendIcon(prVals)}
               tCol={trendColor(prVals)}
               sparkValues={prVals}
-              sparkColor="#60a5fa"
+              sparkColor="var(--sm-cool)"
             />
           </div>
 
           {/* Combined multi-line chart */}
           {pts.length >= 2 && (
-            <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
-              <div style={{ color: '#64748b', fontSize: 10, marginBottom: 8 }}>
+            <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 8 }}>
                 TRAJECTORY — scenes 0–{pts[pts.length - 1].sceneIdx}
               </div>
               <MultiLineChart points={pts} />
               <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
                 {[
-                  { label: 'Quality', color: '#4ade80' },
-                  { label: 'Regression', color: '#a78bfa' },
-                  { label: 'Proof Pass', color: '#60a5fa' },
+                  { label: 'Quality', color: 'var(--sm-ok)' },
+                  { label: 'Regression', color: 'var(--sm-cool)' },
+                  { label: 'Proof Pass', color: 'var(--sm-cool)' },
                 ].map(({ label, color }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <div style={{ width: 16, height: 2, background: color }} />
-                    <span style={{ color: '#64748b', fontSize: 10 }}>{label}</span>
+                    <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{label}</span>
                   </div>
                 ))}
               </div>
@@ -218,7 +218,7 @@ export function MomentumPanel({ onClose }: Props) {
 
           {/* Scene-by-scene table */}
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, marginBottom: 6 }}>SCENE HISTORY</div>
+            <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 6 }}>SCENE HISTORY</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <SceneTableHeader />
               {pts.map(p => <SceneRow key={p.commitId} point={p} />)}
@@ -250,13 +250,13 @@ function MultiLineChart({ points }: { points: MomentumPoint[] }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display: 'block', borderRadius: 4 }}>
-      <rect width={W} height={H} fill="#0f172a" />
-      {line(points.map(p => p.qualityScore),     '#4ade80')}
-      {line(points.map(p => p.regressionScore),  '#a78bfa')}
-      {line(points.map(p => p.proofPassRate),    '#60a5fa')}
+      <rect width={W} height={H} fill="var(--sm-night)" />
+      {line(points.map(p => p.qualityScore),     'var(--sm-ok)')}
+      {line(points.map(p => p.regressionScore),  'var(--sm-cool)')}
+      {line(points.map(p => p.proofPassRate),    'var(--sm-cool)')}
       {points.map((_, i) => {
         const x = (i / (n - 1)) * W;
-        return <line key={i} x1={x} y1={H - 3} x2={x} y2={H} stroke="#334155" strokeWidth={1} />;
+        return <line key={i} x1={x} y1={H - 3} x2={x} y2={H} stroke="var(--sm-night-line)" strokeWidth={1} />;
       })}
     </svg>
   );
@@ -279,11 +279,11 @@ function SceneTableHeader() {
 }
 
 function SceneRow({ point: p }: { point: MomentumPoint }) {
-  const qColor = p.qualityScore >= 75 ? '#4ade80' : p.qualityScore >= 55 ? '#fbbf24' : '#f87171';
-  const prColor = p.proofPassRate === 100 ? '#4ade80' : p.proofPassRate >= 80 ? '#fbbf24' : '#f87171';
+  const qColor = p.qualityScore >= 75 ? 'var(--sm-ok)' : p.qualityScore >= 55 ? 'var(--sm-warn)' : 'var(--sm-stamp)';
+  const prColor = p.proofPassRate === 100 ? 'var(--sm-ok)' : p.proofPassRate >= 80 ? 'var(--sm-warn)' : 'var(--sm-stamp)';
   return (
     <div style={{
-      background: '#1e293b', border: '1px solid #1e293b', borderRadius: 4, padding: '5px 9px',
+      background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-2)', borderRadius: 4, padding: '5px 9px',
       display: 'flex', alignItems: 'center', gap: 8,
     }}>
       <span style={{ color: '#475569', fontSize: 10, width: 50, flexShrink: 0 }}>scene {p.sceneIdx}</span>
@@ -291,20 +291,20 @@ function SceneRow({ point: p }: { point: MomentumPoint }) {
       <span style={{ color: gradeColor(p.regressionGrade), fontSize: 10, width: 60, flexShrink: 0, fontWeight: 700 }}>
         {p.regressionGrade} ({p.regressionScore})
       </span>
-      <span style={{ color: '#fb923c', fontSize: 10, width: 60, flexShrink: 0 }}>{p.tensionTotal.toFixed(2)}</span>
+      <span style={{ color: 'var(--sm-warn)', fontSize: 10, width: 60, flexShrink: 0 }}>{p.tensionTotal.toFixed(2)}</span>
       <span style={{ color: prColor, fontSize: 10, width: 60, flexShrink: 0 }}>{p.proofPassRate}%</span>
-      <span style={{ color: p.qualityWarnings > 3 ? '#f87171' : '#64748b', fontSize: 10, flex: 1 }}>
+      <span style={{ color: p.qualityWarnings > 3 ? 'var(--sm-stamp)' : 'var(--sm-ink-mute)', fontSize: 10, flex: 1 }}>
         {p.qualityWarnings} warning{p.qualityWarnings !== 1 ? 's' : ''}
       </span>
-      <span style={{ color: '#64748b', fontSize: 10, width: 40, flexShrink: 0 }}>{p.opCount} ops</span>
+      <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10, width: 40, flexShrink: 0 }}>{p.opCount} ops</span>
     </div>
   );
 }
 
 function chipBtn(bg: string): React.CSSProperties {
   return {
-    background: bg, border: '1px solid #334155', borderRadius: 4,
-    color: '#e2e8f0', padding: '3px 8px', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 11,
+    background: bg, border: '1px solid var(--sm-night-line)', borderRadius: 4,
+    color: 'var(--sm-cream)', padding: '3px 8px', cursor: 'pointer',
+    fontFamily: 'var(--sm-font-mono)', fontSize: 11,
   };
 }

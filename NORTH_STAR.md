@@ -13,30 +13,61 @@ reconstructs what the surrounding docs already assumed existed.*
 A deterministic core (audit / verdicts / percentiles / counterfactuals /
 critics / receipts — fully keyless) inside a generative shell (candidates /
 rewrites / voices — opt-in, labeled, degradable). The product's structural
-claim is not "an AI that judges scripts" — it is "3,216 hand-specified,
-corpus-measured rules a script either satisfies or doesn't," with the score
-formula and every rule inspectable, not a black-box LLM opinion.
+claim is not "an AI that judges scripts" — it is **a private, instant,
+reproducible coverage read whose every verdict is an inspectable
+deterministic rule or formula, not a black-box LLM opinion.** The score
+formula and every rule are open to inspection, and the same script text
+always produces the same report.
 
-Measured proof points, current:
-- **Discrimination**: 6 of 6 paired good/bad scenarios order correctly
-  (good scores higher); 5 pairs are hard CI assertions with real margins
-  (+1.4 to +6.2); the 6th (composite-reviewer-scenario) orders correctly
-  (+2.2) but hasn't yet cleared the 5.0-point minimum-gap floor — diagnosed
-  as ~19 style-minor false positives flooding the good half.
-- **Ground truth**: 72 produced scripts (70 animated features + Pulp
-  Fiction + Jaws, the first two live-action entries), all scoring
-  RECOMMEND, manifest-locked with content-hash verification, run through an
-  env-gated harness so the corpus text itself never enters the git history.
-- **Degradation AUC** (the separation-margin metric made executable):
-  shuffle-drop AUC-24 measured 0.672 against a hard ratchet floor of 0.622;
-  AUC-71 (full corpus) measured ~0.652. A second degradation recipe
-  (act-swap) sits at ~0.48, still near a coin flip — see the lexicon-vs-
-  position law below for why.
-- **Rulebook**: 3,216 rules extracted and browsable, staleness-tested
-  against the live pass code so the count can't silently drift from docs.
+**Honest correction on the rule count (2026-07-14).** Earlier drafts of this
+file led with "3,216 hand-specified rules" as the structural claim; the
+rulebook has since grown to 8,917 by generated count. Neither number should
+be the pitch, for two measured reasons: (1) ~5,701 of the 8,917 were
+produced in one bulk wave from 7 template functions as field × mode ×
+position permutations — only ~2,300 are genuinely distinct hand-authored
+checks (`docs/rulebook/README.md`: 6,610 "Unattributed"); (2) by the
+doctor's own measurements (`server/nvm/analyze/doctor.ts:1656-1669`) the
+entire weighted-rule channel has AUC ~0.076 while the scene-count scarcity
+term has AUC ~0.938 — **the rules barely move the score.** Lead with what is
+true and verifiable (reproducibility, determinism, inspectability), never
+with the rule count. The rule count is neither the wedge nor load-bearing.
+
+Measured proof points (honest, as of 2026-07-14):
+- **Discrimination is thin and synthetic.** 6 hand-authored paired
+  good/bad scenarios; 5 are hard CI assertions but two pass by only +1.4,
+  and the 6th (composite-reviewer-scenario) still fails its 5.0-point
+  minimum-gap floor. No runnable discrimination test on *real* writing
+  exists yet — this is the P1 gap the roadmap now treats as the One Bet.
+- **Ground truth is a floor-check, not a discrimination test, and it does
+  not run locally.** 72 produced scripts are manifest-locked (71 RECOMMEND
+  + 1 CONSIDER), but the text lives outside the repo and
+  `tests/core/real-script-corpus.test.ts` SKIPS every assertion without
+  `REAL_SCRIPT_CORPUS_DIR` (0 files present here). The check asserts
+  health ≥ 80 by fiat, not that the score separates strong from weak.
+- **Degradation AUC is near coin-flip.** Shuffle-drop AUC-24 measured 0.672
+  against a 0.622 ratchet floor; AUC-71 ~0.652; act-swap 0.48→0.62. A ~0.65
+  AUC is barely above chance — treat these as work-in-progress baselines,
+  not proof the score discriminates.
+- **Rulebook**: 8,917 entries by generated count (~2,300 distinct rule
+  concepts), staleness-tested against the live pass code. Freeze means **add
+  no entries to the current catalog** and maintain the distinct conceptual
+  set — not delete 6,600 entries by implication. Any removal is a separately
+  approved migration with dependency review.
 
 ## 1. Non-negotiables (the constitution proper)
 
+- **Demand before rigor.** No new engine work ships without a validated user
+  need behind it. The project's central failure mode — the one this
+  constitution now exists to prevent — was optimizing rigor (rule counts,
+  AUC ratchets, research intake) in isolation from any evidence a real
+  writer wants the output. `ROADMAP.md` P0 (validate with real writers) is a
+  hard gate, not a preference: it blocks everything downstream.
+- **Correct before reproducible.** Reproducibility is earned *after* the
+  score is shown valid on real writing, never instead of it. A broken ruler
+  is perfectly reproducible; determinism is worthless if the verdict is
+  wrong. This resolves the historical confusion between "the same input
+  gives the same output" and "the output is right" — they are different
+  claims and only the second creates demand.
 - **No LLM-as-judge.** Every verdict a user sees is a deterministic rule or
   formula, inspectable and reproducible via `contentHash`. LLMs may SENSE
   (deep-read scene annotation) but never SCORE — rules verdict on whatever
@@ -48,25 +79,36 @@ Measured proof points, current:
   functional fallback when keyless — never a silent quality drop, never a
   500.
 - **Determinism receipts.** `contentHash`-keyed reproducibility is a
-  load-bearing product claim: the same script text always produces the same
-  report, and the verify endpoint lets anyone check that externally.
-- **Measure before threshold, on the real corpus, always.** Every detector
-  that skipped this died (fired on zero corpus samples) or misfired
-  (inverted on well-crafted writing). Fixture-only evidence is necessary but
-  never sufficient — see the two hard-won laws below.
+  load-bearing product claim *once the score is valid*: the same script text
+  always produces the same report, and the verify endpoint lets anyone check
+  that externally. This is a trust feature to surface to third parties
+  (roadmap P3), not an end in itself.
+- **Measure discrimination on runnable, real writing — always.** Every
+  detector that skipped this died (fired on zero corpus samples) or misfired
+  (inverted on well-crafted writing). Synthetic fixtures and an env-gated
+  corpus that skips in CI are necessary but never sufficient: a test that
+  doesn't run proves nothing. The score must separate strong from weak real
+  screenplays on a set that runs — see the two hard-won laws below and the
+  roadmap's P1 One Bet.
+
+*Canonical sequencing lives in `ROADMAP.md` (the demand-driven P0→P4
+phases). This constitution sets the laws; the roadmap sets the order. Where
+older sequencing in `ULTRAPLAN.md` or `CLAUDE.md`'s wave program disagrees
+with the roadmap, the roadmap wins — those documents have been reconciled to
+it.*
 
 ## 2. Two hard-won laws (added this wave — earn their place here)
 
-- **Lexicon signals carry content, not position.** Act-swap degradation AUC
-  sits at ~0.48 — worse than shuffle-drop's 0.672 — because word-and-phrase
-  based signals (the vast majority of today's 3,216 rules) detect WHAT is
+- **Lexicon signals carry content, not position.** Raw act-swap degradation
+  measured ~0.48 — worse than shuffle-drop's ~0.652 — because word-and-phrase
+  signals (the vast majority of the ~2,300 distinct checks) detect WHAT is
   said, and reordering large blocks preserves what's said while destroying
-  when it's said. A script with its acts swapped still contains all the same
-  clue words, emotional beats, and character text — just in the wrong
-  sequence — and lexicon-derived signals are structurally blind to that.
+  when it's said. The landed emotional-arc diagnostic lifted its own
+  act-swap signal to ~0.647 and the bounded deduction lifted doctor-level
+  act-swap to ~0.62, but that is still weak evidence, not a solved problem.
   Global-arc-position claims (setup-before-payoff, escalation-before-climax)
-  require a semantic channel that reads FOR position, not just content — the
-  deep-read arc signal work (ULTRAPLAN SS1) exists to close exactly this gap.
+  require signals that read FOR position, not just content. Any further work
+  belongs to ROADMAP P1 only after P0 validates that writers want the report.
 - **Density normalization absorbs rule families at feature scale.**
   A newly-added rule that fires N more times on a bad script than a good one
   does not automatically move the displayed health score at feature length —
@@ -80,13 +122,16 @@ Measured proof points, current:
 
 ## 3. Sources
 
-`ARCHITECTURE.md` (system map), `CLAUDE.md` (conventions + Wave Program v2),
-`server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` (binding wave quality spec),
-`ROADMAP.md` (resume protocol + open work), `ULTRAPLAN.md` (current spine +
-priority queue), `docs/research-audit/MASTER_RESEARCH_AUDIT.md` (research
-incorporation map), `tests/core/discrimination.test.ts` and
-`tests/core/real-script-corpus.test.ts` (the numbers this file cites — always
-re-verify against these before quoting them further).
+`ROADMAP.md` (canonical P0→P4 sequencing, resume protocol, measured current
+state), `ULTRAPLAN.md` (short execution brief), `ARCHITECTURE.md` (system
+map), `CLAUDE.md` (working constraints), `server/nvm/analyze/doctor.ts`
+(score formula and its own channel-AUC diagnostics),
+`tests/core/discrimination.test.ts` and
+`tests/core/real-script-corpus.test.ts` (the evidence this file cites —
+always re-verify before quoting), and
+`docs/research-audit/MASTER_RESEARCH_AUDIT.md` (filed research backlog, not
+active sequencing). `server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` is a
+historical quality reference; its wave cadence is retired.
 
 ## 4. Non-goals
 
@@ -100,6 +145,17 @@ re-verify against these before quoting them further).
   manifest-locked, hash-verified harness beats an unverified pile of
   scraped text; corpus growth is real work (OCR, live-action sourcing) but
   never trades away verification.
+- Not chasing rule COUNT for its own sake — the rule total is not the
+  product claim and never was a good one. ~64% of today's count is
+  mechanical field × mode × position permutation of 7 template functions
+  (`passes/lib/checks.ts`), and by the doctor's own measurement the whole
+  weighted-rule channel contributes AUC ~0.076 to discrimination while the
+  scene-count scarcity term carries AUC ~0.938. Add no entries to the
+  current 8,917-entry catalog; maintain ~2,300 distinct rule concepts unless
+  a separately approved migration removes generated permutations. The claim
+  is now a score that demonstrably separates strong from weak real writing,
+  not a big number. (See ROADMAP.md — the wave cadence that manufactured the
+  permutations is retired.)
 - Not adopting AI-generated "research" mechanisms on the strength of their
   citations — `v35_integration_plan.md`'s fabrication audit stands: adopt
   mechanisms, never citations, from anything in the research archive.

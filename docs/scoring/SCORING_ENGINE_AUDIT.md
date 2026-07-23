@@ -52,7 +52,7 @@ Entry: convergence loop ranks GENERATED candidates.
 | Uncalibrated probabilities | **YES.** No Platt/isotonic; percentile is empirical rank; tier multipliers are guesses; "confidence" fields unused/unvalidated. | confidence.ts, percentile.ts |
 | Global score ignores genre/phase/scene-function/author-intent | **CONFIRMED.** Health formula is genre-agnostic; genre only shifts rule thresholds (`genre-router.ts`), never the aggregation. No phase/scene-function/author-intent conditioning of weights. | doctor formula |
 | Pointwise treated as truth | **YES.** Health & composite are point estimates presented as fact; no pairwise final comparison. | — |
-| Position/verbosity/format/model bias | **CONFIRMED (verbosity).** Phase-B metamorphic suite: appending stateless filler RAISED health +6.0 (66.4→72.4) — the density penalty rewards word count. Format/rename/whitespace invariance holds. | doctor `:328-349`; `evals/scoring` |
+| Position/verbosity/format/model bias | **CONFIRMED (verbosity).** Phase-B metamorphic suite: the 2026-07-11 baseline rose +6.0 (66.4→72.4); the 2026-07-14 HEAD witness rises +6.5 (66.4→72.9). The density penalty rewards word count. Format/rename/whitespace invariance holds. | doctor `:328-349`; `evals/scoring` |
 | Scores without evidence | **Partial.** Issues carry location/rule; the aggregate health/composite carry NO evidence trace of why the number is what it is. | — |
 | Scores without uncertainty | **CONFIRMED.** Point estimates only; no intervals; W1 confidence is inert; no abstention. | — |
 | Judges can't abstain | **CONFIRMED.** No abstention anywhere (also found in the coverage-gap analysis). | — |

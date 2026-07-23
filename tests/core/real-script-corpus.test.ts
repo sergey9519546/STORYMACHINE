@@ -26,7 +26,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
@@ -44,14 +44,35 @@ const CORPUS_DIR = process.env.REAL_SCRIPT_CORPUS_DIR ?? '';
  *  ORPHAN_CLUE flood (which produced health 0, not 80). */
 const PRODUCED_FLOOR = 80;
 
+// Three distinct states, kept distinct on purpose so a misconfiguration reads
+// as a hard failure rather than a silent skip that looks like a pass:
+//   1. unset      → the copyright-boundary skip (honest, expected in CI).
+//   2. set-broken → the env var points at a path that doesn't exist or isn't a
+//                   directory. This is almost always a typo'd path, and the old
+//                   code surfaced it only as N confusing per-file "missing from
+//                   it" failures. Fail once, early, with the offending path.
+//   3. set-valid  → run the assertions below.
+const CORPUS_DIR_STATE: 'unset' | 'broken' | 'valid' = !CORPUS_DIR
+  ? 'unset'
+  : (existsSync(CORPUS_DIR) && statSync(CORPUS_DIR).isDirectory() ? 'valid' : 'broken');
+const SKIP_REASON = CORPUS_DIR_STATE === 'unset'
+  ? 'REAL_SCRIPT_CORPUS_DIR not set — corpus text is local-only (copyright)'
+  : false;
+
 describe('real-script corpus — produced features through the full doctor', () => {
   it('manifest sanity: at least 8 scripts, unique hashes', () => {
     assert.ok(MANIFEST.length >= 8, `manifest has ${MANIFEST.length} entries`);
     assert.equal(new Set(MANIFEST.map(m => m.contentHash)).size, MANIFEST.length);
   });
 
+  // Fail fast on a set-but-broken path so the run doesn't masquerade as a skip
+  // (unset) or bury the real cause under one failure per manifest entry.
+  it('corpus dir integrity: set path must exist and be a directory', { skip: CORPUS_DIR_STATE !== 'broken' && 'only runs when REAL_SCRIPT_CORPUS_DIR is set to a bad path' }, () => {
+    assert.fail(`REAL_SCRIPT_CORPUS_DIR is set to "${CORPUS_DIR}" but that path does not exist or is not a directory — fix the path, or unset it to skip the copyright-gated corpus`);
+  });
+
   for (const entry of MANIFEST) {
-    it(`${entry.name}: exact when byte-identical, floor otherwise`, { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set — corpus text is local-only (copyright)' }, async () => {
+    it(`${entry.name}: exact when byte-identical, floor otherwise`, { skip: SKIP_REASON }, async () => {
       const file = path.join(CORPUS_DIR, entry.file);
       if (!existsSync(file)) {
         assert.fail(`REAL_SCRIPT_CORPUS_DIR is set but ${entry.file} is missing from it`);
@@ -111,7 +132,7 @@ describe('real-script corpus — produced features through the full doctor', () 
 // todo still names the 0.9 target that feature-scale structural detectors
 // (setup-before-payoff ordering, act shape, escalation coherence) must
 // reach. This is the north-star separation metric made executable.
-describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
+describe('real-script corpus — structural-degradation AUC', { skip: SKIP_REASON }, () => {
   const SUBSET = 24; // grown from 12 (AUC-conversion wave, 2026-07-10)
   async function measure() {
     const { makePrng, seedFromString, shuffle } = await import('../../server/nvm/repro/seed.ts');
@@ -182,7 +203,7 @@ describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DI
 // (act shape, setup-before-payoff ordering, or a less lexicon-noisy
 // escalation measure than suspenseDelta) has an honest, already-measured
 // baseline to improve against instead of discovering this gap cold.
-describe('real-script corpus — act-swap-degradation AUC (second recipe)', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
+describe('real-script corpus — act-swap-degradation AUC (second recipe)', { skip: SKIP_REASON }, () => {
   const SUBSET = 24;
   function actSwap(t: string): string {
     const parts = t.split(/^(?=INT\.|EXT\.)/mi);
@@ -211,5 +232,93 @@ describe('real-script corpus — act-swap-degradation AUC (second recipe)', { sk
   }, async () => {
     const m = await measure();
     assert.ok(m.auc >= 0.9, `AUC ${m.auc.toFixed(3)} < 0.9 target (informational until a global-arc detector exists)`);
+  });
+});
+
+// —— Story Graph metrics: graph-native act-swap discrimination (Wave SG-1) ——
+// The Story Graph layer (server/nvm/analyze/story-graph.ts) constructs typed
+// causal-temporal graphs from existing scene signals (seededClueIds,
+// payoffSetupIds, relationshipShifts) and scores graph-native properties that
+// are ORDER-AWARE by construction. Unlike lexical rules (which count words) or
+// even the emotional-arc signal (which reads position via correlation), graph
+// metrics directly measure CAUSAL DIRECTION (setup → payoff vs. payoff →
+// setup) and STRUCTURAL PROGRESSION (tension rising across acts).
+//
+// TARGET: forwardEdgeRatio and arcCoherence should each achieve AUC >= 0.70 on
+// the act-swap recipe, proving graph-native scoring solves the position-
+// blindness that lexical rules cannot (DEEP_AUDIT findings #2, #9).
+describe('real-script corpus — Story Graph act-swap discrimination (Wave SG-1)', { skip: SKIP_REASON }, () => {
+  const SUBSET = 24;
+  function actSwap(t: string): string {
+    const parts = t.split(/^(?=INT\.|EXT\.)/mi);
+    const head = /^(INT\.|EXT\.)/i.test(parts[0]) ? '' : parts.shift() ?? '';
+    const scenes = parts.filter(x => /^(INT\.|EXT\.)/i.test(x));
+    const n = scenes.length;
+    const a = Math.ceil(n / 3);
+    const b = Math.ceil((n / 3) * 2);
+    const thirds = [scenes.slice(0, a), scenes.slice(a, b), scenes.slice(b)];
+    return head + [...thirds[2], ...thirds[0], ...thirds[1]].join('');
+  }
+  
+  async function measureGraphMetric(metricExtractor: (report: Awaited<ReturnType<typeof runScriptDoctor>>) => number) {
+    const files = MANIFEST.slice(0, SUBSET).map(m => m.file);
+    const goods: number[] = [], bads: number[] = [];
+    for (const f of files) {
+      const t = readFileSync(path.join(CORPUS_DIR, f), 'utf8');
+      const intactReport = await runScriptDoctor(t);
+      const swappedReport = await runScriptDoctor(actSwap(t));
+      
+      const intactMetric = metricExtractor(intactReport);
+      const swappedMetric = metricExtractor(swappedReport);
+      
+      goods.push(intactMetric);
+      bads.push(swappedMetric);
+    }
+    let wins = 0, ties = 0;
+    for (const g of goods) for (const b of bads) { if (g > b) wins++; else if (g === b) ties++; }
+    return { 
+      auc: (wins + ties / 2) / (goods.length * bads.length),
+      goods,
+      bads,
+      meanGood: goods.reduce((a, b) => a + b, 0) / goods.length,
+      meanBad: bads.reduce((a, b) => a + b, 0) / bads.length,
+    };
+  }
+  
+  it('forwardEdgeRatio: intact scripts show higher forward progression than act-swapped (AUC >= 0.70)', async () => {
+    const result = await measureGraphMetric(report => {
+      if (!report.storyGraph) return 0.5; // Fallback if no graph (shouldn't happen)
+      return report.storyGraph.graph.forwardEdgeRatio;
+    });
+    
+    assert.ok(result.auc >= 0.70,
+      `forwardEdgeRatio AUC ${result.auc.toFixed(3)} < 0.70 target ` +
+      `(meanIntact=${result.meanGood.toFixed(3)}, meanSwapped=${result.meanBad.toFixed(3)}) — ` +
+      `graph-native causality metric should detect backward edges in act-swapped scripts`);
+  });
+  
+  it('arcCoherence: intact scripts show higher tension-position correlation than act-swapped (AUC >= 0.70)', async () => {
+    const result = await measureGraphMetric(report => {
+      if (!report.storyGraph) return 0; // Fallback
+      // Normalize arcCoherence from [-1, 1] to [0, 1] for AUC comparison
+      return (report.storyGraph.graph.arcCoherence + 1) / 2;
+    });
+    
+    assert.ok(result.auc >= 0.70,
+      `arcCoherence AUC ${result.auc.toFixed(3)} < 0.70 target ` +
+      `(meanIntact=${result.meanGood.toFixed(3)}, meanSwapped=${result.meanBad.toFixed(3)}) — ` +
+      `position-aware tension correlation should detect act-swap scrambling`);
+  });
+  
+  it('graphHealth composite: intact scripts show higher overall graph quality than act-swapped (AUC >= 0.70)', async () => {
+    const result = await measureGraphMetric(report => {
+      if (!report.storyGraph) return 50; // Fallback
+      return report.storyGraph.graphHealth;
+    });
+    
+    assert.ok(result.auc >= 0.70,
+      `graphHealth AUC ${result.auc.toFixed(3)} < 0.70 target ` +
+      `(meanIntact=${result.meanGood.toFixed(3)}, meanSwapped=${result.meanBad.toFixed(3)}) — ` +
+      `composite graph metric should discriminate structural coherence`);
   });
 });

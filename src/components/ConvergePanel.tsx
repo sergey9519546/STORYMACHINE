@@ -230,14 +230,14 @@ function isTier1Passing(c: CandidateResult): boolean {
 
 function statusChipColor(status: CandidateStatus): string {
   if (status === 'winner') return '#facc15';
-  if (status === 'pass') return '#4ade80';
-  return '#fb923c';
+  if (status === 'pass') return 'var(--sm-ok)';
+  return 'var(--sm-warn)';
 }
 
 function sourceColor(source: CandidateSource): string {
-  if (source === 'llm') return '#60a5fa';
-  if (source === 'mutation') return '#a78bfa';
-  return '#94a3b8';
+  if (source === 'llm') return 'var(--sm-cool)';
+  if (source === 'mutation') return 'var(--sm-cool)';
+  return 'var(--sm-cream-mute)';
 }
 
 // One commit attempt's lifecycle, keyed per candidateId so many cards can be
@@ -370,23 +370,23 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
 
   const row = (step: ConvergeStep, i: number) => {
     const statusColor = step.passed
-      ? (step.ghostReason ? '#fb923c' : '#4ade80')
-      : '#f87171';
+      ? (step.ghostReason ? 'var(--sm-warn)' : 'var(--sm-ok)')
+      : 'var(--sm-stamp)';
     return (
-      <tr key={i} style={{ borderBottom: '1px solid #1e293b' }}>
-        <td style={{ padding: '4px 8px', color: '#94a3b8' }}>{step.iteration}</td>
+      <tr key={i} style={{ borderBottom: '1px solid var(--sm-night-2)' }}>
+        <td style={{ padding: '4px 8px', color: 'var(--sm-cream-mute)' }}>{step.iteration}</td>
         <td style={{ padding: '4px 8px' }}>
           <span style={{ color: statusColor, fontWeight: 600 }}>
             {step.passed ? (step.ghostReason ? 'GHOST' : 'PASS') : 'FAIL'}
           </span>
         </td>
-        <td style={{ padding: '4px 8px', color: '#60a5fa' }}>{step.valuationScore.toFixed(1)}</td>
-        <td style={{ padding: '4px 8px', color: '#a78bfa' }}>{step.qualityScore.toFixed(1)}</td>
+        <td style={{ padding: '4px 8px', color: 'var(--sm-cool)' }}>{step.valuationScore.toFixed(1)}</td>
+        <td style={{ padding: '4px 8px', color: 'var(--sm-cool)' }}>{step.qualityScore.toFixed(1)}</td>
         <td style={{ padding: '4px 8px', color: '#f9a8d4' }}>{step.compositeScore.toFixed(1)}</td>
         <td style={{ padding: '4px 8px', color: '#34d399', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {step.operator ? step.operator.replace(/_/g, ' ') : '—'}
         </td>
-        <td style={{ padding: '4px 8px', color: '#64748b', fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <td style={{ padding: '4px 8px', color: 'var(--sm-ink-mute)', fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {step.writersRoomSummary ?? '—'}
         </td>
       </tr>
@@ -402,7 +402,7 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
     return (
       <div key={candidate.candidateId} style={{
         background: isWinner ? '#1c1917' : '#111827',
-        border: isWinner ? '2px solid #facc15' : '1px solid #334155',
+        border: isWinner ? '2px solid #facc15' : '1px solid var(--sm-night-line)',
         borderRadius: 8, padding: 12,
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
@@ -411,17 +411,17 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
           <span style={{ color: statusChipColor(candidate.status), fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>
             {candidate.status.toUpperCase()}
           </span>
-          <span style={{ color: '#64748b', fontSize: 11 }}>
+          <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>
             iter {candidate.iteration} · <span style={{ color: sourceColor(candidate.source) }}>{candidate.source}</span>
           </span>
         </div>
-        <div style={{ color: '#64748b', fontSize: 10, fontFamily: 'monospace' }}>{candidate.candidateId}</div>
+        <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, fontFamily: 'var(--sm-font-mono)' }}>{candidate.candidateId}</div>
 
         {/* Scores */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <span style={{ color: '#f9a8d4', fontSize: 22, fontWeight: 700 }}>{candidate.composite.toFixed(1)}</span>
-          <span style={{ color: '#60a5fa', fontSize: 11 }}>tension {candidate.tension.toFixed(1)}</span>
-          <span style={{ color: '#a78bfa', fontSize: 11 }}>quality {candidate.quality.toFixed(1)}</span>
+          <span style={{ color: 'var(--sm-cool)', fontSize: 11 }}>tension {candidate.tension.toFixed(1)}</span>
+          <span style={{ color: 'var(--sm-cool)', fontSize: 11 }}>quality {candidate.quality.toFixed(1)}</span>
         </div>
 
         {/* Why it won — winner card only */}
@@ -433,10 +433,10 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
 
         {/* Ghost reason / tier failures */}
         {candidate.ghostReason && (
-          <div style={{ color: '#fb923c', fontSize: 11 }}>Ghost: {candidate.ghostReason.replace(/_/g, ' ')}</div>
+          <div style={{ color: 'var(--sm-warn)', fontSize: 11 }}>Ghost: {candidate.ghostReason.replace(/_/g, ' ')}</div>
         )}
         {candidate.tier1Failures.length > 0 && (
-          <div style={{ color: '#f87171', fontSize: 11 }}>
+          <div style={{ color: 'var(--sm-stamp)', fontSize: 11 }}>
             <div style={{ fontWeight: 600 }}>Tier-1 failures:</div>
             <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
               {candidate.tier1Failures.map((f, i) => <li key={i}>{f}</li>)}
@@ -444,7 +444,7 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
           </div>
         )}
         {candidate.tier2Flags.length > 0 && (
-          <div style={{ color: '#fbbf24', fontSize: 11 }}>
+          <div style={{ color: 'var(--sm-warn)', fontSize: 11 }}>
             <div style={{ fontWeight: 600 }}>Tier-2 flags:</div>
             <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
               {candidate.tier2Flags.map((f, i) => <li key={i}>{f}</li>)}
@@ -458,7 +458,7 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
             {ops.map((op, i) => {
               const { kind, detail } = summarizeOp(op);
               return (
-                <div key={i} style={{ fontSize: 10.5, color: '#94a3b8', padding: '2px 0' }}>
+                <div key={i} style={{ fontSize: 10.5, color: 'var(--sm-cream-mute)', padding: '2px 0' }}>
                   <span style={{ color: '#34d399', fontWeight: 600 }}>{kind}</span>{' '}
                   <span>{detail}</span>
                 </div>
@@ -472,47 +472,47 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
           <div>
             {commitState.phase === 'idle' && (
               <button onClick={() => commitCandidate(candidate)} style={{
-                width: '100%', padding: '6px 0', background: '#1d4ed8', color: '#fff',
-                border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 12,
+                width: '100%', padding: '6px 0', background: 'var(--sm-cool)', color: '#fff',
+                border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--sm-font-mono)', fontSize: 12,
               }}>
                 Commit this candidate
               </button>
             )}
             {commitState.phase === 'loading' && (
               <button disabled style={{
-                width: '100%', padding: '6px 0', background: '#334155', color: '#fff',
-                border: 'none', borderRadius: 4, fontFamily: 'monospace', fontSize: 12,
+                width: '100%', padding: '6px 0', background: 'var(--sm-night-line)', color: '#fff',
+                border: 'none', borderRadius: 4, fontFamily: 'var(--sm-font-mono)', fontSize: 12,
               }}>
                 Committing…
               </button>
             )}
             {commitState.phase === 'committed' && (
-              <div style={{ background: '#14532d', border: '1px solid #4ade80', borderRadius: 4, padding: 6, color: '#4ade80', fontSize: 11 }}>
+              <div style={{ background: '#14532d', border: '1px solid var(--sm-ok)', borderRadius: 4, padding: 6, color: 'var(--sm-ok)', fontSize: 11 }}>
                 Committed — id {commitState.commitId}
               </div>
             )}
             {commitState.phase === 'conflict' && (
-              <div style={{ background: '#450a0a', border: '1px solid #f87171', borderRadius: 4, padding: 8 }}>
-                <div style={{ color: '#f87171', fontSize: 11, fontWeight: 600 }}>{commitState.error}</div>
+              <div style={{ background: 'var(--sm-stamp-dk)', border: '1px solid var(--sm-stamp)', borderRadius: 4, padding: 8 }}>
+                <div style={{ color: 'var(--sm-stamp)', fontSize: 11, fontWeight: 600 }}>{commitState.error}</div>
                 {commitState.failures.length > 0 && (
                   <ul style={{ color: '#fca5a5', fontSize: 10.5, margin: '4px 0 0', paddingLeft: 16 }}>
                     {commitState.failures.map((f, i) => <li key={i}>{f}</li>)}
                   </ul>
                 )}
                 <button onClick={run} style={{
-                  marginTop: 6, padding: '4px 8px', background: '#1d4ed8', color: '#fff',
-                  border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11,
+                  marginTop: 6, padding: '4px 8px', background: 'var(--sm-cool)', color: '#fff',
+                  border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--sm-font-mono)', fontSize: 11,
                 }}>
                   Re-run search
                 </button>
               </div>
             )}
             {commitState.phase === 'error' && (
-              <div style={{ background: '#450a0a', border: '1px solid #f87171', borderRadius: 4, padding: 8 }}>
+              <div style={{ background: 'var(--sm-stamp-dk)', border: '1px solid var(--sm-stamp)', borderRadius: 4, padding: 8 }}>
                 <div style={{ color: '#fca5a5', fontSize: 11 }}>{commitState.message}</div>
                 <button onClick={() => commitCandidate(candidate)} style={{
-                  marginTop: 6, padding: '4px 8px', background: '#1d4ed8', color: '#fff',
-                  border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11,
+                  marginTop: 6, padding: '4px 8px', background: 'var(--sm-cool)', color: '#fff',
+                  border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--sm-font-mono)', fontSize: 11,
                 }}>
                   Retry
                 </button>
@@ -520,7 +520,7 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
             )}
           </div>
         ) : (
-          <div style={{ color: '#64748b', fontSize: 10.5, fontStyle: 'italic' }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10.5, fontStyle: 'italic' }}>
             Not proof-passing — no commit available.
           </div>
         )}
@@ -530,41 +530,41 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      padding: 20, width: 700, maxWidth: '95vw', fontFamily: 'monospace',
-      fontSize: 13, border: '1px solid #334155',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      padding: 20, width: 700, maxWidth: '95vw', fontFamily: 'var(--sm-font-mono)',
+      fontSize: 13, border: '1px solid var(--sm-night-line)',
       maxHeight: '80vh', overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <strong style={{ fontSize: 15 }}>Convergence Search (G1)</strong>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>x</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
       </div>
 
       {/* Controls */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
         <label>
-          <div style={{ color: '#94a3b8', marginBottom: 3 }}>Scene index</div>
+          <div style={{ color: 'var(--sm-cream-mute)', marginBottom: 3 }}>Scene index</div>
           <input type="number" min={0} value={sceneIdx} onChange={e => setSceneIdx(Number(e.target.value))}
             style={inputStyle} />
         </label>
         <label>
-          <div style={{ color: '#94a3b8', marginBottom: 3 }}>Scene function</div>
+          <div style={{ color: 'var(--sm-cream-mute)', marginBottom: 3 }}>Scene function</div>
           <select value={sceneFunc} onChange={e => setSceneFunc(e.target.value)} style={inputStyle}>
             {SCENE_FUNCTIONS.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
         </label>
         <label>
-          <div style={{ color: '#94a3b8', marginBottom: 3 }}>Max iterations</div>
+          <div style={{ color: 'var(--sm-cream-mute)', marginBottom: 3 }}>Max iterations</div>
           <input type="number" min={1} max={8} value={maxIter} onChange={e => setMaxIter(Number(e.target.value))}
             style={inputStyle} />
         </label>
         <label>
-          <div style={{ color: '#94a3b8', marginBottom: 3 }}>Tension target (0–100)</div>
+          <div style={{ color: 'var(--sm-cream-mute)', marginBottom: 3 }}>Tension target (0–100)</div>
           <input type="number" min={0} max={100} value={tensionTarget} onChange={e => setTension(Number(e.target.value))}
             style={inputStyle} />
         </label>
         <label>
-          <div style={{ color: '#94a3b8', marginBottom: 3 }}>Quality target (0–100)</div>
+          <div style={{ color: 'var(--sm-cream-mute)', marginBottom: 3 }}>Quality target (0–100)</div>
           <input type="number" min={0} max={100} value={qualityTarget} onChange={e => setQuality(Number(e.target.value))}
             style={inputStyle} />
         </label>
@@ -572,23 +572,23 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
 
       <button onClick={run} disabled={running} style={{
         width: '100%', padding: '8px 0', marginBottom: 16,
-        background: running ? '#334155' : '#1d4ed8',
+        background: running ? 'var(--sm-night-line)' : 'var(--sm-cool)',
         color: '#fff', border: 'none', borderRadius: 6,
-        cursor: running ? 'default' : 'pointer', fontFamily: 'monospace',
+        cursor: running ? 'default' : 'pointer', fontFamily: 'var(--sm-font-mono)',
       }}>
         {running
           ? `Searching… (iter ${liveSteps.length > 0 ? liveSteps[liveSteps.length - 1].iteration + 1 : 1}/${maxIter})`
           : 'Run Convergence Search'}
       </button>
 
-      {error && <div style={{ color: '#f87171', marginBottom: 12 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--sm-stamp)', marginBottom: 12 }}>{error}</div>}
 
       {/* Live step table — shown while running and after completion */}
       {displaySteps.length > 0 && (
         <div style={{ overflowX: 'auto', marginBottom: result ? 0 : 14 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #334155' }}>
+              <tr style={{ color: 'var(--sm-ink-mute)', textAlign: 'left', borderBottom: '1px solid var(--sm-night-line)' }}>
                 <th style={{ padding: '4px 8px' }}>iter</th>
                 <th style={{ padding: '4px 8px' }}>status</th>
                 <th style={{ padding: '4px 8px' }}>tension</th>
@@ -609,14 +609,14 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
           borderRadius: 6, padding: '8px 14px', marginTop: 14,
           display: 'flex', gap: 20, flexWrap: 'wrap',
         }}>
-          <span style={{ fontWeight: 700, color: result.converged ? '#4ade80' : '#fb923c' }}>
+          <span style={{ fontWeight: 700, color: result.converged ? 'var(--sm-ok)' : 'var(--sm-warn)' }}>
             {result.converged ? 'CONVERGED' : 'BUDGET EXHAUSTED'}
           </span>
           <span>{result.iterations} iteration{result.iterations !== 1 ? 's' : ''}</span>
           <span>tension {result.finalValuation.toFixed(1)}</span>
           <span>quality {result.finalQuality.toFixed(1)}</span>
           <span>composite {result.finalComposite.toFixed(1)}</span>
-          <span style={{ color: '#f87171' }}>{result.ghostCount} ghost{result.ghostCount !== 1 ? 's' : ''}</span>
+          <span style={{ color: 'var(--sm-stamp)' }}>{result.ghostCount} ghost{result.ghostCount !== 1 ? 's' : ''}</span>
         </div>
       )}
 
@@ -638,12 +638,12 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Writers' Room</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[...result.roomTranscript].sort((a, b) => b.severity - a.severity).map((entry, i) => (
-              <div key={i} style={{ background: '#111827', border: '1px solid #334155', borderRadius: 6, padding: 10 }}>
+              <div key={i} style={{ background: '#111827', border: '1px solid var(--sm-night-line)', borderRadius: 6, padding: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ color: '#a78bfa', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <span style={{ color: 'var(--sm-cool)', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     {criticName(entry)}
                   </span>
-                  <span style={{ color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>
+                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11, fontStyle: 'italic' }}>
                     {criticStance(entry)} (severity {entry.severity})
                     {entry.targetOpIdx !== null && ` · op${entry.targetOpIdx}`}
                   </span>
@@ -664,7 +664,7 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#1e293b', border: '1px solid #334155', borderRadius: 4,
-  color: '#e2e8f0', padding: '5px 8px', fontFamily: 'monospace',
+  background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 4,
+  color: 'var(--sm-cream)', padding: '5px 8px', fontFamily: 'var(--sm-font-mono)',
   fontSize: 13, width: '100%', boxSizing: 'border-box',
 };

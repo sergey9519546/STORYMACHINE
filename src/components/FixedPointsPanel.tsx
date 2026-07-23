@@ -127,16 +127,16 @@ export function FixedPointsPanel({ onClose }: Props) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      border: '1px solid #334155', width: 860, maxWidth: '98vw',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      border: '1px solid var(--sm-night-line)', width: 860, maxWidth: '98vw',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 13,
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0 }}>
         <div>
           <strong style={{ fontSize: 15 }}>Fixed Points — Temporal Authoring (G9)</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>Drop attractors on future scenes · the planner back-chains the ops needed to reach them</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>Drop attractors on future scenes · the planner back-chains the ops needed to reach them</div>
         </div>
         <button onClick={onClose} style={iconBtn}>✕</button>
       </div>
@@ -144,11 +144,11 @@ export function FixedPointsPanel({ onClose }: Props) {
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
         {/* Left: fixed point editor */}
-        <div style={{ width: 360, flexShrink: 0, borderRight: '1px solid #334155', overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ width: 360, flexShrink: 0, borderRight: '1px solid var(--sm-night-line)', overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* Current scene control */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ color: '#64748b', fontSize: 11 }}>Current scene</span>
+            <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>Current scene</span>
             <input type="number" min={0} max={50} value={currentScene}
               onChange={e => setCurrentScene(Number(e.target.value))}
               style={{ ...inputSt, width: 52 }} />
@@ -171,7 +171,7 @@ export function FixedPointsPanel({ onClose }: Props) {
           ))}
 
           <button onClick={addFP} disabled={fps.length >= 6}
-            style={{ ...btnSt('#1e293b'), color: '#94a3b8' }}>
+            style={{ ...btnSt('var(--sm-night-2)'), color: 'var(--sm-cream-mute)' }}>
             + Add Fixed Point
           </button>
         </div>
@@ -187,7 +187,7 @@ export function FixedPointsPanel({ onClose }: Props) {
             </button>
           </div>
 
-          {error && <div style={{ color: '#f87171', background: '#1e293b', borderRadius: 5, padding: 10 }}>{error}</div>}
+          {error && <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>{error}</div>}
 
           {/* Multi-point plan result */}
           {planResult && <PlanResultView result={planResult} />}
@@ -229,11 +229,11 @@ function FixedPointCard({ idx, fp, onChange, onReqChange, onRemove, onBackchain,
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div style={{ background: '#1e293b', borderRadius: 6, border: '1px solid #334155', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, border: '1px solid var(--sm-night-line)', overflow: 'hidden' }}>
       {/* Card header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: expanded ? '1px solid #334155' : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: expanded ? '1px solid var(--sm-night-line)' : 'none' }}>
         <span style={{ color: '#7c3aed', fontSize: 14 }}>◈</span>
-        <span style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>Scene</span>
+        <span style={{ color: 'var(--sm-cream-mute)', fontSize: 11, fontWeight: 700 }}>Scene</span>
         <input type="number" min={0} max={50} value={fp.atScene}
           onChange={e => onChange({ atScene: Number(e.target.value) })}
           style={{ ...inputSt, width: 46 }} />
@@ -333,19 +333,19 @@ function PlanResultView({ result }: { result: PlanResult }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Banner */}
-      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', background: '#1e293b', borderRadius: 6, padding: '10px 14px', alignItems: 'center' }}>
-        <Stat label="Goal biases" value={String(result.biases.length)} color="#a78bfa" />
-        <Stat label="Already met" value={String(result.alreadySatisfied.length)} color="#4ade80" />
-        <Stat label="Blocked" value={String(result.blocked.length)} color={result.blocked.length > 0 ? '#f87171' : '#64748b'} />
-        <Stat label="Pressures injected" value={String(result.pressuresInjected)} color="#60a5fa" />
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 14px', alignItems: 'center' }}>
+        <Stat label="Goal biases" value={String(result.biases.length)} color="var(--sm-cool)" />
+        <Stat label="Already met" value={String(result.alreadySatisfied.length)} color="var(--sm-ok)" />
+        <Stat label="Blocked" value={String(result.blocked.length)} color={result.blocked.length > 0 ? 'var(--sm-stamp)' : 'var(--sm-ink-mute)'} />
+        <Stat label="Pressures injected" value={String(result.pressuresInjected)} color="var(--sm-cool)" />
       </div>
 
       {/* Already satisfied */}
       {result.alreadySatisfied.length > 0 && (
         <div>
-          <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Already satisfied</div>
+          <div style={{ color: 'var(--sm-ok)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Already satisfied</div>
           {result.alreadySatisfied.map((fp, i) => (
-            <div key={i} style={{ color: '#4ade80', fontSize: 12, padding: '3px 0' }}>
+            <div key={i} style={{ color: 'var(--sm-ok)', fontSize: 12, padding: '3px 0' }}>
               ✓ Scene {fp.atScene}: {fp.description || '(unnamed)'}
             </div>
           ))}
@@ -355,11 +355,11 @@ function PlanResultView({ result }: { result: PlanResult }) {
       {/* Blocked */}
       {result.blocked.length > 0 && (
         <div>
-          <div style={{ color: '#f87171', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Blocked fixed points</div>
+          <div style={{ color: 'var(--sm-stamp)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Blocked fixed points</div>
           {result.blocked.map((b, i) => (
-            <div key={i} style={{ background: '#1e293b', border: '1px solid #991b1b', borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
-              <div style={{ color: '#f87171', fontSize: 12 }}>✗ Scene {b.fixedPoint.atScene}: {b.fixedPoint.description || '(unnamed)'}</div>
-              <div style={{ color: '#64748b', fontSize: 11 }}>{b.reason}</div>
+            <div key={i} style={{ background: 'var(--sm-night-2)', border: '1px solid #991b1b', borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
+              <div style={{ color: 'var(--sm-stamp)', fontSize: 12 }}>✗ Scene {b.fixedPoint.atScene}: {b.fixedPoint.description || '(unnamed)'}</div>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{b.reason}</div>
             </div>
           ))}
         </div>
@@ -368,10 +368,10 @@ function PlanResultView({ result }: { result: PlanResult }) {
       {/* Bias schedule */}
       {scenes.length > 0 && (
         <div>
-          <div style={{ color: '#a78bfa', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Planned bias schedule</div>
+          <div style={{ color: 'var(--sm-cool)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Planned bias schedule</div>
           {scenes.map(sc => (
-            <div key={sc} style={{ background: '#1e293b', borderRadius: 5, padding: '8px 12px', marginBottom: 6 }}>
-              <div style={{ color: '#64748b', fontSize: 10, marginBottom: 5 }}>INJECT AT SCENE {sc}</div>
+            <div key={sc} style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '8px 12px', marginBottom: 6 }}>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 5 }}>INJECT AT SCENE {sc}</div>
               {byScene.get(sc)!.map((bias, i) => (
                 <div key={i} style={{ marginBottom: i < byScene.get(sc)!.length - 1 ? 6 : 0 }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
@@ -381,7 +381,7 @@ function PlanResultView({ result }: { result: PlanResult }) {
                       </span>
                     ))}
                   </div>
-                  <div style={{ color: '#64748b', fontSize: 11 }}>{bias.rationale}</div>
+                  <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{bias.rationale}</div>
                   <div style={{ color: '#475569', fontSize: 10 }}>for: {bias.fixedPointDescription}</div>
                 </div>
               ))}
@@ -391,9 +391,9 @@ function PlanResultView({ result }: { result: PlanResult }) {
       )}
 
       {/* Transcript */}
-      <details style={{ background: '#1e293b', borderRadius: 5, padding: 10 }}>
-        <summary style={{ color: '#64748b', fontSize: 11, cursor: 'pointer' }}>Planning transcript</summary>
-        <pre style={{ marginTop: 8, fontSize: 11, color: '#94a3b8', whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0' }}>
+      <details style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>
+        <summary style={{ color: 'var(--sm-ink-mute)', fontSize: 11, cursor: 'pointer' }}>Planning transcript</summary>
+        <pre style={{ marginTop: 8, fontSize: 11, color: 'var(--sm-cream-mute)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0' }}>
           {result.transcript}
         </pre>
       </details>
@@ -415,7 +415,7 @@ function BackchainResultView({ result, fpDesc }: { result: BackchainResult; fpDe
         borderRadius: 5, padding: '8px 12px',
       }}>
         {result.complete
-          ? <span style={{ color: '#4ade80' }}>✓ Complete — {result.schedule.length} op(s) scheduled, no ordering conflicts</span>
+          ? <span style={{ color: 'var(--sm-ok)' }}>✓ Complete — {result.schedule.length} op(s) scheduled, no ordering conflicts</span>
           : <span style={{ color: '#f97316' }}>⚠ Incomplete — {result.blockingConstraint}</span>}
       </div>
 
@@ -426,17 +426,17 @@ function BackchainResultView({ result, fpDesc }: { result: BackchainResult; fpDe
           {result.schedule.map((s, i) => (
             <div key={i} style={{ background: '#0c1a2a', border: '1px solid #0e4166', borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ color: '#64748b', fontSize: 10 }}>scene {s.atScene}</span>
+                <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>scene {s.atScene}</span>
                 <span style={{ background: '#0e4166', color: '#7dd3fc', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>{s.op.op}</span>
               </div>
-              <div style={{ color: '#64748b', fontSize: 11 }}>{s.reason}</div>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{s.reason}</div>
             </div>
           ))}
         </div>
       )}
 
       {result.schedule.length === 0 && result.complete && (
-        <div style={{ color: '#4ade80', fontSize: 12, padding: '10px 0' }}>All requirements already satisfied — this fixed point needs no prep work.</div>
+        <div style={{ color: 'var(--sm-ok)', fontSize: 12, padding: '10px 0' }}>All requirements already satisfied — this fixed point needs no prep work.</div>
       )}
 
       {/* Biases generated */}
@@ -444,7 +444,7 @@ function BackchainResultView({ result, fpDesc }: { result: BackchainResult; fpDe
         <div>
           <div style={{ color: '#38bdf8', fontSize: 11, marginBottom: 6 }}>{result.biases.length} bias(es) scheduled for injection</div>
           {result.biases.map((b, i) => (
-            <div key={i} style={{ color: '#64748b', fontSize: 11, padding: '2px 0' }}>
+            <div key={i} style={{ color: 'var(--sm-ink-mute)', fontSize: 11, padding: '2px 0' }}>
               Scene {b.atScene}: {b.ops.map(o => o.op).join(', ')} — {b.rationale}
             </div>
           ))}
@@ -452,9 +452,9 @@ function BackchainResultView({ result, fpDesc }: { result: BackchainResult; fpDe
       )}
 
       {/* Trace */}
-      <details style={{ background: '#1e293b', borderRadius: 5, padding: 10 }}>
-        <summary style={{ color: '#64748b', fontSize: 11, cursor: 'pointer' }}>Precondition trace</summary>
-        <pre style={{ marginTop: 8, fontSize: 11, color: '#94a3b8', whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0' }}>
+      <details style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>
+        <summary style={{ color: 'var(--sm-ink-mute)', fontSize: 11, cursor: 'pointer' }}>Precondition trace</summary>
+        <pre style={{ marginTop: 8, fontSize: 11, color: 'var(--sm-cream-mute)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0' }}>
           {result.trace}
         </pre>
       </details>
@@ -467,30 +467,30 @@ function BackchainResultView({ result, fpDesc }: { result: BackchainResult; fpDe
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <div style={{ color: '#64748b', fontSize: 10 }}>{label}</div>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{label}</div>
       <div style={{ color, fontSize: 20, fontWeight: 700 }}>{value}</div>
     </div>
   );
 }
 
 const inputSt: React.CSSProperties = {
-  background: '#0f172a', border: '1px solid #334155', borderRadius: 4,
-  color: '#e2e8f0', padding: '4px 6px', fontFamily: 'monospace',
+  background: 'var(--sm-night)', border: '1px solid var(--sm-night-line)', borderRadius: 4,
+  color: 'var(--sm-cream)', padding: '4px 6px', fontFamily: 'var(--sm-font-mono)',
   fontSize: 12, boxSizing: 'border-box',
 };
 
 const labelSt: React.CSSProperties = {
-  display: 'block', color: '#64748b', fontSize: 10, marginBottom: 3,
+  display: 'block', color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 3,
 };
 
 const iconBtn: React.CSSProperties = {
-  background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16,
+  background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16,
 };
 
 function btnSt(bg: string): React.CSSProperties {
   return {
     padding: '7px 12px', border: 'none', borderRadius: 5,
     background: bg, color: '#fff', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 12,
+    fontFamily: 'var(--sm-font-mono)', fontSize: 12,
   };
 }

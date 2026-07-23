@@ -27,8 +27,20 @@ jobs:
       # rule — a written convention only reliably holds when CI holds it.
       # grep exits 1 on no-match, so `!` inverts: any hit fails the build
       # and prints the offending lines.
+      #
+      # --exclude-dir/--exclude mirror the tsconfig.json + package.json test
+      # quarantine of the never-compiled v5.0 experimental "narrative OS"
+      # subsystem (server/nvm/{kernel,quantum,research,infinity-gate}, plus
+      # server/planning and every *.bench.ts under server/nvm/**/benchmarks)
+      # and its two broken ai-provider tests (reference removed exports) —
+      # none of it is wired into the running server, so it isn't held to the
+      # logger convention either. Genuinely-live code stays covered.
       - name: Enforce no console.* under server/
-        run: "! grep -rn 'console\\.' server --include='*.ts'"
+        run: >-
+          ! grep -rn 'console\.' server --include='*.ts'
+          --exclude-dir=kernel --exclude-dir=quantum --exclude-dir=research
+          --exclude-dir=infinity-gate --exclude-dir=planning --exclude-dir=benchmarks
+          --exclude=ai-provider.test.ts --exclude=ai-provider-integration.test.ts
 
       # Deliberately NO GEMINI_API_KEY here: the product's official keyless
       # analysis-only mode is what CI must prove. With a fake key set, the

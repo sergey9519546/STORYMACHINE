@@ -50,9 +50,13 @@ describe('resolveDraftConflict', () => {
 });
 
 describe('saveStatusLabel', () => {
-  it('labels durable states honestly', () => {
+  it('labels every persistence state honestly', () => {
+    assert.equal(saveStatusLabel('idle'), '');
+    assert.equal(saveStatusLabel('saving-local'), 'Saving locally…');
+    assert.equal(saveStatusLabel('saved-local'), 'Saved locally');
+    assert.equal(saveStatusLabel('saving-server'), 'Saving to server…');
     assert.equal(saveStatusLabel('saved-server'), 'Saved to server');
     assert.equal(saveStatusLabel('save-failed'), 'Save failed');
-    assert.equal(saveStatusLabel('idle'), '');
+    assert.equal(saveStatusLabel('save-conflict'), 'Save conflict');
   });
 });

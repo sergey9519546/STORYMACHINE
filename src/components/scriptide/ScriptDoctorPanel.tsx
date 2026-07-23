@@ -415,6 +415,269 @@ function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
   );
 }
 
+/** Story Graph Section — Phase 2 Enhanced Diagnostics
+ *  Displays structural analysis with severity-based grouping, impact explanations,
+ *  and actionable suggestions. Shows critical/medium/low issues plus strengths. */
+function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server/nvm/analyze/story-graph.ts").StoryGraphReport }) {
+  const { diagnostics, summary, graph } = storyGraph;
+  const [expandedDiagnostic, setExpandedDiagnostic] = useState<string | null>(null);
+
+  // Overall assessment styling
+  const assessmentMeta = {
+    strong: { label: "Strong Structure", color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20", icon: CheckCircle2 },
+    good: { label: "Good Structure", color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20", icon: CheckCircle2 },
+    "needs-work": { label: "Needs Work", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20", icon: AlertCircle },
+    weak: { label: "Weak Structure", color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/20", icon: AlertTriangle },
+  };
+
+  const assessment = assessmentMeta[summary.overallAssessment];
+
+  // Severity icons
+  const severityIcons = {
+    critical: { Icon: AlertTriangle, color: "text-red-600 dark:text-red-400" },
+    medium: { Icon: AlertCircle, color: "text-amber-600 dark:text-amber-400" },
+    low: { Icon: Info, color: "text-zinc-500 dark:text-zinc-400" },
+    strength: { Icon: CheckCircle2, color: "text-green-600 dark:text-green-400" },
+  };
+
+  return (
+    <div>
+      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+        Story Structure Analysis
+      </h3>
+      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-3">
+        Graph-based structural diagnostics — promise tracking, causal flow, escalation.
+      </p>
+
+      {/* Overall assessment banner */}
+      <div className={`${assessment.bg} border-2 border-black/10 dark:border-white/10 p-3 mb-4`}>
+        <div className="flex items-center gap-2 mb-2">
+          <assessment.icon className={`w-4 h-4 ${assessment.color}`} aria-hidden="true" />
+          <span className={`text-xs font-bold uppercase tracking-widest ${assessment.color}`}>
+            {assessment.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] font-mono text-gray-600 dark:text-gray-400">
+          <span>{summary.totalIssues} issues</span>
+          <span>·</span>
+          <span>{summary.criticalCount} critical</span>
+          <span>·</span>
+          <span>{summary.strengthCount} strengths</span>
+        </div>
+        <div className="mt-2 text-[10px] font-mono text-gray-500 dark:text-gray-400">
+          Health score: {storyGraph.graphHealth}/100 · 
+          Promise closure: {Math.round(graph.promisePaymentRatio * 100)}% · 
+          Forward flow: {Math.round(graph.forwardEdgeRatio * 100)}%
+        </div>
+      </div>
+
+      {/* Critical Issues */}
+      {diagnostics.critical.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400">
+              Critical ({diagnostics.critical.length})
+            </h4>
+          </div>
+          <div className="space-y-2">
+            {diagnostics.critical.map((diag, i) => {
+              const diagId = `critical-${i}`;
+              const isExpanded = expandedDiagnostic === diagId;
+              return (
+                <div
+                  key={i}
+                  className="border-2 border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 p-2.5"
+                >
+                  <button
+                    onClick={() => setExpandedDiagnostic(isExpanded ? null : diagId)}
+                    className="w-full text-left flex items-start gap-2"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-600" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-600" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-[11px] font-bold text-red-900 dark:text-red-200 leading-snug">
+                        {diag.message}
+                        {diag.sceneIdx !== undefined && (
+                          <span className="ml-1.5 text-[10px] font-mono text-red-700 dark:text-red-400">
+                            (Scene {diag.sceneIdx + 1})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="mt-2 pl-5 space-y-2">
+                      <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {diag.impact}
+                      </p>
+                      {diag.suggestions.length > 0 && (
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-1">
+                            Suggestions:
+                          </p>
+                          <ul className="space-y-1">
+                            {diag.suggestions.map((suggestion, si) => (
+                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
+                                <span className="text-red-600 shrink-0">→</span>
+                                <span>{suggestion}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Medium Issues */}
+      {diagnostics.medium.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+              Medium ({diagnostics.medium.length})
+            </h4>
+          </div>
+          <div className="space-y-2">
+            {diagnostics.medium.map((diag, i) => {
+              const diagId = `medium-${i}`;
+              const isExpanded = expandedDiagnostic === diagId;
+              return (
+                <div
+                  key={i}
+                  className="border-2 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 p-2.5"
+                >
+                  <button
+                    onClick={() => setExpandedDiagnostic(isExpanded ? null : diagId)}
+                    className="w-full text-left flex items-start gap-2"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-[11px] font-bold text-amber-900 dark:text-amber-200 leading-snug">
+                        {diag.message}
+                        {diag.sceneIdx !== undefined && (
+                          <span className="ml-1.5 text-[10px] font-mono text-amber-700 dark:text-amber-400">
+                            (Scene {diag.sceneIdx + 1})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="mt-2 pl-5 space-y-2">
+                      <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {diag.impact}
+                      </p>
+                      {diag.suggestions.length > 0 && (
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-1">
+                            Suggestions:
+                          </p>
+                          <ul className="space-y-1">
+                            {diag.suggestions.map((suggestion, si) => (
+                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
+                                <span className="text-amber-600 shrink-0">→</span>
+                                <span>{suggestion}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Low Issues (Collapsed by default, show count) */}
+      {diagnostics.low.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Info className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+              Low Priority ({diagnostics.low.length})
+            </h4>
+          </div>
+          <details className="border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/10 p-2.5">
+            <summary className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 cursor-pointer">
+              Click to expand {diagnostics.low.length} minor issue{diagnostics.low.length === 1 ? '' : 's'}
+            </summary>
+            <div className="mt-2 space-y-2">
+              {diagnostics.low.map((diag, i) => (
+                <div key={i} className="pl-2 border-l-2 border-zinc-300 dark:border-zinc-600">
+                  <p className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 leading-snug">
+                    {diag.message}
+                    {diag.sceneIdx !== undefined && (
+                      <span className="ml-1.5 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
+                        (Scene {diag.sceneIdx + 1})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
+
+      {/* Strengths */}
+      {diagnostics.strengths.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-green-600 dark:text-green-400">
+              Strengths ({diagnostics.strengths.length})
+            </h4>
+          </div>
+          <div className="space-y-2">
+            {diagnostics.strengths.map((strength, i) => (
+              <div
+                key={i}
+                className="border-2 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10 p-2.5"
+              >
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-green-600" aria-hidden="true" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold text-green-900 dark:text-green-200 leading-snug mb-1">
+                      {strength.message}
+                    </p>
+                    <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                      {strength.impact}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {summary.totalIssues === 0 && diagnostics.strengths.length === 0 && (
+        <div className="text-center py-4 text-[10px] font-mono text-gray-500 dark:text-gray-400">
+          No structural issues detected. Graph analysis found clean causal flow.
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Heatmap cell color by issue density — critical presence always wins regardless
  *  of total count, so a single critical issue reads as urgent even in a light scene. */
 function heatmapClass(scene: SceneDiagnostics): string {
@@ -942,7 +1205,7 @@ function RootCauseCard({
                   ? "No analyzable script text is available for this report."
                   : undefined
               }
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5"
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5"
             >
               {fixState.pending ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -1219,13 +1482,13 @@ function FixReceiptCard({
                 ? "This is the read-only sample script — try Fix & verify on your own script to accept a change."
                 : undefined
             }
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-black text-white hover:bg-green-600 transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn--ink hover:bg-green-600 transition-colors disabled:opacity-40 flex items-center gap-1.5"
           >
             <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Accept
           </button>
           <button
             onClick={onDiscard}
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
           >
             <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Discard
           </button>
@@ -2060,14 +2323,15 @@ export default function ScriptDoctorPanel({
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[640px] max-w-[94vw] h-dvh bg-white dark:bg-zinc-900 dark:text-white brutal-border-thick text-black p-0 overflow-y-auto z-50 brutal-shadow flex flex-col"
+      className="fixed top-0 right-0 w-[640px] max-w-[94vw] h-dvh bg-[var(--sm-panel)] text-[var(--sm-ink)] border-l-[1.5px] border-[var(--sm-ink)] p-0 overflow-y-auto z-50 flex flex-col"
+      style={{ boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.6), -24px 0 48px -20px rgba(33,29,21,0.25)' }}
     >
       {/* Chrome header */}
-      <div className="flex flex-wrap items-center gap-3 p-6 pb-4 border-b-[8px] border-black shrink-0">
-        <Stethoscope className="w-8 h-8 shrink-0" aria-hidden="true" />
+      <div className="flex flex-wrap items-center gap-3 px-6 py-5 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-night)] text-[var(--sm-cream)] shrink-0">
+        <Stethoscope className="w-5 h-5 shrink-0 opacity-80" aria-hidden="true" />
         <h2
           id="script-doctor-title"
-          className="text-2xl font-display uppercase tracking-widest flex-1"
+          className="font-[family-name:var(--sm-font-display)] text-xl uppercase tracking-widest flex-1"
         >
           Script Doctor
         </h2>
@@ -2093,7 +2357,7 @@ export default function ScriptDoctorPanel({
           disabled={status === "loading"}
           aria-label="Upload script file to diagnose instead of the editor content"
           title="Upload a .fountain, .txt, Final Draft (.fdx), or PDF file to diagnose instead of the editor content"
-          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
         >
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> Upload script
         </button>
@@ -2117,7 +2381,7 @@ export default function ScriptDoctorPanel({
                 ? "Export re-verifies deterministically (quick read) — run a quick diagnosis to export"
                 : "Export the current report as a downloadable HTML coverage document"
             }
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             {exportStatus === "loading" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -2138,7 +2402,7 @@ export default function ScriptDoctorPanel({
             disabled={breakdownStatus === "loading"}
             aria-label="Export a scene/character breakdown as CSV"
             title="Download a production breakdown (scenes, characters, locations) as CSV"
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             {breakdownStatus === "loading" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -2154,7 +2418,7 @@ export default function ScriptDoctorPanel({
             disabled={pitchkitStatus === "loading"}
             aria-label="Export a standalone pitch kit as HTML"
             title="Download a standalone, shareable pitch kit document (HTML)"
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             {pitchkitStatus === "loading" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -2169,7 +2433,7 @@ export default function ScriptDoctorPanel({
             onClick={() => runDiagnosis()}
             disabled={isEmpty}
             aria-label="Re-run diagnosis"
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Re-run
           </button>
@@ -2177,9 +2441,9 @@ export default function ScriptDoctorPanel({
         <button
           onClick={onClose}
           aria-label="Close Script Doctor panel"
-          className="p-2 brutal-border hover:bg-black hover:text-white transition-colors"
+          className="sm-btn border-[var(--sm-cream)]/30 p-2 text-[var(--sm-cream)] hover:border-[var(--sm-cream)]"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
 
@@ -2212,7 +2476,7 @@ export default function ScriptDoctorPanel({
                 : "Stop analyzing the uploaded file and go back to the editor content"
             }
             title="Analyze the editor content instead"
-            className="p-1 brutal-border hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
+            className="p-1 sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
           >
             <X className="w-3 h-3" aria-hidden="true" />
           </button>
@@ -2310,7 +2574,7 @@ export default function ScriptDoctorPanel({
                   see loadSample. */}
               <button
                 onClick={loadSample}
-                className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-2 mx-auto"
+                className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-2 mx-auto"
               >
                 <Sparkles className="w-3.5 h-3.5" aria-hidden="true" /> Try a sample script
               </button>
@@ -2359,7 +2623,7 @@ export default function ScriptDoctorPanel({
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => runDiagnosis()}
-                  className="flex-1 bg-black text-white px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border flex items-center justify-center gap-2"
+                  className="flex-1 sm-btn--ink px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[var(--sm-stamp)] transition-colors sm-btn flex items-center justify-center gap-2"
                 >
                   <Stethoscope className="w-4 h-4" aria-hidden="true" /> Run Diagnosis
                 </button>
@@ -2370,7 +2634,7 @@ export default function ScriptDoctorPanel({
                   onClick={loadSample}
                   aria-label="Load a built-in sample screenplay and run a diagnosis on it immediately, instead of the current content"
                   title="Try Script Doctor on a built-in sample screenplay — no upload or typing needed"
-                  className="px-4 py-3 text-xs font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center justify-center gap-2 shrink-0"
+                  className="px-4 py-3 text-xs font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center justify-center gap-2 shrink-0"
                 >
                   <Sparkles className="w-4 h-4" aria-hidden="true" /> Try a sample
                 </button>
@@ -2389,7 +2653,7 @@ export default function ScriptDoctorPanel({
             </p>
             <button
               disabled
-              className="mt-4 w-full bg-gray-300 text-gray-600 px-4 py-3 text-xs font-bold uppercase tracking-widest brutal-border cursor-not-allowed flex items-center justify-center gap-2"
+              className="mt-4 w-full bg-gray-300 text-gray-600 px-4 py-3 text-xs font-bold uppercase tracking-widest sm-btn cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Diagnosing&hellip;
             </button>
@@ -2406,7 +2670,7 @@ export default function ScriptDoctorPanel({
             <button
               onClick={() => runDiagnosis()}
               disabled={isEmpty}
-              className="bg-black text-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors brutal-border disabled:opacity-40 flex items-center gap-2"
+              className="sm-btn--ink px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors sm-btn disabled:opacity-40 flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Retry
             </button>
@@ -2416,10 +2680,31 @@ export default function ScriptDoctorPanel({
         {/* ── Success state ── */}
         {status === "success" && report && (
           <div className="space-y-6">
-            {/* Report header: verdict banner when the coverage layer is present
-                (report.verdict), else the original health/grade box — so older
-                doctor responses (verdict absent) still render exactly as before. */}
-            {report.verdict ? (
+            {/* P0.3: incomplete analysis — one or more revision passes failed.
+                Health/grade sentinels (0 / troubled) are NOT real scores and
+                must not be shown as if they were. */}
+            {report.analysisComplete === false ? (
+              <div className="sm-panel border-2 border-stamp bg-paper p-5 space-y-3">
+                <div className="sm-sub text-stamp">Analysis incomplete</div>
+                <div className="font-display text-xl uppercase tracking-wide text-ink">
+                  Score withheld
+                </div>
+                <p className="text-xs font-mono leading-relaxed text-ink/80">
+                  {report.plainSummary ||
+                    "One or more diagnostic passes failed. Health, verdict, and percentiles are withheld because the issue count may be artificially low."}
+                </p>
+                {Array.isArray(report.failedPasses) && report.failedPasses.length > 0 && (
+                  <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-ink/70">
+                    Failed passes: {report.failedPasses.join(", ")}
+                  </div>
+                )}
+                <div className="text-[10px] font-mono text-ink/60">
+                  {report.sceneCount} scene{report.sceneCount === 1 ? "" : "s"} ·{" "}
+                  {report.wordCount.toLocaleString()} words · {report.totalIssues} issue
+                  {report.totalIssues === 1 ? "" : "s"} observed before failure
+                </div>
+              </div>
+            ) : report.verdict ? (
               /* 1c Coverage — the honest read: paper card, rotated verdict
                  stamp, big ink health number, decomposition, determinism line. */
               <div className="sm-panel p-5">
@@ -2473,7 +2758,7 @@ export default function ScriptDoctorPanel({
                 </div>
               </div>
             ) : (
-              <div className="bg-black text-white p-4 brutal-border-thick">
+              <div className="sm-btn--ink p-4 border-[2px] border-[var(--sm-ink)]">
                 <div className="flex items-center gap-4">
                   <div className={`text-5xl font-bold ${GRADE_META[report.grade].text}`}>
                     {Math.round(report.health)}
@@ -2738,7 +3023,7 @@ export default function ScriptDoctorPanel({
                             loadedNoticeTimerRef.current = setTimeout(() => setLoadedNotice(false), 4000);
                           }}
                           aria-label="Load the converted Fountain text into the script editor"
-                          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
+                          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
                         >
                           <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" /> Load converted
                           Fountain into editor
@@ -2787,6 +3072,13 @@ export default function ScriptDoctorPanel({
                 before it existed degrade gracefully with no gap — same
                 optional-field convention as report.deepRead/rootCauses. */}
             {report.metrics && <StoryMetricsSection metrics={report.metrics} />}
+
+            {/* Story graph — Phase 2 enhanced structural diagnostics from
+                server/nvm/analyze/story-graph.ts (report.storyGraph). Rendered
+                only when the report carries the field, same optional-field
+                convention as report.metrics above. Shows severity-grouped
+                diagnostics with impact + actionable suggestions. */}
+            {report.storyGraph && <StoryGraphSection storyGraph={report.storyGraph} />}
 
             {/* Top priorities */}
             {report.topPriorities.length > 0 && (
@@ -2942,13 +3234,13 @@ export default function ScriptDoctorPanel({
                               setPreviousEntry(null);
                               setConfirmingClearHistory(false);
                             }}
-                            className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest brutal-border bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest sm-btn bg-red-600 text-white hover:bg-red-700 transition-colors"
                           >
                             Confirm
                           </button>
                           <button
                             onClick={() => setConfirmingClearHistory(false)}
-                            className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors"
+                            className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors"
                           >
                             Cancel
                           </button>
@@ -2957,7 +3249,7 @@ export default function ScriptDoctorPanel({
                         <button
                           onClick={() => setConfirmingClearHistory(true)}
                           aria-label="Clear all saved draft history"
-                          className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
+                          className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
                         >
                           <Trash2 className="w-3 h-3" aria-hidden="true" /> Clear history
                         </button>

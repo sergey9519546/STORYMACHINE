@@ -14,6 +14,7 @@ import type { SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { NarrativeMetricsReport } from './metrics.ts';
+import type { StoryGraphReport } from './story-graph.ts';
 
 /** Output of the heuristic Fountain analyzer — everything the revision
  *  pipeline needs, reconstructed from raw text instead of StoryCommits. */
@@ -222,9 +223,13 @@ export interface ScriptDoctorReport {
    *  constants and their empirical tuning live in doctor.ts's craftPenalty —
    *  that function is the single source of truth; this comment describes
    *  shape, not constants, so it can't silently drift. Length-invariant by
-   *  regression test: same craft at 1×/2×/3× length scores within ~10 pts. */
+   *  regression test: same craft at 1×/2×/3× length scores within ~10 pts.
+   *  P0.3: when analysisComplete is false, this is a degraded value (0) and
+   *  should not be presented as a real score — show the incomplete banner. */
   health: number;
-  /** health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled */
+  /** health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled.
+   *  P0.3: when analysisComplete is false, this is 'troubled' and should not
+   *  be presented as a real grade — show the incomplete banner. */
   grade: DoctorGrade;
   totalIssues: number;
   bySeverity: { critical: number; major: number; minor: number };
@@ -268,6 +273,15 @@ export interface ScriptDoctorReport {
   bonding?: import('./bonding-signal.ts').BondingReport;
   coldOpenPromise?: import('./cold-open-promise.ts').ColdOpenReport;
   patternEstablishment?: import('./pattern-establishment.ts').PatternReport;
+  /** Wave SG-1: Story Graph diagnostic analysis. Constructs typed
+   *  causal-temporal graph from existing scene signals (seededClueIds,
+   *  payoffSetupIds, relationshipShifts), scores graph-native properties
+   *  (promise-payment ratio, arc coherence, escalation monotonicity,
+   *  forward-edge ratio) to solve act-swap AUC 0.48 and rule-channel AUC 0.076
+   *  failures (DEEP_AUDIT findings #2, #9). Diagnostic only — not yet coupled
+   *  to health. Optional so reports serialized before this field existed stay
+   *  valid; the doctor populates it on every non-degenerate run. */
+  storyGraph?: StoryGraphReport;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
   /** Present ONLY on deep-read reports (POST /api/scriptide/doctor/deep).
@@ -292,6 +306,15 @@ export interface ScriptDoctorReport {
      *  annotation), so the panel can mark them honestly. Empty when all read. */
     fallbackScenes: number[];
   };
+  /** P0.3: false when any revision pass threw and was skipped. When false,
+   *  health/verdict/percentiles are withheld because the issue count may be
+   *  artificially low — a failed detector returning zero issues can make a
+   *  script look healthier than one where the detector ran. The client must
+   *  show an incomplete-analysis banner instead of a score. */
+  analysisComplete?: boolean;
+  /** P0.3: passes that threw during execution. Only populated when
+   *  analysisComplete === false. */
+  failedPasses?: PassName[];
   /** sha256 hex of the trimmed analyzed Fountain text. The determinism
    *  receipt: two reports with equal contentHash came from the identical
    *  script, so their verdicts are comparable draft-over-draft, and an

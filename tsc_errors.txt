@@ -1,0 +1,171 @@
+server/engine/ai-provider-integration.test.ts(7,3): error TS2724: '"./ai-provider.ts"' has no exported member named 'OpenAIProvider'. Did you mean 'AIProvider'?
+server/engine/ai-provider-integration.test.ts(8,3): error TS2305: Module '"./ai-provider.ts"' has no exported member 'AnthropicProvider'.
+server/engine/ai-provider.test.ts(6,10): error TS2724: '"./ai-provider.ts"' has no exported member named 'OpenAIProvider'. Did you mean 'AIProvider'?
+server/engine/ai-provider.test.ts(6,26): error TS2305: Module '"./ai-provider.ts"' has no exported member 'AnthropicProvider'.
+server/nvm/__tests__/compatibility.test.ts(27,5): error TS2322: Type 'string' is not assignable to type 'CommitDeltaSummary'.
+server/nvm/__tests__/smoke.test.ts(188,53): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(213,49): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(229,53): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(289,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(392,56): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(417,56): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(444,56): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(479,49): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(505,49): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(554,49): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/smoke.test.ts(571,53): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/__tests__/v5-integration.test.ts(504,55): error TS2353: Object literal may only specify known properties, and 'presentationIndex' does not exist in type '{ sceneIdx?: number | undefined; storyTime?: number | undefined; realityLayer?: RealityLayer | undefined; createdBy?: ProvenanceOrigin | undefined; parentCommitId?: string | undefined; }'.
+server/nvm/analyze/temporal-consistency-doctor.ts(8,15): error TS2459: Module '"./types.ts"' declares 'ScreenplaySceneRecord' locally, but it is not exported.
+server/nvm/analyze/temporal-consistency-doctor.ts(9,15): error TS2305: Module '"./doctor.ts"' has no exported member 'DoctorIssue'.
+server/nvm/analyze/temporal-consistency.test.ts(12,15): error TS2459: Module '"./types.ts"' declares 'ScreenplaySceneRecord' locally, but it is not exported.
+server/nvm/analyze/temporal-consistency.ts(23,15): error TS2459: Module '"./types.ts"' declares 'ScreenplaySceneRecord' locally, but it is not exported.
+server/nvm/benchmarks/integration.bench.ts(50,9): error TS2322: Type '`character_${number}`' is not assignable to type 'ClueCarrier'.
+server/nvm/benchmarks/integration.bench.ts(66,9): error TS2353: Object literal may only specify known properties, and 'text' does not exist in type 'AtomicFact'.
+server/nvm/benchmarks/integration.bench.ts(80,3): error TS2741: Property 'authorIntent' is missing in type '{ turn: number; objectiveReality: never[]; characterBeliefs: {}; characterEmotions: {}; relationships: {}; clues: never[]; payoffs: never[]; clocks: {}; themeArgument: never[]; objectArcs: {}; firedRules: never[]; audienceState: { ...; }; sceneFacts: never[]; }' but required in type 'NarrativeState'.
+server/nvm/benchmarks/integration.bench.ts(338,11): error TS2322: Type '`character_${number}`' is not assignable to type 'ClueCarrier'.
+server/nvm/benchmarks/integration.bench.ts(360,11): error TS2353: Object literal may only specify known properties, and 'payoffAtTurn' does not exist in type '{ op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }'.
+server/nvm/benchmarks/integration.bench.ts(433,9): error TS2322: Type '"new_character"' is not assignable to type 'ClueCarrier'.
+server/nvm/benchmarks/integration.bench.ts(438,52): error TS2339: Property 'clueId' does not exist on type 'StoryOp'.
+  Property 'clueId' does not exist on type '{ op: "ADD_FACT"; fact: AtomicFact; }'.
+server/nvm/kernel/__tests__/integration.test.ts(170,47): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/__tests__/integration.test.ts(171,7): error TS2322: Type '{ op: "EXPIRE_FACT"; factId: string; }' is not assignable to type 'StoryOp'.
+  Property 'atTurn' is missing in type '{ op: "EXPIRE_FACT"; factId: string; }' but required in type '{ op: "EXPIRE_FACT"; factId: string; atTurn: number; }'.
+server/nvm/kernel/__tests__/integration.test.ts(172,56): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'Belief'.
+server/nvm/kernel/__tests__/integration.test.ts(173,88): error TS2353: Object literal may only specify known properties, and 'change' does not exist in type 'RelationshipDelta'.
+server/nvm/kernel/__tests__/integration.test.ts(174,60): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type 'EmotionState'.
+server/nvm/kernel/__tests__/integration.test.ts(175,43): error TS2322: Type '"photograph"' is not assignable to type 'ClueCarrier'.
+server/nvm/kernel/__tests__/integration.test.ts(342,9): error TS2322: Type 'string' is not assignable to type 'CommitDeltaSummary'.
+server/nvm/kernel/__tests__/integration.test.ts(351,9): error TS2322: Type 'string' is not assignable to type 'CommitDeltaSummary'.
+server/nvm/kernel/__tests__/integration.test.ts(473,34): error TS2339: Property 'stateId' does not exist on type 'CollapseResult'.
+server/nvm/kernel/adapters.ts(53,7): error TS2322: Type 'string' is not assignable to type 'CommitDeltaSummary'.
+server/nvm/kernel/adapters.ts(117,5): error TS2353: Object literal may only specify known properties, and 'characterCount' does not exist in type 'FountainAnalysis'.
+server/nvm/kernel/adapters.ts(161,16): error TS2339: Property 'characters' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/kernel/adapters.ts(162,14): error TS2339: Property 'characters' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/kernel/adapters.ts(162,33): error TS7006: Parameter 'c' implicitly has an 'any' type.
+server/nvm/kernel/adapters.ts(190,46): error TS2345: Argument of type '{ buildScreenplayMemory(): Promise<ScreenplaySceneRecord[]>; toFountainAnalysis(): Promise<FountainAnalysis>; getCommits(): StoryCommit[]; }' is not assignable to parameter of type 'EventStore'.
+  Type '{ buildScreenplayMemory(): Promise<ScreenplaySceneRecord[]>; toFountainAnalysis(): Promise<FountainAnalysis>; getCommits(): StoryCommit[]; }' is missing the following properties from type 'EventStore': events, branches, mainTimelineHead, append, and 14 more.
+server/nvm/kernel/adapters.ts(193,43): error TS2345: Argument of type '{ buildScreenplayMemory(): Promise<ScreenplaySceneRecord[]>; toFountainAnalysis(): Promise<FountainAnalysis>; getCommits(): StoryCommit[]; }' is not assignable to parameter of type 'EventStore'.
+  Type '{ buildScreenplayMemory(): Promise<ScreenplaySceneRecord[]>; toFountainAnalysis(): Promise<FountainAnalysis>; getCommits(): StoryCommit[]; }' is missing the following properties from type 'EventStore': events, branches, mainTimelineHead, append, and 14 more.
+server/nvm/kernel/adapters.ts(196,35): error TS2339: Property 'getAllEvents' does not exist on type '{ buildScreenplayMemory(): Promise<ScreenplaySceneRecord[]>; toFountainAnalysis(): Promise<FountainAnalysis>; getCommits(): StoryCommit[]; }'.
+server/nvm/kernel/benchmarks/event-store.bench.ts(54,9): error TS2353: Object literal may only specify known properties, and 'text' does not exist in type 'AtomicFact'.
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(41,9): error TS2353: Object literal may only specify known properties, and 'text' does not exist in type 'AtomicFact'.
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(59,7): error TS2322: Type '`character_${number}`' is not assignable to type 'ClueCarrier'.
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(77,7): error TS2353: Object literal may only specify known properties, and 'payoffAtTurn' does not exist in type '{ op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }'.
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(92,3): error TS2741: Property 'authorIntent' is missing in type '{ turn: number; objectiveReality: never[]; characterBeliefs: {}; characterEmotions: {}; relationships: {}; clues: never[]; payoffs: never[]; clocks: {}; themeArgument: never[]; objectArcs: {}; firedRules: never[]; audienceState: { ...; }; sceneFacts: never[]; }' but required in type 'NarrativeState'.
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(220,3): error TS2739: Type '{ opsPerSec: number; target: number; pass: boolean; avgMs: number; minMs: number; maxMs: number; p50Ms: number; p95Ms: number; p99Ms: number; name: string; operations: number; }' is missing the following properties from type 'BenchmarkResult': avgTimeMs, minTimeMs, maxTimeMs
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(261,3): error TS2739: Type '{ opsPerSec: number; target: number; pass: boolean; avgMs: number; minMs: number; maxMs: number; p50Ms: number; p95Ms: number; p99Ms: number; name: string; operations: number; }' is missing the following properties from type 'BenchmarkResult': avgTimeMs, minTimeMs, maxTimeMs
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(308,3): error TS2739: Type '{ opsPerSec: number; target: number; pass: boolean; avgMs: number; minMs: number; maxMs: number; p50Ms: number; p95Ms: number; p99Ms: number; name: string; operations: number; }' is missing the following properties from type 'BenchmarkResult': avgTimeMs, minTimeMs, maxTimeMs
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(349,18): error TS2345: Argument of type '{ opsPerSec: number; avgMs: number; minMs: number; maxMs: number; p50Ms: number; p95Ms: number; p99Ms: number; name: string; operations: number; }' is not assignable to parameter of type 'BenchmarkResult'.
+  Type '{ opsPerSec: number; avgMs: number; minMs: number; maxMs: number; p50Ms: number; p95Ms: number; p99Ms: number; name: string; operations: number; }' is missing the following properties from type 'BenchmarkResult': avgTimeMs, minTimeMs, maxTimeMs
+server/nvm/kernel/benchmarks/trinity-gate.bench.ts(391,3): error TS2739: Type '{ opsPerSec: number; avgMs: number; minMs: number; maxMs: number; p50Ms: number; p95Ms: number; p99Ms: number; name: string; operations: number; }' is missing the following properties from type 'BenchmarkResult': avgTimeMs, minTimeMs, maxTimeMs
+server/nvm/kernel/event-store.test.ts(25,49): error TS2322: Type '{ op: "ADD_FACT"; fact: { factId: string; content: string; addedAtTurn: number; }; }' is not assignable to type 'StoryOp'.
+  Types of property 'fact' are incompatible.
+    Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(118,20): error TS2345: Argument of type '{ storyTime: number; presentationIndex: number; op: any; assertions: never[]; derivedFrom: never[]; createdBy: "user_authored"; realityLayer: "diegetic"; sceneIdx: number; }' is not assignable to parameter of type 'NarrativeEventInput'.
+  Property 'parentHash' is missing in type '{ storyTime: number; presentationIndex: number; op: any; assertions: never[]; derivedFrom: never[]; createdBy: "user_authored"; realityLayer: "diegetic"; sceneIdx: number; }' but required in type 'Omit<NarrativeEvent, "eventId" | "eventHash" | "createdAt">'.
+server/nvm/kernel/event-store.test.ts(226,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(244,9): error TS2322: Type '{ op: string; fact: { factId: string; content: string; addedAtTurn: number; }; factId?: undefined; charId?: undefined; belief?: undefined; pair?: undefined; delta?: undefined; emotion?: undefined; clueId?: undefined; ... 11 more ...; sceneId?: undefined; } | ... 11 more ... | { ...; }' is not assignable to type 'StoryOp | undefined'.
+  Type '{ op: string; fact: { factId: string; content: string; addedAtTurn: number; }; factId?: undefined; charId?: undefined; belief?: undefined; pair?: undefined; delta?: undefined; emotion?: undefined; clueId?: undefined; ... 11 more ...; sceneId?: undefined; }' is not assignable to type 'StoryOp | undefined'.
+    Type '{ op: string; fact: { factId: string; content: string; addedAtTurn: number; }; factId?: undefined; charId?: undefined; belief?: undefined; pair?: undefined; delta?: undefined; emotion?: undefined; clueId?: undefined; ... 11 more ...; sceneId?: undefined; }' is not assignable to type '{ op: "ADD_FACT"; fact: AtomicFact; } | { op: "EXPIRE_FACT"; factId: string; atTurn: number; } | { op: "UPDATE_BELIEF"; charId: string; belief: Belief; } | { op: "APPRAISE_EMOTION"; charId: string; emotion: EmotionState; } | ... 9 more ... | { ...; }'.
+      Type '{ op: string; fact: { factId: string; content: string; addedAtTurn: number; }; factId?: undefined; charId?: undefined; belief?: undefined; pair?: undefined; delta?: undefined; emotion?: undefined; clueId?: undefined; ... 11 more ...; sceneId?: undefined; }' is not assignable to type '{ op: "RECORD_SONIC_FACT"; sceneId: string; fact: string; }'.
+        Types of property 'op' are incompatible.
+          Type 'string' is not assignable to type '"RECORD_SONIC_FACT"'.
+server/nvm/kernel/event-store.test.ts(256,56): error TS2339: Property 'type' does not exist on type 'EmotionState'.
+server/nvm/kernel/event-store.test.ts(272,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(276,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(300,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(305,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(324,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(329,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/event-store.test.ts(590,56): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/kernel/trinity-gate.ts(425,3): error TS2484: Export declaration conflicts with exported declaration of 'TrinityViolation'.
+server/nvm/kernel/trinity-gate.ts(426,3): error TS2484: Export declaration conflicts with exported declaration of 'TrinityVerification'.
+server/nvm/kernel/trinity-gate.ts(427,3): error TS2484: Export declaration conflicts with exported declaration of 'TrinityGateOptions'.
+server/nvm/kernel/trinity-gate.ts(428,3): error TS2484: Export declaration conflicts with exported declaration of 'VerificationLayer'.
+server/nvm/kernel/v5-examples.ts(31,9): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(38,7): error TS2322: Type '"bartender_apron"' is not assignable to type 'ClueCarrier'.
+server/nvm/kernel/v5-examples.ts(135,45): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(136,57): error TS2322: Type 'number' is not assignable to type 'RelationshipDelta'.
+server/nvm/kernel/v5-examples.ts(140,45): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(141,57): error TS2322: Type 'number' is not assignable to type 'RelationshipDelta'.
+server/nvm/kernel/v5-examples.ts(145,45): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(191,46): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(201,46): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(231,46): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(241,46): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/v5-examples.ts(251,46): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'AtomicFact'.
+server/nvm/kernel/verifiers/owne-verifier.ts(295,28): error TS2339: Property 'subject' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/owne-verifier.ts(296,30): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/owne-verifier.ts(307,62): error TS2339: Property 'subject' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/owne-verifier.ts(307,80): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/owne-verifier.ts(307,100): error TS2339: Property 'object' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/owne-verifier.ts(346,27): error TS2339: Property 'valence' does not exist on type 'EmotionState'.
+server/nvm/kernel/verifiers/owne-verifier.ts(346,53): error TS2339: Property 'arousal' does not exist on type 'EmotionState'.
+server/nvm/kernel/verifiers/owne-verifier.ts(352,30): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/owne-verifier.ts(352,57): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/owne-verifier.ts(542,15): error TS2484: Export declaration conflicts with exported declaration of 'OwneViolation'.
+server/nvm/kernel/verifiers/owne-verifier.ts(542,30): error TS2484: Export declaration conflicts with exported declaration of 'OwneVerification'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(124,14): error TS2339: Property 'subject' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(125,14): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(126,14): error TS2339: Property 'object' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(137,58): error TS2339: Property 'subject' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(137,76): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(137,96): error TS2339: Property 'object' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(328,13): error TS2339: Property 'subject' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(329,13): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(330,13): error TS2339: Property 'object' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(354,7): error TS2339: Property 'subject' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(355,7): error TS2339: Property 'predicate' does not exist on type 'Belief'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(683,15): error TS2484: Export declaration conflicts with exported declaration of 'PreFlightViolation'.
+server/nvm/kernel/verifiers/preflight-auditor.ts(683,35): error TS2484: Export declaration conflicts with exported declaration of 'PreFlightAudit'.
+server/nvm/kernel/verifiers/story-graph-verifier.ts(260,5): error TS2353: Object literal may only specify known properties, and 'pageCount' does not exist in type 'FountainAnalysis'.
+server/nvm/quantum/benchmarks/story-field.bench.ts(44,9): error TS2322: Type '`character_${number}`' is not assignable to type 'ClueCarrier'.
+server/nvm/quantum/benchmarks/story-field.bench.ts(61,9): error TS2353: Object literal may only specify known properties, and 'payoffAtTurn' does not exist in type '{ op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }'.
+server/nvm/quantum/benchmarks/story-field.bench.ts(76,9): error TS2353: Object literal may only specify known properties, and 'text' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(20,49): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(31,55): error TS2322: Type '"environment"' is not assignable to type 'ClueCarrier'.
+server/nvm/quantum/example.ts(52,49): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(72,49): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(109,35): error TS2345: Argument of type '{ op: { op: "SEED_CLUE"; clueId: string; carrier: "object"; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: never[]; createdBy: "user_authored"; sceneIdx: number; }' is not assignable to parameter of type 'NarrativeEventInput'.
+  Property 'parentHash' is missing in type '{ op: { op: "SEED_CLUE"; clueId: string; carrier: "object"; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: never[]; createdBy: "user_authored"; sceneIdx: number; }' but required in type 'Omit<NarrativeEvent, "eventId" | "eventHash" | "createdAt">'.
+server/nvm/quantum/example.ts(125,37): error TS2345: Argument of type '{ op: { op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: string[]; createdBy: "user_authored"; sceneIdx: number; }' is not assignable to parameter of type 'NarrativeEventInput'.
+  Property 'parentHash' is missing in type '{ op: { op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: string[]; createdBy: "user_authored"; sceneIdx: number; }' but required in type 'Omit<NarrativeEvent, "eventId" | "eventHash" | "createdAt">'.
+server/nvm/quantum/example.ts(145,55): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(180,52): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(196,62): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(246,43): error TS2345: Argument of type '{ op: { op: "SEED_CLUE"; clueId: string; carrier: "object"; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: never[]; createdBy: "user_authored"; sceneIdx: number; }' is not assignable to parameter of type 'NarrativeEventInput'.
+  Property 'parentHash' is missing in type '{ op: { op: "SEED_CLUE"; clueId: string; carrier: "object"; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: never[]; createdBy: "user_authored"; sceneIdx: number; }' but required in type 'Omit<NarrativeEvent, "eventId" | "eventHash" | "createdAt">'.
+server/nvm/quantum/example.ts(261,23): error TS2345: Argument of type '{ op: { op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: string[]; createdBy: "user_authored"; sceneIdx: number; }' is not assignable to parameter of type 'NarrativeEventInput'.
+  Property 'parentHash' is missing in type '{ op: { op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: string[]; createdBy: "user_authored"; sceneIdx: number; }' but required in type 'Omit<NarrativeEvent, "eventId" | "eventHash" | "createdAt">'.
+server/nvm/quantum/example.ts(274,23): error TS2345: Argument of type '{ op: { op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: string[]; createdBy: "user_authored"; sceneIdx: number; }' is not assignable to parameter of type 'NarrativeEventInput'.
+  Property 'parentHash' is missing in type '{ op: { op: "PAYOFF_SETUP"; setupId: string; payoffEventId: string; }; storyTime: number; presentationIndex: number; realityLayer: "diegetic"; assertions: never[]; derivedFrom: string[]; createdBy: "user_authored"; sceneIdx: number; }' but required in type 'Omit<NarrativeEvent, "eventId" | "eventHash" | "createdAt">'.
+server/nvm/quantum/example.ts(327,51): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(343,61): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/example.ts(371,59): error TS2353: Object literal may only specify known properties, and 'content' does not exist in type 'AtomicFact'.
+server/nvm/quantum/story-field.ts(416,35): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+server/nvm/quantum/story-field.ts(419,36): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+server/nvm/research/experiments/quantum-branching.ts(49,9): error TS2367: This comparison appears to be unintentional because the types 'ScenePurpose' and '"reveal"' have no overlap.
+server/nvm/research/experiments/quantum-branching.ts(50,9): error TS2367: This comparison appears to be unintentional because the types 'ScenePurpose' and '"reversal"' have no overlap.
+server/nvm/research/experiments/quantum-branching.ts(52,9): error TS2367: This comparison appears to be unintentional because the types '"revelation" | "turning_point" | "complicate" | "establish_world" | "resolution" | "introduce_conflict" | "raise_stakes" | "character_moment" | "setup_planting" | "relationship_beat" | ... 4 more ... | "dark_night"' and '"commitment"' have no overlap.
+server/nvm/research/experiments/quantum-branching.ts(76,35): error TS2339: Property 'tension' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/quantum-branching.ts(77,34): error TS2339: Property 'suspense' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/quantum-branching.ts(90,35): error TS2339: Property 'tension' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/quantum-branching.ts(90,58): error TS2339: Property 'suspense' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(204,58): error TS2339: Property 'tension' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(205,59): error TS2339: Property 'suspense' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(206,60): error TS2339: Property 'curiosity' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(247,25): error TS2339: Property 'tension' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(247,43): error TS2339: Property 'suspense' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(252,15): error TS2339: Property 'beliefShifts' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(252,37): error TS2339: Property 'beliefShifts' does not exist on type 'ScreenplaySceneRecord'.
+server/nvm/research/experiments/trinity-gate-precision.ts(257,15): error TS2339: Property 'temporalViolation' does not exist on type 'ScreenplaySceneRecord'.
+tests/core/story-graph-corpus-auc.test.ts(61,31): error TS2769: No overload matches this call.
+  Overload 1 of 5, '(path: PathLike, options?: BufferEncoding | { encoding: BufferEncoding | null; withFileTypes?: false | undefined; recursive?: boolean | undefined; } | null | undefined): string[]', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'PathLike'.
+      Type 'undefined' is not assignable to type 'PathLike'.
+  Overload 2 of 5, '(path: PathLike, options?: BufferEncoding | (ObjectEncodingOptions & { withFileTypes?: false | undefined; recursive?: boolean | undefined; }) | null | undefined): string[] | NonSharedBuffer[]', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'PathLike'.
+      Type 'undefined' is not assignable to type 'PathLike'.
+tests/core/story-graph-corpus-auc.test.ts(73,49): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+tests/core/story-graph-corpus-auc.test.ts(101,41): error TS18046: 'err' is of type 'unknown'.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, MessageSquare, Activity, Loader2, User } from 'lucide-react';
 import { motion } from 'motion/react';
 // The ScriptIDE character type (simpler than the full game Character in types.ts)
@@ -23,6 +23,9 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
   const [activeTab, setActiveTab] = useState<'world' | 'dialogue' | 'tension' | 'character'>('world');
   const [selectedChar, setSelectedChar] = useState<string>('');
   const [input, setInput] = useState('');
+  
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const runPrompt = async (endpoint: string, payload: Record<string, unknown>) => {
     setLoading(true);
@@ -34,44 +37,46 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
         body: JSON.stringify(payload)
       });
       const data = await response.json() as { result?: string; error?: string };
+      if (!mountedRef.current) return;
       if (data.error) throw new Error(data.error);
       setResult(data.result ?? null);
     } catch (err: unknown) {
+      if (!mountedRef.current) return;
       setResult(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="bg-white border-4 border-black p-4 brutal-shadow">
-        <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
+      <div className="sm-panel p-4">
+        <h2 className="sm-title mb-4 border-b border-[var(--sm-ink)] pb-2 flex items-center gap-2">
           <Sparkles className="w-4 h-4" /> Story Engine
         </h2>
 
-        <div className="flex border-b-2 border-black mb-4">
+        <div className="flex border-b border-[var(--sm-ink)] mb-4">
           <button
             onClick={() => setActiveTab('world')}
-            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'world' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
+            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'world' ? 'bg-[var(--sm-ink)] text-[var(--sm-cream)]' : 'bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-[var(--sm-panel-2)]'}`}
           >
             World
           </button>
           <button
             onClick={() => setActiveTab('dialogue')}
-            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l-2 border-black ${activeTab === 'dialogue' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
+            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l border-[var(--sm-ink)] ${activeTab === 'dialogue' ? 'bg-[var(--sm-ink)] text-[var(--sm-cream)]' : 'bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-[var(--sm-panel-2)]'}`}
           >
             Dialogue
           </button>
           <button
             onClick={() => setActiveTab('tension')}
-            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l-2 border-black ${activeTab === 'tension' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
+            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l border-[var(--sm-ink)] ${activeTab === 'tension' ? 'bg-[var(--sm-ink)] text-[var(--sm-cream)]' : 'bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-[var(--sm-panel-2)]'}`}
           >
             Tension
           </button>
           <button
             onClick={() => setActiveTab('character')}
-            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l-2 border-black ${activeTab === 'character' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
+            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l border-[var(--sm-ink)] ${activeTab === 'character' ? 'bg-[var(--sm-ink)] text-[var(--sm-cream)]' : 'bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-[var(--sm-panel-2)]'}`}
           >
             Character
           </button>
@@ -80,17 +85,17 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
         <div className="space-y-4">
           {activeTab === 'world' && (
             <>
-              <p className="text-xs font-mono text-gray-600">Generate a visceral scene description from a simple beat.</p>
+              <p className="text-xs font-[family-name:var(--sm-font-mono)] text-[var(--sm-ink-mute)]">Generate a visceral scene description from a simple beat.</p>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="E.g., John enters the abandoned warehouse, looking for the stolen briefcase."
-                className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
+                className="w-full h-32 p-3 border border-[var(--sm-ink)] bg-[var(--sm-panel-2)] text-sm outline-none focus:border-[var(--sm-stamp)] resize-none font-[family-name:var(--sm-font-mono)]"
               />
               <button
                 onClick={() => runPrompt('world-build', { beat: input, scriptContext: script, profiles: characters })}
                 disabled={loading || !input}
-                className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
+                className="sm-btn sm-btn--ink w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 Generate Scene
@@ -100,17 +105,17 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
 
           {activeTab === 'dialogue' && (
             <>
-              <p className="text-xs font-mono text-gray-600">Refine dialogue to add subtext and distinct character voices.</p>
+              <p className="text-xs font-[family-name:var(--sm-font-mono)] text-[var(--sm-ink-mute)]">Refine dialogue to add subtext and distinct character voices.</p>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Paste dialogue here to refine..."
-                className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
+                className="w-full h-32 p-3 border border-[var(--sm-ink)] bg-[var(--sm-panel-2)] text-sm outline-none focus:border-[var(--sm-stamp)] resize-none font-[family-name:var(--sm-font-mono)]"
               />
               <button
                 onClick={() => runPrompt('refine-dialogue', { dialogue: input, profiles: characters, scriptContext: script })}
                 disabled={loading || !input}
-                className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
+                className="sm-btn sm-btn--ink w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
                 Subtextify
@@ -120,17 +125,17 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
 
           {activeTab === 'tension' && (
             <>
-              <p className="text-xs font-mono text-gray-600">Analyze a scene for pacing, stakes, and psychological tension.</p>
+              <p className="text-xs font-[family-name:var(--sm-font-mono)] text-[var(--sm-ink-mute)]">Analyze a scene for pacing, stakes, and psychological tension.</p>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Paste scene text here to analyze..."
-                className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
+                className="w-full h-32 p-3 border border-[var(--sm-ink)] bg-[var(--sm-panel-2)] text-sm outline-none focus:border-[var(--sm-stamp)] resize-none font-[family-name:var(--sm-font-mono)]"
               />
               <button
                 onClick={() => runPrompt('analyze-tension', { scene: input, scriptContext: script, profiles: characters })}
                 disabled={loading || !input}
-                className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
+                className="sm-btn sm-btn--ink w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
                 Analyze Tension
@@ -139,11 +144,11 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
           )}
           {activeTab === 'character' && (
             <>
-              <p className="text-xs font-mono text-gray-600">Generate a visceral physical description based on a character's psychological profile.</p>
+              <p className="text-xs font-[family-name:var(--sm-font-mono)] text-[var(--sm-ink-mute)]">Generate a visceral physical description based on a character's psychological profile.</p>
               <select
                 value={selectedChar}
                 onChange={(e) => setSelectedChar(e.target.value)}
-                className="w-full p-3 border-2 border-black bg-gray-50 text-xs font-mono outline-none focus:border-[#FF4444]"
+                className="w-full p-3 border border-[var(--sm-ink)] bg-[var(--sm-panel-2)] text-xs font-[family-name:var(--sm-font-mono)] outline-none focus:border-[var(--sm-stamp)]"
               >
                 <option value="">Select a Character...</option>
                 {characters.map((char, i) => (
@@ -156,7 +161,7 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
                   if (char) runPrompt('character-profile', { profile: char });
                 }}
                 disabled={loading || !selectedChar}
-                className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
+                className="sm-btn sm-btn--ink w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <User className="w-4 h-4" />}
                 Generate Profile
@@ -167,14 +172,14 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
       </div>
 
       {result && (
-        <div className="bg-white border-4 border-black p-4 brutal-shadow">
-          <h3 className="font-bold uppercase tracking-widest text-xs mb-2 text-[#FF4444]">Result</h3>
-          <div className="bg-gray-50 p-3 border-2 border-black text-xs font-mono whitespace-pre-wrap text-black max-h-64 overflow-y-auto">
+        <div className="sm-panel p-4">
+          <h3 className="sm-title mb-2 text-[var(--sm-stamp)]">Result</h3>
+          <div className="bg-[var(--sm-panel-2)] p-3 border border-[var(--sm-ink)] text-xs font-[family-name:var(--sm-font-mono)] whitespace-pre-wrap text-[var(--sm-ink)] max-h-64 overflow-y-auto">
             {result}
           </div>
           <button
             onClick={() => onApplySuggestion(result)}
-            className="mt-4 w-full bg-white text-black py-2 text-[10px] font-bold uppercase tracking-wider hover:bg-[#FF4444] hover:text-white transition-colors brutal-border brutal-shadow-hover"
+            className="sm-btn sm-btn--stamp mt-4 w-full py-2"
           >
             Insert into Script
           </button>

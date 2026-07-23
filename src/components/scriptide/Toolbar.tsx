@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
+  CheckCircle2,
   ChevronDown,
   Download,
   Home,
@@ -135,17 +137,17 @@ export default function Toolbar({
 
   return (
     <header
-      className="sm-pagetop z-20 min-h-[48px] flex-wrap gap-y-2 border-b-[1.5px] border-[var(--sm-ink)]"
-      style={{ padding: "8px 12px" }}
+      className="sm-pagetop z-20 flex-wrap gap-y-2 border-b-[1.5px] border-[var(--sm-ink)]"
+      style={{ padding: '10px 16px' }}
     >
       {/* Identity */}
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {onToggleSidebar && (
           <button
             type="button"
             onClick={onToggleSidebar}
             aria-label="Open scenes and characters"
-            className="flex h-9 w-9 items-center justify-center border border-[var(--sm-cream)]/25 text-[var(--sm-cream)] md:hidden"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center border border-[var(--sm-cream)]/25 text-[var(--sm-cream)] md:hidden"
           >
             <Menu className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -155,7 +157,7 @@ export default function Toolbar({
             <span className="sm-chip hidden border-[var(--sm-cream)]/30 bg-transparent text-[var(--sm-cream)] sm:inline-flex">
               Script
             </span>
-            <h1 className="truncate font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--sm-cream)]">
+            <h1 className="truncate font-[family-name:var(--sm-font-display)] text-sm uppercase leading-none tracking-[0.04em] text-[var(--sm-cream)]">
               {title}
             </h1>
           </div>
@@ -184,7 +186,7 @@ export default function Toolbar({
                 title={t.title}
                 aria-pressed={active}
                 onClick={() => onTaskChange(t.id)}
-                className={`min-h-[36px] px-3.5 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                className={`min-h-[40px] px-4 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${
                   active
                     ? "bg-[var(--sm-cream)] text-[var(--sm-ink)]"
                     : "text-[var(--sm-cream)]/70 hover:text-[var(--sm-cream)]"
@@ -197,23 +199,70 @@ export default function Toolbar({
         </div>
       </nav>
 
-      {/* Status + ship actions */}
-      <div className="flex shrink-0 items-center gap-2">
+      {/* Status + utilities cluster */}
+      <div className="flex shrink-0 items-center gap-2.5">
+        {/* Status chip */}
         <span
-          className={`font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] ${statusClass}`}
+          className={`inline-flex min-h-[28px] items-center border px-2 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.12em] ${
+            isAnalyzing
+              ? "border-[var(--sm-warn)] text-[var(--sm-warn)]"
+              : coverageStale
+                ? "border-[var(--sm-stamp)] text-[var(--sm-stamp)]"
+                : "border-[var(--sm-ok)] text-[var(--sm-ok)]"
+          }`}
           role="status"
           aria-live="polite"
         >
           {statusLabel}
         </span>
-        {saveStatusLabel ? (
+        
+        {/* Save status chip - now prominent with icons and colors */}
+        {saveStatusLabel && (
           <span
-            className="hidden max-w-[8rem] truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-wider text-[var(--sm-cream)]/40 sm:inline"
-            title={saveStatusLabel}
+            className={`inline-flex min-h-[28px] items-center gap-1.5 border px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.1em] transition-colors ${
+              saveStatusLabel === "saved-server"
+                ? "border-[var(--sm-ok)] text-[var(--sm-ok)]"
+                : saveStatusLabel === "saving-local"
+                  ? "border-[var(--sm-warn)] text-[var(--sm-warn)]"
+                  : saveStatusLabel === "save-conflict"
+                    ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]"
+                    : saveStatusLabel === "save-failed"
+                      ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]"
+                      : "border-[var(--sm-cream)]/30 text-[var(--sm-cream)]/60"
+            }`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            title={
+              saveStatusLabel === "saved-server"
+                ? "All changes saved to server"
+                : saveStatusLabel === "saving-local"
+                  ? "Saving changes..."
+                  : saveStatusLabel === "save-conflict"
+                    ? "Conflict detected - resolve below"
+                    : saveStatusLabel === "save-failed"
+                      ? "Failed to save - your work may be at risk"
+                      : saveStatusLabel
+            }
           >
-            {saveStatusLabel}
+            {saveStatusLabel === "saved-server" && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+            {saveStatusLabel === "saving-local" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+            {(saveStatusLabel === "save-conflict" || saveStatusLabel === "save-failed") && (
+              <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            <span className="hidden sm:inline">
+              {saveStatusLabel === "saved-server"
+                ? "Saved"
+                : saveStatusLabel === "saving-local"
+                  ? "Saving"
+                  : saveStatusLabel === "save-conflict"
+                    ? "Conflict"
+                    : saveStatusLabel === "save-failed"
+                      ? "Not Saved"
+                      : saveStatusLabel}
+            </span>
           </span>
-        ) : null}
+        )}
 
         <div className="relative" ref={exportRef}>
           <button
@@ -224,13 +273,13 @@ export default function Toolbar({
               setExportOpen((v) => !v);
               setOverflowOpen(false);
             }}
-            className={`flex min-h-[36px] items-center gap-1 border px-2.5 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+            className={`flex min-h-[40px] items-center gap-1.5 border px-3 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
               task === "ship"
                 ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)] text-white"
                 : "border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)]"
             }`}
           >
-            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            <Download className="h-4 w-4" aria-hidden="true" />
             Export
             <ChevronDown className="h-3 w-3" aria-hidden="true" />
           </button>
@@ -267,14 +316,17 @@ export default function Toolbar({
           onClick={onSimulateScript}
           disabled={isSimulating || !onSimulateScript}
           aria-label={isSimulating ? "Simulating script" : "Simulate in Story Machine"}
-          className="flex min-h-[36px] items-center gap-1.5 border border-[var(--sm-cream)]/30 px-2.5 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)] disabled:cursor-wait disabled:opacity-40"
+          aria-busy={isSimulating}
+          className={`flex min-h-[40px] min-w-[40px] items-center gap-1.5 border border-[var(--sm-cream)]/30 px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)] ${
+            isSimulating ? "cursor-wait opacity-50" : "disabled:opacity-40"
+          }`}
         >
           {isSimulating ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           ) : (
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          <span className="hidden sm:inline">{isSimulating ? "…" : "Simulate"}</span>
+          <span className="hidden sm:inline">{isSimulating ? "Simulating" : "Simulate"}</span>
         </button>
 
         <div className="relative" ref={overflowRef}>
@@ -287,9 +339,9 @@ export default function Toolbar({
               setOverflowOpen((v) => !v);
               setExportOpen(false);
             }}
-            className="flex h-9 w-9 items-center justify-center border border-[var(--sm-cream)]/30 text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)]"
-          >
-            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+              className="flex min-h-[40px] min-w-[40px] items-center justify-center border border-[var(--sm-cream)]/30 text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)]"
+            >
+              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
           </button>
           {overflowOpen && (
             <div

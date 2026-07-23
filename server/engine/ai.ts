@@ -2,17 +2,58 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
 import { logger } from '../lib/logger.ts';
 import { metrics } from '../lib/metrics.ts';
+import { aiProviderManager, FreeRideProvider, GeminiProvider } from './ai-provider.ts';
 
 let _shared: GoogleGenAI | null = null;
 
-export function getAI(): GoogleGenAI {
+export function getAI(): GoogleGenAI | null {
   if (!_shared) {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error('GEMINI_API_KEY environment variable is required');
+    if (!key) {
+      // GEMINI_API_KEY is now optional - return null if not set
+      return null;
+    }
     _shared = new GoogleGenAI({ apiKey: key });
   }
   return _shared;
 }
+
+// ── Initialize AI Providers ──────────────────────────────────────────────────
+// Register available providers on module load
+function initializeProviders(): void {
+  // Try to register FreeRide provider (free, via OpenRouter)
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (openrouterKey) {
+    try {
+      const freeride = new FreeRideProvider(openrouterKey);
+      aiProviderManager.registerProvider('freeride', freeride);
+      logger.info('ai_provider_registered', { provider: 'FreeRide', tier: 'free' });
+    } catch (e) {
+      logger.warn('freeride_provider_init_failed', { error: (e as Error).message });
+    }
+  }
+  
+  // Try to register Gemini provider (premium)
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      const geminiAI = getAI();
+      if (geminiAI) {
+        const gemini = new GeminiProvider(geminiAI);
+        aiProviderManager.registerProvider('gemini', gemini);
+        logger.info('ai_provider_registered', { provider: 'Gemini', tier: 'premium' });
+      }
+    } catch (e) {
+      logger.warn('gemini_provider_init_failed', { error: (e as Error).message });
+    }
+  }
+  
+  // Auto-select the best available provider (prefers free > premium)
+  aiProviderManager.autoSelectProvider();
+}
+
+// Initialize providers when module loads
+initializeProviders();
 
 // ── Provider interfaces ───────────────────────────────────────────────────────
 
@@ -66,13 +107,26 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 // Exported so ai-config.ts can restore them without circular deps.
 
 export const geminiProvider: LLMProvider = {
-  generate: (params) => getAI().models.generateContent(params),
-  generateStream: (params) => getAI().models.generateContentStream(params),
+  generate: (params) => {
+    const ai = getAI();
+    if (!ai) throw new Error('Gemini provider not available (GEMINI_API_KEY not set)');
+    return ai.models.generateContent(params);
+  },
+  generateStream: (params) => {
+    const ai = getAI();
+    if (!ai) throw new Error('Gemini provider not available (GEMINI_API_KEY not set)');
+    return ai.models.generateContentStream(params);
+  },
 };
 
 export const geminiEmbeddingProvider: EmbeddingProvider = {
   embed: async (text: string): Promise<number[]> => {
-    const result = await getAI().models.embedContent({
+    const ai = getAI();
+    if (!ai) {
+      logger.warn('embedding_provider_unavailable', { reason: 'GEMINI_API_KEY not set' });
+      return [];
+    }
+    const result = await ai.models.embedContent({
       model: 'text-embedding-004',
       contents: [text],
     });
@@ -85,6 +139,11 @@ export const geminiEmbeddingProvider: EmbeddingProvider = {
 // pipeline or an image-generation toggle in the Director panel.
 export const geminiImageProvider: ImageProvider = {
   generate: async (prompt: string): Promise<string | undefined> => {
+    const ai = getAI();
+    if (!ai) {
+      logger.warn('image_provider_unavailable', { reason: 'GEMINI_API_KEY not set' });
+      return undefined;
+    }
     try {
       const response = await generateContent({
         model: process.env.GEMINI_IMG_MODEL ?? 'gemini-2.5-flash-preview-image-generation',
@@ -107,6 +166,11 @@ export const geminiImageProvider: ImageProvider = {
 export const geminiTTSProvider: TTSProvider = {
   speak: async (text: string): Promise<{ dataUrl: string; mimeType: string } | undefined> => {
     if (!text) return undefined;
+    const ai = getAI();
+    if (!ai) {
+      logger.warn('tts_provider_unavailable', { reason: 'GEMINI_API_KEY not set' });
+      return undefined;
+    }
     try {
       const response = await generateContent({
         model: process.env.GEMINI_TTS_MODEL ?? 'gemini-2.5-flash-preview-tts',
@@ -141,14 +205,35 @@ export const geminiTTSProvider: TTSProvider = {
 };
 
 // ── Provider seam slots ───────────────────────────────────────────────────────
+// Default to multi-provider system if available, fall back to Gemini
 
 let _provider:          LLMProvider       = geminiProvider;
 let _embeddingProvider: EmbeddingProvider = geminiEmbeddingProvider;
 let _imageProvider:     ImageProvider     = geminiImageProvider;
 let _ttsProvider:       TTSProvider       = geminiTTSProvider;
 
+// Override _provider if multi-provider system has a provider available
+if (aiProviderManager.hasProvider()) {
+  const activeProvider = aiProviderManager.getProvider();
+  _provider = {
+    generate: (params) => activeProvider.generate(params),
+    generateStream: (params) => activeProvider.generateStream?.(params) ?? activeProvider.generate(params).then(async function* (r) { yield r; }),
+  };
+}
+
 export function setLLMProvider(p: LLMProvider): void         { _provider = p; }
-export function resetLLMProvider(): void                     { _provider = geminiProvider; }
+export function resetLLMProvider(): void                     { 
+  // Reset to multi-provider system if available, otherwise Gemini
+  if (aiProviderManager.hasProvider()) {
+    const activeProvider = aiProviderManager.getProvider();
+    _provider = {
+      generate: (params) => activeProvider.generate(params),
+      generateStream: (params) => activeProvider.generateStream?.(params) ?? activeProvider.generate(params).then(async function* (r) { yield r; }),
+    };
+  } else {
+    _provider = geminiProvider;
+  }
+}
 export function setEmbeddingProvider(p: EmbeddingProvider): void { _embeddingProvider = p; }
 export function setImageProvider(p: ImageProvider): void         { _imageProvider = p; }
 export function setTTSProvider(p: TTSProvider): void             { _ttsProvider = p; }
@@ -156,7 +241,15 @@ export function getEmbeddingProvider(): EmbeddingProvider        { return _embed
 export function getImageProvider(): ImageProvider                { return _imageProvider; }
 export function getTTSProvider(): TTSProvider                    { return _ttsProvider; }
 export function resetAllProviders(): void {
-  _provider          = geminiProvider;
+  if (aiProviderManager.hasProvider()) {
+    const activeProvider = aiProviderManager.getProvider();
+    _provider = {
+      generate: (params) => activeProvider.generate(params),
+      generateStream: (params) => activeProvider.generateStream?.(params) ?? activeProvider.generate(params).then(async function* (r) { yield r; }),
+    };
+  } else {
+    _provider = geminiProvider;
+  }
   _embeddingProvider = geminiEmbeddingProvider;
   _imageProvider     = geminiImageProvider;
   _ttsProvider       = geminiTTSProvider;

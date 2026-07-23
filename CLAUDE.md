@@ -1,18 +1,19 @@
 # STORYMACHINE — Project Memory
 
-Orientation: `ARCHITECTURE.md` (system map) · `README.md` (setup, env vars) ·
-`server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` (binding quality spec for
-revision-engine work) · `ULTRAPLAN.md` (consolidated post-corpus state) ·
-`docs/research-audit/MASTER_RESEARCH_AUDIT.md` (research-archive incorporation
-map).
+Orientation: `ROADMAP.md` (canonical demand-driven sequence and active phase) ·
+`NORTH_STAR.md` (product constitution) · `ULTRAPLAN.md` (short execution brief) ·
+`ARCHITECTURE.md` (system map) · `README.md` (setup, env vars). Research and
+retired wave material is filed backlog, not active direction; see ROADMAP §8.
 
 ## Quality bar
 
-Build the strongest version of a change, not the quickest one that passes:
-edge cases handled, inputs guarded, fire + no-fire tests for every new rule,
-consistency with the surrounding file's patterns. For revision waves this bar
-is binding and precisely specified — read the guarantee doc before authoring
-one.
+Build the strongest version of a **validated** change, not the quickest one
+that passes: start with the active ROADMAP phase and its user-facing exit
+gate, then handle edge cases, guard inputs, and match surrounding patterns.
+For any scoring change, tests must include both positive/negative fixtures
+and runnable discrimination evidence on real writing; synthetic fire/no-fire
+coverage alone is not enough. The retired wave guarantee remains a historical
+quality reference, not an instruction to author another wave.
 
 ## Commands
 
@@ -61,8 +62,8 @@ before every push. CI runs lint + test + build on every branch, plus a
   module-level consts hit a temporal dead zone through the doctor↔reference
   circular import and the failure is silently swallowed by a fallback
   (documented at the site — it cost a real bug hunt).
-- Wave rotation order ≠ revision pipeline execution order — two different
-  14-pass orderings that are easy to conflate.
+- The revision pipeline's 14-pass execution order is still live. The old
+  wave-rotation order is retired history — never use it to choose new work.
 - OneDrive hazard: direct file-tool writes to the mounted repo can truncate
   files and introduce CRLF diff inflation. Edit in a clone, copy back with
   byte verification, commit via Windows-side git.
@@ -74,37 +75,44 @@ before every push. CI runs lint + test + build on every branch, plus a
   deduction path in `doctor.ts` — never rely on issue-count density, which
   is provably blind to document-scale scene-order collapse at feature-scale
   issue volume.
-- Parallel sessions ship concurrently: pull `main` and check `git log`
-  before starting any wave.
+- Parallel sessions ship concurrently: pull the integration branch and check
+  `git log` before starting any implementation work. Do not assume `main` or
+  any other branch name; use the current session's designated branch.
 
-## Standing task — Wave Program v2
+## Standing task — see ROADMAP.md (the wave program is RETIRED)
 
-The matrix-filling era (waves 1–1181) is complete: the signals × modes ×
-positions coverage matrix is saturated and further cells are permutation
-farming. Waves continue at the same cadence and rigor — 3 new checks +
-6 tests (fire + no-fire) per wave, guarantee-doc acceptance standard —
-but rotate through four wave TYPES with genuine headroom:
+**The "3 checks + 6 tests per wave, forever" cadence is dead.** It was the
+machine that manufactured the project's biggest liability: ~5,701 of ~8,917
+rules are one bulk wave of field × mode × position permutations from 7
+template functions (`passes/lib/checks.ts`), and by the doctor's own
+measurement (`doctor.ts:1656-1669`) the entire weighted-rule channel
+contributes AUC ~0.076 to discrimination while scene-count scarcity carries
+AUC ~0.938. More rules stopped adding signal a long time ago; they add
+maintenance cost (~47,500 pass-file lines, 1,326 `as any` casts) and
+undercut the trust story. Do not author a new wave.
 
-1. **Signal channels** — extract a genuinely new per-scene signal in
-   `server/nvm/analyze/fountain-analyzer.ts` (and, where applicable, the
-   ops-derived records in `screenplay/memory.ts`), then ship the first
-   3 checks consuming it.
-2. **Excellence detectors** — rules that detect what a script does WELL
-   (feeding the earned-strengths surface), with the same guard discipline
-   as defect rules. Never-padded: an excellence rule that fires on
-   mediocre input is a failing rule.
-3. **Genre-conditioned variants** — give the highest-firing generic rules
-   genre-aware thresholds via `server/lib/genre-router.ts`, so a slow-burn
-   drama and a thriller stop being judged by one pacing yardstick.
-4. **Root-cause templates** — new co-occurrence clusters in
-   `server/nvm/analyze/cluster.ts` that convert recurring symptom groups
-   into named, plain-language diagnoses.
+The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
 
-Rotation: cycle 1 → 2 → 3 → 4 → repeat, one type per wave. Full procedure
-and per-type acceptance criteria: `WAVE_QUALITY_GUARANTEE.md` § "Program v2".
-Waves are additionally gated by the corpus ratchets: the real-corpus
-shuffle-drop AUC hard floor (0.622) must not regress, and measure-before-
-threshold on the REAL corpus — prototype a candidate signal against the full
-corpus, ship only what shows measured separation — is mandatory for every
-new rule, not just structural ones. Commit to the branch designated for the
+1. **P0 — Validate with real writers.** No new engine work ships without a
+   validated user need. Blocks everything below.
+2. **P1 — Make the score provably discriminate on REAL writing** (the One
+   Bet). A legally distributable benchmark of real drafts running in CI,
+   independently blind-labeled by >=3 experienced readers, with a
+   pre-registered split, held-out evaluation, and uncertainty reporting.
+   Rebuild around the smallest signal set that actually separates. Add no
+   entries to the current 8,917 generated catalog; treat ~2,300 distinct rule
+   concepts as the maintained conceptual set. Removal is a separate approved
+   migration, never implied by "freeze."
+3. **P2 — Collapse the surface to Doctor + Editor.** Everything else
+   (OASIS, the ~38 research panels) behind a Labs flag.
+4. **P3 — Ship a shareable, third-party-verifiable coverage report.**
+5. **P4 — Retention & defensibility.** Last, not first.
+
+**Two laws now outrank the old rigor discipline** (full text in NORTH_STAR
+§1): *demand before rigor* — a validated user need gates engine work; and
+*correct before reproducible* — determinism is worthless if the verdict is
+wrong, so reproducibility is earned AFTER the score is shown valid on real
+writing, never as a substitute for it. `measure-before-threshold on the
+REAL corpus` still holds for any scoring change, and the shuffle-drop AUC
+must not regress below its floor. Commit to the branch designated for the
 current session — never a branch name hardcoded here.

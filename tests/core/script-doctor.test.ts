@@ -248,6 +248,58 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
     assert.equal(health, 0);
     assert.equal(gradeForHealth(health), 'troubled');
   });
+
+  // P0.1 continuity/monotonicity: the density penalty must never reward a
+  // denser issue mix. Crossing density=1 used to drop the penalty by ~7.5
+  // points; this asserts the continuous join cannot do that.
+  it('P0.1: adding severity-weighted issues never improves health (monotonicity)', () => {
+    const sceneCount = 12;
+    const wordCount = 600;
+    let prev = computeHealthScore({ critical: 0, major: 0, minor: 0 }, sceneCount, wordCount);
+    for (let minor = 1; minor <= 40; minor++) {
+      const next = computeHealthScore({ critical: 0, major: 0, minor }, sceneCount, wordCount);
+      assert.ok(
+        next <= prev + 1e-9,
+        `health rose from ${prev} to ${next} when minor issues increased to ${minor}`,
+      );
+      prev = next;
+    }
+    prev = computeHealthScore({ critical: 0, major: 0, minor: 0 }, sceneCount, wordCount);
+    for (let major = 1; major <= 20; major++) {
+      const next = computeHealthScore({ critical: 0, major, minor: 0 }, sceneCount, wordCount);
+      assert.ok(
+        next <= prev + 1e-9,
+        `health rose from ${prev} to ${next} when major issues increased to ${major}`,
+      );
+      prev = next;
+    }
+  });
+
+  it('P0.1: density penalty is continuous across the density=1 seam', () => {
+    // Opportunity words for wordCount=600: 600^0.7 ≈ 88.1.
+    // weightedIssues ≈ 88.1 ⇒ density ≈ 1. Probe just below and just above.
+    const sceneCount = 12;
+    const wordCount = 600;
+    // minor weight = 0.5 → need ~176 minors for density≈1; use fine steps near seam.
+    const near = [];
+    for (let minor = 160; minor <= 200; minor++) {
+      near.push({
+        minor,
+        health: computeHealthScore({ critical: 0, major: 0, minor }, sceneCount, wordCount),
+      });
+    }
+    for (let i = 1; i < near.length; i++) {
+      const delta = near[i - 1].health - near[i].health;
+      // Monotone non-increasing; no discontinuous jump upward.
+      assert.ok(delta >= -1e-9, `health increased across minor=${near[i].minor}`);
+      // Continuity proxy: one additional minor (0.5 weight) should not swing
+      // health by the old ~7.5-point seam jump.
+      assert.ok(
+        delta < 3,
+        `health dropped by ${delta} when minor issues went ${near[i - 1].minor}→${near[i].minor} — discontinuity?`,
+      );
+    }
+  });
 });
 
 // ── Coverage layer ────────────────────────────────────────────────────────────
@@ -1136,7 +1188,7 @@ function buildDimensionSkewedResult(
 
   return {
     passResults,
-    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, completedAt: 0,
+    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [], completedAt: 0,
   };
 }
 
@@ -1232,6 +1284,77 @@ describe('runScriptDoctor report shape — dimension-collapse fix, end to end (W
         assert.ok(dim.score >= 0 && dim.score <= 100, `dimension ${dim.key} out of range at x${multiplier}: ${dim.score}`);
       }
     }
+  });
+});
+
+// ── P0.3 incomplete analysis (pass failure withholding) ─────────────────────
+// When any revision pass throws, the pipeline records it in failedPasses and
+// aggregateReport must withhold the complete-looking quality surface rather
+// than treating a crashed detector as "zero issues found".
+describe('aggregateReport — incomplete analysis when passes fail', () => {
+  it('withholds verdict/percentiles and marks analysisComplete=false when failedPasses is non-empty', () => {
+    const analysis = buildAnalysisFixture(10, 500);
+    const result = buildDimensionSkewedResult([
+      { minor: 10 }, { minor: 10 }, { minor: 10 }, { minor: 10 }, { minor: 10 },
+    ]);
+    result.failedPasses = ['structure', 'payoff'];
+    const report = aggregateReport(result, analysis, 'fixture fountain — incomplete analysis');
+
+    assert.equal(report.analysisComplete, false);
+    assert.deepEqual(report.failedPasses, ['structure', 'payoff']);
+    assert.equal(report.verdict, undefined, 'verdict must be withheld on incomplete analysis');
+    assert.equal(report.dimensions, undefined, 'dimensions must be withheld on incomplete analysis');
+    assert.equal(report.healthPercentile, undefined, 'percentile must be withheld on incomplete analysis');
+    assert.equal(report.health, 0, 'health sentinel is 0 when incomplete');
+    assert.equal(report.grade, 'troubled', 'grade sentinel is troubled when incomplete');
+    assert.match(report.plainSummary ?? '', /Analysis incomplete/i);
+    assert.match(report.plainSummary ?? '', /structure/);
+    assert.match(report.plainSummary ?? '', /payoff/);
+  });
+
+  it('marks analysisComplete=true and keeps verdict when no passes failed', () => {
+    const analysis = buildAnalysisFixture(10, 500);
+    const result = buildDimensionSkewedResult([
+      { minor: 4 }, { minor: 4 }, { minor: 4 }, { minor: 4 }, { minor: 4 },
+    ]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — complete analysis');
+    assert.equal(report.analysisComplete, true);
+    assert.equal(report.failedPasses, undefined);
+    assert.ok(report.verdict, 'complete analysis still emits a verdict');
+    assert.ok(Array.isArray(report.dimensions) && report.dimensions.length === 5);
+    assert.ok(report.health > 0, 'complete analysis emits a real health score');
+  });
+});
+
+// ── P0.2 truncation denominator scope ───────────────────────────────────────
+// Health density must not count text the analyzer did not diagnose. Scripts
+// under the scene ceiling keep full-fountain word counts (calibration
+// compatibility). Scripts over the ceiling count only analyzed scene blocks.
+describe('analyzeFountainText / runScriptDoctor — truncation denominator scope', () => {
+  it('does not improve health solely by appending ignored scenes beyond the analyzer ceiling', async () => {
+    // Build a baseline under the ceiling, then append enough minimal scenes to
+    // force truncation. If wordCount still counted the ignored tail, the larger
+    // denominator would reduce issue density and could raise health.
+    const baseline = buildMultiSceneFountain();
+    const filler = Array.from({ length: 1100 }, (_, i) =>
+      `INT. PAD ROOM ${i} - DAY\n\nA person waits.\n\nPERSON\nOkay.\n`,
+    ).join('\n');
+    const padded = `${baseline}\n\n${filler}`;
+
+    const baseReport = await runScriptDoctor(baseline);
+    const padReport = await runScriptDoctor(padded);
+
+    assert.equal(baseReport.analysisComplete, true);
+    assert.equal(padReport.analysisComplete, true);
+    assert.ok(padReport.truncatedForAnalysis, 'padded script must trip the analyzer ceiling');
+    assert.ok((padReport.totalSceneCount ?? 0) > padReport.sceneCount,
+      'totalSceneCount must exceed analyzed sceneCount when truncated');
+
+    // Core invariant: ignored post-ceiling text must not raise health.
+    assert.ok(
+      padReport.health <= baseReport.health,
+      `post-ceiling padding improved health from ${baseReport.health} to ${padReport.health}`,
+    );
   });
 });
 

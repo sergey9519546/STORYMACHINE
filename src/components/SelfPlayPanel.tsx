@@ -83,29 +83,29 @@ export function SelfPlayPanel({ onClose }: Props) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      border: '1px solid #334155', width: 860, maxWidth: '98vw',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      border: '1px solid var(--sm-night-line)', width: 860, maxWidth: '98vw',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 13,
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0 }}>
         <div>
           <strong style={{ fontSize: 15 }}>Self-Play Corpus — G13 Story Engine</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>Headless sims · learned Director policy · genome diff/breed</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>Headless sims · learned Director policy · genome diff/breed</div>
         </div>
         <button onClick={onClose} style={iconBtn}>✕</button>
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #334155', background: '#0c1525', flexShrink: 0 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--sm-night-line)', background: '#0c1525', flexShrink: 0 }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            background: t.id === tab ? '#1e293b' : 'transparent',
+            background: t.id === tab ? 'var(--sm-night-2)' : 'transparent',
             border: 'none',
             borderBottom: t.id === tab ? '2px solid #7c3aed' : '2px solid transparent',
-            color: t.id === tab ? '#e2e8f0' : '#64748b',
-            padding: '9px 18px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12,
+            color: t.id === tab ? 'var(--sm-cream)' : 'var(--sm-ink-mute)',
+            padding: '9px 18px', cursor: 'pointer', fontFamily: 'var(--sm-font-mono)', fontSize: 12,
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <span>{t.icon}</span>{t.label}
@@ -193,14 +193,14 @@ function LauncherTab() {
 
   return (
     <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ color: '#64748b', fontSize: 11 }}>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>
         Each scenario runs the convergence loop headlessly across its scenes. Results are persisted to the corpus and feed the Director Policy.
       </div>
 
       {/* Scenario list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {scenarios.map((sc, i) => (
-          <div key={sc.scenarioId || i} style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 80px 60px 28px', gap: 8, alignItems: 'center' }}>
+          <div key={sc.scenarioId || i} style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 80px 60px 28px', gap: 8, alignItems: 'center' }}>
             <div>
               <div style={labelSt}>Scenario ID</div>
               <input value={sc.scenarioId} onChange={e => updateScenario(i, { scenarioId: e.target.value })}
@@ -224,7 +224,7 @@ function LauncherTab() {
 
       {/* Launch controls row 1: scenario count + convergence budget */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <button onClick={addScenario} disabled={scenarios.length >= 5} style={btnSt('#1e293b')}>
+        <button onClick={addScenario} disabled={scenarios.length >= 5} style={btnSt('var(--sm-night-2)')}>
           + Add Scenario
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -254,19 +254,19 @@ function LauncherTab() {
         </button>
       </div>
 
-      {error && <div style={{ color: '#f87171', background: '#1e293b', borderRadius: 5, padding: 10 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>{error}</div>}
 
       {running && (
-        <div style={{ color: '#64748b', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>
+        <div style={{ color: 'var(--sm-ink-mute)', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>
           Running convergence loops — this may take a few seconds…
         </div>
       )}
 
       {result && (
-        <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 16px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Stat label="Runs completed" value={String(result.runs)} color="#4ade80" />
-          <Stat label="Mean score" value={(result.meanScore * 100).toFixed(1)} color="#a78bfa" />
-          <Stat label="Best scenario" value={result.bestScenario} color="#60a5fa" small />
+        <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 16px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Stat label="Runs completed" value={String(result.runs)} color="var(--sm-ok)" />
+          <Stat label="Mean score" value={(result.meanScore * 100).toFixed(1)} color="var(--sm-cool)" />
+          <Stat label="Best scenario" value={result.bestScenario} color="var(--sm-cool)" small />
           <div>
             <div style={labelSt}>Top operators</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -305,8 +305,8 @@ function CorpusTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div style={{ color: '#64748b', textAlign: 'center', padding: 50 }}>Loading corpus…</div>;
-  if (error) return <div style={{ color: '#f87171', padding: 18 }}>{error}</div>;
+  if (loading) return <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 50 }}>Loading corpus…</div>;
+  if (error) return <div style={{ color: 'var(--sm-stamp)', padding: 18 }}>{error}</div>;
   if (!data) return null;
 
   if (data.runs.length === 0) {
@@ -324,13 +324,13 @@ function CorpusTab() {
   return (
     <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Summary stats */}
-      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', background: '#1e293b', borderRadius: 6, padding: '10px 14px' }}>
-        <Stat label="Corpus runs" value={String(data.runCount)} color="#a78bfa" />
-        <Stat label="Best score" value={(maxScore * 100).toFixed(1)} color="#4ade80" />
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 14px' }}>
+        <Stat label="Corpus runs" value={String(data.runCount)} color="var(--sm-cool)" />
+        <Stat label="Best score" value={(maxScore * 100).toFixed(1)} color="var(--sm-ok)" />
         {data.playbook && (
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={labelSt}>Director summary</div>
-            <div style={{ color: '#94a3b8', fontSize: 11 }}>{data.playbook.summary.slice(0, 120)}</div>
+            <div style={{ color: 'var(--sm-cream-mute)', fontSize: 11 }}>{data.playbook.summary.slice(0, 120)}</div>
           </div>
         )}
       </div>
@@ -340,7 +340,7 @@ function CorpusTab() {
         <div>
           <div style={{ color: '#7c3aed', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>Director Policy</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px' }}>
+            <div style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px' }}>
               <div style={labelSt}>Global top operators</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                 {data.playbook.policy.globalTopOperators.slice(0, 6).map(op => (
@@ -350,16 +350,16 @@ function CorpusTab() {
                 ))}
               </div>
             </div>
-            <div style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px' }}>
+            <div style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px' }}>
               <div style={labelSt}>Operator effectiveness</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
                 {data.playbook.policy.operatorEffectiveness.slice(0, 5).map(({ operator, score }) => (
                   <div key={operator} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: '#64748b', fontSize: 10, width: 130, flexShrink: 0 }}>{operator.replace(/_/g, '-')}</span>
-                    <div style={{ flex: 1, background: '#334155', borderRadius: 2, height: 6 }}>
-                      <div style={{ width: `${score * 100}%`, background: '#a78bfa', height: '100%', borderRadius: 2 }} />
+                    <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10, width: 130, flexShrink: 0 }}>{operator.replace(/_/g, '-')}</span>
+                    <div style={{ flex: 1, background: 'var(--sm-night-line)', borderRadius: 2, height: 6 }}>
+                      <div style={{ width: `${score * 100}%`, background: 'var(--sm-cool)', height: '100%', borderRadius: 2 }} />
                     </div>
-                    <span style={{ color: '#a78bfa', fontSize: 10 }}>{(score * 100).toFixed(0)}</span>
+                    <span style={{ color: 'var(--sm-cool)', fontSize: 10 }}>{(score * 100).toFixed(0)}</span>
                   </div>
                 ))}
               </div>
@@ -371,12 +371,12 @@ function CorpusTab() {
       {/* Run list */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ color: '#a78bfa', fontSize: 11, fontWeight: 700 }}>Run history</div>
-          <button onClick={load} style={{ ...btnSt('#1e293b'), fontSize: 10, padding: '3px 8px' }}>↺ Refresh</button>
+          <div style={{ color: 'var(--sm-cool)', fontSize: 11, fontWeight: 700 }}>Run history</div>
+          <button onClick={load} style={{ ...btnSt('var(--sm-night-2)'), fontSize: 10, padding: '3px 8px' }}>↺ Refresh</button>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
-            <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #334155' }}>
+            <tr style={{ color: 'var(--sm-ink-mute)', textAlign: 'left', borderBottom: '1px solid var(--sm-night-line)' }}>
               <th style={{ padding: '4px 8px' }}>Scenario</th>
               <th style={{ padding: '4px 8px' }}>Score</th>
               <th style={{ padding: '4px 8px' }}>Proof%</th>
@@ -386,19 +386,19 @@ function CorpusTab() {
           </thead>
           <tbody>
             {data.runs.map(run => (
-              <tr key={run.run_id} style={{ borderBottom: '1px solid #1e293b' }}>
-                <td style={{ padding: '5px 8px', color: '#94a3b8' }}>{run.scenario_id}</td>
+              <tr key={run.run_id} style={{ borderBottom: '1px solid var(--sm-night-2)' }}>
+                <td style={{ padding: '5px 8px', color: 'var(--sm-cream-mute)' }}>{run.scenario_id}</td>
                 <td style={{ padding: '5px 8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 60, background: '#334155', borderRadius: 2, height: 6 }}>
+                    <div style={{ width: 60, background: 'var(--sm-night-line)', borderRadius: 2, height: 6 }}>
                       <div style={{ width: `${run.score * 100}%`, background: scoreColor(run.score), height: '100%', borderRadius: 2 }} />
                     </div>
                     <span style={{ color: scoreColor(run.score) }}>{(run.score * 100).toFixed(0)}</span>
                   </div>
                 </td>
-                <td style={{ padding: '5px 8px', color: '#60a5fa' }}>{(run.proof_pass_rate * 100).toFixed(0)}%</td>
+                <td style={{ padding: '5px 8px', color: 'var(--sm-cool)' }}>{(run.proof_pass_rate * 100).toFixed(0)}%</td>
                 <td style={{ padding: '5px 8px', color: '#34d399' }}>{run.mean_valuation.toFixed(1)}</td>
-                <td style={{ padding: '5px 8px', color: '#64748b' }}>{run.ops_count}</td>
+                <td style={{ padding: '5px 8px', color: 'var(--sm-ink-mute)' }}>{run.ops_count}</td>
               </tr>
             ))}
           </tbody>
@@ -476,7 +476,7 @@ function GenomeTab() {
 
   return (
     <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ color: '#64748b', fontSize: 11 }}>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>
         Select two corpus runs to compare their story genomes (tension profile, voice vectors, arc archetype) and optionally breed a hybrid seed.
       </div>
 
@@ -497,7 +497,7 @@ function GenomeTab() {
         </button>
       </div>
 
-      {error && <div style={{ color: '#f87171', background: '#1e293b', borderRadius: 5, padding: 10 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>{error}</div>}
 
       {/* Diff result */}
       {diffResult && <GenomeDiffView result={diffResult} />}
@@ -511,7 +511,7 @@ function GenomeTab() {
 function RunSelector({ label, value, runs, onChange }: { label: string; value: string; runs: CorpusRun[]; onChange: (v: string) => void }) {
   const selected = runs.find(r => r.run_id === value);
   return (
-    <div style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px' }}>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px' }}>
       <div style={labelSt}>{label}</div>
       <select value={value} onChange={e => onChange(e.target.value)}
         style={{ ...inputSt, width: '100%', cursor: 'pointer' }}>
@@ -523,9 +523,9 @@ function RunSelector({ label, value, runs, onChange }: { label: string; value: s
       </select>
       {selected && (
         <div style={{ marginTop: 6, display: 'flex', gap: 12 }}>
-          <div><span style={labelSt}>proof%</span><span style={{ color: '#60a5fa', fontSize: 11 }}>{(selected.proof_pass_rate * 100).toFixed(0)}%</span></div>
+          <div><span style={labelSt}>proof%</span><span style={{ color: 'var(--sm-cool)', fontSize: 11 }}>{(selected.proof_pass_rate * 100).toFixed(0)}%</span></div>
           <div><span style={labelSt}>val</span><span style={{ color: '#34d399', fontSize: 11 }}>{selected.mean_valuation.toFixed(1)}</span></div>
-          <div><span style={labelSt}>ops</span><span style={{ color: '#64748b', fontSize: 11 }}>{selected.ops_count}</span></div>
+          <div><span style={labelSt}>ops</span><span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{selected.ops_count}</span></div>
         </div>
       )}
     </div>
@@ -539,19 +539,19 @@ function GenomeDiffView({ result }: { result: { diff: GenomeDiff; genomeA: Story
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Similarity banner */}
-      <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 14px' }}>
+      <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 14px' }}>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 10 }}>
-          <Stat label="Overall similarity" value={`${simPct}%`} color={Number(simPct) >= 70 ? '#4ade80' : Number(simPct) >= 40 ? '#fb923c' : '#f87171'} />
+          <Stat label="Overall similarity" value={`${simPct}%`} color={Number(simPct) >= 70 ? 'var(--sm-ok)' : Number(simPct) >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)'} />
           <SimBar label="Tension" value={diff.tensionSim} />
           <SimBar label="Voice"   value={diff.voiceSim} />
           <SimBar label="Theme"   value={diff.thematicSim} />
-          <Stat label="Arc match" value={diff.arcMatch === 1 ? '✓' : '✗'} color={diff.arcMatch === 1 ? '#4ade80' : '#f87171'} />
+          <Stat label="Arc match" value={diff.arcMatch === 1 ? '✓' : '✗'} color={diff.arcMatch === 1 ? 'var(--sm-ok)' : 'var(--sm-stamp)'} />
         </div>
         {diff.differences.length > 0 && (
           <div>
             <div style={labelSt}>Notable differences</div>
             {diff.differences.map((d, i) => (
-              <div key={i} style={{ color: '#94a3b8', fontSize: 11 }}>• {d}</div>
+              <div key={i} style={{ color: 'var(--sm-cream-mute)', fontSize: 11 }}>• {d}</div>
             ))}
           </div>
         )}
@@ -574,8 +574,8 @@ function GenomeSummary({ genome, label }: { genome: StoryGenome; label: string }
     .sort((a, b) => b[1] - a[1]).slice(0, 3);
 
   return (
-    <div style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px' }}>
-      <div style={{ color: '#a78bfa', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>{label} — {genome.genomeId}</div>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px' }}>
+      <div style={{ color: 'var(--sm-cool)', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>{label} — {genome.genomeId}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <Row k="arc" v={genome.arcArchetype} />
         <Row k="wound" v={genome.dominantWound ?? 'none'} />
@@ -605,14 +605,14 @@ function TensionCompare({ profileA, profileB }: { profileA: [number, number, num
     return <polyline points={points} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />;
   }
   return (
-    <div style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px' }}>
+    <div style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px' }}>
       <div style={labelSt}>Tension profile comparison (A=purple, B=teal)</div>
       <svg width={w} height={h} style={{ display: 'block', marginTop: 4 }}>
-        {toPath(Array.from(profileA), '#a78bfa')}
+        {toPath(Array.from(profileA), 'var(--sm-cool)')}
         {toPath(Array.from(profileB), '#2dd4bf')}
         {[0, 1, 2, 3, 4].map(i => {
           const x = 10 + i * ((w - 20) / 4);
-          return <line key={i} x1={x} y1={0} x2={x} y2={h} stroke="#334155" strokeWidth={0.5} />;
+          return <line key={i} x1={x} y1={0} x2={x} y2={h} stroke="var(--sm-night-line)" strokeWidth={0.5} />;
         })}
       </svg>
     </div>
@@ -622,7 +622,7 @@ function TensionCompare({ profileA, profileB }: { profileA: [number, number, num
 function BreedResultView({ genome }: { genome: StoryGenome }) {
   return (
     <div style={{ background: '#064e3b', border: '1px solid #10b981', borderRadius: 6, padding: '12px 14px' }}>
-      <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🧬 Hybrid genome bred: {genome.genomeId}</div>
+      <div style={{ color: 'var(--sm-ok)', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🧬 Hybrid genome bred: {genome.genomeId}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         <Row k="arc" v={genome.arcArchetype} />
         <Row k="wound" v={genome.dominantWound ?? 'none'} />
@@ -666,10 +666,10 @@ function SimBar({ label, value }: { label: string; value: number }) {
     <div>
       <div style={labelSt}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <div style={{ width: 50, background: '#334155', borderRadius: 2, height: 6 }}>
+        <div style={{ width: 50, background: 'var(--sm-night-line)', borderRadius: 2, height: 6 }}>
           <div style={{ width: `${value * 100}%`, background: '#7c3aed', height: '100%', borderRadius: 2 }} />
         </div>
-        <span style={{ color: '#a78bfa', fontSize: 11 }}>{(value * 100).toFixed(0)}%</span>
+        <span style={{ color: 'var(--sm-cool)', fontSize: 11 }}>{(value * 100).toFixed(0)}%</span>
       </div>
     </div>
   );
@@ -678,38 +678,38 @@ function SimBar({ label, value }: { label: string; value: number }) {
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      <span style={{ color: '#64748b', fontSize: 10 }}>{k}:</span>
+      <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{k}:</span>
       <span style={{ color: '#cbd5e1', fontSize: 11 }}>{v}</span>
     </div>
   );
 }
 
 function scoreColor(s: number): string {
-  if (s >= 0.7) return '#4ade80';
-  if (s >= 0.4) return '#fb923c';
-  return '#f87171';
+  if (s >= 0.7) return 'var(--sm-ok)';
+  if (s >= 0.4) return 'var(--sm-warn)';
+  return 'var(--sm-stamp)';
 }
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
 const inputSt: React.CSSProperties = {
-  background: '#0f172a', border: '1px solid #334155', borderRadius: 4,
-  color: '#e2e8f0', padding: '4px 6px', fontFamily: 'monospace',
+  background: 'var(--sm-night)', border: '1px solid var(--sm-night-line)', borderRadius: 4,
+  color: 'var(--sm-cream)', padding: '4px 6px', fontFamily: 'var(--sm-font-mono)',
   fontSize: 12, boxSizing: 'border-box',
 };
 
 const labelSt: React.CSSProperties = {
-  display: 'block', color: '#64748b', fontSize: 10, marginBottom: 2,
+  display: 'block', color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 2,
 };
 
 const iconBtn: React.CSSProperties = {
-  background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16,
+  background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16,
 };
 
 function btnSt(bg: string): React.CSSProperties {
   return {
     padding: '7px 12px', border: 'none', borderRadius: 5,
     background: bg, color: '#fff', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 12,
+    fontFamily: 'var(--sm-font-mono)', fontSize: 12,
   };
 }

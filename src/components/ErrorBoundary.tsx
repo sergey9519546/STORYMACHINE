@@ -56,34 +56,34 @@ export default class ErrorBoundary extends React.Component<Props, State> {
         <div
           role="alert"
           aria-live="assertive"
-          className="min-h-screen bg-white flex flex-col items-center justify-center p-16 font-mono"
+          className="min-h-screen bg-[var(--sm-paper)] flex flex-col items-center justify-center p-16 font-[family-name:var(--sm-font-mono)]"
         >
-          <div className="brutal-border-thick brutal-shadow p-12 max-w-xl w-full space-y-6">
-            <h1 className="text-3xl font-bold uppercase tracking-widest text-black border-b-4 border-black pb-4">
+          <div className="border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow-lg)] bg-[var(--sm-panel)] p-12 max-w-xl w-full space-y-6">
+            <h1 className="text-3xl font-bold uppercase tracking-widest text-[var(--sm-ink)] border-b-[2px] border-[var(--sm-ink)] pb-4">
               Something went wrong
             </h1>
-            <pre className="text-sm text-red-600 bg-gray-50 p-4 overflow-auto border-2 border-black">
+            <pre className="text-sm text-[var(--sm-stamp)] bg-[var(--sm-panel-2)] p-4 overflow-auto border border-[var(--sm-ink)]">
               {error.message}
             </pre>
-            <div className="text-xs text-gray-500 font-mono uppercase tracking-widest">
-              Error code: <span className="text-black font-bold">{errorCode}</span>
+            <div className="text-xs text-[var(--sm-ink-mute)] uppercase tracking-widest">
+              Error code: <span className="text-[var(--sm-ink)] font-bold">{errorCode}</span>
             </div>
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => this.setState({ error: null, errorTime: null })}
-                className="w-full py-3 bg-black text-white font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border"
+                className="sm-btn sm-btn--stamp w-full py-3 font-bold uppercase tracking-widest"
               >
                 Try Again
               </button>
               <button
                 onClick={this.handleCopyError}
-                className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors brutal-border border-2 border-black"
+                className="sm-btn w-full py-3 font-bold uppercase tracking-widest"
               >
                 Copy Error Details
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors brutal-border border-2 border-black"
+                className="sm-btn w-full py-3 font-bold uppercase tracking-widest"
               >
                 Reload Page
               </button>

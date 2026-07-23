@@ -144,7 +144,13 @@ router.get('/api/ai-config', (_req, res) => {
   // show keySet:false and mislead a first-time user into thinking no key is
   // configured. llmReady ORs both independent sources so the client gets one
   // honest readiness signal without ever learning either key's value.
-  const llmReady = Boolean(process.env.GEMINI_API_KEY) || pub.keySet;
+  //
+  // Third source: a keyless local model server (Ollama, LM Studio). When the
+  // provider is openai-compat with a baseUrl set, the LLM seam is wired and
+  // ready even with no stored key (those servers ignore Authorization), so
+  // keySet stays false yet the provider genuinely works. OR that in too.
+  const localProviderReady = pub.provider === 'openai-compat' && Boolean(pub.baseUrl);
+  const llmReady = Boolean(process.env.GEMINI_API_KEY) || pub.keySet || localProviderReady;
   res.json({ ...pub, llmReady });
 });
 

@@ -72,10 +72,10 @@ export function HarvestPanel({ onClose }: HarvestPanelProps) {
     }
   }
 
-  function bar(value: number, max = 100, color = '#4ade80') {
+  function bar(value: number, max = 100, color = 'var(--sm-ok)') {
     const pct = Math.min(100, Math.round((value / max) * 100));
     return (
-      <div style={{ background: '#1e293b', borderRadius: 4, height: 8, marginTop: 4 }}>
+      <div style={{ background: 'var(--sm-night-2)', borderRadius: 4, height: 8, marginTop: 4 }}>
         <div style={{ background: color, width: `${pct}%`, height: '100%', borderRadius: 4, transition: 'width 0.4s' }} />
       </div>
     );
@@ -83,38 +83,38 @@ export function HarvestPanel({ onClose }: HarvestPanelProps) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      padding: 20, minWidth: 300, fontFamily: 'monospace', fontSize: 13,
-      border: '1px solid #334155',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      padding: 20, minWidth: 300, fontFamily: 'var(--sm-font-mono)', fontSize: 13,
+      border: '1px solid var(--sm-night-line)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <strong style={{ fontSize: 15 }}>Harvest</strong>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>x</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
       </div>
 
-      {error && <div style={{ color: '#f87171', marginBottom: 12 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--sm-stamp)', marginBottom: 12 }}>{error}</div>}
 
       {metrics ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Metric label="Momentum" value={metrics.momentumScore} suffix="/100" color="#a78bfa">
-            {bar(metrics.momentumScore, 100, '#a78bfa')}
+          <Metric label="Momentum" value={metrics.momentumScore} suffix="/100" color="var(--sm-cool)">
+            {bar(metrics.momentumScore, 100, 'var(--sm-cool)')}
           </Metric>
-          <Metric label="Quality" value={metrics.qualityScore} suffix="/100" color="#4ade80">
-            {bar(metrics.qualityScore, 100, '#4ade80')}
+          <Metric label="Quality" value={metrics.qualityScore} suffix="/100" color="var(--sm-ok)">
+            {bar(metrics.qualityScore, 100, 'var(--sm-ok)')}
           </Metric>
-          <Metric label="Propp Coverage" value={metrics.proppCoverage} suffix="%" color="#60a5fa">
-            {bar(metrics.proppCoverage, 100, '#60a5fa')}
+          <Metric label="Propp Coverage" value={metrics.proppCoverage} suffix="%" color="var(--sm-cool)">
+            {bar(metrics.proppCoverage, 100, 'var(--sm-cool)')}
           </Metric>
-          <Metric label="Tension" value={Math.round(metrics.tensionTotal)} suffix="" color="#fb923c">
-            {bar(metrics.tensionTotal, 100, '#fb923c')}
+          <Metric label="Tension" value={Math.round(metrics.tensionTotal)} suffix="" color="var(--sm-warn)">
+            {bar(metrics.tensionTotal, 100, 'var(--sm-warn)')}
           </Metric>
-          <div style={{ borderTop: '1px solid #334155', paddingTop: 10, display: 'flex', gap: 16 }}>
+          <div style={{ borderTop: '1px solid var(--sm-night-line)', paddingTop: 10, display: 'flex', gap: 16 }}>
             <Pill label="Commits" value={metrics.commitCount} />
             <Pill label="Ghosts" value={metrics.ghostCount} />
           </div>
         </div>
       ) : (
-        <div style={{ color: '#94a3b8' }}>Loading...</div>
+        <div style={{ color: 'var(--sm-cream-mute)' }}>Loading...</div>
       )}
 
       <button
@@ -122,9 +122,9 @@ export function HarvestPanel({ onClose }: HarvestPanelProps) {
         disabled={downloading}
         style={{
           marginTop: 16, width: '100%', padding: '8px 0',
-          background: downloading ? '#334155' : '#1d4ed8',
+          background: downloading ? 'var(--sm-night-line)' : 'var(--sm-cool)',
           color: '#fff', border: 'none', borderRadius: 6,
-          cursor: downloading ? 'default' : 'pointer', fontFamily: 'monospace',
+          cursor: downloading ? 'default' : 'pointer', fontFamily: 'var(--sm-font-mono)',
         }}
       >
         {downloading ? 'Downloading...' : 'Download Sidecar JSON'}
@@ -139,7 +139,7 @@ function Metric({ label, value, suffix, color, children }: {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ color: '#94a3b8' }}>{label}</span>
+        <span style={{ color: 'var(--sm-cream-mute)' }}>{label}</span>
         <span style={{ color }}>{value}{suffix}</span>
       </div>
       {children}
@@ -150,8 +150,8 @@ function Metric({ label, value, suffix, color, children }: {
 function Pill({ label, value }: { label: string; value: number }) {
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      <span style={{ color: '#64748b', fontSize: 11 }}>{label}</span>
-      <span style={{ background: '#1e293b', padding: '1px 6px', borderRadius: 4 }}>{value}</span>
+      <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{label}</span>
+      <span style={{ background: 'var(--sm-night-2)', padding: '1px 6px', borderRadius: 4 }}>{value}</span>
     </div>
   );
 }

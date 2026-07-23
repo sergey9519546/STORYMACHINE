@@ -14,6 +14,23 @@ import {
   type SaveStatus,
 } from "../lib/draft-persistence";
 import {
+  acknowledgeScriptIDESave,
+  shouldStartScriptIDESave,
+} from "../lib/scriptide-autosave";
+import {
+  applyServerScriptIDEDraft,
+  decideScriptIDERestore,
+  loadScriptIDEDraft,
+  readScriptIDEDraft,
+  scriptIDEDraftStatesEqual,
+  updateScriptIDEDraft,
+  writeScriptIDEDraft,
+  type ScriptIDEDraftEnvelope,
+  type ScriptIDEDraftState,
+  type ScriptIDEServerSnapshot,
+} from "../lib/scriptide-draft-store";
+import {
+  AlertCircle,
   Loader2,
   BookOpen,
   Film,
@@ -22,6 +39,7 @@ import {
   Sparkles,
   Camera,
   Layers,
+  Upload,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -50,10 +68,10 @@ const CoverageSummary = lazy(() => import("./scriptide/CoverageSummary"));
 const SlatePanel = lazy(() => import("./SlatePanel"));
 
 // Matches the DirectorPanel/ScriptDoctorPanel shell (fixed right-side drawer,
-// same brutal-border/white-bg idiom) so first-open doesn't flash blank space
+// same sm-btn/white-bg idiom) so first-open doesn't flash blank space
 // before sliding in.
 const DrawerPanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] text-[var(--sm-ink)] p-8 flex items-center justify-center font-mono text-sm z-50 shadow-[var(--sm-shadow)]">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -63,7 +81,7 @@ const DrawerPanelFallback = () => (
 // DrawerPanelFallback's 500px — a mismatched fallback width would flash a
 // narrower box for a moment before the real panel snaps wider.
 const SlatePanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] text-[var(--sm-ink)] p-8 flex items-center justify-center font-mono text-sm z-50 shadow-[var(--sm-shadow)]">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -77,6 +95,8 @@ const TabPanelFallback = () => (
 );
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+type ScriptIDEServerDraft = ScriptIDEServerSnapshot;
 
 interface ScriptIDEProps {
   initialConfig: StoryConfig;
@@ -140,8 +160,6 @@ const lsSet = (key: string, val: string): boolean => {
   }
 };
 
-const DRAFT_UPDATED_AT_KEY = "script_draft_updated_at";
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ScriptIDE({
@@ -152,11 +170,18 @@ export default function ScriptIDE({
   onImportConsumed,
   onNewStory,
 }: ScriptIDEProps) {
+  const initialDraftRef = useRef<ScriptIDEDraftEnvelope | null>(null);
+  const hadVersionedDraftRef = useRef(false);
+  if (!initialDraftRef.current) {
+    const stored = readScriptIDEDraft(lsGet);
+    hadVersionedDraftRef.current = stored !== null;
+    initialDraftRef.current = stored ?? loadScriptIDEDraft(lsGet);
+  }
+  const initialDraft = initialDraftRef.current;
+
   // ── Core state ──────────────────────────────────────────────────────────────
   const [engineState, setEngineState] = useState<EngineState | null>(null);
-  const [scriptText, setScriptText] = useState<string>(
-    () => lsGet("script_draft") || ""
-  );
+  const [scriptText, setScriptText] = useState<string>(initialDraft.scriptText);
   const [activeTab, setActiveTab] = useState<
     | "production"
     | "analysis"
@@ -186,6 +211,9 @@ export default function ScriptIDE({
   const [coverageStale, setCoverageStale] = useState(false);
   /** Progressive depth: summary first; full Script Doctor is opt-in. */
   const [coverageFull, setCoverageFull] = useState(false);
+  /** Current cursor line (1-based) for sidebar scene highlighting. */
+  const [currentLine, setCurrentLine] = useState(1);
+  const currentLineRef = useRef(1);
   const [prefsOpen, setPrefsOpen] = useState<"none" | "copilot" | "collab">("none");
   const [directorsLayer, setDirectorsLayer] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
@@ -193,12 +221,12 @@ export default function ScriptIDE({
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
   );
-  // Theme preference: localStorage + server ScriptIDE_State.is_dark_mode.
-  const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
+  // Theme preference: atomic local draft + server ScriptIDE_State.is_dark_mode.
+  const [isDarkMode, setIsDarkMode] = useState(initialDraft.isDarkMode);
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
-  >(() => safeJsonParse(lsGet("script_snapshots"), []));
+  >(initialDraft.snapshots as { id: string; name: string; text: string; date: string }[]);
   const [titlePage, setTitlePage] = useState({
     title: "UNTITLED SCRIPT",
     author: "AUTHOR NAME",
@@ -206,8 +234,13 @@ export default function ScriptIDE({
   });
   const [researchNotes, setResearchNotes] = useState<
     { id: string; title: string; content: string }[]
-  >(() => safeJsonParse(lsGet("research_notes"), []));
+  >(initialDraft.researchNotes as { id: string; title: string; content: string }[]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveConflict, setSaveConflict] = useState<(ScriptIDEDraftState & { updatedAt: number }) | null>(null);
+  // Persistence starts only after the mount-time server/local conflict has been
+  // resolved. This prevents StrictMode cleanup and slow loads from saving stale
+  // local state over a newer server revision.
+  const [persistenceReady, setPersistenceReady] = useState(false);
   const [snapshotModal, setSnapshotModal] = useState<{
     open: boolean;
     name: string;
@@ -222,8 +255,8 @@ export default function ScriptIDE({
     cursor: number;
   }>({ show: false, charName: "", cursor: 0 });
   const [actionInput, setActionInput] = useState("");
-  const [characters, setCharacters] = useState<ScriptCharacter[]>(() =>
-    safeJsonParse(lsGet("script_characters"), [])
+  const [characters, setCharacters] = useState<ScriptCharacter[]>(
+    initialDraft.characters as ScriptCharacter[],
   );
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   const [cleanError, setCleanError] = useState<string | null>(null);
@@ -274,19 +307,23 @@ export default function ScriptIDE({
   const charactersRef = useRef(characters);
   // Always-current draft payload for mount-stable server autosave (must NOT be
   // recreated on every keystroke — that starved the previous 30s interval).
-  const draftRef = useRef({ scriptText, snapshots, characters, researchNotes, isDarkMode });
-  const draftUpdatedAtRef = useRef<number>(
-    Number(lsGet(DRAFT_UPDATED_AT_KEY) || "0") || 0,
-  );
+  const draftRef = useRef<ScriptIDEDraftState>({ scriptText, snapshots, characters, researchNotes, isDarkMode });
+  const draftEnvelopeRef = useRef(initialDraft);
+  const draftGenerationRef = useRef(0);
+  const persistedGenerationRef = useRef(initialDraft.dirty ? -1 : 0);
+  const persistenceReadyRef = useRef(false);
+  const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
+  const requestServerSaveRef = useRef<(opts?: { updateStatus: boolean; keepalive?: boolean }) => void>(() => {});
+  const skipNextLocalWriteRef = useRef(true);
   // Prevent setState-after-unmount from the flush-on-cleanup save path.
   const mountedRef = useRef(true);
   draftRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode };
 
   // Sync document class for Tailwind `dark:` variants + CodeMirror theme.
+  // Theme storage is mirrored from the draft envelope write path only.
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
-    lsSet("theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
   useEffect(() => {
@@ -295,100 +332,218 @@ export default function ScriptIDE({
   }, []);
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
-  // Debounced write of heavy text data. Success/failure drives honest status.
+  // Update the in-memory envelope immediately on a real edit, then debounce its
+  // single atomic storage write. Mounting and server restore are not edits.
   useEffect(() => {
-    setSaveStatus("saving-local");
+    const state = draftRef.current;
+    if (skipNextLocalWriteRef.current) {
+      skipNextLocalWriteRef.current = false;
+      return;
+    }
+    if (scriptIDEDraftStatesEqual(draftEnvelopeRef.current, state)) return;
+
+    draftEnvelopeRef.current = updateScriptIDEDraft(draftEnvelopeRef.current, state);
+    const generation = ++draftGenerationRef.current;
+    setSaveStatus(saveConflictRef.current ? "save-conflict" : "saving-local");
+
+    // A writer may type while the initial server load is still pending. Persist
+    // that edit immediately so the restore decision sees it and navigation
+    // cannot lose it. Server-applied state sets skipNextLocalWriteRef above.
+    if (!persistenceReady) {
+      const ok = writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+      setSaveStatus(ok ? "saved-local" : "save-failed");
+      return;
+    }
+
     const debounceTimer = setTimeout(() => {
-      const now = Date.now();
-      const ok =
-        lsSet("script_draft", scriptText) &&
-        lsSet("script_snapshots", JSON.stringify(snapshots)) &&
-        lsSet("script_characters", JSON.stringify(characters)) &&
-        lsSet("research_notes", JSON.stringify(researchNotes)) &&
-        lsSet("theme", isDarkMode ? "dark" : "light") &&
-        lsSet(DRAFT_UPDATED_AT_KEY, String(now));
+      const ok = writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
       if (!mountedRef.current) return;
       if (ok) {
-        draftUpdatedAtRef.current = now;
-        setSaveStatus("saved-local");
+        if (draftGenerationRef.current === generation && !saveConflictRef.current) {
+          setSaveStatus("saved-local");
+        }
       } else {
         setSaveStatus("save-failed");
       }
     }, 500);
     return () => clearTimeout(debounceTimer);
-  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
+  }, [persistenceReady, scriptText, snapshots, characters, researchNotes, isDarkMode]);
 
   // ── Server-side persistence ────────────────────────────────────────────────
-  // Load from server on mount. Prefer NEWER draft (timestamp), not longer text.
+  // Versioned drafts compare opaque server revisions. Legacy drafts use the old
+  // timestamp/length rule once, then migrate into the envelope.
   useEffect(() => {
     let cancelled = false;
     fetch('/api/scriptide/load')
       .then(r => r.ok ? r.json() : null)
-      .then((data: { status: string; scriptText?: string; snapshots?: unknown[]; characters?: unknown[]; researchNotes?: unknown[]; isDarkMode?: boolean; updatedAt?: number | null } | null) => {
-        if (cancelled || !data || data.status === 'empty') return;
-        const localText = draftRef.current.scriptText ?? "";
-        const localTs = draftUpdatedAtRef.current || Number(lsGet(DRAFT_UPDATED_AT_KEY) || "0") || 0;
-        const decision = resolveDraftConflict(
-          { text: localText, updatedAt: localTs },
-          { text: data.scriptText ?? "", updatedAt: data.updatedAt },
+      .then((data: ({ status: string } & Partial<ScriptIDEServerDraft>) | null) => {
+        if (cancelled || !data) return;
+        if (data.status === 'empty') {
+          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+          return;
+        }
+        if (
+          typeof data.scriptText !== 'string' ||
+          !Array.isArray(data.snapshots) ||
+          !Array.isArray(data.characters) ||
+          !Array.isArray(data.researchNotes) ||
+          typeof data.isDarkMode !== 'boolean' ||
+          typeof data.updatedAt !== 'number'
+        ) return;
+
+        const server: ScriptIDEServerDraft = {
+          scriptText: data.scriptText,
+          snapshots: data.snapshots,
+          characters: data.characters,
+          researchNotes: data.researchNotes,
+          isDarkMode: data.isDarkMode,
+          updatedAt: data.updatedAt,
+        };
+        const local = draftEnvelopeRef.current;
+        const legacyDecision = resolveDraftConflict(
+          { text: local.scriptText, updatedAt: local.contentUpdatedAt },
+          { text: server.scriptText, updatedAt: server.updatedAt },
         );
-        if (decision.source === "server") {
-          setScriptText(decision.text);
-          if (typeof decision.updatedAt === "number") {
-            draftUpdatedAtRef.current = decision.updatedAt;
-            lsSet(DRAFT_UPDATED_AT_KEY, String(decision.updatedAt));
-          }
-          if (data.snapshots?.length) setSnapshots(data.snapshots as { id: string; name: string; text: string; date: string }[]);
-          if (data.characters?.length) setCharacters(data.characters as typeof characters);
-          if (data.researchNotes?.length) setResearchNotes(data.researchNotes as typeof researchNotes);
-          if (typeof data.isDarkMode === "boolean") setIsDarkMode(data.isDarkMode);
+        const decision = decideScriptIDERestore(local, server, {
+          hadVersionedDraft: hadVersionedDraftRef.current,
+          legacySource: legacyDecision.source,
+        });
+
+        if (decision.action === 'conflict') {
+          saveConflictRef.current = decision.server;
+          setSaveConflict(decision.server);
+          setSaveStatus('save-conflict');
+          return;
+        }
+        if (decision.action === 'use-server') {
+          const cleanEnvelope = applyServerScriptIDEDraft(decision.server);
+          draftEnvelopeRef.current = cleanEnvelope;
+          skipNextLocalWriteRef.current = true;
+          persistedGenerationRef.current = draftGenerationRef.current;
+          setScriptText(decision.server.scriptText);
+          setSnapshots(decision.server.snapshots as { id: string; name: string; text: string; date: string }[]);
+          setCharacters(decision.server.characters as typeof characters);
+          setResearchNotes(decision.server.researchNotes as typeof researchNotes);
+          setIsDarkMode(decision.server.isDarkMode);
+          writeScriptIDEDraft(lsSet, cleanEnvelope);
+          return;
+        }
+
+        if (decision.action === 'keep-local') {
+          draftEnvelopeRef.current = {
+            ...local,
+            serverRevision: decision.serverRevision,
+            // Legacy multi-key imports must still server-save after migration.
+            dirty: local.dirty || hadVersionedDraftRef.current === false,
+          };
+          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
         }
       })
-      .catch(() => { /* non-critical — continue with localStorage */ });
+      .catch(() => { /* non-critical — continue with local envelope */ })
+      .finally(() => {
+        if (cancelled) return;
+        persistenceReadyRef.current = true;
+        setPersistenceReady(true);
+      });
     return () => { cancelled = true; };
   }, []); // mount only
 
   // Auto-save to server every 30s from refs so continuous typing cannot starve it.
-  // Also flush on tab hide and unmount (unmount path never setStates).
+  // A trigger during an in-flight request queues one trailing save of the newest
+  // generation. Only the generation actually acknowledged may claim success.
   useEffect(() => {
+    if (!persistenceReady) return;
     let inFlight = false;
-    const saveToServer = (opts: { updateStatus: boolean } = { updateStatus: true }) => {
-      if (inFlight) return;
+    let trailingRequested = false;
+    let disposed = false;
+
+    const saveToServer = (opts: { updateStatus: boolean; keepalive?: boolean } = { updateStatus: true }) => {
+      if (!persistenceReadyRef.current) return;
+      if (inFlight) {
+        trailingRequested = true;
+        return;
+      }
+      if (!shouldStartScriptIDESave(draftEnvelopeRef.current, saveConflictRef.current !== null, inFlight)) return;
+
+      const generation = draftGenerationRef.current;
       const payload = draftRef.current;
-      if (!payload.scriptText && payload.snapshots.length === 0) return;
+      const expectedUpdatedAt = draftEnvelopeRef.current.serverRevision;
       inFlight = true;
       if (opts.updateStatus && mountedRef.current) setSaveStatus("saving-server");
       fetch('/api/scriptide/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, expectedUpdatedAt }),
+        keepalive: opts.keepalive === true,
       })
-        .then((r) => {
-          if (!r.ok) throw new Error(`save ${r.status}`);
-          const now = Date.now();
-          draftUpdatedAtRef.current = now;
-          lsSet(DRAFT_UPDATED_AT_KEY, String(now));
-          if (opts.updateStatus && mountedRef.current) setSaveStatus("saved-server");
+        .then(async (r) => {
+          const data = await r.json() as {
+            status?: string;
+            updatedAt?: number;
+            server?: ScriptIDEServerDraft;
+          };
+          if (r.status === 409 && data.status === 'conflict' && data.server) {
+            saveConflictRef.current = data.server;
+            if (mountedRef.current) {
+              setSaveConflict(data.server);
+              setSaveStatus('save-conflict');
+            }
+            return;
+          }
+          if (!r.ok || data.status !== 'saved' || typeof data.updatedAt !== 'number') {
+            throw new Error(`save ${r.status}`);
+          }
+
+          const transition = acknowledgeScriptIDESave(
+            draftEnvelopeRef.current,
+            generation,
+            draftGenerationRef.current,
+            data.updatedAt,
+          );
+          draftEnvelopeRef.current = transition.envelope;
+          persistedGenerationRef.current = Math.max(persistedGenerationRef.current, generation);
+          const localWriteOk = writeScriptIDEDraft(lsSet, transition.envelope);
+          if (transition.needsTrailingSave) trailingRequested = true;
+          if (opts.updateStatus && mountedRef.current && transition.acknowledgedCurrentDraft) {
+            setSaveStatus(localWriteOk ? "saved-server" : "save-failed");
+          }
         })
         .catch(() => {
           if (opts.updateStatus && mountedRef.current) setSaveStatus("save-failed");
         })
         .finally(() => {
           inFlight = false;
+          if (trailingRequested && !disposed && !saveConflictRef.current) {
+            trailingRequested = false;
+            saveToServer({ updateStatus: true });
+          }
         });
+    };
+    requestServerSaveRef.current = saveToServer;
+    const syncLocalEnvelope = () => {
+      if (!scriptIDEDraftStatesEqual(draftEnvelopeRef.current, draftRef.current)) {
+        draftEnvelopeRef.current = updateScriptIDEDraft(draftEnvelopeRef.current, draftRef.current);
+        draftGenerationRef.current += 1;
+      }
+      return writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
     };
     const interval = setInterval(() => saveToServer({ updateStatus: true }), 30_000);
     const onVis = () => {
-      if (document.visibilityState === "hidden") saveToServer({ updateStatus: true });
+      if (document.visibilityState === "hidden") {
+        syncLocalEnvelope();
+        saveToServer({ updateStatus: true, keepalive: true });
+      }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVis);
-      // Fire-and-forget flush; never touch React state after unmount.
-      saveToServer({ updateStatus: false });
+      syncLocalEnvelope();
+      saveToServer({ updateStatus: false, keepalive: true });
+      requestServerSaveRef.current = () => {};
+      disposed = true;
     };
-  }, []); // mount only — reads draftRef
+  }, [persistenceReady]);
 
   // Keep both refs in sync so async callbacks always read the latest values.
   useEffect(() => {
@@ -816,6 +971,25 @@ export default function ScriptIDE({
     return () => document.removeEventListener("keydown", onKey);
   }, [prefsOpen, toolSlot, task, sidebarOpen, coverageFull]);
 
+  // Poll the editor cursor at ~250ms to highlight the active scene in the sidebar.
+  // Uses requestAnimationFrame-gated interval to avoid re-render storm.
+  useEffect(() => {
+    let raf: number;
+    const poll = () => {
+      const view = editorRef.current?.getView();
+      if (view) {
+        const line = view.state.doc.lineAt(view.state.selection.main.head).number;
+        if (line !== currentLineRef.current) {
+          currentLineRef.current = line;
+          setCurrentLine(line);
+        }
+      }
+      raf = requestAnimationFrame(poll);
+    };
+    raf = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const handleScriptChange = (text: string) => {
     setScriptText(text);
     setCoverageStale(true);
@@ -1102,6 +1276,39 @@ export default function ScriptIDE({
     setResearchNotes(researchNotes.filter((n) => n.id !== id));
   };
 
+  const useServerConflictDraft = () => {
+    const server = saveConflictRef.current;
+    if (!server) return;
+    const cleanEnvelope = applyServerScriptIDEDraft(server);
+    draftEnvelopeRef.current = cleanEnvelope;
+    skipNextLocalWriteRef.current = true;
+    persistedGenerationRef.current = draftGenerationRef.current;
+    saveConflictRef.current = null;
+    setSaveConflict(null);
+    setScriptText(server.scriptText);
+    setSnapshots(server.snapshots as typeof snapshots);
+    setCharacters(server.characters as typeof characters);
+    setResearchNotes(server.researchNotes as typeof researchNotes);
+    setIsDarkMode(server.isDarkMode);
+    setSaveStatus("saved-server");
+    writeScriptIDEDraft(lsSet, cleanEnvelope);
+  };
+
+  const keepLocalConflictDraft = () => {
+    const server = saveConflictRef.current;
+    if (!server) return;
+    draftEnvelopeRef.current = {
+      ...draftEnvelopeRef.current,
+      serverRevision: server.updatedAt,
+      dirty: true,
+    };
+    saveConflictRef.current = null;
+    setSaveConflict(null);
+    setSaveStatus("saving-server");
+    writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+    requestServerSaveRef.current({ updateStatus: true });
+  };
+
   // renderAnalysis() removed — dead code (never called; superseded by the
   // "analysis" tab's <AnalysisPanel/>, which has no recharts dependency).
   // Removing it drops recharts entirely from the bundle: it was the only
@@ -1109,7 +1316,7 @@ export default function ScriptIDE({
 
   // ── Title page ───────────────────────────────────────────────────────────────
   const renderTitlePage = () => (
-    <div className="p-12 bg-white dark:bg-zinc-900 dark:text-white h-full flex flex-col items-center justify-center text-center font-courier">
+    <div className="p-12 bg-[var(--sm-panel)] dark:text-white h-full flex flex-col items-center justify-center text-center font-courier">
       <div className="w-full max-w-md space-y-12">
         <input
           value={titlePage.title}
@@ -1150,8 +1357,8 @@ export default function ScriptIDE({
   // ── Guard ────────────────────────────────────────────────────────────────────
   if (!engineState) {
     return (
-      <div className="flex h-dvh w-full items-center justify-center bg-[#f4f4f0] font-mono text-sm uppercase tracking-widest text-black">
-        <div className="flex items-center gap-3 border-2 border-black bg-white px-6 py-4">
+      <div className="flex h-dvh w-full items-center justify-center bg-[#f4f4f0] font-mono text-sm uppercase tracking-widest text-[var(--sm-ink)]">
+        <div className="flex items-center gap-3 border-2 border-black bg-[var(--sm-panel)] px-6 py-4">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           Opening script desk…
         </div>
@@ -1173,6 +1380,7 @@ export default function ScriptIDE({
         scriptText={scriptText}
         parsedBlocks={parsedBlocks}
         onNavigate={handleNavigate}
+        currentLine={currentLine}
         mobileOpen={sidebarOpen}
         onCloseMobile={() => setSidebarOpen(false)}
       />
@@ -1188,9 +1396,42 @@ export default function ScriptIDE({
           </div>
         )}
         {fdxImportNotice && (
-          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-black text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
+          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-[var(--sm-ink)] text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
             <span>{fdxImportNotice}</span>
             <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
+          </div>
+        )}
+        {saveConflict && (
+          <div
+            className="z-30 flex flex-wrap items-center gap-3 border-b-[2px] border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 px-4 py-3 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]"
+            role="alert"
+            aria-live="assertive"
+          >
+            <AlertCircle className="h-5 w-5 shrink-0 text-[var(--sm-stamp)]" aria-hidden="true" />
+            <div className="mr-auto flex flex-col gap-1">
+              <span className="font-bold uppercase tracking-wider text-[var(--sm-stamp)]">
+                Save Conflict Detected
+              </span>
+              <span className="text-[10px] text-[var(--sm-ink)]/70">
+                This draft was modified in another tab or window. Choose which version to keep.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={useServerConflictDraft}
+              className="sm-btn min-h-9 border-[var(--sm-ink)] bg-[var(--sm-panel)] px-4 text-[10px]"
+              title="Discard your local changes and use the server version"
+            >
+              Use Server Version
+            </button>
+            <button
+              type="button"
+              onClick={keepLocalConflictDraft}
+              className="sm-btn sm-btn--stamp min-h-9 px-4 text-[10px] font-extrabold"
+              title="Overwrite server with your local changes"
+            >
+              Keep My Changes
+            </button>
           </div>
         )}
         <Toolbar
@@ -1235,8 +1476,8 @@ export default function ScriptIDE({
           onOpenCopilot={() => setPrefsOpen("copilot")}
         />
 
-        {/* Action strip — paper bar; one dominant next step */}
-        <div className="flex min-h-[44px] flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-bar)] px-3 py-2 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]">
+        {/* Action strip — director's slate: one context, one dominant CTA, right-aligned */}
+        <div className="flex min-h-[44px] items-center gap-3 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-bar)] px-4 py-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]">
           {simulateStatus ? (
             <>
               <span
@@ -1355,15 +1596,15 @@ export default function ScriptIDE({
 
         {/* Progressive depth: prefs only when requested from overflow */}
         {prefsOpen === "copilot" && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-white px-3 py-2">
-            <label htmlFor="copilot-persona" className="font-mono text-[10px] font-bold uppercase tracking-widest text-black/60">
+          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
+            <label htmlFor="copilot-persona" className="font-mono text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink)]/60">
               Copilot
             </label>
             <select
               id="copilot-persona"
               value={copilotPersona}
               onChange={(e) => setCopilotPersona(e.target.value)}
-              className="border border-black bg-white px-2 py-1 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-black"
+              className="border border-black bg-[var(--sm-panel)] px-2 py-1 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-black"
             >
               {(personaList.length > 0
                 ? personaList
@@ -1382,7 +1623,7 @@ export default function ScriptIDE({
           </div>
         )}
         {prefsOpen === "collab" && !collabRoom && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-white px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
             <input
               value={collabNameInput}
               onChange={(e) => setCollabNameInput(e.target.value)}
@@ -1433,7 +1674,9 @@ export default function ScriptIDE({
         )}
 
         <div
-          className="relative flex-1 overflow-hidden bg-[var(--sm-paper)]"
+          className={`relative flex-1 overflow-hidden bg-[var(--sm-paper)] sm-stage-transition ${
+            task === "ship" ? "bg-[#f0ebe0]" : task === "coverage" ? "bg-[#f2ede3]" : "bg-[var(--sm-paper)]"
+          }`}
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
         >
           {/* CodeMirror 6 editor — replaces the textarea + syntax-highlight overlay.
@@ -1456,35 +1699,56 @@ export default function ScriptIDE({
             liveDiagnostics={liveDiagnostics}
           />
 
+          {/* Page furniture — quiet manuscript metadata in the right gutter */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-3 right-5 z-10 hidden items-end gap-2 font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--sm-ink-faint)]/60 md:flex"
+          >
+            <span className="tabular-nums">{stats.wordCount}w</span>
+            <span className="text-[var(--sm-ink-faint)]/30">·</span>
+            <span className="tabular-nums">{pageCount} {pageCount === 1 ? "page" : "pages"}</span>
+          </div>
+
           {/* Empty draft coach — Write mode only; disappears on first keystroke */}
           {isEmptyDraft && task === "write" && toolSlot === "none" && (
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[18%] sm:pt-[14%]">
-              <div className="sm-panel pointer-events-auto mx-4 max-w-md">
-                <div className="sm-panel-body">
-                  <p className="sm-slug">Script · write</p>
-                  <h2 className="font-[family-name:var(--sm-font-display)] text-2xl uppercase leading-none text-[var(--sm-ink)]">
-                    Start the page
-                  </h2>
-                  <p className="sm-sub">Type a slug line, or load the sample for coverage.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDoctorAutoSample(true);
-                        handleTaskChange("coverage");
-                      }}
-                      className="sm-btn sm-btn--stamp"
-                    >
-                      Sample coverage
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => editorRef.current?.getView()?.focus()}
-                      className="sm-btn"
-                    >
-                      Focus editor
-                    </button>
-                  </div>
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[16%] sm:pt-[12%]">
+              <div className="pointer-events-auto sm-panel mx-4 max-w-[48ch] px-8 py-8 text-center shadow-[var(--sm-shadow-lg)]">
+                <p className="font-[family-name:var(--sm-font-hand)] text-lg text-[var(--sm-ink-faint)]">
+                  the page is yours
+                </p>
+                <h2 className="mt-2 font-[family-name:var(--sm-font-display)] text-3xl uppercase leading-none tracking-[0.04em] text-[var(--sm-ink)]">
+                  Start Your Script
+                </h2>
+                <div className="mt-5 rounded border border-[var(--sm-hair)] bg-[var(--sm-panel-2)] px-4 py-4 text-left">
+                  <p className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--sm-ink-mute)]">
+                    Type or paste Fountain format:
+                  </p>
+                  <pre className="mt-2 font-[family-name:Courier_Prime] text-[13px] leading-relaxed text-[var(--sm-ink-soft)]">
+                    FADE IN:
+                    <br />
+                    <br />
+                    INT. COFFEE SHOP - DAY
+                  </pre>
+                </div>
+                <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDoctorAutoSample(true);
+                      handleTaskChange("coverage");
+                    }}
+                    className="sm-btn sm-btn--stamp min-h-[44px] px-5"
+                  >
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Try Sample Script
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editorRef.current?.getView()?.focus()}
+                    className="sm-btn min-h-[44px] px-5"
+                  >
+                    Start Typing
+                  </button>
                 </div>
               </div>
             </div>
@@ -1505,7 +1769,7 @@ export default function ScriptIDE({
                 <motion.div
                   initial={{ scale: 0.9, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
-                  className="bg-white border-4 border-black p-6 brutal-shadow max-w-md w-full"
+                  className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full"
                 >
                   <h2 className="font-bold uppercase tracking-widest text-xl mb-2 border-b-4 border-black pb-2">
                     Action Required
@@ -1541,7 +1805,7 @@ export default function ScriptIDE({
                     </button>
                     <button
                       onClick={() => submitActionModal(false)}
-                      className="px-4 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-red-600 transition-colors brutal-border"
+                      className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
                     >
                       Insert Action
                     </button>
@@ -1568,7 +1832,7 @@ export default function ScriptIDE({
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-white border-4 border-black p-6 brutal-shadow max-w-md w-full mx-4"
+              className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full mx-4"
             >
               <h2 id="new-story-confirm-title" className="font-bold uppercase tracking-widest text-lg mb-3 border-b-4 border-black pb-2">
                 Start a new story?
@@ -1585,7 +1849,7 @@ export default function ScriptIDE({
                 </button>
                 <button
                   onClick={() => { setNewStoryConfirm(false); onNewStory?.(); }}
-                  className="px-4 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-red-600 transition-colors brutal-border"
+                  className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
                 >
                   New Story
                 </button>
@@ -1612,11 +1876,11 @@ export default function ScriptIDE({
             <button
               onClick={() => openToolSlot("studio")}
               aria-label="Close studio panel"
-              className="md:hidden absolute top-2 right-2 z-10 p-2 brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors"
+              className="md:hidden absolute top-2 right-2 z-10 p-2 sm-btn bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-black hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
-        <div className="flex bg-black text-white overflow-x-auto">
+        <div className="flex sm-btn--ink overflow-x-auto">
           {(
             [
               { id: "production", icon: Film, label: "Production" },
@@ -1634,7 +1898,7 @@ export default function ScriptIDE({
               aria-pressed={activeTab === id}
               className={`px-3 py-3 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2 transition-colors whitespace-nowrap ${
                 activeTab === id
-                  ? "bg-[#e8e8e3] text-black"
+                  ? "bg-[#e8e8e3] text-[var(--sm-ink)]"
                   : "hover:bg-gray-800"
               }`}
             >
@@ -1660,7 +1924,7 @@ export default function ScriptIDE({
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
-                <div className="bg-white dark:bg-zinc-900 border-4 border-black p-6 brutal-shadow">
+                <div className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)]">
                   <h2 className="font-bold uppercase tracking-widest text-sm mb-6 border-b-4 border-black pb-2 flex items-center gap-2">
                     <Activity className="w-5 h-5 text-[#FF4444]" /> Story Engine
                     Diagnostics
@@ -1671,11 +1935,11 @@ export default function ScriptIDE({
                       <h3 className="text-[10px] font-bold uppercase opacity-50">
                         Narrative Tension
                       </h3>
-                      <div className="h-40 flex items-end gap-1 bg-zinc-50 dark:bg-zinc-950 p-2 brutal-border">
+                      <div className="h-40 flex items-end gap-1 bg-zinc-50 dark:bg-zinc-950 p-2 sm-btn">
                         {TENSION_BARS.map((h, i) => (
                           <div
                             key={i}
-                            className="flex-1 bg-black dark:bg-white"
+                            className="flex-1 bg-black dark:bg-[var(--sm-panel)]"
                             style={{ height: `${h}%`, opacity: 0.1 + i * 0.04 }}
                           />
                         ))}
@@ -1696,7 +1960,7 @@ export default function ScriptIDE({
                         ].map((beat) => (
                           <div
                             key={beat}
-                            className="flex items-center justify-between text-[10px] font-mono p-2 bg-zinc-100 dark:bg-zinc-800 brutal-border-thin"
+                            className="flex items-center justify-between text-[10px] font-mono p-2 bg-zinc-100 dark:bg-zinc-800 border border-[var(--sm-ink)]"
                           >
                             <span>{beat}</span>
                             <span className="text-green-600 font-bold">
@@ -1708,7 +1972,7 @@ export default function ScriptIDE({
                     </div>
                   </div>
 
-                  <div className="mt-8 p-4 bg-black text-white brutal-border">
+                  <div className="mt-8 p-4 sm-btn--ink sm-btn">
                     <p className="text-[10px] font-mono leading-relaxed">
                       SYSTEM STATUS: THE STORY MIND IS ACTIVE. NARRATIVE
                       COHESION AT 94%. DETECTED THEME:{" "}
@@ -1724,7 +1988,7 @@ export default function ScriptIDE({
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-zinc-900 border-4 border-black p-6 brutal-shadow">
+                <div className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)]">
                   <h2 className="font-bold uppercase tracking-widest text-sm mb-4">
                     Active Throughlines
                   </h2>
@@ -1761,7 +2025,7 @@ export default function ScriptIDE({
               className="space-y-6"
             >
               {directorsLayer && (
-                <div className="bg-white border-4 border-black p-4 brutal-shadow">
+                <div className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-4 shadow-[var(--sm-shadow)]">
                   <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-purple-600">
                     <Camera className="w-4 h-4" /> Director&apos;s Shot List
                   </h2>
@@ -1796,7 +2060,7 @@ export default function ScriptIDE({
 
               {/* MEDIA PRODUCTION */}
               <div
-                className="bg-white border-4 border-black p-4 brutal-shadow"
+                className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-4 shadow-[var(--sm-shadow)]"
                 aria-busy={engineState.isGeneratingMedia ? "true" : "false"}
               >
                 <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
@@ -1850,7 +2114,7 @@ export default function ScriptIDE({
 
               {/* AUDIO PRODUCTION */}
               <div
-                className="bg-white border-4 border-black p-4 brutal-shadow"
+                className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-4 shadow-[var(--sm-shadow)]"
                 aria-busy={engineState.isGeneratingMedia ? "true" : "false"}
               >
                 <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
@@ -1912,13 +2176,13 @@ export default function ScriptIDE({
                 engineState.directorState.activeCodexEntries.map((entry, i) => (
                   <div
                     key={i}
-                    className="bg-white border-4 border-black p-3 brutal-shadow"
+                    className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-3 shadow-[var(--sm-shadow)]"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-bold uppercase text-xs">
                         {entry.title}
                       </h3>
-                      <span className="bg-black text-white px-2 py-0.5 text-[8px] uppercase">
+                      <span className="sm-btn--ink px-2 py-0.5 text-[8px] uppercase">
                         {entry.category}
                       </span>
                     </div>

@@ -4,6 +4,8 @@ import {
   appendUploadedFiles,
   filterUploadableFiles,
   readUploadedFiles,
+  removeUploadedFile,
+  updateUploadedFileCategory,
   type FileCategory,
   type UploadedFile,
 } from "../../lib/uploaded-files";
@@ -43,14 +45,18 @@ export function StoryConfigForm({
   onDrop,
 }: StoryConfigFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Bumps on Clear All so a pending multi-file read cannot re-append after wipe.
+  const uploadGenerationRef = useRef(0);
 
   // Batch-read every selected file, then append once via a functional update so
   // concurrent FileReader completions cannot overwrite each other (stale-closure race).
   const processFiles = async (files: File[]) => {
     const allowed = filterUploadableFiles(files);
     if (allowed.length === 0) return;
+    const generation = uploadGenerationRef.current;
     const batch = await readUploadedFiles(allowed);
     if (batch.length === 0) return;
+    if (generation !== uploadGenerationRef.current) return;
     onUploadedFilesChange((prev) => appendUploadedFiles(prev, batch));
   };
 
@@ -61,17 +67,17 @@ export function StoryConfigForm({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const removeFile = (index: number) => {
-    onUploadedFilesChange((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = (id: string) => {
+    onUploadedFilesChange((prev) => removeUploadedFile(prev, id));
   };
 
-  const updateFileCategory = (index: number, category: FileCategory) => {
-    onUploadedFilesChange((prev) => {
-      const next = prev.slice();
-      if (!next[index]) return prev;
-      next[index] = { ...next[index], category };
-      return next;
-    });
+  const updateFileCategory = (id: string, category: FileCategory) => {
+    onUploadedFilesChange((prev) => updateUploadedFileCategory(prev, id, category));
+  };
+
+  const clearAllFiles = () => {
+    uploadGenerationRef.current += 1;
+    onUploadedFilesChange([]);
   };
 
   const estimatedTokens = Math.round((backstory.length + uploadedFiles.reduce((acc, f) => acc + f.content.length, 0)) / 4);
@@ -93,7 +99,7 @@ export function StoryConfigForm({
           value={theme}
           onChange={(e) => onThemeChange(e.target.value)}
           placeholder="e.g., A detective haunted by a cold case in a neon city..."
-          className="w-full bg-panel brutal-border-thick px-8 py-6 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-xl brutal-shadow-focus"
+          className="w-full bg-panel border-[2px] border-[var(--sm-ink)] px-8 py-6 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-xl shadow-[var(--sm-shadow)]-focus"
           disabled={isGenerating}
         />
         <p className="text-sm font-mono text-faint mt-2">
@@ -121,7 +127,7 @@ export function StoryConfigForm({
           </label>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-ink text-cream px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-stamp brutal-border-thick brutal-shadow-hover"
+            className="flex items-center justify-center gap-2 bg-ink text-cream px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-stamp border-[2px] border-[var(--sm-ink)] "
             disabled={isGenerating}
           >
             <Upload className="w-4 h-4" /> Upload Documents
@@ -142,17 +148,17 @@ export function StoryConfigForm({
               value={backstory}
               onChange={(e) => onBackstoryChange(e.target.value)}
               placeholder="Type manual context here... (e.g., character motivations, specific plot points, world rules)"
-              className="w-full bg-panel brutal-border-thick px-6 py-4 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-sm min-h-[200px] resize-y brutal-shadow-focus"
+              className="w-full bg-panel border-[2px] border-[var(--sm-ink)] px-6 py-4 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-sm min-h-[200px] resize-y shadow-[var(--sm-shadow)]-focus"
               disabled={isGenerating}
             />
           </div>
 
-          <div className="bg-panel2 brutal-border-thick p-4 flex flex-col h-[200px] overflow-y-auto">
+          <div className="bg-panel2 border-[2px] border-[var(--sm-ink)] p-4 flex flex-col h-[200px] overflow-y-auto">
             <h4 className="font-bold uppercase tracking-widest text-xs border-b-2 border-ink pb-2 mb-3 flex justify-between items-center">
               <span>Ingested Files</span>
               <div className="flex items-center gap-3">
                 {uploadedFiles.length > 0 && (
-                  <button onClick={() => onUploadedFilesChange([])} className="text-[10px] hover:text-stamp transition-colors uppercase font-bold">Clear All</button>
+                  <button onClick={clearAllFiles} className="text-[10px] hover:text-stamp transition-colors uppercase font-bold">Clear All</button>
                 )}
                 <span className="bg-ink text-cream px-2 py-0.5">{uploadedFiles.length}</span>
               </div>
@@ -161,12 +167,12 @@ export function StoryConfigForm({
             {uploadedFiles.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-faint space-y-2 text-center">
                 <FileText className="w-8 h-8 opacity-50" />
-                <p className="text-xs font-mono">No files attached.<br />Drag &amp; drop .txt or .md</p>
+                <p className="text-xs font-mono">No files attached.<br />Drag &amp; drop lore docs</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {uploadedFiles.map((file, idx) => (
-                  <div key={idx} className="flex flex-col gap-2 bg-panel brutal-border p-2 group hover:border-stamp brutal-shadow-hover">
+                {uploadedFiles.map((file) => (
+                  <div key={file.id} className="flex flex-col gap-2 bg-panel sm-btn p-2 group hover:border-stamp ">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 overflow-hidden">
                         <FileText className="w-3 h-3 flex-shrink-0 text-stamp" />
@@ -177,15 +183,15 @@ export function StoryConfigForm({
                         <button onClick={() => onPreviewFile(file)} className="text-faint hover:text-ink transition-colors" title="Preview">
                           <Eye className="w-3 h-3" />
                         </button>
-                        <button onClick={() => removeFile(idx)} className="text-faint hover:text-stamp transition-colors" title="Remove">
+                        <button onClick={() => removeFile(file.id)} className="text-faint hover:text-stamp transition-colors" title="Remove">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
                     <select
                       value={file.category}
-                      onChange={(e) => updateFileCategory(idx, e.target.value as FileCategory)}
-                      className="text-[10px] font-mono p-1 brutal-border bg-panel2 focus:outline-none cursor-pointer w-full"
+                      onChange={(e) => updateFileCategory(file.id, e.target.value as FileCategory)}
+                      className="text-[10px] font-mono p-1 sm-btn bg-panel2 focus:outline-none cursor-pointer w-full"
                     >
                       <option value="Lore">Lore / Worldbuilding</option>
                       <option value="Character">Character Sheet</option>
@@ -201,7 +207,7 @@ export function StoryConfigForm({
         </div>
 
         {/* Context Size Indicator */}
-        <div className="flex items-center gap-2 bg-ink text-cream p-2 brutal-border-thick w-full max-w-[200px] ml-auto">
+        <div className="flex items-center gap-2 bg-ink text-cream p-2 border-[2px] border-[var(--sm-ink)] w-full max-w-[200px] ml-auto">
           <div className="flex-1">
             <div className="flex justify-between text-[10px] font-mono uppercase tracking-widest mb-1">
               <span className="opacity-0 w-0 overflow-hidden">Context Volume</span>

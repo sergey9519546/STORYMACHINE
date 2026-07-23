@@ -133,30 +133,30 @@ export function LivePlayPanel({ onClose }: Props) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      border: '1px solid #334155', width: 860, maxWidth: '98vw',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      border: '1px solid var(--sm-night-line)', width: 860, maxWidth: '98vw',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 13,
     }}>
       {/* Header */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0,
+        padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0,
       }}>
         <div>
           <strong style={{ fontSize: 15 }}>Author Presence</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>
             Live story control · STEER · INJECT · OVERRULE
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={loadFeed} style={chipBtn('#1e293b')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button onClick={loadFeed} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 
       {error && (
-        <div style={{ color: '#f87171', background: '#1e293b', padding: 10, margin: '8px 14px', borderRadius: 5, fontSize: 11 }}>
+        <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', padding: 10, margin: '8px 14px', borderRadius: 5, fontSize: 11 }}>
           {error}
         </div>
       )}
@@ -165,13 +165,13 @@ export function LivePlayPanel({ onClose }: Props) {
       <div style={{ flex: 1, overflowY: 'hidden', display: 'flex', gap: 0 }}>
 
         {/* Scene feed */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 14, borderRight: '1px solid #1e293b' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 14, borderRight: '1px solid var(--sm-night-2)' }}>
           <div style={{ color: '#475569', fontSize: 10, marginBottom: 8 }}>
             SCENE LEDGER — {commits.length} beat{commits.length !== 1 ? 's' : ''} committed
           </div>
-          {loading && <div style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>Loading…</div>}
+          {loading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 20 }}>Loading…</div>}
           {!loading && commits.length === 0 && (
-            <div style={{ color: '#334155', textAlign: 'center', padding: 30, fontSize: 11 }}>
+            <div style={{ color: 'var(--sm-night-line)', textAlign: 'center', padding: 30, fontSize: 11 }}>
               No scenes committed yet.<br />
               Use the controls to inject your first beat.
             </div>
@@ -195,10 +195,10 @@ export function LivePlayPanel({ onClose }: Props) {
                   onClick={() => setVerb(v)}
                   style={{
                     flex: 1, padding: '5px 0', borderRadius: 5, cursor: 'pointer',
-                    fontSize: 10, fontFamily: 'monospace', fontWeight: 700,
-                    border: `1px solid ${verb === v ? VERB_INFO[v].color : '#334155'}`,
-                    background: verb === v ? VERB_INFO[v].color + '22' : '#1e293b',
-                    color: verb === v ? VERB_INFO[v].color : '#64748b',
+                    fontSize: 10, fontFamily: 'var(--sm-font-mono)', fontWeight: 700,
+                    border: `1px solid ${verb === v ? VERB_INFO[v].color : 'var(--sm-night-line)'}`,
+                    background: verb === v ? VERB_INFO[v].color + '22' : 'var(--sm-night-2)',
+                    color: verb === v ? VERB_INFO[v].color : 'var(--sm-ink-mute)',
                     transition: 'all 0.1s',
                   }}
                 >{v}</button>
@@ -219,13 +219,13 @@ export function LivePlayPanel({ onClose }: Props) {
               placeholder={VERB_INFO[verb].example}
               rows={4}
               style={{
-                width: '100%', background: '#1e293b', border: '1px solid #334155',
-                borderRadius: 5, color: '#e2e8f0', fontFamily: 'monospace',
+                width: '100%', background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)',
+                borderRadius: 5, color: 'var(--sm-cream)', fontFamily: 'var(--sm-font-mono)',
                 fontSize: 11, padding: '7px 9px', resize: 'vertical',
                 outline: 'none', boxSizing: 'border-box',
               }}
             />
-            <div style={{ color: '#334155', fontSize: 9, marginTop: 3 }}>
+            <div style={{ color: 'var(--sm-night-line)', fontSize: 9, marginTop: 3 }}>
               Ctrl+Enter to submit · prefix optional (STEER / INJECT / OVERRULE)
             </div>
           </div>
@@ -235,10 +235,10 @@ export function LivePlayPanel({ onClose }: Props) {
             onClick={submitMove}
             disabled={submitting || !moveText.trim()}
             style={{
-              background: submitting ? '#1e293b' : VERB_INFO[verb].color,
+              background: submitting ? 'var(--sm-night-2)' : VERB_INFO[verb].color,
               border: 'none', borderRadius: 5, color: '#fff',
               padding: '8px 0', cursor: submitting ? 'not-allowed' : 'pointer',
-              fontFamily: 'monospace', fontWeight: 700, fontSize: 12,
+              fontFamily: 'var(--sm-font-mono)', fontWeight: 700, fontSize: 12,
               opacity: moveText.trim() ? 1 : 0.5,
               transition: 'background 0.15s',
             }}
@@ -257,13 +257,13 @@ export function LivePlayPanel({ onClose }: Props) {
                   disabled={submitting}
                   style={{
                     flex: 1, padding: '5px 0', borderRadius: 5, cursor: submitting ? 'not-allowed' : 'pointer',
-                    fontSize: 10, fontFamily: 'monospace',
-                    border: '1px solid #334155', background: '#1e293b', color: '#64748b',
+                    fontSize: 10, fontFamily: 'var(--sm-font-mono)',
+                    border: '1px solid var(--sm-night-line)', background: 'var(--sm-night-2)', color: 'var(--sm-ink-mute)',
                   }}
                 >{n} beat{n !== 1 ? 's' : ''}</button>
               ))}
             </div>
-            <div style={{ color: '#334155', fontSize: 9, marginTop: 3 }}>
+            <div style={{ color: 'var(--sm-night-line)', fontSize: 9, marginTop: 3 }}>
               NPC reactions fire from current world state
             </div>
           </div>
@@ -273,9 +273,9 @@ export function LivePlayPanel({ onClose }: Props) {
 
           {/* Commit stats */}
           {feed && feed.totalCommits > 0 && (
-            <div style={{ background: '#1e293b', borderRadius: 5, padding: '8px 10px' }}>
-              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 4 }}>LEDGER STATS</div>
-              <div style={{ color: '#94a3b8', fontSize: 11 }}>
+            <div style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '8px 10px' }}>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 9, marginBottom: 4 }}>LEDGER STATS</div>
+              <div style={{ color: 'var(--sm-cream-mute)', fontSize: 11 }}>
                 {feed.totalCommits} commits
               </div>
               <div style={{ color: '#475569', fontSize: 10, marginTop: 3 }}>
@@ -300,39 +300,39 @@ function CommitRow({ commit: c, index }: { commit: CommitFeedEntry; index: numbe
 
   return (
     <div style={{
-      background: '#1e293b', borderRadius: 4, padding: '6px 9px',
+      background: 'var(--sm-night-2)', borderRadius: 4, padding: '6px 9px',
       marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8,
     }}>
-      <span style={{ color: '#334155', fontSize: 9, width: 18, flexShrink: 0 }}>
+      <span style={{ color: 'var(--sm-night-line)', fontSize: 9, width: 18, flexShrink: 0 }}>
         {index + 1}
       </span>
       <span style={{ color: '#475569', fontSize: 9, width: 55, flexShrink: 0 }}>
         scene {c.sceneIdx}
       </span>
-      <span style={{ color: '#94a3b8', fontSize: 10, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ color: 'var(--sm-cream-mute)', fontSize: 10, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {c.opSummary}
       </span>
-      <span style={{ color: '#334155', fontSize: 9, flexShrink: 0 }}>{ageStr}</span>
+      <span style={{ color: 'var(--sm-night-line)', fontSize: 9, flexShrink: 0 }}>{ageStr}</span>
     </div>
   );
 }
 
 function MoveResultCard({ result }: { result: MoveResult }) {
-  const color = !result.tier1Pass ? '#f87171' : result.ambiguous ? '#fbbf24' : '#4ade80';
+  const color = !result.tier1Pass ? 'var(--sm-stamp)' : result.ambiguous ? 'var(--sm-warn)' : 'var(--sm-ok)';
   const status = !result.tier1Pass ? 'PROOF REJECTED' : result.ambiguous ? 'AMBIGUOUS' : 'COMMITTED';
 
   return (
     <div style={{
-      background: '#1e293b', border: `1px solid ${color}22`,
+      background: 'var(--sm-night-2)', border: `1px solid ${color}22`,
       borderRadius: 5, padding: '8px 10px',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ color: '#64748b', fontSize: 9 }}>LAST MOVE</span>
+        <span style={{ color: 'var(--sm-ink-mute)', fontSize: 9 }}>LAST MOVE</span>
         <span style={{ color, fontSize: 9, fontWeight: 700 }}>{status}</span>
       </div>
-      <div style={{ color: '#94a3b8', fontSize: 10 }}>{result.summary}</div>
+      <div style={{ color: 'var(--sm-cream-mute)', fontSize: 10 }}>{result.summary}</div>
       {result.commitId && (
-        <div style={{ color: '#334155', fontSize: 9, marginTop: 4 }}>
+        <div style={{ color: 'var(--sm-night-line)', fontSize: 9, marginTop: 4 }}>
           id: {result.commitId.slice(0, 8)}…
         </div>
       )}
@@ -342,8 +342,8 @@ function MoveResultCard({ result }: { result: MoveResult }) {
 
 function chipBtn(bg: string): React.CSSProperties {
   return {
-    background: bg, border: '1px solid #334155', borderRadius: 4,
-    color: '#e2e8f0', padding: '3px 8px', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 11,
+    background: bg, border: '1px solid var(--sm-night-line)', borderRadius: 4,
+    color: 'var(--sm-cream)', padding: '3px 8px', cursor: 'pointer',
+    fontFamily: 'var(--sm-font-mono)', fontSize: 11,
   };
 }

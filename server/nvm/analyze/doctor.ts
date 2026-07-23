@@ -48,6 +48,7 @@ import { detectSilence } from './silence-signal.ts';
 import { detectBonding } from './bonding-signal.ts';
 import { detectColdOpenPromise } from './cold-open-promise.ts';
 import { detectPatternEstablishment } from './pattern-establishment.ts';
+import { analyzeStoryGraph } from './story-graph.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import { computeNarrativeMetrics } from './metrics.ts';
@@ -307,20 +308,16 @@ export function clearDoctorCache(): void {
 // can fix it; it is a missing-detector gap, not a compression gap, and stays
 // a discrimination.test.ts todo).
 //
-// Accepted, documented tradeoff: subDensityPenalty saturates near
-// SUB_DENSITY_SCALE=10 for density roughly >= 0.65, while the >= 1 branch
-// starts at DENSITY_SCALE=2.5 at density=1 — a discontinuity of ~7.5 points
-// exists across the density=1 seam, and the whole [0.65, 1.0) sub-band scores
-// a flat ~10-point penalty rather than density^3.75's continuously-rising
-// curve. No corpus sample, discrimination pair, or 2x/3x length variant this
-// wave measured against lands in [0.65, 1.0) — that band is short scripts
-// (roughly 400-900 words at typical weighted-issue counts) sitting almost
-// exactly at the boundary between "too little material for structural rules
-// to fire" and "enough material to read as a normal script," which is
-// inherently a low-confidence zone for this formula (see
-// DIMENSION_LOW_CONFIDENCE_SCENES above for the same honesty concern at the
-// per-dimension level). Noted here rather than silently smoothed over, in
-// case a future wave's fixture ever lands there and the seam needs revisiting.
+// MONOTONICITY FIX (2026-07-14): The prior piecewise formula had a ~7.5-point
+// discontinuity at density=1 — the logistic sub-1 branch saturated near 10,
+// while the power >=1 branch started at 2.5. A nominally worse issue density
+// could therefore IMPROVE health. Replaced with a single continuous power
+// curve (DENSITY_SCALE * density^DENSITY_POWER) that is monotonic by
+// construction: adding any severity-weighted issue can only increase the
+// penalty. The old sub-1 branch's flat ~10-point penalty in [0.65, 1.0) was
+// a low-confidence zone where no corpus sample or discrimination pair landed;
+// the new curve is smooth across that region. See tests/core/monotonicity.test.ts
+// for property-based invariants enforcing this contract.
 /** The word-density half of craftPenalty, factored out on its own (Wave
  *  18-β) so a caller can apply it WITHOUT the scarcity term below — see
  *  computeDimensionScore's comment for why the per-dimension scores need
@@ -341,20 +338,32 @@ function densityPenalty(
   const WORD_COUNT_EXPONENT = 0.7;
   const DENSITY_POWER = 3.75;
   const DENSITY_SCALE = 2.5;
-  // Sub-1.0-density branch (see design comment above) — a logistic, not a
-  // power law, so its scale is independent of DENSITY_SCALE above.
+  // CONTINUITY FIX (P0.1, 2026-07-15): the prior piecewise formula had a
+  // ~7.5-point discontinuity at density=1 — logistic sub-1 branch saturated
+  // near SUB_DENSITY_SCALE=10 while the power branch started at
+  // DENSITY_SCALE=2.5. Crossing the seam could IMPROVE health despite more
+  // weighted issues (non-monotonic at the branch boundary).
+  //
+  // Fix: keep the calibrated logistic for density < 1 (unchanged shape in the
+  // band where discrimination pairs live), and for density >= 1 use a power
+  // curve that starts at the same value the logistic reaches at density=1:
+  //   SUB_DENSITY_SCALE + DENSITY_SCALE * (density^DENSITY_POWER - 1)
+  // At density=1 both sides equal 10. Both sides are increasing, so the full
+  // function is continuous and monotonic. Above density=1 the penalty is
+  // higher than the old 2.5*density^3.75 by a constant +7.5 offset — denser
+  // scripts are scored more harshly, but never rewarded for crossing the seam.
   const SUB_DENSITY_SCALE = 10;
   const SUB_DENSITY_MIDPOINT = 0.52;
   const SUB_DENSITY_STEEPNESS = 50;
 
   const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
   const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
-  const density = weightedIssues / opportunityWords;
+  const density = weightedIssues / Math.max(opportunityWords, 1e-10);
 
   if (density < 1) {
     return SUB_DENSITY_SCALE / (1 + Math.exp(-SUB_DENSITY_STEEPNESS * (density - SUB_DENSITY_MIDPOINT)));
   }
-  return DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
+  return SUB_DENSITY_SCALE + DENSITY_SCALE * (Math.pow(density, DENSITY_POWER) - 1);
 }
 
 /** The scene-scarcity half of craftPenalty, factored out on its own (Wave
@@ -1801,9 +1810,18 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     // computed independently of calibration and remain fully valid on their own.
   }
 
+  // P0.3: When any pass threw and was skipped, the issue count is artificially
+  // low — a failed detector returning zero issues can make a script look
+  // healthier than one where the detector ran. Withhold verdict, percentiles,
+  // and dimensions rather than presenting a misleadingly complete report.
+  // health/grade are always provided (required by the interface) but set to
+  // sentinel values (0 / 'troubled') when incomplete — the client must check
+  // analysisComplete before displaying them.
+  const analysisComplete = result.failedPasses.length === 0;
+
   return {
-    health,
-    grade: gradeForHealth(health),
+    health: analysisComplete ? health : 0,
+    grade: analysisComplete ? gradeForHealth(health) : 'troubled',
     totalIssues,
     bySeverity,
     passes,
@@ -1814,12 +1832,16 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     sceneCount: analysis.sceneCount,
     wordCount: analysis.wordCount,
     analyzedAt: Date.now(),
-    verdict,
-    dimensions,
-    strengths,
-    plainSummary,
+    analysisComplete,
+    ...(analysisComplete ? {} : { failedPasses: result.failedPasses }),
+    verdict: analysisComplete ? verdict : undefined,
+    dimensions: analysisComplete ? dimensions : undefined,
+    strengths: analysisComplete ? strengths : undefined,
+    plainSummary: analysisComplete
+      ? plainSummary
+      : `Analysis incomplete — ${result.failedPasses.length} diagnostic pass(es) failed: ${result.failedPasses.join(', ')}. The score and verdict are withheld because the issue count may be artificially low.`,
     contentHash: computeContentHash(fountain),
-    healthPercentile,
+    healthPercentile: analysisComplete ? healthPercentile : undefined,
     metrics,
     pageEstimate: estimatePages(fountain) ?? undefined,
     excerptNote: excerptNoteFor(analysis.sceneCount),
@@ -1832,6 +1854,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     bonding: detectBonding(fountain),
     coldOpenPromise: detectColdOpenPromise(fountain),
     patternEstablishment: detectPatternEstablishment(fountain),
+    storyGraph: analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined,
     ...(analysis.truncatedForAnalysis
       ? { truncatedForAnalysis: true, totalSceneCount: analysis.totalSceneCount }
       : {}),

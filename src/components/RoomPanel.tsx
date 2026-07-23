@@ -4,7 +4,7 @@
 // no AI key required.
 //
 // Style idiom: ConvergePanel.tsx's terminal dark-slate inline-style idiom
-// (bg #0f172a card, monospace, slate borders) — this panel is a sibling
+// (bg var(--sm-night) card, monospace, slate borders) — this panel is a sibling
 // surface to ConvergePanel's own "Writers' Room" transcript section, so it
 // should look identical when placed next to it rather than introduce a
 // second visual language for the same critics.
@@ -64,10 +64,10 @@ function criticStance(severity: number): string {
 }
 
 function severityColor(severity: number): string {
-  if (severity >= 70) return '#f87171';
-  if (severity >= 40) return '#fb923c';
+  if (severity >= 70) return 'var(--sm-stamp)';
+  if (severity >= 40) return 'var(--sm-warn)';
   if (severity > 0) return '#facc15';
-  return '#4ade80';
+  return 'var(--sm-ok)';
 }
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -130,34 +130,34 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
     <div role="dialog" aria-modal="true" aria-labelledby="room-panel-title" style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      padding: 20, width: 640, maxWidth: '95vw', fontFamily: 'monospace',
-      fontSize: 13, border: '1px solid #334155',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      padding: 20, width: 640, maxWidth: '95vw', fontFamily: 'var(--sm-font-mono)',
+      fontSize: 13, border: '1px solid var(--sm-night-line)',
       maxHeight: '80vh', overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <strong id="room-panel-title" style={{ fontSize: 15 }}>Writers' Room</strong>
-        <button onClick={onClose} aria-label="Close Writers' Room" style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button onClick={onClose} aria-label="Close Writers' Room" style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
 
-      <p style={{ color: '#64748b', fontSize: 11.5, marginTop: 0, marginBottom: 14 }}>
+      <p style={{ color: 'var(--sm-ink-mute)', fontSize: 11.5, marginTop: 0, marginBottom: 14 }}>
         Six critics debate the current story state — deterministic, no AI key required.
         Re-convene any time; the same state always produces the same verdict.
       </p>
 
       <button onClick={convene} disabled={state === 'loading'} style={{
         width: '100%', padding: '8px 0', marginBottom: 14,
-        background: state === 'loading' ? '#334155' : '#1d4ed8',
+        background: state === 'loading' ? 'var(--sm-night-line)' : 'var(--sm-cool)',
         color: '#fff', border: 'none', borderRadius: 6,
-        cursor: state === 'loading' ? 'default' : 'pointer', fontFamily: 'monospace', fontSize: 13,
+        cursor: state === 'loading' ? 'default' : 'pointer', fontFamily: 'var(--sm-font-mono)', fontSize: 13,
       }}>
         {state === 'loading' ? 'Convening…' : result ? 'Re-convene the room' : 'Convene the room'}
       </button>
 
-      {error && <div style={{ color: '#f87171', marginBottom: 12, fontSize: 12 }}>{error}</div>}
+      {error && <div style={{ color: 'var(--sm-stamp)', marginBottom: 12, fontSize: 12 }}>{error}</div>}
 
       {routeMissing && (
-        <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 12, fontStyle: 'italic' }}>
+        <div style={{ color: 'var(--sm-cream-mute)', fontSize: 12, marginBottom: 12, fontStyle: 'italic' }}>
           The room's critique endpoint isn't available yet — this will start working once the server route ships.
         </div>
       )}
@@ -166,24 +166,24 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
         <>
           {/* Header strip: dominant voice + consensus */}
           <div style={{
-            background: '#111827', border: '1px solid #334155', borderRadius: 6,
+            background: '#111827', border: '1px solid var(--sm-night-line)', borderRadius: 6,
             padding: '8px 14px', marginBottom: 16, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center',
           }}>
             {dominant && (
               <span>
-                <span style={{ color: '#64748b' }}>dominant voice </span>
-                <span style={{ color: '#a78bfa', fontWeight: 700 }}>{criticName(dominant)}</span>
+                <span style={{ color: 'var(--sm-ink-mute)' }}>dominant voice </span>
+                <span style={{ color: 'var(--sm-cool)', fontWeight: 700 }}>{criticName(dominant)}</span>
               </span>
             )}
             {typeof result.consensus === 'number' && (
               <span>
-                <span style={{ color: '#64748b' }}>consensus </span>
-                <span style={{ color: '#4ade80', fontWeight: 700 }}>{result.consensus}/100</span>
+                <span style={{ color: 'var(--sm-ink-mute)' }}>consensus </span>
+                <span style={{ color: 'var(--sm-ok)', fontWeight: 700 }}>{result.consensus}/100</span>
               </span>
             )}
             {result.suggestedOperator && (
               <span>
-                <span style={{ color: '#64748b' }}>suggests </span>
+                <span style={{ color: 'var(--sm-ink-mute)' }}>suggests </span>
                 <span style={{ color: '#34d399' }}>{result.suggestedOperator.replace(/_/g, ' ')}</span>
               </span>
             )}
@@ -193,19 +193,19 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
           </div>
 
           {sorted.length === 0 ? (
-            <p style={{ color: '#64748b', fontSize: 12.5, fontStyle: 'italic' }}>
+            <p style={{ color: 'var(--sm-ink-mute)', fontSize: 12.5, fontStyle: 'italic' }}>
               No objections — either the session is fresh with nothing yet to critique, or the room is fully satisfied with the current state.
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {sorted.map((entry, i) => (
-                <div key={`${entry.criticId}_${i}`} style={{ background: '#111827', border: '1px solid #334155', borderRadius: 6, padding: 10 }}>
+                <div key={`${entry.criticId}_${i}`} style={{ background: '#111827', border: '1px solid var(--sm-night-line)', borderRadius: 6, padding: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
-                    <span style={{ color: '#a78bfa', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <span style={{ color: 'var(--sm-cool)', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       {criticName(entry.criticId)}
                     </span>
                     <span style={{ color: severityColor(entry.severity), fontSize: 11, fontWeight: 600 }}>
-                      {criticStance(entry.severity)} <span style={{ color: '#64748b', fontWeight: 400 }}>(severity {entry.severity})</span>
+                      {criticStance(entry.severity)} <span style={{ color: 'var(--sm-ink-mute)', fontWeight: 400 }}>(severity {entry.severity})</span>
                     </span>
                   </div>
                   <div style={{ color: '#cbd5e1', fontSize: 12, whiteSpace: 'pre-wrap' }}>{entry.objection}</div>
@@ -216,7 +216,7 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
                       </span>
                     )}
                     {typeof entry.attentionBid === 'number' && (
-                      <span style={{ color: '#64748b', fontSize: 10.5 }}>
+                      <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10.5 }}>
                         attention bid {entry.attentionBid}
                       </span>
                     )}
@@ -229,7 +229,7 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
       )}
 
       {!result && state !== 'loading' && !error && !routeMissing && (
-        <p style={{ color: '#64748b', fontSize: 12, fontStyle: 'italic' }}>
+        <p style={{ color: 'var(--sm-ink-mute)', fontSize: 12, fontStyle: 'italic' }}>
           Convene the room to see where the six critics stand on the story as it is right now.
         </p>
       )}
