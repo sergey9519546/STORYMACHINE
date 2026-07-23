@@ -1,6 +1,7 @@
 import express from 'express';
 import { gameLimiter } from '../lib/session-store.ts';
 import { logger } from '../lib/logger.ts';
+import { checkAdminAuth } from '../lib/admin-auth.ts';
 
 const router = express.Router();
 
@@ -99,15 +100,26 @@ router.get('/api/ai-providers', gameLimiter, (_req, res) => {
 
 /**
  * POST /api/ai-providers/switch
- * 
+ *
  * Switches the active AI provider. Note: This is a runtime configuration change
  * that affects the current process only. For persistent configuration, users should
  * set environment variables (AI_PROVIDER, AI_BASE_URL, etc.) in their .env file.
- * 
+ *
  * Body: { provider: string }
  * Response: { success: boolean, provider: string }
+ *
+ * Admin-gated (server/lib/admin-auth.ts's checkAdminAuth) — this route
+ * mutates process.env.AI_PROVIDER/AI_BASE_URL/AI_API_KEY, which is
+ * PROCESS-GLOBAL state shared by every session on this server, not just the
+ * caller's own. That's the exact same class of mutation
+ * POST /api/ai-config (server/routes/config.ts) already gates behind
+ * checkAdminAuth — an anonymous remote caller must not be able to flip every
+ * concurrent user's AI traffic to a different provider (or blank out the
+ * server's own AI_API_KEY) with no authorization check at all, which is what
+ * this route did before this gate was added.
  */
 router.post('/api/ai-providers/switch', gameLimiter, (req, res) => {
+  if (!checkAdminAuth(req, res)) return;
   try {
     const { provider } = req.body as { provider?: unknown };
 

@@ -632,10 +632,19 @@ router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
 
     // P8: use the full composed modifier (synergy override when available) instead
     // of the simple "DIRECTOR STYLE: X" / "GENRE: Y" string fragments.
-    const isValidGenre = (s: string): s is StoryGenre =>
-      ['thriller','horror','drama','comedy','romance','sci_fi','noir','mystery'].includes(s);
-    const isValidStyle = (s: string): s is DirectorStyle =>
-      ['hitchcock','fincher','nolan','villeneuve','aster','lynch'].includes(s);
+    //
+    // Validity checks against the SAME live roster tables every other genre/
+    // style-consuming route in this codebase uses (validation.ts's
+    // StoryGenreBodySchema/DirectorStyleBodySchema both refine on
+    // `k in GENRE_NAMES` / `k in STYLE_MODIFIERS`) — not a separately
+    // hand-maintained literal list. This used to be a hardcoded 8-genre/
+    // 6-style allowlist left over from before the genre-completion wave
+    // (engine/types.ts's StoryGenre union: 8 -> 47 members; DirectorStyle:
+    // 6 -> 27), which silently dropped the genre/style modifier block for
+    // every value added since — the inline-copilot completion route was the
+    // one place in the app that still only recognized the original roster.
+    const isValidGenre = (s: string): s is StoryGenre => s in GENRE_NAMES;
+    const isValidStyle = (s: string): s is DirectorStyle => s in STYLE_MODIFIERS;
     const composedGenre  = isValidGenre(genre)   ? genre   : undefined;
     const composedStyle  = isValidStyle(dirStyle) ? dirStyle : undefined;
     const { block: composedBlock } = composePromptModifiers(composedGenre, composedStyle);
