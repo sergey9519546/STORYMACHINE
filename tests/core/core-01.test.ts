@@ -2009,6 +2009,34 @@ describe('character-memory — export / import', () => {
     assert.ok(target.getAgent('alice_2'), 'imported alice remapped');
   });
 
+  it('throws a clear error instead of spinning forever when every suffix up to the cap is already taken', () => {
+    const source = makeStage();
+    const bundle = exportCharacter(source, 'alice')!;
+
+    const target = makeStage(); // already has 'alice'
+    // Pre-occupy every alice_2..alice_1000 suffix so the dedup loop can never
+    // find a free slot within its cap — this exercises the uncapped-loop fix
+    // in importCharacter (server/engine/character-memory.ts) directly, since
+    // reaching this state via 1000 real imports would be impractically slow.
+    for (let i = 2; i <= 1000; i++) {
+      target.addAgent({
+        char_id: `alice_${i}`,
+        name: 'Alice',
+        public_mask: 'Librarian',
+        hidden_motive: 'Steal the ledger',
+        knowledge_vector: [],
+        current_location_id: 'room1',
+        suspicion_score: 10,
+        is_alive: true,
+      });
+    }
+
+    assert.throws(
+      () => importCharacter(target, bundle),
+      /could not find a free char_id suffix/,
+    );
+  });
+
   it('rejects a bundle with a newer schema version', () => {
     const source = makeStage();
     const bundle = exportCharacter(source, 'alice')!;
