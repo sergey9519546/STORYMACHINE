@@ -1,6 +1,7 @@
 import express from 'express';
 import { gameLimiter } from '../lib/session-store.ts';
 import { logger } from '../lib/logger.ts';
+import { validate, AiProviderSwitchSchema } from '../lib/validation.ts';
 
 const router = express.Router();
 
@@ -107,14 +108,9 @@ router.get('/api/ai-providers', gameLimiter, (_req, res) => {
  * Body: { provider: string }
  * Response: { success: boolean, provider: string }
  */
-router.post('/api/ai-providers/switch', gameLimiter, (req, res) => {
+router.post('/api/ai-providers/switch', gameLimiter, validate(AiProviderSwitchSchema), (req, res) => {
   try {
-    const { provider } = req.body as { provider?: unknown };
-
-    if (typeof provider !== 'string') {
-      res.status(400).json({ error: 'Missing or invalid provider field' });
-      return;
-    }
+    const { provider } = req.body as { provider: string };
 
     const providers = checkProviderAvailability();
     const targetProvider = providers.find(p => p.id === provider);
