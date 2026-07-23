@@ -15,7 +15,7 @@ import {
 } from '../lib/validation.ts';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
-  asyncHandler, gameLimiter, sessions, sessionId, getOrCreateSession, destroySession,
+  asyncHandler, gameLimiter, aiLimiter, sessions, sessionId, getOrCreateSession, destroySession,
   metrics,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
@@ -162,7 +162,9 @@ router.post('/api/ai-config', gameLimiter, validate(AiConfigSchema), asyncHandle
 }));
 
 // Connection test — fires a minimal generate call so the Settings UI can verify credentials.
-router.post('/api/ai-config/test', gameLimiter, asyncHandler(async (req, res) => {
+// aiLimiter (not gameLimiter): this route calls generateContent (an actual LLM
+// call), same as every other LLM-triggering route in this codebase.
+router.post('/api/ai-config/test', aiLimiter, asyncHandler(async (req, res) => {
   if (!checkAdminAuth(req, res)) return;
   try {
     const result = await generateContent({
