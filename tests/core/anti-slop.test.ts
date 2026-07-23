@@ -209,6 +209,20 @@ describe('detectSlop — edge cases', () => {
       genericEmotion: { count: 0, lines: [] },
       negatedClicheRaw: { count: 0, lines: [] },
       negatedClicheGuarded: { count: 0, lines: [] },
+      screenplayAIMarkers: {
+        detection: { count: 0, lines: [] },
+        byCategory: {
+          'copula-avoidance': 0,
+          'inflated-staging': 0,
+          'vague-complexity': 0,
+          'unnecessary-formality': 0,
+          'metaphorical-inflation': 0,
+          'generic-intensifiers': 0,
+          'buzzwords-jargon': 0,
+          'filler-cliches': 0,
+        },
+        validated: false,
+      },
       freshness: null,
       slopScore: 0,
       scored: false,
@@ -334,5 +348,90 @@ text text text text text text text text text text text text text text text text.
     for (const result of results) {
       assert(typeof result.scored === 'boolean');
     }
+  });
+});
+
+// Screenplay AI markers (64 Tier 1 patterns, 8 categories). UNVALIDATED detection —
+// these synthetic fire/no-fire tests lock behavior; P1 real-corpus discrimination
+// evidence is a separate gate (see anti-slop.ts header + CLAUDE.md quality bar).
+describe('detectSlop — screenplay AI markers', () => {
+  it('fires on copula-avoidance ("serves as")', () => {
+    const result = detectSlop('The old lighthouse serves as a shelter for the crew.');
+    assert.equal(result.screenplayAIMarkers.detection.count, 1);
+    assert.deepEqual(result.screenplayAIMarkers.detection.lines, [0]);
+    assert.equal(result.screenplayAIMarkers.byCategory['copula-avoidance'], 1);
+    assert.equal(result.screenplayAIMarkers.validated, false);
+  });
+
+  it('fires on inflated-staging ("nestled in")', () => {
+    const result = detectSlop('A cabin nestled in the pines, smoke curling from the chimney.');
+    assert.equal(result.screenplayAIMarkers.byCategory['inflated-staging'], 1);
+  });
+
+  it('fires on vague-complexity ("nuanced")', () => {
+    const result = detectSlop('A nuanced negotiation unfolds across the table.');
+    assert.equal(result.screenplayAIMarkers.byCategory['vague-complexity'], 1);
+  });
+
+  it('fires on unnecessary-formality ("commence")', () => {
+    const result = detectSlop('The soldiers commence their advance at dawn.');
+    assert.equal(result.screenplayAIMarkers.byCategory['unnecessary-formality'], 1);
+  });
+
+  it('fires on metaphorical-inflation ("tapestry of")', () => {
+    const result = detectSlop('A tapestry of lies binds the family together.');
+    assert.equal(result.screenplayAIMarkers.byCategory['metaphorical-inflation'], 1);
+  });
+
+  it('fires on generic-intensifiers ("robust")', () => {
+    const result = detectSlop('He builds a robust defense around the compound.');
+    assert.equal(result.screenplayAIMarkers.byCategory['generic-intensifiers'], 1);
+  });
+
+  it('fires on buzzwords-jargon ("paradigm")', () => {
+    const result = detectSlop('The discovery breaks the old paradigm entirely.');
+    assert.equal(result.screenplayAIMarkers.byCategory['buzzwords-jargon'], 1);
+  });
+
+  it('fires on filler-cliches ("in order to")', () => {
+    const result = detectSlop('She sprints down the alley in order to lose the tail.');
+    assert.equal(result.screenplayAIMarkers.byCategory['filler-cliches'], 1);
+  });
+
+  it('counts unique lines, not total pattern hits', () => {
+    // One line with 3 markers (serves as, robust, in order to) counts as 1 line,
+    // but byCategory tallies each pattern independently.
+    const text = 'The bunker serves as a robust shelter built in order to survive.';
+    const result = detectSlop(text);
+    assert.equal(result.screenplayAIMarkers.detection.count, 1);
+    assert.equal(result.screenplayAIMarkers.byCategory['copula-avoidance'], 1);
+    assert.equal(result.screenplayAIMarkers.byCategory['generic-intensifiers'], 1);
+    assert.equal(result.screenplayAIMarkers.byCategory['filler-cliches'], 1);
+  });
+
+  it('does not fire on clean action prose (no-fire)', () => {
+    const text = `INT. WAREHOUSE - NIGHT
+Mara ducks behind a crate. Footsteps echo. She holds her breath, then bolts for the door.`;
+    const result = detectSlop(text);
+    assert.equal(result.screenplayAIMarkers.detection.count, 0);
+    for (const count of Object.values(result.screenplayAIMarkers.byCategory)) {
+      assert.equal(count, 0);
+    }
+  });
+
+  it('respects the "features" guard (immediately-following film/actor does not fire)', () => {
+    // Guard blocks only when film/movie/actor/star directly follows "features".
+    const guarded = detectSlop('The trailer features actor cameos throughout.');
+    assert.equal(guarded.screenplayAIMarkers.byCategory['copula-avoidance'], 0);
+    // Any other object still fires — "features a courtyard" is inflated copula-avoidance.
+    const fires = detectSlop('The estate features a courtyard and a fountain.');
+    assert.equal(fires.screenplayAIMarkers.byCategory['copula-avoidance'], 1);
+  });
+
+  it('adds 0.35 per marker line to slopScore', () => {
+    const result = detectSlop('The lighthouse serves as a shelter.');
+    // Single marker line, no other signals → slopScore == 0.35.
+    assert.equal(result.screenplayAIMarkers.detection.count, 1);
+    assert.ok(Math.abs(result.slopScore - 0.35) < 1e-9);
   });
 });
