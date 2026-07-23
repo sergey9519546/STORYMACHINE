@@ -38,6 +38,11 @@ export interface AiRuntimeConfig {
   embModel?:   string;
 }
 
+// Placeholder Authorization token used when an openai-compat provider is wired
+// with no API key. Local model servers (Ollama, LM Studio) ignore it; public
+// endpoints that require a real key will return a clear 401 at call time.
+const LOCAL_PLACEHOLDER_KEY = 'not-needed';
+
 // ── Internal state ────────────────────────────────────────────────────────────
 
 let _cfg: AiRuntimeConfig = {
@@ -56,8 +61,14 @@ function wireProviders(): void {
   // ── Text LLM ──
   if (_cfg.provider === 'openai-compat') {
     const baseURL = _cfg.baseUrl ?? '';
-    const apiKey  = _keys.apiKey ?? '';
-    if (baseURL && apiKey) {
+    // A key is OPTIONAL here. Local model servers (Ollama, LM Studio) ignore
+    // the Authorization header entirely, so keyless testing must work — the
+    // stock recipe. Public endpoints (OpenRouter, Groq…) do need a real key,
+    // but an absent one surfaces as a clear 401 at call time, not a silent
+    // misconfig — so we wire on baseURL alone and pass a conventional
+    // placeholder when no key was supplied.
+    const apiKey = _keys.apiKey || LOCAL_PLACEHOLDER_KEY;
+    if (baseURL) {
       setLLMProvider(makeOpenAICompatLLMProvider({ baseURL, apiKey }));
     }
   } else {
@@ -69,9 +80,9 @@ function wireProviders(): void {
     setEmbeddingProvider(noopEmbeddingProvider);
   } else if (_cfg.embProvider === 'openai-compat') {
     const baseURL = _cfg.embBaseUrl ?? _cfg.baseUrl ?? '';
-    const apiKey  = _keys.embApiKey ?? _keys.apiKey ?? '';
+    const apiKey  = _keys.embApiKey ?? _keys.apiKey ?? LOCAL_PLACEHOLDER_KEY;
     const model   = _cfg.embModel ?? 'text-embedding-3-small';
-    if (baseURL && apiKey) {
+    if (baseURL) {
       setEmbeddingProvider(makeOpenAICompatEmbeddingProvider({ baseURL, apiKey, model }));
     }
   } else {
@@ -83,9 +94,9 @@ function wireProviders(): void {
     setImageProvider(noopImageProvider);
   } else if (_cfg.imgProvider === 'openai-compat') {
     const baseURL = _cfg.imgBaseUrl ?? _cfg.baseUrl ?? '';
-    const apiKey  = _keys.imgApiKey ?? _keys.apiKey ?? '';
+    const apiKey  = _keys.imgApiKey ?? _keys.apiKey ?? LOCAL_PLACEHOLDER_KEY;
     const model   = _cfg.imgModel ?? 'dall-e-3';
-    if (baseURL && apiKey) {
+    if (baseURL) {
       setImageProvider(makeOpenAICompatImageProvider({ baseURL, apiKey, model }));
     }
   } else {
@@ -97,10 +108,10 @@ function wireProviders(): void {
     setTTSProvider(noopTTSProvider);
   } else if (_cfg.ttsProvider === 'openai-compat') {
     const baseURL = _cfg.ttsBaseUrl ?? _cfg.baseUrl ?? '';
-    const apiKey  = _keys.ttsApiKey ?? _keys.apiKey ?? '';
+    const apiKey  = _keys.ttsApiKey ?? _keys.apiKey ?? LOCAL_PLACEHOLDER_KEY;
     const model   = _cfg.ttsModel ?? 'tts-1';
     const voice   = _cfg.ttsVoice;
-    if (baseURL && apiKey) {
+    if (baseURL) {
       setTTSProvider(makeOpenAICompatTTSProvider({ baseURL, apiKey, model, voice }));
     }
   } else {
