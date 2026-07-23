@@ -17,6 +17,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { StoryVector } from '../nvm/analyze/story-vector.ts';
+import { logger } from './logger.ts';
 
 // ── Paths ──────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export async function loadCorpusVectors(
     return true;
   });
   
-  console.log(`[corpus-loader] Found ${validEntries.length} valid screenplays in manifest`);
+  logger.info('corpus_loader_manifest_loaded', { validScreenplays: validEntries.length });
   
   const vectors: StoryVector[] = [];
   const { vectorizeScript } = await import('../nvm/analyze/story-vector.ts');
@@ -140,7 +141,7 @@ export async function loadCorpusVectors(
     try {
       fountainText = await fs.readFile(fountainPath, 'utf-8');
     } catch (err) {
-      console.warn(`[corpus-loader] Failed to read ${slug}: ${err}`);
+      logger.warn('corpus_loader_read_failed', { slug, error: err instanceof Error ? err.message : String(err) });
       continue;
     }
     
@@ -150,13 +151,13 @@ export async function loadCorpusVectors(
     // Try cache first
     const cached = await loadCachedVector(slug, contentHash);
     if (cached) {
-      console.log(`[corpus-loader] Cache hit: ${slug}`);
+      logger.debug('corpus_loader_cache_hit', { slug });
       vectors.push(cached);
       continue;
     }
-    
+
     // Cache miss: vectorize from scratch
-    console.log(`[corpus-loader] Cache miss: ${slug} — vectorizing (this may take 30-60s)...`);
+    logger.info('corpus_loader_cache_miss', { slug, note: 'vectorizing (this may take 30-60s)' });
     try {
       const vector = await vectorizeScript(fountainText, entry.slug, 'corpus');
       
@@ -168,14 +169,14 @@ export async function loadCorpusVectors(
       await saveCachedVector(slug, vector);
       
       vectors.push(vector);
-      console.log(`[corpus-loader] Vectorized and cached: ${slug}`);
+      logger.info('corpus_loader_vectorized', { slug });
     } catch (err) {
-      console.error(`[corpus-loader] Failed to vectorize ${slug}:`, err);
+      logger.error('corpus_loader_vectorize_failed', { slug, error: err instanceof Error ? err.message : String(err) });
       // Continue with other screenplays
     }
   }
-  
-  console.log(`[corpus-loader] Loaded ${vectors.length} vectors (${validEntries.length} attempted)`);
+
+  logger.info('corpus_loader_complete', { vectorCount: vectors.length, attempted: validEntries.length });
   return vectors;
 }
 

@@ -20,7 +20,7 @@
  * Complexity: O(n³) constraint propagation, sub-10ms at screenplay scale (verified)
  */
 
-import type { ScreenplaySceneRecord } from './types.ts';
+import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Allen's 13 Interval Relations
@@ -298,6 +298,18 @@ function intersectRelations(setA: AllenRelation[], setB: AllenRelation[]): Allen
   return setA.filter(r => setB.includes(r));
 }
 
+/** Each Allen relation's inverse (file-header comment's "[7 inverses]"), so a
+ *  relation asserted A→B can be checked against what B→A implies about A→B. */
+const INVERSE_RELATION: Record<AllenRelation, AllenRelation> = {
+  'before': 'after', 'after': 'before',
+  'meets': 'met-by', 'met-by': 'meets',
+  'overlaps': 'overlapped-by', 'overlapped-by': 'overlaps',
+  'starts': 'started-by', 'started-by': 'starts',
+  'during': 'contains', 'contains': 'during',
+  'finishes': 'finished-by', 'finished-by': 'finishes',
+  'equals': 'equals',
+};
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Temporal Extraction from Screenplay
 // ────────────────────────────────────────────────────────────────────────────────
@@ -322,9 +334,9 @@ export function extractTemporalConstraints(scenes: ScreenplaySceneRecord[]): {
   scenes.forEach((scene, idx) => {
     const sceneInterval: TemporalInterval = {
       id: `scene_${idx}`,
-      label: scene.heading || `Scene ${idx + 1}`,
+      label: scene.slug || `Scene ${idx + 1}`,
       sceneIds: [String(idx)],
-      evidence: [scene.heading || ''],
+      evidence: [scene.slug || ''],
     };
     intervals.push(sceneInterval);
     
@@ -343,8 +355,14 @@ export function extractTemporalConstraints(scenes: ScreenplaySceneRecord[]): {
   
   // Extract explicit temporal markers
   scenes.forEach((scene, idx) => {
-    const heading = scene.heading?.toUpperCase() || '';
-    const sceneText = scene.text?.toUpperCase() || '';
+    const heading = scene.slug?.toUpperCase() || '';
+    // ScreenplaySceneRecord carries no raw scene prose (heuristic extraction
+    // keeps only structured fields) — approximate "scene text" for keyword
+    // matching by concatenating its narrative-bearing string fields.
+    const sceneText = [scene.dramaticTurn, scene.revelation, ...scene.dialogueHighlights, ...scene.visualBeats]
+      .filter((s): s is string => Boolean(s))
+      .join(' ')
+      .toUpperCase();
     const combined = heading + ' ' + sceneText;
     
     // FLASHBACK detection
@@ -356,7 +374,7 @@ export function extractTemporalConstraints(scenes: ScreenplaySceneRecord[]): {
         relation: 'before',
         confidence: 0.9,
         sourceSceneId: String(idx),
-        evidence: `Flashback marker in ${scene.heading}`,
+        evidence: `Flashback marker in ${scene.slug}`,
       });
     }
     
@@ -377,7 +395,7 @@ export function extractTemporalConstraints(scenes: ScreenplaySceneRecord[]): {
           relation: 'meets', // Abutting, no gap
           confidence: 0.95,
           sourceSceneId: String(idx),
-          evidence: `Continuous marker in ${scene.heading}`,
+          evidence: `Continuous marker in ${scene.slug}`,
         });
       }
     }
@@ -390,7 +408,7 @@ export function extractTemporalConstraints(scenes: ScreenplaySceneRecord[]): {
       );
       if (weakConstraintIdx >= 0) {
         constraints[weakConstraintIdx].confidence = 0.8;
-        constraints[weakConstraintIdx].evidence = `${laterMatch[0]} in ${scene.heading}`;
+        constraints[weakConstraintIdx].evidence = `${laterMatch[0]} in ${scene.slug}`;
       }
     }
     
@@ -599,7 +617,57 @@ export function detectTemporalContradictions(
       });
     }
   });
-  
+
+  // Pairwise mirror-consistency check: A→B's constrained relations must agree
+  // with what B→A implies (each relation's inverse — e.g. B before A implies
+  // A after B). The Floyd-Warshall propagation above only surfaces
+  // contradictions through a third interval, so a direct 2-interval cycle
+  // (A before B AND B before A, with nothing else in the graph) is otherwise
+  // invisible — there's no distinct third interval to route the composition
+  // through. Skip pairs already reported via the transitive/explicit checks.
+  const reportedPairs = new Set(
+    contradictions.flatMap(c => c.intervals.length === 2 ? [`${c.intervals[0]}|${c.intervals[1]}`, `${c.intervals[1]}|${c.intervals[0]}`] : [])
+  );
+  for (const intA of intervals) {
+    for (const intB of intervals) {
+      if (intA.id === intB.id) continue;
+      if (reportedPairs.has(`${intA.id}|${intB.id}`)) continue;
+
+      const forward = constraintMatrix.get(intA.id)?.get(intB.id);
+      const backward = constraintMatrix.get(intB.id)?.get(intA.id);
+      if (!forward || !backward || forward.size === 0 || backward.size === 0) continue;
+
+      const impliedFromBackward = new Set(Array.from(backward).map(r => INVERSE_RELATION[r]));
+      if (!relationsCompatible(Array.from(forward), Array.from(impliedFromBackward))) {
+        const relevantConstraints = constraints.filter(
+          c => (c.intervalA === intA.id && c.intervalB === intB.id) ||
+               (c.intervalA === intB.id && c.intervalB === intA.id)
+        );
+        // Distinguish a direct 2-interval cycle (both directions come from
+        // their OWN explicit constraint — e.g. a flashback marker asserting
+        // both "present before flashback" and "flashback before present")
+        // from a transitive one (this pair's conflict only surfaces once a
+        // third interval's chain is composed through it — the classic A→B→C→A
+        // case, where A→C was never asserted directly, only inferred).
+        const hasDirectForward = constraints.some(c => c.intervalA === intA.id && c.intervalB === intB.id);
+        const hasDirectBackward = constraints.some(c => c.intervalA === intB.id && c.intervalB === intA.id);
+        const isDirectCycle = hasDirectForward && hasDirectBackward;
+        contradictions.push({
+          type: isDirectCycle ? 'cyclic_dependency' : 'transitive_violation',
+          severity: 'blocker',
+          intervals: [intA.id, intB.id],
+          constraints: relevantConstraints,
+          explanation: isDirectCycle
+            ? `Cyclic temporal dependency detected: ${intA.label} and ${intB.label} directly constrain each other to incompatible orderings (${Array.from(forward).join('|')} vs. inverse of ${Array.from(backward).join('|')})`
+            : `Transitive temporal constraint violated: inferred ordering between ${intA.label} and ${intB.label} (${Array.from(forward).join('|')}) conflicts with the inverse of the explicit ordering back from ${intB.label} (${Array.from(backward).join('|')})`,
+          affectedScenes: [...new Set(relevantConstraints.map(c => c.sourceSceneId))],
+        });
+        reportedPairs.add(`${intA.id}|${intB.id}`);
+        reportedPairs.add(`${intB.id}|${intA.id}`);
+      }
+    }
+  }
+
   return contradictions;
 }
 

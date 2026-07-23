@@ -25,6 +25,11 @@ describe('Story Graph Position-Sensitivity Regression', () => {
     console.log('    Set to merged-fountain corpus path to enable (e.g., from corpus-pipeline)');
     return;
   }
+  // Narrowed once, here — CORPUS_DIR (string | undefined) is captured by
+  // closure in measureCorpusAUC below, and narrowing from the guard above
+  // doesn't cross that function boundary, so pass this down explicitly
+  // instead of re-reading the module-scope optional.
+  const corpusDir: string = CORPUS_DIR;
 
   // Act-swap recipe: reorder acts 1-2-3 → 3-1-2
   function actSwap(fountain: string): string {
@@ -58,7 +63,7 @@ describe('Story Graph Position-Sensitivity Regression', () => {
   ) {
     const { maxScripts = 50, minScenes = 10 } = options;
     
-    const files = readdirSync(CORPUS_DIR)
+    const files = readdirSync(corpusDir)
       .filter(f => f.endsWith('.fountain.txt'))
       .slice(0, maxScripts * 2); // Sample more, filter later
     
@@ -70,7 +75,7 @@ describe('Story Graph Position-Sensitivity Regression', () => {
       if (goods.length >= maxScripts) break;
       
       try {
-        const fountain = readFileSync(path.join(CORPUS_DIR, file), 'utf8');
+        const fountain = readFileSync(path.join(corpusDir, file), 'utf8');
         
         // Skip very short scripts (not enough structure for act-swap)
         const sceneCount = (fountain.match(/^(INT\.|EXT\.)/gim) || []).length;
@@ -98,7 +103,7 @@ describe('Story Graph Position-Sensitivity Regression', () => {
           console.log(`  Processed ${goods.length}/${maxScripts} scripts...`);
         }
       } catch (err) {
-        skipped.push(`${file} (error: ${err.message})`);
+        skipped.push(`${file} (error: ${err instanceof Error ? err.message : String(err)})`);
       }
     }
     
