@@ -9,11 +9,20 @@ import { z } from 'zod';
 
 // ── Director Panel Schemas ────────────────────────────────────────────────────
 
+// Mirrors server/engine/types.ts's OutlineBeat (phase/turn_start/turn_end/
+// goal/constraint/avoid) — the actual shape GET /api/outline returns
+// (server/routes/config.ts: `res.json({ beats: illusion.outline ?? [] })`).
+// This previously declared a stale ordinal/label/description/timestamp shape
+// that never matched the route, so schema validation of a real response
+// would have thrown or silently produced beats DirectorPanel's own
+// OutlineBeat-typed state couldn't accept.
 export const OutlineBeatSchema = z.object({
-  ordinal: z.number(),
-  label: z.string(),
-  description: z.string(),
-  timestamp: z.number().optional(),
+  phase: z.enum(['Setup', 'Turn', 'Prestige']),
+  turn_start: z.number(),
+  turn_end: z.number(),
+  goal: z.string(),
+  constraint: z.string(),
+  avoid: z.string(),
 });
 
 export const StoryConfigSchema = z.object({

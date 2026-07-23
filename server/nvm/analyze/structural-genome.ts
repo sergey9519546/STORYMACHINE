@@ -210,7 +210,10 @@ function detectCharacterArcShape(
   if (records.length < 5) return 'flat';
   
   // Use emotionalShift as a proxy for character state
-  const emotions = records.map(r => {
+  // Widen to number[] (not the inferred 1|0|-1 literal union) — reduce()
+  // below accumulates via `sum + e`, which TS always types as `number`, so a
+  // narrower element type makes the accumulator/return type mismatch.
+  const emotions: number[] = records.map(r => {
     if (r.emotionalShift === 'positive') return 1;
     if (r.emotionalShift === 'negative') return -1;
     return 0;
@@ -252,7 +255,10 @@ function detectCharacterArcShape(
 /** Compute emotional curvature (variance in emotional trajectory).
  *  Higher = more emotional range, lower = steadier tone. */
 function computeEmotionalCurvature(records: ScreenplaySceneRecord[]): number {
-  const emotions = records.map(r => {
+  // Widen to number[] (not the inferred 1|0|-1 literal union) — reduce()
+  // below accumulates via `sum + e`, which TS always types as `number`, so a
+  // narrower element type makes the accumulator/return type mismatch.
+  const emotions: number[] = records.map(r => {
     if (r.emotionalShift === 'positive') return 1;
     if (r.emotionalShift === 'negative') return -1;
     return 0;

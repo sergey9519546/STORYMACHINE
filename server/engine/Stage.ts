@@ -27,6 +27,7 @@ import type {
   StakeCategory,
 } from './types.ts';
 import { safeJsonParse } from '../lib/json.ts';
+import { logger } from '../lib/logger.ts';
 import type { StoryCommit } from '../nvm/state/StoryCommit.ts';
 import type { StoryOp } from '../nvm/ops/StoryOp.ts';
 import type { ActionType } from './types.ts';
@@ -36,8 +37,6 @@ import type { EventStore } from '../nvm/kernel/event-store.ts';
 import { getV5Phase1Config } from '../config/v5-flags.ts';
 import { getV5Metrics } from '../monitoring/v5-metrics.ts';
 import { commitToEvents, estimateEventsByteSize } from '../nvm/kernel/adapters/commit-to-events.ts';
-
-import type { ActionType } from './types.ts';
 
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
@@ -1350,7 +1349,7 @@ export class Stage {
         
         if (events.length === 0) {
           if (this.v5Config.enableLogging) {
-            console.warn('[V5 Shadow] No events generated from commit:', commit.commitId);
+            logger.warn('v5_shadow_no_events', { commitId: commit.commitId });
           }
           return;
         }
@@ -1369,7 +1368,7 @@ export class Stage {
         }
         
         if (this.v5Config.enableLogging) {
-          console.log(`[V5 Shadow] ✓ Wrote ${events.length} events in ${latency}ms (commit: ${commit.commitId})`);
+          logger.info('v5_shadow_write_success', { eventCount: events.length, latencyMs: latency, commitId: commit.commitId });
         }
         
       } catch (err) {
@@ -1385,9 +1384,11 @@ export class Stage {
         }
         
         if (this.v5Config.enableLogging) {
-          console.error('[V5 Shadow] ✗ Shadow write failed:', err);
-          console.error('[V5 Shadow]   Commit:', commit.commitId);
-          console.error('[V5 Shadow]   Latency:', latency + 'ms');
+          logger.error('v5_shadow_write_failed', {
+            error: err instanceof Error ? err.message : String(err),
+            commitId: commit.commitId,
+            latencyMs: latency,
+          });
         }
         
         // CRITICAL: Never throw - shadow writes must not block
@@ -1405,15 +1406,15 @@ export class Stage {
   public enableEventStoreShadow(eventStore: EventStore): void {
     this.eventStore = eventStore;
     if (this.v5Config.enableLogging) {
-      console.log('[V5 Shadow] EventStore shadow mode enabled');
+      logger.info('v5_shadow_enabled', {});
     }
   }
-  
+
   // V5.0 PHASE 1: Disable EventStore shadow mode
   public disableEventStoreShadow(): void {
     this.eventStore = undefined;
     if (this.v5Config.enableLogging) {
-      console.log('[V5 Shadow] EventStore shadow mode disabled');
+      logger.info('v5_shadow_disabled', {});
     }
   }
   
