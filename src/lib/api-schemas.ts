@@ -44,14 +44,25 @@ export const AIConfigSchema = z.object({
   llmReady: z.boolean(),
 });
 
+// Mirrors server/engine/types.ts's PersuasionRecord — the actual shape
+// GET /api/persuasion/:charId returns (server/routes/game.ts:
+// `res.json(stage.getPersuasionLog(...))`, straight off the Persuasion_Log
+// table). This previously declared a stale turn/targetId/mode/resistance
+// shape that shares not one field name with what the route returns — the
+// same drift class OutlineBeatSchema had before its fix (see that schema's
+// comment above): any real caller of `PersuasionRecordSchema.parse()` would
+// throw on every response.
 export const PersuasionRecordSchema = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  target_id: z.string(),
+  strategy: z.string(),
   turn: z.number(),
-  targetId: z.string(),
-  mode: z.string(),
   success: z.boolean().optional(),
-  resistance: z.number().optional(),
 });
 
+// Mirrors server/engine/types.ts's CharacterSheet as returned by GET
+// /api/state (server/routes/game.ts: `agents: stage.getAllAgents()`).
 export const CharacterSheetSchema = z.object({
   char_id: z.string(),
   name: z.string(),
@@ -60,11 +71,19 @@ export const CharacterSheetSchema = z.object({
   knowledge_vector: z.array(z.string()).optional(),
 });
 
+// Mirrors server/engine/types.ts's Location as returned by GET /api/state
+// (server/routes/game.ts: `nodes: stage.getAllLocations()`) — field names
+// are `location_id`/`adjacent_locations`, straight off the Locations table
+// row (server/engine/Stage.ts's getAllLocations()), not `node_id`/
+// `adjacent`. The previous field names matched nothing the route ever
+// returns, so `StateResponseSchema.parse()` would throw on every real
+// /api/state response (missing required `node_id`) — same drift class as
+// PersuasionRecordSchema above and the now-fixed OutlineBeatSchema.
 export const LocationSchema = z.object({
-  node_id: z.string(),
+  location_id: z.string(),
   name: z.string(),
   description: z.string().optional(),
-  adjacent: z.array(z.string()).optional(),
+  adjacent_locations: z.array(z.string()).optional(),
 });
 
 export const StateResponseSchema = z.object({
