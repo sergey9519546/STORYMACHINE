@@ -2,6 +2,7 @@ import express from 'express';
 import { gameLimiter } from '../lib/session-store.ts';
 import { logger } from '../lib/logger.ts';
 import { checkAdminAuth } from '../lib/admin-auth.ts';
+import { validate, AiProviderSwitchSchema } from '../lib/validation.ts';
 
 const router = express.Router();
 
@@ -118,15 +119,10 @@ router.get('/api/ai-providers', gameLimiter, (_req, res) => {
  * server's own AI_API_KEY) with no authorization check at all, which is what
  * this route did before this gate was added.
  */
-router.post('/api/ai-providers/switch', gameLimiter, (req, res) => {
+router.post('/api/ai-providers/switch', gameLimiter, validate(AiProviderSwitchSchema), (req, res) => {
   if (!checkAdminAuth(req, res)) return;
   try {
-    const { provider } = req.body as { provider?: unknown };
-
-    if (typeof provider !== 'string') {
-      res.status(400).json({ error: 'Missing or invalid provider field' });
-      return;
-    }
+    const { provider } = req.body as { provider: string };
 
     const providers = checkProviderAvailability();
     const targetProvider = providers.find(p => p.id === provider);

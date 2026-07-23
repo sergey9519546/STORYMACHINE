@@ -804,6 +804,18 @@ export const NcpStoryformBodySchema = z.object({
   characters: z.array(z.unknown()).max(10).optional(),
 });
 
+// POST /api/nvm/analyze/compare — vectorizes `scriptText` (server/nvm/
+// analyze/story-vector.ts) and also runs it through runScriptDoctor
+// (server/nvm/analyze/doctor.ts), same as DoctorBodySchema's `fountain`
+// field above — so this reuses that field's exact bound and rationale:
+// 900_000 chars is deliberately below the express `express.json({ limit:
+// '1mb' })` body cap (server/app.ts) so THIS schema's max-length check is
+// the one that fires with a clean, specific 400 instead of the body
+// parser's generic 413.
+export const StoryVectorCompareBodySchema = z.object({
+  scriptText: z.string().min(1).max(900_000),
+});
+
 // Path-param schema shared by GET /api/dramatic-pressure/:charId,
 // /api/goal-mutations/:charId, /api/persuasion/:charId — these previously
 // only did `req.params.charId?.substring(0, 128)` plus an empty-string
@@ -982,6 +994,14 @@ export const CharactersImportBodySchema = z.object({
 }).refine(b => typeof b.bundle === 'object' && b.bundle !== null, {
   message: 'bundle is required',
   path: ['bundle'],
+});
+
+// POST /api/ai-providers/switch — the route's own inline check
+// (`typeof provider !== 'string'`) becomes this schema; the route itself
+// still validates `provider` against the known provider id list, so this
+// only guards the outer shape/length before that lookup runs.
+export const AiProviderSwitchSchema = z.object({
+  provider: z.string().min(1).max(64),
 });
 
 // ── server/routes/export.ts schemas (W4 validation-completeness audit) ──────

@@ -186,4 +186,33 @@ describe('routes/nvm — HTTP behavior', async () => {
     });
     assert.equal(res.status, 400);
   });
+
+  it('POST /api/nvm/analyze/compare rejects a missing scriptText with 400 (zod validation)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/nvm/analyze/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('POST /api/nvm/analyze/compare rejects a non-string scriptText with 400 (zod validation)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/nvm/analyze/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptText: 12345 }),
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it('POST /api/nvm/analyze/compare rejects an empty-string scriptText with 400 (zod validation)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/nvm/analyze/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptText: '' }),
+    });
+    assert.equal(res.status, 400);
+  });
 });

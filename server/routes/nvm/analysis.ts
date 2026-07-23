@@ -10,7 +10,10 @@ import {
   asyncHandler, sessionId, getOrCreateSession,
   gameLimiter,
 } from '../../lib/session-store.ts';
-import { validate, validateParams, QualityBodySchema, CommitIdParamSchema } from '../../lib/validation.ts';
+import {
+  validate, validateParams, QualityBodySchema, CommitIdParamSchema,
+  StoryVectorCompareBodySchema,
+} from '../../lib/validation.ts';
 import { logger } from '../../lib/logger.ts';
 
 const router = express.Router();
@@ -155,14 +158,9 @@ router.get('/api/nvm/quality/scene/:commitId', gameLimiter, validateParams(Commi
 // POST /api/nvm/analyze/compare — Compare a screenplay against the corpus
 // using Story Vector embeddings. Returns nearest neighbors, cluster assignment,
 // and structural genome template.
-router.post('/api/nvm/analyze/compare', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompareBodySchema), asyncHandler(async (req, res) => {
   const { scriptText } = req.body as { scriptText: string };
-  
-  if (!scriptText || typeof scriptText !== 'string') {
-    res.status(400).json({ error: 'Missing or invalid scriptText in request body' });
-    return;
-  }
-  
+
   // Vectorize the input script
   const { vectorizeScript, findNearestNeighbors, clusterCorpus } = await import('../../nvm/analyze/story-vector.ts');
   const { loadCorpusVectors } = await import('../../lib/corpus-loader.ts');
