@@ -9,7 +9,35 @@ import {
   type TemporalConstraint,
   type AllenRelation,
 } from './temporal-consistency.ts';
-import type { ScreenplaySceneRecord } from './types.ts';
+import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
+
+// Test fixture factory: builds a minimal valid ScreenplaySceneRecord from
+// just a slugline + free text. The real record type carries no raw scene
+// prose (see temporal-consistency.ts's extractTemporalConstraints), so the
+// text goes into dramaticTurn — the field that function's `sceneText`
+// concatenation reads for keyword matching (FLASHBACK/CONTINUOUS/MEANWHILE/
+// etc.), keeping these fixtures' original heading+text intent working.
+function scene(heading: string, text: string): ScreenplaySceneRecord {
+  return {
+    commitId: 'test',
+    sceneIdx: 0,
+    slug: heading,
+    purpose: 'establish_world',
+    dramaticTurn: text,
+    revelation: null,
+    emotionalShift: 'neutral',
+    visualBeats: [],
+    dialogueHighlights: [],
+    unresolvedClues: [],
+    seededClueIds: [],
+    payoffSetupIds: [],
+    clockRaised: false,
+    clockDelta: 0,
+    suspenseDelta: 0,
+    curiosityDelta: 0,
+    createdAt: 0,
+  };
+}
 
 describe('TRACE §13 Temporal-Consistency Detectors', () => {
   
@@ -20,9 +48,9 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
   describe('extractTemporalConstraints', () => {
     it('creates sequential before constraints for normal scene progression', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. KITCHEN - DAY', text: 'John makes breakfast.', sceneNumber: null },
-        { heading: 'INT. OFFICE - DAY', text: 'John arrives at work.', sceneNumber: null },
-        { heading: 'INT. BAR - NIGHT', text: 'John drinks alone.', sceneNumber: null },
+        scene('INT. KITCHEN - DAY', 'John makes breakfast.'),
+        scene('INT. OFFICE - DAY', 'John arrives at work.'),
+        scene('INT. BAR - NIGHT', 'John drinks alone.'),
       ];
       
       const { intervals, constraints } = extractTemporalConstraints(scenes);
@@ -41,8 +69,8 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('detects CONTINUOUS marker and creates meets constraint', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. HALLWAY - DAY', text: 'Mary runs.', sceneNumber: null },
-        { heading: 'EXT. STREET - CONTINUOUS', text: 'Mary keeps running.', sceneNumber: null },
+        scene('INT. HALLWAY - DAY', 'Mary runs.'),
+        scene('EXT. STREET - CONTINUOUS', 'Mary keeps running.'),
       ];
       
       const { constraints } = extractTemporalConstraints(scenes);
@@ -55,8 +83,8 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('detects FLASHBACK marker and creates before constraint to present', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. OFFICE - DAY', text: 'Present day.', sceneNumber: null },
-        { heading: 'INT. SCHOOL - DAY - FLASHBACK', text: "Young John's memory.", sceneNumber: null },
+        scene('INT. OFFICE - DAY', 'Present day.'),
+        scene('INT. SCHOOL - DAY - FLASHBACK', "Young John's memory."),
       ];
       
       const { constraints } = extractTemporalConstraints(scenes);
@@ -71,8 +99,8 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('detects MEANWHILE marker and creates overlaps constraint', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. BANK - DAY', text: 'Heist in progress.', sceneNumber: null },
-        { heading: 'EXT. POLICE STATION - DAY', text: 'MEANWHILE, cops plan their response.', sceneNumber: null },
+        scene('INT. BANK - DAY', 'Heist in progress.'),
+        scene('EXT. POLICE STATION - DAY', 'MEANWHILE, cops plan their response.'),
       ];
       
       const { constraints } = extractTemporalConstraints(scenes);
@@ -84,8 +112,8 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('detects age mentions and creates age intervals', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. HOUSE - DAY', text: 'SARAH, now 45, looks tired.', sceneNumber: null },
-        { heading: 'INT. SCHOOL - DAY (FLASHBACK)', text: 'SARAH, 12, laughs with friends.', sceneNumber: null },
+        scene('INT. HOUSE - DAY', 'SARAH, now 45, looks tired.'),
+        scene('INT. SCHOOL - DAY (FLASHBACK)', 'SARAH, 12, laughs with friends.'),
       ];
       
       const { intervals } = extractTemporalConstraints(scenes);
@@ -98,8 +126,8 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('detects LATER markers and upgrades confidence', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. APARTMENT - DAY', text: 'Morning.', sceneNumber: null },
-        { heading: 'INT. APARTMENT - DAY - THREE YEARS LATER', text: 'Same place, older.', sceneNumber: null },
+        scene('INT. APARTMENT - DAY', 'Morning.'),
+        scene('INT. APARTMENT - DAY - THREE YEARS LATER', 'Same place, older.'),
       ];
       
       const { constraints } = extractTemporalConstraints(scenes);
@@ -194,9 +222,9 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
   describe('auditTemporalConsistency (end-to-end)', () => {
     it('passes clean linear timeline', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. HOUSE - MORNING', text: 'Wake up.', sceneNumber: null },
-        { heading: 'INT. OFFICE - DAY', text: 'Work.', sceneNumber: null },
-        { heading: 'INT. BAR - NIGHT', text: 'Drinks.', sceneNumber: null },
+        scene('INT. HOUSE - MORNING', 'Wake up.'),
+        scene('INT. OFFICE - DAY', 'Work.'),
+        scene('INT. BAR - NIGHT', 'Drinks.'),
       ];
       
       const contradictions = auditTemporalConsistency(scenes);
@@ -206,9 +234,9 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('detects flashback paradox in real screenplay context', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. COURTROOM - DAY', text: 'Trial is underway. Judge presiding.', sceneNumber: null },
-        { heading: 'EXT. CRIME SCENE - NIGHT - FLASHBACK', text: 'The murder happens.', sceneNumber: null },
-        { heading: 'INT. COURTROOM - DAY - CONTINUOUS', text: 'Back in court, immediately.', sceneNumber: null },
+        scene('INT. COURTROOM - DAY', 'Trial is underway. Judge presiding.'),
+        scene('EXT. CRIME SCENE - NIGHT - FLASHBACK', 'The murder happens.'),
+        scene('INT. COURTROOM - DAY - CONTINUOUS', 'Back in court, immediately.'),
       ];
       
       const contradictions = auditTemporalConsistency(scenes);
@@ -225,9 +253,9 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('handles CONTINUOUS correctly (no contradiction)', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. HALLWAY - DAY', text: 'Running.', sceneNumber: null },
-        { heading: 'EXT. STREET - CONTINUOUS', text: 'Still running.', sceneNumber: null },
-        { heading: 'INT. BUILDING - DAY', text: 'Arrives.', sceneNumber: null },
+        scene('INT. HALLWAY - DAY', 'Running.'),
+        scene('EXT. STREET - CONTINUOUS', 'Still running.'),
+        scene('INT. BUILDING - DAY', 'Arrives.'),
       ];
       
       const contradictions = auditTemporalConsistency(scenes);
@@ -237,9 +265,9 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
     
     it('handles MEANWHILE correctly (parallel timelines)', () => {
       const scenes: ScreenplaySceneRecord[] = [
-        { heading: 'INT. BANK - DAY', text: 'Robbery starts.', sceneNumber: null },
-        { heading: 'INT. POLICE STATION - DAY', text: 'MEANWHILE, cops get the call.', sceneNumber: null },
-        { heading: 'EXT. BANK - DAY', text: 'Cops arrive.', sceneNumber: null },
+        scene('INT. BANK - DAY', 'Robbery starts.'),
+        scene('INT. POLICE STATION - DAY', 'MEANWHILE, cops get the call.'),
+        scene('EXT. BANK - DAY', 'Cops arrive.'),
       ];
       
       const contradictions = auditTemporalConsistency(scenes);

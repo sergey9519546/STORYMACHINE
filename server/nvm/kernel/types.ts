@@ -71,7 +71,12 @@ export interface NarrativeEvent {
 // ── Event Creation Request ────────────────────────────────────────────────────
 // Input to EventStore.append() - system computes hash
 
-export type NarrativeEventInput = Omit<NarrativeEvent, 'eventHash' | 'eventId' | 'createdAt'> & {
+// parentHash is also server-computed (EventStore.append() derives it from the
+// current timeline head and overwrites whatever the caller passes — see
+// event-store.ts's append(): `{ ...input, eventId, eventHash, parentHash,
+// createdAt }` always wins with its own freshly-computed parentHash), so it
+// is omitted alongside the other three system-assigned fields.
+export type NarrativeEventInput = Omit<NarrativeEvent, 'eventHash' | 'eventId' | 'createdAt' | 'parentHash'> & {
   eventId?: string;         // Optional - will generate if not provided
 };
 

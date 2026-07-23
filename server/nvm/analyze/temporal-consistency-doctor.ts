@@ -5,9 +5,40 @@
  * Produces findings that show up in coverage reports.
  */
 
-import type { ScreenplaySceneRecord } from './types.ts';
-import type { DoctorIssue } from './doctor.ts';
+import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import { auditTemporalConsistency, formatTemporalReport } from './temporal-consistency.ts';
+import type { TemporalContradiction, TemporalConstraint } from './temporal-consistency.ts';
+
+/** Shape of a temporal-audit finding, formatted to slot alongside the Script
+ *  Doctor pipeline's own per-rule issues. No such export ever existed on
+ *  doctor.ts (this module's original `import type { DoctorIssue } from
+ *  './doctor.ts'` never resolved) — defined locally from the fields this
+ *  module actually produces below, since nothing else in the codebase
+ *  consumes this shape. */
+export interface DoctorIssue {
+  ruleId: string;
+  ruleName: string;
+  sceneIndex: number;
+  weight: number;
+  message: string;
+  template: string;
+  category: string;
+  pass: string;
+  metadata: {
+    contradictionType: TemporalContradiction['type'];
+    severity: TemporalContradiction['severity'];
+    intervals: TemporalContradiction['intervals'];
+    affectedScenes: TemporalContradiction['affectedScenes'];
+    constraintCount: number;
+    evidence: Array<{
+      intervalA: TemporalConstraint['intervalA'];
+      intervalB: TemporalConstraint['intervalB'];
+      relation: TemporalConstraint['relation'];
+      confidence: TemporalConstraint['confidence'];
+      source: TemporalConstraint['evidence'];
+    }>;
+  };
+}
 
 /**
  * Convert TRACE temporal contradictions to Doctor issues.
