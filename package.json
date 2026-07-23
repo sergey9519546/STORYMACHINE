@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test",
+    "test": "node --experimental-strip-types --test 'evals/scoring/**/*.test.ts' 'server/nvm/analyze/**/*.test.ts' 'server/nvm/proof/**/*.test.ts' 'tests/collab/**/*.test.ts' 'tests/core/**/*.test.ts' 'tests/e2e/**/*.test.ts' 'tests/passes/**/*.test.ts' 'tests/routes/**/*.test.ts'",
     "test:metamorphic": "node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts",
     "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts",
     "generate-p0-sample": "node --experimental-strip-types scripts/generate-p0-sample-report.ts",

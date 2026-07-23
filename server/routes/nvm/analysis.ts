@@ -11,6 +11,7 @@ import {
   gameLimiter,
 } from '../../lib/session-store.ts';
 import { validate, validateParams, QualityBodySchema, CommitIdParamSchema } from '../../lib/validation.ts';
+import { logger } from '../../lib/logger.ts';
 
 const router = express.Router();
 export default router;
@@ -169,18 +170,18 @@ router.post('/api/nvm/analyze/compare', gameLimiter, asyncHandler(async (req, re
   const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');
   const { runScriptDoctor } = await import('../../nvm/analyze/doctor.ts');
   
-  console.log('[story-vector] Vectorizing input script...');
+  logger.info('story_vector_vectorizing_input', {});
   const queryVector = await vectorizeScript(scriptText, 'User Draft', 'generated');
-  
-  console.log('[story-vector] Loading corpus vectors...');
+
+  logger.info('story_vector_loading_corpus', {});
   const corpus = await loadCorpusVectors(undefined, (current, total, slug) => {
-    console.log(`[story-vector] Loading corpus: ${current}/${total} (${slug})`);
+    logger.debug('story_vector_loading_corpus_progress', { current, total, slug });
   });
-  
-  console.log('[story-vector] Finding nearest neighbors...');
+
+  logger.info('story_vector_finding_neighbors', {});
   const neighbors = findNearestNeighbors(queryVector, corpus, 5);
-  
-  console.log('[story-vector] Clustering corpus...');
+
+  logger.info('story_vector_clustering_corpus', {});
   // Cluster the full corpus + query vector to see which cluster it lands in
   const allVectors = [...corpus, queryVector];
   const numClusters = Math.min(5, Math.floor(corpus.length / 3)); // 5 clusters or fewer
@@ -192,7 +193,7 @@ router.post('/api/nvm/analyze/compare', gameLimiter, asyncHandler(async (req, re
   );
   
   // Build scene records for genome extraction (query + top match)
-  console.log('[story-vector] Extracting structural genome...');
+  logger.info('story_vector_extracting_genome', {});
   const queryReport = await runScriptDoctor(scriptText);
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
   
@@ -207,7 +208,7 @@ router.post('/api/nvm/analyze/compare', gameLimiter, asyncHandler(async (req, re
   let structuralTemplate = null;
   if (neighbors.length > 0) {
     const topMatch = neighbors[0];
-    console.log(`[story-vector] Extracting genome from top match: ${topMatch.vector.metadata.title}`);
+    logger.info('story_vector_extracting_top_match_genome', { title: topMatch.vector.metadata.title });
     
     // For now, we can't build full scene records without re-running Script Doctor
     // on the corpus screenplay. In production, these would be cached alongside vectors.

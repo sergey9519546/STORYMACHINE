@@ -7,10 +7,11 @@
  * type roles, and the reusable primitives (panel frame, button, chip/tag,
  * stamp, card, bar/gauge). Screens compose these — they do not redefine them.
  *
- * Fonts: Anton + JetBrains Mono are already self-hosted (see index.css).
- * Archivo (body) and Caveat (margin hand) are declared here with graceful
- * fallbacks to the already-hosted Inter/system + cursive until their woff2
- * files are vendored under public/fonts/ (follow-up — needs the font binaries).
+ * Fonts: Anton + JetBrains Mono are self-hosted in index.css. Archivo (body)
+ * and Caveat (margin hand) are self-hosted here — their @font-face rules below
+ * point at woff2 files vendored under public/fonts/ (served at the site root),
+ * with Inter/system + cursive kept only as fallbacks in --sm-font-body /
+ * --sm-font-hand for the brief pre-load window.
  */
 
 :root {
@@ -48,8 +49,11 @@
   --sm-shadow-lg: 12px 12px 0 rgba(33,29,21,.18);
 }
 
-@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:local('Archivo')}
-@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:local('Caveat')}
+/* Was `src:local(...)` — resolves only if the visitor already has the font
+   installed, which almost nobody does, so these silently fell back to Inter/
+   system. Now served from the vendored woff2 (see header). */
+@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/archivo-var.woff2') format('woff2')}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:url('/fonts/caveat-var.woff2') format('woff2')}
 
 /* ============================ primitives ============================ */
 

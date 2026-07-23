@@ -18,7 +18,14 @@
 // in this space regardless of genre or surface content.
 
 import crypto from 'node:crypto';
-import type { RevisionIssue } from '../revision/passes/types.ts';
+import type { RevisionIssue, PassName } from '../revision/passes/types.ts';
+
+/** RevisionIssue doesn't carry its own pass name (that's tracked one level up,
+ *  on PassResult/DoctorPassSummary) — this module needs it to build "pass::
+ *  rule" dimension keys, so callers tag each issue with its pass before
+ *  handing the flat list in. Same shape doctor.ts's buildTopPriorities()
+ *  already uses for the same reason. */
+type TaggedIssue = RevisionIssue & { pass: PassName };
 
 // ── Core Types ─────────────────────────────────────────────────────────────
 
@@ -91,7 +98,7 @@ export interface Neighbor {
  *  @param metadata - Human-readable context for this vector
  *  @returns Normalized StoryVector ready for similarity comparison */
 export function vectorizeFromIssues(
-  issues: RevisionIssue[],
+  issues: TaggedIssue[],
   metadata: Omit<StoryVector['metadata'], 'timestamp'>
 ): StoryVector {
   // Count rule firings: rule name → count
@@ -137,8 +144,9 @@ export async function vectorizeScript(
   // Run Script Doctor to get rule-firing pattern
   const report = await runScriptDoctor(fountainText);
   
-  // Flatten all issues from all 14 passes
-  const allIssues = report.passes.flatMap(p => p.issues);
+  // Flatten all issues from all 14 passes, tagging each with its pass name
+  // (RevisionIssue itself doesn't carry it — see TaggedIssue above).
+  const allIssues = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   
   return vectorizeFromIssues(allIssues, {
     title,
@@ -409,7 +417,7 @@ const RULE_INDEX: string[] = (() => {
  * 
  *  @param issues - Issues from a Script Doctor report
  *  @returns Updated rule index */
-function buildRuleIndex(issues: RevisionIssue[]): string[] {
+function buildRuleIndex(issues: TaggedIssue[]): string[] {
   const encountered = new Set<string>();
   for (const issue of issues) {
     encountered.add(`${issue.pass}::${issue.rule}`);
@@ -451,7 +459,7 @@ export function resetRuleIndex(): void {
 // Patch vectorizeFromIssues to build the index on first call
 const originalVectorizeFromIssues = vectorizeFromIssues;
 (vectorizeFromIssues as any) = function(
-  issues: RevisionIssue[],
+  issues: TaggedIssue[],
   metadata: Omit<StoryVector['metadata'], 'timestamp'>
 ): StoryVector {
   if (RULE_INDEX.length === 0) {
