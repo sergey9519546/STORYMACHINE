@@ -48,8 +48,13 @@
   --sm-shadow-lg: 12px 12px 0 rgba(33,29,21,.18);
 }
 
-@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:local('Archivo')}
-@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:local('Caveat')}
+/* Self-hosted (vendored under public/fonts, served at the site root). Was
+   `src:local('Archivo')`/`local('Caveat')`, which only resolves if the visitor
+   happens to have the font installed locally — almost nobody does — so
+   --sm-font-body / --sm-font-hand silently fell back to Inter/system and the
+   design's body + margin-hand voices never actually rendered. */
+@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/archivo-var.woff2') format('woff2')}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:url('/fonts/caveat-var.woff2') format('woff2')}
 
 /* ============================ primitives ============================ */
 
