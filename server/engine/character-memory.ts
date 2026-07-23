@@ -106,11 +106,22 @@ export function importCharacter(
     : (locations[0]?.location_id ?? '');
 
   // Resolve char_id collisions so an existing character is never overwritten.
+  // Capped at MAX_SUFFIX attempts: a normal collision (importing the same
+  // character bundle a handful of times) resolves in the first few
+  // iterations, so the cap never bites in practice — it only guards against
+  // a pathological/corrupted session that already holds hundreds of
+  // `${char_id}_<n>` agents, where an uncapped loop would spin forever.
   let charId = src.char_id;
   let remapped = false;
   if (stage.getAgent(charId)) {
+    const MAX_SUFFIX = 1000;
     let suffix = 2;
-    while (stage.getAgent(`${src.char_id}_${suffix}`)) suffix++;
+    while (stage.getAgent(`${src.char_id}_${suffix}`)) {
+      suffix++;
+      if (suffix > MAX_SUFFIX) {
+        throw new Error(`importCharacter: could not find a free char_id suffix for "${src.char_id}" after ${MAX_SUFFIX} attempts`);
+      }
+    }
     charId = `${src.char_id}_${suffix}`;
     remapped = true;
   }
