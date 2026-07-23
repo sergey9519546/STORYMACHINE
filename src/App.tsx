@@ -2,6 +2,7 @@ import React, { useState, Suspense, lazy, useCallback, useEffect, useRef } from 
 import { MotionConfig } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { StoryConfig } from './types';
+import { getLabsEnabled } from './lib/feature-flags';
 
 const StartScreen  = lazy(() => import('./components/StartScreen'));
 const ScriptIDE    = lazy(() => import('./components/ScriptIDE'));
@@ -66,6 +67,13 @@ export default function App() {
 
   const [config, setConfig] = useState<StoryConfig | null>(initialView.current.config);
   const [showStoryMachine, setShowStoryMachine] = useState(initialView.current.showStoryMachine);
+  
+  // ROADMAP P2: Gate OASIS behind Labs flag. Check on every render so toggling
+  // Labs in settings takes effect immediately. If Labs is OFF and user somehow
+  // has showStoryMachine=true (e.g. from before Labs was implemented), reset to
+  // ScriptIDE to avoid showing a gated feature.
+  const labsEnabled = getLabsEnabled();
+  const effectiveShowStoryMachine = labsEnabled && showStoryMachine;
   // Fountain text + extracted character list coming from a Story Machine export
   const [importedScript, setImportedScript] = useState<string | undefined>(undefined);
   const [importedCharacters, setImportedCharacters] = useState<
@@ -82,6 +90,13 @@ export default function App() {
       // best-effort — continue silently
     }
   }, [config, showStoryMachine]);
+  
+  // Reset showStoryMachine if Labs gets disabled while StoryMachine is active
+  useEffect(() => {
+    if (showStoryMachine && !labsEnabled) {
+      setShowStoryMachine(false);
+    }
+  }, [labsEnabled, showStoryMachine]);
 
   const handleExportToIDE = useCallback(
     (fountain: string, characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>) => {
@@ -102,10 +117,12 @@ export default function App() {
   // seeds a default config (only if none is set yet) so closing StoryMachine
   // (onClose → setShowStoryMachine(false)) lands the user in ScriptIDE rather
   // than falling through to the wizard with config still null.
+  // ROADMAP P2: Only allow opening StoryMachine if Labs is enabled.
   const handleOpenStoryMachineFromStart = useCallback(() => {
+    if (!labsEnabled) return; // Silently ignore if Labs is OFF
     setConfig((prev) => prev ?? DEFAULT_STORY_CONFIG);
     setShowStoryMachine(true);
-  }, []);
+  }, [labsEnabled]);
 
   // Deliverable 2's "New story" affordance: ScriptIDE can send the user back
   // to the wizard on demand (e.g. to start an unrelated project) by clearing
@@ -143,7 +160,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
-          {showStoryMachine ? (
+          {effectiveShowStoryMachine ? (
             <StoryMachine
               onClose={() => setShowStoryMachine(false)}
               onExportToIDE={handleExportToIDE}
@@ -151,7 +168,7 @@ export default function App() {
           ) : config ? (
             <ScriptIDE
               initialConfig={config}
-              onOpenStoryMachine={() => setShowStoryMachine(true)}
+              onOpenStoryMachine={labsEnabled ? () => setShowStoryMachine(true) : undefined}
               importedScript={importedScript}
               importedCharacters={importedCharacters}
               onImportConsumed={handleClearImport}
@@ -161,7 +178,7 @@ export default function App() {
             <StartScreen
               onStart={setConfig}
               isGenerating={false}
-              onOpenStoryMachine={handleOpenStoryMachineFromStart}
+              onOpenStoryMachine={labsEnabled ? handleOpenStoryMachineFromStart : undefined}
             />
           )}
         </Suspense>

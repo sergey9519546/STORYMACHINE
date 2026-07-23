@@ -1,9 +1,12 @@
 # STORYMACHINE — Project Memory
 
-Orientation: `ROADMAP.md` (canonical demand-driven sequence and active phase) ·
-`NORTH_STAR.md` (product constitution) · `ULTRAPLAN.md` (short execution brief) ·
-`ARCHITECTURE.md` (system map) · `README.md` (setup, env vars). Research and
-retired wave material is filed backlog, not active direction; see ROADMAP §8.
+**PRIMARY REFERENCE**: `docs/MASTER_ROADMAP.md` — single source of truth for project direction, phases, and sequencing (reconciled 2026-07-15)
+
+**SUPPORTING DOCS**: `NORTH_STAR.md` (constitution) · `ARCHITECTURE.md` (system map) · `docs/DECISION_LOG.md` (audit trail) · `README.md` (setup)
+
+**ACTIVE WORK**: `docs/user-validation/` (P0 protocol, recruitment, sessions)
+
+**HISTORICAL**: `docs/filed-backlog/` (V5 vision, session docs) — NOT active direction
 
 ## Quality bar
 
@@ -79,40 +82,33 @@ before every push. CI runs lint + test + build on every branch, plus a
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.
 
-## Standing task — see ROADMAP.md (the wave program is RETIRED)
+## Current Priority — P0 User Validation (BLOCKS ALL NEW WORK)
 
-**The "3 checks + 6 tests per wave, forever" cadence is dead.** It was the
-machine that manufactured the project's biggest liability: ~5,701 of ~8,917
-rules are one bulk wave of field × mode × position permutations from 7
-template functions (`passes/lib/checks.ts`), and by the doctor's own
-measurement (`doctor.ts:1656-1669`) the entire weighted-rule channel
-contributes AUC ~0.076 to discrimination while scene-count scarcity carries
-AUC ~0.938. More rules stopped adding signal a long time ago; they add
-maintenance cost (~47,500 pass-file lines, 1,326 `as any` casts) and
-undercut the trust story. Do not author a new wave.
+**Status**: Phase 0 (documentation reconciliation) complete, Phase 1 (fix broken) next, Phase 2 (P0 validation) starts this week
 
-The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
+See `docs/MASTER_ROADMAP.md` for full plan. Key points:
 
-1. **P0 — Validate with real writers.** No new engine work ships without a
-   validated user need. Blocks everything below.
-2. **P1 — Make the score provably discriminate on REAL writing** (the One
-   Bet). A legally distributable benchmark of real drafts running in CI,
-   independently blind-labeled by >=3 experienced readers, with a
-   pre-registered split, held-out evaluation, and uncertainty reporting.
-   Rebuild around the smallest signal set that actually separates. Add no
-   entries to the current 8,917 generated catalog; treat ~2,300 distinct rule
-   concepts as the maintained conceptual set. Removal is a separate approved
-   migration, never implied by "freeze."
-3. **P2 — Collapse the surface to Doctor + Editor.** Everything else
-   (OASIS, the ~38 research panels) behind a Labs flag.
-4. **P3 — Ship a shareable, third-party-verifiable coverage report.**
-5. **P4 — Retention & defensibility.** Last, not first.
+**P0 Gate (Hard Blocker)**:
+- Recruit 5+ real screenwriters
+- Show them the sample coverage report with Story Graph
+- Ask: "Would you run your own draft?"
+- Count pull signals: strong (4+) / weak (2-3) / none (<2)
+- Decision: GREEN → proceed to V5 activation + P1 corpus | YELLOW → iterate | RED → stop/pivot
 
-**Two laws now outrank the old rigor discipline** (full text in NORTH_STAR
-§1): *demand before rigor* — a validated user need gates engine work; and
-*correct before reproducible* — determinism is worthless if the verdict is
-wrong, so reproducibility is earned AFTER the score is shown valid on real
-writing, never as a substitute for it. `measure-before-threshold on the
-REAL corpus` still holds for any scoring change, and the shuffle-drop AUC
-must not regress below its floor. Commit to the branch designated for the
-current session — never a branch name hardcoded here.
+**What's Working**:
+- Story Graph Phase 1-2 (697 LOC) — fully integrated, shows in P0 sessions
+- V5 systems (5,000+ LOC) — shadow mode OFF, activates if P0 GREEN
+- Deterministic core — production-ready
+
+**What's Gated**:
+- No new engine work until P0 clears (exception: security fixes)
+- No Phase 3-4 Story Graph until P0 GREEN + P1 validation
+- No Infinity Gate expansion until P0 GREEN
+- No new rules (frozen at 8,917), no new waves (program RETIRED)
+
+**Constitutional Laws** (NORTH_STAR.md):
+- *Demand before rigor* — validated user need gates engine work
+- *Correct before reproducible* — score validity before determinism claims
+- *Measure on runnable real writing* — synthetic tests necessary but insufficient
+
+Commit to the branch designated for the current session.
