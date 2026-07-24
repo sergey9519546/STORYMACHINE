@@ -56,7 +56,7 @@ export function AIProviderSettings({ onProviderChange }: AIProviderSettingsProps
       available: false,
       description: [
         '✓ GPT-4o, GPT-4 Turbo models',
-        '✓ Best-in-class reasoning',
+        '✓ Strong reasoning performance',
         '✓ Vision & function calling',
         '✓ Requires OpenAI API key',
       ],

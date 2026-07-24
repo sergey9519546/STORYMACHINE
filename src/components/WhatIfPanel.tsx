@@ -727,7 +727,7 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
           <div className="flex items-center gap-2">
             <FlaskConical className="w-5 h-5 text-purple-400" />
             <h2 id="whatif-panel-title" className="text-white font-semibold text-lg">What-If Lab</h2>
-            <span className="text-xs text-gray-500 ml-2">flip a decision, see provably-coherent alternate futures</span>
+            <span className="text-xs text-gray-500 ml-2">flip a decision, see consistency-checked alternate futures ranked best-first</span>
           </div>
           <button onClick={onClose} aria-label="Close What-If Lab" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />

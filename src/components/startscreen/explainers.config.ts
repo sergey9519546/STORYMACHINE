@@ -40,7 +40,7 @@ export const EXPLAINERS: Explainers = {
     save_the_cat: {
       title: "Save the Cat",
       vibe: "Commercial & Satisfying",
-      desc: "The Hollywood gold standard. A 15-beat template that guarantees commercial pacing, clear character transformation, and satisfying payoffs.",
+      desc: "A widely used 15-beat template for commercial feature pacing, clear character transformation, and satisfying payoffs.",
       mechanics: "15 precise beats. Inciting incident at 10%, midpoint false victory/defeat, and an 'all is lost' moment.",
       idealFor: "Commercial fiction, action, accessible thrillers, and blockbusters.",
       warning: "Can feel formulaic and predictable if the beats are hit too rigidly without subversion.",
