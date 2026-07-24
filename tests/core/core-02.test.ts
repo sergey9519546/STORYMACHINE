@@ -2275,12 +2275,13 @@ describe('NVM — Story Health Dashboard (Wave 26)', () => {
     assert.equal(state.clues.length, 1, 'one clue');
   });
 
-  it('proof pass rate: 100% when no commits', () => {
-    // Simulate: 0 commits → passRate = 100 (no failure = perfect)
+  it('proof pass rate: null when no commits (G0-05 — no sentinel score)', () => {
+    // 0 commits → nothing to score. The honest value is null, NOT a green
+    // 100% "no failure = perfect" sentinel that reads as a real pass rate.
     const commitCount = 0;
     const t1PassCount = 0;
-    const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : 100;
-    assert.equal(proofPassRate, 100);
+    const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : null;
+    assert.equal(proofPassRate, null);
   });
 
   it('proof pass rate: proportional calculation', () => {

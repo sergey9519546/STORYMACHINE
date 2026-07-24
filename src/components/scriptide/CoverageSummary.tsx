@@ -228,6 +228,34 @@ export default function CoverageSummary({
         )}
 
         {status === "success" && report && (
+          report.analysisComplete === false ? (
+            /* P0.3 / G0-05: one or more diagnostic passes failed. Health/grade
+               sentinels (0 / troubled) are NOT real scores and must not be
+               shown as if they were — mirror ScriptDoctorPanel's withheld read. */
+            <div className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)]">
+              <p className="sm-h text-[var(--sm-stamp)]">Analysis incomplete</p>
+              <p className="mt-2 font-[family-name:var(--sm-font-display)] text-2xl uppercase leading-none text-[var(--sm-ink)]">
+                Score withheld
+              </p>
+              <p className="mt-3 text-sm leading-snug text-[var(--sm-ink-soft)]">
+                {report.plainSummary ||
+                  "One or more diagnostic passes failed. Health, verdict, and percentiles are withheld because the issue count may be artificially low."}
+              </p>
+              {Array.isArray(report.failedPasses) && report.failedPasses.length > 0 && (
+                <p className="sm-slug mt-3">Failed passes: {report.failedPasses.join(", ")}</p>
+              )}
+              <p className="sm-slug mt-2">
+                {report.sceneCount} scene{report.sceneCount === 1 ? "" : "s"} ·{" "}
+                {report.wordCount.toLocaleString()} words · {report.totalIssues} issue
+                {report.totalIssues === 1 ? "" : "s"} observed before failure
+              </p>
+              <div className="mt-4">
+                <button type="button" onClick={onOpenFullReport} className="sm-btn">
+                  Full report
+                </button>
+              </div>
+            </div>
+          ) : (
           <>
             <div className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)]">
               <div className="flex flex-wrap items-end justify-between gap-3">
@@ -310,6 +338,7 @@ export default function CoverageSummary({
               </div>
             )}
           </>
+          )
         )}
 
         {status === "idle" && !report && (

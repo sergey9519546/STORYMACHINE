@@ -76,6 +76,9 @@ interface SlateEntry {
   topDimension?: string;
   weakestDimension?: string;
   contentHash?: string;
+  /** G0-05: false when analysis did not complete — health is a sentinel and
+   *  must render as an "incomplete" badge, not a score. */
+  analysisComplete?: boolean;
 }
 
 interface SlateResponse {
@@ -632,6 +635,38 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                 </thead>
                 <tbody>
                   {result.slate.map((entry, i) => {
+                    // G0-05: incomplete analyses carry a sentinel health (0)
+                    // that is not a real score. Badge them "incomplete" and
+                    // suppress the derived score/verdict/percentile cells.
+                    const incomplete = entry.analysisComplete === false;
+                    if (incomplete) {
+                      return (
+                        <tr
+                          key={entry.contentHash ?? `${entry.title}-${i}`}
+                          className={i % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-gray-50 dark:bg-zinc-800"}
+                        >
+                          <td className="px-2 py-2 font-bold text-gray-400">—</td>
+                          <td
+                            className="px-2 py-2 truncate max-w-[160px]"
+                            title={entry.contentHash ? `contentHash: ${entry.contentHash}` : undefined}
+                          >
+                            {entry.title}
+                          </td>
+                          <td className="px-2 py-2">
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-gray-200 text-gray-600 dark:bg-zinc-700 dark:text-gray-300">
+                              Incomplete
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-gray-400">—</td>
+                          <td className="px-2 py-2 text-gray-400">—</td>
+                          <td className="px-2 py-2 text-gray-500 dark:text-gray-400">
+                            {entry.sceneCount} / {entry.wordCount.toLocaleString()}
+                          </td>
+                          <td className="px-2 py-2 text-gray-400">—</td>
+                          <td className="px-2 py-2 text-gray-400">—</td>
+                        </tr>
+                      );
+                    }
                     const grade = gradeFromHealth(entry.health);
                     const verdictMeta = entry.verdict ? VERDICT_CHIP[entry.verdict] : undefined;
                     return (
