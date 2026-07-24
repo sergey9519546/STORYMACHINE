@@ -49,6 +49,13 @@ jobs:
       - name: Honesty string audit
         run: npm run honesty-audit
 
+      # Documentation quality check: scan markdown files for AI writing patterns
+      # Uses avoid-ai-writing Tier 1 patterns (25 high-confidence markers)
+      # Non-blocking (warnings only) to avoid false positives on legitimate usage
+      - name: Check documentation quality
+        run: npm run check-docs
+        continue-on-error: true
+
       # Deliberately NO GEMINI_API_KEY here: the product's official keyless
       # analysis-only mode is what CI must prove. With a fake key set, the
       # "keyless" degradation paths construct a real client and attempt live

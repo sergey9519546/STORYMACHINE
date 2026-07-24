@@ -1,0 +1,332 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://storymachine.dev/schemas/p1-benchmark-manifest.json",
+  "title": "STORYMACHINE P1 Benchmark Corpus Manifest",
+  "description": "Metadata schema for P1 real-screenplay benchmark corpus with stratified train/val/test splits",
+  "type": "object",
+  "required": [
+    "version",
+    "created_date",
+    "total_scripts",
+    "splits",
+    "stratification",
+    "labeling"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Semantic version of corpus (e.g., 1.0.0)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["1.0.0", "1.1.0", "2.0.0"]
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date corpus was finalized (YYYY-MM-DD)"
+    },
+    "updated_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of last update to corpus or metadata"
+    },
+    "total_scripts": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Total number of screenplays in entire corpus"
+    },
+    "splits": {
+      "type": "object",
+      "description": "Train/validation/test split definitions",
+      "required": ["train", "val", "test"],
+      "properties": {
+        "train": {
+          "$ref": "#/definitions/split"
+        },
+        "val": {
+          "$ref": "#/definitions/split"
+        },
+        "test": {
+          "$ref": "#/definitions/split_with_protection"
+        }
+      }
+    },
+    "stratification": {
+      "type": "object",
+      "description": "Stratification statistics across quality, genre, length, etc.",
+      "required": ["by_quality"],
+      "properties": {
+        "by_quality": {
+          "type": "object",
+          "description": "Distribution across quality tiers (A/B/C/D)",
+          "properties": {
+            "A": {"type": "integer", "minimum": 0},
+            "B": {"type": "integer", "minimum": 0},
+            "C": {"type": "integer", "minimum": 0},
+            "D": {"type": "integer", "minimum": 0"}
+          },
+          "required": ["A", "B", "C", "D"]
+        },
+        "by_genre": {
+          "type": "object",
+          "description": "Distribution across genres",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "by_length": {
+          "type": "object",
+          "description": "Distribution across length categories",
+          "properties": {
+            "short": {"type": "integer", "minimum": 0, "description": "< 90 pages"},
+            "medium": {"type": "integer", "minimum": 0, "description": "90-120 pages"},
+            "long": {"type": "integer", "minimum": 0, "description": "> 120 pages"}
+          }
+        },
+        "by_era": {
+          "type": "object",
+          "description": "Distribution across time periods",
+          "properties": {
+            "classic": {"type": "integer", "minimum": 0, "description": "pre-2000"},
+            "modern": {"type": "integer", "minimum": 0, "description": "2000-2015"},
+            "recent": {"type": "integer", "minimum": 0, "description": "2015+"}
+          }
+        }
+      }
+    },
+    "labeling": {
+      "type": "object",
+      "description": "Labeling methodology and inter-rater agreement",
+      "required": ["raters", "method", "inter_rater_agreement", "conflict_resolution"],
+      "properties": {
+        "raters": {
+          "type": "integer",
+          "minimum": 3,
+          "description": "Number of independent raters"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["blind_independent", "consensus_panel", "pairwise_comparison"],
+          "description": "Labeling methodology used"
+        },
+        "inter_rater_agreement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fleiss' kappa or Cohen's kappa score"
+        },
+        "agreement_metric": {
+          "type": "string",
+          "enum": ["fleiss_kappa", "cohen_kappa", "krippendorff_alpha"],
+          "description": "Which agreement metric was used"
+        },
+        "conflict_resolution": {
+          "type": "string",
+          "enum": ["majority_vote", "consensus_discussion", "adjudication"],
+          "description": "How conflicts were resolved"
+        },
+        "rater_backgrounds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["professional_reader", "screenwriter", "script_consultant", "producer", "academic"]
+          },
+          "description": "Background of each rater"
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "Screenplay source metadata",
+      "items": {
+        "$ref": "#/definitions/source"
+      }
+    },
+    "random_seed": {
+      "type": "integer",
+      "description": "Random seed used for stratified split (for reproducibility)"
+    },
+    "pre_registration": {
+      "type": "object",
+      "description": "Links to pre-registration documents",
+      "properties": {
+        "protocol_url": {"type": "string", "format": "uri"},
+        "protocol_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "registered_date": {"type": "string", "format": "date"}
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "description": "Evaluation results (filled after P1 test evaluation)",
+      "properties": {
+        "commit_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$",
+          "description": "Git commit hash of code evaluated"
+        },
+        "evaluation_date": {"type": "string", "format": "date"},
+        "test_auc": {"type": "number", "minimum": 0, "maximum": 1},
+        "test_auc_ci_lower": {"type": "number", "minimum": 0, "maximum": 1},
+        "test_auc_ci_upper": {"type": "number", "minimum": 0, "maximum": 1},
+        "brier_score": {"type": "number", "minimum": 0, "maximum": 1},
+        "passed": {"type": "boolean", "description": "Did evaluation pass P1 gate (AUC >= 0.70)?"}
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-form notes about corpus construction, issues, or caveats"
+    }
+  },
+  "definitions": {
+    "split": {
+      "type": "object",
+      "description": "Definition of a data split (train or validation)",
+      "required": ["count", "scripts"],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of scripts in this split"
+        },
+        "scripts": {
+          "type": "array",
+          "description": "List of script identifiers in this split",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "quality_distribution": {
+          "type": "object",
+          "description": "Quality tier distribution within this split",
+          "properties": {
+            "A": {"type": "integer", "minimum": 0},
+            "B": {"type": "integer", "minimum": 0},
+            "C": {"type": "integer", "minimum": 0},
+            "D": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "split_with_protection": {
+      "type": "object",
+      "description": "Test split with additional held-out protections",
+      "required": ["count", "scripts", "hash", "locked"],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scripts": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "SHA-256 hash of test set manifest for held-out protection"
+        },
+        "locked": {
+          "type": "boolean",
+          "description": "Is test set locked (never to be touched except final evaluation)?",
+          "const": true
+        },
+        "unlocked_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date test set was unlocked for final evaluation (if applicable)"
+        },
+        "accessed_by": {
+          "type": "array",
+          "description": "Log of who accessed test set and when",
+          "items": {
+            "type": "object",
+            "properties": {
+              "person": {"type": "string"},
+              "date": {"type": "string", "format": "date"},
+              "purpose": {"type": "string"}
+            }
+          }
+        },
+        "quality_distribution": {
+          "type": "object",
+          "properties": {
+            "A": {"type": "integer", "minimum": 0},
+            "B": {"type": "integer", "minimum": 0},
+            "C": {"type": "integer", "minimum": 0},
+            "D": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "Metadata about screenplay source",
+      "required": ["id", "title", "license"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier (filename without extension)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Screenplay title"
+        },
+        "author": {
+          "type": "string",
+          "description": "Screenplay author (if known)"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2100,
+          "description": "Year written/released"
+        },
+        "genre": {
+          "type": "string",
+          "enum": ["drama", "comedy", "thriller", "horror", "sci-fi", "fantasy", "action", "romance", "western", "historical", "other"],
+          "description": "Primary genre"
+        },
+        "length_pages": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Screenplay length in pages"
+        },
+        "license": {
+          "type": "string",
+          "enum": ["CC0", "CC-BY", "CC-BY-SA", "CC-BY-NC", "public-domain", "unknown"],
+          "description": "License status"
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL where screenplay was sourced"
+        },
+        "source_repository": {
+          "type": "string",
+          "enum": ["project-gutenberg", "internet-archive", "github", "simplyscripts", "imsdb", "original", "other"],
+          "description": "Repository where screenplay was found"
+        },
+        "attribution_required": {
+          "type": "boolean",
+          "description": "Does license require attribution?"
+        },
+        "quality_label": {
+          "type": "string",
+          "enum": ["A", "B", "C", "D"],
+          "description": "Consensus quality label from raters"
+        },
+        "split": {
+          "type": "string",
+          "enum": ["train", "val", "test"],
+          "description": "Which split this screenplay belongs to"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any special notes about this screenplay"
+        }
+      }
+    }
+  }
+}

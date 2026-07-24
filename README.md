@@ -12,13 +12,11 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 
 1. Install dependencies:
    `npm install`
-2. Copy `.env.example` to `.env` and set at least one AI provider key:
+2. Copy `.env.example` to `.env` and fill in your key:
    `cp .env.example .env`
-   Then set `OPENROUTER_API_KEY` (free, no credit card — get one at
-   https://openrouter.ai/keys) or `GEMINI_API_KEY` (premium) — or skip this
-   step entirely to run in analysis-only mode (all deterministic features
-   work without a key; generation features stay off until one is
-   configured).
+   Then set `GEMINI_API_KEY` to your Gemini API key — or skip this step
+   entirely to run in analysis-only mode (all deterministic features work
+   without a key; generation features stay off until one is configured).
 3. Run the app:
    `npm run dev`
 
@@ -26,8 +24,8 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENROUTER_API_KEY` | Optional | Free AI provider — get a key at https://openrouter.ai/keys (no credit card required). Gives access to 30+ free models with automatic failover when rate limits are hit. Takes priority over `GEMINI_API_KEY` when both are set. |
-| `GEMINI_API_KEY` | Optional | Premium AI provider (Gemini) — never commit this. Without either key the server boots in **analysis-only mode**: Script Doctor, live diagnostics, coverage export, What-If Lab, Writers' Room, and interview receipts all work; generation (copilot, simulation dialogue, rewrites) stays disabled until a key is set. |
+| `GEMINI_API_KEY` | Optional | Gemini AI API key — never commit this. Without it the server boots in **analysis-only mode**: Script Doctor, live diagnostics, coverage export, What-If Lab, Writers' Room, and interview receipts all work; generation (copilot, simulation dialogue, rewrites) stays disabled until a key is set. |
+| `APP_URL` | Optional | Hosting URL (injected automatically by AI Studio) |
 
 > **Security note:** `.env` is gitignored via `.env*` in `.gitignore`. Only `.env.example` is tracked. Never commit real keys.
 
@@ -47,6 +45,36 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 ```
 npm test
 ```
+
+## Available npm Scripts
+
+**Development & Build:**
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Build production bundle
+- `npm run preview` - Preview production build locally
+
+**Testing & Quality:**
+- `npm test` - Run full test suite
+- `npm run lint` - Type check with TypeScript (no emit)
+- `npm run check-docs` - Scan documentation for AI writing patterns
+- `npm run check-docs:strict` - Same as check-docs but fails on high-severity patterns
+- `npm run validate` - Run all checks (lint + check-docs + test)
+
+**Git Hooks:**
+- `npm run setup-hooks` - Install pre-commit hook for documentation quality checks
+
+**Utilities:**
+- `npm run rulebook` - Generate rulebook from current rule set
+- `npm run generate-p0-sample` - Generate P0 validation sample coverage report
+- `npm run backup` - Backup session data
+
+**Code Quality Tools:**
+
+The project includes automated detection of AI-generated writing patterns in documentation:
+- Pre-commit hooks scan `.md` files for 25 high-confidence AI patterns
+- Run `npm run setup-hooks` to install (one-time setup)
+- Bypass when needed: `git commit --no-verify`
+- See `scripts/check-docs-quality.ts` for pattern definitions
 
 ## Deployment
 
