@@ -15,6 +15,7 @@ import {
   Sparkles,
   SpellCheck,
   Stethoscope,
+  Wand2,
 } from "lucide-react";
 
 /** Three user-facing desk modes. Scenes/cast stay in the rail (not a peer mode). */
@@ -29,6 +30,8 @@ interface ToolbarProps {
   isAnalyzing: boolean;
   directorsLayer: boolean;
   liveDiagnostics: boolean;
+  /** G0-03: inline AI ghost-text completion toggle state. */
+  inlineCompletion: boolean;
   wordCount: number;
   pageCount: number;
   isTypewriterSound: boolean;
@@ -41,6 +44,7 @@ interface ToolbarProps {
   onOpenSlate: () => void;
   onOpenStudio: () => void;
   onToggleLiveDiagnostics: () => void;
+  onToggleInlineCompletion: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onExportFDX: () => void;
@@ -73,6 +77,7 @@ export default function Toolbar({
   isAnalyzing,
   directorsLayer,
   liveDiagnostics,
+  inlineCompletion,
   wordCount,
   pageCount,
   isTypewriterSound,
@@ -85,6 +90,7 @@ export default function Toolbar({
   onOpenSlate,
   onOpenStudio,
   onToggleLiveDiagnostics,
+  onToggleInlineCompletion,
   onToggleTypewriterSound,
   onExportFountain,
   onExportFDX,
@@ -396,6 +402,15 @@ export default function Toolbar({
                 pressed={liveDiagnostics}
                 onClick={() => {
                   onToggleLiveDiagnostics();
+                  setOverflowOpen(false);
+                }}
+              />
+              <OverflowItem
+                icon={<Wand2 className="h-3.5 w-3.5" />}
+                label={inlineCompletion ? "Inline copilot on" : "Inline copilot off"}
+                pressed={inlineCompletion}
+                onClick={() => {
+                  onToggleInlineCompletion();
                   setOverflowOpen(false);
                 }}
               />

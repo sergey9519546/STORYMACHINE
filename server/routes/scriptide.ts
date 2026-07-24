@@ -586,8 +586,29 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
   res.json(result);
 }));
 
+// ── Keyless guard for the seven generation-only ScriptIDE routes ───────────
+// The server's front door is analysis-only (no AI key). These routes call the
+// LLM directly, so with no key configured generateContent throws and the route
+// 500s — a NORTH_STAR "honest degradation" violation. Degrade to a labeled
+// response instead (mirrors game.ts interview). Readiness ORs BOTH key sources
+// (see config.ts llmReady — checking only one is a documented trap).
+const KEYLESS_AI_NOTE =
+  'This AI feature needs a model key — add one in Settings to enable it.';
+const llmReady = (): boolean =>
+  Boolean(process.env.GEMINI_API_KEY) || getPublicConfig().keySet;
+
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
+// G0-03: this was the one generation route with no llmReady() guard at all —
+// every other generative route in this file degrades honestly when keyless;
+// this one instead reached generateContentStream() unconditionally, which
+// throws with no key and gets caught by the route's own try/catch as an SSE
+// `{type:'error'}` event after a 200 had already been flushed. Guard before
+// any header is written, matching /api/analyze-script's 503 JSON shape
+// (the other keyless generation routes return 200 + `{usedLLM:false}` since
+// they have a natural non-streaming success shape to degrade into; this
+// SSE route doesn't, so it degrades exactly like analyze-script instead).
 router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
+  if (!llmReady()) { res.status(503).json({ error: KEYLESS_AI_NOTE }); return; }
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -759,17 +780,6 @@ const sessionStyleGenreBlock = (req: import('express').Request): string => {
   const { block } = composePromptModifiers(ill.story_genre, ill.director_style);
   return block ? `\n${block}\n` : '';
 };
-
-// ── Keyless guard for the six generation-only ScriptIDE routes ─────────────
-// The server's front door is analysis-only (no AI key). These routes call the
-// LLM directly, so with no key configured generateContent throws and the route
-// 500s — a NORTH_STAR "honest degradation" violation. Degrade to a labeled
-// response instead (mirrors game.ts interview). Readiness ORs BOTH key sources
-// (see config.ts llmReady — checking only one is a documented trap).
-const KEYLESS_AI_NOTE =
-  'This AI feature needs a model key — add one in Settings to enable it.';
-const llmReady = (): boolean =>
-  Boolean(process.env.GEMINI_API_KEY) || getPublicConfig().keySet;
 
 router.post('/api/scriptide/world-build', aiLimiter, validate(WorldBuildBodySchema), asyncHandler(async (req, res) => {
   if (!llmReady()) { res.json({ result: '', usedLLM: false, note: KEYLESS_AI_NOTE }); return; }

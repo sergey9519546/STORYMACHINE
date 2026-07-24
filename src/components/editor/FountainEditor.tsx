@@ -21,7 +21,7 @@ import { closeBrackets, autocompletion } from '@codemirror/autocomplete';
 
 import { fountainHighlight, fountainTheme } from './fountain-highlight.ts';
 import { screenplayFormat, screenplayFormatTheme } from './screenplay-format.ts';
-import { inlineComplete, CompletionContext } from './inline-complete.ts';
+import { inlineCompletionExtension, CompletionContext } from './inline-complete.ts';
 import { fountainKeymap } from './fountain-keymap.ts';
 import { screenplayComplete } from './screenplay-complete.ts';
 import { createCollabSession, CollabSession } from './collab.ts';
@@ -41,6 +41,13 @@ export interface FountainEditorProps {
   onChange: (value: string) => void;
   characters?: string[];
   completionCtx?: CompletionContext;
+  /**
+   * G0-03: inline AI ghost-text completion (Tab/Ctrl-Right accept), off by
+   * default — a writer drafting a first pass didn't ask for a provider call
+   * on every debounced keystroke. Same off-by-default idiom as
+   * `liveDiagnostics` below (ScriptIDE/Toolbar "Copilot" toggle).
+   */
+  inlineCompletionEnabled?: boolean;
   isDarkMode?: boolean;
   placeholder?: string;
   className?: string;
@@ -158,6 +165,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       onChange,
       characters = [],
       completionCtx = {},
+      inlineCompletionEnabled = false,
       isDarkMode = false,
       placeholder: placeholderText = 'INT. STUDIO - DAY\n\nStart typing your script here...',
       className = '',
@@ -218,11 +226,14 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     }));
 
     // ── Build the inline completion extension with fresh context ──────────────
+    // G0-03: gated through inlineCompletionExtension() — enabled=false (the
+    // default) returns [] so the trigger plugin (debounced fetch to
+    // /api/scriptide/complete) is never mounted into the compartment at all.
     const completionExt = useMemo(
-      () => inlineComplete(completionCtx),
-      // Re-create when context keys change
+      () => inlineCompletionExtension(inlineCompletionEnabled, completionCtx),
+      // Re-create when context keys or the enabled flag change
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [completionCtx?.directorStyle, completionCtx?.genre, completionCtx?.persona, JSON.stringify(completionCtx?.characters)],
+      [inlineCompletionEnabled, completionCtx?.directorStyle, completionCtx?.genre, completionCtx?.persona, JSON.stringify(completionCtx?.characters)],
     );
 
     // ── Create EditorView once on mount ──────────────────────────────────────
