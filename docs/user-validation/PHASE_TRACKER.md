@@ -53,13 +53,43 @@ default-OFF stubs. `npx tsx server.ts` now boots keyless and serves
 `GET /api/ai-config` → `200` (`llmReady:false`). See the "Blocker root cause
 found and fixed" section in `P0_EVIDENCE_SUMMARY.md` for verification detail.
 
-**Still required before fielding:** the operating kit's full pre-session smoke
-check must be run and certified against a clean boot — sample flow renders end
-to end, no CodeMirror update crash, `/api/analyze-script` and coverage return
-non-error responses. The earlier CodeMirror crash / 503 was seen on a stale
-`commit: dev` instance and has not been re-verified post-fix. Do not begin
-participant sessions until that certification is recorded here and in
-`P0_EVIDENCE_SUMMARY.md`.
+**API-level smoke: CERTIFIED (2026-07-23, commit `c5749b9`, isolated sandbox
+re-clone — not the persistent dev instance).** Server booted keyless
+(`PORT=<isolated> node_modules/.bin/tsx server.ts`, no `GEMINI_API_KEY`);
+built-in sample script (`src/lib/sample-script.ts`, "The Second Key") POSTed
+verbatim to every route the live sample flow actually calls:
+
+| Route | Status | Result |
+|---|---|---|
+| `GET /api/ai-config` | 200 | `llmReady:false` — analysis-only front door confirmed |
+| `POST /api/scriptide/doctor` (`ScriptDoctorPanel.tsx`'s live report call) | 200 | health 68.9, grade "solid", totalIssues 200 |
+| `POST /api/scriptide/diagnose` | 200 | health 68.9, verdict CONSIDER, sceneCount 14 |
+| `POST /api/export/coverage` | 200 | 210,208 bytes — byte-identical size to the committed `sample-coverage-report.html` |
+| `POST /api/analyze-script` (opt-in idle AI, off by default per G0-04) | 503 | clean honest-degradation body — correct keyless behavior, not a crash |
+| `npm run build` | — | clean, 2294 modules, 3.63s, 0 errors |
+
+The live doctor route's health/verdict/scene-count (68.9 / CONSIDER / 14) match
+the committed static stimulus's provenance table exactly — the static report
+and the live in-app report are confirmed consistent on this commit. The
+previously-flagged CodeMirror synchronous-dispatch crash cause is fixed in
+source at HEAD: `src/components/editor/inline-complete.ts` now defers the
+dismiss-dispatch via `setTimeout(..., 0)`, with an inline comment recording the
+prior crash cause.
+
+**Still open — browser DOM smoke not certified.** The checks above ran in a
+headless sandbox with no display and no Playwright install (verified: not a
+dependency, no cached browser binaries). They prove every endpoint the live
+flow calls returns correct data and that the frontend compiles cleanly — they
+do not prove the actual StartScreen → load-sample → editor-renders →
+ScriptDoctorPanel-renders click-through is crash-free in a real browser.
+**Static-report-only sessions may proceed now** (the operating kit's stimulus
+note already supports this exposure mode and this evidence confirms the static
+artifact is live-consistent). **Before the first LIVE-FLOW session**, someone
+on a machine with a browser must do one manual click-through of `npm run dev`
+→ StartScreen → "Try the sample script" → confirm the Script Doctor report
+renders with zero browser console errors, and record that check here and in
+`P0_EVIDENCE_SUMMARY.md`. That manual check is the only remaining fielding
+blocker, and only for live-flow (not static-report) sessions.
 
 ## Allowed now
 
@@ -98,9 +128,9 @@ No decisions have been made.
 | Field | Value |
 |---|---|
 | Tracker status | Status-only |
-| Last reviewed | Not yet reviewed |
-| Reviewed by | Not assigned |
-| Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` — PLANNED, 0 sessions |
+| Last reviewed | 2026-07-23 — API-level pre-session smoke certified on commit `c5749b9` (server boot, `/api/scriptide/doctor`, `/api/scriptide/diagnose`, `/api/export/coverage`, `/api/analyze-script` degradation, `npm run build`); browser-DOM click-through still open, see "Current fielding blocker" |
+| Reviewed by | Agent session (sandboxed, no browser available) |
+| Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` — PLANNED, 0 sessions, static-report sessions unblocked |
 | Session artifact directory | `docs/user-validation/sessions/` — empty (`.gitkeep` only) |
 | Canonical source | `ROADMAP.md` §3 |
-| Next review trigger | First documented session, any counter/status change, or a formal P0 gate review |
+| Next review trigger | Manual browser click-through certification, first documented session, any counter/status change, or a formal P0 gate review |

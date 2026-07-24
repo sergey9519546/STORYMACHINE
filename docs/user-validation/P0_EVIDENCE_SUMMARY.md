@@ -4,17 +4,17 @@
 
 **PLANNED**
 
-- Study status: **PLANNED — FIELDING BLOCKED BY PRE-SESSION SMOKE**
+- Study status: **PLANNED — STATIC-REPORT SESSIONS UNBLOCKED; LIVE-FLOW SESSIONS PENDING ONE MANUAL BROWSER CHECK**
 - Study dates: **Not started**
-- Intended stimulus commit SHA: `e7b9a946510da21f2cab4b8b3eaa8621e76e9cf1`
-- Certified stimulus commit SHA: **None — exact-commit keyless instance did not bind a port in this environment**
+- Intended stimulus commit SHA: `e7b9a946510da21f2cab4b8b3eaa8621e76e9cf1` (superseded — main has advanced; see certified SHA below)
+- Certified stimulus commit SHA (API-level only): **`c5749b9`** — exact-commit keyless instance boots and every live-flow route returns correct data; browser-DOM click-through still uncertified (no display/Playwright in the verifying sandbox)
 - Provisional UI inspection: an older local instance (`/health` reported `commit: dev`) reached StartScreen and rendered sample coverage, but is not an authorized study stimulus
 - Recruited / scheduled / completed / valid / fully documented: **0 / 0 / 0 / 0 / 0**
 - Required valid documented sessions: **>=5**
 - Decision: **INCONCLUSIVE (placeholder; no sessions completed)**
 - P0 gate: **NOT MET**
 
-No participants or sessions are represented in this document yet. Recruitment and scheduling may proceed, but no validation session may begin until an exact-commit keyless instance passes the operating kit's pre-session smoke check. Current blocker evidence: supported `npm run dev`, `npx tsx server.ts`, `node --import tsx server.ts`, and absolute-entry invocations exited 0 without binding the requested isolated port; the already-running `commit: dev` instance logged a CodeMirror update crash and `503` responses from `/api/analyze-script` during provisional inspection.
+No participants or sessions are represented in this document yet. Recruitment and scheduling may proceed. **Static-report-only sessions may now begin** on the strength of the API-level certification below (commit `c5749b9`), which confirms the committed static stimulus matches the live pipeline byte-for-byte in health/verdict/scene-count. **Live-flow sessions** (interactive editor, not just the static report) still require the one manual browser click-through described below before fielding. Historical blocker evidence (superseded, kept for the record): supported `npm run dev`, `npx tsx server.ts`, `node --import tsx server.ts`, and absolute-entry invocations exited 0 without binding the requested isolated port; the already-running `commit: dev` instance logged a CodeMirror update crash and `503` responses from `/api/analyze-script` during provisional inspection. Root cause and fix below; the fix is confirmed present at `c5749b9`.
 
 ### Blocker root cause found and fixed (2026-07-15)
 
@@ -42,11 +42,53 @@ inert unless explicitly enabled via env). Verified after the fix:
   V5Integration-layer logic assertions — none involve the stub modules).
 - `tsc --noEmit` error count fell from 255 to 240.
 
-**Caveat:** this clears the *boot* blocker. The operating kit's full
-pre-session smoke check (exact-commit keyless instance, sample flow renders,
-no console crashes) must still be run and certified before fielding. The
-CodeMirror update crash noted above was observed on a stale `commit: dev`
-instance and has not been re-verified against a clean boot.
+**Caveat (resolved 2026-07-23, see below):** this clears the *boot* blocker.
+The operating kit's API-level pre-session smoke has since been run and
+certified against a clean boot on commit `c5749b9`; only the browser-DOM
+portion (actual click-through, console-error check) remains uncertified —
+see "API-level smoke certified" below.
+
+### API-level smoke certified (2026-07-23, commit `c5749b9`)
+
+Run in an isolated sandbox re-clone of the repository (not the persistent dev
+instance), server booted keyless (`node_modules/.bin/tsx server.ts`, no
+`GEMINI_API_KEY` set, isolated port), built-in sample script
+(`src/lib/sample-script.ts`, "The Second Key", 3,880 chars) POSTed verbatim to
+every route the live sample flow actually calls:
+
+| Route | Status | Result |
+|---|---|---|
+| `GET /api/ai-config` | 200 | `llmReady:false` — analysis-only front door confirmed |
+| `POST /api/scriptide/doctor` (`ScriptDoctorPanel.tsx`'s live report call) | 200 | health 68.9, grade "solid", totalIssues 200 |
+| `POST /api/scriptide/diagnose` | 200 | health 68.9, verdict CONSIDER, sceneCount 14 |
+| `POST /api/export/coverage` | 200 | 210,208 bytes — byte-identical size to the committed `sample-coverage-report.html` |
+| `POST /api/analyze-script` (opt-in idle AI, off by default per G0-04) | 503 | clean honest-degradation body (`"This AI feature needs a model key — add one in Settings to enable it."`) — correct keyless behavior, not a crash |
+| `npm run build` | — | clean, 2294 modules transformed, 3.63s, 0 errors |
+
+The live `/api/scriptide/doctor` route's health/verdict/scene-count
+(68.9 / CONSIDER / 14) match this document's static-stimulus provenance table
+below exactly, confirming the static report and the live in-app report are
+consistent on this commit. Source inspection also confirms the previously
+diagnosed CodeMirror crash cause is fixed at HEAD:
+`src/components/editor/inline-complete.ts`'s trigger plugin now defers its
+dismiss-dispatch via `setTimeout(..., 0)` (comment: "dispatching synchronously
+from a plugin update crashes") instead of calling `view.dispatch()`
+synchronously inside the ViewPlugin `update()` lifecycle method.
+
+**What this does NOT certify:** the sandbox used has no display and no
+Playwright/browser install (verified absent — not a dependency, no cached
+browser binaries), so no actual browser rendered StartScreen, the CodeMirror
+editor, or the ScriptDoctorPanel. The table above proves every endpoint the
+live flow depends on returns correct, reproducible data and that the frontend
+builds cleanly; it does not replace an actual click-through. **Static-report-
+only P0 sessions may proceed now** — the operating kit's own stimulus note
+already permits this exposure mode, and this evidence confirms the static
+artifact matches the live pipeline. **Before the first LIVE-FLOW session**,
+someone with a browser must run `npm run dev`, click StartScreen → "Try the
+sample script", confirm the report renders with zero console errors, and
+record that check here and in `PHASE_TRACKER.md`. That single manual check is
+the only remaining fielding blocker, and it blocks only live-flow (not
+static-report) sessions.
 
 ## Core question and exit gate
 
