@@ -29,6 +29,8 @@ import {
   type ScriptIDEDraftState,
   type ScriptIDEServerSnapshot,
 } from "../lib/scriptide-draft-store";
+import { decideSampleInstall } from "../lib/sample-install-guard";
+import { fountain as sampleScriptFountain } from "../lib/sample-script";
 import {
   AlertCircle,
   Loader2,
@@ -288,6 +290,10 @@ export default function ScriptIDE({
   // lets the user land in the editor anyway, with this notice explaining why
   // their file isn't sitting in the draft and pointing at Script Doctor.
   const [fdxImportNotice, setFdxImportNotice] = useState<string | null>(null);
+
+  // G0-01: shown when the sample-coverage handoff is refused because the editor
+  // already holds a draft — the sample is never allowed to clobber real work.
+  const [sampleRefusedNotice, setSampleRefusedNotice] = useState<string | null>(null);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -891,9 +897,23 @@ export default function ScriptIDE({
       const pendingSample = sessionStorage.getItem("sm_sample_pending");
       if (pendingSample) {
         sessionStorage.removeItem("sm_sample_pending");
-        setDoctorAutoSample(true);
+        // G0-01: never let the sample overwrite an existing draft. Only
+        // auto-install into an empty editor; otherwise open Coverage on the
+        // writer's OWN draft and explain why the sample was withheld.
+        const decision = decideSampleInstall({
+          currentDraft: draftRef.current.scriptText,
+          incomingSample: sampleScriptFountain,
+        });
         setTask("coverage");
         setToolSlot("coverage");
+        if (decision.allow) {
+          setDoctorAutoSample(true);
+        } else {
+          setDoctorAutoSample(false);
+          setSampleRefusedNotice(
+            "Sample not loaded — your draft already has content. Coverage is running on your draft. Clear the editor first if you want the sample instead.",
+          );
+        }
       }
     } catch { /* sessionStorage unavailable — notice just never appears */ }
   }, []);
@@ -1399,6 +1419,12 @@ export default function ScriptIDE({
           <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-[var(--sm-ink)] text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
             <span>{fdxImportNotice}</span>
             <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
+          </div>
+        )}
+        {sampleRefusedNotice && (
+          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-[var(--sm-ink)] text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2" role="status" aria-live="polite">
+            <span>{sampleRefusedNotice}</span>
+            <button onClick={() => setSampleRefusedNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
           </div>
         )}
         {saveConflict && (
@@ -2312,6 +2338,18 @@ export default function ScriptIDE({
               autoLoadSample={doctorAutoSample}
               onFreshReport={() => setCoverageStale(false)}
               onLoadSampleIntoEditor={(text) => {
+                // G0-01 defense in depth: refuse to overwrite a non-empty draft
+                // that differs from the sample. The draft stays byte-identical.
+                const decision = decideSampleInstall({
+                  currentDraft: draftRef.current.scriptText,
+                  incomingSample: text,
+                });
+                if (!decision.allow) {
+                  setSampleRefusedNotice(
+                    "Sample not loaded — your draft already has content. Clear the editor first if you want the sample instead.",
+                  );
+                  return;
+                }
                 setScriptText(text);
                 setCoverageStale(false);
                 triggerAnalysis(text);
