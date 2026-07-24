@@ -149,6 +149,33 @@ export function getPublicConfig(): AiRuntimeConfig & {
   };
 }
 
+// ── Readiness (single source of truth) ────────────────────────────────────────
+// `llmReady` is THE readiness signal shared by every route that gates on whether
+// a text-LLM call can actually be served. It must OR every independent key
+// source that wires a text provider at startup — checking only one is a
+// documented trap (a deployment with only the missed source configured shows
+// `llmReady:false` while generation silently works, or vice-versa).
+//
+// Three independent sources wire a text LLM in this codebase:
+//   1. GEMINI_API_KEY  (env → getAI()/GeminiProvider, ai.ts:37-44)
+//   2. OPENROUTER_API_KEY (env → FreeRideProvider, ai.ts:25-34) — the free tier
+//   3. Runtime config:  applyConfig()'s openai-compat path with a stored key
+//      (pub.keySet) OR a keyless local model server with a baseUrl
+//      (Ollama/LM Studio ignore Authorization, so keySet stays false yet the
+//      provider genuinely works) — see wireProviders() above.
+// Note: ai.ts reads these env vars itself at module load; we re-check them here
+// rather than reaching into the provider manager so readiness stays a pure
+// function of configuration (no provider-registration side effects) and stays
+// correct even if module-load order or the manager's API changes.
+export function llmReady(): boolean {
+  const pub = getPublicConfig();
+  const localProviderReady = pub.provider === 'openai-compat' && Boolean(pub.baseUrl);
+  return Boolean(process.env.GEMINI_API_KEY)
+    || Boolean(process.env.OPENROUTER_API_KEY)
+    || pub.keySet
+    || localProviderReady;
+}
+
 const VALID_PROVIDERS: readonly string[]      = ['gemini', 'openai-compat'];
 const VALID_MEDIA_PROVIDERS: readonly string[] = ['gemini', 'openai-compat', 'none'];
 
