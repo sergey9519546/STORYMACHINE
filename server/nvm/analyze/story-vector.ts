@@ -97,7 +97,12 @@ export interface Neighbor {
  *  @param issues - Raw issues from Script Doctor's 14-pass pipeline
  *  @param metadata - Human-readable context for this vector
  *  @returns Normalized StoryVector ready for similarity comparison */
-export function vectorizeFromIssues(
+type VectorizeFromIssuesFn = (
+  issues: TaggedIssue[],
+  metadata: Omit<StoryVector['metadata'], 'timestamp'>
+) => StoryVector;
+
+function vectorizeFromIssuesCore(
   issues: TaggedIssue[],
   metadata: Omit<StoryVector['metadata'], 'timestamp'>
 ): StoryVector {
@@ -125,6 +130,17 @@ export function vectorizeFromIssues(
     },
   };
 }
+
+// `vectorizeFromIssues` is declared as a typed `let` (not `export function`)
+// specifically so it CAN be reassigned below, once, to a wrapper that builds
+// RULE_INDEX on first call — see "Module Initialization" further down. A
+// plain `export function` binding is not reassignable (tsc: "Cannot assign
+// to 'X' because it is a function", TS2630), which is why this used to be
+// patched via `(vectorizeFromIssues as any) = ...`. The `let` binding is
+// still a live ESM export (function/let/const exports are all live
+// bindings), so external behavior — importers always observe the
+// index-building wrapper, never the bare core implementation — is unchanged.
+export let vectorizeFromIssues: VectorizeFromIssuesFn = vectorizeFromIssuesCore;
 
 /** Convenience wrapper: vectorize directly from Fountain text by running
  *  Script Doctor first. This is the high-level entry point for most callers.
@@ -456,9 +472,12 @@ export function resetRuleIndex(): void {
 // adding a new pass) may have incompatible dimensions. For production use,
 // consider freezing RULE_INDEX to a known-good snapshot and versioning it.
 
-// Patch vectorizeFromIssues to build the index on first call
+// Patch vectorizeFromIssues to build the index on first call. `vectorizeFromIssues`
+// is a typed `let` (see its declaration above), so this plain reassignment
+// type-checks with no cast — tsc verifies the wrapper matches
+// VectorizeFromIssuesFn exactly, including the return type.
 const originalVectorizeFromIssues = vectorizeFromIssues;
-(vectorizeFromIssues as any) = function(
+vectorizeFromIssues = function(
   issues: TaggedIssue[],
   metadata: Omit<StoryVector['metadata'], 'timestamp'>
 ): StoryVector {
