@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "title": "The Second Key",
+  "file": "sample-script.fountain",
+  "sha256": "5c6df225f22db6ddf54efe98b59132b83a477d8e3c12b9975c7c50b9fa530cc3",
+  "frozen": "2026-07-24",
+  "note": "Immutable moderator demo corpus. Any change to the live sample requires a new version entry here — tests/core/demo-corpus-freeze.test.ts enforces the match."
+}

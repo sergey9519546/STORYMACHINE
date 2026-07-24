@@ -6,11 +6,16 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RefreshCw, Stethoscope, X, ArrowRight } from "lucide-react";
 import type { ScriptDoctorReport } from "../../../server/nvm/analyze/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
+import { isDraftStale } from "../../lib/coverage-staleness.ts";
 
 interface CoverageSummaryProps {
   fountain: string;
   title?: string;
   autoLoadSample?: boolean;
+  /** G0-02: reads ScriptIDE's live draft generation. Captured when a coverage
+   *  request starts and compared when it resolves so a late response can't
+   *  clear the stale flag or install a sample over edits made during flight. */
+  getDraftGeneration?: () => number;
   onOpenFullReport: () => void;
   onJumpToLine?: (line1Based: number) => void;
   onLoadSampleIntoEditor?: (text: string) => void;
@@ -29,6 +34,7 @@ export default function CoverageSummary({
   fountain,
   title,
   autoLoadSample = false,
+  getDraftGeneration,
   onOpenFullReport,
   onJumpToLine,
   onLoadSampleIntoEditor,
@@ -41,6 +47,15 @@ export default function CoverageSummary({
   const [usingSample, setUsingSample] = useState(false);
   const genRef = useRef(0);
   const sampleFired = useRef(false);
+  // G0-02: false once the panel unmounts (Coverage closed mid-flight), so a
+  // late response can't invoke parent callbacks over a torn-down editor.
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   const run = useCallback(
     async (override?: { fountain: string; title: string; sample?: boolean }) => {
@@ -52,6 +67,9 @@ export default function CoverageSummary({
         return;
       }
       const gen = ++genRef.current;
+      // G0-02: draft version this request is measuring. Compared at resolution
+      // so edits made during flight invalidate the result.
+      const startDraftGen = getDraftGeneration?.() ?? 0;
       setStatus("loading");
       setError(null);
       try {
@@ -77,9 +95,16 @@ export default function CoverageSummary({
         }
         const data = (await res.json()) as ScriptDoctorReport;
         if (gen !== genRef.current) return;
+        // G0-02: Coverage closed mid-flight, or the writer typed during the
+        // request. Show the numbers we computed, but never write back over the
+        // live draft (onLoadSampleIntoEditor) and never clear the stale flag
+        // (onFreshReport) — the parent keeps "coverage outdated" so the writer
+        // is told to re-run against their current draft.
+        const stale = !aliveRef.current || isDraftStale(startDraftGen, getDraftGeneration?.() ?? startDraftGen);
         setReport(data);
         setUsingSample(!!override?.sample);
         setStatus("success");
+        if (stale) return;
         onFreshReport?.();
         if (override?.sample && onLoadSampleIntoEditor) {
           onLoadSampleIntoEditor(override.fountain);
@@ -90,7 +115,7 @@ export default function CoverageSummary({
         setError((e as Error).message || "Coverage failed.");
       }
     },
-    [fountain, title, onFreshReport, onLoadSampleIntoEditor],
+    [fountain, title, onFreshReport, onLoadSampleIntoEditor, getDraftGeneration],
   );
 
   useEffect(() => {
@@ -203,6 +228,34 @@ export default function CoverageSummary({
         )}
 
         {status === "success" && report && (
+          report.analysisComplete === false ? (
+            /* P0.3 / G0-05: one or more diagnostic passes failed. Health/grade
+               sentinels (0 / troubled) are NOT real scores and must not be
+               shown as if they were — mirror ScriptDoctorPanel's withheld read. */
+            <div className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)]">
+              <p className="sm-h text-[var(--sm-stamp)]">Analysis incomplete</p>
+              <p className="mt-2 font-[family-name:var(--sm-font-display)] text-2xl uppercase leading-none text-[var(--sm-ink)]">
+                Score withheld
+              </p>
+              <p className="mt-3 text-sm leading-snug text-[var(--sm-ink-soft)]">
+                {report.plainSummary ||
+                  "One or more diagnostic passes failed. Health, verdict, and percentiles are withheld because the issue count may be artificially low."}
+              </p>
+              {Array.isArray(report.failedPasses) && report.failedPasses.length > 0 && (
+                <p className="sm-slug mt-3">Failed passes: {report.failedPasses.join(", ")}</p>
+              )}
+              <p className="sm-slug mt-2">
+                {report.sceneCount} scene{report.sceneCount === 1 ? "" : "s"} ·{" "}
+                {report.wordCount.toLocaleString()} words · {report.totalIssues} issue
+                {report.totalIssues === 1 ? "" : "s"} observed before failure
+              </p>
+              <div className="mt-4">
+                <button type="button" onClick={onOpenFullReport} className="sm-btn">
+                  Full report
+                </button>
+              </div>
+            </div>
+          ) : (
           <>
             <div className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)]">
               <div className="flex flex-wrap items-end justify-between gap-3">
@@ -285,6 +338,7 @@ export default function CoverageSummary({
               </div>
             )}
           </>
+          )
         )}
 
         {status === "idle" && !report && (

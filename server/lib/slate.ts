@@ -28,6 +28,11 @@ export interface SlateEntry {
   /** Label of the dimension with the lowest score. */
   weakestDimension: string;
   contentHash: string;
+  /** G0-05: false when the underlying report's analysis did not complete (a
+   *  revision pass threw). Its `health` is a sentinel (0) that must NOT be
+   *  presented as a real score — renderers show an "incomplete" badge and
+   *  rankSlate holds it out of the scored ranking. */
+  analysisComplete: boolean;
 }
 
 /** Pick the strongest/weakest of a report's 5 craft dimensions by score.
@@ -65,14 +70,24 @@ export function buildSlateEntry(title: string, report: ScriptDoctorReport, conte
     topDimension: top,
     weakestDimension: weakest,
     contentHash,
+    analysisComplete: report.analysisComplete !== false,
   };
 }
 
 /** Rank entries by health, descending. Array.prototype.sort is stable, so
  *  scripts with equal health keep their submission order rather than being
- *  reshuffled arbitrarily. */
+ *  reshuffled arbitrarily.
+ *
+ *  G0-05: entries whose analysis did not complete carry a sentinel health (0)
+ *  that is NOT a real score, so they must never interleave with scored
+ *  scripts. They are partitioned to the end (keeping submission order among
+ *  themselves) where renderers badge them "incomplete" instead of ranking
+ *  them as the weakest bet. */
 export function rankSlate(entries: SlateEntry[]): SlateEntry[] {
-  return [...entries].sort((a, b) => b.health - a.health);
+  const scored = entries.filter(e => e.analysisComplete !== false);
+  const incomplete = entries.filter(e => e.analysisComplete === false);
+  scored.sort((a, b) => b.health - a.health);
+  return [...scored, ...incomplete];
 }
 
 // ── HTML rendering (comparative table, print-friendly) ───────────────────────
@@ -200,6 +215,24 @@ const STYLES = `
  */
 export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string {
   const rows = entries.map((entry, i) => {
+    // G0-05: incomplete analyses have a sentinel health (0) that is not a real
+    // score — badge them "incomplete" and suppress the derived cells rather
+    // than rendering a health chip, verdict, or rank that reads as scored.
+    if (entry.analysisComplete === false) {
+      return `
+    <tr>
+      <td class="rank-cell">&mdash;</td>
+      <td>${escapeHtml(entry.title)}</td>
+      <td><span class="health-chip" style="background:#52525b;">incomplete</span></td>
+      <td>&mdash;</td>
+      <td class="verdict-cell" style="color:#64748b;">&mdash;</td>
+      <td>${entry.sceneCount.toLocaleString('en-US')}</td>
+      <td>${entry.wordCount.toLocaleString('en-US')}</td>
+      <td>&mdash;</td>
+      <td>&mdash;</td>
+      <td class="hash-cell">${escapeHtml(entry.contentHash.slice(0, 10))}</td>
+    </tr>`;
+    }
     const band = healthBandColor(entry.health);
     const verdictColor = entry.verdict ? VERDICT_COLOR[entry.verdict] ?? '#334155' : '#64748b';
     const percentile = typeof entry.healthPercentile === 'number'

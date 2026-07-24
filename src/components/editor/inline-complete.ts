@@ -15,18 +15,18 @@
 import {
   EditorView,
   Decoration,
-  DecorationSet,
   WidgetType,
   ViewPlugin,
   keymap,
 } from '@codemirror/view';
+import type { DecorationSet } from '@codemirror/view';
 import {
   EditorState,
   StateField,
   StateEffect,
   Transaction,
-  Extension,
 } from '@codemirror/state';
+import type { Extension } from '@codemirror/state';
 import { withSession } from '../../lib/session.ts';
 
 // ── Context passed to the completion endpoint ─────────────────────────────────
@@ -91,7 +91,13 @@ function fetchCompletion(
 
 // ── Ghost text widget ─────────────────────────────────────────────────────────
 class GhostTextWidget extends WidgetType {
-  constructor(readonly text: string) { super(); }
+  // Not a TS parameter-property constructor: node's --experimental-strip-types
+  // "strip-only" mode (used by this repo's `npm test`) can't erase parameter
+  // properties (they have runtime semantics beyond a type annotation), so this
+  // file couldn't be imported by any node:test file at all until this was an
+  // explicit field + assignment instead.
+  readonly text: string;
+  constructor(text: string) { super(); this.text = text; }
 
   toDOM(): HTMLElement {
     const span = document.createElement('span');
@@ -274,6 +280,21 @@ export function inlineComplete(ctx: CompletionContext = {}): Extension {
       { key: 'Escape',      run: dismiss,     preventDefault: false },
     ]),
   ];
+}
+
+// ── G0-03: off-by-default gate ────────────────────────────────────────────────
+// FountainEditor.tsx's completionCompartment is reconfigured with this
+// function's return value (never with inlineComplete() directly) — the same
+// "compute the compartment content from a flag" seam liveDiagnostics already
+// uses for scriptDiagnostics() (`liveDiagnostics ? scriptDiagnostics() : []`
+// in FountainEditor.tsx). `enabled` defaults to false so that a caller who
+// forgets to pass it — or FountainEditor's own `inlineCompletionEnabled = false`
+// prop default — gets an inert (zero-extension) compartment: no
+// createTriggerPlugin, so no debounced GET /api/scriptide/complete is ever
+// possible, regardless of typing. This is a keyless feature (server-side calls
+// an LLM), so it must stay opt-in the same way Live Notes is.
+export function inlineCompletionExtension(enabled: boolean = false, ctx: CompletionContext = {}): Extension {
+  return enabled ? inlineComplete(ctx) : [];
 }
 
 // Expose state accessor for test hooks

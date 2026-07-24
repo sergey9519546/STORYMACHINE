@@ -84,8 +84,8 @@ export default function DesignPreview() {
             <span className="sm-x" style={{ color: '#8f846b' }}>Wave gate</span></div>
           <div className="sm-panel-body">
             <div className="sm-card" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <span style={{ font: "600 9px var(--sm-font-mono)", flex: 1 }}>Degradation AUC</span>
-              <span style={{ font: "700 8px var(--sm-font-mono)", color: 'var(--sm-ok)' }}>0.672 &gt; 0.622 ✓</span>
+              <span style={{ font: "600 9px var(--sm-font-mono)", flex: 1 }}>Render check</span>
+              <span style={{ font: "700 8px var(--sm-font-mono)", color: 'var(--sm-ok)' }}>✓</span>
             </div>
             <div className="sm-bar"><i style={{ width: '67%', background: 'var(--sm-ok)' }} /></div>
             <span className="sm-h" style={{ textAlign: 'center' }}>No LLM in the verdict path</span>

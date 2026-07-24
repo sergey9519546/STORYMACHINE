@@ -17,6 +17,7 @@ import {
   acknowledgeScriptIDESave,
   shouldStartScriptIDESave,
 } from "../lib/scriptide-autosave";
+import { scheduleAutoAnalysis } from "../lib/auto-analysis-gate";
 import {
   applyServerScriptIDEDraft,
   decideScriptIDERestore,
@@ -29,6 +30,8 @@ import {
   type ScriptIDEDraftState,
   type ScriptIDEServerSnapshot,
 } from "../lib/scriptide-draft-store";
+import { decideSampleInstall } from "../lib/sample-install-guard";
+import { fountain as sampleScriptFountain } from "../lib/sample-script";
 import {
   AlertCircle,
   Loader2,
@@ -198,7 +201,7 @@ export default function ScriptIDE({
   // Mobile sidebar drawer: the Sidebar is a permanent 320px column on md+ but
   // slides in as an overlay on < md (see Sidebar.tsx). This toggles that drawer.
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // In-app confirm for "New Story" — replaces window.confirm (QA P1-5: native
+  // In-app confirm for "Change setup" — replaces window.confirm (QA P1-5: native
   // confirms block the thread, are unstyleable, and can't be dismissed by Esc).
   const [newStoryConfirm, setNewStoryConfirm] = useState(false);
   // StartScreen's "Try the sample script" handoff (sessionStorage flag, same
@@ -220,6 +223,21 @@ export default function ScriptIDE({
   // a first pass doesn't want squiggles until they ask for them.
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
+  );
+  // G0-03: inline AI ghost-text completion — off by default, same rationale
+  // as Live Notes above (a keyless-by-default provider feature the writer
+  // has to opt into, not one that fires on every debounced keystroke).
+  const [inlineCompletion, setInlineCompletion] = useState(
+    () => lsGet("inline_completion") === "1"
+  );
+  // G0-04: idle/background AI analysis (triggerAnalysis, fired 2s after the
+  // last keystroke via handleScriptChange below) — off by default. It POSTs
+  // /api/analyze-script, which runs generateContent + image + TTS provider
+  // calls in parallel, so it must stay opt-in the same way Live Notes and
+  // inline completion are. Explicit "Analyze" actions elsewhere still call
+  // triggerAnalysis directly and are unaffected by this flag.
+  const [autoAnalysis, setAutoAnalysis] = useState(
+    () => lsGet("auto_analysis") === "1"
   );
   // Theme preference: atomic local draft + server ScriptIDE_State.is_dark_mode.
   const [isDarkMode, setIsDarkMode] = useState(initialDraft.isDarkMode);
@@ -289,6 +307,10 @@ export default function ScriptIDE({
   // their file isn't sitting in the draft and pointing at Script Doctor.
   const [fdxImportNotice, setFdxImportNotice] = useState<string | null>(null);
 
+  // G0-01: shown when the sample-coverage handoff is refused because the editor
+  // already holds a draft — the sample is never allowed to clobber real work.
+  const [sampleRefusedNotice, setSampleRefusedNotice] = useState<string | null>(null);
+
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<FountainEditorHandle>(null);
@@ -310,6 +332,26 @@ export default function ScriptIDE({
   const draftRef = useRef<ScriptIDEDraftState>({ scriptText, snapshots, characters, researchNotes, isDarkMode });
   const draftEnvelopeRef = useRef(initialDraft);
   const draftGenerationRef = useRef(0);
+  // G0-02: monotonic counter bumped on every draft edit. Coverage / fix
+  // requests capture it at start and compare against the live value before
+  // applying a late result, so a report that predates the writer's current
+  // edits can never be silently written back over them. Distinct from
+  // draftGenerationRef above (that one tracks persistence writes across
+  // scriptText/characters/notes/theme).
+  const draftTextGenRef = useRef(0);
+  // G0-02 gap close: the ONLY sanctioned way to write scriptText. Every real
+  // content mutation — including programmatic ones (server/conflict restore,
+  // sample install, AI write-backs) — must bump draftTextGenRef alongside the
+  // write, or a later stale coverage/fix report can't tell the draft moved
+  // and may silently clobber it. A write-back that was itself already
+  // gen-checked (e.g. ScriptDoctorPanel's onLoadFountain) still CHANGES the
+  // draft afterward, so it must bump too — see coverage-staleness.test.ts's
+  // source-level assertion that no raw setter call for the draft text remains
+  // outside this wrapper.
+  const mutateDraft = useCallback((text: string) => {
+    setScriptText(text);
+    draftTextGenRef.current += 1;
+  }, []);
   const persistedGenerationRef = useRef(initialDraft.dirty ? -1 : 0);
   const persistenceReadyRef = useRef(false);
   const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
@@ -420,7 +462,7 @@ export default function ScriptIDE({
           draftEnvelopeRef.current = cleanEnvelope;
           skipNextLocalWriteRef.current = true;
           persistedGenerationRef.current = draftGenerationRef.current;
-          setScriptText(decision.server.scriptText);
+          mutateDraft(decision.server.scriptText);
           setSnapshots(decision.server.snapshots as { id: string; name: string; text: string; date: string }[]);
           setCharacters(decision.server.characters as typeof characters);
           setResearchNotes(decision.server.researchNotes as typeof researchNotes);
@@ -572,7 +614,7 @@ export default function ScriptIDE({
   // ── Consume imported Fountain script ────────────────────────────────────────
   useEffect(() => {
     if (!importedScript) return;
-    setScriptText(importedScript);
+    mutateDraft(importedScript);
     setActiveTab("production");
 
     if (importedCharacters && importedCharacters.length > 0) {
@@ -891,9 +933,23 @@ export default function ScriptIDE({
       const pendingSample = sessionStorage.getItem("sm_sample_pending");
       if (pendingSample) {
         sessionStorage.removeItem("sm_sample_pending");
-        setDoctorAutoSample(true);
+        // G0-01: never let the sample overwrite an existing draft. Only
+        // auto-install into an empty editor; otherwise open Coverage on the
+        // writer's OWN draft and explain why the sample was withheld.
+        const decision = decideSampleInstall({
+          currentDraft: draftRef.current.scriptText,
+          incomingSample: sampleScriptFountain,
+        });
         setTask("coverage");
         setToolSlot("coverage");
+        if (decision.allow) {
+          setDoctorAutoSample(true);
+        } else {
+          setDoctorAutoSample(false);
+          setSampleRefusedNotice(
+            "Sample not loaded — your draft already has content. Coverage is running on your draft. Clear the editor first if you want the sample instead.",
+          );
+        }
       }
     } catch { /* sessionStorage unavailable — notice just never appears */ }
   }, []);
@@ -906,6 +962,16 @@ export default function ScriptIDE({
   useEffect(() => {
     lsSet("live_diagnostics", liveDiagnostics ? "1" : "0");
   }, [liveDiagnostics]);
+
+  // Persist the inline-completion toggle the same way (G0-03).
+  useEffect(() => {
+    lsSet("inline_completion", inlineCompletion ? "1" : "0");
+  }, [inlineCompletion]);
+
+  // Persist the auto-analysis toggle the same way (G0-04).
+  useEffect(() => {
+    lsSet("auto_analysis", autoAnalysis ? "1" : "0");
+  }, [autoAnalysis]);
 
   // Dismissing the keyless-readiness banner is remembered per-app (finding E
   // asks for "dismissible, non-nagging" — StoryMachine.tsx tracks its own key
@@ -990,14 +1056,23 @@ export default function ScriptIDE({
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // G0-02: stable live-generation reader handed to Coverage / Script Doctor so
+  // their async callbacks compare against the CURRENT draft version, not a
+  // stale closure captured when the request was fired.
+  const getDraftGeneration = useCallback(() => draftTextGenRef.current, []);
+
   const handleScriptChange = (text: string) => {
-    setScriptText(text);
+    mutateDraft(text); // G0-02: draft advanced — invalidate in-flight coverage/fixes
     setCoverageStale(true);
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    typingTimeoutRef.current = setTimeout(() => {
+    // G0-04: scheduleAutoAnalysis returns null (schedules nothing) unless
+    // autoAnalysis is explicitly on — default config never fires
+    // triggerAnalysis from typing alone. Explicit "Analyze" actions elsewhere
+    // call triggerAnalysis directly and are unaffected.
+    typingTimeoutRef.current = scheduleAutoAnalysis(autoAnalysis, () => {
       triggerAnalysis(text);
     }, 2000);
   };
@@ -1017,7 +1092,7 @@ export default function ScriptIDE({
     }
 
     const newText = textBefore + insertion + textAfter;
-    setScriptText(newText);
+    mutateDraft(newText);
     setActionModal({ show: false, charName: "", cursor: 0 });
     triggerAnalysis(newText);
 
@@ -1064,7 +1139,7 @@ export default function ScriptIDE({
     const textBefore = scriptText.substring(0, cursor);
     const textAfter = scriptText.substring(cursor);
     const newText = `${textBefore}\n${suggestion}\n${textAfter}`;
-    setScriptText(newText);
+    mutateDraft(newText);
     triggerAnalysis(newText);
   };
 
@@ -1163,7 +1238,7 @@ export default function ScriptIDE({
       const updatedBlocks = [...blocks];
       updatedBlocks[index] = { ...updatedBlocks[index], text: newText };
       const newScript = updatedBlocks.map((b) => b.text).join("\n");
-      setScriptText(newScript);
+      mutateDraft(newScript);
       triggerAnalysis(newScript);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
@@ -1245,7 +1320,7 @@ export default function ScriptIDE({
   };
 
   const confirmRestore = () => {
-    setScriptText(restoreModal.text);
+    mutateDraft(restoreModal.text);
     triggerAnalysis(restoreModal.text);
     setRestoreModal({ open: false, text: "" });
   };
@@ -1285,7 +1360,7 @@ export default function ScriptIDE({
     persistedGenerationRef.current = draftGenerationRef.current;
     saveConflictRef.current = null;
     setSaveConflict(null);
-    setScriptText(server.scriptText);
+    mutateDraft(server.scriptText);
     setSnapshots(server.snapshots as typeof snapshots);
     setCharacters(server.characters as typeof characters);
     setResearchNotes(server.researchNotes as typeof researchNotes);
@@ -1401,6 +1476,12 @@ export default function ScriptIDE({
             <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
           </div>
         )}
+        {sampleRefusedNotice && (
+          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-[var(--sm-ink)] text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2" role="status" aria-live="polite">
+            <span>{sampleRefusedNotice}</span>
+            <button onClick={() => setSampleRefusedNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
+          </div>
+        )}
         {saveConflict && (
           <div
             className="z-30 flex flex-wrap items-center gap-3 border-b-[2px] border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 px-4 py-3 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]"
@@ -1442,6 +1523,8 @@ export default function ScriptIDE({
           isAnalyzing={engineState.isAnalyzing}
           directorsLayer={directorsLayer}
           liveDiagnostics={liveDiagnostics}
+          inlineCompletion={inlineCompletion}
+          autoAnalysis={autoAnalysis}
           wordCount={stats.wordCount}
           pageCount={pageCount}
           isTypewriterSound={isTypewriterSound}
@@ -1454,6 +1537,8 @@ export default function ScriptIDE({
           onOpenSlate={() => openToolSlot("slate")}
           onOpenStudio={() => openToolSlot("studio")}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
+          onToggleInlineCompletion={() => setInlineCompletion((prev) => !prev)}
+          onToggleAutoAnalysis={() => setAutoAnalysis((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound((prev) => {
               lsSet("typewriter_sound", prev ? "off" : "on");
@@ -1697,6 +1782,7 @@ export default function ScriptIDE({
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
+            inlineCompletionEnabled={inlineCompletion}
           />
 
           {/* Page furniture — quiet manuscript metadata in the right gutter */}
@@ -1817,7 +1903,7 @@ export default function ScriptIDE({
         </div>
       </div>
 
-      {/* New Story confirm modal — replaces window.confirm (QA P1-5). */}
+      {/* Change-setup confirm modal — replaces window.confirm (QA P1-5). */}
       <AnimatePresence>
         {newStoryConfirm && (
           <motion.div
@@ -1835,7 +1921,7 @@ export default function ScriptIDE({
               className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full mx-4"
             >
               <h2 id="new-story-confirm-title" className="font-bold uppercase tracking-widest text-lg mb-3 border-b-4 border-black pb-2">
-                Start a new story?
+                Change setup?
               </h2>
               <p className="text-sm font-mono mb-5 text-gray-700">
                 This returns you to the setup wizard — your current draft stays saved.
@@ -1851,7 +1937,7 @@ export default function ScriptIDE({
                   onClick={() => { setNewStoryConfirm(false); onNewStory?.(); }}
                   className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
                 >
-                  New Story
+                  Change setup
                 </button>
               </div>
             </motion.div>
@@ -2310,9 +2396,22 @@ export default function ScriptIDE({
               fountain={scriptText}
               title={titlePage.title}
               autoLoadSample={doctorAutoSample}
+              getDraftGeneration={getDraftGeneration}
               onFreshReport={() => setCoverageStale(false)}
               onLoadSampleIntoEditor={(text) => {
-                setScriptText(text);
+                // G0-01 defense in depth: refuse to overwrite a non-empty draft
+                // that differs from the sample. The draft stays byte-identical.
+                const decision = decideSampleInstall({
+                  currentDraft: draftRef.current.scriptText,
+                  incomingSample: text,
+                });
+                if (!decision.allow) {
+                  setSampleRefusedNotice(
+                    "Sample not loaded — your draft already has content. Clear the editor first if you want the sample instead.",
+                  );
+                  return;
+                }
+                mutateDraft(text);
                 setCoverageStale(false);
                 triggerAnalysis(text);
               }}
@@ -2336,8 +2435,9 @@ export default function ScriptIDE({
           <Suspense fallback={<DrawerPanelFallback />}><ScriptDoctorPanel
             fountain={scriptText}
             title={titlePage.title}
+            getDraftGeneration={getDraftGeneration}
             onLoadFountain={(text) => {
-              setScriptText(text);
+              mutateDraft(text);
               setCoverageStale(false);
               triggerAnalysis(text);
             }}

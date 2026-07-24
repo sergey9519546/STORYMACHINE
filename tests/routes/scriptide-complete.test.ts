@@ -34,8 +34,18 @@ const PREFIX = 'INT. QUIET HOUSE - NIGHT\nA woman studies a photograph in silenc
 describe('routes/scriptide — GET /api/scriptide/complete genre/directorStyle composition', async () => {
   let server: TestServer;
   let capturedContents: string | undefined;
+  // G0-03: the route now guards on llmReady() (server/routes/scriptide.ts)
+  // before ever reaching the provider — setLLMProvider's mock alone (below)
+  // no longer makes the route "ready", since llmReady() checks the key
+  // sources (env GEMINI_API_KEY / ai-config.ts's multi-provider config), not
+  // whether ai.ts's provider seam has been swapped. This suite's actual
+  // subject is genre/directorStyle prompt composition, which only runs once
+  // the guard is satisfied, so set a dummy key for its duration (restored in
+  // `after`) the same way the mocked provider below is installed/reset.
+  const prevGeminiKey = process.env.GEMINI_API_KEY;
 
   before(async () => {
+    process.env.GEMINI_API_KEY = 'test-key-for-genre-style-composition';
     server = await startTestServer();
     setLLMProvider({
       generate: async (params: GenerateContentParameters) => {
@@ -46,6 +56,8 @@ describe('routes/scriptide — GET /api/scriptide/complete genre/directorStyle c
   });
   after(async () => {
     resetLLMProvider();
+    if (prevGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = prevGeminiKey;
     await server.close();
   });
 
