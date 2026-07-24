@@ -339,6 +339,19 @@ export default function ScriptIDE({
   // draftGenerationRef above (that one tracks persistence writes across
   // scriptText/characters/notes/theme).
   const draftTextGenRef = useRef(0);
+  // G0-02 gap close: the ONLY sanctioned way to write scriptText. Every real
+  // content mutation — including programmatic ones (server/conflict restore,
+  // sample install, AI write-backs) — must bump draftTextGenRef alongside the
+  // write, or a later stale coverage/fix report can't tell the draft moved
+  // and may silently clobber it. A write-back that was itself already
+  // gen-checked (e.g. ScriptDoctorPanel's onLoadFountain) still CHANGES the
+  // draft afterward, so it must bump too — see coverage-staleness.test.ts's
+  // source-level assertion that no raw setter call for the draft text remains
+  // outside this wrapper.
+  const mutateDraft = useCallback((text: string) => {
+    setScriptText(text);
+    draftTextGenRef.current += 1;
+  }, []);
   const persistedGenerationRef = useRef(initialDraft.dirty ? -1 : 0);
   const persistenceReadyRef = useRef(false);
   const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
@@ -449,7 +462,7 @@ export default function ScriptIDE({
           draftEnvelopeRef.current = cleanEnvelope;
           skipNextLocalWriteRef.current = true;
           persistedGenerationRef.current = draftGenerationRef.current;
-          setScriptText(decision.server.scriptText);
+          mutateDraft(decision.server.scriptText);
           setSnapshots(decision.server.snapshots as { id: string; name: string; text: string; date: string }[]);
           setCharacters(decision.server.characters as typeof characters);
           setResearchNotes(decision.server.researchNotes as typeof researchNotes);
@@ -601,7 +614,7 @@ export default function ScriptIDE({
   // ── Consume imported Fountain script ────────────────────────────────────────
   useEffect(() => {
     if (!importedScript) return;
-    setScriptText(importedScript);
+    mutateDraft(importedScript);
     setActiveTab("production");
 
     if (importedCharacters && importedCharacters.length > 0) {
@@ -1049,9 +1062,8 @@ export default function ScriptIDE({
   const getDraftGeneration = useCallback(() => draftTextGenRef.current, []);
 
   const handleScriptChange = (text: string) => {
-    setScriptText(text);
+    mutateDraft(text); // G0-02: draft advanced — invalidate in-flight coverage/fixes
     setCoverageStale(true);
-    draftTextGenRef.current += 1; // G0-02: draft advanced — invalidate in-flight coverage/fixes
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -1080,7 +1092,7 @@ export default function ScriptIDE({
     }
 
     const newText = textBefore + insertion + textAfter;
-    setScriptText(newText);
+    mutateDraft(newText);
     setActionModal({ show: false, charName: "", cursor: 0 });
     triggerAnalysis(newText);
 
@@ -1127,7 +1139,7 @@ export default function ScriptIDE({
     const textBefore = scriptText.substring(0, cursor);
     const textAfter = scriptText.substring(cursor);
     const newText = `${textBefore}\n${suggestion}\n${textAfter}`;
-    setScriptText(newText);
+    mutateDraft(newText);
     triggerAnalysis(newText);
   };
 
@@ -1226,7 +1238,7 @@ export default function ScriptIDE({
       const updatedBlocks = [...blocks];
       updatedBlocks[index] = { ...updatedBlocks[index], text: newText };
       const newScript = updatedBlocks.map((b) => b.text).join("\n");
-      setScriptText(newScript);
+      mutateDraft(newScript);
       triggerAnalysis(newScript);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
@@ -1308,7 +1320,7 @@ export default function ScriptIDE({
   };
 
   const confirmRestore = () => {
-    setScriptText(restoreModal.text);
+    mutateDraft(restoreModal.text);
     triggerAnalysis(restoreModal.text);
     setRestoreModal({ open: false, text: "" });
   };
@@ -1348,7 +1360,7 @@ export default function ScriptIDE({
     persistedGenerationRef.current = draftGenerationRef.current;
     saveConflictRef.current = null;
     setSaveConflict(null);
-    setScriptText(server.scriptText);
+    mutateDraft(server.scriptText);
     setSnapshots(server.snapshots as typeof snapshots);
     setCharacters(server.characters as typeof characters);
     setResearchNotes(server.researchNotes as typeof researchNotes);
@@ -2399,7 +2411,7 @@ export default function ScriptIDE({
                   );
                   return;
                 }
-                setScriptText(text);
+                mutateDraft(text);
                 setCoverageStale(false);
                 triggerAnalysis(text);
               }}
@@ -2425,7 +2437,7 @@ export default function ScriptIDE({
             title={titlePage.title}
             getDraftGeneration={getDraftGeneration}
             onLoadFountain={(text) => {
-              setScriptText(text);
+              mutateDraft(text);
               setCoverageStale(false);
               triggerAnalysis(text);
             }}

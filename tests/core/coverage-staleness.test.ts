@@ -11,7 +11,13 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { isDraftStale, decideWriteBack } from "../../src/lib/coverage-staleness.ts";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const read = (rel: string) => readFileSync(resolve(__dirname, rel), "utf8");
 
 describe("coverage-staleness (G0-02 writer safety)", () => {
   it("flags a draft as stale when it advanced during a request's flight", () => {
@@ -38,5 +44,50 @@ describe("coverage-staleness (G0-02 writer safety)", () => {
   it("treats any generation drift, forward or backward, as a mismatch", () => {
     assert.equal(decideWriteBack(5, 4).allow, false);
     assert.equal(decideWriteBack(4, 5).allow, false);
+  });
+});
+
+// KNOWN GAP CLOSE: draftTextGenRef (the counter these helpers key off of) was
+// bumped ONLY in handleScriptChange. Every other path that mutates the draft
+// (submitActionModal, handleApplySuggestion, snapshot restore, fdx/converted-
+// fountain load, the sample-install callback, server-conflict resolution...)
+// called setScriptText directly and left the counter untouched, so a Script
+// Doctor report was not marked stale after e.g. an action-modal insert. Fix:
+// every mutation routes through a single mutateDraft(text) wrapper that both
+// writes the draft and bumps the counter. These are source-level assertions
+// (this repo's sanctioned pattern for component logic — no React render
+// harness) rather than a render test.
+describe("G0-02 gap close — every ScriptIDE draft mutation bumps draftTextGenRef", () => {
+  const scriptIde = read("../../src/components/ScriptIDE.tsx");
+
+  it("defines a single mutateDraft wrapper that writes the draft and bumps draftTextGenRef together", () => {
+    assert.match(
+      scriptIde,
+      /const mutateDraft = useCallback\(\(text: string\) => \{[\s\S]{0,200}?setScriptText\(text\);[\s\S]{0,200}?draftTextGenRef\.current \+= 1;[\s\S]{0,200}?\}, \[\]\);/,
+      "ScriptIDE.tsx must define a mutateDraft(text) wrapper that both calls setScriptText(text) and bumps draftTextGenRef.current",
+    );
+  });
+
+  it("has no raw setScriptText( call site left in ScriptIDE.tsx outside the mutateDraft wrapper (or an explicitly exempt comment)", () => {
+    // Strip the wrapper's own internal call (the one legitimate raw usage),
+    // then any site explicitly marked exempt via a same-line/prior-line
+    // "G0-02-STALENESS-EXEMPT" comment, then assert nothing raw remains. A
+    // raw setScriptText( bypasses the staleness counter entirely, letting a
+    // later-resolving stale coverage/fix report silently write back over a
+    // draft that was mutated through that uncounted path.
+    const withoutWrapperDef = scriptIde.replace(
+      /const mutateDraft = useCallback\(\(text: string\) => \{[\s\S]{0,400}?\}, \[\]\);/,
+      "",
+    );
+    const withoutExemptSites = withoutWrapperDef.replace(
+      /\/\/[^\n]*G0-02-STALENESS-EXEMPT[^\n]*\n[^\n]*setScriptText\(/g,
+      "",
+    );
+    const rawCallSites = withoutExemptSites.match(/\bsetScriptText\(/g) ?? [];
+    assert.equal(
+      rawCallSites.length,
+      0,
+      `found ${rawCallSites.length} raw setScriptText( call site(s) in ScriptIDE.tsx outside mutateDraft — route through mutateDraft(text) so draftTextGenRef stays authoritative`,
+    );
   });
 });
