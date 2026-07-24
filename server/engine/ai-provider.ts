@@ -5,7 +5,13 @@
  * Phase 1: FreeRide integration with OpenRouter free models
  */
 
-import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
+import { FinishReason } from '@google/genai';
+import type {
+  Candidate,
+  GenerateContentParameters,
+  GenerateContentResponse,
+  GenerateContentResponseUsageMetadata,
+} from '@google/genai';
 import { logger } from '../lib/logger.ts';
 
 // ─────────────────────────────────────────────────────────────────
@@ -46,6 +52,71 @@ function extractTextFromContents(contents: any): string {
   }
   
   return parts.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// OpenRouter → Gemini response-shape bridge
+// ─────────────────────────────────────────────────────────────────
+//
+// FreeRideProvider talks to OpenRouter's OpenAI-shaped chat-completions API
+// but must return the Gemini `GenerateContentResponse` shape so callers
+// (server/engine/ai.ts, server/nvm/generate/llm-generator.ts, etc.) can treat
+// every provider uniformly. Building that bridge object runs into a real
+// typing wall: `GenerateContentResponse` is a CLASS, not a plain interface —
+// `.text`, `.data`, `.functionCalls`, `.executableCode`, and
+// `.codeExecutionResult` are all computed getters on it, and TypeScript
+// treats every one of those getters as a required member of the type. A
+// plain object literal can never structurally satisfy `GenerateContentResponse`
+// (confirmed: assigning `{candidates, usageMetadata}` straight to a
+// `GenerateContentResponse`-typed variable fails with "missing the following
+// properties ... text, data, functionCalls, executableCode,
+// codeExecutionResult").
+//
+// The alternative that WOULD satisfy the type with zero cast —
+// `Object.assign(new GenerateContentResponse(), { candidates, usageMetadata })`
+// — was deliberately rejected: `GenerateContentResponse` has no declared
+// constructor (implicit no-arg `new` works), so this compiles, but it
+// produces a REAL instance whose `.text` getter actually computes a value
+// from `candidates[0].content.parts[...]`. Every current consumer of a
+// FreeRide-bridged response reads `.text` with a fallback — e.g.
+// `response.text ?? '{}'` in server/engine/agent/memory.ts and decision.ts,
+// `response.text ?? ''` in server/routes/scriptide.ts and game.ts — and
+// today that top-level getter is simply absent (this bridge only ever sets
+// `candidates`/`usageMetadata`, never a top-level `text`), so `.text` is
+// always `undefined` and every caller's fallback always fires. Constructing
+// a real instance would make `.text` start resolving to the actual model
+// output instead of the fallback — a genuine runtime behavior change, which
+// is explicitly out of scope for this type-only hardening.
+//
+// So: the fields this bridge actually builds are precisely typed below using
+// the real @google/genai field types (`Candidate`,
+// `GenerateContentResponseUsageMetadata`), which lets tsc catch shape errors
+// (wrong field names, wrong `finishReason` enum member, etc.) at both call
+// sites. `toGeminiResponse()` is the ONE remaining escape hatch — a single,
+// well-commented `as unknown as GenerateContentResponse` — instead of the
+// two silent `as any as GenerateContentResponse` casts this replaces.
+// Runtime shape (no `.text` getter is exercised, `candidates`/`usageMetadata`
+// carry exactly the values passed in) is covered by
+// tests/core/ai-provider-bridge.test.ts.
+
+/** Precisely-typed shape this module ever constructs to bridge an OpenRouter
+ *  chat-completion response into Gemini's response shape. Only `candidates`
+ *  and `usageMetadata` are populated — no bridge site here ever sets any
+ *  other `GenerateContentResponse` field. */
+interface OpenRouterBridgeResponse {
+  candidates: Candidate[];
+  usageMetadata?: GenerateContentResponseUsageMetadata;
+}
+
+/** The single typed choke point for the OpenRouter → Gemini cast. See the
+ *  block comment above for why a plain object can never structurally satisfy
+ *  `GenerateContentResponse` (its getters) and why we don't construct a real
+ *  class instance instead (it would change `.text` behavior for every
+ *  consumer). `body` is fully type-checked against `OpenRouterBridgeResponse`
+ *  at every call site; only the final hand-off to the wider class type needs
+ *  the escape hatch. */
+function toGeminiResponse(body: OpenRouterBridgeResponse): GenerateContentResponse {
+  return body as unknown as GenerateContentResponse;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -128,13 +199,13 @@ export class FreeRideProvider implements AIProvider {
         const text = data.choices?.[0]?.message?.content || '';
         
         // Create a minimal GenerateContentResponse that matches Gemini's structure
-        return {
+        return toGeminiResponse({
           candidates: [{
             content: {
               parts: [{ text }],
               role: 'model',
             },
-            finishReason: 'STOP',
+            finishReason: FinishReason.STOP,
             safetyRatings: [],
           }],
           usageMetadata: {
@@ -142,7 +213,7 @@ export class FreeRideProvider implements AIProvider {
             candidatesTokenCount: data.usage?.completion_tokens || 0,
             totalTokenCount: data.usage?.total_tokens || 0,
           },
-        } as any as GenerateContentResponse;
+        });
       } catch (error) {
         logger.error('openrouter_model_error', { 
           model, 
@@ -212,16 +283,16 @@ export class FreeRideProvider implements AIProvider {
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               // Convert to Gemini-style streaming response
-              yield {
+              yield toGeminiResponse({
                 candidates: [{
                   content: {
                     parts: [{ text: content }],
                     role: 'model',
                   },
-                  finishReason: 'STOP',
+                  finishReason: FinishReason.STOP,
                   safetyRatings: [],
                 }],
-              } as any as GenerateContentResponse;
+              });
             }
           } catch (e) {
             // Skip invalid JSON
