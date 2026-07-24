@@ -40,6 +40,7 @@ import type {
 } from "../../../server/nvm/revision/passes/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
 import { diffLines } from "../../lib/diff.ts";
+import { decideWriteBack } from "../../lib/coverage-staleness.ts";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,10 @@ interface ScriptDoctorPanelProps {
    *  ScriptIDE.tsx). Same code path as the in-panel button, so provenance is
    *  "sample" and the draft-history guard holds. */
   autoLoadSample?: boolean;
+  /** G0-02: reads ScriptIDE's live draft generation. Captured when a diagnosis
+   *  runs and compared before a fix or converted-Fountain write-back, so a
+   *  result built against an older draft can't clobber edits made since. */
+  getDraftGeneration?: () => number;
   onClose: () => void;
 }
 
@@ -1505,6 +1510,7 @@ export default function ScriptDoctorPanel({
   title,
   onLoadFountain,
   autoLoadSample,
+  getDraftGeneration,
   onClose,
 }: ScriptDoctorPanelProps) {
   const [status, setStatus] = useState<Status>("idle");
@@ -1625,6 +1631,13 @@ export default function ScriptDoctorPanel({
   // clobber the state of a newer run — same guard pattern as
   // ScriptIDE.triggerAnalysis's analysisGenerationRef.
   const generationRef = useRef(0);
+  // G0-02: the editor's draft generation at the moment the DISPLAYED report was
+  // produced. A fix / converted-Fountain write-back is refused when the live
+  // generation has moved past this — the report predates the writer's edits.
+  // null until the first diagnosis lands, or when no host is tracking edits.
+  const reportDraftGenRef = useRef<number | null>(null);
+  // Shown when a write-back is refused because the draft changed under it.
+  const [staleWriteBackNotice, setStaleWriteBackNotice] = useState<string | null>(null);
 
   // ── Fix & verify (Run 11) ──────────────────────────────────────────────
   // Keyed by RootCauseFinding.id. Only root-cause findings carry a genuine
@@ -1767,6 +1780,10 @@ export default function ScriptDoctorPanel({
     const controller = new AbortController();
     abortRef.current = controller;
     const myGeneration = ++generationRef.current;
+    // G0-02: the editor draft version this diagnosis is reading. Committed to
+    // reportDraftGenRef when the report lands, then checked before any
+    // write-back so a later edit can't be silently overwritten.
+    const draftGenForThisRun = getDraftGeneration?.() ?? null;
 
     // 14 LLM-backed passes over a full script can run long — generous timeout,
     // scaled up from the 60s single-scene-analysis pattern in services/director.ts.
@@ -1852,6 +1869,8 @@ export default function ScriptDoctorPanel({
         if (myGeneration !== generationRef.current) return; // superseded by a newer run
         setReport(data);
         setAnalyzedSnapshot(snapshotForThisRun);
+        reportDraftGenRef.current = draftGenForThisRun; // G0-02: draft version this report reflects
+        setStaleWriteBackNotice(null); // fresh report — clear any prior stale-write warning
         setActiveReportTitle(effectiveTitle);
         setAnalyzedIsSample(isSampleRun);
         // A fresh diagnosis starts a new fix-and-verify lifecycle: any prior
@@ -2241,10 +2260,26 @@ export default function ScriptDoctorPanel({
    *  drafts: one fabricated from a receipt that was never itself measured
    *  against the full 14-pass pipeline's OWN read of the resulting script,
    *  one from the actual next report. */
+  // G0-02: true when the live editor draft has advanced past the version the
+  // displayed report was produced against — any write-back would overwrite
+  // edits the writer made since. No-op when the host isn't tracking edits
+  // (getDraftGeneration absent) or no report has landed yet.
+  const isWriteBackStale = (): boolean => {
+    const captured = reportDraftGenRef.current;
+    if (captured === null || !getDraftGeneration) return false;
+    return !decideWriteBack(captured, getDraftGeneration()).allow;
+  };
+
   const acceptFix = (findingId: string) => {
     const entry = fixResults[findingId];
     if (!entry?.result.candidateFountain) return;
     if (analyzedIsSample) return; // read-only demo source — button is disabled too
+    if (isWriteBackStale()) {
+      setStaleWriteBackNotice(
+        "Your draft changed since this report was produced. Re-run diagnosis before applying this fix, so it can't overwrite your edits.",
+      );
+      return;
+    }
     onLoadFountain?.(entry.result.candidateFountain);
     setAppliedFixIds((prev) => {
       if (prev.has(findingId)) return prev;
@@ -2556,6 +2591,25 @@ export default function ScriptDoctorPanel({
           className="px-6 py-2 bg-green-50 dark:bg-green-950/40 border-b-2 border-green-300 dark:border-green-800 text-[10px] font-mono text-green-700 dark:text-green-300 shrink-0 flex items-center gap-2"
         >
           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {fixToast}
+        </div>
+      )}
+
+      {/* G0-02: refused write-back — the draft moved on since this report ran. */}
+      {staleWriteBackNotice && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b-2 border-amber-400 dark:border-amber-700 text-[10px] font-mono text-amber-800 dark:text-amber-200 shrink-0 flex items-center gap-2"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span className="min-w-0">{staleWriteBackNotice}</span>
+          <button
+            type="button"
+            onClick={() => setStaleWriteBackNotice(null)}
+            aria-label="Dismiss"
+            className="ml-auto shrink-0 leading-none hover:opacity-70"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -3017,6 +3071,13 @@ export default function ScriptDoctorPanel({
                       <div className="flex items-center gap-3 flex-wrap pt-1">
                         <button
                           onClick={() => {
+                            // G0-02: never overwrite edits made since this report ran.
+                            if (isWriteBackStale()) {
+                              setStaleWriteBackNotice(
+                                "Your draft changed since this conversion was produced. Re-run diagnosis before loading it, so it can't overwrite your edits.",
+                              );
+                              return;
+                            }
                             onLoadFountain(source.convertedFountain as string);
                             setLoadedNotice(true);
                             if (loadedNoticeTimerRef.current) clearTimeout(loadedNoticeTimerRef.current);

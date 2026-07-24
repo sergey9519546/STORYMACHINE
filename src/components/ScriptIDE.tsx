@@ -316,6 +316,13 @@ export default function ScriptIDE({
   const draftRef = useRef<ScriptIDEDraftState>({ scriptText, snapshots, characters, researchNotes, isDarkMode });
   const draftEnvelopeRef = useRef(initialDraft);
   const draftGenerationRef = useRef(0);
+  // G0-02: monotonic counter bumped on every draft edit. Coverage / fix
+  // requests capture it at start and compare against the live value before
+  // applying a late result, so a report that predates the writer's current
+  // edits can never be silently written back over them. Distinct from
+  // draftGenerationRef above (that one tracks persistence writes across
+  // scriptText/characters/notes/theme).
+  const draftTextGenRef = useRef(0);
   const persistedGenerationRef = useRef(initialDraft.dirty ? -1 : 0);
   const persistenceReadyRef = useRef(false);
   const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
@@ -1010,9 +1017,15 @@ export default function ScriptIDE({
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // G0-02: stable live-generation reader handed to Coverage / Script Doctor so
+  // their async callbacks compare against the CURRENT draft version, not a
+  // stale closure captured when the request was fired.
+  const getDraftGeneration = useCallback(() => draftTextGenRef.current, []);
+
   const handleScriptChange = (text: string) => {
     setScriptText(text);
     setCoverageStale(true);
+    draftTextGenRef.current += 1; // G0-02: draft advanced — invalidate in-flight coverage/fixes
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -2336,6 +2349,7 @@ export default function ScriptIDE({
               fountain={scriptText}
               title={titlePage.title}
               autoLoadSample={doctorAutoSample}
+              getDraftGeneration={getDraftGeneration}
               onFreshReport={() => setCoverageStale(false)}
               onLoadSampleIntoEditor={(text) => {
                 // G0-01 defense in depth: refuse to overwrite a non-empty draft
@@ -2374,6 +2388,7 @@ export default function ScriptIDE({
           <Suspense fallback={<DrawerPanelFallback />}><ScriptDoctorPanel
             fountain={scriptText}
             title={titlePage.title}
+            getDraftGeneration={getDraftGeneration}
             onLoadFountain={(text) => {
               setScriptText(text);
               setCoverageStale(false);
