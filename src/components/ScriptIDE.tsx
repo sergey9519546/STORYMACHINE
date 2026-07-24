@@ -223,6 +223,12 @@ export default function ScriptIDE({
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
   );
+  // G0-03: inline AI ghost-text completion — off by default, same rationale
+  // as Live Notes above (a keyless-by-default provider feature the writer
+  // has to opt into, not one that fires on every debounced keystroke).
+  const [inlineCompletion, setInlineCompletion] = useState(
+    () => lsGet("inline_completion") === "1"
+  );
   // Theme preference: atomic local draft + server ScriptIDE_State.is_dark_mode.
   const [isDarkMode, setIsDarkMode] = useState(initialDraft.isDarkMode);
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
@@ -934,6 +940,11 @@ export default function ScriptIDE({
     lsSet("live_diagnostics", liveDiagnostics ? "1" : "0");
   }, [liveDiagnostics]);
 
+  // Persist the inline-completion toggle the same way (G0-03).
+  useEffect(() => {
+    lsSet("inline_completion", inlineCompletion ? "1" : "0");
+  }, [inlineCompletion]);
+
   // Dismissing the keyless-readiness banner is remembered per-app (finding E
   // asks for "dismissible, non-nagging" — StoryMachine.tsx tracks its own key
   // separately since the two apps are shown/dismissed independently).
@@ -1481,6 +1492,7 @@ export default function ScriptIDE({
           isAnalyzing={engineState.isAnalyzing}
           directorsLayer={directorsLayer}
           liveDiagnostics={liveDiagnostics}
+          inlineCompletion={inlineCompletion}
           wordCount={stats.wordCount}
           pageCount={pageCount}
           isTypewriterSound={isTypewriterSound}
@@ -1493,6 +1505,7 @@ export default function ScriptIDE({
           onOpenSlate={() => openToolSlot("slate")}
           onOpenStudio={() => openToolSlot("studio")}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
+          onToggleInlineCompletion={() => setInlineCompletion((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound((prev) => {
               lsSet("typewriter_sound", prev ? "off" : "on");
@@ -1736,6 +1749,7 @@ export default function ScriptIDE({
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
+            inlineCompletionEnabled={inlineCompletion}
           />
 
           {/* Page furniture — quiet manuscript metadata in the right gutter */}

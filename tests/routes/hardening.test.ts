@@ -103,11 +103,24 @@ describe('hardening — request-log query-string hygiene (regression guard)', as
   let server: TestServer;
   const originalWrite = process.stdout.write.bind(process.stdout);
   let captured: string[] = [];
+  // G0-03: /api/scriptide/complete now guards on llmReady() before ever
+  // reaching the SSE branch this test exercises (see server/routes/scriptide.ts
+  // — the same "keyless guard" the other six generation routes already had).
+  // Set a dummy key for this describe block's duration so the request still
+  // reaches the real SSE code path this test is about, rather than short-
+  // circuiting to the (also query-string-bearing, so equally in-scope, but
+  // not what this test claims to cover) 503 keyless response.
+  const prevGeminiKey = process.env.GEMINI_API_KEY;
 
   before(async () => {
+    process.env.GEMINI_API_KEY = 'test-key-for-request-log-hygiene';
     server = await startTestServer();
   });
-  after(async () => { await server.close(); });
+  after(async () => {
+    if (prevGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = prevGeminiKey;
+    await server.close();
+  });
 
   it('an SSE-style request carrying a capability-bearing ?sessionId= query param never has that value appear in the request log line', async () => {
     captured = [];
