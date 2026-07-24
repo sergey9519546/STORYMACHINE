@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "license": "UNLICENSED",
   "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "start": "tsx server.ts",
@@ -11,11 +14,12 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test",
+    "test": "node --experimental-strip-types --test 'evals/scoring/**/*.test.ts' 'server/nvm/analyze/**/*.test.ts' 'server/nvm/proof/**/*.test.ts' 'tests/collab/**/*.test.ts' 'tests/core/**/*.test.ts' 'tests/e2e/**/*.test.ts' 'tests/nvm/**/*.test.ts' 'tests/passes/**/*.test.ts' 'tests/routes/**/*.test.ts'",
     "test:metamorphic": "node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts",
     "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts",
     "generate-p0-sample": "node --experimental-strip-types scripts/generate-p0-sample-report.ts",
     "measure-slop": "node --experimental-strip-types scripts/measure-slop-discrimination.ts",
+    "honesty-audit": "node scripts/honesty-audit.mjs",
     "backup": "node --experimental-strip-types scripts/backup-sessions.ts",
     "check-docs": "node --experimental-strip-types scripts/check-docs-quality.ts --all",
     "check-docs:strict": "node --experimental-strip-types scripts/check-docs-quality.ts --all --strict",
