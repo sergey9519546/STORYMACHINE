@@ -16,7 +16,7 @@ interface HealthReport {
   tensionHistory: number[];
   momentum: number;
   topology: {
-    dominantArc: string;
+    dominantArc: string | null;
     coherence: number;
     scores: TopologyScore[];
   };
@@ -35,8 +35,8 @@ interface HealthReport {
     payoffCount: number;
   };
   proof: {
-    passRate: number;
-    avgQualityScore: number;
+    passRate: number | null;
+    avgQualityScore: number | null;
     tier1TopFailures?: Array<{ proof: string; failCount: number }>;
   };
 }
@@ -87,6 +87,18 @@ export function StoryHealthPanel({ onClose }: Props) {
     </div>
   );
 
+  // G0-05: an empty story has nothing to score. Show an honest empty state
+  // rather than sentinel vitals (a green "100%" pass rate, a fabricated arc).
+  if (report.commitCount === 0) return (
+    <div style={panelStyle}>
+      <PanelHeader onClose={onClose} onRefresh={load} subtitle="0 commits · 0 scenes" />
+      <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 60, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sm-cream-mute)', marginBottom: 6 }}>No commits yet</div>
+        Story vitals appear once you commit scenes.
+      </div>
+    </div>
+  );
+
   return (
     <div style={panelStyle}>
       <PanelHeader onClose={onClose} onRefresh={load} subtitle={`${report.commitCount} commits · ${report.sceneCount} scenes`} />
@@ -95,8 +107,8 @@ export function StoryHealthPanel({ onClose }: Props) {
 
         {/* Vitals grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          <VitalCard label="Proof pass rate" value={`${report.proof.passRate}%`} color={report.proof.passRate >= 80 ? 'var(--sm-ok)' : report.proof.passRate >= 60 ? 'var(--sm-warn)' : 'var(--sm-stamp)'} sub="Tier 1 per scene" />
-          <VitalCard label="Avg quality" value={String(report.proof.avgQualityScore)} color={scoreColor(report.proof.avgQualityScore)} sub="Tier 2 score" />
+          <VitalCard label="Proof pass rate" value={report.proof.passRate == null ? '—' : `${report.proof.passRate}%`} color={report.proof.passRate == null ? 'var(--sm-ink-mute)' : report.proof.passRate >= 80 ? 'var(--sm-ok)' : report.proof.passRate >= 60 ? 'var(--sm-warn)' : 'var(--sm-stamp)'} sub="Tier 1 per scene" />
+          <VitalCard label="Avg quality" value={report.proof.avgQualityScore == null ? '—' : String(report.proof.avgQualityScore)} color={report.proof.avgQualityScore == null ? 'var(--sm-ink-mute)' : scoreColor(report.proof.avgQualityScore)} sub="Tier 2 score" />
           <VitalCard label="Tension" value={report.currentTension.toFixed(1)} color="var(--sm-cool)" sub="mark-to-market" />
           <VitalCard label="Momentum" value={`${Math.round(report.momentum * 100)}%`} color={report.momentum >= 0.6 ? 'var(--sm-ok)' : report.momentum >= 0.3 ? 'var(--sm-warn)' : 'var(--sm-stamp)'} sub="5-scene signal" />
         </div>
@@ -119,7 +131,7 @@ export function StoryHealthPanel({ onClose }: Props) {
             <div>
               <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>DOMINANT ARC</div>
               <div style={{ color: 'var(--sm-cool)', fontSize: 16, fontWeight: 700, textTransform: 'capitalize' }}>
-                {report.topology.dominantArc.replace(/_/g, ' ')}
+                {report.topology.dominantArc ? report.topology.dominantArc.replace(/_/g, ' ') : '—'}
               </div>
             </div>
             <div>

@@ -28,7 +28,10 @@ export interface TopologyScore {
 export interface TopologyReport {
   trajectory: number[];         // normalized tension values per scene
   scores: TopologyScore[];
-  dominantArc: ArcArchetype;
+  /** Closest-matching archetype, or null when there is no data to fit (zero
+   *  ledgers). A null here means "no dominant arc" — never render it as if a
+   *  real arc were detected. */
+  dominantArc: ArcArchetype | null;
   coherence: number;            // 0–100: how cleanly the story fits any known arc
 }
 
@@ -86,7 +89,7 @@ export function computeTopology(ledgers: TensionLedger[]): TopologyReport {
       scores: (Object.keys(ARC_TEMPLATES) as ArcArchetype[]).map((a, i) => ({
         archetype: a, similarity: 0, rank: i + 1,
       })),
-      dominantArc: 'man_in_hole',
+      dominantArc: null,
       coherence: 0,
     };
   }

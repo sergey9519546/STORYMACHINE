@@ -389,8 +389,10 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
     totalQuality += tier2Score(t2);
     rollingState = applyStoryOps(rollingState, commit.ops);
   }
-  const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : 100;
-  const avgQuality = commitCount > 0 ? Math.round(totalQuality / commitCount) : 0;
+  // G0-05: with zero commits there is nothing to score — return null rather
+  // than a sentinel 100% pass rate / 0 quality that renders as a real reading.
+  const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : null;
+  const avgQuality = commitCount > 0 ? Math.round(totalQuality / commitCount) : null;
   const tier1TopFailures = Object.entries(tier1FailureCounts)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)

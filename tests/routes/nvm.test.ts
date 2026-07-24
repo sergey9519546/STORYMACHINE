@@ -21,6 +21,20 @@ describe('routes/nvm — HTTP behavior', async () => {
     assert.equal(res.status, 200);
   });
 
+  it('GET /api/nvm/health withholds sentinel scores for an empty session (G0-05)', async () => {
+    const sid = freshSessionId();
+    const res = await fetch(`${server.baseUrl}/api/nvm/health?sessionId=${sid}`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.commitCount, 0);
+    // An empty story must NOT report a green "100%" proof pass rate.
+    assert.notEqual(body.proof.passRate, 100);
+    assert.equal(body.proof.passRate, null);
+    assert.equal(body.proof.avgQualityScore, null);
+    // ...and must not fabricate a dominant emotional arc from zero data.
+    assert.equal(body.topology.dominantArc, null);
+  });
+
   it('GET /api/nvm/commits/:commitId returns 404 for a nonexistent commit', async () => {
     const sid = freshSessionId();
     const res = await fetch(`${server.baseUrl}/api/nvm/commits/does-not-exist?sessionId=${sid}`);
