@@ -19,6 +19,7 @@
     "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts",
     "generate-p0-sample": "node --experimental-strip-types scripts/generate-p0-sample-report.ts",
     "measure-slop": "node --experimental-strip-types scripts/measure-slop-discrimination.ts",
+    "honesty-audit": "node scripts/honesty-audit.mjs",
     "backup": "node --experimental-strip-types scripts/backup-sessions.ts"
   },
   "dependencies": {
