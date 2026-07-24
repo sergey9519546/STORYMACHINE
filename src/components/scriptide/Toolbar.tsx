@@ -449,7 +449,7 @@ export default function Toolbar({
                   )}
                   {onNewStory && (
                     <OverflowItem
-                      label="New story…"
+                      label="Change setup…"
                       onClick={() => {
                         onNewStory();
                         setOverflowOpen(false);
