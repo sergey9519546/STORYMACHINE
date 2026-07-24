@@ -7,3 +7,6 @@
 ## 2024-07-15 - [Zero-Allocation CodeMirror Rendering]
 **Learning:** Found O(N) intermediate array allocations caused by `block.text.split('\n')` inside high-frequency CodeMirror plugin update loops (`fountain-highlight.ts` and `screenplay-format.ts`). Since plugins run synchronously on keystrokes, these allocations cause frame stuttering in large documents.
 **Action:** When extracting line offsets in rendering or highlighting loops, replace `.split('\n')` with native `while (startIndex <= text.length)` loops using `text.indexOf('\n', startIndex)`. This guarantees zero allocation for multiline text processing on hot paths.
+## 2026-07-24 - [Zero-Allocation Word Parsing]
+**Learning:** When attempting to remove `.split()` for performance, replacing it with string searches like `indexOf(" ")` can cause functional regressions by failing to account for other whitespace characters (like tabs) or by altering how subsequent regex replacements behave on the sliced text.
+**Action:** Use native RegExp `exec` loops (e.g., `/\S+/g.exec(str)`) to safely iterate over word boundaries without allocating intermediate string arrays, preserving exact original parsing behavior while maintaining high performance.
