@@ -111,4 +111,29 @@ See `docs/MASTER_ROADMAP.md` for full plan. Key points:
 - *Correct before reproducible* — score validity before determinism claims
 - *Measure on runnable real writing* — synthetic tests necessary but insufficient
 
+## Architecture Decision Records (ADRs)
+
+Major architectural decisions are documented in `docs/adr/`. This preserves
+the *why* behind choices, not just the *what* that was built.
+
+**When to write an ADR:**
+- System architecture changes (new subsystems, major refactors)
+- Cross-cutting concerns (affects multiple components)
+- Long-term implications (hard to reverse)
+- Significant tradeoffs (performance vs maintainability)
+- Pattern establishment (conventions for future code)
+
+**Process:**
+1. Copy `docs/adr/template.md` to `ADR-NNN-title.md` (sequential numbering)
+2. Fill in: context, decision, alternatives considered, consequences
+3. Commit with status "Accepted" after approval
+4. Never delete old ADRs - mark as "Superseded by ADR-XXX" instead
+
+**Integration with phase gates:**
+- Use `storymachine-phase-design` skill for phase transitions
+- Extract architectural decisions from design docs into ADRs
+- ADRs provide institutional memory across phase boundaries
+
+See `docs/adr/README.md` for full guide and examples.
+
 Commit to the branch designated for the current session.
