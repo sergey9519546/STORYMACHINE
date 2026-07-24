@@ -1,7 +1,7 @@
 import express from 'express';
 import { Type } from '@google/genai';
 import { generateContent, modelForTask, getImageProvider, getTTSProvider } from '../engine/ai.ts';
-import { getPublicConfig } from '../lib/ai-config.ts';
+import { llmReady } from '../lib/ai-config.ts';
 import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
@@ -590,12 +590,14 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
 // The server's front door is analysis-only (no AI key). These routes call the
 // LLM directly, so with no key configured generateContent throws and the route
 // 500s — a NORTH_STAR "honest degradation" violation. Degrade to a labeled
-// response instead (mirrors game.ts interview). Readiness ORs BOTH key sources
-// (see config.ts llmReady — checking only one is a documented trap).
+// response instead (mirrors game.ts interview). Readiness comes from the shared
+// server/lib/ai-config.ts::llmReady() (imported at the top of this file) —
+// ORing only a subset of the key sources here is the documented trap (it left
+// an OpenRouter-only deployment reporting ready from /api/ai-config while every
+// ScriptIDE route degraded to keyless). Keeping a single source of truth closes
+// that gap permanently.
 const KEYLESS_AI_NOTE =
   'This AI feature needs a model key — add one in Settings to enable it.';
-const llmReady = (): boolean =>
-  Boolean(process.env.GEMINI_API_KEY) || getPublicConfig().keySet;
 
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
 // G0-03: this was the one generation route with no llmReady() guard at all —

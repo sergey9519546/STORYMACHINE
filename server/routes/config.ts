@@ -2,7 +2,7 @@ import express from 'express';
 import { generateContent, getModel } from '../engine/ai.ts';
 import { validate, AiConfigSchema, StoryToneSchema } from '../lib/validation.ts';
 import { logger } from '../lib/logger.ts';
-import { applyConfig, getPublicConfig } from '../lib/ai-config.ts';
+import { applyConfig, getPublicConfig, llmReady } from '../lib/ai-config.ts';
 import { checkAdminAuth, isLoopbackAddress, timingSafeStringEqual } from '../lib/admin-auth.ts';
 import { instantiatePreset } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
@@ -101,23 +101,13 @@ router.get('/metrics', (req, res) => {
 // ── AI provider config routes ─────────────────────────────────────────────
 router.get('/api/ai-config', (_req, res) => {
   const pub = getPublicConfig();
-  // Journey-audit finding A: SettingsPanel's keySet only mirrors the
-  // multi-provider AI_API_KEY path (server/lib/ai-config.ts's private _keys,
-  // wired through applyConfig/wireProviders). But the *default* code path —
-  // server/engine/ai.ts's getAI() — reads process.env.GEMINI_API_KEY
-  // directly and never touches ai-config.ts at all. A deployment that only
-  // sets GEMINI_API_KEY (the documented default) is fully "ready" yet would
-  // show keySet:false and mislead a first-time user into thinking no key is
-  // configured. llmReady ORs both independent sources so the client gets one
-  // honest readiness signal without ever learning either key's value.
-  //
-  // Third source: a keyless local model server (Ollama, LM Studio). When the
-  // provider is openai-compat with a baseUrl set, the LLM seam is wired and
-  // ready even with no stored key (those servers ignore Authorization), so
-  // keySet stays false yet the provider genuinely works. OR that in too.
-  const localProviderReady = pub.provider === 'openai-compat' && Boolean(pub.baseUrl);
-  const llmReady = Boolean(process.env.GEMINI_API_KEY) || pub.keySet || localProviderReady;
-  res.json({ ...pub, llmReady });
+  // Single source of truth: server/lib/ai-config.ts::llmReady() ORs every
+  // independent key source (GEMINI_API_KEY, OPENROUTER_API_KEY, the runtime
+  // config key, and the keyless-local-model path) so this route and every
+  // generative route agree on one readiness signal. Duplicating the OR here
+  // is the historical trap — a missed source silently disagrees with the
+  // generation routes' own guard. See the helper's header for the full list.
+  res.json({ ...pub, llmReady: llmReady() });
 });
 
 router.post('/api/ai-config', gameLimiter, validate(AiConfigSchema), asyncHandler(async (req, res) => {
