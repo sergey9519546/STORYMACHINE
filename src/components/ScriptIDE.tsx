@@ -201,7 +201,7 @@ export default function ScriptIDE({
   // Mobile sidebar drawer: the Sidebar is a permanent 320px column on md+ but
   // slides in as an overlay on < md (see Sidebar.tsx). This toggles that drawer.
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // In-app confirm for "New Story" — replaces window.confirm (QA P1-5: native
+  // In-app confirm for "Change setup" — replaces window.confirm (QA P1-5: native
   // confirms block the thread, are unstyleable, and can't be dismissed by Esc).
   const [newStoryConfirm, setNewStoryConfirm] = useState(false);
   // StartScreen's "Try the sample script" handoff (sessionStorage flag, same
@@ -1891,7 +1891,7 @@ export default function ScriptIDE({
         </div>
       </div>
 
-      {/* New Story confirm modal — replaces window.confirm (QA P1-5). */}
+      {/* Change-setup confirm modal — replaces window.confirm (QA P1-5). */}
       <AnimatePresence>
         {newStoryConfirm && (
           <motion.div
@@ -1909,7 +1909,7 @@ export default function ScriptIDE({
               className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full mx-4"
             >
               <h2 id="new-story-confirm-title" className="font-bold uppercase tracking-widest text-lg mb-3 border-b-4 border-black pb-2">
-                Start a new story?
+                Change setup?
               </h2>
               <p className="text-sm font-mono mb-5 text-gray-700">
                 This returns you to the setup wizard — your current draft stays saved.
@@ -1925,7 +1925,7 @@ export default function ScriptIDE({
                   onClick={() => { setNewStoryConfirm(false); onNewStory?.(); }}
                   className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
                 >
-                  New Story
+                  Change setup
                 </button>
               </div>
             </motion.div>
