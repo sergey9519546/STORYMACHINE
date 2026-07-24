@@ -16,6 +16,7 @@ import {
   SpellCheck,
   Stethoscope,
   Wand2,
+  Zap,
 } from "lucide-react";
 
 /** Three user-facing desk modes. Scenes/cast stay in the rail (not a peer mode). */
@@ -32,6 +33,8 @@ interface ToolbarProps {
   liveDiagnostics: boolean;
   /** G0-03: inline AI ghost-text completion toggle state. */
   inlineCompletion: boolean;
+  /** G0-04: idle/background AI analysis (POST /api/analyze-script) toggle state. */
+  autoAnalysis: boolean;
   wordCount: number;
   pageCount: number;
   isTypewriterSound: boolean;
@@ -45,6 +48,7 @@ interface ToolbarProps {
   onOpenStudio: () => void;
   onToggleLiveDiagnostics: () => void;
   onToggleInlineCompletion: () => void;
+  onToggleAutoAnalysis: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onExportFDX: () => void;
@@ -78,6 +82,7 @@ export default function Toolbar({
   directorsLayer,
   liveDiagnostics,
   inlineCompletion,
+  autoAnalysis,
   wordCount,
   pageCount,
   isTypewriterSound,
@@ -91,6 +96,7 @@ export default function Toolbar({
   onOpenStudio,
   onToggleLiveDiagnostics,
   onToggleInlineCompletion,
+  onToggleAutoAnalysis,
   onToggleTypewriterSound,
   onExportFountain,
   onExportFDX,
@@ -411,6 +417,15 @@ export default function Toolbar({
                 pressed={inlineCompletion}
                 onClick={() => {
                   onToggleInlineCompletion();
+                  setOverflowOpen(false);
+                }}
+              />
+              <OverflowItem
+                icon={<Zap className="h-3.5 w-3.5" />}
+                label={autoAnalysis ? "Auto-analysis on" : "Auto-analysis off"}
+                pressed={autoAnalysis}
+                onClick={() => {
+                  onToggleAutoAnalysis();
                   setOverflowOpen(false);
                 }}
               />

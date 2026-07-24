@@ -17,6 +17,7 @@ import {
   acknowledgeScriptIDESave,
   shouldStartScriptIDESave,
 } from "../lib/scriptide-autosave";
+import { scheduleAutoAnalysis } from "../lib/auto-analysis-gate";
 import {
   applyServerScriptIDEDraft,
   decideScriptIDERestore,
@@ -228,6 +229,15 @@ export default function ScriptIDE({
   // has to opt into, not one that fires on every debounced keystroke).
   const [inlineCompletion, setInlineCompletion] = useState(
     () => lsGet("inline_completion") === "1"
+  );
+  // G0-04: idle/background AI analysis (triggerAnalysis, fired 2s after the
+  // last keystroke via handleScriptChange below) — off by default. It POSTs
+  // /api/analyze-script, which runs generateContent + image + TTS provider
+  // calls in parallel, so it must stay opt-in the same way Live Notes and
+  // inline completion are. Explicit "Analyze" actions elsewhere still call
+  // triggerAnalysis directly and are unaffected by this flag.
+  const [autoAnalysis, setAutoAnalysis] = useState(
+    () => lsGet("auto_analysis") === "1"
   );
   // Theme preference: atomic local draft + server ScriptIDE_State.is_dark_mode.
   const [isDarkMode, setIsDarkMode] = useState(initialDraft.isDarkMode);
@@ -945,6 +955,11 @@ export default function ScriptIDE({
     lsSet("inline_completion", inlineCompletion ? "1" : "0");
   }, [inlineCompletion]);
 
+  // Persist the auto-analysis toggle the same way (G0-04).
+  useEffect(() => {
+    lsSet("auto_analysis", autoAnalysis ? "1" : "0");
+  }, [autoAnalysis]);
+
   // Dismissing the keyless-readiness banner is remembered per-app (finding E
   // asks for "dismissible, non-nagging" — StoryMachine.tsx tracks its own key
   // separately since the two apps are shown/dismissed independently).
@@ -1041,7 +1056,11 @@ export default function ScriptIDE({
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    typingTimeoutRef.current = setTimeout(() => {
+    // G0-04: scheduleAutoAnalysis returns null (schedules nothing) unless
+    // autoAnalysis is explicitly on — default config never fires
+    // triggerAnalysis from typing alone. Explicit "Analyze" actions elsewhere
+    // call triggerAnalysis directly and are unaffected.
+    typingTimeoutRef.current = scheduleAutoAnalysis(autoAnalysis, () => {
       triggerAnalysis(text);
     }, 2000);
   };
@@ -1493,6 +1512,7 @@ export default function ScriptIDE({
           directorsLayer={directorsLayer}
           liveDiagnostics={liveDiagnostics}
           inlineCompletion={inlineCompletion}
+          autoAnalysis={autoAnalysis}
           wordCount={stats.wordCount}
           pageCount={pageCount}
           isTypewriterSound={isTypewriterSound}
@@ -1506,6 +1526,7 @@ export default function ScriptIDE({
           onOpenStudio={() => openToolSlot("studio")}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
           onToggleInlineCompletion={() => setInlineCompletion((prev) => !prev)}
+          onToggleAutoAnalysis={() => setAutoAnalysis((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound((prev) => {
               lsSet("typewriter_sound", prev ? "off" : "on");
