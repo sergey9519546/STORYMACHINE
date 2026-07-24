@@ -42,6 +42,13 @@ jobs:
           --exclude-dir=infinity-gate --exclude-dir=planning --exclude-dir=benchmarks
           --exclude=ai-provider.test.ts --exclude=ai-provider-integration.test.ts
 
+      # G0-08: user-facing honesty string audit — fails the build on
+      # overclaim language ("Hollywood gold standard", "provably", stale
+      # hardcoded rule/corpus counts, unverified superlatives, etc.) in the
+      # shipped surface. See scripts/honesty-audit.mjs for scope and rules.
+      - name: Honesty string audit
+        run: npm run honesty-audit
+
       # Deliberately NO GEMINI_API_KEY here: the product's official keyless
       # analysis-only mode is what CI must prove. With a fake key set, the
       # "keyless" degradation paths construct a real client and attempt live

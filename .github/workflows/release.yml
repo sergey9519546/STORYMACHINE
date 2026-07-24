@@ -56,6 +56,11 @@ jobs:
           --exclude-dir=infinity-gate --exclude-dir=planning --exclude-dir=benchmarks
           --exclude=ai-provider.test.ts --exclude=ai-provider-integration.test.ts
 
+      # G0-08: mirrors ci.yml's honesty string audit — see that file's
+      # comment and scripts/honesty-audit.mjs for scope and rules.
+      - name: Honesty string audit
+        run: npm run honesty-audit
+
       - name: Run tests (keyless — analysis-only posture)
         run: npm test
 
