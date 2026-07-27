@@ -2163,8 +2163,33 @@ export default function ScriptDoctorPanel({
     if (fixPendingId) return;
     if (!fixSourceText) return;
 
-    const lines = fixSourceText.split("\n");
-    const originalSpanText = lines.slice(startLine - 1, endLine).join("\n");
+    let startIndex = 0;
+    for (let i = 1; i < startLine; i++) {
+      if (startIndex >= fixSourceText.length) break;
+      const nextIndex = fixSourceText.indexOf("\n", startIndex);
+      if (nextIndex === -1) {
+        startIndex = fixSourceText.length;
+        break;
+      }
+      startIndex = nextIndex + 1;
+    }
+    let endIndex = startIndex;
+    for (let i = startLine; i <= endLine; i++) {
+      if (endIndex >= fixSourceText.length) {
+        // If endLine overshoots the text (e.g. final line without a trailing newline),
+        // we've already reached the end, so break without advancing endIndex further.
+        break;
+      }
+      const nextIndex = fixSourceText.indexOf("\n", endIndex);
+      if (nextIndex === -1) {
+        endIndex = fixSourceText.length;
+        break;
+      }
+      // Keep the newline character for lines *before* the final one in the span,
+      // but drop it for the final one, matching .join("\n")'s exact output.
+      endIndex = i === endLine ? nextIndex : nextIndex + 1;
+    }
+    const originalSpanText = fixSourceText.slice(startIndex, endIndex);
 
     fixAbortRef.current?.abort();
     const controller = new AbortController();
