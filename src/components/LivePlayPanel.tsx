@@ -71,14 +71,21 @@ export function LivePlayPanel({ onClose }: Props) {
   const [lastResult, setLastResult] = useState<MoveResult | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom. Covers loadFeed
+  // plus the submitMove/advanceWorld event handlers.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const loadFeed = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const res = await fetch('/api/nvm/live/feed');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       setFeed(await res.json());
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    } catch (e) { if (mountedRef.current) setError(e instanceof Error ? e.message : String(e)); }
+    finally { if (mountedRef.current) setLoading(false); }
   }, []);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
@@ -103,12 +110,13 @@ export function LivePlayPanel({ onClose }: Props) {
         body: JSON.stringify({ text: fullText }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       const result: MoveResult = await res.json();
       setLastResult(result);
       setMoveText('');
       await loadFeed(); // Refresh feed
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setSubmitting(false); }
+    } catch (e) { if (mountedRef.current) setError(e instanceof Error ? e.message : String(e)); }
+    finally { if (mountedRef.current) setSubmitting(false); }
   }, [moveText, verb, submitting, loadFeed]);
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -125,8 +133,8 @@ export function LivePlayPanel({ onClose }: Props) {
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
       await loadFeed();
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setSubmitting(false); }
+    } catch (e) { if (mountedRef.current) setError(e instanceof Error ? e.message : String(e)); }
+    finally { if (mountedRef.current) setSubmitting(false); }
   }, [submitting, loadFeed]);
 
   const commits = feed?.commits ?? [];
@@ -150,8 +158,8 @@ export function LivePlayPanel({ onClose }: Props) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={loadFeed} style={chipBtn('var(--sm-night-2)')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button aria-label="Refresh" onClick={loadFeed} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 

@@ -4,7 +4,7 @@
 //   - Inferred ToM² meta-layers (cross-character knowledge inference)
 //   - Dramatic irony pairs (characters holding divergent beliefs)
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -55,21 +55,28 @@ export function EpistemicMapPanel({ onClose }: Props) {
   const [selectedChar, setSelectedChar] = useState<string | null>(null);
   const [view, setView]     = useState<'beliefs' | 'meta' | 'irony'>('beliefs');
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/nvm/epistemic');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       const data: EpistemicState = await res.json();
       setState(data);
       // Functional update so this doesn't depend on (and re-create on) selectedChar —
       // character selection below is a pure client-side switch, not a re-fetch trigger.
       setSelectedChar(prev => (!prev && data.characters.length > 0) ? data.characters[0] : prev);
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
@@ -95,7 +102,7 @@ export function EpistemicMapPanel({ onClose }: Props) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={load} style={chipBtn('var(--sm-night-2)')}>↺ refresh</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 
@@ -126,7 +133,12 @@ export function EpistemicMapPanel({ onClose }: Props) {
               const mCount = state.metaLayers.filter(m => m.holderId === charId).length;
               const selected = charId === selectedChar;
               return (
-                <div key={charId} onClick={() => setSelectedChar(charId)} style={{
+                <div key={charId} onClick={() => setSelectedChar(charId)}
+                  role="button" tabIndex={0}
+                  aria-label={`Select character ${charId}`}
+                  aria-pressed={selected}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedChar(charId); } }}
+                  style={{
                   background: selected ? '#1e2d4a' : 'var(--sm-night-2)',
                   border: `1px solid ${selected ? '#3b82f6' : 'var(--sm-night-line)'}`,
                   borderRadius: 5, padding: '8px 10px', marginBottom: 5, cursor: 'pointer',

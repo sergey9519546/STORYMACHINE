@@ -3,7 +3,7 @@
 //   pass (green) / fail (red) / warning (amber) / na (gray)
 // with an overall grade and per-category breakdown.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -68,14 +68,20 @@ export function RegressionPanel({ onClose }: Props) {
   const [filter, setFilter]   = useState<Status | 'all'>('all');
   const [catFilter, setCatFilter] = useState<Category | 'all'>('all');
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const res = await fetch('/api/nvm/regression');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       setData(await res.json());
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    } catch (e) { if (mountedRef.current) setError(e instanceof Error ? e.message : String(e)); }
+    finally { if (mountedRef.current) setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -102,8 +108,8 @@ export function RegressionPanel({ onClose }: Props) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {data && <GradeBadge grade={data.grade} score={data.score} />}
-          <button onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button aria-label="Refresh" onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 
@@ -120,6 +126,10 @@ export function RegressionPanel({ onClose }: Props) {
                 const m = STATUS_META[s];
                 return (
                   <div key={s} onClick={() => setFilter(filter === s ? 'all' : s)}
+                    role="button" tabIndex={0}
+                    aria-label={`Filter by ${m.label}`}
+                    aria-pressed={filter === s}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilter(filter === s ? 'all' : s); } }}
                     style={{ background: filter === s ? m.bg : 'var(--sm-night-2)', border: `1px solid ${filter === s ? m.color : 'var(--sm-night-line)'}`, borderRadius: 5, padding: '6px 8px', cursor: 'pointer', textAlign: 'center' }}>
                     <div style={{ color: m.color, fontWeight: 700, fontSize: 16 }}>{data[s]}</div>
                     <div style={{ color: 'var(--sm-ink-mute)', fontSize: 9 }}>{m.label}</div>
@@ -134,7 +144,12 @@ export function RegressionPanel({ onClose }: Props) {
               const stats = data.byCategory[cat];
               const sel = catFilter === cat;
               return (
-                <div key={cat} onClick={() => setCatFilter(sel ? 'all' : cat)} style={{
+                <div key={cat} onClick={() => setCatFilter(sel ? 'all' : cat)}
+                  role="button" tabIndex={0}
+                  aria-label={`Filter by ${cat} category`}
+                  aria-pressed={sel}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCatFilter(sel ? 'all' : cat); } }}
+                  style={{
                   background: sel ? 'var(--sm-night-2)' : 'transparent',
                   border: `1px solid ${sel ? 'var(--sm-night-line)' : 'transparent'}`,
                   borderRadius: 5, padding: '6px 8px', marginBottom: 3, cursor: 'pointer',

@@ -2,7 +2,7 @@
 // Fetches GET /api/nvm/quality/scene/:commitId and renders:
 //   Overview · Dialogue (10 validators) · Voice & Style · Propp's Morphology · Causal Graph
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -89,17 +89,23 @@ export function QualityEnginesPanel({ onClose }: Props) {
   const [error, setError]       = useState<string | null>(null);
   const [tab, setTab]           = useState<TabId>('overview');
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const loadScenes = useCallback(async () => {
     setListLoading(true);
     try {
       const res = await fetch('/api/nvm/arc-timeline');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       const data: { scenes: TimelineScene[] } = await res.json();
       setScenes(data.scenes);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (mountedRef.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setListLoading(false);
+      if (mountedRef.current) setListLoading(false);
     }
   }, []);
 
@@ -113,11 +119,12 @@ export function QualityEnginesPanel({ onClose }: Props) {
     try {
       const res = await fetch(`/api/nvm/quality/scene/${commitId}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       setReport(await res.json());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (mountedRef.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }
 
@@ -136,7 +143,7 @@ export function QualityEnginesPanel({ onClose }: Props) {
             Specificity · 10 Dialogue Validators · Necessity · Burrows's Delta · ArcDebt · Propp · Causal Graph
           </div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -144,7 +151,7 @@ export function QualityEnginesPanel({ onClose }: Props) {
         <div style={{ width: 230, flexShrink: 0, borderRight: '1px solid var(--sm-night-line)', overflowY: 'auto', padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>COMMITTED SCENES</span>
-            <button onClick={loadScenes} style={{ background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 4, color: 'var(--sm-cream)', padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>↺</button>
+            <button aria-label="Refresh" onClick={loadScenes} style={{ background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-line)', borderRadius: 4, color: 'var(--sm-cream)', padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>↺</button>
           </div>
           {listLoading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 16 }}>Loading…</div>}
           {!listLoading && scenes.length === 0 && (
@@ -153,7 +160,12 @@ export function QualityEnginesPanel({ onClose }: Props) {
           {scenes.map(sc => {
             const sel = sc.commitId === selectedId;
             return (
-              <div key={sc.commitId} onClick={() => inspect(sc.commitId)} style={{
+              <div key={sc.commitId} onClick={() => inspect(sc.commitId)}
+                role="button" tabIndex={0}
+                aria-label={`Inspect scene ${sc.commitId}`}
+                aria-pressed={sel}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inspect(sc.commitId); } }}
+                style={{
                 background: sel ? '#1e2d4a' : 'var(--sm-night-2)',
                 border: `1px solid ${sel ? '#3b82f6' : 'var(--sm-night-line)'}`,
                 borderRadius: 5, padding: '7px 9px', marginBottom: 5, cursor: 'pointer',

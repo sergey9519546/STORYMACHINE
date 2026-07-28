@@ -4,7 +4,7 @@
 //   Corpus   — ranked runs, Director Policy, operator effectiveness
 //   Genome   — diff and breed story genomes from corpus runs
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ export function SelfPlayPanel({ onClose }: Props) {
           <strong style={{ fontSize: 15 }}>Self-Play Corpus — G13 Story Engine</strong>
           <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>Headless sims · learned Director policy · genome diff/breed</div>
         </div>
-        <button onClick={onClose} style={iconBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={iconBtn}>✕</button>
       </div>
 
       {/* Tab bar */}
@@ -290,16 +290,22 @@ function CorpusTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
+  // mountedRef guards setState after the tab unmounts mid-fetch. Mirrors
+  // CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const res = await fetch('/api/nvm/corpus');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       setData(await res.json());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (mountedRef.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
@@ -420,17 +426,23 @@ function GenomeTab() {
   const [acting, setActing]       = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
+  // mountedRef guards setState after the tab unmounts mid-fetch. Mirrors
+  // CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   useEffect(() => {
     setLoading(true);
     fetch('/api/nvm/corpus').then(r => r.json()).then((d: CorpusData) => {
+      if (!mountedRef.current) return;
       setRuns(d.runs ?? []);
       if (d.runs?.length >= 2) {
         setRunIdA(d.runs[0].run_id);
         setRunIdB(d.runs[1].run_id);
       }
     }).catch((e: unknown) => {
-      setError(e instanceof Error ? e.message : 'Failed to load corpus');
-    }).finally(() => setLoading(false));
+      if (mountedRef.current) setError(e instanceof Error ? e.message : 'Failed to load corpus');
+    }).finally(() => { if (mountedRef.current) setLoading(false); });
   }, []);
 
   async function runDiff() {

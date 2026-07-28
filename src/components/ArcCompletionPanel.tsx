@@ -3,7 +3,7 @@
 // counting down, broken relationships, unresolved themes, and object
 // arcs in intermediate states, each with a pacing score + completion window.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,17 +59,25 @@ export function ArcCompletionPanel({ onClose }: Props) {
   const [filter, setFilter]     = useState<PromiseKind | 'ALL'>('ALL');
   const [urgFilter, setUrgFilter] = useState<PromiseUrgency | 'ALL'>('ALL');
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // the panel mid-fetch), preventing setState-after-unmount warnings and
+  // stale-response overwrites. Mirrors CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/nvm/arc-completion');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       setReport(await res.json());
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
@@ -102,8 +110,8 @@ export function ArcCompletionPanel({ onClose }: Props) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button aria-label="Refresh" onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 

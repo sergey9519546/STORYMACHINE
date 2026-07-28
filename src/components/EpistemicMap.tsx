@@ -4,7 +4,7 @@
 // and opacity encodes confidence. A live window into the story's information
 // asymmetry — who knows what, who's been deceived, where dramatic irony lives.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Brain, RefreshCw, X } from 'lucide-react';
 
 interface BeliefEdgeData {
@@ -40,6 +40,11 @@ export default function EpistemicMap({ onClose }: EpistemicMapProps) {
   const [selectedEdge, setSelectedEdge] = useState<BeliefEdgeData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -48,13 +53,14 @@ export default function EpistemicMap({ onClose }: EpistemicMapProps) {
         fetch('/api/belief-edges'),
         fetch('/api/state'),
       ]);
+      if (!mountedRef.current) return;
       if (edgeRes.ok) setEdges(await edgeRes.json() as BeliefEdgeData[]);
       if (stateRes.ok) {
         const data = await stateRes.json() as { agents: CharacterState[] };
         setAgents(data.agents ?? []);
       }
-    } catch { setErrorMsg('Failed to load epistemic data'); }
-    finally { setLoading(false); }
+    } catch { if (mountedRef.current) setErrorMsg('Failed to load epistemic data'); }
+    finally { if (mountedRef.current) setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);

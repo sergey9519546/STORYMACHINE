@@ -3,7 +3,7 @@
 //   quality score, regression grade, tension total, proof pass rate
 // — one data point per committed scene, rendered as sparklines + a scene table.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -104,14 +104,20 @@ export function MomentumPanel({ onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const res = await fetch('/api/nvm/momentum');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       setData(await res.json());
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setLoading(false); }
+    } catch (e) { if (mountedRef.current) setError(e instanceof Error ? e.message : String(e)); }
+    finally { if (mountedRef.current) setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -140,8 +146,8 @@ export function MomentumPanel({ onClose }: Props) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button aria-label="Refresh" onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 

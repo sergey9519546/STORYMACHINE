@@ -2,7 +2,7 @@
 // Replays state to the selected commit, runs all 4 tiers + lint + repair,
 // and renders per-proof pass/fail badges, findings, and patch suggestions.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,17 +63,23 @@ export function ProofInspectorPanel({ onClose }: Props) {
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError]             = useState<string | null>(null);
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes
+  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const loadList = useCallback(async () => {
     setLoadingList(true);
     try {
       const res = await fetch('/api/nvm/arc-timeline');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       const data: { scenes: TimelineScene[] } = await res.json();
       setScenes(data.scenes);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (mountedRef.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoadingList(false);
+      if (mountedRef.current) setLoadingList(false);
     }
   }, []);
 
@@ -87,11 +93,12 @@ export function ProofInspectorPanel({ onClose }: Props) {
     try {
       const res = await fetch(`/api/nvm/proof/${commitId}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      if (!mountedRef.current) return;
       setReport(await res.json());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (mountedRef.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoadingReport(false);
+      if (mountedRef.current) setLoadingReport(false);
     }
   }
 
@@ -110,7 +117,7 @@ export function ProofInspectorPanel({ onClose }: Props) {
             Select any committed scene · run all tiers · see findings + repair patches
           </div>
         </div>
-        <button onClick={onClose} style={iconBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={iconBtn}>✕</button>
       </div>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -119,7 +126,7 @@ export function ProofInspectorPanel({ onClose }: Props) {
         <div style={{ width: 260, flexShrink: 0, borderRight: '1px solid var(--sm-night-line)', overflowY: 'auto', padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>COMMITTED SCENES</span>
-            <button onClick={loadList} style={{ ...chipBtn('var(--sm-night-2)'), fontSize: 10 }}>↺</button>
+            <button aria-label="Refresh" onClick={loadList} style={{ ...chipBtn('var(--sm-night-2)'), fontSize: 10 }}>↺</button>
           </div>
 
           {loadingList && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 20 }}>Loading…</div>}
