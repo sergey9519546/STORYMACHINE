@@ -118,12 +118,12 @@ export type FixPhase =
 // header is injected globally by src/main.tsx's fetch monkey-patch (see
 // src/lib/session.ts's header comment), so no call site here needs to opt in.
 
-/** GET /api/ai-config — llmReady ORs the two independent key sources
- *  server-side (env GEMINI_API_KEY and the multi-provider config); this
- *  reads the flag only, never guessing at which source is live. Returns null
- *  (treated as "unknown, don't hard-disable yet") on any network failure or
- *  malformed response, rather than throwing — this is a best-effort
- *  affordance check, not a gate the rest of the editor depends on. */
+/** GET /api/ai-config — llmReady is evaluated server-side against the active
+ *  text provider; this reads the flag only, never guessing from credentials in
+ *  the browser. Returns null (treated as "unknown, don't hard-disable yet")
+ *  on any network failure or malformed response, rather than throwing — this
+ *  is a best-effort affordance check, not a gate the rest of the editor depends
+ *  on. */
 async function fetchAiConfigReady(): Promise<boolean | null> {
   try {
     const res = await fetch('/api/ai-config');

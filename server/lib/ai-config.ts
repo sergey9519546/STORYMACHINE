@@ -149,6 +149,39 @@ export function getPublicConfig(): AiRuntimeConfig & {
   };
 }
 
+// ── Readiness (single source of truth) ────────────────────────────────────────
+// `llmReady` is the readiness signal shared by routes that expose the
+// configured text-generation workflow. It must evaluate the ACTIVE configured
+// provider, not OR unrelated credentials: an OpenAI-compatible key cannot
+// power Gemini, and a Gemini key cannot power a selected OpenAI-compatible
+// endpoint.
+//
+// OPENROUTER_API_KEY is intentionally not accepted here. The legacy FreeRide
+// bridge is not yet response-compatible with the ScriptIDE routes (its bridge
+// object has no `.text` getter), so treating that key as readiness would send a
+// writer's draft to a provider and return an empty or invalid result. It stays
+// unavailable to this surface until that provider has an end-to-end contract.
+//
+// Keyless OpenAI-compatible endpoints are supported only for loopback local
+// model servers such as Ollama and LM Studio. A public endpoint must have an
+// explicit runtime key; otherwise we fail closed instead of issuing an
+// unauthenticated request to an arbitrary URL.
+function isLoopbackBaseUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
+export function llmReady(): boolean {
+  const pub = getPublicConfig();
+  if (pub.provider === 'gemini') return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(pub.baseUrl) && (pub.keySet || isLoopbackBaseUrl(pub.baseUrl));
+}
+
 const VALID_PROVIDERS: readonly string[]      = ['gemini', 'openai-compat'];
 const VALID_MEDIA_PROVIDERS: readonly string[] = ['gemini', 'openai-compat', 'none'];
 
