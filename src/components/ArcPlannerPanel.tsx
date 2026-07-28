@@ -205,7 +205,7 @@ export function ArcPlannerPanel({ onClose }: Props) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
         <strong style={{ fontSize: 15 }}>Arc Compiler — multi-scene convergence</strong>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
+        <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
       </div>
 
       {/* Genre presets */}
@@ -267,7 +267,7 @@ export function ArcPlannerPanel({ onClose }: Props) {
             </div>
             <div />
             <div />
-            <button onClick={() => removeScene(i)} disabled={scenes.length <= 1}
+            <button aria-label="Close" onClick={() => removeScene(i)} disabled={scenes.length <= 1}
               style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 14 }}>✕</button>
           </div>
         ))}

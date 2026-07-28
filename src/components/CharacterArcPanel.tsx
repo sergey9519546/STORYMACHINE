@@ -128,8 +128,8 @@ export function CharacterArcPanel({ onClose }: Props) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button aria-label="Refresh" onClick={load} style={chipBtn('var(--sm-night-2)')}>↺</button>
+          <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       </div>
 
@@ -149,7 +149,12 @@ export function CharacterArcPanel({ onClose }: Props) {
             {data.characters.map(c => {
               const sel = c.charId === selectedChar;
               return (
-                <div key={c.charId} onClick={() => setSelectedChar(c.charId)} style={{
+                <div key={c.charId} onClick={() => setSelectedChar(c.charId)}
+                  role="button" tabIndex={0}
+                  aria-label={`Select character ${c.charId}`}
+                  aria-pressed={sel}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedChar(c.charId); } }}
+                  style={{
                   background: sel ? '#1e2d4a' : 'var(--sm-night-2)',
                   border: `1px solid ${sel ? '#3b82f6' : 'var(--sm-night-line)'}`,
                   borderRadius: 5, padding: '8px 10px', marginBottom: 5, cursor: 'pointer',

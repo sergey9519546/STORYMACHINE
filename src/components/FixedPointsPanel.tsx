@@ -138,7 +138,7 @@ export function FixedPointsPanel({ onClose }: Props) {
           <strong style={{ fontSize: 15 }}>Fixed Points — Temporal Authoring (G9)</strong>
           <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>Drop attractors on future scenes · the planner back-chains the ops needed to reach them</div>
         </div>
-        <button onClick={onClose} style={iconBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={iconBtn}>✕</button>
       </div>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -240,7 +240,7 @@ function FixedPointCard({ idx, fp, onChange, onReqChange, onRemove, onBackchain,
         <button onClick={() => setExpanded(x => !x)} style={{ ...iconBtn, fontSize: 12, marginLeft: 'auto' }}>
           {expanded ? '▲' : '▼'}
         </button>
-        <button onClick={onRemove} disabled={!canRemove} style={{ ...iconBtn, fontSize: 12, opacity: canRemove ? 1 : 0.3 }}>✕</button>
+        <button aria-label="Close" onClick={onRemove} disabled={!canRemove} style={{ ...iconBtn, fontSize: 12, opacity: canRemove ? 1 : 0.3 }}>✕</button>
       </div>
 
       {expanded && (

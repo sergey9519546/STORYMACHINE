@@ -71,7 +71,7 @@ export function ArcTimelinePanel({ onClose }: ArcTimelinePanelProps) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
         <strong style={{ fontSize: 15 }}>Arc Timeline ({scenes.length} scene{scenes.length !== 1 ? 's' : ''})</strong>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
+        <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
       </div>
 
       {loading && <div style={{ color: 'var(--sm-cream-mute)' }}>Loading timeline…</div>}

@@ -148,7 +148,7 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
           <strong style={{ fontSize: 15 }}>Projection Gallery — G3 Holographic Output</strong>
           <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>One canon · every format · pure projection</div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
 
       {/* Tab bar */}

@@ -124,7 +124,7 @@ export function CausalTwinPanel({ onClose }: Props) {
           <strong style={{ fontSize: 15 }}>Causal Twin — Pearl's do()-calculus (G4)</strong>
           <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>Select an op · fire do(remove) · see exactly what breaks downstream</div>
         </div>
-        <button onClick={onClose} style={iconBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={iconBtn}>✕</button>
       </div>
 
       {/* Body: two-column split */}
@@ -137,7 +137,7 @@ export function CausalTwinPanel({ onClose }: Props) {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>CAUSAL DAG — {scm?.nodeCount ?? '…'} ops</span>
-            <button onClick={loadSCM} style={{ ...chip('var(--sm-night-2)'), fontSize: 10 }}>↺</button>
+            <button aria-label="Refresh" onClick={loadSCM} style={{ ...chip('var(--sm-night-2)'), fontSize: 10 }}>↺</button>
           </div>
 
           {scmLoading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 30 }}>Building SCM…</div>}

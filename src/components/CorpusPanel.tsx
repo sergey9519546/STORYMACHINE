@@ -65,7 +65,7 @@ export function CorpusPanel({ onClose }: CorpusPanelProps) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <strong style={{ fontSize: 15 }}>Director Policy (G13 Corpus)</strong>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
+        <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>x</button>
       </div>
 
       {loading && <div style={{ color: 'var(--sm-cream-mute)' }}>Loading corpus…</div>}
