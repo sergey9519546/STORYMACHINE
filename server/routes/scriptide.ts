@@ -2,6 +2,7 @@ import express from 'express';
 import { Type } from '@google/genai';
 import { generateContent, modelForTask, getImageProvider, getTTSProvider } from '../engine/ai.ts';
 import { llmReady } from '../lib/ai-config.ts';
+import { isWholeDraftAnalysisComplete } from '../lib/analysis-completeness.ts';
 import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
@@ -23,7 +24,17 @@ import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
 import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
-import type { DoctorSource, LiveDiagnosis } from '../nvm/analyze/types.ts';
+import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
+
+/** The core keeps health/grade sentinel fields for internal compatibility, but
+ * a browser response must never serialize those values as if they were an
+ * assessment when the whole draft was not analyzed. Partial issue evidence is
+ * still returned and explicitly marked through analysisComplete. */
+function publicDoctorReport(report: ScriptDoctorReport): Omit<ScriptDoctorReport, 'health' | 'grade'> | ScriptDoctorReport {
+  if (isWholeDraftAnalysisComplete(report)) return report;
+  const { health: _health, grade: _grade, ...withoutHeadlineScores } = report;
+  return withoutHeadlineScores;
+}
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
 const AnalyzeScriptSchema = {
@@ -310,7 +321,7 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // existing consumer of the report shape.
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
-  res.json({ ...report, rootCauses, source });
+  res.json({ ...publicDoctorReport(report), rootCauses, source });
 }));
 
 // POST /api/scriptide/doctor/deep — opt-in "deep read" sibling of /doctor
@@ -388,7 +399,7 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
   // of the resulting issues, so this step is identical either way.
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
-  res.json({ ...report, rootCauses, source });
+  res.json({ ...publicDoctorReport(report), rootCauses, source });
 }));
 
 // POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
@@ -494,7 +505,7 @@ router.post(
     // report's own `passes` plus the converted Fountain text already in scope.
     const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
     const rootCauses = clusterIssues(locateIssues(issuesWithPass, converted.fountain));
-    res.json({ ...report, rootCauses, source });
+    res.json({ ...publicDoctorReport(report), rootCauses, source });
   }),
 );
 
@@ -525,11 +536,16 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   const locatedIssues = locateIssues(issuesWithPass, fountain);
   const rootCauses = clusterIssues(locatedIssues);
+  const analysisComplete = isWholeDraftAnalysisComplete(report);
 
   const diagnosis: LiveDiagnosis = {
-    health: report.health,
-    grade: report.grade,
-    verdict: report.verdict,
+    analysisComplete,
+    ...(analysisComplete
+      ? { health: report.health, grade: report.grade, verdict: report.verdict }
+      : {}),
+    ...(report.truncatedForAnalysis
+      ? { truncatedForAnalysis: true, totalSceneCount: report.totalSceneCount }
+      : {}),
     sceneCount: report.sceneCount,
     locatedIssues,
     rootCauses,

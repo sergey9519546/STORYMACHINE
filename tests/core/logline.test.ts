@@ -423,6 +423,21 @@ describe('buildPitchContent', () => {
 // the builder layer above.
 
 describe('renderPitchKitHtml — pitch content markers', () => {
+  it('refuses a pitch kit when the analysis is incomplete or scene-truncated', async () => {
+    const { renderPitchKitHtml } = await import('../../server/lib/pitchkit-html.ts');
+    const input = {
+      title: 'Incomplete Draft',
+      report: makeReport({ analysisComplete: false }),
+      records: [],
+      sceneCharacters: [],
+    };
+    assert.throws(() => renderPitchKitHtml(input), /complete whole-draft analysis/i);
+    assert.throws(
+      () => renderPitchKitHtml({ ...input, report: makeReport({ analysisComplete: true, truncatedForAnalysis: true }) }),
+      /complete whole-draft analysis/i,
+    );
+  });
+
   it('renders logline, genre, synopsis, and comps sections, plus a cast table with role hints', async () => {
     const { renderPitchKitHtml } = await import('../../server/lib/pitchkit-html.ts');
 

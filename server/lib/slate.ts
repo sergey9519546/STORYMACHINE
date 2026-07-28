@@ -15,6 +15,7 @@
 // through escapeHtml() in renderSlateHtml.
 
 import type { ScriptDoctorReport, DimensionScore } from '../nvm/analyze/types.ts';
+import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 
 export interface SlateEntry {
   title: string;
@@ -22,16 +23,18 @@ export interface SlateEntry {
   verdict?: ScriptDoctorReport['verdict'];
   healthPercentile?: number;
   sceneCount: number;
+  /** True submitted scene count when this row covers a truncated prefix. */
+  totalSceneCount?: number;
   wordCount: number;
   /** Label (e.g. "Structure & Pacing") of the dimension with the highest score. */
-  topDimension: string;
+  topDimension?: string;
   /** Label of the dimension with the lowest score. */
-  weakestDimension: string;
+  weakestDimension?: string;
   contentHash: string;
-  /** G0-05: false when the underlying report's analysis did not complete (a
-   *  revision pass threw). Its `health` is a sentinel (0) that must NOT be
-   *  presented as a real score — renderers show an "incomplete" badge and
-   *  rankSlate holds it out of the scored ranking. */
+  /** G0-05: false when the underlying report does not cover a complete whole
+   *  draft (failed pass or scene truncation). Its `health` is a sentinel (0)
+   *  that must NOT be presented as a real score — renderers show an
+   *  "incomplete" badge and rankSlate holds it out of the scored ranking. */
   analysisComplete: boolean;
 }
 
@@ -59,18 +62,21 @@ export function pickTopWeakestDimensions(dimensions: DimensionScore[]): { top: s
  *  export uses (runScriptDoctor doesn't always populate it yet — see
  *  types.ts's own doc comment on ScriptDoctorReport.contentHash). */
 export function buildSlateEntry(title: string, report: ScriptDoctorReport, contentHash: string): SlateEntry {
-  const { top, weakest } = pickTopWeakestDimensions(report.dimensions ?? []);
+  const analysisComplete = isWholeDraftAnalysisComplete(report);
+  const dimensions = analysisComplete
+    ? pickTopWeakestDimensions(report.dimensions ?? [])
+    : undefined;
   return {
     title,
     health: report.health,
     verdict: report.verdict,
     healthPercentile: report.healthPercentile,
     sceneCount: report.sceneCount,
+    ...(report.truncatedForAnalysis ? { totalSceneCount: report.totalSceneCount } : {}),
     wordCount: report.wordCount,
-    topDimension: top,
-    weakestDimension: weakest,
+    ...(dimensions ? { topDimension: dimensions.top, weakestDimension: dimensions.weakest } : {}),
     contentHash,
-    analysisComplete: report.analysisComplete !== false,
+    analysisComplete,
   };
 }
 
@@ -84,8 +90,8 @@ export function buildSlateEntry(title: string, report: ScriptDoctorReport, conte
  *  themselves) where renderers badge them "incomplete" instead of ranking
  *  them as the weakest bet. */
 export function rankSlate(entries: SlateEntry[]): SlateEntry[] {
-  const scored = entries.filter(e => e.analysisComplete !== false);
-  const incomplete = entries.filter(e => e.analysisComplete === false);
+  const scored = entries.filter(e => e.analysisComplete === true);
+  const incomplete = entries.filter(e => e.analysisComplete !== true);
   scored.sort((a, b) => b.health - a.health);
   return [...scored, ...incomplete];
 }
@@ -218,7 +224,10 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
     // G0-05: incomplete analyses have a sentinel health (0) that is not a real
     // score — badge them "incomplete" and suppress the derived cells rather
     // than rendering a health chip, verdict, or rank that reads as scored.
-    if (entry.analysisComplete === false) {
+    if (entry.analysisComplete !== true) {
+      const scope = entry.totalSceneCount !== undefined
+        ? `${entry.sceneCount.toLocaleString('en-US')} of ${entry.totalSceneCount.toLocaleString('en-US')} scenes analyzed`
+        : `${entry.sceneCount.toLocaleString('en-US')} scenes analyzed before analysis became incomplete`;
       return `
     <tr>
       <td class="rank-cell">&mdash;</td>
@@ -226,8 +235,7 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
       <td><span class="health-chip" style="background:#52525b;">incomplete</span></td>
       <td>&mdash;</td>
       <td class="verdict-cell" style="color:#64748b;">&mdash;</td>
-      <td>${entry.sceneCount.toLocaleString('en-US')}</td>
-      <td>${entry.wordCount.toLocaleString('en-US')}</td>
+      <td colspan="2">${scope}</td>
       <td>&mdash;</td>
       <td>&mdash;</td>
       <td class="hash-cell">${escapeHtml(entry.contentHash.slice(0, 10))}</td>
@@ -247,8 +255,8 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
       <td class="verdict-cell" style="color:${verdictColor};">${escapeHtml(entry.verdict ?? 'N/A')}</td>
       <td>${entry.sceneCount.toLocaleString('en-US')}</td>
       <td>${entry.wordCount.toLocaleString('en-US')}</td>
-      <td>${escapeHtml(entry.topDimension)}</td>
-      <td>${escapeHtml(entry.weakestDimension)}</td>
+      <td>${escapeHtml(entry.topDimension ?? 'N/A')}</td>
+      <td>${escapeHtml(entry.weakestDimension ?? 'N/A')}</td>
       <td class="hash-cell">${escapeHtml(entry.contentHash.slice(0, 10))}</td>
     </tr>`;
   }).join('\n');

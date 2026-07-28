@@ -2,6 +2,13 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, freshSessionId, type TestServer } from './helpers.ts';
 
+function buildSceneTruncatedFountain(): string {
+  return Array.from(
+    { length: 1_001 },
+    (_, index) => `INT. ROOM ${index} - DAY\n\nA person waits.`,
+  ).join('\n\n');
+}
+
 describe('routes/nvm — HTTP behavior', async () => {
   let server: TestServer;
   before(async () => { server = await startTestServer(); });
@@ -228,5 +235,17 @@ describe('routes/nvm — HTTP behavior', async () => {
       body: JSON.stringify({ scriptText: '' }),
     });
     assert.equal(res.status, 400);
+  });
+
+  it('POST /api/nvm/analyze/compare refuses a scene-truncated prefix before making comparative claims', async () => {
+    const res = await fetch(`${server.baseUrl}/api/nvm/analyze/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptText: buildSceneTruncatedFountain() }),
+    });
+    assert.equal(res.status, 422);
+    const body = await res.json();
+    assert.equal(body.error, 'analysis_incomplete');
+    assert.equal(body.healthMetrics, undefined);
   });
 });

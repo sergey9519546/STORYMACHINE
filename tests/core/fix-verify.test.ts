@@ -284,6 +284,69 @@ Should I even trust you anymore?`;
     assert.equal(result.after, undefined);
   });
 
+  it('refuses to send a rewrite request when the baseline analysis is incomplete', async () => {
+    const completeReport = await runScriptDoctor(FOUNTAIN);
+    const incompleteBaseline = {
+      ...completeReport,
+      analysisComplete: false,
+      truncatedForAnalysis: true,
+      totalSceneCount: 1_001,
+    };
+    let providerCalls = 0;
+    setLLMProvider({ generate: async () => {
+      providerCalls += 1;
+      return { text: VALID_REPLACEMENT } as never;
+    } });
+
+    const result = await fixAndVerify(
+      FOUNTAIN,
+      TARGET_SPAN,
+      FIX_ISSUES,
+      { runDoctor: async () => incompleteBaseline },
+    );
+
+    assert.equal(providerCalls, 0, 'an incomplete baseline must not be sent to an AI provider');
+    assert.equal(result.usedLLM, false);
+    assert.match(result.note ?? '', /analysis is incomplete/i);
+    assert.equal(result.candidateFountain, undefined);
+    assert.equal(result.before, undefined);
+    assert.equal(result.after, undefined);
+  });
+
+  it('withholds an AI candidate and every verification claim when candidate analysis is incomplete', async () => {
+    const completeReport = await runScriptDoctor(FOUNTAIN);
+    const incompleteCandidate = {
+      ...completeReport,
+      analysisComplete: false,
+      truncatedForAnalysis: true,
+      totalSceneCount: 1_001,
+    };
+    let doctorCalls = 0;
+    setLLMProvider(mockProvider(VALID_REPLACEMENT));
+
+    const result = await fixAndVerify(
+      FOUNTAIN,
+      TARGET_SPAN,
+      FIX_ISSUES,
+      {
+        runDoctor: async () => {
+          doctorCalls += 1;
+          return doctorCalls === 1 ? completeReport : incompleteCandidate;
+        },
+      },
+    );
+
+    assert.equal(result.usedLLM, true, 'the provider call occurred before verification failed');
+    assert.match(result.note ?? '', /verification is incomplete/i);
+    assert.equal(result.candidateFountain, undefined);
+    assert.equal(result.spanReplacement, undefined);
+    assert.equal(result.span, undefined);
+    assert.equal(result.before, undefined);
+    assert.equal(result.after, undefined);
+    assert.equal(result.cleared, undefined);
+    assert.equal(result.introduced, undefined);
+  });
+
   it('span clamping: out-of-range and reversed line numbers never throw', async () => {
     setLLMProvider(mockProvider(VALID_REPLACEMENT));
     await assert.doesNotReject(() => fixAndVerify(FOUNTAIN, { startLine: 99999, endLine: 999999 }, FIX_ISSUES));

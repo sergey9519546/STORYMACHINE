@@ -21,6 +21,7 @@ import type {
   ScriptDoctorReport, DimensionScore, SceneDiagnostics, CoverageVerdict,
 } from '../nvm/analyze/types.ts';
 import type { RevisionIssue, PassName } from '../nvm/revision/passes/types.ts';
+import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the
@@ -629,6 +630,10 @@ export interface CoverageHtmlOptions {
  * interpolation.
  */
 export function renderCoverageHtml(report: ScriptDoctorReport, title: string, opts: CoverageHtmlOptions = {}): string {
+  if (!isWholeDraftAnalysisComplete(report)) {
+    throw new Error('Coverage export requires a complete whole-draft analysis.');
+  }
+
   // Title fallback chain: explicit title > parsed title page > 'Untitled'.
   // An explicit 'Untitled' (the client's own default when no title field was
   // posted — see server/routes/export.ts) is treated the same as empty, so

@@ -63,6 +63,7 @@
 
 import { runScriptDoctor } from './doctor.ts';
 import { generateContent, modelForTask } from '../../engine/ai.ts';
+import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { parseFountain } from '../../../src/lib/fountain.ts';
 import type { FixVerifyResult, ScriptDoctorReport } from './types.ts';
@@ -76,6 +77,13 @@ export interface FixIssueInput {
   rule: string;
   description: string;
   suggestedFix?: string;
+}
+
+/** Test seam for the deterministic verifier. Production deliberately uses the
+ * real doctor; the seam lets regressions prove that no provider request or
+ * unverified receipt can escape when a report is incomplete. */
+export interface FixAndVerifyDependencies {
+  runDoctor?: typeof runScriptDoctor;
 }
 
 type TaggedIssue = RevisionIssue & { pass: PassName };
@@ -297,9 +305,17 @@ export async function fixAndVerify(
   fountain: string,
   target: { startLine: number; endLine: number },
   issues: FixIssueInput[],
+  dependencies: FixAndVerifyDependencies = {},
 ): Promise<FixVerifyResult> {
   // ── 1. Baseline ───────────────────────────────────────────────────────
-  const baseline = await runScriptDoctor(fountain);
+  const runDoctor = dependencies.runDoctor ?? runScriptDoctor;
+  const baseline = await runDoctor(fountain);
+  if (!isWholeDraftAnalysisComplete(baseline)) {
+    return {
+      usedLLM: false,
+      note: 'AI fix is unavailable because the current analysis is incomplete. Re-run the analysis before requesting a fix.',
+    };
+  }
 
   // ── 2. Span extraction ───────────────────────────────────────────────
   const lines = fountain.split('\n');
@@ -357,7 +373,13 @@ export async function fixAndVerify(
     ...lines.slice(span.endLine),
   ].join('\n');
 
-  const candidateReport = await runScriptDoctor(candidateFountain);
+  const candidateReport = await runDoctor(candidateFountain);
+  if (!isWholeDraftAnalysisComplete(candidateReport)) {
+    return {
+      usedLLM: true,
+      note: 'An AI rewrite was generated, but verification is incomplete, so no candidate or score is available.',
+    };
+  }
 
   // ── 6. Delta (whole document, not just the span) ─────────────────────
   const { cleared, introduced } = multisetDiff(flattenIssues(baseline), flattenIssues(candidateReport));

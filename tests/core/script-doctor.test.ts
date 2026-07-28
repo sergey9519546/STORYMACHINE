@@ -946,25 +946,19 @@ describe('runScriptDoctor — plainSummary', () => {
   });
 });
 
-describe('runScriptDoctor — degenerate zero-scene coverage layer', () => {
-  it('returns PASS, empty strengths, and all-zero (but present) dimensions for whitespace-only input', async () => {
+describe('runScriptDoctor — degenerate zero-scene truth contract', () => {
+  it('withholds every whole-draft assessment from whitespace-only input', async () => {
     const report = await runScriptDoctor('   \n\n  \t  ');
 
-    assert.equal(report.verdict, 'PASS');
-    assert.deepEqual(report.strengths, []);
-
-    assert.ok(report.dimensions, 'dimensions must still be present on the degenerate report');
-    const dimensions = report.dimensions!;
-    assert.equal(dimensions.length, 5);
-    assert.deepEqual(dimensions.map(d => d.key), DIMENSION_CONTRACT_ORDER.map(d => d.key));
-    for (const dim of dimensions) {
-      assert.equal(dim.score, 0);
-      assert.equal(dim.issueCount, 0);
-      assert.ok(dim.summary.length > 0);
-    }
-
+    assert.equal(report.analysisComplete, false);
+    assert.equal(report.health, 0, 'wire-compatible sentinel only; consumers must withhold it');
+    assert.equal(report.grade, 'troubled');
+    assert.equal(report.verdict, undefined);
+    assert.equal(report.dimensions, undefined);
+    assert.equal(report.strengths, undefined);
     assert.ok(report.plainSummary && report.plainSummary.length > 0);
-    assert.ok(report.plainSummary!.includes('PASS'));
+    assert.match(report.plainSummary!, /no screenplay scenes were found/i);
+    assert.match(report.plainSummary!, /score and verdict are withheld/i);
   });
 });
 
@@ -1053,18 +1047,11 @@ describe('runScriptDoctor — calibration percentiles', () => {
     }
   });
 
-  it('leaves healthPercentile and every dimension percentile undefined for degenerate whitespace-only input', async () => {
+  it('withholds percentile and dimension fields for degenerate whitespace-only input', async () => {
     const report = await runScriptDoctor('   \n\n  \t  ');
 
     assert.equal(report.healthPercentile, undefined, 'the zero-scene report must never populate healthPercentile');
-    assert.ok(report.dimensions, 'dimensions must still be present on the degenerate report');
-    for (const dim of report.dimensions!) {
-      assert.equal(dim.percentile, undefined, `dimension ${dim.key} must not carry a percentile on the degenerate report`);
-      assert.equal(
-        dim.percentileDescriptor, undefined,
-        `dimension ${dim.key} must not carry a percentileDescriptor on the degenerate report`,
-      );
-    }
+    assert.equal(report.dimensions, undefined, 'a zero-scene report must not carry fabricated dimension readings');
   });
 
   it('is deterministic: two runs on the same input produce identical healthPercentile and per-dimension percentiles', async () => {
@@ -1345,16 +1332,17 @@ describe('analyzeFountainText / runScriptDoctor — truncation denominator scope
     const padReport = await runScriptDoctor(padded);
 
     assert.equal(baseReport.analysisComplete, true);
-    assert.equal(padReport.analysisComplete, true);
+    assert.equal(padReport.analysisComplete, false);
     assert.ok(padReport.truncatedForAnalysis, 'padded script must trip the analyzer ceiling');
     assert.ok((padReport.totalSceneCount ?? 0) > padReport.sceneCount,
       'totalSceneCount must exceed analyzed sceneCount when truncated');
+    assert.equal(padReport.health, 0, 'partial-prefix health must be withheld, not ranked');
+    assert.equal(padReport.verdict, undefined, 'partial-prefix verdict must be withheld');
+    assert.equal(padReport.dimensions, undefined, 'partial-prefix dimensions must be withheld');
 
-    // Core invariant: ignored post-ceiling text must not raise health.
-    assert.ok(
-      padReport.health <= baseReport.health,
-      `post-ceiling padding improved health from ${baseReport.health} to ${padReport.health}`,
-    );
+    // Core invariant: ignored post-ceiling text cannot produce a score that
+    // looks better than the fully analyzed baseline.
+    assert.ok(padReport.health <= baseReport.health);
   });
 });
 

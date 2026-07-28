@@ -14,6 +14,7 @@ import {
   validate, validateParams, QualityBodySchema, CommitIdParamSchema,
   StoryVectorCompareBodySchema,
 } from '../../lib/validation.ts';
+import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
 import { logger } from '../../lib/logger.ts';
 
 const router = express.Router();
@@ -167,6 +168,22 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
   const { extractGenome, findStructuralTemplate } = await import('../../nvm/analyze/structural-genome.ts');
   const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');
   const { runScriptDoctor } = await import('../../nvm/analyze/doctor.ts');
+
+  // A similarity/health comparison over a scene-truncated prefix would look
+  // like a claim about the whole draft. Refuse it before corpus I/O or vector
+  // work so partial input cannot acquire a polished comparative result.
+  const queryReport = await runScriptDoctor(scriptText);
+  if (!isWholeDraftAnalysisComplete(queryReport)) {
+    res.status(422).json({
+      error: 'analysis_incomplete',
+      message: 'Comparative analysis is unavailable because the script could not be analyzed completely.',
+      analysisComplete: false,
+      ...(queryReport.truncatedForAnalysis
+        ? { truncatedForAnalysis: true, totalSceneCount: queryReport.totalSceneCount }
+        : {}),
+    });
+    return;
+  }
   
   logger.info('story_vector_vectorizing_input', {});
   const queryVector = await vectorizeScript(scriptText, 'User Draft', 'generated');
@@ -192,7 +209,6 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
   
   // Build scene records for genome extraction (query + top match)
   logger.info('story_vector_extracting_genome', {});
-  const queryReport = await runScriptDoctor(scriptText);
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
   
   // Convert Script Doctor report to scene records (simplified)

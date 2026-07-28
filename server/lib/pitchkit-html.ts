@@ -24,6 +24,7 @@
 import type { ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import type { ScreenplaySceneRecord } from '../nvm/screenplay/memory.ts';
 import type { SceneCharacterTally } from './breakdown.ts';
+import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 
 // ── Escaping (identical discipline to coverage-html.ts) ──────────────────────
 function escapeHtml(value: string): string {
@@ -525,6 +526,10 @@ export interface PitchKitInput {
  * pitch content) escaped via escapeHtml() before interpolation.
  */
 export function renderPitchKitHtml(input: PitchKitInput): string {
+  if (!isWholeDraftAnalysisComplete(input.report)) {
+    throw new Error('Pitch kit export requires a complete whole-draft analysis.');
+  }
+
   // Title fallback chain: explicit title > parsed title page > 'Untitled'.
   // An explicit 'Untitled' (the client's own default when no title field was
   // posted — see server/routes/export.ts) is treated the same as empty, so

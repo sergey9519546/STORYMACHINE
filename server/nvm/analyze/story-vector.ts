@@ -19,6 +19,7 @@
 
 import crypto from 'node:crypto';
 import type { RevisionIssue, PassName } from '../revision/passes/types.ts';
+import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
 
 /** RevisionIssue doesn't carry its own pass name (that's tracked one level up,
  *  on PassResult/DoctorPassSummary) — this module needs it to build "pass::
@@ -57,6 +58,12 @@ export interface StoryVector {
     
     /** Optional: word count from the screenplay */
     wordCount?: number;
+
+    /** Present only when vectorizeScript confirmed that every diagnostic pass
+     *  covered the complete submitted draft. Corpus caches require this
+     *  receipt so a legacy prefix-only vector cannot be reused as a
+     *  whole-draft comparison. */
+    wholeDraftAnalysisComplete?: true;
   };
 }
 
@@ -148,29 +155,36 @@ export let vectorizeFromIssues: VectorizeFromIssuesFn = vectorizeFromIssuesCore;
  *  @param fountainText - Raw Fountain screenplay text
  *  @param title - Human-readable title for this screenplay
  *  @param source - Provenance tag ('generated' | 'corpus' | 'synthetic')
- *  @returns StoryVector ready for comparison */
+ *  @returns StoryVector ready for comparison
+ *  @throws when the doctor could not analyze the complete submitted draft */
 export async function vectorizeScript(
   fountainText: string,
   title: string,
   source: 'generated' | 'corpus' | 'synthetic' = 'generated'
 ): Promise<StoryVector> {
-  const { runScriptDoctor } = await import('./doctor.ts');
-  const { computeContentHash } = await import('./doctor.ts');
+  const { runScriptDoctor, computeContentHash } = await import('./doctor.ts');
   
   // Run Script Doctor to get rule-firing pattern
   const report = await runScriptDoctor(fountainText);
+  if (!isWholeDraftAnalysisComplete(report)) {
+    throw new Error('Story vector requires a complete whole-draft analysis.');
+  }
   
   // Flatten all issues from all 14 passes, tagging each with its pass name
   // (RevisionIssue itself doesn't carry it — see TaggedIssue above).
   const allIssues = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   
-  return vectorizeFromIssues(allIssues, {
+  const vector = vectorizeFromIssues(allIssues, {
     title,
     source,
     contentHash: computeContentHash(fountainText),
     sceneCount: report.sceneCount,
     wordCount: report.wordCount,
   });
+  return {
+    ...vector,
+    metadata: { ...vector.metadata, wholeDraftAnalysisComplete: true },
+  };
 }
 
 // ── Similarity & Distance ──────────────────────────────────────────────────

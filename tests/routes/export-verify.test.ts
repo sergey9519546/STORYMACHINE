@@ -74,6 +74,13 @@ function sha256(text: string): string {
   return createHash('sha256').update(text.trim()).digest('hex');
 }
 
+function buildSceneTruncatedFountain(): string {
+  return Array.from(
+    { length: 1_001 },
+    (_, index) => `INT. ROOM ${index} - DAY\n\nA person waits.`,
+  ).join('\n\n');
+}
+
 describe('routes/export/verify — HTTP behavior', async () => {
   let server: TestServer;
   const contentHash = sha256(MULTI_SCENE_FOUNTAIN);
@@ -192,6 +199,17 @@ describe('routes/export/verify — HTTP behavior', async () => {
     assert.equal(body.verified, true);
     assert.deepEqual(body.mismatches, []);
     assert.equal(body.recomputed.contentHash, fdxContentHash);
+  });
+
+  it('refuses to attest a score or verdict when recomputation covers only a scene-truncated prefix', async () => {
+    const fountain = buildSceneTruncatedFountain();
+    const res = await post({ fountain, expected: { contentHash: sha256(fountain) } });
+    assert.equal(res.status, 422);
+    const body = await res.json();
+    assert.equal(body.verified, false);
+    assert.equal(body.error, 'analysis_incomplete');
+    assert.match(body.message, /complete/i);
+    assert.equal(body.recomputed, undefined);
   });
 
   it('missing expected.contentHash -> 400', async () => {

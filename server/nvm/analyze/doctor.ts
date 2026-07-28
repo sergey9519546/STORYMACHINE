@@ -804,20 +804,6 @@ function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCo
   });
 }
 
-/** All-5 zero-score dimensions for the degenerate zero-scene report. Each
- *  still names its own label so a reader can tell nothing was silently
- *  dropped — there was simply nothing to score. */
-function emptyDimensions(): DimensionScore[] {
-  return DIMENSION_DEFS.map(def => ({
-    key: def.key,
-    label: def.label,
-    passes: def.passes,
-    score: 0,
-    issueCount: 0,
-    summary: `${def.label} could not be scored — this submission has no scenes to analyze.`,
-  }));
-}
-
 // ── Strengths ─────────────────────────────────────────────────────────────────
 
 export interface StrengthsInput {
@@ -1810,14 +1796,17 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     // computed independently of calibration and remain fully valid on their own.
   }
 
-  // P0.3: When any pass threw and was skipped, the issue count is artificially
-  // low — a failed detector returning zero issues can make a script look
-  // healthier than one where the detector ran. Withhold verdict, percentiles,
-  // and dimensions rather than presenting a misleadingly complete report.
-  // health/grade are always provided (required by the interface) but set to
-  // sentinel values (0 / 'troubled') when incomplete — the client must check
-  // analysisComplete before displaying them.
-  const analysisComplete = result.failedPasses.length === 0;
+  // P0 truth invariant: a whole-draft score is valid only when every pass ran
+  // AND the analyzer covered the whole submitted draft. A failed pass can make
+  // a script look artificially healthy; a scene ceiling can make a prefix look
+  // healthier than the unseen remainder. Either case withholds every headline
+  // claim. The partial findings remain available as explicitly incomplete
+  // diagnostic evidence, never as a full-draft verdict or ranking.
+  const failedPasses = result.failedPasses;
+  const analysisComplete = failedPasses.length === 0 && !analysis.truncatedForAnalysis;
+  const incompleteSummary = analysis.truncatedForAnalysis && analysis.totalSceneCount !== undefined
+    ? `Analysis incomplete — this script has ${analysis.totalSceneCount} scenes, exceeding the analyzer's ${analysis.sceneCount}-scene limit. Only the first ${analysis.sceneCount} scenes were analyzed; the score and verdict are withheld.`
+    : `Analysis incomplete — ${failedPasses.length} diagnostic pass(es) failed: ${failedPasses.join(', ')}. The score and verdict are withheld because the issue count may be artificially low.`;
 
   return {
     health: analysisComplete ? health : 0,
@@ -1833,16 +1822,16 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     wordCount: analysis.wordCount,
     analyzedAt: Date.now(),
     analysisComplete,
-    ...(analysisComplete ? {} : { failedPasses: result.failedPasses }),
+    ...(failedPasses.length > 0 ? { failedPasses } : {}),
     verdict: analysisComplete ? verdict : undefined,
     dimensions: analysisComplete ? dimensions : undefined,
     strengths: analysisComplete ? strengths : undefined,
-    plainSummary: analysisComplete
-      ? plainSummary
-      : `Analysis incomplete — ${result.failedPasses.length} diagnostic pass(es) failed: ${result.failedPasses.join(', ')}. The score and verdict are withheld because the issue count may be artificially low.`,
+    plainSummary: analysisComplete ? plainSummary : incompleteSummary,
     contentHash: computeContentHash(fountain),
     healthPercentile: analysisComplete ? healthPercentile : undefined,
-    metrics,
+    // These summarize the whole narrative. A prefix-only analysis must not
+    // present them as if they described the unexamined remainder of a draft.
+    metrics: analysisComplete ? metrics : undefined,
     pageEstimate: estimatePages(fountain) ?? undefined,
     excerptNote: excerptNoteFor(analysis.sceneCount),
     emotionalArc: computeEmotionalArc(scenesFromFountain(fountain)),
@@ -1854,7 +1843,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     bonding: detectBonding(fountain),
     coldOpenPromise: detectColdOpenPromise(fountain),
     patternEstablishment: detectPatternEstablishment(fountain),
-    storyGraph: analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined,
+    storyGraph: analysisComplete && analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined,
     ...(analysis.truncatedForAnalysis
       ? { truncatedForAnalysis: true, totalSceneCount: analysis.totalSceneCount }
       : {}),
@@ -1927,13 +1916,12 @@ export async function runScriptDoctor(
 
   const analysis = analyzeFountainText(fountain);
 
-  // Nothing to diagnose — return a well-formed, worst-case report rather than
-  // running 14 passes over an empty screenplay. The coverage layer degrades
-  // the same way: PASS (there is nothing to recommend), all-zero dimensions
-  // that say so rather than silently omitting themselves, no strengths
-  // (nothing was earned — there was nothing to earn it from), and a
-  // plainSummary that says plainly that the submission was empty instead of
-  // reusing the "problems found" templates on data that doesn't exist.
+  // Nothing to diagnose — return a well-formed incomplete report rather than
+  // running 14 passes over an empty screenplay. An empty input is complete as
+  // text, but it has no screenplay evidence from which a score, PASS verdict,
+  // dimensions, or strengths could be honestly derived. Keep the required
+  // health/grade sentinels only for wire compatibility; every claim boundary
+  // must withhold them via analysisComplete.
   //
   // Deliberately NOT cached: this branch already skips the entire 14-pass
   // pipeline (the whole point of the cache), so memoizing it would only
@@ -1953,11 +1941,9 @@ export async function runScriptDoctor(
       sceneCount: 0,
       wordCount: 0,
       analyzedAt: Date.now(),
-      verdict: 'PASS',
-      dimensions: emptyDimensions(),
-      strengths: [],
+      analysisComplete: false,
       plainSummary:
-        'PASS — this submission is empty, so there is nothing to score; overall craft score 0/100. ' +
+        'Analysis incomplete — no screenplay scenes were found, so the score and verdict are withheld. ' +
         'Add at least one scene of screenplay content and resubmit for a real assessment.',
       contentHash,
     };

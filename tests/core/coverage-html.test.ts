@@ -135,6 +135,20 @@ function buildReport(overrides: Partial<ScriptDoctorReport> = {}): ScriptDoctorR
 }
 
 describe('renderCoverageHtml — full document shape', () => {
+  it('refuses to export a report that is incomplete or scene-truncated', () => {
+    assert.throws(
+      () => renderCoverageHtml(buildReport({ analysisComplete: false, health: 0, verdict: undefined }), 'Incomplete'),
+      /complete whole-draft analysis/i,
+    );
+    assert.throws(
+      () => renderCoverageHtml(
+        buildReport({ analysisComplete: true, truncatedForAnalysis: true, totalSceneCount: 1_001 }),
+        'Truncated',
+      ),
+      /complete whole-draft analysis/i,
+    );
+  });
+
   it('renders a complete standalone document with doctype, title, verdict, all five dimension labels, and a footer hash', () => {
     const report = buildReport();
     const html = renderCoverageHtml(report, 'The Long Wait');
@@ -304,7 +318,7 @@ describe('renderCoverageHtml — full document shape', () => {
     assert.ok(!html.includes('class="logline-line"'));
   });
 
-  it('gracefully handles a degenerate zero-scene report (no dimensions/strengths/heatmap crash)', () => {
+  it('refuses a zero-scene report instead of exporting a fabricated PASS assessment', () => {
     const report = buildReport({
       health: 0,
       grade: 'troubled' as DoctorGrade,
@@ -316,15 +330,16 @@ describe('renderCoverageHtml — full document shape', () => {
       characters: [],
       sceneCount: 0,
       wordCount: 0,
-      verdict: 'PASS' as CoverageVerdict,
-      strengths: [],
-      plainSummary: 'PASS — this submission is empty, so there is nothing to score; overall craft score 0/100.',
+      analysisComplete: false,
+      verdict: undefined,
+      strengths: undefined,
+      dimensions: undefined,
+      plainSummary: 'Analysis incomplete — no screenplay scenes were found, so the score and verdict are withheld.',
     });
 
-    const html = renderCoverageHtml(report, 'Empty Script');
-    assert.ok(html.startsWith('<!DOCTYPE html>'));
-    assert.match(html, /PASS \(decline\)/);
-    assert.match(html, /No scenes were analyzed/);
-    assert.match(html, /Nothing urgent surfaced/);
+    assert.throws(
+      () => renderCoverageHtml(report, 'Empty Script'),
+      /complete whole-draft analysis/i,
+    );
   });
 });

@@ -10,8 +10,9 @@
 //   4. Returns StoryVector[] ready for nearest-neighbor / clustering
 //
 // CACHING STRATEGY: Vectors are cached by contentHash (SHA-256 of the Fountain
-// text). If the cache exists and the hash matches, we skip re-vectorization.
-// This makes subsequent loads ~1000x faster (read JSON vs run full pipeline).
+// text) plus a whole-draft completion receipt. A legacy vector without that
+// receipt is deliberately re-built: a matching full-input hash is not enough
+// if the underlying rules examined only a truncated prefix.
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -75,8 +76,14 @@ async function loadCachedVector(
     const json = await fs.readFile(cachePath, 'utf-8');
     const cached = JSON.parse(json) as StoryVector;
     
-    // Validate cache: hash must match
-    if (cached.metadata.contentHash !== contentHash) {
+    // Validate cache: hash and whole-draft receipt must match. The receipt
+    // intentionally invalidates legacy cache rows, which predate the
+    // truncation guard and could contain a prefix vector labeled with a full
+    // script hash.
+    if (
+      cached.metadata.contentHash !== contentHash ||
+      cached.metadata.wholeDraftAnalysisComplete !== true
+    ) {
       return null; // Cache stale (Fountain text changed)
     }
     

@@ -13,9 +13,10 @@ import {
 import { parseFountain, type FountainBlockType } from '../../src/lib/fountain.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { logger } from '../lib/logger.ts';
+import { isWholeDraftAnalysisComplete } from '../lib/analysis-completeness.ts';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
 import { validate, DoctorBodySchema, SlateBodySchema, VerifyBodySchema, FountainTitleBodySchema } from '../lib/validation.ts';
-import type { CoverageVerdict } from '../nvm/analyze/types.ts';
+import type { CoverageVerdict, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { renderCoverageHtml } from '../lib/coverage-html.ts';
 import { buildBreakdownRows, breakdownRowsToCsv, analyzeSceneCharacters } from '../lib/breakdown.ts';
@@ -34,6 +35,27 @@ function extractFountain(body: unknown): string {
   const b = body as Record<string, unknown>;
   const raw = typeof b['fountain'] === 'string' ? b['fountain'] : '';
   return raw.slice(0, 200_000); // 200 KB max
+}
+
+/** Stops a producer-facing document before a partial analysis can be styled
+ * into a report that reads as whole-draft coverage. The pure renderers make
+ * the same check as defense in depth; routes return 422 so callers receive a
+ * useful, intentional error instead of a generic caught 500. */
+function respondIncompleteAnalysis(
+  res: express.Response,
+  report: ScriptDoctorReport,
+  artifact: string,
+): boolean {
+  if (isWholeDraftAnalysisComplete(report)) return false;
+  res.status(422).json({
+    error: 'analysis_incomplete',
+    message: `${artifact} is unavailable because the script could not be analyzed completely.`,
+    analysisComplete: false,
+    ...(report.truncatedForAnalysis
+      ? { truncatedForAnalysis: true, totalSceneCount: report.totalSceneCount }
+      : {}),
+  });
+  return true;
 }
 
 function escapeXml(s: string): string {
@@ -481,13 +503,11 @@ router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asy
     // so routes that never call the doctor don't pay for it at startup.
     const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
     const report = await runScriptDoctor(fountain);
+    if (respondIncompleteAnalysis(res, report, 'Coverage export')) return;
 
-    // ScriptDoctorReport.contentHash isn't populated by runScriptDoctor yet
-    // (see its doc comment in server/nvm/analyze/types.ts) — compute it here
-    // using the exact formula that comment documents (sha256 hex of the
-    // trimmed analyzed Fountain text) so every exported report still carries
-    // a verification hash. If a future doctor.ts revision starts populating
-    // it directly, that value wins here and this becomes a no-op fallback.
+    // The doctor normally supplies the deterministic receipt itself. Retain a
+    // local fallback for historical or reconstructed report shapes so an
+    // export never loses its exact-input verification hash.
     const contentHash = report.contentHash ?? createHash('sha256').update(fountain.trim()).digest('hex');
 
     // Title-page fallback (P2 — "Untitled" bug fix) + a logline line in the
@@ -654,6 +674,7 @@ router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asy
     // never call the doctor shouldn't pay for it at startup.
     const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
     const report = await runScriptDoctor(fountain);
+    if (respondIncompleteAnalysis(res, report, 'Pitch kit export')) return;
     const { records } = analyzeFountainText(fountain);
     const sceneCharacters = analyzeSceneCharacters(fountain);
 
@@ -757,6 +778,19 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
     // produces the same report (doctor.ts's own header comment).
     const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
     const report = await runScriptDoctor(fountain);
+    if (!isWholeDraftAnalysisComplete(report)) {
+      res.status(422).json({
+        verified: false,
+        error: 'analysis_incomplete',
+        message: 'Verification is unavailable because the script could not be analyzed completely.',
+        analysisComplete: false,
+        ...(report.truncatedForAnalysis
+          ? { truncatedForAnalysis: true, totalSceneCount: report.totalSceneCount }
+          : {}),
+        verifiedAt,
+      });
+      return;
+    }
 
     const checked: string[] = ['contentHash'];
     const mismatches: VerifyMismatch[] = [];

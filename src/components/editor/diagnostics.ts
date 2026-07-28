@@ -77,8 +77,13 @@ export interface LocatedIssue {
 }
 
 export interface LiveDiagnosis {
-  health: number;
-  grade: string;
+  /** The editor may render partial located issues, but headline values are
+   * withheld whenever this is false. Mirrors server/nvm/analyze/types.ts. */
+  analysisComplete: boolean;
+  truncatedForAnalysis?: boolean;
+  totalSceneCount?: number;
+  health?: number;
+  grade?: string;
   verdict?: unknown;
   sceneCount: number;
   locatedIssues: LocatedIssue[];

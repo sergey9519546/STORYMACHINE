@@ -67,6 +67,13 @@ I'm sorry. I should have told you everything.
 
 const MULTI_SCENE_FDX = fountainToFdx(MULTI_SCENE_FOUNTAIN, 'The Long Wait');
 
+function buildSceneTruncatedFountain(): string {
+  return Array.from(
+    { length: 1_001 },
+    (_, index) => `INT. ROOM ${index} - DAY\n\nA person waits.`,
+  ).join('\n\n');
+}
+
 describe('routes/export/coverage — HTTP behavior', async () => {
   let server: TestServer;
   before(async () => { server = await startTestServer(); });
@@ -130,6 +137,16 @@ describe('routes/export/coverage — HTTP behavior', async () => {
   it('POST an empty-string fountain returns 400 (zod .min(1))', async () => {
     const res = await post({ fountain: '' });
     assert.equal(res.status, 400);
+  });
+
+  it('refuses to export coverage from a scene-truncated partial analysis', async () => {
+    const res = await post({ fountain: buildSceneTruncatedFountain(), title: 'Partial Draft' });
+    assert.equal(res.status, 422);
+    assert.ok(res.headers.get('content-type')?.startsWith('application/json'));
+    const body = await res.json();
+    assert.equal(body.error, 'analysis_incomplete');
+    assert.match(body.message, /complete/i);
+    assert.equal(body.health, undefined);
   });
 
   it('does not leak an unescaped title into the exported HTML', async () => {

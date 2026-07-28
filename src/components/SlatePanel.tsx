@@ -72,12 +72,13 @@ interface SlateEntry {
   verdict?: CoverageVerdict;
   healthPercentile?: number;
   sceneCount: number;
+  totalSceneCount?: number;
   wordCount: number;
   topDimension?: string;
   weakestDimension?: string;
   contentHash?: string;
-  /** G0-05: false when analysis did not complete — health is a sentinel and
-   *  must render as an "incomplete" badge, not a score. */
+  /** G0-05: only explicit true may render a score. Anything else is an
+   * incomplete-analysis badge, never a fail-open health value. */
   analysisComplete?: boolean;
 }
 
@@ -638,7 +639,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                     // G0-05: incomplete analyses carry a sentinel health (0)
                     // that is not a real score. Badge them "incomplete" and
                     // suppress the derived score/verdict/percentile cells.
-                    const incomplete = entry.analysisComplete === false;
+                    const incomplete = entry.analysisComplete !== true;
                     if (incomplete) {
                       return (
                         <tr
@@ -660,7 +661,9 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                           <td className="px-2 py-2 text-gray-400">—</td>
                           <td className="px-2 py-2 text-gray-400">—</td>
                           <td className="px-2 py-2 text-gray-500 dark:text-gray-400">
-                            {entry.sceneCount} / {entry.wordCount.toLocaleString()}
+                            {entry.totalSceneCount !== undefined
+                              ? `${entry.sceneCount.toLocaleString()} of ${entry.totalSceneCount.toLocaleString()} scenes analyzed`
+                              : `${entry.sceneCount.toLocaleString()} scenes analyzed before analysis became incomplete`}
                           </td>
                           <td className="px-2 py-2 text-gray-400">—</td>
                           <td className="px-2 py-2 text-gray-400">—</td>

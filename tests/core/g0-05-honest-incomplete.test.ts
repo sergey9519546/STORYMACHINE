@@ -43,11 +43,16 @@ describe('G0-05 (a) CoverageSummary — no raw score for incomplete analysis', (
     'utf8',
   );
 
-  it('guards the success state on analysisComplete === false', () => {
+  it('uses the shared fail-closed whole-draft predicate before showing a score', () => {
     assert.match(
       src,
-      /analysisComplete\s*===\s*false/,
-      'CoverageSummary must branch on analysisComplete === false before showing a score',
+      /isWholeDraftAnalysisComplete\(report\)/,
+      'CoverageSummary must use the shared completeness predicate before showing a score',
+    );
+    assert.match(
+      src,
+      /!reportIsComplete/,
+      'CoverageSummary must route incomplete or malformed reports to the withheld branch',
     );
   });
 
@@ -69,6 +74,18 @@ describe('G0-05 (b) Slate — incomplete entries are not scored', () => {
   it('buildSlateEntry marks a complete report analysisComplete !== false', () => {
     const entry = buildSlateEntry('Fine', mkReport({ health: 60, analysisComplete: true }), 'hashB');
     assert.notEqual(entry.analysisComplete, false);
+  });
+
+  it('buildSlateEntry holds a scene-truncated report out of the scored ranking', () => {
+    const entry = buildSlateEntry(
+      'Partial',
+      mkReport({ analysisComplete: true, truncatedForAnalysis: true, totalSceneCount: 1_001 }),
+      'hashPartial',
+    );
+    assert.equal(entry.analysisComplete, false);
+    assert.equal(entry.totalSceneCount, 1_001);
+    assert.equal(entry.topDimension, undefined);
+    assert.equal(entry.weakestDimension, undefined);
   });
 
   it('rankSlate keeps every incomplete entry after every scored entry', () => {
@@ -94,6 +111,34 @@ describe('G0-05 (b) Slate — incomplete entries are not scored', () => {
     const scored = buildSlateEntry('High', mkReport({ health: 71, analysisComplete: true }), 'h2');
     const html = renderSlateHtml(rankSlate([scored, incomplete]), 0);
     assert.match(html, /incomplete/i, 'HTML export must label incomplete entries');
+  });
+
+  it('renderSlateHtml discloses the analyzed prefix for a scene-truncated entry', () => {
+    const partial = buildSlateEntry(
+      'Partial',
+      mkReport({ analysisComplete: false, truncatedForAnalysis: true, totalSceneCount: 1_001, sceneCount: 1_000 }),
+      'partial-hash',
+    );
+    const html = renderSlateHtml([partial], 0);
+    assert.match(html, /1,000 of 1,001 scenes analyzed/i);
+    assert.doesNotMatch(html, /N\/A/, 'incomplete rows must not expose prefix-derived dimension labels');
+  });
+});
+
+describe('G0-05 (c) ScriptDoctorPanel — incomplete reports cannot create false actions or deltas', () => {
+  const src = readFileSync(
+    resolve(__dirname, '../../src/components/scriptide/ScriptDoctorPanel.tsx'),
+    'utf8',
+  );
+
+  it('uses the shared predicate for display, history, fix, and scored exports', () => {
+    assert.match(src, /isWholeDraftAnalysisComplete\(report\)/);
+    assert.match(src, /if \(!isWholeDraftAnalysisComplete\(report\)\) return/);
+    assert.match(src, /if \(!report \|\| !reportIsComplete\) return/);
+    assert.match(src, /if \(!reportIsComplete\) return/);
+    assert.match(src, /reportIsComplete && previousEntry && report\.contentHash/);
+    assert.match(src, /entry\.wholeDraftAnalysisComplete === true/);
+    assert.match(src, /wholeDraftAnalysisComplete: true/);
   });
 });
 

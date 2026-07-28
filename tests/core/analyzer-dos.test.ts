@@ -73,7 +73,7 @@ describe('analyzer DoS guard — primary scene-count ceiling', () => {
     assert.equal(analysis.annotations.length, 1000);
   });
 
-  it('fire: runScriptDoctor over the same pathological script completes in bounded time with an honest truncation notice', async () => {
+  it('fire: runScriptDoctor withholds whole-draft scores for a truncated script', async () => {
     clearDoctorCache();
     const fountain = buildTrivialScenes(5000);
     const t0 = performance.now();
@@ -84,9 +84,16 @@ describe('analyzer DoS guard — primary scene-count ceiling', () => {
     assert.equal(report.truncatedForAnalysis, true);
     assert.equal(report.totalSceneCount, 5000);
     assert.equal(report.sceneCount, 1000);
-    assert.ok(Number.isFinite(report.health));
+    assert.equal(report.analysisComplete, false);
+    assert.equal(report.health, 0);
+    assert.equal(report.grade, 'troubled');
+    assert.equal(report.verdict, undefined);
+    assert.equal(report.dimensions, undefined);
+    assert.equal(report.metrics, undefined, 'prefix-only narrative metrics must not look like whole-draft readings');
+    assert.equal(report.storyGraph, undefined, 'prefix-only graph health must not look like a whole-draft assessment');
     assert.ok(report.plainSummary?.includes('5000 scenes'));
     assert.ok(report.plainSummary?.includes('1000-scene limit'));
+    assert.match(report.plainSummary ?? '', /score and verdict are withheld/i);
   });
 
   it('no-fire: a script at exactly the ceiling (1000 scenes) is analyzed in full, with no truncation flag', () => {

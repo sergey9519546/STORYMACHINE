@@ -58,6 +58,13 @@ I'm sorry. I should have told you everything.
 
 const VALID_ANCHORS = new Set(['scene', 'character', 'lines', 'document']);
 
+function buildSceneTruncatedFountain(): string {
+  return Array.from(
+    { length: 1_001 },
+    (_, index) => `INT. ROOM ${index} - DAY\n\nA person waits.`,
+  ).join('\n\n');
+}
+
 describe('routes/scriptide/diagnose — HTTP behavior', async () => {
   let server: TestServer;
   before(async () => { server = await startTestServer(); });
@@ -81,11 +88,12 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
 
     // No API key needed and no full 14-pass report here — only the
     // lightweight LiveDiagnosis shape (types.ts).
-    const expectedKeys = ['health', 'grade', 'sceneCount', 'locatedIssues', 'rootCauses', 'contentHash', 'analyzedAt'];
+    const expectedKeys = ['analysisComplete', 'health', 'grade', 'sceneCount', 'locatedIssues', 'rootCauses', 'contentHash', 'analyzedAt'];
     for (const key of expectedKeys) {
       assert.ok(key in body, `expected LiveDiagnosis to have key "${key}"`);
     }
     assert.equal(body.sceneCount, 4);
+    assert.equal(body.analysisComplete, true);
     assert.ok(body.health >= 0 && body.health <= 100);
     assert.ok(Array.isArray(body.locatedIssues));
     assert.ok(Array.isArray(body.rootCauses));
@@ -129,6 +137,21 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
   it('POST with fountain of the wrong type (number) returns 400', async () => {
     const res = await postDiagnose({ fountain: 42 });
     assert.equal(res.status, 400);
+  });
+
+  it('returns partial located issues but withholds live headline diagnostics for a scene-truncated draft', async () => {
+    const res = await postDiagnose({ fountain: buildSceneTruncatedFountain() });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.analysisComplete, false);
+    assert.equal(body.truncatedForAnalysis, true);
+    assert.equal(body.totalSceneCount, 1_001);
+    assert.equal(body.sceneCount, 1_000);
+    assert.equal(body.health, undefined);
+    assert.equal(body.grade, undefined);
+    assert.equal(body.verdict, undefined);
+    assert.ok(Array.isArray(body.locatedIssues));
+    assert.ok(Array.isArray(body.rootCauses));
   });
 
   it('is deterministic through HTTP: the same script POSTed twice yields deep-equal diagnoses (minus analyzedAt)', async () => {

@@ -73,6 +73,13 @@ ALICE
 Hi.
 `;
 
+function buildSceneTruncatedFountain(): string {
+  return Array.from(
+    { length: 1_001 },
+    (_, index) => `INT. ROOM ${index} - DAY\n\nA person waits.`,
+  ).join('\n\n');
+}
+
 const MULTI_SCENE_FDX = fountainToFdx(MULTI_SCENE_FOUNTAIN, 'The Long Wait');
 
 describe('routes/export/slate — HTTP behavior', async () => {
@@ -122,6 +129,25 @@ describe('routes/export/slate — HTTP behavior', async () => {
       json2.slate.map((e: { title: string; health: number; contentHash: string }) => [e.title, e.health, e.contentHash]),
       json1.slate.map((e: { title: string; health: number; contentHash: string }) => [e.title, e.health, e.contentHash]),
     );
+  });
+
+  it('holds a scene-truncated draft out of the ranked slate and discloses its scope', async () => {
+    const res = await post({
+      scripts: [
+        { title: 'Complete Draft', fountain: MULTI_SCENE_FOUNTAIN },
+        { title: 'Partial Draft', fountain: buildSceneTruncatedFountain() },
+      ],
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    const partial = body.slate.find((entry: { title: string }) => entry.title === 'Partial Draft');
+    assert.ok(partial, 'the partial draft must remain visible rather than silently disappear');
+    assert.equal(partial.analysisComplete, false);
+    assert.equal(partial.totalSceneCount, 1_001);
+    assert.equal(partial.health, 0, 'the withheld health sentinel is never a ranked score');
+    assert.equal(partial.topDimension, undefined);
+    assert.equal(partial.weakestDimension, undefined);
+    assert.equal(body.slate.at(-1)?.title, 'Partial Draft', 'incomplete analyses follow all scored drafts');
   });
 
   it('returns 400 for a single-script slate (min 2)', async () => {
@@ -296,6 +322,15 @@ describe('routes/export/pitchkit — HTTP behavior', async () => {
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /<svg/);
+  });
+
+  it('refuses to export a pitch kit from a scene-truncated partial analysis', async () => {
+    const res = await post({ fountain: buildSceneTruncatedFountain(), title: 'Partial Draft' });
+    assert.equal(res.status, 422);
+    assert.ok(res.headers.get('content-type')?.startsWith('application/json'));
+    const body = await res.json();
+    assert.equal(body.error, 'analysis_incomplete');
+    assert.match(body.message, /complete/i);
   });
 
   it('escapes a hostile title rather than injecting it verbatim', async () => {

@@ -61,6 +61,13 @@ I'm sorry. I should have told you everything.
 // produce a non-degenerate report, without hand-rolling FDX XML by hand.
 const MULTI_SCENE_FDX = fountainToFdx(MULTI_SCENE_FOUNTAIN, 'The Long Wait');
 
+function buildSceneTruncatedFountain(): string {
+  return Array.from(
+    { length: 1_001 },
+    (_, index) => `INT. ROOM ${index} - DAY\n\nA person waits.`,
+  ).join('\n\n');
+}
+
 describe('routes/scriptide/doctor — HTTP behavior', async () => {
   let server: TestServer;
   before(async () => { server = await startTestServer(); });
@@ -101,14 +108,32 @@ describe('routes/scriptide/doctor — HTTP behavior', async () => {
     assert.equal(critical + major + minor, body.totalIssues);
   });
 
-  it('POST a whitespace-only fountain returns 200 with the documented zero-scene contract', async () => {
+  it('POST a whitespace-only fountain returns an explicitly incomplete, scoreless report', async () => {
     const res = await post({ fountain: '   \n  ' });
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.health, 0);
-    assert.equal(body.grade, 'troubled');
+    assert.equal(body.analysisComplete, false);
+    assert.equal(body.health, undefined);
+    assert.equal(body.grade, undefined);
+    assert.equal(body.verdict, undefined);
+    assert.equal(body.dimensions, undefined);
+    assert.equal(body.strengths, undefined);
     assert.deepEqual(body.passes, []);
     assert.equal(body.sceneCount, 0);
+    assert.match(body.plainSummary, /score and verdict are withheld/i);
+  });
+
+  it('does not serialize headline scores for a scene-truncated partial draft', async () => {
+    const res = await post({ fountain: buildSceneTruncatedFountain() });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.analysisComplete, false);
+    assert.equal(body.truncatedForAnalysis, true);
+    assert.equal(body.totalSceneCount, 1_001);
+    assert.equal(body.health, undefined);
+    assert.equal(body.grade, undefined);
+    assert.equal(body.verdict, undefined);
+    assert.equal(body.dimensions, undefined);
   });
 
   it('POST with a missing fountain field returns 400', async () => {

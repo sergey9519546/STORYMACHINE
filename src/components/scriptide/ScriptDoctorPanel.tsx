@@ -39,6 +39,7 @@ import type {
   PassName,
 } from "../../../server/nvm/revision/passes/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
+import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
 import { diffLines } from "../../lib/diff.ts";
 import { decideWriteBack } from "../../lib/coverage-staleness.ts";
 
@@ -768,6 +769,10 @@ interface DoctorHistoryEntry {
    *  when it was recorded), the same "absence is a known fact, not an
    *  unknown" convention formulaVersion already uses above. */
   mode?: "quick" | "deep";
+  /** Added with the whole-draft truth repair. History recorded before this
+   *  receipt can contain a scene-truncated prefix that looked complete, so it
+   *  is deliberately ineligible as a future draft-delta baseline. */
+  wholeDraftAnalysisComplete?: true;
 }
 
 /** An entry's effective formula version. Entries recorded before this field
@@ -784,12 +789,43 @@ function entryMode(entry: DoctorHistoryEntry): "quick" | "deep" {
   return entry.mode ?? "quick";
 }
 
+/** Browser storage is untrusted input. Most importantly, pre-repair entries
+ * did not carry a whole-draft receipt, so a former truncated-prefix score
+ * cannot be compared against a newly complete draft. Validate the few fields
+ * the delta UI reads as well, rather than trusting JSON merely because it
+ * happened to parse. */
+function isCurrentDoctorHistoryEntry(value: unknown): value is DoctorHistoryEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Record<string, unknown>;
+  const severity = entry.bySeverity;
+  return (
+    entry.wholeDraftAnalysisComplete === true &&
+    typeof entry.at === "number" && Number.isFinite(entry.at) &&
+    typeof entry.title === "string" &&
+    typeof entry.contentHash === "string" && /^[0-9a-f]{64}$/.test(entry.contentHash) &&
+    typeof entry.health === "number" && Number.isFinite(entry.health) &&
+    (entry.verdict === undefined || entry.verdict === "RECOMMEND" || entry.verdict === "CONSIDER" || entry.verdict === "PASS") &&
+    !!severity && typeof severity === "object" &&
+    typeof (severity as Record<string, unknown>).critical === "number" &&
+    typeof (severity as Record<string, unknown>).major === "number" &&
+    typeof (severity as Record<string, unknown>).minor === "number" &&
+    Array.isArray(entry.dimensions) &&
+    entry.dimensions.every((dimension) =>
+      !!dimension && typeof dimension === "object" &&
+      typeof (dimension as Record<string, unknown>).key === "string" &&
+      typeof (dimension as Record<string, unknown>).score === "number",
+    ) &&
+    (entry.formulaVersion === undefined || (typeof entry.formulaVersion === "number" && Number.isFinite(entry.formulaVersion))) &&
+    (entry.mode === undefined || entry.mode === "quick" || entry.mode === "deep")
+  );
+}
+
 function loadDoctorHistory(): DoctorHistoryEntry[] {
   try {
     const raw = localStorage.getItem(DOCTOR_HISTORY_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as DoctorHistoryEntry[]) : [];
+    return Array.isArray(parsed) ? parsed.filter(isCurrentDoctorHistoryEntry) : [];
   } catch {
     return [];
   }
@@ -829,6 +865,9 @@ function recordDoctorHistory(
   const existing = loadDoctorHistory();
   const previous = existing.length > 0 ? existing[existing.length - 1] : null;
 
+  // A sentinel health/grade is not a draft measurement. Never make it a
+  // historical baseline that could later fabricate a delta for a full report.
+  if (!isWholeDraftAnalysisComplete(report)) return { history: existing, previous };
   if (!report.contentHash) return { history: existing, previous };
   if (previous && previous.contentHash === report.contentHash) {
     return { history: existing, previous };
@@ -845,6 +884,7 @@ function recordDoctorHistory(
     dimensions: (report.dimensions ?? []).map((d) => ({ key: d.key, score: d.score })),
     formulaVersion: DOCTOR_HISTORY_FORMULA_VERSION,
     mode,
+    wholeDraftAnalysisComplete: true,
   };
   const next = [...existing, entry].slice(-DOCTOR_HISTORY_MAX_ENTRIES);
   saveDoctorHistory(next);
@@ -1515,6 +1555,7 @@ export default function ScriptDoctorPanel({
 }: ScriptDoctorPanelProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [report, setReport] = useState<ScriptDoctorReport | null>(null);
+  const reportIsComplete = report !== null && isWholeDraftAnalysisComplete(report);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Per-pass collapse overrides; a pass with no override defaults to
   // "open iff it found issues" (collapsed-by-default when 0 issues).
@@ -1898,10 +1939,14 @@ export default function ScriptDoctorPanel({
         // reflects which lineage the request belongs to, matching the
         // lineage contract on ScriptDoctorReport.deepRead — not whether the
         // LLM actually fired this particular time.
-        if (!isSampleRun) {
+        if (!isSampleRun && isWholeDraftAnalysisComplete(data)) {
           const { history: nextHistory, previous } = recordDoctorHistory(data, effectiveTitle ?? "", effectiveMode);
           setHistory(nextHistory);
           setPreviousEntry(previous);
+        } else if (!isSampleRun) {
+          // Keep existing history intact, but do not compare this partial
+          // report against the last complete draft.
+          setPreviousEntry(null);
         }
       })
       .catch((err: unknown) => {
@@ -1968,7 +2013,7 @@ export default function ScriptDoctorPanel({
   }, [autoLoadSample]);
 
   const handleExportReport = () => {
-    if (!report) return;
+    if (!report || !reportIsComplete) return;
 
     exportAbortRef.current?.abort();
     const controller = new AbortController();
@@ -2120,6 +2165,7 @@ export default function ScriptDoctorPanel({
   };
 
   const handleExportPitchkit = () => {
+    if (!reportIsComplete) return;
     const stem = safeFilenameStem(activeReportTitle ?? title);
     runProducerExport(
       "/api/export/pitchkit",
@@ -2157,6 +2203,7 @@ export default function ScriptDoctorPanel({
    *  backstop against a stale response landing after a newer request
    *  superseded it (same idiom as runDiagnosis's generationRef). */
   const runFix = (finding: RootCauseFinding) => {
+    if (!reportIsComplete) return;
     const startLine = finding.startLine;
     const endLine = finding.endLine;
     if (startLine === undefined || endLine === undefined) return;
@@ -2271,6 +2318,7 @@ export default function ScriptDoctorPanel({
   };
 
   const acceptFix = (findingId: string) => {
+    if (!reportIsComplete) return;
     const entry = fixResults[findingId];
     if (!entry?.result.candidateFountain) return;
     if (analyzedIsSample) return; // read-only demo source — button is disabled too
@@ -2409,10 +2457,12 @@ export default function ScriptDoctorPanel({
         {status === "success" && report && (
           <button
             onClick={handleExportReport}
-            disabled={exportStatus === "loading" || !!report.deepRead}
+            disabled={exportStatus === "loading" || !!report.deepRead || !reportIsComplete}
             aria-label="Export coverage report as an HTML document"
             title={
-              report.deepRead
+              !reportIsComplete
+                ? "Coverage export requires a complete whole-draft analysis — re-run after resolving the incomplete analysis."
+                : report.deepRead
                 ? "Export re-verifies deterministically (quick read) — run a quick diagnosis to export"
                 : "Export the current report as a downloadable HTML coverage document"
             }
@@ -2450,9 +2500,13 @@ export default function ScriptDoctorPanel({
         {status === "success" && report && (
           <button
             onClick={handleExportPitchkit}
-            disabled={pitchkitStatus === "loading"}
+            disabled={pitchkitStatus === "loading" || !reportIsComplete}
             aria-label="Export a standalone pitch kit as HTML"
-            title="Download a standalone, shareable pitch kit document (HTML)"
+            title={
+              reportIsComplete
+                ? "Download a standalone, shareable pitch kit document (HTML)"
+                : "Pitch kit export requires a complete whole-draft analysis — re-run after resolving the incomplete analysis."
+            }
             className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             {pitchkitStatus === "loading" ? (
@@ -2734,10 +2788,9 @@ export default function ScriptDoctorPanel({
         {/* ── Success state ── */}
         {status === "success" && report && (
           <div className="space-y-6">
-            {/* P0.3: incomplete analysis — one or more revision passes failed.
-                Health/grade sentinels (0 / troubled) are NOT real scores and
-                must not be shown as if they were. */}
-            {report.analysisComplete === false ? (
+            {/* P0: a failed pass or scene-truncated prefix leaves health/grade
+                sentinels (0 / troubled) unsafe to display as real scores. */}
+            {!reportIsComplete ? (
               <div className="sm-panel border-2 border-stamp bg-paper p-5 space-y-3">
                 <div className="sm-sub text-stamp">Analysis incomplete</div>
                 <div className="font-display text-xl uppercase tracking-wide text-ink">
@@ -2745,7 +2798,7 @@ export default function ScriptDoctorPanel({
                 </div>
                 <p className="text-xs font-mono leading-relaxed text-ink/80">
                   {report.plainSummary ||
-                    "One or more diagnostic passes failed. Health, verdict, and percentiles are withheld because the issue count may be artificially low."}
+                    "Analysis could not be completed across the whole draft. Health, verdict, and percentiles are withheld."}
                 </p>
                 {Array.isArray(report.failedPasses) && report.failedPasses.length > 0 && (
                   <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-ink/70">
@@ -2753,9 +2806,17 @@ export default function ScriptDoctorPanel({
                   </div>
                 )}
                 <div className="text-[10px] font-mono text-ink/60">
-                  {report.sceneCount} scene{report.sceneCount === 1 ? "" : "s"} ·{" "}
-                  {report.wordCount.toLocaleString()} words · {report.totalIssues} issue
-                  {report.totalIssues === 1 ? "" : "s"} observed before failure
+                  {report.truncatedForAnalysis && report.totalSceneCount !== undefined ? (
+                    <>
+                      {report.sceneCount.toLocaleString()} of {report.totalSceneCount.toLocaleString()} scenes analyzed · {report.totalIssues} issue
+                      {report.totalIssues === 1 ? "" : "s"} observed in the analyzed portion
+                    </>
+                  ) : (
+                    <>
+                      {report.sceneCount} scene{report.sceneCount === 1 ? "" : "s"} · {report.wordCount.toLocaleString()} words · {report.totalIssues} issue
+                      {report.totalIssues === 1 ? "" : "s"} observed before analysis became incomplete
+                    </>
+                  )}
                 </div>
               </div>
             ) : report.verdict ? (
@@ -2901,8 +2962,9 @@ export default function ScriptDoctorPanel({
                   Root Causes
                 </h3>
                 <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
-                  Several notes often share one underlying problem. Fixing these first
-                  clears the most issues at once.
+                  {reportIsComplete
+                    ? "Several notes often share one underlying problem. Fixing these first clears the most issues at once."
+                    : "These are partial findings from the analyzed portion. Re-run a complete analysis before treating them as whole-draft priorities."}
                 </p>
                 <div className="space-y-2">
                   {report.rootCauses.map((finding) => {
@@ -2911,7 +2973,7 @@ export default function ScriptDoctorPanel({
                     // POST /api/scriptide/fix otherwise (see FixRunState's
                     // doc comment).
                     const hasAnchor = finding.startLine !== undefined && finding.endLine !== undefined;
-                    const fixState: RootCauseFixState | null = hasAnchor
+                    const fixState: RootCauseFixState | null = reportIsComplete && hasAnchor
                       ? {
                           pending: fixPendingId === finding.id,
                           blockedByOtherPending: fixPendingId !== null && fixPendingId !== finding.id,
@@ -2949,7 +3011,7 @@ export default function ScriptDoctorPanel({
                 comparable numbers no matter how much the script changed, so
                 this branch must be checked before DraftDeltaStrip ever
                 renders. */}
-            {previousEntry && report.contentHash && (
+            {reportIsComplete && previousEntry && report.contentHash && (
               previousEntry.contentHash === report.contentHash ? (
                 <p className="text-[11px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
                   No changes since last diagnosis — identical script.
@@ -2971,7 +3033,7 @@ export default function ScriptDoctorPanel({
             )}
 
             {/* Craft dimensions — 14 passes rolled up into 5 writer-facing scores. */}
-            {report.dimensions && report.dimensions.length > 0 && (
+            {reportIsComplete && report.dimensions && report.dimensions.length > 0 && (
               <div>
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
                   Craft Dimensions
@@ -3020,7 +3082,7 @@ export default function ScriptDoctorPanel({
 
             {/* What's working — deterministic, earned strengths. Never padded,
                 so this only renders when there's something real to say. */}
-            {report.strengths && report.strengths.length > 0 && (
+            {reportIsComplete && report.strengths && report.strengths.length > 0 && (
               <div>
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
                   What&rsquo;s Working
@@ -3132,14 +3194,14 @@ export default function ScriptDoctorPanel({
                 when the report carries the field, so reports produced/cached
                 before it existed degrade gracefully with no gap — same
                 optional-field convention as report.deepRead/rootCauses. */}
-            {report.metrics && <StoryMetricsSection metrics={report.metrics} />}
+            {reportIsComplete && report.metrics && <StoryMetricsSection metrics={report.metrics} />}
 
             {/* Story graph — Phase 2 enhanced structural diagnostics from
                 server/nvm/analyze/story-graph.ts (report.storyGraph). Rendered
                 only when the report carries the field, same optional-field
                 convention as report.metrics above. Shows severity-grouped
                 diagnostics with impact + actionable suggestions. */}
-            {report.storyGraph && <StoryGraphSection storyGraph={report.storyGraph} />}
+            {reportIsComplete && report.storyGraph && <StoryGraphSection storyGraph={report.storyGraph} />}
 
             {/* Top priorities */}
             {report.topPriorities.length > 0 && (

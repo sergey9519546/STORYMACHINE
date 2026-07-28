@@ -170,8 +170,19 @@ export interface RootCauseFinding {
  *  what the editor needs (located issues + clusters + the headline numbers),
  *  NOT the full 14-pass report, so it stays cheap to call on every pause. */
 export interface LiveDiagnosis {
-  health: number;
-  grade: DoctorGrade;
+  /** True only when every pass completed and the whole submitted draft was
+   *  analyzed. Partial located issues remain useful to the editor, but the
+   *  headline fields below are absent unless this is true. */
+  analysisComplete: boolean;
+  /** Present only when the analyzer stopped at its scene ceiling. */
+  truncatedForAnalysis?: boolean;
+  /** True submitted scene count when `truncatedForAnalysis` is true; the
+   *  regular `sceneCount` remains the analyzed-prefix count. */
+  totalSceneCount?: number;
+  /** Present only for a complete whole-draft analysis. */
+  health?: number;
+  /** Present only for a complete whole-draft analysis. */
+  grade?: DoctorGrade;
   verdict?: CoverageVerdict;
   sceneCount: number;
   /** Every diagnosable issue, resolved to a line anchor where possible. */
@@ -224,12 +235,14 @@ export interface ScriptDoctorReport {
    *  that function is the single source of truth; this comment describes
    *  shape, not constants, so it can't silently drift. Length-invariant by
    *  regression test: same craft at 1×/2×/3× length scores within ~10 pts.
-   *  P0.3: when analysisComplete is false, this is a degraded value (0) and
-   *  should not be presented as a real score — show the incomplete banner. */
+   *  P0: when analysisComplete is false (a pass failed, the submitted draft
+   *  was scene-truncated, or no screenplay scene was found), this is a
+   *  degraded value (0) and must not be
+   *  presented as a real score — show the incomplete banner. */
   health: number;
   /** health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled.
-   *  P0.3: when analysisComplete is false, this is 'troubled' and should not
-   *  be presented as a real grade — show the incomplete banner. */
+   *  P0: when analysisComplete is false, this is 'troubled' and must not be
+   *  presented as a real grade — show the incomplete banner. */
   grade: DoctorGrade;
   totalIssues: number;
   bySeverity: { critical: number; major: number; minor: number };
@@ -280,7 +293,9 @@ export interface ScriptDoctorReport {
    *  forward-edge ratio) to solve act-swap AUC 0.48 and rule-channel AUC 0.076
    *  failures (DEEP_AUDIT findings #2, #9). Diagnostic only — not yet coupled
    *  to health. Optional so reports serialized before this field existed stay
-   *  valid; the doctor populates it on every non-degenerate run. */
+   *  valid; the doctor populates it only for complete, non-degenerate runs.
+   *  Prefix-only analysis must not present a graph-health reading as a
+   *  whole-draft assessment. */
   storyGraph?: StoryGraphReport;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
@@ -306,14 +321,15 @@ export interface ScriptDoctorReport {
      *  annotation), so the panel can mark them honestly. Empty when all read. */
     fallbackScenes: number[];
   };
-  /** P0.3: false when any revision pass threw and was skipped. When false,
-   *  health/verdict/percentiles are withheld because the issue count may be
-   *  artificially low — a failed detector returning zero issues can make a
-   *  script look healthier than one where the detector ran. The client must
-   *  show an incomplete-analysis banner instead of a score. */
+  /** P0: false when any revision pass threw, the submitted draft was
+   *  scene-truncated, or no screenplay scene was found. In each case
+   *  health/verdict/percentiles are withheld: a failed detector can make a
+   *  script look healthier, an unseen suffix cannot support a whole-draft
+   *  claim, and no scene supplies no assessment evidence. The client must show an
+   *  incomplete-analysis banner instead of a score. */
   analysisComplete?: boolean;
-  /** P0.3: passes that threw during execution. Only populated when
-   *  analysisComplete === false. */
+  /** P0: passes that threw during execution. Omitted when all passes ran;
+   *  a scene-truncated report may be incomplete with this field absent. */
   failedPasses?: PassName[];
   /** sha256 hex of the trimmed analyzed Fountain text. The determinism
    *  receipt: two reports with equal contentHash came from the identical
@@ -339,8 +355,10 @@ export interface ScriptDoctorReport {
    *  NarrativeMetricsReport shape verbatim (no redeclaration here) so the two
    *  can never drift apart. Optional so reports serialized/cached before this
    *  field existed stay valid: a missing `metrics` means "not computed for
-   *  this report", never "computed as empty" (the doctor always populates it
-   *  on every non-degenerate run — see doctor.ts's aggregateReport). Every
+   *  this report", never "computed as empty" (the doctor populates it only
+   *  for complete, non-degenerate runs — see doctor.ts's aggregateReport).
+   *  Prefix-only analysis cannot truthfully supply whole-draft shape metrics.
+   *  Every
    *  pacingFit inside (per-scene and script-level) is `null` on every doctor
    *  report: the doctor has no session `emotional_arc` to pass
    *  computeNarrativeMetrics, and metrics.ts reports that absence honestly
@@ -371,8 +389,8 @@ export interface ScriptDoctorReport {
   /** DoS guard (S1-b): mirrors FountainAnalysis.truncatedForAnalysis — set
    *  only when the submitted script exceeded the analyzer's scene ceiling and
    *  this report covers its first `sceneCount` scenes only. Absent for every
-   *  normal-sized script. plainSummary is prefixed with a matching
-   *  plain-language notice whenever this is true (see doctor.ts). */
+   *  normal-sized script. It also makes analysisComplete false, because a
+   *  prefix cannot support a whole-draft score or verdict. */
   truncatedForAnalysis?: boolean;
   /** The script's TRUE total scene count, present only alongside
    *  truncatedForAnalysis === true. */
