@@ -5,7 +5,18 @@
 import type { GenerateContentParameters, GenerateContentResponse, Schema } from '@google/genai';
 import type { EmbeddingProvider, ImageProvider, TTSProvider, LLMProvider } from '../../engine/ai.ts';
 import { geminiSchemaToJsonSchema } from './schema.ts';
-import { ssrfUnsafeUrlReason } from '../validation.ts';
+import { ssrfUnsafeUrlReason, isPrivateIp } from '../validation.ts';
+// undici ships the global fetch's implementation; we import its fetch + Agent
+// directly so we can pass a custom dispatcher that pins the TCP connect to the
+// DNS-resolved, re-validated IP. (The GLOBAL fetch rejects a custom-connect
+// Agent with `invalid onRequestStart method` in current Node — undici's own
+// fetch accepts it. Same Response API surface as global fetch, so callers are
+// unchanged.)
+import { fetch as undiciFetch, Agent } from 'undici';
+import net from 'node:net';
+import tls from 'node:tls';
+import dns from 'node:dns/promises';
+import { logger } from '../logger.ts';
 
 // ── Belt-and-suspenders SSRF guard (audit finding S1-a-1) ───────────────────
 // server/lib/validation.ts's AiConfigSchema already rejects a private/
@@ -75,10 +86,16 @@ function assertFetchTargetSafe(baseURL: string): void {
 //   3. Never forwards Authorization across origins (scheme/host/port change).
 //   4. Caps the hop chain (default 3).
 //
-// Residual gap (unchanged, documented in validation.ts): this is still a
-// literal-form host check, not DNS-pinning. A hostname that resolves public at
-// validation time can be repointed to a private IP before the TCP connect.
-// Full closure needs resolve-and-pin at the connection layer — out of scope here.
+// DNS rebinding — CLOSED at this fetch site. Every hop is resolved with the
+// shared resolveHost() below (production default: node:dns/promises lookup),
+// each resolved address is re-checked against the SAME private-IP policy the
+// literal guard uses (server/lib/validation.ts isPrivateIp), and the TCP
+// connect is PINNED to a validated IP via a per-hop undici Agent whose connect
+// function dials the resolved address. The Host header and TLS SNI stay bound
+// to the URL hostname (undici derives them from the URL), so a hostname that
+// resolves public at validation time but is repointed to a private IP before
+// connect cannot redirect the socket — the pin was set against the
+// re-validated resolution, and a mid-flight DNS change has no effect.
 const DEFAULT_MAX_REDIRECTS = 3;
 
 function originKey(u: URL): string {
@@ -95,19 +112,148 @@ function toHeaders(init?: HeadersInit): Headers {
   return new Headers(init ?? undefined);
 }
 
+// ── DNS resolver + IP-pin test seam ──────────────────────────────────────────
+// resolveHost is the stubbable seam: production resolves via node:dns/promises
+// lookup({ all: true }); tests inject a deterministic resolver so rebinding /
+// NXDOMAIN / re-pin cases never depend on real external DNS or monkeypatch
+// Node globals. resolvePort lets a test pin a hop to a specific port (e.g. a
+// loopback mock); production leaves it undefined so the URL's own port is used.
+export type ResolvedAddress = { address: string; family: number };
+export type ResolveHost = (hostname: string) => Promise<ResolvedAddress[]>;
+export type ResolvePort = (hostname: string) => Promise<number | undefined>;
+// Test seam: the IP to actually DIAL, which may differ from the validated IP
+// returned by resolveHost (e.g. a test validates a PUBLIC hostname but routes
+// the socket to a loopback mock). Production leaves this undefined and the
+// validated IP from resolveHost is the dial target (validated == dialed).
+export type ResolveDialTarget = (hostname: string) => Promise<ResolvedAddress | undefined>;
+
+async function defaultResolveHost(hostname: string): Promise<ResolvedAddress[]> {
+  // { all: true } returns every A/AAAA record; we validate EACH — a hostname
+  // that returns a mix of public + private addresses must fail closed.
+  const records = await dns.lookup(hostname, { all: true });
+  return records.map(r => ({ address: r.address, family: r.family }));
+}
+
 /**
- * fetch() with manual redirect handling and per-hop SSRF revalidation.
- * Exported for unit tests that exercise redirect chains directly.
+ * Resolve a hostname, validate EVERY resolved IP against the shared private-IP
+ * policy, and return the first validated public (or override-allowed private)
+ * address to pin the connect to. Throws the same shape of error
+ * assertFetchTargetSafe throws when ANY resolved IP is private and the
+ * production gate is active without the override; throws on NXDOMAIN/lookup
+ * failure. Never falls back to letting the transport re-resolve.
+ */
+async function resolveAndValidateHost(
+  hostname: string,
+  resolveHost: ResolveHost,
+): Promise<ResolvedAddress> {
+  let records: ResolvedAddress[];
+  try {
+    records = await resolveHost(hostname);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Refusing outbound AI-provider request: DNS resolution failed for ${hostname} (${msg})`);
+  }
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new Error(`Refusing outbound AI-provider request: DNS resolution returned no addresses for ${hostname} (NXDOMAIN)`);
+  }
+  // Check every resolved address — a single private address in the set is a
+  // rebinding signal and must fail closed even when other addresses are public.
+  const rejectPrivate = enforceFetchSiteGuard() && !allowPrivateNetworkTargets();
+  for (const rec of records) {
+    if (isPrivateIp(rec.address)) {
+      if (rejectPrivate) {
+        throw new Error(`Refusing outbound AI-provider request: ${hostname} resolves to a private/loopback/reserved address (${rec.address})`);
+      }
+      // Override / dev: allowed, but we still surface it for traceability.
+      logger.warn('ai-provider-resolve-private-allowed', {
+        hostname,
+        address: rec.address,
+        override: true,
+      });
+    }
+  }
+  // Pin to the first resolved address (the resolver order is the OS's
+  // preference). Both public and override-allowed-private addresses are valid
+  // pin targets here; the private ones were already policy-checked above.
+  return records[0];
+}
+
+/**
+ * Build a fresh undici Agent whose connect function pins the TCP dial to a
+ * specific IP, preserving the URL's hostname for the Host header and TLS SNI.
+ * One Agent per request keeps the pin bound to that request's resolution.
+ *
+ * `dialPortOverride` is a test-only seam: when set, the socket dials that port
+ * instead of the URL's port (so a loopback mock on an ephemeral port can be
+ * reached while the URL host/port — and thus the Host header and origin
+ * tracking — stay intact). Production leaves it undefined and the URL port is
+ * used.
+ *
+ * TLS: for https:// URLs the raw TCP socket to the pinned IP is wrapped with
+ * tls.connect using servername = the URL hostname (options.hostname). That
+ * keeps SNI bound to the original host AND keeps certificate verification
+ * against the hostname — NOT the pinned IP — so HTTPS integrity is unchanged.
+ */
+function pinnedAgentFor(ip: ResolvedAddress, dialPortOverride?: number): Agent {
+  return new Agent({
+    connect: (options, callback) => {
+      const urlPort = typeof options.port === 'number' ? options.port : Number(options.port);
+      const dialPort = typeof dialPortOverride === 'number' ? dialPortOverride : urlPort;
+      const dialOpts: net.TcpNetConnectOpts = {
+        host: ip.address,
+        family: ip.family,
+        port: dialPort,
+      };
+      const raw = net.connect(dialOpts);
+      let settled = false;
+      const fail = (err: Error): void => {
+        if (!settled) { settled = true; callback(err, null); }
+        raw.destroy();
+      };
+      raw.once('connect', () => {
+        if (options.protocol === 'https:') {
+          // Wrap the pinned plain socket in TLS with SNI/cert-verification
+          // bound to the URL hostname — never the pinned IP. Default
+          // rejectUnauthorized (true) keeps production cert validation intact.
+          const tlsSock = tls.connect({
+            socket: raw,
+            servername: options.servername || options.hostname,
+          });
+          tlsSock.once('secureConnect', () => {
+            if (!settled) { settled = true; callback(null, tlsSock); }
+          });
+          tlsSock.once('error', fail);
+        } else {
+          if (!settled) { settled = true; callback(null, raw); }
+        }
+      });
+      raw.once('error', fail);
+    },
+  });
+}
+
+/**
+ * fetch() with manual redirect handling, per-hop SSRF revalidation, AND per-hop
+ * DNS resolve-and-pin (closes DNS rebinding). Exported for unit tests that
+ * exercise redirect chains and the resolver directly.
  */
 export async function fetchOpenAICompat(
   url: string,
   init: RequestInit = {},
-  opts: { maxRedirects?: number } = {},
+  opts: {
+    maxRedirects?: number;
+    resolveHost?: ResolveHost;
+    resolvePort?: ResolvePort;
+    resolveDialTarget?: ResolveDialTarget;
+  } = {},
 ): Promise<Response> {
   const maxRedirects = opts.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
   if (!Number.isInteger(maxRedirects) || maxRedirects < 0) {
     throw new Error('OpenAI-compat maxRedirects must be a non-negative integer');
   }
+  const resolveHost = opts.resolveHost ?? defaultResolveHost;
+  const resolvePort = opts.resolvePort ?? (async () => undefined);
+  const resolveDialTarget = opts.resolveDialTarget ?? (async () => undefined);
 
   let currentUrl = url;
   // Clone once so body/method stay available across same-origin hops. Request
@@ -128,7 +274,39 @@ export async function fetchOpenAICompat(
       headers.delete('Authorization');
     }
 
-    const res = await fetch(currentUrl, { ...baseInit, headers });
+    // Resolve + validate + pin the connect for THIS hop. A redirect to a new
+    // hostname gets its own resolution and IP validation (re-pin on redirect).
+    const hopUrl = new URL(currentUrl);
+    const pinnedAddr = await resolveAndValidateHost(hopUrl.hostname, resolveHost);
+    // The dial target is normally the validated IP (validated == dialed). The
+    // resolveDialTarget seam lets a test route the socket elsewhere (e.g. a
+    // loopback mock) WITHOUT weakening the validation above.
+    const dialTarget = (await resolveDialTarget(hopUrl.hostname)) ?? pinnedAddr;
+    // Test seam: let a test point the DIAL port at a controlled mock port
+    // without changing the URL (so Host header + origin tracking stay honest).
+    const dialPortOverride = await resolvePort(hopUrl.hostname);
+    const agent = pinnedAgentFor(dialTarget, typeof dialPortOverride === 'number' ? dialPortOverride : undefined);
+
+    // undici's fetch accepts a `dispatcher` option (global RequestInit does
+    // not). Its Response/RequestInit types differ from lib.dom's only in
+    // ReadableStream generic params, so we type the call through undici's own
+    // RequestInit and cast the result back to the global Response the callers
+    // (and this function's signature) expect — they are structurally identical
+    // at runtime.
+    let res: Response;
+    try {
+      const undiciRes = await undiciFetch(currentUrl, {
+        ...baseInit,
+        headers,
+        dispatcher: agent,
+      } as unknown as Parameters<typeof undiciFetch>[1]);
+      res = undiciRes as unknown as Response;
+    } finally {
+      // Release the per-request connection pool promptly so a fresh pin is
+      // used every hop (and so tests don't leak sockets across cases).
+      agent.close().catch(() => { /* best effort */ });
+    }
+
     if (!isRedirectStatus(res.status)) return res;
     await res.body?.cancel().catch(() => { /* best effort: release redirect connection */ });
 

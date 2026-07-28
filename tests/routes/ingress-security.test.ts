@@ -12,7 +12,45 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, freshSessionId, type TestServer } from './helpers.ts';
-import { ssrfUnsafeUrlReason } from '../../server/lib/validation.ts';
+import { ssrfUnsafeUrlReason, isPrivateIp } from '../../server/lib/validation.ts';
+
+describe('ingress-security — shared private-IP policy (isPrivateIp)', () => {
+  // isPrivateIp is the single entry point shared between the literal-form SSRF
+  // guard (ssrfUnsafeUrlReason) and the fetch-site DNS resolver in
+  // openai-compat.ts. These cases lock the IDENTICAL policy the two layers use
+  // so a resolved DNS address that the literal guard would reject on a URL
+  // string is also rejected post-resolution — closing DNS rebinding without
+  // range-table drift between the two layers.
+  it('rejects loopback / link-local / RFC1918 / ULA IPv4 and IPv6 addresses', () => {
+    assert.equal(isPrivateIp('127.0.0.1'), true);
+    assert.equal(isPrivateIp('169.254.169.254'), true);
+    assert.equal(isPrivateIp('10.0.0.5'), true);
+    assert.equal(isPrivateIp('172.16.0.5'), true);
+    assert.equal(isPrivateIp('192.168.1.5'), true);
+    assert.equal(isPrivateIp('::1'), true);
+    assert.equal(isPrivateIp('fd12:3456:789a::1'), true);
+    assert.equal(isPrivateIp('fe80::1'), true);
+  });
+
+  it('accepts public IPv4 / IPv6 addresses', () => {
+    assert.equal(isPrivateIp('8.8.8.8'), false);
+    assert.equal(isPrivateIp('1.1.1.1'), false);
+    assert.equal(isPrivateIp('104.18.0.1'), false);
+    assert.equal(isPrivateIp('2606:4700:4700::1111'), false);
+  });
+
+  it('decodes IPv4-mapped IPv6 and IPv6 link-local zone ids', () => {
+    assert.equal(isPrivateIp('::ffff:127.0.0.1'), true);
+    assert.equal(isPrivateIp('::ffff:8.8.8.8'), false);
+    // Zone id (e.g. fe80::1%eth0) must not defeat the policy.
+    assert.equal(isPrivateIp('fe80::1%eth0'), true);
+  });
+
+  it('fails closed on malformed/non-IP inputs (treats as private)', () => {
+    assert.equal(isPrivateIp('not-an-ip'), true);
+    assert.equal(isPrivateIp(''), true);
+  });
+});
 
 describe('ingress-security — SSRF guard unit coverage (ssrfUnsafeUrlReason)', () => {
   it('rejects cloud metadata IP literals (AWS/GCP/Azure all use 169.254.169.254)', () => {

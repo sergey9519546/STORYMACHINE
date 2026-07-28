@@ -32,20 +32,28 @@ import { ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES, STRUCTURE_NAM
 // userinfo-in-URL (user:pass@host — a classic parser-confusion vector, closed
 // here even though Node's URL parser itself extracts hostname correctly).
 //
-// Residual gap (documented, not silently assumed away): DNS rebinding. A
-// hostname that resolves to a public IP at validation time can be repointed
-// to a private IP by the time the fetch actually runs — this validator
-// operates on the URL string only and does not (and structurally cannot,
-// synchronously, at zod-validation time) resolve DNS to check where a
-// public-looking hostname currently points. Fully closing that requires
-// resolving DNS at the fetch site and pinning the connection to the resolved,
-// re-validated IP (a dns.lookup + custom `dispatcher`/agent override), which
-// is out of scope for this pass — see openai-compat.ts's belt-and-suspenders
-// assertFetchTargetSafe() for the second checkpoint this guard is paired with.
+// Residual gap — CLOSED at the fetch site: this validator operates on the URL
+// STRING only and does not (and structurally cannot, synchronously, at
+// zod-validation time) resolve DNS to check where a public-looking hostname
+// currently points, so DNS rebinding — a hostname that resolves to a public IP
+// here being repointed to a private IP by the time the fetch connects — could
+// not be ruled out by this layer alone. That gap is now closed downstream:
+// server/lib/ai-providers/openai-compat.ts's fetchOpenAICompat() resolves DNS
+// at the fetch site, re-runs the SAME private-IP policy exported below
+// (isPrivateIp) against every resolved address, and pins the TCP connection to
+// a validated IP so a mid-flight repoint cannot redirect the socket to a
+// private/metadata target. This literal guard remains the first layer (cheap,
+// synchronous, blocks the anonymous-caller path at POST /api/ai-config); the
+// fetch-site resolve-and-pin is the connection-layer second layer that closes
+// rebinding. assertFetchTargetSafe() in openai-compat.ts is the per-hop
+// checkpoint that pairs this guard with the fetch site.
 const PRIVATE_HOSTNAME_EXACT = new Set(['localhost']);
 const PRIVATE_HOSTNAME_SUFFIXES = ['.localhost', '.local', '.internal'];
 
-function isPrivateIPv4(ip: string): boolean {
+/** Private-range policy for IPv4 literals. Exported so the fetch-site DNS
+ *  resolver (openai-compat.ts) applies the IDENTICAL range policy as this
+ *  literal-form guard — no duplicated range tables (drift would be a bypass). */
+export function isPrivateIPv4(ip: string): boolean {
   const parts = ip.split('.').map(Number);
   if (parts.length !== 4 || parts.some(p => !Number.isInteger(p) || p < 0 || p > 255)) return true;
   const [a, b, c] = parts;
@@ -81,7 +89,33 @@ function isPrivateIPv6(ip: string): boolean {
     const embedded = `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`;
     return isPrivateIPv4(embedded);
   }
+  // The dotted-quad IPv4-mapped form (::ffff:127.0.0.1) is NOT canonicalized
+  // by the URL parser on the raw string (only inside a [bracketed] URL host),
+  // and dns.lookup()/external inputs can hand it to us verbatim. Decode it too
+  // so the IPv4 policy applies uniformly across both mapped-IPv6 representations.
+  const v4mapDotted = norm.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (v4mapDotted) {
+    return isPrivateIPv4(v4mapDotted[1]);
+  }
   return false;
+}
+
+/** Single entry point shared by the literal-form guard above AND the fetch-site
+ *  DNS resolver in openai-compat.ts. Applies the IPv4/IPv6 private-range policy
+ *  to any address string (IPv4 dotted, IPv6 hextet, or IPv4-mapped IPv6).
+ *  Returns true for loopback / link-local / RFC1918 / unique-local / reserved /
+ *  multicast — anything that must never be the resolved-and-pinned connect
+ *  target of an outbound AI-provider request unless the explicit
+ *  AI_ALLOW_PRIVATE_NETWORK_TARGETS override is set. */
+export function isPrivateIp(address: string): boolean {
+  if (net.isIPv4(address)) return isPrivateIPv4(address);
+  // IPv6 literals here may arrive from dns.lookup() with a scope (fe80::1%eth0)
+  // — strip the zone id before the literal comparisons.
+  const noScope = address.split('%')[0];
+  if (net.isIPv6(noScope)) return isPrivateIPv6(noScope);
+  // Bracketed or odd forms: fail closed (treat as private) so a malformed
+  // resolved address can never become a pinned connect target.
+  return true;
 }
 
 export interface SsrfUrlPolicy {
