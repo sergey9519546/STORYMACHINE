@@ -9,7 +9,7 @@ import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS
 import { composePromptModifiers, GENRE_NAMES } from '../lib/genre-router.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
-  gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
+  withSessionCommand, gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
@@ -211,8 +211,8 @@ const router = express.Router();
 export default router;
 
 // ── ScriptIDE persistence routes (H2) ────────────────────────────────────────
-router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const body = req.body as {
     scriptText?: unknown;
     snapshots?: unknown;
@@ -1071,7 +1071,7 @@ router.post('/api/characters/export', gameLimiter, validate(CharactersExportBody
   res.json(bundle);
 }));
 
-router.post('/api/characters/import', gameLimiter, validate(CharactersImportBodySchema), asyncHandler(async (req, res) => {
+router.post('/api/characters/import', gameLimiter, validate(CharactersImportBodySchema), withSessionCommand(async (req, res, session) => {
   const { importCharacter, isCharacterMemoryBundle } = await import('../engine/character-memory.ts');
   const bundle = req.body?.bundle;
   if (!isCharacterMemoryBundle(bundle)) {
@@ -1080,7 +1080,7 @@ router.post('/api/characters/import', gameLimiter, validate(CharactersImportBody
   }
   const targetLocationId = typeof req.body?.targetLocationId === 'string'
     ? req.body.targetLocationId : undefined;
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   try {
     const result = importCharacter(stage, bundle, targetLocationId);
     res.json({ status: 'imported', ...result });

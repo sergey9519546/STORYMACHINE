@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { logger, requestLogger } from './lib/logger.ts';
-import { ValidationError, gameLimiter } from './lib/session-store.ts';
+import { ValidationError, SessionBusyError, SessionCapacityError, gameLimiter } from './lib/session-store.ts';
 import configRouter      from './routes/config.ts';
 import gameRouter        from './routes/game.ts';
 import scriptideRouter   from './routes/scriptide.ts';
@@ -201,6 +201,13 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
     // Application-level validation errors (e.g. bad sessionId format).
     if (err instanceof ValidationError) {
       res.status(400).json({ error: err.message });
+      return;
+    }
+    // Session lifecycle pressure is expected and retryable: never evict or
+    // close an active command merely to satisfy a request. Keep it distinct
+    // from an application fault so clients do not retry a 500 blindly.
+    if (err instanceof SessionBusyError || err instanceof SessionCapacityError) {
+      res.status(err.status).json({ error: err.message });
       return;
     }
     // Body over express.json()'s 1mb cap — body-parser throws a

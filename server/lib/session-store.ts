@@ -6,19 +6,59 @@ import { Stage } from '../engine/Stage.ts';
 import { Orchestrator } from '../engine/Orchestrator.ts';
 import { logger } from './logger.ts';
 import { metrics } from './metrics.ts';
+import { pruneAllSessionResetBackups } from './backup.ts';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface Session {
   stage: Stage;
   orchestrator: Orchestrator;
   lastAccess: number;
-  _turnQueue: Promise<void>;  // serializes concurrent /api/turn calls per session
+  commands: SessionCommandCoordinator;
+}
+
+/**
+ * Rejection-safe FIFO for mutations to one session's canonical SQLite state.
+ * Commands for distinct sessions remain independent. A failed command does not
+ * poison the tail, so the next admitted command can still run.
+ */
+export class SessionCommandCoordinator {
+  private tail: Promise<void> = Promise.resolve();
+  private pending = 0;
+
+  public get isIdle(): boolean {
+    return this.pending === 0;
+  }
+
+  public run<T>(operation: () => T | PromiseLike<T>): Promise<T> {
+    this.pending++;
+    const result = this.tail.then(operation, operation);
+    this.tail = result.then(() => undefined, () => undefined);
+    return result.finally(() => { this.pending--; });
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export class ValidationError extends Error {
   status = 400;
   constructor(message: string) { super(message); this.name = 'ValidationError'; }
+}
+
+/** No idle in-memory session can be safely closed to admit another request. */
+export class SessionCapacityError extends Error {
+  status = 503;
+  constructor(message = 'Server session capacity is temporarily busy. Please retry shortly.') {
+    super(message);
+    this.name = 'SessionCapacityError';
+  }
+}
+
+/** A destructive lifecycle action must never close a session mid-command. */
+export class SessionBusyError extends Error {
+  status = 409;
+  constructor(message = 'Session has an active command and cannot be deleted yet.') {
+    super(message);
+    this.name = 'SessionBusyError';
+  }
 }
 
 export const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
@@ -29,6 +69,31 @@ export const asyncHandler = (fn: express.RequestHandler): express.RequestHandler
       next(e);
     }
   };
+
+/**
+ * Admit a Stage-mutating HTTP command through the owning session's FIFO. The
+ * handler receives the exact session it owns, so backup/reset and every
+ * subsequent write observe one deliberate before-or-after boundary.
+ *
+ * This is intentionally a handler wrapper, not response-finish middleware:
+ * async work stays held until the handler's promise has settled, including
+ * state writes performed after provider or simulation awaits.
+ */
+export function withSessionCommand(
+  handler: (req: express.Request, res: express.Response, session: Session) => unknown | Promise<unknown>,
+): express.RequestHandler {
+  return asyncHandler(async (req, res) => {
+    const session = getOrCreateSession(sessionId(req));
+    try {
+      await session.commands.run(() => handler(req, res, session));
+    } finally {
+      // A long command may have begun before a short idle-TTL expires. Mark
+      // the moment it settles as access so a just-finished in-memory session
+      // is not immediately evicted (especially important in :memory: mode).
+      session.lastAccess = Date.now();
+    }
+  });
+}
 
 export const requireString = (val: unknown, name: string, maxLen = 20_000): string => {
   // ValidationError, not plain Error: app.ts's global error handler only maps
@@ -100,8 +165,33 @@ export const heavyBodyLimiter = rateLimit({
 });
 
 // ── Session constants ─────────────────────────────────────────────────────────
+function boundedIntegerEnv(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`${name} must be an integer between ${min} and ${max}`);
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be an integer between ${min} and ${max}`);
+  }
+  return value;
+}
+
 export const SESSION_DB_DIR  = process.env.SESSION_DB_DIR ?? path.join(process.cwd(), 'data', 'sessions');
 export const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
+// Recovery artifacts deliberately live outside the live session root so file
+// cleanup and normal session discovery cannot mistake a reset backup for a
+// loadable project database.
+export const SESSION_BACKUP_DIR = process.env.SESSION_BACKUP_DIR
+  ?? path.join(process.cwd(), 'data', 'backups', 'session-resets');
+// Reset recovery copies can contain the full writer project. Retention is
+// intentionally mandatory and bounded rather than inheriting the optional
+// periodic-backup policy: automatic UI resets must not create unbounded hidden
+// draft copies. Invalid operator settings fail fast instead of silently
+// disabling this privacy and disk-use boundary.
+export const SESSION_RESET_BACKUP_KEEP = boundedIntegerEnv('SESSION_RESET_BACKUP_KEEP', 5, 1, 100);
+export const SESSION_RESET_BACKUP_TTL_HOURS = boundedIntegerEnv('SESSION_RESET_BACKUP_TTL_HOURS', 168, 1, 24 * 365);
 export const MAX_SESSIONS    = Number(process.env.MAX_SESSIONS ?? 100);
 // Idle eviction TTL: how long a session may sit untouched in memory before the
 // sweep below closes it. Deliberately generous (24h default) — a writer
@@ -129,7 +219,9 @@ export function getOrCreateSession(sessionId: string): Session {
   let session = sessions.get(sessionId);
   if (!session) {
     if (sessions.size >= MAX_SESSIONS) {
-      // Evict the least-recently-accessed session to stay within the cap.
+      // Evict only an idle least-recently-accessed session. Closing a Stage
+      // with a queued/running command would permit a second same-id Stage to
+      // reopen while the first command is still mutating SQLite.
       // Close-only, same as sweepIdleSessions() below — the sqlite file (in
       // PERSIST mode) is deliberately left on disk. Whether to *also* delete
       // long-cold PERSIST-mode files (distinct from the existing orphaned-file
@@ -139,18 +231,22 @@ export function getOrCreateSession(sessionId: string): Session {
       let oldestId = '';
       let oldestAccess = Infinity;
       for (const [id, s] of sessions) {
-        if (s.lastAccess < oldestAccess) { oldestAccess = s.lastAccess; oldestId = id; }
+        if (s.commands.isIdle && s.lastAccess < oldestAccess) {
+          oldestAccess = s.lastAccess;
+          oldestId = id;
+        }
       }
-      if (oldestId) {
-        sessions.get(oldestId)?.stage.close();
-        sessions.delete(oldestId);
-        logger.warn('session_evicted', { evicted: oldestId, cap: MAX_SESSIONS });
+      if (!oldestId) {
+        throw new SessionCapacityError();
       }
+      sessions.get(oldestId)?.stage.close();
+      sessions.delete(oldestId);
+      logger.warn('session_evicted', { evicted: oldestId, cap: MAX_SESSIONS });
     }
     // For a persisted session this opens the existing file; the Orchestrator
     // constructor re-hydrates agents + locations, so the session resumes intact.
     const s = new Stage(dbPathFor(sessionId));
-    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now(), _turnQueue: Promise.resolve() };
+    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now(), commands: new SessionCommandCoordinator() };
     sessions.set(sessionId, session);
   }
   session.lastAccess = Date.now();
@@ -160,6 +256,7 @@ export function getOrCreateSession(sessionId: string): Session {
 // Evict a session from memory AND delete its persisted DB file — a true wipe.
 export function destroySession(sessionId: string): void {
   const session = sessions.get(sessionId);
+  if (session && !session.commands.isIdle) throw new SessionBusyError();
   if (session) { session.stage.close(); sessions.delete(sessionId); }
   if (PERSIST_SESSIONS) {
     const base = path.join(SESSION_DB_DIR, `${sessionId}.db`);
@@ -244,7 +341,7 @@ export function sessionId(req: express.Request): string {
 export function sweepIdleSessions(now: number = Date.now(), ttlMs: number = SESSION_TTL_MS): string[] {
   const evicted: string[] = [];
   for (const [id, s] of sessions) {
-    if (now - s.lastAccess > ttlMs) {
+    if (s.commands.isIdle && now - s.lastAccess > ttlMs) {
       s.stage.close();
       sessions.delete(id);
       evicted.push(id);
@@ -280,6 +377,27 @@ if (PERSIST_SESSIONS) {
           logger.info('session_disk_cleanup', { sid, ageDays: Math.round((now - stat.mtimeMs) / 86_400_000) });
         }
       } catch { /* file already gone */ }
+    }
+  }, 6 * 60 * 60 * 1000).unref();
+
+  // Reset recovery artifacts contain complete local project snapshots, so
+  // enforce their separate retention clock even when the user never resets
+  // again. The pruning helper only touches generated names beneath safe
+  // session-id directories; a failure is logged for the operator rather than
+  // being silently interpreted as successful retention.
+  setInterval(() => {
+    try {
+      const summary = pruneAllSessionResetBackups(SESSION_BACKUP_DIR, {
+        keep: SESSION_RESET_BACKUP_KEEP,
+        maxAgeMs: SESSION_RESET_BACKUP_TTL_HOURS * 60 * 60 * 1000,
+      });
+      if (summary.removed.length > 0) {
+        logger.info('session_reset_backups_pruned', { removed: summary.removed.length });
+      }
+    } catch (error) {
+      logger.error('session_reset_backup_retention_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }, 6 * 60 * 60 * 1000).unref();
 }

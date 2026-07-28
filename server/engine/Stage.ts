@@ -41,6 +41,33 @@ import { commitToEvents, estimateEventsByteSize } from '../nvm/kernel/adapters/c
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
 
+// This is the entire simulation authority. Reset intentionally excludes only
+// the writer project (`ScriptIDE_State`). Provider-cache entries and self-play
+// genomes are derived from a prior simulation and must not bias or retain data
+// in the next one. Child tables precede the parent tables they reference so the
+// transaction remains valid with foreign keys enabled.
+export const SIMULATION_RESET_TABLES = [
+  'Event_Propositions',
+  'Belief_Edges',
+  'Goal_Mutations',
+  'Dramatic_Pressure',
+  'Beat_Traces',
+  'Persuasion_Log',
+  'Stakes',
+  'Knowledge_Ledger',
+  'Action_Log',
+  'Event_Cards',
+  'Character_State',
+  'Characters',
+  'Locations',
+  'Story_Commits',
+  'Ghost_Commits',
+  'Reveal_Plans',
+  'Drama_Positions',
+  'Llm_Cache',
+  'Self_Play_Corpus',
+] as const;
+
 export interface ScriptIDEState {
   scriptText: string;
   snapshots: unknown[];
@@ -102,6 +129,50 @@ export class Stage {
   // remains on disk and can be re-opened later; for ':memory:' it is discarded.
   public close(): void {
     try { this.db.close(); } catch { /* already closed */ }
+  }
+
+  /** Use SQLite's online backup API against this exact live, WAL-aware handle. */
+  public async backupTo(destination: string): Promise<void> {
+    await this.db.backup(destination);
+  }
+
+  public getSchemaVersion(): number {
+    return this.db.pragma('user_version', { simple: true }) as number;
+  }
+
+  /**
+   * Clear only the declared simulation aggregate. A failed delete rolls the
+   * whole reset back. The writer project remains untouched, as do the author
+   * outline and story settings stored alongside transient director state.
+   * Project deletion is a distinct operation and is not implied.
+   */
+  public resetSimulationState(): void {
+    this.db.transaction(() => {
+      for (const table of SIMULATION_RESET_TABLES) {
+        this.db.prepare(`DELETE FROM ${table}`).run();
+      }
+
+      // Illusion_State deliberately combines resettable runtime state with
+      // author-owned outline/configuration. Preserve the latter exactly except
+      // the Director's derived tension cache, which belongs to the prior run.
+      const current = this.db.prepare(
+        'SELECT outline_json, config_json FROM Illusion_State WHERE id = 1',
+      ).get() as { outline_json: string | null; config_json: string | null } | undefined;
+      const config = safeJsonParse<Record<string, unknown>>(current?.config_json ?? '{}', {});
+      delete config.tension_accumulator;
+      delete config.tension_history;
+      this.db.prepare(`
+        INSERT INTO Illusion_State
+          (id, phase, planted_elements_json, pending_recontextualization_json, outline_json, config_json)
+        VALUES (1, 'Setup', '[]', '[]', ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          phase = excluded.phase,
+          planted_elements_json = excluded.planted_elements_json,
+          pending_recontextualization_json = excluded.pending_recontextualization_json,
+          outline_json = excluded.outline_json,
+          config_json = excluded.config_json
+      `).run(current?.outline_json ?? null, JSON.stringify(config));
+    })();
   }
 
   // ── Schema versioning ────────────────────────────────────────────────────────

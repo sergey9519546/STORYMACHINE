@@ -24,8 +24,18 @@ process.env.MAX_SESSIONS = '3';
 
 const {
   sessions, getOrCreateSession, destroySession, sweepIdleSessions,
-  dbPathFor, PERSIST_SESSIONS, MAX_SESSIONS, SESSION_TTL_MS,
+  dbPathFor, PERSIST_SESSIONS, MAX_SESSIONS, SESSION_TTL_MS, SessionCapacityError,
 } = await import('../../server/lib/session-store.ts');
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T | PromiseLike<T>) => void; reject: (reason?: unknown) => void } {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 after(() => {
   for (const [, s] of sessions) { try { s.stage.close(); } catch { /* already closed */ } }
@@ -83,6 +93,28 @@ describe('session eviction — idle TTL sweep (sweepIdleSessions)', () => {
     assert.deepEqual(evicted, []);
     assert.equal(sessions.size, sizeBefore);
   });
+
+  it('never closes an idle-looking session while it has an admitted command', async () => {
+    const id = 'busy-idle-session';
+    const session = getOrCreateSession(id);
+    const release = deferred<void>();
+    const command = session.commands.run(async () => { await release.promise; });
+    session.lastAccess = Date.now() - 10_000;
+    try {
+      const whileBusy = sweepIdleSessions(Date.now(), 1);
+      assert.ok(!whileBusy.includes(id), 'busy sessions must not be evicted by TTL');
+      assert.ok(sessions.has(id));
+
+      release.resolve();
+      await command;
+      assert.ok(sweepIdleSessions(Date.now(), 1).includes(id),
+        'the same session becomes evictable after its command settles');
+    } finally {
+      release.resolve();
+      await command.catch(() => undefined);
+      sweepIdleSessions(Date.now(), -1);
+    }
+  });
 });
 
 describe('session eviction — MAX_SESSIONS cap (LRU)', () => {
@@ -131,6 +163,24 @@ describe('session eviction — MAX_SESSIONS cap (LRU)', () => {
     getOrCreateSession('cap-2'); // re-fetch, not a new id
     assert.equal(sessions.size, sizeBefore, 're-fetching an existing session must not change the map size');
     assert.ok(sessions.has('cap-3') && sessions.has('cap-4'), 'no unrelated session should be evicted on a cache hit');
+  });
+
+  it('fails cleanly rather than evicting a busy session when every slot is active', async () => {
+    sweepIdleSessions(Date.now(), -1);
+    const releases = Array.from({ length: MAX_SESSIONS }, () => deferred<void>());
+    const commands = releases.map((release, index) => {
+      const session = getOrCreateSession(`busy-cap-${index}`);
+      return session.commands.run(async () => { await release.promise; });
+    });
+
+    try {
+      assert.throws(() => getOrCreateSession('busy-cap-overflow'), SessionCapacityError);
+      assert.equal(sessions.size, MAX_SESSIONS, 'capacity rejection must not close any active Stage');
+    } finally {
+      releases.forEach(release => release.resolve());
+      await Promise.all(commands);
+      sweepIdleSessions(Date.now(), -1);
+    }
   });
 });
 

@@ -65,9 +65,9 @@ no account record, no way to prove "this session belongs to user X" beyond
     on any client that navigates rather than `fetch()`s.
   - **No revocation.** A writer who suspects their id leaked (pasted a link
     publicly, shared a machine) has no way to invalidate it and get a fresh
-    one without losing their session state — the only "reset" available
-    today is `destroySession()` (`POST` routes that call it), which deletes
-    the session entirely rather than rotating its id.
+    one. `POST /api/reset` only clears simulation state; it neither rotates
+    the bearer id nor deletes the writer project. `destroySession()` is an
+    internal lifecycle helper, not a public session-rotation route.
 - **No user-level accountability.** Nothing distinguishes "this session's
   legitimate owner" from "whoever currently holds the id" — no audit trail
   of which human performed an action, no per-account rate limits or

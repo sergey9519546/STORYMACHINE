@@ -230,6 +230,31 @@ into `SESSION_DB_DIR` under its original name — e.g.
 snapshot directory's `*.db` files over `SESSION_DB_DIR` the same way before
 restarting.
 
+**Simulation reset:** `POST /api/reset` is not project deletion. It clears
+only simulation state and preserves the writer/editor state, author outline,
+and story settings in the live database. It clears prior-run provider cache
+and self-play artifacts so a new simulation does not inherit them. In
+persistent mode it first publishes a SQLite online backup that passes an
+integrity check and schema-version match under
+`SESSION_BACKUP_DIR` (default
+`data/backups/session-resets/<sessionId>/`). The successful response includes
+the local recovery-artifact identifier, its local-only scope, and the active
+retention policy. If required backup publication or retention enforcement fails, reset
+returns `503` and leaves the session unchanged.
+
+These reset copies are for an operator-controlled local/single-user
+deployment; they are not encrypted, not an off-device backup service, and
+not a confidential-draft deletion mechanism. They retain complete SQLite
+project snapshots, so deletion procedures must explicitly reconcile them.
+They are bounded independently of normal session cleanup by
+`SESSION_RESET_BACKUP_KEEP` (default `5`) and
+`SESSION_RESET_BACKUP_TTL_HOURS` (default `168`). The policy is enforced on
+every reset and by the running server's six-hour retention sweep; a stopped
+server cannot delete files on its own. To recover one receipt, stop the
+server, copy `<SESSION_BACKUP_DIR>/<sessionId>/<recovery-artifact-id>` to
+`<SESSION_DB_DIR>/<sessionId>.db`, then restart. Do this only for a local
+operator-approved recovery; no public restore endpoint exists.
+
 ### Session capability model
 
 See `docs/AUTH.md` for the current auth model (unguessable session ids as

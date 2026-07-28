@@ -7,7 +7,7 @@ import express from 'express';
 import { buildEnrichedState } from '../../nvm/state/enrichedState.ts';
 import {
   asyncHandler, sessionId, getOrCreateSession,
-  gameLimiter,
+  withSessionCommand, gameLimiter,
 } from '../../lib/session-store.ts';
 import {
   validate, RedteamBodySchema, TwinDoBodySchema,
@@ -99,8 +99,8 @@ router.post('/api/nvm/whatif/explore', gameLimiter, validate(WhatIfExploreBodySc
 }));
 
 // POST /api/nvm/author/fixed-points — backward-chain toward a narrative attractor
-router.post('/api/nvm/author/fixed-points', gameLimiter, validate(FixedPointsBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/author/fixed-points', gameLimiter, validate(FixedPointsBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { planToward } = await import('../../nvm/author/fixed-points.ts');
   type FixedPointT = import('../../nvm/author/fixed-points.ts').FixedPoint;
   const { fixedPoints: fps, currentScene: bodyCurrentScene } = req.body as { fixedPoints: FixedPointT[]; currentScene?: number };

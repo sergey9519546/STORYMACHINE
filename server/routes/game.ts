@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import { Stage } from '../engine/Stage.ts';
 import { Orchestrator } from '../engine/Orchestrator.ts';
 import type { CharacterSheet, StageSnapshot } from '../engine/types.ts';
@@ -11,14 +11,16 @@ import {
   validate, validateParams, InitBodySchema, TurnBodySchema, RunRoomBodySchema, OutlineBodySchema, InterviewBodySchema,
   RunSceneBodySchema, DarkTriadFieldSchema, BigFiveFieldSchema, AttachmentStyleFieldSchema,
   DefenseMechanismFieldSchema, GoalStackFieldSchema, SimulateToFountainBodySchema,
-  QbnFilterChoicesBodySchema, NcpStoryformBodySchema, CharIdParamSchema,
+  QbnFilterChoicesBodySchema, NcpStoryformBodySchema, CharIdParamSchema, ResetBodySchema,
 } from '../lib/validation.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { buildInterviewGrounding } from '../lib/interview.ts';
 import { generateContent, modelForTask, getTemperature } from '../engine/ai.ts';
+import { createVerifiedBackup, pruneSessionResetBackups } from '../lib/backup.ts';
 import {
-  asyncHandler, requireString, sessionId, getOrCreateSession, destroySession,
-  gameLimiter, aiLimiter, sessions, runningRooms, PERSIST_SESSIONS, SESSION_DB_DIR,
+  asyncHandler, requireString, sessionId, getOrCreateSession,
+  withSessionCommand, gameLimiter, aiLimiter, sessions, runningRooms,
+  PERSIST_SESSIONS, SESSION_BACKUP_DIR, SESSION_RESET_BACKUP_KEEP, SESSION_RESET_BACKUP_TTL_HOURS,
 } from '../lib/session-store.ts';
 import type { RoomProgressEvent } from '../engine/Orchestrator.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
@@ -62,10 +64,49 @@ function extractPsychology(raw: Record<string, unknown>): Pick<
 const router = express.Router();
 export default router;
 
-router.post('/api/init', gameLimiter, validate(InitBodySchema), asyncHandler(async (req, res) => {
+/**
+ * Claim room keys before a simulation command enters the session FIFO. This
+ * retains duplicate-click protection while the command waits behind an earlier
+ * mutation; the FIFO itself remains the source of truth for Stage safety.
+ */
+function reserveSimulationRooms(
+  roomIdsFor: (req: express.Request) => string[],
+): express.RequestHandler {
+  return (req, res, next) => {
+    try {
+      const sid = sessionId(req);
+      const lockKeys = roomIdsFor(req).map(roomId => `${sid}:${roomId}`);
+      if (lockKeys.some(lockKey => runningRooms.has(lockKey))) {
+        res.status(409).json({ error: 'Simulation is already running or queued for one or more of these rooms. Please wait.' });
+        return;
+      }
+      lockKeys.forEach(lockKey => runningRooms.add(lockKey));
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        lockKeys.forEach(lockKey => runningRooms.delete(lockKey));
+      };
+      res.locals.releaseSimulationRooms = release;
+      // A response emitted before the command body can begin (for example, a
+      // session-open failure) must not leak its admission reservation.
+      res.once('finish', release);
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+function releaseSimulationRooms(res: express.Response): void {
+  const release = res.locals.releaseSimulationRooms as (() => void) | undefined;
+  release?.();
+}
+
+router.post('/api/init', gameLimiter, validate(InitBodySchema), withSessionCommand(async (req, res, session) => {
   const sid = sessionId(req);
   const { nodes, agents } = req.body;
-  const { orchestrator } = getOrCreateSession(sid);
+  const { orchestrator } = session;
 
   const truncatedNodes  = Array.isArray(nodes)  && nodes.length  > 50;
   const truncatedAgents = Array.isArray(agents) && agents.length > 50;
@@ -137,33 +178,17 @@ router.post('/api/init', gameLimiter, validate(InitBodySchema), asyncHandler(asy
   });
 }));
 
-router.post('/api/turn', gameLimiter, validate(TurnBodySchema), asyncHandler(async (req, res) => {
-  const session = getOrCreateSession(sessionId(req));
+router.post('/api/turn', gameLimiter, validate(TurnBodySchema), withSessionCommand(async (req, res, session) => {
   const agentId = requireString(req.body?.agentId, 'agentId', 128);
-
   if (!session.stage.getAgent(agentId)) {
     res.status(404).json({ error: `Agent '${agentId}' does not exist in this session` });
     return;
   }
-
-  // Per-session serialization: each turn is chained behind the previous so
-  // concurrent requests for the same session run sequentially, not in parallel,
-  // preventing state corruption in the SQLite-backed engine.
-  let resolveSlot!: () => void;
-  const slot = new Promise<void>(r => { resolveSlot = r; });
-  const prev = session._turnQueue;
-  session._turnQueue = slot;
-
-  try {
-    await prev;
-    const action = await session.orchestrator.runTurn(agentId);
-    // Fix C: surface Tier-1 canon drops (previously only a server log) —
-    // additive, only present when this turn actually dropped a commit.
-    const droppedCommits = session.orchestrator.consumeDroppedCommits();
-    res.json({ action, ...(droppedCommits ? { droppedCommits } : {}) });
-  } finally {
-    resolveSlot();
-  }
+  const action = await session.orchestrator.runTurn(agentId);
+  // Fix C: surface Tier-1 canon drops (previously only a server log) —
+  // additive, only present when this turn actually dropped a commit.
+  const droppedCommits = session.orchestrator.consumeDroppedCommits();
+  res.json({ action, ...(droppedCommits ? { droppedCommits } : {}) });
 }));
 
 // ── Character interview ───────────────────────────────────────────────────
@@ -248,15 +273,10 @@ router.post('/api/game/interview', aiLimiter, validate(InterviewBodySchema), asy
 // LLM fan-out rationale /api/run-scene and /api/game/interview already use
 // aiLimiter for above, just not previously applied here or to its SSE
 // sibling below.
-router.post('/api/run-room', aiLimiter, validate(RunRoomBodySchema), asyncHandler(async (req, res) => {
-  const sid = sessionId(req);
+router.post('/api/run-room', aiLimiter, validate(RunRoomBodySchema), reserveSimulationRooms(req => [
+  requireString(req.body?.nodeId, 'nodeId', 128),
+]), withSessionCommand(async (req, res, session) => {
   const nodeId = requireString(req.body?.nodeId, 'nodeId', 128);
-  const lockKey = `${sid}:${nodeId}`;
-
-  if (runningRooms.has(lockKey)) {
-    res.status(409).json({ error: 'Simulation already running for this room. Please wait.' });
-    return;
-  }
 
   // Optional maxTurns — clamped to a safe range to bound LLM fan-out per request.
   const rawMaxTurns = req.body?.maxTurns;
@@ -264,19 +284,19 @@ router.post('/api/run-room', aiLimiter, validate(RunRoomBodySchema), asyncHandle
     ? Math.max(2, Math.min(12, Math.round(rawMaxTurns)))
     : 5;
 
-  const { stage, orchestrator } = getOrCreateSession(sid);
+  const { stage, orchestrator } = session;
   if (!stage.getLocation(nodeId)) {
+    releaseSimulationRooms(res);
     res.status(404).json({ error: `Location '${nodeId}' does not exist in this session` });
     return;
   }
-  runningRooms.add(lockKey);
   try {
     await orchestrator.runRoomSimulation(nodeId, maxTurns);
     // Fix C: surface Tier-1 canon drops — additive, only present when nonzero.
     const droppedCommits = orchestrator.consumeDroppedCommits();
     res.json({ status: 'completed', maxTurns, ...(droppedCommits ? { droppedCommits } : {}) });
   } finally {
-    runningRooms.delete(lockKey);
+    releaseSimulationRooms(res);
   }
 }));
 
@@ -284,7 +304,9 @@ router.post('/api/run-room', aiLimiter, validate(RunRoomBodySchema), asyncHandle
 // aiLimiter — same fan-out rationale as POST /api/run-room above; this is
 // its streaming twin and drives the identical orchestrator.runRoomSimulation
 // call with the same maxTurns budget.
-router.get('/api/run-room-stream', aiLimiter, async (req, res) => {
+router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
+  requireString(req.query?.nodeId as string | undefined, 'nodeId', 128),
+]), withSessionCommand(async (req, res, session) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -316,30 +338,21 @@ router.get('/api/run-room-stream', aiLimiter, async (req, res) => {
     if (!ended) { ended = true; res.end(); }
   };
 
-  let lockKey = '';
   try {
-    const sid = sessionId(req);
     const nodeId = requireString(req.query?.nodeId as string | undefined, 'nodeId', 128);
-    lockKey = `${sid}:${nodeId}`;
-
-    if (runningRooms.has(lockKey)) {
-      emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'already_running' });
-      ensureEnded();
-      return;
-    }
 
     const rawMaxTurns = req.query?.maxTurns;
     const maxTurns = typeof rawMaxTurns === 'string' && rawMaxTurns
       ? Math.max(2, Math.min(12, parseInt(rawMaxTurns, 10) || 5))
       : 5;
 
-    const { stage, orchestrator } = getOrCreateSession(sid);
+    const { stage, orchestrator } = session;
     if (!stage.getLocation(nodeId)) {
+      releaseSimulationRooms(res);
       emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: location '${nodeId}' not found` });
       ensureEnded();
       return;
     }
-    runningRooms.add(lockKey);
     try {
       await orchestrator.runRoomSimulation(nodeId, maxTurns, emit);
       // Fix C: the final 'simulation_complete' event (emitted from inside
@@ -348,15 +361,17 @@ router.get('/api/run-room-stream', aiLimiter, async (req, res) => {
       // doesn't leak into this session's NEXT run-room call.
       orchestrator.consumeDroppedCommits();
     } finally {
-      runningRooms.delete(lockKey);
+      releaseSimulationRooms(res);
     }
   } catch (err) {
+    releaseSimulationRooms(res);
     emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
   } finally {
     clearTimeout(wallTimer);
+    releaseSimulationRooms(res);
     ensureEnded();
   }
-});
+}));
 
 // ── Multi-room orchestration (Fix D) ────────────────────────────────────────
 // POST /api/run-scene — exposes Orchestrator.runFullScene (Orchestrator.ts),
@@ -376,27 +391,19 @@ router.get('/api/run-room-stream', aiLimiter, async (req, res) => {
 // without an API key (see the engine's existing keyless fallbacks exercised
 // throughout tests/), so an empty/keyless run still resolves and returns 200
 // with the hollow-but-valid { totalTurns, roundsRun, locationIds } shape.
-router.post('/api/run-scene', aiLimiter, validate(RunSceneBodySchema), asyncHandler(async (req, res) => {
-  const sid = sessionId(req);
+router.post('/api/run-scene', aiLimiter, validate(RunSceneBodySchema), reserveSimulationRooms(req => {
+  const { locationIds } = req.body as { locationIds: string[] };
+  return locationIds;
+}), withSessionCommand(async (req, res, session) => {
   const { locationIds, roundsPerRoom } = req.body as { locationIds: string[]; roundsPerRoom?: number };
-  const { stage, orchestrator } = getOrCreateSession(sid);
+  const { stage, orchestrator } = session;
 
   const missing = locationIds.filter(id => !stage.getLocation(id));
   if (missing.length > 0) {
+    releaseSimulationRooms(res);
     res.status(404).json({ error: `Location(s) not found: ${missing.join(', ')}` });
     return;
   }
-
-  // Lock every individual room this scene touches — the SAME per-room lock
-  // /api/run-room uses — so a concurrent /api/run-room (or another
-  // /api/run-scene) call on any shared room is rejected instead of two
-  // simulations racing on the same SQLite-backed Stage.
-  const lockKeys = locationIds.map(id => `${sid}:${id}`);
-  if (lockKeys.some(k => runningRooms.has(k))) {
-    res.status(409).json({ error: 'A simulation is already running for one or more of these rooms. Please wait.' });
-    return;
-  }
-  lockKeys.forEach(k => runningRooms.add(k));
   try {
     const result = await orchestrator.runFullScene(locationIds, roundsPerRoom ?? 3);
     // Fix C: surface Tier-1 canon drops accumulated across every room/round
@@ -404,7 +411,7 @@ router.post('/api/run-scene', aiLimiter, validate(RunSceneBodySchema), asyncHand
     const droppedCommits = orchestrator.consumeDroppedCommits();
     res.json({ status: 'completed', ...result, ...(droppedCommits ? { droppedCommits } : {}) });
   } finally {
-    lockKeys.forEach(k => runningRooms.delete(k));
+    releaseSimulationRooms(res);
   }
 }));
 
@@ -472,19 +479,77 @@ router.get('/api/state', gameLimiter, asyncHandler(async (req, res) => {
   res.json({ agents: stage.getAllAgents(), nodes: stage.getAllLocations() });
 }));
 
-// Reset a session (clears all simulation state for this sessionId).
-// When running with disk persistence a timestamped backup is written first.
-router.post('/api/reset', gameLimiter, asyncHandler(async (req, res) => {
+// Reset only the simulation aggregate. Writer/editor state stays in the same
+// live Stage. Persistent sessions fail closed unless a verified SQLite online
+// backup has been published first.
+router.post('/api/reset', gameLimiter, validate(ResetBodySchema), withSessionCommand(async (req, res, session) => {
   const sid = sessionId(req);
+  if ([...runningRooms].some(lockKey => lockKey.startsWith(`${sid}:`))) {
+    res.status(409).json({ error: 'Reset is unavailable while a simulation is running or queued. Please wait.' });
+    return;
+  }
+
+  let backupCreated = false;
+  let backupId: string | undefined;
   if (PERSIST_SESSIONS) {
-    const src = path.join(SESSION_DB_DIR, `${sid}.db`);
-    if (fs.existsSync(src)) {
-      const dest = path.join(SESSION_DB_DIR, `${sid}.${Date.now()}.bak.db`);
-      try { fs.copyFileSync(src, dest); } catch { /* non-fatal */ }
+    const backupDirectory = path.join(SESSION_BACKUP_DIR, sid);
+    backupId = `${Date.now()}-${randomUUID()}.db`;
+    const destination = path.join(backupDirectory, backupId);
+    try {
+      // Keep one known recovery artifact until the replacement has been
+      // verified. If cleanup cannot enforce the bounded policy, do not begin
+      // the destructive transition at all.
+      pruneSessionResetBackups(backupDirectory, {
+        keep: Math.max(1, SESSION_RESET_BACKUP_KEEP - 1),
+        minimumRetained: 1,
+        maxAgeMs: SESSION_RESET_BACKUP_TTL_HOURS * 60 * 60 * 1000,
+      });
+      await createVerifiedBackup(session.stage, destination);
+      pruneSessionResetBackups(backupDirectory, {
+        keep: SESSION_RESET_BACKUP_KEEP,
+        maxAgeMs: SESSION_RESET_BACKUP_TTL_HOURS * 60 * 60 * 1000,
+        protectedNames: [backupId],
+      });
+      backupCreated = true;
+    } catch (error) {
+      logger.error('session_reset_backup_failed', {
+        sessionId: sid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(503).json({ error: 'Reset aborted because a required recovery backup could not be prepared.' });
+      return;
     }
   }
-  destroySession(sid);
-  res.json({ status: 'reset', sessionId: sid });
+
+  let resetCommitted = false;
+  try {
+    session.stage.resetSimulationState();
+    resetCommitted = true;
+    session.orchestrator = new Orchestrator(session.stage);
+  } catch (error) {
+    logger.error('session_reset_failed', {
+      sessionId: sid,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(500).json({
+      error: resetCommitted
+        ? 'Simulation reset completed, but in-memory reinitialization failed. Reload before continuing.'
+        : 'Reset failed; the simulation state was not changed.',
+    });
+    return;
+  }
+  res.json({
+    status: 'reset',
+    sessionId: sid,
+    ...(backupCreated ? {
+      backupCreated: true,
+      backup: {
+        id: backupId,
+        scope: 'verified pre-reset local session snapshot',
+        retention: { keep: SESSION_RESET_BACKUP_KEEP, maxAgeHours: SESSION_RESET_BACKUP_TTL_HOURS },
+      },
+    } : {}),
+  });
 }));
 
 // Export current simulation as a Fountain screenplay draft (with beat traces)

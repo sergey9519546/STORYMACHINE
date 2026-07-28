@@ -6,7 +6,7 @@ import express from 'express';
 import { buildEnrichedState } from '../../nvm/state/enrichedState.ts';
 import {
   asyncHandler, safeJsonParse, sessionId, getOrCreateSession,
-  gameLimiter, aiLimiter,
+  withSessionCommand, gameLimiter, aiLimiter,
 } from '../../lib/session-store.ts';
 import {
   validate, SelfplayBodySchema, GenomeDiffBodySchema, GenomeBreedBodySchema,
@@ -49,8 +49,8 @@ router.get('/api/nvm/corpus', gameLimiter, asyncHandler(async (req, res) => {
 
 // POST /api/nvm/selfplay — run N headless sims and persist corpus results.
 // aiLimiter: self-play runs up to 50 simulations × LLM candidate generations per request.
-router.post('/api/nvm/selfplay', aiLimiter, validate(SelfplayBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/selfplay', aiLimiter, validate(SelfplayBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { runSelfPlay } = await import('../../nvm/selfplay/corpus.ts');
   const { makeLLMCandidateGenerator } = await import('../../nvm/generate/llm-generator.ts');
   const { extractGenome } = await import('../../nvm/selfplay/genome.ts');

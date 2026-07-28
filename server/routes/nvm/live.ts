@@ -6,7 +6,7 @@ import express from 'express';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import {
   asyncHandler, sessionId, getOrCreateSession,
-  gameLimiter,
+  withSessionCommand, gameLimiter,
 } from '../../lib/session-store.ts';
 import {
   validate, LiveMoveBodySchema, LiveAdvanceBodySchema, RoomCritiqueBodySchema,
@@ -97,8 +97,8 @@ router.post('/api/nvm/room/critique', gameLimiter, validate(RoomCritiqueBodySche
 }));
 
 // POST /api/nvm/live/move — Author-Presence Move Bus.
-router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { text, sceneIdx: bodySceneIdx } = req.body as { text: string; sceneIdx?: number };
   if (text.trim().length === 0) {
     res.status(400).json({ error: 'text is required' });
@@ -211,8 +211,8 @@ router.get('/api/nvm/live/feed', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/live/advance — Reactive Turn Cycle.
-router.post('/api/nvm/live/advance', gameLimiter, validate(LiveAdvanceBodySchema), asyncHandler(async (req, res) => {
-  const { stage, orchestrator } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/live/advance', gameLimiter, validate(LiveAdvanceBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage, orchestrator } = session;
   const { beats = 1, locationId } = req.body as { beats?: number; locationId?: string };
   const safeBeats = Math.max(1, Math.min(5, typeof beats === 'number' ? beats : 1));
 

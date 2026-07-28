@@ -16,7 +16,7 @@ import {
 import type { ToneName } from '../lib/genre-router.ts';
 import {
   asyncHandler, gameLimiter, aiLimiter, sessions, sessionId, getOrCreateSession,
-  metrics,
+  withSessionCommand, metrics,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
 
@@ -176,8 +176,8 @@ router.get('/api/pacing-target', gameLimiter, asyncHandler(async (req, res) => {
   res.json({ target });
 }));
 
-router.post('/api/pacing-target', gameLimiter, validate(PacingTargetBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/pacing-target', gameLimiter, validate(PacingTargetBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { target } = req.body as { target: 'slow' | 'medium' | 'fast' };
   stage.updateIllusionState({ pacing_target: target });
   res.json({ target });
@@ -200,23 +200,23 @@ router.get('/api/story-config', gameLimiter, asyncHandler(async (req, res) => {
   });
 }));
 
-router.post('/api/emotional-arc', gameLimiter, validate(EmotionalArcBodySchema), asyncHandler(async (req, res) => {
+router.post('/api/emotional-arc', gameLimiter, validate(EmotionalArcBodySchema), withSessionCommand(async (req, res, session) => {
   const { arc } = req.body as { arc: string };
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   stage.updateIllusionState({ emotional_arc: arc as NonNullable<import('../engine/types.ts').IllusionState['emotional_arc']> });
   res.json({ arc });
 }));
 
-router.post('/api/director-style', gameLimiter, validate(DirectorStyleBodySchema), asyncHandler(async (req, res) => {
+router.post('/api/director-style', gameLimiter, validate(DirectorStyleBodySchema), withSessionCommand(async (req, res, session) => {
   const { style } = req.body as { style: string };
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   stage.updateIllusionState({ director_style: style as NonNullable<import('../engine/types.ts').IllusionState['director_style']> });
   res.json({ style });
 }));
 
-router.post('/api/story-genre', gameLimiter, validate(StoryGenreBodySchema), asyncHandler(async (req, res) => {
+router.post('/api/story-genre', gameLimiter, validate(StoryGenreBodySchema), withSessionCommand(async (req, res, session) => {
   const { genre } = req.body as { genre: string };
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   stage.updateIllusionState({ story_genre: genre as NonNullable<import('../engine/types.ts').IllusionState['story_genre']> });
   res.json({ genre });
 }));
@@ -226,9 +226,9 @@ router.post('/api/story-genre', gameLimiter, validate(StoryGenreBodySchema), asy
 // back) but through a proper zod schema (StoryToneSchema, validated against
 // TONE_NAME_LIST). Tone now persists in IllusionState's config_json exactly
 // like story_genre, so it survives restarts and rides /api/session/export.
-router.post('/api/story-tone', gameLimiter, validate(StoryToneSchema), asyncHandler(async (req, res) => {
+router.post('/api/story-tone', gameLimiter, validate(StoryToneSchema), withSessionCommand(async (req, res, session) => {
   const { tone } = req.body as { tone: ToneName };
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   stage.updateIllusionState({ story_tone: tone });
   res.json({ tone });
 }));
@@ -238,18 +238,18 @@ router.post('/api/story-tone', gameLimiter, validate(StoryToneSchema), asyncHand
 // IllusionState so the prompt-assembly path (server/engine/agent/decision.ts)
 // can inject the mode's promptInstruction the same way STYLE_MODIFIERS'
 // agentInstruction reaches prompts via director_style.
-router.post('/api/character-arc-mode', gameLimiter, validate(CharacterArcModeBodySchema), asyncHandler(async (req, res) => {
+router.post('/api/character-arc-mode', gameLimiter, validate(CharacterArcModeBodySchema), withSessionCommand(async (req, res, session) => {
   const { mode } = req.body as { mode: string };
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   stage.updateIllusionState({ character_arc_mode: mode as NonNullable<import('../engine/types.ts').IllusionState['character_arc_mode']> });
   res.json({ mode });
 }));
 
-router.post('/api/story-theme', gameLimiter, validate(StoryThemeBodySchema), asyncHandler(async (req, res) => {
+router.post('/api/story-theme', gameLimiter, validate(StoryThemeBodySchema), withSessionCommand(async (req, res, session) => {
   const { sanitizeForPrompt } = await import('../lib/prompt-utils.ts');
   const raw = (req.body as { theme: string }).theme;
   const theme = sanitizeForPrompt(raw.trim(), 500);
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   stage.updateIllusionState({ story_theme: theme });
   res.json({ theme });
 }));
@@ -261,8 +261,8 @@ router.get('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
   res.json({ beats: illusion.outline ?? [] });
 }));
 
-router.post('/api/outline', gameLimiter, validate(OutlineBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/outline', gameLimiter, validate(OutlineBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const beats = req.body?.beats;
   if (!Array.isArray(beats)) { res.status(400).json({ error: 'beats array required' }); return; }
   // Sanitize each beat's text fields before persisting — they are later embedded in agent prompts.
@@ -284,17 +284,17 @@ router.post('/api/outline', gameLimiter, validate(OutlineBodySchema), asyncHandl
   res.json({ status: 'ok', beatCount: sanitizedBeats.length });
 }));
 
-router.delete('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.delete('/api/outline', gameLimiter, withSessionCommand(async (_req, res, session) => {
+  const { stage } = session;
   stage.setOutline([]);
   res.json({ status: 'cleared' });
 }));
 
 // Apply a structure preset — instantiates beat templates into OutlineBeat[] and persists.
-router.post('/api/outline/apply-preset', gameLimiter, validate(ApplyPresetBodySchema), asyncHandler(async (req, res) => {
+router.post('/api/outline/apply-preset', gameLimiter, validate(ApplyPresetBodySchema), withSessionCommand(async (req, res, session) => {
   const { structure, expectedTurns } = req.body as { structure: string; expectedTurns?: number };
   const n = Math.max(4, Math.min(200, Number(expectedTurns) || 20));
-  const { stage } = getOrCreateSession(sessionId(req));
+  const { stage } = session;
   const beats = instantiatePreset(structure, n);
   stage.setOutline(beats);
   stage.updateIllusionState({ structure: structure as import('../engine/types.ts').IllusionState['structure'], expected_turns: n });

@@ -7,7 +7,7 @@ import express from 'express';
 import { buildEnrichedState } from '../../nvm/state/enrichedState.ts';
 import {
   asyncHandler, sessionId, getOrCreateSession,
-  gameLimiter,
+  withSessionCommand, gameLimiter,
 } from '../../lib/session-store.ts';
 import {
   validate, validateParams, GhostBranchBodySchema, InjectOpsBodySchema, ConvergeCommitBodySchema,
@@ -58,8 +58,8 @@ router.get('/api/nvm/manifest', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/inject-ops — Director's Cut: inject custom StoryOps into the canon.
-router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   const { stateHash } = await import('../../nvm/state/NarrativeState.ts');
   const { summarizeOps } = await import('../../nvm/state/StoryCommit.ts');
@@ -106,8 +106,8 @@ router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), a
 // gameLimiter (not aiLimiter): unlike /api/nvm/converge, this route makes no LLM
 // call — it only re-proves and commits already-generated ops, same cost profile
 // as /api/nvm/inject-ops.
-router.post('/api/nvm/converge/commit', gameLimiter, validate(ConvergeCommitBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/converge/commit', gameLimiter, validate(ConvergeCommitBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { runTier1, tier1Passes, failedProofs } = await import('../../nvm/proof/kernel.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   const { stateHash } = await import('../../nvm/state/NarrativeState.ts');

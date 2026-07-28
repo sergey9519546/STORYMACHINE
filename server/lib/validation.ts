@@ -273,6 +273,13 @@ export const RunSceneBodySchema = z.object({
   roundsPerRoom: z.number().int().min(1).max(12).optional(),
 });
 
+// A reset is a simulation-only destructive operation. Keep its contract
+// intentionally small and reject misspelled fields before the route can create
+// a recovery artifact or clear any simulation state.
+export const ResetBodySchema = z.object({
+  sessionId: sessionIdField,
+}).strict();
+
 // The legacy JSON session importer is retired. Its body carries no semantics;
 // keeping this body-agnostic lets every syntactically valid JSON request reach
 // the unconditional, non-mutating 410 tombstone instead of falsely suggesting

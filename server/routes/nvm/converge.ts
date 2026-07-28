@@ -7,7 +7,7 @@ import { buildStoryBibleSummary } from '../../nvm/bible/index.ts';
 import { buildEnrichedState } from '../../nvm/state/enrichedState.ts';
 import {
   asyncHandler, sessionId, getOrCreateSession,
-  aiLimiter,
+  withSessionCommand, aiLimiter,
 } from '../../lib/session-store.ts';
 import {
   validate, ConvergeBodySchema, ConvergeArcBodySchema,
@@ -19,8 +19,8 @@ export default router;
 // POST /api/nvm/converge — run the G1 convergence loop on a scene target.
 // aiLimiter (not gameLimiter): each converge call fans out to multiple LLM candidate
 // generations — the loose 120/min game limit would allow a cost/quota-exhaustion DoS.
-router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { convergeScene } = await import('../../nvm/converge/loop.ts');
   const { makeLLMCandidateGenerator } = await import('../../nvm/generate/llm-generator.ts');
   type SceneTargetT = import('../../nvm/generate/proof-spec.ts').SceneTarget;
@@ -108,7 +108,7 @@ router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), asyncH
 
 // GET /api/nvm/converge-stream — SSE streaming variant of G1 convergence.
 // aiLimiter: SSE variant of /api/nvm/converge — same LLM fan-out per request.
-router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
+router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req, res, session) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -125,7 +125,7 @@ router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
   const ensureEnded = () => { if (!ended) { ended = true; res.end(); } };
 
   try {
-    const { stage } = getOrCreateSession(sessionId(req));
+    const { stage } = session;
     const { convergeScene } = await import('../../nvm/converge/loop.ts');
     const { makeLLMCandidateGenerator } = await import('../../nvm/generate/llm-generator.ts');
     const { analyzeArcCompletion } = await import('../../nvm/quality/arc-tracker.ts');
@@ -245,12 +245,12 @@ router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
   } finally {
     ensureEnded();
   }
-});
+}));
 
 // POST /api/nvm/converge-arc — multi-scene arc compiler.
 // aiLimiter: arc convergence runs the LLM converge loop for up to 8 scenes per request.
-router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema), asyncHandler(async (req, res) => {
-  const { stage } = getOrCreateSession(sessionId(req));
+router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema), withSessionCommand(async (req, res, session) => {
+  const { stage } = session;
   const { convergeScene } = await import('../../nvm/converge/loop.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   const { makeLLMCandidateGenerator } = await import('../../nvm/generate/llm-generator.ts');
