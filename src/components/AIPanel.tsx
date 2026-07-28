@@ -20,26 +20,40 @@ interface AIPanelProps {
 export default function AIPanel({ script, characters, onApplySuggestion }: AIPanelProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  // Keyless-mode note surfaced from the server (e.g. "add an AI key in
+  // Settings..."). The scriptide routes return { result: '', usedLLM: false,
+  // note } when no provider is configured — without surfacing this, keyless
+  // mode shows a blank Result panel with no explanation of why output is empty.
+  const [note, setNote] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'world' | 'dialogue' | 'tension' | 'character'>('world');
   const [selectedChar, setSelectedChar] = useState<string>('');
   const [input, setInput] = useState('');
-  
+
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const runPrompt = async (endpoint: string, payload: Record<string, unknown>) => {
     setLoading(true);
     setResult(null);
+    setNote(null);
     try {
       const response = await fetch(`/api/scriptide/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await response.json() as { result?: string; error?: string };
+      const data = await response.json() as { result: string; usedLLM: boolean; note?: string };
       if (!mountedRef.current) return;
-      if (data.error) throw new Error(data.error);
-      setResult(data.result ?? null);
+      // The server signals failure via a non-2xx status (error bodies are
+      // { error }), never via an `error` field on a 2xx success body — so gate
+      // on the HTTP status, not a phantom data.error the success type can't
+      // carry. Preserve the server's message when present.
+      if (!response.ok) {
+        const errBody = data as unknown as { error?: string };
+        throw new Error(errBody.error ?? `Request failed (${response.status})`);
+      }
+      setResult(data.result);
+      setNote(data.usedLLM === false ? (data.note ?? null) : null);
     } catch (err: unknown) {
       if (!mountedRef.current) return;
       setResult(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -171,18 +185,27 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
         </div>
       </div>
 
-      {result && (
+      {(result || note) && (
         <div className="sm-panel p-4">
           <h3 className="sm-title mb-2 text-[var(--sm-stamp)]">Result</h3>
-          <div className="bg-[var(--sm-panel-2)] p-3 border border-[var(--sm-ink)] text-xs font-[family-name:var(--sm-font-mono)] whitespace-pre-wrap text-[var(--sm-ink)] max-h-64 overflow-y-auto">
-            {result}
-          </div>
-          <button
-            onClick={() => onApplySuggestion(result)}
-            className="sm-btn sm-btn--stamp mt-4 w-full py-2"
-          >
-            Insert into Script
-          </button>
+          {result && (
+            <div className="bg-[var(--sm-panel-2)] p-3 border border-[var(--sm-ink)] text-xs font-[family-name:var(--sm-font-mono)] whitespace-pre-wrap text-[var(--sm-ink)] max-h-64 overflow-y-auto">
+              {result}
+            </div>
+          )}
+          {note && (
+            <p className="mt-2 text-[11px] font-[family-name:var(--sm-font-mono)] text-[var(--sm-ink-mute)]">
+              {note}
+            </p>
+          )}
+          {result && (
+            <button
+              onClick={() => onApplySuggestion(result)}
+              className="sm-btn sm-btn--stamp mt-4 w-full py-2"
+            >
+              Insert into Script
+            </button>
+          )}
         </div>
       )}
     </motion.div>

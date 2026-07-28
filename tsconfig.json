@@ -57,8 +57,6 @@
     "server/nvm/live/v5-loop.ts",
     "server/nvm/__tests__",
     "tests/apdl.test.ts",
-    "tests/story-vector.test.ts",
-    "server/engine/ai-provider.test.ts",
-    "server/engine/ai-provider-integration.test.ts"
+    "tests/story-vector.test.ts"
   ]
 }

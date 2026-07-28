@@ -25,13 +25,25 @@ export const OutlineBeatSchema = z.object({
   avoid: z.string(),
 });
 
+// Mirrors the actual GET /api/story-config response
+// (server/routes/config.ts:190-200), which returns 9 keys. The three
+// `story_theme`/`story_tone`/`character_arc_mode` keys were previously
+// omitted here; since zod's default `.parse()` STRIPS unknown keys, a caller
+// using `StoryConfigSchema.parse()` silently lost those three values.
+// Server types: story_theme is `string`; story_tone is a `ToneName`
+// (string subtype); character_arc_mode is a `CharacterArcMode` (string
+// subtype) — all three arrive as `string | null` (each is `?? null` in the
+// route), so model them as `z.string().nullable()`.
 export const StoryConfigSchema = z.object({
   structure: z.string().nullable(),
   emotional_arc: z.string().nullable(),
   director_style: z.string().nullable(),
   expected_turns: z.number(),
   pacing_target: z.string().nullable(),
+  story_theme: z.string().nullable(),
   story_genre: z.string().nullable(),
+  story_tone: z.string().nullable(),
+  character_arc_mode: z.string().nullable(),
 });
 
 export const OutlineResponseSchema = z.object({
@@ -39,10 +51,6 @@ export const OutlineResponseSchema = z.object({
 });
 
 // ── Story Machine Schemas ─────────────────────────────────────────────────────
-
-export const AIConfigSchema = z.object({
-  llmReady: z.boolean(),
-});
 
 // Mirrors server/engine/types.ts's PersuasionRecord — the actual shape
 // GET /api/persuasion/:charId returns (server/routes/game.ts:
@@ -119,6 +127,11 @@ export const ArcDataResponseSchema = z.object({
 });
 
 // ── Causal Twin Panel Schemas ─────────────────────────────────────────────────
+// (The former `AIResponseSchema` for /api/scriptide/* lived here; removed —
+// the scriptide response shape is now consumed via a localized cast in
+// AIPanel.tsx's runPrompt, where it parses a concrete { result, usedLLM,
+// note } shape that actually matches the route, instead of a stale
+// { result?, error? } that suggested an error path the route never returns.)
 
 // StoryOp payloads vary by op kind — require the discriminant, allow extra keys.
 const StoryOpShapeSchema = z.object({ op: z.string() }).passthrough();
@@ -158,18 +171,10 @@ export const CounterfactualReportSchema = z.object({
   summary: z.string(),
 });
 
-// ── AI Panel Schemas ──────────────────────────────────────────────────────────
-
-export const AIResponseSchema = z.object({
-  result: z.string().optional(),
-  error: z.string().optional(),
-});
-
 // ── Type Exports ──────────────────────────────────────────────────────────────
 
 export type OutlineBeat = z.infer<typeof OutlineBeatSchema>;
 export type StoryConfig = z.infer<typeof StoryConfigSchema>;
-export type AIConfig = z.infer<typeof AIConfigSchema>;
 export type PersuasionRecord = z.infer<typeof PersuasionRecordSchema>;
 export type CharacterSheet = z.infer<typeof CharacterSheetSchema>;
 export type Location = z.infer<typeof LocationSchema>;
@@ -181,4 +186,3 @@ export type SCMNodeSummary = z.infer<typeof SCMNodeSummarySchema>;
 export type SCMData = z.infer<typeof SCMDataSchema>;
 export type AffectedOp = z.infer<typeof AffectedOpSchema>;
 export type CounterfactualReport = z.infer<typeof CounterfactualReportSchema>;
-export type AIResponse = z.infer<typeof AIResponseSchema>;
