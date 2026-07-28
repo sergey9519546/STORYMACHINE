@@ -365,7 +365,11 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
     }
   } catch (err) {
     releaseSimulationRooms(res);
-    emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
+    // SECURITY (M2/F2): raw error text can leak API keys / internal detail to
+    // the browser via the SSE stream. Emit a fixed stoppedBy category and log
+    // the real detail server-side only.
+    logger.error('sse-error', { route: 'run-room', detail: (err as Error).message });
+    emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'error' });
   } finally {
     clearTimeout(wallTimer);
     releaseSimulationRooms(res);

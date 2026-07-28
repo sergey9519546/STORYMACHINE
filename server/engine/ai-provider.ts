@@ -13,6 +13,25 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { logger } from '../lib/logger.ts';
+// SECURITY (audit H1): the OpenRouter calls in this provider used to hit the
+// GLOBAL fetch() directly, bypassing server/lib/ai-providers/openai-compat.ts's
+// fetchOpenAICompat guard — i.e. they skipped the per-hop SSRF revalidation,
+// the redirect-safety checks, and the DNS-rebinding resolve-and-pin that every
+// OTHER OpenAI-compat outbound request in this codebase goes through. The URL
+// here is a hardcoded public literal ('https://openrouter.ai/...'), so there is
+// no caller-control risk at this call site; routing it through the shared helper
+// is defense-in-depth so redirect-safety + the DNS-pin apply uniformly and so a
+// future change to this URL (or a redirect from openrouter.ai) can't quietly
+// regress behind a different fetch path. The helper returns a standard Response
+// (undici fetch under the hood, same API surface), so the streaming path below
+// still reads response.body as a ReadableStream unchanged.
+import { fetchOpenAICompat } from '../lib/ai-providers/openai-compat.ts';
+
+// Signature of the outbound fetch used by FreeRideProvider. Mirrors
+// fetchOpenAICompat's (url, init) => Promise<Response> contract so the helper
+// can be swapped for a deterministic fake in tests (the production default is
+// fetchOpenAICompat itself; the test seam is the constructor's optional 2nd arg).
+export type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
 // ─────────────────────────────────────────────────────────────────
 // Provider Interfaces (compatible with existing ai.ts)
@@ -22,8 +41,12 @@ export interface AIProvider {
   name: string;
   tier: 'free' | 'premium';
   id: string;
-  generate(params: GenerateContentParameters): Promise<GenerateContentResponse>;
-  generateStream?(params: GenerateContentParameters): Promise<AsyncIterable<GenerateContentResponse>>;
+  // SECURITY (audit H2): the optional `signal` lets the caller (ai.ts's
+  // withTimeout/generateContent) abort the in-flight fetch on a hard timeout.
+  // Providers that can't honor it (e.g. the Gemini SDK path) may ignore it;
+  // the OpenRouter path threads it into fetchOpenAICompat's RequestInit.
+  generate(params: GenerateContentParameters, signal?: AbortSignal): Promise<GenerateContentResponse>;
+  generateStream?(params: GenerateContentParameters, signal?: AbortSignal): Promise<AsyncIterable<GenerateContentResponse>>;
 }
 
 // Helper to extract text from complex Gemini content structures
@@ -129,6 +152,13 @@ export class FreeRideProvider implements AIProvider {
   id = 'freeride';
   
   private apiKey: string;
+  // SECURITY (audit H1): outbound fetch goes through fetchOpenAICompat by
+  // default (redirect-safe + DNS-pinned). The optional fetchFn arg is a test
+  // seam only — ai.ts constructs FreeRideProvider(apiKey) with no second arg, so
+  // production traffic always flows through the hardened helper. Tests inject a
+  // deterministic fake because fetchOpenAICompat resolves real DNS / opens a
+  // real socket and is not interceptable via globalThis.fetch mocking.
+  private fetchFn: FetchFn;
   private currentModel: string = 'google/gemma-2-9b-it:free';
   private fallbackModels: string[] = [
     'meta-llama/llama-3.2-3b-instruct:free',
@@ -136,17 +166,18 @@ export class FreeRideProvider implements AIProvider {
     'mistralai/mistral-7b-instruct:free',
     'nvidia/llama-3.1-nemotron-70b-instruct:free',
   ];
-  
-  constructor(apiKey: string) {
+
+  constructor(apiKey: string, fetchFn: FetchFn = fetchOpenAICompat) {
     if (!apiKey) {
       throw new Error(
         'OPENROUTER_API_KEY required for free AI. Get one at https://openrouter.ai/keys (no credit card needed)'
       );
     }
     this.apiKey = apiKey;
+    this.fetchFn = fetchFn;
   }
   
-  async generate(params: GenerateContentParameters): Promise<GenerateContentResponse> {
+  async generate(params: GenerateContentParameters, signal?: AbortSignal): Promise<GenerateContentResponse> {
     const models = [params.model || this.currentModel, ...this.fallbackModels];
     
     // Extract text content
@@ -166,7 +197,7 @@ export class FreeRideProvider implements AIProvider {
     // Try each model with automatic failover
     for (const model of models) {
       try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const response = await this.fetchFn('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
@@ -181,6 +212,10 @@ export class FreeRideProvider implements AIProvider {
             max_tokens: maxTokens,
             stop: stopSequences,
           }),
+          // SECURITY (audit H2): abort the in-flight request when the caller's
+          // hard deadline (ai.ts withTimeout) fires, so a hung upstream can't
+          // hold the socket open past the timeout.
+          signal,
         });
         
         if (!response.ok) {
@@ -215,9 +250,14 @@ export class FreeRideProvider implements AIProvider {
           },
         });
       } catch (error) {
-        logger.error('openrouter_model_error', { 
-          model, 
-          error: (error as Error).message 
+        // SECURITY (audit H2): an abort (caller's hard timeout fired) must NOT
+        // be swallowed into the failover loop — once the signal is aborted every
+        // remaining model would reject instantly, and the caller is waiting on
+        // the timeout rejection, not an "all models exhausted" surrogate.
+        if (signal?.aborted || (error as Error)?.name === 'AbortError') throw error;
+        logger.error('openrouter_model_error', {
+          model,
+          error: (error as Error).message
         });
         // Try next fallback
         continue;
@@ -227,7 +267,7 @@ export class FreeRideProvider implements AIProvider {
     throw new Error('All free models exhausted. Try again in a few minutes or upgrade to premium.');
   }
   
-  async generateStream(params: GenerateContentParameters): Promise<AsyncIterable<GenerateContentResponse>> {
+  async generateStream(params: GenerateContentParameters, signal?: AbortSignal): Promise<AsyncIterable<GenerateContentResponse>> {
     const model = params.model || this.currentModel;
     
     // Extract text content
@@ -242,7 +282,7 @@ export class FreeRideProvider implements AIProvider {
     const temperature = config?.temperature ?? 0.7;
     const maxTokens = config?.maxOutputTokens ?? 4096;
     
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await this.fetchFn('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
@@ -257,6 +297,10 @@ export class FreeRideProvider implements AIProvider {
         max_tokens: maxTokens,
         stream: true,
       }),
+      // SECURITY (audit H2): abort the in-flight stream when the caller's hard
+      // deadline fires. fetchOpenAICompat forwards RequestInit.signal to undici,
+      // which cancels the socket and unblocks the stream reader.
+      signal,
     });
     
     if (!response.body) {
@@ -323,12 +367,20 @@ export class GeminiProvider implements AIProvider {
     this.geminiAI = geminiAI;
   }
   
-  async generate(params: GenerateContentParameters): Promise<GenerateContentResponse> {
+  // SECURITY (audit H2): the optional `signal` is accepted to satisfy the
+  // AIProvider contract so ai.ts can thread one abort signal uniformly. It is
+  // intentionally NOT wired into the @google/genai SDK call here: doing so
+  // safely would require changing params.config (abortSignal) and re-validating
+  // SDK behavior, which is out of scope under the P0 security freeze. The
+  // OpenRouter path (FreeRideProvider) is the one that honors it; Gemini still
+  // relies on withTimeout's promise race to bound the call. Param is prefixed
+  // with _ so tsc/noUnusedParameters doesn't flag the intentional ignore.
+  async generate(params: GenerateContentParameters, _signal?: AbortSignal): Promise<GenerateContentResponse> {
     // Use existing Gemini implementation
     return await this.geminiAI.models.generateContent(params);
   }
-  
-  async generateStream(params: GenerateContentParameters): Promise<AsyncIterable<GenerateContentResponse>> {
+
+  async generateStream(params: GenerateContentParameters, _signal?: AbortSignal): Promise<AsyncIterable<GenerateContentResponse>> {
     // Use existing Gemini streaming implementation
     return await this.geminiAI.models.generateContentStream(params);
   }

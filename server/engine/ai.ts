@@ -58,11 +58,15 @@ initializeProviders();
 // ── Provider interfaces ───────────────────────────────────────────────────────
 
 export interface LLMProvider {
-  generate(params: GenerateContentParameters): Promise<GenerateContentResponse>;
+  // SECURITY (audit H2): optional AbortSignal so generateContent/withTimeout can
+  // cancel the in-flight fetch on a hard timeout. Threaded through to the
+  // OpenRouter path's fetchOpenAICompat; providers that can't honor it may
+  // ignore it (Gemini SDK path still relies on withTimeout's promise race).
+  generate(params: GenerateContentParameters, signal?: AbortSignal): Promise<GenerateContentResponse>;
   /** Optional streaming generate. Yields response chunks (each with a `.text`).
    *  Providers that don't support streaming can omit this; callers fall back to
    *  a single non-streamed generate. */
-  generateStream?(params: GenerateContentParameters): Promise<AsyncIterable<GenerateContentResponse>>;
+  generateStream?(params: GenerateContentParameters, signal?: AbortSignal): Promise<AsyncIterable<GenerateContentResponse>>;
 }
 
 export interface EmbeddingProvider {
@@ -107,12 +111,14 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 // Exported so ai-config.ts can restore them without circular deps.
 
 export const geminiProvider: LLMProvider = {
-  generate: (params) => {
+  // SECURITY (audit H2): _signal accepted for interface parity and ignored —
+  // wiring abortSignal into the @google/genai SDK is out of scope under freeze.
+  generate: (params, _signal) => {
     const ai = getAI();
     if (!ai) throw new Error('Gemini provider not available (GEMINI_API_KEY not set)');
     return ai.models.generateContent(params);
   },
-  generateStream: (params) => {
+  generateStream: (params, _signal) => {
     const ai = getAI();
     if (!ai) throw new Error('Gemini provider not available (GEMINI_API_KEY not set)');
     return ai.models.generateContentStream(params);
@@ -227,8 +233,10 @@ export function resetLLMProvider(): void                     {
   if (aiProviderManager.hasProvider()) {
     const activeProvider = aiProviderManager.getProvider();
     _provider = {
-      generate: (params) => activeProvider.generate(params),
-      generateStream: (params) => activeProvider.generateStream?.(params) ?? activeProvider.generate(params).then(async function* (r) { yield r; }),
+      // SECURITY (audit H2): forward the caller's AbortSignal to the active
+      // provider so withTimeout can cancel the in-flight fetch on timeout.
+      generate: (params, signal) => activeProvider.generate(params, signal),
+      generateStream: (params, signal) => activeProvider.generateStream?.(params, signal) ?? activeProvider.generate(params, signal).then(async function* (r) { yield r; }),
     };
   } else {
     _provider = geminiProvider;
@@ -244,8 +252,10 @@ export function resetAllProviders(): void {
   if (aiProviderManager.hasProvider()) {
     const activeProvider = aiProviderManager.getProvider();
     _provider = {
-      generate: (params) => activeProvider.generate(params),
-      generateStream: (params) => activeProvider.generateStream?.(params) ?? activeProvider.generate(params).then(async function* (r) { yield r; }),
+      // SECURITY (audit H2): forward the caller's AbortSignal to the active
+      // provider so withTimeout can cancel the in-flight fetch on timeout.
+      generate: (params, signal) => activeProvider.generate(params, signal),
+      generateStream: (params, signal) => activeProvider.generateStream?.(params, signal) ?? activeProvider.generate(params, signal).then(async function* (r) { yield r; }),
     };
   } else {
     _provider = geminiProvider;
@@ -324,12 +334,28 @@ export function getTemperature(): number {
 }
 
 // Wraps a promise with a hard deadline. Clears the timer on settle so Node can exit cleanly.
-export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+//
+// SECURITY (audit H2): the optional `controller` is aborted when the deadline
+// fires, so the in-flight work the promise represents — an OpenRouter fetch in
+// production — is actually cancelled at the socket instead of being left to
+// run to completion in the background after the caller has already moved on.
+// The 3-arg form (promise, ms, label) is unchanged for every existing caller;
+// only generateContent passes a controller (it owns the oneAbortSignal it also
+// threaded into _provider.generate).
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+  controller?: AbortController,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`Gemini timeout (${ms}ms): ${label}`)),
-      ms,
-    );
+    const timer = setTimeout(() => {
+      // Abort the in-flight fetch (OpenRouter path) so a hung upstream can't
+      // hold the socket past the deadline. Best-effort: a provider that doesn't
+      // honor the signal (Gemini SDK) still gets bounded by the promise race.
+      controller?.abort(new Error(`Gemini timeout (${ms}ms): ${label}`));
+      reject(new Error(`Gemini timeout (${ms}ms): ${label}`));
+    }, ms);
     promise.then(
       (v) => { clearTimeout(timer); resolve(v); },
       (e) => { clearTimeout(timer); reject(e); },
@@ -395,7 +421,16 @@ export async function generateContent(
   let res: GenerateContentResponse | undefined;
   try {
     res = await withRetry(
-      () => withTimeout(_provider.generate(params), timeoutMs, label),
+      // SECURITY (audit H2): a fresh AbortController per attempt — the
+      // controller is aborted on timeout and a previously-aborted controller
+      // can't be reused, so it must be created inside the retry factory (each
+      // attempt gets its own). The signal threads all the way to the
+      // OpenRouter fetch via _provider.generate(params, signal); withTimeout
+      // aborts it when the hard deadline fires, cancelling the socket.
+      () => {
+        const controller = new AbortController();
+        return withTimeout(_provider.generate(params, controller.signal), timeoutMs, label, controller);
+      },
       label,
       maxAttempts,
     );

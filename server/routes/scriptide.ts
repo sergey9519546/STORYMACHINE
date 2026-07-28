@@ -736,7 +736,12 @@ router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
     if (!hasTokens) emitSSE({ type: 'token', token: '' });
     emitSSE({ type: 'done' });
   } catch (err) {
-    emitSSE({ type: 'error', message: (err as Error).message ?? 'completion_failed' });
+    // SECURITY (M2/F2): never forward raw error text to the browser — it can
+    // leak API keys / internal paths / upstream detail. Emit a fixed category
+    // and log the real detail server-side only. Mirrors the pattern in
+    // server/routes/config.ts's /api/ai-config/test handler.
+    logger.error('sse-error', { route: 'scriptide-complete', detail: (err as Error).message });
+    emitSSE({ type: 'error', message: 'internal_error' });
   } finally {
     ensureEnded();
   }

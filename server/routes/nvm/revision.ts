@@ -9,6 +9,7 @@ import {
   gameLimiter, aiLimiter,
 } from '../../lib/session-store.ts';
 import { validate, CompileBodySchema, ReviseBodySchema } from '../../lib/validation.ts';
+import { logger } from '../../lib/logger.ts';
 
 const router = express.Router();
 export default router;
@@ -166,7 +167,10 @@ router.get('/api/nvm/revise-stream', aiLimiter, async (req, res) => {
     }, storyCtxStream);
     emitSSE({ type: 'revision_complete', result });
   } catch (err) {
-    emitSSE({ type: 'revision_error', error: (err as Error).message });
+    // SECURITY (M2/F2): raw error text can leak API keys / internal detail to
+    // the browser. Emit a fixed category; log the real detail server-side only.
+    logger.error('sse-error', { route: 'nvm-revise', detail: (err as Error).message });
+    emitSSE({ type: 'revision_error', error: 'internal_error' });
   } finally {
     ensureEnded();
   }

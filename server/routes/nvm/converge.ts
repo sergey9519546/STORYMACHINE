@@ -12,6 +12,7 @@ import {
 import {
   validate, ConvergeBodySchema, ConvergeArcBodySchema,
 } from '../../lib/validation.ts';
+import { logger } from '../../lib/logger.ts';
 
 const router = express.Router();
 export default router;
@@ -241,7 +242,10 @@ router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req,
       },
     });
   } catch (err) {
-    emitSSE({ type: 'converge_error', error: (err as Error).message });
+    // SECURITY (M2/F2): raw error text can leak API keys / internal detail to
+    // the browser. Emit a fixed category; log the real detail server-side only.
+    logger.error('sse-error', { route: 'nvm-converge', detail: (err as Error).message });
+    emitSSE({ type: 'converge_error', error: 'internal_error' });
   } finally {
     ensureEnded();
   }

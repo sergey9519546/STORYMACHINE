@@ -15,30 +15,37 @@
 // `.text`/`.data`/... getters must stay inert; every consumer already reads
 // `response.text ?? <fallback>` and depends on that getter being absent for
 // OpenRouter-bridged responses).
-import { describe, it, after } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { GenerateContentResponse } from '@google/genai';
 import { FreeRideProvider } from '../../server/engine/ai-provider.ts';
+import type { FetchFn } from '../../server/engine/ai-provider.ts';
 
-const realFetch = globalThis.fetch;
-after(() => { globalThis.fetch = realFetch; });
+// SECURITY (audit H1): FreeRideProvider now routes its outbound fetch through
+// fetchOpenAICompat (redirect-safe + DNS-pinned) by default. That helper uses
+// undici's fetch directly and resolves real DNS, so it is NOT interceptable by
+// replacing globalThis.fetch (confirmed: the old globalThis.fetch mock here was
+// silently ignored and a real socket was opened against openrouter.ai). To keep
+// this suite fully deterministic — its purpose is to verify the OpenRouter→Gemini
+// response-shape bridge, NOT the network path — we inject a fake fetch via the
+// constructor's optional second arg (a test seam). Production constructs
+// FreeRideProvider(apiKey) with no second arg, so it always uses the hardened
+// helper; the fetchFn seam exists only so this bridge test stays hermetic.
 
-function mockJsonFetch(body: unknown, status = 200): typeof fetch {
+function mockJsonFetch(body: unknown, status = 200): FetchFn {
   return (async () =>
     new Response(JSON.stringify(body), {
       status,
       headers: { 'Content-Type': 'application/json' },
-    })) as unknown as typeof fetch;
+    })) as FetchFn;
 }
 
 describe('FreeRideProvider — OpenRouter to Gemini bridge (generate)', () => {
   it('builds a candidates[0].content.parts[0].text shape consumers read', async () => {
-    globalThis.fetch = mockJsonFetch({
+    const provider = new FreeRideProvider('sk-or-test-key', mockJsonFetch({
       choices: [{ message: { content: 'Hello from OpenRouter' } }],
       usage: { prompt_tokens: 12, completion_tokens: 34, total_tokens: 46 },
-    });
-
-    const provider = new FreeRideProvider('sk-or-test-key');
+    }));
     const response = await provider.generate({
       model: 'test/model',
       contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
@@ -56,12 +63,10 @@ describe('FreeRideProvider — OpenRouter to Gemini bridge (generate)', () => {
   });
 
   it('proves zero behavior change: bridged response is a plain object, not a real GenerateContentResponse instance', async () => {
-    globalThis.fetch = mockJsonFetch({
+    const provider = new FreeRideProvider('sk-or-test-key', mockJsonFetch({
       choices: [{ message: { content: 'some text' } }],
       usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
-    });
-
-    const provider = new FreeRideProvider('sk-or-test-key');
+    }));
     const response = await provider.generate({
       model: 'test/model',
       contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
@@ -80,9 +85,7 @@ describe('FreeRideProvider — OpenRouter to Gemini bridge (generate)', () => {
   });
 
   it('defaults missing OpenRouter fields to the same fallbacks as before (empty text, zeroed usage)', async () => {
-    globalThis.fetch = mockJsonFetch({ choices: [], usage: {} });
-
-    const provider = new FreeRideProvider('sk-or-test-key');
+    const provider = new FreeRideProvider('sk-or-test-key', mockJsonFetch({ choices: [], usage: {} }));
     const response = await provider.generate({
       model: 'test/model',
       contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
@@ -102,10 +105,10 @@ describe('FreeRideProvider — OpenRouter to Gemini bridge (generateStream)', ()
       `data: ${JSON.stringify({ choices: [{ delta: { content: 'lo' } }] })}\n\n` +
       `data: [DONE]\n\n`;
 
-    globalThis.fetch = (async () =>
-      new Response(sseBody, { status: 200 })) as unknown as typeof fetch;
+    const fakeFetch = (async () =>
+      new Response(sseBody, { status: 200 })) as FetchFn;
 
-    const provider = new FreeRideProvider('sk-or-test-key');
+    const provider = new FreeRideProvider('sk-or-test-key', fakeFetch);
     const stream = await provider.generateStream({
       model: 'test/model',
       contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
