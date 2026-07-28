@@ -173,7 +173,7 @@ export default function DirectorCutPanel({ onClose, onInjected }: DirectorCutPan
             <h2 className="text-white font-semibold text-lg">Director's Cut</h2>
             <span className="text-xs text-gray-500 ml-2">inject custom StoryOps mid-sim</span>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close Director's Cut" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>

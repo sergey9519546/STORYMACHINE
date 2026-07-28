@@ -102,10 +102,11 @@ export default function EpistemicMap({ onClose }: EpistemicMapProps) {
               disabled={loading}
               className="text-gray-400 hover:text-white transition-colors disabled:opacity-40"
               title="Refresh"
+              aria-label="Refresh"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-            <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <button onClick={onClose} aria-label="Close Epistemic Map" className="text-gray-500 hover:text-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
