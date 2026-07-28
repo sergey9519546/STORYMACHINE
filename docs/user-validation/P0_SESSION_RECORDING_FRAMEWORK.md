@@ -4,6 +4,16 @@
 
 Framework for recording, transcribing, and documenting P0 user validation sessions in compliance with consent requirements.
 
+> **⚠️ PARTIALLY SUPERSEDED — consent is authoritative in `P0_OPERATING_KIT.md`.**
+> The recording/consent mechanics in this file predate the operating kit and
+> may conflict with it on specifics. The kit's consent block is canonical:
+> recording is **separate and optional** (distinct from notes consent),
+> automated transcription/AI summaries are **OFF**, withdrawal is always
+> available, and no recording, transcript, PII, or contact ever enters Git.
+> If anything below disagrees with `P0_OPERATING_KIT.md`, the **kit wins**.
+> Use this file only for the recording-workflow detail the kit does not
+> repeat.
+
 ---
 
 ## Consent Form

@@ -5,6 +5,21 @@
 **Duration:** 1 week (5-10 sessions)  
 **Gate:** GO/NO-GO decision on building Phase 3-4
 
+> **⚠️ PARTIALLY SUPERSEDED — read before fielding.** This is an earlier
+> protocol draft. The **authoritative** P0 protocol is now
+> `P0_OPERATING_KIT.md` (deferred to by `P0_QUICK_START.md` and
+> `PHASE_TRACKER.md`). Where the two conflict, follow the **operating kit**.
+> The specific known conflicts in this file are marked `⚠️ SUPERSEDED` inline:
+> - The **core question** is paraphrased below; the verbatim ROADMAP wording
+>   is *does this make you want to run your own draft — why or why not?*
+> - **"Run Doctor on their script (if they share it)"** violates the kit's
+>   never-collect-the-draft rule.
+> - **"Common Objections & Responses"** scripts the moderator to defend/teach
+>   the report, violating the kit's observe-don't-pitch rule.
+> - The **GREEN/YELLOW/RED** decision thresholds are guidance, not canonical
+>   (ROADMAP §3 is qualitative; the kit declines to set a numerical threshold).
+> Use this document for historical context only.
+
 ---
 
 ## Objective
@@ -48,14 +63,19 @@ Specifically for Story Graph:
 
 ### Before the Session
 
+> **⚠️ SUPERSEDED — see `P0_OPERATING_KIT.md`.** The two items below that
+> reference the writer's script are **forbidden by the kit**: never ask for,
+> accept, view, or run a participant's draft. Expose **only the existing
+> sample report**. Recording also requires separate consent and is optional.
+
 **Materials to Prepare**:
 1. Sample report with Story Graph section visible
-2. Writer's script (if they share it) or use sample script
+2. ~~Writer's script (if they share it) or use sample script~~ ⚠️ FORBIDDEN — never collect a participant's draft
 3. Screen recording setup (with permission)
 4. Note-taking template ready
 
 **Technical Setup**:
-- Run Doctor on their script (or sample)
+- ~~Run Doctor on their script (or sample)~~ ⚠️ FORBIDDEN — never run the tool on a participant's draft
 - Ensure Story Graph section renders
 - Have report open and ready to share screen
 
@@ -293,20 +313,31 @@ Reason: [WHAT THEY SAID]
 
 ## Common Objections & Responses
 
+> **⚠️ SUPERSEDED — DO NOT USE THESE SCRIPTED RESPONSES.** The
+> `P0_OPERATING_KIT.md` is explicit: the moderator **observes and does not
+> pitch, teach, defend, or rebut**. When a participant raises an objection,
+> the correct action is to **log it verbatim** (with anonymous-quote
+> permission) and, if needed, ask a neutral clarifying question — not to
+> deliver a prepared defense. Scripted rebuttals bias the signal the session
+> exists to measure. The responses below also assert overclaim figures
+> ("tested on 364 real scripts") that are not substantiated and must not be
+> repeated. They are retained only as a record of what NOT to do.
+
 ### "How accurate is this?"
-**Response**: "We've tested on 364 real scripts. The unpaid promise detection catches things human readers miss because it tracks every setup across the full screenplay. But you're the writer—you know if a suggestion makes sense for your story."
+**Response** *(superseded — log the objection, do not answer this way)*:
+"We've tested on 364 real scripts. The unpaid promise detection catches things human readers miss because it tracks every setup across the full screenplay. But you're the writer—you know if a suggestion makes sense for your story."
 
 ### "Is this replacing human feedback?"
-**Response**: "No. This catches structural patterns—things that are hard to see when you're in the weeds. Think of it as a first pass that spots the big structural issues, so you can fix those before paying for coverage."
+**Response** *(superseded)*: "No. This catches structural patterns—things that are hard to see when you're in the weeds. Think of it as a first pass that spots the big structural issues, so you can fix those before paying for coverage."
 
 ### "What if I'm breaking the rules on purpose?"
-**Response**: "The suggestions are guidance, not rules. If you're breaking structure intentionally for artistic reasons, you'll know it. The tool just flags patterns that might be accidents."
+**Response** *(superseded)*: "The suggestions are guidance, not rules. If you're breaking structure intentionally for artistic reasons, you'll know it. The tool just flags patterns that might be accidents."
 
 ### "This is overwhelming—too many issues"
-**Response**: "That's why we group by severity. Start with critical issues—those are the structural problems that confuse audiences. Low-priority issues are nice-to-haves."
+**Response** *(superseded)*: "That's why we group by severity. Start with critical issues—those are the structural problems that confuse audiences. Low-priority issues are nice-to-haves."
 
 ### "How do I know the suggestions are good?"
-**Response**: "Try one. If it makes your script better, great. If not, ignore it. We show impact explanations so you can decide if the fix makes sense for your story."
+**Response** *(superseded)*: "Try one. If it makes your script better, great. If not, ignore it. We show impact explanations so you can decide if the fix makes sense for your story."
 
 ---
 
@@ -326,9 +357,19 @@ Reason: [WHAT THEY SAID]
 - Most actionable suggestion type:
 
 **Decision**:
-- GREEN: 4+ strong pull → Proceed to P1
-- YELLOW: 2-3 strong pull → Iterate P0
-- RED: < 2 strong pull → Reframe product
+> **⚠️ These thresholds are GUIDANCE, not the canonical gate.** ROADMAP §3
+> defines the P0 exit qualitatively: *"≥5 documented sessions with a clear
+> signal on the core question. If negative or ambiguous, STOP, reframe,
+> repeat P0."* The `P0_OPERATING_KIT.md` explicitly declines to set a
+> numerical threshold and defers the call to the decision owner. The counts
+> below are a reasonable starting heuristic for that owner but must not be
+> treated as binding doctrine, and "Strong/Weak/No pull" should be mapped to
+> the kit's five-way classification (Positive / Qualified / Negative /
+> Ambiguous / Invalid-excluded) before any decision is recorded.
+
+- GREEN: 4+ strong pull → Proceed to P1 *(guidance)*
+- YELLOW: 2-3 strong pull → Iterate P0 *(guidance)*
+- RED: < 2 strong pull → Reframe product *(guidance)*
 
 ### Write P0 Evidence Summary
 

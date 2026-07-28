@@ -4,6 +4,27 @@
 **Goal:** Recruit 8-10 screenwriters for 30-minute validation sessions  
 **Timeline:** 1 week for recruitment + scheduling
 
+> **⚠️ SUPERSEDED for outreach copy — use the kit-compliant templates instead.**
+> The recruitment messaging in this file was an early draft and conflicts with
+> the authoritative `P0_OPERATING_KIT.md` in ways that bias or corrupt the
+> P0 signal:
+> - It pitches the tool as **"objective"/"accurate"** — overclaim language the
+>   kit forbids (sessions must observe, not sell).
+> - It **offers free analysis as compensation** — this converts willingness-
+>   to-pay into willingness-to-run and contaminates the core question.
+> - Some variants **invite draft-sharing** — the kit forbids collecting or
+>   viewing a participant's draft.
+>
+> For ready-to-send, kit-compliant outreach use:
+> - **`OUTREACH_DRAFTS.md`** — neutral, non-pitching recruitment copy
+> - **`P0_RECRUITMENT_TEMPLATES.md`** — screening and scheduling templates
+> - **`P0_OPERATING_KIT.md`** — the authoritative protocol (eligibility,
+>   consent, neutral-invitation rules)
+>
+> This file is retained for the screening-question structure and channel
+> list; ignore any copy that pitches, offers compensation, or invites
+> draft-sharing.
+
 ---
 
 ## Screening Questions (Short Form)
