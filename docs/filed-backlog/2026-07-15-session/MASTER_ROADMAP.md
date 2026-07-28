@@ -1,5 +1,7 @@
 # STORYMACHINE — MASTER ROADMAP (Single Source of Truth)
 
+> **ARCHIVED 2026-07-28.** This doc claimed to be the "single source of truth" but conflicted with the broader coalition deferring to repo-root ROADMAP.md. Superseded — ROADMAP.md is canonical. Retained for history; claims below are NOT authoritative.
+
 **Reconciled:** 2026-07-15  
 **Decision:** User Validation First  
 **Status:** Phase 0 in progress

@@ -28,12 +28,12 @@ constraints.
 
 StoryMachine is a beautifully engineered answer to a question nobody has
 confirmed anyone is asking. The deterministic core is real and well-built —
-keyless boot, reproducible hashing, honest degradation. But the headline
-pitch (8,917 deterministic rules scoring your screenplay) is inflated at the
-source and, by the doctor's own measurements, the rules barely move the
-score. We have zero evidence of real users, and the score has never been
-validated against a human quality judgment on a real, non-synthetic
-screenplay.
+keyless boot, reproducible hashing, honest degradation. But the rule-count
+pitch (3,216 generated pass-scoped rule constants, per `docs/rulebook/README.md`,
+machine-counted from the live pass files) is a weak headline: by the doctor's
+own measurements the rule channel barely moves the score. We have zero
+evidence of real users, and the score has never been validated against a human
+quality judgment on a real, non-synthetic screenplay.
 
 ### What actually works
 - Keyless-first boot with honest degradation — no 500s when running without an LLM key.
@@ -43,8 +43,8 @@ screenplay.
 - The emotional-arc signal (`server/nvm/analyze/emotional-arc.ts`, 12,142-word VAD lexicon, Reagan-2016 fitting) landed cleanly as a diagnostic field.
 
 ### What's broken or overstated
-- **Rule count is inflated.** The claimed 8,917 rules include ~5,701 generated in one bulk wave (Wave 1191) from just 7 template functions in `server/nvm/revision/passes/lib/checks.ts` (aftermath-void, drought-run, zone-cluster, co-occurrence, half-loaded, zone-imbalance, peak-uncaused) as field×mode×position permutations. The rulebook's own table: 6,610 "Unattributed," 9 "Founding," 22 "meaningful." Genuinely distinct hand-authored checks: ~2,300. The passes are ~47,500 lines with 1,326 `as any` casts.
-- **The score doesn't discriminate — by its own numbers.** Comments in `doctor.ts:1656-1669` record: scene-count scarcity term AUC 0.938, the entire weighted-rule channel AUC 0.076, and with scene count held constant "the doctor cannot detect reordering at all (AUC ~0.48)." Scene count + raw issue density dominate; the 8,917 rules barely register.
+- **The rule count is a weak pitch, not a wedge.** The live generated rulebook is **3,216 distinct pass-scoped rule constants** (per `docs/rulebook/README.md`, machine-counted from the live pass files by `scripts/generate-rulebook.ts`; enforced by `tests/core/rulebook.test.ts`). Earlier prose in these docs claimed 8,917 rules — ~5,701 from a bulk "Wave 1191," ~47,500 pass lines, ~1,326 `as any` casts. An independent audit (`docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md` R2-C01) showed that bulk-wave history to be inaccurate: the catalog was always 3,216, "Wave 1191" (commit a68a425) added 6 named detectors across 2 passes, and the live totals are ~97,775 pass lines and ~1,421 `as any` occurrences. The rule-count freeze below stands — but on validity grounds (the rule channel's measured discrimination AUC is ~0.076), not on the earlier "bulk wave" history.
+- **The score doesn't discriminate — by its own numbers.** Comments in `doctor.ts:1656-1669` record: scene-count scarcity term AUC 0.938, the entire weighted-rule channel AUC 0.076, and with scene count held constant "the doctor cannot detect reordering at all (AUC ~0.48)." Scene count + raw issue density dominate; the rule channel's ~0.076 AUC is independently re-measurable (see `docs/audits/2026-07-14-high-end-audit/`).
 - **Evidence base is synthetic and largely unrunnable.** Only 6 synthetic discrimination pairs (`tests/core/discrimination.test.ts`) — 2 pass by only +1.4, the composite pair FAILS the 5.0 min-gap guard (still a todo), 3 were tied until a curve was retuned. Calibration corpus = 20 synthetic samples. The "72 produced scripts" real corpus is not in the repo; `tests/core/real-script-corpus.test.ts` SKIPS every assertion without `REAL_SCRIPT_CORPUS_DIR` (0 files locally, never runs), the manifest is actually 71 RECOMMEND + 1 CONSIDER, and the check is a floor-check (health>=80), not discrimination. Degradation AUCs are near coin-flip: shuffle-drop ~0.652, act-swap 0.48→0.62.
 - **Marketing number is internally inconsistent.** Landing footer says "3,216 deterministic rules," docs say 8,917, a stale plan file says 10,523.
 - **UI sprawl:** ~40 React panels (DirectorPanel 70KB, StoryMachine 82KB, WhatIfPanel 53KB, plus SelfPlay, EpistemicMap, Converge, Twin, Room, etc.).

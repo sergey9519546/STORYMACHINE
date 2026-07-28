@@ -1,6 +1,6 @@
 # STORYMACHINE — Project Memory
 
-**PRIMARY REFERENCE**: `docs/MASTER_ROADMAP.md` — single source of truth for project direction, phases, and sequencing (reconciled 2026-07-15)
+**PRIMARY REFERENCE**: `ROADMAP.md` — single source of truth for project direction, phases, and sequencing
 
 **SUPPORTING DOCS**: `NORTH_STAR.md` (constitution) · `ARCHITECTURE.md` (system map) · `docs/DECISION_LOG.md` (audit trail) · `README.md` (setup)
 
@@ -53,7 +53,7 @@ before every push. CI runs lint + test + build on every branch, plus a
   fatal key check in `server.ts`.
 - `apiKey` identifiers in `src/components/SettingsPanel.tsx` are input-field
   prop bindings, not embedded secrets — leave them alone.
-- `.Codex/` and `data/` are gitignored: nothing placed there is shared via
+- `.claude/` and `data/` are gitignored: nothing placed there is shared via
   git unless `.gitignore` changes first.
 - Calibration corpus (`server/nvm/analyze/calibration/corpus.ts`): band
   monotonicity is a property of the CONTROLLED-RICHNESS DESIGN — all 20
@@ -86,7 +86,7 @@ before every push. CI runs lint + test + build on every branch, plus a
 
 **Status**: Phase 0 (documentation reconciliation) complete, Phase 1 (fix broken) next, Phase 2 (P0 validation) starts this week
 
-See `docs/MASTER_ROADMAP.md` for full plan. Key points:
+See `ROADMAP.md` for full plan. Key points:
 
 **P0 Gate (Hard Blocker)**:
 - Recruit 5+ real screenwriters

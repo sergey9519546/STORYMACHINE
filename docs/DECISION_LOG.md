@@ -2,6 +2,19 @@
 
 **Purpose**: Audit trail of major strategic decisions that changed project direction.
 
+**Canonical source**: `ROADMAP.md` is the single source of truth for project
+direction, phases, and sequencing. This log is a narrative audit trail, not the
+authoritative record. Phase-defining architectural decisions are recorded in the
+ADR system at `docs/adr/` (see `docs/adr/README.md`; e.g. `ADR-001` and
+`ADR-002`) — that is the authoritative record for *why* a phase-defining
+decision holds. New phase-defining decisions should land as a new ADR there.
+
+**Note (2026-07-28):** The `MASTER_ROADMAP.md` referenced in earlier entries
+below has been archived to `docs/filed-backlog/2026-07-15-session/`. Its shifted
+phase numbering ("Phase 0 = documentation", "Phase 2 = P0 validation") does not
+match ROADMAP.md, where **P0 = user validation**. Read any phase references below
+through ROADMAP.md's numbering, not MASTER_ROADMAP's.
+
 ---
 
 ## Decision #1: User Validation First (2026-07-15)
@@ -41,7 +54,9 @@
 - **RED (<2 strong pull)**: Archive V5, stop P1, pivot or graceful exit
 
 **Documents Reconciled**:
-- Created MASTER_ROADMAP.md as single source of truth
+- Created MASTER_ROADMAP.md as single source of truth *(now superseded —
+  `MASTER_ROADMAP.md` was archived to `docs/filed-backlog/2026-07-15-session/`
+  on 2026-07-28; `ROADMAP.md` is the canonical source of truth)*
 - Archived contradictory docs to `filed-backlog/2026-07-15-session/`:
   - V5.0_ULTIMATE_ROADMAP.md
   - SESSION_EPIC_COMPLETE.md
@@ -50,7 +65,11 @@
   - STORY_GRAPH_*.md (11 files)
   - V5.0_RELEASE.md
 
-**Status**: Active — Phase 0 (documentation) in progress, Phase 1 (fix broken) next, Phase 2 (P0 validation) starts this week
+**Status**: Active — this is a phase-defining decision. P0 (user validation) is the active phase per ROADMAP.md and blocks all new engine work until its exit gate clears.
+
+**Cross-reference**: The phase-defining nature of this decision belongs in the
+ADR system at `docs/adr/` (see `ADR-001`, `ADR-002`, and `docs/adr/README.md`),
+which is the authoritative record for *why* phase-defining decisions hold.
 
 **Revision History**: This decision can be revisited if P0 GREEN validates demand for V5 capabilities
 

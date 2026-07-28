@@ -1,5 +1,7 @@
 # PHASE 0-1 IMPLEMENTATION COMPLETE
 
+> **ARCHIVED 2026-07-28.** This doc claimed to be the "single source of truth" but conflicted with the broader coalition deferring to repo-root ROADMAP.md. Superseded — ROADMAP.md is canonical. Retained for history; claims below are NOT authoritative.
+
 **Date:** 2026-07-15  
 **Status:** ✅ COMPLETE  
 **Commit:** 272943f
