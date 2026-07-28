@@ -13,12 +13,21 @@ import {
   StoryGenreBodySchema, CharacterArcModeBodySchema, StoryThemeBodySchema,
   ApplyPresetBodySchema,
 } from '../lib/validation.ts';
+import { z } from 'zod';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
   asyncHandler, gameLimiter, aiLimiter, sessions, sessionId, getOrCreateSession,
   withSessionCommand, metrics,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
+
+// /api/ai-config/test takes no body fields — the route fires a fixed probe
+// prompt and ignores req.body entirely. AGENTS.md requires every POST to
+// zod-validate its body, so this strict empty-object schema (tolerating the
+// undefined body Express leaves on a bodyless POST) rejects any payload a
+// caller might attach, keeping the route's "no body" contract enforced
+// rather than implicit. Mirrors the validate() gate every other POST uses.
+const AiConfigTestBodySchema = z.object({}).strict().or(z.undefined());
 
 const router = express.Router();
 export default router;
@@ -150,7 +159,7 @@ router.post('/api/ai-config', gameLimiter, validate(AiConfigSchema), asyncHandle
 // Connection test — fires a minimal generate call so the Settings UI can verify credentials.
 // aiLimiter (not gameLimiter): this route calls generateContent (an actual LLM
 // call), same as every other LLM-triggering route in this codebase.
-router.post('/api/ai-config/test', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/ai-config/test', aiLimiter, validate(AiConfigTestBodySchema), asyncHandler(async (req, res) => {
   if (!checkAdminAuth(req, res)) return;
   try {
     const result = await generateContent({
