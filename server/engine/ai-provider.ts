@@ -367,22 +367,17 @@ export class GeminiProvider implements AIProvider {
     this.geminiAI = geminiAI;
   }
   
-  // SECURITY (audit H2): the optional `signal` is accepted to satisfy the
-  // AIProvider contract so ai.ts can thread one abort signal uniformly. It is
-  // intentionally NOT wired into the @google/genai SDK call here: doing so
-  // safely would require changing params.config (abortSignal) and re-validating
-  // SDK behavior, which is out of scope under the P0 security freeze. The
-  // OpenRouter path (FreeRideProvider) is the one that honors it; Gemini still
-  // relies on withTimeout's promise race to bound the call. Param is prefixed
-  // with _ so tsc/noUnusedParameters doesn't flag the intentional ignore.
-  async generate(params: GenerateContentParameters, _signal?: AbortSignal): Promise<GenerateContentResponse> {
-    // Use existing Gemini implementation
-    return await this.geminiAI.models.generateContent(params);
+  // SECURITY (audit H2): forward the optional `signal` into the @google/genai
+  // SDK via config.abortSignal (documented on GenerateContentConfig) so
+  // withTimeout can actually cancel the in-flight fetch instead of orphaning
+  // the socket. params.config is optional per SDK types; spreading undefined
+  // contributes nothing, so the merge is safe when no config was supplied.
+  async generate(params: GenerateContentParameters, signal?: AbortSignal): Promise<GenerateContentResponse> {
+    return await this.geminiAI.models.generateContent({ ...params, config: { ...params.config, abortSignal: signal } });
   }
 
-  async generateStream(params: GenerateContentParameters, _signal?: AbortSignal): Promise<AsyncIterable<GenerateContentResponse>> {
-    // Use existing Gemini streaming implementation
-    return await this.geminiAI.models.generateContentStream(params);
+  async generateStream(params: GenerateContentParameters, signal?: AbortSignal): Promise<AsyncIterable<GenerateContentResponse>> {
+    return await this.geminiAI.models.generateContentStream({ ...params, config: { ...params.config, abortSignal: signal } });
   }
 }
 

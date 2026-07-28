@@ -111,17 +111,20 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 // Exported so ai-config.ts can restore them without circular deps.
 
 export const geminiProvider: LLMProvider = {
-  // SECURITY (audit H2): _signal accepted for interface parity and ignored —
-  // wiring abortSignal into the @google/genai SDK is out of scope under freeze.
-  generate: (params, _signal) => {
+  // SECURITY (audit H2): forward the abort signal into the @google/genai SDK via
+  // config.abortSignal (documented on GenerateContentConfig) so withTimeout can
+  // actually cancel the in-flight fetch instead of orphaning the socket.
+  // params.config is optional per SDK types; spreading undefined contributes
+  // nothing, so the merge is safe when no config was supplied.
+  generate: (params, signal) => {
     const ai = getAI();
     if (!ai) throw new Error('Gemini provider not available (GEMINI_API_KEY not set)');
-    return ai.models.generateContent(params);
+    return ai.models.generateContent({ ...params, config: { ...params.config, abortSignal: signal } });
   },
-  generateStream: (params, _signal) => {
+  generateStream: (params, signal) => {
     const ai = getAI();
     if (!ai) throw new Error('Gemini provider not available (GEMINI_API_KEY not set)');
-    return ai.models.generateContentStream(params);
+    return ai.models.generateContentStream({ ...params, config: { ...params.config, abortSignal: signal } });
   },
 };
 
