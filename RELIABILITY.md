@@ -1,4 +1,16 @@
-# STORYMACHINE — Formal Reliability Specification
+# STORYMACHINE — Formal Reliability Specification (Historical Audit Baseline)
+
+> **Status: historical as of 2026-07-15; not an active specification.**
+> This document preserves the audited failure model and proposed repair program
+> from that date. It is not the current API contract, roadmap, or completion
+> gate. Current authority lives in `docs/MASTER_ROADMAP.md`, `ARCHITECTURE.md`,
+> `README.md`, and accepted ADRs.
+>
+> In particular, every legacy JSON session import/export round-trip state,
+> finding, repair wave, test prescription, and completion criterion below is
+> superseded: public JSON import is retired and non-mutating; JSON export is a
+> self-describing partial observation that cannot restore a project. The old
+> material remains below only as evidence for why that boundary was retired.
 
 *Companion to `SECURITY.md`. Produced 2026-07-15 (v2). This document is a
 complete rewrite of the original reliability audit, upgraded from a prose-based

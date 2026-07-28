@@ -2,6 +2,30 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, freshSessionId, type TestServer } from './helpers.ts';
 
+function legacySnapshot(sessionId: string, storyTone = 'paranoid') {
+  return {
+    sessionId,
+    schema_version: 6,
+    exported_at: Date.now(),
+    locations: [{ location_id: 'room1', name: 'Room', description: '', adjacent_locations: [] }],
+    agents: [{
+      char_id: 'alice', name: 'Alice', public_mask: 'friendly', hidden_motive: 'none',
+      knowledge_vector: [], current_location_id: 'room1', suspicion_score: 0, is_alive: true,
+    }],
+    action_log: [],
+    dramatic_pressures: [],
+    event_propositions: [],
+    persuasion_log: [],
+    illusion_state: {
+      phase: 'Setup', planted_elements: [], pending_recontextualization: [],
+      story_tone: storyTone, character_arc_mode: 'descent',
+    },
+    beat_traces: [],
+    belief_edges: [],
+    goal_mutations: [],
+  };
+}
+
 describe('routes/config — HTTP behavior', async () => {
   let server: TestServer;
   before(async () => { server = await startTestServer(); });
@@ -91,13 +115,98 @@ describe('routes/config — HTTP behavior', async () => {
     assert.equal(body.beatCount, 1);
   });
 
-  it('POST /api/session/import rejects a snapshot missing required arrays with 400', async () => {
+  it('GET /api/session/export labels an allowlisted observation, never a project backup', async () => {
+    const sid = freshSessionId();
+    const draftMarker = `CONFIDENTIAL-DRAFT-${sid}`;
+    const save = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: draftMarker,
+        snapshots: [],
+        characters: [],
+        researchNotes: [],
+        isDarkMode: false,
+      }),
+    });
+    assert.equal(save.status, 200);
+
+    const res = await fetch(`${server.baseUrl}/api/session/export?sessionId=${sid}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    assert.match(
+      res.headers.get('content-disposition') ?? '',
+      /filename="storymachine-partial-simulation-observation\.json"/,
+    );
+
+    const raw = await res.text();
+    assert.equal(raw.includes(draftMarker), false, 'the observation must not contain writer draft bytes');
+    const body = JSON.parse(raw);
+    assert.equal(body.kind, 'storymachine.simulation-observation');
+    assert.equal(body.format_version, 1);
+    assert.equal(body.project_recoverable, false);
+    assert.equal(body.project_restore.supported, false);
+    assert.equal(body.project_restore.use_instead, 'documented-sqlite-backup-and-restore');
+    assert.equal(body.manifest.complete_project_state, false);
+    assert.equal(body.manifest.exclusion_policy, 'all_unlisted_session_and_project_state_is_excluded');
+    assert.deepEqual(body.manifest.included, [
+      'action_log', 'agents', 'beat_traces', 'belief_edges', 'dramatic_pressures',
+      'event_propositions', 'goal_mutations', 'illusion_state', 'locations',
+      'persuasion_log', 'stakes',
+    ]);
+    assert.deepEqual(Object.keys(body.observation).sort(), [...body.manifest.included].sort());
+    assert.ok(body.manifest.notable_exclusions.includes('writer_draft_and_scriptide_state'));
+    assert.equal(body.observation.scriptText, undefined);
+    assert.equal(body.locations, undefined, 'simulation data belongs inside the explicit observation envelope');
+
+    const importRes = await fetch(`${server.baseUrl}/api/session/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: raw,
+    });
+    assert.equal(importRes.status, 410);
+    assert.equal((await importRes.json()).code, 'SESSION_JSON_IMPORT_RETIRED');
+
+    const load = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+    assert.equal(load.status, 200);
+    assert.equal(
+      (await load.json()).scriptText,
+      draftMarker,
+      'posting an observation to the retired importer must preserve the writer draft',
+    );
+  });
+
+  it('POST /api/session/import is retired regardless of the legacy body shape', async () => {
     const res = await fetch(`${server.baseUrl}/api/session/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: freshSessionId(), notAgents: [] }),
     });
+    assert.equal(res.status, 410);
+    const body = await res.json();
+    assert.equal(body.code, 'SESSION_JSON_IMPORT_RETIRED');
+  });
+
+  it('invalid JSON for the retired importer is rejected before routing and preserves existing state', async () => {
+    const sid = freshSessionId();
+    const seed = await fetch(`${server.baseUrl}/api/story-tone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, tone: 'operatic' }),
+    });
+    assert.equal(seed.status, 200);
+
+    const res = await fetch(`${server.baseUrl}/api/session/import?sessionId=${sid}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"schema_version":',
+    });
     assert.equal(res.status, 400);
+
+    const after = await fetch(`${server.baseUrl}/api/story-config?sessionId=${sid}`);
+    assert.equal(after.status, 200);
+    assert.equal((await after.json()).story_tone, 'operatic');
   });
 
   it('GET /api/pacing-target rejects a malformed sessionId with 400', async () => {
@@ -144,7 +253,7 @@ describe('routes/config — HTTP behavior', async () => {
     const expRes = await fetch(`${server.baseUrl}/api/session/export?sessionId=${sid}`);
     assert.equal(expRes.status, 200);
     const snap = await expRes.json();
-    assert.equal(snap.illusion_state?.story_tone, 'operatic', 'session export must carry story_tone');
+    assert.equal(snap.observation?.illusion_state?.story_tone, 'operatic', 'observation must carry story_tone');
   });
 
   // ── I1-a: character arc mode (mirrors /api/emotional-arc) ─────────────────
@@ -166,7 +275,7 @@ describe('routes/config — HTTP behavior', async () => {
 
     const expRes = await fetch(`${server.baseUrl}/api/session/export?sessionId=${sid}`);
     const snap = await expRes.json();
-    assert.equal(snap.illusion_state?.character_arc_mode, 'corruption', 'session export must carry character_arc_mode');
+    assert.equal(snap.observation?.illusion_state?.character_arc_mode, 'corruption', 'observation must carry character_arc_mode');
   });
 
   it('POST /api/character-arc-mode rejects an unknown mode with 400 naming valid modes', async () => {
@@ -196,39 +305,29 @@ describe('routes/config — HTTP behavior', async () => {
     assert.equal(body.character_arc_mode, null);
   });
 
-  it('story_tone and character_arc_mode survive a session import round-trip', async () => {
-    const snapshot = {
-      sessionId: freshSessionId(),
-      schema_version: 6,
-      exported_at: Date.now(),
-      locations: [{ location_id: 'room1', name: 'Room', description: '', adjacent_locations: [] }],
-      agents: [{
-        char_id: 'alice', name: 'Alice', public_mask: 'friendly', hidden_motive: 'none',
-        knowledge_vector: [], current_location_id: 'room1', suspicion_score: 0, is_alive: true,
-      }],
-      action_log: [],
-      dramatic_pressures: [],
-      event_propositions: [],
-      persuasion_log: [],
-      illusion_state: {
-        phase: 'Setup', planted_elements: [], pending_recontextualization: [],
-        story_tone: 'paranoid', character_arc_mode: 'descent',
-      },
-      beat_traces: [],
-      belief_edges: [],
-      goal_mutations: [],
-    };
+  it('POST /api/session/import leaves existing state unchanged and never creates the legacy session', async () => {
+    const sid = freshSessionId();
+    const seed = await fetch(`${server.baseUrl}/api/story-tone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, tone: 'operatic' }),
+    });
+    assert.equal(seed.status, 200);
+    const before = await (await fetch(`${server.baseUrl}/api/story-config?sessionId=${sid}`)).json();
+    const healthBefore = await (await fetch(`${server.baseUrl}/health`)).json();
+
     const impRes = await fetch(`${server.baseUrl}/api/session/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(snapshot),
+      body: JSON.stringify(legacySnapshot(sid, 'paranoid')),
     });
-    assert.equal(impRes.status, 200);
+    assert.equal(impRes.status, 410);
+    assert.equal((await impRes.json()).code, 'SESSION_JSON_IMPORT_RETIRED');
 
-    const cfgRes = await fetch(`${server.baseUrl}/api/story-config?sessionId=${snapshot.sessionId}`);
-    const cfg = await cfgRes.json();
-    assert.equal(cfg.story_tone, 'paranoid', 'imported story_tone must be readable');
-    assert.equal(cfg.character_arc_mode, 'descent', 'imported character_arc_mode must be readable');
+    const after = await (await fetch(`${server.baseUrl}/api/story-config?sessionId=${sid}`)).json();
+    assert.deepEqual(after, before);
+    const healthAfter = await (await fetch(`${server.baseUrl}/health`)).json();
+    assert.equal(healthAfter.sessions, healthBefore.sessions);
   });
 });
 

@@ -15,13 +15,44 @@ import {
 } from '../lib/validation.ts';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
-  asyncHandler, gameLimiter, aiLimiter, sessions, sessionId, getOrCreateSession, destroySession,
+  asyncHandler, gameLimiter, aiLimiter, sessions, sessionId, getOrCreateSession,
   metrics,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
 
 const router = express.Router();
 export default router;
+
+const SIMULATION_OBSERVATION_FIELDS = [
+  'action_log',
+  'agents',
+  'beat_traces',
+  'belief_edges',
+  'dramatic_pressures',
+  'event_propositions',
+  'goal_mutations',
+  'illusion_state',
+  'locations',
+  'persuasion_log',
+  'stakes',
+] as const satisfies readonly (keyof StageSnapshot)[];
+
+const SIMULATION_OBSERVATION_NOTABLE_EXCLUSIONS = [
+  'browser_local_state',
+  'canonical_story_ops_and_commits',
+  'database_wal_backups_and_recovery_metadata',
+  'drama_positions',
+  'event_cards',
+  'ghost_commits',
+  'illusion_state_total_turns_and_director_tension_state',
+  'llm_cache',
+  'provider_configuration_and_secrets',
+  'reveal_plans',
+  'self_play_corpus',
+  'session_identity_and_capability',
+  'v5_shadow_event_store',
+  'writer_draft_and_scriptide_state',
+] as const;
 
 // Health check — no rate limit, no auth, responds even when Gemini is down.
 // version/commit identify what's actually running in a deployed instance so
@@ -270,41 +301,51 @@ router.post('/api/outline/apply-preset', gameLimiter, validate(ApplyPresetBodySc
   res.json({ beats, structure, expected_turns: n, beat_count: beats.length });
 }));
 
-// ── Session snapshot export / import ──────────────────────────────────────
+// ── Partial simulation observation export / retired JSON import ───────────
 router.get('/api/session/export', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const snapshot = stage.exportSnapshot();
-  res.setHeader('Content-Disposition', 'attachment; filename="storymachine-session.json"');
-  res.json(snapshot);
+  const observation = {
+    action_log: snapshot.action_log,
+    agents: snapshot.agents,
+    beat_traces: snapshot.beat_traces,
+    belief_edges: snapshot.belief_edges,
+    dramatic_pressures: snapshot.dramatic_pressures,
+    event_propositions: snapshot.event_propositions,
+    goal_mutations: snapshot.goal_mutations,
+    illusion_state: snapshot.illusion_state,
+    locations: snapshot.locations,
+    persuasion_log: snapshot.persuasion_log,
+    stakes: snapshot.stakes ?? [],
+  } satisfies Pick<StageSnapshot, (typeof SIMULATION_OBSERVATION_FIELDS)[number]>;
+
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Disposition', 'attachment; filename="storymachine-partial-simulation-observation.json"');
+  res.json({
+    kind: 'storymachine.simulation-observation',
+    format_version: 1,
+    project_recoverable: false,
+    exported_at: snapshot.exported_at,
+    source_database_schema_version: snapshot.schema_version,
+    project_restore: {
+      supported: false,
+      reason: 'This artifact is a partial simulation observation; writer draft and the canonical StoryOp/commit ledger are excluded.',
+      use_instead: 'documented-sqlite-backup-and-restore',
+    },
+    manifest: {
+      complete_project_state: false,
+      exclusion_policy: 'all_unlisted_session_and_project_state_is_excluded',
+      included: [...SIMULATION_OBSERVATION_FIELDS],
+      notable_exclusions: [...SIMULATION_OBSERVATION_NOTABLE_EXCLUSIONS],
+    },
+    observation,
+  });
 }));
 
-router.post('/api/session/import', gameLimiter, validate(ImportBodySchema), asyncHandler(async (req, res) => {
-  const snap = req.body as StageSnapshot;
-  if (!snap || typeof snap !== 'object' || !Array.isArray(snap.agents) || !Array.isArray(snap.locations)) {
-    res.status(400).json({ error: 'Invalid snapshot: must include agents and locations arrays' });
-    return;
-  }
-  if (snap.agents.length === 0 || snap.locations.length === 0) {
-    res.status(400).json({ error: 'Invalid snapshot: agents and locations arrays must be non-empty' });
-    return;
-  }
-  // Reject snapshots that are newer than the current schema version to prevent
-  // silent data loss when an older server tries to import a newer snapshot.
-  const CURRENT_SCHEMA = 6;
-  if (typeof snap.schema_version === 'number' && snap.schema_version > CURRENT_SCHEMA) {
-    res.status(422).json({
-      error: `Snapshot schema v${snap.schema_version} is newer than server schema v${CURRENT_SCHEMA}. Upgrade the server first.`,
-    });
-    return;
-  }
-  const sid = sessionId(req);
-  // Replace existing session with a fresh one (wipes any persisted DB), then import.
-  destroySession(sid);
-  const { stage, orchestrator } = getOrCreateSession(sid);
-  stage.importSnapshot(snap);
-  // Re-register agents and nodes into the orchestrator for future turns.
-  for (const agent of stage.getAllAgents())     orchestrator.registerAgent(agent);
-  for (const loc   of stage.getAllLocations())  orchestrator.registerNode(loc);
-  logger.info('session_imported', { sid, agents: snap.agents.length, actions: snap.action_log.length });
-  res.json({ status: 'imported', sessionId: sid, agents: snap.agents.length, turns: snap.action_log.length });
-}));
+router.post('/api/session/import', gameLimiter, validate(ImportBodySchema), (_req, res) => {
+  res.status(410).json({
+    code: 'SESSION_JSON_IMPORT_RETIRED',
+    error: 'JSON session import is retired because the legacy projection is not a recoverable project.',
+    recovery: 'JSON restore is unavailable. Use the documented SQLite backup and restore procedure.',
+  });
+});

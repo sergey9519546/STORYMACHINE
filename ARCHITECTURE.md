@@ -54,7 +54,7 @@ Browser (React SPA — same-origin fetch / SSE / WebSocket)
   │                middleware: JSON, request log (pathname only),
   │                security headers, CSP (prod), rate limits
   │                │
-  │                ├─ routes/config.ts     health, AI config (booleans only), session import/export
+  │                ├─ routes/config.ts     health, AI config, simulation observation export, retired JSON import
   │                ├─ routes/scriptide.ts  doctor, diagnose, copilot, fix-and-verify
   │                ├─ routes/export.ts     coverage HTML, FDX/DOCX/print
   │                ├─ routes/game.ts       OASIS simulation (init/turn/room/interview)

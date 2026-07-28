@@ -36,8 +36,8 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 | `GET /health` | Liveness probe — returns `{ status, uptime, sessions, version, commit }`. `version`/`commit` identify what's actually running (see "Releases" below); no auth, no rate limit. |
 | `POST /api/init` | Initialize simulation with agents and locations |
 | `POST /api/run-room` | Run a 5-turn dialogue lock in a location |
-| `GET /api/session/export` | Download full session snapshot as JSON |
-| `POST /api/session/import` | Restore a previously exported snapshot |
+| `GET /api/session/export` | Download a self-describing partial simulation observation; it is not a project backup and cannot restore a project |
+| `POST /api/session/import` | Retired; returns non-mutating `410 Gone` because the legacy JSON projection is not recoverable |
 | `GET /api/ledger/fountain` | Export action log as annotated Fountain screenplay |
 
 ## Running Tests

@@ -1455,7 +1455,7 @@ export class Stage {
       .run(outcome, turnIndex, id);
   }
 
-  // ── Session snapshot export / import ─────────────────────────────────────────
+  // ── Legacy partial simulation projection (not a project backup) ──────────────
 
   public exportSnapshot(): StageSnapshot {
     return {
@@ -1492,9 +1492,9 @@ export class Stage {
     };
   }
 
-  // Restore a snapshot into this (empty) Stage instance.
-  // Characters use INSERT OR REPLACE (overwrites existing state).
-  // Spine data (edges, mutations, beats) uses INSERT OR IGNORE so partial re-imports are safe.
+  // Reconstruct only the legacy projection's subset into an empty Stage.
+  // This is an internal compatibility helper, not a supported project restore
+  // boundary; the public JSON importer is retired.
   public importSnapshot(snap: StageSnapshot): void {
     for (const loc of snap.locations) this.addLocation(loc);
     for (const agent of snap.agents)   this.addAgent(agent);

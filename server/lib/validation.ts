@@ -273,15 +273,11 @@ export const RunSceneBodySchema = z.object({
   roundsPerRoom: z.number().int().min(1).max(12).optional(),
 });
 
-export const ImportBodySchema = z
-  .object({
-    sessionId: sessionIdField,
-    schema_version: z.number().int().min(0).optional(),
-    agents: z.array(z.unknown()),
-    locations: z.array(z.unknown()),
-    action_log: z.array(z.unknown()).default([]),
-  })
-  .passthrough();
+// The legacy JSON session importer is retired. Its body carries no semantics;
+// keeping this body-agnostic lets every syntactically valid JSON request reach
+// the unconditional, non-mutating 410 tombstone instead of falsely suggesting
+// that some snapshot shapes are still restoreable.
+export const ImportBodySchema = z.unknown();
 
 export const AiConfigSchema = z.object({
   provider:    z.enum(['gemini', 'openai-compat']).optional(),

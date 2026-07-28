@@ -590,7 +590,10 @@ export interface PerspectiveEvaluation {
   contradicted_propositions: string[];            // text of beliefs the new observations contradict
 }
 
-// ── Session snapshot (export / import) ───────────────────────────────────────
+// ── Legacy partial simulation projection ────────────────────────────────────
+// This is not a complete project backup or public restore format. The HTTP
+// export wraps an explicit allowlisted subset in an observation envelope, and
+// the public JSON importer is retired.
 
 export interface StageSnapshot {
   schema_version: number;
@@ -598,7 +601,7 @@ export interface StageSnapshot {
   locations: Location[];
   agents: CharacterSheet[];
   action_log: ActionLogEntry[];
-  // Previously omitted — now included for a lossless round-trip:
+  // Included so this legacy simulation subset can be reconstructed internally:
   dramatic_pressures: DramaticPressure[];   // live bias signals survive restart
   event_propositions: EventProposition[];   // is_lie ground truth survives restart
   persuasion_log: PersuasionRecord[];       // strategy history survives restart
@@ -612,4 +615,3 @@ export interface StageSnapshot {
   goal_mutations: GoalMutation[];
   stakes?: Stakes[];                        // active stakes survive restart
 }
-

@@ -3508,16 +3508,16 @@ describe('Zod validation schemas', () => {
     assert.ok(!result.success);
   });
 
-  it('ImportBodySchema accepts valid snapshot structure', () => {
-    const result = ImportBodySchema.safeParse({
-      agents: [], locations: [], action_log: [], schema_version: 6,
-    });
-    assert.ok(result.success);
-  });
-
-  it('ImportBodySchema rejects missing agents', () => {
-    const result = ImportBodySchema.safeParse({ locations: [], action_log: [] });
-    assert.ok(!result.success);
+  it('the retired-session import schema is intentionally body-agnostic', () => {
+    for (const parsedJson of [
+      null,
+      [],
+      {},
+      { agents: [], locations: [], action_log: [], schema_version: 6 },
+      { malformed: true, schema_version: Number.MAX_SAFE_INTEGER },
+    ]) {
+      assert.ok(ImportBodySchema.safeParse(parsedJson).success);
+    }
   });
 
   it('AiConfigSchema accepts valid openai-compat config', () => {
