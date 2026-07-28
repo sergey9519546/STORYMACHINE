@@ -82,14 +82,15 @@ before every push. CI runs lint + test + build on every branch, plus a
 ## Standing task — see ROADMAP.md (the wave program is RETIRED)
 
 **The "3 checks + 6 tests per wave, forever" cadence is dead.** It was the
-machine that manufactured the project's biggest liability: ~5,701 of ~8,917
-rules are one bulk wave of field × mode × position permutations from 7
-template functions (`passes/lib/checks.ts`), and by the doctor's own
-measurement (`doctor.ts:1656-1669`) the entire weighted-rule channel
-contributes AUC ~0.076 to discrimination while scene-count scarcity carries
-AUC ~0.938. More rules stopped adding signal a long time ago; they add
-maintenance cost (~47,500 pass-file lines, 1,326 `as any` casts) and
-undercut the trust story. Do not author a new wave.
+machine that manufactured the project's biggest liability: the live generated
+rulebook is 3,216 pass-scoped constants (the earlier "~8,917 rules, ~5,701
+from a bulk Wave 1191" story was shown to be inaccurate by the 2026-07-14
+audit — `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
+R2-C01), and by the doctor's own measurement (`doctor.ts:1656-1669`) the
+entire weighted-rule channel contributes AUC ~0.076 to discrimination while
+scene-count scarcity carries AUC ~0.938. More rules stopped adding signal a
+long time ago; they add maintenance cost and undercut the trust story. Do not
+author a new wave.
 
 The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
 
@@ -100,7 +101,7 @@ The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
    independently blind-labeled by >=3 experienced readers, with a
    pre-registered split, held-out evaluation, and uncertainty reporting.
    Rebuild around the smallest signal set that actually separates. Add no
-   entries to the current 8,917 generated catalog; treat ~2,300 distinct rule
+   entries to the current 3,216 generated catalog; treat the distinct rule
    concepts as the maintained conceptual set. Removal is a separate approved
    migration, never implied by "freeze."
 3. **P2 — Collapse the surface to Doctor + Editor.** Everything else

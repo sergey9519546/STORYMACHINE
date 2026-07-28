@@ -22,12 +22,21 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 
 ## Environment Variables
 
+The server deliberately boots **without any key** into analysis-only mode (the deterministic surface — Script Doctor, coverage export, What-If Lab, Writers' Room, interview receipts — works keyless). Keys are only needed to enable generation (copilot, simulation dialogue, rewrites). See `.env.example` and `docs/LOCAL_AI_TESTING.md` for the authoritative, fully-commented list.
+
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | Optional | Gemini AI API key — never commit this. Without it the server boots in **analysis-only mode**: Script Doctor, live diagnostics, coverage export, What-If Lab, Writers' Room, and interview receipts all work; generation (copilot, simulation dialogue, rewrites) stays disabled until a key is set. |
-| `APP_URL` | Optional | Hosting URL (injected automatically by AI Studio) |
+| `GEMINI_API_KEY` | Optional | Gemini AI API key — never commit this. Without it the server boots in **analysis-only mode**. |
+| `OPENROUTER_API_KEY` | Optional | OpenRouter (FreeRide) API key — the **default provider when set** (selected ahead of Gemini). The recommended key for new users per `.env.example`. |
+| `AI_PROVIDER` | Optional | Multi-provider selector (e.g. `openai-compat`, `gemini`). When using the OpenAI-compatible path, set with `AI_BASE_URL` / `AI_MODEL` / `AI_API_KEY` / `AI_FAST_MODEL`. |
+| `AI_BASE_URL`, `AI_API_URL`, `AI_IMG_BASE_URL`, `AI_TTS_BASE_URL`, `AI_EMBEDDING_BASE_URL` | Optional | OpenAI-compatible provider endpoints. SSRF-guarded (private/loopback/metadata IPs rejected; DNS resolve-and-pinned at the fetch site). Set `AI_ALLOW_PRIVATE_NETWORK_TARGETS=true` to point at a local Ollama/LM Studio server. |
+| `ADMIN_TOKEN` | Optional | Gates admin-only routes (e.g. `/api/ai-config/test`). Required in production to use those endpoints. |
+| `METRICS_TOKEN` | Optional | Gates `/metrics` (loopback access is always allowed; non-loopback requires this token). |
+| `COLLAB_SECRET` | Optional | Shared secret for the collaborative-editing WebSocket. Required in production. |
+| `TRUST_PROXY` | Optional | Set to `1` / `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored. |
+| `APP_URL` | Optional | Hosting URL (not in `.env.example`; injected automatically by some deployment environments like AI Studio). |
 
-> **Security note:** `.env` is gitignored via `.env*` in `.gitignore`. Only `.env.example` is tracked. Never commit real keys.
+> **Security note:** `.env` is gitignored via `.env*` in `.gitignore`. Only `.env.example` is tracked. Never commit real keys. API keys live only in `.env` and are never serialized to clients — `getPublicConfig()` exposes boolean flags only.
 
 ## Key Endpoints
 
@@ -67,6 +76,10 @@ npm test
 - `npm run rulebook` - Generate rulebook from current rule set
 - `npm run generate-p0-sample` - Generate P0 validation sample coverage report
 - `npm run backup` - Backup session data
+- `npm run honesty-audit` - Scan shipped surface for overclaim language (CI-enforced)
+- `npm run test:metamorphic` - Run the metamorphic scoring invariants (the `empty_verbosity` case is a documented known-failing witness)
+- `npm run measure-slop` - Measure anti-slop marker discrimination
+- `npm run clean` - Remove the `dist/` build output
 
 **Code Quality Tools:**
 

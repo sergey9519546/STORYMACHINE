@@ -14,8 +14,9 @@ OASIS and the research surfaces remain available only as filed Labs work.
 
 The project has strong deterministic engineering but no documented evidence
 in this repo that a real writer wants the output. Its former headline metric
-is also non-load-bearing: ~5,701 of 8,917 generated rules are permutations
-from 7 templates, while the doctor's own diagnostics report rule-channel AUC
+is also non-load-bearing: the live generated rulebook is 3,216 pass-scoped
+constants (the earlier "8,917" figure was shown to be inaccurate by the
+2026-07-14 audit), while the doctor's own diagnostics report rule-channel AUC
 ~0.076 versus scene-count scarcity AUC ~0.938. Reproducibility is real; score
 validity on real writing is not yet proven.
 
@@ -106,8 +107,8 @@ separates strong from weak real writing — not a larger rulebook.
    regressions.
 6. Close the composite minimum-gap guard through measured false-positive
    reduction — never by a global curve tweak that merely moves the fixture.
-7. Freeze rule growth: add no entries to the current 8,917-entry generated
-   catalog; treat ~2,300 distinct rule concepts as the maintained conceptual
+7. Freeze rule growth: add no entries to the current 3,216-entry generated
+   catalog; treat the distinct rule concepts as the maintained conceptual
    set. Author no new wave. Removal is a separately approved migration after
    dependency mapping, never implied by "freeze."
 

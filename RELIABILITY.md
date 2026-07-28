@@ -3,7 +3,7 @@
 > **Status: historical as of 2026-07-15; not an active specification.**
 > This document preserves the audited failure model and proposed repair program
 > from that date. It is not the current API contract, roadmap, or completion
-> gate. Current authority lives in `docs/MASTER_ROADMAP.md`, `ARCHITECTURE.md`,
+> gate. Current authority lives in `ROADMAP.md` (repo root), `ARCHITECTURE.md`,
 > `README.md`, and accepted ADRs.
 >
 > In particular, every legacy JSON session import/export round-trip state,
@@ -2813,7 +2813,7 @@ All surfaces consume it.
 ### Evidence
 
 Two systems produce quality signals:
-1. Deterministic Script Doctor (keyless, ~8,917 rules).
+1. Deterministic Script Doctor (keyless, 3,216 generated rule constants).
 2. LLM analysis route (`POST /api/scriptide/analyze-script`).
 3. Hard-coded status language ("NARRATIVE COHESION AT 94%").
 

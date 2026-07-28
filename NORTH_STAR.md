@@ -19,16 +19,18 @@ deterministic rule or formula, not a black-box LLM opinion.** The score
 formula and every rule are open to inspection, and the same script text
 always produces the same report.
 
-**Honest correction on the rule count (2026-07-14).** Earlier drafts of this
-file led with "3,216 hand-specified rules" as the structural claim; the
-rulebook has since grown to 8,917 by generated count. Neither number should
-be the pitch, for two measured reasons: (1) ~5,701 of the 8,917 were
-produced in one bulk wave from 7 template functions as field × mode ×
-position permutations — only ~2,300 are genuinely distinct hand-authored
-checks (`docs/rulebook/README.md`: 6,610 "Unattributed"); (2) by the
-doctor's own measurements (`server/nvm/analyze/doctor.ts:1656-1669`) the
-entire weighted-rule channel has AUC ~0.076 while the scene-count scarcity
-term has AUC ~0.938 — **the rules barely move the score.** Lead with what is
+**Honest correction on the rule count (2026-07-14, reconciled 2026-07-28).** Earlier drafts of this
+file led with "3,216 hand-specified rules" and later asserted the rulebook
+had grown to "8,917 by generated count." An independent audit
+(`docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
+R2-C01) showed the "8,917" figure and the "~5,701 from a bulk Wave 1191"
+story to be inaccurate: the live generated rulebook is **3,216 distinct
+pass-scoped rule constants** (machine-counted from the live pass files by
+`scripts/generate-rulebook.ts`, enforced by `tests/core/rulebook.test.ts`).
+The rule channel barely moves the score regardless: by the doctor's own
+measurements (`server/nvm/analyze/doctor.ts:1656-1669`) the entire
+weighted-rule channel has AUC ~0.076 while the scene-count scarcity term
+has AUC ~0.938 — **the rules barely move the score.** Lead with what is
 true and verifiable (reproducibility, determinism, inspectability), never
 with the rule count. The rule count is neither the wedge nor load-bearing.
 
@@ -48,10 +50,11 @@ Measured proof points (honest, as of 2026-07-14):
   against a 0.622 ratchet floor; AUC-71 ~0.652; act-swap 0.48→0.62. A ~0.65
   AUC is barely above chance — treat these as work-in-progress baselines,
   not proof the score discriminates.
-- **Rulebook**: 8,917 entries by generated count (~2,300 distinct rule
-  concepts), staleness-tested against the live pass code. Freeze means **add
+- **Rulebook**: 3,216 generated pass-scoped rule constants (the live
+  `docs/rulebook/README.md` count; the earlier "8,917" figure was shown to
+  be inaccurate by the 2026-07-14 audit). Freeze means **add
   no entries to the current catalog** and maintain the distinct conceptual
-  set — not delete 6,600 entries by implication. Any removal is a separately
+  set — not delete generated permutations by implication. Any removal is a separately
   approved migration with dependency review.
 
 ## 1. Non-negotiables (the constitution proper)
@@ -151,11 +154,12 @@ historical quality reference; its wave cadence is retired.
   (`passes/lib/checks.ts`), and by the doctor's own measurement the whole
   weighted-rule channel contributes AUC ~0.076 to discrimination while the
   scene-count scarcity term carries AUC ~0.938. Add no entries to the
-  current 8,917-entry catalog; maintain ~2,300 distinct rule concepts unless
+  current 3,216-entry catalog; maintain the distinct rule concepts unless
   a separately approved migration removes generated permutations. The claim
   is now a score that demonstrably separates strong from weak real writing,
   not a big number. (See ROADMAP.md — the wave cadence that manufactured the
   permutations is retired.)
 - Not adopting AI-generated "research" mechanisms on the strength of their
-  citations — `v35_integration_plan.md`'s fabrication audit stands: adopt
+  citations — the fabrication-audit lesson stands (see
+  `docs/audits/2026-07-14-high-end-audit/`): adopt
   mechanisms, never citations, from anything in the research archive.
