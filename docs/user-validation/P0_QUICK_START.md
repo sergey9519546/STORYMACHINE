@@ -44,9 +44,14 @@ session. See the stimulus note in `P0_EVIDENCE_SUMMARY.md`.
 1. **Read the protocol.** `P0_OPERATING_KIT.md` — authority, consent, privacy,
    session script, stop rules, evidence classification. This is the real
    playbook; the steps below are just its table of contents.
-2. **Recruit.** `P0_RECRUITMENT.md` — outreach/screening templates. Eligibility
-   and the neutral-invitation rules in the operating kit override any wording
-   there (do not pitch "objective/accurate/trusted"; do not lead the answer).
+2. **Recruit (when the decision to field is made).** Recruitment is **deferred**
+   until a decision owner decides whether, when, and on what signal rule to run
+   P0 — building fielding machinery ahead of that decision is premature. The
+   earlier ready-to-send outreach/screening kit has been filed to
+   `docs/filed-backlog/premature-p0-machinery/` (recoverable if/when P0 is
+   re-opened, but re-check each template against the kit). When you do recruit,
+   the operating kit's eligibility and neutral-invitation rules govern directly
+   (do not pitch "objective/accurate/trusted"; do not lead the answer).
 3. **Per session, before you start.** Copy `P0_SESSION_TEMPLATE.md` to
    `sessions/P0-S##.md` (kept anonymous). Run the operating kit's pre-session
    checklist. Assign an anonymous participant ID; keep all PII/contacts/
