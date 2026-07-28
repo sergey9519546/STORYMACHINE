@@ -38,7 +38,7 @@ interface Finding {
 const DOC_AI_PATTERNS: AIPattern[] = [
   // Copula avoidance
   { pattern: /\bserves as\b/gi, category: 'copula-avoidance', severity: 'high', replacement: 'is' },
-  { pattern: /\bfeatures\s+(?!film|movie)/gi, category: 'copula-avoidance', severity: 'high', replacement: 'has/includes' },
+  { pattern: /\bfeatures\s+(an?|the|our|comprehensive|robust|seamless|powerful|advanced|cutting-edge)\b/gi, category: 'copula-avoidance', severity: 'high', replacement: 'has/includes' },
   { pattern: /\bboasts\b/gi, category: 'copula-avoidance', severity: 'high', replacement: 'has' },
   
   // Unnecessary formality

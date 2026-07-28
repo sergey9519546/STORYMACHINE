@@ -1,0 +1,90 @@
+name: Security
+
+# Additive security gate. Runs alongside CI (see ci.yml) and never edits it.
+# Three independent jobs:
+#   - dependency-review: blocks PRs that introduce known-vulnerable
+#     dependency versions in their diff (GitHub Advisory Database).
+#   - npm-audit: surfaces high/critical CVEs in the resolved dependency
+#     tree. NON-BLOCKING for now (continue-on-error) so it reports without
+#     failing existing PRs; the lead can flip it to blocking once the
+#     baseline is clean.
+#   - codeql: semantic code scanning for the JavaScript/TypeScript surface.
+#
+# Matches ci.yml conventions (Node 22, checkout@v4, setup-node@v4 with
+# cache: npm). See docs/AGENT_HANDOFF.md §"P1 — security residual" for
+# context on the open DNS-rebinding/resolve-and-pin work this complements.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  schedule:
+    # Every Monday 06:00 UTC — catches new advisories on unchanged code.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    # Only meaningful on PRs: it diffs the dependency change in the PR.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          # Fail the PR on high/critical vulnerable packages in the diff.
+          fail-on-severity: high
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # NON-BLOCKING (continue-on-error: true): npm audit reports
+      # high/critical CVEs in the resolved tree so they are visible on
+      # every run, but it does NOT fail existing PRs while the baseline
+      # contains pre-existing advisories. Flip `continue-on-error` to
+      # `false` (and drop this comment) once the baseline is clean and
+      # the lead has signed off — this is the intended steady state.
+      - name: npm audit (production, high+)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["javascript-actions"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3

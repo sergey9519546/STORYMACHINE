@@ -1,0 +1,70 @@
+name: Bug report
+description: Report something that is broken or behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Before opening this, please
+        confirm it is not a security vulnerability — if it is, follow
+        **SECURITY.md** instead and report it privately; do not open a public
+        issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps that reliably triggers the bug.
+      placeholder: |
+        1. Start the server with `npm run dev`
+        2. ...
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead (paste errors/logs if relevant).
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser / Node version and OS.
+      placeholder: "Node 22.6.0 on Windows 11, Chrome 125"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      description: |
+        Was this in keyless (analysis-only) mode or with a `GEMINI_API_KEY`
+        configured (keyed)? This tells us which surface was live.
+      options:
+        - Keyless (no GEMINI_API_KEY)
+        - Keyed (GEMINI_API_KEY configured)
+        - Not sure
+    validations:
+      required: true

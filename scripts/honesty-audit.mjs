@@ -70,10 +70,23 @@ const PATTERNS = [
   // rules") don't false-positive; tuned per task instructions rather than
   // allowlisting broadly.
   { name: 'n-rules-claim', re: /\b\d{3,}[\d,]*\s+(deterministic\s+)?rules\b/gi },
-  // Allow the honest disclaimer phrase "not a hard guarantee" (RevisionPanel
-  // and doctor.ts use it to explain what the tool does NOT claim). Negative
-  // lookbehind on "not a hard " immediately preceding "guarantee".
-  { name: 'guarantees', re: /(?<!not a hard )\bguarantees?\b/gi },
+  // Allow legitimate non-overclaim uses of "guarantee(s)"/"guaranteed" via
+  // negative lookbehinds/lookahead on the constructions present in this codebase:
+  //   - "not a hard guarantee" — honest disclaimer (RevisionPanel, doctor.ts)
+  //     explaining what the tool does NOT claim.
+  //   - "as guaranteed <adj>" / "reads as guaranteed" — literary-perception
+  //     language in originality.ts describing how an audience perceives a
+  //     story pattern (e.g. "a pivot scene reads as guaranteed clue-free",
+  //     "a seed scene as guaranteed pivot-free"), not a promise about the tool.
+  //   - "guaranteed to <verb>" — factual descriptions of deterministic game
+  //     mechanics, e.g. decision.ts's REVEAL action ("guaranteed to land as
+  //     real knowledge"), which the engine actually enforces (Orchestrator's
+  //     _applyReveal writes the belief at 0.85 confidence). Real overclaims
+  //     modify a quality noun ("guaranteed results/quality/satisfaction"),
+  //     so excluding only the "guaranteed to <verb>" form keeps the net tight.
+  // The [ds]? closes the earlier gap where only the base verb and "guarantees"
+  // were matched; genuine product overclaims still trip the pattern.
+  { name: 'guarantees', re: /(?<!not a hard )(?<!as )\bguarantee[ds]?\b(?! to\b)/gi },
   { name: 'industry-standard', re: /\bindustry[\s-]?standard\b/gi },
   { name: 'objectively-correct', re: /\bobjectively correct\b/gi },
   { name: 'scientifically', re: /\bscientifically\b/gi },
@@ -213,7 +226,7 @@ function shouldScan(filePath) {
   const rel = relative(ROOT, filePath);
   const ext = extname(filePath);
   if (EXEMPT_NAME_RE.test(basename(filePath))) return false;
-  const topDir = rel.split('/')[0];
+  const topDir = rel.split(/[\\/]/)[0];
   const allowedExts = DIR_EXTS[topDir];
   if (allowedExts) return allowedExts.has(ext); // src/, public/, server/
   return SCAN_ROOT_FILES.includes(rel); // individually-named root files
@@ -232,7 +245,7 @@ function scanFile(filePath) {
   const hits = [];
   for (const pattern of PATTERNS) {
     if (pattern.scopeDirs) {
-      const topDir = rel.split('/')[0];
+      const topDir = rel.split(/[\\/]/)[0];
       if (!pattern.scopeDirs.includes(topDir)) continue;
     }
     lines.forEach((line, idx) => {

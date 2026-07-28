@@ -12,6 +12,7 @@
 
 import { createHash } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
+import { logger } from '../../lib/logger.ts';
 import type {
   NarrativeEvent,
   NarrativeEventInput,
@@ -213,7 +214,7 @@ export class EventStore {
       });
       
       if (expectedHash !== event.eventHash) {
-        console.error(`Hash mismatch for event ${event.eventId}`);
+        logger.error('Hash mismatch for event', { eventId: event.eventId });
         return false;
       }
       
@@ -222,7 +223,7 @@ export class EventStore {
         const parentExists = Array.from(this.events.values())
           .some(e => e.eventHash === event.parentHash);
         if (!parentExists) {
-          console.error(`Parent hash ${event.parentHash} not found for event ${event.eventId}`);
+          logger.error('Parent hash not found for event', { eventId: event.eventId, parentHash: event.parentHash });
           return false;
         }
       }
@@ -397,7 +398,7 @@ export class EventStore {
         break;
       default:
         // Unknown op type - log but don't crash
-        console.warn(`Unknown StoryOp type: ${(op as any).op}`);
+        logger.warn('Unknown StoryOp type', { op: (op as any).op });
     }
   }
 }

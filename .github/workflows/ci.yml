@@ -28,19 +28,32 @@ jobs:
       # grep exits 1 on no-match, so `!` inverts: any hit fails the build
       # and prints the offending lines.
       #
-      # --exclude-dir/--exclude mirror the tsconfig.json + package.json test
-      # quarantine of the never-compiled v5.0 experimental "narrative OS"
-      # subsystem (server/nvm/{kernel,quantum,research,infinity-gate}, plus
-      # server/planning and every *.bench.ts under server/nvm/**/benchmarks)
-      # and its two broken ai-provider tests (reference removed exports) —
-      # none of it is wired into the running server, so it isn't held to the
-      # logger convention either. Genuinely-live code stays covered.
+      # --exclude-dir/--exclude mirror the tsconfig.json quarantine of the
+      # never-compiled v5.0 experimental "narrative OS" subsystem, EXCLUDING
+      # BY FILE rather than by the whole kernel/ dir. server/nvm/kernel/ is
+      # NOT fully dead: server/engine/Stage.ts imports live runtime values
+      # from server/nvm/kernel/event-store.ts and adapters/commit-to-events.ts
+      # (a small live closure fixed in place per the tsconfig comment). The
+      # earlier `--exclude-dir=kernel` hid that whole closure — including
+      # event-store.ts's console.* calls — from this gate on shipped code.
+      # Now only the genuinely-dead kernel files (the v5-examples, trinity-gate,
+      # integration, and adapters/type-enrichment experiments, plus their
+      # __tests__ and verifiers subdirs) are excluded, so the live event-store
+      # path stays covered. The fully-dead top-level dirs
+      # (quantum/research/infinity-gate/planning/benchmarks) stay dir-excluded.
+      # None of the excluded code is wired into the running server, so it isn't
+      # held to the logger convention either; genuinely-live code stays covered.
       - name: Enforce no console.* under server/
         run: >-
           ! grep -rn 'console\.' server --include='*.ts'
-          --exclude-dir=kernel --exclude-dir=quantum --exclude-dir=research
+          --exclude-dir=quantum --exclude-dir=research
           --exclude-dir=infinity-gate --exclude-dir=planning --exclude-dir=benchmarks
-          --exclude=ai-provider.test.ts --exclude=ai-provider-integration.test.ts
+          --exclude-dir=__tests__ --exclude-dir=verifiers
+          --exclude=type-enrichment.ts --exclude=type-enrichment.test.ts
+          --exclude=v5-examples.ts --exclude=adapters.ts
+          --exclude=event-store.test.ts --exclude=index.ts --exclude=integration.ts
+          --exclude=trinity-gate.ts --exclude=trinity-gate-example.ts
+          --exclude=trinity-gate-demo.ts
 
       # G0-08: user-facing honesty string audit — fails the build on
       # overclaim language ("Hollywood gold standard", "provably", stale

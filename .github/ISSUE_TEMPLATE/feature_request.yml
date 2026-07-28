@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        STORYMACHINE is under a **P0 freeze**: no new engine / scoring / UI
+        work without clearance (see ROADMAP.md). Ideas are welcome, but
+        please answer the freeze-check honestly so we can triage.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? Who does it affect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What you'd like to happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways you thought about solving this, and why they fall short.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: freeze-check
+    attributes:
+      label: Freeze check
+      description: |
+        Does this require engine, scoring, or UI changes that are blocked by
+        the P0 freeze?
+      options:
+        - "No — this is docs/CI/tooling/security (allowed during freeze)"
+        - "Yes — engine/scoring/UI change (needs P0 clearance)"
+        - "Not sure"
+    validations:
+      required: true
