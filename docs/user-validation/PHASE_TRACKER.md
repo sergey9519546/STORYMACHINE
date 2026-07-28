@@ -76,20 +76,38 @@ source at HEAD: `src/components/editor/inline-complete.ts` now defers the
 dismiss-dispatch via `setTimeout(..., 0)`, with an inline comment recording the
 prior crash cause.
 
-**Still open — browser DOM smoke not certified.** The checks above ran in a
-headless sandbox with no display and no Playwright install (verified: not a
-dependency, no cached browser binaries). They prove every endpoint the live
-flow calls returns correct data and that the frontend compiles cleanly — they
-do not prove the actual StartScreen → load-sample → editor-renders →
-ScriptDoctorPanel-renders click-through is crash-free in a real browser.
-**Static-report-only sessions may proceed now** (the operating kit's stimulus
-note already supports this exposure mode and this evidence confirms the static
-artifact is live-consistent). **Before the first LIVE-FLOW session**, someone
-on a machine with a browser must do one manual click-through of `npm run dev`
-→ StartScreen → "Try the sample script" → confirm the Script Doctor report
-renders with zero browser console errors, and record that check here and in
-`P0_EVIDENCE_SUMMARY.md`. That manual check is the only remaining fielding
-blocker, and only for live-flow (not static-report) sessions.
+**Browser DOM smoke: CERTIFIED (2026-07-28, current `main` tip `1a7f3b4`,
+on a machine with a real browser).** Drove the exact flow the operating kit
+requires with headless Chromium (Playwright 1.61.1, system-wide install +
+cached browser binaries; not a project dependency and not required to be one):
+
+- Keyless boot (`tsx server.ts`, `PORT=4319`, no `GEMINI_API_KEY`) → analysis-
+  only mode, `GET /` → 200, StartScreen rendered with the "Try sample
+  coverage" CTA.
+- Click "Try sample coverage" → `ScriptIDE` + `ScriptDoctorPanel` mount via
+  `autoLoadSample`.
+- `POST /api/scriptide/doctor` → **200**, full deterministic report: grade
+  `solid`, verdict `CONSIDER`, 14 revision passes, 13 root causes, 200
+  issues, dimensions/strengths/storyGraph/healthPercentile all populated.
+- Report rendered in the DOM (probed + screenshot): `CONSIDER` stamp, health
+  69, craft dimensions (overall 68.9, Theme & Originality 98.8, Structure &
+  Pacing 67.7), issue counts 3 Critical / 38 Major / 159 Minor. Banner read
+  "NO AI KEY · ANALYSIS OK" (keyless posture confirmed).
+- **Zero genuine browser console errors.** The only console events were (a)
+  dev-only Vite HMR WebSocket noise on port 24678 (never present in a prod
+  build) and (b) the documented keyless 503 on `POST /api/analyze-script`
+  (the opt-in AI Director generative path, off by default per G0-04; the
+  client intentionally swallows it to keep the editor usable). The
+  deterministic coverage route `/api/scriptide/doctor` is unaffected.
+
+No source files were modified for this check; throwaway harness + screenshots
+live under the gitignored `.playwright-cli/`. **Both static-report AND
+live-flow P0 sessions are now unblocked.** (One non-blocking observation noted
+during the run, no action taken: the panel briefly showed a "COVERAGE
+OUTDATED / RE-RUN COVERAGE" affordance alongside the rendered report on first
+sample load — the report content itself was present and correct, so this is a
+freshness affordance rather than a missing render; worth a glance in a future
+pass if the gate intends a "fresh" first-load label.)
 
 ## Allowed now
 
@@ -128,9 +146,9 @@ No decisions have been made.
 | Field | Value |
 |---|---|
 | Tracker status | Status-only |
-| Last reviewed | 2026-07-23 — API-level pre-session smoke certified on commit `c5749b9` (server boot, `/api/scriptide/doctor`, `/api/scriptide/diagnose`, `/api/export/coverage`, `/api/analyze-script` degradation, `npm run build`); browser-DOM click-through still open, see "Current fielding blocker" |
-| Reviewed by | Agent session (sandboxed, no browser available) |
-| Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` — PLANNED, 0 sessions, static-report sessions unblocked |
+| Last reviewed | 2026-07-28 — browser DOM click-through certified on `main` tip `1a7f3b4` (StartScreen → "Try sample coverage" → ScriptDoctorPanel renders with zero genuine console errors; keyless posture confirmed). API-level smoke certified earlier on `c5749b9`. See "Browser DOM smoke" above. |
+| Reviewed by | Agent session (Playwright/Chromium available this run) |
+| Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` — PLANNED, 0 sessions; static-report AND live-flow sessions now unblocked |
 | Session artifact directory | `docs/user-validation/sessions/` — empty (`.gitkeep` only) |
 | Canonical source | `ROADMAP.md` §3 |
-| Next review trigger | Manual browser click-through certification, first documented session, any counter/status change, or a formal P0 gate review |
+| Next review trigger | First documented session, any counter/status change, or a formal P0 gate review (no remaining fielding blocker) |
