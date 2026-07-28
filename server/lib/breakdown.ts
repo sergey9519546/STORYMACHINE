@@ -36,6 +36,7 @@
 
 import { parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
+import { fastWordCount } from './string-utils.ts';
 
 // ── Scene segmentation (mirrors fountain-analyzer.ts — see file header) ─────
 
@@ -85,9 +86,8 @@ function sceneWordCount(blocks: FountainBlock[]): number {
   let words = 0;
   for (const b of blocks) {
     if (b.type === 'boneyard' || b.type === 'synopsis' || b.type === 'note') continue;
-    const text = b.text.trim();
-    if (!text) continue;
-    words += text.split(/\s+/).filter(Boolean).length;
+    if (!b.text.trim()) continue;
+    words += fastWordCount(b.text);
   }
   return words;
 }

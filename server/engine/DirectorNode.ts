@@ -8,6 +8,7 @@ import { getModel, generateContent } from './ai.ts';
 import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import { analyzeSubtext } from '../lib/subtext-meter.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
+import { fastWordCount } from '../lib/string-utils.ts';
 
 export class DirectorNode {
   private stage: Stage;
@@ -416,7 +417,7 @@ From ${sObserverName}'s perspective only:
 
     const allText = speech.map(a => a.content).join(' ');
     const sentences = allText.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
-    const wordLens = sentences.map(s => s.split(/\s+/).filter(Boolean).length);
+    const wordLens = sentences.map(s => fastWordCount(s));
 
     const avgLen = wordLens.length > 0
       ? wordLens.reduce((s, l) => s + l, 0) / wordLens.length
@@ -426,7 +427,7 @@ From ${sObserverName}'s perspective only:
       : 0;
     const normVariance = Math.min(1, variance / 64);  // 8-word stddev → 1.0
 
-    const totalWords = allText.split(/\s+/).filter(Boolean).length;
+    const totalWords = fastWordCount(allText);
     const density = totalWords > 0 ? (nonSpeech.length / totalWords) * 100 : 0;
 
     let tempo: 'fast' | 'medium' | 'slow' = 'medium';
