@@ -355,16 +355,21 @@ function StoryTab() {
   const timersRef = useRef<Partial<Record<AxisKey, ReturnType<typeof setTimeout>>>>({});
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/story-config")
       .then((r) => (r.ok ? (r.json() as Promise<StoryConfig>) : Promise.reject(new Error(r.statusText))))
       .then((data) => {
+        if (cancelled) return;
         setStory(data);
         if (data.expected_turns) setExpectedTurns(data.expected_turns);
         setLoading(false);
       })
-      .catch(() => { setFailed(true); setLoading(false); });
+      .catch(() => { if (!cancelled) { setFailed(true); setLoading(false); } });
     const timers = timersRef.current;
-    return () => { for (const t of Object.values(timers)) if (t) clearTimeout(t); };
+    return () => {
+      cancelled = true;
+      for (const t of Object.values(timers)) if (t) clearTimeout(t);
+    };
   }, []);
 
   const setStatus = (key: AxisKey, status: { ok: boolean; msg: string } | null) => {
@@ -613,10 +618,12 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [embApiKey, setEmbApiKey] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/ai-config")
       .then((r) => r.json())
-      .then((data: AiConfig) => { setCfg(data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((data: AiConfig) => { if (!cancelled) { setCfg(data); setLoading(false); } })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const patchCfg = (patch: Partial<AiConfig>) => {

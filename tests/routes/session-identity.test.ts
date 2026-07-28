@@ -153,6 +153,66 @@ describe('routes — X-Session-Id header precedence', async () => {
   });
 });
 
+// Path-traversal hardening: sessionId() flows straight into a filesystem path
+// in PERSIST mode — `path.join(SESSION_DB_DIR, sessionId + '.db')` with no
+// other sanitization (see server/lib/session-store.ts dbPathFor()/
+// destroySession()). The X-Session-Id header's [A-Za-z0-9_-]{8,64} charset is
+// the ONLY thing keeping an attacker-controlled header from writing/reading
+// outside SESSION_DB_DIR (no `/`, `\`, or `.` in the allowed set). These cases
+// lock that boundary: every traversal payload must fall through to the safe
+// 'default' session (HTTP 200, never a 500 from a failed file op, never a
+// leaked external file). Tests run in :memory: mode (helpers.ts sets
+// SESSION_DB_DIR=':memory:'), so they cannot prove a file wasn't written on
+// disk — the regex makes that impossible regardless — but they do prove the
+// request is handled safely and resolves to 'default' rather than throwing or
+// resolving to the attacker's path.
+describe('routes — X-Session-Id header rejects path-traversal payloads', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  // Each payload hits /api/init with the traversal attempt as the ONLY session
+  // identifier (no explicit body sessionId, so precedence falls through to the
+  // header). The route echoes the resolved sessionId, so asserting
+  // body.sessionId === 'default' proves the header was rejected AND that no
+  // uncaught exception turned the request into a 500.
+  const traversalPayloads: Array<[string, string]> = [
+    ['unix relative traversal', '../../etc/passwd'],
+    ['windows backslash traversal', '..\\..\\windows\\system32'],
+    ['bare parent dir', '../'],
+    ['absolute unix path', '/etc/passwd'],
+    ['double-dot/slash repeated', '....//....//etc'],
+  ];
+
+  for (const [label, payload] of traversalPayloads) {
+    it(`falls through to "default" for ${label} (X-Session-Id: ${JSON.stringify(payload)})`, async () => {
+      const res = await fetch(`${server.baseUrl}/api/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-Id': payload },
+        body: JSON.stringify({}),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.sessionId, 'default');
+    });
+  }
+
+  // Control: the literal string 'default' is the documented fallback value.
+  // It satisfies [A-Za-z0-9_-]{8,64}? 'default' is 7 chars — under the 8-char
+  // floor — so it too falls through to the 'default' session via precedence 3,
+  // never via the header path. Either way the request resolves safely.
+  it('treats the literal "default" header as the default session (control case)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': 'default' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.sessionId, 'default');
+  });
+});
+
 describe('src/lib/session.ts — mergeSessionHeader (fetch header-merge helper)', () => {
   it('adds X-Session-Id to a plain object headers init, preserving other entries', () => {
     const merged = mergeSessionHeader({ 'Content-Type': 'application/json' }, 'abc123');

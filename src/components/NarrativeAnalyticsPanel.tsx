@@ -5,7 +5,7 @@
 //   • Two-Reader Report (GET /api/nvm/two-reader)— first-watch vs rewatch scoring
 // All three derive from committed story state, so they read "empty" until scenes exist.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 
 type AnalyticsTab = 'tension' | 'topology' | 'two-reader';
 
@@ -82,9 +82,22 @@ export function NarrativeAnalyticsPanel({ onClose }: Props) {
   const [loading, setLoading] = useState<Partial<Record<AnalyticsTab, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<AnalyticsTab, string>>>({});
 
+  // mountedRef guards setState after the panel unmounts (e.g. user closes the
+  // panel mid-fetch), mirroring CharacterArcPanel's cancellation idiom.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // data/loading are read via refs so `load` doesn't depend on (and therefore
+  // re-create on) them — the original effect's `[load]` dep made load change on
+  // every successful fetch, re-firing the default-tab fetch constantly.
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+
   const load = useCallback(async (tab: AnalyticsTab, force = false) => {
     const spec = TABS.find(t => t.id === tab)!;
-    if (!force && (data[tab] || loading[tab])) return;
+    if (!force && (dataRef.current[tab] || loadingRef.current[tab])) return;
     setLoading(l => ({ ...l, [tab]: true }));
     setErrors(e => ({ ...e, [tab]: undefined }));
     try {
@@ -94,13 +107,15 @@ export function NarrativeAnalyticsPanel({ onClose }: Props) {
         throw new Error(body.error ?? 'Server error');
       }
       const json = await res.json();
+      if (!mountedRef.current) return;
       setData(d => ({ ...d, [tab]: json }));
     } catch (e) {
+      if (!mountedRef.current) return;
       setErrors(err => ({ ...err, [tab]: e instanceof Error ? e.message : String(e) }));
     } finally {
-      setLoading(l => ({ ...l, [tab]: false }));
+      if (mountedRef.current) setLoading(l => ({ ...l, [tab]: false }));
     }
-  }, [data, loading]);
+  }, []);
 
   function selectTab(id: AnalyticsTab) { setActiveTab(id); load(id); }
 
@@ -109,8 +124,9 @@ export function NarrativeAnalyticsPanel({ onClose }: Props) {
   const currentError = errors[activeTab];
   const current = data[activeTab];
 
-  // Load the default tab once on first render.
-  React.useEffect(() => { load('tension'); }, [load]);
+  // Load the default tab once on first render. load is stable (its only deps
+  // are refs), so this fires exactly once instead of re-fetching constantly.
+  useEffect(() => { load('tension'); }, [load]);
 
   return (
     <div style={{

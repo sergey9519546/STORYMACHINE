@@ -44,11 +44,13 @@ export function CorpusPanel({ onClose }: CorpusPanelProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     fetch('/api/nvm/corpus')
       .then(r => r.ok ? r.json() : Promise.reject('Server error'))
-      .then(setData)
-      .catch(e => setError(String(e)))
-      .finally(() => setLoading(false));
+      .then(d => { if (!cancelled) setData(d); })
+      .catch(e => { if (!cancelled) setError(String(e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   function pct(v: number) { return `${(v * 100).toFixed(0)}%`; }

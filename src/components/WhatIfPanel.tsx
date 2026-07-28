@@ -446,6 +446,9 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
   const [labFlows, setLabFlows] = useState<Record<string, LabFlowState>>({});
   const scmAbortRef = useRef<AbortController | null>(null);
   const labAbortRef = useRef<AbortController | null>(null);
+  // mountedRef guards setState after unmount for fetchGhosts (loadScm/exploreLab
+  // already use AbortController; only fetchGhosts was missing the guard).
+  const mountedRef = useRef(true);
 
   const fetchGhosts = useCallback(async () => {
     setLoading(true);
@@ -453,7 +456,7 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
       const res = await fetch('/api/nvm/ghost-commits');
       if (res.ok) setGhosts((await res.json() as { ghosts: GhostCommit[] }).ghosts ?? []);
     } catch { setError('Failed to fetch ghost commits'); }
-    finally { setLoading(false); }
+    finally { if (mountedRef.current) setLoading(false); }
   }, []);
 
   useEffect(() => { fetchGhosts(); }, [fetchGhosts]);
@@ -485,7 +488,13 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
     return () => scmAbortRef.current?.abort();
   }, [loadScm]);
 
-  useEffect(() => () => { labAbortRef.current?.abort(); }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      labAbortRef.current?.abort();
+    };
+  }, []);
 
   const interventionGroups = useMemo(() => {
     const buckets: Record<InterventionBucketKey, SCMNodeSummary[]> = { facts: [], relationships: [], clocks: [], other: [] };
