@@ -1,0 +1,286 @@
+{
+  "generatedAt": "2026-07-29T11:12:07.008Z",
+  "seed": 42,
+  "fracs": {
+    "train": 0.6,
+    "val": 0.2,
+    "test": 0.2
+  },
+  "counts": {
+    "total": 52,
+    "valid": 48,
+    "excluded": 4,
+    "train": 28,
+    "val": 9,
+    "test": 11
+  },
+  "testSetHash": "49d971422b1885a7a0f50f7241ee4d16fd32a065e399083dbb6cefb5138b6639",
+  "train": [
+    {
+      "file": "inside-out-2015.fountain",
+      "sceneCount": 387,
+      "wordCount": 19651
+    },
+    {
+      "file": "raya-and-the-last-dragon-2021.fountain",
+      "sceneCount": 98,
+      "wordCount": 18894
+    },
+    {
+      "file": "encanto-2021.fountain",
+      "sceneCount": 72,
+      "wordCount": 21606
+    },
+    {
+      "file": "9-matched.fountain",
+      "sceneCount": 112,
+      "wordCount": 17272
+    },
+    {
+      "file": "brave-2012.fountain",
+      "sceneCount": 11,
+      "wordCount": 4708
+    },
+    {
+      "file": "the-mitchells-vs-the-machines-2021.fountain",
+      "sceneCount": 112,
+      "wordCount": 30397
+    },
+    {
+      "file": "zootopia-2016.fountain",
+      "sceneCount": 105,
+      "wordCount": 19724
+    },
+    {
+      "file": "the-red-turtle-2016.fountain",
+      "sceneCount": 11,
+      "wordCount": 11190
+    },
+    {
+      "file": "the-good-dinosaur-2015.fountain",
+      "sceneCount": 71,
+      "wordCount": 14871
+    },
+    {
+      "file": "inside-out-screenplay.fountain",
+      "sceneCount": 387,
+      "wordCount": 19651
+    },
+    {
+      "file": "the-mitchells-vs-the-machines-read-the-screenplay.fountain",
+      "sceneCount": 112,
+      "wordCount": 30397
+    },
+    {
+      "file": "the-wild-robot-2024.fountain",
+      "sceneCount": 145,
+      "wordCount": 17030
+    },
+    {
+      "file": "antz-matched.fountain",
+      "sceneCount": 96,
+      "wordCount": 17661
+    },
+    {
+      "file": "spider-man-across-the-spider-verse-2023.fountain",
+      "sceneCount": 129,
+      "wordCount": 26196
+    },
+    {
+      "file": "coco-script.fountain",
+      "sceneCount": 120,
+      "wordCount": 22341
+    },
+    {
+      "file": "the-secret-life-of-pets-2016.fountain",
+      "sceneCount": 107,
+      "wordCount": 16840
+    },
+    {
+      "file": "corpse-bride-2005.fountain",
+      "sceneCount": 66,
+      "wordCount": 14155
+    },
+    {
+      "file": "a-scanner-darkly-matched.fountain",
+      "sceneCount": 152,
+      "wordCount": 27169
+    },
+    {
+      "file": "mulan-1998.fountain",
+      "sceneCount": 86,
+      "wordCount": 18204
+    },
+    {
+      "file": "toy-story-4-2019.fountain",
+      "sceneCount": 138,
+      "wordCount": 20679
+    },
+    {
+      "file": "the-boss-baby-family-business-2021.fountain",
+      "sceneCount": 52,
+      "wordCount": 26403
+    },
+    {
+      "file": "anastasia-matched.fountain",
+      "sceneCount": 134,
+      "wordCount": 21169
+    },
+    {
+      "file": "the-adventures-of-tintin-2011.fountain",
+      "sceneCount": 141,
+      "wordCount": 21150
+    },
+    {
+      "file": "spiyder-race-2011-html.fountain",
+      "sceneCount": 120,
+      "wordCount": 26590
+    },
+    {
+      "file": "sing-2016.fountain",
+      "sceneCount": 202,
+      "wordCount": 23572
+    },
+    {
+      "file": "darkymind-html.fountain",
+      "sceneCount": 121,
+      "wordCount": 23523
+    },
+    {
+      "file": "2020-07-17-soul-final-script.fountain",
+      "sceneCount": 94,
+      "wordCount": 22579
+    },
+    {
+      "file": "luca-2021.fountain",
+      "sceneCount": 116,
+      "wordCount": 20274
+    }
+  ],
+  "val": [
+    {
+      "file": "coraline-matched.fountain",
+      "sceneCount": 143,
+      "wordCount": 24053
+    },
+    {
+      "file": "0meet-the-robinsons-full-screenplay.fountain",
+      "sceneCount": 57,
+      "wordCount": 19976
+    },
+    {
+      "file": "the-incredibles-2004.fountain",
+      "sceneCount": 77,
+      "wordCount": 27146
+    },
+    {
+      "file": "up-2009.fountain",
+      "sceneCount": 187,
+      "wordCount": 16612
+    },
+    {
+      "file": "elemental-2023.fountain",
+      "sceneCount": 136,
+      "wordCount": 23802
+    },
+    {
+      "file": "beavis-and-butt-head-do-america-matched.fountain",
+      "sceneCount": 187,
+      "wordCount": 17575
+    },
+    {
+      "file": "coco-2017.fountain",
+      "sceneCount": 120,
+      "wordCount": 22341
+    },
+    {
+      "file": "ratatouille-2007.fountain",
+      "sceneCount": 127,
+      "wordCount": 24276
+    },
+    {
+      "file": "spider-man-into-the-spider-verse-2018.fountain",
+      "sceneCount": 188,
+      "wordCount": 23978
+    }
+  ],
+  "test": [
+    {
+      "file": "cars-2-matched.fountain",
+      "sceneCount": 118,
+      "wordCount": 24332
+    },
+    {
+      "file": "how-to-train-your-dragon-the-hidden-world-2019.fountain",
+      "sceneCount": 94,
+      "wordCount": 23033
+    },
+    {
+      "file": "teenage-mutant-ninja-turtles-mutant-mayhem-2023.fountain",
+      "sceneCount": 83,
+      "wordCount": 19059
+    },
+    {
+      "file": "over-the-moon-2020.fountain",
+      "sceneCount": 130,
+      "wordCount": 19883
+    },
+    {
+      "file": "coco-matched.fountain",
+      "sceneCount": 115,
+      "wordCount": 22478
+    },
+    {
+      "file": "kubo-and-the-two-strings-2016.fountain",
+      "sceneCount": 55,
+      "wordCount": 21926
+    },
+    {
+      "file": "boxtrolls-the-matched.fountain",
+      "sceneCount": 87,
+      "wordCount": 26088
+    },
+    {
+      "file": "soul-2020.fountain",
+      "sceneCount": 94,
+      "wordCount": 22579
+    },
+    {
+      "file": "the-iron-giant-1999.fountain",
+      "sceneCount": 139,
+      "wordCount": 18630
+    },
+    {
+      "file": "isle-of-dogs-2018.fountain",
+      "sceneCount": 59,
+      "wordCount": 29293
+    },
+    {
+      "file": "sausage-party-2016.fountain",
+      "sceneCount": 55,
+      "wordCount": 22805
+    }
+  ],
+  "excluded": [
+    {
+      "file": "aladdin-matched.fountain",
+      "reason": "sceneCount=1 (<5)",
+      "sceneCount": 1
+    },
+    {
+      "file": "big-hero-6-2014.fountain",
+      "reason": "sceneCount=3 (<5)",
+      "sceneCount": 3
+    },
+    {
+      "file": "dreamworks-animation-touring-education-resource.fountain",
+      "reason": "sceneCount=1 (<5)",
+      "sceneCount": 1
+    },
+    {
+      "file": "moana.fountain",
+      "reason": "sceneCount=2 (<5)",
+      "sceneCount": 2
+    }
+  ]
+}
