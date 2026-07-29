@@ -502,7 +502,7 @@ describe('buildStrengths — earned, never-padded bullets', () => {
  *  detect WHICH guard fired without depending on exact scene numbers/wording,
  *  so corpus-level assertions below stay robust to phrasing tweaks. */
 const WAVE_1183_MARKERS = [
-  "isn't set once and forgotten",       // buildStakesContinuityStrength
+  'Deadline pressure (clock-raising language) appears in both halves', // buildStakesContinuityStrength (Category A reword 2026-07-28)
   'living thread, not a flat one',      // buildRelationshipDynamismStrength
   'earns its ending rather than coasting', // buildEmotionalRangeStrength
 ] as const;
@@ -565,7 +565,7 @@ describe('buildStrengths — Wave 1183 excellence detectors (hand-built fixtures
     const strengths = buildStrengths(baseStrengthsInputFor(records));
 
     assert.ok(
-      strengths.some(s => s.includes("isn't set once and forgotten") && s.includes('Scene 1') && s.includes('Scene 6')),
+      strengths.some(s => s.includes('Deadline pressure (clock-raising language) appears in both halves') && s.includes('Scene 1') && s.includes('Scene 6')),
       `expected the stakes-continuity strength naming Scene 1 and Scene 6, got: ${JSON.stringify(strengths)}`,
     );
   });
@@ -578,7 +578,7 @@ describe('buildStrengths — Wave 1183 excellence detectors (hand-built fixtures
     const strengths = buildStrengths(baseStrengthsInputFor(records));
 
     assert.ok(
-      !strengths.some(s => s.includes("isn't set once and forgotten")),
+      !strengths.some(s => s.includes('Deadline pressure (clock-raising language) appears in both halves')),
       `stakes-continuity must not fire on a single first-half-only clock mention, got: ${JSON.stringify(strengths)}`,
     );
   });
@@ -745,7 +745,7 @@ describe('buildStrengths — Run 20 excellence detectors (hand-built fixtures)',
       11: { suspenseDelta: 2, dramaticTurn: 'the answer lands' },
     });
     const strengths = buildStrengths(baseStrengthsInputFor(records));
-    assert.ok(strengths.some(s => s.includes('climax is where it belongs')),
+    assert.ok(strengths.some(s => s.includes('single most intense scene lands in the final stretch')),
       `expected climax-placement strength; got: ${strengths.join(' | ')}`);
   });
 
@@ -756,7 +756,7 @@ describe('buildStrengths — Run 20 excellence detectors (hand-built fixtures)',
       10: { suspenseDelta: 1 },
     });
     const strengths = buildStrengths(baseStrengthsInputFor(records));
-    assert.ok(!strengths.some(s => s.includes('climax is where it belongs')),
+    assert.ok(!strengths.some(s => s.includes('single most intense scene lands in the final stretch')),
       'a front-loaded draft must not earn the climax-placement claim');
   });
 
