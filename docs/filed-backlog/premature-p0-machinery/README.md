@@ -38,6 +38,25 @@ The decision owner should:
    "objective/accurate," offered free analysis as compensation, or invited
    draft-sharing, all of which violate the kit.
 
+## Re-verification (2026-07-28, commit `0d27c47`)
+
+A grep of all five files in this directory found **no** kit-violating
+language — none pitch the tool as "objective/accurate/trusted/proven," none
+offer compensation, none invite draft-sharing, and none name a rule count.
+`OUTREACH_DRAFTS.md` in fact explicitly cites the operating kit as
+authoritative and references `npm run honesty-audit`. So the content here
+appears to have been reconciled to the kit *after* the warning above was
+written. Treat the kit as **ready to lift** once the fielding decision is
+made — still re-read each template against the kit before sending (cheap
+insurance), but no rewrites should be needed.
+
+A new `docs/user-validation/RUN_DEMO.md` now exists (the file `OUTREACH_DRAFTS.md`
+referenced but that was missing), and a reusable live-flow smoke check lives
+at `scripts/smoke-p0-live-flow.mjs` (`node scripts/smoke-p0-live-flow.mjs`) —
+it boots the server keyless and certifies the StartScreen → report flow with
+zero genuine console errors, which is the operating kit's pre-session "confirm
+the sample loads correctly" check for LIVE-FLOW sessions.
+
 ## Files
 
 - `OUTREACH_DRAFTS.md` — ready-to-send outreach copy (Reddit, DM, email)
