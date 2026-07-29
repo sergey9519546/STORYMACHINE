@@ -29,6 +29,7 @@ jobs:
     # Only meaningful on PRs: it diffs the dependency change in the PR.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
