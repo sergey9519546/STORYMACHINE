@@ -22,7 +22,7 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 
 const files = fs
   .readdirSync(SRC_DIR)
-  .filter((f) => f.endsWith('.fountain'))
+  .filter((f) => f.endsWith('.fountain') || f.endsWith('.fountain.txt'))
   .sort();
 
 const rows = [];

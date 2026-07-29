@@ -44,7 +44,7 @@ function mulberry32(seed) {
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 
 const allFiles = fs.readdirSync(SRC_DIR)
-  .filter(f => f.endsWith('.fountain'))
+  .filter(f => f.endsWith('.fountain') || f.endsWith('.fountain.txt'))
   .sort();
 
 const valid = [];

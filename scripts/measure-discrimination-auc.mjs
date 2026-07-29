@@ -148,7 +148,7 @@ const DEGRADATIONS = [
 fs.mkdirSync(OUT_DIR, { recursive: true });
 const ctx = { theme: '', genre: '', directorStyle: '', characters: [] };
 
-const files = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.fountain')).sort();
+const files = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.fountain') || f.endsWith('.fountain.txt')).sort();
 
 // Collect pairs per degradation: { real: health, degraded: health, file }
 const pairsByDeg = {};

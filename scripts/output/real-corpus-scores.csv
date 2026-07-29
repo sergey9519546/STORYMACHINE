@@ -2,6 +2,32 @@ file,sceneCount,wordCount,health,grade,verdict,totalIssues,critical,major,minor
 0meet-the-robinsons-full-screenplay.fountain,57,19976,97.5,excellent,RECOMMEND,430,0,0,0
 2020-07-17-soul-final-script.fountain,94,22579,97.7,excellent,RECOMMEND,531,0,0,0
 9-matched.fountain,112,17272,91.7,excellent,RECOMMEND,754,0,0,0
+9_2009.fountain.txt,80,17241,98.2,excellent,RECOMMEND,647,0,0,0
+Anastasia.fountain.txt,130,21175,95.3,excellent,RECOMMEND,705,0,0,0
+Antz.fountain.txt,85,17629,92.2,excellent,RECOMMEND,726,0,0,0
+Bee_Movie.fountain.txt,135,19958,89.2,strong,RECOMMEND,808,0,0,0
+Coraline.fountain.txt,138,24180,97.4,excellent,RECOMMEND,727,0,0,0
+Croods_The.fountain.txt,30,16614,95.3,excellent,RECOMMEND,481,0,0,0
+Despicable_Me.fountain.txt,12,17821,88.3,strong,RECOMMEND,212,0,0,0
+Dr_Seuss_The_Lorax.fountain.txt,112,21815,98.7,excellent,RECOMMEND,551,0,0,0
+Frankenweenie.fountain.txt,140,14302,89,strong,RECOMMEND,712,0,0,0
+Frozen.fountain.txt,124,19926,88.9,strong,RECOMMEND,940,0,0,0
+Heavy Metal.fountain.txt,253,20364,89.4,strong,RECOMMEND,1226,0,0,0
+Jaws.fountain.txt,159,28177,87.4,strong,RECOMMEND,934,0,0,0
+Kung Fu Panda.fountain.txt,72,14918,97.4,excellent,RECOMMEND,530,0,0,0
+Looney_Tunes_Back_In_Action.fountain.txt,175,28115,93.2,excellent,RECOMMEND,887,0,0,0
+Monsters_University.fountain.txt,139,24728,91.4,excellent,RECOMMEND,790,0,0,0
+ParaNorman.fountain.txt,119,22884,98.7,excellent,RECOMMEND,698,0,0,0
+Pulp_Fiction.fountain.txt,117,27727,96.8,excellent,RECOMMEND,738,0,0,0
+Shrek.fountain.txt,13,13051,89.2,strong,RECOMMEND,247,0,0,0
+Shrek_The_Third.fountain.txt,95,21763,98.5,excellent,RECOMMEND,582,0,0,0
+South_Park_The_Movie.fountain.txt,125,25537,96.6,excellent,RECOMMEND,899,0,0,0
+Toy_Story_3.fountain.txt,163,24126,98.5,excellent,RECOMMEND,694,0,0,0
+Transformers_The_Movie_1986.fountain.txt,177,20381,89.2,strong,RECOMMEND,1245,0,0,0
+Up.fountain.txt,184,16907,86.6,strong,RECOMMEND,741,0,0,0
+WALL-E.fountain.txt,292,17202,89.5,strong,RECOMMEND,1159,0,0,0
+Who Framed Roger Rabbit.fountain.txt,111,26178,98.6,excellent,RECOMMEND,773,0,0,0
+Wreck-It_Ralph.fountain.txt,79,20875,98.1,excellent,RECOMMEND,627,0,0,0
 a-scanner-darkly-matched.fountain,152,27169,84.6,strong,CONSIDER,1253,0,0,0
 aladdin-matched.fountain,1,17185,0,troubled,PASS,76,0,0,0
 anastasia-matched.fountain,134,21169,87.6,strong,RECOMMEND,1016,0,0,0
@@ -16,7 +42,9 @@ coco-matched.fountain,115,22478,95.1,excellent,RECOMMEND,829,0,0,0
 coco-script.fountain,120,22341,91.8,excellent,RECOMMEND,860,0,0,0
 coraline-matched.fountain,143,24053,88.1,strong,RECOMMEND,1111,0,0,0
 corpse-bride-2005.fountain,66,14155,96,excellent,RECOMMEND,601,0,0,0
+counter-offer.fountain,10,1522,76,strong,CONSIDER,225,0,0,0
 darkymind-html.fountain,121,23523,96.9,excellent,RECOMMEND,680,0,0,0
+dead-frequency.fountain,12,1831,78.4,strong,CONSIDER,174,0,0,0
 dreamworks-animation-touring-education-resource.fountain,1,15918,0,troubled,PASS,64,0,0,0
 elemental-2023.fountain,136,23802,98.7,excellent,RECOMMEND,707,0,0,0
 encanto-2021.fountain,72,21606,88.4,strong,RECOMMEND,990,0,0,0
@@ -28,12 +56,17 @@ kubo-and-the-two-strings-2016.fountain,55,21926,97.5,excellent,RECOMMEND,439,0,0
 luca-2021.fountain,116,20274,92.6,excellent,RECOMMEND,736,0,0,0
 moana.fountain,2,6430,30,troubled,PASS,87,0,0,0
 mulan-1998.fountain,86,18204,88.4,strong,RECOMMEND,969,0,0,0
+off-season.fountain,9,756,71.6,solid,CONSIDER,170,0,0,0
 over-the-moon-2020.fountain,130,19883,88.9,strong,RECOMMEND,1050,0,0,0
 ratatouille-2007.fountain,127,24276,98.9,excellent,RECOMMEND,660,0,0,0
 raya-and-the-last-dragon-2021.fountain,98,18894,94.7,excellent,RECOMMEND,716,0,0,0
+room-12.fountain,10,434,27.3,troubled,PASS,213,0,0,0
+runoff.fountain,9,1449,74.4,solid,CONSIDER,169,0,0,0
 sausage-party-2016.fountain,55,22805,97.4,excellent,RECOMMEND,608,0,0,0
+shrek_script.fountain.txt,13,13051,89.2,strong,RECOMMEND,247,0,0,0
 sing-2016.fountain,202,23572,89.5,strong,RECOMMEND,926,0,0,0
 soul-2020.fountain,94,22579,97.7,excellent,RECOMMEND,531,0,0,0
+soul_script.fountain.txt,94,22579,97.7,excellent,RECOMMEND,531,0,0,0
 spider-man-across-the-spider-verse-2023.fountain,129,26196,98.9,excellent,RECOMMEND,724,0,0,0
 spider-man-into-the-spider-verse-2018.fountain,188,23978,94.4,excellent,RECOMMEND,812,0,0,0
 spiyder-race-2011-html.fountain,120,26590,98.4,excellent,RECOMMEND,814,0,0,0
@@ -43,11 +76,13 @@ the-boss-baby-family-business-2021.fountain,52,26403,91.4,excellent,RECOMMEND,82
 the-good-dinosaur-2015.fountain,71,14871,98,excellent,RECOMMEND,475,0,0,0
 the-incredibles-2004.fountain,77,27146,92,excellent,RECOMMEND,950,0,0,0
 the-iron-giant-1999.fountain,139,18630,94.3,excellent,RECOMMEND,638,0,0,0
+the-lion-king-1994.fountain.txt,46,19080,87.7,strong,RECOMMEND,956,0,0,0
 the-mitchells-vs-the-machines-2021.fountain,112,30397,98.7,excellent,RECOMMEND,730,0,0,0
 the-mitchells-vs-the-machines-read-the-screenplay.fountain,112,30397,98.7,excellent,RECOMMEND,730,0,0,0
 the-red-turtle-2016.fountain,11,11190,87.3,strong,RECOMMEND,160,0,0,0
 the-secret-life-of-pets-2016.fountain,107,16840,96.9,excellent,RECOMMEND,606,0,0,0
 the-wild-robot-2024.fountain,145,17030,89.1,strong,RECOMMEND,776,0,0,0
 toy-story-4-2019.fountain,138,20679,89.2,strong,RECOMMEND,908,0,0,0
+transfer-window.fountain,10,459,38.4,uneven,PASS,204,0,0,0
 up-2009.fountain,187,16612,86.1,strong,RECOMMEND,794,0,0,0
 zootopia-2016.fountain,105,19724,98.5,excellent,RECOMMEND,597,0,0,0
