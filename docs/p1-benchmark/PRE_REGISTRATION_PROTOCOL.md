@@ -23,7 +23,7 @@ This protocol documents the complete benchmark methodology BEFORE any corpus wor
 ### Success Criteria (P1 Gate)
 
 **Primary metric:** AUC (Area Under ROC Curve) on held-out test set
-- **Minimum threshold:** AUC >= 0.70
+- **Minimum threshold:** AUC >= 0.80
 - **Confidence:** Bootstrap 95% CI lower bound > 0.65
 - **Baseline comparison:** Significantly better than random (AUC = 0.50)
 
@@ -34,13 +34,13 @@ This protocol documents the complete benchmark methodology BEFORE any corpus wor
 
 ### Hypotheses
 
-**H1 (Primary):** The doctor score can discriminate between strong (A-tier) and weak (C/D-tier) screenplays with AUC >= 0.70
+**H1 (Primary):** The doctor score can discriminate between strong (A-tier) and weak (C/D-tier) screenplays with AUC >= 0.80
 
 **H2 (Scene-count):** Scene-count scarcity channel contributes most discrimination (as suggested by current AUC ~0.938 internal measurement)
 
 **H3 (Anti-slop):** Newly integrated anti-slop patterns add measurable discrimination over baseline
 
-**H4 (Rules channel):** Current weighted-rule channel (8,917 rules) contributes <0.10 AUC (as measured internally at ~0.076)
+**H4 (Rules channel):** Current weighted-rule channel (3,216 rules) contributes <0.10 AUC (as measured internally at ~0.076)
 
 ---
 
@@ -200,7 +200,7 @@ Exclude scripts with ANY of:
 
 **Features/Channels:**
 1. **Scene-count scarcity:** Scene count percentile (AUC ~0.938 internally)
-2. **Weighted rules:** 8,917 rules across 14 passes (AUC ~0.076 internally)
+2. **Weighted rules:** 3,216 rules across 14 passes (AUC ~0.076 internally)
 3. **Anti-slop detection:** 220 patterns across 18 categories (UNVALIDATED)
 4. **Calibration corpus:** 20-sample reference corpus for percentile ranking
 
@@ -367,7 +367,7 @@ Exclude scripts with ANY of:
 ## Section 11: Success Criteria Recap
 
 **P1 Gate PASSES if ALL of:**
-- ✅ AUC >= 0.70 on held-out test set
+- ✅ AUC >= 0.80 on held-out test set
 - ✅ Bootstrap 95% CI lower bound > 0.65
 - ✅ Brier score < 0.20
 - ✅ Test AUC within 0.10 of validation AUC (no severe overfitting)

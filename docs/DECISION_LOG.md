@@ -46,7 +46,7 @@ through ROADMAP.md's numbering, not MASTER_ROADMAP's.
 - V5 systems remain in **shadow mode** (OFF by default) until P0 GREEN
 - Story Graph Phase 3-4 blocked on P0 GREEN + P1 validation
 - Infinity Gate Layer 4-7 moved to filed backlog
-- Wave program stays RETIRED, rule count frozen at 8,917
+- Wave program stays RETIRED, rule count frozen at 3,216
 
 **Expected Outcomes**:
 - **GREEN (4+ strong pull)**: Proceed to activate V5 + build P1 benchmark corpus

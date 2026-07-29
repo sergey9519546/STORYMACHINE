@@ -25,7 +25,7 @@ STORYMACHINE's P1 phase requires proving that the doctor score can discriminate 
 - Blind labels from >=3 experienced readers
 - Pre-registered methodology (no p-hacking)
 - Held-out test set (never touched until final evaluation)
-- AUC >= 0.70 on test set (with 95% CI > 0.65)
+- AUC >= 0.80 on test set (with 95% bootstrap CI lower bound > 0.65)
 - Reproducible by third parties
 
 **Constraints:**
@@ -47,7 +47,7 @@ We will implement a **stratified 60/20/20 split** with **strict held-out test se
 4. **Test protection:** SHA-256 hash published, access-controlled storage, one-time evaluation
 5. **Pre-registration:** Complete protocol documented before any corpus work
 6. **Minimum corpus:** 100-200 screenplays (target 150+)
-7. **Success threshold:** AUC >= 0.70 (bootstrap 95% CI lower bound > 0.65)
+7. **Success threshold:** AUC >= 0.80 (bootstrap 95% CI lower bound > 0.65); shuffle-drop >= 0.80; act-swap >= 0.70
 
 ---
 
@@ -197,9 +197,9 @@ This is a standard ML split that balances data efficiency with held-out discipli
 **Scientific standard:** Medical trials, psychology research require it
 **Aligns with STORYMACHINE values:** Honest about what we don't know
 
-### Why AUC >= 0.70?
+### Why AUC >= 0.80?
 
-**0.70 = acceptable discrimination** in ML/medical diagnostics
+**0.80 = good discrimination — the higher bar is intentional because P1 is 'the One Bet'** in ML/medical diagnostics
 - 0.50: Random (coin flip)
 - 0.60: Poor
 - 0.70: Acceptable
@@ -217,7 +217,7 @@ This is a standard ML split that balances data efficiency with held-out discipli
 
 1. **Trust story:** Pre-registration + held-out test builds credibility
 2. **Reproducible:** Anyone can download corpus (if legal) and verify results
-3. **Clear success criterion:** AUC >= 0.70 is unambiguous
+3. **Clear success criterion:** AUC >= 0.80 is unambiguous
 4. **Prevents overfitting:** Held-out test never touched until final eval
 5. **Standard methodology:** Uses established ML/research practices
 6. **Scalable:** Can expand corpus later using same methodology
@@ -233,7 +233,7 @@ This is a standard ML split that balances data efficiency with held-out discipli
 3. **Labeling cost:** 3 raters × 150 scripts = 450 screenplay reads
    - **Mitigation:** Can parallelize, takes 2-4 weeks total
    
-4. **Risk of failure:** If AUC < 0.70, P1 fails and roadmap stalls
+4. **Risk of failure:** If AUC < 0.80, P1 fails and roadmap stalls
    - **Mitigation:** This is the whole point - validate or pivot
    
 5. **One-shot evaluation:** Can't iterate on test set
@@ -287,14 +287,14 @@ This is a standard ML split that balances data efficiency with held-out discipli
 ## Validation Criteria
 
 ### P1 Gate PASSES if ALL of:
-- ✅ AUC >= 0.70 on held-out test set
+- ✅ AUC >= 0.80 on held-out test set
 - ✅ Bootstrap 95% CI lower bound > 0.65
 - ✅ Brier score < 0.20 (calibration)
 - ✅ Test AUC within 0.10 of validation AUC (no severe overfitting)
 - ✅ Pre-registration protocol followed (or deviations documented)
 
 ### P1 Gate FAILS if ANY of:
-- ❌ AUC < 0.70
+- ❌ AUC < 0.80
 - ❌ CI lower bound <= 0.65 (too uncertain)
 - ❌ Brier score >= 0.25 (poor calibration)
 - ❌ Major overfitting (test << validation by >0.10)
@@ -305,7 +305,7 @@ This is a standard ML split that balances data efficiency with held-out discipli
 
 ## Success Probability Estimate
 
-**Conservative:** 40-60% chance of passing P1 gate
+**Conservative:** 25-45% chance (0.80 is materially harder than 0.70) of passing P1 gate
 
 **Reasoning:**
 - Scene-count channel shows AUC ~0.938 on calibration corpus

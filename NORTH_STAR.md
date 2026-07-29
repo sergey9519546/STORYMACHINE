@@ -27,10 +27,14 @@ R2-C01) showed the "8,917" figure and the "~5,701 from a bulk Wave 1191"
 story to be inaccurate: the live generated rulebook is **3,216 distinct
 pass-scoped rule constants** (machine-counted from the live pass files by
 `scripts/generate-rulebook.ts`, enforced by `tests/core/rulebook.test.ts`).
-The rule channel barely moves the score regardless: by the doctor's own
-measurements (`server/nvm/analyze/doctor.ts:1656-1669`) the entire
-weighted-rule channel has AUC ~0.076 while the scene-count scarcity term
-has AUC ~0.938 — **the rules barely move the score.** Lead with what is
+The rule channel is **inverted** in degradation experiments, not merely weak: by
+the doctor's own measurements (`server/nvm/analyze/doctor.ts:1656-1669`) the
+entire weighted-rule channel has AUC ~0.076 (where 0.50 is random and 1.0 is
+perfect — the rules fire MORE on degraded scripts, not less) while the
+scene-count scarcity term has AUC ~0.938 (measured on artificial scene-drop
+degradation, NOT on natural strong-vs-weak human writing — scene count is a
+suspected confound/proxy until tested on real-labeled data). **The rules do not
+separate good from bad writing.** Lead with what is
 true and verifiable (reproducibility, determinism, inspectability), never
 with the rule count. The rule count is neither the wedge nor load-bearing.
 
@@ -153,7 +157,7 @@ historical quality reference; its wave cadence is retired.
   mechanical field × mode × position permutation of 7 template functions
   (`passes/lib/checks.ts`), and by the doctor's own measurement the whole
   weighted-rule channel contributes AUC ~0.076 to discrimination while the
-  scene-count scarcity term carries AUC ~0.938. Add no entries to the
+  scene-count scarcity term carries AUC ~0.938 (on artificial scene-drop, not natural strong-vs-weak human writing — suspected confound/proxy). Add no entries to the
   current 3,216-entry catalog; maintain the distinct rule concepts unless
   a separately approved migration removes generated permutations. The claim
   is now a score that demonstrably separates strong from weak real writing,

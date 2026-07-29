@@ -33,7 +33,7 @@ V5 is the two-way Story Graph engine — the first tool that reads your structur
 
 ### Assumption 1: "More rules = better discrimination"
 
-**Why it's a cage:** 8,917 rules achieved AUC 0.076. The audit proved rule density is not the lever. Adding rules past saturation adds maintenance cost without discriminating power.
+**Why it's a cage:** 3,216 rules are inverted in degradation experiments (AUC 0.076 — worse than random's 0.50; the rules fire more on degraded scripts, not less). Rule density is not the lever. Adding rules past saturation adds maintenance cost without discriminating power.
 
 **Rebuild:** **Minimum discriminating set.** If 3 graph properties (promise-payment ratio, escalation monotonicity, causal density) achieve AUC >0.80 on held-out real writing, ship those 3. Stop when discrimination saturates. The new gate is not rule count — it is the smallest set that passes the benchmark.
 
