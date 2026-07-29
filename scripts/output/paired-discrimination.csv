@@ -2,25 +2,25 @@ file,degradation,channel,baseHealth,degradedHealth,delta,baseScenes,degradedScen
 ratatouille-2007.fountain,SCENE_SHUFFLE,global arc / position,98.9,98.9,+0.0,127,127,24276,660,RECOMMEND
 ratatouille-2007.fountain,MIDPOINT_DROP,3-act structure,98.9,98.9,+0.0,127,127,24276,660,RECOMMEND
 ratatouille-2007.fountain,CLIMAX_RELOCATE,climax ordering,98.9,98.9,+0.0,127,127,24276,660,RECOMMEND
-ratatouille-2007.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,98.9,98.9,+0.0,127,127,24276,660,RECOMMEND
+ratatouille-2007.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,98.9,88.9,-10.0,127,127,9449,491,RECOMMEND
 ratatouille-2007.fountain,SCENE_MERGE,scene boundaries,98.9,98.9,+0.0,127,127,24276,660,RECOMMEND
 soul-2020.fountain,SCENE_SHUFFLE,global arc / position,97.7,92.7,-5.0,94,94,22579,555,RECOMMEND
 soul-2020.fountain,MIDPOINT_DROP,3-act structure,97.7,98.1,+0.4,94,75,18114,487,RECOMMEND
 soul-2020.fountain,CLIMAX_RELOCATE,climax ordering,97.7,98.5,+0.8,94,94,22579,527,RECOMMEND
-soul-2020.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,97.7,97.7,+0.0,94,94,22579,531,RECOMMEND
+soul-2020.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,97.7,88.5,-9.2,94,94,7225,588,RECOMMEND
 soul-2020.fountain,SCENE_MERGE,scene boundaries,97.7,72,-25.7,94,5,22175,192,CONSIDER
 spider-man-into-the-spider-verse-2018.fountain,SCENE_SHUFFLE,global arc / position,94.4,91.3,-3.1,188,188,23978,805,RECOMMEND
 spider-man-into-the-spider-verse-2018.fountain,MIDPOINT_DROP,3-act structure,94.4,90.9,-3.5,188,142,17843,691,RECOMMEND
 spider-man-into-the-spider-verse-2018.fountain,CLIMAX_RELOCATE,climax ordering,94.4,94.3,-0.1,188,188,23978,811,RECOMMEND
-spider-man-into-the-spider-verse-2018.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,94.4,94.4,+0.0,188,188,23978,812,RECOMMEND
+spider-man-into-the-spider-verse-2018.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,94.4,88.5,-5.9,188,188,8481,788,RECOMMEND
 spider-man-into-the-spider-verse-2018.fountain,SCENE_MERGE,scene boundaries,94.4,98.2,+3.8,188,76,23431,590,RECOMMEND
 inside-out-2015.fountain,SCENE_SHUFFLE,global arc / position,87.6,87.7,+0.1,387,387,19651,1145,RECOMMEND
 inside-out-2015.fountain,MIDPOINT_DROP,3-act structure,87.6,88.1,+0.5,387,308,14863,948,RECOMMEND
 inside-out-2015.fountain,CLIMAX_RELOCATE,climax ordering,87.6,88.8,+1.2,387,387,19651,1171,RECOMMEND
-inside-out-2015.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,87.6,87.6,+0.0,387,387,19651,1167,RECOMMEND
+inside-out-2015.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,87.6,40.4,-47.2,387,387,7956,1069,PASS
 inside-out-2015.fountain,SCENE_MERGE,scene boundaries,87.6,80,-7.6,387,7,18285,335,CONSIDER
 up-2009.fountain,SCENE_SHUFFLE,global arc / position,86.1,89,+2.9,187,187,16612,724,RECOMMEND
 up-2009.fountain,MIDPOINT_DROP,3-act structure,86.1,86.2,+0.1,187,146,11490,704,RECOMMEND
 up-2009.fountain,CLIMAX_RELOCATE,climax ordering,86.1,87.1,+1.0,187,187,16612,793,RECOMMEND
-up-2009.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,86.1,86.1,+0.0,187,187,16612,794,RECOMMEND
+up-2009.fountain,DIALOGUE_FLATTEN,character/voice/dialogue,86.1,81.8,-4.3,187,187,6933,705,CONSIDER
 up-2009.fountain,SCENE_MERGE,scene boundaries,86.1,89.2,+3.1,187,13,15792,218,RECOMMEND
