@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T11:41:14.180Z",
+  "generatedAt": "2026-07-29T12:16:14.874Z",
   "seed": 42,
   "fracs": {
     "train": 0.6,
@@ -7,276 +7,44 @@
     "test": 0.2
   },
   "counts": {
-    "total": 87,
-    "valid": 83,
+    "total": 765,
+    "valid": 761,
     "excluded": 4,
-    "train": 49,
-    "val": 16,
-    "test": 18
+    "train": 456,
+    "val": 152,
+    "test": 153
   },
-  "testSetHash": "d4e97d984d2a8927e9882d21456d809a880b2269f142ca4078b14fae70725b49",
+  "testSetHash": "e19e6cc2ab492b55107ae0721ae985c9779a4723f0288555ac2d86970744edeb",
   "train": [
     {
-      "file": "the-incredibles-2004.fountain",
-      "sceneCount": 77,
-      "wordCount": 27146
+      "file": "crawl/action/the-avengers.fountain",
+      "sceneCount": 33,
+      "wordCount": 24170
     },
     {
-      "file": "Bee_Movie.fountain.txt",
-      "sceneCount": 135,
-      "wordCount": 19958
+      "file": "crawl/sci-fi/the-replacements-pdf.fountain",
+      "sceneCount": 147,
+      "wordCount": 24834
     },
     {
-      "file": "coraline-matched.fountain",
-      "sceneCount": 143,
-      "wordCount": 24053
+      "file": "crawl/sci-fi/land-of-mine-pdf.fountain",
+      "sceneCount": 104,
+      "wordCount": 20392
     },
     {
-      "file": "Anastasia.fountain.txt",
-      "sceneCount": 130,
-      "wordCount": 21175
+      "file": "crawl/comedy/the-shawshank-redemption.fountain",
+      "sceneCount": 45,
+      "wordCount": 29135
     },
     {
-      "file": "inside-out-screenplay.fountain",
-      "sceneCount": 387,
-      "wordCount": 19651
+      "file": "crawl/horror/simone.fountain",
+      "sceneCount": 169,
+      "wordCount": 26295
     },
     {
-      "file": "darkymind-html.fountain",
-      "sceneCount": 121,
-      "wordCount": 23523
-    },
-    {
-      "file": "the-adventures-of-tintin-2011.fountain",
-      "sceneCount": 141,
-      "wordCount": 21150
-    },
-    {
-      "file": "over-the-moon-2020.fountain",
-      "sceneCount": 130,
-      "wordCount": 19883
-    },
-    {
-      "file": "Monsters_University.fountain.txt",
-      "sceneCount": 139,
-      "wordCount": 24728
-    },
-    {
-      "file": "zootopia-2016.fountain",
-      "sceneCount": 105,
-      "wordCount": 19724
-    },
-    {
-      "file": "Antz.fountain.txt",
-      "sceneCount": 85,
-      "wordCount": 17629
-    },
-    {
-      "file": "South_Park_The_Movie.fountain.txt",
-      "sceneCount": 125,
-      "wordCount": 25537
-    },
-    {
-      "file": "Pulp_Fiction.fountain.txt",
-      "sceneCount": 117,
-      "wordCount": 27727
-    },
-    {
-      "file": "kubo-and-the-two-strings-2016.fountain",
-      "sceneCount": 55,
-      "wordCount": 21926
-    },
-    {
-      "file": "Jaws.fountain.txt",
-      "sceneCount": 159,
-      "wordCount": 28177
-    },
-    {
-      "file": "shrek_script.fountain.txt",
-      "sceneCount": 13,
-      "wordCount": 13051
-    },
-    {
-      "file": "spiyder-race-2011-html.fountain",
-      "sceneCount": 120,
-      "wordCount": 26590
-    },
-    {
-      "file": "Looney_Tunes_Back_In_Action.fountain.txt",
-      "sceneCount": 175,
-      "wordCount": 28115
-    },
-    {
-      "file": "coco-script.fountain",
-      "sceneCount": 120,
-      "wordCount": 22341
-    },
-    {
-      "file": "boxtrolls-the-matched.fountain",
-      "sceneCount": 87,
-      "wordCount": 26088
-    },
-    {
-      "file": "cars-2-matched.fountain",
-      "sceneCount": 118,
-      "wordCount": 24332
-    },
-    {
-      "file": "the-mitchells-vs-the-machines-2021.fountain",
-      "sceneCount": 112,
-      "wordCount": 30397
-    },
-    {
-      "file": "the-secret-life-of-pets-2016.fountain",
-      "sceneCount": 107,
-      "wordCount": 16840
-    },
-    {
-      "file": "room-12.fountain",
-      "sceneCount": 10,
-      "wordCount": 434
-    },
-    {
-      "file": "Toy_Story_3.fountain.txt",
-      "sceneCount": 163,
-      "wordCount": 24126
-    },
-    {
-      "file": "Frankenweenie.fountain.txt",
-      "sceneCount": 140,
-      "wordCount": 14302
-    },
-    {
-      "file": "elemental-2023.fountain",
-      "sceneCount": 136,
-      "wordCount": 23802
-    },
-    {
-      "file": "coco-matched.fountain",
-      "sceneCount": 115,
-      "wordCount": 22478
-    },
-    {
-      "file": "luca-2021.fountain",
-      "sceneCount": 116,
-      "wordCount": 20274
-    },
-    {
-      "file": "Shrek.fountain.txt",
-      "sceneCount": 13,
-      "wordCount": 13051
-    },
-    {
-      "file": "antz-matched.fountain",
-      "sceneCount": 96,
-      "wordCount": 17661
-    },
-    {
-      "file": "the-mitchells-vs-the-machines-read-the-screenplay.fountain",
-      "sceneCount": 112,
-      "wordCount": 30397
-    },
-    {
-      "file": "encanto-2021.fountain",
-      "sceneCount": 72,
-      "wordCount": 21606
-    },
-    {
-      "file": "teenage-mutant-ninja-turtles-mutant-mayhem-2023.fountain",
-      "sceneCount": 83,
-      "wordCount": 19059
-    },
-    {
-      "file": "soul-2020.fountain",
-      "sceneCount": 94,
-      "wordCount": 22579
-    },
-    {
-      "file": "Coraline.fountain.txt",
-      "sceneCount": 138,
-      "wordCount": 24180
-    },
-    {
-      "file": "the-iron-giant-1999.fountain",
-      "sceneCount": 139,
-      "wordCount": 18630
-    },
-    {
-      "file": "beavis-and-butt-head-do-america-matched.fountain",
-      "sceneCount": 187,
-      "wordCount": 17575
-    },
-    {
-      "file": "Wreck-It_Ralph.fountain.txt",
-      "sceneCount": 79,
-      "wordCount": 20875
-    },
-    {
-      "file": "Frozen.fountain.txt",
-      "sceneCount": 124,
-      "wordCount": 19926
-    },
-    {
-      "file": "Croods_The.fountain.txt",
-      "sceneCount": 30,
-      "wordCount": 16614
-    },
-    {
-      "file": "Who Framed Roger Rabbit.fountain.txt",
-      "sceneCount": 111,
-      "wordCount": 26178
-    },
-    {
-      "file": "raya-and-the-last-dragon-2021.fountain",
-      "sceneCount": 98,
-      "wordCount": 18894
-    },
-    {
-      "file": "WALL-E.fountain.txt",
-      "sceneCount": 292,
-      "wordCount": 17202
-    },
-    {
-      "file": "Up.fountain.txt",
-      "sceneCount": 184,
-      "wordCount": 16907
-    },
-    {
-      "file": "9-matched.fountain",
-      "sceneCount": 112,
-      "wordCount": 17272
-    },
-    {
-      "file": "toy-story-4-2019.fountain",
-      "sceneCount": 138,
-      "wordCount": 20679
-    },
-    {
-      "file": "transfer-window.fountain",
-      "sceneCount": 10,
-      "wordCount": 459
-    },
-    {
-      "file": "runoff.fountain",
-      "sceneCount": 9,
-      "wordCount": 1449
-    }
-  ],
-  "val": [
-    {
-      "file": "spider-man-into-the-spider-verse-2018.fountain",
-      "sceneCount": 188,
-      "wordCount": 23978
-    },
-    {
-      "file": "Transformers_The_Movie_1986.fountain.txt",
-      "sceneCount": 177,
-      "wordCount": 20381
-    },
-    {
-      "file": "ratatouille-2007.fountain",
-      "sceneCount": 127,
-      "wordCount": 24276
+      "file": "crawl/drama/kate-and-leopold.fountain",
+      "sceneCount": 146,
+      "wordCount": 20432
     },
     {
       "file": "Despicable_Me.fountain.txt",
@@ -284,54 +52,244 @@
       "wordCount": 17821
     },
     {
-      "file": "sausage-party-2016.fountain",
-      "sceneCount": 55,
-      "wordCount": 22805
+      "file": "teenage-mutant-ninja-turtles-mutant-mayhem-2023.fountain",
+      "sceneCount": 83,
+      "wordCount": 19059
     },
     {
-      "file": "a-scanner-darkly-matched.fountain",
-      "sceneCount": 152,
-      "wordCount": 27169
+      "file": "crawl/crime/the-sweet-hereafter.fountain",
+      "sceneCount": 124,
+      "wordCount": 16783
     },
     {
-      "file": "dead-frequency.fountain",
-      "sceneCount": 12,
-      "wordCount": 1831
+      "file": "crawl/adventure/ocean-s-eleven-pdf.fountain",
+      "sceneCount": 340,
+      "wordCount": 29721
     },
     {
-      "file": "Dr_Seuss_The_Lorax.fountain.txt",
-      "sceneCount": 112,
-      "wordCount": 21815
+      "file": "crawl/action/unbreakable.fountain",
+      "sceneCount": 111,
+      "wordCount": 24312
     },
     {
-      "file": "sing-2016.fountain",
-      "sceneCount": 202,
-      "wordCount": 23572
+      "file": "crawl/action/below.fountain",
+      "sceneCount": 303,
+      "wordCount": 19634
     },
     {
-      "file": "Kung Fu Panda.fountain.txt",
-      "sceneCount": 72,
-      "wordCount": 14918
-    },
-    {
-      "file": "2020-07-17-soul-final-script.fountain",
-      "sceneCount": 94,
-      "wordCount": 22579
-    },
-    {
-      "file": "up-2009.fountain",
+      "file": "crawl/action/jerry-maguire.fountain",
       "sceneCount": 187,
-      "wordCount": 16612
+      "wordCount": 27066
     },
     {
-      "file": "9_2009.fountain.txt",
+      "file": "crawl/horror/spartan-html.fountain",
+      "sceneCount": 315,
+      "wordCount": 29930
+    },
+    {
+      "file": "crawl/crime/hotel-rwanda.fountain",
+      "sceneCount": 203,
+      "wordCount": 23939
+    },
+    {
+      "file": "crawl/crime/from-dusk-till-dawn.fountain",
+      "sceneCount": 49,
+      "wordCount": 22924
+    },
+    {
+      "file": "crawl/comedy/boy-who-never-slept.fountain",
       "sceneCount": 80,
-      "wordCount": 17241
+      "wordCount": 12785
     },
     {
-      "file": "the-good-dinosaur-2015.fountain",
+      "file": "crawl/crime/mimic-html.fountain",
+      "sceneCount": 147,
+      "wordCount": 21386
+    },
+    {
+      "file": "crawl/fantasy/the-game.fountain",
+      "sceneCount": 186,
+      "wordCount": 26044
+    },
+    {
+      "file": "crawl/sci-fi/sweet-november-pdf.fountain",
+      "sceneCount": 138,
+      "wordCount": 22709
+    },
+    {
+      "file": "Coraline.fountain.txt",
+      "sceneCount": 138,
+      "wordCount": 24180
+    },
+    {
+      "file": "crawl/sci-fi/death-to-smoochy-pdf.fountain",
+      "sceneCount": 119,
+      "wordCount": 23898
+    },
+    {
+      "file": "crawl/sci-fi/bonfire-of-the-vanities-pdf.fountain",
+      "sceneCount": 142,
+      "wordCount": 27619
+    },
+    {
+      "file": "crawl/adventure/almost-famous.fountain",
+      "sceneCount": 24,
+      "wordCount": 35166
+    },
+    {
+      "file": "crawl/action/storytelling.fountain",
+      "sceneCount": 73,
+      "wordCount": 8597
+    },
+    {
+      "file": "crawl/action/fight-club.fountain",
+      "sceneCount": 269,
+      "wordCount": 28105
+    },
+    {
+      "file": "crawl/action/blade-ii.fountain",
+      "sceneCount": 139,
+      "wordCount": 24705
+    },
+    {
+      "file": "crawl/sci-fi/this-boy-s-life-pdf.fountain",
+      "sceneCount": 188,
+      "wordCount": 26612
+    },
+    {
+      "file": "crawl/action/star-trek-07-generations.fountain",
+      "sceneCount": 5,
+      "wordCount": 24021
+    },
+    {
+      "file": "crawl/drama/what-about-bob.fountain",
+      "sceneCount": 136,
+      "wordCount": 21914
+    },
+    {
+      "file": "crawl/horror/buffy-the-vampire-slayer.fountain",
+      "sceneCount": 132,
+      "wordCount": 23041
+    },
+    {
+      "file": "crawl/horror/my-mother-dreams-the-satan-s-disciples-in-new-york.fountain",
       "sceneCount": 71,
-      "wordCount": 14871
+      "wordCount": 6985
+    },
+    {
+      "file": "crawl/crime/bound.fountain",
+      "sceneCount": 191,
+      "wordCount": 19152
+    },
+    {
+      "file": "crawl/action/virtuosity.fountain",
+      "sceneCount": 5,
+      "wordCount": 25747
+    },
+    {
+      "file": "crawl/fantasy/pleasantville.fountain",
+      "sceneCount": 192,
+      "wordCount": 32395
+    },
+    {
+      "file": "crawl/sci-fi/the-reader-pdf.fountain",
+      "sceneCount": 196,
+      "wordCount": 16201
+    },
+    {
+      "file": "crawl/crime/john-wick-html.fountain",
+      "sceneCount": 464,
+      "wordCount": 19209
+    },
+    {
+      "file": "crawl/action/fargo.fountain",
+      "sceneCount": 148,
+      "wordCount": 16989
+    },
+    {
+      "file": "crawl/sci-fi/any-given-sunday-pdf.fountain",
+      "sceneCount": 304,
+      "wordCount": 49321
+    },
+    {
+      "file": "Jaws.fountain.txt",
+      "sceneCount": 159,
+      "wordCount": 28177
+    },
+    {
+      "file": "crawl/sci-fi/stuart-little-2-pdf.fountain",
+      "sceneCount": 102,
+      "wordCount": 15773
+    },
+    {
+      "file": "crawl/sci-fi/the-fault-in-our-stars-pdf.fountain",
+      "sceneCount": 188,
+      "wordCount": 26875
+    },
+    {
+      "file": "crawl/sci-fi/collateral-damage-pdf.fountain",
+      "sceneCount": 244,
+      "wordCount": 28986
+    },
+    {
+      "file": "crawl/action/hanna-html.fountain",
+      "sceneCount": 8,
+      "wordCount": 25569
+    },
+    {
+      "file": "crawl/action/i-am-sam.fountain",
+      "sceneCount": 152,
+      "wordCount": 23284
+    },
+    {
+      "file": "crawl/sci-fi/matchstick-men-pdf.fountain",
+      "sceneCount": 174,
+      "wordCount": 21884
+    },
+    {
+      "file": "crawl/crime/sling-blade.fountain",
+      "sceneCount": 87,
+      "wordCount": 21301
+    },
+    {
+      "file": "crawl/fantasy/sexual-life.fountain",
+      "sceneCount": 101,
+      "wordCount": 16416
+    },
+    {
+      "file": "crawl/sci-fi/last-flag-flying-pdf.fountain",
+      "sceneCount": 83,
+      "wordCount": 18053
+    },
+    {
+      "file": "over-the-moon-2020.fountain",
+      "sceneCount": 130,
+      "wordCount": 19883
+    },
+    {
+      "file": "crawl/sci-fi/hannibal.fountain",
+      "sceneCount": 150,
+      "wordCount": 32408
+    },
+    {
+      "file": "crawl/sci-fi/memphis-belle-pdf.fountain",
+      "sceneCount": 329,
+      "wordCount": 26383
+    },
+    {
+      "file": "darkymind-html.fountain",
+      "sceneCount": 121,
+      "wordCount": 23523
+    },
+    {
+      "file": "crawl/sci-fi/the-american-president.fountain",
+      "sceneCount": 125,
+      "wordCount": 25598
+    },
+    {
+      "file": "crawl/crime/face-off.fountain",
+      "sceneCount": 205,
+      "wordCount": 23677
     },
     {
       "file": "anastasia-matched.fountain",
@@ -339,31 +297,119 @@
       "wordCount": 21169
     },
     {
-      "file": "0meet-the-robinsons-full-screenplay.fountain",
-      "sceneCount": 57,
-      "wordCount": 19976
-    }
-  ],
-  "test": [
-    {
-      "file": "corpse-bride-2005.fountain",
-      "sceneCount": 66,
-      "wordCount": 14155
+      "file": "crawl/sci-fi/the-help-pdf.fountain",
+      "sceneCount": 198,
+      "wordCount": 26464
     },
     {
-      "file": "how-to-train-your-dragon-the-hidden-world-2019.fountain",
-      "sceneCount": 94,
-      "wordCount": 23033
+      "file": "Antz.fountain.txt",
+      "sceneCount": 85,
+      "wordCount": 17629
     },
     {
-      "file": "the-lion-king-1994.fountain.txt",
-      "sceneCount": 46,
-      "wordCount": 19080
+      "file": "crawl/sci-fi/changeling-pdf.fountain",
+      "sceneCount": 194,
+      "wordCount": 32848
     },
     {
-      "file": "the-wild-robot-2024.fountain",
-      "sceneCount": 145,
-      "wordCount": 17030
+      "file": "crawl/fantasy/pleasantville-html.fountain",
+      "sceneCount": 192,
+      "wordCount": 32770
+    },
+    {
+      "file": "crawl/sci-fi/disturbia-pdf.fountain",
+      "sceneCount": 131,
+      "wordCount": 26323
+    },
+    {
+      "file": "crawl/action/mimic.fountain",
+      "sceneCount": 147,
+      "wordCount": 21006
+    },
+    {
+      "file": "crawl/action/birthday-girl.fountain",
+      "sceneCount": 178,
+      "wordCount": 17550
+    },
+    {
+      "file": "crawl/crime/panther.fountain",
+      "sceneCount": 229,
+      "wordCount": 21480
+    },
+    {
+      "file": "Up.fountain.txt",
+      "sceneCount": 184,
+      "wordCount": 16907
+    },
+    {
+      "file": "crawl/sci-fi/the-kingdom-pdf.fountain",
+      "sceneCount": 161,
+      "wordCount": 29466
+    },
+    {
+      "file": "crawl/action/life-as-a-house.fountain",
+      "sceneCount": 175,
+      "wordCount": 26407
+    },
+    {
+      "file": "crawl/action/made.fountain",
+      "sceneCount": 102,
+      "wordCount": 17997
+    },
+    {
+      "file": "crawl/sci-fi/somewhere-pdf.fountain",
+      "sceneCount": 96,
+      "wordCount": 6733
+    },
+    {
+      "file": "crawl/sci-fi/12-and-holding-pdf.fountain",
+      "sceneCount": 164,
+      "wordCount": 18375
+    },
+    {
+      "file": "crawl/action/halloween-6-the-curse-of-michael-myers-halloween-666-the-ori.fountain",
+      "sceneCount": 158,
+      "wordCount": 22937
+    },
+    {
+      "file": "crawl/action/the-battle-of-shaker-heights.fountain",
+      "sceneCount": 99,
+      "wordCount": 18082
+    },
+    {
+      "file": "crawl/fantasy/american-beauty.fountain",
+      "sceneCount": 168,
+      "wordCount": 20171
+    },
+    {
+      "file": "crawl/action/life.fountain",
+      "sceneCount": 131,
+      "wordCount": 26261
+    },
+    {
+      "file": "crawl/sci-fi/room-pdf.fountain",
+      "sceneCount": 133,
+      "wordCount": 22754
+    },
+    {
+      "file": "crawl/sci-fi/macgruber-pdf.fountain",
+      "sceneCount": 147,
+      "wordCount": 17234
+    },
+    {
+      "file": "crawl/comedy/funny-people-pdf.fountain",
+      "sceneCount": 157,
+      "wordCount": 26902
+    },
+    {
+      "file": "crawl/action/the-crow-salvation.fountain",
+      "sceneCount": 136,
+      "wordCount": 21238
+    },
+    {
+      "file": "crawl/sci-fi/if-beale-street-could-talk-pdf.fountain",
+      "sceneCount": 118,
+      "wordCount": 23263
     },
     {
       "file": "the-red-turtle-2016.fountain",
@@ -371,34 +417,294 @@
       "wordCount": 11190
     },
     {
-      "file": "mulan-1998.fountain",
+      "file": "crawl/sci-fi/donnie-darko-pdf.fountain",
+      "sceneCount": 189,
+      "wordCount": 19618
+    },
+    {
+      "file": "crawl/sci-fi/far-from-the-maddening-crowd-pdf.fountain",
+      "sceneCount": 190,
+      "wordCount": 21866
+    },
+    {
+      "file": "crawl/sci-fi/out-of-time-pdf.fountain",
+      "sceneCount": 198,
+      "wordCount": 22184
+    },
+    {
+      "file": "crawl/action/backdraft-html.fountain",
+      "sceneCount": 214,
+      "wordCount": 27453
+    },
+    {
+      "file": "raya-and-the-last-dragon-2021.fountain",
+      "sceneCount": 98,
+      "wordCount": 18894
+    },
+    {
+      "file": "crawl/sci-fi/save-the-last-dance-pdf.fountain",
+      "sceneCount": 154,
+      "wordCount": 25608
+    },
+    {
+      "file": "crawl/horror/slash-pdf.fountain",
+      "sceneCount": 210,
+      "wordCount": 21367
+    },
+    {
+      "file": "crawl/sci-fi/adaptation-pdf.fountain",
+      "sceneCount": 222,
+      "wordCount": 25428
+    },
+    {
+      "file": "crawl/sci-fi/rocknrolla-pdf.fountain",
+      "sceneCount": 162,
+      "wordCount": 23987
+    },
+    {
+      "file": "crawl/sci-fi/okja-pdf.fountain",
+      "sceneCount": 122,
+      "wordCount": 26604
+    },
+    {
+      "file": "crawl/sci-fi/at-first-sight.fountain",
+      "sceneCount": 150,
+      "wordCount": 28202
+    },
+    {
+      "file": "crawl/sci-fi/defiance-pdf.fountain",
+      "sceneCount": 45,
+      "wordCount": 24025
+    },
+    {
+      "file": "crawl/sci-fi/man-trouble-pdf.fountain",
+      "sceneCount": 176,
+      "wordCount": 27377
+    },
+    {
+      "file": "crawl/action/the-fisher-king.fountain",
+      "sceneCount": 189,
+      "wordCount": 25080
+    },
+    {
+      "file": "crawl/fantasy/bad-santa.fountain",
+      "sceneCount": 206,
+      "wordCount": 16025
+    },
+    {
+      "file": "crawl/adventure/forrest-gump.fountain",
+      "sceneCount": 247,
+      "wordCount": 25190
+    },
+    {
+      "file": "crawl/fantasy/election.fountain",
+      "sceneCount": 219,
+      "wordCount": 24307
+    },
+    {
+      "file": "crawl/fantasy/how-to-train-your-dragon-html.fountain",
+      "sceneCount": 104,
+      "wordCount": 21838
+    },
+    {
+      "file": "crawl/horror/the-nightmare-before-christmas.fountain",
+      "sceneCount": 105,
+      "wordCount": 16371
+    },
+    {
+      "file": "crawl/action/the-family-man.fountain",
+      "sceneCount": 90,
+      "wordCount": 27770
+    },
+    {
+      "file": "crawl/action/15-minutes.fountain",
+      "sceneCount": 85,
+      "wordCount": 25209
+    },
+    {
+      "file": "crawl/action/chasing-amy.fountain",
+      "sceneCount": 42,
+      "wordCount": 23551
+    },
+    {
+      "file": "crawl/sci-fi/hard-rain.fountain",
+      "sceneCount": 153,
+      "wordCount": 20073
+    },
+    {
+      "file": "crawl/crime/memento.fountain",
+      "sceneCount": 6,
+      "wordCount": 32425
+    },
+    {
+      "file": "crawl/sci-fi/crank-pdf.fountain",
+      "sceneCount": 180,
+      "wordCount": 21916
+    },
+    {
+      "file": "room-12.fountain",
+      "sceneCount": 10,
+      "wordCount": 434
+    },
+    {
+      "file": "crawl/sci-fi/analyse-that-pdf.fountain",
+      "sceneCount": 124,
+      "wordCount": 22075
+    },
+    {
+      "file": "crawl/action/hellboy.fountain",
+      "sceneCount": 233,
+      "wordCount": 22656
+    },
+    {
+      "file": "crawl/action/new-nightmare.fountain",
+      "sceneCount": 99,
+      "wordCount": 20267
+    },
+    {
+      "file": "crawl/sci-fi/foundation-pdf.fountain",
+      "sceneCount": 151,
+      "wordCount": 24581
+    },
+    {
+      "file": "crawl/crime/bodies-rest-motion.fountain",
       "sceneCount": 86,
-      "wordCount": 18204
+      "wordCount": 15470
     },
     {
-      "file": "soul_script.fountain.txt",
-      "sceneCount": 94,
-      "wordCount": 22579
+      "file": "crawl/action/detroit-rock-city.fountain",
+      "sceneCount": 115,
+      "wordCount": 26307
     },
     {
-      "file": "ParaNorman.fountain.txt",
-      "sceneCount": 119,
-      "wordCount": 22884
+      "file": "crawl/sci-fi/a-walk-to-remember-pdf.fountain",
+      "sceneCount": 229,
+      "wordCount": 19715
     },
     {
-      "file": "brave-2012.fountain",
-      "sceneCount": 11,
-      "wordCount": 4708
+      "file": "crawl/horror/ghost-ship.fountain",
+      "sceneCount": 261,
+      "wordCount": 25596
     },
     {
-      "file": "spider-man-across-the-spider-verse-2023.fountain",
-      "sceneCount": 129,
-      "wordCount": 26196
+      "file": "crawl/drama/cobb-pdf.fountain",
+      "sceneCount": 146,
+      "wordCount": 27620
     },
     {
-      "file": "inside-out-2015.fountain",
-      "sceneCount": 387,
-      "wordCount": 19651
+      "file": "crawl/fantasy/the-queen-pdf.fountain",
+      "sceneCount": 184,
+      "wordCount": 18619
+    },
+    {
+      "file": "crawl/drama/sling-blade.fountain",
+      "sceneCount": 87,
+      "wordCount": 21279
+    },
+    {
+      "file": "crawl/crime/minority-report.fountain",
+      "sceneCount": 301,
+      "wordCount": 37350
+    },
+    {
+      "file": "crawl/war/warm-springs.fountain",
+      "sceneCount": 148,
+      "wordCount": 20997
+    },
+    {
+      "file": "the-lion-king-1994.fountain.txt",
+      "sceneCount": 46,
+      "wordCount": 19080
+    },
+    {
+      "file": "crawl/drama/the-man-who-wasn-t-there.fountain",
+      "sceneCount": 272,
+      "wordCount": 18815
+    },
+    {
+      "file": "crawl/action/toy-story.fountain",
+      "sceneCount": 121,
+      "wordCount": 21455
+    },
+    {
+      "file": "Who Framed Roger Rabbit.fountain.txt",
+      "sceneCount": 111,
+      "wordCount": 26178
+    },
+    {
+      "file": "crawl/action/austin-powers-2-the-spy-who-shagged-me.fountain",
+      "sceneCount": 111,
+      "wordCount": 17235
+    },
+    {
+      "file": "crawl/crime/invictus-html.fountain",
+      "sceneCount": 272,
+      "wordCount": 28792
+    },
+    {
+      "file": "crawl/sci-fi/gattaca.fountain",
+      "sceneCount": 158,
+      "wordCount": 25659
+    },
+    {
+      "file": "crawl/sci-fi/the-pacifier-pdf.fountain",
+      "sceneCount": 217,
+      "wordCount": 23586
+    },
+    {
+      "file": "crawl/sci-fi/absolute-power-pdf.fountain",
+      "sceneCount": 355,
+      "wordCount": 26228
+    },
+    {
+      "file": "crawl/action/mission-impossible.fountain",
+      "sceneCount": 210,
+      "wordCount": 21712
+    },
+    {
+      "file": "crawl/crime/king-kong-pdf.fountain",
+      "sceneCount": 307,
+      "wordCount": 30998
+    },
+    {
+      "file": "crawl/action/quills.fountain",
+      "sceneCount": 206,
+      "wordCount": 27023
+    },
+    {
+      "file": "crawl/sci-fi/hard-to-kill-pdf.fountain",
+      "sceneCount": 162,
+      "wordCount": 23541
+    },
+    {
+      "file": "crawl/adventure/signs.fountain",
+      "sceneCount": 95,
+      "wordCount": 22605
+    },
+    {
+      "file": "crawl/sci-fi/ftkmf-first-they-killed-my-father-pdf.fountain",
+      "sceneCount": 198,
+      "wordCount": 23322
+    },
+    {
+      "file": "crawl/action/the-butterfly-effect.fountain",
+      "sceneCount": 185,
+      "wordCount": 23748
+    },
+    {
+      "file": "crawl/crime/magnolia.fountain",
+      "sceneCount": 464,
+      "wordCount": 40981
+    },
+    {
+      "file": "crawl/horror/signs-html.fountain",
+      "sceneCount": 95,
+      "wordCount": 22983
+    },
+    {
+      "file": "crawl/sci-fi/while-we-re-young-pdf.fountain",
+      "sceneCount": 111,
+      "wordCount": 22124
     },
     {
       "file": "Shrek_The_Third.fountain.txt",
@@ -406,14 +712,744 @@
       "wordCount": 21763
     },
     {
-      "file": "counter-offer.fountain",
-      "sceneCount": 10,
-      "wordCount": 1522
+      "file": "crawl/action/the-rules-of-attraction-pdf.fountain",
+      "sceneCount": 141,
+      "wordCount": 30632
     },
     {
-      "file": "Heavy Metal.fountain.txt",
+      "file": "crawl/drama/schindler-s-list.fountain",
+      "sceneCount": 262,
+      "wordCount": 29915
+    },
+    {
+      "file": "crawl/sci-fi/spanglish-pdf.fountain",
+      "sceneCount": 200,
+      "wordCount": 27529
+    },
+    {
+      "file": "crawl/sci-fi/wreck-it-ralph-pdf.fountain",
+      "sceneCount": 75,
+      "wordCount": 20882
+    },
+    {
+      "file": "crawl/fantasy/four-rooms.fountain",
+      "sceneCount": 37,
+      "wordCount": 24093
+    },
+    {
+      "file": "crawl/action/independence-day.fountain",
+      "sceneCount": 327,
+      "wordCount": 26883
+    },
+    {
+      "file": "crawl/action/nixon.fountain",
+      "sceneCount": 264,
+      "wordCount": 39615
+    },
+    {
+      "file": "crawl/crime/godfather-html.fountain",
+      "sceneCount": 230,
+      "wordCount": 32649
+    },
+    {
+      "file": "crawl/fantasy/stepmom.fountain",
+      "sceneCount": 194,
+      "wordCount": 27102
+    },
+    {
+      "file": "crawl/crime/jfk.fountain",
+      "sceneCount": 72,
+      "wordCount": 52766
+    },
+    {
+      "file": "crawl/action/hannibal.fountain",
+      "sceneCount": 287,
+      "wordCount": 30628
+    },
+    {
+      "file": "crawl/sci-fi/the-greatest-muppet-movie-of-all-time-filmed-as-the-muppets-.fountain",
+      "sceneCount": 146,
+      "wordCount": 20478
+    },
+    {
+      "file": "crawl/action/resident-evil-romero-unproduced.fountain",
+      "sceneCount": 185,
+      "wordCount": 22909
+    },
+    {
+      "file": "crawl/adventure/big-fish.fountain",
+      "sceneCount": 197,
+      "wordCount": 25933
+    },
+    {
+      "file": "crawl/action/3-kings.fountain",
+      "sceneCount": 140,
+      "wordCount": 25904
+    },
+    {
+      "file": "crawl/action/living-in-oblivion.fountain",
+      "sceneCount": 112,
+      "wordCount": 17382
+    },
+    {
+      "file": "crawl/sci-fi/the-last-boy-scout-pdf.fountain",
+      "sceneCount": 129,
+      "wordCount": 29195
+    },
+    {
+      "file": "toy-story-4-2019.fountain",
+      "sceneCount": 138,
+      "wordCount": 20679
+    },
+    {
+      "file": "crawl/fantasy/ali-html.fountain",
       "sceneCount": 253,
-      "wordCount": 20364
+      "wordCount": 32291
+    },
+    {
+      "file": "crawl/sci-fi/the-red-turtle-pdf.fountain",
+      "sceneCount": 11,
+      "wordCount": 11190
+    },
+    {
+      "file": "crawl/action/true-romance.fountain",
+      "sceneCount": 87,
+      "wordCount": 26509
+    },
+    {
+      "file": "crawl/crime/final-destination-2.fountain",
+      "sceneCount": 130,
+      "wordCount": 25044
+    },
+    {
+      "file": "crawl/sci-fi/the-hollars-pdf.fountain",
+      "sceneCount": 142,
+      "wordCount": 19388
+    },
+    {
+      "file": "crawl/sci-fi/land-of-the-dead-pdf.fountain",
+      "sceneCount": 253,
+      "wordCount": 23073
+    },
+    {
+      "file": "crawl/sci-fi/the-three-musketeers-pdf.fountain",
+      "sceneCount": 98,
+      "wordCount": 28839
+    },
+    {
+      "file": "crawl/action/hostage.fountain",
+      "sceneCount": 155,
+      "wordCount": 24963
+    },
+    {
+      "file": "crawl/crime/confidence.fountain",
+      "sceneCount": 146,
+      "wordCount": 24015
+    },
+    {
+      "file": "crawl/crime/x-men-pdf.fountain",
+      "sceneCount": 135,
+      "wordCount": 25991
+    },
+    {
+      "file": "crawl/sci-fi/one-eight-seven-pdf.fountain",
+      "sceneCount": 373,
+      "wordCount": 25539
+    },
+    {
+      "file": "crawl/comedy/monkeybone.fountain",
+      "sceneCount": 173,
+      "wordCount": 26376
+    },
+    {
+      "file": "brave-2012.fountain",
+      "sceneCount": 11,
+      "wordCount": 4708
+    },
+    {
+      "file": "crawl/action/blade.fountain",
+      "sceneCount": 110,
+      "wordCount": 24677
+    },
+    {
+      "file": "crawl/sci-fi/space-cowboys-pdf.fountain",
+      "sceneCount": 177,
+      "wordCount": 25629
+    },
+    {
+      "file": "crawl/action/crank-html.fountain",
+      "sceneCount": 182,
+      "wordCount": 22500
+    },
+    {
+      "file": "crawl/crime/serial-mom.fountain",
+      "sceneCount": 65,
+      "wordCount": 19165
+    },
+    {
+      "file": "crawl/horror/brutalist-the-html.fountain",
+      "sceneCount": 163,
+      "wordCount": 27414
+    },
+    {
+      "file": "crawl/sci-fi/vantage-point-pdf.fountain",
+      "sceneCount": 169,
+      "wordCount": 23138
+    },
+    {
+      "file": "crawl/crime/grosse-pointe-blank.fountain",
+      "sceneCount": 151,
+      "wordCount": 19135
+    },
+    {
+      "file": "crawl/action/henry-fool.fountain",
+      "sceneCount": 158,
+      "wordCount": 25374
+    },
+    {
+      "file": "crawl/sci-fi/summer-of-84-pdf.fountain",
+      "sceneCount": 117,
+      "wordCount": 25297
+    },
+    {
+      "file": "crawl/horror/good-will-hunting.fountain",
+      "sceneCount": 127,
+      "wordCount": 23488
+    },
+    {
+      "file": "the-secret-life-of-pets-2016.fountain",
+      "sceneCount": 107,
+      "wordCount": 16840
+    },
+    {
+      "file": "crawl/crime/scream.fountain",
+      "sceneCount": 116,
+      "wordCount": 22065
+    },
+    {
+      "file": "crawl/adventure/gods-and-monsters.fountain",
+      "sceneCount": 120,
+      "wordCount": 22832
+    },
+    {
+      "file": "0meet-the-robinsons-full-screenplay.fountain",
+      "sceneCount": 57,
+      "wordCount": 19976
+    },
+    {
+      "file": "crawl/sci-fi/mississippi-grind-pdf.fountain",
+      "sceneCount": 106,
+      "wordCount": 20588
+    },
+    {
+      "file": "crawl/crime/miami-vice.fountain",
+      "sceneCount": 213,
+      "wordCount": 21342
+    },
+    {
+      "file": "crawl/sci-fi/the-end-of-the-tour-pdf.fountain",
+      "sceneCount": 112,
+      "wordCount": 17096
+    },
+    {
+      "file": "crawl/action/intolerable-cruelty.fountain",
+      "sceneCount": 62,
+      "wordCount": 17271
+    },
+    {
+      "file": "crawl/action/l-a-confidential.fountain",
+      "sceneCount": 173,
+      "wordCount": 25768
+    },
+    {
+      "file": "crawl/sci-fi/the-cooler.fountain",
+      "sceneCount": 109,
+      "wordCount": 20864
+    },
+    {
+      "file": "crawl/fantasy/the-big-lebowski.fountain",
+      "sceneCount": 11,
+      "wordCount": 21575
+    },
+    {
+      "file": "crawl/fantasy/braveheart.fountain",
+      "sceneCount": 125,
+      "wordCount": 27455
+    },
+    {
+      "file": "crawl/action/the-insider.fountain",
+      "sceneCount": 249,
+      "wordCount": 26942
+    },
+    {
+      "file": "crawl/comedy/twin-peaks-fire-walk-with-me.fountain",
+      "sceneCount": 213,
+      "wordCount": 24038
+    },
+    {
+      "file": "crawl/sci-fi/analyse-this-pdf.fountain",
+      "sceneCount": 104,
+      "wordCount": 22818
+    },
+    {
+      "file": "crawl/sci-fi/elizabeth-the-golden-age-pdf.fountain",
+      "sceneCount": 172,
+      "wordCount": 24215
+    },
+    {
+      "file": "crawl/action/taking-sides.fountain",
+      "sceneCount": 64,
+      "wordCount": 15292
+    },
+    {
+      "file": "crawl/crime/black-snake-moan.fountain",
+      "sceneCount": 138,
+      "wordCount": 24768
+    },
+    {
+      "file": "crawl/drama/station-pdf.fountain",
+      "sceneCount": 199,
+      "wordCount": 24252
+    },
+    {
+      "file": "crawl/crime/erin-brockovich.fountain",
+      "sceneCount": 244,
+      "wordCount": 28509
+    },
+    {
+      "file": "crawl/sci-fi/ides-of-march-pdf.fountain",
+      "sceneCount": 93,
+      "wordCount": 17093
+    },
+    {
+      "file": "crawl/crime/fatal-instinct.fountain",
+      "sceneCount": 211,
+      "wordCount": 27456
+    },
+    {
+      "file": "mulan-1998.fountain",
+      "sceneCount": 86,
+      "wordCount": 18204
+    },
+    {
+      "file": "crawl/sci-fi/legally-blonde-pdf.fountain",
+      "sceneCount": 32,
+      "wordCount": 23329
+    },
+    {
+      "file": "crawl/action/traffic.fountain",
+      "sceneCount": 248,
+      "wordCount": 30031
+    },
+    {
+      "file": "crawl/sci-fi/tin-cup-pdf.fountain",
+      "sceneCount": 174,
+      "wordCount": 26909
+    },
+    {
+      "file": "crawl/crime/pulp-fiction-html.fountain",
+      "sceneCount": 117,
+      "wordCount": 28138
+    },
+    {
+      "file": "crawl/action/cliffhanger.fountain",
+      "sceneCount": 100,
+      "wordCount": 32407
+    },
+    {
+      "file": "crawl/action/o-brother-where-art-thou.fountain",
+      "sceneCount": 51,
+      "wordCount": 19087
+    },
+    {
+      "file": "crawl/horror/blair-witch-ii.fountain",
+      "sceneCount": 70,
+      "wordCount": 14867
+    },
+    {
+      "file": "crawl/action/feast-revised-draft.fountain",
+      "sceneCount": 107,
+      "wordCount": 17475
+    },
+    {
+      "file": "crawl/action/hudson-hawk.fountain",
+      "sceneCount": 92,
+      "wordCount": 23413
+    },
+    {
+      "file": "crawl/action/the-patriot.fountain",
+      "sceneCount": 165,
+      "wordCount": 29424
+    },
+    {
+      "file": "crawl/horror/531.fountain",
+      "sceneCount": 15,
+      "wordCount": 6928
+    },
+    {
+      "file": "crawl/horror/ed-wood.fountain",
+      "sceneCount": 172,
+      "wordCount": 27931
+    },
+    {
+      "file": "luca-2021.fountain",
+      "sceneCount": 116,
+      "wordCount": 20274
+    },
+    {
+      "file": "crawl/crime/unbreakable.fountain",
+      "sceneCount": 109,
+      "wordCount": 24320
+    },
+    {
+      "file": "9_2009.fountain.txt",
+      "sceneCount": 80,
+      "wordCount": 17241
+    },
+    {
+      "file": "crawl/crime/interview-with-the-vampire.fountain",
+      "sceneCount": 138,
+      "wordCount": 22619
+    },
+    {
+      "file": "crawl/sci-fi/the-bourne-supremacy-pdf.fountain",
+      "sceneCount": 8,
+      "wordCount": 24585
+    },
+    {
+      "file": "crawl/sci-fi/lethal-weapon-4-pdf.fountain",
+      "sceneCount": 232,
+      "wordCount": 24542
+    },
+    {
+      "file": "crawl/adventure/ocean-s-twelve-pdf.fountain",
+      "sceneCount": 183,
+      "wordCount": 23304
+    },
+    {
+      "file": "crawl/crime/nurse-betty.fountain",
+      "sceneCount": 69,
+      "wordCount": 30532
+    },
+    {
+      "file": "crawl/horror/13-ghosts-pdf.fountain",
+      "sceneCount": 116,
+      "wordCount": 21707
+    },
+    {
+      "file": "crawl/sci-fi/the-island-of-dr-moreau-pdf.fountain",
+      "sceneCount": 89,
+      "wordCount": 27180
+    },
+    {
+      "file": "crawl/action/batman-2-unproduced.fountain",
+      "sceneCount": 287,
+      "wordCount": 38094
+    },
+    {
+      "file": "beavis-and-butt-head-do-america-matched.fountain",
+      "sceneCount": 187,
+      "wordCount": 17575
+    },
+    {
+      "file": "crawl/sci-fi/new-york-minute-pdf.fountain",
+      "sceneCount": 143,
+      "wordCount": 21405
+    },
+    {
+      "file": "crawl/crime/the-shipping-news.fountain",
+      "sceneCount": 263,
+      "wordCount": 29069
+    },
+    {
+      "file": "crawl/drama/get-him-to-the-greek-pdf.fountain",
+      "sceneCount": 115,
+      "wordCount": 23489
+    },
+    {
+      "file": "coco-matched.fountain",
+      "sceneCount": 115,
+      "wordCount": 22478
+    },
+    {
+      "file": "crawl/action/blade-trinity.fountain",
+      "sceneCount": 179,
+      "wordCount": 25092
+    },
+    {
+      "file": "crawl/action/smokin-aces.fountain",
+      "sceneCount": 207,
+      "wordCount": 29208
+    },
+    {
+      "file": "crawl/action/x-men.fountain",
+      "sceneCount": 244,
+      "wordCount": 33724
+    },
+    {
+      "file": "crawl/sci-fi/the-comedian-pdf.fountain",
+      "sceneCount": 74,
+      "wordCount": 23892
+    },
+    {
+      "file": "crawl/sci-fi/jackie-pdf.fountain",
+      "sceneCount": 105,
+      "wordCount": 15391
+    },
+    {
+      "file": "crawl/crime/body-of-evidence.fountain",
+      "sceneCount": 84,
+      "wordCount": 21325
+    },
+    {
+      "file": "crawl/sci-fi/the-hurt-locker-pdf.fountain",
+      "sceneCount": 136,
+      "wordCount": 20095
+    },
+    {
+      "file": "crawl/action/surrogates-html.fountain",
+      "sceneCount": 179,
+      "wordCount": 24414
+    },
+    {
+      "file": "crawl/sci-fi/queen-of-the-damned-pdf.fountain",
+      "sceneCount": 120,
+      "wordCount": 27936
+    },
+    {
+      "file": "crawl/action/metro.fountain",
+      "sceneCount": 228,
+      "wordCount": 26858
+    },
+    {
+      "file": "Croods_The.fountain.txt",
+      "sceneCount": 30,
+      "wordCount": 16614
+    },
+    {
+      "file": "crawl/animation/kung-fu-panda-html.fountain",
+      "sceneCount": 70,
+      "wordCount": 15184
+    },
+    {
+      "file": "South_Park_The_Movie.fountain.txt",
+      "sceneCount": 125,
+      "wordCount": 25537
+    },
+    {
+      "file": "crawl/drama/thelma-louise.fountain",
+      "sceneCount": 250,
+      "wordCount": 24413
+    },
+    {
+      "file": "crawl/crime/gang-related.fountain",
+      "sceneCount": 157,
+      "wordCount": 24228
+    },
+    {
+      "file": "crawl/comedy/the-blast-from-the-past.fountain",
+      "sceneCount": 210,
+      "wordCount": 24067
+    },
+    {
+      "file": "crawl/crime/croupier.fountain",
+      "sceneCount": 160,
+      "wordCount": 18706
+    },
+    {
+      "file": "crawl/adventure/two-for-the-money-html.fountain",
+      "sceneCount": 192,
+      "wordCount": 27196
+    },
+    {
+      "file": "crawl/sci-fi/out-of-sight-pdf.fountain",
+      "sceneCount": 164,
+      "wordCount": 30488
+    },
+    {
+      "file": "crawl/comedy/bruce-almighty.fountain",
+      "sceneCount": 162,
+      "wordCount": 22181
+    },
+    {
+      "file": "crawl/action/the-assignment.fountain",
+      "sceneCount": 201,
+      "wordCount": 33055
+    },
+    {
+      "file": "crawl/sci-fi/maverick-pdf.fountain",
+      "sceneCount": 192,
+      "wordCount": 31147
+    },
+    {
+      "file": "crawl/sci-fi/equity-pdf.fountain",
+      "sceneCount": 166,
+      "wordCount": 18939
+    },
+    {
+      "file": "crawl/sci-fi/slow-west-pdf.fountain",
+      "sceneCount": 104,
+      "wordCount": 15541
+    },
+    {
+      "file": "crawl/action/the-bourne-identity.fountain",
+      "sceneCount": 187,
+      "wordCount": 22753
+    },
+    {
+      "file": "crawl/crime/the-sixth-sense.fountain",
+      "sceneCount": 121,
+      "wordCount": 22917
+    },
+    {
+      "file": "crawl/action/pearl-harbor-html.fountain",
+      "sceneCount": 314,
+      "wordCount": 33629
+    },
+    {
+      "file": "Looney_Tunes_Back_In_Action.fountain.txt",
+      "sceneCount": 175,
+      "wordCount": 28115
+    },
+    {
+      "file": "crawl/horror/freddy-s-dead-the-final-nightmare.fountain",
+      "sceneCount": 91,
+      "wordCount": 24729
+    },
+    {
+      "file": "sing-2016.fountain",
+      "sceneCount": 202,
+      "wordCount": 23572
+    },
+    {
+      "file": "crawl/crime/8-millimeter.fountain",
+      "sceneCount": 303,
+      "wordCount": 31444
+    },
+    {
+      "file": "crawl/sci-fi/the-manchurian-candidate-pdf.fountain",
+      "sceneCount": 58,
+      "wordCount": 27305
+    },
+    {
+      "file": "crawl/horror/possession-pdf.fountain",
+      "sceneCount": 159,
+      "wordCount": 24898
+    },
+    {
+      "file": "crawl/action/spider-man.fountain",
+      "sceneCount": 123,
+      "wordCount": 27445
+    },
+    {
+      "file": "crawl/action/the-majestic.fountain",
+      "sceneCount": 161,
+      "wordCount": 27808
+    },
+    {
+      "file": "boxtrolls-the-matched.fountain",
+      "sceneCount": 87,
+      "wordCount": 26088
+    },
+    {
+      "file": "crawl/sci-fi/kill-your-darlings-pdf.fountain",
+      "sceneCount": 164,
+      "wordCount": 20483
+    },
+    {
+      "file": "crawl/sci-fi/the-diving-bell-and-the-butterfly-le-scaphandre-et-le-papill.fountain",
+      "sceneCount": 115,
+      "wordCount": 22309
+    },
+    {
+      "file": "crawl/horror/ali-html.fountain",
+      "sceneCount": 253,
+      "wordCount": 32297
+    },
+    {
+      "file": "crawl/sci-fi/the-bourne-ultimatum-pdf.fountain",
+      "sceneCount": 348,
+      "wordCount": 19822
+    },
+    {
+      "file": "crawl/fantasy/american-pie.fountain",
+      "sceneCount": 227,
+      "wordCount": 20559
+    },
+    {
+      "file": "crawl/fantasy/out-of-sight.fountain",
+      "sceneCount": 163,
+      "wordCount": 30313
+    },
+    {
+      "file": "isle-of-dogs-2018.fountain",
+      "sceneCount": 59,
+      "wordCount": 29293
+    },
+    {
+      "file": "crawl/sci-fi/el-cantante-pdf.fountain",
+      "sceneCount": 230,
+      "wordCount": 25577
+    },
+    {
+      "file": "crawl/action/the-believer.fountain",
+      "sceneCount": 165,
+      "wordCount": 22020
+    },
+    {
+      "file": "crawl/fantasy/very-bad-things.fountain",
+      "sceneCount": 95,
+      "wordCount": 18511
+    },
+    {
+      "file": "crawl/comedy/return-to-me.fountain",
+      "sceneCount": 112,
+      "wordCount": 20742
+    },
+    {
+      "file": "crawl/horror/knocked-up-html.fountain",
+      "sceneCount": 170,
+      "wordCount": 25660
+    },
+    {
+      "file": "crawl/sci-fi/collateral-pdf.fountain",
+      "sceneCount": 121,
+      "wordCount": 26238
+    },
+    {
+      "file": "how-to-train-your-dragon-the-hidden-world-2019.fountain",
+      "sceneCount": 94,
+      "wordCount": 23033
+    },
+    {
+      "file": "crawl/crime/fracture-html.fountain",
+      "sceneCount": 139,
+      "wordCount": 23264
+    },
+    {
+      "file": "crawl/sci-fi/birth-of-a-nation-pdf.fountain",
+      "sceneCount": 137,
+      "wordCount": 22385
+    },
+    {
+      "file": "crawl/action/ticker.fountain",
+      "sceneCount": 101,
+      "wordCount": 14921
+    },
+    {
+      "file": "Anastasia.fountain.txt",
+      "sceneCount": 130,
+      "wordCount": 21175
+    },
+    {
+      "file": "crawl/action/terminator-2-judgement-day-html.fountain",
+      "sceneCount": 11,
+      "wordCount": 35903
+    },
+    {
+      "file": "crawl/sci-fi/cradle-to-the-grave-pdf.fountain",
+      "sceneCount": 240,
+      "wordCount": 18382
     },
     {
       "file": "off-season.fountain",
@@ -421,9 +1457,1096 @@
       "wordCount": 756
     },
     {
-      "file": "the-boss-baby-family-business-2021.fountain",
+      "file": "crawl/action/saving-private-ryan.fountain",
+      "sceneCount": 68,
+      "wordCount": 22243
+    },
+    {
+      "file": "crawl/horror/monster-s-ball-pdf.fountain",
+      "sceneCount": 44,
+      "wordCount": 17273
+    },
+    {
+      "file": "crawl/sci-fi/catwoman-pdf.fountain",
+      "sceneCount": 159,
+      "wordCount": 26673
+    },
+    {
+      "file": "crawl/action/the-bijou.fountain",
+      "sceneCount": 161,
+      "wordCount": 27847
+    },
+    {
+      "file": "crawl/crime/pi.fountain",
+      "sceneCount": 63,
+      "wordCount": 14778
+    },
+    {
+      "file": "crawl/sci-fi/halloween-resurrection-pdf.fountain",
+      "sceneCount": 187,
+      "wordCount": 22202
+    },
+    {
+      "file": "crawl/action/the-salton-sea.fountain",
+      "sceneCount": 199,
+      "wordCount": 22009
+    },
+    {
+      "file": "crawl/adventure/feast-early-draft.fountain",
+      "sceneCount": 118,
+      "wordCount": 21435
+    },
+    {
+      "file": "inside-out-2015.fountain",
+      "sceneCount": 387,
+      "wordCount": 19651
+    },
+    {
+      "file": "kubo-and-the-two-strings-2016.fountain",
+      "sceneCount": 55,
+      "wordCount": 21926
+    },
+    {
+      "file": "crawl/sci-fi/executive-decision-pdf.fountain",
+      "sceneCount": 278,
+      "wordCount": 31279
+    },
+    {
+      "file": "crawl/sci-fi/duchess-pdf.fountain",
+      "sceneCount": 153,
+      "wordCount": 23738
+    },
+    {
+      "file": "crawl/crime/limitless-html.fountain",
+      "sceneCount": 223,
+      "wordCount": 23725
+    },
+    {
+      "file": "crawl/crime/untraceable-pdf.fountain",
+      "sceneCount": 218,
+      "wordCount": 25375
+    },
+    {
+      "file": "crawl/sci-fi/zootopia-pdf.fountain",
+      "sceneCount": 102,
+      "wordCount": 19841
+    },
+    {
+      "file": "crawl/action/legionnaire.fountain",
+      "sceneCount": 199,
+      "wordCount": 23604
+    },
+    {
+      "file": "crawl/comedy/the-hudsucker-proxy.fountain",
+      "sceneCount": 219,
+      "wordCount": 27139
+    },
+    {
+      "file": "crawl/sci-fi/the-lost-city-of-z-pdf.fountain",
+      "sceneCount": 136,
+      "wordCount": 32987
+    },
+    {
+      "file": "crawl/action/snatch-pdf.fountain",
+      "sceneCount": 36,
+      "wordCount": 23048
+    },
+    {
+      "file": "crawl/sci-fi/lion-pdf.fountain",
+      "sceneCount": 228,
+      "wordCount": 25671
+    },
+    {
+      "file": "crawl/action/sgt-rock.fountain",
+      "sceneCount": 22,
+      "wordCount": 28990
+    },
+    {
+      "file": "crawl/crime/what-lies-beneath.fountain",
+      "sceneCount": 158,
+      "wordCount": 18839
+    },
+    {
+      "file": "crawl/sci-fi/the-fantastic-four.fountain",
+      "sceneCount": 181,
+      "wordCount": 27475
+    },
+    {
+      "file": "crawl/sci-fi/liar-liar-pdf.fountain",
+      "sceneCount": 112,
+      "wordCount": 17970
+    },
+    {
+      "file": "crawl/action/clerks.fountain",
+      "sceneCount": 9,
+      "wordCount": 23363
+    },
+    {
+      "file": "crawl/sci-fi/state-and-main.fountain",
+      "sceneCount": 183,
+      "wordCount": 21839
+    },
+    {
+      "file": "crawl/sci-fi/lady-bird-pdf.fountain",
+      "sceneCount": 128,
+      "wordCount": 17434
+    },
+    {
+      "file": "crawl/crime/human-nature.fountain",
+      "sceneCount": 162,
+      "wordCount": 20189
+    },
+    {
+      "file": "crawl/crime/training-day.fountain",
+      "sceneCount": 85,
+      "wordCount": 20319
+    },
+    {
+      "file": "crawl/action/wag-the-dog.fountain",
+      "sceneCount": 278,
+      "wordCount": 26949
+    },
+    {
+      "file": "crawl/fantasy/five-feet-and-rising.fountain",
+      "sceneCount": 27,
+      "wordCount": 4901
+    },
+    {
+      "file": "crawl/action/the-village-originally-the-woods.fountain",
+      "sceneCount": 119,
+      "wordCount": 21139
+    },
+    {
+      "file": "crawl/action/suspect-zero.fountain",
+      "sceneCount": 57,
+      "wordCount": 28854
+    },
+    {
+      "file": "crawl/sci-fi/moonlight-pdf.fountain",
+      "sceneCount": 154,
+      "wordCount": 20662
+    },
+    {
+      "file": "crawl/sci-fi/black-snake-moan-pdf.fountain",
+      "sceneCount": 138,
+      "wordCount": 24794
+    },
+    {
+      "file": "crawl/romance/true-romance-pdf.fountain",
+      "sceneCount": 133,
+      "wordCount": 27328
+    },
+    {
+      "file": "crawl/drama/out-of-sight.fountain",
+      "sceneCount": 165,
+      "wordCount": 30174
+    },
+    {
+      "file": "crawl/sci-fi/10-things-i-hate-about-you.fountain",
+      "sceneCount": 90,
+      "wordCount": 18588
+    },
+    {
+      "file": "crawl/fantasy/cast-away.fountain",
+      "sceneCount": 302,
+      "wordCount": 27041
+    },
+    {
+      "file": "crawl/action/bringing-out-the-dead.fountain",
+      "sceneCount": 78,
+      "wordCount": 18129
+    },
+    {
+      "file": "crawl/action/the-5th-element.fountain",
+      "sceneCount": 98,
+      "wordCount": 24322
+    },
+    {
+      "file": "crawl/action/valkyrie-html.fountain",
+      "sceneCount": 31,
+      "wordCount": 24835
+    },
+    {
+      "file": "crawl/action/bottle-rocket.fountain",
+      "sceneCount": 103,
+      "wordCount": 19812
+    },
+    {
+      "file": "crawl/action/slither.fountain",
+      "sceneCount": 195,
+      "wordCount": 22788
+    },
+    {
+      "file": "crawl/crime/donnie-brasco.fountain",
+      "sceneCount": 137,
+      "wordCount": 22374
+    },
+    {
+      "file": "crawl/action/freaked-pdf.fountain",
+      "sceneCount": 72,
+      "wordCount": 21719
+    },
+    {
+      "file": "crawl/horror/zerophilia-html.fountain",
+      "sceneCount": 34,
+      "wordCount": 14582
+    },
+    {
+      "file": "crawl/sci-fi/charlie-s-angels-pdf.fountain",
+      "sceneCount": 160,
+      "wordCount": 22948
+    },
+    {
+      "file": "crawl/sci-fi/sully-pdf.fountain",
+      "sceneCount": 186,
+      "wordCount": 21127
+    },
+    {
+      "file": "Kung Fu Panda.fountain.txt",
+      "sceneCount": 72,
+      "wordCount": 14918
+    },
+    {
+      "file": "crawl/horror/true-romance-html.fountain",
+      "sceneCount": 87,
+      "wordCount": 26880
+    },
+    {
+      "file": "crawl/sci-fi/the-italian-job-pdf.fountain",
+      "sceneCount": 281,
+      "wordCount": 21066
+    },
+    {
+      "file": "dead-frequency.fountain",
+      "sceneCount": 12,
+      "wordCount": 1831
+    },
+    {
+      "file": "crawl/sci-fi/committed-filmed-as-crazylove-pdf.fountain",
+      "sceneCount": 121,
+      "wordCount": 20948
+    },
+    {
+      "file": "crawl/comedy/kids.fountain",
+      "sceneCount": 73,
+      "wordCount": 17129
+    },
+    {
+      "file": "crawl/action/the-crow.fountain",
+      "sceneCount": 123,
+      "wordCount": 21915
+    },
+    {
+      "file": "crawl/war/spartan-pdf.fountain",
+      "sceneCount": 315,
+      "wordCount": 29564
+    },
+    {
+      "file": "crawl/action/dark-angel-pilot.fountain",
+      "sceneCount": 137,
+      "wordCount": 25521
+    },
+    {
+      "file": "crawl/sci-fi/fury-pdf.fountain",
+      "sceneCount": 116,
+      "wordCount": 24651
+    },
+    {
+      "file": "crawl/action/u-turn.fountain",
+      "sceneCount": 98,
+      "wordCount": 27210
+    },
+    {
+      "file": "crawl/adventure/mrs-brown.fountain",
+      "sceneCount": 137,
+      "wordCount": 17421
+    },
+    {
+      "file": "crawl/action/assassins.fountain",
+      "sceneCount": 181,
+      "wordCount": 22918
+    },
+    {
+      "file": "crawl/sci-fi/sphere.fountain",
+      "sceneCount": 201,
+      "wordCount": 23577
+    },
+    {
+      "file": "crawl/sci-fi/city-of-joy-pdf.fountain",
+      "sceneCount": 176,
+      "wordCount": 30237
+    },
+    {
+      "file": "crawl/action/demolition-man.fountain",
+      "sceneCount": 245,
+      "wordCount": 22473
+    },
+    {
+      "file": "crawl/adventure/the-talented-mr-ripley.fountain",
+      "sceneCount": 131,
+      "wordCount": 20523
+    },
+    {
+      "file": "crawl/sci-fi/mini-s-first-time-pdf.fountain",
+      "sceneCount": 180,
+      "wordCount": 23882
+    },
+    {
+      "file": "crawl/action/avatar-html.fountain",
+      "sceneCount": 165,
+      "wordCount": 35681
+    },
+    {
+      "file": "crawl/sci-fi/troy-pdf.fountain",
+      "sceneCount": 227,
+      "wordCount": 33071
+    },
+    {
+      "file": "up-2009.fountain",
+      "sceneCount": 187,
+      "wordCount": 16612
+    },
+    {
+      "file": "crawl/action/the-cider-house-rules.fountain",
+      "sceneCount": 197,
+      "wordCount": 26146
+    },
+    {
+      "file": "crawl/horror/meet-joe-black-html.fountain",
+      "sceneCount": 117,
+      "wordCount": 30008
+    },
+    {
+      "file": "the-good-dinosaur-2015.fountain",
+      "sceneCount": 71,
+      "wordCount": 14871
+    },
+    {
+      "file": "crawl/action/soldier.fountain",
+      "sceneCount": 239,
+      "wordCount": 32013
+    },
+    {
+      "file": "crawl/sci-fi/american-splendor-pdf.fountain",
+      "sceneCount": 145,
+      "wordCount": 19851
+    },
+    {
+      "file": "crawl/sci-fi/hotel-rwanda-pdf.fountain",
+      "sceneCount": 221,
+      "wordCount": 24651
+    },
+    {
+      "file": "crawl/action/autumn-in-new-york.fountain",
+      "sceneCount": 151,
+      "wordCount": 23928
+    },
+    {
+      "file": "crawl/action/the-grifters.fountain",
+      "sceneCount": 153,
+      "wordCount": 22431
+    },
+    {
+      "file": "crawl/crime/drop-dead-gorgeous.fountain",
+      "sceneCount": 197,
+      "wordCount": 18398
+    },
+    {
+      "file": "crawl/sci-fi/being-human-pdf.fountain",
+      "sceneCount": 209,
+      "wordCount": 39716
+    },
+    {
+      "file": "crawl/sci-fi/rough-diamonds-filmed-as-wild-things-diamonds-in-the-rough-p.fountain",
+      "sceneCount": 150,
+      "wordCount": 21081
+    },
+    {
+      "file": "crawl/crime/fracture-pdf.fountain",
+      "sceneCount": 139,
+      "wordCount": 22915
+    },
+    {
+      "file": "crawl/horror/pirates-of-the-caribbean.fountain",
+      "sceneCount": 154,
+      "wordCount": 121333
+    },
+    {
+      "file": "crawl/sci-fi/toni-erdmann-pdf.fountain",
+      "sceneCount": 113,
+      "wordCount": 27823
+    },
+    {
+      "file": "crawl/comedy/a-walk-to-remember.fountain",
+      "sceneCount": 229,
+      "wordCount": 19398
+    },
+    {
+      "file": "crawl/sci-fi/10-000-b-c-pdf.fountain",
+      "sceneCount": 178,
+      "wordCount": 29763
+    },
+    {
+      "file": "crawl/sci-fi/virtuosity-pdf.fountain",
+      "sceneCount": 166,
+      "wordCount": 26926
+    },
+    {
+      "file": "crawl/sci-fi/the-boy-next-door-pdf.fountain",
+      "sceneCount": 177,
+      "wordCount": 23376
+    },
+    {
+      "file": "spiyder-race-2011-html.fountain",
+      "sceneCount": 120,
+      "wordCount": 26590
+    },
+    {
+      "file": "crawl/sci-fi/20th-century-woman-pdf.fountain",
+      "sceneCount": 196,
+      "wordCount": 17149
+    },
+    {
+      "file": "crawl/action/heist-pdf.fountain",
+      "sceneCount": 334,
+      "wordCount": 26251
+    },
+    {
+      "file": "crawl/action/nick-of-time.fountain",
+      "sceneCount": 143,
+      "wordCount": 20014
+    },
+    {
+      "file": "Frozen.fountain.txt",
+      "sceneCount": 124,
+      "wordCount": 19926
+    },
+    {
+      "file": "Toy_Story_3.fountain.txt",
+      "sceneCount": 163,
+      "wordCount": 24126
+    },
+    {
+      "file": "crawl/action/ace-ventura-pet-detective.fountain",
+      "sceneCount": 132,
+      "wordCount": 17984
+    },
+    {
+      "file": "crawl/crime/the-cell.fountain",
+      "sceneCount": 121,
+      "wordCount": 21551
+    },
+    {
+      "file": "crawl/comedy/timber-falls-html.fountain",
+      "sceneCount": 7,
+      "wordCount": 21740
+    },
+    {
+      "file": "crawl/horror/little-nicky.fountain",
+      "sceneCount": 141,
+      "wordCount": 18224
+    },
+    {
+      "file": "crawl/action/3-kings-spoils-of-war.fountain",
+      "sceneCount": 37,
+      "wordCount": 25460
+    },
+    {
+      "file": "crawl/sci-fi/the-meddler-pdf.fountain",
+      "sceneCount": 137,
+      "wordCount": 21470
+    },
+    {
+      "file": "spider-man-across-the-spider-verse-2023.fountain",
+      "sceneCount": 129,
+      "wordCount": 26196
+    },
+    {
+      "file": "crawl/sci-fi/wonderstruck-pdf.fountain",
+      "sceneCount": 156,
+      "wordCount": 22939
+    },
+    {
+      "file": "crawl/sci-fi/breakdown-pdf.fountain",
+      "sceneCount": 163,
+      "wordCount": 22885
+    },
+    {
+      "file": "crawl/sci-fi/the-island-pdf.fountain",
+      "sceneCount": 225,
+      "wordCount": 39370
+    },
+    {
+      "file": "crawl/fantasy/batman-returns.fountain",
+      "sceneCount": 324,
+      "wordCount": 32378
+    },
+    {
+      "file": "crawl/romance/never-been-kissed.fountain",
+      "sceneCount": 189,
+      "wordCount": 24174
+    },
+    {
+      "file": "crawl/action/hero.fountain",
+      "sceneCount": 201,
+      "wordCount": 29307
+    },
+    {
+      "file": "crawl/sci-fi/get-on-up-pdf.fountain",
+      "sceneCount": 168,
+      "wordCount": 27229
+    },
+    {
+      "file": "crawl/sci-fi/heat-pdf.fountain",
+      "sceneCount": 280,
+      "wordCount": 29125
+    },
+    {
+      "file": "crawl/sci-fi/call-me-by-your-name-pdf.fountain",
       "sceneCount": 52,
-      "wordCount": 26403
+      "wordCount": 23765
+    },
+    {
+      "file": "crawl/crime/the-crowded-room.fountain",
+      "sceneCount": 303,
+      "wordCount": 28422
+    },
+    {
+      "file": "crawl/sci-fi/youth-in-revolt-pdf.fountain",
+      "sceneCount": 247,
+      "wordCount": 25931
+    },
+    {
+      "file": "crawl/sci-fi/dunkirk-pdf.fountain",
+      "sceneCount": 199,
+      "wordCount": 15560
+    },
+    {
+      "file": "crawl/sci-fi/frozen-river-pdf.fountain",
+      "sceneCount": 157,
+      "wordCount": 19370
+    },
+    {
+      "file": "crawl/action/lake-placid.fountain",
+      "sceneCount": 96,
+      "wordCount": 15116
+    },
+    {
+      "file": "crawl/crime/croupier-html.fountain",
+      "sceneCount": 160,
+      "wordCount": 19065
+    },
+    {
+      "file": "crawl/action/last-of-the-mohicans.fountain",
+      "sceneCount": 123,
+      "wordCount": 25205
+    },
+    {
+      "file": "Heavy Metal.fountain.txt",
+      "sceneCount": 253,
+      "wordCount": 20364
+    },
+    {
+      "file": "cars-2-matched.fountain",
+      "sceneCount": 118,
+      "wordCount": 24332
+    },
+    {
+      "file": "crawl/crime/cellular.fountain",
+      "sceneCount": 47,
+      "wordCount": 18871
+    },
+    {
+      "file": "crawl/sci-fi/maggie-s-plan-pdf.fountain",
+      "sceneCount": 136,
+      "wordCount": 19578
+    },
+    {
+      "file": "crawl/crime/reindeer-games.fountain",
+      "sceneCount": 166,
+      "wordCount": 26223
+    },
+    {
+      "file": "crawl/action/snow-falling-on-cedars.fountain",
+      "sceneCount": 270,
+      "wordCount": 25135
+    },
+    {
+      "file": "crawl/sci-fi/arac-attack-released-as-eight-legged-freaks-pdf.fountain",
+      "sceneCount": 203,
+      "wordCount": 18591
+    },
+    {
+      "file": "crawl/action/13-days.fountain",
+      "sceneCount": 281,
+      "wordCount": 33742
+    },
+    {
+      "file": "crawl/action/copycat.fountain",
+      "sceneCount": 152,
+      "wordCount": 30101
+    },
+    {
+      "file": "Monsters_University.fountain.txt",
+      "sceneCount": 139,
+      "wordCount": 24728
+    },
+    {
+      "file": "crawl/action/watchmen-html.fountain",
+      "sceneCount": 201,
+      "wordCount": 27514
+    },
+    {
+      "file": "crawl/crime/glengarry-glen-ross.fountain",
+      "sceneCount": 49,
+      "wordCount": 13908
+    },
+    {
+      "file": "crawl/sci-fi/the-royal-tenenbaums-pdf.fountain",
+      "sceneCount": 143,
+      "wordCount": 25774
+    },
+    {
+      "file": "crawl/sci-fi/the-zero-theorem-pdf.fountain",
+      "sceneCount": 83,
+      "wordCount": 19793
+    },
+    {
+      "file": "crawl/war/rushmore.fountain",
+      "sceneCount": 83,
+      "wordCount": 21911
+    },
+    {
+      "file": "crawl/sci-fi/macbeth-pdf.fountain",
+      "sceneCount": 117,
+      "wordCount": 22450
+    },
+    {
+      "file": "crawl/sci-fi/game-6-pdf.fountain",
+      "sceneCount": 112,
+      "wordCount": 15779
+    },
+    {
+      "file": "crawl/horror/beavis-and-butt-head-do-america.fountain",
+      "sceneCount": 186,
+      "wordCount": 17530
+    },
+    {
+      "file": "crawl/sci-fi/hitchhiker-s-guide-to-the-galaxy-pdf.fountain",
+      "sceneCount": 78,
+      "wordCount": 24476
+    },
+    {
+      "file": "crawl/action/there-s-something-about-mary.fountain",
+      "sceneCount": 133,
+      "wordCount": 22586
+    },
+    {
+      "file": "crawl/sci-fi/chronicle-pdf.fountain",
+      "sceneCount": 99,
+      "wordCount": 18278
+    },
+    {
+      "file": "crawl/sci-fi/the-postman-pdf.fountain",
+      "sceneCount": 172,
+      "wordCount": 28548
+    },
+    {
+      "file": "crawl/crime/thunderheart.fountain",
+      "sceneCount": 98,
+      "wordCount": 30579
+    },
+    {
+      "file": "crawl/action/fear-and-loathing-in-las-vegas.fountain",
+      "sceneCount": 130,
+      "wordCount": 22720
+    },
+    {
+      "file": "crawl/crime/high-fidelity.fountain",
+      "sceneCount": 118,
+      "wordCount": 26095
+    },
+    {
+      "file": "crawl/crime/juno.fountain",
+      "sceneCount": 122,
+      "wordCount": 18289
+    },
+    {
+      "file": "crawl/sci-fi/gone-girl-pdf.fountain",
+      "sceneCount": 299,
+      "wordCount": 33407
+    },
+    {
+      "file": "crawl/sci-fi/brooklyn-pdf.fountain",
+      "sceneCount": 156,
+      "wordCount": 25153
+    },
+    {
+      "file": "crawl/action/mighty-morphin-power-rangers.fountain",
+      "sceneCount": 29,
+      "wordCount": 17152
+    },
+    {
+      "file": "crawl/sci-fi/the-power-of-one-pdf.fountain",
+      "sceneCount": 152,
+      "wordCount": 30466
+    },
+    {
+      "file": "crawl/sci-fi/confidence-pdf.fountain",
+      "sceneCount": 144,
+      "wordCount": 24152
+    },
+    {
+      "file": "crawl/horror/the-ghost-and-the-darkness.fountain",
+      "sceneCount": 11,
+      "wordCount": 22525
+    },
+    {
+      "file": "crawl/action/cold-mountain.fountain",
+      "sceneCount": 203,
+      "wordCount": 29608
+    },
+    {
+      "file": "crawl/sci-fi/unbroken-pdf.fountain",
+      "sceneCount": 199,
+      "wordCount": 20203
+    },
+    {
+      "file": "crawl/sci-fi/harold-and-kumar-go-to-white-castle-pdf.fountain",
+      "sceneCount": 157,
+      "wordCount": 26026
+    },
+    {
+      "file": "crawl/crime/basic.fountain",
+      "sceneCount": 142,
+      "wordCount": 22329
+    },
+    {
+      "file": "crawl/crime/wild-at-heart.fountain",
+      "sceneCount": 27,
+      "wordCount": 27657
+    },
+    {
+      "file": "crawl/adventure/sugar-html.fountain",
+      "sceneCount": 43,
+      "wordCount": 24593
+    },
+    {
+      "file": "crawl/thriller/swingers.fountain",
+      "sceneCount": 115,
+      "wordCount": 17151
+    },
+    {
+      "file": "crawl/sci-fi/sing-street-pdf.fountain",
+      "sceneCount": 144,
+      "wordCount": 24635
+    },
+    {
+      "file": "crawl/drama/the-public-eye.fountain",
+      "sceneCount": 160,
+      "wordCount": 23635
+    },
+    {
+      "file": "crawl/action/red-planet.fountain",
+      "sceneCount": 172,
+      "wordCount": 22197
+    },
+    {
+      "file": "crawl/sci-fi/elle-pdf.fountain",
+      "sceneCount": 296,
+      "wordCount": 48738
+    },
+    {
+      "file": "crawl/sci-fi/silence-pdf.fountain",
+      "sceneCount": 193,
+      "wordCount": 26679
+    },
+    {
+      "file": "crawl/drama/the-kingdom-of-heaven-pdf.fountain",
+      "sceneCount": 181,
+      "wordCount": 29114
+    },
+    {
+      "file": "crawl/sci-fi/newsies-pdf.fountain",
+      "sceneCount": 121,
+      "wordCount": 26127
+    },
+    {
+      "file": "crawl/crime/dark-city.fountain",
+      "sceneCount": 126,
+      "wordCount": 27114
+    },
+    {
+      "file": "crawl/action/punch-drunk-love.fountain",
+      "sceneCount": 155,
+      "wordCount": 15599
+    },
+    {
+      "file": "crawl/crime/speed-pdf.fountain",
+      "sceneCount": 380,
+      "wordCount": 39142
+    },
+    {
+      "file": "crawl/horror/interview-with-the-vampire-pdf.fountain",
+      "sceneCount": 161,
+      "wordCount": 37848
+    },
+    {
+      "file": "crawl/sci-fi/babel-pdf.fountain",
+      "sceneCount": 199,
+      "wordCount": 26271
+    }
+  ],
+  "val": [
+    {
+      "file": "crawl/comedy/erin-brockovich.fountain",
+      "sceneCount": 284,
+      "wordCount": 29377
+    },
+    {
+      "file": "crawl/sci-fi/armstrong-filmed-as-first-man-pdf.fountain",
+      "sceneCount": 279,
+      "wordCount": 34102
+    },
+    {
+      "file": "crawl/crime/jay-and-silent-bob-strike-back.fountain",
+      "sceneCount": 135,
+      "wordCount": 24044
+    },
+    {
+      "file": "crawl/comedy/ghost-world.fountain",
+      "sceneCount": 124,
+      "wordCount": 22543
+    },
+    {
+      "file": "crawl/crime/sixth-sense-the-html.fountain",
+      "sceneCount": 123,
+      "wordCount": 23305
+    },
+    {
+      "file": "crawl/adventure/house-on-haunted-hill.fountain",
+      "sceneCount": 142,
+      "wordCount": 22240
+    },
+    {
+      "file": "crawl/action/ronin-html.fountain",
+      "sceneCount": 99,
+      "wordCount": 28401
+    },
+    {
+      "file": "crawl/drama/dumb-and-dumber.fountain",
+      "sceneCount": 150,
+      "wordCount": 22918
+    },
+    {
+      "file": "crawl/comedy/the-woodsman.fountain",
+      "sceneCount": 130,
+      "wordCount": 16819
+    },
+    {
+      "file": "crawl/crime/kalifornia.fountain",
+      "sceneCount": 309,
+      "wordCount": 26091
+    },
+    {
+      "file": "crawl/horror/blink-twice-html.fountain",
+      "sceneCount": 157,
+      "wordCount": 19342
+    },
+    {
+      "file": "crawl/sci-fi/the-fugitive-pdf.fountain",
+      "sceneCount": 370,
+      "wordCount": 25518
+    },
+    {
+      "file": "crawl/sci-fi/pray-for-dawn-pdf.fountain",
+      "sceneCount": 68,
+      "wordCount": 16395
+    },
+    {
+      "file": "crawl/action/mission-to-mars.fountain",
+      "sceneCount": 178,
+      "wordCount": 28631
+    },
+    {
+      "file": "crawl/horror/kafka.fountain",
+      "sceneCount": 15,
+      "wordCount": 22190
+    },
+    {
+      "file": "crawl/sci-fi/solaris.fountain",
+      "sceneCount": 120,
+      "wordCount": 12342
+    },
+    {
+      "file": "crawl/sci-fi/trainwreck-pdf.fountain",
+      "sceneCount": 115,
+      "wordCount": 19239
+    },
+    {
+      "file": "crawl/comedy/john-q.fountain",
+      "sceneCount": 169,
+      "wordCount": 23499
+    },
+    {
+      "file": "crawl/drama/the-usual-suspects.fountain",
+      "sceneCount": 140,
+      "wordCount": 24106
+    },
+    {
+      "file": "crawl/action/pet-sematary-ii.fountain",
+      "sceneCount": 180,
+      "wordCount": 23076
+    },
+    {
+      "file": "crawl/action/superfights-pdf.fountain",
+      "sceneCount": 111,
+      "wordCount": 18126
+    },
+    {
+      "file": "crawl/action/the-limey.fountain",
+      "sceneCount": 134,
+      "wordCount": 19738
+    },
+    {
+      "file": "crawl/sci-fi/ex-machina-pdf.fountain",
+      "sceneCount": 216,
+      "wordCount": 20257
+    },
+    {
+      "file": "crawl/sci-fi/the-jacket-pdf.fountain",
+      "sceneCount": 185,
+      "wordCount": 28263
+    },
+    {
+      "file": "crawl/sci-fi/i-robot-pdf.fountain",
+      "sceneCount": 58,
+      "wordCount": 21659
+    },
+    {
+      "file": "crawl/crime/lord-of-illusions.fountain",
+      "sceneCount": 190,
+      "wordCount": 20630
+    },
+    {
+      "file": "crawl/crime/man-on-fire-pdf.fountain",
+      "sceneCount": 187,
+      "wordCount": 26126
+    },
+    {
+      "file": "crawl/action/natural-born-killers.fountain",
+      "sceneCount": 193,
+      "wordCount": 31851
+    },
+    {
+      "file": "crawl/sci-fi/antitrust.fountain",
+      "sceneCount": 289,
+      "wordCount": 25133
+    },
+    {
+      "file": "crawl/sci-fi/american-bullshit-filmed-as-american-hustle-pdf.fountain",
+      "sceneCount": 160,
+      "wordCount": 36041
+    },
+    {
+      "file": "corpse-bride-2005.fountain",
+      "sceneCount": 66,
+      "wordCount": 14155
+    },
+    {
+      "file": "crawl/action/game-6.fountain",
+      "sceneCount": 112,
+      "wordCount": 15442
+    },
+    {
+      "file": "crawl/sci-fi/letters-to-juliet-pdf.fountain",
+      "sceneCount": 127,
+      "wordCount": 21513
+    },
+    {
+      "file": "crawl/sci-fi/the-meyerowitz-stories-new-and-selected-pdf.fountain",
+      "sceneCount": 89,
+      "wordCount": 26535
+    },
+    {
+      "file": "crawl/crime/affliction.fountain",
+      "sceneCount": 88,
+      "wordCount": 16102
+    },
+    {
+      "file": "crawl/drama/the-prophecy.fountain",
+      "sceneCount": 91,
+      "wordCount": 24415
+    },
+    {
+      "file": "crawl/crime/man-on-fire.fountain",
+      "sceneCount": 186,
+      "wordCount": 25485
+    },
+    {
+      "file": "crawl/crime/wild-things.fountain",
+      "sceneCount": 151,
+      "wordCount": 25482
+    },
+    {
+      "file": "crawl/romance/something-borrowed-filmed-as-the-wedding-date-pdf.fountain",
+      "sceneCount": 136,
+      "wordCount": 20831
+    },
+    {
+      "file": "crawl/sci-fi/the-flintstones-pdf.fountain",
+      "sceneCount": 106,
+      "wordCount": 27306
+    },
+    {
+      "file": "crawl/crime/conspiracy-theory.fountain",
+      "sceneCount": 183,
+      "wordCount": 23506
+    },
+    {
+      "file": "shrek_script.fountain.txt",
+      "sceneCount": 13,
+      "wordCount": 13051
+    },
+    {
+      "file": "crawl/action/lost-in-translation.fountain",
+      "sceneCount": 121,
+      "wordCount": 13333
+    },
+    {
+      "file": "crawl/action/the-haunting.fountain",
+      "sceneCount": 183,
+      "wordCount": 29719
+    },
+    {
+      "file": "a-scanner-darkly-matched.fountain",
+      "sceneCount": 152,
+      "wordCount": 27169
+    },
+    {
+      "file": "crawl/fantasy/gateway-pdf.fountain",
+      "sceneCount": 139,
+      "wordCount": 23800
+    },
+    {
+      "file": "crawl/action/austin-powers-international-man-of-mystery.fountain",
+      "sceneCount": 139,
+      "wordCount": 19060
+    },
+    {
+      "file": "crawl/sci-fi/the-addams-family-pdf.fountain",
+      "sceneCount": 192,
+      "wordCount": 24956
+    },
+    {
+      "file": "crawl/action/xxx.fountain",
+      "sceneCount": 129,
+      "wordCount": 24700
+    },
+    {
+      "file": "crawl/horror/deep-rising.fountain",
+      "sceneCount": 28,
+      "wordCount": 22786
     },
     {
       "file": "coco-2017.fountain",
@@ -431,9 +2554,1276 @@
       "wordCount": 22341
     },
     {
-      "file": "isle-of-dogs-2018.fountain",
+      "file": "crawl/romance/something-borrowed-filmed-as-the-wedding-date.fountain",
+      "sceneCount": 136,
+      "wordCount": 20700
+    },
+    {
+      "file": "crawl/action/elf.fountain",
+      "sceneCount": 132,
+      "wordCount": 18878
+    },
+    {
+      "file": "2020-07-17-soul-final-script.fountain",
+      "sceneCount": 94,
+      "wordCount": 22579
+    },
+    {
+      "file": "crawl/action/committed-filmed-as-crazy-love.fountain",
+      "sceneCount": 121,
+      "wordCount": 20821
+    },
+    {
+      "file": "crawl/adventure/blow.fountain",
+      "sceneCount": 172,
+      "wordCount": 22686
+    },
+    {
+      "file": "crawl/crime/natural-born-killers-pdf.fountain",
+      "sceneCount": 119,
+      "wordCount": 27161
+    },
+    {
+      "file": "crawl/sci-fi/i-saw-the-light-pdf.fountain",
+      "sceneCount": 175,
+      "wordCount": 25788
+    },
+    {
+      "file": "crawl/crime/batman-forever.fountain",
+      "sceneCount": 30,
+      "wordCount": 23664
+    },
+    {
+      "file": "crawl/action/pitch-black.fountain",
+      "sceneCount": 228,
+      "wordCount": 19562
+    },
+    {
+      "file": "crawl/comedy/the-crying-game.fountain",
+      "sceneCount": 105,
+      "wordCount": 15648
+    },
+    {
+      "file": "crawl/action/enemy-of-the-state.fountain",
+      "sceneCount": 199,
+      "wordCount": 22004
+    },
+    {
+      "file": "crawl/action/star-trek-10-nemesis.fountain",
+      "sceneCount": 170,
+      "wordCount": 21726
+    },
+    {
+      "file": "crawl/action/the-black-dahlia.fountain",
+      "sceneCount": 293,
+      "wordCount": 36011
+    },
+    {
+      "file": "crawl/adventure/american-beauty.fountain",
+      "sceneCount": 168,
+      "wordCount": 20243
+    },
+    {
+      "file": "crawl/adventure/titanic.fountain",
+      "sceneCount": 208,
+      "wordCount": 43358
+    },
+    {
+      "file": "crawl/comedy/beloved.fountain",
+      "sceneCount": 235,
+      "wordCount": 33514
+    },
+    {
+      "file": "elemental-2023.fountain",
+      "sceneCount": 136,
+      "wordCount": 23802
+    },
+    {
+      "file": "crawl/crime/basic-instinct.fountain",
+      "sceneCount": 140,
+      "wordCount": 20119
+    },
+    {
+      "file": "crawl/crime/the-anniversary-party.fountain",
+      "sceneCount": 83,
+      "wordCount": 16518
+    },
+    {
+      "file": "crawl/action/jennifer-eight.fountain",
+      "sceneCount": 22,
+      "wordCount": 35630
+    },
+    {
+      "file": "crawl/fantasy/love-and-basketball.fountain",
+      "sceneCount": 115,
+      "wordCount": 20972
+    },
+    {
+      "file": "encanto-2021.fountain",
+      "sceneCount": 72,
+      "wordCount": 21606
+    },
+    {
+      "file": "crawl/drama/l-a-confidential.fountain",
+      "sceneCount": 174,
+      "wordCount": 25761
+    },
+    {
+      "file": "crawl/crime/goodfellas.fountain",
+      "sceneCount": 157,
+      "wordCount": 24515
+    },
+    {
+      "file": "crawl/adventure/quantum-project.fountain",
+      "sceneCount": 6,
+      "wordCount": 5906
+    },
+    {
+      "file": "crawl/action/solaris.fountain",
+      "sceneCount": 120,
+      "wordCount": 12346
+    },
+    {
+      "file": "crawl/sci-fi/malibu-s-most-wanted-pdf.fountain",
+      "sceneCount": 131,
+      "wordCount": 18638
+    },
+    {
+      "file": "crawl/sci-fi/maria-full-of-grace-pdf.fountain",
+      "sceneCount": 167,
+      "wordCount": 19812
+    },
+    {
+      "file": "crawl/sci-fi/the-disaster-artist-pdf.fountain",
+      "sceneCount": 119,
+      "wordCount": 21897
+    },
+    {
+      "file": "crawl/sci-fi/training-day-pdf.fountain",
+      "sceneCount": 92,
+      "wordCount": 21133
+    },
+    {
+      "file": "crawl/drama/lone-star.fountain",
+      "sceneCount": 100,
+      "wordCount": 23468
+    },
+    {
+      "file": "crawl/sci-fi/tombstone-pdf.fountain",
+      "sceneCount": 113,
+      "wordCount": 30648
+    },
+    {
+      "file": "crawl/mystery/lost-highway.fountain",
+      "sceneCount": 189,
+      "wordCount": 23978
+    },
+    {
+      "file": "crawl/sci-fi/carol-pdf.fountain",
+      "sceneCount": 164,
+      "wordCount": 25806
+    },
+    {
+      "file": "crawl/drama/the-siege.fountain",
+      "sceneCount": 47,
+      "wordCount": 23453
+    },
+    {
+      "file": "crawl/crime/the-bourne-supremacy.fountain",
+      "sceneCount": 327,
+      "wordCount": 22505
+    },
+    {
+      "file": "crawl/action/american-outlaws.fountain",
+      "sceneCount": 147,
+      "wordCount": 21107
+    },
+    {
+      "file": "Dr_Seuss_The_Lorax.fountain.txt",
+      "sceneCount": 112,
+      "wordCount": 21815
+    },
+    {
+      "file": "crawl/sci-fi/next-pdf.fountain",
+      "sceneCount": 113,
+      "wordCount": 24794
+    },
+    {
+      "file": "crawl/sci-fi/the-prestige-pdf.fountain",
+      "sceneCount": 242,
+      "wordCount": 27262
+    },
+    {
+      "file": "crawl/horror/slash.fountain",
+      "sceneCount": 198,
+      "wordCount": 21775
+    },
+    {
+      "file": "crawl/sci-fi/miles-ahead-pdf.fountain",
+      "sceneCount": 88,
+      "wordCount": 21694
+    },
+    {
+      "file": "crawl/crime/seven.fountain",
+      "sceneCount": 206,
+      "wordCount": 34470
+    },
+    {
+      "file": "crawl/sci-fi/capote-pdf.fountain",
+      "sceneCount": 181,
+      "wordCount": 48864
+    },
+    {
+      "file": "crawl/sci-fi/mighty-joe-young-pdf.fountain",
+      "sceneCount": 146,
+      "wordCount": 27563
+    },
+    {
+      "file": "crawl/drama/get-carter-pdf.fountain",
+      "sceneCount": 233,
+      "wordCount": 21771
+    },
+    {
+      "file": "crawl/sci-fi/12-years-a-slave-pdf.fountain",
+      "sceneCount": 230,
+      "wordCount": 36370
+    },
+    {
+      "file": "crawl/comedy/ed-tv.fountain",
+      "sceneCount": 6,
+      "wordCount": 23909
+    },
+    {
+      "file": "crawl/action/the-secret-life-of-walter-mitty-pdf.fountain",
+      "sceneCount": 219,
+      "wordCount": 23520
+    },
+    {
+      "file": "crawl/crime/next-friday.fountain",
+      "sceneCount": 81,
+      "wordCount": 15831
+    },
+    {
+      "file": "crawl/romance/fifty-violins-filmed-as-music-of-the-heart.fountain",
+      "sceneCount": 160,
+      "wordCount": 24891
+    },
+    {
+      "file": "crawl/horror/the-devil-s-advocate-pdf.fountain",
+      "sceneCount": 256,
+      "wordCount": 26180
+    },
+    {
+      "file": "crawl/crime/the-corruptor.fountain",
+      "sceneCount": 16,
+      "wordCount": 22537
+    },
+    {
+      "file": "zootopia-2016.fountain",
+      "sceneCount": 105,
+      "wordCount": 19724
+    },
+    {
+      "file": "crawl/sci-fi/gothika-pdf.fountain",
+      "sceneCount": 158,
+      "wordCount": 25732
+    },
+    {
+      "file": "crawl/fantasy/twilight-html.fountain",
+      "sceneCount": 215,
+      "wordCount": 23047
+    },
+    {
+      "file": "crawl/drama/long-kiss-goodnight.fountain",
+      "sceneCount": 162,
+      "wordCount": 28573
+    },
+    {
+      "file": "crawl/crime/deep-cover.fountain",
+      "sceneCount": 138,
+      "wordCount": 20780
+    },
+    {
+      "file": "crawl/action/high-fidelity-html.fountain",
+      "sceneCount": 118,
+      "wordCount": 26465
+    },
+    {
+      "file": "counter-offer.fountain",
+      "sceneCount": 10,
+      "wordCount": 1522
+    },
+    {
+      "file": "crawl/sci-fi/something-s-gotta-give-pdf.fountain",
+      "sceneCount": 83,
+      "wordCount": 26574
+    },
+    {
+      "file": "crawl/fantasy/swordfish-pdf.fountain",
+      "sceneCount": 182,
+      "wordCount": 20443
+    },
+    {
+      "file": "crawl/romance/the-wedding-crashers-pdf.fountain",
+      "sceneCount": 198,
+      "wordCount": 32677
+    },
+    {
+      "file": "crawl/sci-fi/what-to-expect-when-you-re-expecting-pdf.fountain",
+      "sceneCount": 145,
+      "wordCount": 25040
+    },
+    {
+      "file": "crawl/crime/crime-spree.fountain",
+      "sceneCount": 216,
+      "wordCount": 24466
+    },
+    {
+      "file": "crawl/sci-fi/havoc-2-normal-adolescent-behavior-pdf.fountain",
+      "sceneCount": 105,
+      "wordCount": 18901
+    },
+    {
+      "file": "crawl/crime/jackie-brown.fountain",
+      "sceneCount": 132,
+      "wordCount": 31679
+    },
+    {
+      "file": "crawl/sci-fi/love-and-friendship-pdf.fountain",
+      "sceneCount": 83,
+      "wordCount": 16530
+    },
+    {
+      "file": "crawl/action/miller-s-crossing.fountain",
+      "sceneCount": 290,
+      "wordCount": 27448
+    },
+    {
+      "file": "crawl/horror/star-wars-the-empire-strikes-back-html.fountain",
+      "sceneCount": 285,
+      "wordCount": 27502
+    },
+    {
+      "file": "crawl/sci-fi/mistress-america-pdf.fountain",
+      "sceneCount": 89,
+      "wordCount": 18258
+    },
+    {
+      "file": "crawl/sci-fi/taking-lives-pdf.fountain",
+      "sceneCount": 186,
+      "wordCount": 21479
+    },
+    {
+      "file": "crawl/comedy/the-ghost-and-the-darkness.fountain",
+      "sceneCount": 12,
+      "wordCount": 22871
+    },
+    {
+      "file": "crawl/sci-fi/cellular-pdf.fountain",
+      "sceneCount": 135,
+      "wordCount": 25667
+    },
+    {
+      "file": "crawl/sci-fi/3-kings-pdf.fountain",
+      "sceneCount": 215,
+      "wordCount": 28291
+    },
+    {
+      "file": "crawl/crime/harry-potter-and-the-order-of-the-phoenix-pdf.fountain",
+      "sceneCount": 77,
+      "wordCount": 12735
+    },
+    {
+      "file": "crawl/sci-fi/bad-boys-pdf.fountain",
+      "sceneCount": 286,
+      "wordCount": 26220
+    },
+    {
+      "file": "crawl/action/happy-campers.fountain",
+      "sceneCount": 160,
+      "wordCount": 32922
+    },
+    {
+      "file": "crawl/sci-fi/robin-hood-the-prince-of-thieves-pdf.fountain",
+      "sceneCount": 123,
+      "wordCount": 25637
+    },
+    {
+      "file": "crawl/romance/legally-blonde.fountain",
+      "sceneCount": 129,
+      "wordCount": 20856
+    },
+    {
+      "file": "crawl/sci-fi/downsizing-pdf.fountain",
+      "sceneCount": 214,
+      "wordCount": 26237
+    },
+    {
+      "file": "crawl/fantasy/rko-281.fountain",
+      "sceneCount": 21,
+      "wordCount": 23725
+    },
+    {
+      "file": "crawl/adventure/eternal-sunshine-of-the-spotless-mind.fountain",
+      "sceneCount": 170,
+      "wordCount": 23282
+    },
+    {
+      "file": "crawl/crime/crow-3-resurrection.fountain",
+      "sceneCount": 62,
+      "wordCount": 21124
+    },
+    {
+      "file": "crawl/action/misery.fountain",
+      "sceneCount": 15,
+      "wordCount": 21353
+    },
+    {
+      "file": "crawl/crime/se7en-html.fountain",
+      "sceneCount": 206,
+      "wordCount": 34843
+    },
+    {
+      "file": "WALL-E.fountain.txt",
+      "sceneCount": 292,
+      "wordCount": 17202
+    },
+    {
+      "file": "crawl/action/the-hebrew-hammer.fountain",
+      "sceneCount": 74,
+      "wordCount": 20749
+    },
+    {
+      "file": "crawl/action/el-mariachi.fountain",
+      "sceneCount": 133,
+      "wordCount": 13015
+    },
+    {
+      "file": "the-incredibles-2004.fountain",
+      "sceneCount": 77,
+      "wordCount": 27146
+    },
+    {
+      "file": "crawl/fantasy/mumford.fountain",
+      "sceneCount": 193,
+      "wordCount": 25987
+    },
+    {
+      "file": "sausage-party-2016.fountain",
+      "sceneCount": 55,
+      "wordCount": 22805
+    },
+    {
+      "file": "crawl/sci-fi/spare-me.fountain",
+      "sceneCount": 22,
+      "wordCount": 16171
+    },
+    {
+      "file": "crawl/war/thirteen-days.fountain",
+      "sceneCount": 281,
+      "wordCount": 33674
+    },
+    {
+      "file": "crawl/sci-fi/the-spectacular-now-pdf.fountain",
+      "sceneCount": 103,
+      "wordCount": 22653
+    },
+    {
+      "file": "crawl/sci-fi/pretty-woman-pdf.fountain",
+      "sceneCount": 149,
+      "wordCount": 27806
+    },
+    {
+      "file": "ratatouille-2007.fountain",
+      "sceneCount": 127,
+      "wordCount": 24276
+    },
+    {
+      "file": "crawl/action/reservoir-dogs.fountain",
+      "sceneCount": 52,
+      "wordCount": 17758
+    },
+    {
+      "file": "crawl/crime/the-mummy-1999.fountain",
+      "sceneCount": 108,
+      "wordCount": 27113
+    },
+    {
+      "file": "crawl/crime/mr-holland-s-opus-pdf.fountain",
+      "sceneCount": 171,
+      "wordCount": 25238
+    },
+    {
+      "file": "crawl/crime/wonder-boys.fountain",
+      "sceneCount": 44,
+      "wordCount": 24696
+    }
+  ],
+  "test": [
+    {
+      "file": "crawl/crime/gone-in-sixty-seconds.fountain",
+      "sceneCount": 193,
+      "wordCount": 28817
+    },
+    {
+      "file": "crawl/sci-fi/the-life-of-david-gale-pdf.fountain",
+      "sceneCount": 189,
+      "wordCount": 22577
+    },
+    {
+      "file": "crawl/sci-fi/fences-pdf.fountain",
+      "sceneCount": 75,
+      "wordCount": 30229
+    },
+    {
+      "file": "crawl/action/trainspotting.fountain",
+      "sceneCount": 190,
+      "wordCount": 17373
+    },
+    {
+      "file": "crawl/comedy/beloved-html.fountain",
+      "sceneCount": 235,
+      "wordCount": 33863
+    },
+    {
+      "file": "crawl/fantasy/sideways.fountain",
+      "sceneCount": 185,
+      "wordCount": 24973
+    },
+    {
+      "file": "crawl/comedy/panic-room.fountain",
+      "sceneCount": 174,
+      "wordCount": 23130
+    },
+    {
+      "file": "crawl/crime/12-monkeys.fountain",
+      "sceneCount": 174,
+      "wordCount": 30880
+    },
+    {
+      "file": "crawl/comedy/barton-fink.fountain",
+      "sceneCount": 146,
+      "wordCount": 21529
+    },
+    {
+      "file": "crawl/action/the-english-patient.fountain",
+      "sceneCount": 236,
+      "wordCount": 30945
+    },
+    {
+      "file": "crawl/crime/so-i-married-an-axe-murderer.fountain",
+      "sceneCount": 106,
+      "wordCount": 19746
+    },
+    {
+      "file": "crawl/action/jurassic-park-3.fountain",
+      "sceneCount": 6,
+      "wordCount": 19392
+    },
+    {
+      "file": "crawl/action/inglourious-basterds-html.fountain",
+      "sceneCount": 107,
+      "wordCount": 34205
+    },
+    {
+      "file": "crawl/sci-fi/youth-pdf.fountain",
+      "sceneCount": 7,
+      "wordCount": 28586
+    },
+    {
+      "file": "crawl/crime/the-jacket.fountain",
+      "sceneCount": 185,
+      "wordCount": 28125
+    },
+    {
+      "file": "crawl/sci-fi/red-planet-pdf.fountain",
+      "sceneCount": 201,
+      "wordCount": 19516
+    },
+    {
+      "file": "crawl/action/planet-of-the-apes-2001.fountain",
+      "sceneCount": 166,
+      "wordCount": 22214
+    },
+    {
+      "file": "ParaNorman.fountain.txt",
+      "sceneCount": 119,
+      "wordCount": 22884
+    },
+    {
+      "file": "crawl/sci-fi/the-big-sick-pdf.fountain",
+      "sceneCount": 118,
+      "wordCount": 19633
+    },
+    {
+      "file": "crawl/action/the-boondock-saints.fountain",
+      "sceneCount": 146,
+      "wordCount": 26072
+    },
+    {
+      "file": "crawl/action/the-fugitive.fountain",
+      "sceneCount": 364,
+      "wordCount": 26252
+    },
+    {
+      "file": "crawl/horror/inception-html.fountain",
+      "sceneCount": 288,
+      "wordCount": 28286
+    },
+    {
+      "file": "crawl/horror/house-of-1000-corpses.fountain",
+      "sceneCount": 181,
+      "wordCount": 20717
+    },
+    {
+      "file": "antz-matched.fountain",
+      "sceneCount": 96,
+      "wordCount": 17661
+    },
+    {
+      "file": "crawl/action/man-in-the-iron-mask.fountain",
+      "sceneCount": 140,
+      "wordCount": 26907
+    },
+    {
+      "file": "crawl/crime/insomnia.fountain",
+      "sceneCount": 205,
+      "wordCount": 24433
+    },
+    {
+      "file": "crawl/drama/saving-private-ryan.fountain",
+      "sceneCount": 72,
+      "wordCount": 22216
+    },
+    {
+      "file": "the-wild-robot-2024.fountain",
+      "sceneCount": 145,
+      "wordCount": 17030
+    },
+    {
+      "file": "crawl/sci-fi/knocked-up-pdf.fountain",
+      "sceneCount": 170,
+      "wordCount": 25293
+    },
+    {
+      "file": "the-boss-baby-family-business-2021.fountain",
+      "sceneCount": 52,
+      "wordCount": 26403
+    },
+    {
+      "file": "crawl/sci-fi/the-matrix-pdf.fountain",
+      "sceneCount": 230,
+      "wordCount": 25284
+    },
+    {
+      "file": "the-mitchells-vs-the-machines-2021.fountain",
+      "sceneCount": 112,
+      "wordCount": 30397
+    },
+    {
+      "file": "Bee_Movie.fountain.txt",
+      "sceneCount": 135,
+      "wordCount": 19958
+    },
+    {
+      "file": "crawl/adventure/the-adventures-of-ford-fairlane-ford-fairlane.fountain",
+      "sceneCount": 108,
+      "wordCount": 23218
+    },
+    {
+      "file": "crawl/sci-fi/gold-pdf.fountain",
+      "sceneCount": 217,
+      "wordCount": 28580
+    },
+    {
+      "file": "crawl/action/freddy-vs-jason.fountain",
+      "sceneCount": 139,
+      "wordCount": 25340
+    },
+    {
+      "file": "crawl/comedy/good-will-hunting-html.fountain",
+      "sceneCount": 127,
+      "wordCount": 23860
+    },
+    {
+      "file": "spider-man-into-the-spider-verse-2018.fountain",
+      "sceneCount": 188,
+      "wordCount": 23978
+    },
+    {
+      "file": "crawl/action/unforgiven.fountain",
+      "sceneCount": 129,
+      "wordCount": 27131
+    },
+    {
+      "file": "crawl/sci-fi/inside-out-pdf.fountain",
+      "sceneCount": 387,
+      "wordCount": 19657
+    },
+    {
+      "file": "crawl/fantasy/donnie-darko.fountain",
+      "sceneCount": 185,
+      "wordCount": 19358
+    },
+    {
+      "file": "crawl/action/pearl-harbor.fountain",
+      "sceneCount": 314,
+      "wordCount": 33255
+    },
+    {
+      "file": "crawl/thriller/flight-pdf.fountain",
+      "sceneCount": 141,
+      "wordCount": 32168
+    },
+    {
+      "file": "crawl/sci-fi/ticker-pdf.fountain",
+      "sceneCount": 101,
+      "wordCount": 15303
+    },
+    {
+      "file": "crawl/action/kundun.fountain",
+      "sceneCount": 213,
+      "wordCount": 23742
+    },
+    {
+      "file": "crawl/crime/awakenings-pdf.fountain",
+      "sceneCount": 55,
+      "wordCount": 31012
+    },
+    {
+      "file": "crawl/action/rush-hour-2.fountain",
+      "sceneCount": 115,
+      "wordCount": 18774
+    },
+    {
+      "file": "crawl/horror/scary-movie-2.fountain",
+      "sceneCount": 107,
+      "wordCount": 22594
+    },
+    {
+      "file": "crawl/horror/syriana-html.fountain",
+      "sceneCount": 6,
+      "wordCount": 29232
+    },
+    {
+      "file": "crawl/action/men-in-black.fountain",
+      "sceneCount": 141,
+      "wordCount": 25036
+    },
+    {
+      "file": "crawl/sci-fi/suspect-zero-pdf.fountain",
+      "sceneCount": 57,
+      "wordCount": 29012
+    },
+    {
+      "file": "crawl/action/frequency.fountain",
+      "sceneCount": 227,
+      "wordCount": 27741
+    },
+    {
+      "file": "crawl/sci-fi/event-horizon.fountain",
+      "sceneCount": 373,
+      "wordCount": 21510
+    },
+    {
+      "file": "crawl/crime/jason-x.fountain",
+      "sceneCount": 187,
+      "wordCount": 20674
+    },
+    {
+      "file": "crawl/sci-fi/vicky-cristina-barcelona-pdf.fountain",
+      "sceneCount": 207,
+      "wordCount": 23157
+    },
+    {
+      "file": "crawl/sci-fi/miami-vice-pdf.fountain",
+      "sceneCount": 213,
+      "wordCount": 22170
+    },
+    {
+      "file": "crawl/sci-fi/chasing-sleep.fountain",
+      "sceneCount": 120,
+      "wordCount": 18795
+    },
+    {
+      "file": "crawl/sci-fi/woman-in-gold-pdf.fountain",
+      "sceneCount": 228,
+      "wordCount": 30426
+    },
+    {
+      "file": "crawl/war/four-feathers.fountain",
+      "sceneCount": 378,
+      "wordCount": 32731
+    },
+    {
+      "file": "crawl/action/collateral.fountain",
+      "sceneCount": 121,
+      "wordCount": 25586
+    },
+    {
+      "file": "crawl/action/the-truman-show.fountain",
+      "sceneCount": 215,
+      "wordCount": 28788
+    },
+    {
+      "file": "crawl/crime/true-crime-pdf.fountain",
+      "sceneCount": 150,
+      "wordCount": 29915
+    },
+    {
+      "file": "crawl/crime/entrapment.fountain",
+      "sceneCount": 366,
+      "wordCount": 28986
+    },
+    {
+      "file": "crawl/sci-fi/me-and-earl-and-the-dying-girl-pdf.fountain",
+      "sceneCount": 99,
+      "wordCount": 20412
+    },
+    {
+      "file": "crawl/sci-fi/the-hudsucker-proxy-pdf.fountain",
+      "sceneCount": 222,
+      "wordCount": 28404
+    },
+    {
+      "file": "crawl/sci-fi/wild-wild-west-pdf.fountain",
+      "sceneCount": 233,
+      "wordCount": 29157
+    },
+    {
+      "file": "crawl/sci-fi/hudson-hawk-pdf.fountain",
+      "sceneCount": 104,
+      "wordCount": 26936
+    },
+    {
+      "file": "crawl/crime/grabbers-html.fountain",
+      "sceneCount": 146,
+      "wordCount": 19279
+    },
+    {
+      "file": "crawl/action/the-x-files-movie.fountain",
+      "sceneCount": 137,
+      "wordCount": 28369
+    },
+    {
+      "file": "crawl/sci-fi/ali-pdf.fountain",
+      "sceneCount": 253,
+      "wordCount": 31926
+    },
+    {
+      "file": "crawl/adventure/adventureland-pdf.fountain",
+      "sceneCount": 197,
+      "wordCount": 25299
+    },
+    {
+      "file": "crawl/fantasy/being-john-malkovich.fountain",
+      "sceneCount": 174,
+      "wordCount": 20394
+    },
+    {
+      "file": "the-adventures-of-tintin-2011.fountain",
+      "sceneCount": 141,
+      "wordCount": 21150
+    },
+    {
+      "file": "crawl/drama/the-silence-of-the-lambs.fountain",
+      "sceneCount": 142,
+      "wordCount": 31112
+    },
+    {
+      "file": "crawl/crime/friday-the-13th-part-10-jason-x.fountain",
+      "sceneCount": 187,
+      "wordCount": 20718
+    },
+    {
+      "file": "crawl/sci-fi/three-thousand-filmed-as-pretty-woman-pdf.fountain",
+      "sceneCount": 129,
+      "wordCount": 27427
+    },
+    {
+      "file": "crawl/drama/shakespeare-in-love.fountain",
+      "sceneCount": 198,
+      "wordCount": 23081
+    },
+    {
+      "file": "crawl/sci-fi/the-post-pdf.fountain",
+      "sceneCount": 79,
+      "wordCount": 20779
+    },
+    {
+      "file": "crawl/action/final-destination.fountain",
+      "sceneCount": 150,
+      "wordCount": 24733
+    },
+    {
+      "file": "crawl/sci-fi/he-s-just-not-that-into-you-pdf.fountain",
+      "sceneCount": 130,
+      "wordCount": 24159
+    },
+    {
+      "file": "crawl/crime/the-saint.fountain",
+      "sceneCount": 285,
+      "wordCount": 28879
+    },
+    {
+      "file": "crawl/action/mission-impossible-ii.fountain",
+      "sceneCount": 134,
+      "wordCount": 23288
+    },
+    {
+      "file": "crawl/sci-fi/25th-hour-pdf.fountain",
+      "sceneCount": 123,
+      "wordCount": 24383
+    },
+    {
+      "file": "crawl/action/the-relic.fountain",
+      "sceneCount": 145,
+      "wordCount": 28376
+    },
+    {
+      "file": "transfer-window.fountain",
+      "sceneCount": 10,
+      "wordCount": 459
+    },
+    {
+      "file": "crawl/sci-fi/angel-eyes-pdf.fountain",
+      "sceneCount": 118,
+      "wordCount": 27515
+    },
+    {
+      "file": "crawl/sci-fi/wind-chill-pdf.fountain",
+      "sceneCount": 117,
+      "wordCount": 20951
+    },
+    {
+      "file": "crawl/sci-fi/second-act-pdf.fountain",
+      "sceneCount": 161,
+      "wordCount": 19512
+    },
+    {
+      "file": "crawl/fantasy/the-lord-of-the-rings-the-return-of-the-king.fountain",
+      "sceneCount": 231,
+      "wordCount": 25838
+    },
+    {
+      "file": "crawl/crime/pi-html.fountain",
+      "sceneCount": 63,
+      "wordCount": 15148
+    },
+    {
+      "file": "crawl/comedy/get-shorty.fountain",
+      "sceneCount": 148,
+      "wordCount": 26757
+    },
+    {
+      "file": "Frankenweenie.fountain.txt",
+      "sceneCount": 140,
+      "wordCount": 14302
+    },
+    {
+      "file": "crawl/action/even-cowgirls-get-the-blues.fountain",
+      "sceneCount": 121,
+      "wordCount": 18672
+    },
+    {
+      "file": "crawl/action/highlander-4.fountain",
+      "sceneCount": 117,
+      "wordCount": 18446
+    },
+    {
+      "file": "crawl/sci-fi/the-founder-pdf.fountain",
+      "sceneCount": 129,
+      "wordCount": 20627
+    },
+    {
+      "file": "crawl/crime/gothika-html.fountain",
+      "sceneCount": 158,
+      "wordCount": 26098
+    },
+    {
+      "file": "crawl/sci-fi/the-grudge-pdf.fountain",
+      "sceneCount": 153,
+      "wordCount": 21921
+    },
+    {
+      "file": "crawl/action/casino.fountain",
+      "sceneCount": 606,
+      "wordCount": 51649
+    },
+    {
+      "file": "crawl/sci-fi/the-distinguished-gentleman-pdf.fountain",
+      "sceneCount": 162,
+      "wordCount": 26798
+    },
+    {
+      "file": "crawl/sci-fi/a-perfect-world-pdf.fountain",
+      "sceneCount": 242,
+      "wordCount": 30960
+    },
+    {
+      "file": "crawl/romance/wonder-boys.fountain",
+      "sceneCount": 156,
+      "wordCount": 24731
+    },
+    {
+      "file": "crawl/horror/the-doors.fountain",
+      "sceneCount": 208,
+      "wordCount": 37218
+    },
+    {
+      "file": "crawl/action/bad-lieutenant.fountain",
+      "sceneCount": 5,
+      "wordCount": 15046
+    },
+    {
+      "file": "crawl/action/u-turn-stray-dogs.fountain",
+      "sceneCount": 55,
+      "wordCount": 23304
+    },
+    {
+      "file": "crawl/action/tombstone.fountain",
+      "sceneCount": 117,
+      "wordCount": 30528
+    },
+    {
+      "file": "crawl/action/ronin.fountain",
+      "sceneCount": 99,
+      "wordCount": 28030
+    },
+    {
+      "file": "crawl/crime/to-sleep-with-anger.fountain",
+      "sceneCount": 190,
+      "wordCount": 23258
+    },
+    {
+      "file": "crawl/sci-fi/outbreak-pdf.fountain",
+      "sceneCount": 116,
+      "wordCount": 26243
+    },
+    {
+      "file": "crawl/sci-fi/courage-under-fire-pdf.fountain",
+      "sceneCount": 101,
+      "wordCount": 27859
+    },
+    {
+      "file": "crawl/adventure/1492-conquest-of-paradise.fountain",
+      "sceneCount": 170,
+      "wordCount": 22913
+    },
+    {
+      "file": "crawl/action/sleepy-hollow.fountain",
+      "sceneCount": 215,
+      "wordCount": 25260
+    },
+    {
+      "file": "crawl/horror/star-wars-a-new-hope-html.fountain",
+      "sceneCount": 486,
+      "wordCount": 33473
+    },
+    {
+      "file": "crawl/action/the-cable-guy.fountain",
+      "sceneCount": 5,
+      "wordCount": 24081
+    },
+    {
+      "file": "crawl/fantasy/you-ve-got-mail.fountain",
+      "sceneCount": 202,
+      "wordCount": 24535
+    },
+    {
+      "file": "crawl/fantasy/american-psycho.fountain",
       "sceneCount": 59,
-      "wordCount": 29293
+      "wordCount": 20260
+    },
+    {
+      "file": "runoff.fountain",
+      "sceneCount": 9,
+      "wordCount": 1449
+    },
+    {
+      "file": "Wreck-It_Ralph.fountain.txt",
+      "sceneCount": 79,
+      "wordCount": 20875
+    },
+    {
+      "file": "crawl/crime/matrix-the-html.fountain",
+      "sceneCount": 222,
+      "wordCount": 23650
+    },
+    {
+      "file": "crawl/adventure/ocean-s-twelve-html.fountain",
+      "sceneCount": 8,
+      "wordCount": 23287
+    },
+    {
+      "file": "crawl/sci-fi/little-athens-pdf.fountain",
+      "sceneCount": 154,
+      "wordCount": 26827
+    },
+    {
+      "file": "the-iron-giant-1999.fountain",
+      "sceneCount": 139,
+      "wordCount": 18630
+    },
+    {
+      "file": "crawl/sci-fi/panic-room-pdf.fountain",
+      "sceneCount": 174,
+      "wordCount": 23251
+    },
+    {
+      "file": "crawl/action/mystery-men.fountain",
+      "sceneCount": 101,
+      "wordCount": 22963
+    },
+    {
+      "file": "Pulp_Fiction.fountain.txt",
+      "sceneCount": 117,
+      "wordCount": 27727
+    },
+    {
+      "file": "crawl/drama/stolen-summer.fountain",
+      "sceneCount": 50,
+      "wordCount": 18959
+    },
+    {
+      "file": "crawl/sci-fi/inventing-the-abbotts-pdf.fountain",
+      "sceneCount": 162,
+      "wordCount": 23252
+    },
+    {
+      "file": "crawl/action/philadelphia.fountain",
+      "sceneCount": 28,
+      "wordCount": 22740
+    },
+    {
+      "file": "crawl/action/airforce-one.fountain",
+      "sceneCount": 341,
+      "wordCount": 26252
+    },
+    {
+      "file": "crawl/action/the-time-machine.fountain",
+      "sceneCount": 98,
+      "wordCount": 19963
+    },
+    {
+      "file": "Transformers_The_Movie_1986.fountain.txt",
+      "sceneCount": 177,
+      "wordCount": 20381
+    },
+    {
+      "file": "crawl/horror/bones.fountain",
+      "sceneCount": 176,
+      "wordCount": 28272
+    },
+    {
+      "file": "coraline-matched.fountain",
+      "sceneCount": 143,
+      "wordCount": 24053
+    },
+    {
+      "file": "crawl/sci-fi/remember-pdf.fountain",
+      "sceneCount": 123,
+      "wordCount": 20183
+    },
+    {
+      "file": "crawl/crime/sugar-and-spice.fountain",
+      "sceneCount": 171,
+      "wordCount": 17818
+    },
+    {
+      "file": "9-matched.fountain",
+      "sceneCount": 112,
+      "wordCount": 17272
+    },
+    {
+      "file": "crawl/horror/pandorum-html.fountain",
+      "sceneCount": 120,
+      "wordCount": 28396
+    },
+    {
+      "file": "crawl/sci-fi/blood-work-pdf.fountain",
+      "sceneCount": 104,
+      "wordCount": 18066
+    },
+    {
+      "file": "crawl/drama/batman-begins-pdf.fountain",
+      "sceneCount": 347,
+      "wordCount": 28416
+    },
+    {
+      "file": "crawl/action/rush-hour.fountain",
+      "sceneCount": 192,
+      "wordCount": 23435
+    },
+    {
+      "file": "crawl/adventure/jurassic-park-2-the-lost-world.fountain",
+      "sceneCount": 95,
+      "wordCount": 32313
+    },
+    {
+      "file": "crawl/sci-fi/groundhog-day-pdf.fountain",
+      "sceneCount": 164,
+      "wordCount": 23340
+    },
+    {
+      "file": "crawl/sci-fi/the-florida-project-pdf.fountain",
+      "sceneCount": 198,
+      "wordCount": 17693
+    },
+    {
+      "file": "crawl/action/the-horse-wisperer.fountain",
+      "sceneCount": 240,
+      "wordCount": 38187
+    },
+    {
+      "file": "crawl/crime/the-horse-wisperer.fountain",
+      "sceneCount": 239,
+      "wordCount": 38143
+    },
+    {
+      "file": "crawl/sci-fi/the-bucket-list-pdf.fountain",
+      "sceneCount": 124,
+      "wordCount": 23178
+    },
+    {
+      "file": "crawl/horror/the-pianist.fountain",
+      "sceneCount": 172,
+      "wordCount": 21179
+    },
+    {
+      "file": "crawl/action/tremors.fountain",
+      "sceneCount": 8,
+      "wordCount": 25052
+    },
+    {
+      "file": "crawl/drama/you-can-count-on-me.fountain",
+      "sceneCount": 289,
+      "wordCount": 43559
+    },
+    {
+      "file": "crawl/action/passengers-html.fountain",
+      "sceneCount": 37,
+      "wordCount": 25164
+    },
+    {
+      "file": "crawl/sci-fi/bad-lieutenant-pdf.fountain",
+      "sceneCount": 5,
+      "wordCount": 15149
+    },
+    {
+      "file": "crawl/sci-fi/the-bodyguard-pdf.fountain",
+      "sceneCount": 258,
+      "wordCount": 34424
+    },
+    {
+      "file": "crawl/crime/scream-3.fountain",
+      "sceneCount": 133,
+      "wordCount": 14859
+    },
+    {
+      "file": "crawl/horror/resident-evil.fountain",
+      "sceneCount": 128,
+      "wordCount": 22898
     }
   ],
   "excluded": [

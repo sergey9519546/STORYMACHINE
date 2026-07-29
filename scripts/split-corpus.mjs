@@ -43,19 +43,34 @@ function mulberry32(seed) {
 // This list is computed deterministically from the corpus, not hand-picked.
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 
-const allFiles = fs.readdirSync(SRC_DIR)
-  .filter(f => f.endsWith('.fountain') || f.endsWith('.fountain.txt'))
-  .sort();
+// Recursively gather all .fountain / .fountain.txt files (the crawl corpus
+// lives in subdirectories: data/screenplays/crawl/<genre>/)
+function gatherFountain(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...gatherFountain(full));
+    } else if (entry.name.endsWith('.fountain') || entry.name.endsWith('.fountain.txt')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+const allPaths = gatherFountain(SRC_DIR).sort();
+// Store paths relative to SRC_DIR for the manifest
+const allFiles = allPaths.map(p => path.relative(SRC_DIR, p).replace(/\\/g, '/'));
 
 const valid = [];
 const excluded = [];
-for (const file of allFiles) {
-  const text = fs.readFileSync(path.join(SRC_DIR, file), 'utf-8');
+for (const relFile of allFiles) {
+  const text = fs.readFileSync(path.join(SRC_DIR, relFile), 'utf-8');
   const a = analyzeFountainText(text);
   if ((a.sceneCount ?? 0) >= 5) {
-    valid.push({ file, sceneCount: a.sceneCount, wordCount: a.wordCount });
+    valid.push({ file: relFile, sceneCount: a.sceneCount, wordCount: a.wordCount });
   } else {
-    excluded.push({ file, reason: `sceneCount=${a.sceneCount} (<5)`, sceneCount: a.sceneCount });
+    excluded.push({ file: relFile, reason: `sceneCount=${a.sceneCount} (<5)`, sceneCount: a.sceneCount });
   }
 }
 
