@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Settings, FileText, X, ChevronRight, ChevronLeft, Cpu, Upload, FilePlus2 } from "lucide-react";
+import { Sparkles, Settings, FileText, X, ChevronRight, ChevronLeft, Cpu, Upload, FilePlus2, ShieldCheck } from "lucide-react";
 import { StoryConfig } from "../types";
 import { EXPLAINERS } from "./startscreen/explainers.config";
 import { ExplainerCard } from "./startscreen/ExplainerCard";
@@ -346,6 +346,17 @@ export default function StartScreen({
                       className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
                     >
                       How it works
+                    </a>
+                    {/* P3: the third-party entry point. Someone handed a
+                        shared coverage report needs to reach verification
+                        without ever creating a script of their own — so this
+                        lives on the entrance, not behind the editor. */}
+                    <a
+                      href="#verify"
+                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                      Verify a report
                     </a>
                     {onOpenStoryMachine && (
                       <button

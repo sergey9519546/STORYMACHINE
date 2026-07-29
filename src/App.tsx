@@ -8,6 +8,7 @@ const StartScreen  = lazy(() => import('./components/StartScreen'));
 const ScriptIDE    = lazy(() => import('./components/ScriptIDE'));
 const StoryMachine = lazy(() => import('./components/StoryMachine'));
 const DesignPreview = lazy(() => import('./components/DesignPreview'));
+const VerifyReport = lazy(() => import('./components/VerifyReport'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen bg-white flex items-center justify-center font-mono">
@@ -135,17 +136,27 @@ export default function App() {
     try { localStorage.removeItem(APP_VIEW_KEY); } catch { /* best-effort */ }
   }, []);
 
-  // Design-system preview: open the app with `#design-preview` in the URL to
-  // render the paper·ink·stamp primitive gallery instead of the normal flow.
-  // A dev-only affordance — untouched by any persisted view state.
-  const isDesignPreview = typeof window !== 'undefined'
-    && window.location.hash.replace(/^#/, '') === 'design-preview';
-  if (isDesignPreview) {
+  // Hash-routed standalone views. Tracked in state (with a hashchange
+  // listener) rather than read once per render so in-app links like
+  // StartScreen's "Verify a report" (href="#verify") switch views without a
+  // full reload, and the verify page's "Back to start" (href="#") returns.
+  //   #design-preview — dev-only paper·ink·stamp primitive gallery.
+  //   #verify         — P3 independent-verification surface (VerifyReport).
+  // Both bypass the persisted view state above entirely.
+  const [hashView, setHashView] = useState(() =>
+    typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '');
+  useEffect(() => {
+    const onHashChange = () => setHashView(window.location.hash.replace(/^#/, ''));
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  if (hashView === 'design-preview' || hashView === 'verify') {
     return (
       <MotionConfig reducedMotion="user">
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
-            <DesignPreview />
+            {hashView === 'design-preview' ? <DesignPreview /> : <VerifyReport />}
           </Suspense>
         </ErrorBoundary>
       </MotionConfig>

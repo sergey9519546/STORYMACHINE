@@ -317,6 +317,37 @@ function buildFooterSection(report: ScriptDoctorReport): string {
     ? `<div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>${escapeHtml(report.contentHash.slice(0, 12))}</code></div>`
     : '';
 
+  // P3 "verify this report" block: the footer hash is the anchor fact, but a
+  // 12-char prefix can't anchor anything — collision resistance lives in the
+  // full 64-hex digest. This block publishes the FULL hash alongside the
+  // headline claims (health / verdict / totalIssues) so anyone holding the
+  // original script text can re-attest every number in this document against
+  // POST /api/export/verify on any Story Machine instance (route:
+  // server/routes/export.ts; the engine is deterministic and LLM-free, so a
+  // re-run on the same text always reproduces the same report). The in-app
+  // verifier lives at the app's #verify hash route.
+  const verifyBlock = report.contentHash
+    ? `<div class="verify-block">
+      <div class="verify-heading">Verify this report</div>
+      <div class="verify-body">
+        This report is reproducible. Anyone with the original script text can confirm
+        it was produced by the engine &mdash; not hand-edited &mdash; by re-running the
+        deterministic analysis:
+      </div>
+      <ol class="verify-steps">
+        <li>Open any Story Machine instance and go to <code>#verify</code> (the &ldquo;Verify a report&rdquo; link on the start screen), or POST the script text to <code>/api/export/verify</code>.</li>
+        <li>Paste the original script text and the expected values below.</li>
+        <li>The service recomputes the hash and re-runs the analysis; every value must match.</li>
+      </ol>
+      <dl class="verify-claims">
+        <div><dt>Script-text hash (SHA-256, full)</dt><dd><code>${escapeHtml(report.contentHash)}</code></dd></div>
+        <div><dt>Health</dt><dd><code>${escapeHtml(report.health.toFixed(1))}</code></dd></div>
+        ${report.verdict ? `<div><dt>Verdict</dt><dd><code>${escapeHtml(report.verdict)}</code></dd></div>` : ''}
+        <div><dt>Total issues</dt><dd><code>${report.totalIssues}</code></dd></div>
+      </dl>
+    </div>`
+    : '';
+
   // Category B honesty caveat (2026-07-28): the health formula's density
   // normalization absorbs rule-family signal at feature scale — measured in
   // scripts/probe-dimension-honesty.mjs, a midpoint-scene drop moves the
@@ -339,6 +370,7 @@ function buildFooterSection(report: ScriptDoctorReport): string {
     </div>
     ${structuralCaveat}
     ${hashLine}
+    ${verifyBlock}
     <div class="footer-generated">Generated ${formatDateTime(analyzedAt)}</div>
   </footer>`;
 }
@@ -614,6 +646,49 @@ const STYLES = `
       border: 1px solid #fde68a;
       border-radius: 3px;
       color: #713f12;
+    }
+    /* ── Verify block (P3) ── */
+    .verify-block {
+      margin: 14px auto 0;
+      max-width: 640px;
+      padding: 12px 16px;
+      border: 1px solid #d4d4d8;
+      border-radius: 3px;
+      background: #fafaf9;
+      text-align: left;
+    }
+    .verify-heading {
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: #1a1a1a;
+    }
+    .verify-body { margin-bottom: 8px; }
+    .verify-steps {
+      margin: 0 0 10px 18px;
+      padding: 0;
+    }
+    .verify-steps li { margin-bottom: 3px; }
+    .verify-claims {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+    .verify-claims dt {
+      display: inline;
+      color: #52525b;
+    }
+    .verify-claims dd {
+      display: inline;
+      margin: 0 0 0 6px;
+    }
+    .verify-claims code, .verify-steps code {
+      background: #f4f4f5;
+      padding: 1px 6px;
+      border-radius: 3px;
+      word-break: break-all;
     }
     /* ── Print ── */
     @page {

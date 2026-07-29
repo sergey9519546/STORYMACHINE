@@ -345,3 +345,80 @@ describe('renderCoverageHtml — full document shape', () => {
     );
   });
 });
+
+// P3 — the shared report must be INDEPENDENTLY verifiable by a third party
+// (ROADMAP §3 P3 exit gate). That turns the verify block into a contract, not
+// decoration: whoever receives the file needs the full digest (the footer's
+// 12-char display prefix cannot anchor collision resistance), every headline
+// number they're being asked to trust, and a route to check them against.
+describe('renderCoverageHtml — the verify block (P3 independent verification)', () => {
+  it('publishes the FULL 64-hex content hash, not just the display prefix', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait');
+    const fullHash = report.contentHash!;
+
+    assert.equal(fullHash.length, 64, 'fixture sanity: contentHash is a full SHA-256 hex digest');
+    assert.match(html, /Verify this report/i);
+    assert.ok(
+      html.includes(fullHash),
+      'the verify block must carry the complete digest — a recipient cannot re-attest a report against a truncated prefix',
+    );
+  });
+
+  it('publishes every claim the recipient is asked to check, matching the report exactly', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait');
+
+    // Each value must be re-checkable via POST /api/export/verify's `expected`
+    // — so each must appear as the report's own value, not a rounded display
+    // form that would fail verification for the wrong reason.
+    assert.match(html, /Script-text hash \(SHA-256, full\)/i);
+    assert.ok(html.includes(report.health.toFixed(1)), 'health must be published for verification');
+    assert.ok(html.includes(String(report.totalIssues)), 'total issues must be published for verification');
+    assert.match(html, /CONSIDER/, 'verdict must be published for verification');
+  });
+
+  it('tells the recipient where to verify and what happens when they do', () => {
+    const html = renderCoverageHtml(buildReport(), 'The Long Wait');
+
+    // The instructions must resolve to something real: the #verify surface
+    // (src/components/VerifyReport.tsx, routed in App.tsx) and the route it
+    // posts to. A verify block that only asserts "this is verifiable" without
+    // a path to verification is a trust claim, not a trust mechanism.
+    assert.match(html, /#verify/, 'must name the in-app verification surface');
+    assert.match(html, /\/api\/export\/verify/, 'must name the verification endpoint');
+    assert.match(html, /recomputes/i, 'must state that the hash is recomputed, not merely displayed');
+
+    // Still zero JS — verification is a human/HTTP action, not script in the
+    // artifact (which would also defeat the point: self-checking code in the
+    // file being checked proves nothing).
+    assert.ok(!/<script/i.test(html), 'the verify block must not introduce any JS');
+  });
+
+  it('omits the verify block entirely when the report carries no content hash', () => {
+    // No hash means nothing to anchor verification to. Rendering the block
+    // anyway — with instructions and an empty hash — would invite a recipient
+    // to "verify" a report that cannot be verified.
+    const html = renderCoverageHtml(buildReport({ contentHash: undefined }), 'No Hash');
+
+    assert.ok(!/Verify this report/i.test(html), 'no hash, no verification invitation');
+    assert.ok(!html.includes('class="verify-block"'), 'the verify markup itself must not render');
+  });
+
+  it('publishes claims that survive a round-trip to the verify route unchanged', () => {
+    // The block's whole job is to be machine-transcribable: a recipient types
+    // these values into #verify and POSTs them as `expected`. So each must
+    // appear in a form that parses back to the report's own value — a
+    // thousands separator in totalIssues, or a locale-formatted health, would
+    // make an authentic report fail verification.
+    const report = buildReport({ health: 72.5, totalIssues: 1234 });
+    const html = renderCoverageHtml(report, 'Round Trip');
+
+    const hashMatch = html.match(/<dt>Script-text hash \(SHA-256, full\)<\/dt><dd><code>([^<]+)<\/code><\/dd>/);
+    assert.ok(hashMatch, 'the hash must be published in a parseable dt/dd pair');
+    assert.equal(hashMatch![1], report.contentHash);
+
+    assert.ok(html.includes('<code>1234</code>'), 'totalIssues must be raw digits, not locale-grouped ("1,234")');
+    assert.ok(html.includes('<code>72.5</code>'), 'health must be the plain numeric value');
+  });
+});

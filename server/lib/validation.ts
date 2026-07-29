@@ -789,6 +789,28 @@ export const VerifyBodySchema = z.object({
   'provide exactly one of fountain or fdx',
 );
 
+// POST /api/events — P3 product instrumentation (ROADMAP §3 P3: "% of Doctor
+// runs that export is measured", and P2's deferred time-to-first-report).
+// The event vocabulary is a CLOSED enum, not a free-form string: an open
+// namespace would let any client plant arbitrary keys in the aggregate
+// counters the exit-gate math reads from. Props are a small bounded record
+// (≤8 keys, scalar values only) — enough for source/elapsedMs/verified
+// metadata, small enough that no script text or PII can ride along; the
+// route never stores bodies, only counters.
+export const PRODUCT_EVENT_NAMES = ['doctor_run', 'export_report', 'first_report', 'verify_run'] as const;
+
+export const EventBodySchema = z.object({
+  name: z.enum(PRODUCT_EVENT_NAMES),
+  sessionId: z.string().max(64).optional(),
+  props: z.record(
+    z.string().max(40),
+    z.union([z.string().max(200), z.number(), z.boolean()]),
+  ).optional(),
+}).refine(
+  (body) => !body.props || Object.keys(body.props).length <= 8,
+  { message: 'props must have at most 8 keys', path: ['props'] },
+);
+
 // ── server/routes/game.ts schemas (W4 validation-completeness audit) ────────
 
 // POST /api/simulate-to-fountain — a self-contained, ephemeral-Stage sibling

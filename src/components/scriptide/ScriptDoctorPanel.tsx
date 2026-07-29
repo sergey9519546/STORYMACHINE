@@ -42,6 +42,7 @@ import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "..
 import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
 import { diffLines } from "../../lib/diff.ts";
 import { decideWriteBack } from "../../lib/coverage-staleness.ts";
+import { trackDoctorRun, trackEvent } from "../../lib/analytics";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -1926,6 +1927,18 @@ export default function ScriptDoctorPanel({
         setFixPendingId(null);
         setOpenPasses({});
         setStatus("success");
+        // P3 instrumentation: count successful Doctor runs (not attempts) and
+        // the once-per-session time-to-first-report. Source is classified so
+        // the demo path (sample) never inflates a real writer's draft counts.
+        // isSampleRun already covers the "Run sample" one-click demo; an
+        // active uploadedFile that isn't the sample is an upload; otherwise
+        // the run is against the in-editor draft.
+        const runSource: "sample" | "draft" | "upload" = isSampleRun
+          ? "sample"
+          : uploadedFile && uploadedFile.provenance !== "sample"
+            ? "upload"
+            : "draft";
+        trackDoctorRun(runSource);
         // Draft-over-draft history: a sample run is a one-click demo, not the
         // user's own draft — recording it would plant a fake "draft" in a
         // returning writer's real history (and, worse, become the delta
@@ -2073,6 +2086,9 @@ export default function ScriptDoctorPanel({
       .then(({ blob, filename }) => {
         downloadBlob(blob, filename);
         setExportStatus("idle");
+        // P3: count exports for the export-rate exit-gate metric
+        // (exports / doctor_runs). Fire only on a successful download.
+        trackEvent("export_report", { verdict: report?.verdict ?? "unknown" });
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return; // cancelled — no error state

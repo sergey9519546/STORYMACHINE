@@ -251,3 +251,120 @@ describe('routes/export/verify — HTTP behavior', async () => {
     assert.deepEqual(rest1, rest2);
   });
 });
+
+// P3 exit gate, end to end: "a third party can open a shared report and
+// independently verify the score." The tests above prove the ROUTE honors a
+// correct `expected`; this one proves the shared ARTIFACT actually hands a
+// recipient a correct `expected` — the two halves are only a growth loop if
+// they meet. Everything here is scraped out of the exported HTML, never read
+// off the in-process report object, because that HTML file is all a third
+// party ever has.
+describe('routes/export — a shared report verifies from its own published claims', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); clearDoctorCache(); });
+  after(async () => { await server.close(); });
+
+  /** Pull the verify-block claims out of an exported report the same way a
+   *  recipient reads them off the page. Returns raw strings — parsing them
+   *  back into an `expected` payload is part of what's under test. */
+  function scrapeVerifyClaims(html: string): Record<string, string> {
+    const claims: Record<string, string> = {};
+    const block = html.match(/<dl class="verify-claims">([\s\S]*?)<\/dl>/);
+    assert.ok(block, 'the exported report must contain a verify-claims list');
+    for (const [, term, value] of block[1].matchAll(/<dt>([^<]+)<\/dt><dd><code>([^<]*)<\/code><\/dd>/g)) {
+      claims[term] = value;
+    }
+    return claims;
+  }
+
+  it('an exported report verifies against the original script using only the values it printed', async () => {
+    const exportRes = await fetch(`${server.baseUrl}/api/export/coverage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Warehouse' }),
+    });
+    assert.equal(exportRes.status, 200);
+    const html = await exportRes.text();
+
+    const claims = scrapeVerifyClaims(html);
+    const publishedHash = claims['Script-text hash (SHA-256, full)'];
+    assert.ok(publishedHash, 'the report must publish a script-text hash');
+    assert.match(publishedHash, /^[0-9a-f]{64}$/, 'the published hash must be the full digest a recipient can use');
+    assert.equal(publishedHash, sha256(MULTI_SCENE_FOUNTAIN), 'it must be the hash of the script that was analyzed');
+
+    const verifyRes = await fetch(`${server.baseUrl}/api/export/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fountain: MULTI_SCENE_FOUNTAIN,
+        expected: {
+          contentHash: publishedHash,
+          health: Number(claims['Health']),
+          verdict: claims['Verdict'],
+          totalIssues: Number(claims['Total issues']),
+        },
+      }),
+    });
+    assert.equal(verifyRes.status, 200);
+    const body = await verifyRes.json();
+
+    assert.equal(body.verified, true,
+      `a freshly exported report must verify against its own script; mismatches: ${JSON.stringify(body.mismatches)}`);
+    assert.deepEqual([...body.checked].sort(), ['contentHash', 'health', 'totalIssues', 'verdict']);
+  });
+
+  it('a tampered health figure fails verification while the hash still matches', async () => {
+    // The forgery this whole mechanism exists to catch: someone edits the
+    // score in the HTML before forwarding it. The script text is untouched,
+    // so the hash still checks out — only re-running the analysis exposes it.
+    const exportRes = await fetch(`${server.baseUrl}/api/export/coverage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Warehouse' }),
+    });
+    const claims = scrapeVerifyClaims(await exportRes.text());
+    const realHealth = Number(claims['Health']);
+
+    const verifyRes = await fetch(`${server.baseUrl}/api/export/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fountain: MULTI_SCENE_FOUNTAIN,
+        expected: {
+          contentHash: claims['Script-text hash (SHA-256, full)'],
+          health: Math.min(100, realHealth + 20), // the inflated claim
+        },
+      }),
+    });
+    const body = await verifyRes.json();
+
+    assert.equal(body.verified, false, 'an inflated score must not pass verification');
+    const healthMismatch = body.mismatches.find((m: { field: string }) => m.field === 'health');
+    assert.ok(healthMismatch, 'the health mismatch must be named explicitly');
+    assert.equal(healthMismatch.actual, realHealth, 'the recipient must be told the real number');
+  });
+
+  it('a report paired with a different script fails on the hash alone', async () => {
+    // The other forgery: a genuine strong report forwarded as if it were
+    // coverage of a different (weaker) script.
+    const exportRes = await fetch(`${server.baseUrl}/api/export/coverage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Warehouse' }),
+    });
+    const claims = scrapeVerifyClaims(await exportRes.text());
+
+    const verifyRes = await fetch(`${server.baseUrl}/api/export/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fountain: `${MULTI_SCENE_FOUNTAIN}\n\nINT. SOMEWHERE ELSE - DAY\n\nA scene that was never analyzed.\n`,
+        expected: { contentHash: claims['Script-text hash (SHA-256, full)'] },
+      }),
+    });
+    const body = await verifyRes.json();
+
+    assert.equal(body.verified, false);
+    assert.ok(body.mismatches.some((m: { field: string }) => m.field === 'contentHash'));
+  });
+});

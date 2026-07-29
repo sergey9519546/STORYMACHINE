@@ -176,10 +176,14 @@ can proceed in parallel.
 
 **Exit gate:** A new user reaches their first coverage report with **zero
 exposure** to NVM/converge/twin/simulation jargon; time-to-first-report is
-measured. — The gating is complete; time-to-first-report measurement is a P3
-instrumentation task.
+measured. — The gating is complete; time-to-first-report measurement landed
+with P3's instrumentation (`first_report` → `avgTimeToFirstReportMs`).
 
-### P3 — Ship the shareable, verifiable coverage report (the growth loop)
+### P3 — Ship the shareable, verifiable coverage report (the growth loop) ✅
+
+**Status (2026-07-29):** DONE. Every exported report now publishes the claims
+needed to re-attest it, an in-app surface verifies them, and the export-rate /
+time-to-first-report metrics are instrumented.
 
 **Goal:** Turn a coverage run into a branded artifact a third party can
 independently verify.
@@ -189,14 +193,44 @@ screenwriter shares it with a manager, contest, or peer, and reproducibility
 is the hook that makes it credible. The server-side re-run and contentHash
 receipts already exist; this phase productizes them.
 
-**Work:**
-- Produce a branded, presentable PDF/HTML artifact: verdict + 5 craft dimensions + top 5 fixes.
-- Add a **"verify this report"** link that re-derives the score from contentHash.
-- Ensure export re-runs server-side for authenticity (already does).
-- Instrument sharing.
+**What shipped:**
+- `server/lib/coverage-html.ts`: a **verify block** in every exported report
+  carrying the *full* 64-hex script-text hash (the footer's 12-char display
+  prefix cannot anchor collision resistance), the health/verdict/totalIssues
+  it claims, and three-step instructions pointing at `#verify`. Omitted
+  entirely when a report has no `contentHash` — no hash, no invitation to
+  "verify" something unverifiable. Still zero JS in the artifact.
+- `src/components/VerifyReport.tsx` + `#verify` hash route (`src/App.tsx`) +
+  a "Verify a report" entry on the start screen: a recipient pastes the
+  original script text and the printed numbers, and the engine re-runs the
+  deterministic analysis. Reachable **without creating a script** — the
+  third party is the user here, so it lives on the entrance, not behind the
+  editor, and outside the Labs gate.
+- `server/routes/events.ts` + `EventBodySchema`: instrumentation sink over a
+  **closed** event vocabulary (`doctor_run`, `export_report`, `first_report`,
+  `verify_run`) with bounded scalar props — an open namespace would let any
+  client plant keys in the counters that gate this phase. Aggregate counters
+  only (no per-event history, no PII, no script text); `GET
+  /api/events/summary` reports `exportRate` and `avgTimeToFirstReportMs`,
+  both `null` rather than `0` before any run.
+- `src/lib/analytics.ts` + `ScriptDoctorPanel.tsx` wiring: fire-and-forget
+  `trackDoctorRun` on *successful* diagnosis (classified sample/draft/upload
+  so the one-click demo never inflates real-draft counts) and
+  `trackEvent('export_report')` on a completed download. Also closes P2's
+  deferred time-to-first-report measurement.
 
 **Exit gate:** A third party can open a shared report and **independently
-verify** the score; % of Doctor runs that export is measured.
+verify** the score; % of Doctor runs that export is measured. — **Met.**
+`tests/routes/export-verify.test.ts` proves the loop end to end by scraping
+the claims out of an exported artifact (never the in-process report object —
+that HTML file is all a recipient ever has) and verifying them through the
+real route, plus the two forgeries the mechanism exists to catch: an inflated
+health figure on untouched text, and a genuine report paired with a different
+script.
+
+**Known limit:** counters are in-memory and per-process — they answer the
+exit-gate ratios for a single deployment since boot, and reset on restart. A
+durable store is only worth adding once the rate itself is being acted on.
 
 ### P4 — Retention & defensibility (later; only after the score is trusted)
 
