@@ -1207,10 +1207,19 @@ function buildSuspenseShapingStrength(
   if (!earlierAvgs.every(avg => peakRecord.suspenseDelta > avg)) return null;
 
   const baselineRecord = zones[0].find(r => r.suspenseDelta !== 0) ?? zones[0][0];
+  // Wording (Category A honesty fix, 2026-07-28): the gate proves "the
+  // draft's highest-suspense scene sits in the final quartile AND tops every
+  // earlier quartile's average." It does NOT prove authored escalation —
+  // per-scene suspenseDelta is content-derived (suspense-lexicon density),
+  // so shuffling scenes can redistribute that content and re-trigger the
+  // gate on whatever high-suspense scene lands late (survives 4/10 shuffles;
+  // verified in scripts/probe-claim-falsification.mjs). The earlier wording
+  // ("builds to a genuine peak") implied an engineered rise; describe the
+  // measured positional fact instead.
   return (
-    `Suspense doesn't stay flat and hope for the best — it builds to a genuine peak late in the draft ` +
-    `(Scene ${peakRecord.sceneIdx}, suspense delta ${peakRecord.suspenseDelta}) that tops every earlier quarter's average tension, ` +
-    `off a real baseline established as early as Scene ${baselineRecord.sceneIdx}.`
+    `The draft's highest-suspense scene sits in the final quartile (Scene ${peakRecord.sceneIdx}, ` +
+    `suspense delta ${peakRecord.suspenseDelta}) and tops every earlier quarter's average tension, ` +
+    `off a real baseline established as early as Scene ${baselineRecord.sceneIdx} (by the engine's suspense-lexicon signal).`
   );
 }
 

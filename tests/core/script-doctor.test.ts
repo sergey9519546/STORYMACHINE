@@ -706,7 +706,7 @@ describe('Wave 1183 — calibration-drift guard (strengths must never leak into 
  *  phrasing-independent detection convention as WAVE_1183_MARKERS above. */
 const WAVE_1187_MARKERS = [
   "doesn't lean on one narrative gear", // buildScenePurposeVarietyStrength
-  'genuine peak late in the draft',     // buildSuspenseShapingStrength
+  "highest-suspense scene sits in the final quartile", // buildSuspenseShapingStrength (Category A reword 2026-07-28)
   'keeps generating real turns',        // buildDramaticTurnDensityStrength
 ] as const;
 
@@ -838,7 +838,7 @@ describe('buildStrengths — Wave 1187 excellence detectors (hand-built fixtures
 
     assert.ok(
       strengths.some(s =>
-        s.includes('genuine peak late in the draft') && s.includes('Scene 6') && s.includes('Scene 0')),
+        s.includes('highest-suspense scene sits in the final quartile') && s.includes('Scene 6') && s.includes('Scene 0')),
       `expected the suspense-shaping strength naming Scene 6 (the peak) and Scene 0 (the baseline), got: ${JSON.stringify(strengths)}`,
     );
   });
@@ -855,7 +855,7 @@ describe('buildStrengths — Wave 1187 excellence detectors (hand-built fixtures
     const strengths = buildStrengths(baseStrengthsInputFor(records));
 
     assert.ok(
-      !strengths.some(s => s.includes('genuine peak late in the draft')),
+      !strengths.some(s => s.includes('highest-suspense scene sits in the final quartile')),
       `suspense-shaping must not fire when the closing peak merely ties (not tops) an earlier quarter's average, got: ${JSON.stringify(strengths)}`,
     );
   });
