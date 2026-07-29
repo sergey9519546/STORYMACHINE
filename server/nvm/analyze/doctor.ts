@@ -722,21 +722,38 @@ function analyzeDimensionIssues(issues: RevisionIssue[]): DimensionIssueMix | nu
 function buildDimensionSummary(
   label: string, sceneCount: number, score: number, mix: DimensionIssueMix | null,
 ): string {
+  // Structural-degeneracy caveat (scene-merge inversion fix, 2026-07-28):
+  // below DIMENSION_LOW_CONFIDENCE_SCENES, a script has too few scenes for
+  // the dimension's passes to fire meaningfully — collapsing scenes (e.g.
+  // stripping all headings) eliminates cross-scene signals and the
+  // density-only dimension formula then reads the near-empty issue set as
+  // "clean," producing a misleadingly HIGH dimension score while overall
+  // health correctly crashes via the scarcity term. The dimension NUMBER
+  // stays computed (formula untouched), but the summary flags it as
+  // unreliable so a writer doesn't read a 99/100 Structure & Pacing on a
+  // 1-scene script. Verified in scripts/probe-dimension-honesty.mjs:
+  // scene-merge on the sample script dropped health 68.9→0 while every
+  // dimension rose +1 to +32.
+  const degeneracyCaveat =
+    sceneCount < DIMENSION_LOW_CONFIDENCE_SCENES
+      ? `Only ${sceneCount} scene(s) detected — too few for this dimension's signals to fire reliably, so treat this score as provisional. `
+      : '';
+
   if (!mix) {
-    return `${label} reads cleanly — no issues found across ${sceneCount} scene(s).`;
+    return `${degeneracyCaveat}${label} reads cleanly — no issues found across ${sceneCount} scene(s).`;
   }
 
   const { dominantSeverity, dominantCount, topRuleArea } = mix;
   switch (gradeForHealth(score)) {
     case 'excellent':
     case 'strong':
-      return `${label} is in good shape — a handful of ${dominantSeverity} notes, mostly around ${topRuleArea}.`;
+      return `${degeneracyCaveat}${label} is in good shape — a handful of ${dominantSeverity} notes, mostly around ${topRuleArea}.`;
     case 'solid':
-      return `${dominantCount} ${dominantSeverity} problem(s) here, mostly around ${topRuleArea}.`;
+      return `${degeneracyCaveat}${dominantCount} ${dominantSeverity} problem(s) here, mostly around ${topRuleArea}.`;
     case 'uneven':
-      return `${dominantCount} ${dominantSeverity} problem(s) here, mostly around ${topRuleArea} — worth a focused revision pass.`;
+      return `${degeneracyCaveat}${dominantCount} ${dominantSeverity} problem(s) here, mostly around ${topRuleArea} — worth a focused revision pass.`;
     case 'troubled':
-      return `${label} needs real work — ${dominantCount} ${dominantSeverity} problem(s), centered on ${topRuleArea}.`;
+      return `${degeneracyCaveat}${label} needs real work — ${dominantCount} ${dominantSeverity} problem(s), centered on ${topRuleArea}.`;
   }
 }
 
