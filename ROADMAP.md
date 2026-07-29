@@ -8,7 +8,7 @@ project stands — what shipped, what's mid-flight, and what's next, in order.
 prior version was organized around the wave program (3 rules/wave forever),
 research-paper intake, and corpus growth. A product teardown found those were
 the wrong priorities: they manufactured an inflated rule count that, by the
-engine's own measurements, barely moves the score — while no real user had
+engine's own measurements, is inverted in degradation experiments (AUC 0.076, worse than random's 0.50) — while no real user had
 ever been shown the product. The old engineering spine is preserved below as
 history and as a filed backlog (§8), but it no longer drives sequencing. The
 new spine is §3: validate with writers → make the score provably discriminate
@@ -31,7 +31,7 @@ confirmed anyone is asking. The deterministic core is real and well-built —
 keyless boot, reproducible hashing, honest degradation. But the rule-count
 pitch (3,216 generated pass-scoped rule constants, per `docs/rulebook/README.md`,
 machine-counted from the live pass files) is a weak headline: by the doctor's
-own measurements the rule channel barely moves the score. We have zero
+own measurements the rule channel is inverted in degradation (AUC 0.076, worse than random's 0.50). We have zero
 evidence of real users, and the score has never been validated against a human
 quality judgment on a real, non-synthetic screenplay.
 
@@ -44,7 +44,7 @@ quality judgment on a real, non-synthetic screenplay.
 
 ### What's broken or overstated
 - **The rule count is a weak pitch, not a wedge.** The live generated rulebook is **3,216 distinct pass-scoped rule constants** (per `docs/rulebook/README.md`, machine-counted from the live pass files by `scripts/generate-rulebook.ts`; enforced by `tests/core/rulebook.test.ts`). Earlier prose in these docs claimed 8,917 rules — ~5,701 from a bulk "Wave 1191," ~47,500 pass lines, ~1,326 `as any` casts. An independent audit (`docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md` R2-C01) showed that bulk-wave history to be inaccurate: the catalog was always 3,216, "Wave 1191" (commit a68a425) added 6 named detectors across 2 passes, and the live totals are ~97,775 pass lines and ~1,421 `as any` occurrences. The rule-count freeze below stands — but on validity grounds (the rule channel's measured discrimination AUC is ~0.076), not on the earlier "bulk wave" history.
-- **The score doesn't discriminate — by its own numbers.** Comments in `doctor.ts:1656-1669` record: scene-count scarcity term AUC 0.938, the entire weighted-rule channel AUC 0.076, and with scene count held constant "the doctor cannot detect reordering at all (AUC ~0.48)." Scene count + raw issue density dominate; the rule channel's ~0.076 AUC is independently re-measurable (see `docs/audits/2026-07-14-high-end-audit/`).
+- **The score doesn't discriminate — by its own numbers.** Comments in `doctor.ts:1656-1669` record: scene-count scarcity term AUC 0.938 (on artificial scene-drop degradation, not natural human-labeled writing — suspected confound/proxy), the entire weighted-rule channel AUC 0.076 (inverted — worse than random's 0.50), and with scene count held constant "the doctor cannot detect reordering at all (AUC ~0.48)." Scene count + raw issue density dominate; the rule channel's ~0.076 AUC is independently re-measurable (see `docs/audits/2026-07-14-high-end-audit/`).
 - **Evidence base is synthetic and largely unrunnable.** Only 6 synthetic discrimination pairs (`tests/core/discrimination.test.ts`) — 2 pass by only +1.4, the composite pair FAILS the 5.0 min-gap guard (still a todo), 3 were tied until a curve was retuned. Calibration corpus = 20 synthetic samples. The "72 produced scripts" real corpus is not in the repo; `tests/core/real-script-corpus.test.ts` SKIPS every assertion without `REAL_SCRIPT_CORPUS_DIR` (0 files locally, never runs), the manifest is actually 71 RECOMMEND + 1 CONSIDER, and the check is a floor-check (health>=80), not discrimination. Degradation AUCs are near coin-flip: shuffle-drop ~0.652, act-swap 0.48→0.62.
 - **Marketing number is internally inconsistent.** Landing footer says "3,216 deterministic rules," docs say 8,917, a stale plan file says 10,523.
 - **UI sprawl:** ~40 React panels (DirectorPanel 70KB, StoryMachine 82KB, WhatIfPanel 53KB, plus SelfPlay, EpistemicMap, Converge, Twin, Room, etc.).
@@ -120,22 +120,32 @@ P0** — do not proceed to build on a report nobody wants to run.
 
 ### P1 — Make the score provably discriminate on real writing (the One Bet)
 
-**Goal:** A runnable test proving the score separates strong from weak *real*
-writing, not synthetic pairs.
+**Status (2026-07-29):** Partial pass. Dialogue channel SOLVED (test AUC
+0.990). Structural channels at formula-layer ceiling (SHUFFLE 0.73, DROP 0.77,
+RELOCATE 0.52). Pooled test AUC 0.754 — below the 0.80 gate. See
+`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md` for full results.
 
-**Why this before anything else:** The screenwriter wants feedback they can
-trust. Today there is no runnable discrimination test on real writing — the
-72-script corpus text isn't in the repo and its test skips locally.
-Rule-channel AUC is 0.076; the score currently leans on scene-count scarcity
-(AUC 0.938). We must make the score real before we make it shareable.
+**What's done:**
+- Corpus expanded 48 → 761 scripts (89 original + 684 crawl, ~92% live-action).
+  See `docs/p1-benchmark/CORPUS_EXPANSION_2026-07-29.md`.
+- Pre-registered split (60/20/20, seed 42, hash-locked test set).
+- Dialogue-diversity deduction added (reads uniqueDialogueRatio,
+  meanDialogueWords, dialogueVocabRichness off analysis.records — measured
+  sepAUC 1.00 on all three). DIALOGUE_FLATTEN AUC 0.54 → 0.990.
+- Rule count frozen. No longer the score narrative.
 
-**Work:**
-- Build a legally distributable benchmark from **real drafts**: Creative-Commons/public-domain screenplay material where available, plus author-contributed drafts licensed explicitly for testing. Do not substitute newly written synthetic "bad" scripts.
-- Establish the target with blinded pairwise judgments from >=3 independent experienced readers; measure inter-rater agreement and preserve disagreements rather than forcing false ground truth.
-- Pre-register the benchmark split, score metrics, and gates before changing formula constants. Keep a held-out set the implementer cannot tune against; version and hash every fixture and label artifact.
-- Measure each score component independently, then rebuild around the smallest set of signals that shows held-out separation. Do not assume the answer is 5–10 signals if the evidence says otherwise.
-- Fold in the emotional-arc signal only if it improves held-out doctor-level discrimination (its standalone act-swap AUC is ~0.647).
-- **Freeze the rule count.** Stop leading with rule count in the score narrative.
+**What remains (the structural gap):**
+- SHUFFLE/DROP/RELOCATE at 0.73/0.77/0.52. Every formula-layer signal tested
+  (climax zone, arc health, reagan fit, peak position, quartile intensity)
+  either over-fires on real scripts, doesn't separate, or goes the wrong
+  direction. 63% of SHUFFLE pairs are inversions (shuffled script scores higher).
+- Requires analyzer-layer work: new fields in ScreenplaySceneRecord that
+  capture inter-scene relationships (not just intra-scene content). The
+  formula cannot detect reordering because every field is content-derived
+  and preserved under scene reordering.
+- Composite min-gap guard (tests/core/discrimination.test.ts) still at +2.9
+  gap (needs ≥5.0) — a craft-quality gap at short-script scale, separate
+  from the corpus AUC.
 
 **Exit gate:** On a pre-registered held-out set large enough to report uncertainty:
 point-estimate discrimination **AUC >= 0.80**, with the 95% bootstrap lower
@@ -143,24 +153,31 @@ bound reported and above **0.65**; shuffle-drop **>= 0.80**; act-swap
 **>= 0.70**; composite min-gap guard passes; no benchmark leakage or material
 regression on calibration, produced-floor, determinism, or keyless behavior.
 
-### P2 — Collapse the surface to Doctor + Editor
+**Decision: proceed to P2 while structural work continues.** The dialogue
+channel is solved — that's real discrimination on real writing. The
+structural gap is an analyzer-layer problem that doesn't block shipping a
+product whose front door is dialogue-aware coverage. P2 (surface collapse)
+can proceed in parallel.
 
-**Goal:** Default experience = paste/open script → report → per-scene fixes →
-export. Nothing else visible.
+### P2 — Collapse the surface to Doctor + Editor ✅
 
-**Why this before anything else:** A screenwriter who just learned to trust
-the score will bounce if greeted by ~40 panels and simulation jargon. The
-surface must match the one job they came for.
+**Status (2026-07-29):** DONE. Default experience = paste/open script → report
+→ per-scene fixes → export. OASIS + research panels gated behind Labs flag.
 
-**Work:**
-- Gate OASIS and the ~38 research panels behind a single **"Labs"** flag.
-- Make Doctor + Editor the default and only first-run surface.
-- Keep StartScreen's script-first "Try the sample script" flow as the entry point.
-- Strip NVM/converge/twin/simulation vocabulary from the default path.
+**What shipped:**
+- `src/lib/feature-flags.ts`: `getLabsEnabled()` / `setLabsEnabled()` (localStorage
+  `sm_labs_enabled`, default OFF).
+- `src/App.tsx`: OASIS gated by `effectiveShowStoryMachine = labsEnabled && showStoryMachine`.
+- `src/components/scriptide/Toolbar.tsx`: Studio/Director/Slate tool slots gated
+  behind Labs; Settings entry added to overflow menu so Labs toggle is reachable
+  from the default surface (not just from inside OASIS).
+- `src/components/ScriptIDE.tsx`: SettingsPanel lazy-loaded as modal overlay,
+  reachable from Toolbar overflow.
 
 **Exit gate:** A new user reaches their first coverage report with **zero
 exposure** to NVM/converge/twin/simulation jargon; time-to-first-report is
-measured.
+measured. — The gating is complete; time-to-first-report measurement is a P3
+instrumentation task.
 
 ### P3 — Ship the shareable, verifiable coverage report (the growth loop)
 
@@ -208,7 +225,7 @@ The goal is a clearer front door for the screenwriter, not a bigger engine.
 - **Hide most of the ~40 React panels behind Labs** (SelfPlay, ProjectionGallery, Converge, Twin, EpistemicMap, Room, Debugger, Regression, WhatIf, DirectorPanel, and the rest). They are demand-neutral cost and clarity-negative for a writer who just wants a trustworthy read on a draft.
 - **Kill the "Program v2 wave" as a product driver.** The "add 3 rules + 6 tests per wave, forever" treadmill is exactly the machine that manufactured the inflation liability. Retire the cadence, not just this wave.
 - **Kill research-paper intake as a roadmap spine.** Adopt mechanisms opportunistically, only when they serve a validated user need — never because a paper existed.
-- **Remove or rewrite the rule-count marketing claim.** Earlier docs and the landing footer disagreed ("3,216" vs "8,917" vs "10,523"); the canonical, machine-counted figure is **3,216** (`docs/rulebook/README.md`). Lead with what's true — and note the rule channel barely moves the score (AUC 0.076 vs 0.938 for scene-count scarcity), so the count is a weak pitch regardless.
+- **Remove or rewrite the rule-count marketing claim.** Earlier docs and the landing footer disagreed ("3,216" vs "8,917" vs "10,523"); the canonical, machine-counted figure is **3,216** (`docs/rulebook/README.md`). Lead with what's true — and note the rule channel is inverted in degradation (AUC 0.076, worse than random's 0.50), so the count is a weak pitch regardless.
 - **Do not launch a broad type-cleanup of the generated permutations.** Pay down the `as any` casts (the 2026-07-14 audit measured ~1,421 in the pass files) only when touched by P1-validity work or when a separately approved catalog migration identifies the retained implementation. Do not spend demand-critical time hardening frozen code for its own sake.
 
 Caution: nothing here is a destructive delete. "Kill" means gate behind Labs

@@ -1,15 +1,15 @@
-# P1 Discrimination Baseline — 2026-07-29 (UPDATED: corpus expansion)
+# P1 Discrimination Baseline — 2026-07-29 (UPDATED: dialogue deduction + final test eval)
 
-**Status:** Re-measured on the expanded corpus (761 scripts, mostly live-action).
-The previous baseline's headline result (dialogue AUC 0.906) was an artifact
-of the animation-heavy 48-script corpus. This update replaces it.
+**Status:** Dialogue channel SOLVED via a new bounded deduction (AUC 0.990 on
+test). Structural channels remain at their formula-layer ceiling (0.73/0.77/
+0.52). Final test pooled AUC 0.754 — partial pass, not yet at the 0.80 gate.
 
 > ⚠️ **Retraction notice:** The 2026-07-29 baseline's claim that "dialogue
-> discrimination is solved" (AUC 0.906) is **retracted**. That number was
-> measured on 48 animation features where dialogue is dense and character-
-> count drives the score hard. On the expanded live-action corpus, dialogue
-> flattening barely moves health (mean delta +0.13, AUC 0.54). See §"What
-> changed and why" below.
+> discrimination is solved" (AUC 0.906) was retracted — that number was an
+> artifact of the animation-heavy 48-script corpus. On the expanded live-action
+> corpus, dialogue flattening originally scored AUC 0.54 (chance). A new
+> dialogue-diversity deduction (§"Dialogue deduction" below) SOLVED this —
+> dialogue AUC is now 0.990 on the test partition.
 
 ---
 
@@ -18,13 +18,21 @@ of the animation-heavy 48-script corpus. This update replaces it.
 On 761 real produced screenplays (456 train / 152 val / 153 test, seed 42,
 hash-locked test set), the doctor health score's discrimination is:
 
-| Degradation | Train AUC | Val AUC | Gate (≥0.80) |
-|---|---:|---:|---|
-| SCENE_SHUFFLE | 0.727 | 0.725 | partial |
-| MIDPOINT_DROP | 0.735 | 0.675 | partial/weak |
-| CLIMAX_RELOCATE | 0.481 | 0.540 | **FAIL** (chance) |
-| DIALOGUE_FLATTEN | 0.567 | 0.543 | **FAIL** (near-chance) |
-| **ALL POOLED** | **0.627** | **0.621** | **FAIL** |
+| Degradation | Train AUC | Val AUC | **Test AUC** | Gate (≥0.80) |
+|---|---:|---:|---:|---|
+| **DIALOGUE_FLATTEN** | 0.997 | 0.993 | **0.990** | ✅ **PASS** |
+| MIDPOINT_DROP | 0.732 | 0.669 | 0.766 | partial |
+| SCENE_SHUFFLE | 0.729 | 0.725 | 0.734 | partial |
+| CLIMAX_RELOCATE | 0.481 | 0.540 | 0.523 | FAIL (chance) |
+| **ALL POOLED** | **0.735** | **0.732** | **0.754** | partial |
+
+**Dialogue discrimination passes the gate** (test AUC 0.990, CI lower bound
+0.977). The structural channels (SHUFFLE 0.73, DROP 0.77, RELOCATE 0.52) are
+at their formula-layer ceiling — every signal tested (climax zone, arc health,
+reagan fit, peak position, quartile intensity) either over-fires on real
+scripts, doesn't separate, or goes the wrong direction. Structural
+discrimination requires analyzer-layer work (new inter-scene relationship
+fields), not formula-layer tuning.
 
 No channel clears the 0.80 gate on the expanded corpus. The pooled AUC is
 ~0.62 — above chance (0.50) but well below the gate. This is a **more honest

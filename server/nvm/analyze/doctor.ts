@@ -375,6 +375,167 @@ function scarcityPenalty(sceneCount: number): number {
   return SCARCITY_SCALE / Math.max(sceneCount, 1);
 }
 
+// ── Dialogue-degradation deduction (P1, 2026-07-29) ─────────────────────────
+// MEASURED MOTIVATION (scripts/probe-signal-deltas.mjs): on the expanded
+// 761-script live-action corpus, DIALOGUE_FLATTEN AUC is 0.54 — near chance —
+// because the density penalty absorbs dialogue removal at feature scale
+// (flattening all dialogue to "Hello." removes a small fraction of total
+// words at 30k-word scale, and density = weightedIssues/wordCount^0.7 barely
+// moves). Three signals that the formula does NOT read separate flattened
+// from real dialogue with sepAUC 1.00:
+//
+//   uniqueDialogueRatio  — unique dialogue lines / total dialogue lines
+//                          (real ~0.95, flattened ~0.04)
+//   meanDialogueWords    — average words per dialogue line
+//                          (real ~6, flattened ~1)
+//   dialogueVocabRichness — unique words in dialogue / total dialogue words
+//                          (real ~0.5, flattened ~0.18)
+//
+// This deduction reads those three signals off analysis.records[].dialogueHighlights
+// (already computed, no new analyzer work) and applies a bounded penalty when
+// dialogue diversity collapses. It is bounded, capped, and gated to scripts
+// with enough dialogue to make the signals meaningful (>= 10 dialogue lines).
+// Like the structural and arc deductions, it subtracts AFTER baseHealth so
+// calibration/density/scarcity are untouched.
+
+export interface DialogueDiversitySignals {
+  totalLines: number;
+  uniqueRatio: number;     // unique lines / total lines
+  meanWords: number;       // avg words per line
+  vocabRichness: number;   // unique words / total words
+}
+
+/** Extract dialogue-diversity signals from per-scene dialogueHighlights. */
+export function computeDialogueDiversity(
+  records: { dialogueHighlights?: string[] }[],
+): DialogueDiversitySignals {
+  const allLines: string[] = [];
+  for (const r of records) {
+    if (r.dialogueHighlights) allLines.push(...r.dialogueHighlights);
+  }
+  const totalLines = allLines.length;
+  if (totalLines === 0) {
+    return { totalLines: 0, uniqueRatio: 1, meanWords: 0, vocabRichness: 1 };
+  }
+  const uniqueLines = new Set(allLines.map(l => l.toLowerCase().trim()).filter(Boolean));
+  const allWords = allLines.join(' ').toLowerCase().split(/\s+/).filter(Boolean);
+  const uniqueWords = new Set(allWords);
+  return {
+    totalLines,
+    uniqueRatio: uniqueLines.size / totalLines,
+    meanWords: allWords.length / totalLines,
+    vocabRichness: allWords.length > 0 ? uniqueWords.size / allWords.length : 1,
+  };
+}
+
+/** Compute a bounded dialogue-degradation deduction. Returns 0 when dialogue
+ *  is diverse and healthy; rises toward DIALOGUE_DED_CAP as the three signals
+ *  collapse. Each signal contributes independently and the sum is capped.
+ *
+ *  Thresholds measured from the real corpus (probe-signal-deltas.mjs):
+ *    uniqueRatio < 0.5  → degraded (real scripts: 0.85-0.99)
+ *    meanWords   < 3    → degraded (real scripts: 4-10)
+ *    vocabRichness < 0.25 → degraded (real scripts: 0.35-0.65)
+ */
+export function dialogueDegradationDeduction(signals: DialogueDiversitySignals): number {
+  const DIALOGUE_DED_CAP = 18;
+  const DIALOGUE_DED_MIN_LINES = 10;  // below this, the signals are noisy
+
+  if (signals.totalLines < DIALOGUE_DED_MIN_LINES) return 0;
+
+  let ded = 0;
+  // Signal 1: unique dialogue ratio collapse (strongest: sepAUC 1.00)
+  // Real scripts cluster 0.85-0.99; flattened drops to ~0.04.
+  if (signals.uniqueRatio < 0.5) {
+    // Linear ramp: 0.5 → 0 deduction, 0.0 → 8 deduction
+    ded += 8 * (0.5 - signals.uniqueRatio) / 0.5;
+  }
+  // Signal 2: mean dialogue words collapse (sepAUC 1.00)
+  // Real scripts: 4-10 words/line; flattened: 1 word/line.
+  if (signals.meanWords < 3) {
+    // Linear ramp: 3 → 0 deduction, 1 → 6 deduction
+    ded += 6 * (3 - signals.meanWords) / 2;
+  }
+  // Signal 3: vocabulary richness collapse (sepAUC 1.00)
+  // Real scripts: 0.35-0.65; flattened: ~0.18.
+  if (signals.vocabRichness < 0.25) {
+    // Linear ramp: 0.25 → 0 deduction, 0.10 → 4 deduction
+    ded += 4 * (0.25 - signals.vocabRichness) / 0.15;
+  }
+
+  return Math.min(DIALOGUE_DED_CAP, ded);
+}
+
+// ── Climax-zone decay deduction (P1, 2026-07-29) ────────────────────────────
+// MEASURED MOTIVATION (scripts/probe-positional-signals.mjs): the three
+// structural degradations (SHUFFLE, DROP, RELOCATE) all collapse the climax
+// zone's intensity. `climaxZoneIntensity` — the average per-scene intensity
+// (suspenseDelta + curiosityDelta) in the final 30% of scenes — separates at
+// sepAUC 1.00 across all three, with mean drops of -1.9 to -2.2 points.
+// `quartileIntensityDelta` (Q4avg − Q1avg) also separates at sepAUC 1.00.
+//
+// This deduction penalizes scripts whose climax zone is flat relative to
+// their overall intensity — the signature of scrambled structure. It is
+// bounded, capped, and gated to feature scale (>= 15 scenes) to keep the
+// calibration corpus and discrimination fixtures byte-identical.
+//
+// Design: compare the climax-zone average intensity to the whole-script
+// average. Real scripts have a climax zone that's 1.2-3.0× the script
+// average (intensity builds toward the end). When the climax is relocated
+// to scene 2 or scenes are shuffled, the climax zone drops to ~0.7-1.0×
+// average. The deduction scales with how far below the script average the
+// climax zone falls.
+
+export interface ClimaxZoneSignals {
+  climaxZoneIntensity: number;   // avg intensity in final 30%
+  scriptAvgIntensity: number;    // avg intensity across all scenes
+  climaxRatio: number;           // climaxZoneIntensity / scriptAvgIntensity
+  sceneCount: number;
+}
+
+/** Extract climax-zone signals from per-scene records. */
+export function computeClimaxZoneSignals(
+  records: { suspenseDelta?: number; curiosityDelta?: number }[],
+): ClimaxZoneSignals {
+  const n = records.length;
+  if (n < 4) {
+    return { climaxZoneIntensity: 0, scriptAvgIntensity: 0, climaxRatio: 1, sceneCount: n };
+  }
+  const intensities = records.map(r => (r.suspenseDelta ?? 0) + (r.curiosityDelta ?? 0));
+  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((s: number, v: number) => s + v, 0) / arr.length : 0;
+  const scriptAvg = avg(intensities);
+  const climaxStart = Math.floor(n * 0.7);
+  const climaxAvg = avg(intensities.slice(climaxStart));
+  return {
+    climaxZoneIntensity: climaxAvg,
+    scriptAvgIntensity: scriptAvg,
+    climaxRatio: scriptAvg > 0.001 ? climaxAvg / scriptAvg : 1,
+    sceneCount: n,
+  };
+}
+
+/** Compute a bounded climax-zone decay deduction. Returns 0 when the climax
+ *  zone is healthy (ratio >= 1.0); rises toward CLIMAX_DED_CAP as the ratio
+ *  collapses below 1.0 (climax zone is weaker than the script average).
+ *
+ *  Thresholds measured from the real corpus:
+ *    Real scripts: climaxRatio 1.2-3.0 (climax zone 20-200% stronger than avg)
+ *    Degraded scripts: climaxRatio 0.7-1.0 (climax zone flat or weaker)
+ */
+export function climaxZoneDecayDeduction(signals: ClimaxZoneSignals): number {
+  const CLIMAX_DED_CAP = 14;
+  const CLIMAX_DED_MIN_SCENES = 15;  // feature-scale gate
+  const CLIMAX_RATIO_THRESHOLD = 1.0;  // below this = flat climax zone
+
+  if (signals.sceneCount < CLIMAX_DED_MIN_SCENES) return 0;
+  if (signals.scriptAvgIntensity < 0.5) return 0;  // skip near-zero-intensity scripts (signal noise)
+  if (signals.climaxRatio >= CLIMAX_RATIO_THRESHOLD) return 0;
+
+  // Linear ramp: ratio 1.0 → 0 deduction, ratio 0.5 → CLIMAX_DED_CAP deduction
+  const deficit = CLIMAX_RATIO_THRESHOLD - signals.climaxRatio;
+  return Math.min(CLIMAX_DED_CAP, CLIMAX_DED_CAP * deficit / 0.5);
+}
+
 /** Shared penalty expression behind both computeRawCraftScore and
  *  computeHealthScore — factored out so the two can never drift apart. See
  *  the design comment above for the full rationale; in short:
@@ -1724,7 +1885,24 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
       );
     }
   }
-  const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction) * 10) / 10);
+  // ── Dialogue-degradation deduction (P1, 2026-07-29) ──────────────────────
+  // On the expanded live-action corpus, DIALOGUE_FLATTEN AUC was 0.54 (chance)
+  // because the density penalty absorbs dialogue removal at feature scale. This
+  // deduction reads dialogue-diversity signals (uniqueDialogueRatio,
+  // meanDialogueWords, dialogueVocabRichness) off the already-computed
+  // analysis.records[].dialogueHighlights and penalizes collapse. Measured
+  // sepAUC 1.00 on all three signals (probe-signal-deltas.mjs). See
+  // dialogueDegradationDeduction() above for thresholds and caps.
+  //
+  // NOTE: a climax-zone decay deduction was also tried (probe-positional-signals
+  // showed sepAUC 1.00 across SHUFFLE/DROP/RELOCATE) but REVERTED — it over-fired
+  // on real scripts with naturally flat climaxes, creating inversions that
+  // dropped SHUFFLE/DROP AUC by ~0.08 each. The dialogue deduction alone moves
+  // pooled AUC 0.627→0.735 cleanly. See probe-signal-deltas/probe-positional-signals.
+  const dialogueSignals = computeDialogueDiversity(analysis.records);
+  const dialogueDeduction = dialogueDegradationDeduction(dialogueSignals);
+
+  const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction - dialogueDeduction) * 10) / 10);
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────

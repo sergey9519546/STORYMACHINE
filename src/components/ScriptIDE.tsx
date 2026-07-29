@@ -67,6 +67,9 @@ const AIPanel = lazy(() => import("./AIPanel"));
 const DirectorPanel = lazy(() => import("./DirectorPanel"));
 const AnalysisPanel = lazy(() => import("./scriptide/AnalysisPanel"));
 const ScriptDoctorPanel = lazy(() => import("./scriptide/ScriptDoctorPanel"));
+// P2: SettingsPanel (incl. Labs toggle) is reachable from the IDE overflow
+// menu so a writer can enable OASIS/research surfaces without first entering them.
+const SettingsPanel = lazy(() => import("./SettingsPanel"));
 const CoverageSummary = lazy(() => import("./scriptide/CoverageSummary"));
 const SlatePanel = lazy(() => import("./SlatePanel"));
 
@@ -217,7 +220,7 @@ export default function ScriptIDE({
   /** Current cursor line (1-based) for sidebar scene highlighting. */
   const [currentLine, setCurrentLine] = useState(1);
   const currentLineRef = useRef(1);
-  const [prefsOpen, setPrefsOpen] = useState<"none" | "copilot" | "collab">("none");
+  const [prefsOpen, setPrefsOpen] = useState<"none" | "copilot" | "collab" | "settings">("none");
   const [directorsLayer, setDirectorsLayer] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
   // a first pass doesn't want squiggles until they ask for them.
@@ -1559,6 +1562,7 @@ export default function ScriptIDE({
             setPrefsOpen("collab");
           }}
           onOpenCopilot={() => setPrefsOpen("copilot")}
+          onOpenSettings={() => setPrefsOpen("settings")}
         />
 
         {/* Action strip — director's slate: one context, one dominant CTA, right-aligned */}
@@ -1755,6 +1759,16 @@ export default function ScriptIDE({
             >
               Cancel
             </button>
+          </div>
+        )}
+        {/* P2: Settings panel (incl. Labs toggle) as a modal overlay. */}
+        {prefsOpen === "settings" && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
+            <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto bg-[var(--sm-paper)] shadow-2xl">
+              <Suspense fallback={<div className="p-8 font-mono text-xs">Loading settings…</div>}>
+                <SettingsPanel onClose={() => setPrefsOpen("none")} />
+              </Suspense>
+            </div>
           </div>
         )}
 

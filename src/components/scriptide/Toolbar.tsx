@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Download,
+  FlaskConical,
   Home,
   Layers,
   Layers3,
@@ -18,6 +19,7 @@ import {
   Wand2,
   Zap,
 } from "lucide-react";
+import { getLabsEnabled } from "../../lib/feature-flags";
 
 /** Three user-facing desk modes. Scenes/cast stay in the rail (not a peer mode). */
 export type IdeTask = "write" | "coverage" | "ship";
@@ -60,6 +62,7 @@ interface ToolbarProps {
   onGoHome?: () => void;
   onOpenCollab?: () => void;
   onOpenCopilot?: () => void;
+  onOpenSettings?: () => void;
   onToggleSidebar?: () => void;
 }
 
@@ -108,8 +111,12 @@ export default function Toolbar({
   onGoHome,
   onOpenCollab,
   onOpenCopilot,
+  onOpenSettings,
   onToggleSidebar,
 }: ToolbarProps) {
+  // P2 (ROADMAP): research tool slots (Studio, Director, Slate) are gated behind
+  // the Labs flag so the default experience is Doctor + Editor only.
+  const labsEnabled = getLabsEnabled();
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement>(null);
@@ -368,30 +375,34 @@ export default function Toolbar({
                   setOverflowOpen(false);
                 }}
               />
-              <OverflowItem
-                icon={<PanelRight className="h-3.5 w-3.5" />}
-                label={toolSlot === "studio" ? "Close Studio" : "Open Studio"}
-                onClick={() => {
-                  onOpenStudio();
-                  setOverflowOpen(false);
-                }}
-              />
-              <OverflowItem
-                icon={<Settings2 className="h-3.5 w-3.5" />}
-                label={toolSlot === "director" ? "Close Director" : "Director HUD"}
-                onClick={() => {
-                  onOpenDirector();
-                  setOverflowOpen(false);
-                }}
-              />
-              <OverflowItem
-                icon={<Layers3 className="h-3.5 w-3.5" />}
-                label={toolSlot === "slate" ? "Close Slate" : "Slate compare"}
-                onClick={() => {
-                  onOpenSlate();
-                  setOverflowOpen(false);
-                }}
-              />
+              {labsEnabled && (
+                <>
+                  <OverflowItem
+                    icon={<PanelRight className="h-3.5 w-3.5" />}
+                    label={toolSlot === "studio" ? "Close Studio" : "Open Studio"}
+                    onClick={() => {
+                      onOpenStudio();
+                      setOverflowOpen(false);
+                    }}
+                  />
+                  <OverflowItem
+                    icon={<Settings2 className="h-3.5 w-3.5" />}
+                    label={toolSlot === "director" ? "Close Director" : "Director HUD"}
+                    onClick={() => {
+                      onOpenDirector();
+                      setOverflowOpen(false);
+                    }}
+                  />
+                  <OverflowItem
+                    icon={<Layers3 className="h-3.5 w-3.5" />}
+                    label={toolSlot === "slate" ? "Close Slate" : "Slate compare"}
+                    onClick={() => {
+                      onOpenSlate();
+                      setOverflowOpen(false);
+                    }}
+                  />
+                </>
+              )}
               <div className="my-1 border-t border-[var(--sm-hair)]" />
               <OverflowItem
                 icon={<Layers className="h-3.5 w-3.5" />}
@@ -486,6 +497,21 @@ export default function Toolbar({
                       }}
                     />
                   )}
+                </>
+              )}
+              {/* P2: Settings (incl. Labs toggle) always reachable so a writer
+                  can enable OASIS/research surfaces without first entering them. */}
+              {onOpenSettings && (
+                <>
+                  <div className="my-1 border-t border-[var(--sm-hair)]" />
+                  <OverflowItem
+                    icon={<FlaskConical className="h-3.5 w-3.5" />}
+                    label={labsEnabled ? "Labs is ON" : "Labs & Settings"}
+                    onClick={() => {
+                      onOpenSettings();
+                      setOverflowOpen(false);
+                    }}
+                  />
                 </>
               )}
             </div>
