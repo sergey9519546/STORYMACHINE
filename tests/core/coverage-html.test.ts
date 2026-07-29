@@ -126,9 +126,9 @@ function buildReport(overrides: Partial<ScriptDoctorReport> = {}): ScriptDoctorR
       'Nothing to fix in Character — clean across all 3 scene(s).',
       'No fatal flaws surfaced across 3 scenes — nothing here would sink the draft outright.',
     ],
-    plainSummary: 'CONSIDER — a promising draft that needs focused work; overall craft score 72.5/100. '
-      + 'Theme & Originality is the strongest part of the draft, scoring 95/100. '
-      + 'Dialogue & Voice is the weakest area, at 55/100 — most of the trouble is around dialogue on the nose.',
+    plainSummary: 'CONSIDER — the engine\'s intermediate threshold-based verdict; overall engine score 73/100. '
+      + 'Theme & Originality is the highest-scoring diagnostic dimension, at 95/100. '
+      + 'Dialogue & Voice is the lowest-scoring diagnostic dimension, at 55/100 — most of the trouble is around dialogue on the nose.',
     contentHash: createHash('sha256').update('fixture-script-text').digest('hex'),
     ...overrides,
   };
@@ -168,10 +168,12 @@ describe('renderCoverageHtml — full document shape', () => {
     assert.match(html, /Plot Logic &amp; Payoff/);
     assert.match(html, /Theme &amp; Originality/);
 
-    // Footer: deterministic-analysis disclaimer + verification hash (short form).
+    // Footer: deterministic-analysis disclaimer + script-text hash (short form).
     assert.match(html, /Deterministic analysis/);
-    assert.match(html, /Verification hash/i);
+    assert.match(html, /Script-text hash/i);
+    assert.ok(!/Verification hash/i.test(html), 'footer must not retain the legacy "Verification hash" label');
     assert.ok(html.includes(report.contentHash!.slice(0, 12)), 'footer must include the short-form content hash');
+    assert.ok(!/same script, same verdict, every time/i.test(html), 'footer must not collapse reproducibility into a correctness claim');
 
     // Sanity: no JS is emitted anywhere (the deliverable requires zero JS to view).
     assert.ok(!/<script/i.test(html), 'document must not contain any <script> tag');

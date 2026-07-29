@@ -98,7 +98,7 @@ describe('routes/export/coverage — HTTP behavior', async () => {
     const html = await res.text();
     assert.ok(html.startsWith('<!DOCTYPE html>'));
     assert.match(html, /RECOMMEND|CONSIDER|PASS/, 'body must carry a coverage verdict');
-    assert.match(html, /Verification hash/i, 'body must carry the verification hash footer');
+    assert.match(html, /Script-text hash/i, 'body must carry the script-text hash footer');
     assert.ok(!/<script/i.test(html), 'export must not contain any <script> tag');
   });
 
@@ -110,7 +110,7 @@ describe('routes/export/coverage — HTTP behavior', async () => {
     const html = await res.text();
     assert.ok(html.startsWith('<!DOCTYPE html>'));
     assert.match(html, /RECOMMEND|CONSIDER|PASS/);
-    assert.match(html, /Verification hash/i);
+    assert.match(html, /Script-text hash/i);
   });
 
   it('POST a body with both fountain and fdx returns 400', async () => {

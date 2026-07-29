@@ -1352,7 +1352,7 @@ export function buildStrengths(input: StrengthsInput): string[] {
   // as an earned strength rather than generic praise.
   if (structure.escalating) {
     strengths.push(
-      'Tension genuinely builds as the story goes — the back half reads more intensely than the front half, not less.',
+      'Tension rises on average from the first half to the second, based on the engine\'s suspense-language signal.',
     );
   }
 
@@ -1361,7 +1361,7 @@ export function buildStrengths(input: StrengthsInput): string[] {
   // openClues === 0 but hasn't earned a "pays off" claim, it just never set
   // anything up in the first place.
   if (structure.openClues === 0 && anyClueSeeded) {
-    strengths.push('Every clue planted in this draft gets paid off — nothing is left dangling by the end.');
+    strengths.push('Among clues detected by the engine, every planted clue is paid off; none remains open at the end.');
   }
 
   // Guard: zero critical issues, but only once there's been enough script
@@ -1417,9 +1417,9 @@ export function buildStrengths(input: StrengthsInput): string[] {
 // ── Plain-language summary ──────────────────────────────────────────────────
 
 const VERDICT_DESCRIPTORS: Record<CoverageVerdict, string> = {
-  RECOMMEND: 'a strong draft ready to move forward',
-  CONSIDER: 'a promising draft that needs focused work',
-  PASS: 'a draft with fundamental problems to solve first',
+  RECOMMEND: 'the engine\'s top threshold-based verdict',
+  CONSIDER: 'the engine\'s intermediate threshold-based verdict',
+  PASS: 'the engine\'s decline verdict below its score threshold',
 };
 
 /** 2-4 template sentences: verdict + health, the strongest dimension, the
@@ -1435,7 +1435,7 @@ function buildPlainSummary(
   topPriorities: Array<RevisionIssue & { pass: PassName }>,
 ): string {
   const sentences: string[] = [
-    `${verdict} — ${VERDICT_DESCRIPTORS[verdict]}; overall craft score ${health}/100.`,
+    `${verdict} — ${VERDICT_DESCRIPTORS[verdict]}; overall engine score ${Math.round(health)}/100.`,
   ];
 
   // Strongest/weakest picked with strict comparisons so the first dimension
@@ -1450,8 +1450,8 @@ function buildPlainSummary(
 
   sentences.push(
     strongest.score.issueCount === 0
-      ? `${strongest.score.label} is the strongest part of the draft, with nothing flagged.`
-      : `${strongest.score.label} is the strongest part of the draft, scoring ${strongest.score.score}/100.`,
+      ? `${strongest.score.label} is the highest-scoring diagnostic dimension, with nothing flagged.`
+      : `${strongest.score.label} is the highest-scoring diagnostic dimension, at ${Math.round(strongest.score.score)}/100.`,
   );
 
   // weakest.mix === null only when every dimension cleared — a dimension can
@@ -1459,8 +1459,8 @@ function buildPlainSummary(
   // scored below 100.
   sentences.push(
     weakest.mix === null
-      ? 'No dimension underperforms — every area holds up well.'
-      : `${weakest.score.label} is the weakest area, at ${weakest.score.score}/100 — most of the trouble is around ${weakest.mix.topRuleArea}.`,
+      ? 'No diagnostic dimension had an issue flagged.'
+      : `${weakest.score.label} is the lowest-scoring diagnostic dimension, at ${Math.round(weakest.score.score)}/100 — most of the trouble is around ${weakest.mix.topRuleArea}.`,
   );
 
   if (topPriorities.length > 0) {

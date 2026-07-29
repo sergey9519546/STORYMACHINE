@@ -136,21 +136,21 @@ const VERDICT_META: Record<
   RECOMMEND: {
     label: "Recommend",
     explainer:
-      "Industry-coverage shorthand for “champion this up the chain.” It's the rarest, strongest endorsement a reader gives — this script is ready to move forward.",
+      "The deterministic engine placed this draft in its top verdict tier. That reflects the engine's measurements, not a human-reader endorsement.",
     bg: "bg-green-600",
     text: "text-white",
   },
   CONSIDER: {
     label: "Consider",
     explainer:
-      "Industry-coverage shorthand for “promising, worth developing further.” Not a yes yet, but the bones are there — worth another pass before it goes further.",
+      "The deterministic engine assigned its CONSIDER verdict. Its checks indicate focused revision before moving forward.",
     bg: "bg-amber-500",
     text: "text-black",
   },
   PASS: {
     label: "Pass",
     explainer:
-      "In script coverage, “pass” is the industry term for a decline — not a compliment, and not the opposite of “fail.” It means a reader is putting this draft down as-is. The breakdown below shows exactly what to fix.",
+      "In script coverage, “pass” means decline, not the opposite of “fail.” The deterministic engine placed this draft in its decline tier; the breakdown shows what its checks flagged.",
     bg: "bg-red-600",
     text: "text-white",
   },
@@ -2846,7 +2846,7 @@ export default function ScriptDoctorPanel({
                 </div>
                 {typeof report.healthPercentile === "number" && (
                   <div className="text-[10px] font-mono text-ink/60 mt-0.5">
-                    Stronger than {Math.round(report.healthPercentile)}% of the reference set
+                    Health percentile: {ordinal(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
                   </div>
                 )}
                 <p className="text-xs font-mono leading-relaxed mt-3 pt-3 border-t border-ink/15 text-ink/80">
@@ -2891,7 +2891,7 @@ export default function ScriptDoctorPanel({
                     </div>
                     {typeof report.healthPercentile === "number" && (
                       <div className="text-[10px] font-mono opacity-70 mt-0.5">
-                        Stronger than {Math.round(report.healthPercentile)}% of the reference set
+                        Health percentile: {ordinal(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
                       </div>
                     )}
                   </div>
@@ -3038,6 +3038,9 @@ export default function ScriptDoctorPanel({
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
                   Craft Dimensions
                 </h3>
+                <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 mb-2">
+                  Percentile badges compare against the same 20-sample, hand-authored synthetic reference set.
+                </p>
                 <div className="space-y-3">
                   {report.dimensions.map((dim) => {
                     const band = dimensionBand(dim.score);

@@ -706,7 +706,7 @@ router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asy
 
 // ── Determinism-badge verify (Run 15, ROADMAP §11) ───────────────────────────
 // POST /api/export/verify — this is the determinism badge made checkable: a
-// coverage report's footer "Verification hash" and the headline numbers next
+// coverage report's footer "Script-text hash" and the headline numbers next
 // to it (health, verdict, totalIssues, healthPercentile — coverage-html.ts's
 // buildFooterSection/buildHealthSection/buildHeaderSection) are claims. This
 // route is how ANYONE holding the original script text can independently

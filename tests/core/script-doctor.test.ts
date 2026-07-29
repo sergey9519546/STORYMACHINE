@@ -437,12 +437,28 @@ describe('buildStrengths — earned, never-padded bullets', () => {
       dimensions: buildDimensionFixtures([0, 2, 3, 4, 5]),
     });
 
-    assert.deepEqual(strengths, [
-      'Nothing to fix in Structure & Pacing — clean across all 10 scene(s).',
-      'Tension genuinely builds as the story goes — the back half reads more intensely than the front half, not less.',
-      'Every clue planted in this draft gets paid off — nothing is left dangling by the end.',
-      'No fatal flaws surfaced across 10 scenes — nothing here would sink the draft outright.',
-    ]);
+    // Per-signal substring checks instead of an exact deepEqual: the
+    // wording is deliberately honest (names the engine's actual signal per
+    // guard), so we assert WHICH guard fired and that nothing was padded —
+    // not the literal sentence. Count is fixed at 4 (one per fired guard)
+    // so a duplicate or spurious bullet still fails.
+    assert.equal(strengths.length, 4, 'exactly the four earned guards fire, nothing padded');
+    assert.ok(
+      strengths.some(s => s.includes('Structure & Pacing') && s.includes('clean across all 10')),
+      'zero-issue dimension guard fired for the one clean dimension',
+    );
+    assert.ok(
+      strengths.some(s => s.includes('Tension rises') && s.includes('suspense-language signal')),
+      'escalation guard fired, scoped to its suspense-language signal',
+    );
+    assert.ok(
+      strengths.some(s => s.includes('clues detected by the engine') && s.includes('paid off')),
+      'clue/payoff guard fired, scoped to engine-detected clues',
+    );
+    assert.ok(
+      strengths.some(s => s.includes('No fatal flaws') && s.includes('10 scenes')),
+      'no-fatal-flaws guard fired',
+    );
   });
 
   it('no-fire case: nothing is padded in when no guard has genuine evidence', () => {

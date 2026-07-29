@@ -101,11 +101,17 @@ describe('routes/scriptide/doctor/pdf — HTTP behavior', async () => {
   before(async () => { server = await startTestServer(); });
   after(async () => { await server.close(); });
 
-  const postPdf = (body: Buffer | string) => fetch(`${server.baseUrl}/api/scriptide/doctor/pdf`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/pdf' },
-    body,
-  });
+  // `Uint8Array` is used (rather than passing `Buffer` directly) so the body
+  // satisfies the DOM `BodyInit` typing the test-only fetch call expects —
+  // Node's `Buffer<ArrayBufferLike>` is not assignable to `BodyInit` under the
+  // active lib.dom typings. At runtime a `Uint8Array` and a `Buffer` over the
+  // same bytes are interchangeable to fetch, so this changes no behavior.
+  const postPdf = (body: Buffer | string) =>
+    fetch(`${server.baseUrl}/api/scriptide/doctor/pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/pdf' },
+      body: typeof body === 'string' ? body : new Uint8Array(body),
+    });
 
   it('POST a valid screenplay PDF returns 200 with a well-formed report, 14 passes, and source.format "pdf"', async () => {
     const res = await postPdf(FIXTURE_PDF);

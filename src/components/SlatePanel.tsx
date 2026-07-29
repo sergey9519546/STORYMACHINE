@@ -118,19 +118,19 @@ const VERDICT_CHIP: Record<
     label: "Recommend",
     bg: "bg-green-600",
     text: "text-white",
-    title: "Champion this up the chain — the rarest, strongest endorsement a reader gives.",
+    title: "The deterministic engine placed this draft in its top verdict tier — a measurement, not a human-reader endorsement.",
   },
   CONSIDER: {
     label: "Consider",
     bg: "bg-amber-500",
     text: "text-black",
-    title: "Promising, worth developing further — not a yes yet, but the bones are there.",
+    title: "The engine's intermediate verdict — its checks indicate focused revision before moving forward.",
   },
   PASS: {
     label: "Pass",
     bg: "bg-red-600",
     text: "text-white",
-    title: "Industry-coverage shorthand for a decline — not the opposite of a school-test “fail.”",
+    title: "In coverage, “pass” means decline — not the opposite of a school-test “fail.” The engine placed this draft in its decline tier.",
   },
 };
 

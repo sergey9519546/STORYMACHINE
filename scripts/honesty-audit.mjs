@@ -31,6 +31,16 @@ const ROOT = process.cwd();
 // we simply never walk into them.
 const SCAN_ROOT_FILES = ['index.html', 'README.md', 'metadata.json', 'package.json'];
 
+// Tracked user-facing artifacts that live OUTSIDE the scanned dirs (under
+// docs/**) but must not retain retired overclaim wording. The committed P0
+// sample coverage report is a writer-facing stimulus shown in P0 sessions;
+// if the renderer's copy is corrected, this artifact must follow it or the
+// two surfaces drift. Listed explicitly (not by walking docs/) so the audit
+// still ignores the rest of docs/** — the candid internal audit trail.
+const SCAN_TRACKED_ARTIFACTS = [
+  'docs/user-validation/sample-coverage-report.html',
+];
+
 // Per-directory extension allowlist (skips binaries like the woff2 fonts
 // under public/fonts/, and keeps server/** scoped to .ts as specified).
 const DIR_EXTS = {
@@ -94,6 +104,59 @@ const PATTERNS = [
   { name: 'auc-user-facing', re: /\bAUC\b/g, scopeExts: null, scopeDirs: ['src', 'public'] },
   { name: 'no-competitor-can-claim', re: /\bno (other )?(tool|app|platform|competitor)s? can claim\b/gi },
   { name: 'the-only-tool', re: /\bthe only (tool|app|platform|way)\b/gi },
+  // ── Lever 3 retired report overclaims ───────────────────────────────────
+  // These phrases were deliberately removed from writer-facing report copy
+  // because the claim audit (docs/scoring/REPORT_CLAIM_AUDIT.md) found them
+  // overstated or unsupported. They are banned in the user-facing surfaces
+  // (src/**, public/**) and the committed P0 sample report so the report
+  // cannot regress to them and the sample cannot drift from the renderer.
+  // Internal candid commentary in server/** and tests/** is out of scope.
+  {
+    name: 'report-verification-hash',
+    re: /Verification hash/gi,
+    scopeExts: null,
+    scopeDirs: ['src', 'public'],
+  },
+  {
+    name: 'report-same-verdict-every-time',
+    re: /same script, same verdict, every time/gi,
+    scopeExts: null,
+    scopeDirs: ['src', 'public'],
+  },
+  {
+    name: 'report-stronger-than-reference-set',
+    re: /stronger than \d+% of the reference set/gi,
+    scopeExts: null,
+    scopeDirs: ['src', 'public'],
+  },
+  {
+    name: 'report-craft-score',
+    re: /overall craft score/gi,
+    scopeExts: null,
+    scopeDirs: ['src', 'public'],
+  },
+  {
+    name: 'report-rarest-endorsement',
+    re: /rarest, strongest endorsement/gi,
+    scopeExts: null,
+    scopeDirs: ['src', 'public'],
+  },
+  {
+    name: 'report-strongest-part',
+    re: /strongest part of the draft/gi,
+    scopeExts: null,
+    scopeDirs: ['src', 'public'],
+  },
+  // The committed P0 sample report lives under docs/** (tracked artifact),
+  // which is outside src/public, so it needs its own scoped entry covering
+  // the same retired phrases plus the leg of the determinism footer that
+  // collapsed reproducibility into a correctness claim.
+  {
+    name: 'p0-sample-retired-overclaims',
+    re: /Verification hash|same script, same verdict, every time|stronger than \d+% of the reference set|overall craft score|rarest, strongest endorsement|strongest part of the draft/gi,
+    scopeExts: null,
+    scopeDirs: ['docs'],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -219,17 +282,32 @@ function collectFiles() {
       // Optional file not present — skip silently.
     }
   }
+  for (const f of SCAN_TRACKED_ARTIFACTS) {
+    const full = join(ROOT, f);
+    try {
+      statSync(full);
+      files.push(full);
+    } catch {
+      // Optional tracked artifact not present — skip silently.
+    }
+  }
   return files;
 }
 
 function shouldScan(filePath) {
   const rel = relative(ROOT, filePath);
+  // Normalize to forward slashes so the tracked-artifact list (which uses
+  // POSIX separators) matches on Windows too, where path.relative yields \.
+  const relPosix = rel.split(/[\\/]/).join('/');
   const ext = extname(filePath);
   if (EXEMPT_NAME_RE.test(basename(filePath))) return false;
+  // Explicitly-listed tracked artifacts (under docs/**) are always scanned
+  // regardless of directory extension allowlists.
+  if (SCAN_TRACKED_ARTIFACTS.includes(relPosix)) return true;
   const topDir = rel.split(/[\\/]/)[0];
   const allowedExts = DIR_EXTS[topDir];
   if (allowedExts) return allowedExts.has(ext); // src/, public/, server/
-  return SCAN_ROOT_FILES.includes(rel); // individually-named root files
+  return SCAN_ROOT_FILES.includes(relPosix); // individually-named root files
 }
 
 // ---------------------------------------------------------------------------

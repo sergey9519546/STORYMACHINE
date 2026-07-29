@@ -161,7 +161,7 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
       <div class="dim-bar-track">
         <div class="dim-bar-fill" style="width:${width}%; background:${band.bg};"></div>
       </div>
-      <div class="dim-score">${dim.score.toFixed(1)}/100</div>
+      <div class="dim-score">${Math.round(dim.score)}/100</div>
       <div class="dim-summary">${escapeHtml(dim.summary)}</div>
     </div>`;
   }).join('\n');
@@ -314,14 +314,14 @@ function buildAppendixSection(passes: ScriptDoctorReport['passes']): string {
 function buildFooterSection(report: ScriptDoctorReport): string {
   const analyzedAt = typeof report.analyzedAt === 'number' ? report.analyzedAt : Date.now();
   const hashLine = report.contentHash
-    ? `<div class="footer-hash">Verification hash: <code>${escapeHtml(report.contentHash.slice(0, 12))}</code></div>`
+    ? `<div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>${escapeHtml(report.contentHash.slice(0, 12))}</code></div>`
     : '';
 
   return `
   <footer class="report-footer">
     <div class="footer-disclaimer">
       Deterministic analysis &mdash; no generative AI read or scored this script.
-      Same script, same verdict, every time.
+      Running this engine again on the same script text reproduces the same score and verdict.
     </div>
     ${hashLine}
     <div class="footer-generated">Generated ${formatDateTime(analyzedAt)}</div>
