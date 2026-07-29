@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T11:12:07.008Z",
+  "generatedAt": "2026-07-29T11:41:14.180Z",
   "seed": 42,
   "fracs": {
     "train": 0.6,
@@ -7,59 +7,34 @@
     "test": 0.2
   },
   "counts": {
-    "total": 52,
-    "valid": 48,
+    "total": 87,
+    "valid": 83,
     "excluded": 4,
-    "train": 28,
-    "val": 9,
-    "test": 11
+    "train": 49,
+    "val": 16,
+    "test": 18
   },
-  "testSetHash": "49d971422b1885a7a0f50f7241ee4d16fd32a065e399083dbb6cefb5138b6639",
+  "testSetHash": "d4e97d984d2a8927e9882d21456d809a880b2269f142ca4078b14fae70725b49",
   "train": [
     {
-      "file": "inside-out-2015.fountain",
-      "sceneCount": 387,
-      "wordCount": 19651
+      "file": "the-incredibles-2004.fountain",
+      "sceneCount": 77,
+      "wordCount": 27146
     },
     {
-      "file": "raya-and-the-last-dragon-2021.fountain",
-      "sceneCount": 98,
-      "wordCount": 18894
+      "file": "Bee_Movie.fountain.txt",
+      "sceneCount": 135,
+      "wordCount": 19958
     },
     {
-      "file": "encanto-2021.fountain",
-      "sceneCount": 72,
-      "wordCount": 21606
+      "file": "coraline-matched.fountain",
+      "sceneCount": 143,
+      "wordCount": 24053
     },
     {
-      "file": "9-matched.fountain",
-      "sceneCount": 112,
-      "wordCount": 17272
-    },
-    {
-      "file": "brave-2012.fountain",
-      "sceneCount": 11,
-      "wordCount": 4708
-    },
-    {
-      "file": "the-mitchells-vs-the-machines-2021.fountain",
-      "sceneCount": 112,
-      "wordCount": 30397
-    },
-    {
-      "file": "zootopia-2016.fountain",
-      "sceneCount": 105,
-      "wordCount": 19724
-    },
-    {
-      "file": "the-red-turtle-2016.fountain",
-      "sceneCount": 11,
-      "wordCount": 11190
-    },
-    {
-      "file": "the-good-dinosaur-2015.fountain",
-      "sceneCount": 71,
-      "wordCount": 14871
+      "file": "Anastasia.fountain.txt",
+      "sceneCount": 130,
+      "wordCount": 21175
     },
     {
       "file": "inside-out-screenplay.fountain",
@@ -67,64 +42,9 @@
       "wordCount": 19651
     },
     {
-      "file": "the-mitchells-vs-the-machines-read-the-screenplay.fountain",
-      "sceneCount": 112,
-      "wordCount": 30397
-    },
-    {
-      "file": "the-wild-robot-2024.fountain",
-      "sceneCount": 145,
-      "wordCount": 17030
-    },
-    {
-      "file": "antz-matched.fountain",
-      "sceneCount": 96,
-      "wordCount": 17661
-    },
-    {
-      "file": "spider-man-across-the-spider-verse-2023.fountain",
-      "sceneCount": 129,
-      "wordCount": 26196
-    },
-    {
-      "file": "coco-script.fountain",
-      "sceneCount": 120,
-      "wordCount": 22341
-    },
-    {
-      "file": "the-secret-life-of-pets-2016.fountain",
-      "sceneCount": 107,
-      "wordCount": 16840
-    },
-    {
-      "file": "corpse-bride-2005.fountain",
-      "sceneCount": 66,
-      "wordCount": 14155
-    },
-    {
-      "file": "a-scanner-darkly-matched.fountain",
-      "sceneCount": 152,
-      "wordCount": 27169
-    },
-    {
-      "file": "mulan-1998.fountain",
-      "sceneCount": 86,
-      "wordCount": 18204
-    },
-    {
-      "file": "toy-story-4-2019.fountain",
-      "sceneCount": 138,
-      "wordCount": 20679
-    },
-    {
-      "file": "the-boss-baby-family-business-2021.fountain",
-      "sceneCount": 52,
-      "wordCount": 26403
-    },
-    {
-      "file": "anastasia-matched.fountain",
-      "sceneCount": 134,
-      "wordCount": 21169
+      "file": "darkymind-html.fountain",
+      "sceneCount": 121,
+      "wordCount": 23523
     },
     {
       "file": "the-adventures-of-tintin-2011.fountain",
@@ -132,103 +52,34 @@
       "wordCount": 21150
     },
     {
-      "file": "spiyder-race-2011-html.fountain",
-      "sceneCount": 120,
-      "wordCount": 26590
-    },
-    {
-      "file": "sing-2016.fountain",
-      "sceneCount": 202,
-      "wordCount": 23572
-    },
-    {
-      "file": "darkymind-html.fountain",
-      "sceneCount": 121,
-      "wordCount": 23523
-    },
-    {
-      "file": "2020-07-17-soul-final-script.fountain",
-      "sceneCount": 94,
-      "wordCount": 22579
-    },
-    {
-      "file": "luca-2021.fountain",
-      "sceneCount": 116,
-      "wordCount": 20274
-    }
-  ],
-  "val": [
-    {
-      "file": "coraline-matched.fountain",
-      "sceneCount": 143,
-      "wordCount": 24053
-    },
-    {
-      "file": "0meet-the-robinsons-full-screenplay.fountain",
-      "sceneCount": 57,
-      "wordCount": 19976
-    },
-    {
-      "file": "the-incredibles-2004.fountain",
-      "sceneCount": 77,
-      "wordCount": 27146
-    },
-    {
-      "file": "up-2009.fountain",
-      "sceneCount": 187,
-      "wordCount": 16612
-    },
-    {
-      "file": "elemental-2023.fountain",
-      "sceneCount": 136,
-      "wordCount": 23802
-    },
-    {
-      "file": "beavis-and-butt-head-do-america-matched.fountain",
-      "sceneCount": 187,
-      "wordCount": 17575
-    },
-    {
-      "file": "coco-2017.fountain",
-      "sceneCount": 120,
-      "wordCount": 22341
-    },
-    {
-      "file": "ratatouille-2007.fountain",
-      "sceneCount": 127,
-      "wordCount": 24276
-    },
-    {
-      "file": "spider-man-into-the-spider-verse-2018.fountain",
-      "sceneCount": 188,
-      "wordCount": 23978
-    }
-  ],
-  "test": [
-    {
-      "file": "cars-2-matched.fountain",
-      "sceneCount": 118,
-      "wordCount": 24332
-    },
-    {
-      "file": "how-to-train-your-dragon-the-hidden-world-2019.fountain",
-      "sceneCount": 94,
-      "wordCount": 23033
-    },
-    {
-      "file": "teenage-mutant-ninja-turtles-mutant-mayhem-2023.fountain",
-      "sceneCount": 83,
-      "wordCount": 19059
-    },
-    {
       "file": "over-the-moon-2020.fountain",
       "sceneCount": 130,
       "wordCount": 19883
     },
     {
-      "file": "coco-matched.fountain",
-      "sceneCount": 115,
-      "wordCount": 22478
+      "file": "Monsters_University.fountain.txt",
+      "sceneCount": 139,
+      "wordCount": 24728
+    },
+    {
+      "file": "zootopia-2016.fountain",
+      "sceneCount": 105,
+      "wordCount": 19724
+    },
+    {
+      "file": "Antz.fountain.txt",
+      "sceneCount": 85,
+      "wordCount": 17629
+    },
+    {
+      "file": "South_Park_The_Movie.fountain.txt",
+      "sceneCount": 125,
+      "wordCount": 25537
+    },
+    {
+      "file": "Pulp_Fiction.fountain.txt",
+      "sceneCount": 117,
+      "wordCount": 27727
     },
     {
       "file": "kubo-and-the-two-strings-2016.fountain",
@@ -236,9 +87,104 @@
       "wordCount": 21926
     },
     {
+      "file": "Jaws.fountain.txt",
+      "sceneCount": 159,
+      "wordCount": 28177
+    },
+    {
+      "file": "shrek_script.fountain.txt",
+      "sceneCount": 13,
+      "wordCount": 13051
+    },
+    {
+      "file": "spiyder-race-2011-html.fountain",
+      "sceneCount": 120,
+      "wordCount": 26590
+    },
+    {
+      "file": "Looney_Tunes_Back_In_Action.fountain.txt",
+      "sceneCount": 175,
+      "wordCount": 28115
+    },
+    {
+      "file": "coco-script.fountain",
+      "sceneCount": 120,
+      "wordCount": 22341
+    },
+    {
       "file": "boxtrolls-the-matched.fountain",
       "sceneCount": 87,
       "wordCount": 26088
+    },
+    {
+      "file": "cars-2-matched.fountain",
+      "sceneCount": 118,
+      "wordCount": 24332
+    },
+    {
+      "file": "the-mitchells-vs-the-machines-2021.fountain",
+      "sceneCount": 112,
+      "wordCount": 30397
+    },
+    {
+      "file": "the-secret-life-of-pets-2016.fountain",
+      "sceneCount": 107,
+      "wordCount": 16840
+    },
+    {
+      "file": "room-12.fountain",
+      "sceneCount": 10,
+      "wordCount": 434
+    },
+    {
+      "file": "Toy_Story_3.fountain.txt",
+      "sceneCount": 163,
+      "wordCount": 24126
+    },
+    {
+      "file": "Frankenweenie.fountain.txt",
+      "sceneCount": 140,
+      "wordCount": 14302
+    },
+    {
+      "file": "elemental-2023.fountain",
+      "sceneCount": 136,
+      "wordCount": 23802
+    },
+    {
+      "file": "coco-matched.fountain",
+      "sceneCount": 115,
+      "wordCount": 22478
+    },
+    {
+      "file": "luca-2021.fountain",
+      "sceneCount": 116,
+      "wordCount": 20274
+    },
+    {
+      "file": "Shrek.fountain.txt",
+      "sceneCount": 13,
+      "wordCount": 13051
+    },
+    {
+      "file": "antz-matched.fountain",
+      "sceneCount": 96,
+      "wordCount": 17661
+    },
+    {
+      "file": "the-mitchells-vs-the-machines-read-the-screenplay.fountain",
+      "sceneCount": 112,
+      "wordCount": 30397
+    },
+    {
+      "file": "encanto-2021.fountain",
+      "sceneCount": 72,
+      "wordCount": 21606
+    },
+    {
+      "file": "teenage-mutant-ninja-turtles-mutant-mayhem-2023.fountain",
+      "sceneCount": 83,
+      "wordCount": 19059
     },
     {
       "file": "soul-2020.fountain",
@@ -246,19 +192,248 @@
       "wordCount": 22579
     },
     {
+      "file": "Coraline.fountain.txt",
+      "sceneCount": 138,
+      "wordCount": 24180
+    },
+    {
       "file": "the-iron-giant-1999.fountain",
       "sceneCount": 139,
       "wordCount": 18630
     },
     {
-      "file": "isle-of-dogs-2018.fountain",
-      "sceneCount": 59,
-      "wordCount": 29293
+      "file": "beavis-and-butt-head-do-america-matched.fountain",
+      "sceneCount": 187,
+      "wordCount": 17575
+    },
+    {
+      "file": "Wreck-It_Ralph.fountain.txt",
+      "sceneCount": 79,
+      "wordCount": 20875
+    },
+    {
+      "file": "Frozen.fountain.txt",
+      "sceneCount": 124,
+      "wordCount": 19926
+    },
+    {
+      "file": "Croods_The.fountain.txt",
+      "sceneCount": 30,
+      "wordCount": 16614
+    },
+    {
+      "file": "Who Framed Roger Rabbit.fountain.txt",
+      "sceneCount": 111,
+      "wordCount": 26178
+    },
+    {
+      "file": "raya-and-the-last-dragon-2021.fountain",
+      "sceneCount": 98,
+      "wordCount": 18894
+    },
+    {
+      "file": "WALL-E.fountain.txt",
+      "sceneCount": 292,
+      "wordCount": 17202
+    },
+    {
+      "file": "Up.fountain.txt",
+      "sceneCount": 184,
+      "wordCount": 16907
+    },
+    {
+      "file": "9-matched.fountain",
+      "sceneCount": 112,
+      "wordCount": 17272
+    },
+    {
+      "file": "toy-story-4-2019.fountain",
+      "sceneCount": 138,
+      "wordCount": 20679
+    },
+    {
+      "file": "transfer-window.fountain",
+      "sceneCount": 10,
+      "wordCount": 459
+    },
+    {
+      "file": "runoff.fountain",
+      "sceneCount": 9,
+      "wordCount": 1449
+    }
+  ],
+  "val": [
+    {
+      "file": "spider-man-into-the-spider-verse-2018.fountain",
+      "sceneCount": 188,
+      "wordCount": 23978
+    },
+    {
+      "file": "Transformers_The_Movie_1986.fountain.txt",
+      "sceneCount": 177,
+      "wordCount": 20381
+    },
+    {
+      "file": "ratatouille-2007.fountain",
+      "sceneCount": 127,
+      "wordCount": 24276
+    },
+    {
+      "file": "Despicable_Me.fountain.txt",
+      "sceneCount": 12,
+      "wordCount": 17821
     },
     {
       "file": "sausage-party-2016.fountain",
       "sceneCount": 55,
       "wordCount": 22805
+    },
+    {
+      "file": "a-scanner-darkly-matched.fountain",
+      "sceneCount": 152,
+      "wordCount": 27169
+    },
+    {
+      "file": "dead-frequency.fountain",
+      "sceneCount": 12,
+      "wordCount": 1831
+    },
+    {
+      "file": "Dr_Seuss_The_Lorax.fountain.txt",
+      "sceneCount": 112,
+      "wordCount": 21815
+    },
+    {
+      "file": "sing-2016.fountain",
+      "sceneCount": 202,
+      "wordCount": 23572
+    },
+    {
+      "file": "Kung Fu Panda.fountain.txt",
+      "sceneCount": 72,
+      "wordCount": 14918
+    },
+    {
+      "file": "2020-07-17-soul-final-script.fountain",
+      "sceneCount": 94,
+      "wordCount": 22579
+    },
+    {
+      "file": "up-2009.fountain",
+      "sceneCount": 187,
+      "wordCount": 16612
+    },
+    {
+      "file": "9_2009.fountain.txt",
+      "sceneCount": 80,
+      "wordCount": 17241
+    },
+    {
+      "file": "the-good-dinosaur-2015.fountain",
+      "sceneCount": 71,
+      "wordCount": 14871
+    },
+    {
+      "file": "anastasia-matched.fountain",
+      "sceneCount": 134,
+      "wordCount": 21169
+    },
+    {
+      "file": "0meet-the-robinsons-full-screenplay.fountain",
+      "sceneCount": 57,
+      "wordCount": 19976
+    }
+  ],
+  "test": [
+    {
+      "file": "corpse-bride-2005.fountain",
+      "sceneCount": 66,
+      "wordCount": 14155
+    },
+    {
+      "file": "how-to-train-your-dragon-the-hidden-world-2019.fountain",
+      "sceneCount": 94,
+      "wordCount": 23033
+    },
+    {
+      "file": "the-lion-king-1994.fountain.txt",
+      "sceneCount": 46,
+      "wordCount": 19080
+    },
+    {
+      "file": "the-wild-robot-2024.fountain",
+      "sceneCount": 145,
+      "wordCount": 17030
+    },
+    {
+      "file": "the-red-turtle-2016.fountain",
+      "sceneCount": 11,
+      "wordCount": 11190
+    },
+    {
+      "file": "mulan-1998.fountain",
+      "sceneCount": 86,
+      "wordCount": 18204
+    },
+    {
+      "file": "soul_script.fountain.txt",
+      "sceneCount": 94,
+      "wordCount": 22579
+    },
+    {
+      "file": "ParaNorman.fountain.txt",
+      "sceneCount": 119,
+      "wordCount": 22884
+    },
+    {
+      "file": "brave-2012.fountain",
+      "sceneCount": 11,
+      "wordCount": 4708
+    },
+    {
+      "file": "spider-man-across-the-spider-verse-2023.fountain",
+      "sceneCount": 129,
+      "wordCount": 26196
+    },
+    {
+      "file": "inside-out-2015.fountain",
+      "sceneCount": 387,
+      "wordCount": 19651
+    },
+    {
+      "file": "Shrek_The_Third.fountain.txt",
+      "sceneCount": 95,
+      "wordCount": 21763
+    },
+    {
+      "file": "counter-offer.fountain",
+      "sceneCount": 10,
+      "wordCount": 1522
+    },
+    {
+      "file": "Heavy Metal.fountain.txt",
+      "sceneCount": 253,
+      "wordCount": 20364
+    },
+    {
+      "file": "off-season.fountain",
+      "sceneCount": 9,
+      "wordCount": 756
+    },
+    {
+      "file": "the-boss-baby-family-business-2021.fountain",
+      "sceneCount": 52,
+      "wordCount": 26403
+    },
+    {
+      "file": "coco-2017.fountain",
+      "sceneCount": 120,
+      "wordCount": 22341
+    },
+    {
+      "file": "isle-of-dogs-2018.fountain",
+      "sceneCount": 59,
+      "wordCount": 29293
     }
   ],
   "excluded": [

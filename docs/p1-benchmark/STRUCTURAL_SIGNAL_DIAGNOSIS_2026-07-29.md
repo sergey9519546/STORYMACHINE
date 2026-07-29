@@ -32,15 +32,39 @@ obstacle precisely so the next P1 session doesn't rediscover it.
 
 ### Step 1 — Confirm the formula has no position-reading term
 
-`computeHealthScore` (doctor.ts:434-441) is `100 − craftPenalty`, where
-`craftPenalty = densityPenalty + scarcityPenalty`. Neither term reads
-peak position, act shape, or climax placement. The `structuralDeduction`
-and `arcIncoherenceDeduction` that the 2026-07-14 deep audit documented
-(`health = 100 − craftPenalty − structuralDeduction − arcIncoherence`)
-are no longer in the formula — the demand-first re-spin stripped them.
+**RETRACTION (2026-07-29, post subagent verification):** The original
+text of this section claimed the `structuralDeduction` and
+`arcIncoherenceDeduction` "are no longer in the formula — the demand-
+first re-spin stripped them." **That was false.** Both deductions were
+present in `aggregateReport()` (doctor.ts:1693-1727) the entire time.
+The error came from reading `computeHealthScore` (the pure function,
+which has no deductions) and generalizing to the whole pipeline without
+checking `aggregateReport`, which applies the deductions on top.
 
-So the current formula has **zero** position-reading signal. CLIMAX_
-RELOCATE AUC 0.490 is consistent with this.
+The CORRECTED finding: the formula DOES have two structural deductions,
+but neither discriminates reordering. Independent verification (subagent
++ direct measurement) showed:
+
+- `structuralDeduction` (SCC + global-arc rules, cap 24): present,
+  fires on rule-detected structural issues. These rules read per-scene
+  content, so they inherit the position-blindness documented in Steps
+  2-4 below.
+- `arcIncoherenceDeduction` (arcHealth basis, cap 15, 15-scene floor):
+  present, but fires BACKWARDS — arcHealth rises under corruption for
+  most scripts (drops in only 11/37 relocate cases = 0.297), so
+  corrupted scripts get LESS deducted → HIGHER health. This is net-
+  harmful for discrimination.
+
+A subagent attempt to replace `arcIncoherenceDeduction` with a
+`reaganFitDeduction` (reaganFit basis, cap 8) was measured on the val
+set and found WORSE than the original: CLIMAX_RELOCATE 0.444 (vs 0.500
+original), SCENE_SHUFFLE 0.500 (vs 0.611 original). The replacement
+branch (`p1/reagan-fit-structural-deduction`) was NOT merged.
+
+The root cause is unchanged and confirmed three ways: the underlying
+signals (arcHealth, reaganFit) are computed from per-scene content that
+is preserved under scene reorder. No formula weight on these signals
+can reliably detect reordering. Steps 2-4 below remain valid.
 
 ### Step 2 — Check whether existing position-aware signals move under relocate
 
