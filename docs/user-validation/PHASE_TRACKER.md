@@ -146,7 +146,7 @@ No decisions have been made.
 | Field | Value |
 |---|---|
 | Tracker status | Status-only |
-| Last reviewed | 2026-07-28 — browser DOM click-through certified on `main` tip `1a7f3b4` (StartScreen → "Try sample coverage" → ScriptDoctorPanel renders with zero genuine console errors; keyless posture confirmed). API-level smoke certified earlier on `c5749b9`. See "Browser DOM smoke" above. |
+| Last reviewed | 2026-07-28 — browser DOM click-through certified on `main` tip `1a7f3b4` (StartScreen → "Try sample coverage" → ScriptDoctorPanel renders with zero genuine console errors; keyless posture confirmed). API-level smoke certified earlier on `c5749b9`. Static-stimulus reproducibility + honesty-audit re-verified on HEAD `d733240` (6 commits past `1a7f3b4`; intervening commits are docs/tests/a11y/security, render path untouched) — see `FIELDING_DECISION_BRIEF.md`. See "Browser DOM smoke" above. |
 | Reviewed by | Agent session (Playwright/Chromium available this run) |
 | Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` — PLANNED, 0 sessions; static-report AND live-flow sessions now unblocked |
 | Session artifact directory | `docs/user-validation/sessions/` — empty (`.gitkeep` only) |
