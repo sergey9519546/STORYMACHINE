@@ -65,14 +65,44 @@ export interface LayoutPage {
   pageNumber: number;
 }
 
+const HIGH_WHITESPACE_CODES: ReadonlySet<number> = new Set([
+  0x00a0, // NO-BREAK SPACE
+  0x1680, // OGHAM SPACE MARK
+  0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, // EN QUAD .. HAIR SPACE
+  0x2028, // LINE SEPARATOR
+  0x2029, // PARAGRAPH SEPARATOR
+  0x202f, // NARROW NO-BREAK SPACE
+  0x205f, // MEDIUM MATHEMATICAL SPACE
+  0x3000, // IDEOGRAPHIC SPACE
+  0xfeff, // ZERO WIDTH NO-BREAK SPACE / BOM
+]);
+
+function isWhitespaceCode(code: number): boolean {
+  if (code <= 32) {
+    return code === 0x20 || (code >= 0x09 && code <= 0x0d);
+  }
+  if (code < 0x00a0) return false;
+  return HIGH_WHITESPACE_CODES.has(code);
+}
+
 // ── Word wrap: break text into lines no longer than maxChars ──────────────────
 function wrapText(text: string, maxChars: number): string[] {
   if (maxChars <= 0) return [text];
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [''];
+
   const lines: string[] = [];
   let current = '';
-  for (const word of words) {
+  let i = 0;
+  const len = text.length;
+
+  while (i < len) {
+    while (i < len && isWhitespaceCode(text.charCodeAt(i))) i++;
+    if (i >= len) break;
+
+    let wordStart = i;
+    while (i < len && !isWhitespaceCode(text.charCodeAt(i))) i++;
+
+    const word = text.slice(wordStart, i);
+
     if (current === '') {
       // A single word longer than the line gets hard-split.
       if (word.length > maxChars) {
@@ -101,6 +131,10 @@ function wrapText(text: string, maxChars: number): string[] {
       }
     }
   }
+
+  // Preserve previous behaviour where string of only whitespace returns ['']
+  if (current === '' && lines.length === 0) return [''];
+
   if (current !== '') lines.push(current);
   return lines;
 }
