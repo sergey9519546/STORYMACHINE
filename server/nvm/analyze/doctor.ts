@@ -903,9 +903,19 @@ function buildStakesContinuityStrength(
 
   const firstScene = firstHalfClock[0].sceneIdx;
   const lastScene = secondHalfClock[secondHalfClock.length - 1].sceneIdx;
+  // Wording (Category A honesty fix, 2026-07-28): the gate proves "scenes
+  // the engine flags as raising the clock appear in BOTH halves." It does
+  // NOT prove chronological escalation, and the named scene numbers are
+  // POSITIONS in detected order, not authored chronology — reversing the
+  // scene list still satisfies the gate (both halves still contain a
+  // clock-raising scene) while swapping the early/late numbers
+  // (verified in scripts/probe-dimension-honesty.mjs). The earlier wording
+  // ("keeping the stakes genuinely alive throughout") implied an earned
+  // through-line; describe the measured fact (presence in both halves) and
+  // frame the scene numbers as detected positions, not narrative chronology.
   return (
-    `The clock isn't set once and forgotten — deadline pressure resurfaces in both halves of the draft ` +
-    `(first raised in Scene ${firstScene}, still live as late as Scene ${lastScene}), keeping the stakes genuinely alive throughout.`
+    `Deadline pressure (clock-raising language) appears in both halves of the draft — ` +
+    `the engine flags it as early as Scene ${firstScene} and as late as Scene ${lastScene} (detected positions), so the stakes aren't set once and dropped.`
   );
 }
 
@@ -1313,7 +1323,19 @@ function buildClimaxPlacementStrength(
   const sumQ4 = intensity.slice(Math.floor(sceneCount * 0.75)).reduce((a, b) => a + b, 0);
   const sumQ1 = intensity.slice(0, Math.floor(sceneCount * 0.25)).reduce((a, b) => a + b, 0);
   if (sumQ4 <= sumQ1) return null;
-  return 'The climax is where it belongs — the story\'s single most intense scene lands in the final stretch, and the last quarter outweighs the first instead of the draft peaking early.';
+  // Wording (Category A honesty fix, 2026-07-28): the gate proves "the
+  // draft's single highest-intensity scene sits in the final 30% and the
+  // last quarter outweighs the first." It does NOT prove "the author's
+  // intended climax is correctly placed" — peak intensity is partly
+  // position-derived (a scene's suspenseDelta is computed against its
+  // neighbors), so relocating scenes re-binds the peak to whatever scene
+  // is now most intense, and this claim fires again on the new peak
+  // (verified in scripts/probe-dimension-honesty.mjs). The earlier wording
+  // ("The climax is where it belongs") overstated the gate by implying the
+  // author's specific climax scene was confirmed. Describe the measured
+  // fact instead; a writer reads "intensity is back-loaded" rather than
+  // "my climax placement is correct."
+  return 'The draft\'s single most intense scene lands in the final stretch — by the engine\'s suspense/clock/turn signal, total intensity is back-loaded (the last quarter outweighs the first) rather than peaking early.';
 }
 
 /** Acceleration: scene lengths compress toward the end (final-quarter mean

@@ -317,12 +317,27 @@ function buildFooterSection(report: ScriptDoctorReport): string {
     ? `<div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>${escapeHtml(report.contentHash.slice(0, 12))}</code></div>`
     : '';
 
+  // Category B honesty caveat (2026-07-28): the health formula's density
+  // normalization absorbs rule-family signal at feature scale — measured in
+  // scripts/probe-dimension-honesty.mjs, a midpoint-scene drop moves the
+  // Structure & Pacing dimension by ~10 points at 20 scenes but only ~2 at
+  // 80. Structural verdicts (act shape, climax placement, escalation) are
+  // most reliable under ~40 scenes; above that, focus on the dialogue and
+  // per-scene findings. NORTH_STAR section 2 law #2 documents the property;
+  // this caveat surfaces it to the writer.
+  const STRUCTURAL_ABSORPTION_THRESHOLD = 40;
+  const structuralCaveat =
+    typeof report.sceneCount === 'number' && report.sceneCount > STRUCTURAL_ABSORPTION_THRESHOLD
+      ? `<div class="footer-caveat">This draft has ${report.sceneCount} scenes. The engine's structural signals (act shape, climax placement, escalation) are most reliable under ~${STRUCTURAL_ABSORPTION_THRESHOLD} scenes; at feature length they're partially absorbed by length-normalization, so weight the dialogue and per-scene findings more heavily than the structural verdicts.</div>`
+      : '';
+
   return `
   <footer class="report-footer">
     <div class="footer-disclaimer">
       Deterministic analysis &mdash; no generative AI read or scored this script.
       Running this engine again on the same script text reproduces the same score and verdict.
     </div>
+    ${structuralCaveat}
     ${hashLine}
     <div class="footer-generated">Generated ${formatDateTime(analyzedAt)}</div>
   </footer>`;
@@ -591,6 +606,14 @@ const STYLES = `
       background: #f4f4f5;
       padding: 1px 6px;
       border-radius: 3px;
+    }
+    .footer-caveat {
+      margin: 8px 0;
+      padding: 6px 10px;
+      background: #fef9c3;
+      border: 1px solid #fde68a;
+      border-radius: 3px;
+      color: #713f12;
     }
     /* ── Print ── */
     @page {
