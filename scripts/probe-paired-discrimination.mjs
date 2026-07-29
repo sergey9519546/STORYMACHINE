@@ -47,6 +47,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
+import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
 
 const SRC_DIR = 'data/screenplays';
@@ -149,21 +150,26 @@ function degradeClimaxRelocate(text) {
 // 4. DIALOGUE_FLATTEN — replace every dialogue block with "Hello." This is
 //    the harshest test: if character/voice/subtext channels carry weight,
 //    the score must crater. Preserves scene structure and action lines.
-//    Uses the project's OWN parseFountain() to identify dialogue blocks —
-//    same tokenizer the engine uses — so the result reflects what the
-//    engine actually sees, not a fragile heuristic.
+//
+//    IMPORTANT: must operate on NORMALIZED text. analyzeFountainText calls
+//    parseFountain(normalizeScreenplay(fountain)) internally, so the
+//    dialogue blocks the engine actually sees are those in the normalized
+//    text, not the raw input. Calling parseFountain on raw double-spaced
+//    input yields zero dialogue blocks (a known issue the normalizer
+//    exists to fix — see screenplay-normalizer.ts header). We normalize
+//    first, parse the normalized text to find dialogue line numbers, then
+//    flatten those lines in the normalized text and feed THAT to the
+//    doctor — exactly the input the engine will analyze.
 function degradeDialogueFlatten(text) {
-  const blocks = parseFountain(text);
-  if (blocks.length === 0) return text;
-  // Reconstruct line-by-line, replacing any line whose block was classified
-  // as dialogue (or parenthetical) with the placeholder. Character cues,
-  // action, scene headings, and transitions are preserved verbatim.
+  const normalized = normalizeScreenplay(text);
+  const blocks = parseFountain(normalized);
+  if (blocks.length === 0) return normalized;
   const dialogueLineNumbers = new Set(
     blocks
       .filter((b) => b.type === 'dialogue' || b.type === 'parenthetical')
       .map((b) => b.lineNumber)
   );
-  const lines = text.split(/\r?\n/);
+  const lines = normalized.split(/\r?\n/);
   const out = lines.map((line, idx) => {
     const ln = idx + 1;
     return dialogueLineNumbers.has(ln) ? 'Hello.' : line;

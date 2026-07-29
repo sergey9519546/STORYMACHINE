@@ -1,49 +1,108 @@
 # P0 Readiness Assessment — 2026-07-28
 
 **Status:** Evidence-only. No engine, formula, rule, or detector was modified
-to produce this document. Two new measurement scripts were added under
-`scripts/`; their outputs are committed under `scripts/output/`. This file
-sits under `docs/user-validation/` because it bears directly on whether the
-P0 gate (validate with real writers) is even *fieldable* in its current form.
+to produce this document. Two measurement scripts were added under `scripts/`;
+their outputs are committed under `scripts/output/`.
 
-## TL;DR
+## RETRACTION (read first)
 
-The P0 gate as written asks: *"show 5+ real screenwriters the sample report;
-would they run their own draft?"* Before spending recruitment effort on that
-question, two runnable probes were built over the **52 real produced
-screenplays already in `data/screenplays/`** to test the simpler, upstream
-question: **does the score the report is built on actually read the script?**
+An earlier draft of this assessment (commit `41764d8`, same date) claimed the
+Fountain parser was "dialogue-blind on 42 of 52 real screenplays (81%),
+including every Pixar and Spider-Verse screenplay," and that the "Dialogue &
+Voice" dimension was therefore a floor value computed from zero dialogue on
+those scripts.
 
-The answer, on the evidence below, is **no — not for most real scripts, and
-not on most of the channels the report claims to score.** Specifically:
+**That claim was false. It is retracted in full.**
 
-1. **The Fountain parser is dialogue-blind on 42 of 52 real screenplays
-   (81%).** Including every Pixar script in the corpus (Ratatouille, Soul,
-   Up, Inside Out, Incredibles, Coco, Elemental, Luca, Onward, Toy Story 4,
-   Turning Red, etc.) and every Spider-Verse script. The "Dialogue & Voice"
-   dimension on those reports is computed from **zero detected dialogue**.
-2. **The health score does not move under four of five mechanical
-   degradations** applied to real scripts (scene shuffle, midpoint drop,
-   climax relocate, dialogue flatten). Only scene-heading removal produces
-   a signal, and that signal is inconsistent across scripts.
-3. **The 14-point clustering on the real corpus (84.6 – 98.9) is therefore
-   not evidence of correct scoring** — it is evidence that the score is
-   dominated by a single term (the `140/sceneCount` scarcity penalty) that
-   every produced feature satisfies, while the rule and dialogue channels
-   contribute approximately nothing on the scripts the parser misreads.
+The error was in the measurement instrument, not the engine. My
+`DIALOGUE_FLATTEN` degradation called `parseFountain()` directly on raw,
+double-spaced input. The engine never does this: `analyzeFountainText()` calls
+`parseFountain(normalizeScreenplay(fountain))`, and `normalizeScreenplay()`
+(`server/nvm/analyze/screenplay-normalizer.ts`) exists *specifically* to
+collapse double-spaced imported scripts into clean Fountain before parsing.
+That module's header comment documents the exact issue I "discovered" —
+including naming Ratatouille, Mulan, and Coco by name — as a known problem
+the normalizer was built to fix.
 
-**Recommendation:** the P0 gate should not be fielded against real writers
-in its current state. Showing a screenwriter a "Dialogue & Voice = 99.8"
-score that was computed without reading any dialogue is the exact failure
-mode NORTH_STAR §1 warns against: *"a broken ruler is perfectly
-reproducible; determinism is worthless if the verdict is wrong."* The
-recruitment effort would validate demand for a number that does not yet
-mean what it claims.
+Verified through the real pipeline (`analyzeFountainText`, which normalizes):
 
-The two probes below are the replacement evidence P0 needs: they are
-runnable today, reproducible by anyone, and they answer the upstream
-question (does the score work?) for free, without a single recruitment
-email.
+| Script | Dialogue lines detected |
+|---|---:|
+| ratatouille-2007 | 799 |
+| soul-2020 | 822 |
+| up-2009 | 687 |
+| inside-out-2015 | 1,028 |
+| spider-man-into-the-spider-verse-2018 | 1,033 |
+
+Of 52 corpus scripts, only **3** have zero detected dialogue — and all three
+(`big-hero-6-2014`, `moana`, `brave-2012`) are scene-count-collapse parse
+failures (1–11 scenes), not dialogue-blindness. The engine reads dialogue
+correctly on 49 of 52 real scripts.
+
+After fixing the degradation to normalize before parsing (matching the
+engine's own input path), `DIALOGUE_FLATTEN` produces a **strong, consistent
+drop** (mean −15.3 health points across 5 scripts; range −4.3 to −47.2). The
+dialogue channel is, in fact, the *strongest* discriminator in the harness.
+
+The corrected harness and corrected findings below replace the earlier
+draft. The non-dialogue findings from that draft (corpus clustering,
+shuffle/drop/climax/merge deltas) were always valid — they ran through
+`runScriptDoctor`, which normalizes — and are reported unchanged below. The
+bug was confined to the dialogue claim.
+
+**Lesson, recorded against myself:** NORTH_STAR §1 law 2 — *"correct before
+reproducible"* — applies to measurement instruments too. My probe was
+perfectly reproducible and perfectly wrong, because it bypassed the
+normalization layer the engine depends on. I asserted a catastrophic engine
+bug from a probe that didn't exercise the engine's actual input path. The
+correction was one function call (`parseFountain` →
+`analyzeFountainText` / normalize-then-parse); the false claim should never
+have been committed without that check.
+
+---
+
+## TL;DR (corrected)
+
+Two runnable probes were built over the 52 real produced screenplays in
+`data/screenplays/` to answer the upstream P0 question: **does the score
+the report is built on actually discriminate?**
+
+The answer, on the corrected evidence: **the score discriminates on two of
+five signal channels and is blind on three.**
+
+1. **Dialogue channel: strong, consistent signal.** Replacing all dialogue
+   with "Hello." drops health by 4–47 points (mean −15.3) across 5
+   Oscar-winning scripts. This is the strongest discriminator measured.
+2. **Scene-boundary channel: real but inconsistent signal.** Removing scene
+   headings drops health on some scripts (Soul −25.7, Inside Out −7.6) but
+   leaves others unchanged (Ratatouille 0.0) or raises it (Spider-Verse
+   +3.8, Up +3.1). The signal is the `140/sceneCount` scarcity term, which
+   fires unpredictably when scene count collapses.
+3. **Global-arc / position channel: blind.** Shuffling all scenes into
+   random order moves the score by ≤1 point on 3 of 5 scripts (Ratatouille
+   0.0, Inside Out +0.1, Up +2.9). This empirically confirms NORTH_STAR §2
+   law #1 — *"lexicon signals carry content, not position"* — on real
+   scripts, not just synthetic ones.
+4. **3-act structure channel: blind.** Deleting the middle 20% of scenes
+   (the structural midpoint) moves the score by ≤0.5 points on 4 of 5
+   scripts.
+5. **Climax-ordering channel: blind.** Moving the final scene to position 2
+   moves the score by ≤1.2 points on all 5 scripts.
+
+**What this means for P0:** the score is not broken — it reads dialogue,
+it reads scene boundaries — but it **cannot see document-scale structure**
+(arc, three-act spine, climax position). A writer who shuffles their scenes
+into random order would get nearly the same score. This is a known, named
+limitation (NORTH_STAR §2, law #1; the bounded structural-deduction pathway
+is the documented P1 fix), now confirmed empirically on real produced
+screenplays.
+
+**Recommendation:** the P0 gate *can* be fielded in its current state — the
+report is honest about what it measures (per-scene signals, dialogue,
+dimensions) and the sample script is single-spaced so all channels fire.
+But the report should not be presented to writers as a verdict on
+*structural* quality until the position-reading gap closes. The probes below
+are the runnable evidence for that narrower claim.
 
 ---
 
@@ -54,26 +113,25 @@ email.
 **Command:** `node scripts/probe-real-corpus.mjs`
 
 Scores every `.fountain` file under `data/screenplays/` through the real,
-frozen `runScriptDoctor()` pipeline and emits health/grade/verdict/issue
-counts. Results:
+frozen `runScriptDoctor()` pipeline. Results (48 valid; 4 had scene-count
+collapse from parse failures):
 
 ```
-48 valid screenplays (4 had scene-count collapse from parse failures):
-  Health range:  84.6 – 98.9
-  Mean:          93.2
-  Std deviation:  4.5
-  Band distribution:
-    excellent (≥95):  20 scripts
-    strong    (85-95): 27 scripts
-    uneven    (50-85):  1 script   (a-scanner-darkly, H=84.6)
-    troubled  (<50):    0 scripts
+Health range:  84.6 – 98.9
+Mean:          93.2
+Std deviation:  4.5
+Band distribution:
+  excellent (≥95):  20 scripts
+  strong    (85-95): 27 scripts
+  uneven    (50-85):  1 script   (a-scanner-darkly, H=84.6)
+  troubled  (<50):    0 scripts
 ```
 
-Every produced feature scores RECOMMEND or CONSIDER. The lowest-scoring
-script in the corpus (A Scanner Darkly, H=84.6) is a produced, distributed,
-Richard Linklater feature. The score does not separate good real writing
-from anything — because there is no "anything" in this corpus. Probe 2
-supplies the missing negative class.
+Every produced feature scores RECOMMEND or CONSIDER. This is **not** evidence
+of a broken score — every script in this corpus is genuinely good (all were
+greenlit, financed, and shipped), so a tight cluster among them is arguably
+correct. The corpus lacks a negative class, which is why Probe 2 supplies
+one by degrading known-good scripts.
 
 ---
 
@@ -86,132 +144,67 @@ supplies the missing negative class.
 Takes 5 strong real scripts (Ratatouille, Soul, Spider-Verse, Inside Out,
 Up — all Oscar winners or nominees, all scoring ≥ 86 by the current
 formula) and applies five mechanical, reversible degradations. Each
-degradation isolates one signal channel the doctor reports on. If the
-channel carries weight, the score must fall. Aggregate results:
+isolates one signal channel the doctor reports on. Aggregate results:
 
 | Degradation | Channel | Mean Δ | Min Δ | Max Δ | Verdict |
 |---|---|---:|---:|---:|---|
 | SCENE_SHUFFLE | global arc / position | −1.0 | −5.0 | +2.9 | **BLIND** — no signal |
 | MIDPOINT_DROP | 3-act structure | −0.5 | −3.5 | +0.5 | **BLIND** — no signal |
 | CLIMAX_RELOCATE | climax ordering | +0.6 | −0.1 | +1.2 | **BLIND** — no signal |
-| DIALOGUE_FLATTEN | character/voice/dialogue | 0.0 | 0.0 | 0.0 | **BLIND** — no signal |
+| DIALOGUE_FLATTEN | character/voice/dialogue | −15.3 | −47.2 | −4.3 | **STRONG signal** |
 | SCENE_MERGE | scene boundaries | −5.3 | −25.7 | +3.8 | real but inconsistent |
 
-**Reading the table.** Four of five channels show no discrimination
-whatsoever — the score is unchanged when the script is structurally
-destroyed. The one channel that moves (scene merge) is inconsistent: it
-craters Soul (−25.7) and Inside Out (−7.6) but leaves Ratatouille unchanged
-(0.0) and *raises* Spider-Verse (+3.8) and Up (+3.1). That is not
-discrimination; it is the `140/sceneCount` scarcity term firing
-unpredictably when scene count collapses.
+**Reading the table.** Two channels discriminate; three are blind. The blind
+channels are exactly the document-scale structural signals — scene order,
+act spine, climax position — that NORTH_STAR §2 law #1 names as a known
+limitation: lexicon signals carry *content*, not *position*, so reordering
+scenes preserves content while destroying structure, and the score does not
+notice.
 
-The DIALOGUE_FLATTEN row is the most damning: replacing every line of
-dialogue with "Hello." leaves the health score **byte-identical** across
-all five scripts. This is not because the dialogue channel is weakly
-weighted — it is because, as Probe 3 below shows, **the parser detects zero
-dialogue in these scripts to begin with.** There is nothing to flatten.
+The DIALOGUE_FLATTEN row is the strongest result in the harness: flattening
+all dialogue to "Hello." drops Inside Out from 87.6 to 40.4 (−47.2), a
+passing-grade script collapsing to "troubled." The dialogue channel is
+alive, weighted, and discriminates hard.
 
----
-
-## Probe 3 — Dialogue-blindness audit (root cause)
-
-**Finding:** the Fountain parser (`src/lib/fountain.ts`) detects zero
-dialogue blocks in 42 of 52 corpus scripts (81%), including every Pixar
-and Spider-Verse screenplay.
-
-**Root cause.** The character-cue detector at `src/lib/fountain.ts:75-89`
-requires the previous block to be `empty` (blank line) before classifying
-an all-caps line as a `character` cue, and the dialogue classifier at
-line 100-101 requires the previous block to be `character`/`dual_dialogue`/
-`parenthetical`. Both conditions assume **single-spaced** Fountain
-(dialogue flows contiguously under its cue).
-
-The non-matched corpus scripts are **double-spaced**: every line,
-including dialogue, is followed by a blank line. Under double-spacing the
-dialogue lines each become standalone `action` blocks separated by `empty`
-blocks, so the dialogue-classifier's "previous block is character/paren"
-condition never fires. The cue is detected (it matches the all-caps regex
-and follows a blank), but the dialogue under it is not.
-
-Evidence — same scene in two corpus formats:
-
-```
-DIALOGUE-AWARE  (cars-2-matched.fountain — single-spaced):
-  LELAND TURBO
-  Finn. My cover's been compromised.       ← contiguous, classified as 'dialogue'
-  Everything's gone pear-shaped.
-
-DIALOGUE-BLIND  (ratatouille-2007.fountain — double-spaced):
-  REMY
-
-  (sniffing Napoleon)                       ← blank line breaks the cue→dialogue chain
-
-  Flour, eggs, sugar, vanilla bean,         ← classified as 'action', not 'dialogue'
-
-  small twist of lemon...                   ← classified as 'action'
-```
-
-**Corpus-wide count** (`parseFountain` block types per file):
-
-| Format | Scripts | Dialogue blocks detected |
-|---|---:|---|
-| Single-spaced ("-matched" variants + a few others) | 10 | 467 – 1268 each |
-| Double-spaced (the majority of the corpus) | 42 | **0** each |
-
-The discrimination harness in `tests/core/discrimination.test.ts` and the
-calibration corpus in `server/nvm/analyze/calibration/corpus.ts` are both
-single-spaced, so this blindness was invisible to every existing test.
-
-**What this means for the score.** On 81% of the real corpus, the
-"Dialogue & Voice" dimension, every `DIALOGUE_*` rule, the
-`PROTAGONIST_DECISION_VACUUM` detector, and the bonding/interiority signals
-that read dialogue are all operating on an empty input. The dimension
-score of 99.8 reported for Ratatouille is computed from zero dialogue
-samples — it is a default-floor number, not a measurement.
+The SCENE_MERGE inconsistency (Ratatouille 0.0 vs Soul −25.7) is the
+`140/sceneCount` scarcity term firing when scene count collapses below the
+formula's expectation, which depends on how many `.`-forced headings the
+normalizer preserves versus how many scene boundaries SCENE_MERGE strips —
+script-dependent, not a clean signal.
 
 ---
 
-## Why this blocks P0 (not just P1)
+## What this means for P0
 
-The P0 protocol (`docs/user-validation/PHASE_TRACKER.md`) allows:
-> Show the existing sample coverage report and observe without pitching.
+The score is not the broken ruler the retracted draft claimed. It reads
+dialogue (strongly), it reads scene boundaries (inconsistently), and it
+produces defensible per-scene signals. The P0 sample report — generated
+from a single-spaced hand-authored sample — exercises all these channels.
 
-The sample report is generated from `src/lib/sample-script.ts`, which is
-hand-authored in single-spaced Fountain — so the sample report itself
-*does* have dialogue detected, and the score on it is arguably meaningful.
-The problem is **generalization**: a real screenwriter's draft, exported
-from Final Draft or WriterDuet in standard double-spaced Fountain, will
-hit the dialogue-blindness path and produce a report whose dialogue
-dimension is a floor value. The writer will see "Dialogue & Voice = 99.8"
-on a draft the engine never actually read for dialogue.
+What the score *cannot* do is see document-scale structure. A writer who
+shuffles their scenes, deletes their midpoint, or relocates their climax
+will see the score barely move. This is the genuine P1 gap, now confirmed
+on real produced screenplays rather than synthetic fixtures:
 
-That is not a UX problem P0 can iterate around. It is a correctness
-problem that turns the P0 core question — *"does this make you want to run
-your own draft?"* — into a trap: the answer will be "yes, the number is
-flattering," and the writer will trust a number that was computed without
-reading their dialogue.
+- NORTH_STAR §2 law #1: *"Lexicon signals carry content, not position …
+  Global-arc-position claims require signals that read FOR position, not
+  just content."*
+- NORTH_STAR §2 law #2: *"Document-scale findings (global arc, structural
+  collapse) need the bounded structural-deduction pathway … not more
+  detectors hoping to out-fire the normalization."*
 
-NORTH_STAR §1, law 2: *"Correct before reproducible. A broken ruler is
-perfectly reproducible; determinism is worthless if the verdict is
-wrong."*
+The probes make these laws **measured on real writing**, which is exactly
+the standard NORTH_STAR §1 law 3 demands: *"Measure discrimination on
+runnable, real writing — always."*
 
----
-
-## What this does NOT block
-
-- **The deterministic surface is real and working.** The doctor boots
-  keyless, produces byte-identical reports for the same input, and the
-  reproducibility receipts (`contentHash`) are genuine. None of that is in
-  question. The problem is upstream of reproducibility: the *input* the
-  pipeline reads is incomplete.
-- **The synthetic discrimination tests pass.** `tests/core/discrimination.test.ts`
-  still discriminates on its 6 paired scenarios because those scenarios
-  are single-spaced. The harness there is not wrong; it is testing a
-  subset of the input space that hides the format bug.
-- **Recruitment is not wasted effort in principle.** Once the parser reads
-  dialogue on standard-format drafts, the P0 protocol is the right next
-  step. This assessment says "fix the ruler before handing it to writers,"
-  not "never talk to writers."
+**Fielding decision:** P0 can proceed against real writers with the current
+report, provided the report does not claim to verdict on structural
+ordering. The current sample report's language should be checked against
+this — if it claims arc/structure verdicts it cannot support, that is the
+honest-degradation violation to fix before fielding, not a reason to block
+fielding. The probes give the recruitment effort a defensible scope: "we
+are validating the dialogue/dimension/per-scene surface; structural-arc
+verdicts are P1 work."
 
 ---
 
@@ -230,19 +223,18 @@ node scripts/probe-paired-discrimination.mjs
 ```
 
 Neither script modifies the engine. Both import the real, frozen
-`runScriptDoctor()` and `parseFountain()` and run them on inputs derived
-from real produced screenplays. Re-running on any commit will reproduce
-these numbers byte-for-byte (modulo the `analyzedAt` timestamp).
+`runScriptDoctor()` and run it on inputs derived from real produced
+screenplays. Re-running on any commit will reproduce these numbers
+byte-for-byte (modulo the `analyzedAt` timestamp).
 
 ## Provenance
 
 - Corpus: `data/screenplays/` — 52 produced screenplays, manifest-locked at
   `data/screenplays/manifest.json`. These are real, produced, distributed
-  features (Pixar, DreamWorks, Sony Animation, Laika, etc.). They are the
-  strongest possible "known-good" reference set available without human
-  recruitment.
+  features (Pixar, DreamWorks, Sony Animation, Laika, etc.).
 - Engine: HEAD of `main` at the time of this assessment. No engine files
   were modified.
-- Probes: `scripts/probe-real-corpus.mjs`, `scripts/probe-paired-discrimination.mjs`
-  (new this assessment). Outputs: `scripts/output/real-corpus-scores.csv`,
+- Probes: `scripts/probe-real-corpus.mjs`,
+  `scripts/probe-paired-discrimination.mjs` (new this assessment).
+  Outputs: `scripts/output/real-corpus-scores.csv`,
   `scripts/output/paired-discrimination.csv` (new this assessment).
