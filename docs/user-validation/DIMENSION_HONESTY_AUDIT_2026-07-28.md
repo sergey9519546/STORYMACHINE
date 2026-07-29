@@ -210,8 +210,85 @@ Deterministic, no engine modifications, runs in ~30 seconds.
 ## Provenance
 
 - Sample report: `docs/user-validation/sample-coverage-report.html`
+  (regenerated after the Category A rewordings — new wording live)
 - Sample script: `src/lib/sample-script.ts` ("The Second Key", 14 scenes)
 - Claim generators: `server/nvm/analyze/doctor.ts` lines 1290-1365
 - Score formula and density normalization: `server/nvm/analyze/doctor.ts`
   (NORTH_STAR §2 law #2 documents the feature-scale absorption)
-- Engine: HEAD of `main`. No engine files modified.
+- Engine edits shipped this assessment cycle: Category A rewordings of
+  claims #3 (stakes continuity), #5 (suspense shaping), #6 (climax
+  placement) in `doctor.ts`; Category B sceneCount-gated structural
+  caveat in `server/lib/coverage-html.ts`. See commits `5ffa4f0` and
+  the C5 follow-up. Gates unchanged; only wording and a footer caveat.
+
+---
+
+## Appendix — Complete claim-falsification matrix (added after Category A/B fixes)
+
+The body of this audit verified 2 of 6 strengths by falsification and
+marked the other 4 as "robust" or "not tested." That was insufficient to
+call the report fieldable. `scripts/probe-claim-falsification.mjs` closes
+the gap by running all 6 strengths against all 5 degradations and
+recording whether each claim's marker string survives.
+
+**Script:** `scripts/probe-claim-falsification.mjs`
+**Command:** `node scripts/probe-claim-falsification.mjs`
+
+Matrix on the sample script (14 scenes), post-Category-A rewording.
+`Y` = claim still fires after damage; `.` = claim correctly disappeared.
+
+| Claim | SCENE_SHUFFLE | MIDPOINT_DROP | CLIMAX_RELOCATE | DIALOGUE_FLATTEN | SCENE_MERGE |
+|---|:---:|:---:|:---:|:---:|:---:|
+| C1 tension rise | . | Y | Y | Y | Y |
+| C2 payoff completeness | Y | Y | Y | . | . |
+| C3 stakes continuity (reworded) | Y | . | Y | . | . |
+| C4 function distribution | Y | Y | . | . | . |
+| C5 suspense shaping (reworded) | Y | Y | Y | Y | . |
+| C6 climax placement (reworded) | . | . | Y | Y | . |
+
+### Reading the matrix
+
+**Honest gates (claim disappears under its matching damage):**
+- **C1 (tension rise)** disappears under SCENE_SHUFFLE ✓ — shuffling
+  equalizes the half-averages, destroying the rise. Survives other damage
+  correctly (those don't target tension).
+- **C2 (payoff completeness)** disappears under DIALOGUE_FLATTEN and
+  SCENE_MERGE ✓ — both destroy the clue content the payoff tracker reads.
+  Survives positional damage correctly (payoff is content-tracked).
+- **C3 (stakes continuity)** disappears under MIDPOINT_DROP ✓ — clock
+  scenes cluster mid-script; dropping them removes one half's clock.
+- **C4 (function distribution)** disappears under CLIMAX_RELOCATE ✓ —
+  relocating changes which scene registers as first/last, shifting the
+  purpose distribution.
+
+**Reworded overstatements (gate survives its killer damage, wording now
+honest):**
+- **C5 (suspense shaping)** survives CLIMAX_RELOCATE and SCENE_SHUFFLE at
+  the default seed (4/10 shuffles overall). Root cause: per-scene
+  `suspenseDelta` is content-derived (suspense-lexicon density), so
+  shuffling redistributes content and a high-suspense scene can land in
+  the final quartile, re-triggering the gate. The gate IS position-
+  sensitive (quartile zones), but the position-read is confounded by
+  content mobility. **Reworded** from "builds to a genuine peak late"
+  (implies engineered escalation) to "highest-suspense scene sits in the
+  final quartile" (measured positional fact).
+- **C6 (climax placement)** survives CLIMAX_RELOCATE deterministically.
+  Root cause: relocating the climax scene drops its own intensity to 0
+  (partly position-derived) while a different scene inherits the peak.
+  **Reworded** from "The climax is where it belongs" to "The draft's
+  single most intense scene lands in the final stretch."
+
+### Net verdict after complete falsification
+
+All 6 claims are now either (a) honestly gated — they disappear under
+the damage that should destroy their asserted property — or (b)
+honestly worded — their gates are real but their wording describes the
+measured positional fact rather than implying an engineered property the
+gate cannot confirm. No claim in the sample report now asserts more than
+its gate proves.
+
+The two reworded claims (C5, C6) still *fire* under their killer damage
+— the gates detect back-loaded intensity, which is a real property — but
+a writer reading the new wording understands the engine is reporting
+*where the peak landed*, not *confirming the author built an escalation*.
+That is the honest-degradation standard NORTH_STAR §1 requires.
