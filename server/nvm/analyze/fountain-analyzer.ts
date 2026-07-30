@@ -159,6 +159,7 @@
 // and cannot honestly carry for each of the three).
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { fastWordCount } from '../../lib/string-utils.ts';
 import { normalizeScreenplay } from './screenplay-normalizer.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
@@ -1564,7 +1565,7 @@ function scoreDyadLines(
         lineScore += POWER_W_INTERRUPT;
       }
     }
-    const words = text.split(/\s+/).filter(Boolean).length;
+    const words = fastWordCount(text);
     if (speaker === primary) { scorePrimary += lineScore; wordsPrimary += words; }
     else { scoreSecondary += lineScore; wordsSecondary += words; }
   }
@@ -1972,10 +1973,10 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   // full-fountain word count so calibration remains byte-compatible. For
   // truncated scripts, count only the analyzed scene blocks — otherwise
   // post-ceiling padding can inflate the denominator and improve health.
-  const fullWordCount = fountain.split(/\s+/).filter(w => w.length > 0).length;
+  const fullWordCount = fastWordCount(fountain);
   const analyzedWordCount = rawScenes.reduce((n, s) => {
     for (const b of s.blocks) {
-      if (b.text.trim()) n += b.text.split(/\s+/).filter(w => w.length > 0).length;
+      if (b.text.trim()) n += fastWordCount(b.text);
     }
     return n;
   }, 0);
