@@ -74,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["javascript-actions"]
+        language: ["javascript"]
     steps:
       - uses: actions/checkout@v4
 
