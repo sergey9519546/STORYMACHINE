@@ -3,6 +3,7 @@ import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
 import { layoutScreenplay } from "../lib/screenplay-layout";
+import { fastWordCount } from "../../server/lib/string-utils.ts";
 import { buildScenarioFromScript } from "../lib/scenario-from-script";
 // fdx/pdf/docx exporters are dynamic-imported at their call sites below
 // (exportFDX/exportPDF/exportDOCX) — each is a one-shot user action (a
@@ -757,15 +758,7 @@ export default function ScriptIDE({
     // reruns on every scriptText change), which shows up as real GC pressure
     // on feature-length (90-120pp) scripts. A single char-code scan needs no
     // intermediate array and has no empty-string special case to get wrong.
-    let wordCount = 0;
-    let inWord = false;
-    for (let i = 0; i < scriptText.length; i++) {
-      if (scriptText.charCodeAt(i) > 32) {
-        if (!inWord) { wordCount++; inWord = true; }
-      } else {
-        inWord = false;
-      }
-    }
+    const wordCount = fastWordCount(scriptText);
 
     blocks.forEach((block) => {
       if (block.type === "character") {

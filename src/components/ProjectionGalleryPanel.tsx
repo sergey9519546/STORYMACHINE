@@ -352,27 +352,39 @@ function ComicRenderer({ content, color }: { content: string; color: string }) {
 // ── Rewatch renderer — highlights irony/clue notes ────────────────────────────
 
 function RewatchRenderer({ content, color }: { content: string; color: string }) {
-  const lines = content.split('\n');
+  const renderedLines = [];
+  let startIndex = 0;
+  let lineIndex = 0;
+
+  while (startIndex <= content.length) {
+    let nlIndex = content.indexOf('\n', startIndex);
+    if (nlIndex === -1) nlIndex = content.length;
+
+    const line = content.slice(startIndex, nlIndex);
+    const isWarning = line.startsWith('⚠️');
+    const isClue    = line.startsWith('🔍');
+    const isHeading = line.startsWith('###');
+
+    renderedLines.push(
+      <div key={lineIndex++} style={{
+        padding: isWarning || isClue ? '5px 10px' : isHeading ? '10px 0 2px' : '1px 0',
+        background: isWarning ? '#2d1515' : isClue ? '#1a2b1a' : 'transparent',
+        borderLeft: isWarning ? `3px solid var(--sm-stamp)` : isClue ? `3px solid ${color}` : 'none',
+        borderRadius: isWarning || isClue ? 4 : 0,
+        color: isHeading ? 'var(--sm-cream-mute)' : '#cbd5e1',
+        fontSize: isHeading ? 13 : 12,
+        fontWeight: isHeading ? 700 : 400,
+      }}>
+        {line || ' '}
+      </div>
+    );
+
+    startIndex = nlIndex + 1;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {lines.map((line, i) => {
-        const isWarning = line.startsWith('⚠️');
-        const isClue    = line.startsWith('🔍');
-        const isHeading = line.startsWith('###');
-        return (
-          <div key={i} style={{
-            padding: isWarning || isClue ? '5px 10px' : isHeading ? '10px 0 2px' : '1px 0',
-            background: isWarning ? '#2d1515' : isClue ? '#1a2b1a' : 'transparent',
-            borderLeft: isWarning ? `3px solid var(--sm-stamp)` : isClue ? `3px solid ${color}` : 'none',
-            borderRadius: isWarning || isClue ? 4 : 0,
-            color: isHeading ? 'var(--sm-cream-mute)' : '#cbd5e1',
-            fontSize: isHeading ? 13 : 12,
-            fontWeight: isHeading ? 700 : 400,
-          }}>
-            {line || ' '}
-          </div>
-        );
-      })}
+      {renderedLines}
     </div>
   );
 }
