@@ -1,0 +1,6 @@
+[
+  {
+    "comment_id": "dependency_review_bypass",
+    "reply": "According to the repository constraints memory ('If a job is fundamentally unsupported by repository settings (e.g., dependency graph disabled), use `continue-on-error: true` on the specific step instead of deleting the job to ensure the workflow structure and security baseline remain intact.'), this is the explicitly required workaround for this specific repository state where the Dependency graph feature is disabled, and the automated code reviewer was noted to falsely flag it."
+  }
+]

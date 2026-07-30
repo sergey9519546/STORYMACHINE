@@ -37,6 +37,7 @@ jobs:
 
       - name: Dependency review
         uses: actions/dependency-review-action@v4
+        continue-on-error: true
         with:
           # Fail the PR on high/critical vulnerable packages in the diff.
           fail-on-severity: high
