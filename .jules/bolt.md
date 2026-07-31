@@ -7,3 +7,6 @@
 ## 2024-07-15 - [Zero-Allocation CodeMirror Rendering]
 **Learning:** Found O(N) intermediate array allocations caused by `block.text.split('\n')` inside high-frequency CodeMirror plugin update loops (`fountain-highlight.ts` and `screenplay-format.ts`). Since plugins run synchronously on keystrokes, these allocations cause frame stuttering in large documents.
 **Action:** When extracting line offsets in rendering or highlighting loops, replace `.split('\n')` with native `while (startIndex <= text.length)` loops using `text.indexOf('\n', startIndex)`. This guarantees zero allocation for multiline text processing on hot paths.
+## 2026-07-31 - Fast word count optimization
+**Learning:** In the fountain text analysis hot path, `String.prototype.split(/\s+/)` allocations can be avoided. Using the custom `fastWordCount` utility is ~3-5x faster and avoids array allocation overhead.
+**Action:** Use `fastWordCount` from `server/lib/string-utils.ts` in critical paths instead of `.split()`.

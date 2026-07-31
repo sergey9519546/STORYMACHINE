@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../lib/string-utils.ts';
 // Script Doctor — Fountain-native heuristic analyzer (half 1 of the bridge
 // described in ./types.ts). Turns raw Fountain text directly into the same
 // ScreenplaySceneRecord[]/StructureState shapes the live NVM screenplay memory
@@ -584,8 +585,8 @@ function detectSuspenseDelta(actionLines: string[], dialogueLines: DialogueLine[
   const exclamations = countHits(allText, /!/g);
   const emdashEllipsis = countHits(allText, /—|\.\.\./g);
   const shortPunchy = actionLines.filter(l => {
-    const words = l.split(/\s+/).filter(Boolean);
-    return words.length > 0 && words.length <= 4;
+    const wordCount = fastWordCount(l);
+    return wordCount > 0 && wordCount <= 4;
   }).length;
   const raw = dangerHits * 1 + exclamations * 0.5 + emdashEllipsis * 0.3 + shortPunchy * 0.4 - reliefHits * 0.7;
   return clamp(Math.round(raw), -3, 5);
@@ -1564,7 +1565,7 @@ function scoreDyadLines(
         lineScore += POWER_W_INTERRUPT;
       }
     }
-    const words = text.split(/\s+/).filter(Boolean).length;
+    const words = fastWordCount(text);
     if (speaker === primary) { scorePrimary += lineScore; wordsPrimary += words; }
     else { scoreSecondary += lineScore; wordsSecondary += words; }
   }
@@ -1972,10 +1973,10 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   // full-fountain word count so calibration remains byte-compatible. For
   // truncated scripts, count only the analyzed scene blocks — otherwise
   // post-ceiling padding can inflate the denominator and improve health.
-  const fullWordCount = fountain.split(/\s+/).filter(w => w.length > 0).length;
+  const fullWordCount = fastWordCount(fountain);
   const analyzedWordCount = rawScenes.reduce((n, s) => {
     for (const b of s.blocks) {
-      if (b.text.trim()) n += b.text.split(/\s+/).filter(w => w.length > 0).length;
+      if (b.text.trim()) n += fastWordCount(b.text);
     }
     return n;
   }, 0);
