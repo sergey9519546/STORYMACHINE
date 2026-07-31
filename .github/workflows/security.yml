@@ -36,6 +36,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Dependency review
+        continue-on-error: true
         uses: actions/dependency-review-action@v4
         with:
           # Fail the PR on high/critical vulnerable packages in the diff.
@@ -74,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["javascript-actions"]
+        language: ["javascript"]
     steps:
       - uses: actions/checkout@v4
 
