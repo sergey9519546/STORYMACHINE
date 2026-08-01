@@ -526,6 +526,7 @@ import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
+import { fastWordCount } from '../../../lib/string-utils.ts';
 /** Extract action line word frequency per scene */
 function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>> {
   const lines = fountain.split('\n');
@@ -618,7 +619,7 @@ function buildCharacterVoiceProfiles(fountain: string): Map<string, CharacterVoi
       const words = t.toLowerCase().split(/\W+/).filter(w => w.length > 2 && !DIALOGUE_STOPWORDS.has(w));
       for (const w of words) profile.vocab.add(w);
       profile.lineCount++;
-      profile.wordCountsPerLine.push(t.split(/\s+/).filter(w => w.length > 0).length);
+      profile.wordCountsPerLine.push(fastWordCount(t));
     } else {
       // Action line: reset dialogue context
       currentChar = null;
@@ -1755,7 +1756,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     // single-character piece. Speech-length variation is a primary tool of
     // rhythm and characterization; its absence flattens every exchange.
     if (dlg308.length >= 12) {
-      const wc308 = dlg308.map(l => l.split(/\s+/).filter(Boolean).length);
+      const wc308 = dlg308.map(l => fastWordCount(l));
       let bestBand308 = 0;
       for (const c of new Set(wc308)) {
         const inBand = wc308.filter(w => Math.abs(w - c) <= 1).length;
@@ -2432,7 +2433,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
   // this fires on low *relative spread* of action-line lengths regardless of their absolute size,
   // catching prose where every line is, say, a uniform 12 words.
   if (actionOnlyLines.length >= 12) {
-    const wordCounts417a = actionOnlyLines.map(l => l.split(/\s+/).filter(Boolean).length);
+    const wordCounts417a = actionOnlyLines.map(l => fastWordCount(l));
     const mean417a = wordCounts417a.reduce((s, v) => s + v, 0) / wordCounts417a.length;
     if (mean417a >= 6) {
       const variance417a = wordCounts417a.reduce((s, v) => s + (v - mean417a) ** 2, 0) / wordCounts417a.length;
@@ -2471,7 +2472,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       if (inDlg417b) dlg417b.push(t);
     }
     if (dlg417b.length >= 12) {
-      const monoCount417b = dlg417b.filter(l => l.split(/\s+/).filter(Boolean).length <= 2).length;
+      const monoCount417b = dlg417b.filter(l => fastWordCount(l) <= 2).length;
       if (monoCount417b / dlg417b.length > 0.35) {
         issues.push({
           location: 'Dialogue throughout',
@@ -2587,7 +2588,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     // DIALOGUE_MONOSYLLABIC_FLOOD (Wave 417 — a brevity FLOOR measured as a rate):
     // this isolates the single longest line as an outlier against the distribution.
     if (dlg431.length >= 12) {
-      const wc431 = dlg431.map(l => l.split(/\s+/).filter(Boolean).length);
+      const wc431 = dlg431.map(l => fastWordCount(l));
       const mean431 = wc431.reduce((s, v) => s + v, 0) / wc431.length;
       const max431 = Math.max(...wc431);
       if (max431 >= 30 && mean431 > 0 && max431 >= mean431 * 4) {
@@ -2711,7 +2712,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         if (/^\(/.test(t)) continue;
         if (siInDlg445) continue;
         // Action line
-        const wc445 = t.split(/\s+/).filter(Boolean).length;
+        const wc445 = fastWordCount(t);
         if (!siFirstActSeen445 && !siDlgBeforeAct445) {
           siIntros445.push(wc445);
           siFirstActSeen445 = true;
@@ -2872,7 +2873,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     // this is backward-cause checking what PRECEDES long speeches).
     if (dlg459.length >= 8) {
       const longSpeeches459c = dlg459
-        .map((t, i) => ({ t, i, wc: t.split(/\s+/).filter(Boolean).length }))
+        .map((t, i) => ({ t, i, wc: fastWordCount(t) }))
         .filter(x => x.wc >= 10);
       if (longSpeeches459c.length >= 3) {
         const anyPrecededByQuestion459c = longSpeeches459c.some(({ i }) => {
@@ -2969,7 +2970,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
     if (allDlg473b.length >= 12) {
       const openEndIdx473b = Math.floor(allDlg473b.length * 0.25);
-      const wordCounts473b = allDlg473b.map(t => t.split(/\s+/).filter(Boolean).length);
+      const wordCounts473b = allDlg473b.map(t => fastWordCount(t));
       const openingLong473b = wordCounts473b.slice(0, openEndIdx473b).filter(wc => wc >= 10).length;
       const restLong473b = wordCounts473b.slice(openEndIdx473b).filter(wc => wc >= 10).length;
       if (openingLong473b === 0 && restLong473b >= 3) {
@@ -3045,7 +3046,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       if (inDlg487a) allDlg487a.push(t);
     }
     if (allDlg487a.length >= 8) {
-      const wc487a = allDlg487a.map(t => t.split(/\s+/).filter(Boolean).length);
+      const wc487a = allDlg487a.map(t => fastWordCount(t));
       const longIdxs487a = wc487a
         .map((wc, i) => ({ wc, i }))
         .filter(({ wc, i }) => wc >= 10 && i < allDlg487a.length - 1)
@@ -3174,7 +3175,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       if (inDlg501a) allDlg501a.push(t);
     }
     if (allDlg501a.length >= 8) {
-      const wc501a = allDlg501a.map(t => t.split(/\s+/).filter(Boolean).length);
+      const wc501a = allDlg501a.map(t => fastWordCount(t));
       const qIdxs501a = allDlg501a
         .map((t, i) => ({ t, i }))
         .filter(({ t, i }) => t.trimEnd().endsWith('?') && i < allDlg501a.length - 1)
@@ -3260,7 +3261,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       if (inDlg501c) allDlg501c.push(t);
     }
     if (allDlg501c.length >= 8) {
-      const wc501c = allDlg501c.map(t => t.split(/\s+/).filter(Boolean).length);
+      const wc501c = allDlg501c.map(t => fastWordCount(t));
       const peakWC501c = Math.max(...wc501c);
       const peakPos501c = wc501c.indexOf(peakWC501c);
       const openEnd501c = Math.floor(allDlg501c.length * 0.25);
@@ -3344,7 +3345,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     // × question absent — same zone, different signal).
     if (dlg515.length >= 12) {
       const closeStart515b = Math.floor(dlg515.length * 0.75);
-      const wc515b = dlg515.map(t => t.split(/\s+/).filter(Boolean).length);
+      const wc515b = dlg515.map(t => fastWordCount(t));
       const globalLong515b = wc515b.filter(w => w >= 10).length;
       if (globalLong515b >= 3) {
         const closingLong515b = wc515b.slice(closeStart515b).filter(w => w >= 10).length;
@@ -3497,7 +3498,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     // aren't question-triggered; this fires when long speeches ARE question-triggered, every time),
     // DIALOGUE_LENGTH_OUTLIER (Wave 431: single-peak isolation — one speech dominates by ratio).
     if (dlg529.length >= 8) {
-      const wc529c = dlg529.map(t => t.split(/\s+/).filter(Boolean).length);
+      const wc529c = dlg529.map(t => fastWordCount(t));
       const qAfterIdxs529c = dlg529
         .map((t, i) => ({ t, i }))
         .filter(({ t, i }) => t.trimEnd().endsWith('?') && i < dlg529.length - 1)
@@ -3705,7 +3706,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       if (inDlg557b) dlg557b.push(t);
     }
     if (dlg557b.length >= 12) {
-      const wc557b = dlg557b.map(t => t.split(/\s+/).filter(Boolean).length);
+      const wc557b = dlg557b.map(t => fastWordCount(t));
       const longIdxs557b = wc557b.map((w, i) => ({ w, i })).filter(x => x.w >= 10).map(x => x.i);
       if (longIdxs557b.length >= 3) {
         const third557b = Math.floor(dlg557b.length / 3);
@@ -3985,7 +3986,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         .map((t, i) => ({ t, i }))
         .filter(({ t, i }) => t.trimEnd().endsWith('!') && i < dlg585b.length - 1);
       if (qualExclLines585b.length >= 2) {
-        const countWords585b = (s: string) => s.split(/\s+/).filter(w => w.length > 0).length;
+        const countWords585b = (s: string) => fastWordCount(s);
         const allTerse585b = qualExclLines585b.every(({ i }) => countWords585b(dlg585b[i + 1]) <= 2);
         if (allTerse585b) {
           issues.push({
