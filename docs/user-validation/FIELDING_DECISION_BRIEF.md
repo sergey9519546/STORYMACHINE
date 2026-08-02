@@ -39,7 +39,7 @@ deterministic checks on this HEAD to confirm the certified facts still hold:
 | Verdict | generator output | **CONSIDER** (matches) |
 | Scene count | generator output | **14** (matches) |
 | contentHash | generator output | **`33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f`** (matches) |
-| Artifact size | `wc -c` | **210208 bytes** (byte-identical to committed) |
+| Artifact size | `wc -c` | **212723 bytes** (byte-identical to committed) |
 
 The only diff the regeneration produced against the committed
 `sample-coverage-report.html` was the **datestamp** ("July 15" → "July 28" and

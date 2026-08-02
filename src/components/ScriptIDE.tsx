@@ -355,6 +355,20 @@ export default function ScriptIDE({
     setScriptText(text);
     draftTextGenRef.current += 1;
   }, []);
+  // Text we just installed programmatically (sample load, converted import,
+  // accepted fix). Setting scriptText re-renders FountainEditor, which syncs
+  // the new value into the CodeMirror doc — and that sync echoes back through
+  // onChange -> handleScriptChange, which cannot otherwise tell the echo apart
+  // from a real keystroke. Left unhandled, the echo re-marks coverage stale
+  // immediately after a programmatic install, so the P0 golden path ("Try
+  // sample coverage") renders a fresh report already banner-flagged
+  // "COVERAGE OUTDATED — RE-RUN COVERAGE". Recording the installed text lets
+  // handleScriptChange recognize and swallow exactly that one echo.
+  const programmaticInstallRef = useRef<string | null>(null);
+  const installDraft = useCallback((text: string) => {
+    programmaticInstallRef.current = text;
+    mutateDraft(text);
+  }, [mutateDraft]);
   const persistedGenerationRef = useRef(initialDraft.dirty ? -1 : 0);
   const persistenceReadyRef = useRef(false);
   const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
@@ -1065,6 +1079,16 @@ export default function ScriptIDE({
   const getDraftGeneration = useCallback(() => draftTextGenRef.current, []);
 
   const handleScriptChange = (text: string) => {
+    // Swallow the editor's echo of a programmatic install (see
+    // programmaticInstallRef). The install already called mutateDraft, so the
+    // text and the generation counter are current; re-processing the echo
+    // would double-bump the generation and falsely mark fresh coverage stale.
+    // Any mismatch means a real user edit, so the marker is cleared either way.
+    if (programmaticInstallRef.current !== null) {
+      const installed = programmaticInstallRef.current;
+      programmaticInstallRef.current = null;
+      if (text === installed) return;
+    }
     mutateDraft(text); // G0-02: draft advanced — invalidate in-flight coverage/fixes
     setCoverageStale(true);
 
@@ -2425,9 +2449,17 @@ export default function ScriptIDE({
                   );
                   return;
                 }
-                mutateDraft(text);
+                installDraft(text);
                 setCoverageStale(false);
-                triggerAnalysis(text);
+                // G0-04: installing the sample is a request for *coverage*
+                // (deterministic, /api/scriptide/doctor) — not for AI scene
+                // analysis. triggerAnalysis POSTs /api/analyze-script, which
+                // fires generateContent + image + TTS in one Promise.all. It
+                // must respect the same off-by-default flag as the typing
+                // path, or the P0 golden path silently spends three provider
+                // calls the user never asked for (and emits a 503 console
+                // error on a keyless demo box).
+                if (autoAnalysis) triggerAnalysis(text);
               }}
               onJumpToLine={(line1) => {
                 editorRef.current?.navigateTo(line1);
@@ -2451,9 +2483,13 @@ export default function ScriptIDE({
             title={titlePage.title}
             getDraftGeneration={getDraftGeneration}
             onLoadFountain={(text) => {
-              mutateDraft(text);
+              installDraft(text);
               setCoverageStale(false);
-              triggerAnalysis(text);
+              // G0-04: same rule as the sample-install callback above — a
+              // programmatic draft install (converted FDX/PDF, accepted fix)
+              // is not an explicit "Analyze" click, so it must not fire
+              // /api/analyze-script unless auto-analysis is opted into.
+              if (autoAnalysis) triggerAnalysis(text);
             }}
             autoLoadSample={false}
             onClose={() => {
