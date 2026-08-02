@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../../lib/string-utils.ts';
 // Wave 137 — Pass 8: Rhythm/Prosody
 // Checks sentence rhythm in action lines: monotonous sentence lengths,
 // run-on action blocks, staccato beats that need expansion.
@@ -590,7 +591,7 @@ function countSentences(text: string): number {
 
 /** Count words in a line */
 function countWords(text: string): number {
-  return text.split(/\s+/).filter(w => w.length > 0).length;
+  return fastWordCount(text);
 }
 
 export async function rhythmPass(input: PassInput): Promise<PassResult> {
@@ -2034,7 +2035,7 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     const firstZone428b = actionLines.filter(l => l.lineNum <= zoneThreshold428b);
     const lastZone428b = actionLines.filter(l => l.lineNum > zoneThreshold428b);
     if (firstZone428b.length >= 3 && lastZone428b.length >= 3) {
-      const wc428b = (l: { text: string }) => l.text.split(/\s+/).filter(Boolean).length;
+      const wc428b = (l: { text: string }) => fastWordCount(l.text);
       const firstAvg428b = firstZone428b.reduce((s, l) => s + wc428b(l), 0) / firstZone428b.length;
       const lastAvg428b = lastZone428b.reduce((s, l) => s + wc428b(l), 0) / lastZone428b.length;
       if (firstAvg428b > 0 && lastAvg428b > firstAvg428b * 1.4) {
@@ -2063,7 +2064,7 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // fires only when ONE specific line is 4× average AND ≥25 words — a single-peak outlier
   // check that is complementary and orthogonal to the flood check.
   if (actionLines.length >= 8) {
-    const wcs428c = actionLines.map(l => l.text.split(/\s+/).filter(Boolean).length);
+    const wcs428c = actionLines.map(l => fastWordCount(l.text));
     const avgWc428c = wcs428c.reduce((s, w) => s + w, 0) / wcs428c.length;
     const maxWc428c = Math.max(...wcs428c);
     if (maxWc428c >= 25 && avgWc428c > 0 && maxWc428c >= avgWc428c * 4) {
@@ -2091,14 +2092,14 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // extreme peak. This is the first check to test LOCAL CO-OCCURRENCE of short and long extremes in a
   // sliding 5-line window — a granular spatial test distinct from all proportion or zone checks.
   if (actionLines.length >= 10) {
-    const shortAL442a = actionLines.filter(l => l.text.split(/\s+/).filter(Boolean).length <= 4);
-    const longAL442a = actionLines.filter(l => l.text.split(/\s+/).filter(Boolean).length >= 12);
+    const shortAL442a = actionLines.filter(l => fastWordCount(l.text) <= 4);
+    const longAL442a = actionLines.filter(l => fastWordCount(l.text) >= 12);
     if (shortAL442a.length >= 2 && longAL442a.length >= 2) {
       let hasCoOccurrence442a = false;
       for (let w = 0; w <= actionLines.length - 5; w++) {
         const win442a = actionLines.slice(w, w + 5);
-        const hasShort442a = win442a.some(l => l.text.split(/\s+/).filter(Boolean).length <= 4);
-        const hasLong442a = win442a.some(l => l.text.split(/\s+/).filter(Boolean).length >= 12);
+        const hasShort442a = win442a.some(l => fastWordCount(l.text) <= 4);
+        const hasLong442a = win442a.some(l => fastWordCount(l.text) >= 12);
         if (hasShort442a && hasLong442a) { hasCoOccurrence442a = true; break; }
       }
       if (!hasCoOccurrence442a) {
@@ -2126,7 +2127,7 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // exist or where they cluster. Orthogonal to all existing analytical modes in use here.
   if (actionLines.length >= 8) {
     const qualifying442b = actionLines.filter(
-      (l, idx) => l.text.split(/\s+/).filter(Boolean).length >= 14 && idx < actionLines.length - 2,
+      (l, idx) => fastWordCount(l.text) >= 14 && idx < actionLines.length - 2,
     );
     if (qualifying442b.length >= 2) {
       const hasRecovery442b = qualifying442b.some(ql => {
@@ -2163,7 +2164,7 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // when line lengths are uniformly mediocre — no line too long, no line too short — a monotone band.
   // None of the existing checks can detect a script where 100% of lines are exactly 6 words each.
   if (actionLines.length >= 8) {
-    const wcs442c = actionLines.map(l => l.text.split(/\s+/).filter(Boolean).length);
+    const wcs442c = actionLines.map(l => fastWordCount(l.text));
     const avg442c = wcs442c.reduce((s, w) => s + w, 0) / wcs442c.length;
     if (avg442c > 4) {
       const variance442c = wcs442c.reduce((s, w) => s + (w - avg442c) ** 2, 0) / wcs442c.length;

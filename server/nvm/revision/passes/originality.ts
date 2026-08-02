@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../../lib/string-utils.ts';
 // Wave 137 — Pass 10: Originality
 // Checks for clichés, generic scene descriptions, and predictable outcomes.
 // Wave 137 additions: emotion-naming in action lines (show-don't-tell violation).
@@ -2365,7 +2366,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (/^\(/.test(t)) continue;
       if (inDlg396b) {
         totalDlg396b++;
-        if (t.split(/\s+/).filter(Boolean).length <= 4) shortCount396b++;
+        if (fastWordCount(t) <= 4) shortCount396b++;
       }
     }
     if (totalDlg396b >= 15 && shortCount396b / totalDlg396b >= 0.75) {
@@ -2658,7 +2659,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (t.startsWith('(')) continue;
       if (!inDlg438b) continue;
       dlgTotal438b++;
-      if (t.split(/\s+/).filter(Boolean).length > 15) longDlgCount438b++;
+      if (fastWordCount(t) > 15) longDlgCount438b++;
     }
     if (dlgTotal438b >= 12 && longDlgCount438b / dlgTotal438b < 0.05) {
       issues.push({
@@ -3030,7 +3031,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (t.startsWith('(')) continue;
       if (inDlg480b) continue;
       actionLineCount480b++;
-      actionWordTotal480b += t.split(/\s+/).filter(Boolean).length;
+      actionWordTotal480b += fastWordCount(t);
     }
     if (actionLineCount480b >= 8) {
       const avgActionWords480b = actionWordTotal480b / actionLineCount480b;
@@ -3081,7 +3082,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       }
       if (t.startsWith('(')) { prevWasBlank480c = false; continue; }
       if (inDlg480c) { prevWasBlank480c = false; continue; }
-      curParaWords480c += t.split(/\s+/).filter(Boolean).length;
+      curParaWords480c += fastWordCount(t);
       prevWasBlank480c = false;
     }
     if (curParaWords480c > 0) paragraphWords480c.push(curParaWords480c);
@@ -3193,7 +3194,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { flushSpeech494b(); inDlg494b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg494b) continue;
-      curSpeechWords494b += t.split(/\s+/).filter(Boolean).length;
+      curSpeechWords494b += fastWordCount(t);
       hasDlgLine494b = true;
     }
     flushSpeech494b();
@@ -3607,7 +3608,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (t.startsWith('(')) continue;
       if (!inDlg536c) continue;
       dlgTotal536c++;
-      const wordCount536c = t.split(/\s+/).filter((w: string) => w.length > 0).length;
+      const wordCount536c = fastWordCount(t);
       if (wordCount536c <= 3) shortCount536c++;
     }
     if (dlgTotal536c >= 8 && shortCount536c / dlgTotal536c > 0.60) {
@@ -3696,7 +3697,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (t.startsWith('(')) continue;
       if (!inDlg550b) continue;
       dlgTotal550b++;
-      const wordCount550b = t.split(/\s+/).filter((w: string) => w.length > 0).length;
+      const wordCount550b = fastWordCount(t);
       if (wordCount550b > 15) longCount550b++;
     }
     if (dlgTotal550b >= 8 && longCount550b / dlgTotal550b > 0.30) {
