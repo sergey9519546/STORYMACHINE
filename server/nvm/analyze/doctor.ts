@@ -52,6 +52,13 @@ import { analyzeStoryGraph } from './story-graph.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import { computeNarrativeMetrics } from './metrics.ts';
+// Real element-aware paginator, shared with the editor's page chip so the
+// report and the app can never disagree about how long a script is. Safe to
+// import here: screenplay-layout.ts's only dependency is src/lib/fountain.ts,
+// a leaf parser this directory already imports (see locate.ts, canonical-
+// fountain.ts), so it adds no cycle and cannot re-enter the doctor↔reference
+// circular import this file's TDZ note warns about.
+import { layoutScreenplay } from '../../../src/lib/screenplay-layout.ts';
 import type {
   FountainAnalysis, ScriptDoctorReport, DoctorPassSummary, SceneDiagnostics, DoctorGrade,
   CoverageVerdict, DimensionKey, DimensionScore,
@@ -772,18 +779,36 @@ export function verdictFor(health: number, sceneCount: number): CoverageVerdict 
 }
 
 /** Deterministic page/runtime estimate from the analyzed Fountain text.
- *  Pure arithmetic over the text the doctor already holds — no layout engine,
- *  no new heuristics: non-blank rendered lines at the classic ~55 lines per
- *  screenplay page, runtime at the 1-page-≈-1-minute convention. Constants
- *  stay function-local per this file's standing TDZ note (doctor↔reference
- *  circular import). Floors at 1 page for any non-empty text so a one-scene
- *  excerpt never reports "0 pages"; returns null for empty/whitespace input
- *  (degenerate reports carry no estimate rather than a fabricated one). */
+ *
+ *  Uses the real paginator (src/lib/screenplay-layout.ts's layoutScreenplay —
+ *  the same one the editor's page chip renders from), so the number in the
+ *  report matches what the writer sees in the app and what the script would
+ *  actually run to on the page.
+ *
+ *  WHY NOT THE OLD ARITHMETIC: this previously counted non-blank SOURCE lines
+ *  at ~55 lines/page. In Fountain source an entire speech or action paragraph
+ *  is ONE line no matter how many lines it occupies once rendered, so the
+ *  count bore no relation to page count. Measured against the six produced
+ *  screenplays in data/screenplays/, that formula implied 434-761 words per
+ *  page; real produced screenplays run ~215 words/page (median of the 761-script
+ *  P1 corpus: 23,604 words over a ~110-page feature). It under-reported every
+ *  real script by 2-3x — the 665-word, 14-scene sample rendered as "~1 page /
+ *  ~1 min", which is also self-contradictory, since 14 scene headings cannot
+ *  fit on one page. layoutScreenplay pools to 208 words/page across those same
+ *  six scripts, within 3% of the corpus figure.
+ *
+ *  Element-aware pagination is why: scene headings, action, character cues,
+ *  parentheticals and dialogue each occupy a different width and therefore wrap
+ *  differently. Only a layout pass can know that.
+ *
+ *  Runtime keeps the 1-page-≈-1-minute convention. Floors at 1 page for any
+ *  non-empty text so a one-scene excerpt never reports "0 pages"; returns null
+ *  for empty/whitespace input (degenerate reports carry no estimate rather than
+ *  a fabricated one). Note this value is presentational — it feeds the report
+ *  header only (server/lib/coverage-html.ts) and no score, threshold or verdict. */
 export function estimatePages(fountain: string): ScriptDoctorReport['pageEstimate'] | null {
-  const LINES_PER_PAGE = 55; // classic screenplay layout density
-  const lines = fountain.split(/\r?\n/).filter(l => l.trim().length > 0).length;
-  if (lines === 0) return null;
-  const pages = Math.max(1, Math.round(lines / LINES_PER_PAGE));
+  if (fountain.trim().length === 0) return null;
+  const pages = Math.max(1, layoutScreenplay(fountain).length);
   return { pages, runtimeMinutes: pages, basis: 'lines' };
 }
 
