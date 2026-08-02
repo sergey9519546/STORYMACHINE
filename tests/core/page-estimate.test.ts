@@ -2,8 +2,14 @@
 // Conventions: node:test + assert/strict, matching tests/core/script-doctor.test.ts.
 //
 // Coverage, fire + no-fire per check:
-//  - estimatePages: proportional to non-blank line count at ~55 lines/page,
-//    1-page floor on any non-empty text, null on empty/whitespace input.
+//  - estimatePages: delegates to the real element-aware paginator
+//    (src/lib/screenplay-layout.ts's layoutScreenplay, shared with the editor's
+//    page chip), 1-page floor on any non-empty text, null on empty/whitespace.
+//    It previously counted non-blank SOURCE lines at ~55 lines/page, which
+//    under-reported every real screenplay by 2-3x — in Fountain source a whole
+//    speech or action paragraph is ONE line however many lines it renders to.
+//    See tests/core/page-estimate-realism.test.ts for the corpus-grounded
+//    density check that pins the corrected behavior.
 //  - excerptNoteFor: fires below the RECOMMEND scene floor (8), silent at and
 //    above it — never padded onto full-length input.
 //  - runScriptDoctor integration: non-degenerate reports carry both fields
@@ -15,6 +21,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { runScriptDoctor, estimatePages, excerptNoteFor } from '../../server/nvm/analyze/doctor.ts';
+import { layoutScreenplay } from '../../src/lib/screenplay-layout.ts';
 
 /** n scenes of identical, competent shape — enough text to be non-degenerate. */
 function buildFountain(sceneCount: number): string {
@@ -37,14 +44,27 @@ function buildFountain(sceneCount: number): string {
 }
 
 describe('estimatePages — pure helper', () => {
-  it('fires: scales with non-blank line count at ~55 lines/page', () => {
-    // 110 non-blank lines → exactly 2 pages, 2 minutes.
-    const text = Array.from({ length: 110 }, (_, i) => `Line ${i}`).join('\n');
-    const est = estimatePages(text);
-    assert.ok(est, 'non-empty text must produce an estimate');
-    assert.equal(est.pages, 2);
-    assert.equal(est.runtimeMinutes, 2);
-    assert.equal(est.basis, 'lines');
+  it('fires: grows monotonically with script length, and agrees with the paginator', () => {
+    // The old assertion here pinned the source-line formula (110 raw lines ===
+    // exactly 2 pages). That formula was the bug: it ignored how elements wrap,
+    // so it under-reported real screenplays by 2-3x. The real contract is that
+    // the estimate IS the paginator's page count, and that longer scripts
+    // produce more pages.
+    const short = buildFountain(2);
+    const long = buildFountain(20);
+
+    const shortEst = estimatePages(short);
+    const longEst = estimatePages(long);
+    assert.ok(shortEst && longEst, 'non-empty text must produce an estimate');
+
+    assert.equal(shortEst.pages, layoutScreenplay(short).length,
+      'estimate must equal the paginator the editor renders from');
+    assert.equal(longEst.pages, layoutScreenplay(long).length);
+
+    assert.ok(longEst.pages > shortEst.pages,
+      `a 20-scene script (${longEst.pages}pp) must exceed a 2-scene one (${shortEst.pages}pp)`);
+    assert.equal(longEst.runtimeMinutes, longEst.pages, 'one page ~ one minute');
+    assert.equal(longEst.basis, 'lines');
   });
 
   it('fires: floors at 1 page for any non-empty text (never 0 pages)', () => {
