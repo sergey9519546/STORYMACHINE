@@ -64,7 +64,7 @@ verbatim to every route the live sample flow actually calls:
 | `GET /api/ai-config` | 200 | `llmReady:false` — analysis-only front door confirmed |
 | `POST /api/scriptide/doctor` (`ScriptDoctorPanel.tsx`'s live report call) | 200 | health 68.9, grade "solid", totalIssues 200 |
 | `POST /api/scriptide/diagnose` | 200 | health 68.9, verdict CONSIDER, sceneCount 14 |
-| `POST /api/export/coverage` | 200 | 210,208 bytes — byte-identical size to the committed `sample-coverage-report.html` |
+| `POST /api/export/coverage` | 200 | 212,723 bytes — byte-identical size to the committed `sample-coverage-report.html` |
 | `POST /api/analyze-script` (opt-in idle AI, off by default per G0-04) | 503 | clean honest-degradation body — correct keyless behavior, not a crash |
 | `npm run build` | — | clean, 2294 modules, 3.63s, 0 errors |
 

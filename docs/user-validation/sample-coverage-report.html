@@ -275,6 +275,49 @@
       border-radius: 3px;
       color: #713f12;
     }
+    /* ── Verify block (P3) ── */
+    .verify-block {
+      margin: 14px auto 0;
+      max-width: 640px;
+      padding: 12px 16px;
+      border: 1px solid #d4d4d8;
+      border-radius: 3px;
+      background: #fafaf9;
+      text-align: left;
+    }
+    .verify-heading {
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: #1a1a1a;
+    }
+    .verify-body { margin-bottom: 8px; }
+    .verify-steps {
+      margin: 0 0 10px 18px;
+      padding: 0;
+    }
+    .verify-steps li { margin-bottom: 3px; }
+    .verify-claims {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+    .verify-claims dt {
+      display: inline;
+      color: #52525b;
+    }
+    .verify-claims dd {
+      display: inline;
+      margin: 0 0 0 6px;
+    }
+    .verify-claims code, .verify-steps code {
+      background: #f4f4f5;
+      padding: 1px 6px;
+      border-radius: 3px;
+      word-break: break-all;
+    }
     /* ── Print ── */
     @page {
       size: letter portrait;
@@ -299,7 +342,7 @@
       <h1 class="title">The Second Key</h1>
       
       <div class="meta-line">
-        July 29, 2026 &middot;
+        August 2, 2026 &middot;
         14 scenes &middot;
         665 words &middot;
         ~1 page / ~1 min (est.)
@@ -2400,7 +2443,26 @@
     </div>
     
     <div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>33dcf2146211</code></div>
-    <div class="footer-generated">Generated July 29, 2026 at 06:56:09 AM UTC</div>
+    <div class="verify-block">
+      <div class="verify-heading">Verify this report</div>
+      <div class="verify-body">
+        This report is reproducible. Anyone with the original script text can confirm
+        it was produced by the engine &mdash; not hand-edited &mdash; by re-running the
+        deterministic analysis:
+      </div>
+      <ol class="verify-steps">
+        <li>Open any Story Machine instance and go to <code>#verify</code> (the &ldquo;Verify a report&rdquo; link on the start screen), or POST the script text to <code>/api/export/verify</code>.</li>
+        <li>Paste the original script text and the expected values below.</li>
+        <li>The service recomputes the hash and re-runs the analysis; every value must match.</li>
+      </ol>
+      <dl class="verify-claims">
+        <div><dt>Script-text hash (SHA-256, full)</dt><dd><code>33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f</code></dd></div>
+        <div><dt>Health</dt><dd><code>68.9</code></dd></div>
+        <div><dt>Verdict</dt><dd><code>CONSIDER</code></dd></div>
+        <div><dt>Total issues</dt><dd><code>200</code></dd></div>
+      </dl>
+    </div>
+    <div class="footer-generated">Generated August 2, 2026 at 11:25:17 PM UTC</div>
   </footer>
   </div>
 </body>

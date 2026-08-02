@@ -34,7 +34,7 @@ contentHash `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f`.
 
 **Fielding readiness (re-verified on HEAD `d733240`, 2026-07-28):** the
 committed static stimulus is reproducible — `npm run generate-p0-sample`
-reproduces health 68.9 / CONSIDER / 14 scenes / the hash above / 210208 bytes
+reproduces health 68.9 / CONSIDER / 14 scenes / the hash above / 212723 bytes
 byte-identical to the committed artifact (the only regeneration diff is the
 runtime datestamp). `npm run honesty-audit` is clean. The last
 *browser-DOM* click-through was certified on `1a7f3b4` (6 commits prior); the
