@@ -35,6 +35,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # REQUIRES A REPO SETTING: this action needs the Dependency graph
+      # enabled (Settings > Code security and analysis > Dependency graph).
+      # Without it the step fails every PR with "Dependency review is not
+      # supported on this repository", which is a configuration error, not a
+      # vulnerability finding.
+      #
+      # It is deliberately left BLOCKING rather than made continue-on-error:
+      # a supply-chain gate that cannot fail is not a gate, and a silently
+      # non-blocking step here would be indistinguishable from a clean run.
+      # If this step is red, fix the setting — do not disable the step.
+      # (See tests/core/ci-gates-intact.test.ts, which enforces exactly that.)
       - name: Dependency review
         uses: actions/dependency-review-action@v4
         with:
@@ -74,7 +85,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["javascript-actions"]
+        # "javascript" covers the JS/TS surface (CodeQL analyzes TypeScript
+        # under the javascript extractor). It was previously
+        # "javascript-actions", which is not a CodeQL language id — the job
+        # failed at init on every run with "Did not recognize the following
+        # languages: javascript-actions", so this workflow has never actually
+        # scanned anything.
+        language: ["javascript"]
     steps:
       - uses: actions/checkout@v4
 
