@@ -1104,8 +1104,10 @@ function buildStakesContinuityStrength(
   const secondHalfClock = records.slice(midN).filter(r => r.clockRaised);
   if (firstHalfClock.length === 0 || secondHalfClock.length === 0) return null;
 
-  const firstScene = firstHalfClock[0].sceneIdx;
-  const lastScene = secondHalfClock[secondHalfClock.length - 1].sceneIdx;
+  // 1-based for display, like every writer-facing "Scene N" (2026-08 label
+  // migration — these strengths prose sites were the last 0-based leak).
+  const firstScene = firstHalfClock[0].sceneIdx + 1;
+  const lastScene = secondHalfClock[secondHalfClock.length - 1].sceneIdx + 1;
   // Wording (Category A honesty fix, 2026-07-28): the gate proves "scenes
   // the engine flags as raising the clock appear in BOTH halves." It does
   // NOT prove chronological escalation, and the named scene numbers are
@@ -1193,9 +1195,9 @@ function buildRelationshipDynamismStrength(
   if (!best) return null;
   const [charA, charB] = best.pairKey.split('|');
   return (
-    `The ${charA}/${charB} relationship is a living thread, not a flat one — it ruptures in Scene ${best.rupture.sceneIdx} ` +
+    `The ${charA}/${charB} relationship is a living thread, not a flat one — it ruptures in Scene ${best.rupture.sceneIdx + 1} ` +
     `(trust swings ${best.rupture.amount}) and genuinely repairs ${best.repair.sceneIdx - best.rupture.sceneIdx} scenes later ` +
-    `in Scene ${best.repair.sceneIdx} (trust swings +${best.repair.amount}), not left as a one-note thread.`
+    `in Scene ${best.repair.sceneIdx + 1} (trust swings +${best.repair.amount}), not left as a one-note thread.`
   );
 }
 
@@ -1231,7 +1233,7 @@ function buildEmotionalRangeStrength(
 
   return (
     `This draft earns its ending rather than coasting to it — real emotional difficulty surfaces ` +
-    `(Scene ${negativeScenes[0].sceneIdx} turns negative) before the story lands deliberately positive at the close (Scene ${finalRecord.sceneIdx}).`
+    `(Scene ${negativeScenes[0].sceneIdx + 1} turns negative) before the story lands deliberately positive at the close (Scene ${finalRecord.sceneIdx + 1}).`
   );
 }
 
@@ -1420,9 +1422,9 @@ function buildSuspenseShapingStrength(
   // ("builds to a genuine peak") implied an engineered rise; describe the
   // measured positional fact instead.
   return (
-    `The draft's highest-suspense scene sits in the final quartile (Scene ${peakRecord.sceneIdx}, ` +
+    `The draft's highest-suspense scene sits in the final quartile (Scene ${peakRecord.sceneIdx + 1}, ` +
     `suspense delta ${peakRecord.suspenseDelta}) and tops every earlier quarter's average tension, ` +
-    `off a real baseline established as early as Scene ${baselineRecord.sceneIdx} (by the engine's suspense-lexicon signal).`
+    `off a real baseline established as early as Scene ${baselineRecord.sceneIdx + 1} (by the engine's suspense-lexicon signal).`
   );
 }
 
@@ -1462,8 +1464,8 @@ function buildDramaticTurnDensityStrength(
   if (firstHalfTurns.length < DRAMATIC_TURN_DENSITY_MIN_PER_HALF) return null;
   if (secondHalfTurns.length < DRAMATIC_TURN_DENSITY_MIN_PER_HALF) return null;
 
-  const frontScenes = firstHalfTurns.map(r => r.sceneIdx).join(', ');
-  const backScenes = secondHalfTurns.map(r => r.sceneIdx).join(', ');
+  const frontScenes = firstHalfTurns.map(r => r.sceneIdx + 1).join(', ');
+  const backScenes = secondHalfTurns.map(r => r.sceneIdx + 1).join(', ');
   return (
     `This draft keeps generating real turns, not just one per act — dramatic turning points land repeatedly in ` +
     `both the front half (Scenes ${frontScenes}) and the back half (Scenes ${backScenes}) of the document.`

@@ -99,6 +99,38 @@ describe('scene-label consistency — 1-based labels, agreeing consumers', () =>
     assert.deepEqual(bad, [], `scene numbers outside 1..${slugs.length}:\n  ${bad.join('\n  ')}`);
   });
 
+  it('strengths prose ("What\'s Working") uses 1-based scene numbers that agree with the records', async () => {
+    // The strengths bullets are built by doctor.ts's own emitters, OUTSIDE
+    // the 14 pass files — they were the last 0-based leak (the shipped
+    // report claimed clock pressure "as early as Scene 3 and as late as
+    // Scene 7" when the clock-raising scenes are 4 and 8). Range checks
+    // can't catch that (3 and 7 are in range), so cross-check content: any
+    // scene number a strength names for the clock claim must actually be a
+    // clockRaised scene under 1-based numbering.
+    const { analyzeFountainText } = await import('../../server/nvm/analyze/fountain-analyzer.ts');
+    const { records } = analyzeFountainText(fountain);
+    const strengths = report.strengths ?? [];
+    for (const s of strengths) {
+      for (const m of s.matchAll(/Scene (\d+)/g)) {
+        const n = Number(m[1]);
+        assert.ok(
+          n >= 1 && n <= slugs.length,
+          `strength names Scene ${n}, outside 1..${slugs.length}: "${s}"`,
+        );
+      }
+      const clock = /as early as Scene (\d+) and as late as Scene (\d+)/.exec(s);
+      if (clock) {
+        for (const nStr of [clock[1], clock[2]]) {
+          const rec = records[Number(nStr) - 1];
+          assert.ok(
+            rec?.clockRaised === true,
+            `strength claims Scene ${nStr} raises the clock, but records[${Number(nStr) - 1}].clockRaised is ${rec?.clockRaised} — 0-based leak? "${s}"`,
+          );
+        }
+      }
+    }
+  });
+
   it('heatmap attribution agrees with the label text (doctor.ts decode)', () => {
     // Every slug-paired issue must be counted on the heatmap cell whose slug
     // it names — content agreement, not just index arithmetic.
