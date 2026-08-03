@@ -1,0 +1,1725 @@
+[
+  {
+    "id": "data/screenplays/counter-offer.fountain",
+    "group": "real-cc0-screenplay",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "data/screenplays/dead-frequency.fountain",
+    "group": "real-cc0-screenplay",
+    "clean": {
+      "sceneCount": 12,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "data/screenplays/off-season.fountain",
+    "group": "real-cc0-screenplay",
+    "clean": {
+      "sceneCount": 9,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 7,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "data/screenplays/room-12.fountain",
+    "group": "real-cc0-screenplay",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "data/screenplays/runoff.fountain",
+    "group": "real-cc0-screenplay",
+    "clean": {
+      "sceneCount": 9,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 7,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "data/screenplays/transfer-window.fountain",
+    "group": "real-cc0-screenplay",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/structural-form-experiment/pair1-kishotenketsu.fountain",
+    "group": "structural-form-fixture",
+    "clean": {
+      "sceneCount": 12,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/structural-form-experiment/pair1-three-act-control.fountain",
+    "group": "structural-form-fixture",
+    "clean": {
+      "sceneCount": 12,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/structural-form-experiment/pair2-kishotenketsu.fountain",
+    "group": "structural-form-fixture",
+    "clean": {
+      "sceneCount": 16,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 16,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 13,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 16,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/structural-form-experiment/pair2-three-act-control.fountain",
+    "group": "structural-form-fixture",
+    "clean": {
+      "sceneCount": 16,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 16,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 13,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 16,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Low Tide",
+    "group": "calibration-strong",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 1,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 1,
+        "indeterminate": 0
+      },
+      "contradictions": [
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between EXT. CONTAINER YARD - CONTINUOUS and EXT. CONTAINER YARD - MOMENTS LATER (meets) conflicts with the inverse of the explicit ordering back from EXT. CONTAINER YARD - MOMENTS LATER (before|meets|after|starts|started-by|equals|overlaps)",
+          "affectedScenes": [
+            "8"
+          ],
+          "classification": "explicit"
+        }
+      ]
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between EXT. CONTAINER YARD - CONTINUOUS and EXT. CONTAINER YARD - MOMENTS LATER (meets) conflicts with the inverse of the explicit ordering back from EXT. CONTAINER YARD - MOMENTS LATER (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "6"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between EXT. CONTAINER YARD - CONTINUOUS and EXT. CONTAINER YARD - MOMENTS LATER (meets) conflicts with the inverse of the explicit ordering back from EXT. CONTAINER YARD - MOMENTS LATER (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "9"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "calibration/Nine Minutes",
+    "group": "calibration-strong",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 6,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 6,
+        "indeterminate": 0
+      },
+      "contradictions": [
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
+          "affectedScenes": [
+            "3"
+          ],
+          "classification": "explicit"
+        },
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+          "affectedScenes": [
+            "4"
+          ],
+          "classification": "explicit"
+        },
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+          "affectedScenes": [
+            "5"
+          ],
+          "classification": "explicit"
+        },
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|after)",
+          "affectedScenes": [
+            "6"
+          ],
+          "classification": "explicit"
+        },
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK VESTIBULE - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+          "affectedScenes": [
+            "7"
+          ],
+          "classification": "explicit"
+        },
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+          "affectedScenes": [
+            "8"
+          ],
+          "classification": "explicit"
+        }
+      ]
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 4,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 4,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "2"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "3"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "4"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "9"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 4,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 4,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "3"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "4"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK VESTIBULE - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "5"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "6"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 6,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 6,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "4"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "5"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "6"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "7"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK VESTIBULE - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "8"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
+            "affectedScenes": [
+              "9"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "calibration/The Long Game",
+    "group": "calibration-strong",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 1,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 1,
+        "indeterminate": 0
+      },
+      "contradictions": [
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. MUSEUM VAULT CORRIDOR - CONTINUOUS and INT. MUSEUM VAULT - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. MUSEUM VAULT - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+          "affectedScenes": [
+            "8"
+          ],
+          "classification": "explicit"
+        }
+      ]
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. MUSEUM VAULT CORRIDOR - CONTINUOUS and INT. MUSEUM VAULT - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. MUSEUM VAULT - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "6"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. MUSEUM VAULT CORRIDOR - CONTINUOUS and INT. MUSEUM VAULT - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. MUSEUM VAULT - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "9"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "calibration/Second Wind",
+    "group": "calibration-strong",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Sunlight Clause",
+    "group": "calibration-strong",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Reasonable Doubt",
+    "group": "calibration-competent",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Thanksgiving, Maybe",
+    "group": "calibration-competent",
+    "clean": {
+      "sceneCount": 9,
+      "contradictionCount": 1,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 1,
+        "indeterminate": 0
+      },
+      "contradictions": [
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE KITCHEN - CONTINUOUS and INT. FARMHOUSE PORCH - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE PORCH - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+          "affectedScenes": [
+            "6"
+          ],
+          "classification": "explicit"
+        }
+      ]
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 9,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE DINING ROOM - CONTINUOUS and INT. FARMHOUSE KITCHEN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE KITCHEN - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "8"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 7,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE KITCHEN - CONTINUOUS and INT. FARMHOUSE PORCH - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE PORCH - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "4"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 9,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE KITCHEN - CONTINUOUS and INT. FARMHOUSE PORCH - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE PORCH - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "7"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "calibration/The Dead Drop",
+    "group": "calibration-competent",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SAFEHOUSE - CONTINUOUS and INT. TRAIN CAR - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. TRAIN CAR - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "3"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Encore",
+    "group": "calibration-competent",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Zero Day",
+    "group": "calibration-competent",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 1,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 1,
+        "indeterminate": 0
+      },
+      "contradictions": [
+        {
+          "type": "transitive_violation",
+          "severity": "blocker",
+          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+          "affectedScenes": [
+            "2"
+          ],
+          "classification": "explicit"
+        }
+      ]
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 2,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 2,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|after|meets)",
+            "affectedScenes": [
+              "5"
+            ],
+            "classification": "explicit"
+          },
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|after|meets)",
+            "affectedScenes": [
+              "6"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "2"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "transitive_violation",
+            "severity": "blocker",
+            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
+            "affectedScenes": [
+              "3"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "calibration/Yard Signs",
+    "group": "calibration-weak",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Merge",
+    "group": "calibration-weak",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Splitting the House",
+    "group": "calibration-weak",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/The Visit",
+    "group": "calibration-weak",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/The Corner Booth",
+    "group": "calibration-weak",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/The Grift",
+    "group": "calibration-troubled",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Adrift",
+    "group": "calibration-troubled",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Lockdown",
+    "group": "calibration-troubled",
+    "clean": {
+      "sceneCount": 9,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 7,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Whiteout",
+    "group": "calibration-troubled",
+    "clean": {
+      "sceneCount": 9,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 7,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/Firebreak",
+    "group": "calibration-troubled",
+    "clean": {
+      "sceneCount": 9,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 7,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  }
+]
