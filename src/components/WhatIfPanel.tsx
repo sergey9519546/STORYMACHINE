@@ -313,7 +313,7 @@ function SnapshotCard({ label, tone, snapshot }: { label: string; tone: 'gray' |
   return (
     <div className={`bg-[#111] rounded-lg border ${border} p-3`}>
       <div className={`text-[11px] font-medium mb-1.5 ${titleColor}`}>{label}</div>
-      {snapshot.sceneIdx !== undefined && <div className="text-[11px] text-gray-500 mb-1">scene {snapshot.sceneIdx}</div>}
+      {snapshot.sceneIdx !== undefined && <div className="text-[11px] text-gray-500 mb-1">scene {snapshot.sceneIdx + 1}</div>}
       {hasScores && (
         <div className="flex gap-3 text-[11px] font-mono mb-1.5">
           {scoreEntries.map(([k, v]) => v !== undefined && (
@@ -930,7 +930,7 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
                       </span>
                     </div>
                     <div className="text-gray-400 text-xs flex items-center gap-3">
-                      <span>Scene {g.sceneIdx}</span>
+                      <span>Scene {g.sceneIdx + 1}</span>
                       <span>{g.ir?.sceneFunction ?? '—'}</span>
                       <span>{g.ir?.ops?.length ?? 0} ops</span>
                     </div>
@@ -1032,7 +1032,7 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
                     </div>
                     <div className="bg-[#111] rounded-lg p-3 text-xs font-mono text-gray-300 space-y-1">
                       <div><span className="text-gray-500">id:</span> {selected.ghostId}</div>
-                      <div><span className="text-gray-500">scene:</span> {selected.sceneIdx}</div>
+                      <div><span className="text-gray-500">scene:</span> {selected.sceneIdx + 1}</div>
                       <div><span className="text-gray-500">function:</span> {selected.ir?.sceneFunction ?? '—'}</div>
                       <div><span className="text-gray-500">rejected:</span> {selected.reason}</div>
                       <div className="pt-1"><span className="text-gray-500">ops ({selected.ir?.ops?.length ?? 0}):</span></div>

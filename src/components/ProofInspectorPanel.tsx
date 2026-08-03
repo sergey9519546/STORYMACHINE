@@ -151,7 +151,7 @@ export function ProofInspectorPanel({ onClose }: Props) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>Scene {sc.sceneIdx}</span>
+                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>Scene {sc.sceneIdx + 1}</span>
                   <span style={{
                     background: sc.t1Pass ? '#064e3b' : '#7f1d1d',
                     color: sc.t1Pass ? 'var(--sm-ok)' : 'var(--sm-stamp)',
@@ -210,7 +210,7 @@ function ReportView({ report }: { report: ProofReport }) {
         display: 'flex', gap: 18, flexWrap: 'wrap',
         background: 'var(--sm-night-2)', borderRadius: 6, padding: '10px 14px', alignItems: 'center',
       }}>
-        <Stat label="Scene" value={String(report.sceneIdx)} color="var(--sm-cream-mute)" />
+        <Stat label="Scene" value={String(report.sceneIdx + 1)} color="var(--sm-cream-mute)" />
         <Stat label="Ops" value={String(report.opCount)} color="var(--sm-ink-mute)" />
         <Stat label="T1" value={report.tier1Pass ? '✓ pass' : '✗ fail'} color={report.tier1Pass ? 'var(--sm-ok)' : 'var(--sm-stamp)'} />
         <Stat label="T2 score" value={String(report.tier2Score)} color={qualityColor(report.tier2Score)} />

@@ -103,8 +103,8 @@ export function ArcTimelinePanel({ onClose }: ArcTimelinePanelProps) {
               })}
             </svg>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--sm-night-line)', fontSize: 10, marginTop: 2 }}>
-              <span>scene 0</span>
-              {scenes.length > 1 && <span>scene {scenes[scenes.length - 1].sceneIdx}</span>}
+              <span>scene 1</span>
+              {scenes.length > 1 && <span>scene {scenes[scenes.length - 1].sceneIdx + 1}</span>}
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export function ArcTimelinePanel({ onClose }: ArcTimelinePanelProps) {
               <tbody>
                 {scenes.map(s => (
                   <tr key={s.commitId} style={{ borderBottom: '1px solid var(--sm-night)' }}>
-                    <td style={{ padding: '5px 6px', color: 'var(--sm-cream-mute)' }}>{s.sceneIdx}</td>
+                    <td style={{ padding: '5px 6px', color: 'var(--sm-cream-mute)' }}>{s.sceneIdx + 1}</td>
                     <td style={{ padding: '5px 6px' }}>
                       <span style={{ color: s.t1Pass ? 'var(--sm-ok)' : 'var(--sm-stamp)', fontWeight: 700 }}>
                         {s.t1Pass ? '✓' : `✗${s.t1FailCount}`}
