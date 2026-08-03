@@ -36,6 +36,11 @@ interface Room {
   doc: Y.Doc;
   awareness: awarenessProtocol.Awareness;
   conns: Set<WebSocket>;
+  // Tracks which awareness clientID(s) each connection controls (populated as
+  // its MESSAGE_AWARENESS updates arrive below), so closeConn can remove
+  // exactly the departing client's state instead of an unrelated id (e.g. the
+  // room's own Y.Doc clientID, which no connection ever owns).
+  connAwareness: Map<WebSocket, Set<number>>;
 }
 
 const rooms = new Map<string, Room>();
@@ -51,7 +56,7 @@ function getRoom(name: string): Room | null {
   }
   const doc = new Y.Doc();
   const awareness = new awarenessProtocol.Awareness(doc);
-  room = { doc, awareness, conns: new Set() };
+  room = { doc, awareness, conns: new Set(), connAwareness: new Map() };
 
   // Broadcast document updates to every other connection in the room.
   doc.on('update', (update: Uint8Array, origin: unknown) => {
@@ -67,6 +72,15 @@ function getRoom(name: string): Room | null {
   // Relay awareness (cursor/selection) changes to the whole room.
   awareness.on('update', ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
     const changed = added.concat(updated, removed);
+    // Record which clientID(s) the originating connection controls, so
+    // closeConn can later remove exactly this client's state on disconnect.
+    if (origin instanceof WebSocket) {
+      const ids = room!.connAwareness.get(origin);
+      if (ids) {
+        for (const id of added) ids.add(id);
+        for (const id of removed) ids.delete(id);
+      }
+    }
     const enc = encoding.createEncoder();
     encoding.writeVarUint(enc, MESSAGE_AWARENESS);
     encoding.writeVarUint8Array(enc, awarenessProtocol.encodeAwarenessUpdate(awareness, changed));
@@ -120,6 +134,7 @@ function onMessage(conn: WebSocket, room: Room, data: Uint8Array): void {
 function setupConnection(conn: WebSocket, room: Room): void {
   conn.binaryType = 'arraybuffer';
   room.conns.add(conn);
+  room.connAwareness.set(conn, new Set());
 
   conn.on('message', (message: ArrayBuffer | Buffer) => {
     try {
@@ -135,9 +150,14 @@ function setupConnection(conn: WebSocket, room: Room): void {
   const closeConn = () => {
     room.conns.delete(conn);
     // Drop this client's awareness state so other cursors disappear cleanly.
+    // Use the awareness clientID(s) this connection actually controls
+    // (recorded above as its updates arrived) rather than the room's own
+    // Y.Doc clientID, which this connection never owns.
+    const controlledIds = room.connAwareness.get(conn);
+    room.connAwareness.delete(conn);
     awarenessProtocol.removeAwarenessStates(
       room.awareness,
-      [room.doc.clientID],
+      controlledIds ? [...controlledIds] : [],
       conn,
     );
     if (room.conns.size === 0) {
@@ -178,8 +198,16 @@ export function parseRoomId(url: string | undefined): string | null {
   const path = url.split('?')[0];
   const m = path.match(/^\/collab\/([^/]+)\/?$/);
   if (!m) return null;
-  const room = decodeURIComponent(m[1]);
-  return ROOM_RE.test(room) ? room : null;
+  try {
+    // decodeURIComponent throws on malformed percent-encoding (e.g. a lone
+    // '%' or an incomplete UTF-8 escape); treat that the same as any other
+    // malformed room id (return null) instead of letting it escape as an
+    // uncaught exception from the synchronous 'upgrade' handler.
+    const room = decodeURIComponent(m[1]);
+    return ROOM_RE.test(room) ? room : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Extract the `token` query parameter from a /collab/<room>?token=... URL. */

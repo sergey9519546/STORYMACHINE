@@ -361,6 +361,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const submitScenario = useCallback(async (payload: { nodes: Location[]; agents: CharacterSheet[] }) => {
     setShowBuilder(false);
     setLoading(true);
+    let resetSucceeded = false;
     try {
       // Reset first so a new scenario never inherits stale agents/ledger from a
       // prior session (sessions now persist to disk between server restarts).
@@ -375,6 +376,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         body: JSON.stringify({}),
       });
       if (!resetRes.ok) throw new Error(`Reset failed: ${resetRes.status}`);
+      resetSucceeded = true;
       const initRes = await fetch("/api/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -384,8 +386,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       await refreshAll();
     } catch (e) {
       showError((e as Error).message ?? 'Failed to start scenario. Check the server.');
+      // /api/reset already wiped server-side agents/nodes/ledger even if
+      // /api/init then failed — resync client state to that post-reset reality
+      // instead of leaving the stale pre-reset scenario/ledger on screen.
+      if (resetSucceeded) await refreshAll();
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [refreshAll, showError]);
 
@@ -466,7 +472,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     } catch (e) {
       showError((e as Error).message ?? 'Turn failed.');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
@@ -498,6 +504,11 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           } catch { /* ignore parse errors */ }
         };
         evtSource.onerror = () => {
+          // EventSource auto-reconnects on transient drops (readyState moves to
+          // CONNECTING, not CLOSED) — only treat CLOSED as fatal so a brief
+          // network blip doesn't abort a simulation the browser would have
+          // quietly resumed on its own.
+          if (evtSource.readyState !== EventSource.CLOSED) return;
           evtSource.close();
           evtSourceRef.current = null;
           reject(new Error('SSE connection lost'));
@@ -507,8 +518,10 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     } catch (e) {
       showError((e as Error).message ?? 'Room simulation failed.');
     } finally {
-      setLoading(false);
-      setStreamLog([]);
+      if (mountedRef.current) {
+        setLoading(false);
+        setStreamLog([]);
+      }
     }
   };
 

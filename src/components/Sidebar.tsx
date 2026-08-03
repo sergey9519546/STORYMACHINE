@@ -112,7 +112,15 @@ function LongTextField({
   placeholder: string;
   onUpdate: (id: string, field: keyof Character, value: string) => void;
 }) {
-  const displayValue = value.slice(0, LONG_FIELD_MAX);
+  // Note: `value` (from the `characters` prop) can exceed LONG_FIELD_MAX if
+  // it was set via a path that doesn't share this cap (e.g. an imported
+  // script, or the server's own per-field limits in validation.ts, which
+  // allow up to 2000 chars for lie/want/need). Displaying the full value
+  // here — rather than a sliced view — is required so onChange below never
+  // writes back less than what the user can see, which would silently
+  // discard any pre-existing tail beyond the cap. The textarea's native
+  // maxLength attribute still blocks *new* growth past LONG_FIELD_MAX.
+  const displayValue = value;
   const count = displayValue.length;
   const nearLimit = count >= LONG_FIELD_WARN_THRESHOLD;
 
@@ -120,10 +128,7 @@ function LongTextField({
     <div className="flex-1 relative">
       <textarea
         value={displayValue}
-        onChange={(e) => {
-          const capped = e.target.value.slice(0, LONG_FIELD_MAX);
-          onUpdate(charId, field, capped);
-        }}
+        onChange={(e) => onUpdate(charId, field, e.target.value)}
         className="h-12 w-full resize-none border-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel-2)] p-2 font-mono text-[10px] text-[var(--sm-ink)] outline-none focus:ring-2 focus:ring-[var(--sm-stamp)]"
         placeholder={placeholder}
         maxLength={LONG_FIELD_MAX}

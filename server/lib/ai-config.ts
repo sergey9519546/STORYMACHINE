@@ -70,6 +70,15 @@ function wireProviders(): void {
     const apiKey = _keys.apiKey || LOCAL_PLACEHOLDER_KEY;
     if (baseURL) {
       setLLMProvider(makeOpenAICompatLLMProvider({ baseURL, apiKey }));
+    } else {
+      // No baseUrl yet (e.g. `provider` was patched ahead of a follow-up call
+      // that supplies it). llmReady() already reports not-ready for this
+      // state; fail closed here too instead of silently leaving whatever
+      // provider was wired before this call (stale Gemini, or a previous
+      // openai-compat endpoint/key) active under this new, mismatched label.
+      setLLMProvider({
+        generate: async () => { throw new Error('AI LLM provider is set to openai-compat but no baseUrl is configured yet'); },
+      });
     }
   } else {
     resetLLMProvider(); // back to Gemini
@@ -84,6 +93,9 @@ function wireProviders(): void {
     const model   = _cfg.embModel ?? 'text-embedding-3-small';
     if (baseURL) {
       setEmbeddingProvider(makeOpenAICompatEmbeddingProvider({ baseURL, apiKey, model }));
+    } else {
+      // No baseUrl yet — don't leave a stale/prior provider silently wired.
+      setEmbeddingProvider(noopEmbeddingProvider);
     }
   } else {
     setEmbeddingProvider(geminiEmbeddingProvider);
@@ -98,6 +110,9 @@ function wireProviders(): void {
     const model   = _cfg.imgModel ?? 'dall-e-3';
     if (baseURL) {
       setImageProvider(makeOpenAICompatImageProvider({ baseURL, apiKey, model }));
+    } else {
+      // No baseUrl yet — don't leave a stale/prior provider silently wired.
+      setImageProvider(noopImageProvider);
     }
   } else {
     setImageProvider(geminiImageProvider);
@@ -113,6 +128,9 @@ function wireProviders(): void {
     const voice   = _cfg.ttsVoice;
     if (baseURL) {
       setTTSProvider(makeOpenAICompatTTSProvider({ baseURL, apiKey, model, voice }));
+    } else {
+      // No baseUrl yet — don't leave a stale/prior provider silently wired.
+      setTTSProvider(noopTTSProvider);
     }
   } else {
     setTTSProvider(geminiTTSProvider);

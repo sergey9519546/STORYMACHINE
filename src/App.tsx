@@ -30,13 +30,37 @@ interface PersistedAppView {
   showStoryMachine: boolean;
 }
 
+// Enum values mirrored from StoryConfig (src/types.ts). A typeof-object check
+// alone lets any object (e.g. `{}`, or a config from an older schema with a
+// renamed/removed field or a retired enum value) through `as StoryConfig`,
+// which later crashes/mis-renders in ScriptIDE/StoryMachine instead of
+// falling back to the wizard — so validate shape and enum values, not just
+// "is an object".
+const VALID_FORMATS = ['film', 'limited_series'] as const;
+const VALID_STRUCTURES = ['save_the_cat', 'dan_harmon', 'john_yorke', 'freytag', 'sequence', 'kishotenketsu'] as const;
+const VALID_DIRECTOR_STYLES = ['hitchcock', 'fincher', 'nolan', 'villeneuve', 'aster', 'lynch'] as const;
+const VALID_EMOTIONAL_ARCS = ['rags_to_riches', 'riches_to_rags', 'man_in_a_hole', 'icarus', 'cinderella', 'oedipus'] as const;
+
+function isValidStoryConfig(value: unknown): value is StoryConfig {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.theme === 'string' &&
+    (v.backstory === undefined || typeof v.backstory === 'string') &&
+    (VALID_FORMATS as readonly unknown[]).includes(v.format) &&
+    (VALID_STRUCTURES as readonly unknown[]).includes(v.structure) &&
+    (VALID_DIRECTOR_STYLES as readonly unknown[]).includes(v.directorStyle) &&
+    (VALID_EMOTIONAL_ARCS as readonly unknown[]).includes(v.emotionalArc)
+  );
+}
+
 function loadPersistedView(): PersistedAppView {
   try {
     const raw = localStorage.getItem(APP_VIEW_KEY);
     if (!raw) return { config: null, showStoryMachine: false };
     const parsed = JSON.parse(raw) as Partial<PersistedAppView> | null;
-    const config = parsed && typeof parsed === 'object' && parsed.config && typeof parsed.config === 'object'
-      ? (parsed.config as StoryConfig)
+    const config = parsed && typeof parsed === 'object' && isValidStoryConfig(parsed.config)
+      ? parsed.config
       : null;
     return { config, showStoryMachine: !!parsed?.showStoryMachine };
   } catch {

@@ -10,7 +10,11 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   const a = arr.slice();
   let s = seed;
   for (let i = a.length - 1; i > 0; i--) {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    // 32-bit-exact multiply: s approaches 2^31, and s * 1103515245 overflows
+    // 2^53 (the double integer-precision limit), corrupting the low bits the
+    // mask then keeps. Math.imul does the multiply in exact int32, so the LCG
+    // is a true, platform-stable sequence.
+    s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff;
     const j = s % (i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }

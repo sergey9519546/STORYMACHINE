@@ -22,7 +22,13 @@ export async function analyzeScriptBlock(
   // Combine the caller's abort signal (for cancellation) with a 60s timeout guard.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60_000);
-  externalSignal?.addEventListener('abort', () => controller.abort());
+  const onExternalAbort = () => controller.abort();
+  // If the caller's signal was already aborted before this call started, the 'abort'
+  // event has already fired and a new listener would never see it — abort immediately
+  // instead. Otherwise listen for a future abort, removed again once this call settles
+  // so long-lived signals shared across many calls don't accumulate listeners.
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener('abort', onExternalAbort, { once: true });
 
   let response: Response;
   try {
@@ -41,6 +47,7 @@ export async function analyzeScriptBlock(
     });
   } catch (e) {
     clearTimeout(timeoutId);
+    externalSignal?.removeEventListener('abort', onExternalAbort);
     if (e instanceof DOMException && e.name === 'AbortError') {
       if (externalSignal?.aborted) throw new DOMException('Cancelled', 'AbortError');
       throw new Error('Analysis request timed out (60s). Try a shorter script.');
@@ -48,6 +55,7 @@ export async function analyzeScriptBlock(
     throw e;
   }
   clearTimeout(timeoutId);
+  externalSignal?.removeEventListener('abort', onExternalAbort);
 
   if (!response.ok) {
     if (response.status === 503) {

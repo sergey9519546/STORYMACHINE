@@ -281,8 +281,14 @@ export class DeterministicEmotionalValidator implements EmotionalValidator {
       return Array.from(state.emotional_state.keys());
     }
     if (target === 'both' || target === 'actor' || target === 'target') {
-      // Would need action parameter resolution
-      return [];
+      // Convention (see examples.ts): action.parameters[0] is the actor,
+      // action.parameters[1] is the target of the action.
+      const actorId = action.parameters[0];
+      const targetId = action.parameters[1];
+
+      if (target === 'actor') return actorId ? [actorId] : [];
+      if (target === 'target') return targetId ? [targetId] : [];
+      return [actorId, targetId].filter((id): id is CharacterId => !!id);
     }
     return [target];
   }

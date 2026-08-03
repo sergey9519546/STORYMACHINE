@@ -267,6 +267,10 @@ export class Orchestrator {
       if (targetLoc) {
         action.content = action.action_type === 'FLEE' ? `→ ${targetLoc.name} (flees)` : `→ ${targetLoc.name}`;
         this.stage.updateAgentLocation(agentId, targetLoc.location_id);
+        // The destination has been consumed into `content`/the location move —
+        // clear it so target_char_id (every other consumer's char-id field)
+        // isn't left holding a location identifier, like the two branches below.
+        action.target = null;
       } else if (action.action_type === 'FLEE') {
         // A blocked flight reads as cornered, not merely as changing plans —
         // WAIT (not SPEAK) is the honest downgrade for a failed fear-response.
@@ -456,7 +460,6 @@ export class Orchestrator {
     while (turnCount < maxTurns) {
       round++;
       let lastActionId = '';
-      let didRelocate = false;
       // X1: relationship deltas produced by THREATEN/BETRAY/PROTECT/FORM_ALLIANCE
       // are computed immediately per-action (direct ToM mutation on the
       // TARGET), not via the round-end diffTheoryOfMind batch below — collect
@@ -492,10 +495,13 @@ export class Orchestrator {
           if (targetLoc) {
             action.content = action.action_type === 'FLEE' ? `→ ${targetLoc.name} (flees)` : `→ ${targetLoc.name}`;
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
+            // The destination has been consumed into `content`/the location move —
+            // clear it so target_char_id (every other consumer's char-id field)
+            // isn't left holding a location identifier, like the two branches below.
+            action.target = null;
             const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
             lastActionId = action_id;
             logger.info('agent_relocated', { agent: currentSheet.name, to: targetLoc.name, fled: action.action_type === 'FLEE' });
-            didRelocate = true;
             turnCount++;
             break;
           } else if (action.action_type === 'FLEE') {
@@ -600,7 +606,13 @@ export class Orchestrator {
       // This prevents O(agents × actions) Gemini calls (fanout explosion).
       // C4: serialized (not Promise.all) to prevent concurrent SQLite belief writes
       // that would interleave and silently lose updates under WAL mode.
-      if (!didRelocate && lastActionId) {
+      // Fix (canon-drop): this used to also gate on `!didRelocate`, which
+      // skipped the ENTIRE round's epistemic batch + StoryCommit — including
+      // for agents who already acted earlier in the round — whenever any
+      // agent relocated/fled and ended the round early. A relocate ending the
+      // round early is no different from maxTurns ending it early elsewhere;
+      // neither may drop already-recorded actions from canon.
+      if (lastActionId) {
         const recentActions = this.stage.getSensoryFilter(location_id, maxTurns);
         // Snapshot suspicion scores before epistemic updates for persuasion outcome tracking
         const suspicionBefore = new Map<string, number>(
@@ -807,8 +819,13 @@ export class Orchestrator {
         if (suspB !== suspA) return suspB - suspA;
         // Secondary key: number of agents (more agents → more narrative potential)
         if (agentsB.length !== agentsA.length) return agentsB.length - agentsA.length;
-        // Tertiary: tension accumulator tiebreak (stable across calls)
-        return (tensionState.accumulator > 50 ? a : b) === a ? -1 : 1;
+        // Tertiary: tension accumulator tiebreak (stable across calls). Must
+        // actually compare a against b (not just re-test one side against
+        // itself) so the comparator stays antisymmetric — a real ordering,
+        // direction flipped by the global accumulator, rather than the same
+        // verdict for every pair regardless of which locations are compared.
+        if (a === b) return 0;
+        return tensionState.accumulator > 50 ? (a < b ? -1 : 1) : (a < b ? 1 : -1);
       });
 
       for (const lid of sorted) {

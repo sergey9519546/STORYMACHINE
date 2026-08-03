@@ -11,6 +11,7 @@ import type {
   GenerateContentParameters,
   GenerateContentResponse,
   GenerateContentResponseUsageMetadata,
+  Schema,
 } from '@google/genai';
 import { logger } from '../lib/logger.ts';
 // SECURITY (audit H1): the OpenRouter calls in this provider used to hit the
@@ -26,6 +27,11 @@ import { logger } from '../lib/logger.ts';
 // (undici fetch under the hood, same API surface), so the streaming path below
 // still reads response.body as a ReadableStream unchanged.
 import { fetchOpenAICompat } from '../lib/ai-providers/openai-compat.ts';
+// Reuses the exact Gemini-Schema → JSON-Schema translation
+// makeOpenAICompatLLMProvider (in that same module) uses, so FreeRideProvider's
+// generate() below constrains structured JSON output identically to every
+// other OpenAI-compat-backed provider instead of dropping the constraint.
+import { geminiSchemaToJsonSchema } from '../lib/ai-providers/schema.ts';
 
 // Signature of the outbound fetch used by FreeRideProvider. Mirrors
 // fetchOpenAICompat's (url, init) => Promise<Response> contract so the helper
@@ -182,17 +188,41 @@ export class FreeRideProvider implements AIProvider {
     
     // Extract text content
     const userPrompt = extractTextFromContents(params.contents);
-    
-    // Build messages array
-    const messages: Array<{ role: string; content: string }> = [
-      { role: 'user', content: userPrompt }
-    ];
-    
+
     // Extract generation config
     const config = params.config;
     const temperature = config?.temperature ?? 0.7;
     const maxTokens = config?.maxOutputTokens ?? 4096;
     const stopSequences = config?.stopSequences;
+
+    // Build messages array. config.systemInstruction is forwarded as a leading
+    // OpenAI-style `system` message — GeminiProvider forwards the identical
+    // config straight to the SDK, so callers (e.g. memory.ts's
+    // synthesizeReflectionsFor/replanGoalsFor, which set persona/instruction
+    // framing via systemInstruction) need it honored here too, not silently
+    // dropped.
+    const systemInstructionText = extractTextFromContents(config?.systemInstruction);
+    const messages: Array<{ role: string; content: string }> = [
+      ...(systemInstructionText ? [{ role: 'system', content: systemInstructionText }] : []),
+      { role: 'user', content: userPrompt },
+    ];
+
+    // Translate responseSchema/responseMimeType into an OpenAI-style
+    // response_format, mirroring makeOpenAICompatLLMProvider in
+    // ../lib/ai-providers/openai-compat.ts, so structured-JSON callers get the
+    // same shape constraint GeminiProvider gives them instead of unconstrained
+    // prose.
+    let responseFormat: Record<string, unknown> | undefined;
+    if (config?.responseMimeType === 'application/json' && config?.responseSchema) {
+      responseFormat = {
+        type: 'json_schema',
+        json_schema: {
+          name: 'response',
+          strict: false, // not universally supported
+          schema: geminiSchemaToJsonSchema(config.responseSchema as Schema),
+        },
+      };
+    }
     
     // Try each model with automatic failover
     for (const model of models) {
@@ -211,6 +241,7 @@ export class FreeRideProvider implements AIProvider {
             temperature,
             max_tokens: maxTokens,
             stop: stopSequences,
+            ...(responseFormat ? { response_format: responseFormat } : {}),
           }),
           // SECURITY (audit H2): abort the in-flight request when the caller's
           // hard deadline (ai.ts withTimeout) fires, so a hung upstream can't
@@ -272,16 +303,34 @@ export class FreeRideProvider implements AIProvider {
     
     // Extract text content
     const userPrompt = extractTextFromContents(params.contents);
-    
-    const messages: Array<{ role: string; content: string }> = [
-      { role: 'user', content: userPrompt }
-    ];
-    
+
     // Extract generation config
     const config = params.config;
     const temperature = config?.temperature ?? 0.7;
     const maxTokens = config?.maxOutputTokens ?? 4096;
-    
+    const stopSequences = config?.stopSequences;
+
+    // Mirror generate(): forward systemInstruction as a leading `system` message,
+    // and honor stopSequences / responseSchema so the streaming path doesn't
+    // silently diverge from GeminiProvider (which forwards the identical config).
+    const systemInstructionText = extractTextFromContents(config?.systemInstruction);
+    const messages: Array<{ role: string; content: string }> = [
+      ...(systemInstructionText ? [{ role: 'system', content: systemInstructionText }] : []),
+      { role: 'user', content: userPrompt },
+    ];
+
+    let responseFormat: Record<string, unknown> | undefined;
+    if (config?.responseMimeType === 'application/json' && config?.responseSchema) {
+      responseFormat = {
+        type: 'json_schema',
+        json_schema: {
+          name: 'response',
+          strict: false, // not universally supported
+          schema: geminiSchemaToJsonSchema(config.responseSchema as Schema),
+        },
+      };
+    }
+
     const response = await this.fetchFn('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -295,6 +344,8 @@ export class FreeRideProvider implements AIProvider {
         messages,
         temperature,
         max_tokens: maxTokens,
+        stop: stopSequences,
+        ...(responseFormat ? { response_format: responseFormat } : {}),
         stream: true,
       }),
       // SECURITY (audit H2): abort the in-flight stream when the caller's hard

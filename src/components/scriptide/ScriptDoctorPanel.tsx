@@ -1780,9 +1780,13 @@ export default function ScriptDoctorPanel({
     }
 
     // Format detection: trust the extension first; fall back to sniffing the
-    // content (XML prolog or a literal FinalDraft tag) for files renamed or
-    // exported without a reliable extension.
-    const sniffedFdx = /^\s*<\?xml/.test(text) || text.includes("<FinalDraft");
+    // content (an XML prolog, or a literal `<FinalDraft` root tag) for files
+    // renamed or exported without a reliable extension. Both checks are
+    // anchored to the start of the file — FDX's root element is always the
+    // first thing in a real export — so an ordinary Fountain script whose
+    // dialogue or action lines happen to mention "<FinalDraft" doesn't
+    // false-positive as FDX (an unanchored `text.includes(...)` would).
+    const sniffedFdx = /^\s*<\?xml/.test(text) || /^\s*<FinalDraft\b/.test(text);
     const format: "fountain" | "fdx" = lowerName.endsWith(".fdx") || sniffedFdx ? "fdx" : "fountain";
 
     setUploadedFile({ name: file.name, content: text, format, provenance: "upload" });

@@ -1405,8 +1405,9 @@ export class Stage {
     let timedOut = false;
     
     // Create timeout promise
+    let timeoutHandle: ReturnType<typeof setTimeout>;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutHandle = setTimeout(() => {
         timedOut = true;
         reject(new Error('TIMEOUT'));
       }, this.v5Config.shadowWriteTimeoutMs);
@@ -1470,6 +1471,12 @@ export class Stage {
     Promise.race([shadowWrite(), timeoutPromise])
       .catch(() => {
         // Already logged in shadowWrite catch block
+      })
+      .finally(() => {
+        // Cancel the pending timer once the race settles so a fast shadow
+        // write doesn't leave a dangling setTimeout (and its commit closure)
+        // alive in the event loop until shadowWriteTimeoutMs elapses.
+        clearTimeout(timeoutHandle);
       });
   }
   

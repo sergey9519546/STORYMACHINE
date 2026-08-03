@@ -192,8 +192,31 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
     res.status(404).json({ error: 'Not found' });
   });
 
+  // ── Static serving ─────────────────────────────────────────────────────────
+  if (serveStatic) {
+    if (process.env.NODE_ENV !== 'production') {
+      // Dynamically imported: route-level tests pass serveStatic:false and
+      // never reach this branch, so they skip Vite's (relatively heavy)
+      // module-load cost entirely rather than paying it on every test process.
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+    }
+  }
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
+  // Registered AFTER static serving (Vite dev middleware / express.static /
+  // the SPA catch-all's res.sendFile) so it can actually catch errors raised
+  // there: Express dispatches next(err) by walking FORWARD through the
+  // middleware stack from the failing handler's position looking for the next
+  // error-handling (4-arg) middleware — one registered earlier in the stack,
+  // as this used to be, is never reached and falls through to Express's own
+  // default error handler instead.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
     // Malformed JSON body — Express throws a SyntaxError with a 'body' property.
     if (err instanceof SyntaxError && 'body' in err) {
@@ -235,22 +258,6 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
     });
     res.status(500).json({ error: 'Internal Server Error' });
   });
-
-  // ── Static serving ─────────────────────────────────────────────────────────
-  if (serveStatic) {
-    if (process.env.NODE_ENV !== 'production') {
-      // Dynamically imported: route-level tests pass serveStatic:false and
-      // never reach this branch, so they skip Vite's (relatively heavy)
-      // module-load cost entirely rather than paying it on every test process.
-      const { createServer: createViteServer } = await import('vite');
-      const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
-      app.use(vite.middlewares);
-    } else {
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
-    }
-  }
 
   return app;
 }

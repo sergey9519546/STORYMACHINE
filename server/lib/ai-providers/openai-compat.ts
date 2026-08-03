@@ -480,7 +480,10 @@ export function makeOpenAICompatEmbeddingProvider(cfg: {
         },
         body: JSON.stringify({ model: cfg.model, input: text }),
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`OpenAI-compat embedding error ${res.status}: ${errText}`);
+      }
       const data = await res.json() as { data?: Array<{ embedding?: number[] }> };
       return data.data?.[0]?.embedding ?? [];
     },

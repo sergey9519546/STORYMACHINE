@@ -136,7 +136,16 @@ export function applyEffect(effect: Effect, state: PDDLWorldState): void {
 export function cloneWorldState(state: PDDLWorldState): PDDLWorldState {
   return {
     facts: new Map(state.facts),
-    entities: new Map(state.entities),
+    // Deep-copy each entity and its properties Map. A shallow `new Map(entities)`
+    // shares the Entity objects (and their mutable `properties` Map) with the
+    // original, so a simulated action mutating an entity property would leak back
+    // into the pre-clone state — corrupting backtracking search / what-if.
+    entities: new Map(
+      [...state.entities].map(([id, e]): [string, Entity] => [
+        id,
+        { ...e, properties: new Map(e.properties) },
+      ]),
+    ),
     timestamp: state.timestamp,
   };
 }

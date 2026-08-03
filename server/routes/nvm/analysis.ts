@@ -200,7 +200,11 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
   // Cluster the full corpus + query vector to see which cluster it lands in
   const allVectors = [...corpus, queryVector];
   const numClusters = Math.min(5, Math.floor(corpus.length / 3)); // 5 clusters or fewer
-  const clusters = clusterCorpus(allVectors, numClusters);
+  // clusterCorpus() throws for numClusters <= 0, which the formula above
+  // yields whenever the corpus has fewer than 3 vectors (including an empty
+  // or not-yet-built cache) — a legitimate early-stage state, not an error.
+  // Degrade to "no cluster" rather than 500ing the whole comparison.
+  const clusters = numClusters > 0 ? clusterCorpus(allVectors, numClusters) : [];
   
   // Find which cluster the query landed in
   const queryCluster = clusters.find(c => 

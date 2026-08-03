@@ -1452,7 +1452,7 @@ export function instantiatePreset(structure: string | StoryStructure, expectedTu
     return {
       phase,
       turn_start: Math.round((t.pct_start / 100) * n),
-      turn_end: Math.max(Math.round((t.pct_end / 100) * n), Math.round((t.pct_start / 100) * n) + 1),
+      turn_end: Math.min(n, Math.max(Math.round((t.pct_end / 100) * n), Math.round((t.pct_start / 100) * n) + 1)),
       goal: `[${t.name}] ${t.goal}`,
       constraint: t.constraint,
       avoid: t.avoid,
