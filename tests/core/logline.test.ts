@@ -243,7 +243,7 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0, relationshipShifts: [{ pairKey: 'DEV|MARIA', dimension: 'trust', amount: -5 }] }),
       makeRecord({ sceneIdx: 1, purpose: 'climax', dramaticTurn: 'The building collapses around them.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'The building collapses around them.');
+    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “The building collapses around them”');
   });
 
   it('tier (b) fires: highest-betrayal scene with a distinct power-holder, when tier (a) is absent', () => {
@@ -259,7 +259,7 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0, betrayalSignal: 2, powerHolder: 'ROSA' }),
       makeRecord({ sceneIdx: 1, purpose: 'climax', dramaticTurn: 'Rosa faces the collapse alone.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'Rosa faces the collapse alone.');
+    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “Rosa faces the collapse alone”');
   });
 
   it('tier (c) fires: the climax scene\'s dramaticTurn when tiers (a)/(b) are absent', () => {
@@ -267,7 +267,7 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0 }),
       makeRecord({ sceneIdx: 1, purpose: 'climax', dramaticTurn: 'She confronts the man who killed her sister.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'She confronts the man who killed her sister.');
+    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “She confronts the man who killed her sister”');
   });
 
   it('tier (c) falls back to the single highest-suspense scene when no scene is tagged climax', () => {
@@ -275,12 +275,55 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0, suspenseDelta: 1, dramaticTurn: 'A car passes by.' }),
       makeRecord({ sceneIdx: 1, suspenseDelta: 5, dramaticTurn: 'Gunfire erupts in the alley.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'Gunfire erupts in the alley.');
+    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “Gunfire erupts in the alley”');
   });
 
   it('no-fire: no signal in any tier returns null', () => {
     const records = [makeRecord({ sceneIdx: 0, suspenseDelta: 0 })];
     assert.equal(findCentralObstacle(records, 'ROSA'), null);
+  });
+
+  // ── Regression: the "must face <raw dialogue>" defect ──────────────────────
+  // The sample coverage report's logline read:
+  //   JUNE must face Turns out Holloway signed my transfer papers six years
+  //   ago. We've never really stopped working together.
+  // Tier (c) returned the climax scene's text verbatim, so a whole line of
+  // VANCE's dialogue landed in the protagonist's obstacle slot: ungrammatical,
+  // two sentences deep, and misattributed. It was the first line of the report.
+  it('tier (c) never emits raw multi-sentence text into the obstacle slot', () => {
+    const records = [
+      makeRecord({
+        sceneIdx: 0,
+        purpose: 'climax',
+        dramaticTurn: "Turns out Holloway signed my transfer papers six years ago. We've never really stopped working together.",
+      }),
+    ];
+    const obstacle = findCentralObstacle(records, 'JUNE');
+    assert.ok(obstacle, 'tier (c) should still produce an obstacle');
+    // One sentence only — the trailing speech is dropped.
+    assert.ok(!obstacle!.includes("We've never really stopped"),
+      `obstacle carried a second sentence: ${obstacle}`);
+    // Quoted and labeled, so it reads grammatically after "must face".
+    assert.match(obstacle!, /^(the turn|the revelation) “.+”$/,
+      `obstacle must be a labeled, quoted noun phrase, got: ${obstacle}`);
+    // The assembled sentence must be grammatical: no bare capitalized sentence
+    // immediately after "must face".
+    assert.doesNotMatch(`JUNE must face ${obstacle}.`, /must face [A-Z][a-z]+ [a-z]/,
+      'a raw sentence was spliced after "must face"');
+  });
+
+  it('tier (c) obstacles slot grammatically into both assembleLogline branches', () => {
+    // Both templates consume the same obstacle string: "must face X" and
+    // "... before X". Whatever tier (c) returns has to read correctly in both.
+    const records = [
+      makeRecord({ sceneIdx: 0, purpose: 'climax', revelation: 'The vault was empty all along.' }),
+    ];
+    const obstacle = findCentralObstacle(records, 'JUNE')!;
+    assert.equal(obstacle, 'the revelation “The vault was empty all along”');
+    for (const sentence of [`JUNE must face ${obstacle}.`, `JUNE must contend with “escape” before ${obstacle}.`]) {
+      assert.doesNotMatch(sentence, /\s{2,}/, 'no doubled spacing');
+      assert.match(sentence, /\.$/, 'ends in a single period');
+    }
   });
 
   it('no-fire: empty records or empty protagonist name', () => {
@@ -332,7 +375,9 @@ describe('buildLogline', () => {
     const noGoalFountain = 'INT. DAM - DAY\n\nRosa watches the water rise.';
     const logline = buildLogline(report, records, noGoalFountain);
     assert.ok(logline);
-    assert.match(logline!, /ROSA must face The dam finally breaks\.$/);
+    // Tier (c) text is a whole sentence from the script, so it is labeled and
+    // quoted rather than spliced raw after "must face" — see frameSceneText.
+    assert.match(logline!, /ROSA must face the turn “The dam finally breaks”\.$/);
     assert.ok(!logline!.includes('contend with'), 'must not fabricate a goal clause');
   });
 
