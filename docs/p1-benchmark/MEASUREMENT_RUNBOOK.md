@@ -160,6 +160,28 @@ DIALOGUE_FLATTEN       |   456 | 0.567   | [0.529, 0.605]   | FAIL
 ALL POOLED             |  1820 | 0.627   | [0.608, 0.647]   | FAIL
 ```
 
+### 2.1b Optional: measure the question-latency deduction candidate (P1, 2026-08-03)
+
+`server/nvm/analyze/question-latency-deduction.ts` is an UNWIRED bounded-deduction
+candidate re-routing payoff.ts's three question-latency rules (UNANSWERED_QUESTION_FLOOD,
+INSTANT_GRATIFICATION_PATTERN, DEAD_QUESTION_ZONE) out of the AUC~0.076 densityPenalty
+channel — see `docs/p1-benchmark/STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md`, candidate 5, for
+the diagnosis this responds to. `measure-auc-split.mjs` takes an opt-in flag to measure its
+effect on the real corpus, OFF by default (default behavior is unchanged):
+
+```bash
+CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=train --with-question-latency-deduction
+# or: QL_DEDUCTION=1 CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=train
+```
+
+Run this AND a normal flag-off `--partition=train` run, then compare the two AUC tables —
+that comparison is the entire experiment. Output goes to a separate file
+(`discrimination-auc-train-with-ql-deduction.csv`) so it can never collide with or shrink the
+committed baseline CSV. This does not change production health/verdict/grade by itself
+(`computeQuestionLatencyDeduction` is not called from `doctor.ts`); wiring it in is a
+separate future change gated on this measurement plus the AUC-24 ratchet in
+`tests/core/real-script-corpus.test.ts` holding (see CLAUDE.md's "Which floor, exactly").
+
 ### 2.2 Run Validation Partition (Checkpoint, No Tuning)
 
 ```bash

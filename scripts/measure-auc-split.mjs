@@ -12,6 +12,28 @@
 //   node scripts/measure-auc-split.mjs --partition val
 //   node scripts/measure-auc-split.mjs --partition test   # ONCE, at the end
 // Output: stdout table + scripts/output/discrimination-auc-<partition>.csv
+//
+// ── OPT-IN: --with-question-latency-deduction / QL_DEDUCTION=1 (P1, 2026-08-03) ──
+// Off by default; the default path (no flag, no env var) is byte-identical to
+// this harness's pre-existing behavior — verified by diffing the code path
+// and by running the 6 CC0 scripts through both branches before/after this
+// flag was added (see docs/p1-benchmark/STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md
+// for the candidate this measures). When set, EACH script's health — real and
+// degraded alike, before pairing — has
+// server/nvm/analyze/question-latency-deduction.ts's UNWIRED
+// computeQuestionLatencyDeduction() output subtracted from it (floored at 0)
+// before the pairwiseAuc/bootstrapCi calculation below, so a maintainer's
+// local run directly measures what re-routing payoff.ts's three question-
+// latency rules out of densityPenalty and into this bounded deduction would
+// do to SCENE_SHUFFLE/MIDPOINT_DROP/CLIMAX_RELOCATE AUC on the real corpus,
+// against the unmodified baseline from a flag-off run. This is a MEASUREMENT
+// TOOL, not a wiring change: computeQuestionLatencyDeduction is not called
+// anywhere in server/nvm/analyze/doctor.ts, so no production health/verdict/
+// grade is affected by this flag existing. Output routes to a SEPARATE file
+// (discrimination-auc-<partition>-with-ql-deduction.csv) so it can never
+// collide with or shrink the committed baseline CSV.
+//   node scripts/measure-auc-split.mjs --partition train --with-question-latency-deduction
+//   QL_DEDUCTION=1 node scripts/measure-auc-split.mjs --partition train
 
 // Safety: this harness used to write
 // scripts/output/discrimination-auc-<partition>.csv unconditionally, and
@@ -29,6 +51,8 @@ import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
 import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
+import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
+import { computeQuestionLatencyDeduction } from '../server/nvm/analyze/question-latency-deduction.ts';
 
 const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
@@ -40,6 +64,29 @@ const PARTITION = arg ? arg.split('=')[1] : 'val';
 if (!['train', 'val', 'test'].includes(PARTITION)) {
   console.error(`Invalid partition "${PARTITION}". Use --partition=train|val|test`);
   process.exit(1);
+}
+
+// OPT-IN flag — see file header "OPT-IN: --with-question-latency-deduction" for
+// the full contract. Default false: every branch this gates is additive and the
+// flag-off path below is unchanged from before this flag existed.
+const QL_DEDUCTION = process.argv.includes('--with-question-latency-deduction') ||
+  process.env.QL_DEDUCTION === '1';
+/** Health minus the UNWIRED question-latency deduction (floored at 0), computed
+ *  from the same text already read for runScriptDoctor. Only called when
+ *  QL_DEDUCTION is set; returns `health` unmodified otherwise, so the flag-off
+ *  path never even imports the extra analyzer pass's cost into its numbers. */
+function healthWithOptionalQlDeduction(text, health) {
+  if (!QL_DEDUCTION) return health;
+  try {
+    const analysis = analyzeFountainText(text);
+    const ql = computeQuestionLatencyDeduction(analysis.records);
+    return Math.max(0, health - ql.deduction);
+  } catch {
+    // analyzeFountainText threw on text runScriptDoctor already tolerated
+    // (defense-in-depth only — not observed in practice); fall back to the
+    // undeducted health rather than dropping the pair.
+    return health;
+  }
 }
 
 const split = JSON.parse(fs.readFileSync(SPLIT_FILE, 'utf-8'));
@@ -173,18 +220,25 @@ for (const file of files) {
   try { baseRep = await runScriptDoctor(text, ctx, 'quick'); }
   catch { continue; }
   if (!baseRep.sceneCount || baseRep.sceneCount < 5) continue;
+  const baseHealth = healthWithOptionalQlDeduction(text, baseRep.health);
   for (const d of DEGRADATIONS) {
     const degradedText = d.fn(text);
     if (degradedText === null) continue;
     let rep;
     try { rep = await runScriptDoctor(degradedText, ctx, 'quick'); }
     catch { continue; }
-    pairsByDeg[d.id].push({ real: baseRep.health, degraded: rep.health, file });
-    csvRows.push([file, d.id, baseRep.health, rep.health, +(rep.health - baseRep.health).toFixed(1)].join(','));
+    const degHealth = healthWithOptionalQlDeduction(degradedText, rep.health);
+    pairsByDeg[d.id].push({ real: baseHealth, degraded: degHealth, file });
+    csvRows.push([file, d.id, baseHealth, degHealth, +(degHealth - baseHealth).toFixed(1)].join(','));
   }
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────
+if (QL_DEDUCTION) {
+  console.log('\n[--with-question-latency-deduction ON] Every health value below has the UNWIRED');
+  console.log('question-latency-deduction.ts candidate subtracted before pairing. Compare against a');
+  console.log('flag-off run of this same partition to see the re-routed channel\'s effect on AUC.');
+}
 console.log('\ndegradation            | pairs |   AUC   |  95% CI          | gate (>=0.80)');
 console.log('-----------------------|-------|---------|------------------|----------------');
 for (const d of DEGRADATIONS) {
@@ -208,7 +262,13 @@ if (missingLocally > 0) {
 }
 
 const header = 'file,degradation,realHealth,degradedHealth,delta';
-const OUT_FILE = path.join(OUT_DIR, `discrimination-auc-${PARTITION}.csv`);
+// QL_DEDUCTION writes to a SEPARATE file — never the committed baseline CSV —
+// so an opt-in measurement run can never collide with or shrink the evidence
+// file the flag-off path produces (see file header).
+const OUT_FILE = path.join(
+  OUT_DIR,
+  QL_DEDUCTION ? `discrimination-auc-${PARTITION}-with-ql-deduction.csv` : `discrimination-auc-${PARTITION}.csv`,
+);
 guardedWrite(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', { rowCount: csvRows.length, label: OUT_FILE });
 
 if (PARTITION === 'test') {
