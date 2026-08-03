@@ -59,6 +59,58 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
   );
 }
 
+// ─── "Recently meaningfully-focused elements" tracker ──────────────────────
+// WHY THIS EXISTS (found live with scripts/verify-focus-traps.mjs, not from
+// source review): every dialog in this app is opened by flipping a boolean
+// that swaps two mutually-exclusive sibling JSX blocks under one parent —
+// e.g. clicking CoverageSummary's "Full report" button unmounts CoverageSummary
+// (removing the button) in the SAME commit that mounts ScriptDoctorPanel; a
+// dropdown-menu item (StoryMachine's "Inspect" menu, which opens WhatIf/
+// Interview/Revision/Room) unmounts even more directly — the click handler
+// closes the whole menu in the same state update that opens the dialog. DOM
+// node removal synchronously blurs focus to <body> per spec — and every one
+// of these dialogs is also `React.lazy`-loaded behind a `Suspense` boundary,
+// so the *real* panel component doesn't even render synchronously in that
+// commit; React commits the loading fallback first and mounts the real panel
+// only after the dynamic import's promise resolves, at least one tick later.
+// By the time ANY code inside the panel runs — render body or `useEffect`,
+// doesn't matter — `document.activeElement` has already settled on `<body>`.
+// Reading it there (what this file used to do) makes "restore focus to the
+// trigger" restore to `<body>` instead, every time, for every dialog.
+//
+// The fix has to observe focus continuously, from outside React's
+// render/commit/lazy-load timeline entirely: a single document-level
+// `focusin` listener, registered once at module scope, remembers a short
+// history of elements that received focus — but only real focus targets.
+// `<body>`/`<html>` are explicitly excluded, because the only way they
+// normally receive a `focusin` here is the synchronous "focus reverted after
+// the previously-focused node was removed" case above — accepting that
+// update would reproduce the exact bug this exists to avoid.
+//
+// A *history*, not just the single most-recent target: the immediate
+// trigger (a menu item, say) is very often exactly the element that's about
+// to be unmounted along with the rest of its menu, so it alone is not always
+// restorable. Keeping a short backlog lets restore-on-close fall back to the
+// next-most-recent still-attached control — typically the persistent button
+// that opened the menu in the first place — rather than giving up and
+// leaving focus on <body>.
+const FOCUS_HISTORY_LIMIT = 8;
+const focusHistory: HTMLElement[] = [];
+if (typeof document !== "undefined") {
+  document.addEventListener(
+    "focusin",
+    (e) => {
+      const target = e.target as HTMLElement | null;
+      if (!target || target === document.body || target === document.documentElement) return;
+      if (focusHistory[focusHistory.length - 1] !== target) {
+        focusHistory.push(target);
+        if (focusHistory.length > FOCUS_HISTORY_LIMIT) focusHistory.shift();
+      }
+    },
+    true,
+  );
+}
+
 /**
  * Minimal modal focus management for a `role="dialog" aria-modal="true"`
  * panel: moves focus into the dialog when it mounts, traps Tab/Shift+Tab
@@ -85,7 +137,14 @@ export function useModalFocusTrap(containerRef: RefObject<HTMLElement | null>): 
     const container = containerRef.current;
     if (!container) return;
 
-    const previouslyFocused = document.activeElement as HTMLElement | null;
+    // See the `focusHistory` tracker above for why this is not
+    // `document.activeElement` — by the time this effect runs (after commit,
+    // and after this Suspense-lazy panel's own async mount), that has
+    // already settled on `<body>`. Snapshotting the whole history here (not
+    // just its last entry) is what lets restore-on-close fall back past an
+    // immediate trigger that turned out to be unmountable too (e.g. a
+    // dropdown menu item) to the next-most-recent control that's still real.
+    const priorFocusHistory = focusHistory.slice();
 
     const initial = getFocusableElements(container)[0];
     (initial ?? container).focus({ preventScroll: true });
@@ -117,14 +176,21 @@ export function useModalFocusTrap(containerRef: RefObject<HTMLElement | null>): 
     container.addEventListener("keydown", onKeyDown);
     return () => {
       container.removeEventListener("keydown", onKeyDown);
-      // Restore focus to the trigger — but only if it's still attached to
-      // the document. A trigger that was itself removed while the dialog
-      // was open has nowhere safe to send focus back to; calling .focus() on
-      // a detached node is a silent no-op in every browser, so skipping it
-      // explicitly here is just documentation, not a behavior change.
-      if (previouslyFocused && document.contains(previouslyFocused)) {
-        previouslyFocused.focus({ preventScroll: true });
-      }
+      // Restore focus to the most recent pre-dialog control that's still
+      // actually in the document — walking backward from the immediate
+      // trigger through the snapshot taken at mount. Excludes anything
+      // inside this dialog itself (tabbing around while it was open landed
+      // fresh focusin events in the GLOBAL history too; those aren't valid
+      // restore targets for "focus before this dialog opened"). A trigger
+      // that was itself removed while the dialog was open, with nothing
+      // else attached in its recent history either, has nowhere safe to
+      // send focus back to; calling .focus() on a detached node is a silent
+      // no-op in every browser, so finding nothing here is just
+      // documentation, not a behavior change.
+      const restoreTarget = [...priorFocusHistory]
+        .reverse()
+        .find((el) => document.contains(el) && !container.contains(el));
+      restoreTarget?.focus({ preventScroll: true });
     };
     // containerRef is a ref object with stable identity across renders (one
     // ref per dialog instance) — this intentionally runs once per mount.

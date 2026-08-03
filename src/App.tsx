@@ -3,6 +3,17 @@ import { MotionConfig } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { StoryConfig } from './types';
 import { getLabsEnabled } from './lib/feature-flags';
+// Side-effect-only: registers use-modal-focus-trap's module-scope
+// document-level `focusin` history tracker as soon as the app boots, not
+// whenever some dialog's OWN lazy chunk happens to load it first. Every
+// dialog that uses useModalFocusTrap is itself lazy-loaded (see the `lazy()`
+// calls below and in StoryMachine.tsx), and none of StoryMachine.tsx's own
+// module scope imports use-modal-focus-trap.ts — so for a route like
+// StoryMachine → "Inspect" menu → WhatIf, the tracker's listener previously
+// didn't exist yet when the user clicked "Inspect" or the menu item; both
+// focus events were missed, restore-on-close had nothing to fall back to,
+// and focus landed on <body>. Found live with scripts/verify-focus-traps.mjs.
+import './lib/use-modal-focus-trap';
 
 const StartScreen  = lazy(() => import('./components/StartScreen'));
 const ScriptIDE    = lazy(() => import('./components/ScriptIDE'));

@@ -1825,21 +1825,22 @@ export default function ScriptIDE({
                     ? "Next fix in panel"
                     : "Diagnose this draft"}
               </span>
-              {toolSlot === "coverage" && !coverageFull && (
-                <button type="button" onClick={() => setCoverageFull(true)} className="sm-btn py-1.5">
-                  Full report
-                </button>
-              )}
-              {toolSlot === "coverage" && coverageFull && (
-                <button type="button" onClick={() => setCoverageFull(false)} className="sm-btn py-1.5">
-                  Summary
-                </button>
-              )}
-              {toolSlot !== "coverage" && (
-                <button type="button" onClick={() => openToolSlot("coverage")} className="sm-btn sm-btn--ink py-1.5">
-                  Open coverage
-                </button>
-              )}
+              {/* ONE button, not three mutually-exclusive ones: label/handler/class
+                  vary by state but it's the same element across every toolSlot/
+                  coverageFull transition. Kept deliberately un-conditional so React
+                  never unmounts+remounts it — a conditionally-rendered trigger here
+                  would unmount in the same commit that mounts ScriptDoctorPanel,
+                  which synchronously blurs focus to <body> before that dialog's
+                  useModalFocusTrap can ever see this element as "previously
+                  focused" — breaking focus-restore-on-close for the P0 coverage
+                  dialog. Found live with scripts/verify-focus-traps.mjs. */}
+              <button
+                type="button"
+                onClick={() => (toolSlot !== "coverage" ? openToolSlot("coverage") : setCoverageFull(!coverageFull))}
+                className={toolSlot !== "coverage" ? "sm-btn sm-btn--ink py-1.5" : "sm-btn py-1.5"}
+              >
+                {toolSlot !== "coverage" ? "Open coverage" : coverageFull ? "Summary" : "Full report"}
+              </button>
             </>
           ) : task === "ship" ? (
             <>
