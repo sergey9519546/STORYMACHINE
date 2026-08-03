@@ -24,8 +24,9 @@
     "backup": "node --experimental-strip-types scripts/backup-sessions.ts",
     "check-docs": "node --experimental-strip-types scripts/check-docs-quality.ts --all",
     "check-docs:strict": "node --experimental-strip-types scripts/check-docs-quality.ts --all --strict",
-    "setup-hooks": "cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo '✓ Git hooks installed'",
-    "validate": "npm run lint && npm run check-docs && npm test"
+    "setup-hooks": "cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo '\u2713 Git hooks installed'",
+    "validate": "npm run lint && npm run check-docs && npm test",
+    "gates": "node scripts/report-unverified-gates.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

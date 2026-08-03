@@ -78,6 +78,13 @@ jobs:
       - name: Run tests (keyless — analysis-only posture)
         run: npm test
 
+      # Reports which env-gated suites did NOT run. Non-blocking by design:
+      # it does not fix the gap, it stops the gap being invisible. "0 failures"
+      # above does not mean the AUC ratchet was checked — it is skipped here.
+      - name: Report unverified gates
+        if: always()
+        run: node scripts/report-unverified-gates.mjs
+
       # Hard metamorphic invariants must hold; empty_verbosity is a known-failing
       # witness (verbosity bias) and does not fail this step — see
       # evals/scoring/runner/metamorphic-lib.ts + docs/scoring/VERBOSITY_BIAS_2026-07-11.md.
