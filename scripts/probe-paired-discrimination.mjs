@@ -41,8 +41,16 @@
 // drop; scene-count signal on merge).
 //
 // ── Run ────────────────────────────────────────────────────────────────────
-//   node scripts/probe-paired-discrimination.mjs
+//   node scripts/probe-paired-discrimination.mjs <file1.fountain> [file2.fountain ...]
 // Output: scripts/output/paired-discrimination.csv + stdout table.
+//
+// De-identification note: this used to hardcode 5 specific corpus titles
+// (curated to be >=40 scenes so the structural degradations have material
+// to work on — keep that selection criterion in mind when choosing files to
+// pass in). Filenames are read relative to data/screenplays/ (override with
+// --src-dir) and now come from CLI arguments instead of hardcoded titles, so
+// re-running this script never re-introduces titles into
+// scripts/output/paired-discrimination.csv on its own.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -50,22 +58,26 @@ import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
 
-const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
 const OUT_FILE = path.join(OUT_DIR, 'paired-discrimination.csv');
 
-// Curated real scripts spanning studios and lengths. All scored >= 87 in
-// probe-real-corpus.mjs (i.e. all are "good" by the current formula), so any
-// drop under degradation is the formula reading real damage, not baseline
-// noise. We deliberately pick scripts with enough scenes (>=40) that the
-// structural degradations have material to work on.
-const TEST_SCRIPTS = [
-  'ratatouille-2007.fountain',                     // H=98.9, 127 sc — Pixar, Oscar winner
-  'soul-2020.fountain',                            // H=97.7,  94 sc — Pixar, Oscar winner
-  'spider-man-into-the-spider-verse-2018.fountain',// H=94.4, 188 sc — Oscar winner
-  'inside-out-2015.fountain',                      // H=87.6, 387 sc — Pixar, Oscar winner
-  'up-2009.fountain',                              // H=86.1, 187 sc — Best Pic nominee
-];
+function parseArgs(argv) {
+  const files = [];
+  let srcDir = 'data/screenplays';
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--src-dir') srcDir = argv[++i];
+    else files.push(argv[i]);
+  }
+  return { files, srcDir };
+}
+
+const { files: TEST_SCRIPTS, srcDir: SRC_DIR } = parseArgs(process.argv.slice(2));
+if (TEST_SCRIPTS.length === 0) {
+  console.error('Usage: node scripts/probe-paired-discrimination.mjs [--src-dir <dir>] <file1.fountain> [file2.fountain ...]');
+  console.error('Runs the 5 mechanical degradations against each given script (read from --src-dir, default data/screenplays/) and appends to scripts/output/paired-discrimination.csv.');
+  console.error('Pick scripts with >=40 scenes so the structural degradations (MIDPOINT_DROP, CLIMAX_RELOCATE) have material to work on.');
+  process.exit(1);
+}
 
 // ── Seeded PRNG (mulberry32) so shuffle is reproducible ────────────────────
 function mulberry32(seed) {

@@ -167,9 +167,18 @@ The cross-check rule mirrors the regression test:
 
 ### Mismatch (real finding — flagged, not fixed)
 
-| File | Field | Computed | Manifest |
+**Title redacted** (corpus de-identification — see `docs/p1-benchmark/
+CORPUS_IDENTIFICATION.md`). The finding below stays verifiable without the
+plaintext title because the manifest entry is uniquely located by its
+`contentHash`: `tests/fixtures/real-corpus-manifest.json`, entry with
+`contentHash` = `b11cb8ba18911311b0e9fc6acf0b4a7af1499df6d1391bb9e772b703f52e5398`.
+Once the crosswalk from the de-identification migration exists, that hash (or
+the manifest's post-migration id for the same entry) resolves back to the
+original filename for anyone with private-corpus access.
+
+| File (contentHash prefix) | Field | Computed | Manifest |
 |---|---|---|---|
-| `inside-out-screenplay.fountain.txt` | health (hash match) | **87.6** | 95.1 |
+| `b11cb8ba…` | health (hash match) | **87.6** | 95.1 |
 
 The local file's `contentHash` matches the manifest **exactly**
 (`b11cb8ba18911311b0e9fc6acf0b4a7af1499df6d1391bb9e772b703f52e5398`), and
@@ -186,9 +195,9 @@ it is reported here as a discovered discrepancy. It is **out of scope for this
 freeze to fix**: the manifest is the regression harness's contract and the
 scoring/rules are frozen. The parent session should decide whether to (a)
 regenerate the manifest entry to lock the new value, or (b) treat the 7.5-point
-drift as a regression to investigate. The single "not in manifest" file
-(`inside-out-screenplay.fountain.txt` is in the manifest; the one un-manifested
-file is a corpus script present on disk but absent from the 72-entry manifest —
+drift as a regression to investigate. The single "not in manifest" file (the
+`contentHash = b11cb8ba…` entry is in the manifest; a separate, different
+corpus script present on disk is absent from the 72-entry manifest —
 informational only).
 
 > Note: `tests/core/real-script-corpus.test.ts` asserts exact health on
@@ -226,7 +235,8 @@ script), not a craft-quality test across different scripts. Calling
 produced-floor "strong-vs-weak discrimination" would be the fabrication this
 project's constitution forbids.
 
-**One real discrepancy surfaced:** `inside-out-screenplay.fountain.txt` hash-matches
+**One real discrepancy surfaced:** the corpus entry with `contentHash`
+`b11cb8ba…` (title redacted, see §3) hash-matches
 the manifest but its health drifted 95.1 → 87.6 (see §3). Reported, not fixed —
 out of freeze scope.
 

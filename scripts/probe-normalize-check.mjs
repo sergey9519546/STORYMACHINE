@@ -1,11 +1,24 @@
+// Inspection tool for normalizeScreenplay(): shows whether normalization
+// changed a file's text, and the block-type counts parseFountain() finds
+// before vs. after normalization.
+//
+// De-identification note: this originally hardcoded 2 specific corpus paths.
+// It now takes files as CLI arguments instead of hardcoding titles, which
+// also makes it reusable against any fountain file.
+//
+// Usage:
+//   node scripts/probe-normalize-check.mjs <file1.fountain> [file2.fountain ...]
 import fs from 'node:fs';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
 
-const files = [
-  'data/screenplays/crawl/action/13-days.fountain',
-  'data/screenplays/crawl/action/15-minutes.fountain',
-];
+const files = process.argv.slice(2);
+if (files.length === 0) {
+  console.error('Usage: node scripts/probe-normalize-check.mjs <file1.fountain> [file2.fountain ...]');
+  console.error('Runs normalizeScreenplay() on each file and compares parseFountain() block counts before/after.');
+  process.exit(1);
+}
+
 function countTypes(blocks) {
   const t = {};
   for (const b of blocks) t[b.type] = (t[b.type]||0)+1;

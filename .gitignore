@@ -24,3 +24,18 @@ data/
 # and 38 server/analyzer/export tests fail. Re-include that one dir explicitly.
 !server/nvm/analyze/data/
 !server/nvm/analyze/data/**
+
+# corpus-crosswalk.json (scripts/migrate-corpus-ids.mjs's output): maps
+# de-identified SM-<hash> corpus ids back to the private corpus's original
+# paths/titles for the maintainer's own local audit. MUST NEVER be committed
+# -- that would re-enumerate every title the id scheme exists to hide. The
+# generator itself refuses to write into a tracked location (git check-ignore
+# gate), and this pattern is the belt to that suspenders. See
+# docs/p1-benchmark/CORPUS_IDENTIFICATION.md.
+corpus-crosswalk.json
+corpus-crosswalk*.json
+corpus-crosswalk*
+
+# Captured test-run output (2.5MB of console noise, regenerable via `npm test`).
+# Was tracked by accident; it also echoed corpus filenames into git.
+test_results.txt

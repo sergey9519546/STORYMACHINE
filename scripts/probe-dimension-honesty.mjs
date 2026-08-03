@@ -27,8 +27,14 @@
 // This is a MEASUREMENT INSTRUMENT. It does not modify the engine.
 //
 // ── Run ────────────────────────────────────────────────────────────────────
-//   node scripts/probe-dimension-honesty.mjs
+//   node scripts/probe-dimension-honesty.mjs [--real-script <file>] [--src-dir <dir>]
 // Output: scripts/output/dimension-honesty.csv + stdout table.
+//
+// De-identification note: this used to hardcode one real corpus title as a
+// fixed second cross-check script. The sample-report script (synthetic,
+// ships in-repo) always runs; the real-corpus cross-check is now opt-in via
+// --real-script so re-running this probe never re-introduces a title into
+// scripts/output/dimension-honesty.csv on its own.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,17 +42,35 @@ import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
 
-const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
 const OUT_FILE = path.join(OUT_DIR, 'dimension-honesty.csv');
 
-// Use the sample report's own script + one real script for cross-check.
-// The sample script is what P0 writers actually see; ratatouille is a real
-// produced feature for external validity.
-const TEST_SCRIPTS = [
-  { file: '__SAMPLE__', label: 'sample-report-script' },
-  { file: 'ratatouille-2007.fountain', label: 'ratatouille (real)' },
-];
+function parseArgs(argv) {
+  let realScript = null;
+  let srcDir = 'data/screenplays';
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--real-script') realScript = argv[++i];
+    else if (argv[i] === '--src-dir') srcDir = argv[++i];
+    else if (argv[i] === '--help' || argv[i] === '-h') {
+      console.log('Usage: node scripts/probe-dimension-honesty.mjs [--real-script <file>] [--src-dir <dir>]');
+      console.log('Always runs the in-repo synthetic sample report script. Pass --real-script to additionally');
+      console.log('cross-check against a real corpus script (read from --src-dir, default data/screenplays/);');
+      console.log('its output label is derived from the filename, not a hardcoded title.');
+      process.exit(0);
+    }
+  }
+  return { realScript, srcDir };
+}
+
+const { realScript, srcDir: SRC_DIR } = parseArgs(process.argv.slice(2));
+
+// The sample script is what P0 writers actually see; a --real-script arg
+// adds a real produced feature for external validity (opt-in, see note above).
+const TEST_SCRIPTS = [{ file: '__SAMPLE__', label: 'sample-report-script' }];
+if (realScript) {
+  const label = `${path.basename(realScript).replace(/\.[a-z0-9.]+$/i, '')} (real)`;
+  TEST_SCRIPTS.push({ file: realScript, label });
+}
 
 // ── Seeded PRNG ────────────────────────────────────────────────────────────
 function mulberry32(seed) {

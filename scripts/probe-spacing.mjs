@@ -1,5 +1,23 @@
+// Blank-line spacing heuristic for any fountain file(s): reports what
+// fraction of non-blank lines are immediately followed by a blank line
+// (double-spaced-script detection).
+//
+// De-identification note: this originally hardcoded 2 specific corpus paths.
+// It now takes files as CLI arguments instead of hardcoding titles, which
+// also makes it reusable against any fountain file.
+//
+// Usage:
+//   node scripts/probe-spacing.mjs <file1.fountain> [file2.fountain ...]
 import fs from 'node:fs';
-for (const f of ['data/screenplays/crawl/war/rushmore.fountain', 'data/screenplays/crawl/action/elf.fountain']) {
+
+const files = process.argv.slice(2);
+if (files.length === 0) {
+  console.error('Usage: node scripts/probe-spacing.mjs <file1.fountain> [file2.fountain ...]');
+  console.error('Reports the fraction of non-blank lines immediately followed by a blank line.');
+  process.exit(1);
+}
+
+for (const f of files) {
   const text = fs.readFileSync(f, 'utf-8');
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
   let nonBlank = 0, followedByBlank = 0;

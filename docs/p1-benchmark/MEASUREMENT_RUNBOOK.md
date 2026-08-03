@@ -15,19 +15,25 @@ The 761-script corpus is LOCAL-ONLY (copyright) and is never committed. The corp
 
 **Required directory structure on YOUR machine:**
 
+The example filenames below are illustrative id-form placeholders, not real
+titles — the corpus was de-identified (see `docs/p1-benchmark/
+CORPUS_IDENTIFICATION.md`) so this repo does not enumerate the private
+corpus's screenplay titles. Real ids resolve to real titles only via the
+private crosswalk the migration produces, kept off this repo.
+
 ```
 /path/to/corpus/
 ├── crawl/
 │   ├── action/
-│   │   ├── the-avengers.fountain
+│   │   ├── SM-a1b2c3d4.fountain
 │   │   ├── (other action scripts)
 │   ├── sci-fi/
-│   │   ├── the-replacements-pdf.fountain
+│   │   ├── SM-e5f6a7b8.fountain
 │   │   ├── (other sci-fi scripts)
 │   ├── drama/
 │   ├── comedy/
 │   └── (other genre folders)
-├── Despicable_Me.fountain.txt
+├── SM-c9d0e1f2.fountain.txt
 ├── (other root-level scripts)
 ```
 
@@ -53,14 +59,22 @@ The actual 761 scripts referenced by `scripts/output/corpus-split.json` live ONL
 
 Before running any measurement, verify your corpus structure:
 
-> **Status when this runbook was written:** `scripts/verify-corpus-layout.mjs`
-> did not exist — this section specified the check the runbook needed rather
-> than one that shipped. The script is being added alongside the corpus
-> de-identification work (see `CORPUS_IDENTIFICATION.md`). If the command
-> below fails with "module not found", the script has not landed yet; verify
-> manually in the meantime (the corpus dir resolves, every manifest entry's
-> file is present, and the counts match), and treat the flags shown here as
-> the intended interface, not a verified one.
+> **Status as of this update:** `scripts/verify-corpus-layout.mjs` now
+> exists and is verified end-to-end against the 6 CC0 files in
+> `data/screenplays/` plus synthetic fixtures (see
+> `CORPUS_IDENTIFICATION.md` §6). It has **not** been run against the real
+> 761-script corpus. It also assumes the **migrated, id-based** manifest
+> schema (`scripts/migrate-corpus-ids.mjs`'s output: `id`, `contentHash`,
+> `genre`, `origin`, `file=<id>.fountain`, ...) — as of this writing,
+> `scripts/output/corpus-split.json` is still the **pre-migration**,
+> title-bearing manifest (`file` paths like `crawl/action/the-avengers.fountain`),
+> because the real corpus text needed to compute real ids isn't available
+> in the environment that built this tooling. Run
+> `node scripts/migrate-corpus-ids.mjs --corpus-dir=/path/to/corpus --write`
+> first (see `CORPUS_IDENTIFICATION.md` §4 for the full procedure); running
+> verify-corpus-layout.mjs against the manifest as currently committed will
+> correctly fail its second check ("split manifest is migrated schema") with
+> a message pointing at that command.
 
 **Command:**
 
@@ -68,28 +82,53 @@ Before running any measurement, verify your corpus structure:
 node scripts/verify-corpus-layout.mjs --corpus-dir=/path/to/corpus --split-file=scripts/output/corpus-split.json
 ```
 
-**Expected output (all green):**
+**Expected output (all green, post-migration):**
 
 ```
-═ CORPUS LAYOUT VERIFICATION ═
-corpus dir               : /path/to/corpus
-split manifest           : scripts/output/corpus-split.json
+══════════════════════════════════════════════════════════════════════════
+CORPUS LAYOUT VERIFICATION
+══════════════════════════════════════════════════════════════════════════
+corpus dir   : /path/to/corpus
+split file   : scripts/output/corpus-split.json
+
+✓ corpus dir set and readable
+✓ split manifest present
+✓ split manifest is migrated schema (id + contentHash present)
+✓ every manifest id resolves to a present file (761/761)
+✓ content hash matches for every present file (761/761)
 
 partition               | expected | found | status
 --------------------------------------------------
 train                   |      456 |   456 | ✓
 val                     |      152 |   152 | ✓
-test (hash-locked)      |      153 |   153 | ✓
+test                    |      153 |   153 | ✓
 --------------------------------------------------
 total                   |      761 |   761 | ✓
 
-test set hash           : e19e6cc2ab492b55107ae0721ae985c9779a4723f0288555ac2d86970744edeb
-test set verification   : ✓ locked (hash match)
+✓ partition counts match manifest
+test set hash (manifest) : <the RE-LOCKED hash — see CORPUS_IDENTIFICATION.md §7,
+                             this differs from the pre-migration
+                             e19e6cc2...744edeb value on purpose: renamed files
+                             change the lock's filename half>
+test set hash (recomputed): <same value>
+✓ test set lock verifies
 
+──────────────────────────────────────────────────────────────────────────
+tests/fixtures/real-corpus-manifest.json
+──────────────────────────────────────────────────────────────────────────
+✓ real-corpus-manifest is migrated schema (id + contentHash present)
+✓ every entry resolves (72/72)
+✓ content hash matches (72/72)
+
+══════════════════════════════════════════════════════════════════════════
 corpus layout OK. Ready to measure.
 ```
 
-**If verification fails:** Stop. Do not run measurements. The split manifest expects specific files at specific paths; mismatches will produce invalid results. Fix the corpus directory structure and rerun verification.
+Each check line prints `✓`/`✗` independently and the script exits non-zero
+on any failure — a partial pass never looks green. **If verification
+fails:** stop, do not run measurements. Fix whatever the failing line names
+(missing corpus dir, un-migrated manifest, a resolve/hash mismatch, or a
+lock mismatch) and rerun.
 
 ---
 
@@ -451,7 +490,7 @@ The following gaps or conflicts exist across the P1 docs and should be addressed
 
 ### 7.2 corpus-split.json References Files Not in data/screenplays/
 
-**Issue:** `scripts/output/corpus-split.json` lists 761 scripts with paths like `crawl/action/the-avengers.fountain`. The repo's `data/screenplays/` contains only 6 CC0 reference files. The 755 other scripts live only in the external corpus directory.
+**Issue:** `scripts/output/corpus-split.json` lists 761 scripts with paths like `crawl/action/SM-a1b2c3d4.fountain` (id-form example — see de-identification note in §1.1). The repo's `data/screenplays/` contains only 6 CC0 reference files. The 755 other scripts live only in the external corpus directory.
 
 **Current state:** Documented (DISCRIMINATION_BASELINE_2026-07-29.md §"What changed and why") but not formalized in the runbook or split schema.
 

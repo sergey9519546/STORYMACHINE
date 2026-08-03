@@ -1,14 +1,23 @@
-// Sample each broken file to understand WHY dialogue isn't being detected.
+// Sample any file(s) to understand WHY dialogue isn't being detected.
+//
+// De-identification note: this originally hardcoded 4 specific corpus paths
+// (a diagnostic aid while investigating dialogue-detection gaps that fed into
+// the canonical Fountain formatter). It now takes file paths as CLI arguments
+// instead — that removes the corpus titles from source control AND makes the
+// probe reusable against any file, not just the four it was written for.
+//
+// Usage:
+//   node scripts/probe-broken-samples.mjs <file1.fountain> [file2.fountain ...]
 import fs from 'node:fs';
 
-const broken = [
-  'data/screenplays/crawl/action/elf.fountain',           // NO-DIALOGUE
-  'data/screenplays/crawl/war/rushmore.fountain',         // NO-DIALOGUE
-  'data/screenplays/crawl/crime/the-corruptor.fountain',  // needsNormalize + NO-DIALOGUE
-  'data/screenplays/crawl/action/legionnaire.fountain',   // needsNormalize
-];
+const files = process.argv.slice(2);
+if (files.length === 0) {
+  console.error('Usage: node scripts/probe-broken-samples.mjs <file1.fountain> [file2.fountain ...]');
+  console.error('Samples each given file to show why a character-cue candidate is/isn\'t found near dialogue.');
+  process.exit(1);
+}
 
-for (const f of broken) {
+for (const f of files) {
   const text = fs.readFileSync(f, 'utf-8');
   console.log('========================================');
   console.log('FILE:', f.split(/[\\/]/).slice(-2).join('/'));
