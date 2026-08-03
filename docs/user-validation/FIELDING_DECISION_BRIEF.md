@@ -58,6 +58,63 @@ references in the tracker/evidence summary should be refreshed to `d733240`
 > browser before each session anyway. Static-report sessions need no such check
 > — the artifact is already verified above.
 
+## Update — 2026-08-03: the caveat above is CLEARED, and the stimulus changed
+
+Two things happened since this brief was written, both of which the decision
+owner should know before deciding.
+
+**1. The browser caveat is resolved.** The click-through is no longer a manual,
+un-repeatable check: `scripts/smoke-p0-live-flow.mjs` now boots the server
+keyless on an isolated port, drives StartScreen → "Try sample coverage" →
+report, and exits non-zero on a wrong verdict/health or any genuine console
+error. It PASSES on current `main`. Run it yourself before any live-flow
+session — it is the pre-session checklist, automated. (Running it also
+surfaced and fixed a real defect: the app shipped no favicon, so every browser
+visit logged a 404.)
+
+**2. The stimulus you would show writers has changed — for the better, and you
+should know how.** Every writer-facing "Scene N" in the report used to
+interpolate the engine's 0-based scene index raw, so *every* "here's the scene
+to fix" pointer named the scene before the one it meant. The report contradicted
+itself in print — it said "Scene 12 (INT. HOLLOWAY ESTATE - VAULT -
+CONTINUOUS)" when that slug is the 13th scene. Of 19 slug-paired labels in the
+shipped sample, 0 were correct. That is now fixed end to end (labels, the three
+consumers that parse them back, the "What's Working" prose, the research
+panels, room/proof/project exports), with a CI tripwire that fails the build if
+a scene label ever again disagrees with the slug it names.
+
+Verified facts on current `main` after the change:
+
+| Check | Result |
+|---|---|
+| Health / verdict / scene count | 68.9 / CONSIDER / 14 — **unchanged** |
+| contentHash | `33dcf214…` — **unchanged** (scoring untouched) |
+| Artifact size | **212,708 bytes** (was 212,723 — label text only) |
+| Determinism | consecutive generations differ only in the footer datestamp |
+| Browser click-through | **PASS**, zero genuine console errors |
+| Full suite / type check / honesty-audit | 10,013 tests 0 fail / clean / clean |
+
+**Why this matters to the decision, not just to the changelog:** if you had
+fielded before this fix, every participant who tried to follow a fix-pointer
+into their own reading of the script would have landed on the wrong scene. That
+is precisely the kind of defect that reads to a professional as "this tool does
+not actually know my script" — and it would have contaminated the one signal P0
+exists to measure. The stimulus is materially more trustworthy now than when
+this brief was written.
+
+**A limitation the decision owner should weigh, and it is not fixed:** the
+sample script ("The Second Key") is thin — ~665 words across 14 scenes, about
+**47.5 words per scene**, against a median of roughly **161–181 words per scene**
+in the 761-script corpus. It reads as a competent skeleton, not a real draft.
+That thinness is also load-bearing for some of the report's less flattering
+numbers (159 minor issues over 14 scenes; Theme & Originality 98.8 on a 665-word
+piece reads as false precision to an experienced reader — see
+`docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md` D5). Fielding on a thin
+stimulus is a legitimate choice — it isolates "does the *shape* of this output
+create pull?" — but it is a choice, and it should be recorded as one in the
+decision log rather than discovered mid-session when a writer says "this isn't
+a real script."
+
 ## The state of the gate, honestly
 
 | Counter | Current | Required |
