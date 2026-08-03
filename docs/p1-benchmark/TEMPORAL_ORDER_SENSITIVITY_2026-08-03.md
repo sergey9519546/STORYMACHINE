@@ -305,3 +305,173 @@ to create or destroy an adjacent CONTINUOUS pair in this sample.
   `auditTemporalConsistency`) — untouched by this probe.
 - Degradations source (copied verbatim, not modified):
   `scripts/measure-auc-split.mjs`
+
+---
+
+## ADDENDUM — 2026-08-03 (later same day): the "actually uses the markers" re-run
+
+**What changed since the original measurement above:** the CONTINUOUS/
+MOMENTS-LATER adjacency false-positive documented in this file's own
+"What would change this verdict" §1 was fixed (commit `31884bb`, same day).
+This addendum (a) re-runs the unmodified original probe to confirm that fix
+holds, and (b) does what §2 of "What would change this verdict" asked for —
+builds a small corpus that actually contains FLASHBACK/MEANWHILE/LATER
+markers and re-measures. **This section is appended, not a rewrite; every
+number above stands as originally measured on the original 30-script
+sample.**
+
+### (a) Re-run of the unmodified 30-script probe — the fix holds, and the sample is now perfectly flat
+
+`node scripts/probe-temporal-order-sensitivity.mjs`, same 30 scripts, probe
+file byte-identical to the version analyzed above:
+
+- Clean-script false positives: **0/30** (down from 5/30). Confirms the
+  CONTINUOUS/MOMENTS-LATER fix eliminated every false positive this file
+  originally found.
+- Pooled rank statistic (n=90): **AUC = 0.500 exactly, win=0 / tie=90 /
+  loss=0.** Every one of the 90 (script × degradation) pairs stayed at
+  0→0. This is *lower* signal than the original 0.489 (2/84/4) — because
+  the two `MORE` and three `FEWER` movements the original run recorded were
+  themselves instances of the same adjacency bug (a shuffle/relocate
+  happening to create or destroy a CONTINUOUS-adjacent pair), now fixed.
+  **The original run's only nonzero movement was entirely the bug, not a
+  weak-but-real signal** — post-fix, this sample shows literally zero
+  motion, not just chance-level motion. This is expected, not alarming: the
+  sample still contains zero FLASHBACK/MEANWHILE markers (per §1's original
+  grep), so there is still nothing for the *real* mechanism to react to
+  here — see (b).
+
+### (b) New corpus that actually uses the markers: `tests/fixtures/nonlinear-timeline/` (n=6)
+
+Six original, hand-written, temporally-coherent short Fountain screenplays
+(10–13 scenes each; 2 flashback-framed, 2 parallel-action, 2 mixed
+flashback+LATER), built using ONLY the markers
+`extractTemporalConstraints()` actually reads (verified against the
+2026-08-03 source, not assumed): heading-only `FLASHBACK` and
+`CONTINUOUS|MOMENTS LATER|SAME TIME`; `MEANWHILE|SIMULTANEOUSLY|AT THE SAME
+TIME` and a quantified `(DAYS|WEEKS|MONTHS|YEARS) LATER` pattern checked
+against heading + extracted narrative fields. Each fixture's exact scene
+sequence was empirically verified against the real
+`analyzeFountainText`/`auditTemporalConsistency` pipeline before being
+finalized (not hand-derived from the Allen-algebra tables) — see
+`server/nvm/analyze/temporal-consistency.test.ts`'s new "nonlinear-timeline
+fixtures audit clean" describe block, which locks in 0/6 clean-audit as a
+regression test.
+
+**HONESTY BAR:** these are AUTHORED fixtures, not corpus evidence. n=6
+scripts, n=18 (script × degradation) pairs pooled across the three
+degradations — below the task's own n>=10 threshold per individual
+degradation (n=6 each), at or just past it pooled (n=18). This is an
+existence/mechanism test — does the detector's own explicit-marker branch
+ever separate an intact order from a shuffled one on writing that actually
+triggers it — not a claim about recall or precision on real screenwriting.
+
+Probe: `scripts/probe-temporal-nonlinear.mjs` (new, additive; does not
+modify the original probe; degradations and (a)/(b) classification copied
+verbatim from it). Raw data: `scripts/output/temporal-nonlinear.json`.
+
+**Results:**
+
+| | count |
+|---|---|
+| Clean-fixture false positives | 0/6 (all six audit clean, as designed) |
+| Total (script × degradation) pairs | 18 (6 fixtures × 3 degradations; no fixture skipped — all clear every degradation's scene-count gate) |
+| Pairs where degraded > clean (win) | 1/18 |
+| Pairs where degraded = clean (tie) | 17/18 |
+| Pairs where degraded < clean (loss) | 0/18 |
+| Pooled AUC (more-is-degraded correct), n=18 | 0.528 |
+
+Per-degradation (n=6 each, below the AUC threshold, win/tie/loss only):
+SCENE_SHUFFLE 1/5/0, MIDPOINT_DROP 0/6/0, CLIMAX_RELOCATE 0/6/0.
+
+**The one win, examined directly** (not asserted — the actual contradiction
+object from `scripts/output/temporal-nonlinear.json`):
+`flashback-01-the-weight-of-water.fountain` under SCENE_SHUFFLE produced
+
+```
+explicit_conflict [blocker]: Conflicting explicit constraints on scene_0
+and scene_0: existing=equals, new=before
+```
+
+This is the exact mechanism the module's own file header and this repo's
+existing `order-sensitivity` unit test already document (`temporal-
+consistency.test.ts`: "moving the flashback scene to position 0 makes the
+same content report a contradiction") — the deterministic mulberry32(42)
+shuffle happened to relocate a FLASHBACK-tagged scene to array position 0,
+where its own `scene_idx before scene_0` constraint becomes
+self-referential (`scene_0 before scene_0`). It is a genuine explicit-marker
+contradiction, appearing only under degradation, never on the intact
+script — i.e. it satisfies the task's own bar for "the mechanism finally
+being exercised." It is also a narrow, positional coincidence (whether *any*
+FLASHBACK-tagged scene lands at index 0 after a fixed-seed shuffle), not a
+general story-level check — it fires on this specific degenerate placement
+and nothing richer.
+
+**What did NOT move, and why it matters more than the one win:** neither
+parallel-action fixture (MEANWHILE/SIMULTANEOUSLY, 2 fixtures × 3
+degradations = 6 pairs) produced any movement at all, in either direction —
+not because the mechanism is blind to MEANWHILE, but because of how the
+constraint is anchored: `extractTemporalConstraints` attaches the MEANWHILE
+`overlaps` relation to **whichever scene currently sits at position idx-1**,
+not to the scene that was semantically its partner in the original text.
+After a shuffle, "the partner scene moved away" is not detectable *by
+construction* — the detector doesn't track partner identity across a
+reorder, it just re-derives a fresh set of position-based constraints from
+the new array and (per the (a)/(b) split findings, reconfirmed here at 0/18
+bucket-(a) fires) that fresh set is again almost always self-consistent.
+The task's own hypothesized positive case — "a MEANWHILE whose partner scene
+moved away" produces a contradiction — did not occur in this sample, in
+either flashback-and-return case where the return scene's marker also
+depends on positional adjacency, or in the MEANWHILE case. Only the single,
+narrower self-referential FLASHBACK-at-position-0 case fired.
+
+### Mechanism verdict
+
+**The mechanism moves, but only in one narrow, already-documented,
+degenerate case (a FLASHBACK-tagged scene coincidentally landing at array
+position 0), not via the richer story-level violations (a flashback whose
+frame lands after it in a non-degenerate sense, a MEANWHILE whose partner
+scene relocates) the task was probing for.** 1 win / 17 ties / 0 losses
+across n=18 authored pairs, AUC=0.528 — barely above the 0.500 chance floor
+and not distinguishable from noise at this n, but not literally zero either
+(unlike the re-run in (a), which is now exactly 0.500/0/90/0 on the
+marker-free sample). The one real movement is not new evidence beyond what
+`temporal-consistency.test.ts`'s pre-existing `order-sensitivity` unit test
+already proved qualitatively (that same shape, hand-built, in that test);
+this addendum's contribution is confirming it also happens on independently
+authored, competent-craft screenwriting outside a fixture built specifically
+to trigger it, and confirming that the *other* marker branches
+(MEANWHILE/SIMULTANEOUSLY, the LATER confidence bump, a non-degenerate
+flashback return) do not similarly separate on this sample.
+
+### Recommendation
+
+**The P1 question for `temporal-consistency.ts` should be treated as
+closed, not reopened, by this evidence.** The task's own stated bar — "if
+the mechanism STILL doesn't move — contradictions stay 0 under shuffle even
+with real markers present — that is the final word" — is *almost* met: it
+is not a flat 0, but the one motion found is a positional self-reference
+edge case already known and already covered by an existing unit test, not a
+new demonstration that the detector tracks a script's actual non-linear
+story logic under reordering. A signal that only reacts when a specific
+marker type happens to land at index 0 is not a usable order-sensitivity
+signal for P1's smallest-signal-set plan; it is closer to the same
+"bookkeeping artifact of array position" critique the original measurement
+made of the whole module, just with one more special case than previously
+known. Promoting this module to score/verdict math would still require the
+three preconditions this file's own header already lists (real-corpus AUC
+measurement, false-positive rate on intact real flashback/cross-cut
+scripts, a pre-registered fixture pair) — none of which this addendum
+changes the case for. Recommend no further probing of this module without a
+materially different measurement design (e.g., real screenplays that
+naturally contain FLASHBACK/MEANWHILE headings, which neither this file's
+original 30-script sample nor this addendum's 6 authored fixtures can
+stand in for at scale).
+
+**Files (this addendum):**
+- New probe: `scripts/probe-temporal-nonlinear.mjs`
+- New raw output: `scripts/output/temporal-nonlinear.json`
+- New fixtures: `tests/fixtures/nonlinear-timeline/*.fountain` (6 files)
+- New regression tests: `server/nvm/analyze/temporal-consistency.test.ts`,
+  `describe('nonlinear-timeline fixtures audit clean (2026-08-03
+  addendum)')`

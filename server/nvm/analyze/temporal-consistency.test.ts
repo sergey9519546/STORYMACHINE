@@ -1,5 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   auditTemporalConsistency,
   extractTemporalConstraints,
@@ -10,6 +13,7 @@ import {
   type AllenRelation,
 } from './temporal-consistency.ts';
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
+import { analyzeFountainText } from './fountain-analyzer.ts';
 
 // Test fixture factory: builds a minimal valid ScreenplaySceneRecord from
 // just a slugline + free text. The real record type carries no raw scene
@@ -569,4 +573,52 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
       assert.ok(contradictions.length > 0, 'Should detect 2-cycle');
     });
   });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Non-linear-timeline fixture audits (2026-08-03 addendum)
+//
+// GAP THIS CLOSES: docs/p1-benchmark/TEMPORAL_ORDER_SENSITIVITY_2026-08-03.md
+// measured this module against 30 real/calibration scripts and found ZERO of
+// them used FLASHBACK or MEANWHILE in any scene heading -- so the module's
+// stated semantic purpose (detecting a violated non-linear timeline) was
+// never exercised by that probe at all. tests/fixtures/nonlinear-timeline/
+// supplies 6 short, competently-written Fountain screenplays that DO use
+// those markers (2 flashback-framed, 2 parallel-action, 2 mixed
+// flashback+LATER), each built ONLY from markers extractTemporalConstraints()
+// actually reads (heading-only FLASHBACK / CONTINUOUS|MOMENTS LATER|SAME
+// TIME; MEANWHILE|SIMULTANEOUSLY|AT THE SAME TIME and a quantified LATER
+// pattern checked against heading + extracted narrative fields).
+//
+// These assertions lock in the false-positive property (0 contradictions on
+// unmodified text) on material that finally uses the markers -- they do NOT
+// establish order-sensitivity or recall on real corpus writing; see
+// scripts/probe-temporal-nonlinear.mjs and this suite's own honesty-bar
+// framing in TEMPORAL_ORDER_SENSITIVITY_2026-08-03.md's addendum for what
+// this evidence is and is not.
+// ────────────────────────────────────────────────────────────────────────────
+describe('nonlinear-timeline fixtures audit clean (2026-08-03 addendum)', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const FIXTURES_DIR = path.resolve(__dirname, '..', '..', '..', 'tests', 'fixtures', 'nonlinear-timeline');
+  const fixtureFiles = fs.readdirSync(FIXTURES_DIR).filter(f => f.endsWith('.fountain')).sort();
+
+  // Guard against a silently-empty fixture directory making this whole
+  // describe block a no-op pass -- the six fixtures are the point.
+  it('finds all 6 expected fixture files', () => {
+    assert.equal(fixtureFiles.length, 6, `expected 6 .fountain fixtures in ${FIXTURES_DIR}, found ${fixtureFiles.length}: ${fixtureFiles.join(', ')}`);
+  });
+
+  for (const file of fixtureFiles) {
+    it(`${file}: audits to 0 temporal contradictions on unmodified text`, () => {
+      const fountainText = fs.readFileSync(path.join(FIXTURES_DIR, file), 'utf-8');
+      const analysis = analyzeFountainText(fountainText);
+      assert.ok(analysis.records.length >= 10 && analysis.records.length <= 16,
+        `${file}: expected 10-16 scenes per the task's fixture spec, got ${analysis.records.length}`);
+
+      const contradictions = auditTemporalConsistency(analysis.records);
+      const explanations = contradictions.map(c => `[${c.severity}] ${c.type}: ${c.explanation}`).join('\n  ');
+      assert.equal(contradictions.length, 0,
+        `${file}: expected 0 contradictions on this temporally-coherent fixture, got ${contradictions.length}:\n  ${explanations}`);
+    });
+  }
 });

@@ -1,0 +1,127 @@
+// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+// consistency mechanism material, 2026-08-03). Mixed structure: a FLASHBACK
+// bracket (returning via CONTINUOUS) plus a separate forward time-jump
+// using a LATER heading modifier, per the markers
+// extractTemporalConstraints() actually parses. Temporally clean as
+// written -- 0 expected contradictions.
+
+INT. TERRACE HOUSE - FRONT HALL - DAY
+
+Moving boxes stacked three high. MARGUERITE OYELARAN, thirties, keys still in hand, stands in the doorway of a house she clearly used to live in.
+
+MARGUERITE
+(to herself)
+Same creak in the third stair. Nobody fixed it. Good.
+
+EXT. TERRACE HOUSE - BACKYARD - DAY
+
+A small, overgrown garden, a rusted swing set still standing in one corner. Marguerite crosses the grass slowly, stops at the swing, gives it a light push.
+
+MARGUERITE
+Still squeaks. Some things this house refuses to let go of.
+
+INT. TERRACE HOUSE - LIVING ROOM - DAY
+
+She runs a hand along the mantel, stops at a faded pencil mark and a name scratched beside it: height measurements climbing the wall.
+
+MARGUERITE
+Twelve years and the landlord never painted over this.
+
+She presses her palm flat against the marks like she's checking her own height against them.
+
+INT. TERRACE HOUSE - LIVING ROOM - DAY - FLASHBACK
+
+The same wall, decades younger paint. YOUNG MARGUERITE, eight, stands rigid against it while her FATHER pencils a line just above her head.
+
+FATHER
+Hold still. You grow an inch every time you fidget, I swear it.
+
+YOUNG MARGUERITE
+I'm not fidgeting, I'm growing on purpose.
+
+He laughs, marks the wall, ruffles her hair.
+
+INT. TERRACE HOUSE - LIVING ROOM - DAY - CONTINUOUS
+
+Still the flashback, moments later: Young Marguerite steps back to inspect the new line, deeply unsatisfied with the gap between it and the last one.
+
+YOUNG MARGUERITE
+That's barely anything.
+
+FATHER
+It's exactly what you earned this year. Ask for more, you get less. That's the rule.
+
+INT. TERRACE HOUSE - LIVING ROOM - DAY - CONTINUOUS
+
+Marguerite, adult again, blinks back into the present, still touching the marks. A REAL ESTATE AGENT appears in the doorway behind her, apologetic.
+
+AGENT
+Sorry -- didn't mean to startle you. The inspector's running late.
+
+MARGUERITE
+(not turning around yet)
+Take your time. I'm not in a hurry to leave this wall.
+
+INT. TERRACE HOUSE - LIVING ROOM - DAY
+
+The agent steps in, clipboard ready, scanning the room with professional detachment.
+
+AGENT
+Original crown molding, working fireplace. This place will move fast once it's listed.
+
+MARGUERITE
+It moved fast the first time too. We were only meant to stay a year.
+
+INT. TERRACE HOUSE - KITCHEN - DAY
+
+Marguerite runs her fingers along a chipped tile edge, a small private smile surfacing.
+
+MARGUERITE
+(to the agent)
+There's a burn mark under the stove. Nobody ever tell you why it's there.
+
+AGENT
+(checking clipboard)
+No burn mark listed in the disclosure.
+
+MARGUERITE
+Exactly. We kept it a family secret. Some legacies you protect.
+
+EXT. TERRACE HOUSE - BACKYARD - DAY - THREE YEARS LATER
+
+The same overgrown garden, a fresh coat of paint on the swing set's frame. Marguerite pushes Isabel gently on the swing, both of them mid-laugh.
+
+ISABEL
+Higher! You always push too slow.
+
+MARGUERITE
+Your grandfather used to say the same thing about me.
+
+INT. TERRACE HOUSE - LIVING ROOM - DAY - THREE YEARS LATER
+
+The wall has been repainted, the height marks gone entirely. Marguerite, hair different, more settled, stands with her own daughter, ISABEL, seven, in the same spot her father once stood.
+
+MARGUERITE
+Hold still. You grow an inch every time you fidget, I swear it.
+
+ISABEL
+I'm not fidgeting, I'm growing on purpose.
+
+Marguerite freezes, pencil in hand, recognizing her own line coming back to her from somewhere she didn't expect it.
+
+INT. TERRACE HOUSE - LIVING ROOM - DAY
+
+She marks the wall carefully, steps back, studies the fresh line against nothing -- the first mark of a whole new column.
+
+MARGUERITE
+(quiet, to herself)
+Ask for more, you get less. That's the rule.
+
+ISABEL
+What rule? You're not making sense, Mom.
+
+MARGUERITE
+(smiling)
+You'll understand it in about twenty-five years. I've got time to explain it slowly.
+
+She sets the pencil down on the mantel, in the exact spot where one always used to live.

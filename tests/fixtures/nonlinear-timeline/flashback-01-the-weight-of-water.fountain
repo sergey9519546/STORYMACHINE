@@ -1,0 +1,151 @@
+// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+// consistency mechanism material, 2026-08-03). Flashback-framed structure:
+// an interrogation-room present tense frame with two FLASHBACK insertions,
+// each returning via a CONTINUOUS-marked scene, per the markers
+// extractTemporalConstraints() in server/nvm/analyze/temporal-consistency.ts
+// actually parses (heading-only FLASHBACK / CONTINUOUS). Temporally clean
+// as written -- 0 expected contradictions.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT
+
+A metal table, two chairs, a recorder blinking red. DETECTIVE OKONKWO-REYES, fifties, sets a thin case file down without opening it. Across from her, ANNA VOSS, thirties, still in a borrowed police blanket, hair salt-stiff.
+
+DETECTIVE OKONKWO-REYES
+Start with the weather. People always skip the weather and it's never the part that's wrong.
+
+ANNA
+It was calm. That's the part nobody believes. Glass calm.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT
+
+Okonkwo-Reyes clicks her pen once, twice.
+
+DETECTIVE OKONKWO-REYES
+Three of you went out. One of you came back. Walk me through the boat.
+
+Anna wraps the blanket tighter, eyes fixed on the table's scarred edge.
+
+ANNA
+The Marlene. My father's boat. Twenty-two feet, nothing special.
+
+EXT. MARLENE - OPEN WATER - DUSK - FLASHBACK
+
+The Marlene sits low and easy on a mirror-flat sea. ANNA, dry, sunburned, laughing, hauls a line. Her brother TOMAS, twenties, stands at the wheel. Their cousin DEV, twenties, dangles bare feet over the stern.
+
+DEV
+Your dad know you take his boat out this far?
+
+TOMAS
+My dad knows everything and forgives nothing. So no.
+
+Anna throws a coil of rope at him. It misses. Everyone laughs.
+
+INT. MARLENE - CABIN - CONTINUOUS
+
+Below deck, cramped and warm. Anna digs a cooler out from under a bench, tosses cans up through the hatch.
+
+ANNA
+(calling up)
+Last three, no fighting.
+
+Tomas's voice drifts down, easy, unhurried.
+
+TOMAS (V.O.)
+Bring the good ones.
+
+Anna smiles, grabs one more can for herself, starts back up the ladder.
+
+EXT. MARLENE - OPEN WATER - CONTINUOUS
+
+Anna emerges into gray light -- the sky has changed, fast and wrong, a wall of cloud where there was none. Dev is already on his feet, pointing.
+
+DEV
+That wasn't there ten minutes ago.
+
+TOMAS
+(taking the wheel hard)
+Vests. Now. Both of you.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT - CONTINUOUS
+
+Anna's hands are flat on the table now, pressed still on purpose.
+
+ANNA
+The radio said clear through morning. The radio was wrong.
+
+DETECTIVE OKONKWO-REYES
+Radios usually are, out there. What happened after the vests.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT
+
+A uniformed officer sets two coffees down without a word, leaves. Okonkwo-Reyes slides one across.
+
+DETECTIVE OKONKWO-REYES
+Take your time. I'm not the one who has to live in it after.
+
+Anna doesn't touch the coffee.
+
+ANNA
+I keep starting the next part and stopping.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT
+
+Okonkwo-Reyes leans back, softer now.
+
+DETECTIVE OKONKWO-REYES
+Then start smaller. What's the last thing you're sure of.
+
+ANNA
+Dev's hand. Around my wrist. Before the water took the boat sideways.
+
+EXT. MARLENE - OPEN WATER - NIGHT - FLASHBACK
+
+Chaos: rain sheeting sideways, the boat pitched hard on its side. Tomas fights the wheel. Dev has Anna's wrist in a death grip, both of them thrown against the rail.
+
+TOMAS
+(screaming over the wind)
+Hold the line! Hold the—
+
+A wave takes the boat broadside. The world tips.
+
+INT. MARLENE - CABIN - NIGHT - CONTINUOUS
+
+Water floods the cabin fast, black and freezing. Anna, submerged to the waist, claws for the hatch. Dev's hand is gone from her wrist. She doesn't stop moving.
+
+ANNA
+(choking, barely audible)
+Dev! Tomas!
+
+Nothing answers but the groan of the hull.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT - CONTINUOUS
+
+Back in the present, Anna's voice has gone flat, procedural, the only way she can say it at all.
+
+ANNA
+I got out through the cabin window. I don't remember deciding to.
+
+DETECTIVE OKONKWO-REYES
+Nobody decides that. Bodies decide it for you.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT
+
+Okonkwo-Reyes finally opens the case file. A single photo inside -- the Marlene's hull, recovered, split down the keel.
+
+DETECTIVE OKONKWO-REYES
+Coast Guard found her upside down eleven miles east. No sign of your brother or your cousin. Yet.
+
+Anna stares at the photo like it might rearrange itself into a different answer.
+
+INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT
+
+Anna finally reaches for the coffee, hands shaking too hard to lift it.
+
+ANNA
+Yet. You keep saying yet like it's kind.
+
+DETECTIVE OKONKWO-REYES
+(quiet)
+It's the only honest word I've got left tonight.
+
+The recorder blinks red between them. Neither reaches to turn it off.

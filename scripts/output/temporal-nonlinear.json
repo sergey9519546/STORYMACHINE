@@ -1,0 +1,288 @@
+[
+  {
+    "id": "tests/fixtures/nonlinear-timeline/flashback-01-the-weight-of-water.fountain",
+    "group": "flashback-framed",
+    "clean": {
+      "sceneCount": 13,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 13,
+        "contradictionCount": 1,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 1,
+          "indeterminate": 0
+        },
+        "contradictions": [
+          {
+            "type": "explicit_conflict",
+            "severity": "blocker",
+            "explanation": "Conflicting explicit constraints on scene_0 and scene_0: existing=equals, new=before",
+            "affectedScenes": [
+              "0"
+            ],
+            "classification": "explicit"
+          }
+        ]
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 11,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 13,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/nonlinear-timeline/flashback-02-last-confession.fountain",
+    "group": "flashback-framed",
+    "clean": {
+      "sceneCount": 11,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 11,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 11,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/nonlinear-timeline/mixed-01-homecoming.fountain",
+    "group": "mixed",
+    "clean": {
+      "sceneCount": 11,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 11,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 11,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/nonlinear-timeline/mixed-02-the-understudy.fountain",
+    "group": "mixed",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/nonlinear-timeline/parallel-01-crossfire.fountain",
+    "group": "parallel-action",
+    "clean": {
+      "sceneCount": 12,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "tests/fixtures/nonlinear-timeline/parallel-02-the-long-distance.fountain",
+    "group": "parallel-action",
+    "clean": {
+      "sceneCount": 12,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 9,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 12,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      }
+    }
+  }
+]

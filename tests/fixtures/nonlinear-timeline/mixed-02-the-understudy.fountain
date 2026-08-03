@@ -1,0 +1,105 @@
+// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+// consistency mechanism material, 2026-08-03). Mixed structure: a
+// FLASHBACK bracket (returning via CONTINUOUS) plus a separate forward
+// time-jump using a LATER heading modifier, per the markers
+// extractTemporalConstraints() actually parses. Temporally clean as
+// written -- 0 expected contradictions.
+
+INT. REGIONAL PLAYHOUSE - BACKSTAGE - NIGHT
+
+Racks of costumes, a mirror ringed with bare bulbs. DELPHINE ASANTE, twenties, stares at her own reflection in a half-buttoned understudy's costume, hands not quite steady.
+
+STAGE MANAGER (O.S.)
+Five minutes, Delphine. You're on in five.
+
+DELPHINE
+(to the mirror)
+Five minutes to become someone who's had four years of rehearsal I never got.
+
+INT. REGIONAL PLAYHOUSE - WINGS - NIGHT
+
+Delphine peers through the curtain gap at the packed house, the orchestra tuning below.
+
+DELPHINE
+(muttering)
+Just don't think about the last time. Just don't.
+
+INT. REGIONAL PLAYHOUSE - AUDITORIUM - NIGHT - FLASHBACK
+
+Three years younger, YOUNG DELPHINE stands center stage under a single spotlight, mid-audition, voice cracking badly on a high note. A DIRECTOR watches from the dark house, expression unreadable.
+
+DIRECTOR (O.S.)
+Thank you. We'll be in touch.
+
+Young Delphine's face falls, just for a second, before she catches it.
+
+INT. REGIONAL PLAYHOUSE - LOBBY - CONTINUOUS
+
+Young Delphine pushes through the lobby doors into the cold, phone already out, dialing.
+
+YOUNG DELPHINE
+(into phone, forcing brightness)
+It went fine. I mean, it went. I'll know Thursday.
+
+She hangs up before whoever answered can hear her voice actually break.
+
+INT. REGIONAL PLAYHOUSE - WINGS - NIGHT - CONTINUOUS
+
+Present day again: Delphine blinks hard, the memory releasing her. The stage manager appears at her shoulder, headset crooked.
+
+STAGE MANAGER
+Hey. Wherever you just went, come back. You're on.
+
+DELPHINE
+(steadying)
+I'm back. I promise I'm back.
+
+INT. REGIONAL PLAYHOUSE - WINGS - NIGHT
+
+The stage manager squeezes her arm once, all business again.
+
+STAGE MANAGER
+The lead's understudy has never gone on cold in this house. You're about to be the exception.
+
+DELPHINE
+Exceptions get remembered. That's what I'm counting on.
+
+INT. REGIONAL PLAYHOUSE - AUDITORIUM - NIGHT
+
+The house lights dim. A ripple of anticipation moves through the crowd as the curtain begins to rise.
+
+STAGE MANAGER (V.O.)
+(over headset, to the booth)
+Standby, house to half. She's going on.
+
+INT. REGIONAL PLAYHOUSE - AUDITORIUM - NIGHT - FOUR YEARS LATER
+
+The same house, renovated seats, a different marquee glow bleeding through the lobby doors. DELPHINE, now visibly assured, takes a bow to a full standing ovation, flowers landing at her feet.
+
+VOICE FROM CROWD (O.S.)
+(shouted, joyful)
+Encore!
+
+Delphine laughs, genuinely startled by the volume of it.
+
+INT. REGIONAL PLAYHOUSE - BACKSTAGE - NIGHT
+
+Delphine collapses into a chair in front of the same mirror, bulbs still bare, breathing hard, radiant.
+
+DELPHINE
+(to her reflection)
+Four years. You'd think it would stop feeling like the first time.
+
+A knock at the door. The CURRENT STAGE MANAGER pokes her head in, young, nervous, achingly familiar.
+
+CURRENT STAGE MANAGER
+Ms. Asante? Your understudy asked if she could watch you get ready. If that's allowed.
+
+INT. REGIONAL PLAYHOUSE - BACKSTAGE - NIGHT
+
+Delphine looks at the young understudy hovering in the doorway, recognizing something in the girl's face she hasn't seen in years -- not the costume, the fear underneath it.
+
+DELPHINE
+Tell her to come sit right here. I've got about five minutes' worth of advice I wish someone had given me.
+
+The understudy steps in slowly, and Delphine pats the chair beside her own mirror, already making room.

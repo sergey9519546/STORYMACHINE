@@ -1,0 +1,115 @@
+// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+// consistency mechanism material, 2026-08-03). Parallel-action structure:
+// a heist crosscut between two threads using MEANWHILE / SIMULTANEOUSLY
+// heading markers, per the markers extractTemporalConstraints() actually
+// parses (checked against heading + extracted narrative fields). Temporally
+// clean as written -- 0 expected contradictions.
+
+INT. MERIDIAN MUSEUM - EAST GALLERY - NIGHT
+
+Security lights hum on standby. LUCA REYES, thirties, in a maintenance jumpsuit, kneels at a display case, feeding a thin blade under the glass seal.
+
+LUCA
+(into an earpiece)
+I'm at the case. Tell me the loop's still holding.
+
+INT. VAN - PARKED ACROSS THE STREET - NIGHT - MEANWHILE
+
+MEANWHILE, at the curb: PRIYA OSEI, forties, surrounded by monitors, watches a looped feed of an empty gallery.
+
+PRIYA
+(into headset)
+Loop's holding. You've got six minutes before the guard's actual round catches up to the fake one.
+
+INT. MERIDIAN MUSEUM - EAST GALLERY - NIGHT
+
+Luca lifts the case lid an inch, freezes as a servo whines somewhere in the ceiling.
+
+LUCA
+Something just moved. Camera or vent?
+
+PRIYA (V.O.)
+(over earpiece)
+Vent. Building's just breathing. Keep going.
+
+INT. MERIDIAN MUSEUM - SERVICE CORRIDOR - NIGHT - SIMULTANEOUSLY
+
+SIMULTANEOUSLY, down a service corridor: DESMOND OKAFOR, twenties, disables a keypad panel with a cloned fob, sweat beading at his temple.
+
+DESMOND
+(muttering to himself)
+Third try's the charm. Third try's the charm.
+
+The panel clicks green. He exhales, pushes through the door.
+
+INT. MERIDIAN MUSEUM - EAST GALLERY - NIGHT
+
+Luca eases the artifact -- a small gold reliquary -- free of its mount, wraps it, tucks it against his chest.
+
+LUCA
+(into earpiece)
+Got it. Moving to the corridor now.
+
+INT. VAN - PARKED ACROSS THE STREET - NIGHT - MEANWHILE
+
+MEANWHILE, Priya's monitor flickers -- the loop stutters, one frame repeating.
+
+PRIYA
+(sharp)
+Loop's degrading. Someone's running a diagnostic on the feed. Move faster than fast.
+
+INT. MERIDIAN MUSEUM - SERVICE CORRIDOR - NIGHT
+
+Desmond reaches a junction, checks both directions, waves Luca in as he arrives from the gallery.
+
+DESMOND
+Priya says we're bleeding time.
+
+LUCA
+Priya's always right about that. Which door.
+
+INT. MERIDIAN MUSEUM - LOADING DOCK - NIGHT
+
+The two of them reach a rolling door, Desmond already working the manual release.
+
+DESMOND
+Thirty seconds and we're a delivery van nobody remembers seeing.
+
+The door grinds up. Night air floods in.
+
+INT. VAN - PARKED ACROSS THE STREET - NIGHT - SIMULTANEOUSLY
+
+SIMULTANEOUSLY, Priya's monitors go fully dark, replaced by a live security override banner.
+
+PRIYA
+(into headset, urgent)
+Loop's dead. They're on live feed. However far you are from that door, be further.
+
+EXT. MERIDIAN MUSEUM - LOADING DOCK - NIGHT
+
+Luca and Desmond burst out into the alley just as a spotlight sweeps the far wall behind them.
+
+LUCA
+(running)
+Define "further."
+
+DESMOND
+(running)
+The van, ideally.
+
+EXT. ALLEY BEHIND MUSEUM - NIGHT
+
+They round the corner at a dead sprint. The van's side door is already open, engine running.
+
+INT. VAN - MOVING - NIGHT
+
+Luca and Desmond pile in. Priya floors it before the door fully shuts, the reliquary clutched safe in Luca's lap.
+
+PRIYA
+Anyone want to explain the vent noise before I have a heart attack retroactively?
+
+LUCA
+(catching his breath)
+Building. Breathing.
+
+The van swings hard onto the main road, sirens rising somewhere behind them, still distant.

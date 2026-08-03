@@ -1,0 +1,121 @@
+// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+// consistency mechanism material, 2026-08-03). Flashback-framed structure:
+// a deathbed present tense frame with two FLASHBACK insertions (one a
+// longer multi-scene continuous run, one a short single scene), each
+// returning via a CONTINUOUS-marked scene, per the markers
+// extractTemporalConstraints() actually parses (heading-only FLASHBACK /
+// CONTINUOUS). Temporally clean as written -- 0 expected contradictions.
+
+INT. RIVERBEND HOSPICE - ROOM FOUR - DAY
+
+Late afternoon light through half-closed blinds. IRENA KOVAC, elderly, propped on pillows, an oxygen line looped under her nose. Her granddaughter, NOOR, twenties, sits close, holding a chipped enamel pin between two fingers.
+
+NOOR
+You never told me what this was for. Just that I wasn't allowed to touch it.
+
+IRENA
+(a thin smile)
+Now you're allowed. Everything I was keeping it from you for already happened.
+
+INT. RIVERBEND HOSPICE - ROOM FOUR - DAY
+
+Noor turns the pin over in her palm -- a small tarnished star.
+
+NOOR
+Tell me, then. All of it, not the version from the birthday toasts.
+
+Irena closes her eyes, not from pain -- from arriving somewhere.
+
+IRENA
+The version from the toasts starts with a road. It should start with a fence.
+
+EXT. VILLAGE FENCE LINE - DAWN - FLASHBACK
+
+Frost on wire. YOUNG IRENA, seventeen, presses a folded paper into a gap in the fence post while a dog barks somewhere behind her, close.
+
+YOUNG IRENA
+(barely a whisper)
+Don't you dare bark now. Not now.
+
+She freezes, listens, then moves fast into the tree line.
+
+EXT. FOREST EDGE - CONTINUOUS
+
+Young Irena runs low along a ditch, breath fogging, one hand pressed to her side.
+
+A distant shout, unintelligible, behind her. She doesn't look back.
+
+INT. FARMHOUSE CELLAR - CONTINUOUS
+
+A trapdoor opens from below. Young Irena drops down into darkness, pulling it shut over her head. A man's hand, unseen owner, presses a lantern into hers.
+
+MAN'S VOICE (O.S.)
+Two hours. Not a sound before that.
+
+EXT. RIVER CROSSING - NIGHT - CONTINUOUS
+
+Later that same unbroken night: Young Irena wades a shallow crossing, lantern extinguished, a bundle held over her head. On the far bank, a shape waits -- a boy, thin, no older than her.
+
+BOY
+(reaching to help her up)
+You're the one with the star pin.
+
+YOUNG IRENA
+I'm the one who almost wasn't.
+
+INT. RIVERBEND HOSPICE - ROOM FOUR - DAY - CONTINUOUS
+
+Irena's eyes open. Noor hasn't moved, the pin still cupped in her hand like it might vanish.
+
+IRENA
+That boy carried messages for three years and never once told anyone my name.
+
+NOOR
+What happened to him?
+
+IRENA
+That's a different story. Ask me tomorrow, if there's a tomorrow to ask in.
+
+INT. RIVERBEND HOSPICE - ROOM FOUR - DAY
+
+A nurse passes the doorway, glances in, moves on without interrupting. Noor waits until the hallway is quiet again.
+
+NOOR
+Was there a day you almost got caught? A real one, not the fence.
+
+IRENA
+(a long breath)
+Once. At the checkpoint. I'll tell you, but you have to let me tell it slow.
+
+EXT. BORDER CHECKPOINT - NIGHT - FLASHBACK
+
+A striped barrier arm, a single guard lamp swinging in wind. YOUNG IRENA, papers in hand, stands rigid as a GUARD examines them under the light, far too long.
+
+GUARD
+(not looking up)
+This photograph is five years old.
+
+YOUNG IRENA
+(steady, rehearsed calm)
+I was told not to smile in the new one. I look like a different person when I smile.
+
+The guard finally looks up, studies her face against the photo.
+
+INT. RIVERBEND HOSPICE - ROOM FOUR - DAY - CONTINUOUS
+
+Irena's hand trembles slightly, remembering, and Noor covers it with her own without being asked.
+
+IRENA
+He waved me through. To this day I don't know if he believed me or simply wanted his shift to end.
+
+NOOR
+Grandma. You were seventeen.
+
+INT. RIVERBEND HOSPICE - ROOM FOUR - DAY
+
+Irena presses the star pin into Noor's palm, closes her granddaughter's fingers around it gently.
+
+IRENA
+Seventeen and certain I'd live forever. Turns out I only needed to live long enough to hand this to you.
+
+Noor holds the pin against her chest, and for a long moment neither of them speaks.
