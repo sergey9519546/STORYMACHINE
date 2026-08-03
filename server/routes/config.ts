@@ -20,6 +20,19 @@ import {
   withSessionCommand, metrics,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
+import { withAiBudget, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
+import { sanitizeExternalError } from '../lib/safe-error.ts';
+
+// TASK 1 (ai-budget, 2026-08-03 audit): maxAttempts=1/timeoutMs=10_000 — a
+// single connectivity probe, matching this call's own existing per-attempt
+// timeoutMs exactly. withAiBudget (abandon-on-timeout) is safe here: this
+// route holds no SessionCommandCoordinator command and mutates no session
+// state.
+const AI_CONFIG_TEST_BUDGET: AiBudgetLimits = {
+  label: 'ai-config-test',
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_AI_CONFIG_TEST_MAX_ATTEMPTS', 1),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_AI_CONFIG_TEST_TIMEOUT_MS', 10_000),
+};
 
 // /api/ai-config/test takes no body fields — the route fires a fixed probe
 // prompt and ignores req.body entirely. AGENTS.md requires every POST to
@@ -166,24 +179,30 @@ router.post('/api/ai-config', gameLimiter, validate(AiConfigSchema), asyncHandle
 router.post('/api/ai-config/test', aiLimiter, validate(AiConfigTestBodySchema), asyncHandler(async (req, res) => {
   if (!checkAdminAuth(req, res)) return;
   try {
-    const result = await generateContent({
+    const result = await withAiBudget(AI_CONFIG_TEST_BUDGET, () => generateContent({
       model: getModel('fast'),
       contents: 'Reply with the single word: OK',
       config: { maxOutputTokens: 8, temperature: 0 },
-    }, { label: 'connection-test', timeoutMs: 10_000 });
+    }, { label: 'connection-test', timeoutMs: 10_000 }));
     const text = typeof result.text === 'string' ? result.text.trim() : '';
     res.json({ ok: true, response: text.substring(0, 64) });
   } catch (err) {
-    const raw = err instanceof Error ? err.message : String(err);
-    const safe = raw.length > 200 ? raw.substring(0, 200) + '…' : raw;
-    const sanitized = safe.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]');
-    // Log the SANITIZED text, not `raw` (2026-08-03 audit). The redaction two
-    // lines up was computed for the HTTP response and then discarded here, so
-    // an upstream error echoing a bearer token or sk- key wrote it verbatim
-    // into the logs. CI's no-console grep cannot catch this — it is a logger
-    // call, which is exactly why it survived.
-    logger.warn('ai_config_test_failed', { error: sanitized });
-    res.status(502).json({ ok: false, error: sanitized });
+    // TASK 2 (safe-error, 2026-08-03 audit): sanitizeExternalError() is now
+    // THE single source of the redacted text, computed once and reused for
+    // both sinks. Previously this call site computed its own inline
+    // redaction for the HTTP response only and logged the RAW error two
+    // lines below — see server/lib/safe-error.ts's header for the incident
+    // this centralizes the fix for. isAiBudgetExceededError() gets its own
+    // distinct status (503, not 502): a budget stop is this server
+    // deliberately giving up, not the upstream provider failing.
+    const sanitized = sanitizeExternalError(err);
+    logger.warn('ai_config_test_failed', { ...sanitized });
+    const budgetExceeded = isAiBudgetExceededError(err);
+    res.status(budgetExceeded ? 503 : 502).json({
+      ok: false,
+      error: sanitized.message,
+      ...(budgetExceeded ? { code: err.code } : {}),
+    });
   }
 }));
 

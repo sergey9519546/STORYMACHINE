@@ -286,6 +286,15 @@ export interface ScriptDoctorReport {
   bonding?: import('./bonding-signal.ts').BondingReport;
   coldOpenPromise?: import('./cold-open-promise.ts').ColdOpenReport;
   patternEstablishment?: import('./pattern-establishment.ts').PatternReport;
+  /** TRACE §13: Allen's Interval Algebra temporal-consistency audit (built,
+   *  tested, and wired 2026-08-03 — see temporal-consistency.ts's header for
+   *  the false-positive bug found and fixed during wiring, and the
+   *  order-sensitivity finding that makes this module notable: unlike
+   *  almost everything else in this list, its output is a function of scene
+   *  ORDER, not just content). Diagnostic only — does NOT affect
+   *  health/verdict; folding it into the score is a separate, P1-gated,
+   *  evidence-requiring change (see temporal-consistency.ts). */
+  temporalConsistency?: import('./temporal-consistency.ts').TemporalConsistencyReport;
   /** Wave SG-1: Story Graph diagnostic analysis. Constructs typed
    *  causal-temporal graph from existing scene signals (seededClueIds,
    *  payoffSetupIds, relationshipShifts), scores graph-native properties

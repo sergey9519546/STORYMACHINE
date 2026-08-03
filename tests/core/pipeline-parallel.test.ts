@@ -256,7 +256,9 @@ describe('doctor cache (contentHash + storyContext keyed LRU) — cache proof', 
 });
 
 describe('latency measurement (informational — not asserted)', () => {
-  it('reports sequential vs parallel wall-clock time on the largest corpus sample', async () => {
+  it('reports sequential vs parallel wall-clock time on the largest corpus sample', {
+    todo: "informational latency report only -- deliberately asserts nothing about relative speed (see the comment at the end of this test), so it must not count toward the suite's pass total",
+  }, async () => {
     let largest = REFERENCE_CORPUS[0];
     for (const sample of REFERENCE_CORPUS) {
       if (sample.fountain.length > largest.fountain.length) largest = sample;
@@ -315,6 +317,5 @@ describe('latency measurement (informational — not asserted)', () => {
     // under diagnose-only. This test exists to report the honest number,
     // not to assert a speedup that the current pass implementations don't
     // produce.
-    assert.ok(true);
   });
 });

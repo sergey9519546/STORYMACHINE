@@ -28,6 +28,21 @@
 // economy; length is the offending variable, not the ratio alone).
 //
 // strength ∈ [0,1] rewards a high median economy across scored scenes.
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE
+// Zero importers anywhere in the repo except its own test. Takes raw
+// fountain text directly (`detectSceneEconomy(fountain)`) — no missing
+// extractor, unlike most of this file's neighbors. THEORETICALLY order-
+// sensitive: "first occurrence anywhere in the document" is a function of
+// scan order, so which scene gets credit for introducing a shared term can
+// shift under reordering. NOT CONFIRMED empirically: a probe (14-scene hand-
+// built fixture, 15 seeded shuffles) found `bloatedScenes`/`strength`
+// unchanged in every shuffle (0/15) — either the effect is real but too
+// small to move this formula's thresholds on ordinary scripts, or the
+// fixture didn't stress it. Left unresolved rather than guessed either way;
+// a real probe would need a fixture specifically engineered so contested
+// vocabulary crosses the BLOAT_MIN_WORDS/BLOAT_ECONOMY_THRESHOLD boundary
+// depending on scan order, or a real corpus.
 
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',

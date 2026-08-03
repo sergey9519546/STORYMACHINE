@@ -14,6 +14,24 @@
  *  - `diff` walks sorted keys, comparing leaves by value (deep equality).
  *
  * No LLM, no I/O — a pure, deterministic, byte-reproducible data structure.
+ *
+ * ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE
+ * Zero importers anywhere in the repo except its own test. IMPORTANT NAME
+ * COLLISION: this is a DIFFERENT type from the live, wired
+ * `server/nvm/state/NarrativeState.ts` (imported throughout server/routes/
+ * nvm/**, server/nvm/ops/, server/nvm/proof/**, etc.) — that file's
+ * `NarrativeState` is a flat `{ objectiveReality, characterBeliefs,
+ * relationships, clues, payoffs, ... }` record; THIS file's `NarrativeState`
+ * is a generic dot-path `{ ledgers, graphs, characters }` container ported
+ * from OWNE's `NCPState`. Do not assume one is a newer/older version of the
+ * other — they are unrelated designs that happen to share a name, one
+ * shipped, one didn't. Infrastructure, not a signal: nothing to "wire" as a
+ * diagnostic on its own — it's a state container the rest of this cluster
+ * (custody-ledger.ts, epistemic-ledger.ts, etc.) COULD sit on top of if
+ * they were ever unified into one OWNE-style engine rather than the current
+ * one-typed-input-per-module shape. Not worth adopting piecemeal; revisit
+ * only if a future decision consolidates the ledger cluster onto a shared
+ * state substrate instead of building per-module extractors.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,5 +1,17 @@
 # StoryMachine V5.0 Performance Benchmarks
 
+> **Status (2026-08-03): dormant/quarantined, not currently runnable.** Every
+> `.bench.ts` file this README documents lives under a path excluded from
+> TypeScript compilation — `**/*.bench.ts` is excluded outright in
+> `tsconfig.json`, and `server/nvm/quantum` is separately excluded as part of
+> the V5.0 "narrative OS" quarantine (see `CLAUDE.md`, which the wave program
+> and this experimental subsystem are both deprioritized behind). No
+> `npm run bench:*` script exists in `package.json` — none of the commands
+> below resolve on a clean checkout. The walkthroughs, sample output, and
+> checked-off "V5.0 Goals" further down describe an intended suite from
+> before the quarantine, not results you can currently reproduce. This
+> directory is kept for when that subsystem is re-included, not deleted.
+
 Comprehensive benchmark suite for validating the performance of StoryMachine V5.0 Narrative OS. These benchmarks ensure that the system meets its performance targets across Event Store, Trinity Gate, and Quantum Field components.
 
 ## 📊 Performance Targets

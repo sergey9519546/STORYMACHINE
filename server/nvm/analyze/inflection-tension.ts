@@ -6,6 +6,32 @@
 // length to produce inflectionRate: low for flat/monotone arcs, moderate
 // for well-structured stories with clear acts, high for erratic noise.
 // Deterministic, no LLM. Research: arXiv 2604.09854 "Spoiler Alert / 100-Endings".
+//
+// -- Status (2026-08-03 wiring audit) -- INTEGRATE LATER (strongest
+// order-sensitivity finding outside temporal-consistency.ts this audit)
+// Zero importers anywhere in the repo except its own test
+// (tests/core/inflection-tension.test.ts). Takes ordered scene texts
+// directly (computeInflectionTension(sceneTexts)) -- no missing extractor,
+// trivially callable from doctor.ts via the same scenesFromFountain split
+// already duplicated elsewhere in this directory. STRONG order-sensitivity
+// CONFIRMED by probe (12-scene fixture, 15 seeded shuffles): inflectionRate
+// changed in 11/15 shuffles (73%), ranging 0.27-0.82 against an intact-order
+// reading of 0.45 -- nearly a 3x spread from reordering the SAME 12 scenes.
+// This is a curve-shape statistic by construction (local minima/maxima over
+// an ordered sequence), so the sensitivity is expected, not incidental --
+// unlike story-spine.ts. Comparable in spirit to the ALREADY-PROVEN
+// emotional-arc.ts rampCorrelation/peakPosition signal NORTH_STAR credits
+// with AUC ~0.82 on act-swap; this may be an underused sibling of that
+// signal, sharing the same LEXICON (data/emotional-arc-lexicon.json).
+// NOT YET SAFE to wire: this probe only shows the output CHANGES under
+// shuffle, not that it changes in the discriminating direction on REAL
+// (non-adversarially-constructed) scripts, and -- per this audit's
+// temporal-consistency.ts finding -- an existing green test suite is not
+// sufficient evidence of low false-positive risk on realistic input. What
+// would unblock it: the same adversarial-fixture pass temporal-
+// consistency.ts's FLASHBACK branch needed (ordinary scripts, not just
+// hand-picked shuffles) before diagnostic wiring; real-corpus shuffle-AUC
+// measurement before any score-side conversation.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

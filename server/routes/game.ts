@@ -545,7 +545,21 @@ router.post('/api/run-scene', aiLimiter, validate(RunSceneBodySchema), reserveSi
     return;
   }
   try {
-    const result = await orchestrator.runFullScene(locationIds, roundsPerRoom ?? 3);
+    // TASK 1 (ai-budget): same coordinator-safe deadline pattern as /api/turn
+    // and /api/run-room above — this is the worst engine-internal fan-out in
+    // the file (see RUN_SCENE_BUDGET's comment), so it gets the largest
+    // timeout of the three, still finite.
+    const operation = orchestrator.runFullScene(locationIds, roundsPerRoom ?? 3);
+    const raced = await withDeadline(operation, RUN_SCENE_BUDGET.timeoutMs);
+    if (raced.timedOut) {
+      res.status(503).json({
+        error: 'This scene simulation is taking longer than expected and was stopped to protect the server. Try again with fewer rooms or rounds.',
+        code: 'AI_BUDGET_DEADLINE_EXCEEDED',
+      });
+      await operation.catch(() => {});
+      return;
+    }
+    const result = raced.value;
     // Fix C: surface Tier-1 canon drops accumulated across every room/round
     // this scene ran — additive, only present when nonzero.
     const droppedCommits = orchestrator.consumeDroppedCommits();
@@ -766,7 +780,26 @@ router.post('/api/simulate-to-fountain', aiLimiter, validate(SimulateToFountainB
   const turns = typeof maxTurns === 'number' ? Math.min(maxTurns, 10) : 5;
 
   if (runLocationId) {
-    await simOrchestrator.runRoomSimulation(String(runLocationId), turns);
+    // TASK 1 (ai-budget): this route holds no SessionCommandCoordinator
+    // command (simStage is a request-local ':memory:' Stage, not a session's
+    // shared one), but it DOES own simStage's lifecycle via the `finally {
+    // simStage.close() }` below — so, same as /api/turn, `operation` is
+    // always fully awaited (even after an early deadline response) rather
+    // than abandoned: abandoning it here would risk the still-running
+    // simulation touching simStage after this route's `finally` has already
+    // closed it, which better-sqlite3 would surface as a background unhandled
+    // rejection (logged, not fatal, per server.ts's crash-safety net — but
+    // avoidable, so avoided). Only the HTTP response is early.
+    const operation = simOrchestrator.runRoomSimulation(String(runLocationId), turns);
+    const raced = await withDeadline(operation, SIMULATE_TO_FOUNTAIN_BUDGET.timeoutMs);
+    if (raced.timedOut) {
+      res.status(503).json({
+        error: 'This simulation is taking longer than expected and was stopped to protect the server. Try again with fewer turns.',
+        code: 'AI_BUDGET_DEADLINE_EXCEEDED',
+      });
+      await operation.catch(() => {});
+      return;
+    }
   }
 
   const log = simStage.getFullLedger();

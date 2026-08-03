@@ -20,6 +20,20 @@
 //     rather than assert CONTRADICTED for merely-episodic structure.
 //   - Empty or single-scene input -> UNKNOWN (nothing to entail or
 //     contradict; abstain).
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test. Order-sensitive
+// BY DESIGN: `causeSceneIndex` must point BACKWARD in the sequence or the
+// link is flagged broken (`causedByPriorScene`); this is a scene-ORDER
+// integrity check, not a content check — same family as temporal-
+// consistency.ts and disclosure-ledger.ts. Blocked on the same missing
+// piece as the rest of this cluster: no extractor produces CausalScene[]
+// (a per-scene cause-declaration) from raw fountain text or
+// ScreenplaySceneRecord[] anywhere in this codebase. What would unblock it:
+// a causal-link extractor — plausibly derivable from the "because/so/
+// therefore" connective detection scene-value-shift.ts's cool-but-wrong
+// check already does on a per-scene basis, generalized to link ACROSS
+// scenes rather than just flag their absence within one.
 
 import type { SupportState } from '../proof/surfacing.ts';
 

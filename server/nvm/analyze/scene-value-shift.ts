@@ -20,6 +20,22 @@
 //
 // NEVER-PADDED: conservative thresholds, abstain on tiny input (<6 scenes,
 // matching EMOTIONAL_ARC_MIN_SCENES's precedent for position-aware signals).
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE
+// Zero importers anywhere in the repo except its own test. Takes raw
+// fountain text directly (`detectSceneValueShift(fountain)`) — no missing
+// extractor. CONFIRMED order-INVARIANT by probe (14-scene fixture, 15
+// seeded shuffles): `shiftRatio` identical in all 15, as expected — each
+// scene's opening-vs-closing valence reads only that scene's own text, and
+// the aggregate is a simple count over an order-independent per-scene
+// property. Despite that, it's a real per-scene craft signal (does the
+// scene turn) with low apparent false-positive surface (conservative
+// thresholds, abstains under 6 scenes) — a plausible INTEGRATE NOW
+// candidate on its own diagnostic merits, just not evaluated for
+// adversarial false-positive behavior this audit (the one thing that
+// turned out to matter most for temporal-consistency.ts). Left at KEEP AS
+// REFERENCE rather than wired, for the same reason as its neighbors below:
+// untested against realistic scripts beyond its own synthetic fixtures.
 
 export interface SceneValueShiftEntry {
   sceneIndex: number;

@@ -1,3 +1,4 @@
+// INTENTIONALLY DORMANT (2026-08-03 audit): targets server/planning/**, which is deliberately quarantined (tsconfig excludes it, CI's console-grep excludes it) — do not port or wire this into TEST_ROOTS; its absence from the run is by design, not an accident.
 // ── APDL Tests ───────────────────────────────────────────────────────────────
 // Comprehensive test suite for the Affective Planning Domain Language system.
 

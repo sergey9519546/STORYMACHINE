@@ -25,6 +25,62 @@ import { locateIssues } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
 import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
+import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
+import { sanitizeExternalError } from '../lib/safe-error.ts';
+
+// ── AI provider fan-out budgets (2026-08-03 audit, Task 1) ─────────────────
+// See server/lib/ai-budget.ts's header for the full design. Every route
+// below calling withAiBudget holds no SessionCommandCoordinator command
+// (all are asyncHandler, not withSessionCommand — verified against this
+// file), so the abandon-on-timeout withAiBudget() primitive is safe to use
+// directly everywhere in this file (unlike game.ts's coordinator-tracked
+// /api/turn/run-room/run-scene, which need the withDeadline() pattern
+// instead — see that file's comments).
+//
+// world-build/refine-dialogue/analyze-tension/clean-action/character-profile:
+// one direct generateContent call each, already at 30s per-attempt timeout.
+const SIMPLE_GENERATION_BUDGET: AiBudgetLimits = {
+  label: 'scriptide-simple-generation',
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_SIMPLE_MAX_ATTEMPTS', 1),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_SIMPLE_TIMEOUT_MS', 45_000),
+};
+
+// /api/scriptide/complete: inline copilot completion stream. Previously had
+// NO timeout at all when the active provider supports streaming
+// (generateContentStream's opts type carries no timeoutMs — see
+// server/engine/ai.ts) — a hung stream could hold the SSE connection open
+// indefinitely. This is a genuinely new bound, not a tightened existing one.
+const COMPLETE_BUDGET: AiBudgetLimits = {
+  label: 'scriptide-complete',
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_COMPLETE_MAX_ATTEMPTS', 1),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_COMPLETE_TIMEOUT_MS', 30_000),
+};
+
+// /api/analyze-script: one analysis call (45s) then image+audio generation
+// in parallel (25s/20s) — 3 logical AI operations.
+const ANALYZE_SCRIPT_BUDGET: AiBudgetLimits = {
+  label: 'analyze-script',
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_ANALYZE_SCRIPT_MAX_ATTEMPTS', 3),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_ANALYZE_SCRIPT_TIMEOUT_MS', 90_000),
+};
+
+// /api/scriptide/fix and /api/scriptide/doctor/deep reach the LLM through
+// fixAndVerify()/runScriptDoctor() (server/nvm/analyze/**), which has no
+// injectable seam from this file — same limitation as game.ts's engine-fan-out
+// routes (see server/lib/ai-budget.ts's header). maxAttempts is therefore
+// DOCUMENTED/informational; only the deadline is actually enforced.
+const FIX_BUDGET: AiBudgetLimits = {
+  label: 'scriptide-fix',
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_FIX_MAX_ATTEMPTS', 1),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_FIX_TIMEOUT_MS', 45_000),
+};
+
+const DOCTOR_DEEP_BUDGET: AiBudgetLimits = {
+  label: 'scriptide-doctor-deep',
+  // Up to ~10 LLM calls, one per scene (route/module comment above).
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_DOCTOR_DEEP_MAX_ATTEMPTS', 10),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_DOCTOR_DEEP_TIMEOUT_MS', 120_000),
+};
 
 /** The core keeps health/grade sentinel fields for internal compatibility, but
  * a browser response must never serialize those values as if they were an
@@ -284,7 +340,10 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
     try {
       converted = fdxToFountain(fdx);
     } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
+      // TASK 2 (safe-error): fdxToFountain's parse-error message describes
+      // caller-supplied malformed XML — sanitized anyway as defense-in-depth
+      // per this module's blanket "every response/logger sink" mandate.
+      res.status(400).json({ error: sanitizeExternalError(err).message });
       return;
     }
     if (converted.fountain.trim() === '') {
@@ -371,7 +430,7 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
     try {
       converted = fdxToFountain(fdx);
     } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
+      res.status(400).json({ error: sanitizeExternalError(err).message });
       return;
     }
     if (converted.fountain.trim() === '') {
@@ -391,7 +450,26 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
 
   // Dynamic import — same lazy-load convention as /doctor above.
   const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-  const report = await runScriptDoctor(fountain, undefined, { deepRead: true });
+  // TASK 1 (ai-budget): deep read fans out up to ~10 LLM calls inside
+  // runScriptDoctor (server/nvm/analyze/**, no injectable seam from this
+  // file — see DOCTOR_DEEP_BUDGET's comment above), so only the wall-clock
+  // deadline below is actually enforced; withAiBudget's attempts dimension
+  // is documentation for a future instrumentation point, not a live ceiling
+  // here. Safe to use the abandon-on-timeout form: this route is
+  // asyncHandler, not withSessionCommand — no coordinator tracks it.
+  let report: ScriptDoctorReport;
+  try {
+    report = await withAiBudget(DOCTOR_DEEP_BUDGET, () => runScriptDoctor(fountain, undefined, { deepRead: true }));
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.status(503).json({
+        error: 'Deep read took longer than expected and was stopped to protect the server. Try a quick read, or try again.',
+        code: err.code,
+      });
+      return;
+    }
+    throw err;
+  }
 
   // Root-cause clustering, attached here for the exact same reason /doctor
   // attaches it at the route rather than inside doctor.ts — see that route's
@@ -484,7 +562,7 @@ router.post(
     try {
       converted = await pdfToFountain(new Uint8Array(body));
     } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
+      res.status(400).json({ error: sanitizeExternalError(err).message });
       return;
     }
     if (converted.fountain.trim() === '') {
@@ -598,8 +676,22 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
   // runScriptDoctor, so routes that never call it don't pay the cost at
   // startup.
   const { fixAndVerify } = await import('../nvm/analyze/fix.ts');
-  const result = await fixAndVerify(fountain, span, issues);
-  res.json(result);
+  // TASK 1 (ai-budget): fixAndVerify's one generation call has no injectable
+  // seam from this file (server/nvm/analyze/fix.ts) — same documented-only
+  // attempts caveat as DOCTOR_DEEP_BUDGET above; the deadline is what's real.
+  try {
+    const result = await withAiBudget(FIX_BUDGET, () => fixAndVerify(fountain, span, issues));
+    res.json(result);
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.status(503).json({
+        error: 'This fix took longer than expected and was stopped to protect the server. Try again.',
+        code: err.code,
+      });
+      return;
+    }
+    throw err;
+  }
 }));
 
 // ── Keyless guard for the seven generation-only ScriptIDE routes ───────────
@@ -712,36 +804,48 @@ router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
 
     const { generateContentStream, modelForTask: mft } = await import('../engine/ai.ts');
 
-    // Stream tokens via the provider abstraction (testable + metered).
-    // Persona sampling knobs override the route defaults when present.
-    const stream = await generateContentStream({
-      model: mft('GHOST_TEXT'),
-      contents: prompt,
-      config: {
-        maxOutputTokens: persona?.maxOutputTokens ?? 256,
-        temperature: persona?.temperature ?? 0.85,
-      },
-    }, { label: 'scriptide-complete' });
+    // TASK 1 (ai-budget): generateContentStream() has NO timeout of its own
+    // when the active provider supports streaming (see COMPLETE_BUDGET's
+    // comment above) — a hung stream could hold this SSE connection open
+    // indefinitely. withAiBudget's abandon-on-timeout deadline is safe here:
+    // this route holds no SessionCommandCoordinator command, and the
+    // existing `disconnected`/`ended` guards on emitSSE/ensureEnded already
+    // make any late writes from an abandoned, still-running stream a no-op.
+    await withAiBudget(COMPLETE_BUDGET, async () => {
+      // Stream tokens via the provider abstraction (testable + metered).
+      // Persona sampling knobs override the route defaults when present.
+      const stream = await generateContentStream({
+        model: mft('GHOST_TEXT'),
+        contents: prompt,
+        config: {
+          maxOutputTokens: persona?.maxOutputTokens ?? 256,
+          temperature: persona?.temperature ?? 0.85,
+        },
+      }, { label: 'scriptide-complete' });
 
-    let hasTokens = false;
-    for await (const chunk of stream) {
-      if (disconnected) break;
-      const token = chunk.text ?? '';
-      if (token) {
-        hasTokens = true;
-        emitSSE({ type: 'token', token });
+      let hasTokens = false;
+      for await (const chunk of stream) {
+        if (disconnected) break;
+        const token = chunk.text ?? '';
+        if (token) {
+          hasTokens = true;
+          emitSSE({ type: 'token', token });
+        }
       }
-    }
 
-    if (!hasTokens) emitSSE({ type: 'token', token: '' });
-    emitSSE({ type: 'done' });
+      if (!hasTokens) emitSSE({ type: 'token', token: '' });
+      emitSSE({ type: 'done' });
+    });
   } catch (err) {
-    // SECURITY (M2/F2): never forward raw error text to the browser — it can
-    // leak API keys / internal paths / upstream detail. Emit a fixed category
-    // and log the real detail server-side only. Mirrors the pattern in
-    // server/routes/config.ts's /api/ai-config/test handler.
-    logger.error('sse-error', { route: 'scriptide-complete', detail: (err as Error).message });
-    emitSSE({ type: 'error', message: 'internal_error' });
+    if (isAiBudgetExceededError(err)) {
+      emitSSE({ type: 'error', message: 'ai_budget_exceeded' });
+    } else {
+      // SECURITY (M2/F2): never forward raw error text to the browser — it can
+      // leak API keys / internal paths / upstream detail. Emit a fixed category
+      // and log the SANITIZED detail server-side only (TASK 2, safe-error).
+      logger.error('sse-error', { route: 'scriptide-complete', ...sanitizeExternalError(err) });
+      emitSSE({ type: 'error', message: 'internal_error' });
+    }
   } finally {
     ensureEnded();
   }
@@ -825,17 +929,25 @@ router.post('/api/scriptide/world-build', aiLimiter, validate(WorldBuildBodySche
     const b = s ? buildStoryBibleSummary(s.stage) : '';
     return b ? `\n${b}\n` : '';
   })();
-  const response = await generateContent({
-    model: modelForTask('WORLDBUILD'),
-    contents: getPrompt('scriptide-worldbuild', {
-      contextBlock,
-      bibleBlock,
-      profilesBlock: wbProfiles,
-      beat: sanitizeForPrompt(beat, 8000),
-      styleGenreBlock: sessionStyleGenreBlock(req),
-    }),
-  }, { label: 'world-build', timeoutMs: 30_000 });
-  res.json({ result: response.text ?? '' });
+  try {
+    const response = await withAiBudget(SIMPLE_GENERATION_BUDGET, () => generateContent({
+      model: modelForTask('WORLDBUILD'),
+      contents: getPrompt('scriptide-worldbuild', {
+        contextBlock,
+        bibleBlock,
+        profilesBlock: wbProfiles,
+        beat: sanitizeForPrompt(beat, 8000),
+        styleGenreBlock: sessionStyleGenreBlock(req),
+      }),
+    }, { label: 'world-build', timeoutMs: 30_000 }));
+    res.json({ result: response.text ?? '' });
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.json({ result: '', usedLLM: false, note: 'This took longer than expected and was stopped to protect the server. Try again.' });
+      return;
+    }
+    throw err;
+  }
 }));
 
 router.post('/api/scriptide/refine-dialogue', aiLimiter, validate(RefineDialogueBodySchema), asyncHandler(async (req, res) => {
@@ -872,17 +984,25 @@ router.post('/api/scriptide/refine-dialogue', aiLimiter, validate(RefineDialogue
     const b = s ? buildStoryBibleSummary(s.stage) : '';
     return b ? `\n${b}\n` : '';
   })();
-  const response = await generateContent({
-    model: modelForTask('DIALOGUE'),
-    contents: getPrompt('scriptide-dialogue', {
-      contextBlock: dlgContextBlock,
-      bibleBlock: dlgBibleBlock,
-      dialogue: sanitizeForPrompt(dialogue, 8000),
-      profiles: JSON.stringify(profiles),
-      styleGenreBlock: sessionStyleGenreBlock(req),
-    }),
-  }, { label: 'refine-dialogue', timeoutMs: 30_000 });
-  res.json({ result: response.text ?? '' });
+  try {
+    const response = await withAiBudget(SIMPLE_GENERATION_BUDGET, () => generateContent({
+      model: modelForTask('DIALOGUE'),
+      contents: getPrompt('scriptide-dialogue', {
+        contextBlock: dlgContextBlock,
+        bibleBlock: dlgBibleBlock,
+        dialogue: sanitizeForPrompt(dialogue, 8000),
+        profiles: JSON.stringify(profiles),
+        styleGenreBlock: sessionStyleGenreBlock(req),
+      }),
+    }, { label: 'refine-dialogue', timeoutMs: 30_000 }));
+    res.json({ result: response.text ?? '' });
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.json({ result: '', usedLLM: false, note: 'This took longer than expected and was stopped to protect the server. Try again.' });
+      return;
+    }
+    throw err;
+  }
 }));
 
 router.post('/api/scriptide/analyze-tension', aiLimiter, validate(AnalyzeTensionBodySchema), asyncHandler(async (req, res) => {
@@ -898,17 +1018,25 @@ router.post('/api/scriptide/analyze-tension', aiLimiter, validate(AnalyzeTension
     const b = s ? buildStoryBibleSummary(s.stage) : '';
     return b ? `\n${b}\n` : '';
   })();
-  const response = await generateContent({
-    model: modelForTask('ANALYSIS'),
-    contents: getPrompt('scriptide-tension', {
-      contextBlock: tnContextBlock,
-      bibleBlock: tnBibleBlock,
-      profilesBlock: tnProfiles,
-      scene: sanitizeForPrompt(scene, 8000),
-      styleGenreBlock: sessionStyleGenreBlock(req),
-    }),
-  }, { label: 'analyze-tension', timeoutMs: 30_000 });
-  res.json({ result: response.text ?? '' });
+  try {
+    const response = await withAiBudget(SIMPLE_GENERATION_BUDGET, () => generateContent({
+      model: modelForTask('ANALYSIS'),
+      contents: getPrompt('scriptide-tension', {
+        contextBlock: tnContextBlock,
+        bibleBlock: tnBibleBlock,
+        profilesBlock: tnProfiles,
+        scene: sanitizeForPrompt(scene, 8000),
+        styleGenreBlock: sessionStyleGenreBlock(req),
+      }),
+    }, { label: 'analyze-tension', timeoutMs: 30_000 }));
+    res.json({ result: response.text ?? '' });
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.json({ result: '', usedLLM: false, note: 'This took longer than expected and was stopped to protect the server. Try again.' });
+      return;
+    }
+    throw err;
+  }
 }));
 
 router.post('/api/scriptide/clean-action', aiLimiter, validate(CleanActionBodySchema), asyncHandler(async (req, res) => {
@@ -916,14 +1044,22 @@ router.post('/api/scriptide/clean-action', aiLimiter, validate(CleanActionBodySc
   const text = requireString(req.body?.text, 'text');
   // P8: use full composed modifier (synergy override when available) instead of a simple genre hint string.
   const genreHint = sessionStyleGenreBlock(req);
-  const response = await generateContent({
-    model: modelForTask('ACTION'),
-    contents: getPrompt('scriptide-clean-action', {
-      genreHint,
-      text: sanitizeForPrompt(text, 8000),
-    }),
-  }, { label: 'clean-action', timeoutMs: 30_000 });
-  res.json({ result: response.text ?? '' });
+  try {
+    const response = await withAiBudget(SIMPLE_GENERATION_BUDGET, () => generateContent({
+      model: modelForTask('ACTION'),
+      contents: getPrompt('scriptide-clean-action', {
+        genreHint,
+        text: sanitizeForPrompt(text, 8000),
+      }),
+    }, { label: 'clean-action', timeoutMs: 30_000 }));
+    res.json({ result: response.text ?? '' });
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.json({ result: '', usedLLM: false, note: 'This took longer than expected and was stopped to protect the server. Try again.' });
+      return;
+    }
+    throw err;
+  }
 }));
 
 router.post('/api/scriptide/character-profile', aiLimiter, validate(CharacterProfileBodySchema), asyncHandler(async (req, res) => {
@@ -941,18 +1077,26 @@ router.post('/api/scriptide/character-profile', aiLimiter, validate(CharacterPro
     return b ? `\nSTORY CONTEXT (arc and world the character lives in — let it inflect the description):\n${b}\n` : '';
   })();
 
-  const response = await generateContent({
-    model: modelForTask('CHARACTER'),
-    contents: getPrompt('scriptide-character', {
-      bibleBlock: cpBibleBlock,
-      name,
-      ghost,
-      lie,
-      want,
-      need,
-    }),
-  }, { label: 'character-profile', timeoutMs: 30_000 });
-  res.json({ result: response.text ?? '' });
+  try {
+    const response = await withAiBudget(SIMPLE_GENERATION_BUDGET, () => generateContent({
+      model: modelForTask('CHARACTER'),
+      contents: getPrompt('scriptide-character', {
+        bibleBlock: cpBibleBlock,
+        name,
+        ghost,
+        lie,
+        want,
+        need,
+      }),
+    }, { label: 'character-profile', timeoutMs: 30_000 }));
+    res.json({ result: response.text ?? '' });
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.json({ result: '', usedLLM: false, note: 'This took longer than expected and was stopped to protect the server. Try again.' });
+      return;
+    }
+    throw err;
+  }
 }));
 
 // ── Comprehensive script analysis (replaces frontend director.ts AI calls) ──
@@ -1012,64 +1156,97 @@ Ensure throughline commentary addresses all active throughlines listed above.
 ${structure ? `structuralNode must name a specific beat from the ${structure} structure (e.g. "Catalyst", "Midpoint", "Ten — Twist").` : ''}
 ${dirStyle ? `Cinematic composition and commentary must be filtered through the ${dirStyle} style.` : ''}`;
 
-  const analysisResponse = await generateContent({
-    model: modelForTask('ANALYSIS'),
-    contents: prompt,
-    config: {
-      systemInstruction: 'You are the AI Director, a strict narrative dungeon master enforcing psychological and structural rules of screenwriting.',
-      responseMimeType: 'application/json',
-      responseSchema: AnalyzeScriptSchema,
-    },
-  }, { label: 'analyze-script', timeoutMs: 45_000 });
+  // TASK 1 (ai-budget): 3 logical AI operations under one request-level
+  // budget — the analysis call, then image+audio generation in parallel.
+  // consumeAiAttempt() is called directly at each call site below (no
+  // wrapping seam needed: this route makes exactly these 3 calls, no loop),
+  // so the attempts dimension is fully real here, not documentation-only.
+  // withAiBudget's abandon-on-timeout deadline is safe: asyncHandler, no
+  // SessionCommandCoordinator.
+  try {
+    const result = await withAiBudget(ANALYZE_SCRIPT_BUDGET, async () => {
+      consumeAiAttempt();
+      const analysisResponse = await generateContent({
+        model: modelForTask('ANALYSIS'),
+        contents: prompt,
+        config: {
+          systemInstruction: 'You are the AI Director, a strict narrative dungeon master enforcing psychological and structural rules of screenwriting.',
+          responseMimeType: 'application/json',
+          responseSchema: AnalyzeScriptSchema,
+        },
+      }, { label: 'analyze-script', timeoutMs: 45_000 });
 
-  const rawText = analysisResponse.text ?? '{}';
-  const analysisData = safeJsonParse<{ sceneAnalysis: Record<string, unknown>; updatedDirectorState: Record<string, unknown> } | null>(rawText, null);
-  if (!analysisData?.sceneAnalysis) {
-    res.status(500).json({ error: 'Failed to parse AI analysis response.' });
-    return;
+      const rawText = analysisResponse.text ?? '{}';
+      const analysisData = safeJsonParse<{ sceneAnalysis: Record<string, unknown>; updatedDirectorState: Record<string, unknown> } | null>(rawText, null);
+      if (!analysisData?.sceneAnalysis) {
+        return { parseFailed: true as const };
+      }
+
+      // Generate image and audio in parallel, server-side (API key never leaves server)
+      const composition = analysisData.sceneAnalysis.composition as Record<string, string> ?? {};
+      const imagePromptText = [
+        'Graphic novel style.',
+        composition.lighting ? `${composition.lighting} lighting,` : '',
+        composition.colorPalette ? `${composition.colorPalette} color palette.` : '',
+        composition.cameraAngle ?? '',
+        composition.shotType ?? '',
+        visualAnchor,
+        typeof analysisData.sceneAnalysis.imagePrompt === 'string' ? analysisData.sceneAnalysis.imagePrompt : '',
+      ].filter(Boolean).join(' ');
+
+      const audioText = typeof analysisData.sceneAnalysis.audioDialogue === 'string'
+        ? analysisData.sceneAnalysis.audioDialogue : '';
+
+      consumeAiAttempt();
+      consumeAiAttempt();
+      const [imageUrl, audioResult] = await Promise.all([
+        getImageProvider().generate(imagePromptText).catch((e: Error) => {
+          logger.warn('image_generation_failed', { ...sanitizeExternalError(e) });
+          return undefined;
+        }),
+        getTTSProvider().speak(audioText).catch((e: Error) => {
+          logger.warn('tts_generation_failed', { ...sanitizeExternalError(e) });
+          return undefined;
+        }),
+      ]);
+      const audioUrl = audioResult?.dataUrl;
+
+      // ── 5-Evaluator scoring flags ──
+      const scores = (analysisData.sceneAnalysis.commentary as Record<string, unknown> | undefined)?.evaluatorScores as Record<string, number> | undefined;
+      const evaluatorWarnings: string[] = [];
+      if (scores) {
+        if ((scores.audience ?? 1) < 0.4) evaluatorWarnings.push('LOW_AUDIENCE_SCORE: Scene lacks emotional engagement for the audience.');
+        if ((scores.ego ?? 0) > 0.8)      evaluatorWarnings.push('EGO_SPIKE: Character behaviour is inconsistent with their established psychological profile.');
+        if ((scores.storymind ?? 1) < 0.3) evaluatorWarnings.push('STORYMIND_ALERT: Scene is drifting from the core dramatic argument.');
+      }
+
+      return {
+        parseFailed: false as const,
+        sceneAnalysis: { ...analysisData.sceneAnalysis, imageUrl, audioUrl },
+        updatedDirectorState: analysisData.updatedDirectorState,
+        evaluatorWarnings,
+      };
+    });
+
+    if (result.parseFailed) {
+      res.status(500).json({ error: 'Failed to parse AI analysis response.' });
+      return;
+    }
+    res.json({
+      sceneAnalysis: result.sceneAnalysis,
+      updatedDirectorState: result.updatedDirectorState,
+      evaluatorWarnings: result.evaluatorWarnings,
+    });
+  } catch (err) {
+    if (isAiBudgetExceededError(err)) {
+      res.status(503).json({
+        error: 'This analysis took longer than expected and was stopped to protect the server. Try again.',
+        code: err.code,
+      });
+      return;
+    }
+    throw err;
   }
-
-  // Generate image and audio in parallel, server-side (API key never leaves server)
-  const composition = analysisData.sceneAnalysis.composition as Record<string, string> ?? {};
-  const imagePromptText = [
-    'Graphic novel style.',
-    composition.lighting ? `${composition.lighting} lighting,` : '',
-    composition.colorPalette ? `${composition.colorPalette} color palette.` : '',
-    composition.cameraAngle ?? '',
-    composition.shotType ?? '',
-    visualAnchor,
-    typeof analysisData.sceneAnalysis.imagePrompt === 'string' ? analysisData.sceneAnalysis.imagePrompt : '',
-  ].filter(Boolean).join(' ');
-
-  const audioText = typeof analysisData.sceneAnalysis.audioDialogue === 'string'
-    ? analysisData.sceneAnalysis.audioDialogue : '';
-
-  const [imageUrl, audioResult] = await Promise.all([
-    getImageProvider().generate(imagePromptText).catch((e: Error) => {
-      logger.warn('image_generation_failed', { error: e.message });
-      return undefined;
-    }),
-    getTTSProvider().speak(audioText).catch((e: Error) => {
-      logger.warn('tts_generation_failed', { error: e.message });
-      return undefined;
-    }),
-  ]);
-  const audioUrl = audioResult?.dataUrl;
-
-  // ── 5-Evaluator scoring flags ──
-  const scores = (analysisData.sceneAnalysis.commentary as Record<string, unknown> | undefined)?.evaluatorScores as Record<string, number> | undefined;
-  const evaluatorWarnings: string[] = [];
-  if (scores) {
-    if ((scores.audience ?? 1) < 0.4) evaluatorWarnings.push('LOW_AUDIENCE_SCORE: Scene lacks emotional engagement for the audience.');
-    if ((scores.ego ?? 0) > 0.8)      evaluatorWarnings.push('EGO_SPIKE: Character behaviour is inconsistent with their established psychological profile.');
-    if ((scores.storymind ?? 1) < 0.3) evaluatorWarnings.push('STORYMIND_ALERT: Scene is drifting from the core dramatic argument.');
-  }
-
-  res.json({
-    sceneAnalysis: { ...analysisData.sceneAnalysis, imageUrl, audioUrl },
-    updatedDirectorState: analysisData.updatedDirectorState,
-    evaluatorWarnings,
-  });
 }));
 
 // ── Character memory export / import (P6) ─────────────────────────────────────
@@ -1100,6 +1277,6 @@ router.post('/api/characters/import', gameLimiter, validate(CharactersImportBody
     const result = importCharacter(stage, bundle, targetLocationId);
     res.json({ status: 'imported', ...result });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    res.status(400).json({ error: sanitizeExternalError(err).message });
   }
 }));

@@ -13,6 +13,22 @@
 // DELETE ALL    →  clearGraph()
 //
 // Pure functions only — no I/O, no Neo4j driver, no Math.random.
+//
+// -- Status (2026-08-03 wiring audit) -- KEEP AS REFERENCE
+// Zero importers from server/routes/**/live code (only its own test,
+// tests/core/story-graph-ops.test.ts, and a filed-backlog doc). This is a
+// generic GRAPH-EDITING library (create/match/shortestPath/recommend) over
+// the StoryGraph type also used by story-graph.ts -- which IS wired
+// (imported by doctor.ts, self-describes as "DIAGNOSTIC ONLY... solve the
+// act-swap AUC 0.48 failure and rule-channel AUC 0.076 weakness"). story-
+// graph.ts builds and analyzes its own graph in place without ever calling
+// into this file's create/match/shortestPath primitives -- the two modules
+// share a type, not an implementation. Not itself an order-sensitivity
+// question (it doesn't extract anything from scene sequence; sensitivity
+// would depend entirely on what's fed into it). Nothing urgent to
+// integrate: the wired story-graph.ts already does its own job without this
+// library. Worth a look only if story-graph.ts's own analysis ever needs a
+// real shortest-path/pattern-match query it would otherwise reimplement.
 
 import type { StoryGraph, StoryGraphNode, StoryGraphEdge } from './story-graph.ts';
 

@@ -60,6 +60,16 @@
 // development; only RELATIVE (good > bad) comparisons survive that
 // evolution. See tests/core/discrimination.test.ts for the assertions and
 // the honest per-pair pass/todo ledger.
+//
+// ── Status (2026-08-03 wiring audit) ── NOT DORMANT — test fixture, correct as-is
+// Not reachable from server/routes/** or server.ts, and it should not be —
+// this is CI test-fixture data (paired screenplay text), not a detector.
+// It IS actively consumed: `DISCRIMINATION_PAIRS` is imported by
+// tests/core/discrimination.test.ts (the composite-reviewer-scenario
+// min-gap-guard harness NORTH_STAR/ROADMAP describe), which is a real,
+// load-bearing part of the P1 evidence story. Listed here only because a
+// naive "grep for importers under server/routes/**" pass would flag it as
+// unwired alongside genuinely dead code — it isn't. No action needed.
 
 export type DiscriminationAxis =
   | 'subtext-vs-on-the-nose'

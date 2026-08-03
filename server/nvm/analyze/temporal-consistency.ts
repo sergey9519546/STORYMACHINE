@@ -832,6 +832,35 @@ export function formatTemporalReport(contradictions: TemporalContradiction[]): s
     }
     lines.push('');
   });
-  
+
   return lines.join('\n');
+}
+
+/** Report shape for the doctor's diagnostic surface (types.ts's
+ *  ScriptDoctorReport.temporalConsistency) — the same
+ *  structured-data-plus-convenience-summary shape the rest of the
+ *  diagnostic-field family uses. Wraps auditTemporalConsistency +
+ *  formatTemporalReport; adds no new detection logic of its own. */
+export interface TemporalConsistencyReport {
+  contradictions: TemporalContradiction[];
+  /** True iff no contradictions were found — convenience for a UI that just
+   *  wants a pass/fail read without inspecting the array. */
+  consistent: boolean;
+  /** Human-readable rendering of `contradictions` (formatTemporalReport). */
+  summary: string;
+}
+
+/** Doctor-facing entry point: run the audit and wrap it for direct
+ *  attachment to ScriptDoctorReport. Diagnostic only — the caller must NOT
+ *  fold this into health/verdict (see this file's 2026-08-03 header note
+ *  for what evidence would be needed before that's a defensible change). */
+export function auditTemporalConsistencyReport(
+  scenes: ScreenplaySceneRecord[]
+): TemporalConsistencyReport {
+  const contradictions = auditTemporalConsistency(scenes);
+  return {
+    contradictions,
+    consistent: contradictions.length === 0,
+    summary: formatTemporalReport(contradictions),
+  };
 }

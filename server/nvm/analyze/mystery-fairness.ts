@@ -6,6 +6,18 @@
 // requires, in time, and NOT hidden from them ("fair play" mystery
 // convention)? Deterministic bookkeeping over caller-supplied clue-plant
 // events -- not semantic understanding of what a clue means.
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test. Order-sensitive
+// BY DESIGN: a clue is "late" precisely when its sceneIndex is too close to
+// (or after) `revealSceneIndex` — a position comparison, not a content one.
+// Same missing-extractor gate as the rest of this cluster; the closest
+// existing candidate is fountain-analyzer.ts's live `seededClueIds`/
+// `unresolvedClues` fields, but D6 (DETECTOR_DEFECTS_2026-08-03.md) already
+// documents that pipeline assigns setup/payoff by scan position, not
+// evidence, so it needs the same fix before feeding CluePlantEvent[]
+// meaningfully. What would unblock it: the D6 fix (P1-gated, spec only) or
+// a standalone mystery-specific clue extractor.
 import type { SupportState } from '../proof/surfacing.ts';
 
 /** A single clue-plant event: the clue with id `clueId` is planted in scene

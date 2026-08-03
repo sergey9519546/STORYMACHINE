@@ -4,6 +4,19 @@
 // NEVER-PADDED: an excellence rule that fires on mediocre input is a FAILING rule.
 // Conservative default: flag a signal as present only on clear, high-confidence evidence.
 // Abstain on tiny input.
+//
+// -- Status (2026-08-03 wiring audit) -- KEEP AS REFERENCE
+// Zero importers anywhere in the repo except its own test
+// (tests/core/excellence-signals.test.ts). Takes raw fountain text directly
+// (detectExcellence(fountain)) -- no missing extractor. ORDER-INVARIANT by
+// construction: every signal here (character want/need patterns) is a
+// presence/co-occurrence regex test over the whole text, not a positional
+// or sequential comparison -- not empirically probed this audit, but the
+// implementation gives no reason to expect shuffle-sensitivity the way
+// inflection-tension.ts or temporal-consistency.ts have. A plausible
+// diagnostic candidate on content merits alone, gated the same as its
+// content-only neighbors: no adversarial false-positive pass against real
+// scripts yet.
 
 export interface Signal {
   id: string;

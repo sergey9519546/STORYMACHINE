@@ -10,6 +10,22 @@
 // ordered list of belief events (see epistemic-ledger.ts for the sibling
 // deterministic-substrate discipline this file follows: no LLM, no semantic
 // inference, guarded inputs, UNKNOWN/abstain rather than false positives).
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test. Order-sensitive
+// BY DESIGN: a BeliefMovement is explicitly a fromScene->toScene transition,
+// and `earned` depends on whether the reversal was seeded by something at an
+// EARLIER sceneIndex — the whole point of the module is sequence, not
+// content. Blocked on the same missing piece as assertion-containment.ts
+// above: no extractor exists anywhere in the codebase that produces
+// BeliefEvent[] from raw scene text (unlike disclosure-ledger.ts or
+// assertion-containment.ts, this file does not even ship a heuristic seed —
+// only the typed-input algorithm). What would unblock it: a real
+// belief/stance extractor (character X believes/doubts/learns proposition Y
+// at scene Z) — likely LLM-assisted given how semantic "what does a
+// character believe" is, which would also make this diagnostic-only surface
+// a candidate for the deep-read pipeline (deep-read.ts) rather than the
+// lexicon-only path, unlike its cheaper siblings.
 
 export type BeliefStance = 'believes' | 'doubts' | 'learns';
 

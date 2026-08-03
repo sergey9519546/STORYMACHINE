@@ -22,6 +22,27 @@
  * The data structures and `detectContradictions` algorithm below are the
  * substrate that per-scene extraction feeds; the extraction adapter is wired
  * separately (findings layer). No LLM, no I/O — pure and deterministic.
+ *
+ * ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+ * Zero importers anywhere in the repo except its own test (266 lines of
+ * tests, matching OWNE's test_truth.py case-for-case per this header's own
+ * claim). The most complete module in this cluster and the closest sibling
+ * to temporal-consistency.ts: both use Allen-style interval overlap for
+ * contradiction detection, both are order/position-aware by construction
+ * (a TruthFact's validity interval + the scene-index-as-`step` population
+ * note above), and both are genuinely promising P1-shaped signals IF fed
+ * real data. Unlike temporal-consistency.ts, this file's own header already
+ * says outright that "the extraction adapter is wired separately" and
+ * apparently never was — this class's `detectContradictions` has had no
+ * empirical adversarial testing against realistic scene sequences the way
+ * temporal-consistency.ts's FLASHBACK branch just got (that fix started
+ * from a bug the existing unit tests did not catch either, so the same risk
+ * should be assumed here until checked). What would unblock it: (1) the
+ * per-scene fact extractor this header already calls for (highest-leverage
+ * single build in this whole cluster, since TruthLedger's class-based API
+ * — add/expire/query/retcon/promote — is the richest target); (2) the same
+ * adversarial-fixture pass temporal-consistency.ts received before either
+ * diagnostic wiring or any P1 candidacy discussion.
  */
 
 /** All 13 fact statuses (OWNE's FACT_STATUSES; the docstring says 14, the set is 13). */

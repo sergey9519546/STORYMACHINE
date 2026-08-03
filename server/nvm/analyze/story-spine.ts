@@ -19,6 +19,20 @@
 // document serves one throughline), not about ordering.
 //
 // Deterministic, no LLM.
+//
+// -- Status (2026-08-03 wiring audit) -- KEEP AS REFERENCE
+// Zero importers anywhere in the repo except its own test. Takes raw
+// fountain text directly (detectStorySpine(fountain)) -- no missing
+// extractor. WEAK, INCIDENTAL order-sensitivity confirmed by probe
+// (12-scene fixture, 15 seeded shuffles): spineCoverage changed in 3/15
+// shuffles (1.0 -> 0.917), protagonist/hasCoherentSpine never changed. This
+// module's own header explicitly says it is designed to measure SCOPE, not
+// order -- the "opening 25%" slice for spine-token mining is the only
+// position-dependent piece, so a shuffle only occasionally moves a token
+// across that boundary. Consistent with intent, not a defect. A real
+// diagnostic candidate on its own (protagonist-coverage read is legible to
+// a screenwriter), gated the same way as its neighbors: no adversarial
+// false-positive pass against real scripts yet.
 
 export const STORY_SPINE_MIN_SCENES = 8;
 

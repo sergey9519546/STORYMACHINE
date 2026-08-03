@@ -63,7 +63,20 @@ because no weak human-written comparison class exists yet.
    scene-count scarcity. Whether scene count is a real craft signal or a
    length proxy is **not yet determined** — it has only been measured on
    artificial scene-drop degradation, never on natural strong-vs-weak human
-   writing. That question is exactly what P1 is for, and P1 has not started.
+   writing. That question is exactly what P1 is for.
+
+   > **Status update (2026-08-03).** This section originally ended "and P1
+   > has not started." That is no longer true: P1 built a 761-script corpus
+   > with a hash-locked test partition and measured discrimination on it
+   > (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`). The
+   > dialogue channel now clears the gate at test AUC 0.990; the structural
+   > channels do not (SCENE_SHUFFLE 0.734, MIDPOINT_DROP 0.766,
+   > CLIMAX_RELOCATE 0.523 against a >= 0.80 gate). **The paragraph's actual
+   > point still stands and is now measured rather than suspected:** the
+   > scene-count question remains open, because those figures come from
+   > mechanical degradations of produced screenplays, not from natural
+   > strong-vs-weak human writing with blind reader labels — which is still
+   > P1's unmet exit gate.
 
 ## What this means for showing the report to writers (P0)
 

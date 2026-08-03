@@ -46,6 +46,18 @@
 //     claim).
 //   - nothing applicable at all (zero checks) → UNKNOWN — there is
 //     nothing for the aggregate to entail or contradict.
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE (contingent)
+// Zero importers anywhere in the repo except its own test. This is a pure
+// ROLLUP over assertion-containment.ts / typed-promises.ts / mystery-
+// fairness.ts / well-made-surprise.ts's outputs, by its own header's design
+// — it has no order-sensitivity or content-extraction question of its own
+// to answer; it inherits whatever its four inputs eventually have. Not
+// independently unblockable: it becomes wireable only once at least one of
+// its four sibling detectors has a real extractor feeding it (see each
+// sibling's own status note for its specific gate), and fully wireable only
+// once all four do. Lowest priority in this cluster for that reason — build
+// the extractor(s) first, this falls out for free afterward.
 
 import type { SupportState } from '../proof/surfacing.ts';
 

@@ -39,3 +39,11 @@ corpus-crosswalk*
 # Captured test-run output (2.5MB of console noise, regenerable via `npm test`).
 # Was tracked by accident; it also echoed corpus filenames into git.
 test_results.txt
+
+# Captured `tsc --noEmit` output from the quarantined v5.0 kernel era (2026-07-23).
+# Both test files it cites errors for (server/engine/ai-provider.test.ts,
+# server/engine/ai-provider-integration.test.ts) no longer exist, and
+# `npm run lint` is currently clean (0 errors) -- this file was tracked by
+# accident and is actively misleading if read as current lint output.
+# 2026-08-03 hygiene audit.
+tsc_errors.txt

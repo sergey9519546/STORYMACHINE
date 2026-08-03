@@ -1,5 +1,18 @@
 // STORY GOD SG2 — Genre-obligation engine (excellence/coverage detector).
 //
+// -- Status (2026-08-03 wiring audit) -- KEEP AS REFERENCE
+// Zero importers anywhere in the repo except its own test
+// (genre-obligation.test.ts). Takes raw fountain text + a genre string
+// directly (assessGenreObligations(fountain, genre)) -- no missing
+// extractor for the TEXT side, but doctor.ts's aggregateReport does not
+// currently have a `genre` value in scope to pass (StoryContext's `genre`
+// field lives on the revision pipeline's input, not on the FountainAnalysis
+// object aggregateReport receives) -- wiring this needs a small threading
+// change, not a new extractor. CONFIRMED order-INVARIANT by reading
+// assessGenreObligations: an obligation is "met" iff `evidenceScenes.length
+// > 0` -- presence anywhere in the script, never a positional check -- so
+// this is a pure content signal, not an order-sensitivity candidate.
+//
 // Every genre owes its audience certain obligatory beats — a thriller that
 // never confronts its threat, a mystery that never reveals its answer, is
 // not doing its job regardless of prose quality elsewhere. This module

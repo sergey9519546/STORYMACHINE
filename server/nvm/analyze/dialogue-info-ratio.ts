@@ -9,6 +9,19 @@
 // heuristic tier 'pattern_to_watch' (not actionable yet, marked for future
 // refinement). Measured separation between exposition-heavy and natural dialogue
 // is the gate for promotion to a real check.
+//
+// -- Status (2026-08-03 wiring audit) -- KEEP AS REFERENCE
+// Zero importers anywhere in the repo except its own test
+// (tests/core/dialogue-info-ratio.test.ts). Takes ordered scene texts
+// directly (analyzeDialogueInfoRatio(sceneTexts, genre?)) -- no missing
+// extractor. ORDER-SENSITIVE by construction: "new relative to PRIOR
+// dialogue" is a running/cumulative computation over sequence, the same
+// shape as scene-economy.ts's first-occurrence tracking (not empirically
+// probed this audit). Not wired because the module's OWN header already
+// says it isn't ready: "DIAGNOSTIC ONLY... heuristic tier 'pattern_to_watch'
+// (not actionable yet)... measured separation... is the gate for promotion
+// to a real check." Respecting that self-assessment rather than overriding
+// it -- what would unblock it is exactly what the header already asks for.
 
 // Compact inline stopword set — common words that don't count as content/info.
 const STOPWORDS = new Set([

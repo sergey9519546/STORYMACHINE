@@ -1,6 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, freshSessionId, type TestServer } from './helpers.ts';
+import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
 
 function legacySnapshot(sessionId: string, storyTone = 'paranoid') {
   return {
@@ -415,6 +416,59 @@ describe('routes/config — ADMIN_TOKEN gate for AI config writes', async () => 
       assert.equal(typeof body.error, 'string');
     } finally {
       delete process.env.ADMIN_TOKEN;
+    }
+  });
+});
+
+// TASK 2 (safe-error, 2026-08-03 audit) — regression test for the exact
+// incident server/lib/safe-error.ts centralizes the fix for: POST
+// /api/ai-config/test used to compute a redacted copy of an upstream error
+// for the HTTP response, then log the RAW error two lines below, so a
+// provider error echoing a bearer token or sk- key wrote it verbatim into the
+// logs even though the client-facing response was already safe. This proves
+// BOTH sinks — the HTTP response body AND the structured log line — are
+// clean, end-to-end through the real route, not just the sanitizer function
+// in isolation (see tests/routes/safe-error.test.ts for the unit-level
+// fixture sweep).
+describe('routes/config — POST /api/ai-config/test never leaks a secret to either sink', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  it('a provider error echoing a bearer token and an sk- key is redacted in BOTH the HTTP response and the log line', async () => {
+    const SECRET_BEARER = 'sk-live-REALSECRETVALUE9876543210';
+    setLLMProvider({
+      generate: async () => {
+        throw new Error(`upstream rejected Authorization: Bearer ${SECRET_BEARER} (invalid_api_key=${SECRET_BEARER})`);
+      },
+    } as never);
+
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    const captured: string[] = [];
+    process.stderr.write = ((chunk: unknown, ...args: unknown[]) => {
+      captured.push(String(chunk));
+      return (originalWrite as (...a: unknown[]) => boolean)(chunk, ...args);
+    }) as typeof process.stderr.write;
+
+    try {
+      const res = await fetch(`${server.baseUrl}/api/ai-config/test`, { method: 'POST' });
+      assert.equal(res.status, 502);
+      const body = await res.json();
+
+      // Sink 1: the HTTP response.
+      assert.equal(typeof body.error, 'string');
+      assert.doesNotMatch(body.error, new RegExp(SECRET_BEARER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.doesNotMatch(body.error, /Bearer\s+sk-/);
+
+      // Sink 2: the logger. ai_config_test_failed is a logger.warn call
+      // (server/routes/config.ts), which writes to stderr (server/lib/logger.ts).
+      const logLine = captured.find((line) => line.includes('ai_config_test_failed'));
+      assert.ok(logLine, `expected an ai_config_test_failed log line, got: ${captured.join('')}`);
+      assert.ok(!logLine!.includes(SECRET_BEARER), `secret leaked into the log line: ${logLine}`);
+      assert.doesNotMatch(logLine!, /Bearer\s+sk-/);
+    } finally {
+      process.stderr.write = originalWrite;
+      resetLLMProvider();
     }
   });
 });

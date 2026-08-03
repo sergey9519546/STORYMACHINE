@@ -6,6 +6,32 @@
 // consistency checking — each interval represents an event or scene span.
 // Path-consistency style detection: O(n³) deterministic propagation over the
 // relation constraint set.
+//
+// -- Status (2026-08-03 wiring audit) -- KEEP AS REFERENCE
+// Zero importers anywhere in the repo except its own test
+// (tests/core/temporal.test.ts -- NOT co-located; do not confuse with
+// temporal-consistency.test.ts). An EARLIER, SIMPLER, INDEPENDENTLY-BUILT
+// sibling of temporal-consistency.ts (different program tag -- "RECOVER-02
+// / M4" here vs "TRACE Section 13" there -- consistent with two sessions
+// building overlapping Allen-algebra detectors without cross-awareness, the
+// exact hazard CLAUDE.md's "parallel sessions" gotcha warns about). NOT a
+// duplicate to delete: `relate(a, b)` derives a qualitative relation from
+// two CONCRETE numeric [start, end] intervals, a capability temporal-
+// consistency.ts does not have -- that file's TemporalInterval carries
+// optional start/end fields that are DEFINED but NEVER POPULATED (its own
+// age-mention extraction builds an interval with no start/end and no
+// constraint ever references it -- dead code within a dead file). `temporal
+// .ts`'s composeConsistent is, however, a strictly WEAKER contradiction
+// detector than temporal-consistency.ts's: it only follows explicitly
+// declared constraint edges via DFS cycle-detection, with no composition-
+// table transitivity, so it cannot catch a contradiction that isn't a
+// literal cycle in the input graph. What would unblock either use: a real
+// extractor converting screenplay time markers ("age 25" vs "age 40",
+// explicit years/dates) into concrete numeric timeline positions, which
+// would let temporal-consistency.ts's currently-inert age intervals feed
+// `relate()` for genuine numeric-interval reasoning instead of qualitative-
+// only. Until then this stays a tested, self-contained utility with no
+// consumer.
 
 // The 13 Allen basic interval relations.
 export type AllenRelation =

@@ -34,6 +34,7 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '../..');
 const securityYml = path.join(root, '.github/workflows/security.yml');
 const ciYml = path.join(root, '.github/workflows/ci.yml');
+const releaseYml = path.join(root, '.github/workflows/release.yml');
 
 /**
  * Extract the YAML block for a named step: everything from `- name: <name>`
@@ -59,6 +60,7 @@ function stepBlock(source: string, stepName: string): string | null {
 describe('CI gate integrity — blocking gates must stay blocking', () => {
   const security = fs.readFileSync(securityYml, 'utf8');
   const ci = fs.readFileSync(ciYml, 'utf8');
+  const release = fs.readFileSync(releaseYml, 'utf8');
 
   it('the Dependency review step still exists', () => {
     assert.ok(
@@ -104,12 +106,56 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
   it('no workflow disables a gate by neutering the whole job', () => {
     // `if: false` on a job silently skips every step inside it, achieving the
     // same result as continue-on-error without touching any step.
-    for (const [file, src] of [['security.yml', security], ['ci.yml', ci]] as const) {
+    for (const [file, src] of [['security.yml', security], ['ci.yml', ci], ['release.yml', release]] as const) {
       assert.doesNotMatch(
         src,
         /^\s*if\s*:\s*false\s*$/m,
         `${file} must not contain a hardcoded \`if: false\`, which disables a job wholesale`,
       );
     }
+  });
+
+  // release.yml deliberately duplicates four of ci.yml's gates (its own
+  // header comment: "Type check, no-console lint, keyless test suite,
+  // build") rather than depending on a separate ci.yml run for the same
+  // ref/SHA — workflow_dispatch has no associated PR/push CI run, and a
+  // tag-push CI run is a separate, not-guaranteed-synchronous workflow run.
+  // Because it duplicates rather than reuses, it can independently rot: a
+  // bypass hunk landed here alone (nobody watching ci.yml would notice) would
+  // let a tag push publish a broken image while ci.yml stayed fully intact.
+  // Same #236-241 shape as security.yml's Dependency review step, just in a
+  // workflow the original test never looked at.
+  it('release.yml keeps its duplicated gates (Type check / no-console grep / honesty audit / run tests) and none are continue-on-error', () => {
+    for (const name of [
+      'Type check',
+      'Enforce no console.* under server/',
+      'Honesty string audit',
+      'Run tests (keyless — analysis-only posture)',
+    ]) {
+      const block = stepBlock(release, name);
+      assert.ok(block, `release.yml must keep a step named "${name}"`);
+      assert.doesNotMatch(
+        block,
+        /continue-on-error\s*:\s*true/,
+        `release.yml's "${name}" is a hard gate (duplicated from ci.yml) and must not be continue-on-error`,
+      );
+    }
+  });
+
+  it("release.yml's publish job still hard-depends on the test job", () => {
+    // Unlike ci.yml/security.yml (which have no downstream job to gate),
+    // release.yml's four duplicated steps only actually block anything
+    // because `publish: needs: test` makes a failing test job prevent
+    // `publish` from running at all (see release.yml's own comment). Every
+    // check above would be theater if this dependency were quietly dropped
+    // or narrowed — that alone would let a failing/skipped test job publish
+    // an image anyway, with no single step needing to be touched.
+    const publishJob = release.match(/\n {2}publish:\n([\s\S]*?)(?=\n {2}\S|\n*$)/);
+    assert.ok(publishJob, 'release.yml must keep a "publish" job');
+    assert.match(
+      publishJob![1],
+      /^\s*needs\s*:\s*test\s*$/m,
+      "release.yml's publish job must declare `needs: test` — without it, a failing test job cannot block image publication",
+    );
   });
 });

@@ -8,6 +8,28 @@
 //
 // Measured separation: on distinct voices (terse/imperative vs verbose/hedging),
 // delta ~ 0.4–0.6; near-identical dialogue, delta ~ 0.05–0.15. Threshold: 0.15.
+//
+// -- Status (2026-08-03 wiring audit) -- KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test
+// (tests/core/voice-delta.test.ts). CONFIRMED order-INVARIANT (not
+// probed numerically, but true by construction): Burrows's Delta is a
+// z-scored function-word FREQUENCY comparison over each character's pooled
+// dialogue -- it does not matter what order a character's lines appear in,
+// only their aggregate distribution, so this is squarely a content signal,
+// not a candidate for the order-sensitivity question this audit otherwise
+// prioritizes. Real, legible capability (voice-swap risk between two
+// characters) blocked on a genuine extractor gap, not just missing
+// plumbing: `analyzeVoices(dialogueByCharacter: Record<string, string[]>)`
+// needs full per-character dialogue text, but FountainAnalysis (what
+// doctor.ts holds) only exposes `characters: string[]` (names) and each
+// scene's `dialogueHighlights` (top-2 LONGEST lines only, not the
+// character's full dialogue) -- fountain-analyzer.ts's internal
+// `DialogueLine[]` (speaker + text, line ~471) is exactly what's needed but
+// is discarded down to highlights before ScreenplaySceneRecord is built,
+// and is not exported. What would unblock it: widen ScreenplaySceneRecord
+// (or add a dedicated adapter reading fountain-analyzer.ts's internal
+// DialogueLine[] before it's discarded) to expose full per-character
+// dialogue text -- a real, if small, extractor build, not a wiring change.
 
 export interface CharacterDialogue {
   name: string;

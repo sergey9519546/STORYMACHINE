@@ -49,6 +49,7 @@ import { detectBonding } from './bonding-signal.ts';
 import { detectColdOpenPromise } from './cold-open-promise.ts';
 import { detectPatternEstablishment } from './pattern-establishment.ts';
 import { analyzeStoryGraph } from './story-graph.ts';
+import { auditTemporalConsistencyReport } from './temporal-consistency.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import { computeNarrativeMetrics } from './metrics.ts';
@@ -2103,6 +2104,14 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     coldOpenPromise: detectColdOpenPromise(fountain),
     patternEstablishment: detectPatternEstablishment(fountain),
     storyGraph: analysisComplete && analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined,
+    // TRACE §13 temporal-consistency audit (2026-08-03 wiring). Diagnostic
+    // only, same gating as storyGraph/metrics above: a prefix-only or
+    // failed-pass analysis must not present a temporal read as if it
+    // covered the whole draft. See temporal-consistency.ts's header for the
+    // false-positive fix and order-sensitivity finding behind this field.
+    temporalConsistency: analysisComplete && analysis.sceneCount > 0
+      ? auditTemporalConsistencyReport(analysis.records)
+      : undefined,
     ...(analysis.truncatedForAnalysis
       ? { truncatedForAnalysis: true, totalSceneCount: analysis.totalSceneCount }
       : {}),

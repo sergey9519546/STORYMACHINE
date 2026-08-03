@@ -7,6 +7,25 @@
 // access" is deferred; this substrate reports who had access to an object by scene.
 // Open-world: ENTAILED via direct custody transaction; else UNKNOWN. CONTRADICTED
 // reserved for the semantic layer.
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test
+// (tests/core/custody-ledger.test.ts). Order-sensitive BY DESIGN: `byObject`
+// is built scene-by-scene in sequence — "who holds this object" is
+// inherently a running, position-dependent state, not an aggregate. Unlike
+// the epistemic/belief cluster, `buildCustodyLedger` DOES take raw scene
+// text directly (`sceneTexts: string[]`, derivable from fountain via the
+// scenesFromFountain pattern already duplicated across this directory) — the
+// real gap is its second required argument, `objects: readonly string[]`
+// (the tracked-object allowlist), which nothing in this codebase currently
+// produces. A naive "every capitalized noun" extractor would almost
+// certainly be too noisy (same class of risk as disclosure-ledger.ts's
+// REVEAL_CUE over-firing on ordinary prose, found and documented below).
+// What would unblock it: a precision-checked object-of-interest extractor
+// (Chekhov's-gun style — typed-promises.ts's `chekhov_object` PromiseType
+// is the same concept, worth sharing an extractor with) plus false-positive
+// testing on real scene text before this is safe to surface even as a
+// diagnostic.
 
 import type { SupportState } from '../proof/surfacing.ts';
 

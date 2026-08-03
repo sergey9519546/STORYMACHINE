@@ -7,6 +7,30 @@
 // The semantic "which fact" layer stays LLM-gated (deferred); this substrate is
 // deterministic, no LLM. Returns UNKNOWN (not a negative) when no path is found —
 // absence is not a negative fact.
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test
+// (tests/core/epistemic-ledger.test.ts). Order-sensitive BY DESIGN:
+// `presenceByScene: Array<Set<string>>` is indexed by scene, and `canKnow`
+// (the query function) necessarily asks "was there a co-presence path
+// BEFORE this point" — a position question, not a content one. Unlike most
+// of this cluster, the EXTRACTOR here (`buildEpistemicLedger`) is not the
+// blocker: it takes raw scene texts directly and uses the same character-cue
+// regex this directory already trusts elsewhere (cluster.ts, doctor.ts's
+// live import graph). The real gap is that this module exposes a QUERY
+// primitive (`canKnow(ledger, character, fact, sceneIdx)`-shaped), not a
+// whole-script REPORT — there is no "scan the whole script and list
+// knowledge violations" entry point the way disclosure-ledger.ts's
+// assessFairReveal or temporal-consistency.ts's auditTemporalConsistency
+// are. What would unblock it: (1) a `fact` layer to query knowledge OF
+// (this ledger alone answers "who could have been told," not "who knows
+// what" — it needs pairing with a fact/reveal source, plausibly disclosure-
+// ledger.ts's DisclosureEvent once THAT module's cross-scene identity gap
+// is fixed); (2) a report-building wrapper analogous to
+// auditTemporalConsistencyReport that runs canKnow across every
+// character/fact pair and collects violations, which is new aggregation
+// logic, not just a wiring change.
+
 import type { SupportState } from '../proof/surfacing.ts';
 
 const SLUG = /^\s*(?:INT|EXT|INT\.?\/EXT|I\/E|EST)[.\s]/i;

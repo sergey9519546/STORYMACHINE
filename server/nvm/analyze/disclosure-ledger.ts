@@ -12,6 +12,50 @@
 // feed `DisclosureEvent[]`; `buildDisclosureLedger` below is only a light
 // heuristic seed from raw Fountain scene ordering (story time == discourse
 // order, i.e. no flashback/flash-forward detection).
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test (19/19 passing).
+// DIRECTLY RELEVANT to a live, named defect: docs/p1-benchmark/
+// DETECTOR_DEFECTS_2026-08-03.md's D6 records that fountain-analyzer.ts's
+// applyClueLifecycle assigns setup/payoff BY POSITION (`seed = occ[0],
+// payoff = occ[last]`), making payoff-before-setup undetectable by
+// construction (measured: 0 inversions across 26 scripts x 3 order-
+// destroying degradations). `assessFairReveal` below does NOT have that
+// defect: it buckets events by an independently-assigned `kind`
+// (setup/payoff/reveal) and compares `discourseIndex` directly, so a
+// caller-supplied kind based on evidence (not scan position) CAN represent
+// a genuine use-before-establishment case. This is the "better mechanism"
+// question answered with a concrete yes for the core algorithm.
+//
+// BUT (found by probe this audit, not by the existing tests, which only
+// assert `assessFairReveal` doesn't throw on heuristic-seed output — see
+// disclosure-ledger.test.ts's last test): the ONLY extractor,
+// `buildDisclosureLedger`, undermines its own algorithm two ways:
+//   1. factId is `scene-${i}` — unique PER SCENE — so a setup in one scene
+//      and a reveal in a DIFFERENT scene never share a factId and are never
+//      compared. Empirically verified (20-scene fixture, 15 shuffles):
+//      violation count was IDENTICAL (0/15 changed) across every
+//      reordering, i.e. this pipeline is currently order-BLIND in practice
+//      despite assessFairReveal being order-aware in principle — the seed
+//      throws away the cross-scene link the algorithm needs.
+//   2. REVEAL_CUE includes the bare phrase "it was" (`/\b(?:reveal(?:s|ed)?
+//      |twist|turns out|it was)\b/i`), which will match ordinary descriptive
+//      action lines ("It was raining.") that have nothing to do with a
+//      narrative reveal — an unmeasured but plausible high false-positive
+//      source. Given this codebase's own repeated lesson about exactly this
+//      failure mode (see fountain-analyzer.ts's D-series defects and the
+//      "159 minor issues... reads as noise, not signal" line in
+//      DETECTOR_DEFECTS_2026-08-03.md), this seed should not be wired to a
+//      live diagnostic un-measured, even though it cannot touch the score.
+// What would unblock it: a cross-scene clue/fact-identity extractor (same
+// gate as the rest of this cluster — see assertion-containment.ts) feeding
+// `kind` from evidence rather than per-scene keyword presence, THEN
+// corpus-measured precision on REVEAL_CUE/SETUP_CUE before any surfacing.
+// The D6 fix-shape spec in DETECTOR_DEFECTS_2026-08-03.md already describes
+// almost exactly this design ("require the seeding occurrence to carry
+// introduction-shaped language... let the payoff be any later use") — this
+// file is the closest existing implementation of that spec's SHAPE, not
+// (yet) a working instance of it.
 import type { SupportState } from '../proof/surfacing.ts';
 
 export type DisclosureKind = 'setup' | 'payoff' | 'reveal';

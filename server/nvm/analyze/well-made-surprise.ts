@@ -11,6 +11,16 @@
 // This file does not extract surprises from prose -- same substrate
 // discipline as belief-movement.ts: guarded inputs, UNKNOWN/abstain rather
 // than false positives, never-padded excellence scoring.
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test. Order-sensitive
+// BY DESIGN: `inevitable` is defined as "setup existed strictly before the
+// reveal" (setupSceneIndices vs revealSceneIndex) — a sequence claim, not a
+// content one. Same missing-extractor gate as belief-movement.ts (its
+// explicit sibling per this header): no extractor produces SurpriseEvent[]
+// from raw text anywhere in this codebase, and "was the audience misdirected"
+// is a genuinely semantic judgment, making this (like belief-movement.ts) a
+// more plausible deep-read.ts candidate than a lexicon-only one.
 
 import type { SupportState } from '../proof/surfacing.ts';
 

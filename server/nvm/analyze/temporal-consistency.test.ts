@@ -240,15 +240,20 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
       ];
       
       const contradictions = auditTemporalConsistency(scenes);
-      
-      // Scene 2 is flashback (before scene 0)
-      // Scene 2 is also continuous with scene 1 (meets scene 1)
-      // Scene 1 is before scene 0
-      // This creates: scene 2 before scene 0, but also scene 1 before scene 0, and scene 2 meets scene 1
-      // Depending on composition, might detect issue
-      
-      // At minimum, should complete without crashing
-      assert.ok(Array.isArray(contradictions), 'Should return array');
+
+      // Scene 1 is FLASHBACK (before scene 0); scene 2 is CONTINUOUS with
+      // scene 1 (meets scene 1). This is an entirely ordinary screenplay
+      // technique (a courtroom-frames-a-flashback structure), not a craft
+      // error, and should read as consistent -- 2026-08-03 audit: this used
+      // to be asserted only as "returns an array" because the FLASHBACK
+      // branch left the default sequential chain standing through the
+      // flashback scene, which transitively contradicted the flashback
+      // constraint and fired 2 BLOCKER contradictions on exactly this
+      // fixture. Fixed (see temporal-consistency.ts's FLASHBACK branch and
+      // its 2026-08-03 header note) by splicing out the weak default edges
+      // touching the flashback scene, mirroring what CONTINUOUS/MEANWHILE
+      // already did. Now asserts the real invariant instead of hedging.
+      assert.equal(contradictions.length, 0, 'an ordinary flashback-then-continuous structure is not a timeline error');
     });
     
     it('handles CONTINUOUS correctly (no contradiction)', () => {
@@ -278,8 +283,68 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
       // Should compose consistently
       assert.equal(contradictions.length, 0, 'MEANWHILE overlaps should be consistent');
     });
+
+    it('an ordinary single flashback in a longer script does not cascade into contradictions on unrelated scene pairs (regression, 2026-08-03)', () => {
+      // Realistic shape: 10 plain scenes, exactly one FLASHBACK in the
+      // middle, nothing else unusual -- about as common as screenplay
+      // structure gets. Before the FLASHBACK-branch fix (see this file's
+      // 2026-08-03 header note), this fixture produced 10 BLOCKER
+      // contradictions, including between scene pairs with zero
+      // relationship to the flashback (e.g. scene_0/scene_1).
+      const scenes: ScreenplaySceneRecord[] = [
+        scene('INT. HOUSE - DAY', 'Wake up.'),
+        scene('INT. KITCHEN - DAY', 'Breakfast.'),
+        scene('INT. CAR - DAY', 'Drive to work.'),
+        scene('INT. OFFICE - DAY', 'Meeting.'),
+        scene('INT. OFFICE - DAY - FLASHBACK', 'Remembers childhood.'),
+        scene('INT. OFFICE - DAY', 'Back to work.'),
+        scene('INT. BAR - NIGHT', 'Drinks with coworkers.'),
+        scene('EXT. STREET - NIGHT', 'Walks home.'),
+        scene('INT. APARTMENT - NIGHT', 'Reflects.'),
+        scene('INT. BEDROOM - NIGHT', 'Sleeps.'),
+      ];
+
+      const contradictions = auditTemporalConsistency(scenes);
+
+      assert.equal(contradictions.length, 0, 'one ordinary flashback should not manufacture contradictions elsewhere in the script');
+    });
   });
-  
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Order-sensitivity (2026-08-03 audit finding)
+  //
+  // Nearly every other signal in server/nvm/analyze/ is a pure function of
+  // scene CONTENT and is therefore provably invariant under SCENE_SHUFFLE
+  // (see doctor.ts's own comments: rule-channel AUC ~0.076, "with scene
+  // count held constant the doctor cannot detect reordering at all"). This
+  // module's constraint extraction is instead a direct function of scene
+  // ARRAY POSITION (idx) — reordering the SAME scenes can change the
+  // verdict, which is the property the P1 structural gap is missing. This
+  // is a qualitative proof the mechanism CAN separate orderings, not a
+  // measured AUC (see the file header for the broader seeded-shuffle probe
+  // and what would be needed to promote this to a scored signal).
+  // ──────────────────────────────────────────────────────────────────────────
+  describe('order-sensitivity', () => {
+    it('reordering the same three scenes changes the contradiction count', () => {
+      const courtroom = scene('INT. COURTROOM - DAY', 'Trial is underway. Judge presiding.');
+      const flashback = scene('EXT. CRIME SCENE - NIGHT - FLASHBACK', 'The murder happens.');
+      const continuous = scene('INT. COURTROOM - DAY - CONTINUOUS', 'Back in court, immediately.');
+
+      // Discourse order matching how a writer would actually lay this out:
+      // present -> flashback -> back to present. Consistent.
+      const asWritten = auditTemporalConsistency([courtroom, flashback, continuous]);
+      assert.equal(asWritten.length, 0, 'the intended discourse order is a consistent timeline');
+
+      // The SAME three scenes, reordered so the flashback-marked scene
+      // lands at position 0: its "before scene_0" constraint is now
+      // self-referential (scene_0 before scene_0), an explicit conflict.
+      // Same content, same scenes, different order -> different verdict.
+      const reordered = auditTemporalConsistency([flashback, courtroom, continuous]);
+      assert.equal(reordered.length, 1, 'moving the flashback scene to position 0 makes the same content report a contradiction');
+      assert.equal(reordered[0].type, 'explicit_conflict');
+    });
+  });
+
   // ──────────────────────────────────────────────────────────────────────────
   // Report Formatting Tests
   // ──────────────────────────────────────────────────────────────────────────

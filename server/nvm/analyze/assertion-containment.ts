@@ -27,6 +27,29 @@
 //     entail or contradict; absence of assertions is not itself a fact
 //     about containment (mirrors surfacing.ts's "absence is not a negative
 //     fact" discipline).
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test. Order-sensitive
+// BY DESIGN: `assessAssertionContainment` is defined over an ORDERED
+// assertion list and specifically flags a LATER one contradicting an
+// EARLIER one — one of the rare mechanisms in this directory whose verdict
+// depends on sequence, not just content (see temporal-consistency.ts for
+// the sibling finding this generalizes). Not wired because there is no
+// real extractor: `buildAssertionLedger(sceneTexts)` is explicitly
+// documented as "an explicitly SHALLOW cue-pattern heuristic seed," and —
+// same defect family as disclosure-ledger.ts's buildDisclosureLedger,
+// confirmed there by probe — a per-scene-local seed can accidentally make
+// an order-aware algorithm order-BLIND in practice if it never links the
+// same real-world claim across different scenes under one identity.
+// Untested against that specific failure mode here. What would unblock it:
+// a shared, cross-scene claim/entity-identity extractor (the same missing
+// piece blocking belief-movement.ts, causality-enforcer.ts, custody-
+// ledger.ts, disclosure-ledger.ts, epistemic-ledger.ts, typed-promises.ts,
+// truth-ledger.ts, mystery-fairness.ts, and well-made-surprise.ts — nine
+// modules on the same gate, making it the single highest-leverage next
+// build here) — then adversarial false-positive testing on real scene text
+// before any diagnostic wiring, mirroring what temporal-consistency.ts's
+// FLASHBACK branch needed before it was safe to ship.
 
 import type { SupportState } from '../proof/surfacing.ts';
 

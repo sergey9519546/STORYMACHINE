@@ -33,6 +33,18 @@
 // block counts (character, dialogue, scene_heading) are non-degenerate. If
 // a pass made things WORSE (fewer recognized cues/dialogue than the raw
 // input), we keep whichever form parsed better — never regress.
+//
+// ── Status (2026-08-03 wiring audit) ── NOT DORMANT — out of scope by design
+// Zero importers from server/routes/**, but that is the wrong test for this
+// file: it is a CORPUS-PREP utility, not a screenplay-diagnostic signal, and
+// its own header already says so ("The output is what the corpus SHOULD
+// store — not a runtime fixup"). It IS actively used, just from offline
+// tooling rather than the live server: scripts/convert-crawl-scripts.mjs,
+// scripts/probe-canonical-test.mjs, and scripts/probe-canonical-regression.mjs
+// all import it (grep-verified). No test file of its own — the probe
+// scripts appear to serve as its de facto regression check, though they
+// don't run under `npm test`. Nothing to integrate here: it's already doing
+// the job it was built for, on the surface it was built for.
 
 import { normalizeScreenplay, isCharacterCue } from './screenplay-normalizer.ts';
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';

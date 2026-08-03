@@ -114,11 +114,18 @@ describe("ScriptDoctorPanel wires the focus trap onto its dialog root", () => {
   });
 
   it("attaches panelRef and tabIndex={-1} to the dialog's root motion.div", () => {
-    // Anchor on the role="dialog" declaration itself and look at the JSX
+    // Anchor on the role="dialog" JSX ATTRIBUTE and look at the JSX
     // immediately around it, so this fails loudly if the trap is ever wired
     // to some OTHER element than the actual ARIA dialog root.
-    const idx = source.indexOf('role="dialog"');
-    assert.ok(idx > -1, "expected ScriptDoctorPanel.tsx to declare role=\"dialog\"");
+    //
+    // Match the attribute at the start of its own line (`^\s*role="dialog"`)
+    // rather than the first literal occurrence anywhere in the file: prose
+    // above the component explains the pattern and quotes `role="dialog"`
+    // inline, so a plain indexOf anchored on that COMMENT and windowed past
+    // the real JSX — the test failed while the wiring was perfectly correct.
+    const m = /^[ \t]*role="dialog"/m.exec(source);
+    assert.ok(m, 'expected ScriptDoctorPanel.tsx to declare a role="dialog" JSX attribute');
+    const idx = m.index;
     const around = source.slice(Math.max(0, idx - 400), idx + 100);
     assert.match(around, /ref=\{panelRef\}/, "the dialog root must carry ref={panelRef}");
     assert.match(

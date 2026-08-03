@@ -16,6 +16,23 @@
 // Deterministic, no LLM: this module performs no text extraction of its own;
 // callers are responsible for producing the typed PromiseEvent[] (e.g. from
 // a dedicated extractor, or hand-authored test fixtures).
+//
+// ── Status (2026-08-03 wiring audit) ── KEEP AS REFERENCE / INTEGRATE LATER
+// Zero importers anywhere in the repo except its own test. Order-sensitive
+// BY DESIGN: every payoff must have an EARLIER plant (sceneIndex-ordered) —
+// the strict Chekhov's-gun discipline this module enforces is entirely
+// about sequence. No extractor exists for PromiseEvent[]; note the overlap
+// with fountain-analyzer.ts's LIVE `seededClueIds`/`payoffSetupIds` fields
+// on ScreenplaySceneRecord (already wired, already order-aware in principle)
+// — the D6 defect (DETECTOR_DEFECTS_2026-08-03.md) documents that THOSE
+// fields are populated by position (`occ[0]`/`occ[last]`), not evidence, so
+// they are not a drop-in PromiseEvent[] source without the same fix D6
+// calls for. What would unblock it: either (a) the D6 fix itself (P1-gated,
+// scoring-adjacent, spec only per that doc), reused to also emit
+// PromiseEvent[]-shaped output, or (b) a standalone extractor scoped to
+// typed-promises.ts's five PromiseType categories (chekhov_object/
+// stated_goal/prophecy/threat/mystery_question) independent of the clue
+// system.
 
 import type { SupportState } from '../proof/surfacing.ts';
 
