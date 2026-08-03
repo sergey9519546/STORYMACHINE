@@ -15,6 +15,17 @@
 // that env var is unset (e.g. CI), every assertion is skipped with an honest
 // note rather than silently passing.
 //
+// DE-IDENTIFICATION: this manifest is a title-bearing (`name`, `file`)
+// pre-migration fixture as of this writing — see
+// docs/p1-benchmark/CORPUS_IDENTIFICATION.md for the SM-<hash> id scheme
+// that will replace `name`/`file`'s title-bearing values once the
+// maintainer runs the real migration locally (the corpus text needed to
+// compute real ids isn't available in every environment this test runs in).
+// `id`/`genre`/`origin`/`partition` below are typed as optional so this
+// file does not need a second edit the moment that migration lands; the
+// test's own display labels already prefer `entry.id` when present (see
+// the `label` const below) and never print `entry.name`.
+//
 // ASSERTION TIERS per script:
 //  1. contentHash matches the manifest → the local file is byte-identical to
 //     the one the expectations were locked against → health/verdict/sceneCount
@@ -34,7 +45,10 @@ import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST = JSON.parse(
   readFileSync(path.join(__dirname, '../fixtures/real-corpus-manifest.json'), 'utf8'),
-) as Array<{ name: string; file: string; contentHash: string; health: number; verdict: string; sceneCount: number }>;
+) as Array<{
+  name?: string; file: string; contentHash: string; health: number; verdict: string; sceneCount: number;
+  id?: string; genre?: string | null; origin?: 'crawl' | 'root';
+}>;
 
 const CORPUS_DIR = process.env.REAL_SCRIPT_CORPUS_DIR ?? '';
 /** Produced-feature floor: every professionally produced, correctly extracted
@@ -72,7 +86,16 @@ describe('real-script corpus — produced features through the full doctor', () 
   });
 
   for (const entry of MANIFEST) {
-    it(`${entry.name}: exact when byte-identical, floor otherwise`, { skip: SKIP_REASON }, async () => {
+    // De-identified test label: this manifest is still the PRE-MIGRATION
+    // schema (see docs/p1-benchmark/CORPUS_IDENTIFICATION.md) — its `name`
+    // field is a bare screenplay title, which has no business appearing in
+    // this public repo's test output / CI logs. `entry.id` is the real
+    // SM-<hash> id scripts/migrate-corpus-ids.mjs will populate once the
+    // maintainer runs the real migration (see that doc's §4); until then,
+    // fall back to a label derived from the already-committed, already-
+    // opaque `contentHash` field — never `entry.name` or `entry.file`.
+    const label = entry.id ?? `contentHash:${entry.contentHash.slice(0, 8)}`;
+    it(`${label}: exact when byte-identical, floor otherwise`, { skip: SKIP_REASON }, async () => {
       const file = path.join(CORPUS_DIR, entry.file);
       if (!existsSync(file)) {
         assert.fail(`REAL_SCRIPT_CORPUS_DIR is set but ${entry.file} is missing from it`);
@@ -80,13 +103,13 @@ describe('real-script corpus — produced features through the full doctor', () 
       const fountain = readFileSync(file, 'utf8');
       const report = await runScriptDoctor(fountain);
       if (report.contentHash === entry.contentHash) {
-        assert.equal(report.health, entry.health, `${entry.name}: health drifted on byte-identical input`);
-        assert.equal(report.verdict, entry.verdict, `${entry.name}: verdict drifted on byte-identical input`);
-        assert.equal(report.sceneCount, entry.sceneCount, `${entry.name}: sceneCount drifted on byte-identical input`);
+        assert.equal(report.health, entry.health, `${label}: health drifted on byte-identical input`);
+        assert.equal(report.verdict, entry.verdict, `${label}: verdict drifted on byte-identical input`);
+        assert.equal(report.sceneCount, entry.sceneCount, `${label}: sceneCount drifted on byte-identical input`);
       } else {
         assert.ok(report.health >= PRODUCED_FLOOR,
-          `${entry.name}: produced feature scored ${report.health} < ${PRODUCED_FLOOR} — systemic scoring bug until proven otherwise`);
-        assert.equal(report.verdict, 'RECOMMEND', `${entry.name}: produced feature must verdict RECOMMEND`);
+          `${label}: produced feature scored ${report.health} < ${PRODUCED_FLOOR} — systemic scoring bug until proven otherwise`);
+        assert.equal(report.verdict, 'RECOMMEND', `${label}: produced feature must verdict RECOMMEND`);
       }
     });
   }
