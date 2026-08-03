@@ -6,7 +6,7 @@ import express from 'express';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import {
   asyncHandler, sessionId, getOrCreateSession,
-  withSessionCommand, gameLimiter,
+  withSessionCommand, gameLimiter, aiLimiter,
 } from '../../lib/session-store.ts';
 import {
   validate, LiveMoveBodySchema, LiveAdvanceBodySchema, RoomCritiqueBodySchema,
@@ -211,7 +211,19 @@ router.get('/api/nvm/live/feed', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/live/advance — Reactive Turn Cycle.
-router.post('/api/nvm/live/advance', gameLimiter, validate(LiveAdvanceBodySchema), withSessionCommand(async (req, res, session) => {
+// aiLimiter, not gameLimiter (route-capability audit, T-15, 2026-08-03): this
+// was found on gameLimiter while building tests/routes/route-capabilities.test.ts
+// — a THIRD instance of the exact drift 3a4a905 fixed twice (/api/turn,
+// /api/simulate-to-fountain). advanceWorld() (server/nvm/live/loop.ts) calls
+// reactToCommit(), which runs up to `beats` (clamped to 5) rounds of
+// orchestrator.runTurn() — the SAME Orchestrator method /api/turn uses, which
+// calls agent.takeTurn() (server/engine/Agent.ts), itself up to 4
+// generateContent calls per turn (Agent.ts, agent/decision.ts,
+// agent/memory.ts x2; see /api/turn's own comment below for the citation).
+// So one request here can reach up to ~20 provider calls, same fan-out class
+// as /api/turn, which was already moved off gameLimiter's 120/min for
+// exactly this reason.
+router.post('/api/nvm/live/advance', aiLimiter, validate(LiveAdvanceBodySchema), withSessionCommand(async (req, res, session) => {
   const { stage, orchestrator } = session;
   const { beats = 1, locationId } = req.body as { beats?: number; locationId?: string };
   const safeBeats = Math.max(1, Math.min(5, typeof beats === 'number' ? beats : 1));
