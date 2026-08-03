@@ -734,9 +734,9 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
 
       if (reversalStreak === 3) {
         issues.push({
-          location: `Scenes ${streakStart}–${i}`,
+          location: `Scenes ${streakStart + 1}–${i + 1}`,
           rule: 'CONFLICT_FATIGUE',
-          description: `Three reversals in quick succession (Scenes ${streakStart}-${i}) — the audience experiences whiplash from rapid oscillation without settling`,
+          description: `Three reversals in quick succession (Scenes ${streakStart + 1}-${i + 1}) — the audience experiences whiplash from rapid oscillation without settling`,
           severity: 'minor',
           suggestedFix: 'Space reversals further apart or let one reversal settle with a scene of consequence before introducing the next',
         });
@@ -759,9 +759,9 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
 
     if (clockInAct1 && !clockInSecondHalf) {
       issues.push({
-        location: `Act 1–Act 2 clock gap (Scenes ${act1Zone}–${records.length - 1})`,
+        location: `Act 1–Act 2 clock gap (Scenes ${act1Zone + 1}–${records.length})`,
         rule: 'THREAT_AMNESIA',
-        description: `A clock is raised in Act 1 but no clock pressure appears in the second half (Scenes ${secondHalfStart}+) — the external threat that launched the story is forgotten, and stakes evaporate`,
+        description: `A clock is raised in Act 1 but no clock pressure appears in the second half (Scenes ${secondHalfStart + 1}+) — the external threat that launched the story is forgotten, and stakes evaporate`,
         severity: 'major',
         suggestedFix: 'Re-invoke the original threat in Act 2b with an escalation (a closer deadline, a new consequence, or a complication that restores urgency)',
       });
@@ -779,9 +779,9 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
 
     if (reversalsInFirst >= 2 && reversalsInLast === 0) {
       issues.push({
-        location: `Late conflict (Scenes ${splitPoint}–${records.length - 1})`,
+        location: `Late conflict (Scenes ${splitPoint + 1}–${records.length})`,
         rule: 'ANTAGONIST_VANISH',
-        description: `${reversalsInFirst} reversals occur before Scene ${splitPoint} but none after — the antagonist's active opposition evaporates before the climax. The protagonist wins the finale against a passive opponent.`,
+        description: `${reversalsInFirst} reversals occur before Scene ${splitPoint + 1} but none after — the antagonist's active opposition evaporates before the climax. The protagonist wins the finale against a passive opponent.`,
         severity: 'major',
         suggestedFix: 'Add at least one reversal or direct antagonistic action in the final 40% — the protagonist must face active opposition in the climax, not just the aftermath of it',
       });
@@ -867,9 +867,9 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const climaxZone = Math.floor(records.length * 0.6);
       if (peakShift.sceneIdx < climaxZone && peakShift.amount < -0.4) {
         issues.push({
-          location: `Scene ${peakShift.sceneIdx} (relational peak)`,
+          location: `Scene ${peakShift.sceneIdx + 1} (relational peak)`,
           rule: 'INTERPERSONAL_PEAK_TOO_EARLY',
-          description: `The most damaging relationship shift (${peakShift.amount.toFixed(2)}) occurs at Scene ${peakShift.sceneIdx} — ${Math.round(peakShift.sceneIdx / records.length * 100)}% through the story, before the climax zone (Scene ${climaxZone}+). The relational conflict peaks too early.`,
+          description: `The most damaging relationship shift (${peakShift.amount.toFixed(2)}) occurs at Scene ${peakShift.sceneIdx + 1} — ${Math.round(peakShift.sceneIdx / records.length * 100)}% through the story, before the climax zone (Scene ${climaxZone + 1}+). The relational conflict peaks too early.`,
           severity: 'major',
           suggestedFix: 'Reserve the most damaging relational rupture for the climax or just before it. Maximum interpersonal damage should coincide with maximum dramatic stakes.',
         });
@@ -895,9 +895,9 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       );
       if (isVacuum) {
         issues.push({
-          location: `Scene ${records[i].sceneIdx} (reversal)`,
+          location: `Scene ${records[i].sceneIdx + 1} (reversal)`,
           rule: 'REVERSAL_WITHOUT_CONSEQUENCE',
-          description: `The reversal at Scene ${records[i].sceneIdx} (suspense drop: ${records[i].suspenseDelta.toFixed(1)}) lands in a dramatic vacuum — the next two scenes are emotionally flat with no clock, no relationship impact, and no causal reaction.`,
+          description: `The reversal at Scene ${records[i].sceneIdx + 1} (suspense drop: ${records[i].suspenseDelta.toFixed(1)}) lands in a dramatic vacuum — the next two scenes are emotionally flat with no clock, no relationship impact, and no causal reaction.`,
           severity: 'minor',
           suggestedFix: 'A reversal must ripple forward: the scene after a reversal should register its impact through emotional reaction, relationship strain, or an accelerating clock. Let the hit land.',
         });
@@ -921,7 +921,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasConflictHook) {
         issues.push({
-          location: `Act 1 (Scenes 0–${act1End - 1})`,
+          location: `Act 1 (Scenes 1–${act1End})`,
           rule: 'CONFLICT_ACT1_ABSENT',
           description: `Act 1 (${act1Records.length} scenes) contains no conflict signal: no clock raised, no reversal, no negative relationship shift. The story opens without tension — the audience has nothing at stake from the start.`,
           severity: 'major',
@@ -978,9 +978,9 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     );
     if (!hasMidpointConflict) {
       issues.push({
-        location: `Scenes ${windowLow}–${windowHigh} (midpoint ±1)`,
+        location: `Scenes ${windowLow + 1}–${windowHigh + 1} (midpoint ±1)`,
         rule: 'CONFLICT_MIDPOINT_ABSENT',
-        description: `The midpoint and adjacent scenes (Scenes ${windowLow}–${windowHigh}) carry no conflict signal — no clock, no reversal, no negative relationship shift. The structural pivot has no dramatic tension.`,
+        description: `The midpoint and adjacent scenes (Scenes ${windowLow + 1}–${windowHigh + 1}) carry no conflict signal — no clock, no reversal, no negative relationship shift. The structural pivot has no dramatic tension.`,
         severity: 'major',
         suggestedFix: 'Add a conflict beat to the midpoint zone: raise a clock, introduce a reversal, or create a relational rupture. The midpoint is where the story shifts gear — it should feel dramatic, not inert.',
       });
@@ -1000,7 +1000,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const act3AvgConf = act3Recs.reduce((s: number, r: any) => s + r.suspenseDelta, 0) / act3Recs.length;
       if (act2bAvgConf > 0 && act3AvgConf < act2bAvgConf * 0.6) {
         issues.push({
-          location: `Act 3 (Scenes ${act3StartConf}–${records.length - 1})`,
+          location: `Act 3 (Scenes ${act3StartConf + 1}–${records.length})`,
           rule: 'CONFLICT_ACT3_DEFLATION',
           description: `Act 3 average suspense (${act3AvgConf.toFixed(1)}) is significantly below late Act 2 (${act2bAvgConf.toFixed(1)}) — conflict deflates before the climax instead of crescendoing`,
           severity: 'major',
@@ -1055,7 +1055,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     if (maxPosRun210 >= 4) {
       const runEnd210 = Math.min(maxPosRunStart210 + maxPosRun210 - 1, records.length - 1);
       issues.push({
-        location: `Scenes ${records[maxPosRunStart210].sceneIdx}–${records[runEnd210].sceneIdx}`,
+        location: `Scenes ${records[maxPosRunStart210].sceneIdx + 1}–${records[runEnd210].sceneIdx + 1}`,
         rule: 'POSITIVE_SPIRAL_TRAP',
         severity: 'minor',
         description: `${maxPosRun210} consecutive scenes all end on a positive emotional shift — the protagonist wins continuously with no setback for ${maxPosRun210} scenes. Stakes evaporate when loss is absent for this long.`,
@@ -1077,10 +1077,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     const reversalsAct2b = records.slice(act2Split210, act2bEnd210).filter(r => r.suspenseDelta < -1).length;
     if (reversalsAct2a >= 2 && reversalsAct2b === 0) {
       issues.push({
-        location: `Act 2 (Scenes ${act2aStart210}–${act2bEnd210 - 1})`,
+        location: `Act 2 (Scenes ${act2aStart210 + 1}–${act2bEnd210})`,
         rule: 'REVERSAL_SYMMETRY_BREAK',
         severity: 'minor',
-        description: `Act 2a (Scenes ${act2aStart210}–${act2Split210 - 1}) delivers ${reversalsAct2a} reversals but Act 2b (Scenes ${act2Split210}–${act2bEnd210 - 1}) has none — the conflict's second half goes passive when it should be escalating. The approach to the climax has no oppositional momentum.`,
+        description: `Act 2a (Scenes ${act2aStart210 + 1}–${act2Split210}) delivers ${reversalsAct2a} reversals but Act 2b (Scenes ${act2Split210 + 1}–${act2bEnd210}) has none — the conflict's second half goes passive when it should be escalating. The approach to the climax has no oppositional momentum.`,
         suggestedFix: 'Add at least one reversal in Act 2b: a setback, a plan failure, or an antagonist action that raises the cost before the climax. The protagonist must enter the final act under active pressure, not from a lull.',
       });
     }
@@ -1132,7 +1132,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     if (maxRun214 >= 6) {
       const runEnd214 = maxRunStart214 + maxRun214 - 1;
       issues.push({
-        location: `Scenes ${records[maxRunStart214].sceneIdx}–${records[runEnd214].sceneIdx}`,
+        location: `Scenes ${records[maxRunStart214].sceneIdx + 1}–${records[runEnd214].sceneIdx + 1}`,
         rule: 'UNRELIEVED_TENSION_ASCENT',
         severity: 'major',
         description: `${maxRun214} consecutive scenes each add external pressure (rising suspense or a tightening clock) with no release valve between them — the tension climbs monotonically for ${maxRun214} scenes without a single beat of relief. Unbroken escalation flattens into noise; the audience cannot register a rise it is never allowed to fall from.`,
@@ -1153,10 +1153,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     const spikeIdx214 = masses214.indexOf(maxMass214);
     if (totalMass214 >= 6 && maxMass214 >= 0.6 * totalMass214) {
       issues.push({
-        location: `Scene ${records[spikeIdx214].sceneIdx}`,
+        location: `Scene ${records[spikeIdx214].sceneIdx + 1}`,
         rule: 'CONFLICT_CONCENTRATION_SPIKE',
         severity: 'major',
-        description: `Scene ${records[spikeIdx214].sceneIdx} holds ${Math.round((maxMass214 / totalMass214) * 100)}% of the story's entire conflict mass — the opposition detonates in a single scene while the rest of the arc is dramatically inert. Conflict concentrated this heavily reads as an isolated set-piece, not a sustained pressure on the protagonist.`,
+        description: `Scene ${records[spikeIdx214].sceneIdx + 1} holds ${Math.round((maxMass214 / totalMass214) * 100)}% of the story's entire conflict mass — the opposition detonates in a single scene while the rest of the arc is dramatically inert. Conflict concentrated this heavily reads as an isolated set-piece, not a sustained pressure on the protagonist.`,
         suggestedFix: 'Distribute the conflict: seed smaller oppositional beats across the surrounding scenes so the spike is the crest of a wave, not a lone spike in flat water. A story sustains tension by keeping pressure present, not by discharging it all at once.',
       });
     }
@@ -1263,10 +1263,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const earlyZone229 = Math.floor(records.length * 0.6);
       if (peakPos229.recIdx < earlyZone229) {
         issues.push({
-          location: `Scene ${peakPos229.sceneIdx} (relational peak resolution)`,
+          location: `Scene ${peakPos229.sceneIdx + 1} (relational peak resolution)`,
           rule: 'POSITIVE_RESOLUTION_TOO_EARLY',
           severity: 'major',
-          description: `The story's most significant positive relationship shift (+${peakPos229.amount.toFixed(2)}) occurs at Scene ${peakPos229.sceneIdx} — ${Math.round(peakPos229.recIdx / records.length * 100)}% through the story, before the 60% mark. The central reconciliation arrives too early; the final act has nowhere left to go emotionally.`,
+          description: `The story's most significant positive relationship shift (+${peakPos229.amount.toFixed(2)}) occurs at Scene ${peakPos229.sceneIdx + 1} — ${Math.round(peakPos229.recIdx / records.length * 100)}% through the story, before the 60% mark. The central reconciliation arrives too early; the final act has nowhere left to go emotionally.`,
           suggestedFix: 'Reserve the most significant positive relationship shift for the climax or resolution zone (60%+). Let the characters earn their reconciliation at the story\'s peak — the audience must be made to wait for the reward they sense is coming.',
         });
       }
@@ -1387,10 +1387,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     const act3Conflict257 = records.slice(act3Start257).some(isConflictScene257);
     if (earlyConflict257 && !act3Conflict257) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start257}–${records.length - 1}) — conflict layer`,
+        location: `Act 3 (Scenes ${act3Start257 + 1}–${records.length}) — conflict layer`,
         rule: 'CONFLICT_ACT3_ABSENT',
         severity: 'major',
-        description: `The story carries conflict through its first 75% but Act 3 (Scenes ${act3Start257}–${records.length - 1}) has no conflict signal — no deep tension drop, no strong negative relationship shift. The climax act resolves without struggle; the protagonist coasts to the ending in the stretch that should hold the story's fiercest opposition.`,
+        description: `The story carries conflict through its first 75% but Act 3 (Scenes ${act3Start257 + 1}–${records.length}) has no conflict signal — no deep tension drop, no strong negative relationship shift. The climax act resolves without struggle; the protagonist coasts to the ending in the stretch that should hold the story's fiercest opposition.`,
         suggestedFix: 'Load the final act with its hardest opposition: the antagonist\'s last and strongest move, a betrayal that lands at the worst moment, a setback that makes victory seem impossible. The climax must be the point of maximum pressure, not its release.',
       });
     }
@@ -1445,7 +1445,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const laterConflict257 = records.slice(act1End257).some(isConflictScene257);
       if (!act1Conflict257 && laterConflict257) {
         issues.push({
-          location: `Act 1 (Scenes 0–${act1End257 - 1}) — conflict layer`,
+          location: `Act 1 (Scenes 1–${act1End257}) — conflict layer`,
           rule: 'CONFLICT_OPENING_VOID',
           severity: 'minor',
           description: `Act 1 (the first ${act1End257} scenes) contains no conflict signal — no tension drop, no negative relationship shift — yet the story develops conflict later. The opening is frictionless and the inciting opposition arrives late, giving the audience nothing to lean into from the start.`,
@@ -1472,10 +1472,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const act2bConflict271 = records.slice(act2bStart271, act2bEnd271).filter(isConflictScene257).length;
       if (act2bConflict271 === 0) {
         issues.push({
-          location: `Act 2b (scenes ${act2bStart271}–${act2bEnd271 - 1}) — conflict layer`,
+          location: `Act 2b (scenes ${act2bStart271 + 1}–${act2bEnd271}) — conflict layer`,
           rule: 'CONFLICT_ACT2B_VOID',
           severity: 'minor',
-          description: `The Act 2b zone (scenes ${act2bStart271}–${act2bEnd271 - 1}) has no conflict signal — no tension drop, no negative relationship shift — while the first half and climax both carry conflict. The stretch that should hold the protagonist's lowest moment and the antagonist's strongest move is inert; the bridge to the climax has no dramatic engine.`,
+          description: `The Act 2b zone (scenes ${act2bStart271 + 1}–${act2bEnd271}) has no conflict signal — no tension drop, no negative relationship shift — while the first half and climax both carry conflict. The stretch that should hold the protagonist's lowest moment and the antagonist's strongest move is inert; the bridge to the climax has no dramatic engine.`,
           suggestedFix: 'Put the story\'s hardest moment in Act 2b: a betrayal that isolates the protagonist, a failure that seems final, a revelation that reframes everything. The "dark night" zone needs the story\'s highest conflict density, not its lowest.',
         });
       }
@@ -1592,10 +1592,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
     if (maxSpiral285 >= 4) {
       issues.push({
-        location: `Scenes ${maxSpiralStart285}–${maxSpiralStart285 + maxSpiral285 - 1} — negative spiral`,
+        location: `Scenes ${maxSpiralStart285 + 1}–${maxSpiralStart285 + maxSpiral285} — negative spiral`,
         rule: 'NEGATIVE_SPIRAL_UNBROKEN',
         severity: 'minor',
-        description: `${maxSpiral285} consecutive scenes (${maxSpiralStart285}–${maxSpiralStart285 + maxSpiral285 - 1}) have negative emotional shifts with no neutral or positive break. An unbroken descent desensitizes the audience — each new blow registers with less impact than the last. Even a brief moment of relief or dark humor between negative beats resets the audience's capacity for distress.`,
+        description: `${maxSpiral285} consecutive scenes (${maxSpiralStart285 + 1}–${maxSpiralStart285 + maxSpiral285}) have negative emotional shifts with no neutral or positive break. An unbroken descent desensitizes the audience — each new blow registers with less impact than the last. Even a brief moment of relief or dark humor between negative beats resets the audience's capacity for distress.`,
         suggestedFix: 'Insert a single neutral or positive beat within the spiral — a small victory, a moment of gallows humor, a character reconnection before the next blow. The beat does not need to resolve anything; it just gives the audience permission to breathe before the next descent.',
       });
     }
@@ -1629,7 +1629,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             location: `Dominant conflict pair "${dominantPair285}" — resolves before climax`,
             rule: 'CONFLICT_RESOLUTION_PREMATURE',
             severity: 'minor',
-            description: `"${dominantPair285}" drives ${dominantScenes285.length} negative conflict events but none occur in the final quarter (scene ${finalStart285}+). The central conflict resolves before the climax — the story continues but the dramatic engine has already switched off. The final act plays out in the aftermath of a conflict that is already settled.`,
+            description: `"${dominantPair285}" drives ${dominantScenes285.length} negative conflict events but none occur in the final quarter (scene ${finalStart285 + 1}+). The central conflict resolves before the climax — the story continues but the dramatic engine has already switched off. The final act plays out in the aftermath of a conflict that is already settled.`,
             suggestedFix: 'Extend the central conflict into the final quarter: add a late reversal, an unexpected re-escalation, or a final confrontation that must be resolved at the climax. The dominant conflict pair should be unresolved until the final act — early resolution steals the climax.',
           });
         }
@@ -1706,10 +1706,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     if (elevenths299.length > 0 && firstConflictAt299.size > elevenths299.length) {
       const [latePair299, lateIdx299] = elevenths299[0];
       issues.push({
-        location: `Scene ${lateIdx299} — first conflict for "${latePair299}"`,
+        location: `Scene ${lateIdx299 + 1} — first conflict for "${latePair299}"`,
         rule: 'ELEVENTH_HOUR_CONFLICT',
         severity: 'minor',
-        description: `The conflict between "${latePair299}" first appears at scene ${lateIdx299} — inside the final 10% of the story. A feud introduced this late has no room to escalate or resolve; it reads as artificial tension injected into the finale rather than a fault line the story has been tracking. Late conflict the audience never saw coming (and never sees settled) leaves the ending cluttered.`,
+        description: `The conflict between "${latePair299}" first appears at scene ${lateIdx299 + 1} — inside the final 10% of the story. A feud introduced this late has no room to escalate or resolve; it reads as artificial tension injected into the finale rather than a fault line the story has been tracking. Late conflict the audience never saw coming (and never sees settled) leaves the ending cluttered.`,
         suggestedFix: `Either seed the "${latePair299}" friction earlier — a cold exchange, a competing interest, a small betrayal in Act 2 that makes the late rupture feel inevitable — or cut the late conflict entirely and spend the finale resolving the conflicts the story has already earned.`,
       });
     }
@@ -1768,10 +1768,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       peakMass313 < 0.6 * totalMass313
     ) {
       issues.push({
-        location: `Scene ${(records as any[])[peakIdx313].sceneIdx} — conflict magnitude peak`,
+        location: `Scene ${(records as any[])[peakIdx313].sceneIdx + 1} — conflict magnitude peak`,
         rule: 'CONFLICT_MAGNITUDE_PEAK_EARLY',
         severity: 'minor',
-        description: `The heaviest relational conflict (magnitude ${peakMass313.toFixed(2)}) falls at Scene ${(records as any[])[peakIdx313].sceneIdx}, in the first half of the story, and nothing later surpasses it. The biggest rupture lands in the setup, so the climax inherits a conflict that already peaked — the back half can only echo a blow the audience has already absorbed.`,
+        description: `The heaviest relational conflict (magnitude ${peakMass313.toFixed(2)}) falls at Scene ${(records as any[])[peakIdx313].sceneIdx + 1}, in the first half of the story, and nothing later surpasses it. The biggest rupture lands in the setup, so the climax inherits a conflict that already peaked — the back half can only echo a blow the audience has already absorbed.`,
         suggestedFix: 'Reserve the heaviest rupture for the climax. Either soften the early peak so a later confrontation can exceed it, or escalate the back half — a deeper betrayal, a higher-stakes break — so the relational conflict curve rises toward the ending rather than away from it.',
       });
     }
@@ -1802,8 +1802,8 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       }
     }
     if (maxRunC313 >= 4) {
-      const s313 = (records as any[])[maxStartC313].sceneIdx;
-      const e313 = (records as any[])[maxStartC313 + maxRunC313 - 1].sceneIdx;
+      const s313 = (records as any[])[maxStartC313].sceneIdx + 1;
+      const e313 = (records as any[])[maxStartC313 + maxRunC313 - 1].sceneIdx + 1;
       issues.push({
         location: `Scenes ${s313}–${e313} — relentless conflict`,
         rule: 'CONFLICT_RELENTLESS_RUN',
@@ -1915,28 +1915,28 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       if (peakRec352) {
         if ((peakRec352.suspenseDelta ?? 0) <= 0) {
           issues.push({
-            location: `Scene ${peakRec352.sceneIdx} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
+            location: `Scene ${peakRec352.sceneIdx + 1} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_SUSPENSE_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx}, magnitude ${peakMag352.toFixed(2)}) carries a suspenseDelta of ${(peakRec352.suspenseDelta ?? 0).toFixed(2)} — the biggest break in the story generates no tension. The most consequential rupture should be the most dangerous-feeling moment, leaving the audience uncertain what the fracture will cost; when it lands tension-flat, the story's central conflict peaks without anyone feeling the stakes.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx + 1}, magnitude ${peakMag352.toFixed(2)}) carries a suspenseDelta of ${(peakRec352.suspenseDelta ?? 0).toFixed(2)} — the biggest break in the story generates no tension. The most consequential rupture should be the most dangerous-feeling moment, leaving the audience uncertain what the fracture will cost; when it lands tension-flat, the story's central conflict peaks without anyone feeling the stakes.`,
             suggestedFix: 'Stage the heaviest rupture so it threatens something concrete: the break should put a goal, a life, or a future in jeopardy, not just register as a relationship changing state. The single biggest fracture deserves the story\'s highest suspense, not its flattest.',
           });
         }
         if (peakRec352.emotionalShift === 'neutral') {
           issues.push({
-            location: `Scene ${peakRec352.sceneIdx} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
+            location: `Scene ${peakRec352.sceneIdx + 1} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_EMOTION_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx}, magnitude ${peakMag352.toFixed(2)}) is emotionally neutral — the biggest break leaves the protagonist unmoved. The most consequential fracture in the story should be felt most acutely; when it registers no emotional shift, the rupture reads as a plot adjustment rather than a loss, and the audience is told the bond broke without being made to feel it break.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx + 1}, magnitude ${peakMag352.toFixed(2)}) is emotionally neutral — the biggest break leaves the protagonist unmoved. The most consequential fracture in the story should be felt most acutely; when it registers no emotional shift, the rupture reads as a plot adjustment rather than a loss, and the audience is told the bond broke without being made to feel it break.`,
             suggestedFix: 'Let the heaviest rupture wound: the scene where the most important bond breaks should carry the story\'s sharpest emotional charge — grief, betrayal, rage. The magnitude of a break is measured by how much it costs the person at its center.',
           });
         }
         if ((peakRec352.curiosityDelta ?? 0) <= 0) {
           issues.push({
-            location: `Scene ${peakRec352.sceneIdx} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
+            location: `Scene ${peakRec352.sceneIdx + 1} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_CURIOSITY_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx}, magnitude ${peakMag352.toFixed(2)}) carries a curiosityDelta of ${(peakRec352.curiosityDelta ?? 0).toFixed(2)} — the biggest break raises no questions about what happens next. A major rupture should leave the audience hungry to know how the characters will live with the fracture; when the peak conflict closes a door without opening one, the story's central break is an endpoint rather than a turn.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx + 1}, magnitude ${peakMag352.toFixed(2)}) carries a curiosityDelta of ${(peakRec352.curiosityDelta ?? 0).toFixed(2)} — the biggest break raises no questions about what happens next. A major rupture should leave the audience hungry to know how the characters will live with the fracture; when the peak conflict closes a door without opening one, the story's central break is an endpoint rather than a turn.`,
             suggestedFix: 'Make the heaviest rupture generative: the break should open new uncertainties — what each character does now, what the fracture exposes, who they become without the bond. The biggest conflict should propel the story forward, not just register damage.',
           });
         }
@@ -1969,10 +1969,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         // the Wave 352 peak checks (suspense/emotion/curiosity channels).
         if ((peakRec366.dramaticTurn ?? 'nothing') === 'nothing') {
           issues.push({
-            location: `Scene ${peakRec366.sceneIdx} — peak rupture (magnitude ${peakMag366.toFixed(2)})`,
+            location: `Scene ${peakRec366.sceneIdx + 1} — peak rupture (magnitude ${peakMag366.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_DRAMATIC_TURN_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec366.sceneIdx}, magnitude ${peakMag366.toFixed(2)}) carries no dramatic turn — the biggest break is not a story pivot. The single most consequential fracture should reverse, escalate, or recast the situation; when it leaves the plot's trajectory unchanged, the rupture is an event the story passes through rather than a turn the story turns on.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec366.sceneIdx + 1}, magnitude ${peakMag366.toFixed(2)}) carries no dramatic turn — the biggest break is not a story pivot. The single most consequential fracture should reverse, escalate, or recast the situation; when it leaves the plot's trajectory unchanged, the rupture is an event the story passes through rather than a turn the story turns on.`,
             suggestedFix: 'Make the heaviest rupture pivot the story: the break should change what the protagonist is pursuing, expose a new obstacle, or invert an alliance. The biggest fracture in the relational world deserves to be a hinge the plot swings on, not a beat it merely records.',
           });
         }
@@ -1983,10 +1983,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         const clockScenes366 = (records as any[]).filter(r => r.clockRaised === true);
         if (clockScenes366.length >= 2 && peakRec366.clockRaised !== true) {
           issues.push({
-            location: `Scene ${peakRec366.sceneIdx} — peak rupture (magnitude ${peakMag366.toFixed(2)})`,
+            location: `Scene ${peakRec366.sceneIdx + 1} — peak rupture (magnitude ${peakMag366.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_CLOCK_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec366.sceneIdx}, magnitude ${peakMag366.toFixed(2)}) raises no clock, even though the story uses ${clockScenes366.length} clock-raising scenes elsewhere. The biggest break adds no time pressure — it fractures a bond without tightening the deadline the characters are racing. When the peak conflict and the urgency engine never coincide, the rupture lands in a moment with all the time in the world.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec366.sceneIdx + 1}, magnitude ${peakMag366.toFixed(2)}) raises no clock, even though the story uses ${clockScenes366.length} clock-raising scenes elsewhere. The biggest break adds no time pressure — it fractures a bond without tightening the deadline the characters are racing. When the peak conflict and the urgency engine never coincide, the rupture lands in a moment with all the time in the world.`,
             suggestedFix: 'Couple the heaviest rupture to a deadline: let the break that hurts most also shorten the time available — a betrayal that costs a crucial ally just as the clock runs down, a severed bond that forecloses an escape. The biggest fracture is most devastating when there is no time left to repair it.',
           });
         }
@@ -2004,10 +2004,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           .reduce((min, i) => Math.min(min, i), Infinity);
         if (firstRuptureIdx366 >= mid366) {
           issues.push({
-            location: `First rupture at Scene ${(records as any[])[firstRuptureIdx366].sceneIdx} (at or past the midpoint)`,
+            location: `First rupture at Scene ${(records as any[])[firstRuptureIdx366].sceneIdx + 1} (at or past the midpoint)`,
             rule: 'CONFLICT_LATE_FIRST_RUPTURE',
             severity: 'minor',
-            description: `The story's first relational rupture lands at Scene ${(records as any[])[firstRuptureIdx366].sceneIdx}, at or past the midpoint — the entire first half is frictionless. With ${conflictRecs366.length} conflict scenes in the story, all of them fall in the back half, so the setup and first complication zone establish the world and the relationships without ever straining a bond. The audience reaches the midpoint with no felt conflict to invest in.`,
+            description: `The story's first relational rupture lands at Scene ${(records as any[])[firstRuptureIdx366].sceneIdx + 1}, at or past the midpoint — the entire first half is frictionless. With ${conflictRecs366.length} conflict scenes in the story, all of them fall in the back half, so the setup and first complication zone establish the world and the relationships without ever straining a bond. The audience reaches the midpoint with no felt conflict to invest in.`,
             suggestedFix: 'Introduce a rupture in the first half: even a small friction — a broken promise, an eroded trust, a clash of goals — gives the audience a relational stake before the story starts breaking things in earnest. A first half with no conflict trains the audience to expect calm exactly when the story should be teaching them to worry.',
           });
         }
@@ -2033,10 +2033,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const a2aRecs380 = (records as any[]).slice(a2aStart380, a2aEnd380);
       if (a2aRecs380.length >= 2 && !a2aRecs380.some(isConflictScene380)) {
         issues.push({
-          location: `Act 2a (Scenes ${a2aStart380}–${a2aEnd380 - 1}) — no rupture`,
+          location: `Act 2a (Scenes ${a2aStart380 + 1}–${a2aEnd380}) — no rupture`,
           rule: 'CONFLICT_ACT2A_VOID',
           severity: 'minor',
-          description: `No relational rupture occurs in Act 2a (Scenes ${a2aStart380}–${a2aEnd380 - 1}), though the story contains conflict elsewhere. The first half of the complication zone — where the protagonist should already be under rising pressure after the inciting incident — is frictionless, so the story coasts from setup toward the midpoint without the early escalation that earns the audience's worry.`,
+          description: `No relational rupture occurs in Act 2a (Scenes ${a2aStart380 + 1}–${a2aEnd380}), though the story contains conflict elsewhere. The first half of the complication zone — where the protagonist should already be under rising pressure after the inciting incident — is frictionless, so the story coasts from setup toward the midpoint without the early escalation that earns the audience's worry.`,
           suggestedFix: 'Plant a rupture in Act 2a: an early alliance strained, a trust tested, a first cost paid. The stretch right after the inciting incident should be where the conflict starts biting — a frictionless Act 2a lets the tension go slack precisely where it should begin to climb.',
         });
       }
@@ -2172,10 +2172,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       });
       if (isVoid394c) {
         issues.push({
-          location: `Scene ${r394c.sceneIdx} — rupture (${majorRupture394c.pairKey}, shift: ${majorRupture394c.amount.toFixed(2)})`,
+          location: `Scene ${r394c.sceneIdx + 1} — rupture (${majorRupture394c.pairKey}, shift: ${majorRupture394c.amount.toFixed(2)})`,
           rule: 'CONFLICT_RUPTURE_AFTERMATH_VOID',
           severity: 'minor',
-          description: `The major rupture between "${majorRupture394c.pairKey}" at Scene ${r394c.sceneIdx} (shift: ${majorRupture394c.amount.toFixed(2)}) is followed by 2 scenes where that pair has no further shifts and both scenes are emotionally neutral — the wound lands in a relational vacuum. The story inflicts the damage and the relationship goes silent: no echo, no recoil, no acknowledgement. When a rupture leaves the pair and the emotional register both unchanged for two consecutive scenes, the audience concludes the damage didn't really land.`,
+          description: `The major rupture between "${majorRupture394c.pairKey}" at Scene ${r394c.sceneIdx + 1} (shift: ${majorRupture394c.amount.toFixed(2)}) is followed by 2 scenes where that pair has no further shifts and both scenes are emotionally neutral — the wound lands in a relational vacuum. The story inflicts the damage and the relationship goes silent: no echo, no recoil, no acknowledgement. When a rupture leaves the pair and the emotional register both unchanged for two consecutive scenes, the audience concludes the damage didn't really land.`,
           suggestedFix: 'Let the rupture echo in the next two scenes: a cold exchange between the pair, an emotional reaction that names what was lost, or a shift in that bond — even a tentative one — that confirms the wound registered. The scene after a major break is where the audience learns whether to believe the damage was real.',
         });
         break;
@@ -2210,10 +2210,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         const revScenes408 = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
         if (revScenes408.length >= 2 && (peakRec408.revelation === null || peakRec408.revelation === undefined)) {
           issues.push({
-            location: `Scene ${peakRec408.sceneIdx} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
+            location: `Scene ${peakRec408.sceneIdx + 1} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_REVELATION_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx}, magnitude ${peakMag408.toFixed(2)}) carries no revelation, even though the story discloses ${revScenes408.length} truths in other scenes. The single most consequential fracture surfaces nothing — the biggest break is not the moment a hidden truth comes out. When the peak conflict and the disclosure engine never coincide, the audience watches the deepest wound land without learning anything from it.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx + 1}, magnitude ${peakMag408.toFixed(2)}) carries no revelation, even though the story discloses ${revScenes408.length} truths in other scenes. The single most consequential fracture surfaces nothing — the biggest break is not the moment a hidden truth comes out. When the peak conflict and the disclosure engine never coincide, the audience watches the deepest wound land without learning anything from it.`,
             suggestedFix: 'Let the heaviest rupture reveal something: the betrayal that exposes a long-held secret, the fight that forces a confession, the break that finally makes a buried truth speakable. A rupture that also discloses is doubly charged — the relationship breaks and the audience\'s understanding lurches forward in the same beat.',
           });
         }
@@ -2224,10 +2224,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         const payoffScenes408 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
         if (payoffScenes408.length >= 2 && ((peakRec408.payoffSetupIds ?? []) as any[]).length === 0) {
           issues.push({
-            location: `Scene ${peakRec408.sceneIdx} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
+            location: `Scene ${peakRec408.sceneIdx + 1} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_PAYOFF_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx}, magnitude ${peakMag408.toFixed(2)}) pays off no planted setup, even though ${payoffScenes408.length} other scenes deliver payoffs. The single biggest break collects on no promise the story made — the fracture that costs the most is not the one that resolves a thread the audience was tracking. The peak of relational damage and the peak of structural satisfaction never coincide.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx + 1}, magnitude ${peakMag408.toFixed(2)}) pays off no planted setup, even though ${payoffScenes408.length} other scenes deliver payoffs. The single biggest break collects on no promise the story made — the fracture that costs the most is not the one that resolves a thread the audience was tracking. The peak of relational damage and the peak of structural satisfaction never coincide.`,
             suggestedFix: 'Make the heaviest rupture pay something off: the break that hurts most should also be the moment a planted seed blooms — the foreshadowed betrayal arriving at last, the threat the audience was warned about finally severing the bond it threatened. A rupture that resolves a setup turns relational pain into structural catharsis.',
           });
         }
@@ -2238,10 +2238,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         const seedScenes408 = (records as any[]).filter(r => ((r.seededClueIds ?? []) as any[]).length > 0);
         if (seedScenes408.length >= 2 && ((peakRec408.seededClueIds ?? []) as any[]).length === 0) {
           issues.push({
-            location: `Scene ${peakRec408.sceneIdx} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
+            location: `Scene ${peakRec408.sceneIdx + 1} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_SEED_ABSENT',
             severity: 'minor',
-            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx}, magnitude ${peakMag408.toFixed(2)}) seeds no clue, even though ${seedScenes408.length} other scenes plant threads. The single most consequential fracture opens nothing forward — the biggest break terminates a bond without leaving the audience a new question to carry. When the peak conflict plants no seed, the story's deepest wound generates no momentum.`,
+            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx + 1}, magnitude ${peakMag408.toFixed(2)}) seeds no clue, even though ${seedScenes408.length} other scenes plant threads. The single most consequential fracture opens nothing forward — the biggest break terminates a bond without leaving the audience a new question to carry. When the peak conflict plants no seed, the story's deepest wound generates no momentum.`,
             suggestedFix: 'Let the heaviest rupture plant a thread: the break that hurts most should also open a new unknown — the betrayal that hints at a wider conspiracy, the severed alliance that raises the question of who the protagonist can now trust. A rupture that seeds a clue turns an ending into a beginning, converting relational loss into forward pull.',
           });
         }
@@ -2405,10 +2405,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       }
       if (maxPosRun436a >= 3) {
         issues.push({
-          location: `Scenes ${maxPosStart436a}–${maxPosStart436a + maxPosRun436a - 1} — positive relationship spiral`,
+          location: `Scenes ${maxPosStart436a + 1}–${maxPosStart436a + maxPosRun436a} — positive relationship spiral`,
           rule: 'CONFLICT_POSITIVE_SPIRAL',
           severity: 'minor',
-          description: `${maxPosRun436a} consecutive scenes (${maxPosStart436a}–${maxPosStart436a + maxPosRun436a - 1}) each carry a positive relationship shift while the story also has ${ruptureCount436a} rupture scenes. The relational world warms for ${maxPosRun436a} scenes without interruption. Conflict lives in contrast — a bond improving matters only against a background of bonds under stress. An extended upswing without friction teaches the audience that the relational world is safe, draining the tension from every scene in the spiral.`,
+          description: `${maxPosRun436a} consecutive scenes (${maxPosStart436a + 1}–${maxPosStart436a + maxPosRun436a}) each carry a positive relationship shift while the story also has ${ruptureCount436a} rupture scenes. The relational world warms for ${maxPosRun436a} scenes without interruption. Conflict lives in contrast — a bond improving matters only against a background of bonds under stress. An extended upswing without friction teaches the audience that the relational world is safe, draining the tension from every scene in the spiral.`,
           suggestedFix: 'Interrupt the warmth: introduce a complication, a misunderstanding, or a small fracture within the positive spiral so the upswing feels earned against resistance rather than uncontested. A single scene of relational friction within the spiral makes the warmth around it feel more fragile and therefore more meaningful.',
         });
       }
@@ -2723,10 +2723,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       if (!hasCause464c) {
         const peakRec464c = (records as any[])[peakPos464c];
         issues.push({
-          location: `Scene ${peakRec464c.sceneIdx} — heaviest rupture (magnitude ${peakMag464c.toFixed(2)})`,
+          location: `Scene ${peakRec464c.sceneIdx + 1} — heaviest rupture (magnitude ${peakMag464c.toFixed(2)})`,
           rule: 'CONFLICT_PEAK_RUPTURE_UNCAUSED',
           severity: 'minor',
-          description: `The story's heaviest rupture (Scene ${peakRec464c.sceneIdx}, negative-shift magnitude ${peakMag464c.toFixed(2)}) has no escalation, revelation, dramatic turn, or clock raise in either of the two scenes before it — the deepest fracture arrives without preparation. The bond that breaks hardest does so with no rising pressure, no precipitating discovery, and no pivot leading into it. A major rupture should be the culmination of accumulating strain; when the biggest one appears out of a calm run-up, it reads as an authorial decree rather than the breaking point of a tension the audience watched build.`,
+          description: `The story's heaviest rupture (Scene ${peakRec464c.sceneIdx + 1}, negative-shift magnitude ${peakMag464c.toFixed(2)}) has no escalation, revelation, dramatic turn, or clock raise in either of the two scenes before it — the deepest fracture arrives without preparation. The bond that breaks hardest does so with no rising pressure, no precipitating discovery, and no pivot leading into it. A major rupture should be the culmination of accumulating strain; when the biggest one appears out of a calm run-up, it reads as an authorial decree rather than the breaking point of a tension the audience watched build.`,
           suggestedFix: `Build a gradient into the heaviest rupture: in the two scenes before the story's deepest fracture, plant the pressure that makes it inevitable — a rising suspense beat, a revelation that exposes the fault line, a turn that forces the confrontation, or a clock that makes the break unavoidable. The biggest break should land as the snap of a strain the audience felt tightening, not as a sudden severing from nowhere.`,
         });
       }
@@ -2922,10 +2922,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const closingPosSuspense492b = closing492b.filter(r => (r.suspenseDelta ?? 0) > 0).length;
       if (openMidPosSuspense492b >= 2 && closingPosSuspense492b === 0) {
         issues.push({
-          location: `Closing third (scenes ${2 * third492b}–${n492b - 1}) — no positive suspenseDelta`,
+          location: `Closing third (scenes ${2 * third492b + 1}–${n492b}) — no positive suspenseDelta`,
           rule: 'CONFLICT_CLOSING_SUSPENSE_VOID',
           severity: 'minor',
-          description: `The final third of the story (scenes ${2 * third492b}–${n492b - 1}) contains no scene with rising suspense (positive suspenseDelta), even though ${openMidPosSuspense492b} suspense-escalating scene(s) exist in the opening and middle. The climax approach carries no new tension build — the home stretch generates no visceral urgency. Suspense is an audience-facing signal of mounting threat; when it vanishes in the final third while the earlier acts used it freely, the story's closing movement risks feeling like a release from tension rather than its peak. The final third should carry the story's highest sustained suspense, not its lowest.`,
+          description: `The final third of the story (scenes ${2 * third492b + 1}–${n492b}) contains no scene with rising suspense (positive suspenseDelta), even though ${openMidPosSuspense492b} suspense-escalating scene(s) exist in the opening and middle. The climax approach carries no new tension build — the home stretch generates no visceral urgency. Suspense is an audience-facing signal of mounting threat; when it vanishes in the final third while the earlier acts used it freely, the story's closing movement risks feeling like a release from tension rather than its peak. The final third should carry the story's highest sustained suspense, not its lowest.`,
           suggestedFix: `Introduce at least one scene in the final third that escalates suspense — a threat that tightens, a revelation that raises the stakes, a confrontation that forces the protagonist into a position with no easy exit. The closing act should feel like pressure accumulating toward an inevitable breaking point, not like a wind-down from the tensions the earlier acts established.`,
         });
       }
@@ -3095,10 +3095,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         const anyInFinal506c = repairPositions506c.some(p => p >= 2 * third506c);
         if (!anyInFinal506c) {
           issues.push({
-            location: `${repairPositions506c.length} repair scene(s) — none in the final third (scenes ${2 * third506c}–${n506c - 1})`,
+            location: `${repairPositions506c.length} repair scene(s) — none in the final third (scenes ${2 * third506c + 1}–${n506c})`,
             rule: 'CONFLICT_REPAIR_CLOSING_ABSENT',
             severity: 'minor',
-            description: `The script has ${repairPositions506c.length} scene(s) with a positive relationship shift (bond-repair or bond-warming), but none falls in the final structural third (scenes ${2 * third506c}–${n506c - 1}). The closing act — where the story's emotional arc is meant to resolve — contains no relational healing. The protagonist crosses into the climax with every fractured relationship still unrepaired, leaving the resolution zone as pure wound. A screenplay's final third should carry at least the beginning of relational resolution: even a partial repair, a moment of acknowledged warmth, or an alliance restored can provide the emotional counterpoint that gives the climax its weight.`,
+            description: `The script has ${repairPositions506c.length} scene(s) with a positive relationship shift (bond-repair or bond-warming), but none falls in the final structural third (scenes ${2 * third506c + 1}–${n506c}). The closing act — where the story's emotional arc is meant to resolve — contains no relational healing. The protagonist crosses into the climax with every fractured relationship still unrepaired, leaving the resolution zone as pure wound. A screenplay's final third should carry at least the beginning of relational resolution: even a partial repair, a moment of acknowledged warmth, or an alliance restored can provide the emotional counterpoint that gives the climax its weight.`,
             suggestedFix: `Introduce at least one positive relationship shift in the final third — a small reconciliation, an alliance restored, or a moment of warmth between estranged characters. The repair need not be complete or permanent; even a partial thaw or a single moment of acknowledged warmth in the final act gives the audience the relational counterpoint that makes the climax emotionally complete rather than uniformly harsh.`,
           });
         }
@@ -3206,10 +3206,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       const anyInFinal520c = (records as any[]).slice(2 * third520c).some(r => (r.curiosityDelta ?? 0) > 0);
       if (!anyInFinal520c) {
         issues.push({
-          location: `final third (scenes ${2 * third520c}–${n520c - 1}): no curiosity rise`,
+          location: `final third (scenes ${2 * third520c + 1}–${n520c}): no curiosity rise`,
           rule: 'CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT',
           severity: 'minor',
-          description: `The script raises curiosity in ${curiosScenes520c.length} scene(s) but none fall in the final structural third (scenes ${2 * third520c}–${n520c - 1}). The closing act is where unresolved questions should be at their most urgent — the audience's wondering should peak as the story approaches its resolution. When the curiosity channel goes silent precisely in the closing zone, the story answers its open questions (or simply stops raising new ones) before the climax, and the audience enters the resolution already knowing (or no longer wondering) rather than straining toward disclosure.`,
+          description: `The script raises curiosity in ${curiosScenes520c.length} scene(s) but none fall in the final structural third (scenes ${2 * third520c + 1}–${n520c}). The closing act is where unresolved questions should be at their most urgent — the audience's wondering should peak as the story approaches its resolution. When the curiosity channel goes silent precisely in the closing zone, the story answers its open questions (or simply stops raising new ones) before the climax, and the audience enters the resolution already knowing (or no longer wondering) rather than straining toward disclosure.`,
           suggestedFix: `Introduce at least one curiosity-raising beat in the final structural third — a partial disclosure that opens a new angle, a detail that reframes what the audience thought they understood, or an unanswered question that the climax must resolve. Wonder that peaks just before the ending is the most powerful engine for keeping the audience invested through the final scenes.`,
         });
       }
@@ -3376,20 +3376,20 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           });
           if (!hasCause548a) {
             issues.push({
-              location: `Scene ${(records as any[])[peakIdx548a].sceneIdx} — peak repair (magnitude ${peak548a.mag.toFixed(2)})`,
+              location: `Scene ${(records as any[])[peakIdx548a].sceneIdx + 1} — peak repair (magnitude ${peak548a.mag.toFixed(2)})`,
               rule: 'CONFLICT_PEAK_REPAIR_UNCAUSED',
               severity: 'minor',
-              description: `The story's most significant positive relationship shift (+${peak548a.mag.toFixed(2)}) at Scene ${(records as any[])[peakIdx548a].sceneIdx} has no rupture, revelation, dramatic turn, or clock raise in the two preceding scenes — the peak reconciliation arrives without visible cause. The most emotionally significant repair in the entire story should be the most earned: a disclosure that dissolves a misunderstanding, a turn that removes an obstacle, or a threat that forces estranged characters back together. A spontaneous peak repair reads as authorial convenience rather than character consequence.`,
+              description: `The story's most significant positive relationship shift (+${peak548a.mag.toFixed(2)}) at Scene ${(records as any[])[peakIdx548a].sceneIdx + 1} has no rupture, revelation, dramatic turn, or clock raise in the two preceding scenes — the peak reconciliation arrives without visible cause. The most emotionally significant repair in the entire story should be the most earned: a disclosure that dissolves a misunderstanding, a turn that removes an obstacle, or a threat that forces estranged characters back together. A spontaneous peak repair reads as authorial convenience rather than character consequence.`,
               suggestedFix: 'Add a cause for the peak repair in the one or two scenes before it: a revelation that reframes what went wrong between the characters, a dramatic turn that changes the stakes so that the estrangement no longer makes sense, a shared threat that forces cooperation, or a rupture whose extremity prompts immediate remorse. The story\'s most important reconciliation should arrive as the most inevitable consequence.',
             });
           }
         } else if (peakIdx548a < 2) {
           // Peak repair is in scene 0 or 1 — inherently uncaused by script structure
           issues.push({
-            location: `Scene ${(records as any[])[peakIdx548a].sceneIdx} — peak repair (magnitude ${peak548a.mag.toFixed(2)})`,
+            location: `Scene ${(records as any[])[peakIdx548a].sceneIdx + 1} — peak repair (magnitude ${peak548a.mag.toFixed(2)})`,
             rule: 'CONFLICT_PEAK_REPAIR_UNCAUSED',
             severity: 'minor',
-            description: `The story's most significant positive relationship shift (+${peak548a.mag.toFixed(2)}) occurs at Scene ${(records as any[])[peakIdx548a].sceneIdx} — in the opening scenes, before any prior cause can exist. The peak reconciliation is the story's first event; repairs this early in a script have no buildup and no earned context.`,
+            description: `The story's most significant positive relationship shift (+${peak548a.mag.toFixed(2)}) occurs at Scene ${(records as any[])[peakIdx548a].sceneIdx + 1} — in the opening scenes, before any prior cause can exist. The peak reconciliation is the story's first event; repairs this early in a script have no buildup and no earned context.`,
             suggestedFix: 'Move the most significant repair later in the story so it can follow a visible cause — a revelation, a rupture, or a dramatic turn. The biggest reconciliation should arrive at the moment of maximum earned context, not at the opening.',
           });
         }
@@ -3428,10 +3428,10 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         );
         if (!anyClockInFinalThird548b) {
           issues.push({
-            location: `final third (scenes ${2 * third548b}–${n548b - 1}): no clock raised`,
+            location: `final third (scenes ${2 * third548b + 1}–${n548b}): no clock raised`,
             rule: 'CONFLICT_CLOSING_CLOCK_ABSENT',
             severity: 'minor',
-            description: `The story raises a clock (clockRaised) ${clocksInFirstTwoThirds548b} time(s) in its first two-thirds but never in the final structural third (scenes ${2 * third548b}–${n548b - 1}). The deadline urgency engine goes silent as the story approaches its climax. Without clock pressure in the closing act, the climax must find urgency through other means — and the visceral time-pressure that clock scenes create (the "or else" that makes every decision consequential) is absent at the moment the audience most needs to feel it. A clock that runs only through the setup and midpoint then stops forces the closing act to generate urgency without the story's strongest urgency tool.`,
+            description: `The story raises a clock (clockRaised) ${clocksInFirstTwoThirds548b} time(s) in its first two-thirds but never in the final structural third (scenes ${2 * third548b + 1}–${n548b}). The deadline urgency engine goes silent as the story approaches its climax. Without clock pressure in the closing act, the climax must find urgency through other means — and the visceral time-pressure that clock scenes create (the "or else" that makes every decision consequential) is absent at the moment the audience most needs to feel it. A clock that runs only through the setup and midpoint then stops forces the closing act to generate urgency without the story's strongest urgency tool.`,
             suggestedFix: 'Re-invoke the clock in the final third: escalate the deadline (a second, closer deadline), reveal a new consequence of failure, or show the original deadline expiring with immediate effect. The closing act is where all the ticking should culminate — the audience should feel time running out as the protagonist makes their last moves.',
           });
         }
@@ -7135,11 +7135,11 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         );
         if (!priorStrain1192) {
           issues.push({
-            location: `Scene ${i} (${records[i].slug})`,
+            location: `Scene ${i + 1} (${records[i].slug})`,
             rule: 'BETRAYAL_WITHOUT_SETUP',
             severity: 'major',
-            description: `Scene ${i} spikes with betrayal language (net betrayal signal ${spike1192}) but the entire ${i}-scene run-up contains zero strain: no relationship sours even slightly, and not one earlier scene carries so much as a single net betrayal-leaning word. Trust is declared violated without the audience ever having watched it fray — the betrayal lands as an authorial coin-flip instead of a reveal of pressure that was already there.`,
-            suggestedFix: `Seed the fracture before Scene ${i}: an earlier scene where the eventual betrayer hedges, withholds, or quietly benefits from the other's blind spot — even one negative beat between the pair, or a stray note of disloyalty in the prose, converts the spike from arbitrary to inevitable-in-hindsight.`,
+            description: `Scene ${i + 1} spikes with betrayal language (net betrayal signal ${spike1192}) but the entire ${i}-scene run-up contains zero strain: no relationship sours even slightly, and not one earlier scene carries so much as a single net betrayal-leaning word. Trust is declared violated without the audience ever having watched it fray — the betrayal lands as an authorial coin-flip instead of a reveal of pressure that was already there.`,
+            suggestedFix: `Seed the fracture before Scene ${i + 1}: an earlier scene where the eventual betrayer hedges, withholds, or quietly benefits from the other's blind spot — even one negative beat between the pair, or a stray note of disloyalty in the prose, converts the spike from arbitrary to inevitable-in-hindsight.`,
           });
         }
         break; // audit only the FIRST spike — later spikes have this one as their setup
