@@ -76,6 +76,13 @@ jobs:
       # — a flake source, an outbound network dependency, and a posture the
       # suite was never meant to test. The full suite passes keyless.
       - name: Run tests (keyless — analysis-only posture)
+        # RUN_E2E gates tests/e2e/journeys.test.ts — the only full-stack test
+        # (boots a real server, drives the writer journey over HTTP). It was
+        # skipped on every CI run since it was written; first executed
+        # 2026-08-03 (10/10, ~3s, three consecutive clean runs). No reason to
+        # leave the one end-to-end check dark: enabled.
+        env:
+          RUN_E2E: "1"
         run: npm test
 
       # Reports which env-gated suites did NOT run. Non-blocking by design:
