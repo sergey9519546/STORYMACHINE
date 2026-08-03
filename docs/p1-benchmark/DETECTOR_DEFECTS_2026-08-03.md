@@ -228,11 +228,42 @@ only three of which touch `structure.ts`, and none disables the zone model.
 There is no code path by which a writer can declare a draft is not three-act.
 
 **Confidence.** High on mechanism (every rule read from source, unconditional,
-traced to `health`). Moderate on magnitude — no Kishōtenketsu script has been
-run. **Settling it is cheap and requires no scoring change:** write or generate
-2-3 scripts to the engine's own beat template, run `runScriptDoctor`, and diff
-the issue list, `arcIncoherenceDeduction`, and health against a
-matched-quality three-act control. That should happen before any fix.
+traced to `health`).
+
+**MAGNITUDE: TESTED AND REFUTED at short-fixture scale (2026-08-03).** The
+experiment this entry called for was run — see
+`STRUCTURAL_FORM_EXPERIMENT_2026-08-03.md`. Two matched pairs (12 and 16
+scenes; the 16-scene pair deliberately clears `ARC_DED_MIN_SCENES = 15` so the
+arc deduction is actually exercised), written to the engine's own beat
+templates, matched on scene count, word count, and craft — with the opening
+scenes textually identical between arms where both templates agree, so the
+comparison isolates form.
+
+Result: **health 78.3 vs 78.3, and 81.0 vs 81.3.** No verdict boundary
+crossed. Every one of the eight rules predicted above either did not fire at
+all, fired identically on both forms, or fired ONLY on the three-act control —
+the opposite of the predicted direction.
+
+So the inference "and therefore Kishōtenketsu drafts are penalized" is NOT
+supported at the scale tested. The most likely explanation is the irony this
+document should state plainly: the engine's order-blindness — the same defect
+failing P1's discrimination gate, where CLIMAX_RELOCATE sits at 0.523 — also
+prevents it from noticing structural form at all. A score that cannot detect
+scene order cannot penalize an unconventional order.
+
+**What this does NOT retract:** the mechanism above is real and remains
+correctly documented. `StoryContext` still has no `structure` field, the
+engine's own Kishōtenketsu definition still never reaches scoring, and those
+rules still fire unconditionally. If the structural channels are ever fixed —
+which is exactly what P1 aims to do — this defect becomes live, because a
+score that CAN see order will start seeing unconventional order as wrong. Treat
+D7 as a constraint on how P1's structural work is designed, not as a bug to
+patch today.
+
+**Limitation to respect:** short fixtures are not feature-length screenplays,
+N=2 per arm is an existence check rather than a rate, and many zone rules gate
+on scene count. This refutes the prediction at the tested scale; it does not
+establish form-neutrality at feature scale.
 
 **Fix shape.** Cheapest honest mitigation is a report-level caveat (no scoring
 change, no P1 gate): when enough of the rules above co-fire, say plainly that

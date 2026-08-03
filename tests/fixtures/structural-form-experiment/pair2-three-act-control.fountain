@@ -1,0 +1,167 @@
+// Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
+// Three-act CONTROL, Pair 2 (n=16 scenes), matched to
+// pair2-kishotenketsu.fountain: same protagonist, setting, scene count, and
+// prose register — restructured around structure-presets.ts's three_act
+// template (Act One 0-22%, Inciting 22-28%, Act Two 28-72%, Climax 72-86%,
+// Act Three 86-100%). Scenes 1-3 are textually identical to the
+// kishotenketsu arm; the antagonist and escalating conflict enter at scene 4,
+// exactly where the beat maps diverge, and the story resolves with a public
+// confrontation and a clear winner and loser, unlike the kishotenketsu arm's
+// synthesis ending.
+
+INT. AMARO CONSERVATION STUDIO - MORNING
+
+Tall north-facing windows, even gray light. YUKI AMARO, mid-30s, leans over a slanted table with a bone folder and a jeweler's loupe, easing a brittle fold flat on a hundred-year-old atlas page. Wheat paste, brushes, weighted sandbags arranged with surgical precision.
+
+YUKI
+(not looking up)
+Come around from the left. The light's better and you won't cast a shadow on the seam.
+
+She works the fold another millimeter, exhales.
+
+INT. STUDIO - STORAGE ROOM - CONTINUOUS
+
+Shelves of flat archival boxes, each labeled in careful block print. Yuki slides one free: THORN COLLECTION — 1947 REPRINT, VOL. 3. She holds it a moment before carrying it out, the way you'd hold something that used to belong to someone.
+
+INT. STUDIO - MAIN ROOM - LATER
+
+DEV OKAFOR, 20s, apprentice, sets two coffees down without being asked and peers at the open atlas.
+
+DEV
+Thorn's the one you trained under?
+
+YUKI
+Nineteen years. He restored this exact volume in '91, before I ever touched a bone folder. I'm just re-lining page thirty-four. Foxing's spread since the last treatment.
+
+DEV
+Feels like restoring someone's restoration.
+
+YUKI
+It usually is, eventually. That's the job.
+
+INT. STUDIO - MAIN ROOM - AFTERNOON
+
+MARGO OYELARAN, 50s, auction house liaison, arrives unannounced with a folder of photographs, sets them down hard enough to rattle the loupe.
+
+MARGO
+Someone's consigning a second "original" 1947 Thorn atlas at Kessler's. Near-identical to yours. Your provenance signature's on both files.
+
+YUKI
+There's only one original. It's on this table.
+
+MARGO
+Then someone's using your name to sell the other one.
+
+INT. STUDIO - MAIN ROOM - EVENING
+
+Yuki and Dev dig through client records and backup drives. One external drive — restoration notes, technique photographs, four months of documentation — is missing from its labeled slot. No break-in reported; nothing "valuable" seemed to be taken at the time.
+
+DEV
+Nobody flagged this because nobody thought notes were worth stealing.
+
+YUKI
+Somebody did.
+
+INT. AUCTION HOUSE - PREVIEW ROOM - DAY
+
+Yuki examines the rival atlas under glass, gloved. The repair technique is uncannily hers — same wheat-paste ratio, same stitch along the spine. Margo watches from across the room, arms crossed, no longer entirely on Yuki's side.
+
+MARGO
+Convince me this isn't yours.
+
+YUKI
+It's my technique. It is not my work.
+
+EXT. CITY STREET - DAY
+
+Across four lanes of traffic, Yuki spots CALLUM REYES, late 20s, a folder under his arm, climbing into a cab before she can cross. Their eyes meet for one second through the window as it pulls away.
+
+YUKI
+(to Dev, breathless)
+That's Callum.
+
+INT. STUDIO - MAIN ROOM - NIGHT
+
+Yuki lays it out for Dev, pacing.
+
+YUKI
+Callum apprenticed here two years. I let him go for cutting corners on lining work. He had drive access the month the drive went missing.
+
+DEV
+So he's not just copying your technique. He's selling it as your name.
+
+INT. AUCTION HOUSE - MARGO'S OFFICE - DAY
+
+Margo, cornered by pressure from the consignor, lays it out flat.
+
+MARGO
+Friday's sale, lot forty-one. Bring me hard forensic proof it's a forgery before the gavel, or I pull every one of your consignments and every referral I've ever sent you.
+
+YUKI
+And if I can't get proof by Friday?
+
+MARGO
+Then as far as this house is concerned, the fraud's yours to answer for, not his.
+
+INT. STUDIO - MAIN ROOM - NIGHT
+
+Yuki and Dev run ink-aging tests on a paper sample smuggled from the preview room, comparing spectra on a laptop screen. The ink is modern, deliberately mixed to mimic period oxidation — close enough to fool a casual eye, not close enough to fool a spectrometer.
+
+DEV
+It's good. It's just not old.
+
+YUKI
+Good enough to sell. Not good enough to survive a UV pass.
+
+INT. STUDIO - MAIN ROOM - NIGHT (LATER)
+
+Yuki's phone buzzes: an unknown number, a photo attachment of her own stolen notebook pages, captioned CAREFUL WHOSE NAME YOU PUT ON THINGS. Dev reads it over her shoulder. Outside, Friday is two days away.
+
+DEV
+He knows you're close.
+
+YUKI
+Then we get closer.
+
+INT. AUCTION HOUSE - SALE FLOOR - DAY (FRIDAY)
+
+Bidding underway on lot forty-one. Callum sits near the front, composed, a paddle balanced on his knee. Yuki strides down the aisle with Dev and a folder of forensic results, interrupting the auctioneer mid-call.
+
+YUKI
+Lot forty-one is a forgery. I can prove it to everyone in this room, right now.
+
+A ripple through the crowd. Callum doesn't move, but his knuckles whiten on the paddle.
+
+INT. AUCTION HOUSE - SALE FLOOR - CONTINUOUS
+
+Yuki lays the ink-aging results across the podium and pulls up a UV scan on a tablet: a fingerprint smudge embedded beneath a "period" repair — Callum's own print, left copying her stitch pattern too carefully. Callum tries to argue provenance; his voice thins under the room's stare. Security moves in. He's escorted out past rows of turned heads.
+
+CALLUM
+(low, passing her)
+You always did check your seams too closely.
+
+YUKI
+Somebody had to teach me that.
+
+INT. STUDIO - MAIN ROOM - DAY (LATER)
+
+Yuki's phone on speaker; Margo's voice, brisk and relieved.
+
+MARGO (V.O.)
+Consignments are reinstated. The forged atlas is pulled from record, permanently.
+
+Yuki sets the phone down and finally sits.
+
+INT. STUDIO - MAIN ROOM - DAY
+
+Yuki and Dev return the real atlas to its archival box. A locksmith finishes installing a new deadbolt on the storage room door, hands Yuki two keys.
+
+DEV
+Only two copies this time.
+
+YUKI
+Only two people who need one.
+
+INT. STUDIO - MAIN ROOM - DUSK
+
+Yuki labels a fresh box in careful block print: AMARO CONSERVATION — VERIFIED, and sets it on the shelf beside the others. She switches off the lamp, the studio quiet, the threat gone.
