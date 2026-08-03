@@ -464,23 +464,13 @@
     "group": "calibration-strong",
     "clean": {
       "sceneCount": 10,
-      "contradictionCount": 1,
+      "contradictionCount": 0,
       "buckets": {
         "bookkeeping": 0,
-        "explicit": 1,
+        "explicit": 0,
         "indeterminate": 0
       },
-      "contradictions": [
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between EXT. CONTAINER YARD - CONTINUOUS and EXT. CONTAINER YARD - MOMENTS LATER (meets) conflicts with the inverse of the explicit ordering back from EXT. CONTAINER YARD - MOMENTS LATER (before|meets|after|starts|started-by|equals|overlaps)",
-          "affectedScenes": [
-            "8"
-          ],
-          "classification": "explicit"
-        }
-      ]
+      "contradictions": []
     },
     "degradations": {
       "SCENE_SHUFFLE": {
@@ -495,43 +485,23 @@
       },
       "MIDPOINT_DROP": {
         "sceneCount": 8,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between EXT. CONTAINER YARD - CONTINUOUS and EXT. CONTAINER YARD - MOMENTS LATER (meets) conflicts with the inverse of the explicit ordering back from EXT. CONTAINER YARD - MOMENTS LATER (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "6"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       },
       "CLIMAX_RELOCATE": {
         "sceneCount": 10,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between EXT. CONTAINER YARD - CONTINUOUS and EXT. CONTAINER YARD - MOMENTS LATER (meets) conflicts with the inverse of the explicit ordering back from EXT. CONTAINER YARD - MOMENTS LATER (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "9"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       }
     }
   },
@@ -540,253 +510,13 @@
     "group": "calibration-strong",
     "clean": {
       "sceneCount": 10,
-      "contradictionCount": 6,
+      "contradictionCount": 0,
       "buckets": {
         "bookkeeping": 0,
-        "explicit": 6,
+        "explicit": 0,
         "indeterminate": 0
       },
-      "contradictions": [
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
-          "affectedScenes": [
-            "3"
-          ],
-          "classification": "explicit"
-        },
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-          "affectedScenes": [
-            "4"
-          ],
-          "classification": "explicit"
-        },
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-          "affectedScenes": [
-            "5"
-          ],
-          "classification": "explicit"
-        },
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|after)",
-          "affectedScenes": [
-            "6"
-          ],
-          "classification": "explicit"
-        },
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK VESTIBULE - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-          "affectedScenes": [
-            "7"
-          ],
-          "classification": "explicit"
-        },
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-          "affectedScenes": [
-            "8"
-          ],
-          "classification": "explicit"
-        }
-      ]
-    },
-    "degradations": {
-      "SCENE_SHUFFLE": {
-        "sceneCount": 10,
-        "contradictionCount": 4,
-        "buckets": {
-          "bookkeeping": 0,
-          "explicit": 4,
-          "indeterminate": 0
-        },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "2"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "3"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "4"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "9"
-            ],
-            "classification": "explicit"
-          }
-        ]
-      },
-      "MIDPOINT_DROP": {
-        "sceneCount": 8,
-        "contradictionCount": 4,
-        "buckets": {
-          "bookkeeping": 0,
-          "explicit": 4,
-          "indeterminate": 0
-        },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "3"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "4"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK VESTIBULE - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "5"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "6"
-            ],
-            "classification": "explicit"
-          }
-        ]
-      },
-      "CLIMAX_RELOCATE": {
-        "sceneCount": 10,
-        "contradictionCount": 6,
-        "buckets": {
-          "bookkeeping": 0,
-          "explicit": 6,
-          "indeterminate": 0
-        },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. NEGOTIATION VAN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. NEGOTIATION VAN - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "4"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. NEGOTIATION VAN - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "5"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "6"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK VESTIBULE - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK VESTIBULE - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "7"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK VESTIBULE - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "8"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. BANK LOBBY - CONTINUOUS and INT. BANK LOBBY - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. BANK LOBBY - CONTINUOUS (before|after)",
-            "affectedScenes": [
-              "9"
-            ],
-            "classification": "explicit"
-          }
-        ]
-      }
-    }
-  },
-  {
-    "id": "calibration/The Long Game",
-    "group": "calibration-strong",
-    "clean": {
-      "sceneCount": 10,
-      "contradictionCount": 1,
-      "buckets": {
-        "bookkeeping": 0,
-        "explicit": 1,
-        "indeterminate": 0
-      },
-      "contradictions": [
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. MUSEUM VAULT CORRIDOR - CONTINUOUS and INT. MUSEUM VAULT - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. MUSEUM VAULT - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-          "affectedScenes": [
-            "8"
-          ],
-          "classification": "explicit"
-        }
-      ]
+      "contradictions": []
     },
     "degradations": {
       "SCENE_SHUFFLE": {
@@ -801,43 +531,69 @@
       },
       "MIDPOINT_DROP": {
         "sceneCount": 8,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. MUSEUM VAULT CORRIDOR - CONTINUOUS and INT. MUSEUM VAULT - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. MUSEUM VAULT - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "6"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       },
       "CLIMAX_RELOCATE": {
         "sceneCount": 10,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. MUSEUM VAULT CORRIDOR - CONTINUOUS and INT. MUSEUM VAULT - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. MUSEUM VAULT - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "9"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
+      }
+    }
+  },
+  {
+    "id": "calibration/The Long Game",
+    "group": "calibration-strong",
+    "clean": {
+      "sceneCount": 10,
+      "contradictionCount": 0,
+      "buckets": {
+        "bookkeeping": 0,
+        "explicit": 0,
+        "indeterminate": 0
+      },
+      "contradictions": []
+    },
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "MIDPOINT_DROP": {
+        "sceneCount": 8,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
+      },
+      "CLIMAX_RELOCATE": {
+        "sceneCount": 10,
+        "contradictionCount": 0,
+        "buckets": {
+          "bookkeeping": 0,
+          "explicit": 0,
+          "indeterminate": 0
+        },
+        "contradictions": []
       }
     }
   },
@@ -984,84 +740,44 @@
     "group": "calibration-competent",
     "clean": {
       "sceneCount": 9,
-      "contradictionCount": 1,
+      "contradictionCount": 0,
       "buckets": {
         "bookkeeping": 0,
-        "explicit": 1,
+        "explicit": 0,
         "indeterminate": 0
       },
-      "contradictions": [
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE KITCHEN - CONTINUOUS and INT. FARMHOUSE PORCH - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE PORCH - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-          "affectedScenes": [
-            "6"
-          ],
-          "classification": "explicit"
-        }
-      ]
+      "contradictions": []
     },
     "degradations": {
       "SCENE_SHUFFLE": {
         "sceneCount": 9,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE DINING ROOM - CONTINUOUS and INT. FARMHOUSE KITCHEN - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE KITCHEN - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "8"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       },
       "MIDPOINT_DROP": {
         "sceneCount": 7,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE KITCHEN - CONTINUOUS and INT. FARMHOUSE PORCH - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE PORCH - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "4"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       },
       "CLIMAX_RELOCATE": {
         "sceneCount": 9,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. FARMHOUSE KITCHEN - CONTINUOUS and INT. FARMHOUSE PORCH - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. FARMHOUSE PORCH - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "7"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       }
     }
   },
@@ -1081,23 +797,13 @@
     "degradations": {
       "SCENE_SHUFFLE": {
         "sceneCount": 10,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SAFEHOUSE - CONTINUOUS and INT. TRAIN CAR - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. TRAIN CAR - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "3"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       },
       "MIDPOINT_DROP": {
         "sceneCount": 8,
@@ -1172,93 +878,44 @@
     "group": "calibration-competent",
     "clean": {
       "sceneCount": 10,
-      "contradictionCount": 1,
+      "contradictionCount": 0,
       "buckets": {
         "bookkeeping": 0,
-        "explicit": 1,
+        "explicit": 0,
         "indeterminate": 0
       },
-      "contradictions": [
-        {
-          "type": "transitive_violation",
-          "severity": "blocker",
-          "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-          "affectedScenes": [
-            "2"
-          ],
-          "classification": "explicit"
-        }
-      ]
+      "contradictions": []
     },
     "degradations": {
       "SCENE_SHUFFLE": {
         "sceneCount": 10,
-        "contradictionCount": 2,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 2,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|after|meets)",
-            "affectedScenes": [
-              "5"
-            ],
-            "classification": "explicit"
-          },
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|after|meets)",
-            "affectedScenes": [
-              "6"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       },
       "MIDPOINT_DROP": {
         "sceneCount": 8,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "2"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       },
       "CLIMAX_RELOCATE": {
         "sceneCount": 10,
-        "contradictionCount": 1,
+        "contradictionCount": 0,
         "buckets": {
           "bookkeeping": 0,
-          "explicit": 1,
+          "explicit": 0,
           "indeterminate": 0
         },
-        "contradictions": [
-          {
-            "type": "transitive_violation",
-            "severity": "blocker",
-            "explanation": "Transitive temporal constraint violated: inferred ordering between INT. SOC - CONTINUOUS and INT. SOC - CONTINUOUS (meets) conflicts with the inverse of the explicit ordering back from INT. SOC - CONTINUOUS (before|meets|after|starts|started-by|equals|overlaps)",
-            "affectedScenes": [
-              "3"
-            ],
-            "classification": "explicit"
-          }
-        ]
+        "contradictions": []
       }
     }
   },
