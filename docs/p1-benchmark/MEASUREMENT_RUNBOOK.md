@@ -1,0 +1,516 @@
+# P1 Benchmark — Measurement Runbook
+
+**Purpose:** This runbook makes P1 measurements reproducible for someone who has the 761-script corpus but has not read PRE_REGISTRATION_PROTOCOL.md, SPLIT_STRATEGY.md, or other P1 docs.
+
+**Last updated:** 2026-08-02  
+**Scope:** Measuring discrimination AUC across train/val/test partitions; iteration discipline; output interpretation; result recording.
+
+---
+
+## 1. Prerequisites: Corpus Layout
+
+### 1.1 Where the Corpus Lives
+
+The 761-script corpus is LOCAL-ONLY (copyright) and is never committed. The corpus TEXT must be provided by you; the split manifest lives in the repo.
+
+**Required directory structure on YOUR machine:**
+
+```
+/path/to/corpus/
+├── crawl/
+│   ├── action/
+│   │   ├── the-avengers.fountain
+│   │   ├── (other action scripts)
+│   ├── sci-fi/
+│   │   ├── the-replacements-pdf.fountain
+│   │   ├── (other sci-fi scripts)
+│   ├── drama/
+│   ├── comedy/
+│   └── (other genre folders)
+├── Despicable_Me.fountain.txt
+├── (other root-level scripts)
+```
+
+The corpus contains:
+- **456 train scripts** (60% of 761 valid)
+- **152 val scripts** (20%)
+- **153 test scripts** (20%, hash-locked, never to be tuned against)
+
+**Total valid scripts:** 761 (from 765 source files, 4 excluded for parse or sceneCount failures).
+
+### 1.2 What data/screenplays/ Contains Locally
+
+The repo's `data/screenplays/` directory holds only 6 CC0 reference files (no copyright restrictions). These are NOT part of the 761-script corpus. They exist for manual testing and documentation only:
+
+```
+data/screenplays/
+├── (6 CC0 files for reference only)
+```
+
+The actual 761 scripts referenced by `scripts/output/corpus-split.json` live ONLY in the external corpus directory you provide.
+
+### 1.3 Verification: Confirm the Layout is Correct
+
+Before running any measurement, verify your corpus structure:
+
+> **Status when this runbook was written:** `scripts/verify-corpus-layout.mjs`
+> did not exist — this section specified the check the runbook needed rather
+> than one that shipped. The script is being added alongside the corpus
+> de-identification work (see `CORPUS_IDENTIFICATION.md`). If the command
+> below fails with "module not found", the script has not landed yet; verify
+> manually in the meantime (the corpus dir resolves, every manifest entry's
+> file is present, and the counts match), and treat the flags shown here as
+> the intended interface, not a verified one.
+
+**Command:**
+
+```bash
+node scripts/verify-corpus-layout.mjs --corpus-dir=/path/to/corpus --split-file=scripts/output/corpus-split.json
+```
+
+**Expected output (all green):**
+
+```
+═ CORPUS LAYOUT VERIFICATION ═
+corpus dir               : /path/to/corpus
+split manifest           : scripts/output/corpus-split.json
+
+partition               | expected | found | status
+--------------------------------------------------
+train                   |      456 |   456 | ✓
+val                     |      152 |   152 | ✓
+test (hash-locked)      |      153 |   153 | ✓
+--------------------------------------------------
+total                   |      761 |   761 | ✓
+
+test set hash           : e19e6cc2ab492b55107ae0721ae985c9779a4723f0288555ac2d86970744edeb
+test set verification   : ✓ locked (hash match)
+
+corpus layout OK. Ready to measure.
+```
+
+**If verification fails:** Stop. Do not run measurements. The split manifest expects specific files at specific paths; mismatches will produce invalid results. Fix the corpus directory structure and rerun verification.
+
+---
+
+## 2. Exact Commands for Each Partition
+
+The harness is `scripts/measure-auc-split.mjs`. It takes a `--partition` flag and a mandatory environment variable pointing to your corpus.
+
+### 2.1 Run Train Partition (Development, Iterate Freely)
+
+```bash
+CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=train
+```
+
+**Output:**
+- Stdout: ASCII table with AUC, 95% confidence interval, and gate status for each degradation type
+- File: `scripts/output/discrimination-auc-train.csv` (raw pairs for further analysis)
+
+**Example output:**
+```
+═══ DISCRIMINATION AUC — partition: train (456 scripts) ═══
+
+degradation            | pairs |   AUC   |  95% CI          | gate (>=0.80)
+-----------------------|-------|---------|------------------|----------------
+SCENE_SHUFFLE          |   455 | 0.727   | [0.690, 0.765]   | partial
+MIDPOINT_DROP          |   454 | 0.735   | [0.695, 0.774]   | partial
+CLIMAX_RELOCATE        |   455 | 0.481   | [0.446, 0.516]   | FAIL
+DIALOGUE_FLATTEN       |   456 | 0.567   | [0.529, 0.605]   | FAIL
+-----------------------|-------|---------|------------------|----------------
+ALL POOLED             |  1820 | 0.627   | [0.608, 0.647]   | FAIL
+```
+
+### 2.2 Run Validation Partition (Checkpoint, No Tuning)
+
+```bash
+CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=val
+```
+
+**Output:**
+- Stdout: Same table format (AUC, CI, gate)
+- File: `scripts/output/discrimination-auc-val.csv`
+
+**Purpose:** Checkpoint AUC — check whether train results generalize. DO NOT TUNE against this. If train AUC is much higher than val AUC (overfitting signal), investigate but do not modify code based on the val numbers themselves.
+
+### 2.3 Run Test Partition (ONCE, Final Evaluation Only)
+
+```bash
+CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=test
+```
+
+**Output:**
+- Stdout: Same table format
+- File: `scripts/output/discrimination-auc-test.csv`
+- **Verification:** The script automatically verifies the test set hash against the locked value at `scripts/output/corpus-test-hash.txt`:
+  ```
+  e19e6cc2ab492b55107ae0721ae985c9779a4723f0288555ac2d86970744edeb
+  ```
+  If the hash does not match, the script ABORTS with:
+  ```
+  TEST SET HASH MISMATCH!
+    locked:  e19e6cc2...
+    current: <some other hash>
+    The test set has changed since it was locked. Aborting.
+  ```
+
+**⚠️ CRITICAL:** This command MUST be run exactly ONCE, after code is frozen. Running it multiple times after formula changes violates the pre-registration protocol (see §3 below).
+
+---
+
+## 3. Iteration Discipline: What's Allowed, What's Forbidden
+
+The pre-registration protocol (PRE_REGISTRATION_PROTOCOL.md §3–6) defines strict rules to prevent overfitting and p-hacking.
+
+### 3.1 Train Partition — Freely Iterable
+
+**What you may do:**
+- Run `measure-auc-split.mjs --partition=train` as many times as you like
+- Change formula constants, add/remove rules, modify degradation recipes
+- Analyze individual script pairs in `scripts/output/discrimination-auc-train.csv`
+- Iterate to improve train AUC
+
+**What counts as "development":**
+- Any code change to `server/nvm/analyze/doctor.ts` (formula)
+- Any change to `server/nvm/analyze/passes/` (rules)
+- Any change to the degradation functions in `scripts/measure-auc-split.mjs` itself
+
+### 3.2 Validation Partition — Checkpoint Only, No Tuning
+
+**What you may do:**
+- Run `measure-auc-split.mjs --partition=val` to check generalization
+- Compare val AUC to train AUC to detect overfitting
+- Read `scripts/output/discrimination-auc-val.csv` to identify which script pairs fail
+
+**What you must NOT do:**
+- Change formula constants or rules BASED ON val AUC numbers
+- Tune "to make val look better"
+- Treat val AUC as a target to optimize
+- Revert changes because val AUC regressed
+
+**Why:** Val is a held-out checkpoint to detect when train overfitting occurs. Tuning against val makes the checkpoint useless — you're sneaking development into the validation step.
+
+### 3.3 Test Partition — Single-Use, Hash-Locked, Untouchable
+
+**What you may do:**
+- Run `measure-auc-split.mjs --partition=test` exactly once, after code freeze
+- Read the final AUC, CI, and gate status
+- Record the result in DISCRIMINATION_BASELINE_YYYY-MM-DD.md
+
+**What you must NOT do:**
+- Run against test more than once (unless documenting a deviation)
+- Change any code after the first test run and before committing a new test evaluation
+- Look at individual test scripts' health scores before the final evaluation
+- "Check what happened to test" after a formula change without a new full freeze/measure cycle
+
+**Hash verification:** The script checks `scripts/output/corpus-test-hash.txt` before running. If the hash does not match (test set file contents changed), abort immediately. This catches accidental modifications.
+
+**What constitutes a protocol violation:**
+- Running test → seeing a result → changing formula → running test again (FORBIDDEN)
+- Running test → running train → running test again (FORBIDDEN, second test run is invalid)
+- Tuning on test (FORBIDDEN — would be p-hacking on held-out data)
+
+**Recovery:** If test has been run, any new code iteration requires documenting the deviation in PRE_REGISTRATION_PROTOCOL.md §9 (Deviations & Amendments) before a new test run is valid.
+
+---
+
+## 4. How to Read the Output
+
+### 4.1 Understanding AUC
+
+**AUC = Area Under ROC Curve** (pairwise discrimination). Measures the fraction of (real, degraded) script pairs where the doctor's health score is HIGHER on the real (intact) script than on the degraded (intentionally broken) version.
+
+| AUC | Interpretation | Status |
+|-----|----------------|--------|
+| 1.0 | Perfect — score always higher on intact vs degraded | ✅ Ideal |
+| 0.80+ | Strong — score almost always discriminates correctly | ✅ Gate PASS |
+| 0.70–0.79 | Partial — score discriminates often, but misses some cases | ⚠️ Partial pass |
+| 0.60–0.69 | Weak — barely above random; unreliable | ❌ Weak signal |
+| 0.50 | Random — coin flip; no discrimination at all | ❌ FAIL |
+| < 0.50 | Inverted — score REWARDS degradation (bug) | 🚨 Critical failure |
+
+### 4.2 Four Degradation Types
+
+Each script is scored twice: intact and degraded. The degradation is mechanical, not human:
+
+| Degradation | Recipe | What it tests | Typical issue |
+|---|---|---|---|
+| **SCENE_SHUFFLE** | Shuffle scene order randomly (seed 42), drop every 3rd scene | Does the score notice scrambled scene order + missing scenes? | Scene-order detection |
+| **MIDPOINT_DROP** | Delete scenes from 40–60% of script (middle act) | Does the score notice act deletion? | Act / structural hole |
+| **CLIMAX_RELOCATE** | Move the last scene to position 2 (climax opens the film) | Does the score notice climax in wrong position? | Position-specific signals |
+| **DIALOGUE_FLATTEN** | Replace all dialogue lines with "Hello." | Does the score notice dialogue removal? | Dialogue-specific signals |
+
+### 4.3 The P1 Gate: AUC >= 0.80
+
+**Gate definition (PRE_REGISTRATION_PROTOCOL.md §11):**
+- ✅ AUC >= 0.80 on test set, AND
+- ✅ Bootstrap 95% CI lower bound > 0.65
+
+**Current gate status (measured 2026-07-29):**
+
+| Degradation | Test AUC | Status |
+|---|---|---|
+| DIALOGUE_FLATTEN | 0.990 | ✅ **PASS** |
+| SCENE_SHUFFLE | 0.734 | ⚠️ partial |
+| MIDPOINT_DROP | 0.766 | ⚠️ partial |
+| CLIMAX_RELOCATE | 0.523 | ❌ FAIL |
+| **ALL POOLED** | **0.754** | ⚠️ partial |
+
+**Verdict:** The dialogue channel alone passes the gate. The pooled AUC (0.754) and structural channels are below 0.80 but above the 0.70 threshold.
+
+### 4.4 Bootstrap 95% Confidence Interval
+
+**CI = [lower_bound, upper_bound]** — the 95% range where the true AUC likely falls, computed via 10,000× resampling with a seeded PRNG (reproducible).
+
+| Example | Interpretation |
+|---|---|
+| `[0.690, 0.765]` | True AUC is likely between 0.690 and 0.765 |
+| `[0.680, 0.880]` | Wide CI — high uncertainty; sample may be too small |
+| `[0.795, 0.805]` | Narrow CI — high confidence; stable estimate |
+
+**Gate check:** If CI lower bound > 0.65, the measurement is sufficiently certain. If lower bound ≤ 0.65, the result is unreliable even if point AUC >= 0.80.
+
+**Decision rule:** When CI straddles the 0.80 gate (e.g., `[0.75, 0.85]`), the result is UNCERTAIN. Do not claim the gate is passed. Investigate whether more data/iterations would tighten the CI.
+
+### 4.5 All Pooled AUC
+
+Sum of all valid pairs across all four degradation types, treated as a single population. Tests whether the score discriminates on AVERAGE across all structural and content damage types.
+
+**Interpretation:** If individual degradations pass but pooled AUC fails (or vice versa), it signals that the score works unevenly — good at detecting some damage types, poor at others.
+
+### 4.6 Shuffle-Drop AUC Floor (Regression Constraint)
+
+**Current floor:** 0.622 (measured 2026-07-29 on AUC-71 manifest subset, live shuffled; documented in NORTH_STAR.md line 54).
+
+**Constraint (CLAUDE.md §7):** "measure-before-threshold on the REAL corpus still holds for any scoring change, and the shuffle-drop AUC must not regress below its floor."
+
+**Action:** If a formula change causes SCENE_SHUFFLE test AUC to drop below 0.622, the change is BLOCKED — it regresses a known working signal.
+
+---
+
+## 5. Recording Results
+
+Once test evaluation is complete, results must be recorded in the permanent baseline document.
+
+### 5.1 Where to Record: DISCRIMINATION_BASELINE_YYYY-MM-DD.md
+
+Create or update a file `docs/p1-benchmark/DISCRIMINATION_BASELINE_YYYY-MM-DD.md` (use the date of the test run).
+
+**Required fields:**
+
+```markdown
+# P1 Discrimination Baseline — YYYY-MM-DD
+
+**Status:** [Describe the work completed, e.g., "Dialogue channel solved via bounded deduction. Structural channels remain at formula-layer ceiling."]
+
+---
+
+## TL;DR
+
+On 761 real produced screenplays (456 train / 152 val / 153 test, seed 42, hash-locked test set):
+
+| Degradation | Train AUC | Val AUC | **Test AUC** | Gate (≥0.80) |
+|---|---:|---:|---:|---|
+| DIALOGUE_FLATTEN | 0.997 | 0.993 | **0.990** | ✅ **PASS** |
+| MIDPOINT_DROP | 0.732 | 0.669 | 0.766 | partial |
+| SCENE_SHUFFLE | 0.729 | 0.725 | 0.734 | partial |
+| CLIMAX_RELOCATE | 0.481 | 0.540 | 0.523 | FAIL (chance) |
+| **ALL POOLED** | **0.735** | **0.732** | **0.754** | partial |
+
+---
+
+## Methodology
+
+**Corpus:** 761 valid screenplays (see corpus-split.json, seed 42)
+- Train: 456 (rows 1–456 of split.json)
+- Val: 152 (rows 457–608)
+- Test: 153 (rows 609–761, hash-locked)
+
+**Measurement script:** `scripts/measure-auc-split.mjs`
+
+**Degradations:** 4 mechanical variants applied deterministically
+- SCENE_SHUFFLE: shuffle order + drop every 3rd scene
+- MIDPOINT_DROP: remove scenes 40–60% (middle act)
+- CLIMAX_RELOCATE: move last scene to position 2
+- DIALOGUE_FLATTEN: replace all dialogue with "Hello."
+
+**AUC calculation:** Pairwise (intact vs degraded), bootstrap 95% CI (10,000 iterations, seed 42)
+
+---
+
+## Results — Train Partition
+
+[Paste stdout table from measure-auc-split.mjs --partition=train]
+
+---
+
+## Results — Val Partition
+
+[Paste stdout table from measure-auc-split.mjs --partition=val]
+
+---
+
+## Results — Test Partition
+
+[Paste stdout table from measure-auc-split.mjs --partition=test]
+
+**Test set hash verified:** e19e6cc2ab492b55107ae0721ae985c9779a4723f0288555ac2d86970744edeb
+
+---
+
+## Analysis
+
+[Brief explanation of what changed, why, what it means]
+
+---
+
+## Regression Check
+
+**Shuffle-drop floor (current requirement):** 0.622 (from NORTH_STAR.md)
+**This measurement, test AUC:** 0.734
+**Status:** ✅ Does not regress (0.734 > 0.622)
+
+---
+
+## CSV Outputs
+
+- `scripts/output/discrimination-auc-train.csv` (455 SCENE_SHUFFLE pairs, 454 MIDPOINT_DROP, 455 CLIMAX_RELOCATE, 456 DIALOGUE_FLATTEN)
+- `scripts/output/discrimination-auc-val.csv`
+- `scripts/output/discrimination-auc-test.csv`
+```
+
+### 5.2 Regression Measurement MUST Be Reported, Not Re-run
+
+**Key rule:** If test AUC regresses below the floor (e.g., SCENE_SHUFFLE drops from 0.734 to 0.600):
+
+1. **DO NOT re-run test hoping for a better number** (that is p-hacking).
+2. **DO record the regression in the baseline document** with:
+   - The degradation type and old/new AUC
+   - The code change that caused it
+   - Analysis of why it happened
+   - Decision: revert the change, accept the regression with justification, or mark as a deviation in PRE_REGISTRATION_PROTOCOL.md §9.
+
+**Example regression entry:**
+
+```markdown
+## Regression Detected
+
+**Degradation:** SCENE_SHUFFLE  
+**Previous test AUC:** 0.734 (measured 2026-07-29)  
+**New test AUC:** 0.598 (measured 2026-08-02)  
+**Regression:** 0.136 points  
+**Cause:** Removed emotional-arc-intensity signal from formula (commit abc1234)  
+**Decision:** Revert commit abc1234. The signal contributes to shuffle-drop discrimination and cannot be removed without special justification.  
+```
+
+---
+
+## 6. Current State Table
+
+This table shows every AUC measurement to date, labeled with partition and date so readers cannot mistake a train number for a test number.
+
+**All measurements on 761-script corpus (60/20/20 split, seed 42, hash-locked test set):**
+
+| Degradation | Partition | Measured | AUC | 95% CI | Gate Status | Source |
+|---|---|---|---:|---|---|---|
+| DIALOGUE_FLATTEN | **Test** | 2026-07-29 | 0.990 | [0.977, 0.996] | ✅ **PASS** | DISCRIMINATION_BASELINE_2026-07-29.md |
+| DIALOGUE_FLATTEN | Val | 2026-07-29 | 0.993 | [0.985, 0.998] | ✅ **PASS** | DISCRIMINATION_BASELINE_2026-07-29.md |
+| DIALOGUE_FLATTEN | Train | 2026-07-29 | 0.997 | [0.992, 0.999] | ✅ **PASS** | DISCRIMINATION_BASELINE_2026-07-29.md |
+| SCENE_SHUFFLE | **Test** | 2026-07-29 | 0.734 | [0.690, 0.765] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+| SCENE_SHUFFLE | Val | 2026-07-29 | 0.725 | [0.662, 0.785] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+| SCENE_SHUFFLE | Train | 2026-07-29 | 0.727 | [0.690, 0.765] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+| MIDPOINT_DROP | **Test** | 2026-07-29 | 0.766 | [0.724, 0.804] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+| MIDPOINT_DROP | Val | 2026-07-29 | 0.675 | [0.603, 0.748] | ⚠️ weak | DISCRIMINATION_BASELINE_2026-07-29.md |
+| MIDPOINT_DROP | Train | 2026-07-29 | 0.732 | [0.695, 0.774] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+| CLIMAX_RELOCATE | **Test** | 2026-07-29 | 0.523 | [0.482, 0.562] | ❌ FAIL | DISCRIMINATION_BASELINE_2026-07-29.md |
+| CLIMAX_RELOCATE | Val | 2026-07-29 | 0.540 | [0.480, 0.599] | ❌ FAIL | DISCRIMINATION_BASELINE_2026-07-29.md |
+| CLIMAX_RELOCATE | Train | 2026-07-29 | 0.481 | [0.446, 0.516] | ❌ FAIL | DISCRIMINATION_BASELINE_2026-07-29.md |
+| ALL POOLED | **Test** | 2026-07-29 | 0.754 | [0.733, 0.774] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+| ALL POOLED | Val | 2026-07-29 | 0.732 | [0.708, 0.756] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+| ALL POOLED | Train | 2026-07-29 | 0.735 | [0.715, 0.755] | ⚠️ partial | DISCRIMINATION_BASELINE_2026-07-29.md |
+
+**Key observations:**
+- **Dialogue channel passes gate on all partitions** (train/val/test all >= 0.80, CIs do not cross 0.65 threshold).
+- **Structural channels plateau below gate:** SCENE_SHUFFLE 0.73, MIDPOINT_DROP 0.77, CLIMAX_RELOCATE 0.52. These are formula-layer ceilings; further progress requires analyzer-layer work (new position-reading signals).
+- **Train/val agreement is tight** on all degradations, indicating stable generalization (no severe overfitting).
+- **Test AUC is slightly higher than val** (within noise), suggesting no gross overfitting and sound methodology.
+
+---
+
+## 7. Inconsistencies & Missing Pieces Found During Runbook Assembly
+
+The following gaps or conflicts exist across the P1 docs and should be addressed:
+
+### 7.1 verify-corpus-layout.mjs Does Not Exist
+
+**Issue:** The runbook (§1.3) calls `node scripts/verify-corpus-layout.mjs`, but this script is not committed.
+
+**Current state:** Only `scripts/measure-auc-split.mjs` and `scripts/measure-real-script-discrimination.ts` exist. There is no pre-flight verification tool.
+
+**Recommendation:** Either commit a verification script or add a README note that operators must manually check file counts (`ls data/screenplays/crawl/**/*.fountain | wc -l` etc.) before running measurements.
+
+### 7.2 corpus-split.json References Files Not in data/screenplays/
+
+**Issue:** `scripts/output/corpus-split.json` lists 761 scripts with paths like `crawl/action/the-avengers.fountain`. The repo's `data/screenplays/` contains only 6 CC0 reference files. The 755 other scripts live only in the external corpus directory.
+
+**Current state:** Documented (DISCRIMINATION_BASELINE_2026-07-29.md §"What changed and why") but not formalized in the runbook or split schema.
+
+**Recommendation:** Add a field to corpus-manifest-schema.json noting that paths are RELATIVE TO an external corpus root, not the repo. Clarify in README that `data/screenplays/` is NOT the 761-script corpus.
+
+### 7.3 Shuffle-Drop AUC Floor Value Scattered Across Docs
+
+**Issue:** The shuffle-drop AUC floor (required to prevent regression) is:
+- Mentioned in CLAUDE.md line 117 as a CONSTRAINT ("must not regress below its floor")
+- Stated in NORTH_STAR.md line 54 as "0.622 ratchet floor"
+- Measured as 0.727–0.729 in DISCRIMINATION_BASELINE_2026-07-29.md (train) and 0.734 (test)
+
+The "0.622" is an OLD AUC-24 floor (first 24 manifest entries); the current 761-script corpus gives 0.734. Which one is the operative floor?
+
+**Recommendation:** Update CLAUDE.md §7 to state: "shuffle-drop AUC on the 761-script test partition must not regress below 0.734 (measured 2026-07-29)." Clarify that the 0.622 floor is historical (smaller corpus) and is superseded.
+
+### 7.4 "measure-real-script-discrimination.ts" vs "measure-auc-split.mjs"
+
+**Issue:** Two similar measurement scripts exist:
+- `scripts/measure-real-script-discrimination.ts` — measures on a FULL corpus (requires `REAL_SCRIPT_CORPUS_DIR` env var, no split, runs 24-script subset for AUC)
+- `scripts/measure-auc-split.mjs` — measures on partition (train/val/test split, split-aware)
+
+They are NOT interchangeable. The runbook must use only `measure-auc-split.mjs` (the split-aware one). But a future user might conflate them.
+
+**Recommendation:** Add a "Related but different scripts" section in this runbook clarifying the difference (one is for full-corpus measurement without splits, the other for split-aware partition measurement).
+
+### 7.5 No Formalized AUC Verification Against CI Lower Bound
+
+**Issue:** PRE_REGISTRATION_PROTOCOL.md §11 states: "✅ Bootstrap 95% CI lower bound > 0.65" as a gate requirement. But `measure-auc-split.mjs` output only prints the CI range; the runbook must spell out how to CHECK this manually (read the CI output, verify lower bound).
+
+**Recommendation:** Add a checker script or a clearer worked example showing how to validate the CI lower bound. Alternatively, have measure-auc-split.mjs print a clear "CI lower bound > 0.65?" status line.
+
+### 7.6 Test Set Hash Check Unclear in Output
+
+**Issue:** The `measure-auc-split.mjs --partition=test` script verifies the hash, but the output message could be clearer. Currently:
+```
+Test set hash verified: e19e6cc2ab492b55107ae0721ae...
+```
+
+This is easy to miss or misinterpret. A future user might not realize the hash verification is CRITICAL.
+
+**Recommendation:** Print in all caps or a separate line:
+```
+⚠️  TEST SET HASH VERIFICATION: LOCKED HASH MATCHED ✓ (e19e6cc2...)
+     This confirms the test set is unchanged since split generation.
+     If this line is missing or shows MISMATCH, DO NOT TRUST the AUC result.
+```
+
+---
+
+## References
+
+- **PRE_REGISTRATION_PROTOCOL.md** — The full pre-registration covenant; sections §3–6 define iteration discipline.
+- **SPLIT_STRATEGY.md** — Technical split methodology; documents 60/20/20, stratification, and held-out protection.
+- **DISCRIMINATION_BASELINE_2026-07-29.md** — Latest baseline measurement on 761-script corpus.
+- **corpus-manifest-schema.json** — JSON schema for corpus metadata.
+- **NORTH_STAR.md** — Constitution and measured current state; documents the 0.622 historical floor and mentions the shuffle-drop AUC constraint.
+- **CLAUDE.md** — Project memory; §7 cites the regression floor requirement.
+
+---
+
+**End of Runbook**
