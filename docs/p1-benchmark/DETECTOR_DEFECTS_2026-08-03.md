@@ -134,6 +134,47 @@ Adversarially confirmed but sits at the presentation/aggregation boundary:
   migration; only two scenes total carry clockRaised, which "appears in both
   halves" states in the most generous possible framing.
 
+## D6 — Clue lifecycle assigns setup/payoff order instead of observing it
+
+**Where:** `server/nvm/analyze/fountain-analyzer.ts` — `applyClueLifecycle`
+(~line 838), feeding `seededClueIds` / `payoffSetupIds` / `unresolvedClues`.
+
+**Found by:** the 2026-08-03 structural signal screen
+(`STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md`), not the report truth-audit —
+recorded here because it belongs to the same family and has the same shape.
+
+**Mechanism:**
+
+```ts
+const first = occ[0];
+const last = occ[occ.length - 1];
+```
+
+The seed is *defined* as an id's first occurrence and the payoff as its last,
+in document scan order. The setup→payoff relation is therefore assigned by
+construction, never observed.
+
+**Consequence:** the engine cannot detect a payoff that precedes its own
+setup — a real and recognizable craft error (an object, name, or fact used as
+though established before the draft establishes it). Whatever order the scenes
+arrive in, the first mention is relabeled "the setup" and the ordering error
+disappears. Measured: **0 inversions across 26 scripts × 3 order-destroying
+degradations** — a constant, not a weak signal. Any "setup-before-payoff
+ordering" metric built on these fields is measuring nothing, which is why it
+must not be added as a P1 structural signal in this form.
+
+**Fix shape (P1):** derive the lifecycle from evidence of introduction rather
+than from position — e.g. require the seeding occurrence to carry
+introduction-shaped language (a first-time noun phrase, an ALL-CAPS prop
+introduction, a marked reveal) and let the payoff be any later *use*, so that
+a use-before-introduction case is representable at all. Fixtures: positive =
+drafts with a genuine use-before-setup error; negative = correctly ordered
+plants. Corpus-measured before/after; the AUC-24 ratchet still applies.
+
+**Note on D4:** this is a distinct defect from D4 (content-word co-occurrence
+certified as "planted clues"). D4 is about *what counts* as a clue; D6 is about
+*how its lifecycle is ordered*. Fixing D4 alone would leave D6 intact.
+
 ---
 
 ## Checked and cleared (did not survive adversarial review)

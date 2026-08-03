@@ -1,0 +1,538 @@
+{
+  "generatedAt": "2026-08-03T05:49:36.755Z",
+  "scriptCount": 26,
+  "candidates": {
+    "1_intensityDelta_meanAbsDelta": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 8,
+          "tie": 14,
+          "loss": 4,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5769230769230769,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.577, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 12,
+          "tie": 7,
+          "loss": 7,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5961538461538461,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.596, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 5,
+          "tie": 14,
+          "loss": 7,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.46153846153846156,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.462, n=26)"
+      }
+    },
+    "1_intensityDelta_variance": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 4,
+          "tie": 15,
+          "loss": 7,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.4423076923076923,
+          "n": 26
+        },
+        "verdict": "DEAD — moves wrong direction (AUC 0.442, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 8,
+          "tie": 7,
+          "loss": 11,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.4423076923076923,
+          "n": 26
+        },
+        "verdict": "DEAD — moves wrong direction (AUC 0.442, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 5,
+          "tie": 13,
+          "loss": 8,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.4423076923076923,
+          "n": 26
+        },
+        "verdict": "DEAD — moves wrong direction (AUC 0.442, n=26)"
+      }
+    },
+    "1_intensityDelta_monotoneRuns": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 10,
+          "tie": 11,
+          "loss": 5,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5961538461538461,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.596, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 15,
+          "loss": 11,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.28846153846153844,
+          "n": 26
+        },
+        "verdict": "DEAD — moves wrong direction (AUC 0.288, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 8,
+          "tie": 13,
+          "loss": 5,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5576923076923077,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.558, n=26)"
+      }
+    },
+    "2_forwardReference_count": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 1,
+          "tie": 22,
+          "loss": 3,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.46153846153846156,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.462, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 21,
+          "loss": 5,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.40384615384615385,
+          "n": 26
+        },
+        "verdict": "DEAD — moves wrong direction (AUC 0.404, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 2,
+          "tie": 23,
+          "loss": 1,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5192307692307693,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      }
+    },
+    "2_forwardReference_density": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 1,
+          "tie": 22,
+          "loss": 3,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.46153846153846156,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.462, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 5,
+          "tie": 16,
+          "loss": 5,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.500, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 2,
+          "tie": 23,
+          "loss": 1,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5192307692307693,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      }
+    },
+    "3_emotionalShift_sameRuns": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 5,
+          "tie": 20,
+          "loss": 1,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5769230769230769,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.577, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 25,
+          "tie": 1,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.9807692307692307,
+          "n": 26
+        },
+        "verdict": "PROMISING (AUC 0.981, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 5,
+          "tie": 19,
+          "loss": 2,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5576923076923077,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.558, n=26)"
+      }
+    },
+    "3_emotionalShift_sameRunsRate": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 5,
+          "tie": 20,
+          "loss": 1,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5769230769230769,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.577, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 14,
+          "tie": 11,
+          "loss": 1,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.75,
+          "n": 26
+        },
+        "verdict": "PROMISING (AUC 0.750, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 5,
+          "tie": 19,
+          "loss": 2,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5576923076923077,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC near chance, 0.558, n=26)"
+      }
+    },
+    "3_emotionalShift_entropy": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 6,
+          "tie": 20,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.6153846153846154,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC 0.615, n=26)"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 14,
+          "tie": 11,
+          "loss": 1,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.75,
+          "n": 26
+        },
+        "verdict": "PROMISING (AUC 0.750, n=26)"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 6,
+          "tie": 20,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.6153846153846154,
+          "n": 26
+        },
+        "verdict": "WEAK (AUC 0.615, n=26)"
+      }
+    },
+    "4_setupBeforePayoff_inversions": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 26,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 26,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 26,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      }
+    },
+    "5_questionLatency_unresolvedRate": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 1,
+          "tie": 7,
+          "loss": 0,
+          "n": 8
+        },
+        "auc": {
+          "auc": 0.5625,
+          "n": 8
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 6,
+          "loss": 0,
+          "n": 6
+        },
+        "auc": {
+          "auc": 0.5,
+          "n": 6
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 2,
+          "tie": 6,
+          "loss": 0,
+          "n": 8
+        },
+        "auc": {
+          "auc": 0.625,
+          "n": 8
+        },
+        "verdict": "DEAD-leaning, n<10, AUC NOT COMPUTED (win 2/8)"
+      }
+    },
+    "5_questionLatency_resolutionRate": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 1,
+          "tie": 7,
+          "loss": 0,
+          "n": 8
+        },
+        "auc": {
+          "auc": 0.5625,
+          "n": 8
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 6,
+          "loss": 0,
+          "n": 6
+        },
+        "auc": {
+          "auc": 0.5,
+          "n": 6
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 2,
+          "tie": 6,
+          "loss": 0,
+          "n": 8
+        },
+        "auc": {
+          "auc": 0.625,
+          "n": 8
+        },
+        "verdict": "DEAD-leaning, n<10, AUC NOT COMPUTED (win 2/8)"
+      }
+    },
+    "5_questionLatency_totalUnresolved": {
+      "SCENE_SHUFFLE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 1,
+          "tie": 25,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5192307692307693,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 0,
+          "tie": 25,
+          "loss": 1,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.4807692307692308,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      },
+      "CLIMAX_RELOCATE": {
+        "pairs": 26,
+        "winTieLoss": {
+          "win": 2,
+          "tie": 24,
+          "loss": 0,
+          "n": 26
+        },
+        "auc": {
+          "auc": 0.5384615384615384,
+          "n": 26
+        },
+        "verdict": "DEAD — barely moves"
+      }
+    }
+  },
+  "candidate5Coverage": {
+    "scriptsWithQuestions": 8,
+    "scriptsTotal": 26
+  }
+}
