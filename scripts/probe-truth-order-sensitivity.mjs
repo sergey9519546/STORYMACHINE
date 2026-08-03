@@ -123,6 +123,34 @@ function winTieLoss(pairs) {
 // ── Section A: REAL corpus (false-positive rate + whatever order-signal exists)
 function collectRealScripts() {
   const scripts = [];
+  // RECALL MODE (the open question this probe cannot answer in the cloud):
+  // set REAL_SCRIPT_CORPUS_DIR to the maintainer's local 761-script corpus
+  // and Section A runs over THAT instead of the 30-script in-repo sample.
+  // The in-repo sample measured recall ZERO — none of its 30 scripts
+  // contains an on-page death of a speaking character stated explicitly
+  // enough to fire — so whether this detector has any real-world recall is
+  // decided entirely by a run against varied real material (thriller/action
+  // especially). One command, same env var the corpus harness already uses:
+  //   REAL_SCRIPT_CORPUS_DIR=/path/to/corpus node scripts/probe-truth-order-sensitivity.mjs
+  const corpusDir = process.env.REAL_SCRIPT_CORPUS_DIR;
+  if (corpusDir) {
+    if (!fs.existsSync(corpusDir)) {
+      console.error(`REAL_SCRIPT_CORPUS_DIR is set but does not exist: ${corpusDir}`);
+      process.exit(1);
+    }
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.fountain(\.txt)?$/.test(entry.name)) {
+          scripts.push({ id: path.relative(corpusDir, full), text: fs.readFileSync(full, 'utf-8') });
+        }
+      }
+    };
+    walk(corpusDir);
+    console.log(`RECALL MODE: loaded ${scripts.length} scripts from REAL_SCRIPT_CORPUS_DIR (in-repo sample skipped)\n`);
+    return scripts;
+  }
   const screenplayDir = path.resolve('data/screenplays');
   if (fs.existsSync(screenplayDir)) {
     for (const f of fs.readdirSync(screenplayDir)) {
