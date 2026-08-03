@@ -197,10 +197,13 @@ export function transcriptToFountain(
       }
 
       case 'RELOCATE': {
-        // content is recorded as "→ LocationName" by the Orchestrator
+        // content is recorded as "→ LocationName" by the Orchestrator. Fall
+        // back to the raw content itself (e.g. a bare location name lacking
+        // the arrow prefix) rather than target_char_id — RELOCATE has no
+        // target character semantically, so that id is never a location.
         const destination = entry.content.startsWith('→ ')
           ? entry.content.slice(2)
-          : entry.target_char_id ?? entry.content ?? 'another room';
+          : entry.content || 'another room';
         lines.push(`${agent?.name ?? agentName} moves to ${destination}.`);
         lines.push('');
         break;

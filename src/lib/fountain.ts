@@ -79,9 +79,15 @@ export function parseFountain(text: string): FountainBlock[] {
         // Dual dialogue: character cue ends with ^ (Fountain spec §Dual Dialogue)
         if (trimmed.endsWith('^') || trimmed.replace(/\s*\(.*?\)\s*$/, '').trimEnd().endsWith('^')) {
           type = 'dual_dialogue';
-          // Retroactively mark the preceding character block as the left column so
-          // renderers can lay out both columns side-by-side.
-          const prevChar = [...blocks].reverse().find(b => b.type === 'character');
+          // Retroactively mark the preceding character block as the left column
+          // so renderers can lay out both columns side-by-side. Bound the search
+          // to the current scene: a `^` cue must never retag a character cue from
+          // an earlier scene, so walk back only until the nearest scene heading.
+          let prevChar: FountainBlock | null = null;
+          for (let bi = blocks.length - 1; bi >= 0; bi--) {
+            if (blocks[bi].type === 'scene_heading') break;
+            if (blocks[bi].type === 'character') { prevChar = blocks[bi]; break; }
+          }
           if (prevChar) prevChar.type = 'dual_dialogue';
         } else {
           type = 'character';

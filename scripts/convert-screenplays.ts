@@ -59,6 +59,16 @@ function slugify(name: string): string {
     .toLowerCase();
 }
 
+// Two PDFs (different subfolders, or names differing only in punctuation/case)
+// can slugify to the same string. Without this, the later conversion would
+// silently overwrite the earlier one's .fountain output.
+function dedupeSlug(slug: string, usedSlugs: Set<string>): string {
+  if (!usedSlugs.has(slug)) return slug;
+  let suffix = 2;
+  while (usedSlugs.has(`${slug}-${suffix}`)) suffix++;
+  return `${slug}-${suffix}`;
+}
+
 function countWords(text: string): number {
   return text.split(/\s+/).filter(w => w.length > 0).length;
 }
@@ -76,11 +86,17 @@ async function main() {
   const manifest: ManifestEntry[] = [];
   let successCount = 0;
   let errorCount = 0;
+  const usedSlugs = new Set<string>();
 
   for (const pdfPath of pdfs) {
     const name = basename(pdfPath);
     const dir = basename(join(pdfPath, '..'));
-    const slug = slugify(name);
+    const baseSlug = slugify(name);
+    const slug = dedupeSlug(baseSlug, usedSlugs);
+    usedSlugs.add(slug);
+    if (slug !== baseSlug) {
+      console.log(`  ⚠ ${name}: slug collision with an earlier file, using "${slug}" instead of "${baseSlug}"`);
+    }
     const outputFile = join(OUTPUT_DIR, `${slug}.fountain`);
 
     const entry: ManifestEntry = {

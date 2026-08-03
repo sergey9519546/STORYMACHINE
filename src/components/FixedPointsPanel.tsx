@@ -3,7 +3,7 @@
 // believe X"). The planner backward-chains and injects GoalBiases so the
 // engine steers toward every declared attractor while staying emergent.
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -67,20 +67,31 @@ interface Props { onClose: () => void; }
 
 export function FixedPointsPanel({ onClose }: Props) {
   const [fps, setFps]               = useState<FixedPoint[]>([emptyFP(0)]);
+  // Stable per-card identity, independent of array position — removeFP shifts
+  // fps left, but a card's React key (and thus its local `expanded` state)
+  // must stay bound to the same fixed point, not to whichever index it now sits at.
+  const [fpKeys, setFpKeys]         = useState<number[]>([0]);
+  const nextFpKeyRef                = useRef(1);
   const [currentScene, setCurrentScene] = useState(0);
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const [bcResult, setBcResult]     = useState<BackchainResult | null>(null);
   const [bcTargetIdx, setBcTargetIdx] = useState<number | null>(null);
+  // Snapshot of the target fp's label, captured when the request fires — the
+  // live array index can no longer be trusted once fps shifts.
+  const [bcTargetDesc, setBcTargetDesc] = useState<string | null>(null);
   const [planning, setPlanning]     = useState(false);
   const [chaining, setChaining]     = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
   function addFP() {
+    const newKey = nextFpKeyRef.current++;
     setFps(f => [...f, emptyFP(f.length)]);
+    setFpKeys(k => [...k, newKey]);
   }
 
   function removeFP(i: number) {
     setFps(f => f.filter((_, j) => j !== i));
+    setFpKeys(k => k.filter((_, j) => j !== i));
   }
 
   function updateFP(i: number, patch: Partial<FixedPoint>) {
@@ -109,7 +120,8 @@ export function FixedPointsPanel({ onClose }: Props) {
   }
 
   async function backchainSingle(i: number) {
-    setChaining(true); setError(null); setBcResult(null); setBcTargetIdx(i);
+    const targetDesc = fps[i]?.description || `fixed point @ scene ${(fps[i]?.atScene ?? 0) + 1}`;
+    setChaining(true); setError(null); setBcResult(null); setBcTargetIdx(i); setBcTargetDesc(targetDesc);
     try {
       const res = await fetch('/api/nvm/author/backchain', {
         method: 'POST',
@@ -158,7 +170,7 @@ export function FixedPointsPanel({ onClose }: Props) {
           {/* Fixed point cards */}
           {fps.map((fp, i) => (
             <FixedPointCard
-              key={i}
+              key={fpKeys[i]}
               idx={i}
               fp={fp}
               onChange={patch => updateFP(i, patch)}
@@ -193,10 +205,10 @@ export function FixedPointsPanel({ onClose }: Props) {
           {planResult && <PlanResultView result={planResult} />}
 
           {/* Single-point backchain result */}
-          {bcResult && bcTargetIdx !== null && (
+          {bcResult && bcTargetDesc !== null && (
             <BackchainResultView
               result={bcResult}
-              fpDesc={fps[bcTargetIdx]?.description || `fixed point @ scene ${(fps[bcTargetIdx]?.atScene ?? 0) + 1}`}
+              fpDesc={bcTargetDesc}
             />
           )}
 

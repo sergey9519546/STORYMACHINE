@@ -106,28 +106,32 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
     const body = JSON.stringify({ fountain: artifact.content, title: 'Screenplay' });
     const headers = { 'Content-Type': 'application/json' };
 
-    if (format === 'print-html') {
-      // Open in new tab so browser PDF print kicks in
-      const res = await fetch('/api/export/print-html', { method: 'POST', headers, body });
-      if (!res.ok) return;
-      const html = await res.text();
-      const w = window.open('', '_blank');
-      if (w) { w.document.open(); w.document.write(html); w.document.close(); }
-      return;
-    }
+    try {
+      if (format === 'print-html') {
+        // Open in new tab so browser PDF print kicks in
+        const res = await fetch('/api/export/print-html', { method: 'POST', headers, body });
+        if (!res.ok) throw new Error(`Export failed (${res.status})`);
+        const html = await res.text();
+        const w = window.open('', '_blank');
+        if (w) { w.document.open(); w.document.write(html); w.document.close(); }
+        return;
+      }
 
-    const endpoint = format === 'fdx' ? '/api/export/fdx' : '/api/export/docx';
-    const ext = format === 'fdx' ? 'fdx' : 'docx';
-    const mime = format === 'fdx' ? 'application/xml' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    const res = await fetch(endpoint, { method: 'POST', headers, body });
-    if (!res.ok) return;
-    const blob = new Blob([await res.arrayBuffer()], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `screenplay.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
+      const endpoint = format === 'fdx' ? '/api/export/fdx' : '/api/export/docx';
+      const ext = format === 'fdx' ? 'fdx' : 'docx';
+      const mime = format === 'fdx' ? 'application/xml' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      const res = await fetch(endpoint, { method: 'POST', headers, body });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = new Blob([await res.arrayBuffer()], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `screenplay.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setErrors(err => ({ ...err, fountain: e instanceof Error ? e.message : String(e) }));
+    }
   }
 
   const currentTab = TABS.find(t => t.id === activeTab)!;

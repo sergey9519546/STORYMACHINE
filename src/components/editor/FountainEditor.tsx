@@ -199,6 +199,10 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     const collabCompartment = useRef(new Compartment());
     // P4: live for the editor's lifetime when a collab room is set at mount.
     const collabRef = useRef<CollabSession | null>(null);
+    // Latest `value` prop, kept current for the collab seed getter below: the
+    // session join is async, so the mount-time `value` closure is stale by sync
+    // time — seeding from this ref avoids clobbering newer content.
+    const valueRef = useRef(value);
 
     // ── Expose imperative handle ──────────────────────────────────────────────
     useImperativeHandle(ref, () => ({
@@ -332,7 +336,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         createCollabSession({
           room: collabRoom,
           userName: collabUserName,
-          initialText: value,
+          initialText: () => valueRef.current,
         }).then((session) => {
           if (torndown) { session.destroy(); return; }
           collabRef.current = session;
@@ -356,6 +360,10 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
 
     // ── Sync external value changes (e.g. snapshot restore) ──────────────────
     useEffect(() => {
+      // Keep the collab seed getter's source current so a session that finishes
+      // joining after this runs seeds from the freshest value, not the mount-time
+      // snapshot.
+      valueRef.current = value;
       const view = viewRef.current;
       if (!view) return;
       // In collaboration mode Yjs owns the document — never overwrite it from the

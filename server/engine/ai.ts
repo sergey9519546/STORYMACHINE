@@ -225,8 +225,10 @@ let _ttsProvider:       TTSProvider       = geminiTTSProvider;
 if (aiProviderManager.hasProvider()) {
   const activeProvider = aiProviderManager.getProvider();
   _provider = {
-    generate: (params) => activeProvider.generate(params),
-    generateStream: (params) => activeProvider.generateStream?.(params) ?? activeProvider.generate(params).then(async function* (r) { yield r; }),
+    // SECURITY (audit H2): forward the caller's AbortSignal to the active
+    // provider so withTimeout can cancel the in-flight fetch on timeout.
+    generate: (params, signal) => activeProvider.generate(params, signal),
+    generateStream: (params, signal) => activeProvider.generateStream?.(params, signal) ?? activeProvider.generate(params, signal).then(async function* (r) { yield r; }),
   };
 }
 

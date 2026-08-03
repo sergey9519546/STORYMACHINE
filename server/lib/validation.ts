@@ -75,10 +75,18 @@ export function isPrivateIPv4(ip: string): boolean {
 function isPrivateIPv6(ip: string): boolean {
   const norm = ip.toLowerCase();
   if (norm === '::1' || norm === '::') return true;        // loopback / unspecified
+  // Parse the NUMERIC value of the first hextet rather than matching its
+  // (possibly zero-trimmed) text: RFC5952 canonical form drops leading zeros
+  // within a hextet, so e.g. 'fe8::1' is the value 0x0fe8 — nowhere near
+  // fe80::/10 — even though its text happens to start with the same
+  // characters as a true fe80::/10 literal. A literal-prefix check would
+  // misclassify it as private; comparing the parsed value against the actual
+  // range does not.
+  const firstHextet = Number.parseInt(norm.split(':', 1)[0] || '0', 16);
   // fe80::/10 link-local: first hextet in 0xfe80–0xfebf.
-  if (/^fe[89ab]/.test(norm)) return true;
+  if ((firstHextet & 0xffc0) === 0xfe80) return true;
   // fc00::/7 unique-local: first hextet in 0xfc00–0xfdff.
-  if (norm.startsWith('fc') || norm.startsWith('fd')) return true;
+  if ((firstHextet & 0xfe00) === 0xfc00) return true;
   // WHATWG URL canonicalizes dotted IPv4-mapped addresses to two hexadecimal
   // hextets (for example ::ffff:127.0.0.1 → ::ffff:7f00:1). Decode that form
   // before applying the IPv4 private-range policy.

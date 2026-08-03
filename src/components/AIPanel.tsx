@@ -25,6 +25,10 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
   // note } when no provider is configured — without surfacing this, keyless
   // mode shows a blank Result panel with no explanation of why output is empty.
   const [note, setNote] = useState<string | null>(null);
+  // Distinguishes a caught-failure message (stored in `result` for display)
+  // from real AI output, so the insert button never offers error text for
+  // splicing into the user's script.
+  const [isError, setIsError] = useState(false);
   const [activeTab, setActiveTab] = useState<'world' | 'dialogue' | 'tension' | 'character'>('world');
   const [selectedChar, setSelectedChar] = useState<string>('');
   const [input, setInput] = useState('');
@@ -36,6 +40,7 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
     setLoading(true);
     setResult(null);
     setNote(null);
+    setIsError(false);
     try {
       const response = await fetch(`/api/scriptide/${endpoint}`, {
         method: 'POST',
@@ -56,6 +61,7 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
       setNote(data.usedLLM === false ? (data.note ?? null) : null);
     } catch (err: unknown) {
       if (!mountedRef.current) return;
+      setIsError(true);
       setResult(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       if (mountedRef.current) setLoading(false);
@@ -198,7 +204,7 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
               {note}
             </p>
           )}
-          {result && (
+          {result && !isError && (
             <button
               onClick={() => onApplySuggestion(result)}
               className="sm-btn sm-btn--stamp mt-4 w-full py-2"

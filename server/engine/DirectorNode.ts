@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { Stage } from './Stage.ts';
-import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement, IllusionState } from './types.ts';
+import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement, IllusionState, EventProposition } from './types.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { randomUUID } from 'crypto';
 import { logger } from '../lib/logger.ts';
@@ -36,12 +36,15 @@ export class DirectorNode {
 
     // Observable transcript — what any agent in the room could perceive
     // LIE actions appear as SPEAK to observers; only the Director knows which is which
-    const observableTranscript = recentActions.map(a => {
+    // Numbered so the LLM can report source_action_index per belief (see
+    // evaluatePerspective's new_beliefs schema) — the index maps 1:1 onto
+    // recentActions, used below to resolve per-belief source attribution.
+    const observableTranscript = recentActions.map((a, i) => {
       const agent = this.stage.getAgent(a.char_id);
       const visibleType = a.action_type === 'LIE' ? 'SPEAK' : a.action_type;
       const sName = sanitizeForPrompt(agent?.name ?? 'Unknown', 128);
       const sContent = sanitizeForPrompt(a.content, 500);
-      return `[${visibleType}] ${sName}: ${sContent}`;
+      return `[${i}] [${visibleType}] ${sName}: ${sContent}`;
     }).join('\n');
 
     // Ground truth for the Director (which statements were actually lies)
@@ -82,22 +85,33 @@ export class DirectorNode {
       const existingBeliefs = observer.beliefs ?? [];
       const existingProps = new Set(existingBeliefs.map(b => b.proposition.toLowerCase()));
 
-      // For Director evaluations, beliefs sourced from SPEAK/LIE actions
-      // are attributed to the last audible non-self action in the transcript
+      // For Director evaluations, each belief is attributed to the specific
+      // action that produced it via source_action_index (resolved against
+      // recentActions, numbered identically to observableTranscript above) —
+      // mirroring Agent.ts's updateEpistemics, which resolves the same field
+      // per-belief instead of blaming one action for every belief in the batch.
+      // Falls back to the last audible non-self action when the model omits
+      // or mis-indexes source_action_index.
       const lastExternalAction = [...recentActions].reverse()
         .find(a => a.char_id !== eval_.observer_id && a.is_audible);
 
       const freshBeliefs = eval_.new_beliefs
         .filter(b => b.proposition && !existingProps.has(b.proposition.toLowerCase()))
-        .map(b => ({
-          id: randomUUID(),
-          proposition: b.proposition,
-          confidence: Math.max(0, Math.min(1, b.confidence)),
-          source: (b.source as BeliefSource) ?? 'inferred',
-          source_agent_id: b.source === 'told' ? lastExternalAction?.char_id : undefined,
-          source_event_id: b.source === 'told' ? lastExternalAction?.action_id : undefined,
-          acquired_at: this.stage.getTurnCount(),
-        }));
+        .map(b => {
+          const srcIdx = (b as PerspectiveEvaluation['new_beliefs'][number] & { source_action_index?: number | null }).source_action_index;
+          const srcAction = (typeof srcIdx === 'number' && srcIdx >= 0 && srcIdx < recentActions.length)
+            ? recentActions[srcIdx]
+            : lastExternalAction;
+          return {
+            id: randomUUID(),
+            proposition: b.proposition,
+            confidence: Math.max(0, Math.min(1, b.confidence)),
+            source: (b.source as BeliefSource) ?? 'inferred',
+            source_agent_id: b.source === 'told' ? srcAction?.char_id : undefined,
+            source_event_id: b.source === 'told' ? srcAction?.action_id : undefined,
+            acquired_at: this.stage.getTurnCount(),
+          };
+        });
 
       if (freshBeliefs.length > 0) {
         this.stage.updateAgentBeliefs(observer.char_id, [...existingBeliefs, ...freshBeliefs]);
@@ -224,6 +238,11 @@ From ${sObserverName}'s perspective only:
                   proposition: { type: Type.STRING },
                   confidence: { type: Type.NUMBER },
                   source: { type: Type.STRING, enum: ['witnessed', 'told', 'inferred'] },
+                  source_action_index: {
+                    type: Type.INTEGER,
+                    description: 'Index (0-based) of the action in the numbered transcript above that caused this belief. -1 if not traceable to a specific action.',
+                    nullable: true,
+                  },
                 },
                 required: ['proposition', 'confidence', 'source'],
               },
@@ -259,7 +278,7 @@ From ${sObserverName}'s perspective only:
     const raw = safeJsonParse<{
       tension_delta: number;
       contradiction_detected: boolean;
-      new_beliefs: Array<{ proposition: string; confidence: number; source: string }>;
+      new_beliefs: Array<{ proposition: string; confidence: number; source: string; source_action_index?: number | null }>;
       suspicion_updates: Array<{ agent_name: string; delta: number; reason: string }>;
       contradicted_propositions: string[];
     }>(response.text ?? '{}', {
@@ -888,6 +907,23 @@ From ${sObserverName}'s perspective only:
     logger.info('beat_compliance_redirect', { phase, avoid: activeBeat.avoid.slice(0, 60), violations: violations.length, turn: turnIndex });
   }
 
+  // Resolves the actual origin turn of each unexposed lie via its EventCard —
+  // proposition_id is a random UUID with no temporal ordering, so "oldest"
+  // must be derived from the turn the underlying event was recorded on, not
+  // from sorting the id strings.
+  private _oldestUnexposedProposition(props: EventProposition[]): EventProposition {
+    let oldest = props[0];
+    let oldestTurn = this.stage.getEventCard(oldest.event_id)?.turn_index ?? Number.POSITIVE_INFINITY;
+    for (const p of props.slice(1)) {
+      const turn = this.stage.getEventCard(p.event_id)?.turn_index ?? Number.POSITIVE_INFINITY;
+      if (turn < oldestTurn) {
+        oldest = p;
+        oldestTurn = turn;
+      }
+    }
+    return oldest;
+  }
+
   // ── M: Dramatic irony ────────────────────────────────────────────────────────
   // Finds unexposed lies in the room (audience knows but characters don't).
   // Escalates pressure as the lie ages — the longer the bomb sits under the table,
@@ -909,7 +945,7 @@ From ${sObserverName}'s perspective only:
       if (existing.some(p => p.pressure_type === 'ESCALATE' || p.pressure_type === 'CONFRONT')) continue;
 
       // Oldest unexposed lie determines urgency
-      const oldest = unexposed.sort((a, b) => a.proposition_id.localeCompare(b.proposition_id))[0];
+      const oldest = this._oldestUnexposedProposition(unexposed);
       const liarsName = sanitizeForPrompt(
         this.stage.getAgent(
           unexposed.map(p => p.asserted_by).find(id => id !== agent.char_id) ?? ''

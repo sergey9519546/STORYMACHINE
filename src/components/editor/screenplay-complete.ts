@@ -126,6 +126,17 @@ function toOptions(labels: readonly string[], type: string): Completion[] {
   return labels.map((label) => ({ label, type }));
 }
 
+// The location/time-of-day separator is a hyphen preceded by whitespace, per
+// Fountain's "LOCATION - TIME" convention — this excludes hyphens that are
+// part of the location name itself (e.g. "X-RAY ROOM", "MOTHER-IN-LAW'S
+// HOUSE"), which sit directly against a letter with no space before them.
+function lastSeparatorDashIndex(text: string): number {
+  for (let i = text.length - 1; i > 0; i--) {
+    if (text[i] === '-' && /\s/.test(text[i - 1])) return i;
+  }
+  return -1;
+}
+
 // ── Branch: inside a scene heading (prefix already typed) ─────────────────────
 function sceneHeadingCompletions(
   context: CompletionContext,
@@ -134,7 +145,7 @@ function sceneHeadingCompletions(
   prefixLen: number,
 ): CompletionResult | null {
   const afterPrefix = lineTextBefore.slice(prefixLen);
-  const dashIdx = afterPrefix.lastIndexOf('-');
+  const dashIdx = lastSeparatorDashIndex(afterPrefix);
 
   if (dashIdx === -1) {
     // Still typing the location.
