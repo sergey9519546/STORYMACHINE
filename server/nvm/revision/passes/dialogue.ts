@@ -578,6 +578,8 @@
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+// ⚡ Bolt: Use zero-allocation fastWordCount to avoid O(N) array allocations during dialogue analysis passes.
+import { fastWordCount } from '../../../lib/string-utils.ts';
 import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract dialogue lines from fountain text with speaker attribution */
@@ -723,7 +725,7 @@ function dialogueLineEngages(priorLine: string, replyLine: string, priorWords: S
     if (priorTokens.some(t => replyTokens.has(t))) return true;
   }
   // A short reactive fragment (under 4 raw words) is a reaction, not a topic change.
-  const replyRawWordCount = replyLine.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const replyRawWordCount = fastWordCount(replyLine);
   if (replyRawWordCount < 4) return true;
   return false;
 }
@@ -1377,7 +1379,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // collapses into monotone brevity. Requires 12+ dialogue lines.
   if (dialogue.length >= 12) {
     const staccatoCount204 = dialogue.filter(d => {
-      const wordCount204 = d.line.trim().split(/\s+/).filter(w => w.length > 0).length;
+      const wordCount204 = fastWordCount(d.line);
       return wordCount204 <= 5;
     }).length;
     const staccatoRatio204 = staccatoCount204 / dialogue.length;
@@ -1486,7 +1488,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // measures the rhythmic texture of the dialogue as a whole. Real speech alternates
   // clipped ripostes with longer reaches; a metronomic line length drains the rhythm.
   if (dialogue.length >= 12) {
-    const wordCounts215 = dialogue.map(d => d.line.trim().split(/\s+/).filter(w => w.length > 0).length);
+    const wordCounts215 = dialogue.map(d => fastWordCount(d.line));
     const meanLen215 = wordCounts215.reduce((a, b) => a + b, 0) / wordCounts215.length;
     if (meanLen215 >= 3) {
       const variance215 = wordCounts215.reduce((a, l) => a + (l - meanLen215) ** 2, 0) / wordCounts215.length;
@@ -1810,7 +1812,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // every character gets too much floor time, and the cadence collapses into
   // a single slow register. Requires 12+ dialogue lines.
   if (dialogue.length >= 12) {
-    const longLineCount269 = dialogue.filter(d => d.line.trim().split(/\s+/).length >= 15).length;
+    const longLineCount269 = dialogue.filter(d => fastWordCount(d.line) >= 15).length;
     if (longLineCount269 / dialogue.length > 0.50) {
       issues.push({
         location: 'Dialogue throughout',
@@ -1870,7 +1872,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // experiencing the character's voice. Requires 12+ dialogue lines and
   // 8+ substantive lines (4+ words each).
   if (dialogue.length >= 12) {
-    const substantive283 = dialogue.filter(d => d.line.trim().split(/\s+/).length >= 4);
+    const substantive283 = dialogue.filter(d => fastWordCount(d.line) >= 4);
     if (substantive283.length >= 8) {
       const openerCounts283 = new Map<string, number>();
       for (const d of substantive283) {
@@ -1947,7 +1949,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     const lineCounts297 = new Map<string, number>();
     for (const d of dialogue) {
       const norm297 = d.line.trim().toLowerCase().replace(/[^a-z0-9' ]/g, '');
-      if (norm297.split(/\s+/).length >= 4) {
+      if (fastWordCount(norm297) >= 4) {
         lineCounts297.set(norm297, (lineCounts297.get(norm297) ?? 0) + 1);
       }
     }
@@ -2017,7 +2019,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // 10+ dialogue lines.
   if (dialogue.length >= 10) {
     const oneWordCount311 = dialogue.filter(
-      d => d.line.trim().split(/\s+/).filter(Boolean).length === 1,
+      d => fastWordCount(d.line) === 1,
     ).length;
     if (oneWordCount311 / dialogue.length > 0.35) {
       issues.push({
