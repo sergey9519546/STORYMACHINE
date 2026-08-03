@@ -61,7 +61,7 @@ export function themeAuditorCritic(ir: NarrativeTransitionIR, state: NarrativeSt
     if (state.themeArgument.length === 0 && !hasThemeMoveThisScene) {
       critiques.push({
         criticId: 'theme_auditor', severity: 30, targetOpIdx: null,
-        objection: `Scene ${ir.sceneIdx} and the theme ("${theme}") has never once been argued — ${THEME_SILENCE_SCENE_THRESHOLD}+ scenes in with no ADVANCE_THEME_ARGUMENT move of any kind`,
+        objection: `Scene ${ir.sceneIdx + 1} and the theme ("${theme}") has never once been argued — ${THEME_SILENCE_SCENE_THRESHOLD}+ scenes in with no ADVANCE_THEME_ARGUMENT move of any kind`,
         suggestedOperator: 'sharpen_theme',
         attentionBid: 35,
       });

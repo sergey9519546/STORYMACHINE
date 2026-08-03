@@ -1419,7 +1419,9 @@ describe('NVM — G3 Projection Gallery (Wave 19)', () => {
     const canon = makeCanon();
     const art = project(canon, 'novel');
     assert.ok(art.content.includes('# The Inheritance'), 'has title heading');
-    assert.ok(art.content.includes('Scene 0'), 'has scene section');
+    // makeCanon()'s commit carries sceneIdx: 0 (0-based storage); the novel
+    // heading is writer-facing 1-based display, so "Scene 1".
+    assert.ok(art.content.includes('Scene 1'), 'has scene section');
     assert.ok(typeof art.metadata['wordCount'] === 'number', 'wordCount metadata present');
   });
 

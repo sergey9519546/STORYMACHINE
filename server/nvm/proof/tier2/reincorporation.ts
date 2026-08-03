@@ -43,7 +43,7 @@ export function reincorporationProof(ir: NarrativeTransitionIR, state: Narrative
     'scene introduces only new elements with no callbacks to prior story material', [
       {
         proof: 'ReincorporationProof', severity: 'flag',
-        message: `Scene ${ir.sceneIdx} is a disconnected island — none of its ops reference an established character, relationship, clock, clue, or theme. Add at least one op that builds on prior story material; otherwise this scene cannot be integrated into the story fabric.`,
+        message: `Scene ${ir.sceneIdx + 1} is a disconnected island — none of its ops reference an established character, relationship, clock, clue, or theme. Add at least one op that builds on prior story material; otherwise this scene cannot be integrated into the story fabric.`,
       },
     ]);
 }
