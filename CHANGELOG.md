@@ -94,6 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connection left "Reading the draft…" showing indefinitely. Added the same
   `AbortController` watchdog, distinguishing a real timeout from a
   supersede/teardown abort.
+- **Title-page data loss on reload.** `ScriptIDE.tsx` initialized
+  title/author/contact to placeholders instead of reading them from the
+  draft, unlike `snapshots` and `researchNotes` three lines away, so a
+  writer's title-page metadata silently vanished on reload. The persistence
+  effect's dependency array also omitted `titlePage`, so a title-only edit
+  never triggered a save. Draft schema bumped 1→2 with a migration fixture
+  covering a draft with no `titlePage` key at all.
 
 #### Added
 - **Corpus de-identification tooling**
@@ -142,6 +149,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no-`console.*` grep cannot catch this — it is a logger call.
 - `GET /api/ai-config` had no rate limiter — the one route in the file
   without one.
+- **Request-scoped AI budget** (`server/lib/ai-budget.ts`): a per-request
+  attempt ceiling plus wall-clock deadline for provider fan-out, wired into
+  `/api/turn`, `/api/run-room`, `/api/run-scene`, `/api/simulate-to-fountain`,
+  and `/api/game/interview`. This is the safeguard a comment in `game.ts` had
+  claimed already existed ("bounded by the engine's own per-turn call
+  budget") — no such budget existed anywhere in the tree, which is also why
+  the two fan-out routes above ended up on the wrong rate limiter. For routes
+  whose LLM calls happen deep inside `server/engine` with no injectable seam,
+  `maxAttempts` is informational and the deadline is what is actually
+  enforced; every limit is env-overridable so tests can drive a timeout down
+  and prove the wiring cuts a slow request off.
+- **Centralized error sanitization** (`server/lib/safe-error.ts`): one
+  sanitizer for error text reaching either an HTTP response or the logger,
+  replacing inline redaction that had been applied to one sink and forgotten
+  on the other — which is how the raw-upstream-error log line above survived
+  review (CI's no-`console.*` grep cannot see logger-based leaks).
 
 #### Documentation
 - Corrected three more stale/inaccurate claims found by a nine-agent,
