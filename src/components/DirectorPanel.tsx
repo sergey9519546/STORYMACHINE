@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { GameState, Choice, DefenseMechanism } from "../types";
 import type { OutlineBeat } from "../../server/engine/types";
 import { OutlineResponseSchema, StoryConfigSchema } from "../lib/api-schemas";
+import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import {
   GENRE_OPTIONS,
   STRUCTURE_OPTIONS,
@@ -255,6 +256,9 @@ export default function DirectorPanel({
   const tensionHistoryRef = useRef<Array<{ tension: number; menace: number }>>([]);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Dialog root — see the tabIndex={-1} on the outer motion.div below and
+  // the useModalFocusTrap call near the Escape key effect below.
+  const panelRef = useRef<HTMLDivElement | null>(null);
   
   const showError = useCallback((msg: string) => {
     setErrorMsg(msg);
@@ -334,6 +338,13 @@ export default function DirectorPanel({
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  // Real focus management for this panel's role="dialog" aria-modal="true"
+  // contract (see the outer motion.div below): moves focus in on mount,
+  // traps Tab/Shift+Tab within the panel while mounted, and restores focus
+  // to the triggering control on unmount. See use-modal-focus-trap.ts for
+  // the scope/limits of what this does and does not cover.
+  useModalFocusTrap(panelRef);
 
   // ── QBN filter choices ────────────────────────────────────────────────────
 
@@ -543,6 +554,8 @@ export default function DirectorPanel({
         </div>
       )}
       <motion.div
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="director-panel-title"

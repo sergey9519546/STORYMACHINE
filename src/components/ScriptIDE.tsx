@@ -32,6 +32,7 @@ import {
 } from "../lib/scriptide-draft-store";
 import { decideSampleInstall } from "../lib/sample-install-guard";
 import { fountain as sampleScriptFountain } from "../lib/sample-script";
+import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import {
   AlertCircle,
   Loader2,
@@ -99,6 +100,157 @@ const TabPanelFallback = () => (
     Loading…
   </div>
 );
+
+// ─── Focus-trapped modals ───────────────────────────────────────────────────
+// Both role="dialog" aria-modal="true" overlays below render as inline JSX
+// conditionals inside the ever-mounted ScriptIDE component (not a
+// separately-lazy-loaded panel like ScriptDoctorPanel), so useModalFocusTrap
+// is called from a genuinely separate function component here rather than
+// directly inside ScriptIDE — the hook's mount-focus/trap/restore effect runs
+// once per mount of whichever component calls it (its dependency array holds
+// only the stable containerRef), so it must live in a component whose own
+// mount/unmount lines up with the dialog opening/closing, not in ScriptIDE
+// itself, which never unmounts while a modal toggles open and closed.
+
+/** The "what is this character doing" prompt fired from FountainEditor's
+ *  onCharacterEnter. Its <input> already carries `autoFocus`; that fires
+ *  synchronously in React's commit phase (before paint), and — since it's
+ *  the first focusable descendant in DOM order (input, then the two
+ *  buttons) — useModalFocusTrap's mount-focus effect (a plain useEffect,
+ *  which runs after commit/paint) re-focuses that SAME input a moment
+ *  later. Same node both times: no fight, just a harmless redundant
+ *  .focus() call, and autoFocus's synchronous head start means there's no
+ *  visible flash of unfocus in between. */
+function ActionRequiredModal({
+  charName,
+  value,
+  onChange,
+  onSkip,
+  onInsert,
+}: {
+  charName: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSkip: () => void;
+  onInsert: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useModalFocusTrap(dialogRef);
+
+  return (
+    <motion.div
+      ref={dialogRef}
+      tabIndex={-1}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Action required"
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full"
+      >
+        <h2 className="font-bold uppercase tracking-widest text-xl mb-2 border-b-4 border-black pb-2">
+          Action Required
+        </h2>
+        <p className="text-sm font-mono mb-4">
+          What is{" "}
+          <span className="font-bold text-red-600">{charName}</span>{" "}
+          doing right now?
+        </p>
+
+        <input
+          type="text"
+          autoFocus
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onInsert();
+            if (e.key === "Escape") onSkip();
+          }}
+          aria-label="Character action description"
+          placeholder="e.g., pacing the room, lighting a cigarette..."
+          className="w-full border-2 border-black p-3 font-mono text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onSkip}
+            className="px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-gray-100 transition-colors"
+          >
+            Skip (Dialogue)
+          </button>
+          <button
+            onClick={onInsert}
+            className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
+          >
+            Insert Action
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/** Change-setup confirm modal — replaces window.confirm (QA P1-5). Same
+ *  separate-component rationale as ActionRequiredModal above: its mount
+ *  must line up with `newStoryConfirm` flipping true/false for
+ *  useModalFocusTrap's effect to actually run on open/close. */
+function ChangeSetupConfirmModal({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useModalFocusTrap(dialogRef);
+
+  return (
+    <motion.div
+      ref={dialogRef}
+      tabIndex={-1}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-story-confirm-title"
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full mx-4"
+      >
+        <h2 id="new-story-confirm-title" className="font-bold uppercase tracking-widest text-lg mb-3 border-b-4 border-black pb-2">
+          Change setup?
+        </h2>
+        <p className="text-sm font-mono mb-5 text-gray-700">
+          This returns you to the setup wizard — your current draft stays saved.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-gray-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
+          >
+            Change setup
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1890,61 +2042,13 @@ export default function ScriptIDE({
           {/* Action Prompt Modal */}
           <AnimatePresence>
             {actionModal.show && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Action required"
-              >
-                <motion.div
-                  initial={{ scale: 0.9, y: 20 }}
-                  animate={{ scale: 1, y: 0 }}
-                  className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full"
-                >
-                  <h2 className="font-bold uppercase tracking-widest text-xl mb-2 border-b-4 border-black pb-2">
-                    Action Required
-                  </h2>
-                  <p className="text-sm font-mono mb-4">
-                    What is{" "}
-                    <span className="font-bold text-red-600">
-                      {actionModal.charName}
-                    </span>{" "}
-                    doing right now?
-                  </p>
-
-                  <input
-                    type="text"
-                    autoFocus
-                    value={actionInput}
-                    onChange={(e) => setActionInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") submitActionModal(false);
-                      if (e.key === "Escape") submitActionModal(true);
-                    }}
-                    aria-label="Character action description"
-                    placeholder="e.g., pacing the room, lighting a cigarette..."
-                    className="w-full border-2 border-black p-3 font-mono text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-
-                  <div className="flex justify-end gap-3">
-                    <button
-                      onClick={() => submitActionModal(true)}
-                      className="px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-gray-100 transition-colors"
-                    >
-                      Skip (Dialogue)
-                    </button>
-                    <button
-                      onClick={() => submitActionModal(false)}
-                      className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
-                    >
-                      Insert Action
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
+              <ActionRequiredModal
+                charName={actionModal.charName}
+                value={actionInput}
+                onChange={setActionInput}
+                onSkip={() => submitActionModal(true)}
+                onInsert={() => submitActionModal(false)}
+              />
             )}
           </AnimatePresence>
         </div>
@@ -1953,42 +2057,10 @@ export default function ScriptIDE({
       {/* Change-setup confirm modal — replaces window.confirm (QA P1-5). */}
       <AnimatePresence>
         {newStoryConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="new-story-confirm-title"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full mx-4"
-            >
-              <h2 id="new-story-confirm-title" className="font-bold uppercase tracking-widest text-lg mb-3 border-b-4 border-black pb-2">
-                Change setup?
-              </h2>
-              <p className="text-sm font-mono mb-5 text-gray-700">
-                This returns you to the setup wizard — your current draft stays saved.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setNewStoryConfirm(false)}
-                  className="px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => { setNewStoryConfirm(false); onNewStory?.(); }}
-                  className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
-                >
-                  Change setup
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <ChangeSetupConfirmModal
+            onCancel={() => setNewStoryConfirm(false)}
+            onConfirm={() => { setNewStoryConfirm(false); onNewStory?.(); }}
+          />
         )}
       </AnimatePresence>
 

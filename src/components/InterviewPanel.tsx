@@ -20,6 +20,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import type { CharacterSheet } from '../../server/engine/types';
+import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
 
 // ── Server contract types (server/routes not yet built — feature-detect all
 // optional fields; nothing here assumes a field is present). ────────────────
@@ -210,6 +211,9 @@ export default function InterviewPanel({ onClose, agents }: InterviewPanelProps)
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Dialog root — see the tabIndex={-1} on the role="dialog" div below and
+  // the useModalFocusTrap call near the Escape-handling effect further down.
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => () => {
     mountedRef.current = false;
@@ -333,12 +337,19 @@ export default function InterviewPanel({ onClose, agents }: InterviewPanelProps)
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Real focus management for this panel's role="dialog" aria-modal="true"
+  // contract (see the div below): moves focus in on mount, traps
+  // Tab/Shift+Tab within the panel while mounted, and restores focus to the
+  // triggering control on unmount. See use-modal-focus-trap.ts for the
+  // scope/limits of what this does and does not cover.
+  useModalFocusTrap(panelRef);
+
   return (
     <div
       className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div role="dialog" aria-modal="true" aria-labelledby="interview-panel-title" className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="interview-panel-title" className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#333]">
           <div className="flex items-center gap-2">

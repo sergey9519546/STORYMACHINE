@@ -16,7 +16,8 @@
 // legitimate 200 with critiques: [] — rendered as an honest empty result,
 // not an error.
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
 
 interface RoomCritique {
   criticId: string;
@@ -78,6 +79,9 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [routeMissing, setRouteMissing] = useState(false);
   const [runCount, setRunCount] = useState(0);
+  // Dialog root — see the tabIndex={-1} on the role="dialog" div below and
+  // the useModalFocusTrap call near the Escape-handling effect further down.
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const convene = useCallback(async () => {
     if (state === 'loading') return;
@@ -124,12 +128,19 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Real focus management for this panel's role="dialog" aria-modal="true"
+  // contract (see the div below): moves focus in on mount, traps
+  // Tab/Shift+Tab within the panel while mounted, and restores focus to the
+  // triggering control on unmount. See use-modal-focus-trap.ts for the
+  // scope/limits of what this does and does not cover.
+  useModalFocusTrap(panelRef);
+
   return (
     <div
       className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-    <div role="dialog" aria-modal="true" aria-labelledby="room-panel-title" style={{
+    <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="room-panel-title" style={{
       background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
       padding: 20, width: 640, maxWidth: '95vw', fontFamily: 'var(--sm-font-mono)',
       fontSize: 13, border: '1px solid var(--sm-night-line)',

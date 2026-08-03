@@ -19,6 +19,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
+import { useModalFocusTrap } from "../lib/use-modal-focus-trap.ts";
 import {
   Layers3,
   X,
@@ -201,6 +202,9 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
   const rankAbortRef = useRef<AbortController | null>(null);
   const downloadAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  // Dialog root — see the tabIndex={-1} on the outer motion.div below and
+  // the useModalFocusTrap call near the Escape-handling effect further down.
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   // Abort any in-flight requests on unmount so a stale response can never
   // land after the panel is gone — same idiom as InterviewPanel/
@@ -223,6 +227,13 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  // Real focus management for this panel's role="dialog" aria-modal="true"
+  // contract (see the outer motion.div below): moves focus in on mount,
+  // traps Tab/Shift+Tab within the panel while mounted, and restores focus
+  // to the triggering control on unmount. See use-modal-focus-trap.ts for
+  // the scope/limits of what this does and does not cover.
+  useModalFocusTrap(panelRef);
 
   const combinedChars = files.reduce((sum, f) => sum + f.chars, 0);
 
@@ -402,6 +413,8 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
 
   return (
     <motion.div
+      ref={panelRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="slate-panel-title"

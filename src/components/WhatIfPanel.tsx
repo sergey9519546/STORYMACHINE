@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
+import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
 import {
   GitBranch, Eye, Zap, X, Check, AlertTriangle, FlaskConical, Play, Ban, Link2, Clock3,
 } from 'lucide-react';
@@ -449,6 +450,9 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
   // mountedRef guards setState after unmount for fetchGhosts (loadScm/exploreLab
   // already use AbortController; only fetchGhosts was missing the guard).
   const mountedRef = useRef(true);
+  // Dialog root — see the tabIndex={-1} on the role="dialog" div below and
+  // the useModalFocusTrap call near the Escape-handling effect further down.
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const fetchGhosts = useCallback(async () => {
     setLoading(true);
@@ -728,9 +732,16 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Real focus management for this panel's role="dialog" aria-modal="true"
+  // contract (see the div below): moves focus in on mount, traps
+  // Tab/Shift+Tab within the panel while mounted, and restores focus to the
+  // triggering control on unmount. See use-modal-focus-trap.ts for the
+  // scope/limits of what this does and does not cover.
+  useModalFocusTrap(panelRef);
+
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="whatif-panel-title" className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="whatif-panel-title" className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#333]">
           <div className="flex items-center gap-2">

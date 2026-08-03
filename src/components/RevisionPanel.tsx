@@ -25,6 +25,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { diffLines, type DiffLine } from '../lib/diff.ts';
 import { withSession } from '../lib/session.ts';
+import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
 
 interface RevisionIssue {
   location: string;
@@ -231,6 +232,9 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
   const [streamedPasses, setStreamedPasses] = useState<PassResult[]>([]);
   const [streamProgress, setStreamProgress] = useState<{ done: number; total: number } | null>(null);
   const evtRef = useRef<EventSource | null>(null);
+  // Dialog root — see the tabIndex={-1} on the role="dialog" div below and
+  // the useModalFocusTrap call near the Escape-handling effect further down.
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   // ── Honest chain semantics ───────────────────────────────────────────────
   // One selected pass drives the actual output. Passes build on each other,
@@ -544,9 +548,16 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Real focus management for this panel's role="dialog" aria-modal="true"
+  // contract (see the div below): moves focus in on mount, traps
+  // Tab/Shift+Tab within the panel while mounted, and restores focus to the
+  // triggering control on unmount. See use-modal-focus-trap.ts for the
+  // scope/limits of what this does and does not cover.
+  useModalFocusTrap(panelRef);
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/60" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="revision-panel-title" className="h-full w-full max-w-2xl bg-zinc-950 border-l border-zinc-800 flex flex-col overflow-hidden">
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="revision-panel-title" className="h-full w-full max-w-2xl bg-zinc-950 border-l border-zinc-800 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80">
           <div>
