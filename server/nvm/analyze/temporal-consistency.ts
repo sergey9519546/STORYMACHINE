@@ -386,6 +386,81 @@ const INVERSE_RELATION: Record<AllenRelation, AllenRelation> = {
   'equals': 'equals',
 };
 
+function invertRelationSet(relations: Iterable<AllenRelation>): AllenRelation[] {
+  return Array.from(relations, r => INVERSE_RELATION[r]);
+}
+
+/**
+ * Narrow constraintMatrix[aId][bId] to `relations` AND, in the same step,
+ * narrow constraintMatrix[bId][aId] to its intersection with inverse(relations).
+ *
+ * ROOT CAUSE THIS EXISTS TO FIX (2026-08-03): standard Allen-algebra path
+ * consistency (Allen 1983; Vilain & Kautz's PC-2) maintains, as an
+ * invariant held after EVERY narrowing, that the matrix cell for B→A always
+ * equals the inverse of the cell for A→B — the two directions of one pair
+ * are the same fact seen from either end, never two independently-derived
+ * facts. This module's matrix updates (both explicit-constraint application
+ * and the Floyd-Warshall-style composition loop) used to write ONLY the
+ * forward cell (A→B) on every narrowing and never touch the backward cell
+ * (B→A) at all. The backward cell was then left to be narrowed later,
+ * coincidentally, by whatever OTHER composition chains happened to route
+ * through it — a computation that has no reason to land on the true inverse
+ * of the forward cell, since it draws on a different, often much weaker, set
+ * of paths. The two cells for the same pair could therefore diverge into
+ * two "correct in isolation" but mutually inconsistent views — not because
+ * the timeline was actually contradictory, but because the graph itself was
+ * never kept internally coherent. The pairwise mirror-consistency check
+ * further down (originally added to catch genuine direct 2-cycles) then
+ * flagged that divergence as though it were a real contradiction, which is
+ * exactly the false-positive mechanism behind a run of consecutive
+ * CONTINUOUS/MOMENTS LATER/SAME TIME scene headings: each adjacent pair
+ * gets an explicit 'meets' forward-only, its backward cell drifts away from
+ * 'met-by' via unrelated composition paths, and the mirror check fires on
+ * the drift. Composing meets∘meets=before is, and always was, perfectly
+ * consistent — the defect was structural (an unmaintained invariant), not
+ * algebraic. Fixing constraint application and propagation to go through
+ * this single symmetric setter (so every narrowing simultaneously narrows
+ * both directions) restores the invariant everywhere and the false
+ * positives disappear without weakening real-conflict detection: an actual
+ * cyclic/impossible chain still drives some cell's relation set to empty,
+ * which both the explicit-conflict and transitive-violation checks still
+ * catch (see temporal-consistency.test.ts's regression tests).
+ *
+ * Returns true iff either cell actually changed, so callers can fold this
+ * into their existing propagation `changed` flag.
+ */
+function narrowPairRelations(
+  matrix: Map<string, Map<string, Set<AllenRelation>>>,
+  aId: string,
+  bId: string,
+  relations: AllenRelation[]
+): boolean {
+  let changed = false;
+  const rowA = matrix.get(aId);
+  const rowB = matrix.get(bId);
+
+  const newForward = new Set(relations);
+  const currentForward = rowA?.get(bId);
+  if (rowA) {
+    if (!currentForward || currentForward.size !== newForward.size || !Array.from(currentForward).every(r => newForward.has(r))) {
+      rowA.set(bId, newForward);
+      changed = true;
+    }
+  }
+
+  const invertedForward = invertRelationSet(relations);
+  const currentBackward = rowB?.get(aId);
+  if (rowB && currentBackward) {
+    const newBackward = new Set(Array.from(currentBackward).filter(r => invertedForward.includes(r)));
+    if (newBackward.size !== currentBackward.size) {
+      rowB.set(aId, newBackward);
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Temporal Extraction from Screenplay
 // ────────────────────────────────────────────────────────────────────────────────
@@ -627,7 +702,10 @@ export function detectTemporalContradictions(
             affectedScenes: [c.sourceSceneId],
           });
         } else {
-          rowA.set(c.intervalB, new Set(intersection));
+          // Narrow BOTH directions together (see narrowPairRelations) so the
+          // backward cell never drifts away from being the true inverse of
+          // this forward assertion.
+          narrowPairRelations(constraintMatrix, c.intervalA, c.intervalB, intersection);
         }
       }
     }
@@ -706,11 +784,19 @@ export function detectTemporalContradictions(
             });
             
             // Don't return immediately - collect all contradictions
-            // But mark this relation as impossible
-            constraintMatrix.get(intI.id)?.set(intK.id, new Set());
+            // But mark this relation as impossible (both directions, via
+            // narrowPairRelations, so the backward cell doesn't keep
+            // reporting a now-invalidated relation set).
+            narrowPairRelations(constraintMatrix, intI.id, intK.id, []);
             changed = true;
           } else if (intersection.length < rIK.size) {
-            constraintMatrix.get(intI.id)?.set(intK.id, new Set(intersection));
+            // Narrow BOTH directions together (see narrowPairRelations) so
+            // the backward cell (K→I) stays the true inverse of this
+            // forward cell instead of drifting via unrelated composition
+            // paths — the root cause of the CONTINUOUS/MOMENTS LATER/SAME
+            // TIME false positives fixed 2026-08-03 (see that function's
+            // doc comment).
+            narrowPairRelations(constraintMatrix, intI.id, intK.id, intersection);
             changed = true;
           }
         }
