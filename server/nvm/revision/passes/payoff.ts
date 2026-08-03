@@ -611,9 +611,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
     for (const o of orphans.slice(0, ORPHAN_CLUE_DETAIL_CAP)) {
       issues.push({
-        location: `Scene ${o.plantedAt} (${o.slug})`,
+        location: `Scene ${o.plantedAt + 1} (${o.slug})`,
         rule: 'ORPHAN_CLUE',
-        description: `Clue "${o.clueId}" was planted in Scene ${o.plantedAt} but never paid off — a broken promise to the audience`,
+        description: `Clue "${o.clueId}" was planted in Scene ${o.plantedAt + 1} but never paid off — a broken promise to the audience`,
         severity: 'critical',
         suggestedFix: `Add a scene in Act 3 that reveals the significance of "${o.clueId}" and closes the loop`,
       });
@@ -637,7 +637,7 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const gap = payoffScene - info.plantedAt;
       if (gap === 0) {
         issues.push({
-          location: `Scene ${payoffScene}`,
+          location: `Scene ${payoffScene + 1}`,
           rule: 'PAYOFF_TOO_QUICK',
           description: `Clue "${clueId}" is planted and paid off in the same scene — the audience has no time to form a question`,
           severity: 'major',
@@ -645,7 +645,7 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         });
       } else if (gap === 1) {
         issues.push({
-          location: `Scene ${payoffScene}`,
+          location: `Scene ${payoffScene + 1}`,
           rule: 'PAYOFF_TOO_QUICK',
           description: `Clue "${clueId}" is planted and paid off in consecutive scenes — no suspense window for the audience`,
           severity: 'minor',
@@ -659,9 +659,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
   for (const [setupId, payoffScene] of payoffInfo) {
     if (!clueInfo.has(setupId)) {
       issues.push({
-        location: `Scene ${payoffScene}`,
+        location: `Scene ${payoffScene + 1}`,
         rule: 'DANGLING_PAYOFF',
-        description: `A payoff for "${setupId}" arrives in Scene ${payoffScene} but no matching setup was ever seeded — the audience will feel disoriented`,
+        description: `A payoff for "${setupId}" arrives in Scene ${payoffScene + 1} but no matching setup was ever seeded — the audience will feel disoriented`,
         severity: 'major',
         suggestedFix: `Add a SEED_CLUE for "${setupId}" earlier in the story, or remove the payoff if it references something never established`,
       });
@@ -720,9 +720,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
 
       if (!hasConsequence) {
         const clueInfo_obj = clueInfo.get(clueId);
-        const plantLocation = clueInfo_obj ? `Scene ${clueInfo_obj.plantedAt}` : 'Act 1';
+        const plantLocation = clueInfo_obj ? `Scene ${clueInfo_obj.plantedAt + 1}` : 'Act 1';
         issues.push({
-          location: `Clue appearances: Scenes ${appearanceScenes.join(', ')}`,
+          location: `Clue appearances: Scenes ${appearanceScenes.map(s => s + 1).join(', ')}`,
           rule: 'SETUP_WITHOUT_CONSEQUENCE',
           description: `Clue "${clueId}" appears ${appearanceScenes.length} times (planted at ${plantLocation}) but never drives a character decision or relationship shift — it's narrative noise, not meaningful setup`,
           severity: 'major',
@@ -742,9 +742,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       // 6+ scene gap means audience likely forgot the setup
       if (gap >= 6 && structure.completionPercent >= 70) {
         issues.push({
-          location: `Clue payoff at Scene ${payoffScene}`,
+          location: `Clue payoff at Scene ${payoffScene + 1}`,
           rule: 'PAYOFF_MEMORY_GAP',
-          description: `Clue "${clueId}" planted in Scene ${info.plantedAt} is paid off ${gap} scenes later in Scene ${payoffScene} — the audience has likely forgotten the setup by the time the payoff arrives`,
+          description: `Clue "${clueId}" planted in Scene ${info.plantedAt + 1} is paid off ${gap} scenes later in Scene ${payoffScene + 1} — the audience has likely forgotten the setup by the time the payoff arrives`,
           severity: 'minor',
           suggestedFix: `Add a callback or reminder of "${clueId}" 1-2 scenes before its payoff to rebuild audience memory`,
         });
@@ -766,9 +766,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     for (const [scene, setupIds] of payoffsByScene) {
       if (setupIds.length >= 3) {
         issues.push({
-          location: `Scene ${scene}`,
+          location: `Scene ${scene + 1}`,
           rule: 'CLUSTERED_PAYOFFS',
-          description: `${setupIds.length} separate setups (${setupIds.slice(0, 3).join(', ')}${setupIds.length > 3 ? '…' : ''}) all pay off in Scene ${scene} — resolutions blur together and lose individual impact`,
+          description: `${setupIds.length} separate setups (${setupIds.slice(0, 3).join(', ')}${setupIds.length > 3 ? '…' : ''}) all pay off in Scene ${scene + 1} — resolutions blur together and lose individual impact`,
           severity: 'minor',
           suggestedFix: 'Distribute payoffs across multiple scenes so each resolution lands distinctly. A cascade of simultaneous reveals reads as contrived convenience',
         });
@@ -788,9 +788,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     if (allResolvedEarly && allCluesResolved && (structure.actPosition === 'act3' || structure.completionPercent >= 70)) {
       const lastPayoff = Math.max(...payoffInfo.values());
       issues.push({
-        location: `Last payoff at Scene ${lastPayoff} (climax zone starts Scene ${climaxZoneStart})`,
+        location: `Last payoff at Scene ${lastPayoff + 1} (climax zone starts Scene ${climaxZoneStart + 1})`,
         rule: 'PAYOFF_BEFORE_CLIMAX',
-        description: `All ${clueInfo.size} setups are resolved by Scene ${lastPayoff}, before the climax zone (Scene ${climaxZoneStart}+) — the climax has no unanswered questions left to drive it`,
+        description: `All ${clueInfo.size} setups are resolved by Scene ${lastPayoff + 1}, before the climax zone (Scene ${climaxZoneStart + 1}+) — the climax has no unanswered questions left to drive it`,
         severity: 'major',
         suggestedFix: 'Hold at least one significant payoff for the climax itself. The biggest reveal or resolution should coincide with the story\'s peak, not precede it',
       });
@@ -806,9 +806,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const earliestPlant = Math.min(...[...clueInfo.values()].map(c => c.plantedAt));
     if (earliestPlant >= act1End) {
       issues.push({
-        location: `Earliest clue planted at Scene ${earliestPlant} (Act 1 ends ~Scene ${act1End})`,
+        location: `Earliest clue planted at Scene ${earliestPlant + 1} (Act 1 ends ~Scene ${act1End})`,
         rule: 'SETUP_FRONT_GAP',
-        description: `No clues are planted in Act 1 (first ${act1End} scenes) — the earliest setup appears at Scene ${earliestPlant}. Late seeding can't build the long-arc anticipation that makes payoffs feel earned`,
+        description: `No clues are planted in Act 1 (first ${act1End} scenes) — the earliest setup appears at Scene ${earliestPlant + 1}. Late seeding can't build the long-arc anticipation that makes payoffs feel earned`,
         severity: 'minor',
         suggestedFix: 'Plant at least one clue in Act 1, ideally disguised as an incidental detail, so its later payoff rewards the attentive viewer',
       });
@@ -823,11 +823,11 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const info = clueInfo.get(clueId);
     if (info && payoffScene < info.plantedAt) {
       issues.push({
-        location: `Scene ${payoffScene} (payoff) / Scene ${info.plantedAt} (setup)`,
+        location: `Scene ${payoffScene + 1} (payoff) / Scene ${info.plantedAt + 1} (setup)`,
         rule: 'PAYOFF_BEFORE_SETUP',
-        description: `Clue "${clueId}" is paid off at Scene ${payoffScene} but not seeded until Scene ${info.plantedAt} — the audience receives the answer before the question is asked`,
+        description: `Clue "${clueId}" is paid off at Scene ${payoffScene + 1} but not seeded until Scene ${info.plantedAt + 1} — the audience receives the answer before the question is asked`,
         severity: 'critical',
-        suggestedFix: `Move the seed for "${clueId}" to a scene before Scene ${payoffScene}, or move its payoff to after Scene ${info.plantedAt}`,
+        suggestedFix: `Move the seed for "${clueId}" to a scene before Scene ${payoffScene + 1}, or move its payoff to after Scene ${info.plantedAt + 1}`,
       });
     }
   }
@@ -867,7 +867,7 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const act3Scenes = records.length - act3Start;
     if (act2Payoffs >= 2 && act3Payoffs === 0 && act3Scenes >= 2) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start}–${records.length - 1})`,
+        location: `Act 3 (Scenes ${act3Start + 1}–${records.length})`,
         rule: 'PAYOFF_RATE_DECLINE',
         description: `Act 2 delivers ${act2Payoffs} payoffs but Act 3 delivers none — dramatic resolutions cluster in the middle act, leaving the finale without any story-thread closure`,
         severity: 'major',
@@ -924,9 +924,9 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
     if (maxOpen >= 5) {
       issues.push({
-        location: `Around Scene ${glutScene}`,
+        location: `Around Scene ${glutScene + 1}`,
         rule: 'CLUE_GLUT',
-        description: `By Scene ${glutScene} the audience is tracking ${maxOpen} open clues at once — too many simultaneous unresolved threads overload working memory, and the mysteries start to blur together.`,
+        description: `By Scene ${glutScene + 1} the audience is tracking ${maxOpen} open clues at once — too many simultaneous unresolved threads overload working memory, and the mysteries start to blur together.`,
         severity: 'minor',
         suggestedFix: 'Resolve or consolidate some threads before opening new ones. Pay off an early clue to free up the audience\'s attention before planting the next, so each mystery has room to register.',
       });
@@ -976,10 +976,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const seeded206 = new Set((r.seededClueIds ?? r.unresolvedClues) ?? []);
       if (seeded206.size >= 4) {
         issues.push({
-          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          location: `Scene ${r.sceneIdx + 1} (${r.slug})`,
           rule: 'SETUP_BURST',
           severity: 'minor',
-          description: `Scene ${r.sceneIdx} plants ${seeded206.size} distinct clues at once — too many questions raised in a single beat overloads the audience and reads as an info-dump rather than organic seeding.`,
+          description: `Scene ${r.sceneIdx + 1} plants ${seeded206.size} distinct clues at once — too many questions raised in a single beat overloads the audience and reads as an info-dump rather than organic seeding.`,
           suggestedFix: 'Distribute the setups across several scenes so each planted question has room to register. A scene that seeds four mysteries simultaneously teaches the audience to stop tracking any of them.',
         });
         break; // one flag per pass
@@ -1001,10 +1001,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const inMiddle206 = payoffScenes206.some(s => s >= midStart206 && s < midEnd206);
     if (inAct1_206 && inAct3_206 && !inMiddle206) {
       issues.push({
-        location: `Middle (Scenes ${midStart206}–${midEnd206 - 1})`,
+        location: `Middle (Scenes ${midStart206 + 1}–${midEnd206})`,
         rule: 'MIDSTORY_PAYOFF_VOID',
         severity: 'minor',
-        description: `Payoffs land in Act 1 and Act 3 but none in the entire middle 50% (Scenes ${midStart206}–${midEnd206 - 1}) — the conflict zone delivers no thread closure, leaving a long stretch of dead air between the opening hook and the finale.`,
+        description: `Payoffs land in Act 1 and Act 3 but none in the entire middle 50% (Scenes ${midStart206 + 1}–${midEnd206}) — the conflict zone delivers no thread closure, leaving a long stretch of dead air between the opening hook and the finale.`,
         suggestedFix: 'Resolve at least one planted thread in the middle act. A mid-story payoff rewards the audience\'s patience, raises new questions, and keeps the long second act from feeling like stalling.',
       });
     }
@@ -1034,10 +1034,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       }
       if (maxGap206 >= 5) {
         issues.push({
-          location: `Scenes ${gapStart206}–${gapEnd206}`,
+          location: `Scenes ${gapStart206 + 1}–${gapEnd206 + 1}`,
           rule: 'CLUE_DROUGHT',
           severity: 'minor',
-          description: `The setup/payoff engine goes idle for ${maxGap206 - 1} consecutive scenes (between Scene ${gapStart206} and Scene ${gapEnd206}) — no clue is planted and no thread resolves across the longest interior gap. The mystery architecture stalls in the middle of an otherwise active story.`,
+          description: `The setup/payoff engine goes idle for ${maxGap206 - 1} consecutive scenes (between Scene ${gapStart206 + 1} and Scene ${gapEnd206 + 1}) — no clue is planted and no thread resolves across the longest interior gap. The mystery architecture stalls in the middle of an otherwise active story.`,
           suggestedFix: 'Seed a small clue or resolve a minor thread within the dead stretch. A drip of setup/payoff activity keeps the mystery engine warm so the audience stays engaged between major beats.',
         });
       }
@@ -1062,10 +1062,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
     if (peak219 > 5) {
       issues.push({
-        location: `Scene ${peakScene219} (peak open threads)`,
+        location: `Scene ${peakScene219 + 1} (peak open threads)`,
         rule: 'CONCURRENT_THREAD_OVERLOAD',
         severity: 'major',
-        description: `At Scene ${peakScene219} the story holds ${peak219} planted-but-unresolved threads open simultaneously — the audience is asked to track ${peak219} live questions at once. Beyond roughly five concurrent threads, individual mysteries blur together and each eventual payoff loses its charge.`,
+        description: `At Scene ${peakScene219 + 1} the story holds ${peak219} planted-but-unresolved threads open simultaneously — the audience is asked to track ${peak219} live questions at once. Beyond roughly five concurrent threads, individual mysteries blur together and each eventual payoff loses its charge.`,
         suggestedFix: 'Close some threads before opening new ones: pay off or fold together a few of the early clues so the concurrent open-thread count stays manageable. Suspense comes from a few sharp questions held in focus, not from a dozen blurred ones.',
       });
     }
@@ -1082,7 +1082,7 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const lateShare219 = latePayoffs219 / payoffInfo.size;
     if (lateShare219 >= 0.6) {
       issues.push({
-        location: `Final 15% (Scenes ${endZoneStart219}–${records.length - 1})`,
+        location: `Final 15% (Scenes ${endZoneStart219 + 1}–${records.length})`,
         rule: 'RESOLUTION_CRAMMED_AT_END',
         severity: 'major',
         description: `${latePayoffs219} of ${payoffInfo.size} payoffs (${Math.round(lateShare219 * 100)}%) land in the final 15% of the story — resolution is crammed into the ending rather than paced across the arc. A closing run of back-to-back reveals reads as an info-dump and denies most payoffs the scene-space to land.`,
@@ -1152,7 +1152,7 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const postPayoffs233 = [...payoffInfo.values()].filter(s => s >= postClimaxStart233).length;
     if (postPayoffs233 >= 2) {
       issues.push({
-        location: `Final 20% (Scenes ${postClimaxStart233}–${records.length - 1})`,
+        location: `Final 20% (Scenes ${postClimaxStart233 + 1}–${records.length})`,
         rule: 'PAYOFF_POST_CLIMAX_CLUSTER',
         severity: 'minor',
         description: `${postPayoffs233} payoffs land after Scene ${postClimaxStart233} (post-climax zone) — reveals that arrive in the falling action feel like afterthoughts. The dramatic energy is already spent when these payoffs land.`,
@@ -1201,7 +1201,7 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const act3Clues247 = [...clueInfo.values()].filter(c => c.plantedAt >= act3Start247).length;
     if (act3Clues247 / clueInfo.size >= 0.4) {
       issues.push({
-        location: `Act 3 setup layer (Scenes ${act3Start247}–${records.length - 1})`,
+        location: `Act 3 setup layer (Scenes ${act3Start247 + 1}–${records.length})`,
         rule: 'SETUP_ACT3_SURGE',
         severity: 'minor',
         description: `${act3Clues247} of ${clueInfo.size} planted clues (${Math.round(act3Clues247 / clueInfo.size * 100)}%) are seeded in Act 3 — the story is planting new obligations in its climax act. Clues seeded after the 75% mark have no growing room; the audience barely has time to register them before the resolution arrives.`,
@@ -1223,10 +1223,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const [maxScene247, maxCount247] = [...payoffByScene247.entries()].sort((a, b) => b[1] - a[1])[0];
     if (maxCount247 / payoffInfo.size > 0.5) {
       issues.push({
-        location: `Scene ${maxScene247} (payoff dump)`,
+        location: `Scene ${maxScene247 + 1} (payoff dump)`,
         rule: 'PAYOFF_SINGLE_SCENE_DUMP',
         severity: 'minor',
-        description: `${maxCount247} of ${payoffInfo.size} payoffs (${Math.round(maxCount247 / payoffInfo.size * 100)}%) land in a single scene (Scene ${maxScene247}) — the story fires all its setups simultaneously. Each reveal dilutes the others when they arrive together; none can land with full weight.`,
+        description: `${maxCount247} of ${payoffInfo.size} payoffs (${Math.round(maxCount247 / payoffInfo.size * 100)}%) land in a single scene (Scene ${maxScene247 + 1}) — the story fires all its setups simultaneously. Each reveal dilutes the others when they arrive together; none can land with full weight.`,
         suggestedFix: 'Distribute payoffs across 3-4 separate scenes. Give each revelation room to breathe: a scene to absorb it, a character reaction, a shift in what the audience now knows. A payoff dump feels like a delivery, not a discovery.',
       });
     }
@@ -1246,10 +1246,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     );
     if (!hasAct2bClue247) {
       issues.push({
-        location: `Act 2b (Scenes ${act2bStart247}–${act2bEnd247 - 1}) — setup layer`,
+        location: `Act 2b (Scenes ${act2bStart247 + 1}–${act2bEnd247}) — setup layer`,
         rule: 'SETUP_DESERT_ACT2B',
         severity: 'minor',
-        description: `No clues are planted in the second half of Act 2 (Scenes ${act2bStart247}–${act2bEnd247 - 1}). The run-up to the climax generates no new threads. Act 3 has nothing fresh to resolve — only the setups established earlier, which are already in the audience's fading memory.`,
+        description: `No clues are planted in the second half of Act 2 (Scenes ${act2bStart247 + 1}–${act2bEnd247}). The run-up to the climax generates no new threads. Act 3 has nothing fresh to resolve — only the setups established earlier, which are already in the audience's fading memory.`,
         suggestedFix: 'Plant at least one clue in Act 2b: a detail planted close enough to the climax to feel urgent, far enough to be surprising when it pays off. The Act 2b setup is the fuel for Act 3\'s discoveries.',
       });
     }
@@ -1272,11 +1272,11 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const info261 = clueInfo.get(setupId);
       if (info261 && payoffScene < info261.plantedAt) {
         issues.push({
-          location: `Payoff Scene ${payoffScene} → setup Scene ${info261.plantedAt}`,
+          location: `Payoff Scene ${payoffScene + 1} → setup Scene ${info261.plantedAt + 1}`,
           rule: 'PAYOFF_PRECEDES_SETUP',
           severity: 'major',
-          description: `The payoff for "${setupId}" lands in Scene ${payoffScene}, but its setup isn't planted until Scene ${info261.plantedAt} — the resolution arrives before the audience is shown the thread. The answer is delivered before the question is posed, inverting cause and effect.`,
-          suggestedFix: `Reorder the timeline so "${setupId}" is seeded before it pays off. Either move the setup scene earlier than Scene ${payoffScene}, or move the payoff later than Scene ${info261.plantedAt}. A payoff only lands when the audience has already been holding the question.`,
+          description: `The payoff for "${setupId}" lands in Scene ${payoffScene + 1}, but its setup isn't planted until Scene ${info261.plantedAt + 1} — the resolution arrives before the audience is shown the thread. The answer is delivered before the question is posed, inverting cause and effect.`,
+          suggestedFix: `Reorder the timeline so "${setupId}" is seeded before it pays off. Either move the setup scene earlier than Scene ${payoffScene + 1}, or move the payoff later than Scene ${info261.plantedAt + 1}. A payoff only lands when the audience has already been holding the question.`,
         });
         precedesFired261 = true;
         break;
@@ -1300,10 +1300,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         const gap261 = payoffScene - info261b.plantedAt;
         if (gap261 >= gapThreshold261) {
           issues.push({
-            location: `Clue "${setupId}" (Scene ${info261b.plantedAt} → Scene ${payoffScene})`,
+            location: `Clue "${setupId}" (Scene ${info261b.plantedAt + 1} → Scene ${payoffScene + 1})`,
             rule: 'PAYOFF_GAP_EXCESSIVE',
             severity: 'minor',
-            description: `The clue "${setupId}" is planted in Scene ${info261b.plantedAt} and not paid off until Scene ${payoffScene} — a gap of ${gap261} scenes, spanning ${Math.round(gap261 / records.length * 100)}% of the story. Across that span the audience has likely forgotten the setup, so the payoff lands without the flash of recognition that makes it satisfying.`,
+            description: `The clue "${setupId}" is planted in Scene ${info261b.plantedAt + 1} and not paid off until Scene ${payoffScene + 1} — a gap of ${gap261} scenes, spanning ${Math.round(gap261 / records.length * 100)}% of the story. Across that span the audience has likely forgotten the setup, so the payoff lands without the flash of recognition that makes it satisfying.`,
             suggestedFix: `Reinforce "${setupId}" at least once in the middle stretch — a callback, a reminder, a recontextualisation — so the thread stays warm in the audience's memory. A long fuse only works if it visibly keeps burning.`,
           });
           break;
@@ -1345,10 +1345,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const hasAct2aPayoff275 = [...payoffInfo.values()].some(s => s >= act2aStart275 && s < act2aEnd275);
     if (!hasAct2aPayoff275) {
       issues.push({
-        location: `Act 2a (Scenes ${act2aStart275}–${act2aEnd275 - 1})`,
+        location: `Act 2a (Scenes ${act2aStart275 + 1}–${act2aEnd275})`,
         rule: 'PAYOFF_ACT2A_VOID',
         severity: 'minor',
-        description: `No setups are paid off in Act 2a (Scenes ${act2aStart275}–${act2aEnd275 - 1}) — the early conflict zone delivers no thread closure. A long stretch of pure escalation without any payoff depletes the audience's patience before the midpoint.`,
+        description: `No setups are paid off in Act 2a (Scenes ${act2aStart275 + 1}–${act2aEnd275}) — the early conflict zone delivers no thread closure. A long stretch of pure escalation without any payoff depletes the audience's patience before the midpoint.`,
         suggestedFix: 'Resolve at least one planted thread in Act 2a to reward the audience\'s investment and signal that the setup engine is active. A mid-first-half payoff resets the tension baseline and earns the right to raise it again.',
       });
     }
@@ -1770,10 +1770,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         const s342 = (records as any[])[maxStart342].sceneIdx;
         const e342 = (records as any[])[maxStart342 + maxDead342 - 1].sceneIdx;
         issues.push({
-          location: `Scenes ${s342}–${e342} — no setup or payoff`,
+          location: `Scenes ${s342 + 1}–${e342 + 1} — no setup or payoff`,
           rule: 'SETUP_PAYOFF_DEAD_RUN',
           severity: 'minor',
-          description: `${maxDead342} consecutive scenes (${s342}–${e342}) plant no clue and resolve no thread, in a story that otherwise uses the setup/payoff machine. For this whole stretch the plot's connective tissue vanishes — nothing is seeded and nothing harvested — so the audience's sense of an interlocking design goes quiet and the middle of the story drifts free of the structure built around it.`,
+          description: `${maxDead342} consecutive scenes (${s342 + 1}–${e342 + 1}) plant no clue and resolve no thread, in a story that otherwise uses the setup/payoff machine. For this whole stretch the plot's connective tissue vanishes — nothing is seeded and nothing harvested — so the audience's sense of an interlocking design goes quiet and the middle of the story drifts free of the structure built around it.`,
           suggestedFix: 'Thread continuity through the dead run: plant a small clue, pay off an earlier one, or fold a long fuse partway toward its resolution. The setup/payoff weave is what makes a story feel designed rather than episodic; a long stretch with neither leaves the audience watching events instead of a plot.',
         });
       }
@@ -1836,10 +1836,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const lateSeedScenes356 = (records as any[]).filter((r, i) => i >= lateStart356 && ((r.seededClueIds ?? []) as string[]).length > 0);
     if (lateSeedScenes356.length >= 1) {
       issues.push({
-        location: `Final 15% (Scenes ${lateStart356}–${records.length - 1}) — late clue plant`,
+        location: `Final 15% (Scenes ${lateStart356 + 1}–${records.length}) — late clue plant`,
         rule: 'LATE_CLUE_PLANT',
         severity: 'minor',
-        description: `${lateSeedScenes356.length} clue-seeding scene(s) fall in the final 15% of the story (Scenes ${lateStart356}–${records.length - 1}) — a clue planted this late has no room to be set up before it would need to pay off. Such a seed either dangles unresolved or pays off almost immediately, robbing it of the delay between planting and harvest that makes a payoff satisfying.`,
+        description: `${lateSeedScenes356.length} clue-seeding scene(s) fall in the final 15% of the story (Scenes ${lateStart356 + 1}–${records.length}) — a clue planted this late has no room to be set up before it would need to pay off. Such a seed either dangles unresolved or pays off almost immediately, robbing it of the delay between planting and harvest that makes a payoff satisfying.`,
         suggestedFix: 'Move late clue plants earlier so they have room to breathe before their payoff, or cut them if they are not paid off at all. The pleasure of a payoff is proportional to how long the seed has been quietly waiting; a clue introduced in the closing stretch cannot earn that.',
       });
     }
@@ -1862,10 +1862,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const peakCur370 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCur370);
       if (peakCur370 && ((peakCur370.payoffSetupIds ?? []) as string[]).length === 0) {
         issues.push({
-          location: `Scene ${peakCur370.sceneIdx} — peak curiosity (${maxCur370.toFixed(2)})`,
+          location: `Scene ${peakCur370.sceneIdx + 1} — peak curiosity (${maxCur370.toFixed(2)})`,
           rule: 'PAYOFF_CURIOSITY_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's highest-curiosityDelta scene (Scene ${peakCur370.sceneIdx}, curiosityDelta ${maxCur370.toFixed(2)}) carries no payoff, even though ${payoffScenes370.length} other scenes resolve planted threads. The moment the audience is most urgently wondering is not where anything snaps shut — peak intrigue and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty.`,
+          description: `The story's highest-curiosityDelta scene (Scene ${peakCur370.sceneIdx + 1}, curiosityDelta ${maxCur370.toFixed(2)}) carries no payoff, even though ${payoffScenes370.length} other scenes resolve planted threads. The moment the audience is most urgently wondering is not where anything snaps shut — peak intrigue and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty.`,
           suggestedFix: 'Land a payoff at the peak-curiosity scene: when the audience is most desperate to know, that is the moment to resolve a planted thread — or to pay one off in a way that opens the next question. A payoff that arrives at the crest of curiosity hits with doubled force.',
         });
       }
@@ -1886,10 +1886,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     const act3Payoffs370 = (records as any[]).filter((r, i) => i >= act3Start370 && ((r.payoffSetupIds ?? []) as string[]).length > 0);
     if (earlyPayoffs370.length >= 3 && act3Payoffs370.length === 0) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start370}–${records.length - 1}) — no payoffs`,
+        location: `Act 3 (Scenes ${act3Start370 + 1}–${records.length}) — no payoffs`,
         rule: 'PAYOFF_ACT3_ABSENT',
         severity: 'minor',
-        description: `${earlyPayoffs370.length} payoffs land in Acts 1–2 but none in Act 3 (Scenes ${act3Start370}–${records.length - 1}) — every loop the story closes is closed before the finale. The climax and resolution arrive with no thread left to pay off, so the ending settles nothing the audience has been waiting for; the satisfaction of resolution is spent before the moment it should peak.`,
+        description: `${earlyPayoffs370.length} payoffs land in Acts 1–2 but none in Act 3 (Scenes ${act3Start370 + 1}–${records.length}) — every loop the story closes is closed before the finale. The climax and resolution arrive with no thread left to pay off, so the ending settles nothing the audience has been waiting for; the satisfaction of resolution is spent before the moment it should peak.`,
         suggestedFix: 'Reserve at least one significant payoff for Act 3: hold a planted thread closed until the climax or resolution so the ending delivers the click of completion at the story\'s peak. A finale with no payoffs left is a finale the audience has no structural reason to anticipate.',
       });
     }
@@ -1914,10 +1914,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const afterMid370 = seedScenes370.some(({ i }) => i >= midEnd370);
       if (!inMid370 && beforeMid370 && afterMid370) {
         issues.push({
-          location: `Midpoint zone (Scenes ${midStart370}–${midEnd370 - 1}) — no clue seeded`,
+          location: `Midpoint zone (Scenes ${midStart370 + 1}–${midEnd370}) — no clue seeded`,
           rule: 'CLUE_SEED_MIDPOINT_VOID',
           severity: 'minor',
-          description: `No clue is planted in the midpoint zone (Scenes ${midStart370}–${midEnd370 - 1}), though clues are seeded both before and after it — the setup engine goes silent at the exact structural pivot. The midpoint is where a strong story plants the seeds that reframe the second half; a setup void there means the pivot reorganizes the plot without planting anything the back half can harvest.`,
+          description: `No clue is planted in the midpoint zone (Scenes ${midStart370 + 1}–${midEnd370}), though clues are seeded both before and after it — the setup engine goes silent at the exact structural pivot. The midpoint is where a strong story plants the seeds that reframe the second half; a setup void there means the pivot reorganizes the plot without planting anything the back half can harvest.`,
           suggestedFix: 'Plant a clue at the midpoint: let the pivot that reframes the story also seed the detail its second half will pay off. The midpoint reversal is most powerful when it both turns the plot and quietly lays the groundwork for what the turn makes possible.',
         });
       }
@@ -1940,10 +1940,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const peakSusp384 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSusp384);
       if (peakSusp384 && ((peakSusp384.payoffSetupIds ?? []) as string[]).length === 0) {
         issues.push({
-          location: `Scene ${peakSusp384.sceneIdx} — peak suspense (${maxSusp384.toFixed(2)})`,
+          location: `Scene ${peakSusp384.sceneIdx + 1} — peak suspense (${maxSusp384.toFixed(2)})`,
           rule: 'PAYOFF_SUSPENSE_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's highest-suspenseDelta scene (Scene ${peakSusp384.sceneIdx}, suspenseDelta ${maxSusp384.toFixed(2)}) carries no payoff, even though ${payoffScenes384.length} other scenes resolve planted threads. The moment the audience is most gripped is not where anything snaps shut — peak tension and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty.`,
+          description: `The story's highest-suspenseDelta scene (Scene ${peakSusp384.sceneIdx + 1}, suspenseDelta ${maxSusp384.toFixed(2)}) carries no payoff, even though ${payoffScenes384.length} other scenes resolve planted threads. The moment the audience is most gripped is not where anything snaps shut — peak tension and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty.`,
           suggestedFix: 'Land a payoff at the peak-tension scene: resolving a long-planted thread at the moment of maximum suspense doubles its force — the audience gets the answer and the danger at once. The scene that grips hardest is the most powerful place to pay something off.',
         });
       }
@@ -2093,10 +2093,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const peakCur412a = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCur412a);
       if (peakCur412a && ((peakCur412a.seededClueIds ?? []) as string[]).length === 0) {
         issues.push({
-          location: `Scene ${peakCur412a.sceneIdx} — peak curiosity (${maxCur412a.toFixed(2)})`,
+          location: `Scene ${peakCur412a.sceneIdx + 1} — peak curiosity (${maxCur412a.toFixed(2)})`,
           rule: 'CLUE_SEED_CURIOSITY_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's highest-curiosityDelta scene (Scene ${peakCur412a.sceneIdx}, curiosityDelta ${maxCur412a.toFixed(2)}) plants no clue, even though ${seedScenes412a.length} other scenes seed threads. The moment the audience is most urgently wondering is not where the story plants anything for them to wonder about later — peak intrigue and foreshadowing never coincide, so the seed that would benefit most from the audience's heightened attention is never dropped there.`,
+          description: `The story's highest-curiosityDelta scene (Scene ${peakCur412a.sceneIdx + 1}, curiosityDelta ${maxCur412a.toFixed(2)}) plants no clue, even though ${seedScenes412a.length} other scenes seed threads. The moment the audience is most urgently wondering is not where the story plants anything for them to wonder about later — peak intrigue and foreshadowing never coincide, so the seed that would benefit most from the audience's heightened attention is never dropped there.`,
           suggestedFix: 'Plant a clue at the peak-curiosity scene: when the audience is most alert and leaning in, slip in the detail you want them to carry. A seed dropped at the crest of curiosity is the one most likely to lodge — they are already scrutinizing the scene for answers, so the planted thread registers without being underlined.',
         });
       }
@@ -2118,10 +2118,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       const peakSusp412b = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSusp412b);
       if (peakSusp412b && ((peakSusp412b.seededClueIds ?? []) as string[]).length === 0) {
         issues.push({
-          location: `Scene ${peakSusp412b.sceneIdx} — peak suspense (${maxSusp412b.toFixed(2)})`,
+          location: `Scene ${peakSusp412b.sceneIdx + 1} — peak suspense (${maxSusp412b.toFixed(2)})`,
           rule: 'CLUE_SEED_SUSPENSE_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's highest-suspenseDelta scene (Scene ${peakSusp412b.sceneIdx}, suspenseDelta ${maxSusp412b.toFixed(2)}) plants no clue, even though ${seedScenes412b.length} other scenes seed threads. The tensest moment in the story is not where any thread is planted — peak danger and foreshadowing never share a scene, so the seed that would feel most charged is never dropped where the pressure could brand it into the audience's memory.`,
+          description: `The story's highest-suspenseDelta scene (Scene ${peakSusp412b.sceneIdx + 1}, suspenseDelta ${maxSusp412b.toFixed(2)}) plants no clue, even though ${seedScenes412b.length} other scenes seed threads. The tensest moment in the story is not where any thread is planted — peak danger and foreshadowing never share a scene, so the seed that would feel most charged is never dropped where the pressure could brand it into the audience's memory.`,
           suggestedFix: 'Plant a clue at the peak-suspense scene: a detail glimpsed under threat, an object that matters seen in the middle of the danger. Tension makes a seed feel dangerous and therefore worth remembering — the audience encodes what they see in the scenes that frighten them most, so the highest-suspense beat is the most retentive place to foreshadow.',
         });
       }
@@ -2153,10 +2153,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       }
       if (peakRelRec412c && peakRelMag412c > 0.4 && ((peakRelRec412c.payoffSetupIds ?? []) as string[]).length === 0) {
         issues.push({
-          location: `Scene ${peakRelRec412c.sceneIdx} — peak relational shift (magnitude ${peakRelMag412c.toFixed(2)})`,
+          location: `Scene ${peakRelRec412c.sceneIdx + 1} — peak relational shift (magnitude ${peakRelMag412c.toFixed(2)})`,
           rule: 'PAYOFF_RELATIONSHIP_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's largest relational shift (magnitude ${peakRelMag412c.toFixed(2)} at Scene ${peakRelRec412c.sceneIdx}) carries no payoff, even though ${payoffScenes412c.length} other scenes resolve planted threads. The most consequential relational moment — the biggest rupture or repair in the story — is not also the moment a long-running thread snaps shut, so the human climax and the structural climax land in separate scenes and neither amplifies the other.`,
+          description: `The story's largest relational shift (magnitude ${peakRelMag412c.toFixed(2)} at Scene ${peakRelRec412c.sceneIdx + 1}) carries no payoff, even though ${payoffScenes412c.length} other scenes resolve planted threads. The most consequential relational moment — the biggest rupture or repair in the story — is not also the moment a long-running thread snaps shut, so the human climax and the structural climax land in separate scenes and neither amplifies the other.`,
           suggestedFix: 'Land a payoff at the peak relational shift: arrange for the scene where a bond most decisively breaks or mends to also be the scene where a planted setup pays off. When the relational and structural climaxes coincide, the resolution of the plot thread and the resolution of the relationship reinforce each other — the audience feels both completions in a single beat.',
         });
       }
@@ -2237,10 +2237,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       let len426 = 0;
       for (let i = bestStart426; i < records.length && hasPayoff426((records as any[])[i]); i++) len426++;
       issues.push({
-        location: `Scenes ${bestStart426}–${bestStart426 + len426 - 1} — consecutive payoffs`,
+        location: `Scenes ${bestStart426 + 1}–${bestStart426 + len426} — consecutive payoffs`,
         rule: 'PAYOFF_CONSECUTIVE_RUN',
         severity: 'minor',
-        description: `Scenes ${bestStart426}–${bestStart426 + len426 - 1} each fire a payoff — ${len426} consecutive scenes of resolution with no rebuild between them. A back-to-back run of closures blurs the individual satisfactions together and spends the story's stored questions all at once; payoffs land hardest when they are spaced so each can register and the story can re-pressurize before the next arrives.`,
+        description: `Scenes ${bestStart426 + 1}–${bestStart426 + len426} each fire a payoff — ${len426} consecutive scenes of resolution with no rebuild between them. A back-to-back run of closures blurs the individual satisfactions together and spends the story's stored questions all at once; payoffs land hardest when they are spaced so each can register and the story can re-pressurize before the next arrives.`,
         suggestedFix: 'Interleave the payoffs with rebuilds: between two resolutions, give the story a scene that raises a new stake, deepens a complication, or opens a fresh question. Spreading closures across the act lets each one breathe and keeps the engine from emptying its tank in a single stretch.',
       });
     }
@@ -2682,11 +2682,11 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       });
       if (act3Seeds482b.length === 0) {
         issues.push({
-          location: `Seeds — none in Act 3 (Scenes ${act3Start482b}–${records.length - 1})`,
+          location: `Seeds — none in Act 3 (Scenes ${act3Start482b + 1}–${records.length})`,
           rule: 'SEED_ACT3_VOID',
           severity: 'minor',
-          description: `The story has ${allSeedRecs482b.length} clue-seeding scenes — not one falls in Act 3 (Scene ${act3Start482b} onward). The final act operates on a closed information set: it resolves threads planted in Acts 1–2 but introduces nothing new. A seed planted in Act 3 — an unexpected detail that recontextualises what came before — gives the final act structural life beyond mere closure. The audience's forward pull in Act 3 is not only sustained by approaching the climax but by the possibility that the story still has something to reveal about its own setup. Without any late seeding, Act 3 can feel like an engine that is only winding down.`,
-          suggestedFix: `Plant at least one new clue or detail in Act 3 (Scene ${act3Start482b} or later) — not so late that it cannot be addressed, but late enough to complicate the closure. An Act 3 seed might be a detail that reframes the resolution — a truth that makes the payoffs mean something different than the audience expected. The payoff of an Act 3 seed is double: it delivers new information AND changes the meaning of the threads that preceded it.`,
+          description: `The story has ${allSeedRecs482b.length} clue-seeding scenes — not one falls in Act 3 (Scene ${act3Start482b + 1} onward). The final act operates on a closed information set: it resolves threads planted in Acts 1–2 but introduces nothing new. A seed planted in Act 3 — an unexpected detail that recontextualises what came before — gives the final act structural life beyond mere closure. The audience's forward pull in Act 3 is not only sustained by approaching the climax but by the possibility that the story still has something to reveal about its own setup. Without any late seeding, Act 3 can feel like an engine that is only winding down.`,
+          suggestedFix: `Plant at least one new clue or detail in Act 3 (Scene ${act3Start482b + 1} or later) — not so late that it cannot be addressed, but late enough to complicate the closure. An Act 3 seed might be a detail that reframes the resolution — a truth that makes the payoffs mean something different than the audience expected. The payoff of an Act 3 seed is double: it delivers new information AND changes the meaning of the threads that preceded it.`,
         });
       }
     }
@@ -3336,10 +3336,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         const peakClock566a = (records as any[]).find(r => (r.clockDelta ?? 0) === maxClock566a);
         if (peakClock566a && ((peakClock566a.payoffSetupIds ?? []) as string[]).length === 0) {
           issues.push({
-            location: `Scene ${peakClock566a.sceneIdx} — peak clockDelta (${maxClock566a})`,
+            location: `Scene ${peakClock566a.sceneIdx + 1} — peak clockDelta (${maxClock566a})`,
             rule: 'PAYOFF_CLOCK_PEAK_DECOUPLED',
             severity: 'minor',
-            description: `The story's highest-clockDelta scene (Scene ${peakClock566a.sceneIdx}, clockDelta ${maxClock566a}) carries no payoff, even though ${payoffScenes566a.length} other scenes resolve planted threads. The moment of maximum deadline pressure — when the clock is loudest and the audience most feels time running out — is not where any thread snaps shut. The peak-urgency beat and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty. A promise delivered at the moment the clock is at its most acute lands with doubled force: the audience receives the answer and the urgency in a single beat.`,
+            description: `The story's highest-clockDelta scene (Scene ${peakClock566a.sceneIdx + 1}, clockDelta ${maxClock566a}) carries no payoff, even though ${payoffScenes566a.length} other scenes resolve planted threads. The moment of maximum deadline pressure — when the clock is loudest and the audience most feels time running out — is not where any thread snaps shut. The peak-urgency beat and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty. A promise delivered at the moment the clock is at its most acute lands with doubled force: the audience receives the answer and the urgency in a single beat.`,
             suggestedFix: 'Land a payoff at the peak-clock scene: resolving a long-planted thread at the moment of maximum deadline pressure fuses urgency with satisfaction — the audience gets the delivery and the ticking clock at once. The scene where time is most acutely running out is one of the most powerful places in the story to pay something off, because the resolution arrives under pressure rather than in calm.',
           });
         }
@@ -4519,11 +4519,11 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     });
     if (r776a.fires) {
       issues.push({
-        location: `scene ${r776a.peakIdx} (peak curiosityDelta ${r776a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r776a.peakIdx + 1} (peak curiosityDelta ${r776a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'PAYOFF_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r776a.peakIdx}, curiosityDelta ${r776a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r776a.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the payoff engine hasn't built toward the mystery it's about to pose.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r776a.peakIdx} so the payoff engine earns its peak curiosity instead of springing it without preparation.`,
+        description: `The story's single highest-curiosity scene (Scene ${r776a.peakIdx + 1}, curiosityDelta ${r776a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r776a.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the payoff engine hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r776a.peakIdx + 1} so the payoff engine earns its peak curiosity instead of springing it without preparation.`,
       });
     }
   }
@@ -4651,11 +4651,11 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     });
     if (r804a.fires) {
       issues.push({
-        location: `scene ${r804a.peakIdx} (peak suspenseDelta ${r804a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r804a.peakIdx + 1} (peak suspenseDelta ${r804a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'PAYOFF_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r804a.peakIdx}, suspenseDelta ${r804a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r804a.qualifyingCount} scenes elsewhere carry tension. The moment the payoff engine is under the most pressure lands out of nowhere — nothing has built toward the danger testing which threads survive.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r804a.peakIdx} so the peak tension reads as earned rather than arbitrary.`,
+        description: `The story's single highest-suspense scene (Scene ${r804a.peakIdx + 1}, suspenseDelta ${r804a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r804a.qualifyingCount} scenes elsewhere carry tension. The moment the payoff engine is under the most pressure lands out of nowhere — nothing has built toward the danger testing which threads survive.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r804a.peakIdx + 1} so the peak tension reads as earned rather than arbitrary.`,
       });
     }
   }
@@ -6758,10 +6758,10 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
 
         if (newRatio1350 >= 0.75 && reuseRatio1350 <= 0.15) {
           issues.push({
-            location: `Scenes ${thirdStart1350}-${n1350 - 1} (final third)`,
+            location: `Scenes ${thirdStart1350 + 1}-${n1350} (final third)`,
             rule: 'REINCORPORATION_VOID',
             severity: 'minor',
-            description: `The final third of the story (scenes ${thirdStart1350}-${n1350 - 1}) introduces ${newCount1350} of its ${finalTokens1350.length} distinctive tokens as brand new — only ${Math.round(reuseRatio1350 * 100)}% of the ending's vocabulary reuses anything established in the first two-thirds. The ending reads disconnected from its own setup.`,
+            description: `The final third of the story (scenes ${thirdStart1350 + 1}-${n1350}) introduces ${newCount1350} of its ${finalTokens1350.length} distinctive tokens as brand new — only ${Math.round(reuseRatio1350 * 100)}% of the ending's vocabulary reuses anything established in the first two-thirds. The ending reads disconnected from its own setup.`,
             suggestedFix: `Bring back at least a few names, places, or objects the story already spent Acts 1-2 establishing — let the ending close using material the audience already recognizes, not a wave of new material.`,
           });
         }
