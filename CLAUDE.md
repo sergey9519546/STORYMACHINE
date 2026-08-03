@@ -117,3 +117,16 @@ writing, never as a substitute for it. `measure-before-threshold on the
 REAL corpus` still holds for any scoring change, and the shuffle-drop AUC
 must not regress below its floor. Commit to the branch designated for the
 current session — never a branch name hardcoded here.
+
+**Which floor, exactly** (these are three different statistics and have been
+confused before): the enforced one is **AUC-24 >= 0.622**, asserted in
+`tests/core/real-script-corpus.test.ts` (env-gated on
+`REAL_SCRIPT_CORPUS_DIR`). It measures ONE combined degradation — shuffle
+scenes AND drop every third — over a 24-script subset; last measured 0.731.
+It is NOT comparable to the 761-script P1 baseline
+(`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`), which reports
+SCENE_SHUFFLE (test 0.734) and MIDPOINT_DROP (test 0.766) as SEPARATE
+degradations on a 153-script hash-locked test partition, against a >= 0.80
+gate. Do not "update" the 0.622 ratchet to a P1 number — different corpus,
+different degradation, different denominator; raising it that way breaks the
+enforced test for no real regression.
