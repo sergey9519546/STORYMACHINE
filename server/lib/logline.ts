@@ -279,16 +279,56 @@ export function findCentralObstacle(records: ScreenplaySceneRecord[], protagonis
   // Tier (c) — dominant conflict: climax scene, else the single
   // highest-suspense scene (only if it actually raises tension).
   const climax = records.find(r => r.purpose === 'climax');
-  const climaxText = climax?.dramaticTurn || climax?.revelation;
-  if (climaxText) return truncate(climaxText, MAX_CLAUSE_LEN);
+  if (climax) {
+    const framed = frameSceneText(climax);
+    if (framed) return framed;
+  }
 
   const peak = records.reduce((a, b) => (b.suspenseDelta > a.suspenseDelta ? b : a));
   if (peak.suspenseDelta > 0) {
-    const peakText = peak.dramaticTurn || peak.revelation;
-    if (peakText) return truncate(peakText, MAX_CLAUSE_LEN);
+    const framed = frameSceneText(peak);
+    if (framed) return framed;
   }
 
   return null;
+}
+
+/** Frames tier (c)'s raw scene text as a noun phrase.
+ *
+ *  Tiers (a) and (b) return grammatical noun phrases ("a fracturing bond with
+ *  MARCUS", "opposition from VANCE") that slot cleanly into assembleLogline's
+ *  "<protagonist> must face ___" and "... before ___". Tier (c) text does not:
+ *  a dramaticTurn or revelation is a whole SENTENCE lifted from the script,
+ *  usually a line of dialogue. Dropping one in unframed produced loglines like
+ *
+ *      JUNE must face Turns out Holloway signed my transfer papers six years
+ *      ago. We've never really stopped working together.
+ *
+ *  — ungrammatical, two sentences deep, and misattributed: that is VANCE's
+ *  dialogue, presented as if it were the protagonist's obstacle. It was the
+ *  first line of the coverage report a reader saw.
+ *
+ *  The fix keeps the extracted signal but makes it grammatical and honest:
+ *  label what the text is, quote it so it reads as lifted from the page (the
+ *  same idiom assembleLogline already uses for `goal`), and keep one sentence,
+ *  since a logline carries a single clause. No content is invented. */
+function frameSceneText(r: ScreenplaySceneRecord): string | null {
+  const turn = r.dramaticTurn?.trim();
+  const revelation = r.revelation?.trim();
+  const raw = turn || revelation;
+  if (!raw) return null;
+  const label = turn ? 'the turn' : 'the revelation';
+  const clause = stripTrailingPunctuation(truncate(firstSentence(raw), MAX_CLAUSE_LEN));
+  if (!clause) return null;
+  return `${label} “${clause}”`;
+}
+
+/** First sentence only — tier (c) text is frequently a multi-sentence speech,
+ *  and a logline states one thing. Splits on sentence-final punctuation
+ *  followed by whitespace, so decimals and abbreviations mid-clause survive. */
+function firstSentence(text: string): string {
+  const m = /^(.+?[.!?])(?:\s|$)/s.exec(text.trim());
+  return (m ? m[1] : text).trim();
 }
 
 /** Assembles the four possible clauses into one sentence. Every branch uses
