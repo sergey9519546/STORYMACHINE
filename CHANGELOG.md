@@ -112,7 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Initial Release
 - Story Machine multi-agent narrative simulation
 - Script IDE with Fountain screenplay authoring
-- Doctor analysis engine with ~8,917 rules
+- Doctor analysis engine with a large generated rule catalog (this entry
+  originally said "~8,917 rules"; that count was DISPROVEN by the 2026-07-14
+  audit — the live catalog is 3,216 pass-scoped constants. Left in place as a
+  historical entry with the correction attached rather than silently rewritten.)
 - Deterministic coverage reports
 - [Previous features documented here]
 

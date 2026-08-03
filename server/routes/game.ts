@@ -178,7 +178,13 @@ router.post('/api/init', gameLimiter, validate(InitBodySchema), withSessionComma
   });
 }));
 
-router.post('/api/turn', gameLimiter, validate(TurnBodySchema), withSessionCommand(async (req, res, session) => {
+// aiLimiter, not gameLimiter (2026-08-03 audit). One turn reaches up to four
+// generateContent calls (Agent.ts, agent/decision.ts, agent/memory.ts x2) when
+// a key is configured. Under gameLimiter's 120/min that is ~480 provider calls
+// a minute from one caller, against 20/min for /api/game/interview which makes
+// a single call — the heavier route had the weaker limit. CLAUDE.md's rule is
+// aiLimiter for anything that CAN trigger an LLM call, and this can.
+router.post('/api/turn', aiLimiter, validate(TurnBodySchema), withSessionCommand(async (req, res, session) => {
   const agentId = requireString(req.body?.agentId, 'agentId', 128);
   if (!session.stage.getAgent(agentId)) {
     res.status(404).json({ error: `Agent '${agentId}' does not exist in this session` });
@@ -195,14 +201,16 @@ router.post('/api/turn', gameLimiter, validate(TurnBodySchema), withSessionComma
 // POST /api/game/interview — talk to a simulated character; every answer is
 // grounded in their ACTUAL psychological state, with citable receipts.
 //
-// Rate limiter contrast: every other route in this file (/api/turn,
-// /api/run-room, ...) drives the deterministic simulation engine — no LLM
-// call on the request path unless an agent's turn happens to need one deep
-// inside the orchestrator, and even then it's bounded by the engine's own
-// per-turn call budget. This route calls generateContent directly, once per
-// request, purely to GENERATE PROSE (the in-character answer) — that's a much
-// more expensive, less bounded operation than the analysis/state routes above,
-// so it sits behind aiLimiter (20/min) rather than gameLimiter (120/min).
+// Rate limiter: aiLimiter (20/min), because this route calls generateContent
+// directly, once per request, to GENERATE PROSE (the in-character answer).
+//
+// CORRECTION (2026-08-03 audit): this comment used to argue that /api/turn and
+// the other simulation routes were fine on gameLimiter because an agent's turn
+// only *might* reach an LLM "deep inside the orchestrator," and was "bounded by
+// the engine's own per-turn call budget." No such budget exists — grep finds no
+// call-budget anywhere in server/engine. A turn reaches up to four
+// generateContent calls, and simulate-to-fountain multiplies that by up to ten
+// turns. Both are now on aiLimiter too; see their own notes above.
 //
 // Keyless-analysis principle: receipts (the grounding) are ALWAYS computed and
 // returned regardless of whether the LLM call succeeds. The deterministic half
@@ -578,7 +586,11 @@ router.get('/api/ledger/fountain', gameLimiter, asyncHandler(async (req, res) =>
 }));
 
 // Run a self-contained simulation and return Fountain output without polluting main stage
-router.post('/api/simulate-to-fountain', gameLimiter, validate(SimulateToFountainBodySchema), asyncHandler(async (req, res) => {
+// aiLimiter, not gameLimiter (2026-08-03 audit) — the worst fan-out on the
+// server: runRoomSimulation runs up to 10 turns, each reaching up to four
+// generateContent calls, so a single request can cost ~40 provider calls.
+// At gameLimiter's 120/min that is ~4,800 calls a minute from one caller.
+router.post('/api/simulate-to-fountain', aiLimiter, validate(SimulateToFountainBodySchema), asyncHandler(async (req, res) => {
   const { nodes: nodesPayload, agents: agentPayload, location_id, maxTurns, title, author } = req.body;
 
   const simStage = new Stage(':memory:');

@@ -86,7 +86,7 @@ machine that manufactured the project's biggest liability: the live generated
 rulebook is 3,216 pass-scoped constants (the earlier "~8,917 rules, ~5,701
 from a bulk Wave 1191" story was shown to be inaccurate by the 2026-07-14
 audit — `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
-R2-C01), and by the doctor's own measurement (`doctor.ts:1656-1669`) the
+R2-C01), and by the doctor's own measurement (`doctor.ts:1892-1898`) the
 entire weighted-rule channel contributes AUC ~0.076 to discrimination while
 scene-count scarcity carries AUC ~0.938. More rules stopped adding signal a
 long time ago; they add maintenance cost and undercut the trust story. Do not
@@ -119,14 +119,24 @@ must not regress below its floor. Commit to the branch designated for the
 current session — never a branch name hardcoded here.
 
 **Which floor, exactly** (these are three different statistics and have been
-confused before): the enforced one is **AUC-24 >= 0.622**, asserted in
+confused before): the ratchet is **AUC-24 >= 0.622**, asserted in
 `tests/core/real-script-corpus.test.ts` (env-gated on
 `REAL_SCRIPT_CORPUS_DIR`). It measures ONE combined degradation — shuffle
 scenes AND drop every third — over a 24-script subset; last measured 0.731.
+
 It is NOT comparable to the 761-script P1 baseline
 (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`), which reports
 SCENE_SHUFFLE (test 0.734) and MIDPOINT_DROP (test 0.766) as SEPARATE
 degradations on a 153-script hash-locked test partition, against a >= 0.80
 gate. Do not "update" the 0.622 ratchet to a P1 number — different corpus,
-different degradation, different denominator; raising it that way breaks the
-enforced test for no real regression.
+different degradation, different denominator; raising it that way breaks that
+test for no real regression.
+
+**That floor is NOT automatically enforced, despite the word "ratchet."** CI
+sets only `GEMINI_API_KEY`; `REAL_SCRIPT_CORPUS_DIR` appears nowhere in
+`.github/`, `scripts/pre-commit.sh`, or `package.json`, so the assertion is
+SKIPPED on every CI run (2026-08-03 audit). A change that made the doctor more
+structure-blind would merge with `npm test` reporting 0 failures. Until the
+corpus reaches CI, running `npm run measure-real` locally before merging any
+scoring change is a HUMAN step nothing checks for you — treat it as part of
+the change, not as something the suite covers.

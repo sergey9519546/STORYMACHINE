@@ -12,7 +12,7 @@ import {
   withSessionCommand, gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
-import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
+import { listPersonas, getPersona, registerUserPersona, isPersonaRegisterError, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
 import {
   validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema,
@@ -756,13 +756,23 @@ router.get('/api/scriptide/personas', gameLimiter, asyncHandler(async (_req, res
 // POST /api/scriptide/personas — register a custom (user-uploaded) persona.
 // Body: a CopilotPersona JSON object. Returns the normalized persona, or 400.
 router.post('/api/scriptide/personas', gameLimiter, validate(PersonaBodySchema), asyncHandler(async (req, res) => {
-  const persona = registerUserPersona(req.body);
-  if (!persona) {
-    res.status(400).json({ error: 'Invalid persona: requires id (kebab-case), name, and systemPreamble.' });
+  const result = registerUserPersona(req.body);
+  if (isPersonaRegisterError(result)) {
+    // 409 for the id collision: the request is well-formed, it just names an
+    // id that is already taken by a built-in (see registerUserPersona's
+    // security note — shadowing a builtin replaced it for every user of this
+    // process). 400 for a malformed body, 429 for the capacity ceiling.
+    const { status, error } =
+      result === 'builtin_id'
+        ? { status: 409, error: 'That id belongs to a built-in persona. Choose a different id.' }
+        : result === 'capacity'
+          ? { status: 429, error: 'Too many custom personas registered on this server.' }
+          : { status: 400, error: 'Invalid persona: requires id (kebab-case), name, and systemPreamble.' };
+    res.status(status).json({ error });
     return;
   }
-  logger.info('persona_registered', { id: persona.id });
-  res.json({ persona });
+  logger.info('persona_registered', { id: result.id });
+  res.json({ persona: result });
 }));
 
 // ── ScriptIDE AI routes ────────────────────────────────────────────────────

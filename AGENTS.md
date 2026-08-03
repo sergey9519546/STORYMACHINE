@@ -104,7 +104,11 @@ See `ROADMAP.md` for full plan. Key points:
 - No new engine work until P0 clears (exception: security fixes)
 - No Phase 3-4 Story Graph until P0 GREEN + P1 validation
 - No Infinity Gate expansion until P0 GREEN
-- No new rules (frozen at 8,917), no new waves (program RETIRED)
+- No new rules (frozen at 3,216 pass-scoped constants — machine-counted by
+  `scripts/generate-rulebook.ts`; the "8,917" figure this line used to carry
+  was DISPROVEN by the 2026-07-14 audit, see
+  `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
+  R2-C01), no new waves (program RETIRED)
 
 **Constitutional Laws** (NORTH_STAR.md):
 - *Demand before rigor* — validated user need gates engine work

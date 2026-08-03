@@ -28,9 +28,11 @@ story to be inaccurate: the live generated rulebook is **3,216 distinct
 pass-scoped rule constants** (machine-counted from the live pass files by
 `scripts/generate-rulebook.ts`, enforced by `tests/core/rulebook.test.ts`).
 The rule channel is **inverted** in degradation experiments, not merely weak: by
-the doctor's own measurements (`server/nvm/analyze/doctor.ts:1656-1669`) the
+the doctor's own measurements (`server/nvm/analyze/doctor.ts:1892-1898`) the
 entire weighted-rule channel has AUC ~0.076 (where 0.50 is random and 1.0 is
-perfect — the rules fire MORE on degraded scripts, not less) while the
+perfect — rules fire LESS on shuffled scripts because the shuffle-drop recipe
+also REMOVES about a third of the scenes, so the degraded script looks
+healthier by issue count; that is what inverts the AUC) while the
 scene-count scarcity term has AUC ~0.938 (measured on artificial scene-drop
 degradation, NOT on natural strong-vs-weak human writing — scene count is a
 suspected confound/proxy until tested on real-labeled data). **The rules do not

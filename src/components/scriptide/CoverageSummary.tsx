@@ -73,10 +73,25 @@ export default function CoverageSummary({
       const startDraftGen = getDraftGeneration?.() ?? 0;
       setStatus("loading");
       setError(null);
+      // Watchdog. This is the FIRST request a new visitor's browser makes
+      // ("Try sample coverage" lands here), and without a deadline a stalled
+      // connection — a proxy that never errors, a very long draft — left the
+      // panel on "Reading the draft…" forever, with the re-run button disabled
+      // while loading so the only escape was closing and reopening the panel.
+      // Mirrors runDiagnosis's proven pattern in ScriptDoctorPanel.tsx, with
+      // `timedOut` distinguishing a real deadline from a teardown/superseded
+      // abort so only the former paints an error.
+      const controller = new AbortController();
+      let timedOut = false;
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, 120_000);
       try {
         const res = await fetch("/api/scriptide/doctor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             fountain: override?.fountain ?? fountain,
             title: override?.title ?? title ?? "Untitled",
@@ -112,8 +127,17 @@ export default function CoverageSummary({
         }
       } catch (e) {
         if (gen !== genRef.current) return;
+        // A non-timeout abort means this run was superseded or the panel was
+        // torn down — that is not an error the writer should see.
+        if ((e as Error).name === "AbortError" && !timedOut) return;
         setStatus("error");
-        setError((e as Error).message || "Coverage failed.");
+        setError(
+          timedOut
+            ? "Coverage timed out. The draft may be very long, or the connection stalled — try again."
+            : (e as Error).message || "Coverage failed.",
+        );
+      } finally {
+        clearTimeout(timeoutId);
       }
     },
     [fountain, title, onFreshReport, onLoadSampleIntoEditor, getDraftGeneration],

@@ -56,18 +56,53 @@ export function getPersona(id: string | undefined): CopilotPersona | undefined {
   return builtins.get('default') ?? builtins.values().next().value;
 }
 
+/** Cap on stored user personas. `userPersonas` is process-global and the
+ *  register route is anonymous (gameLimiter, 120/min), so without a ceiling a
+ *  single caller could grow this map without bound. Well above any real
+ *  usage — a writer curates a handful of copilot voices, not hundreds. */
+const MAX_USER_PERSONAS = 64;
+
+/** Why registration can fail, so the route can answer with the right status
+ *  and a message that tells the caller what to change. */
+export type PersonaRegisterError = 'invalid' | 'builtin_id' | 'capacity';
+
 /**
- * Register a user-supplied persona. Returns the normalized persona on success
- * or null if validation failed. Built-in ids cannot be permanently overwritten
- * on disk, but a user persona with the same id will shadow it at lookup time.
+ * Register a user-supplied persona. Returns the normalized persona, or an
+ * error code.
+ *
+ * SECURITY (2026-08-03 audit). `userPersonas` is a single module-level map
+ * shared by every request this process serves, and `getPersona` resolves
+ * `userPersonas.get(id) ?? builtins.get(id)` — the user map wins. Registering
+ * a persona under a BUILTIN id (`default`, `noir-specialist`, …) therefore
+ * replaced what every other user of the deployment received, including the
+ * `default` persona that callers get implicitly. Since a persona carries a
+ * `systemPreamble` and `contextInjectors` that go straight into the model
+ * prompt, that was an anonymous, persistent, cross-session prompt-injection
+ * vector — `sanitizeForPrompt` strips control characters, it is not a content
+ * filter. Builtin ids are now refused outright.
+ *
+ * Shadowing a builtin was never a needed capability: a custom voice can use
+ * any other id. Deliberately NOT gated behind checkAdminAuth — registering a
+ * personal copilot voice is an ordinary user action, unlike flipping the
+ * process's AI provider, and admin-gating it would remove a real feature to
+ * fix a bug that a collision check fixes precisely.
  */
-export function registerUserPersona(raw: unknown): CopilotPersona | null {
+export function registerUserPersona(raw: unknown): CopilotPersona | PersonaRegisterError {
   const persona = validatePersona(raw);
-  if (!persona) return null;
+  if (!persona) return 'invalid';
+  if (builtins.has(persona.id)) return 'builtin_id';
+  if (!userPersonas.has(persona.id) && userPersonas.size >= MAX_USER_PERSONAS) return 'capacity';
   // Never let a user persona claim builtin status.
   const normalized: CopilotPersona = { ...persona, builtin: false };
   userPersonas.set(normalized.id, normalized);
   return normalized;
+}
+
+/** True when the value is a registration failure rather than a persona. */
+export function isPersonaRegisterError(
+  v: CopilotPersona | PersonaRegisterError,
+): v is PersonaRegisterError {
+  return typeof v === 'string';
 }
 
 /** Clear all user personas — primarily for tests. */

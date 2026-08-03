@@ -139,7 +139,11 @@ router.get('/metrics', (req, res) => {
 // server/lib/admin-auth.ts (imported above) — see that module's comment.
 //
 // ── AI provider config routes ─────────────────────────────────────────────
-router.get('/api/ai-config', (_req, res) => {
+// gameLimiter added 2026-08-03: this was the one route in the file with no
+// limiter at all, against CLAUDE.md's "every route takes gameLimiter" rule.
+// Low direct risk — the body is booleans only, never key material — but the
+// same invariant had already silently drifted on two LLM routes, so close it.
+router.get('/api/ai-config', gameLimiter, (_req, res) => {
   const pub = getPublicConfig();
   // Single source of truth: server/lib/ai-config.ts::llmReady() evaluates the
   // active configured provider so this route and every generative route agree.
@@ -173,7 +177,12 @@ router.post('/api/ai-config/test', aiLimiter, validate(AiConfigTestBodySchema), 
     const raw = err instanceof Error ? err.message : String(err);
     const safe = raw.length > 200 ? raw.substring(0, 200) + '…' : raw;
     const sanitized = safe.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]');
-    logger.warn('ai_config_test_failed', { error: raw });
+    // Log the SANITIZED text, not `raw` (2026-08-03 audit). The redaction two
+    // lines up was computed for the HTTP response and then discarded here, so
+    // an upstream error echoing a bearer token or sk- key wrote it verbatim
+    // into the logs. CI's no-console grep cannot catch this — it is a logger
+    // call, which is exactly why it survived.
+    logger.warn('ai_config_test_failed', { error: sanitized });
     res.status(502).json({ ok: false, error: sanitized });
   }
 }));
