@@ -7170,8 +7170,8 @@ describe('D2-b — intentionPass discrimination-harness guards: PASSIVE_ESCALATI
       annotations: noAnnotationsD2b(6), approvedSpans: [],
     });
     assert.ok(
-      result.issues.some(i => i.rule === 'ZERO_ENTROPY_SCENE' && i.location.includes('Scene 3')),
-      `Should detect ZERO_ENTROPY_SCENE at scene 3; got: ${result.issues.map(i => i.rule).join(', ')}`,
+      result.issues.some(i => i.rule === 'ZERO_ENTROPY_SCENE' && i.location.includes('Scene 4')),
+      `Should detect ZERO_ENTROPY_SCENE at scene 4; got: ${result.issues.map(i => i.rule).join(', ')}`,
     );
   });
 
@@ -7189,8 +7189,8 @@ describe('D2-b — intentionPass discrimination-harness guards: PASSIVE_ESCALATI
       annotations: noAnnotationsD2b(6), approvedSpans: [],
     });
     assert.ok(
-      !result.issues.some(i => i.rule === 'ZERO_ENTROPY_SCENE' && i.location.includes('Scene 3')),
-      'Should NOT fire on scene 3 when it lands a payoff even with every other channel flat',
+      !result.issues.some(i => i.rule === 'ZERO_ENTROPY_SCENE' && i.location.includes('Scene 4')),
+      'Should NOT fire on scene 4 when it lands a payoff even with every other channel flat',
     );
   });
 

@@ -603,7 +603,7 @@ describe('Wave 1192 — conflictPass (Program v2, Type 1 — signal channel): be
     const fired = result.issues.filter((i: any) => i.rule === 'BETRAYAL_WITHOUT_SETUP');
     assert.ok(fired.length >= 1, `Expected BETRAYAL_WITHOUT_SETUP, got: ${result.issues.map((i: any) => i.rule).join(', ')}`);
     assert.equal(fired[0].severity, 'major');
-    assert.ok(fired[0].description.includes('Scene 5'), 'description names the spike scene');
+    assert.ok(fired[0].description.includes('Scene 6'), 'description names the spike scene');
   });
 
   it('conflictPass does NOT fire BETRAYAL_WITHOUT_SETUP when an earlier scene carries a negative relationship shift (strain planted)', async () => {

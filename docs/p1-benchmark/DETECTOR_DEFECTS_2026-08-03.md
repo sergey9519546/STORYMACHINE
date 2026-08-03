@@ -17,7 +17,13 @@ the grounded starting point for that work, not a license to skip it.
 
 Presentation-layer siblings already fixed separately (not detector work):
 page estimate (#244), logline splice (#245), and the global 0-based scene
-numbering in issue labels (migration in flight).
+numbering in issue labels (landed 2026-08-03; labels are 1-based and the
+three "Scene N" consumers — locate/heatmap/cluster — decode them, guarded
+by `tests/core/scene-label-consistency.test.ts`). NOTE: the quoted
+"Emitted" excerpts below are verbatim from the PRE-migration report, so
+scene numbers inside them are the old 0-based rendering unless a finding
+says otherwise; the "Reality" paragraphs already re-derive the true
+1-based scene in each case.
 
 ---
 

@@ -632,9 +632,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         .some(r => (r.seededClueIds?.length ?? 0) > 0 || r.unresolvedClues.length > 0);
       if (!anyCluesBefore) {
         issues.push({
-          location: `Scene ${i} (${curr.slug})`,
+          location: `Scene ${i + 1} (${curr.slug})`,
           rule: 'REVELATION_WITHOUT_SETUP',
-          description: `Scene ${i} delivers a revelation but no clues were planted in any prior scene`,
+          description: `Scene ${i + 1} delivers a revelation but no clues were planted in any prior scene`,
           severity: 'critical',
           suggestedFix: 'Add a clue-seeding moment in an earlier scene that anticipates this revelation',
         });
@@ -650,9 +650,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     const tensionReleasingPurposes = new Set<string>(['resolution', 'climax', 'turning_point', 'revelation']);
     if (curr.suspenseDelta < -3 && !tensionReleasingPurposes.has(curr.purpose)) {
       issues.push({
-        location: `Scene ${i} (${curr.slug})`,
+        location: `Scene ${i + 1} (${curr.slug})`,
         rule: 'UNEXPLAINED_SUSPENSE_DROP',
-        description: `Suspense drops sharply in Scene ${i} but the scene's purpose (${curr.purpose}) does not release tension — the cause of the deflation is unclear`,
+        description: `Suspense drops sharply in Scene ${i + 1} but the scene's purpose (${curr.purpose}) does not release tension — the cause of the deflation is unclear`,
         severity: 'minor',
         suggestedFix: 'Add a brief scene of consequence showing why tensions deflated, or recast this scene as a resolution/turning point',
       });
@@ -664,7 +664,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       if (!prevPrev) continue;
       if (prevPrev.emotionalShift === curr.emotionalShift) {
         issues.push({
-          location: `Scenes ${i - 2}–${i}`,
+          location: `Scenes ${i - 1}–${i + 1}`,
           rule: 'EMOTIONAL_MONOTONY',
           description: `Three consecutive scenes share the same emotional tone (${curr.emotionalShift}) — no causal variation`,
           severity: 'minor',
@@ -702,9 +702,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
 
       if (!hasSetup && i >= 2) {
         issues.push({
-          location: `Scene ${i} (${curr.slug})`,
+          location: `Scene ${i + 1} (${curr.slug})`,
           rule: 'UNMOTIVATED_DECISION',
-          description: `Scene ${i} shows a major decision (high suspense, relationship shift, or revelation) with no setup in the 2 preceding scenes — the decision feels arbitrary`,
+          description: `Scene ${i + 1} shows a major decision (high suspense, relationship shift, or revelation) with no setup in the 2 preceding scenes — the decision feels arbitrary`,
           severity: 'major',
           suggestedFix: 'Add a setup scene 1-2 scenes before where a character learns information, faces pressure, or confronts tension that motivates this decision',
         });
@@ -784,9 +784,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       if (!hasConsequence && (curr.seededClueIds?.length ?? 0) > 0) {
         // Only flag for planted clues, not every suspense scene
         issues.push({
-          location: `Scene ${i} (${curr.slug})`,
+          location: `Scene ${i + 1} (${curr.slug})`,
           rule: 'ACTION_WITHOUT_CONSEQUENCE',
-          description: `Scene ${i} plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected`,
+          description: `Scene ${i + 1} plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected`,
           severity: 'major',
           suggestedFix: 'Add a reaction scene where a character responds to or is affected by the action in this scene',
         });
@@ -826,9 +826,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       if (!isResolved && lastAppearance < records.length - 1) {
         // Goal is abandoned: appeared multiple times, then vanished
         issues.push({
-          location: `Goal "${goalId}" last mentioned at Scene ${lastAppearance}`,
+          location: `Goal "${goalId}" last mentioned at Scene ${lastAppearance + 1}`,
           rule: 'ABANDONED_GOAL',
-          description: `Goal/motivation "${goalId}" appears in Scenes ${appearances.slice(0, 3).join(', ')}${appearances.length > 3 ? ',...' : ''} but is never resolved or abandoned on-page — it just disappears`,
+          description: `Goal/motivation "${goalId}" appears in Scenes ${appearances.slice(0, 3).map(x => x + 1).join(', ')}${appearances.length > 3 ? ',...' : ''} but is never resolved or abandoned on-page — it just disappears`,
           severity: 'major',
           suggestedFix: `Either resolve "${goalId}" via payoff in the final act, or add an explicit scene where the character abandons or reframes the goal`,
         });
@@ -857,9 +857,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         );
         if (!hadEarlySetup) {
           issues.push({
-            location: `Scene ${i} (${r.slug})`,
+            location: `Scene ${i + 1} (${r.slug})`,
             rule: 'DEUS_EX_MACHINA',
-            description: `Scene ${i} resolves the plot via a late revelation, but no clue was planted in the first 60% of the story — the resolution arrives from nowhere`,
+            description: `Scene ${i + 1} resolves the plot via a late revelation, but no clue was planted in the first 60% of the story — the resolution arrives from nowhere`,
             severity: 'critical',
             suggestedFix: 'Plant the seed of this resolution in Act 1 or early Act 2. The solution must be available to the attentive audience before it arrives',
           });
@@ -883,9 +883,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         (prev1.seededClueIds?.length ?? 0) === 0 && (prev2.seededClueIds?.length ?? 0) === 0;
       if (noBuildup && noSetup) {
         issues.push({
-          location: `Scene ${i} (${curr.slug})`,
+          location: `Scene ${i + 1} (${curr.slug})`,
           rule: 'SUSPENSE_SPIKE_NO_CAUSE',
-          description: `Scene ${i} spikes to suspense ${curr.suspenseDelta.toFixed(1)} after two flat scenes (${prev2.suspenseDelta.toFixed(1)}, ${prev1.suspenseDelta.toFixed(1)}) with no clock pressure or clue — the danger appears without buildup`,
+          description: `Scene ${i + 1} spikes to suspense ${curr.suspenseDelta.toFixed(1)} after two flat scenes (${prev2.suspenseDelta.toFixed(1)}, ${prev1.suspenseDelta.toFixed(1)}) with no clock pressure or clue — the danger appears without buildup`,
           severity: 'major',
           suggestedFix: 'Escalate tension across the preceding scenes. Plant the threat or raise a clock so the spike feels like a culmination, not a jump-scare',
         });
@@ -952,7 +952,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       const unfiredClues = [...earlyClues].filter(c => !allPayoffs.has(c));
       if (unfiredClues.length >= 2) {
         issues.push({
-          location: `Scenes 0–${midpoint - 1} (setup zone)`,
+          location: `Scenes 1–${midpoint} (setup zone)`,
           rule: 'CHEKHOV_GUN_UNFIRED',
           description: `${unfiredClues.length} clue(s) seeded in the first half (${unfiredClues.slice(0, 3).join(', ')}) have no matching payoff anywhere in the story — Chekhov's gun shown but never fired`,
           severity: 'major',
@@ -983,11 +983,15 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
 
       if (firstConsequenceAt >= i + 5) {
         issues.push({
-          location: `Scenes ${i}–${firstConsequenceAt}`,
+          location: `Scenes ${i + 1}–${firstConsequenceAt + 1}`,
           rule: 'CONSEQUENCE_DELAY_EXCESSIVE',
-          description: `Scene ${i} raises the stakes (clock/clue) but the first narrative consequence doesn't arrive until Scene ${firstConsequenceAt} — ${firstConsequenceAt - i} scenes of delay. Cause and effect are too far apart to feel connected.`,
+          description: `Scene ${i + 1} raises the stakes (clock/clue) but the first narrative consequence doesn't arrive until Scene ${firstConsequenceAt + 1} — ${firstConsequenceAt - i} scenes of delay. Cause and effect are too far apart to feel connected.`,
           severity: 'minor',
-          suggestedFix: 'Add a ripple effect in Scene ${i + 1} or ${i + 2}: an emotional reaction, a relationship shift, or an escalation that shows the action landing immediately',
+          // Was a single-quoted string, so the writer saw literal "${i + 1}"
+          // text (shipped that way in the 2026-07 sample report). The intent
+          // is the scene or two right AFTER the stakes-raiser — 1-based, the
+          // raiser is Scene i+1, so the ripple lands in Scene i+2 or i+3.
+          suggestedFix: `Add a ripple effect in Scene ${i + 2} or ${i + 3}: an emotional reaction, a relationship shift, or an escalation that shows the action landing immediately`,
         });
         break; // one flag per pass
       }
@@ -1005,7 +1009,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       const ratio = firstHalfRevCount / revelationScenes.length;
       if (ratio > 0.6) {
         issues.push({
-          location: `Scenes 0–${midpoint - 1} (first half)`,
+          location: `Scenes 1–${midpoint} (first half)`,
           rule: 'REVELATION_FRONT_LOADING',
           description: `${firstHalfRevCount} of ${revelationScenes.length} revelations (${Math.round(ratio * 100)}%) land in the first half — the second act is informationally starved and can only react to what was already revealed`,
           severity: 'major',
@@ -1033,9 +1037,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         next.suspenseDelta <= 1;
       if (noReaction) {
         issues.push({
-          location: `Scene ${i} → Scene ${i + 1}`,
+          location: `Scene ${i + 1} → Scene ${i + 2}`,
           rule: 'REVELATION_WITHOUT_REACTION',
-          description: `Scene ${i} delivers a revelation but the next scene shows no causal ripple — neutral emotion, no relationship shift, no change in suspense. The truth lands and the story carries on as if nothing was learned.`,
+          description: `Scene ${i + 1} delivers a revelation but the next scene shows no causal ripple — neutral emotion, no relationship shift, no change in suspense. The truth lands and the story carries on as if nothing was learned.`,
           severity: 'minor',
           suggestedFix: 'Let the revelation change something immediately: a character recalibrates, a relationship shifts, or the stakes rise. Information that alters nothing wasn\'t worth revealing.',
         });
@@ -1071,9 +1075,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
     if (!priorCause) {
       issues.push({
-        location: `Scene ${i} (${curr.slug})`,
+        location: `Scene ${i + 1} (${curr.slug})`,
         rule: 'REACTION_WITHOUT_CAUSE',
-        description: `Scene ${i} turns emotionally negative but neither it nor the two preceding scenes contain any trigger — no setback, no bad news, no souring relationship, no rising threat. The downturn has no on-page cause.`,
+        description: `Scene ${i + 1} turns emotionally negative but neither it nor the two preceding scenes contain any trigger — no setback, no bad news, no souring relationship, no rising threat. The downturn has no on-page cause.`,
         severity: 'minor',
         suggestedFix: 'Give the negative turn a visible cause in this scene or just before it: a piece of bad news, a betrayal, a failure, or a threat that justifies the shift in mood.',
       });
@@ -1121,9 +1125,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       if (records[i].suspenseDelta < 2) continue;
       if (isFlat(records[i + 1]) && isFlat(records[i + 2])) {
         issues.push({
-          location: `Scene ${records[i].sceneIdx} (action peak)`,
+          location: `Scene ${records[i].sceneIdx + 1} (action peak)`,
           rule: 'CONSEQUENCE_CHAIN_BREAK',
-          description: `Scene ${records[i].sceneIdx} spikes to suspense ${records[i].suspenseDelta.toFixed(1)} but the next two scenes are completely flat — no emotional aftershock, no clock, no relationship movement. The action peak dissolves without causal consequence.`,
+          description: `Scene ${records[i].sceneIdx + 1} spikes to suspense ${records[i].suspenseDelta.toFixed(1)} but the next two scenes are completely flat — no emotional aftershock, no clock, no relationship movement. The action peak dissolves without causal consequence.`,
           severity: 'minor',
           suggestedFix: 'Let high-action peaks echo forward: show the emotional aftershock, the strained relationship, or the accelerated deadline in the scenes that immediately follow. Action without consequence is noise, not drama.',
         });
@@ -1148,9 +1152,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       );
       if (urgencyAbsent) {
         issues.push({
-          location: `Scene ${records[i].sceneIdx} (clock raised)`,
+          location: `Scene ${records[i].sceneIdx + 1} (clock raised)`,
           rule: 'CLOCK_GHOST',
-          description: `A clock is raised at Scene ${records[i].sceneIdx} but the next three scenes show no urgency — no suspense build, no secondary clock, no antagonistic pressure. The deadline appears once and immediately fades.`,
+          description: `A clock is raised at Scene ${records[i].sceneIdx + 1} but the next three scenes show no urgency — no suspense build, no secondary clock, no antagonistic pressure. The deadline appears once and immediately fades.`,
           severity: 'major',
           suggestedFix: 'Build on the clock in each scene that follows its introduction: show the protagonist becoming more desperate, the antagonist pressing harder, or the deadline looming as a concrete presence — not a forgotten premise.',
         });
@@ -1212,7 +1216,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasAct1Signal) {
         issues.push({
-          location: `Act 1 (Scenes 0–${causalAct1End - 1})`,
+          location: `Act 1 (Scenes 1–${causalAct1End})`,
           rule: 'CAUSAL_ACT1_VOID',
           description: `Act 1 (${act1CausalRecs.length} scenes) plants no clues, raises no clock, and creates no significant relationship shift — the story opens without establishing any causal threads for Acts 2 and 3 to develop`,
           severity: 'major',
@@ -1235,7 +1239,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasAct3Discharge) {
         issues.push({
-          location: `Act 3 (Scenes ${act3DischargeStart}–${records.length - 1})`,
+          location: `Act 3 (Scenes ${act3DischargeStart + 1}–${records.length})`,
           rule: 'ACT3_DISCHARGE_ABSENT',
           description: `Clues are seeded in the story but Act 3 contains no payoffs and no revelations — the planted material is never discharged in the final act. The climax fires no guns.`,
           severity: 'major',
@@ -1267,9 +1271,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             }
             if (!hasCause) {
               issues.push({
-                location: `Scenes ${i}–${j} (pair: ${shiftA.pairKey})`,
+                location: `Scenes ${i + 1}–${j + 1} (pair: ${shiftA.pairKey})`,
                 rule: 'MOTIVATION_REVERSAL_UNCAUSED',
-                description: `The relationship for pair "${shiftA.pairKey}" shifts from +${shiftA.amount.toFixed(2)} (positive) to ${shiftB.amount.toFixed(2)} (negative) across Scenes ${i}–${j} with no triggering event — no revelation, clock raise, or crisis explains the sudden reversal`,
+                description: `The relationship for pair "${shiftA.pairKey}" shifts from +${shiftA.amount.toFixed(2)} (positive) to ${shiftB.amount.toFixed(2)} (negative) across Scenes ${i + 1}–${j + 1} with no triggering event — no revelation, clock raise, or crisis explains the sudden reversal`,
                 severity: 'minor',
                 suggestedFix: 'Add a visible cause for the relational flip: a discovery, a betrayal detail, or a confrontation that makes the reversal inevitable rather than arbitrary. Sudden reversals need earned catalysts.',
               });
@@ -1321,10 +1325,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     const act2DesertRecs212 = records.slice(act2DesertStart212, act2DesertEnd212);
     if (!act2DesertRecs212.some(isCausal212)) {
       issues.push({
-        location: `Act 2 (Scenes ${act2DesertStart212}–${act2DesertEnd212 - 1})`,
+        location: `Act 2 (Scenes ${act2DesertStart212 + 1}–${act2DesertEnd212})`,
         rule: 'ACT2_CAUSAL_DESERT',
         severity: 'major',
-        description: `Act 2 (Scenes ${act2DesertStart212}–${act2DesertEnd212 - 1}, ${act2DesertRecs212.length} scenes) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's longest structural section is causally inert. Nothing is planted, escalated, or discovered across the entire middle act.`,
+        description: `Act 2 (Scenes ${act2DesertStart212 + 1}–${act2DesertEnd212}, ${act2DesertRecs212.length} scenes) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's longest structural section is causally inert. Nothing is planted, escalated, or discovered across the entire middle act.`,
         suggestedFix: 'Act 2 must be the engine of complication. Plant clues, raise clocks, shift relationships, or deliver a mid-story revelation in each act-2 sequence. The protagonist should be discovering, failing, and adapting across the middle — not waiting for Act 3.',
       });
     }
@@ -1341,10 +1345,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     const midVoidRecs212 = records.slice(midVoidStart212, midVoidEnd212);
     if (midVoidRecs212.length >= 2 && act2DesertRecs212.some(isCausal212) && !midVoidRecs212.some(isCausal212)) {
       issues.push({
-        location: `Midpoint zone (Scenes ${midVoidStart212}–${midVoidEnd212 - 1})`,
+        location: `Midpoint zone (Scenes ${midVoidStart212 + 1}–${midVoidEnd212})`,
         rule: 'CAUSAL_MIDPOINT_VOID',
         severity: 'major',
-        description: `The structural midpoint (Scenes ${midVoidStart212}–${midVoidEnd212 - 1}) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's pivot has no felt gear-change. Act 2 has causal activity around the midpoint but not at it.`,
+        description: `The structural midpoint (Scenes ${midVoidStart212 + 1}–${midVoidEnd212}) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's pivot has no felt gear-change. Act 2 has causal activity around the midpoint but not at it.`,
         suggestedFix: 'Plant a causal event at the 40%–60% zone: a revelation that reframes the goal, a clock that raises urgency, or a relationship shift that transforms the alliance map. The midpoint event makes the second half of Act 2 feel like a higher-stakes story than the first.',
       });
     }
@@ -1447,10 +1451,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       );
       if (!anyRevAfterSpike240) {
         issues.push({
-          location: `Curiosity loop (first spike at Scene ${firstSpikeIdx240})`,
+          location: `Curiosity loop (first spike at Scene ${firstSpikeIdx240 + 1})`,
           rule: 'CURIOSITY_OPEN_LOOP',
           severity: 'major',
-          description: `${curiositySpikes240.length} scenes raise curiosity sharply (the story poses strong questions) but no witnessed revelation ever follows the first spike at Scene ${firstSpikeIdx240}. Every question the story plants is left open — the audience is hooked and then abandoned.`,
+          description: `${curiositySpikes240.length} scenes raise curiosity sharply (the story poses strong questions) but no witnessed revelation ever follows the first spike at Scene ${firstSpikeIdx240 + 1}. Every question the story plants is left open — the audience is hooked and then abandoned.`,
           suggestedFix: 'Pay off at least one curiosity spike with a witnessed revelation later in the story. A question raised is a contract: the audience leans in expecting the answer, and a story that never delivers one feels like a tease, not a mystery.',
         });
       }
@@ -1507,10 +1511,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         a240.emotionalShift !== b240.emotionalShift;
       if (oscillates240 && !isCausalPivot240(b240) && !isCausalPivot240(c240)) {
         issues.push({
-          location: `Scenes ${i - 2}–${i}`,
+          location: `Scenes ${i - 1}–${i + 1}`,
           rule: 'EMOTIONAL_WHIPLASH',
           severity: 'minor',
-          description: `Scenes ${i - 2}–${i} swing emotional polarity (${a240.emotionalShift}→${b240.emotionalShift}→${c240.emotionalShift}) but neither reversal is motivated by an on-page causal event — no revelation, clue, clock, or relationship shift drives the mood flips. The tone whiplashes without cause.`,
+          description: `Scenes ${i - 1}–${i + 1} swing emotional polarity (${a240.emotionalShift}→${b240.emotionalShift}→${c240.emotionalShift}) but neither reversal is motivated by an on-page causal event — no revelation, clue, clock, or relationship shift drives the mood flips. The tone whiplashes without cause.`,
           suggestedFix: 'Anchor each emotional reversal to a concrete cause: a discovery that darkens the mood, a relationship repair that lifts it. Uncaused tonal swings read as inconsistency; motivated ones read as drama.',
         });
         break;
@@ -1530,10 +1534,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     for (const r of records) {
       if ((r.seededClueIds?.length ?? 0) >= 3) {
         issues.push({
-          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          location: `Scene ${r.sceneIdx + 1} (${r.slug})`,
           rule: 'CLUE_SEED_CLUSTER',
           severity: 'minor',
-          description: `Scene ${r.sceneIdx} plants ${r.seededClueIds!.length} distinct clues at once (${r.seededClueIds!.slice(0, 3).join(', ')}${r.seededClueIds!.length > 3 ? ', …' : ''}) — too many threads launched in a single beat. The audience can't tell which setup matters, and each one registers more faintly for being crowded.`,
+          description: `Scene ${r.sceneIdx + 1} plants ${r.seededClueIds!.length} distinct clues at once (${r.seededClueIds!.slice(0, 3).join(', ')}${r.seededClueIds!.length > 3 ? ', …' : ''}) — too many threads launched in a single beat. The audience can't tell which setup matters, and each one registers more faintly for being crowded.`,
           suggestedFix: 'Distribute the setups across several scenes so each clue lands with its own moment of attention. A clue planted alone is remembered; three planted together blur into background detail.',
         });
         break;
@@ -1556,10 +1560,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           .some(prev => (prev.seededClueIds ?? []).includes(pid));
         if (!seededBefore254) {
           issues.push({
-            location: `Scene ${i} (${records[i].slug})`,
+            location: `Scene ${i + 1} (${records[i].slug})`,
             rule: 'PAYOFF_WITHOUT_SETUP',
             severity: 'major',
-            description: `Scene ${i} fires a payoff for "${pid}" but that thread was never seeded in any earlier scene — the callback lands on nothing. A payoff only delivers its flash of recognition when the audience was first shown the seed.`,
+            description: `Scene ${i + 1} fires a payoff for "${pid}" but that thread was never seeded in any earlier scene — the callback lands on nothing. A payoff only delivers its flash of recognition when the audience was first shown the seed.`,
             suggestedFix: `Plant "${pid}" earlier: add a setup scene in Act 1 or Act 2 that seeds the clue this payoff calls back to. A payoff without a prior setup is a punchline with no joke.`,
           });
           payoffOrphanFired254 = true;
@@ -1588,10 +1592,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       }
       if (runLen254 >= 4) {
         issues.push({
-          location: `Scenes ${runStart254}–${i}`,
+          location: `Scenes ${runStart254 + 1}–${i + 1}`,
           rule: 'SUSPENSE_PLATEAU_FLATLINE',
           severity: 'minor',
-          description: `Scenes ${runStart254}–${i} hold suspense essentially flat (|delta| ≤ 0.5 for ${runLen254} consecutive scenes) — tension neither rises nor falls across the stretch. The story flatlines; the audience's sense of forward pressure goes slack.`,
+          description: `Scenes ${runStart254 + 1}–${i + 1} hold suspense essentially flat (|delta| ≤ 0.5 for ${runLen254} consecutive scenes) — tension neither rises nor falls across the stretch. The story flatlines; the audience's sense of forward pressure goes slack.`,
           suggestedFix: 'Break the plateau with a deliberate move on the suspense curve: raise a clock, deliver a setback, or release built tension at a turning point. A flat tension line over four-plus scenes reads as the story idling.',
         });
         break;
@@ -1614,10 +1618,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       const secondHalfSpikes268 = curiousSpikes268.filter((r: any) => r.sceneIdx >= midpoint268);
       if (secondHalfSpikes268.length === 0) {
         issues.push({
-          location: `First half only (scenes 0–${midpoint268 - 1})`,
+          location: `First half only (scenes 1–${midpoint268})`,
           rule: 'CURIOSITY_FRONT_LOADED',
           severity: 'minor',
-          description: `All ${curiousSpikes268.length} curiosity spikes occur in the first half (scenes 0–${midpoint268 - 1}); the second half raises no new questions. The story front-loads its mystery and then pivots to pure resolution — but sustained reader curiosity requires open questions throughout, not just in the opening act.`,
+          description: `All ${curiousSpikes268.length} curiosity spikes occur in the first half (scenes 1–${midpoint268}); the second half raises no new questions. The story front-loads its mystery and then pivots to pure resolution — but sustained reader curiosity requires open questions throughout, not just in the opening act.`,
           suggestedFix: 'Plant at least one new question or revelation-hook in the second half — a complication that raises a mystery just as earlier ones resolve. Curiosity sustains forward pull; exhausting it at the midpoint leaves the climax carrying only momentum, not genuine suspense.',
         });
       }
@@ -1638,7 +1642,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     if (payoffScenes268.length >= 2) {
       const firstHalfPayoffs268 = payoffScenes268.filter((r: any) => r.sceneIdx < midpoint268b);
       if (firstHalfPayoffs268.length === 0) {
-        const payoffIdxList268 = payoffScenes268.map((r: any) => r.sceneIdx).join(', ');
+        const payoffIdxList268 = payoffScenes268.map((r: any) => r.sceneIdx + 1).join(', ');
         issues.push({
           location: `Second half only (payoffs at scenes ${payoffIdxList268})`,
           rule: 'PAYOFF_BACK_LOADED',
@@ -1662,10 +1666,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     const clockScenes268 = records.filter((r: any) => r.clockRaised === true);
     if (clockScenes268.length === 1) {
       issues.push({
-        location: `Scene ${clockScenes268[0].sceneIdx} (${clockScenes268[0].slug}) — sole clock`,
+        location: `Scene ${clockScenes268[0].sceneIdx + 1} (${clockScenes268[0].slug}) — sole clock`,
         rule: 'CLOCK_SINGLE_SCENE',
         severity: 'minor',
-        description: `Only one scene (Scene ${clockScenes268[0].sceneIdx}) raises a clock across a ${records.length}-scene story. A single deadline creates a single source of urgency that characters can wait out; once that scene passes, all clock pressure evaporates. A story this long benefits from layered deadlines — separate ticking clocks in different acts.`,
+        description: `Only one scene (Scene ${clockScenes268[0].sceneIdx + 1}) raises a clock across a ${records.length}-scene story. A single deadline creates a single source of urgency that characters can wait out; once that scene passes, all clock pressure evaporates. A story this long benefits from layered deadlines — separate ticking clocks in different acts.`,
         suggestedFix: 'Add at least one more clock: a secondary deadline that begins where the first ends, or a nested ticking clock within a single act. Layered urgency keeps the story in forward motion even after the most immediate threat is resolved or defused.',
       });
     }
@@ -1686,10 +1690,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       const allEarly282 = clockScenes282.every((r: any) => r.sceneIdx < cutoff282);
       if (allEarly282) {
         issues.push({
-          location: `Clock raises (all in first 40%, scenes 0–${cutoff282 - 1})`,
+          location: `Clock raises (all in first 40%, scenes 1–${cutoff282})`,
           rule: 'CLOCK_CLUSTERING',
           severity: 'minor',
-          description: `All ${clockScenes282.length} clocks are raised in the first 40% of the story (scenes 0–${cutoff282 - 1}) — the deadline architecture is entirely front-loaded. The final 60% of the story carries no clock pressure; whatever urgency the deadlines created has dissipated long before the climax arrives.`,
+          description: `All ${clockScenes282.length} clocks are raised in the first 40% of the story (scenes 1–${cutoff282}) — the deadline architecture is entirely front-loaded. The final 60% of the story carries no clock pressure; whatever urgency the deadlines created has dissipated long before the climax arrives.`,
           suggestedFix: 'Distribute clock raises across the full story: let one deadline resolve mid-story and a new, higher-stakes clock replace it. The climax should arrive under a ticking clock that was raised in Act 2, not one that was set and mostly forgotten in Act 1.',
         });
       }
@@ -1736,7 +1740,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       const storyHasPositive282 = records.some((r: any) => r.emotionalShift === 'positive');
       if (!act2HasPositive282 && act2HasNegative282 && storyHasPositive282) {
         issues.push({
-          location: `Act 2 (Scenes ${posDesertAct2Start282}–${posDesertAct2End282 - 1})`,
+          location: `Act 2 (Scenes ${posDesertAct2Start282 + 1}–${posDesertAct2End282})`,
           rule: 'EMOTIONAL_POSITIVE_DESERT',
           severity: 'minor',
           description: `Act 2 (${act2PosRecs282.length} scenes) carries negative and neutral emotional shifts but no positive ones, while at least one scene elsewhere in the story offers a positive shift — the entire middle act has no moment of hope, relief, or partial triumph. An unbroken negative arc through Act 2 makes darkness the default state rather than a dramatic choice.`,
@@ -1758,10 +1762,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       if (r.clockRaised) break; // a clock is established — later deltas are caused
       if ((r.clockDelta ?? 0) > 1) {
         issues.push({
-          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          location: `Scene ${r.sceneIdx + 1} (${r.slug})`,
           rule: 'CLOCK_DELTA_WITHOUT_RAISE',
           severity: 'minor',
-          description: `Scene ${r.sceneIdx} registers significant time pressure (clockDelta ${r.clockDelta}) but no clock has been raised anywhere before it. The audience is asked to feel a deadline tightening before any deadline exists — urgency consequences arrive before their cause, and the pressure reads as unmotivated haste rather than a closing window.`,
+          description: `Scene ${r.sceneIdx + 1} registers significant time pressure (clockDelta ${r.clockDelta}) but no clock has been raised anywhere before it. The audience is asked to feel a deadline tightening before any deadline exists — urgency consequences arrive before their cause, and the pressure reads as unmotivated haste rather than a closing window.`,
           suggestedFix: 'Establish the clock before its pressure mounts: a scene where the deadline is set, the threat is announced, or the window is defined. Once the audience knows what time is running out on, every subsequent tightening lands as escalation rather than noise.',
         });
         break;
@@ -1788,10 +1792,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         sawRun296++;
         if (sawRun296 >= 6) {
           issues.push({
-            location: `Scenes ${(records as any[])[sawStart296].sceneIdx}–${(records as any[])[i296].sceneIdx} — suspense sawtooth`,
+            location: `Scenes ${(records as any[])[sawStart296].sceneIdx + 1}–${(records as any[])[i296].sceneIdx + 1} — suspense sawtooth`,
             rule: 'SUSPENSE_SAWTOOTH',
             severity: 'minor',
-            description: `Suspense strictly alternates between rising and falling for ${sawRun296} consecutive scenes (${(records as any[])[sawStart296].sceneIdx}–${(records as any[])[i296].sceneIdx}). Tension discharges the moment it builds — every rise is immediately cancelled, so the story oscillates without accumulating toward anything. The audience learns that no tension will ever be sustained, and stops investing in the rises.`,
+            description: `Suspense strictly alternates between rising and falling for ${sawRun296} consecutive scenes (${(records as any[])[sawStart296].sceneIdx + 1}–${(records as any[])[i296].sceneIdx + 1}). Tension discharges the moment it builds — every rise is immediately cancelled, so the story oscillates without accumulating toward anything. The audience learns that no tension will ever be sustained, and stops investing in the rises.`,
             suggestedFix: 'Let tension compound: after a suspense rise, hold or escalate it for at least one more scene before any release. Tension is a debt the story owes the audience — releasing it every scene means the debt never grows large enough for the payoff to matter.',
           });
           break;
@@ -1822,10 +1826,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       );
       if (wakeInert296) {
         issues.push({
-          location: `Scene ${r296.sceneIdx} (dramatic turn: ${r296.dramaticTurn})`,
+          location: `Scene ${r296.sceneIdx + 1} (dramatic turn: ${r296.dramaticTurn})`,
           rule: 'DRAMATIC_TURN_AFTERMATH_VOID',
           severity: 'minor',
-          description: `Scene ${r296.sceneIdx} delivers a dramatic turn ("${r296.dramaticTurn}") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.`,
+          description: `Scene ${r296.sceneIdx + 1} delivers a dramatic turn ("${r296.dramaticTurn}") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.`,
           suggestedFix: 'Let the turn ripple: the scenes immediately after a reversal or revelation should show characters adjusting — an emotional shift, a relationship strained or realigned, suspense climbing as the new situation sinks in. The size of a turn is measured by its wake, not its announcement.',
         });
         break;
@@ -1856,10 +1860,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         run310++;
         if (run310 >= 3) {
           issues.push({
-            location: `Scenes ${(records as any[])[start310].sceneIdx}–${r310.sceneIdx} — driverless emotion`,
+            location: `Scenes ${(records as any[])[start310].sceneIdx + 1}–${r310.sceneIdx + 1} — driverless emotion`,
             rule: 'EMOTION_WITHOUT_DRIVER_RUN',
             severity: 'minor',
-            description: `${run310} consecutive scenes (${(records as any[])[start310].sceneIdx}–${r310.sceneIdx}) carry a non-neutral emotional shift but none contains any driver — no suspense rise, no relationship movement, no revelation, no clock raised. The emotional curve swings with nothing on the page to cause it; the feelings are asserted rather than earned.`,
+            description: `${run310} consecutive scenes (${(records as any[])[start310].sceneIdx + 1}–${r310.sceneIdx + 1}) carry a non-neutral emotional shift but none contains any driver — no suspense rise, no relationship movement, no revelation, no clock raised. The emotional curve swings with nothing on the page to cause it; the feelings are asserted rather than earned.`,
             suggestedFix: 'Give each emotional beat a visible cause: a piece of news, a confrontation, a deadline tightening, a relationship turning. Emotion is the audience\'s reading of consequence — when the consequence is missing, the feeling reads as the script telling them how to feel.',
           });
           break;
@@ -1888,10 +1892,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         );
         if (!caused310) {
           issues.push({
-            location: `Scene ${r310b.sceneIdx} (clock relief)`,
+            location: `Scene ${r310b.sceneIdx + 1} (clock relief)`,
             rule: 'CLOCK_RELIEF_UNEXPLAINED',
             severity: 'minor',
-            description: `Scene ${r310b.sceneIdx} releases clock pressure (clockDelta ${r310b.clockDelta}) with no revelation or payoff in that scene or the next — the deadline relaxes for no visible reason. A ticking clock is a tension contract with the audience; relieving it without a cause (the bomb defused, the deadline met, the truth found) breaks the contract silently and lets the air out of the scene.`,
+            description: `Scene ${r310b.sceneIdx + 1} releases clock pressure (clockDelta ${r310b.clockDelta}) with no revelation or payoff in that scene or the next — the deadline relaxes for no visible reason. A ticking clock is a tension contract with the audience; relieving it without a cause (the bomb defused, the deadline met, the truth found) breaks the contract silently and lets the air out of the scene.`,
             suggestedFix: 'Tie every drop in time pressure to a concrete cause: the protagonist resolves the threat, buys time through a choice, or discovers the deadline was false. If the clock should stay live, do not relax it — sustained pressure is the point of raising it in the first place.',
           });
           break;
@@ -1913,10 +1917,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       const turnCount310 = window310c.filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing').length;
       if (turnCount310 >= 3) {
         issues.push({
-          location: `Scenes ${window310c[0].sceneIdx}–${window310c[2].sceneIdx} — turn cluster`,
+          location: `Scenes ${window310c[0].sceneIdx + 1}–${window310c[2].sceneIdx + 1} — turn cluster`,
           rule: 'DRAMATIC_TURN_CLUSTER',
           severity: 'minor',
-          description: `Scenes ${window310c[0].sceneIdx}–${window310c[2].sceneIdx} contain ${turnCount310} dramatic turns in a row — reversals and revelations piled into a three-scene window. The audience gets no time to register one pivot before the next overwrites it, and the turns cannibalize each other's impact instead of compounding it.`,
+          description: `Scenes ${window310c[0].sceneIdx + 1}–${window310c[2].sceneIdx + 1} contain ${turnCount310} dramatic turns in a row — reversals and revelations piled into a three-scene window. The audience gets no time to register one pivot before the next overwrites it, and the turns cannibalize each other's impact instead of compounding it.`,
           suggestedFix: 'Space the turns out. Let each reversal land and ripple — give the characters (and the audience) a scene to absorb and react before the next pivot. Bank some of the clustered turns for later acts where the story needs a fresh jolt.',
         });
         break;
@@ -1942,10 +1946,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         srun324++;
         if (srun324 >= 6) {
           issues.push({
-            location: `Scenes ${(records as any[])[sstart324].sceneIdx}–${(records as any[])[i324].sceneIdx} — unreleased tension`,
+            location: `Scenes ${(records as any[])[sstart324].sceneIdx + 1}–${(records as any[])[i324].sceneIdx + 1} — unreleased tension`,
             rule: 'SUSPENSE_UNRELEASED_RUN',
             severity: 'minor',
-            description: `${srun324} consecutive scenes (${(records as any[])[sstart324].sceneIdx}–${(records as any[])[i324].sceneIdx}) each raise suspense with no release in between — tension only ever builds across the whole stretch. Sustained un-relieved rising tension exhausts the audience: without valleys, there is no contrast to make the peaks feel high, and the climax has no headroom left to escalate into.`,
+            description: `${srun324} consecutive scenes (${(records as any[])[sstart324].sceneIdx + 1}–${(records as any[])[i324].sceneIdx + 1}) each raise suspense with no release in between — tension only ever builds across the whole stretch. Sustained un-relieved rising tension exhausts the audience: without valleys, there is no contrast to make the peaks feel high, and the climax has no headroom left to escalate into.`,
             suggestedFix: 'Carve a release valley into the run: a scene where the immediate threat eases, a small win, a quiet beat that lets the audience exhale. Tension reads as high only against relief; a relief beat now lets the climax spike higher later.',
           });
           break;
@@ -1991,10 +1995,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         erun324++;
         if (erun324 >= 6) {
           issues.push({
-            location: `Scenes ${(records as any[])[estart324].sceneIdx}–${(records as any[])[i324e].sceneIdx} — emotional flatline`,
+            location: `Scenes ${(records as any[])[estart324].sceneIdx + 1}–${(records as any[])[i324e].sceneIdx + 1} — emotional flatline`,
             rule: 'EMOTIONAL_NEUTRAL_RUN',
             severity: 'minor',
-            description: `${erun324} consecutive scenes (${(records as any[])[estart324].sceneIdx}–${(records as any[])[i324e].sceneIdx}) are all emotionally neutral — the emotional curve flatlines for a long stretch. The audience reads emotional movement as their stake in the story; a sustained neutral run is dead air where they are given nothing to feel, and disengagement sets in regardless of how active the plot is.`,
+            description: `${erun324} consecutive scenes (${(records as any[])[estart324].sceneIdx + 1}–${(records as any[])[i324e].sceneIdx + 1}) are all emotionally neutral — the emotional curve flatlines for a long stretch. The audience reads emotional movement as their stake in the story; a sustained neutral run is dead air where they are given nothing to feel, and disengagement sets in regardless of how active the plot is.`,
             suggestedFix: 'Inject emotional movement into the flat stretch: a small loss, an unexpected kindness, a flare of fear or hope. Plot events should leave emotional residue on the characters; if a run of scenes moves the plot but stirs no feeling, the audience is watching machinery, not people.',
           });
           break;
@@ -2426,10 +2430,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
     if (!priorCause405) {
       issues.push({
-        location: `Scene ${i} (${curr.slug})`,
+        location: `Scene ${i + 1} (${curr.slug})`,
         rule: 'POSITIVE_REACTION_WITHOUT_CAUSE',
         severity: 'minor',
-        description: `Scene ${i} turns emotionally positive but neither it nor the two preceding scenes contain any cause for relief or joy — no good news, no reconciliation, no thread paying off, no danger receding. The upswing has no on-page cause, so the relief reads as unearned. Audiences forgive a character feeling bad for no reason far more readily than feeling good for no reason; uncaused joy reads as the story handing out a reward it never set up.`,
+        description: `Scene ${i + 1} turns emotionally positive but neither it nor the two preceding scenes contain any cause for relief or joy — no good news, no reconciliation, no thread paying off, no danger receding. The upswing has no on-page cause, so the relief reads as unearned. Audiences forgive a character feeling bad for no reason far more readily than feeling good for no reason; uncaused joy reads as the story handing out a reward it never set up.`,
         suggestedFix: 'Give the positive turn a visible cause in this scene or just before it: a victory, a reunion, a problem solved, a threat lifted, or a kindness received. Relief lands only when the audience has felt the weight it relieves — earn the upswing by showing what changed for the better.',
       });
       break;
@@ -2459,10 +2463,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
     if (!priorDriver405) {
       issues.push({
-        location: `Scene ${i} (${curr.slug})`,
+        location: `Scene ${i + 1} (${curr.slug})`,
         rule: 'CURIOSITY_SPIKE_WITHOUT_CAUSE',
         severity: 'minor',
-        description: `Scene ${i} spikes curiosity (curiosityDelta ${(curr.curiosityDelta ?? 0).toFixed(1)}) but neither it nor the two preceding scenes plant anything to wonder about — no revelation, no new clue, no dramatic turn, no clock raised. The intrigue materializes from nowhere: the story signals a question without anything on the page giving the audience a reason to ask it.`,
+        description: `Scene ${i + 1} spikes curiosity (curiosityDelta ${(curr.curiosityDelta ?? 0).toFixed(1)}) but neither it nor the two preceding scenes plant anything to wonder about — no revelation, no new clue, no dramatic turn, no clock raised. The intrigue materializes from nowhere: the story signals a question without anything on the page giving the audience a reason to ask it.`,
         suggestedFix: 'Anchor the curiosity spike to a concrete trigger in this scene or just before it: plant a clue, surface a partial truth, or let a turn raise a new unknown. Wonder is a response to a gap in the audience\'s knowledge — open the gap on the page before asking them to lean into it.',
       });
       break;
@@ -2615,10 +2619,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       const prior2_433a = records[peakPos433a - 2];
       if (!isDriver433a(prior1_433a) && !isDriver433a(prior2_433a)) {
         issues.push({
-          location: `Scene ${records[peakPos433a].sceneIdx} (${records[peakPos433a].slug}) — peak suspense ${peakVal433a.toFixed(1)}`,
+          location: `Scene ${records[peakPos433a].sceneIdx + 1} (${records[peakPos433a].slug}) — peak suspense ${peakVal433a.toFixed(1)}`,
           rule: 'SUSPENSE_PEAK_UNCAUSED',
           severity: 'minor',
-          description: `The story's highest-suspense scene (Scene ${records[peakPos433a].sceneIdx}, suspenseDelta ${peakVal433a.toFixed(1)}) has no causal driver in the two scenes before it — neither prior scene raises suspense, starts a clock, delivers a revelation, or turns the story. The tension apex arrives on a flat approach, so the peak reads as an arbitrary jump rather than the culmination of mounting pressure. An audience reaches maximum tension without having been wound up to it.`,
+          description: `The story's highest-suspense scene (Scene ${records[peakPos433a].sceneIdx + 1}, suspenseDelta ${peakVal433a.toFixed(1)}) has no causal driver in the two scenes before it — neither prior scene raises suspense, starts a clock, delivers a revelation, or turns the story. The tension apex arrives on a flat approach, so the peak reads as an arbitrary jump rather than the culmination of mounting pressure. An audience reaches maximum tension without having been wound up to it.`,
           suggestedFix: 'Build a gradient into the tension peak: in the two scenes before the story\'s most suspenseful moment, escalate — raise a clock, plant a threat, deliver a partial revelation, or stack a complication so the suspense rises step by step. The apex should feel earned by its run-up, the top of a climb rather than a cliff that appears from nowhere.',
         });
       }
@@ -2654,10 +2658,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     if (maxRun433b >= 4) {
       const runEnd433b = maxStart433b + maxRun433b - 1;
       issues.push({
-        location: `Scenes ${records[maxStart433b].sceneIdx}–${records[runEnd433b].sceneIdx} (${maxRun433b} consecutive)`,
+        location: `Scenes ${records[maxStart433b].sceneIdx + 1}–${records[runEnd433b].sceneIdx + 1} (${maxRun433b} consecutive)`,
         rule: 'CURIOSITY_DECLINE_RUN',
         severity: 'minor',
-        description: `A run of ${maxRun433b} consecutive scenes (Scenes ${records[maxStart433b].sceneIdx}–${records[runEnd433b].sceneIdx}) each lower audience curiosity (curiosityDelta < 0) with no scene reopening the field. Curiosity is a story's forward pull — the accumulation of unanswered questions that make an audience lean in. When every scene across a stretch only closes or drains curiosity and none plants a new hook, the mystery engine bleeds out: the audience's reasons to keep watching erode scene by scene.`,
+        description: `A run of ${maxRun433b} consecutive scenes (Scenes ${records[maxStart433b].sceneIdx + 1}–${records[runEnd433b].sceneIdx + 1}) each lower audience curiosity (curiosityDelta < 0) with no scene reopening the field. Curiosity is a story's forward pull — the accumulation of unanswered questions that make an audience lean in. When every scene across a stretch only closes or drains curiosity and none plants a new hook, the mystery engine bleeds out: the audience's reasons to keep watching erode scene by scene.`,
         suggestedFix: 'Interrupt the decline with a fresh question: somewhere in this run, plant a new mystery, complicate an answer the audience thought was settled, or reveal a detail that reframes what they know. Curiosity should be replenished as it is spent — a story that only ever closes loops without opening new ones runs out of forward momentum.',
       });
     }
@@ -2690,10 +2694,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           ((peakPayoff433c.relationshipShifts ?? []) as any[]).length === 0;
         if (inert433c) {
           issues.push({
-            location: `Scene ${peakPayoff433c.sceneIdx} (${peakPayoff433c.slug}) — peak payoff, ${peakCount433c} setups resolved`,
+            location: `Scene ${peakPayoff433c.sceneIdx + 1} (${peakPayoff433c.slug}) — peak payoff, ${peakCount433c} setups resolved`,
             rule: 'PAYOFF_PEAK_INERT',
             severity: 'minor',
-            description: `The story's densest payoff scene (Scene ${peakPayoff433c.sceneIdx}, resolving ${peakCount433c} planted setups) lands completely inert — neutral emotion, no suspense rise, no curiosity rise, and no relationship shift, all at once. The single moment where the most threads converge produces no felt consequence on any channel. The audience receives the largest return on its narrative investment as a flat fact, and the story's strongest cathartic opportunity discharges nothing.`,
+            description: `The story's densest payoff scene (Scene ${peakPayoff433c.sceneIdx + 1}, resolving ${peakCount433c} planted setups) lands completely inert — neutral emotion, no suspense rise, no curiosity rise, and no relationship shift, all at once. The single moment where the most threads converge produces no felt consequence on any channel. The audience receives the largest return on its narrative investment as a flat fact, and the story's strongest cathartic opportunity discharges nothing.`,
             suggestedFix: 'Charge the peak payoff on at least one channel: the scene where the most setups resolve should make someone feel something, raise a new question even as it answers old ones, redirect tension toward a fresh problem, or move a relationship. The biggest convergence of threads is the story\'s catharsis engine — let it fire rather than merely report that the loops have closed.',
           });
         }
@@ -2731,10 +2735,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     if (maxRun447a >= 4) {
       const runEnd447a = maxStart447a + maxRun447a - 1;
       issues.push({
-        location: `Scenes ${records[maxStart447a].sceneIdx}–${records[runEnd447a].sceneIdx} (${maxRun447a} consecutive)`,
+        location: `Scenes ${records[maxStart447a].sceneIdx + 1}–${records[runEnd447a].sceneIdx + 1} (${maxRun447a} consecutive)`,
         rule: 'SUSPENSE_DECLINE_RUN',
         severity: 'minor',
-        description: `A run of ${maxRun447a} consecutive scenes (Scenes ${records[maxStart447a].sceneIdx}–${records[runEnd447a].sceneIdx}) each lower suspense (suspenseDelta < 0) with nothing reversing the drop. Sustained tension drainage deflates the dramatic engine: the audience's sense that something is at stake falls scene by scene without any escalation, redirection, or complication arresting the descent. Continuous decline — without even a momentary reversal — signals to the audience that the stakes have been permanently lowered.`,
+        description: `A run of ${maxRun447a} consecutive scenes (Scenes ${records[maxStart447a].sceneIdx + 1}–${records[runEnd447a].sceneIdx + 1}) each lower suspense (suspenseDelta < 0) with nothing reversing the drop. Sustained tension drainage deflates the dramatic engine: the audience's sense that something is at stake falls scene by scene without any escalation, redirection, or complication arresting the descent. Continuous decline — without even a momentary reversal — signals to the audience that the stakes have been permanently lowered.`,
         suggestedFix: `Interrupt the suspense decline with at least one beat of escalation or redirection within the ${maxRun447a}-scene run: raise a clock, introduce a complication, or deliver a partial revelation that resets the threat level. A single non-negative suspense beat breaks the deflation signal and tells the audience the stakes can still rise — that something is still worth fearing.`,
       });
     }
@@ -2796,10 +2800,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       });
       if (!hasRevFollowthrough447c) {
         issues.push({
-          location: `Scene ${records[peakPos447c].sceneIdx} (${records[peakPos447c].slug}) — peak curiosity ${peakCur447c.toFixed(1)}`,
+          location: `Scene ${records[peakPos447c].sceneIdx + 1} (${records[peakPos447c].slug}) — peak curiosity ${peakCur447c.toFixed(1)}`,
           rule: 'CURIOSITY_PEAK_NO_FOLLOWTHROUGH',
           severity: 'minor',
-          description: `The story's highest-curiosity scene (Scene ${records[peakPos447c].sceneIdx}, curiosityDelta ${peakCur447c.toFixed(1)}) is not followed within two scenes by any revelation — the audience's single greatest moment of wonder leads to no disclosure. At the moment of maximum "what is really true?", a story should give the audience something true: a revelation that addresses the wonder and redirects it into a new question. When the peak curiosity moment leads nowhere, the story teaches the audience that their most intense engagement will go unrewarded.`,
+          description: `The story's highest-curiosity scene (Scene ${records[peakPos447c].sceneIdx + 1}, curiosityDelta ${peakCur447c.toFixed(1)}) is not followed within two scenes by any revelation — the audience's single greatest moment of wonder leads to no disclosure. At the moment of maximum "what is really true?", a story should give the audience something true: a revelation that addresses the wonder and redirects it into a new question. When the peak curiosity moment leads nowhere, the story teaches the audience that their most intense engagement will go unrewarded.`,
           suggestedFix: `Schedule a revelation within two scenes of the story's curiosity peak: at the moment the audience is most hungry for truth, give them a disclosure — not necessarily the central answer, but any truth that addresses the question raised by the peak wonder. The peak of curiosity is a primed moment; let a revelation land while the audience is leaning in.`,
         });
       }
@@ -2901,10 +2905,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       if (maxRun461c >= 6) {
         const runEnd461c = maxStart461c + maxRun461c - 1;
         issues.push({
-          location: `Scenes ${records[maxStart461c].sceneIdx}–${records[runEnd461c].sceneIdx} (${maxRun461c} consecutive)`,
+          location: `Scenes ${records[maxStart461c].sceneIdx + 1}–${records[runEnd461c].sceneIdx + 1} (${maxRun461c} consecutive)`,
           rule: 'RELATIONSHIP_STASIS_RUN',
           severity: 'minor',
-          description: `A run of ${maxRun461c} consecutive scenes (Scenes ${records[maxStart461c].sceneIdx}–${records[runEnd461c].sceneIdx}) carries no relationship shift, though the story moves a bond ${totalRelScenes461c} times elsewhere. The relational engine — the evolving web of trust, power, and affection between characters — falls silent across this stretch while the plot keeps moving. Relationships are a primary axis of audience investment; a sustained run where no bond shifts tells the audience the interpersonal stakes have been parked, and the story coasts on plot mechanics alone until they resume.`,
+          description: `A run of ${maxRun461c} consecutive scenes (Scenes ${records[maxStart461c].sceneIdx + 1}–${records[runEnd461c].sceneIdx + 1}) carries no relationship shift, though the story moves a bond ${totalRelScenes461c} times elsewhere. The relational engine — the evolving web of trust, power, and affection between characters — falls silent across this stretch while the plot keeps moving. Relationships are a primary axis of audience investment; a sustained run where no bond shifts tells the audience the interpersonal stakes have been parked, and the story coasts on plot mechanics alone until they resume.`,
           suggestedFix: `Move at least one relationship within the ${maxRun461c}-scene stasis run: let the events of this stretch cost or strengthen a bond, shift the balance of power between two characters, or test an alliance. The plot advancing without any relational consequence reads as machinery; threading even one bond shift through the run keeps the human stakes alive alongside the events.`,
         });
       }
@@ -3095,11 +3099,11 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           if (!hasCause489b) {
             const peakScene = records[peakClockPos489b] as any;
             issues.push({
-              location: `Scene ${peakScene.sceneIdx} (${peakScene.slug}) — peak clockDelta (${maxClockDelta489b}) appears without a prior causal driver`,
+              location: `Scene ${peakScene.sceneIdx + 1} (${peakScene.slug}) — peak clockDelta (${maxClockDelta489b}) appears without a prior causal driver`,
               rule: 'CLOCK_PEAK_UNCAUSED',
               severity: 'minor',
-              description: `The scene with the highest time-pressure escalation (clockDelta ${maxClockDelta489b} at scene ${peakScene.sceneIdx}) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, planted clue, or emotional shift in scenes ${peakScene.sceneIdx - 2} and ${peakScene.sceneIdx - 1}. The story's maximum urgency spike arrives without a causal gradient: a clock that reaches its peak with no preparation reads as an arbitrary escalation rather than a built-up consequence of narrative events.`,
-              suggestedFix: `Give scene ${peakScene.sceneIdx - 1} or ${peakScene.sceneIdx - 2} a structural driver that motivates the urgency peak: a revelation that creates the constraint, a dramatic turn that opens a new deadline, or a suspense escalation that makes the clock pressure legible as a story consequence rather than an authorial decree.`,
+              description: `The scene with the highest time-pressure escalation (clockDelta ${maxClockDelta489b} at scene ${peakScene.sceneIdx + 1}) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, planted clue, or emotional shift in scenes ${peakScene.sceneIdx - 1} and ${peakScene.sceneIdx}. The story's maximum urgency spike arrives without a causal gradient: a clock that reaches its peak with no preparation reads as an arbitrary escalation rather than a built-up consequence of narrative events.`,
+              suggestedFix: `Give scene ${peakScene.sceneIdx} or ${peakScene.sceneIdx - 1} a structural driver that motivates the urgency peak: a revelation that creates the constraint, a dramatic turn that opens a new deadline, or a suspense escalation that makes the clock pressure legible as a story consequence rather than an authorial decree.`,
             });
           }
         }
@@ -3215,10 +3219,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         const inFinal503b = clockPositions503b.some(p => p >= 2 * third503b);
         if (!inFinal503b) {
           issues.push({
-            location: `${clockPositions503b.length} clock scene(s) — none in the final structural third (scenes ${2 * third503b}–${n503b - 1})`,
+            location: `${clockPositions503b.length} clock scene(s) — none in the final structural third (scenes ${2 * third503b + 1}–${n503b})`,
             rule: 'CLOCK_FINAL_THIRD_ABSENT',
             severity: 'minor',
-            description: `The script has ${clockPositions503b.length} scene(s) in which a deadline or urgency clock is raised, but none falls in the final structural third (scenes ${2 * third503b}–${n503b - 1}). Deadline machinery should be felt most acutely in the closing act: the protagonist's time running out, the ticking pressure cresting, the audience feeling the walls close in. When no clock appears in the final third, the story's urgency engine falls silent exactly when stakes should be highest — the resolution arrives without any active deadline compelling the protagonist forward.`,
+            description: `The script has ${clockPositions503b.length} scene(s) in which a deadline or urgency clock is raised, but none falls in the final structural third (scenes ${2 * third503b + 1}–${n503b}). Deadline machinery should be felt most acutely in the closing act: the protagonist's time running out, the ticking pressure cresting, the audience feeling the walls close in. When no clock appears in the final third, the story's urgency engine falls silent exactly when stakes should be highest — the resolution arrives without any active deadline compelling the protagonist forward.`,
             suggestedFix: `Ensure at least one clock or deadline scene lands in the final structural third. This does not require a new plot device: an existing clock from earlier can be re-invoked, a character can remind the protagonist of the remaining time, or a new constraint can be introduced that compresses the closing act. The function of a late-act clock is to give the audience a felt countdown toward the climax.`,
           });
         }
@@ -3374,10 +3378,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         const inFinal517c = chargedPositions517c.some(({ pos }) => pos >= 2 * third517c);
         if (!inFinal517c) {
           issues.push({
-            location: `${chargedPositions517c.length} emotionally charged scene(s) — none in the final third (scenes ${2 * third517c}–${n517c - 1})`,
+            location: `${chargedPositions517c.length} emotionally charged scene(s) — none in the final third (scenes ${2 * third517c + 1}–${n517c})`,
             rule: 'EMOTIONAL_CLOSING_THIRD_ABSENT',
             severity: 'minor',
-            description: `The script has ${chargedPositions517c.length} emotionally charged scenes (positive or negative emotional shift), but none fall in the final structural third (scenes ${2 * third517c}–${n517c - 1}). The closing act should be the most emotionally engaged zone of the screenplay: the protagonist reaches their climax and denouement with the full accumulated weight of everything that has happened, and the audience needs to feel the conclusion rather than merely observe it. When the closing third is emotionally inert, the resolution becomes a purely intellectual event — the audience is told what happened but not moved by it.`,
+            description: `The script has ${chargedPositions517c.length} emotionally charged scenes (positive or negative emotional shift), but none fall in the final structural third (scenes ${2 * third517c + 1}–${n517c}). The closing act should be the most emotionally engaged zone of the screenplay: the protagonist reaches their climax and denouement with the full accumulated weight of everything that has happened, and the audience needs to feel the conclusion rather than merely observe it. When the closing third is emotionally inert, the resolution becomes a purely intellectual event — the audience is told what happened but not moved by it.`,
             suggestedFix: `Ensure at least one scene in the closing third carries an emotional shift — positive or negative. A climax is not just a plot event but an emotional event: the protagonist's decisive action, the revelation that reframes everything, or the loss or triumph that the whole story has been building toward should be felt. Even a single scene of emotional charge in the final act anchors the resolution in the audience's nervous system rather than their intellect.`,
           });
         }
@@ -3565,11 +3569,11 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         );
         if (openingCharged545b.length === 0) {
           issues.push({
-            location: `Opening third (scenes 0–${thirdEnd545b - 1}) — no emotionally charged scene`,
+            location: `Opening third (scenes 1–${thirdEnd545b}) — no emotionally charged scene`,
             rule: 'EMOTIONAL_OPENING_THIRD_ABSENT',
             severity: 'minor',
-            description: `The opening third of the story (scenes 0–${thirdEnd545b - 1}) contains no emotionally charged scene — every scene in the establishment zone has a neutral emotional shift — while ${chargedScenes545b.length} charged scenes exist in the subsequent two-thirds. The opening third's job is to anchor the audience to characters through felt stakes: the protagonist's desire, fear, or attachment must be emotionally registered in the opening zone for the story's eventual conflict to carry weight. When the first structural zone is entirely emotionally neutral, the audience spends the establishment section watching events that register intellectually but don't land as emotionally consequential — the story's initial contract is one of observation rather than investment.`,
-            suggestedFix: `Place at least one emotionally charged scene in the opening third (scenes 0–${thirdEnd545b - 1}) — a moment where the protagonist experiences something that generates felt positive or negative emotion rather than neutral observation. The charged scene doesn't need to be a crisis: a small but genuine moment of joy, fear, hope, or loss in the opening zone tells the audience that they are watching a story that intends to make them feel something, and gives them an emotional stake that the subsequent conflict can then threaten or reward.`,
+            description: `The opening third of the story (scenes 1–${thirdEnd545b}) contains no emotionally charged scene — every scene in the establishment zone has a neutral emotional shift — while ${chargedScenes545b.length} charged scenes exist in the subsequent two-thirds. The opening third's job is to anchor the audience to characters through felt stakes: the protagonist's desire, fear, or attachment must be emotionally registered in the opening zone for the story's eventual conflict to carry weight. When the first structural zone is entirely emotionally neutral, the audience spends the establishment section watching events that register intellectually but don't land as emotionally consequential — the story's initial contract is one of observation rather than investment.`,
+            suggestedFix: `Place at least one emotionally charged scene in the opening third (scenes 1–${thirdEnd545b}) — a moment where the protagonist experiences something that generates felt positive or negative emotion rather than neutral observation. The charged scene doesn't need to be a crisis: a small but genuine moment of joy, fear, hope, or loss in the opening zone tells the audience that they are watching a story that intends to make them feel something, and gives them an emotional stake that the subsequent conflict can then threaten or reward.`,
           });
         }
       }
@@ -3690,10 +3694,10 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         const inFinal559b = relShiftPositions559b.some(i => i >= closingStart559b);
         if (!inFinal559b) {
           issues.push({
-            location: `${relShiftPositions559b.length} relationship-shift scene(s) — none in the final third (scenes ${closingStart559b}–${records.length - 1})`,
+            location: `${relShiftPositions559b.length} relationship-shift scene(s) — none in the final third (scenes ${closingStart559b + 1}–${records.length})`,
             rule: 'RELATIONSHIP_CLOSING_THIRD_ABSENT',
             severity: 'minor',
-            description: `The script has ${relShiftPositions559b.length} relationship-shift scenes, all occurring before the final third (scene ${closingStart559b} onward). The closing third — from approximately the 67% mark through the end — contains no bond movement. The climax and denouement arrive with the story's interpersonal dynamics already settled: characters reach the resolution with their relationships in a fixed state, and the finale can only work with what the audience already knows about how they relate. A story's interpersonal peak typically belongs in the closing section: the alliance that decides the climax, the betrayal that makes the resolution possible or impossible, or the reconciliation that gives the denouement its emotional payoff. When the relational channel goes silent before the finale, the story's conclusion is structurally weaker.`,
+            description: `The script has ${relShiftPositions559b.length} relationship-shift scenes, all occurring before the final third (scene ${closingStart559b + 1} onward). The closing third — from approximately the 67% mark through the end — contains no bond movement. The climax and denouement arrive with the story's interpersonal dynamics already settled: characters reach the resolution with their relationships in a fixed state, and the finale can only work with what the audience already knows about how they relate. A story's interpersonal peak typically belongs in the closing section: the alliance that decides the climax, the betrayal that makes the resolution possible or impossible, or the reconciliation that gives the denouement its emotional payoff. When the relational channel goes silent before the finale, the story's conclusion is structurally weaker.`,
             suggestedFix: `Introduce at least one relationship shift in the final third — a bond move that matters to how the climax and resolution play out. The closing-third relationship shift need not be a dramatic reversal: even a small movement in a key relationship (an acknowledgment, a severance, a reconciliation) gives the finale an interpersonal dimension that makes the resolution feel humanly earned rather than purely plot-mechanical.`,
           });
         }
@@ -3765,11 +3769,11 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         const inOpening573a = relShiftPositions573a.some(i => i < openingEnd573a);
         if (!inOpening573a) {
           issues.push({
-            location: `${relShiftPositions573a.length} relationship-shift scene(s) — none in the opening third (scenes 0–${openingEnd573a - 1})`,
+            location: `${relShiftPositions573a.length} relationship-shift scene(s) — none in the opening third (scenes 1–${openingEnd573a})`,
             rule: 'RELATIONSHIP_OPENING_THIRD_ABSENT',
             severity: 'minor',
-            description: `The script has ${relShiftPositions573a.length} relationship-shift scenes, none occurring in the opening third (scenes 0–${openingEnd573a - 1}). The first act is entirely devoid of relationship movement — no bonds are established, tested, or strained during the window where audiences form their relational expectations. The opening third is the story's relational foundation: the audience needs to see at least one bond in motion early to understand what relationships are at stake and to generate interpersonal investment before the midpoint and climax. When all bond dynamics begin in the middle or closing section, the story's early act is interpersonally static, asking the audience to care about relationships that haven't yet been shown to move.`,
-            suggestedFix: `Introduce at least one relationship shift in the opening third (scenes 0–${openingEnd573a - 1}) — a bond move that establishes what is at stake interpersonally before the midpoint. Even a small relational gesture early (a shift in alliance, a trust that erodes, a connection that deepens) gives the audience a relational investment to carry into the story's escalation.`,
+            description: `The script has ${relShiftPositions573a.length} relationship-shift scenes, none occurring in the opening third (scenes 1–${openingEnd573a}). The first act is entirely devoid of relationship movement — no bonds are established, tested, or strained during the window where audiences form their relational expectations. The opening third is the story's relational foundation: the audience needs to see at least one bond in motion early to understand what relationships are at stake and to generate interpersonal investment before the midpoint and climax. When all bond dynamics begin in the middle or closing section, the story's early act is interpersonally static, asking the audience to care about relationships that haven't yet been shown to move.`,
+            suggestedFix: `Introduce at least one relationship shift in the opening third (scenes 1–${openingEnd573a}) — a bond move that establishes what is at stake interpersonally before the midpoint. Even a small relational gesture early (a shift in alliance, a trust that erodes, a connection that deepens) gives the audience a relational investment to carry into the story's escalation.`,
           });
         }
       }
@@ -3949,11 +3953,11 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         const inClosing587c = payoffPositions587c.some(pos => pos >= closingStart587c);
         if (!inClosing587c) {
           issues.push({
-            location: `${payoffPositions587c.length} payoff scene(s) — none in the closing third (scenes ${closingStart587c}–${records.length - 1})`,
+            location: `${payoffPositions587c.length} payoff scene(s) — none in the closing third (scenes ${closingStart587c + 1}–${records.length})`,
             rule: 'PAYOFF_CLOSING_THIRD_ABSENT',
             severity: 'minor',
-            description: `The script has ${payoffPositions587c.length} payoff scenes, none of them occurring in the closing third (scenes ${closingStart587c}–${records.length - 1}). All planted promises are resolved before the climactic zone — the final third, where the audience expects the accumulated threads to land, is entirely void of payoffs. The closing third is where setups are meant to pay off at the moment of highest consequence: a planted promise resolving during the climax carries the weight of everything that came before it. When all payoffs arrive in the opening and middle sections, the closing act is left without the satisfaction of resolution — the story's final movement has nothing left to deliver.`,
-            suggestedFix: `Reserve at least one payoff for the closing third (scenes ${closingStart587c}–${records.length - 1}) — a planted promise that resolves at or near the climax. Moving an earlier payoff later, or holding a setup's resolution until the final act, ensures that the story's highest-consequence moment is also its most satisfying in terms of planted-thread delivery.`,
+            description: `The script has ${payoffPositions587c.length} payoff scenes, none of them occurring in the closing third (scenes ${closingStart587c + 1}–${records.length}). All planted promises are resolved before the climactic zone — the final third, where the audience expects the accumulated threads to land, is entirely void of payoffs. The closing third is where setups are meant to pay off at the moment of highest consequence: a planted promise resolving during the climax carries the weight of everything that came before it. When all payoffs arrive in the opening and middle sections, the closing act is left without the satisfaction of resolution — the story's final movement has nothing left to deliver.`,
+            suggestedFix: `Reserve at least one payoff for the closing third (scenes ${closingStart587c + 1}–${records.length}) — a planted promise that resolves at or near the climax. Moving an earlier payoff later, or holding a setup's resolution until the final act, ensures that the story's highest-consequence moment is also its most satisfying in terms of planted-thread delivery.`,
           });
         }
       }
@@ -7104,9 +7108,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
 
         if (!hasCost1191) {
           issues.push({
-            location: `Scenes ${dangerScenes1191.join(', ')} (protagonist: ${protagonistName1191})`,
+            location: `Scenes ${dangerScenes1191.map(x => x + 1).join(', ')} (protagonist: ${protagonistName1191})`,
             rule: 'PLOT_ARMOR',
-            description: `${protagonistName1191} passes through ${dangerScenes1191.length} lethal/high-danger scenes (Scenes ${dangerScenes1191.join(', ')}) and comes out of every one with zero recorded cost — no injury, no negative emotional aftermath, no relationship or resource loss. Danger that never touches the protagonist stops reading as danger.`,
+            description: `${protagonistName1191} passes through ${dangerScenes1191.length} lethal/high-danger scenes (Scenes ${dangerScenes1191.map(x => x + 1).join(', ')}) and comes out of every one with zero recorded cost — no injury, no negative emotional aftermath, no relationship or resource loss. Danger that never touches the protagonist stops reading as danger.`,
             severity: 'major',
             suggestedFix: `Give at least one of these encounters a real price: an injury that lingers, a relationship strained by what surviving it took, or a loss the protagonist has to carry into the next scene.`,
           });
@@ -7143,9 +7147,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             const newNouns1191 = nounsHere1191.filter(w => !seenNouns1191.has(w));
             if (newNouns1191.length > 0) {
               issues.push({
-                location: `Scene ${i} (${r.slug})`,
+                location: `Scene ${i + 1} (${r.slug})`,
                 rule: 'COINCIDENCE_RESOLUTION',
-                description: `Scene ${i} closes out payoff(s) [${payoffIds1191.join(', ')}] using lucky-arrival phrasing and introduces "${newNouns1191[0]}" for the first time in the story — no earlier scene ever mentions it, and none of these payoffs trace to a clue seeded in any earlier scene. The resolution reads as coincidence, not payoff.`,
+                description: `Scene ${i + 1} closes out payoff(s) [${payoffIds1191.join(', ')}] using lucky-arrival phrasing and introduces "${newNouns1191[0]}" for the first time in the story — no earlier scene ever mentions it, and none of these payoffs trace to a clue seeded in any earlier scene. The resolution reads as coincidence, not payoff.`,
                 severity: 'major',
                 suggestedFix: `Either seed "${newNouns1191[0]}" (or whoever/whatever actually resolves this) in an earlier scene, or replace the lucky-arrival phrasing with a resolution that draws on something already established.`,
               });
@@ -7193,9 +7197,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
 
         if (isResolution1350 && standingProblemExisted1350 && coincidenceRe1350.test(sceneTextLower1191[i])) {
           issues.push({
-            location: `Scene ${i} (${r.slug})`,
+            location: `Scene ${i + 1} (${r.slug})`,
             rule: 'COINCIDENCE_RESOLVES_PROBLEM',
-            description: `Scene ${i} uses lucky-arrival phrasing exactly where a standing problem resolves (${suspenseDrop1350 ? `suspense drops by ${Math.abs(r.suspenseDelta ?? 0)}` : 'the clock clears'}) — the story gets its characters OUT of trouble by coincidence, which reads as a cheat. Coincidence is fine for getting characters INTO trouble; it undercuts the story when it gets them out.`,
+            description: `Scene ${i + 1} uses lucky-arrival phrasing exactly where a standing problem resolves (${suspenseDrop1350 ? `suspense drops by ${Math.abs(r.suspenseDelta ?? 0)}` : 'the clock clears'}) — the story gets its characters OUT of trouble by coincidence, which reads as a cheat. Coincidence is fine for getting characters INTO trouble; it undercuts the story when it gets them out.`,
             severity: 'major',
             suggestedFix: `Replace the lucky-arrival phrasing with a resolution that follows from something the characters did or that was already set up — let them earn the way out, or let the earlier setup (not chance) be what closes it.`,
           });
@@ -7245,9 +7249,9 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             if (vocabPresent1191 || revelationNamesEither1191) continue;
 
             issues.push({
-              location: `Scenes ${i}–${h} (pair: ${shift.pairKey})`,
+              location: `Scenes ${i + 1}–${h + 1} (pair: ${shift.pairKey})`,
               rule: 'UNMOTIVATED_BETRAYAL',
-              description: `"${shift.pairKey}" are established as allies in Scene ${i} (+${shift.amount.toFixed(2)}), then the bond flips to hostile in Scene ${h} (${hostile1191.amount.toFixed(2)}) with no prior strain anywhere in between, no suspicion or deception language on the page, and no earlier revelation naming either character — the betrayal has no visible motive.`,
+              description: `"${shift.pairKey}" are established as allies in Scene ${i + 1} (+${shift.amount.toFixed(2)}), then the bond flips to hostile in Scene ${h + 1} (${hostile1191.amount.toFixed(2)}) with no prior strain anywhere in between, no suspicion or deception language on the page, and no earlier revelation naming either character — the betrayal has no visible motive.`,
               severity: 'major',
               suggestedFix: `Plant the turn before it happens: a scene of growing suspicion, a secret glimpsed, or a revelation that recontextualizes one character's earlier behavior — so the betrayal reads as the reveal of what was already true, not a coin-flip.`,
             });

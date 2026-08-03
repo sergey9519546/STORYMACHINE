@@ -2892,10 +2892,10 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     const laterDlgCount462c = dialogue.filter(d => (lineToScene462c[d.lineNum - 1] ?? 0) >= openingEnd462c).length;
     if (openingEnd462c >= 1 && openingDlgCount462c === 0 && laterDlgCount462c >= 10) {
       issues.push({
-        location: `Opening 20% (Scenes 0–${openingEnd462c - 1}) — no dialogue`,
+        location: `Opening 20% (Scenes 1–${openingEnd462c}) — no dialogue`,
         rule: 'DIALOGUE_OPENING_SILENT',
         severity: 'minor',
-        description: `The first 20% of scenes (Scenes 0–${openingEnd462c - 1}) contains no dialogue, even though the rest of the story carries ${laterDlgCount462c} spoken lines. The story opens as pure silent spectacle — action, image, and atmosphere with no spoken word until the opening zone has passed. A wordless opening can be a deliberate choice, but when it spans the entire first fifth of a dialogue-driven story, the audience meets the characters without ever hearing them, and the voices that carry the drama are withheld precisely where first impressions of character are formed.`,
+        description: `The first 20% of scenes (Scenes 1–${openingEnd462c}) contains no dialogue, even though the rest of the story carries ${laterDlgCount462c} spoken lines. The story opens as pure silent spectacle — action, image, and atmosphere with no spoken word until the opening zone has passed. A wordless opening can be a deliberate choice, but when it spans the entire first fifth of a dialogue-driven story, the audience meets the characters without ever hearing them, and the voices that carry the drama are withheld precisely where first impressions of character are formed.`,
         suggestedFix: `Introduce at least one line of dialogue in the opening zone: a first spoken word that establishes a character's voice, register, or relationship before the plot accelerates. The line can be terse or oblique — it does not need to deliver exposition — but hearing a character speak early lets the audience form an impression of who they are, which a silent opening defers until the story is already underway.`,
       });
     }

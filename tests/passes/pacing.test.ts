@@ -1030,7 +1030,7 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       assert.ok(plateau.length >= 1, 'Should fire generically on this plateau fixture');
       assert.equal(
         plateau[0].description,
-        'Scenes 0–3 all run within ±20% of the same length (10–10 lines) — a flat stretch with no acceleration or contraction. The cadence plateaus for four scenes in a row.',
+        'Scenes 1–4 all run within ±20% of the same length (10–10 lines) — a flat stretch with no acceleration or contraction. The cadence plateaus for four scenes in a row.',
         'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
       );
     });

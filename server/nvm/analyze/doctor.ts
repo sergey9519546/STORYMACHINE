@@ -1735,7 +1735,13 @@ function buildSceneHeatmap(passes: DoctorPassSummary[], analysis: FountainAnalys
     for (const issue of p.issues) {
       const m = SCENE_LOCATION_RE.exec(issue.location);
       if (!m) continue;
-      const sceneIdx = parseInt(m[1], 10);
+      // Labels are 1-based (writer-facing numbering, same as the heatmap
+      // strip renders); bySceneIdx is keyed by the 0-based record.sceneIdx,
+      // so decode at this boundary. "Scene 0" (impossible post-migration)
+      // decodes to -1 and falls through the get() below, counting toward
+      // totals but pinning to no cell — same handling as any pass-invented
+      // index.
+      const sceneIdx = parseInt(m[1], 10) - 1;
       // A location naming a scene outside the analyzed range (a pass-invented
       // index) still counts toward report totals but can't be pinned to a cell.
       const entry = bySceneIdx.get(sceneIdx);

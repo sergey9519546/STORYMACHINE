@@ -611,8 +611,8 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       ];
       const result = await causalityPass(causeInput(records));
       assert.ok(
-        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
-        'Should NOT flag Scene 0 when its own scene carries the reaction',
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 1')),
+        'Should NOT flag Scene 1 when its own scene carries the reaction',
       );
     });
 
@@ -629,8 +629,8 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       ];
       const result = await causalityPass(causeInput(records));
       assert.ok(
-        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
-        'Should NOT flag Scene 0 when a revelation lands in its wake',
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 1')),
+        'Should NOT flag Scene 1 when a revelation lands in its wake',
       );
     });
 
@@ -646,8 +646,8 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       ];
       const result = await causalityPass(causeInput(records));
       assert.ok(
-        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
-        'Should NOT flag Scene 0 when the following scene chains forward with its own clue',
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 1')),
+        'Should NOT flag Scene 1 when the following scene chains forward with its own clue',
       );
     });
 
@@ -663,8 +663,8 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       ];
       const result = await causalityPass(causeInput(records));
       assert.ok(
-        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
-        'Should NOT flag Scene 0 when its clue is paid off later in the story',
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 1')),
+        'Should NOT flag Scene 1 when its clue is paid off later in the story',
       );
     });
 
@@ -678,7 +678,7 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
         makeRec(1), makeRec(2), makeRec(3), makeRec(4),
       ];
       const result = await causalityPass(causeInput(records));
-      const consequence = result.issues.filter(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0'));
+      const consequence = result.issues.filter(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 1'));
       assert.ok(consequence.length >= 1, 'Should still detect ACTION_WITHOUT_CONSEQUENCE for a truly consequence-free plant');
       assert.ok(consequence[0].severity === 'major');
     });
