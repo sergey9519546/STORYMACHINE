@@ -151,8 +151,50 @@ export interface TemporalContradiction {
 /**
  * Composition table for Allen relations.
  * If A rel1 B and B rel2 C, returns possible relations between A and C.
- * 
+ *
  * This is the heart of constraint propagation - allows transitive inference.
+ *
+ * ── REPLACED 2026-08-03 (second, deeper root cause behind the CONTINUOUS/
+ * MOMENTS LATER/SAME TIME false-positive bug) ─────────────────────────────
+ * The hand-written table this replaced was wrong on 81 of its 169 entries
+ * (48%) — verified two independent ways: (1) an exhaustive, non-random
+ * enumeration of every qualitative order-type of 6 interval endpoints
+ * (As,Ae,Bs,Be,Cs,Ce over integers 0-5, the values sufficient to realize
+ * every distinct ordering including ties — 46,656 configurations checked,
+ * 3,375 valid after enforcing As<Ae/Bs<Be/Cs<Ce), directly computing
+ * rel(A,C) for every (rel(A,B), rel(B,C)) pair actually realized; (2)
+ * cross-checked against psiwray/allen-ia's independently-authored
+ * ternary_constraints_table.txt (an existing open-source implementation of
+ * Allen 1983's canonical table) — all 169 entries agree exactly. A worked
+ * example of the old table's error: 'before' composed with 'met-by' was
+ * hardcoded to just ['before'], but before∘met-by is actually {before,
+ * during, meets, overlaps, starts} — 'meets' is a real possibility the old
+ * entry excluded. That is not a rounding error; nearly every row past
+ * 'before'/'meets' silently collapsed rich, multi-relation compositions
+ * down to whatever single relation looked plausible at a glance.
+ *
+ * Why this was hiding, and why it surfaced now: detectTemporalContradictions
+ * only ever wrote the FORWARD cell of a pair during propagation before this
+ * same 2026-08-03 fix added narrowPairRelations to keep both directions in
+ * sync (see that function's doc comment for that half of the story). With
+ * the matrix left asymmetric, the backward cell for most pairs stayed at
+ * "all 13 relations possible" or got narrowed by unrelated, coincidentally
+ * weak composition paths — so a too-narrow table entry rarely got
+ * intersected against anything specific enough to produce a visible empty
+ * intersection. Once the matrix was made symmetric (the correct, necessary
+ * fix), a chain of only two 'meets' edges — exactly what a run of
+ * consecutive CONTINUOUS/MOMENTS LATER/SAME TIME scene headings produces —
+ * started reliably composing 'before' (from meets∘meets, which was and is
+ * correct) against the *backward* cell's synced 'met-by', hit the old
+ * before∘met-by=['before'] entry, and found it excluded 'meets' — which is
+ * exactly the relation the direct CONTINUOUS assertion held on that same
+ * pair. Intersection empty → spurious BLOCKER. Fixing only the matrix
+ * symmetry bug (without this table correction) would have left that
+ * specific false positive in place; fixing only this table (without matrix
+ * symmetry) would have left the ORIGINAL asymmetric-graph defect free to
+ * keep producing different false positives through other paths. Both were
+ * required. See temporal-consistency.test.ts's CONTINUOUS-chain regression
+ * table and the genuine-contradiction test proving detection still fires.
  */
 const COMPOSITION_TABLE: Record<AllenRelation, Record<AllenRelation, AllenRelation[]>> = {
   'before': {
@@ -160,12 +202,12 @@ const COMPOSITION_TABLE: Record<AllenRelation, Record<AllenRelation, AllenRelati
     'meets': ['before'],
     'overlaps': ['before'],
     'starts': ['before'],
-    'during': ['before'],
-    'finishes': ['before'],
+    'during': ['before', 'during', 'meets', 'overlaps', 'starts'],
+    'finishes': ['before', 'during', 'meets', 'overlaps', 'starts'],
     'equals': ['before'],
-    'after': ['before', 'after', 'overlaps', 'overlapped-by', 'meets', 'met-by', 'starts', 'started-by', 'during', 'contains', 'finishes', 'finished-by', 'equals'],
-    'met-by': ['before'],
-    'overlapped-by': ['before'],
+    'after': ['after', 'before', 'contains', 'during', 'equals', 'finished-by', 'finishes', 'meets', 'met-by', 'overlapped-by', 'overlaps', 'started-by', 'starts'],
+    'met-by': ['before', 'during', 'meets', 'overlaps', 'starts'],
+    'overlapped-by': ['before', 'during', 'meets', 'overlaps', 'starts'],
     'started-by': ['before'],
     'contains': ['before'],
     'finished-by': ['before'],
@@ -175,75 +217,75 @@ const COMPOSITION_TABLE: Record<AllenRelation, Record<AllenRelation, AllenRelati
     'meets': ['before'],
     'overlaps': ['before'],
     'starts': ['meets'],
-    'during': ['overlaps'],
-    'finishes': ['meets'],
+    'during': ['during', 'overlaps', 'starts'],
+    'finishes': ['during', 'overlaps', 'starts'],
     'equals': ['meets'],
-    'after': ['after'],
-    'met-by': ['finishes', 'finished-by', 'equals'],
-    'overlapped-by': ['overlapped-by'],
-    'started-by': ['met-by'],
-    'contains': ['overlapped-by', 'met-by', 'after'],
-    'finished-by': ['met-by'],
+    'after': ['after', 'contains', 'met-by', 'overlapped-by', 'started-by'],
+    'met-by': ['equals', 'finished-by', 'finishes'],
+    'overlapped-by': ['during', 'overlaps', 'starts'],
+    'started-by': ['meets'],
+    'contains': ['before'],
+    'finished-by': ['before'],
   },
   'overlaps': {
     'before': ['before'],
     'meets': ['before'],
-    'overlaps': ['before'],
+    'overlaps': ['before', 'meets', 'overlaps'],
     'starts': ['overlaps'],
-    'during': ['overlaps', 'starts', 'during'],
-    'finishes': ['overlaps'],
+    'during': ['during', 'overlaps', 'starts'],
+    'finishes': ['during', 'overlaps', 'starts'],
     'equals': ['overlaps'],
-    'after': ['after', 'overlapped-by', 'finishes', 'finished-by', 'contains'],
-    'met-by': ['overlapped-by'],
-    'overlapped-by': ['overlapped-by', 'contains', 'finished-by'],
-    'started-by': ['overlaps'],
-    'contains': ['overlapped-by', 'contains', 'after', 'finished-by', 'finishes'],
-    'finished-by': ['overlapped-by'],
+    'after': ['after', 'contains', 'met-by', 'overlapped-by', 'started-by'],
+    'met-by': ['contains', 'overlapped-by', 'started-by'],
+    'overlapped-by': ['contains', 'during', 'equals', 'finished-by', 'finishes', 'overlapped-by', 'overlaps', 'started-by', 'starts'],
+    'started-by': ['contains', 'finished-by', 'overlaps'],
+    'contains': ['before', 'contains', 'finished-by', 'meets', 'overlaps'],
+    'finished-by': ['before', 'meets', 'overlaps'],
   },
   'starts': {
     'before': ['before'],
     'meets': ['before'],
-    'overlaps': ['before'],
+    'overlaps': ['before', 'meets', 'overlaps'],
     'starts': ['starts'],
     'during': ['during'],
-    'finishes': ['equals'],
+    'finishes': ['during'],
     'equals': ['starts'],
     'after': ['after'],
     'met-by': ['met-by'],
-    'overlapped-by': ['overlapped-by'],
-    'started-by': ['started-by', 'equals', 'starts'],
-    'contains': ['contains'],
-    'finished-by': ['finished-by'],
+    'overlapped-by': ['during', 'finishes', 'overlapped-by'],
+    'started-by': ['equals', 'started-by', 'starts'],
+    'contains': ['before', 'contains', 'finished-by', 'meets', 'overlaps'],
+    'finished-by': ['before', 'meets', 'overlaps'],
   },
   'during': {
     'before': ['before'],
     'meets': ['before'],
-    'overlaps': ['before', 'overlaps', 'meets'],
+    'overlaps': ['before', 'during', 'meets', 'overlaps', 'starts'],
     'starts': ['during'],
     'during': ['during'],
     'finishes': ['during'],
     'equals': ['during'],
-    'after': ['after', 'overlapped-by', 'met-by'],
-    'met-by': ['overlapped-by', 'met-by', 'after'],
-    'overlapped-by': ['overlapped-by', 'after'],
-    'started-by': ['contains'],
-    'contains': ['contains'],
-    'finished-by': ['contains'],
+    'after': ['after'],
+    'met-by': ['after'],
+    'overlapped-by': ['after', 'during', 'finishes', 'met-by', 'overlapped-by'],
+    'started-by': ['after', 'during', 'finishes', 'met-by', 'overlapped-by'],
+    'contains': ['after', 'before', 'contains', 'during', 'equals', 'finished-by', 'finishes', 'meets', 'met-by', 'overlapped-by', 'overlaps', 'started-by', 'starts'],
+    'finished-by': ['before', 'during', 'meets', 'overlaps', 'starts'],
   },
   'finishes': {
     'before': ['before'],
     'meets': ['meets'],
-    'overlaps': ['overlaps'],
-    'starts': ['equals'],
+    'overlaps': ['during', 'overlaps', 'starts'],
+    'starts': ['during'],
     'during': ['during'],
     'finishes': ['finishes'],
     'equals': ['finishes'],
     'after': ['after'],
-    'met-by': ['met-by'],
-    'overlapped-by': ['overlapped-by'],
-    'started-by': ['started-by'],
-    'contains': ['contains'],
-    'finished-by': ['finished-by', 'finishes', 'equals'],
+    'met-by': ['after'],
+    'overlapped-by': ['after', 'met-by', 'overlapped-by'],
+    'started-by': ['after', 'met-by', 'overlapped-by'],
+    'contains': ['after', 'contains', 'met-by', 'overlapped-by', 'started-by'],
+    'finished-by': ['equals', 'finished-by', 'finishes'],
   },
   'equals': {
     'before': ['before'],
@@ -262,11 +304,11 @@ const COMPOSITION_TABLE: Record<AllenRelation, Record<AllenRelation, AllenRelati
   },
   // Inverses (symmetric entries)
   'after': {
-    'before': ['before', 'after', 'overlaps', 'overlapped-by', 'meets', 'met-by', 'starts', 'started-by', 'during', 'contains', 'finishes', 'finished-by', 'equals'],
-    'meets': ['after'],
-    'overlaps': ['after', 'overlapped-by', 'starts', 'started-by', 'contains'],
-    'starts': ['after'],
-    'during': ['after', 'overlapped-by', 'met-by'],
+    'before': ['after', 'before', 'contains', 'during', 'equals', 'finished-by', 'finishes', 'meets', 'met-by', 'overlapped-by', 'overlaps', 'started-by', 'starts'],
+    'meets': ['after', 'during', 'finishes', 'met-by', 'overlapped-by'],
+    'overlaps': ['after', 'during', 'finishes', 'met-by', 'overlapped-by'],
+    'starts': ['after', 'during', 'finishes', 'met-by', 'overlapped-by'],
+    'during': ['after', 'during', 'finishes', 'met-by', 'overlapped-by'],
     'finishes': ['after'],
     'equals': ['after'],
     'after': ['after'],
@@ -277,61 +319,61 @@ const COMPOSITION_TABLE: Record<AllenRelation, Record<AllenRelation, AllenRelati
     'finished-by': ['after'],
   },
   'met-by': {
-    'before': ['before'],
-    'meets': ['starts', 'started-by', 'equals'],
-    'overlaps': ['overlaps'],
-    'starts': ['starts'],
-    'during': ['overlaps', 'starts', 'during'],
-    'finishes': ['starts'],
+    'before': ['before', 'contains', 'finished-by', 'meets', 'overlaps'],
+    'meets': ['equals', 'started-by', 'starts'],
+    'overlaps': ['during', 'finishes', 'overlapped-by'],
+    'starts': ['during', 'finishes', 'overlapped-by'],
+    'during': ['during', 'finishes', 'overlapped-by'],
+    'finishes': ['met-by'],
     'equals': ['met-by'],
     'after': ['after'],
-    'met-by': ['met-by'],
+    'met-by': ['after'],
     'overlapped-by': ['after'],
-    'started-by': ['met-by'],
-    'contains': ['overlaps', 'starts', 'during', 'before', 'meets'],
+    'started-by': ['after'],
+    'contains': ['after'],
     'finished-by': ['met-by'],
   },
   'overlapped-by': {
-    'before': ['before'],
-    'meets': ['starts'],
-    'overlaps': ['overlaps', 'starts', 'started-by'],
-    'starts': ['starts'],
-    'during': ['overlaps', 'starts', 'during'],
-    'finishes': ['starts'],
+    'before': ['before', 'contains', 'finished-by', 'meets', 'overlaps'],
+    'meets': ['contains', 'finished-by', 'overlaps'],
+    'overlaps': ['contains', 'during', 'equals', 'finished-by', 'finishes', 'overlapped-by', 'overlaps', 'started-by', 'starts'],
+    'starts': ['during', 'finishes', 'overlapped-by'],
+    'during': ['during', 'finishes', 'overlapped-by'],
+    'finishes': ['overlapped-by'],
     'equals': ['overlapped-by'],
     'after': ['after'],
-    'met-by': ['met-by'],
-    'overlapped-by': ['overlapped-by'],
-    'started-by': ['overlapped-by'],
-    'contains': ['overlaps', 'started-by', 'starts', 'before', 'meets'],
-    'finished-by': ['overlapped-by'],
+    'met-by': ['after'],
+    'overlapped-by': ['after', 'met-by', 'overlapped-by'],
+    'started-by': ['after', 'met-by', 'overlapped-by'],
+    'contains': ['after', 'contains', 'met-by', 'overlapped-by', 'started-by'],
+    'finished-by': ['contains', 'overlapped-by', 'started-by'],
   },
   'started-by': {
-    'before': ['before'],
-    'meets': ['meets'],
-    'overlaps': ['overlaps'],
-    'starts': ['started-by', 'equals', 'starts'],
-    'during': ['contains'],
-    'finishes': ['started-by'],
+    'before': ['before', 'contains', 'finished-by', 'meets', 'overlaps'],
+    'meets': ['contains', 'finished-by', 'overlaps'],
+    'overlaps': ['contains', 'finished-by', 'overlaps'],
+    'starts': ['equals', 'started-by', 'starts'],
+    'during': ['during', 'finishes', 'overlapped-by'],
+    'finishes': ['overlapped-by'],
     'equals': ['started-by'],
     'after': ['after'],
     'met-by': ['met-by'],
     'overlapped-by': ['overlapped-by'],
     'started-by': ['started-by'],
     'contains': ['contains'],
-    'finished-by': ['finished-by'],
+    'finished-by': ['contains'],
   },
   'contains': {
-    'before': ['before'],
-    'meets': ['before', 'overlaps', 'meets'],
-    'overlaps': ['before', 'overlaps', 'meets', 'starts', 'started-by'],
-    'starts': ['contains'],
-    'during': ['contains'],
-    'finishes': ['contains'],
+    'before': ['before', 'contains', 'finished-by', 'meets', 'overlaps'],
+    'meets': ['contains', 'finished-by', 'overlaps'],
+    'overlaps': ['contains', 'finished-by', 'overlaps'],
+    'starts': ['contains', 'finished-by', 'overlaps'],
+    'during': ['contains', 'during', 'equals', 'finished-by', 'finishes', 'overlapped-by', 'overlaps', 'started-by', 'starts'],
+    'finishes': ['contains', 'overlapped-by', 'started-by'],
     'equals': ['contains'],
-    'after': ['after', 'overlapped-by', 'met-by'],
-    'met-by': ['after', 'overlapped-by', 'met-by', 'finishes', 'finished-by'],
-    'overlapped-by': ['after', 'overlapped-by'],
+    'after': ['after', 'contains', 'met-by', 'overlapped-by', 'started-by'],
+    'met-by': ['contains', 'overlapped-by', 'started-by'],
+    'overlapped-by': ['contains', 'overlapped-by', 'started-by'],
     'started-by': ['contains'],
     'contains': ['contains'],
     'finished-by': ['contains'],
@@ -340,14 +382,14 @@ const COMPOSITION_TABLE: Record<AllenRelation, Record<AllenRelation, AllenRelati
     'before': ['before'],
     'meets': ['meets'],
     'overlaps': ['overlaps'],
-    'starts': ['started-by'],
-    'during': ['contains'],
-    'finishes': ['finished-by', 'finishes', 'equals'],
+    'starts': ['overlaps'],
+    'during': ['during', 'overlaps', 'starts'],
+    'finishes': ['equals', 'finished-by', 'finishes'],
     'equals': ['finished-by'],
-    'after': ['after'],
-    'met-by': ['met-by'],
-    'overlapped-by': ['overlapped-by'],
-    'started-by': ['started-by'],
+    'after': ['after', 'contains', 'met-by', 'overlapped-by', 'started-by'],
+    'met-by': ['contains', 'overlapped-by', 'started-by'],
+    'overlapped-by': ['contains', 'overlapped-by', 'started-by'],
+    'started-by': ['contains'],
     'contains': ['contains'],
     'finished-by': ['finished-by'],
   },

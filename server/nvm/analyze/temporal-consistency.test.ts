@@ -346,6 +346,130 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // CONTINUOUS/MOMENTS LATER/SAME TIME chain false positives (regression,
+  // 2026-08-03)
+  //
+  // BUG: a run of consecutive scene headings carrying CONTINUOUS/MOMENTS
+  // LATER/SAME TIME -- ordinary, correct screenwriting (a character moving
+  // through connected spaces in unbroken time) -- used to produce spurious
+  // "transitive_violation" contradictions at severity BLOCKER, one per
+  // additional scene past the first in the run (run length - 1: 0, 1, 2 for
+  // run lengths 1, 2, 3). Measured impact: 5 of 30 real scripts (16.7%)
+  // flagged at least one contradiction on unmodified, correct text, entirely
+  // from this bug (docs/p1-benchmark/TEMPORAL_ORDER_SENSITIVITY_2026-08-03.md).
+  //
+  // ROOT CAUSE (two layered defects, both required for the fix; see doc
+  // comments on narrowPairRelations and COMPOSITION_TABLE above for the
+  // full mechanism):
+  //   1. detectTemporalContradictions' constraint matrix only ever wrote the
+  //      FORWARD cell of a pair (A->B) on every narrowing -- explicit
+  //      constraint application and the Floyd-Warshall-style composition
+  //      loop alike -- and never kept the BACKWARD cell (B->A) in sync as
+  //      its true inverse, breaking the standard Allen-algebra path-
+  //      consistency invariant that N(i,j) = inverse(N(j,i)) must hold after
+  //      every update. The backward cell for a consecutive-meets pair then
+  //      drifted to whatever unrelated composition paths happened to touch
+  //      it, and the pairwise mirror-consistency check (added to catch
+  //      genuine direct 2-cycles) flagged the resulting divergence as a
+  //      contradiction even though the timeline was never actually broken.
+  //   2. Separately, COMPOSITION_TABLE itself was wrong on 81 of 169 entries
+  //      (48%) -- e.g. before∘met-by was hardcoded to just ['before'] when
+  //      it is actually {before, during, meets, overlaps, starts} -- so once
+  //      the matrix was made symmetric (fix #1), a 2-edge 'meets' chain
+  //      (exactly what two consecutive CONTINUOUS scenes produce) composed
+  //      'before' against the newly-synced backward 'met-by' cell, hit the
+  //      too-narrow table entry, and found 'meets' excluded even though the
+  //      direct CONTINUOUS assertion on that same pair held it. Fixing only
+  //      #1 or only #2 would have left a false positive on this exact
+  //      fixture; both were required.
+  //
+  // Allen composition of meets∘meets is 'before', which was and remains
+  // algebraically correct and consistent on its own -- the defect was
+  // structural (an unmaintained invariant) plus a second, independent data
+  // error in the table, not an error in that specific composition.
+  // ──────────────────────────────────────────────────────────────────────────
+  describe('CONTINUOUS/MOMENTS LATER/SAME TIME chains (regression, 2026-08-03)', () => {
+    it('a single CONTINUOUS scene produces no contradiction', () => {
+      const scenes: ScreenplaySceneRecord[] = [
+        scene('INT. KITCHEN - DAY', 'Cooking.'),
+        scene('INT. PANTRY - CONTINUOUS', 'Grabs flour.'),
+      ];
+      assert.equal(auditTemporalConsistency(scenes).length, 0, '1 CONTINUOUS scene: 0 contradictions expected');
+    });
+
+    it('two consecutive CONTINUOUS scenes produce no contradiction (was 1 false positive before the fix)', () => {
+      const scenes: ScreenplaySceneRecord[] = [
+        scene('INT. KITCHEN - DAY', 'Cooking.'),
+        scene('INT. PANTRY - CONTINUOUS', 'Grabs flour.'),
+        scene('INT. HALL - CONTINUOUS', 'Carries it through.'),
+      ];
+      assert.equal(auditTemporalConsistency(scenes).length, 0, '2 consecutive CONTINUOUS scenes: 0 contradictions expected (was 1)');
+    });
+
+    it('three consecutive CONTINUOUS scenes produce no contradiction (was 2 false positives before the fix)', () => {
+      const scenes: ScreenplaySceneRecord[] = [
+        scene('INT. KITCHEN - DAY', 'Cooking.'),
+        scene('INT. PANTRY - CONTINUOUS', 'Grabs flour.'),
+        scene('INT. HALL - CONTINUOUS', 'Carries it through.'),
+        scene('INT. STAIRS - CONTINUOUS', 'Heads upstairs.'),
+      ];
+      assert.equal(auditTemporalConsistency(scenes).length, 0, '3 consecutive CONTINUOUS scenes: 0 contradictions expected (was 2)');
+    });
+
+    it('CONTINUOUS followed by a DAYS LATER jump produces no contradiction', () => {
+      const scenes: ScreenplaySceneRecord[] = [
+        scene('INT. KITCHEN - DAY', 'Cooking.'),
+        scene('INT. PANTRY - CONTINUOUS', 'Grabs flour.'),
+        scene('INT. HALL - DAY - THREE DAYS LATER', 'Different day entirely.'),
+      ];
+      assert.equal(auditTemporalConsistency(scenes).length, 0, 'CONTINUOUS then DAYS LATER: 0 contradictions expected');
+    });
+
+    it('a longer run (five consecutive CONTINUOUS scenes) still produces no contradiction', () => {
+      // Not part of the reported repro table, but proves the fix holds as
+      // the chain grows rather than merely covering the specific lengths
+      // that were manually measured.
+      const scenes: ScreenplaySceneRecord[] = [
+        scene('INT. KITCHEN - DAY', 'Cooking.'),
+        scene('INT. PANTRY - CONTINUOUS', 'A.'),
+        scene('INT. HALL - CONTINUOUS', 'B.'),
+        scene('INT. STAIRS - CONTINUOUS', 'C.'),
+        scene('INT. LANDING - CONTINUOUS', 'D.'),
+        scene('INT. BEDROOM - CONTINUOUS', 'E.'),
+      ];
+      assert.equal(auditTemporalConsistency(scenes).length, 0, '5 consecutive CONTINUOUS scenes: 0 contradictions expected');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Genuine contradictions must still fire (2026-08-03 fix must not have
+  // silenced real detection -- a fix that merely makes the module quiet
+  // would pass the false-positive tests above while destroying its purpose)
+  // ──────────────────────────────────────────────────────────────────────────
+  describe('genuine contradictions still fire after the 2026-08-03 fix', () => {
+    it('detects a real impossible meets-cycle (A meets B, B meets C, C meets A)', () => {
+      // Three scenes each claiming to immediately abut the next, wrapping
+      // back around, is genuinely impossible -- unlike the CONTINUOUS-chain
+      // shape above (a simple LINEAR run), this is a true cycle and must
+      // still be flagged.
+      const intervals: TemporalInterval[] = [
+        { id: 'A', label: 'Scene A', sceneIds: ['0'], evidence: [] },
+        { id: 'B', label: 'Scene B', sceneIds: ['1'], evidence: [] },
+        { id: 'C', label: 'Scene C', sceneIds: ['2'], evidence: [] },
+      ];
+      const constraints: TemporalConstraint[] = [
+        { intervalA: 'A', intervalB: 'B', relation: 'meets', confidence: 1.0, sourceSceneId: '0', evidence: 'A meets B' },
+        { intervalA: 'B', intervalB: 'C', relation: 'meets', confidence: 1.0, sourceSceneId: '1', evidence: 'B meets C' },
+        { intervalA: 'C', intervalB: 'A', relation: 'meets', confidence: 1.0, sourceSceneId: '2', evidence: 'C meets A' },
+      ];
+
+      const contradictions = detectTemporalContradictions(intervals, constraints);
+
+      assert.ok(contradictions.length > 0, 'a genuine cyclic meets-chain must still be flagged, not silenced by the false-positive fix');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Report Formatting Tests
   // ──────────────────────────────────────────────────────────────────────────
   
