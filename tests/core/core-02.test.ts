@@ -1419,7 +1419,9 @@ describe('NVM — G3 Projection Gallery (Wave 19)', () => {
     const canon = makeCanon();
     const art = project(canon, 'novel');
     assert.ok(art.content.includes('# The Inheritance'), 'has title heading');
-    assert.ok(art.content.includes('Scene 0'), 'has scene section');
+    // makeCanon()'s commit carries sceneIdx: 0 (0-based storage); the novel
+    // heading is writer-facing 1-based display, so "Scene 1".
+    assert.ok(art.content.includes('Scene 1'), 'has scene section');
     assert.ok(typeof art.metadata['wordCount'] === 'number', 'wordCount metadata present');
   });
 
@@ -5419,7 +5421,11 @@ describe('Wave 80 — intention bug fix, belief location, voice precision, two-r
     const result = await beliefPass(stub as import('../../server/nvm/revision/passes/types.ts').PassInput);
     const dump = result.issues.find(i => i.rule === 'EXPOSITION_DUMP');
     assert.ok(dump, 'EXPOSITION_DUMP should fire for 3+ consecutive told scenes');
-    assert.ok(dump!.location.includes('1'), 'Location should reference the start scene (1), not end scene (3)');
+    // 1-based labels: told-streak spans sceneIdx 1..3 -> "Scenes 2–4". The
+    // Wave 80 bug this guards was the location naming ONLY the end scene, so
+    // pin the full range — a regression would render "Scene 4" instead.
+    assert.ok(/Scenes 2–4/.test(dump!.location),
+      `Location should span start scene (Scene 2) through end (Scene 4); got "${dump!.location}"`);
   });
 
   // ── voice jaccardDistance returns 0.5 for empty scenes ────────────────────

@@ -171,7 +171,7 @@ export function QualityEnginesPanel({ onClose }: Props) {
                 borderRadius: 5, padding: '7px 9px', marginBottom: 5, cursor: 'pointer',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>Scene {sc.sceneIdx}</span>
+                  <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>Scene {sc.sceneIdx + 1}</span>
                   <span style={{ background: sc.qualityScore >= 70 ? '#064e3b' : sc.qualityScore >= 40 ? '#1c1008' : 'var(--sm-stamp-dk)', color: sc.qualityScore >= 70 ? 'var(--sm-ok)' : sc.qualityScore >= 40 ? 'var(--sm-warn)' : 'var(--sm-stamp)', padding: '1px 5px', borderRadius: 3, fontSize: 10, fontWeight: 700 }}>
                     Q:{sc.qualityScore}
                   </span>

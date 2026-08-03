@@ -347,7 +347,7 @@ function projectNovel(canon: Canon): Artifact {
     '',
   ];
   for (const commit of canon.commits.filter(c => !c.reverted)) {
-    paragraphs.push(`## Scene ${commit.sceneIdx}`);
+    paragraphs.push(`## Scene ${commit.sceneIdx + 1}`);
     for (const op of commit.ops) {
       if (op.op === 'UPDATE_BELIEF') {
         paragraphs.push(`${op.charId} held this thought: _${op.belief.proposition}_.`);
@@ -430,11 +430,11 @@ function projectComic(canon: Canon): Artifact {
     for (const op of commit.ops) {
       panelN++;
       if (op.op === 'RECORD_VISUAL_FACT') {
-        panels.push({ scene: commit.sceneIdx, panel: panelN, caption: op.fact, visual: 'FULL_BLEED' });
+        panels.push({ scene: commit.sceneIdx + 1, panel: panelN, caption: op.fact, visual: 'FULL_BLEED' });
       } else if (op.op === 'UPDATE_BELIEF') {
-        panels.push({ scene: commit.sceneIdx, panel: panelN, caption: `${op.charId} (thought): ${op.belief.proposition}` });
+        panels.push({ scene: commit.sceneIdx + 1, panel: panelN, caption: `${op.charId} (thought): ${op.belief.proposition}` });
       } else if (op.op === 'SHIFT_RELATIONSHIP') {
-        panels.push({ scene: commit.sceneIdx, panel: panelN, caption: op.delta.reason });
+        panels.push({ scene: commit.sceneIdx + 1, panel: panelN, caption: op.delta.reason });
       }
     }
   }
@@ -523,7 +523,7 @@ function projectRewatch(canon: Canon): Artifact {
   // Annotated for second viewing: every commit gets an irony note
   const lines: string[] = [`# ${canon.title ?? 'Untitled'} — Rewatch Guide`, ''];
   for (const commit of canon.commits.filter(c => !c.reverted)) {
-    lines.push(`### Scene ${commit.sceneIdx}`);
+    lines.push(`### Scene ${commit.sceneIdx + 1}`);
     for (const op of commit.ops) {
       if (op.op === 'UPDATE_BELIEF' && op.belief.source === 'told') {
         lines.push(`⚠️  **Rewatch note:** ${op.charId} believes "${op.belief.proposition}" — this is a LIE planted by the narrative`);

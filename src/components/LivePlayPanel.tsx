@@ -315,7 +315,7 @@ function CommitRow({ commit: c, index }: { commit: CommitFeedEntry; index: numbe
         {index + 1}
       </span>
       <span style={{ color: '#475569', fontSize: 9, width: 55, flexShrink: 0 }}>
-        scene {c.sceneIdx}
+        scene {c.sceneIdx + 1}
       </span>
       <span style={{ color: 'var(--sm-cream-mute)', fontSize: 10, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {c.opSummary}

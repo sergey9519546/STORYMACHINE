@@ -661,9 +661,9 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     // Scene is >2.5x average and has low suspense delta = over-written
     if (lineCount > avgLength * 2.5 && record.suspenseDelta < 2) {
       issues.push({
-        location: `Scene ${sceneIdx} (${record.slug})`,
+        location: `Scene ${sceneIdx + 1} (${record.slug})`,
         rule: 'OVERLONG_LOW_TENSION',
-        description: `Scene ${sceneIdx} is ${lineCount} lines (${Math.round(lineCount / avgLength * 100)}% above average) but generates low tension — over-written`,
+        description: `Scene ${sceneIdx + 1} is ${lineCount} lines (${Math.round(lineCount / avgLength * 100)}% above average) but generates low tension — over-written`,
         severity: 'major',
         suggestedFix: 'Trim exposition and redundant beats; reduce to the scene\'s essential dramatic moment',
       });
@@ -672,9 +672,9 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     // Scene is <30% of average and is a turning point — too compressed
     if (lineCount < avgLength * 0.3 && (ann.revelation || record.clockRaised)) {
       issues.push({
-        location: `Scene ${sceneIdx} (${record.slug})`,
+        location: `Scene ${sceneIdx + 1} (${record.slug})`,
         rule: 'COMPRESSED_TURNING_POINT',
-        description: `Scene ${sceneIdx} is a turning point but only ${lineCount} lines (very short) — the moment may not land`,
+        description: `Scene ${sceneIdx + 1} is a turning point but only ${lineCount} lines (very short) — the moment may not land`,
         severity: 'major',
         suggestedFix: 'Expand this key scene with more character reaction and consequence before moving on',
       });
@@ -813,9 +813,9 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       const climaxLines = sceneLengths.get(climaxSceneIdx) ?? 0;
       if (climaxLines > 0 && climaxLines < avgLength * 0.7) {
         issues.push({
-          location: `Scene ${climaxSceneIdx} (climax, peak suspense ${maxClimaxSuspense.toFixed(1)})`,
+          location: `Scene ${climaxSceneIdx + 1} (climax, peak suspense ${maxClimaxSuspense.toFixed(1)})`,
           rule: 'CLIMAX_SCENE_UNDERWEIGHT',
-          description: `The climax scene (Scene ${climaxSceneIdx}) is only ${climaxLines} lines — ${Math.round(climaxLines / avgLength * 100)}% of the story average. The most emotionally significant scene in the story is given less space than a setup scene.`,
+          description: `The climax scene (Scene ${climaxSceneIdx + 1}) is only ${climaxLines} lines — ${Math.round(climaxLines / avgLength * 100)}% of the story average. The most emotionally significant scene in the story is given less space than a setup scene.`,
           severity: 'major',
           suggestedFix: 'Expand the climax with physical staging, character reaction, and immediate consequence. The audience needs time to experience the weight of the moment before the story moves on.',
         });
@@ -831,9 +831,9 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const midLines = sceneLengths.get(midIdx) ?? 0;
     if (midLines > 0 && midLines < avgLength * 0.5 && records[midIdx].suspenseDelta < 2) {
       issues.push({
-        location: `Scene ${midIdx} (midpoint)`,
+        location: `Scene ${midIdx + 1} (midpoint)`,
         rule: 'MIDPOINT_COLLAPSE',
-        description: `The midpoint scene (Scene ${midIdx}) is only ${midLines} lines — ${Math.round(midLines / avgLength * 100)}% of average — with low suspense (${records[midIdx].suspenseDelta.toFixed(1)}). The structural pivot of the story is physically underdeveloped.`,
+        description: `The midpoint scene (Scene ${midIdx + 1}) is only ${midLines} lines — ${Math.round(midLines / avgLength * 100)}% of average — with low suspense (${records[midIdx].suspenseDelta.toFixed(1)}). The structural pivot of the story is physically underdeveloped.`,
         severity: 'major',
         suggestedFix: 'Expand the midpoint with a substantial reversal or revelation. The midpoint should feel like a turning: the second half of Act 2 must be qualitatively different from the first.',
       });
@@ -852,9 +852,9 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       (lastRecord.purpose === 'resolution' || lastRecord.suspenseDelta < 0);
     if (isResolutionScene && lastLines > 0 && lastLines < avgLength * 0.5) {
       issues.push({
-        location: `Scene ${lastSceneIdx} (final/resolution)`,
+        location: `Scene ${lastSceneIdx + 1} (final/resolution)`,
         rule: 'RESOLUTION_TOO_BRIEF',
-        description: `The final scene (Scene ${lastSceneIdx}) is only ${lastLines} lines — ${Math.round(lastLines / avgLength * 100)}% of average. The story ends before there is space for emotional release or denouement.`,
+        description: `The final scene (Scene ${lastSceneIdx + 1}) is only ${lastLines} lines — ${Math.round(lastLines / avgLength * 100)}% of average. The story ends before there is space for emotional release or denouement.`,
         severity: 'major',
         suggestedFix: 'Expand the final scene with character reactions, a moment of reflection, and a visual or physical image that earns the emotional release the story has been building toward.',
       });
@@ -884,9 +884,9 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       const maxLen = Math.max(...window);
       if (minLen > 0 && maxLen <= minLen * pacingPlateauRatio1184) {
         issues.push({
-          location: `Scenes ${i}–${i + 3}`,
+          location: `Scenes ${i + 1}–${i + 4}`,
           rule: 'PACING_PLATEAU',
-          description: `Scenes ${i}–${i + 3} all run within ±${pacingPlateauPct1184}% of the same length (${minLen}–${maxLen} lines) — a flat stretch with no acceleration or contraction. The cadence plateaus for four scenes in a row.${genreNote1184Plateau}`,
+          description: `Scenes ${i + 1}–${i + 4} all run within ±${pacingPlateauPct1184}% of the same length (${minLen}–${maxLen} lines) — a flat stretch with no acceleration or contraction. The cadence plateaus for four scenes in a row.${genreNote1184Plateau}`,
           severity: 'minor',
           suggestedFix: 'Break the plateau: hard-cut one of these scenes to a single beat, or expand another into a full set-piece. A run of same-length scenes reads as a monotone even when the rest of the script breathes.',
         });
@@ -903,7 +903,7 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const openingLen = sceneLengths.get(0) ?? 0;
     if (openingLen > 0 && openingLen > avgLength * 2 && openingLen <= avgLength * 2.5) {
       issues.push({
-        location: `Scene 0 (${records[0]?.slug ?? 'opening'})`,
+        location: `Scene 1 (${records[0]?.slug ?? 'opening'})`,
         rule: 'OPENING_SCENE_BLOAT',
         description: `The opening scene is ${openingLen} lines — ${Math.round(openingLen / avgLength * 100)}% of the story average. The story takes too long to get going before the central engine turns over.`,
         severity: 'minor',
@@ -980,10 +980,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       ];
       if (runwayLens.every(l => l > avgLength)) {
         issues.push({
-          location: `Scenes ${climaxPeakIdx - 3}–${climaxPeakIdx - 1} (climax runway)`,
+          location: `Scenes ${climaxPeakIdx - 2}–${climaxPeakIdx} (climax runway)`,
           rule: 'CLIMAX_RUNWAY_OVERLONG',
           severity: 'minor',
-          description: `The three scenes before the climax (Scenes ${climaxPeakIdx - 3}–${climaxPeakIdx - 1}) are all above average length — the approach to the climax sprawls rather than snapping.`,
+          description: `The three scenes before the climax (Scenes ${climaxPeakIdx - 2}–${climaxPeakIdx}) are all above average length — the approach to the climax sprawls rather than snapping.`,
           suggestedFix: 'Cut at least one pre-climax scene to a sharp, punchy beat. The runway should tighten, not sprawl.',
         });
       }
@@ -1005,10 +1005,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       records[secondToLastIdx].suspenseDelta < 1.5
     ) {
       issues.push({
-        location: `Scenes ${secondToLastIdx}–${lastTwoIdx} (resolution)`,
+        location: `Scenes ${secondToLastIdx + 1}–${lastTwoIdx + 1} (resolution)`,
         rule: 'RESOLUTION_SCENE_BLOAT',
         severity: 'minor',
-        description: `The final two scenes (Scenes ${secondToLastIdx}–${lastTwoIdx}) are both above average length and both low-tension — the resolution drags rather than releasing.`,
+        description: `The final two scenes (Scenes ${secondToLastIdx + 1}–${lastTwoIdx + 1}) are both above average length and both low-tension — the resolution drags rather than releasing.`,
         suggestedFix: 'Trim the resolution to its essential emotional beats. A tight denouement lands harder than an extended one.',
       });
     }
@@ -1037,10 +1037,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
     if (spiralStart >= 0) {
       issues.push({
-        location: `Scenes ${spiralStart}–${spiralStart + 4}`,
+        location: `Scenes ${spiralStart + 1}–${spiralStart + 5}`,
         rule: 'SCENE_COMPRESSION_SPIRAL',
         severity: 'major',
-        description: `Scenes ${spiralStart}–${spiralStart + 4} are each shorter than the last — a five-scene compression spiral that depletes page space before the climax. The story has no recovery or re-expansion within this run.`,
+        description: `Scenes ${spiralStart + 1}–${spiralStart + 5} are each shorter than the last — a five-scene compression spiral that depletes page space before the climax. The story has no recovery or re-expansion within this run.`,
         suggestedFix: 'Break the spiral by expanding at least one mid-sequence scene with a set-piece, confrontation, or character beat. The story needs room to breathe before the climax.',
       });
     }
@@ -1202,10 +1202,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
     if (spikeIdx232 >= 0 && spikeLen232 >= 2.5 * avgLength) {
       issues.push({
-        location: `Scene ${spikeIdx232} (${records[spikeIdx232]?.slug ?? ''})`,
+        location: `Scene ${spikeIdx232 + 1} (${records[spikeIdx232]?.slug ?? ''})`,
         rule: 'PACING_SPIKE_SCENE',
         severity: 'major',
-        description: `Scene ${spikeIdx232} is ${spikeLen232} weighted lines — ${(spikeLen232 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). One scene dominates the story's page space, creating a structural imbalance where all surrounding scenes are dwarfed by a single set-piece.`,
+        description: `Scene ${spikeIdx232 + 1} is ${spikeLen232} weighted lines — ${(spikeLen232 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). One scene dominates the story's page space, creating a structural imbalance where all surrounding scenes are dwarfed by a single set-piece.`,
         suggestedFix: 'Break the oversized scene into 2-3 shorter ones, or trim it down to match the surrounding density. A pacing spike signals a scene that was never edited — every scene should earn its length relative to its dramatic weight.',
       });
     }
@@ -1225,10 +1225,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
     if (maxIdx232 >= 0 && maxIdx232 < act1EndPk232 && maxLen232 >= avgLength * 1.5) {
       issues.push({
-        location: `Scene ${maxIdx232} (${records[maxIdx232]?.slug ?? ''})`,
+        location: `Scene ${maxIdx232 + 1} (${records[maxIdx232]?.slug ?? ''})`,
         rule: 'PEAK_LENGTH_MISPLACED',
         severity: 'minor',
-        description: `The story's longest scene (Scene ${maxIdx232}, ${maxLen232} lines, ${(maxLen232 / avgLength).toFixed(1)}× avg) is in Act 1 (first 25%). The most expansive real estate is in the setup rather than the climax — opening scenes should be crisp and propulsive, not the story's structural crown.`,
+        description: `The story's longest scene (Scene ${maxIdx232 + 1}, ${maxLen232} lines, ${(maxLen232 / avgLength).toFixed(1)}× avg) is in Act 1 (first 25%). The most expansive real estate is in the setup rather than the climax — opening scenes should be crisp and propulsive, not the story's structural crown.`,
         suggestedFix: 'Trim the Act 1 scene to its essentials, then expand the climax zone with the reclaimed page space. The longest scene should be where the stakes are highest, not where the world is being introduced.',
       });
     }
@@ -1254,10 +1254,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         if (delta232 >= joltThreshold232) {
           const dir232 = lenAfter > lenBefore ? 'expands' : 'contracts';
           issues.push({
-            location: `Act boundary (Scene ${boundary232 - 1} → ${boundary232})`,
+            location: `Act boundary (Scene ${boundary232} → ${boundary232 + 1})`,
             rule: 'ACT_TRANSITION_JOLT',
             severity: 'minor',
-            description: `At the act boundary (Scene ${boundary232 - 1} to ${boundary232}) the scene length ${dir232} by ${delta232.toFixed(0)} lines — a sudden step-change of ${(delta232 / avgLength).toFixed(1)}× the average. Act transitions should shift gear gradually; a pacing jolt at the structural seam reads as a tonal splice rather than a deliberate transition.`,
+            description: `At the act boundary (Scene ${boundary232} to ${boundary232 + 1}) the scene length ${dir232} by ${delta232.toFixed(0)} lines — a sudden step-change of ${(delta232 / avgLength).toFixed(1)}× the average. Act transitions should shift gear gradually; a pacing jolt at the structural seam reads as a tonal splice rather than a deliberate transition.`,
             suggestedFix: 'Smooth the transition: add a bridging scene at similar length to the crossing point, or compress the discrepancy across 2-3 scenes rather than one step. Act transitions should feel like a gear shift, not a gear break.',
           });
           break; // one flag per pass
@@ -1286,10 +1286,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         streak246++;
         if (streak246 >= 3) {
           issues.push({
-            location: `Act 2 valley (Scenes ${streakStart246}–${i})`,
+            location: `Act 2 valley (Scenes ${streakStart246 + 1}–${i + 1})`,
             rule: 'ACT2_PACING_VALLEY',
             severity: 'minor',
-            description: `Scenes ${streakStart246}–${i} (Act 2) are each below 60% of the average scene length (avg ${Math.round(avgLength)} lines) — a sustained compression valley in the story's middle. Three or more consecutive under-written scenes create a pacing trough where the story loses physical presence.`,
+            description: `Scenes ${streakStart246 + 1}–${i + 1} (Act 2) are each below 60% of the average scene length (avg ${Math.round(avgLength)} lines) — a sustained compression valley in the story's middle. Three or more consecutive under-written scenes create a pacing trough where the story loses physical presence.`,
             suggestedFix: 'Expand at least one of the valley scenes with a concrete dramatic beat: a new complication, a character reaction, or a piece of world detail. Compression pockets in Act 2 are where narrative momentum quietly dies — the story needs something to sustain forward pull here.',
           });
           break;
@@ -1321,10 +1321,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       const p30246 = sortedLens246[Math.floor(sortedLens246.length * 0.3)] ?? 0;
       if (peakLen246 > 0 && peakLen246 <= p30246) {
         issues.push({
-          location: `Scene ${peakIdx246} (peak suspense, ${peakLen246} lines)`,
+          location: `Scene ${peakIdx246 + 1} (peak suspense, ${peakLen246} lines)`,
           rule: 'CLIMAX_SCENE_UNDERSIZED',
           severity: 'minor',
-          description: `The story's peak suspense scene (Scene ${peakIdx246}, suspenseDelta ${peakDelta246.toFixed(1)}) is ${peakLen246} lines — in the bottom 30% of all scene lengths. The most intense moment is among the shortest. The climax deserves the most space; an undersized peak scene spends the story's central dramatic charge in a flash.`,
+          description: `The story's peak suspense scene (Scene ${peakIdx246 + 1}, suspenseDelta ${peakDelta246.toFixed(1)}) is ${peakLen246} lines — in the bottom 30% of all scene lengths. The most intense moment is among the shortest. The climax deserves the most space; an undersized peak scene spends the story's central dramatic charge in a flash.`,
           suggestedFix: 'Expand the climax scene: more character reaction, more physical consequence, more time inside the highest-stakes moment. The scene that carries the story\'s maximum tension should feel weightier than the setup scenes surrounding it — let the audience live in the peak longer.',
         });
       }
@@ -1342,10 +1342,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const midLen246 = sceneLengths.get(midIdx246) ?? 0;
     if (midLen246 >= 2.5 * avgLength) {
       issues.push({
-        location: `Scene ${midIdx246} (structural midpoint, ${midLen246} lines)`,
+        location: `Scene ${midIdx246 + 1} (structural midpoint, ${midLen246} lines)`,
         rule: 'MIDPOINT_BLOAT',
         severity: 'minor',
-        description: `The structural midpoint scene (Scene ${midIdx246}) is ${midLen246} lines — ${(midLen246 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). An oversized midpoint signals a "pivot dump": the reversal is over-explained rather than landing with the velocity a structural pivot requires.`,
+        description: `The structural midpoint scene (Scene ${midIdx246 + 1}) is ${midLen246} lines — ${(midLen246 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). An oversized midpoint signals a "pivot dump": the reversal is over-explained rather than landing with the velocity a structural pivot requires.`,
         suggestedFix: 'Trim the midpoint scene to its essential reversal. The moment where the story\'s direction changes should feel clean and inevitable — not exhaustive. What you remove from the midpoint goes into building the climax instead.',
       });
     }
@@ -1366,7 +1366,7 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const openLen260 = sceneLengths.get(0) ?? 0;
     if (openLen260 >= 2.5 * avgLength) {
       issues.push({
-        location: `Scene 0 (opening, ${openLen260} lines)`,
+        location: `Scene 1 (opening, ${openLen260} lines)`,
         rule: 'OPENING_SCENE_BLOAT',
         severity: 'minor',
         description: `The opening scene is ${openLen260} lines — ${(openLen260 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). An overlong first scene front-loads setup and atmosphere before the audience is invested. The opening must hook fast: it earns attention before it can spend it.`,
@@ -1392,7 +1392,7 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       const act1Ratio260 = totalLines260 > 0 ? act1Lines260 / totalLines260 : 0;
       if (act1Ratio260 > 0.4) {
         issues.push({
-          location: `Act 1 (Scenes 0–${act1End260 - 1}) — page budget`,
+          location: `Act 1 (Scenes 1–${act1End260}) — page budget`,
           rule: 'ACT1_OVEREXTENDED',
           severity: 'minor',
           description: `Act 1 (the first ${act1End260} of ${records.length} scenes) consumes ${Math.round(act1Ratio260 * 100)}% of the script's total lines — the setup act hogs the page and delays the inciting incident. The audience waits too long for the story to actually begin while Act 1 over-establishes.`,
@@ -1447,10 +1447,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const act3Ratio274 = totalLines274 > 0 ? act3Lines274 / totalLines274 : 0;
     if (act3Ratio274 > 0.35) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start274}–${records.length - 1}) — page budget`,
+        location: `Act 3 (Scenes ${act3Start274 + 1}–${records.length}) — page budget`,
         rule: 'ACT3_PAGE_OVERRUN',
         severity: 'minor',
-        description: `Act 3 (Scenes ${act3Start274}–${records.length - 1}) consumes ${Math.round(act3Ratio274 * 100)}% of total script pages — more than the final act should need. A bloated Act 3 means the resolution lingers: the story keeps spending pages after its dramatic question is answered, and the audience watches denouement instead of experiencing release.`,
+        description: `Act 3 (Scenes ${act3Start274 + 1}–${records.length}) consumes ${Math.round(act3Ratio274 * 100)}% of total script pages — more than the final act should need. A bloated Act 3 means the resolution lingers: the story keeps spending pages after its dramatic question is answered, and the audience watches denouement instead of experiencing release.`,
         suggestedFix: 'Compress the resolution. Land the climax, pay its immediate emotional cost in one or two scenes, and end. Every page after the story\'s question is answered is a page the audience is waiting to leave. Act 3 should be the leanest act, not the longest.',
       });
     }
@@ -1499,10 +1499,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const act2Ratio274 = totalLines274b > 0 ? act2Lines274 / totalLines274b : 0;
     if (act2Ratio274 < 0.40) {
       issues.push({
-        location: `Act 2 (Scenes ${act2Start274}–${act2End274 - 1}) — page budget`,
+        location: `Act 2 (Scenes ${act2Start274 + 1}–${act2End274}) — page budget`,
         rule: 'ACT2_PAGE_WEIGHT',
         severity: 'minor',
-        description: `Act 2 (Scenes ${act2Start274}–${act2End274 - 1}) consumes only ${Math.round(act2Ratio274 * 100)}% of total script pages — the complication engine is underweight. A thin Act 2 means complications are rushed, character development is compressed, and the story moves from setup to resolution without developing its middle. Act 2 should be the heaviest act.`,
+        description: `Act 2 (Scenes ${act2Start274 + 1}–${act2End274}) consumes only ${Math.round(act2Ratio274 * 100)}% of total script pages — the complication engine is underweight. A thin Act 2 means complications are rushed, character development is compressed, and the story moves from setup to resolution without developing its middle. Act 2 should be the heaviest act.`,
         suggestedFix: 'Expand the complication zone: add scenes that develop the protagonist\'s relationships under pressure, deepen the opposition, and let the consequences of Act 1 decisions unfold. Act 2 earns the climax — compress it and the resolution will feel unearned.',
       });
     }
@@ -1621,10 +1621,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       const wake302 = (records as any[]).slice(minIdx302 + 1, minIdx302 + 4);
       if (wake302.every(r => (r.suspenseDelta ?? 0) <= 0)) {
         issues.push({
-          location: `Scenes ${(records as any[])[minIdx302].sceneIdx}–${(records as any[])[minIdx302 + 3].sceneIdx} — post-release dead air`,
+          location: `Scenes ${(records as any[])[minIdx302].sceneIdx + 1}–${(records as any[])[minIdx302 + 3].sceneIdx + 1} — post-release dead air`,
           rule: 'POST_RELEASE_DEAD_AIR',
           severity: 'minor',
-          description: `The story's biggest tension release (suspenseDelta ${minVal302} at scene ${(records as any[])[minIdx302].sceneIdx}) is followed by three scenes that all stay flat or falling. After a major discharge the story idles — the audience, having just exhaled, is given nothing new to hold their breath for, and momentum dies exactly where re-escalation should begin.`,
+          description: `The story's biggest tension release (suspenseDelta ${minVal302} at scene ${(records as any[])[minIdx302].sceneIdx + 1}) is followed by three scenes that all stay flat or falling. After a major discharge the story idles — the audience, having just exhaled, is given nothing new to hold their breath for, and momentum dies exactly where re-escalation should begin.`,
           suggestedFix: 'Start rebuilding within a scene or two of any major release: a new complication, a consequence of the resolution that opens a fresh problem, a clock that starts ticking. The release should feel like a trough between waves, not the tide going out.',
         });
       }
@@ -1933,10 +1933,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       const peakLen355 = sceneLengths.get(peakIdx355) ?? 0;
       if (peakLen355 > 0 && peakLen355 < avgLength * 0.6) {
         issues.push({
-          location: `Scene ${peakIdx355} (peak suspense: ${maxSusp355})`,
+          location: `Scene ${peakIdx355 + 1} (peak suspense: ${maxSusp355})`,
           rule: 'SUSPENSE_PEAK_SCENE_UNDERWEIGHT',
           severity: 'minor',
-          description: `The story's highest-suspense scene (Scene ${peakIdx355}, suspenseDelta ${maxSusp355}) runs ${peakLen355} weighted lines — ${Math.round(peakLen355 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The tensest moment in the story is one of its shortest scenes. A suspense peak needs room to land — the held breath, the reaction, the consequence — and rushing it through the thinnest page space blunts the beat the whole arc has been building toward.`,
+          description: `The story's highest-suspense scene (Scene ${peakIdx355 + 1}, suspenseDelta ${maxSusp355}) runs ${peakLen355} weighted lines — ${Math.round(peakLen355 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The tensest moment in the story is one of its shortest scenes. A suspense peak needs room to land — the held breath, the reaction, the consequence — and rushing it through the thinnest page space blunts the beat the whole arc has been building toward.`,
           suggestedFix: 'Expand the peak-suspense scene: stage the danger, hold on the uncertainty, and let the immediate fallout register before cutting away. The scene of maximum tension should be among the script\'s most fully realized, not a beat the page hurries past.',
         });
       }
@@ -2269,10 +2269,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       const peakLen411 = sceneLengths.get(peakIdx411) ?? 0;
       if (peakLen411 > 0 && peakLen411 > avgLength * 1.5) {
         issues.push({
-          location: `Scene ${peakIdx411} (peak suspense: ${maxSusp411})`,
+          location: `Scene ${peakIdx411 + 1} (peak suspense: ${maxSusp411})`,
           rule: 'SUSPENSE_PEAK_SCENE_BLOAT',
           severity: 'minor',
-          description: `The story's highest-suspense scene (Scene ${peakIdx411}, suspenseDelta ${maxSusp411}) runs ${peakLen411} weighted lines — ${Math.round(peakLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The tensest moment in the story is one of its longest scenes. Suspense is sustained by economy — the held breath works because nothing around it is wasted — and a peak-tension scene that sprawls past its neighbours dilutes the very pressure it should be concentrating, so the audience's grip loosens as the scene overstays.`,
+          description: `The story's highest-suspense scene (Scene ${peakIdx411 + 1}, suspenseDelta ${maxSusp411}) runs ${peakLen411} weighted lines — ${Math.round(peakLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The tensest moment in the story is one of its longest scenes. Suspense is sustained by economy — the held breath works because nothing around it is wasted — and a peak-tension scene that sprawls past its neighbours dilutes the very pressure it should be concentrating, so the audience's grip loosens as the scene overstays.`,
           suggestedFix: 'Tighten the peak-suspense scene: cut everything that does not raise or hold the tension, and let the danger play in lean, propulsive beats. The scene of maximum tension should be among the script\'s most economical, not its most expansive — every extra line of digression is a place the held breath can escape.',
         });
       }
@@ -2295,10 +2295,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       (lastRec411.purpose === 'resolution' || (lastRec411.suspenseDelta ?? 0) < 0);
     if (isResolution411 && lastLen411 > 0 && lastLen411 > avgLength * 2) {
       issues.push({
-        location: `Scene ${lastIdx411} (final/resolution)`,
+        location: `Scene ${lastIdx411 + 1} (final/resolution)`,
         rule: 'RESOLUTION_BLOAT',
         severity: 'minor',
-        description: `The final scene (Scene ${lastIdx411}) runs ${lastLen411} weighted lines — ${Math.round(lastLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story overstays its ending: after the climax, decompression should be brief — a beat of release, an image that lands the meaning, and out. A closing scene more than double the average delivers a "long goodbye" of multiple endings and belaboured reflection that dissipates the energy the climax just generated.`,
+        description: `The final scene (Scene ${lastIdx411 + 1}) runs ${lastLen411} weighted lines — ${Math.round(lastLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story overstays its ending: after the climax, decompression should be brief — a beat of release, an image that lands the meaning, and out. A closing scene more than double the average delivers a "long goodbye" of multiple endings and belaboured reflection that dissipates the energy the climax just generated.`,
         suggestedFix: 'Trim the resolution to its essential release: find the single image or exchange that earns the emotional landing and end on it. If the closing scene is doing several jobs — tying off subplots, reflecting, foreshadowing a sequel — keep only the one the story most needs, and let the rest be implied. The audience leaves most satisfied a beat before they expect to.',
       });
     }
@@ -2316,10 +2316,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const openLen411 = sceneLengths.get(0) ?? 0;
     if (openLen411 > 0 && openLen411 < avgLength * 0.5) {
       issues.push({
-        location: `Scene 0 (${records[0]?.slug ?? 'opening'})`,
+        location: `Scene 1 (${records[0]?.slug ?? 'opening'})`,
         rule: 'OPENING_SCENE_UNDERWEIGHT',
         severity: 'minor',
-        description: `The opening scene (Scene 0) runs ${openLen411} weighted lines — ${Math.round(openLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story opens on a fragment. The first scene does foundational work — establishing tone, the world's rules, and a character to attach to — and when it is among the shortest in the script the audience is thrown into motion before they have anywhere to stand, asked to care before they have been given a reason to.`,
+        description: `The opening scene (Scene 1) runs ${openLen411} weighted lines — ${Math.round(openLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story opens on a fragment. The first scene does foundational work — establishing tone, the world's rules, and a character to attach to — and when it is among the shortest in the script the audience is thrown into motion before they have anywhere to stand, asked to care before they have been given a reason to.`,
         suggestedFix: 'Give the opening room to establish: let the first scene render the world and the protagonist with enough texture that the audience knows whose story this is and what its register will be before the engine turns over. A lean opener can work, but if it is one of the shortest scenes in the script it is likely skipping the orientation the rest of the story depends on.',
       });
     }
@@ -2355,10 +2355,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
     if (expandStart425 >= 0) {
       issues.push({
-        location: `Scenes ${expandStart425}–${expandStart425 + 4}`,
+        location: `Scenes ${expandStart425 + 1}–${expandStart425 + 5}`,
         rule: 'SCENE_EXPANSION_RUN',
         severity: 'minor',
-        description: `Scenes ${expandStart425}–${expandStart425 + 4} are each strictly longer than the last — a five-scene expansion run that inflates page space rather than compressing toward the climax. A sustained lengthening across consecutive scenes signals unedited accumulation: the story is gaining mass across the stretch rather than distilling to essential beats.`,
+        description: `Scenes ${expandStart425 + 1}–${expandStart425 + 5} are each strictly longer than the last — a five-scene expansion run that inflates page space rather than compressing toward the climax. A sustained lengthening across consecutive scenes signals unedited accumulation: the story is gaining mass across the stretch rather than distilling to essential beats.`,
         suggestedFix: 'Break the expansion: trim at least one mid-run scene to a leaner beat, or hard-cut a set-piece scene into a briefer punch. The story should tighten as it advances, not balloon — a consecutive expansion run is a sign that no scene in the sequence was asked whether it could do less.',
       });
     }
@@ -2390,10 +2390,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         midSusp425 < firstHalfAvg425 && midSusp425 < secondHalfAvg425
       ) {
         issues.push({
-          location: `Scene ${midIdx425} (structural midpoint)`,
+          location: `Scene ${midIdx425 + 1} (structural midpoint)`,
           rule: 'SUSPENSE_MIDPOINT_TROUGH',
           severity: 'minor',
-          description: `The structural midpoint (Scene ${midIdx425}, suspenseDelta ${midSusp425.toFixed(1)}) is lower than both the first-half average (${firstHalfAvg425.toFixed(1)}) and second-half average (${secondHalfAvg425.toFixed(1)}), while both halves carry positive energy. The pivot scene is a suspense valley between two active zones: the story dips at the exact moment it should shift gear, creating a structural dead zone at the centre.`,
+          description: `The structural midpoint (Scene ${midIdx425 + 1}, suspenseDelta ${midSusp425.toFixed(1)}) is lower than both the first-half average (${firstHalfAvg425.toFixed(1)}) and second-half average (${secondHalfAvg425.toFixed(1)}), while both halves carry positive energy. The pivot scene is a suspense valley between two active zones: the story dips at the exact moment it should shift gear, creating a structural dead zone at the centre.`,
           suggestedFix: 'Raise the midpoint suspense: add a reversal, a new threat, or an acceleration that makes the pivot feel like a gear-change. The midpoint doesn\'t need to be the story\'s peak, but it must carry enough energy to make the transition from Act 2a to Act 2b feel propulsive rather than slack.',
         });
       }
@@ -2501,11 +2501,11 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       }
       if (maxFlatRun439b >= 5) {
         issues.push({
-          location: `Scenes ${maxFlatStart439b}–${maxFlatStart439b + maxFlatRun439b - 1} — curiosity flatline`,
+          location: `Scenes ${maxFlatStart439b + 1}–${maxFlatStart439b + maxFlatRun439b} — curiosity flatline`,
           rule: 'CURIOSITY_FLATLINE_RUN',
           severity: 'minor',
-          description: `Scenes ${maxFlatStart439b}–${maxFlatStart439b + maxFlatRun439b - 1} (${maxFlatRun439b} consecutive scenes) all have curiosityDelta ≤ 0 — the question-engine goes dark for a sustained stretch while ${posCurioCount439b} positive-curiosity scenes appear elsewhere. During these ${maxFlatRun439b} scenes the audience carries the same unresolved questions without any renewal or deepening: no new question is raised, no existing question is made more urgent. A curiosity dead zone of this length teaches the audience that this stretch of story does not generate forward pull — they are watching events unfold rather than being drawn into unknowns.`,
-          suggestedFix: `Seed at least one or two new questions in the flatline run at Scenes ${maxFlatStart439b}–${maxFlatStart439b + maxFlatRun439b - 1}: introduce a new ambiguity, surface a fragment of information that implies there is more the audience doesn't know, or deepen an existing question by showing evidence that the answer is not what it seemed. The question-engine should be active throughout the story, not only in the zones that bookend this run.`,
+          description: `Scenes ${maxFlatStart439b + 1}–${maxFlatStart439b + maxFlatRun439b} (${maxFlatRun439b} consecutive scenes) all have curiosityDelta ≤ 0 — the question-engine goes dark for a sustained stretch while ${posCurioCount439b} positive-curiosity scenes appear elsewhere. During these ${maxFlatRun439b} scenes the audience carries the same unresolved questions without any renewal or deepening: no new question is raised, no existing question is made more urgent. A curiosity dead zone of this length teaches the audience that this stretch of story does not generate forward pull — they are watching events unfold rather than being drawn into unknowns.`,
+          suggestedFix: `Seed at least one or two new questions in the flatline run at Scenes ${maxFlatStart439b + 1}–${maxFlatStart439b + maxFlatRun439b}: introduce a new ambiguity, surface a fragment of information that implies there is more the audience doesn't know, or deepen an existing question by showing evidence that the answer is not what it seemed. The question-engine should be active throughout the story, not only in the zones that bookend this run.`,
         });
       }
     }
@@ -2714,11 +2714,11 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       }
       if (maxClockRun467b >= 4) {
         issues.push({
-          location: `Scenes ${maxClockStart467b}–${maxClockStart467b + maxClockRun467b - 1} — unbroken clock-pressure run`,
+          location: `Scenes ${maxClockStart467b + 1}–${maxClockStart467b + maxClockRun467b} — unbroken clock-pressure run`,
           rule: 'CLOCK_PRESSURE_RUN',
           severity: 'minor',
-          description: `${maxClockRun467b} consecutive scenes (${maxClockStart467b}–${maxClockStart467b + maxClockRun467b - 1}) all carry explicit clock pressure (clockRaised or clockDelta > 0). When four or more scenes in a row are all under the same deadline, urgency collapses into ambient noise: the clock stops feeling like a ticking threat and becomes the story's permanent background condition. Effective deadline pacing relies on contrast — non-clock scenes give the audience a structural moment to breathe, making the return of pressure register as re-escalation rather than continuation of the same standing urgency.`,
-          suggestedFix: `Break the clock run at Scenes ${maxClockStart467b}–${maxClockStart467b + maxClockRun467b - 1}: introduce at least one scene without clock pressure in the middle of the run. Even a brief scene of planning, connection, or reaction without an explicit deadline makes the next clock scene land as renewed threat. Sustained unrelenting urgency is a form of pacing monotony; the pressure must breathe to have impact.`,
+          description: `${maxClockRun467b} consecutive scenes (${maxClockStart467b + 1}–${maxClockStart467b + maxClockRun467b}) all carry explicit clock pressure (clockRaised or clockDelta > 0). When four or more scenes in a row are all under the same deadline, urgency collapses into ambient noise: the clock stops feeling like a ticking threat and becomes the story's permanent background condition. Effective deadline pacing relies on contrast — non-clock scenes give the audience a structural moment to breathe, making the return of pressure register as re-escalation rather than continuation of the same standing urgency.`,
+          suggestedFix: `Break the clock run at Scenes ${maxClockStart467b + 1}–${maxClockStart467b + maxClockRun467b}: introduce at least one scene without clock pressure in the middle of the run. Even a brief scene of planning, connection, or reaction without an explicit deadline makes the next clock scene land as renewed threat. Sustained unrelenting urgency is a form of pacing monotony; the pressure must breathe to have impact.`,
         });
       }
     }
@@ -2833,11 +2833,11 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       });
       if (!hasCause481b) {
         issues.push({
-          location: `Scene ${peakSuspensePos481b} — highest-suspense scene (suspenseDelta: ${peakSuspenseVal481b})`,
+          location: `Scene ${peakSuspensePos481b + 1} — highest-suspense scene (suspenseDelta: ${peakSuspenseVal481b})`,
           rule: 'SUSPENSE_PEAK_UNCAUSED',
           severity: 'minor',
-          description: `The story's highest-suspense scene (Scene ${peakSuspensePos481b}, suspenseDelta: ${peakSuspenseVal481b}) has no clock event, dramatic turn, or revelation in itself or in either of the two preceding scenes — the narrative's peak tension emerges from a dramatic vacuum. A suspense peak should be the culmination of converging causes: a deadline tightening, a truth exposed, a pivot that forecloses escape. When the tensest moment in the script has no upstream cause signal in the surrounding scenes, the peak reads as arbitrary — it spikes not because the story has driven there, but because the writer chose to raise the temperature.`,
-          suggestedFix: `Add at least one of a clock event, dramatic turn, or revelation to Scene ${peakSuspensePos481b} or the two scenes before it. The peak tension should feel like the inevitable convergence of established pressures: the deadline the audience has been dreading, the truth that forces a confrontation, the pivot that removes the last exit. When the peak arrives with visible cause, the audience feels it as earned; without cause, it lands as manufactured.`,
+          description: `The story's highest-suspense scene (Scene ${peakSuspensePos481b + 1}, suspenseDelta: ${peakSuspenseVal481b}) has no clock event, dramatic turn, or revelation in itself or in either of the two preceding scenes — the narrative's peak tension emerges from a dramatic vacuum. A suspense peak should be the culmination of converging causes: a deadline tightening, a truth exposed, a pivot that forecloses escape. When the tensest moment in the script has no upstream cause signal in the surrounding scenes, the peak reads as arbitrary — it spikes not because the story has driven there, but because the writer chose to raise the temperature.`,
+          suggestedFix: `Add at least one of a clock event, dramatic turn, or revelation to Scene ${peakSuspensePos481b + 1} or the two scenes before it. The peak tension should feel like the inevitable convergence of established pressures: the deadline the audience has been dreading, the truth that forces a confrontation, the pivot that removes the last exit. When the peak arrives with visible cause, the audience feels it as earned; without cause, it lands as manufactured.`,
         });
       }
     }
@@ -2882,11 +2882,11 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       });
       if (!hasCause481c) {
         issues.push({
-          location: `Scene ${emotPeakPos481c} — highest-suspense emotional scene (emotionalShift: ${(records as any[])[emotPeakPos481c].emotionalShift}, suspenseDelta: ${emotPeakSusp481c})`,
+          location: `Scene ${emotPeakPos481c + 1} — highest-suspense emotional scene (emotionalShift: ${(records as any[])[emotPeakPos481c].emotionalShift}, suspenseDelta: ${emotPeakSusp481c})`,
           rule: 'EMOTIONAL_PEAK_UNCAUSED',
           severity: 'minor',
-          description: `The story's most dramatically charged emotional scene (Scene ${emotPeakPos481c}, the non-neutral scene with the highest suspenseDelta) has no clock event, dramatic turn, or revelation in itself or in either of the two preceding scenes — the emotional climax arrives without narrative motivation. An emotional peak should be the consequence of accumulated pressure: a revelation that forces a character to confront what they have avoided, a turn that makes the full emotional cost visible, a deadline that strips the last protection. Without an upstream cause, the emotion reads as weather — a feeling that exists because the story needs it rather than because events have driven the character there.`,
-          suggestedFix: `Provide Scene ${emotPeakPos481c}'s emotional peak with a dramatic cause in itself or the prior two scenes: a revelation that reframes everything, a dramatic turn that closes the character's last exit, or a clock event that makes waiting any longer impossible. The cause doesn't need to be the only reason for the emotion — but one visible dramatic trigger in the surrounding scenes transforms the peak from mood into consequence, and consequence is always more moving than mood.`,
+          description: `The story's most dramatically charged emotional scene (Scene ${emotPeakPos481c + 1}, the non-neutral scene with the highest suspenseDelta) has no clock event, dramatic turn, or revelation in itself or in either of the two preceding scenes — the emotional climax arrives without narrative motivation. An emotional peak should be the consequence of accumulated pressure: a revelation that forces a character to confront what they have avoided, a turn that makes the full emotional cost visible, a deadline that strips the last protection. Without an upstream cause, the emotion reads as weather — a feeling that exists because the story needs it rather than because events have driven the character there.`,
+          suggestedFix: `Provide Scene ${emotPeakPos481c + 1}'s emotional peak with a dramatic cause in itself or the prior two scenes: a revelation that reframes everything, a dramatic turn that closes the character's last exit, or a clock event that makes waiting any longer impossible. The cause doesn't need to be the only reason for the emotion — but one visible dramatic trigger in the surrounding scenes transforms the peak from mood into consequence, and consequence is always more moving than mood.`,
         });
       }
     }
@@ -3005,11 +3005,11 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       });
       if (!hasCause495c) {
         issues.push({
-          location: `Scene ${peakCurPos495c} — highest-curiosity scene (curiosityDelta: ${peakCurVal495c})`,
+          location: `Scene ${peakCurPos495c + 1} — highest-curiosity scene (curiosityDelta: ${peakCurVal495c})`,
           rule: 'CURIOSITY_PEAK_UNCAUSED',
           severity: 'minor',
-          description: `The story's highest-curiosity scene (Scene ${peakCurPos495c}, curiosityDelta: ${peakCurVal495c}) has no revelation, dramatic turn, or clock event in itself or in either of the two preceding scenes — the greatest question-raise in the story emerges from a dramatic vacuum. A curiosity peak should be the consequence of an informational or pivotal event: a disclosure that opens a deeper mystery, a turn that reframes everything the audience thought they knew, or a deadline that raises the stakes of an unanswered question. When the highest-curiosity moment has no upstream cause, the question-raise reads as authorial withholding — the audience wonders not because events have opened a gap but because information was simply not provided.`,
-          suggestedFix: `Add at least one of a revelation, dramatic turn, or clock event to Scene ${peakCurPos495c} or the two scenes before it. The peak curiosity should feel like a question that the story has actively opened — a disclosure that generates a deeper mystery, a pivot that recontextualises the unknown, a deadline that makes the unanswered question urgent. A question-raise caused by an event lands as earned mystery; one without cause lands as a gap the audience can't locate.`,
+          description: `The story's highest-curiosity scene (Scene ${peakCurPos495c + 1}, curiosityDelta: ${peakCurVal495c}) has no revelation, dramatic turn, or clock event in itself or in either of the two preceding scenes — the greatest question-raise in the story emerges from a dramatic vacuum. A curiosity peak should be the consequence of an informational or pivotal event: a disclosure that opens a deeper mystery, a turn that reframes everything the audience thought they knew, or a deadline that raises the stakes of an unanswered question. When the highest-curiosity moment has no upstream cause, the question-raise reads as authorial withholding — the audience wonders not because events have opened a gap but because information was simply not provided.`,
+          suggestedFix: `Add at least one of a revelation, dramatic turn, or clock event to Scene ${peakCurPos495c + 1} or the two scenes before it. The peak curiosity should feel like a question that the story has actively opened — a disclosure that generates a deeper mystery, a pivot that recontextualises the unknown, a deadline that makes the unanswered question urgent. A question-raise caused by an event lands as earned mystery; one without cause lands as a gap the audience can't locate.`,
         });
       }
     }
@@ -6885,10 +6885,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       }
       if (peakIdx1350 === records.length - 1 && peakScore1350 > 0) {
         issues.push({
-          location: `Scene ${peakIdx1350} (final scene)`,
+          location: `Scene ${peakIdx1350 + 1} (final scene)`,
           rule: 'CLIMAX_NO_AFTERMATH',
           severity: 'minor',
-          description: `The story's peak-intensity scene (Scene ${peakIdx1350}) is also its final scene — the story cuts from maximum tension straight to the end with no aftermath, no settling beat, nowhere for the audience to land after the climax.`,
+          description: `The story's peak-intensity scene (Scene ${peakIdx1350 + 1}) is also its final scene — the story cuts from maximum tension straight to the end with no aftermath, no settling beat, nowhere for the audience to land after the climax.`,
           suggestedFix: `Add a short aftermath scene after the climax — even a page or two — to let the audience (and the characters) come down and register what just happened.`,
         });
       }

@@ -204,7 +204,7 @@ export function MomentumPanel({ onClose }: Props) {
           {pts.length >= 2 && (
             <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
               <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 8 }}>
-                TRAJECTORY — scenes 0–{pts[pts.length - 1].sceneIdx}
+                TRAJECTORY — scenes 1–{pts[pts.length - 1].sceneIdx + 1}
               </div>
               <MultiLineChart points={pts} />
               <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
@@ -292,7 +292,7 @@ function SceneRow({ point: p }: { point: MomentumPoint }) {
       background: 'var(--sm-night-2)', border: '1px solid var(--sm-night-2)', borderRadius: 4, padding: '5px 9px',
       display: 'flex', alignItems: 'center', gap: 8,
     }}>
-      <span style={{ color: '#475569', fontSize: 10, width: 50, flexShrink: 0 }}>scene {p.sceneIdx}</span>
+      <span style={{ color: '#475569', fontSize: 10, width: 50, flexShrink: 0 }}>scene {p.sceneIdx + 1}</span>
       <span style={{ color: qColor, fontSize: 10, width: 60, flexShrink: 0 }}>{p.qualityScore}/100</span>
       <span style={{ color: gradeColor(p.regressionGrade), fontSize: 10, width: 60, flexShrink: 0, fontWeight: 700 }}>
         {p.regressionGrade} ({p.regressionScore})

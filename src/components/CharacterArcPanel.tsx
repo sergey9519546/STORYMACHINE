@@ -210,7 +210,7 @@ export function CharacterArcPanel({ onClose }: Props) {
                   {char.scenes.length >= 2 && (
                     <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
                       <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 8 }}>
-                        ARC SIGNALS — scenes 0–{char.scenes[char.scenes.length - 1].sceneIdx}
+                        ARC SIGNALS — scenes 1–{char.scenes[char.scenes.length - 1].sceneIdx + 1}
                       </div>
                       <MultiLineChart arc={char} signals={SIGNALS.filter(s => activeSignals.has(s.id))} />
                     </div>
@@ -287,7 +287,7 @@ function SceneRow({ snap, char }: { snap: SceneSnapshot; char: CharacterArc }) {
       display: 'flex', alignItems: 'center', gap: 10,
       opacity: hasActivity ? 1 : 0.5,
     }}>
-      <span style={{ color: '#475569', fontSize: 10, width: 50, flexShrink: 0 }}>scene {snap.sceneIdx}</span>
+      <span style={{ color: '#475569', fontSize: 10, width: 50, flexShrink: 0 }}>scene {snap.sceneIdx + 1}</span>
       <span style={{ color: 'var(--sm-cool)', fontSize: 10, width: 40, flexShrink: 0 }}>{snap.beliefCount}b</span>
       <span style={{ color: 'var(--sm-ok)', fontSize: 10, width: 45, flexShrink: 0 }}>{Math.round(snap.avgConfidence * 100)}%</span>
       <span style={{ color: emoColor, fontSize: 10, width: 65, flexShrink: 0 }}>

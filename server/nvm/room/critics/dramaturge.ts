@@ -53,7 +53,7 @@ export function dramaturgeCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     if (charCount >= 2 && !hasAnyRelationship) {
       critiques.push({
         criticId: 'dramaturge', severity: 35, targetOpIdx: null,
-        objection: `Scene ${ir.sceneIdx}: ${charCount} characters introduced but no SHIFT_RELATIONSHIP yet — character dynamics are unestablished`,
+        objection: `Scene ${ir.sceneIdx + 1}: ${charCount} characters introduced but no SHIFT_RELATIONSHIP yet — character dynamics are unestablished`,
         suggestedOperator: 'complicate_relationship',
         attentionBid: 40,
       });
@@ -68,7 +68,7 @@ export function dramaturgeCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     if (state.clues.length === 0 && !cluesInThisIR) {
       critiques.push({
         criticId: 'dramaturge', severity: 40, targetOpIdx: null,
-        objection: `Scene ${ir.sceneIdx} and no clues seeded yet — the mystery engine has not started`,
+        objection: `Scene ${ir.sceneIdx + 1} and no clues seeded yet — the mystery engine has not started`,
         suggestedOperator: 'weird_but_valid',
         attentionBid: 45,
       });
@@ -94,7 +94,7 @@ export function dramaturgeCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     if (!hasResolve) {
       critiques.push({
         criticId: 'dramaturge', severity: 35, targetOpIdx: null,
-        objection: `Scene ${ir.sceneIdx} and no theme resolution yet — story needs ADVANCE_THEME_ARGUMENT 'resolve' to reach climax`,
+        objection: `Scene ${ir.sceneIdx + 1} and no theme resolution yet — story needs ADVANCE_THEME_ARGUMENT 'resolve' to reach climax`,
         suggestedOperator: 'sharpen_theme',
         attentionBid: 40,
       });

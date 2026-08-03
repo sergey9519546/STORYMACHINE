@@ -117,7 +117,11 @@ function sceneIdxsOf(members: LocatedIssue[]): number[] {
   const idxs = new Set<number>();
   for (const m of members) {
     const match = SCENE_RE.exec(m.issue.location);
-    if (match) idxs.add(parseInt(match[1], 10));
+    // Labels are 1-based (writer-facing numbering); RootCauseFinding.sceneIdxs
+    // stays 0-based like every other sceneIdx field — ScriptDoctorPanel
+    // already re-encodes with `idx + 1` for display — so decode here at the
+    // parse boundary.
+    if (match) idxs.add(parseInt(match[1], 10) - 1);
   }
   return [...idxs].sort((a, b) => a - b);
 }
@@ -554,10 +558,12 @@ function synthesizeTemplateFinding(template: RootCauseTemplate, members: Located
   const startLine = linedMembers.length > 0 ? Math.min(...linedMembers.map(m => m.startLine!)) : undefined;
   const endLine = linedMembers.length > 0 ? Math.max(...linedMembers.map(m => m.endLine!)) : undefined;
   const sceneIdxs = sceneIdxsOf(members);
+  // sceneIdxs is 0-based (see sceneIdxsOf); labels shown to the writer are
+  // 1-based, so re-encode with + 1 here.
   const where = sceneIdxs.length === 1
-    ? `Scene ${sceneIdxs[0]}`
+    ? `Scene ${sceneIdxs[0] + 1}`
     : sceneIdxs.length > 1
-      ? `Scenes ${sceneIdxs[0]}–${sceneIdxs[sceneIdxs.length - 1]}`
+      ? `Scenes ${sceneIdxs[0] + 1}–${sceneIdxs[sceneIdxs.length - 1] + 1}`
       : startLine !== undefined
         ? `lines ${startLine}-${endLine}`
         : 'across the script';
@@ -693,10 +699,12 @@ function synthesizeSceneOrLinesFinding(members: LocatedIssue[]): RootCauseFindin
   const startLine = Math.min(...members.map(m => m.startLine!));
   const endLine = Math.max(...members.map(m => m.endLine!));
   const sceneIdxs = sceneIdxsOf(members);
+  // sceneIdxs is 0-based (see sceneIdxsOf); labels shown to the writer are
+  // 1-based, so re-encode with + 1 here.
   const where = sceneIdxs.length === 1
-    ? `Scene ${sceneIdxs[0]}`
+    ? `Scene ${sceneIdxs[0] + 1}`
     : sceneIdxs.length > 1
-      ? `Scenes ${sceneIdxs[0]}–${sceneIdxs[sceneIdxs.length - 1]}`
+      ? `Scenes ${sceneIdxs[0] + 1}–${sceneIdxs[sceneIdxs.length - 1] + 1}`
       : `lines ${startLine}-${endLine}`;
 
   return {

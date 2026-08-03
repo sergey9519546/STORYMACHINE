@@ -565,8 +565,9 @@ describe('buildStrengths — Wave 1183 excellence detectors (hand-built fixtures
     const strengths = buildStrengths(baseStrengthsInputFor(records));
 
     assert.ok(
-      strengths.some(s => s.includes('Deadline pressure (clock-raising language) appears in both halves') && s.includes('Scene 1') && s.includes('Scene 6')),
-      `expected the stakes-continuity strength naming Scene 1 and Scene 6, got: ${JSON.stringify(strengths)}`,
+      // 1-based labels: clock raised at 0-based idx 1 and 6 -> Scenes 2 and 7.
+      strengths.some(s => s.includes('Deadline pressure (clock-raising language) appears in both halves') && s.includes('Scene 2') && s.includes('Scene 7')),
+      `expected the stakes-continuity strength naming Scene 2 and Scene 7, got: ${JSON.stringify(strengths)}`,
     );
   });
 
@@ -592,9 +593,10 @@ describe('buildStrengths — Wave 1183 excellence detectors (hand-built fixtures
 
     assert.ok(
       strengths.some(s =>
+        // 1-based labels: rupture at 0-based idx 1, repair at idx 7 -> Scenes 2 and 8.
         s.includes('living thread, not a flat one') && s.includes('ALEX/JORDAN') &&
-        s.includes('Scene 1') && s.includes('Scene 7')),
-      `expected the relationship-dynamism strength naming ALEX/JORDAN, Scene 1 and Scene 7, got: ${JSON.stringify(strengths)}`,
+        s.includes('Scene 2') && s.includes('Scene 8')),
+      `expected the relationship-dynamism strength naming ALEX/JORDAN, Scene 2 and Scene 8, got: ${JSON.stringify(strengths)}`,
     );
   });
 
@@ -622,8 +624,9 @@ describe('buildStrengths — Wave 1183 excellence detectors (hand-built fixtures
 
     assert.ok(
       strengths.some(s =>
-        s.includes('earns its ending rather than coasting') && s.includes('Scene 2') && s.includes('Scene 7')),
-      `expected the emotional-range strength naming Scene 2 and Scene 7, got: ${JSON.stringify(strengths)}`,
+        // 1-based labels: negative at 0-based idx 2, final at idx 7 -> Scenes 3 and 8.
+        s.includes('earns its ending rather than coasting') && s.includes('Scene 3') && s.includes('Scene 8')),
+      `expected the emotional-range strength naming Scene 3 and Scene 8, got: ${JSON.stringify(strengths)}`,
     );
   });
 
@@ -838,8 +841,9 @@ describe('buildStrengths — Wave 1187 excellence detectors (hand-built fixtures
 
     assert.ok(
       strengths.some(s =>
-        s.includes('highest-suspense scene sits in the final quartile') && s.includes('Scene 6') && s.includes('Scene 0')),
-      `expected the suspense-shaping strength naming Scene 6 (the peak) and Scene 0 (the baseline), got: ${JSON.stringify(strengths)}`,
+        // 1-based labels: peak at 0-based idx 6, baseline at idx 0 -> Scenes 7 and 1.
+        s.includes('highest-suspense scene sits in the final quartile') && s.includes('Scene 7') && s.includes('Scene 1')),
+      `expected the suspense-shaping strength naming Scene 7 (the peak) and Scene 1 (the baseline), got: ${JSON.stringify(strengths)}`,
     );
   });
 
@@ -871,8 +875,9 @@ describe('buildStrengths — Wave 1187 excellence detectors (hand-built fixtures
 
     assert.ok(
       strengths.some(s =>
-        s.includes('keeps generating real turns') && s.includes('Scenes 1, 2') && s.includes('Scenes 5, 6')),
-      `expected the dramatic-turn-density strength naming Scenes 1, 2 and Scenes 5, 6, got: ${JSON.stringify(strengths)}`,
+        // 1-based labels: turns at 0-based idx 1,2 and 5,6 -> Scenes 2, 3 and 6, 7.
+        s.includes('keeps generating real turns') && s.includes('Scenes 2, 3') && s.includes('Scenes 6, 7')),
+      `expected the dramatic-turn-density strength naming Scenes 2, 3 and Scenes 6, 7, got: ${JSON.stringify(strengths)}`,
     );
   });
 

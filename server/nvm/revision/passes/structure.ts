@@ -632,7 +632,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   if (n >= 6 && structure.midpointPressure < weakMidpointFloor1188) {
     const genreNote1188 = thresholdNote1184('weakMidpointPressureFloor');
     issues.push({
-      location: `Scene ${Math.floor(n / 2)} (midpoint)`,
+      location: `Scene ${Math.floor(n / 2) + 1} (midpoint)`,
       rule: 'WEAK_MIDPOINT',
       description: `Midpoint suspense pressure is flat — the story lacks a dramatic pivot${genreNote1188}`,
       severity: 'major',
@@ -643,7 +643,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   // ── Tightest scene should be in second half ───────────────────────────────
   if (structure.tightestScene !== null && n > 6 && structure.tightestScene < Math.floor(n * 0.4)) {
     issues.push({
-      location: `Scene ${structure.tightestScene}`,
+      location: `Scene ${structure.tightestScene + 1}`,
       rule: 'CLIMAX_TOO_EARLY',
       description: 'The most intense scene is in the first 40% of the story — the structure peaks too soon',
       severity: 'major',
@@ -676,7 +676,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     );
     if (!hasIncitingEvent && act1Records.length > 0) {
       issues.push({
-        location: `Act 1 (Scenes 0–${Math.max(0, act1End - 1)})`,
+        location: `Act 1 (Scenes 1–${Math.max(0, act1End - 1) + 1})`,
         rule: 'MISSING_INCITING_INCIDENT',
         description: `Act 1 lacks a major inciting event — no clues planted, relationship shifts, or clock pressure. The protagonist isn't forced into the central conflict.`,
         severity: 'critical',
@@ -698,9 +698,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
 
     if (act1EndRecord && act1EndRecord.suspenseDelta < 1) {
       issues.push({
-        location: `End of Act 1 (Scene ~${act1End})`,
+        location: `End of Act 1 (Scene ~${act1End + 1})`,
         rule: 'ACT1_BOUNDARY_WEAK',
-        description: `Scene ${Math.min(act1End, n - 1)} (Act 1 ending) has low suspense delta (${act1EndRecord.suspenseDelta.toFixed(1)}) — Act 1 should end with a turning point that forces entry into Act 2`,
+        description: `Scene ${Math.min(act1End, n - 1) + 1} (Act 1 ending) has low suspense delta (${act1EndRecord.suspenseDelta.toFixed(1)}) — Act 1 should end with a turning point that forces entry into Act 2`,
         severity: 'major',
         suggestedFix: 'Ensure the final Act 1 scene is a clear inciting incident or reversal that propels the protagonist into the main conflict',
       });
@@ -708,9 +708,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
 
     if (act2EndRecord && act2EndRecord.suspenseDelta < 1.5) {
       issues.push({
-        location: `End of Act 2 (Scene ~${act2End})`,
+        location: `End of Act 2 (Scene ~${act2End + 1})`,
         rule: 'ACT2_BOUNDARY_WEAK',
-        description: `Scene ${Math.min(act2End, n - 1)} (Act 2 ending) has low suspense delta (${act2EndRecord.suspenseDelta.toFixed(1)}) — Act 2 should end with a climactic turn that forces entry into Act 3`,
+        description: `Scene ${Math.min(act2End, n - 1) + 1} (Act 2 ending) has low suspense delta (${act2EndRecord.suspenseDelta.toFixed(1)}) — Act 2 should end with a climactic turn that forces entry into Act 3`,
         severity: 'major',
         suggestedFix: 'The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment',
       });
@@ -740,9 +740,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
 
       if (droughtLen === 4) {
         issues.push({
-          location: `Scenes ${droughtStart}–${i}`,
+          location: `Scenes ${droughtStart + 1}–${i + 1}`,
           rule: 'REVELATION_DROUGHT',
-          description: `Scenes ${droughtStart}–${i}: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed`,
+          description: `Scenes ${droughtStart + 1}–${i + 1}: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed`,
           severity: 'major',
           suggestedFix: 'At least one of these scenes must deliver narrative payload: a clue, a revelation, or a shift in a key relationship. The audience should never go 4 scenes without learning something new.',
         });
@@ -767,9 +767,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     // False climax: peak is not near the end AND peak suspense is meaningful (>2)
     if (peakScene >= 0 && peakScene < climaxZoneStart && peakSuspense > 2) {
       issues.push({
-        location: `Scene ${peakScene} (peak intensity)`,
+        location: `Scene ${peakScene + 1} (peak intensity)`,
         rule: 'FALSE_CLIMAX',
-        description: `Peak suspense (${peakSuspense.toFixed(1)}) occurs at Scene ${peakScene} — ${Math.round(peakScene / n * 100)}% through the story — but the climax zone starts at Scene ${climaxZoneStart}. The story peaked too early; the real climax will feel anticlimactic.`,
+        description: `Peak suspense (${peakSuspense.toFixed(1)}) occurs at Scene ${peakScene + 1} — ${Math.round(peakScene / n * 100)}% through the story — but the climax zone starts at Scene ${climaxZoneStart + 1}. The story peaked too early; the real climax will feel anticlimactic.`,
         severity: 'major',
         suggestedFix: 'Either move high-intensity scenes into the final third, or build new complications in Act 2b that exceed the mid-story peak',
       });
@@ -820,7 +820,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         (rec.seededClueIds?.length ?? 0) === 0;
       if (isPassive) {
         issues.push({
-          location: `Scene ${peakScene} (climax peak)`,
+          location: `Scene ${peakScene + 1} (climax peak)`,
           rule: 'PROTAGONIST_PASSIVITY_CLIMAX',
           description: `Peak-intensity climax scene (suspense ${peakSuspense.toFixed(1)}) shows no protagonist engagement — neutral emotion, no clock pressure, no discovery. The protagonist is absent from their own story's highest moment.`,
           severity: 'critical',
@@ -850,7 +850,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       if (!hasDarkNight) {
         const genreNote1184 = thresholdNote1184('darkNightSuspenseFloor');
         issues.push({
-          location: `Scenes ${darkNightStart}–${darkNightEnd} (pre-climax zone)`,
+          location: `Scenes ${darkNightStart + 1}–${darkNightEnd + 1} (pre-climax zone)`,
           rule: 'DARK_NIGHT_ABSENT',
           description: `No scene in the pre-climax zone (${Math.round(darkNightStart / n * 100)}%–${Math.round(darkNightEnd / n * 100)}%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push${genreNote1184}`,
           severity: 'major',
@@ -878,7 +878,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const lateAvg = avg(lateAct2);
       if (midAvg < earlyAvg * 0.7 && midAvg < lateAvg * 0.7) {
         issues.push({
-          location: `Scenes ${midStart}–${midEnd} (mid-Act 2)`,
+          location: `Scenes ${midStart + 1}–${midEnd + 1} (mid-Act 2)`,
           rule: 'ACT2_DEAD_ZONE',
           description: `Mid-Act-2 suspense avg (${midAvg.toFixed(1)}) is less than 70% of both early-Act-2 (${earlyAvg.toFixed(1)}) and late-Act-2 (${lateAvg.toFixed(1)}) — the classic mid-story energy sag. The story loses momentum before the second-half escalation.`,
           severity: 'major',
@@ -941,7 +941,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const last = records[n - 1];
     if (last && last.suspenseDelta > 2 && last.purpose !== 'resolution') {
       issues.push({
-        location: `Scene ${n - 1} (final scene)`,
+        location: `Scene ${n} (final scene)`,
         rule: 'UNRESOLVED_ENDING',
         description: `The final scene still carries high suspense (${last.suspenseDelta.toFixed(1)}) and isn't a resolution beat (purpose: "${last.purpose}") — the story stops mid-climb with no denouement, dropping the audience before the release the rising action promised.`,
         severity: 'major',
@@ -968,9 +968,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const avgAct2b = act2bRecs.reduce((s, r) => s + r.suspenseDelta, 0) / act2bRecs.length;
       if (avgAct2a >= 1.3 && avgAct2b < avgAct2a * 0.7) {
         issues.push({
-          location: `Act 2 (Scenes ${act2aStart}–${act2bEnd - 1})`,
+          location: `Act 2 (Scenes ${act2aStart + 1}–${act2bEnd})`,
           rule: 'SECOND_ACT_INVERSION',
-          description: `Act 2a (Scenes ${act2aStart}–${act2bStart - 1}) averages ${avgAct2a.toFixed(1)} suspense but Act 2b (Scenes ${act2bStart}–${act2bEnd - 1}) drops to ${avgAct2b.toFixed(1)} — the second half of Act 2 de-escalates when it should build toward the climax.`,
+          description: `Act 2a (Scenes ${act2aStart + 1}–${act2bStart}) averages ${avgAct2a.toFixed(1)} suspense but Act 2b (Scenes ${act2bStart + 1}–${act2bEnd}) drops to ${avgAct2b.toFixed(1)} — the second half of Act 2 de-escalates when it should build toward the climax.`,
           severity: 'major',
           suggestedFix: 'Raise the stakes in Act 2b: escalate the antagonist\'s pressure, tighten the deadline, or create a new complication that makes the protagonist\'s situation worse in the second half of the conflict zone.',
         });
@@ -992,9 +992,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     );
     if (!hasMidEvent) {
       issues.push({
-        location: `Midpoint zone (Scenes ${midStart}–${midEnd - 1})`,
+        location: `Midpoint zone (Scenes ${midStart + 1}–${midEnd})`,
         rule: 'MIDPOINT_REVERSAL_ABSENT',
-        description: `The midpoint zone (Scenes ${midStart}–${midEnd - 1}) has no reversal and no revelation — the story passes through its structural centre without the pivot that shifts protagonist strategy from reaction to action.`,
+        description: `The midpoint zone (Scenes ${midStart + 1}–${midEnd}) has no reversal and no revelation — the story passes through its structural centre without the pivot that shifts protagonist strategy from reaction to action.`,
         severity: 'major',
         suggestedFix: 'Place a major reversal or revelatory beat near the midpoint: a discovery that recontextualises the threat, or a setback that forces the protagonist to abandon their first strategy and commit to a new one.',
       });
@@ -1014,9 +1014,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     );
     if (firstEventIdx > lateCutoff) {
       issues.push({
-        location: `First dramatic event at Scene ${firstEventIdx}`,
+        location: `First dramatic event at Scene ${firstEventIdx + 1}`,
         rule: 'INCITING_INCIDENT_TOO_LATE',
-        description: `The first reversal or revelation occurs at Scene ${firstEventIdx} — ${Math.round(firstEventIdx / n * 100)}% through the story. The central conflict doesn't launch until after 40% has elapsed; the audience has no dramatic anchor for the opening.`,
+        description: `The first reversal or revelation occurs at Scene ${firstEventIdx + 1} — ${Math.round(firstEventIdx / n * 100)}% through the story. The central conflict doesn't launch until after 40% has elapsed; the audience has no dramatic anchor for the opening.`,
         severity: 'major',
         suggestedFix: 'Move the inciting event before the 40% mark. The audience needs a dramatic anchor — a reversal, revelation, or shock — early enough to understand what the story is about before the midpoint arrives.',
       });
@@ -1068,9 +1068,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const afterPeak = records[dropPeakScene + 1];
       if (afterPeak.suspenseDelta < 0.5 && afterPeak.purpose !== 'resolution') {
         issues.push({
-          location: `Scene ${dropPeakScene} → Scene ${dropPeakScene + 1}`,
+          location: `Scene ${dropPeakScene + 1} → Scene ${dropPeakScene + 2}`,
           rule: 'TENSION_DROP_ABRUPT',
-          description: `The climax peak (Scene ${dropPeakScene}, suspense ${dropPeakSuspense.toFixed(1)}) is immediately followed by a flat, non-resolution scene (suspense ${afterPeak.suspenseDelta.toFixed(1)}) — the tension collapses without a landing beat`,
+          description: `The climax peak (Scene ${dropPeakScene + 1}, suspense ${dropPeakSuspense.toFixed(1)}) is immediately followed by a flat, non-resolution scene (suspense ${afterPeak.suspenseDelta.toFixed(1)}) — the tension collapses without a landing beat`,
           severity: 'major',
           suggestedFix: 'Insert a transitional beat between the climax and resolution: a moment of consequence, a brief silence with emotional weight, or a reaction scene that lets the audience breathe down from the peak before the story settles.',
         });
@@ -1089,7 +1089,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const act1HasRev = records.slice(0, act1RevEnd).some(r => r.revelation !== null);
       if (!act1HasRev) {
         issues.push({
-          location: `Act 1 (Scenes 0–${act1RevEnd - 1})`,
+          location: `Act 1 (Scenes 1–${act1RevEnd})`,
           rule: 'ACT1_REVELATION_ABSENT',
           description: `The story has ${totalRevs198} revelations but none land in Act 1 — the audience enters the conflict without any anchoring discovery. All revelation is held back, leaving the setup informationally dark.`,
           severity: 'minor',
@@ -1117,7 +1117,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       first209.suspenseDelta <= 1;
     if (isInert209) {
       issues.push({
-        location: 'Scene 0 (cold open)',
+        location: 'Scene 1 (cold open)',
         rule: 'COLD_OPEN_INERT',
         severity: 'minor',
         description: `The screenplay's first scene has no narrative hook — no revelation, clue, clock pressure, or relationship shift, and low suspense (${first209.suspenseDelta.toFixed(1)}). The audience's first impression contains nothing to orient them toward the story's central question.`,
@@ -1144,10 +1144,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
     if (peakD209 >= 0 && peakSusD209 > 2 && n - 1 - peakD209 >= 3) {
       issues.push({
-        location: `Scenes ${peakD209 + 1}–${n - 1} (post-climax)`,
+        location: `Scenes ${peakD209 + 2}–${n} (post-climax)`,
         rule: 'DENOUEMENT_OVERLONG',
         severity: 'minor',
-        description: `The climax peak (Scene ${peakD209}, suspense ${peakSusD209.toFixed(1)}) is followed by ${n - 1 - peakD209} more scenes — the denouement is longer than most Act 1s. Extended aftermath dilutes the climax by giving the audience time to disengage before the screenplay ends.`,
+        description: `The climax peak (Scene ${peakD209 + 1}, suspense ${peakSusD209.toFixed(1)}) is followed by ${n - 1 - peakD209} more scenes — the denouement is longer than most Act 1s. Extended aftermath dilutes the climax by giving the audience time to disengage before the screenplay ends.`,
         suggestedFix: 'Compress the post-climax into no more than 2 scenes: one scene of immediate consequence (what changed), one scene of new equilibrium (the world after). Land and leave — a long denouement signals unconfidence in the climax\'s finality.',
       });
     }
@@ -1165,10 +1165,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const sceneB209 = records[preClimaxEnd209 - 1];
       if (sceneA209.suspenseDelta < 1 && sceneB209.suspenseDelta < 1) {
         issues.push({
-          location: `Scenes ${preClimaxEnd209 - 2}–${preClimaxEnd209 - 1} (pre-climax approach)`,
+          location: `Scenes ${preClimaxEnd209 - 1}–${preClimaxEnd209} (pre-climax approach)`,
           rule: 'PRE_CLIMAX_LULL',
           severity: 'major',
-          description: `The two scenes before the climax zone (Scenes ${preClimaxEnd209 - 2} and ${preClimaxEnd209 - 1}) both have low suspense (${sceneA209.suspenseDelta.toFixed(1)} and ${sceneB209.suspenseDelta.toFixed(1)}) — the story enters its final act from a valley rather than a rising wave.`,
+          description: `The two scenes before the climax zone (Scenes ${preClimaxEnd209 - 1} and ${preClimaxEnd209}) both have low suspense (${sceneA209.suspenseDelta.toFixed(1)} and ${sceneB209.suspenseDelta.toFixed(1)}) — the story enters its final act from a valley rather than a rising wave.`,
           suggestedFix: 'Build the pre-climax approach: raise the stakes in the two scenes before the climax zone through a complication, a failed attempt, or a tightening deadline. The climax lands hardest when it arrives as the peak of already-rising pressure, not as an abrupt acceleration from flat.',
         });
       }
@@ -1204,10 +1204,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       if (maxGap222 > vacuumThreshold222) {
         const gapStart222 = gapEnd222 - maxGap222 + 1;
         issues.push({
-          location: `Scenes ${gapStart222}–${gapEnd222}`,
+          location: `Scenes ${gapStart222 + 1}–${gapEnd222 + 1}`,
           rule: 'DRAMATIC_VACUUM_STRETCH',
           severity: 'major',
-          description: `Scenes ${gapStart222}–${gapEnd222} form a run of ${maxGap222} consecutive scenes with no dramatic event — no reversal, revelation, clock, or major relationship shift across ${Math.round(maxGap222 / n * 100)}% of the story. This vacuum straddles the act structure and leaves the audience without a catalytic beat for a sustained stretch.`,
+          description: `Scenes ${gapStart222 + 1}–${gapEnd222 + 1} form a run of ${maxGap222} consecutive scenes with no dramatic event — no reversal, revelation, clock, or major relationship shift across ${Math.round(maxGap222 / n * 100)}% of the story. This vacuum straddles the act structure and leaves the audience without a catalytic beat for a sustained stretch.`,
           suggestedFix: 'Inject a dramatic event into the middle of this run: a reversal, a revelation, or a relationship rupture that re-orients the story. No quarter of the runtime should pass without at least one beat that changes the protagonist\'s situation.',
         });
       }
@@ -1304,10 +1304,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const firstClockIdx236 = records.findIndex((r: any) => r.clockRaised === true);
     if (firstClockIdx236 > Math.floor(n * 0.5)) {
       issues.push({
-        location: `Scene ${firstClockIdx236} (first clock)`,
+        location: `Scene ${firstClockIdx236 + 1} (first clock)`,
         rule: 'CLOCK_RAISED_LATE',
         severity: 'minor',
-        description: `The story's first ticking clock or deadline appears at Scene ${firstClockIdx236} — ${Math.round(firstClockIdx236 / n * 100)}% through the story, after the halfway point. Without a deadline established in the first half, the opening lacks urgency; the audience doesn't feel the cost of time.`,
+        description: `The story's first ticking clock or deadline appears at Scene ${firstClockIdx236 + 1} — ${Math.round(firstClockIdx236 / n * 100)}% through the story, after the halfway point. Without a deadline established in the first half, the opening lacks urgency; the audience doesn't feel the cost of time.`,
         suggestedFix: 'Introduce a clock or deadline before the midpoint: a looming event, an expiring window, or a countdown that the protagonist must beat. Even an implied deadline changes the tension of every scene that precedes the climax.',
       });
     }
@@ -1327,10 +1327,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const act2Revs236 = records.slice(act2Start236, act2End236).filter((r: any) => r.revelation !== null).length;
       if (act2Revs236 === 0) {
         issues.push({
-          location: `Act 2 (Scenes ${act2Start236}–${act2End236 - 1})`,
+          location: `Act 2 (Scenes ${act2Start236 + 1}–${act2End236})`,
           rule: 'ACT2_REVELATION_ABSENT',
           severity: 'minor',
-          description: `Act 2 (Scenes ${act2Start236}–${act2End236 - 1}) contains no revelations despite ${totalRevs236} total revelations elsewhere. The middle act's dramatic engine is discovery — progressively raising the informational stakes. An Act 2 with no revelations is pure action; the audience stops learning while watching.`,
+          description: `Act 2 (Scenes ${act2Start236 + 1}–${act2End236}) contains no revelations despite ${totalRevs236} total revelations elsewhere. The middle act's dramatic engine is discovery — progressively raising the informational stakes. An Act 2 with no revelations is pure action; the audience stops learning while watching.`,
           suggestedFix: "Plant at least one revelation in Act 2: a truth about the antagonist, a new dimension of the protagonist's situation, or information that reframes everything the audience thought they knew about the central conflict.",
         });
       }
@@ -1373,7 +1373,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       if (act3Purposes250.size === 1) {
         const [onlyPurpose250] = act3Purposes250;
         issues.push({
-          location: `Act 3 (Scenes ${act3Start250}–${n - 1}) — purpose layer`,
+          location: `Act 3 (Scenes ${act3Start250 + 1}–${n}) — purpose layer`,
           rule: 'ACT3_PURPOSE_MONOTONE',
           severity: 'minor',
           description: `Act 3 (${act3Recs250.length} scenes) is entirely composed of "${onlyPurpose250}" scenes — every scene in the resolution wears the same structural label. A resolution needs variety: the confrontation, the aftermath, the final beat. When all scenes serve the same function, the finale is a single extended register rather than a structured landing.`,
@@ -1401,10 +1401,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act2bAvg250 = avgSuspense250(records.slice(act2bStart250, act2bEnd250));
     if (act2bAvg250 < act2aAvg250 - 0.5) {
       issues.push({
-        location: `Act 2b (Scenes ${act2bStart250}–${act2bEnd250 - 1})`,
+        location: `Act 2b (Scenes ${act2bStart250 + 1}–${act2bEnd250})`,
         rule: 'ACT2B_SUSPENSE_DECAY',
         severity: 'minor',
-        description: `Act 2b (Scenes ${act2bStart250}–${act2bEnd250 - 1}) averages ${act2bAvg250.toFixed(2)} suspenseDelta vs ${act2aAvg250.toFixed(2)} in Act 2a — the story loses pressure in the run-up to the climax instead of building it. Act 2b should be the pressure cooker; a falling suspense average here signals a pre-climax stall.`,
+        description: `Act 2b (Scenes ${act2bStart250 + 1}–${act2bEnd250}) averages ${act2bAvg250.toFixed(2)} suspenseDelta vs ${act2aAvg250.toFixed(2)} in Act 2a — the story loses pressure in the run-up to the climax instead of building it. Act 2b should be the pressure cooker; a falling suspense average here signals a pre-climax stall.`,
         suggestedFix: "Build Act 2b pressure: introduce a new threat, escalate an existing one, or reveal a complication that makes the protagonist's situation measurably worse. The scene just before the climax should feel like the most impossible situation yet — not a recovery.",
       });
     }
@@ -1427,10 +1427,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const span264 = revScenes264[revScenes264.length - 1] - revScenes264[0];
       if (span264 <= 3) {
         issues.push({
-          location: `Scenes ${revScenes264[0]}–${revScenes264[revScenes264.length - 1]} (revelation cluster)`,
+          location: `Scenes ${revScenes264[0] + 1}–${revScenes264[revScenes264.length - 1] + 1} (revelation cluster)`,
           rule: 'REVELATION_CLUSTERED',
           severity: 'minor',
-          description: `All ${revScenes264.length} revelations occur within a ${span264 + 1}-scene window (Scenes ${revScenes264[0]}–${revScenes264[revScenes264.length - 1]}) — the story dumps all its discoveries in a single burst. Clustered revelations rob each discovery of individual weight and create an exposition dump rather than sustained mystery.`,
+          description: `All ${revScenes264.length} revelations occur within a ${span264 + 1}-scene window (Scenes ${revScenes264[0] + 1}–${revScenes264[revScenes264.length - 1] + 1}) — the story dumps all its discoveries in a single burst. Clustered revelations rob each discovery of individual weight and create an exposition dump rather than sustained mystery.`,
           suggestedFix: 'Distribute revelations across the story: plant one in Act 1 to hook the audience, one in Act 2 to deepen the situation, and one near Act 3 to recontextualise everything. Spacing allows each revelation to breathe and reframe the scenes that follow it.',
         });
       }
@@ -1448,7 +1448,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const act1Curious264 = records.slice(0, act1End264).filter((r: any) => (r.curiosityDelta ?? 0) > 0.5).length;
       if (act1Curious264 === 0) {
         issues.push({
-          location: `Act 1 (Scenes 0–${act1End264 - 1})`,
+          location: `Act 1 (Scenes 1–${act1End264})`,
           rule: 'ACT1_CURIOSITY_ABSENT',
           severity: 'minor',
           description: `No Act 1 scene raises curiosity above 0.5 despite ${storyCurious264} curiosity spikes later in the story. The opening generates no audience questions — the premise is announced without mystery. The hook opportunity of Act 1 is surrendered; the audience has nothing to wonder about during the setup.`,
@@ -1470,7 +1470,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       if (act1Purposes264.size === 1) {
         const [singlePurpose264] = act1Purposes264;
         issues.push({
-          location: `Act 1 (Scenes 0–${act1End264b - 1})`,
+          location: `Act 1 (Scenes 1–${act1End264b})`,
           rule: 'ACT1_PURPOSE_SINGLE',
           severity: 'minor',
           description: `Act 1 (${act1Recs264.length} scenes) is entirely composed of "${singlePurpose264}" scenes — the opening wears one structural label throughout. A well-crafted Act 1 moves through setup, incitement, and character introduction, each scene serving a different narrative function.`,
@@ -1495,10 +1495,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const hasAct2aTension278 = records.slice(act2aStart278, act2bStart278).some(r => r.suspenseDelta > 1);
     if (!hasAct2aTension278) {
       issues.push({
-        location: `Act 2a (Scenes ${act2aStart278}–${act2bStart278 - 1})`,
+        location: `Act 2a (Scenes ${act2aStart278 + 1}–${act2bStart278})`,
         rule: 'ACT2A_SUSPENSE_VOID',
         severity: 'minor',
-        description: `No scene in Act 2a (Scenes ${act2aStart278}–${act2bStart278 - 1}) reaches a suspenseDelta above 1 — the first half of the conflict zone is entirely flat. Early Act 2 should escalate from the inciting incident; a void of tension here signals a failure to engage the conflict before the midpoint.`,
+        description: `No scene in Act 2a (Scenes ${act2aStart278 + 1}–${act2bStart278}) reaches a suspenseDelta above 1 — the first half of the conflict zone is entirely flat. Early Act 2 should escalate from the inciting incident; a void of tension here signals a failure to engage the conflict before the midpoint.`,
         suggestedFix: 'Raise the stakes in early Act 2: add a complication, a new obstacle, or a ticking-clock moment that pushes suspense above baseline. The conflict should be demonstrably live in Act 2a, not just implied.',
       });
     }
@@ -1563,10 +1563,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const finalSpike292 = records.slice(finalStart292).some(r => r.curiosityDelta > 1);
       if (!finalSpike292) {
         issues.push({
-          location: `Final quarter (Scenes ${finalStart292}+) — curiosity flatline`,
+          location: `Final quarter (Scenes ${finalStart292 + 1}+) — curiosity flatline`,
           rule: 'ACT3_CURIOSITY_SPIKE_ABSENT',
           severity: 'minor',
-          description: `The story generates curiosity spikes (curiosityDelta > 1) before the final quarter but none in the finale (scenes ${finalStart292}+). The climax zone fails to intensify the audience's need to know — entering the resolution without peak curiosity means the answer arrives to an audience that has stopped asking the question.`,
+          description: `The story generates curiosity spikes (curiosityDelta > 1) before the final quarter but none in the finale (scenes ${finalStart292 + 1}+). The climax zone fails to intensify the audience's need to know — entering the resolution without peak curiosity means the answer arrives to an audience that has stopped asking the question.`,
           suggestedFix: "Introduce a late complication or revelation in the final quarter that reintensifies the audience's central question. The climax should feel like the most urgent answer to the most urgent question — if curiosity flatlines before the finale, the question has been implicitly resolved too early.",
         });
       }
@@ -1587,10 +1587,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const finalClocks292 = records.slice(finalStart292b).filter(r => r.clockRaised).length;
       if (finalClocks292 === 0) {
         issues.push({
-          location: `Final quarter (Scenes ${finalStart292b}+) — no clock pressure`,
+          location: `Final quarter (Scenes ${finalStart292b + 1}+) — no clock pressure`,
           rule: 'CLOCK_PRESSURE_FINALE_ABSENT',
           severity: 'minor',
-          description: `${earlyClocks292} clock-raising scene(s) appear before the final quarter but the finale (scenes ${finalStart292b}+) has zero clock events. The ticking deadline engine — which should peak at the climax — goes silent before the resolution. Resolving the story without time pressure relaxes the audience when they should be most tense.`,
+          description: `${earlyClocks292} clock-raising scene(s) appear before the final quarter but the finale (scenes ${finalStart292b + 1}+) has zero clock events. The ticking deadline engine — which should peak at the climax — goes silent before the resolution. Resolving the story without time pressure relaxes the audience when they should be most tense.`,
           suggestedFix: 'Add a clock event in the final quarter: a deadline arriving, a window closing, a countdown reaching zero. The clocks established in Act 2 should all come due at the climax — their convergence is what makes the finale feel like a reckoning rather than a conclusion.',
         });
       }
@@ -1609,7 +1609,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const allFlatOpening292 = openingRecs292.every(r => r.suspenseDelta <= 0);
     if (allFlatOpening292) {
       issues.push({
-        location: `Opening scenes (0–${openingSize292 - 1}) — no tension`,
+        location: `Opening scenes (1–${openingSize292}) — no tension`,
         rule: 'OPENING_SUSPENSE_FLATLINE',
         severity: 'minor',
         description: `The first ${openingSize292} scene(s) all have suspenseDelta ≤ 0 — the story opens with zero tension. A flat opening fails to signal to the audience that stakes exist and things will escalate. Even a slow-burn story needs a tension seed in the opening that promises rising danger ahead.`,
@@ -1632,10 +1632,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const midRec306 = records[midIdx306];
     if (midRec306 && midRec306.emotionalShift === 'neutral' && (midRec306.suspenseDelta ?? 0) <= 0) {
       issues.push({
-        location: `Midpoint (Scene ${midRec306.sceneIdx})`,
+        location: `Midpoint (Scene ${midRec306.sceneIdx + 1})`,
         rule: 'MIDPOINT_EMOTIONAL_FLATLINE',
         severity: 'minor',
-        description: `The midpoint scene (Scene ${midRec306.sceneIdx}) is emotionally neutral and carries no suspense (suspenseDelta ${midRec306.suspenseDelta ?? 0}). The midpoint is the second act's spine — the moment the protagonist's situation should pivot hardest, raising the stakes for everything after. A flat, tensionless midpoint leaves the story without a central fulcrum.`,
+        description: `The midpoint scene (Scene ${midRec306.sceneIdx + 1}) is emotionally neutral and carries no suspense (suspenseDelta ${midRec306.suspenseDelta ?? 0}). The midpoint is the second act's spine — the moment the protagonist's situation should pivot hardest, raising the stakes for everything after. A flat, tensionless midpoint leaves the story without a central fulcrum.`,
         suggestedFix: 'Charge the midpoint: stage a reversal, a revelation, or a point-of-no-return decision that resets the stakes and pushes the protagonist from reaction into action. The audience should feel the story change gears here — emotionally and in tension.',
       });
     }
@@ -1656,10 +1656,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       ((lastRec306.relationshipShifts ?? []) as any[]).length === 0;
     if (lastInert306) {
       issues.push({
-        location: `Final scene (Scene ${lastRec306.sceneIdx})`,
+        location: `Final scene (Scene ${lastRec306.sceneIdx + 1})`,
         rule: 'FINAL_IMAGE_WEAK',
         severity: 'minor',
-        description: `The final scene (Scene ${lastRec306.sceneIdx}) carries no charge on any channel — neutral emotion, no suspense, no relationship movement. The last image is what the audience carries out of the theatre; a closing beat that registers on nothing sends them off empty-handed, undercutting whatever the story built.`,
+        description: `The final scene (Scene ${lastRec306.sceneIdx + 1}) carries no charge on any channel — neutral emotion, no suspense, no relationship movement. The last image is what the audience carries out of the theatre; a closing beat that registers on nothing sends them off empty-handed, undercutting whatever the story built.`,
         suggestedFix: 'Give the final scene a deliberate charge: a last emotional turn (acceptance, grief, hard-won peace), a final relational note (a bond sealed or severed), or a resonant image that answers the opening. The ending does not need spectacle, but it must leave a mark.',
       });
     }
@@ -1709,10 +1709,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act3Revs320 = records.filter(r => r.revelation && r.sceneIdx >= act3Start320).length;
     if (totalRevs320 >= 2 && act3Revs320 === 0) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start320}–${n - 1}) — no revelation`,
+        location: `Act 3 (Scenes ${act3Start320 + 1}–${n}) — no revelation`,
         rule: 'CLIMAX_REVELATION_ABSENT',
         severity: 'minor',
-        description: `The story carries ${totalRevs320} revelations but none lands in Act 3 (Scenes ${act3Start320}+). Every disclosure is spent before the climax, so the audience arrives at the ending already knowing everything. The climax delivers confirmation rather than discovery — the most charged structural position holds no new truth.`,
+        description: `The story carries ${totalRevs320} revelations but none lands in Act 3 (Scenes ${act3Start320 + 1}+). Every disclosure is spent before the climax, so the audience arrives at the ending already knowing everything. The climax delivers confirmation rather than discovery — the most charged structural position holds no new truth.`,
         suggestedFix: 'Reserve at least one significant revelation for Act 3: the final piece that recontextualizes the climax, the truth the protagonist has been missing, or the cost they only now understand. A climax without discovery is an outcome the audience has already calculated.',
       });
     }
@@ -1739,7 +1739,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const a3Cur320 = avgCur320(a3Recs320);
       if (a2Cur320 < a1Cur320 && a2Cur320 < a3Cur320) {
         issues.push({
-          location: `Act 2 (Scenes ${a1End320}–${a2End320 - 1}) — curiosity valley`,
+          location: `Act 2 (Scenes ${a1End320 + 1}–${a2End320}) — curiosity valley`,
           rule: 'ACT2_CURIOSITY_VALLEY',
           severity: 'minor',
           description: `Act 2's average curiosityDelta (${a2Cur320.toFixed(2)}) is below both Act 1 (${a1Cur320.toFixed(2)}) and Act 3 (${a3Cur320.toFixed(2)}) — the complication zone is the least curious stretch of the story. The longest act sags between a curious setup and a curious finale, exactly where the audience spends most of their time. Curiosity that dips in the middle invites disengagement before the climax can re-grab them.`,
@@ -1760,7 +1760,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const opening320 = records.slice(0, 3);
     if (opening320.every(r => r.emotionalShift === 'neutral')) {
       issues.push({
-        location: 'Opening (Scenes 0–2) — emotional flatline',
+        location: 'Opening (Scenes 1–3) — emotional flatline',
         rule: 'EMOTIONAL_OPENING_NEUTRAL',
         severity: 'minor',
         description: `The first three scenes are all emotionally neutral — the opening establishes nothing on the emotional channel. The audience meets the story through flat affect and is given no feeling to attach to before the plot begins. An opening that engages the mind (plot, questions) but not the heart risks the audience watching from a distance rather than investing.`,
@@ -1783,10 +1783,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act3Scenes331 = records.slice(act3Start331);
     if (act3Scenes331.length >= 3 && act3Scenes331.every(r => r.emotionalShift === 'neutral')) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start331}–${n - 1}) — emotional flatline`,
+        location: `Act 3 (Scenes ${act3Start331 + 1}–${n}) — emotional flatline`,
         rule: 'ACT3_EMOTIONAL_FLATLINE',
         severity: 'minor',
-        description: `All ${act3Scenes331.length} Act 3 scenes (${act3Start331}–${n - 1}) are emotionally neutral — the finale generates no emotional charge. Stories that resolve without emotional register close their audience intellectually but leave them untouched at the feeling level. A climax and denouement that carry no emotional weight miss the cathartic function of the final act.`,
+        description: `All ${act3Scenes331.length} Act 3 scenes (${act3Start331 + 1}–${n}) are emotionally neutral — the finale generates no emotional charge. Stories that resolve without emotional register close their audience intellectually but leave them untouched at the feeling level. A climax and denouement that carry no emotional weight miss the cathartic function of the final act.`,
         suggestedFix: 'Charge the finale emotionally: the climax should reach the highest (or lowest) emotional register in the story, and the denouement should deliver either earned warmth or productive grief. The audience needs a feeling to carry out of the theatre — give the resolution an emotional signature.',
       });
     }
@@ -1804,7 +1804,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act1Scenes331 = records.slice(0, act1End331);
     if (act1Scenes331.length >= 2 && !act1Scenes331.some(r => r.emotionalShift === 'positive')) {
       issues.push({
-        location: `Act 1 (Scenes 0–${act1End331 - 1}) — no warmth established`,
+        location: `Act 1 (Scenes 1–${act1End331}) — no warmth established`,
         rule: 'ACT1_WARMTH_ABSENT',
         severity: 'minor',
         description: `None of the ${act1Scenes331.length} Act 1 scene(s) carry a positive emotional shift — the opening act never establishes warmth, hope, or connection. Without a baseline of care, the later darkness has no emotional leverage; the audience has nothing to lose. A world introduced without warmth is harder to invest in.`,
@@ -1829,10 +1829,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     );
     if (!hasTurn331) {
       issues.push({
-        location: `Opening 30% (Scenes 0–${openingEnd331 - 1}) — no dramatic turn`,
+        location: `Opening 30% (Scenes 1–${openingEnd331}) — no dramatic turn`,
         rule: 'DRAMATIC_TURN_OPENING_ABSENT',
         severity: 'minor',
-        description: `No scene in the opening 30% (scenes 0–${openingEnd331 - 1}) carries a dramatic turn — the opening act never pivots. A screenplay's first act should contain at least one turning point that disrupts the protagonist's ordinary world and launches the central conflict. Without a turn, the opening is pure setup with no event to signal that the story has actually started.`,
+        description: `No scene in the opening 30% (scenes 1–${openingEnd331}) carries a dramatic turn — the opening act never pivots. A screenplay's first act should contain at least one turning point that disrupts the protagonist's ordinary world and launches the central conflict. Without a turn, the opening is pure setup with no event to signal that the story has actually started.`,
         suggestedFix: 'Place a dramatic turn in the opening act: the discovery of a problem, the arrival of an antagonist, a decision that changes the protagonist\'s direction. This turn is what separates the story from its backstory — it is the moment the audience knows the clock has started.',
       });
     }
@@ -1854,10 +1854,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act2bRecs345 = records.slice(act2bStart345, act2bEnd345);
     if (act2bRecs345.length >= 2 && !act2bRecs345.some(r => r.suspenseDelta > 1)) {
       issues.push({
-        location: `Act 2b (Scenes ${act2bStart345}–${act2bEnd345 - 1})`,
+        location: `Act 2b (Scenes ${act2bStart345 + 1}–${act2bEnd345})`,
         rule: 'ACT2B_SUSPENSE_VOID',
         severity: 'minor',
-        description: `No scene in Act 2b (Scenes ${act2bStart345}–${act2bEnd345 - 1}) reaches a suspenseDelta above 1 — the run-up to the climax is entirely flat. Act 2b should be the pressure cooker, the tensest stretch before the final confrontation; a void of meaningful tension here means the story coasts into its peak instead of building toward it, and the climax inherits no momentum.`,
+        description: `No scene in Act 2b (Scenes ${act2bStart345 + 1}–${act2bEnd345}) reaches a suspenseDelta above 1 — the run-up to the climax is entirely flat. Act 2b should be the pressure cooker, the tensest stretch before the final confrontation; a void of meaningful tension here means the story coasts into its peak instead of building toward it, and the climax inherits no momentum.`,
         suggestedFix: 'Escalate through Act 2b: tighten a deadline, spring a setback, or close off an escape route so the suspense climbs above baseline on the approach to the climax. The audience should feel the walls closing in during the stretch just before the peak.',
       });
     }
@@ -1877,10 +1877,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act2aRecs345 = records.slice(act2aStart345, act2bStart345b);
     if (act2aRecs345.length >= 3 && act2aRecs345.every(r => r.emotionalShift === 'neutral')) {
       issues.push({
-        location: `Act 2a (Scenes ${act2aStart345}–${act2bStart345b - 1}) — emotional flatline`,
+        location: `Act 2a (Scenes ${act2aStart345 + 1}–${act2bStart345b}) — emotional flatline`,
         rule: 'ACT2A_EMOTIONAL_FLATLINE',
         severity: 'minor',
-        description: `All ${act2aRecs345.length} Act 2a scenes (${act2aStart345}–${act2bStart345b - 1}) are emotionally neutral — the first half of the conflict zone generates no emotional movement. Act 2a is where the audience's investment should deepen as the cost of the conflict starts to register; a flatline here means the plot advances while the emotional arc stalls, and the protagonist meets rising complications without feeling anything about them.`,
+        description: `All ${act2aRecs345.length} Act 2a scenes (${act2aStart345 + 1}–${act2bStart345b}) are emotionally neutral — the first half of the conflict zone generates no emotional movement. Act 2a is where the audience's investment should deepen as the cost of the conflict starts to register; a flatline here means the plot advances while the emotional arc stalls, and the protagonist meets rising complications without feeling anything about them.`,
         suggestedFix: 'Charge Act 2a emotionally: let the early complications land on the protagonist as a flare of fear, a flicker of hope, a wound to a relationship. The conflict should not just happen to the protagonist — it should move them, so the audience deepens its stake as the story climbs toward the midpoint.',
       });
     }
@@ -1904,10 +1904,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const midAvg345 = midRecs345.reduce((s, r) => s + (r.curiosityDelta ?? 0), 0) / midRecs345.length;
       if (midAvg345 <= 0) {
         issues.push({
-          location: `Midpoint (Scenes ${midStart345}–${midEnd345 - 1}) — curiosity void`,
+          location: `Midpoint (Scenes ${midStart345 + 1}–${midEnd345}) — curiosity void`,
           rule: 'MIDPOINT_CURIOSITY_VOID',
           severity: 'minor',
-          description: `The midpoint zone (Scenes ${midStart345}–${midEnd345 - 1}) averages a curiosityDelta of ${midAvg345.toFixed(2)} while the story generates curiosity spikes elsewhere — the pivot of the story passes without renewing the audience's need to know. A strong midpoint reframes the central question: a revelation that recasts the goal, a twist that opens a deeper mystery. A curiosity void at the exact center means the engine of intrigue stalls precisely where it should re-ignite.`,
+          description: `The midpoint zone (Scenes ${midStart345 + 1}–${midEnd345}) averages a curiosityDelta of ${midAvg345.toFixed(2)} while the story generates curiosity spikes elsewhere — the pivot of the story passes without renewing the audience's need to know. A strong midpoint reframes the central question: a revelation that recasts the goal, a twist that opens a deeper mystery. A curiosity void at the exact center means the engine of intrigue stalls precisely where it should re-ignite.`,
           suggestedFix: 'Reframe the central question at the midpoint: introduce a revelation, a reversal, or a new piece of information that changes what the audience thought the story was about. The middle of the story is the most dangerous place to let curiosity flatten — it is where a slack structure loses the room.',
         });
       }
@@ -1933,7 +1933,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const act1CurAvg359 = act1Recs359.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / act1Recs359.length;
       if (act1CurAvg359 <= 0) {
         issues.push({
-          location: `Act 1 (Scenes 0–${act1End359 - 1}) — curiosity flatline`,
+          location: `Act 1 (Scenes 1–${act1End359}) — curiosity flatline`,
           rule: 'OPENING_CURIOSITY_FLATLINE',
           severity: 'minor',
           description: `Act 1 averages a curiosityDelta of ${act1CurAvg359.toFixed(2)} — the opening not only fails to generate audience questions, it closes them. With ${storyCurious359} curiosity spikes later in the story, the first act is the one stretch where the audience is left with nothing to wonder about. A hook that suppresses curiosity surrenders the narrative contract before it's been established.`,
@@ -1962,10 +1962,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     );
     if (act1to2Turns359 >= 3 && !act3HasTurn359) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start359}–${n - 1}) — no dramatic turns`,
+        location: `Act 3 (Scenes ${act3Start359 + 1}–${n}) — no dramatic turns`,
         rule: 'ACT3_DRAMATIC_TURN_ABSENT',
         severity: 'minor',
-        description: `No scene in Act 3 (Scenes ${act3Start359}–${n - 1}) carries a dramatic turn, even though ${act1to2Turns359} turns punctuate Acts 1 and 2. The finale proceeds to resolution without reversals or escalations — the climax plays as a straight line rather than a dynamic sequence of pivots. Act 3 should be the most structurally charged zone; an absence of turns there makes the resolution feel inevitable rather than earned.`,
+        description: `No scene in Act 3 (Scenes ${act3Start359 + 1}–${n}) carries a dramatic turn, even though ${act1to2Turns359} turns punctuate Acts 1 and 2. The finale proceeds to resolution without reversals or escalations — the climax plays as a straight line rather than a dynamic sequence of pivots. Act 3 should be the most structurally charged zone; an absence of turns there makes the resolution feel inevitable rather than earned.`,
         suggestedFix: 'Build at least one reversal into Act 3: a setback before the climax, an unexpected complication that forces the protagonist to adapt, or a twist that reframes the resolution. The finale should contain the story\'s final structural surprise — the turn that makes the ending land with weight rather than arriving on schedule.',
       });
     }
@@ -1989,7 +1989,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     );
     if (totalShifts359 >= 3 && act1Shifts359 === 0) {
       issues.push({
-        location: `Act 1 (Scenes 0–${act1End359b - 1}) — no relationship shifts`,
+        location: `Act 1 (Scenes 1–${act1End359b}) — no relationship shifts`,
         rule: 'ACT1_RELATIONSHIP_VOID',
         severity: 'minor',
         description: `Act 1 carries no relationship shifts despite ${totalShifts359} relational movements later in the story. The opening act introduces the characters but establishes no bond dynamics — the audience meets people without learning how their relationships work or what stakes exist between them. When Act 1 is relationally silent, the audience enters Act 2 without caring about any of the bonds being tested.`,
@@ -2014,10 +2014,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const storyTense373 = records.some(r => (r.suspenseDelta ?? 0) > 1);
     if (midRecs373.length >= 2 && storyTense373 && !midRecs373.some(r => (r.suspenseDelta ?? 0) > 1)) {
       issues.push({
-        location: `Midpoint (Scenes ${midStart373}–${midEnd373 - 1}) — suspense void`,
+        location: `Midpoint (Scenes ${midStart373 + 1}–${midEnd373}) — suspense void`,
         rule: 'MIDPOINT_SUSPENSE_VOID',
         severity: 'minor',
-        description: `The midpoint zone (Scenes ${midStart373}–${midEnd373 - 1}) contains no scene reaching a suspenseDelta above 1, while the story spikes tension elsewhere — the structural pivot passes without pressure. The midpoint is where a strong story raises the stakes and tightens its grip; a tension void at the exact center means the engine of suspense stalls precisely where the second half should be accelerating out of the turn.`,
+        description: `The midpoint zone (Scenes ${midStart373 + 1}–${midEnd373}) contains no scene reaching a suspenseDelta above 1, while the story spikes tension elsewhere — the structural pivot passes without pressure. The midpoint is where a strong story raises the stakes and tightens its grip; a tension void at the exact center means the engine of suspense stalls precisely where the second half should be accelerating out of the turn.`,
         suggestedFix: 'Raise the tension at the midpoint: let the pivot that reframes the story also escalate the danger — a deadline imposed, a threat revealed, an escape route closed. The middle of the story is the most dangerous place to let suspense flatten, because it is where the audience decides whether the back half is worth the wait.',
       });
     }
@@ -2039,7 +2039,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       if (act2Purposes373.size === 1) {
         const [singlePurpose373] = act2Purposes373;
         issues.push({
-          location: `Act 2 (Scenes ${act2Start373}–${act2End373 - 1})`,
+          location: `Act 2 (Scenes ${act2Start373 + 1}–${act2End373})`,
           rule: 'ACT2_PURPOSE_SINGLE',
           severity: 'minor',
           description: `Act 2 (${act2Recs373.length} scenes) is entirely composed of "${singlePurpose373}" scenes — the long middle act wears one structural label throughout. Act 2 is the most functionally varied stretch of a well-built story: testing, escalation, the midpoint reversal, the approach to the low point. A single purpose across all of it means the middle repeats one beat instead of building through distinct phases.`,
@@ -2061,10 +2061,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act2bRecs373 = records.slice(act2bStart373, act2bEnd373);
     if (act2bRecs373.length >= 3 && act2bRecs373.every(r => r.emotionalShift === 'neutral')) {
       issues.push({
-        location: `Act 2b (Scenes ${act2bStart373}–${act2bEnd373 - 1}) — emotional flatline`,
+        location: `Act 2b (Scenes ${act2bStart373 + 1}–${act2bEnd373}) — emotional flatline`,
         rule: 'ACT2B_EMOTIONAL_FLATLINE',
         severity: 'minor',
-        description: `All ${act2bRecs373.length} Act 2b scenes (${act2bStart373}–${act2bEnd373 - 1}) are emotionally neutral — the run-up to the climax generates no emotional movement. Act 2b is where the cost of the conflict should be landing hardest as the protagonist approaches their lowest point; a flatline here means the story climbs toward its peak with the emotional arc stalled, so the climax inherits no accumulated feeling.`,
+        description: `All ${act2bRecs373.length} Act 2b scenes (${act2bStart373 + 1}–${act2bEnd373}) are emotionally neutral — the run-up to the climax generates no emotional movement. Act 2b is where the cost of the conflict should be landing hardest as the protagonist approaches their lowest point; a flatline here means the story climbs toward its peak with the emotional arc stalled, so the climax inherits no accumulated feeling.`,
         suggestedFix: 'Charge Act 2b emotionally: the approach to the climax should be the protagonist\'s most harrowing stretch — mounting dread, deepening loss, the strain of everything closing in. Let the run-up to the peak move the protagonist so the audience arrives at the climax already invested in what it will cost them.',
       });
     }
@@ -2085,7 +2085,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const emotionElsewhere387 = records.slice(a1End387).some(r => r.emotionalShift !== 'neutral');
     if (a1Recs387.length >= 3 && a1Recs387.every(r => r.emotionalShift === 'neutral') && emotionElsewhere387) {
       issues.push({
-        location: `Act 1 (Scenes 0–${a1End387 - 1}) — emotional flatline`,
+        location: `Act 1 (Scenes 1–${a1End387}) — emotional flatline`,
         rule: 'ACT1_EMOTIONAL_FLATLINE',
         severity: 'minor',
         description: `All ${a1Recs387.length} Act 1 scenes are emotionally neutral, while the story carries emotion later. The opening establishes the world without giving the audience anything to feel, so they are oriented but not invested before the conflict begins — an Act 1 with no emotional charge asks the audience to wait for a reason to care.`,
@@ -2110,10 +2110,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const a2aAvg387 = a2aRecs387.reduce((s, r) => s + (r.curiosityDelta ?? 0), 0) / a2aRecs387.length;
       if (a2aAvg387 <= 0) {
         issues.push({
-          location: `Act 2a (Scenes ${a2aStart387}–${a2aEnd387 - 1}) — curiosity void`,
+          location: `Act 2a (Scenes ${a2aStart387 + 1}–${a2aEnd387}) — curiosity void`,
           rule: 'ACT2A_CURIOSITY_VOID',
           severity: 'minor',
-          description: `Act 2a (Scenes ${a2aStart387}–${a2aEnd387 - 1}) averages a curiosityDelta of ${a2aAvg387.toFixed(2)} while the story spikes curiosity elsewhere — the first half of the complication zone generates no intrigue. The early investigation, where new questions should be opening as the protagonist tests the world, instead coasts, so the run toward the midpoint loses the audience's need to know.`,
+          description: `Act 2a (Scenes ${a2aStart387 + 1}–${a2aEnd387}) averages a curiosityDelta of ${a2aAvg387.toFixed(2)} while the story spikes curiosity elsewhere — the first half of the complication zone generates no intrigue. The early investigation, where new questions should be opening as the protagonist tests the world, instead coasts, so the run toward the midpoint loses the audience's need to know.`,
           suggestedFix: 'Open questions in Act 2a: let the protagonist\'s first moves uncover something unexpected — a complication, a partial answer that raises a deeper question, a hint the situation is not what it seemed. Early-Act-2 curiosity is what pulls the audience across the long middle toward the midpoint turn.',
         });
       }
@@ -2136,10 +2136,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const a2HasTurn387 = a2Recs387.some((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing');
     if (a2Recs387.length >= 4 && turnsOutside387 >= 2 && !a2HasTurn387) {
       issues.push({
-        location: `Act 2 (Scenes ${a2Start387}–${a2End387 - 1}) — no dramatic turns`,
+        location: `Act 2 (Scenes ${a2Start387 + 1}–${a2End387}) — no dramatic turns`,
         rule: 'ACT2_DRAMATIC_TURN_ABSENT',
         severity: 'minor',
-        description: `The long middle act (Scenes ${a2Start387}–${a2End387 - 1}) contains no dramatic turn, even though ${turnsOutside387} turns land in Acts 1 and 3. The complication zone — the stretch most prone to sagging — proceeds without a single reversal or recognition, so the middle plays as a flat extension of the setup rather than a sequence of escalating pivots that keeps the audience off balance.`,
+        description: `The long middle act (Scenes ${a2Start387 + 1}–${a2End387}) contains no dramatic turn, even though ${turnsOutside387} turns land in Acts 1 and 3. The complication zone — the stretch most prone to sagging — proceeds without a single reversal or recognition, so the middle plays as a flat extension of the setup rather than a sequence of escalating pivots that keeps the audience off balance.`,
         suggestedFix: 'Build reversals into Act 2: a midpoint twist, a setback that forces a new plan, an alliance that flips. The middle act is where a story most often loses momentum; punctuating it with genuine turns is what keeps the long stretch between setup and climax dynamic.',
       });
     }
@@ -2165,10 +2165,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const a2bHasCurio401a = a2bRecs401a.some((r: any) => (r.curiosityDelta ?? 0) > 0);
       if (!a2bHasCurio401a) {
         issues.push({
-          location: `Act 2b (Scenes ${a2bStart401a}–${a2bEnd401a - 1}) — curiosity void`,
+          location: `Act 2b (Scenes ${a2bStart401a + 1}–${a2bEnd401a}) — curiosity void`,
           rule: 'ACT2B_CURIOSITY_VOID',
           severity: 'minor',
-          description: `No scene in Act 2b (Scenes ${a2bStart401a}–${a2bEnd401a - 1}) raises curiosity — the escalation zone generates no new questions while the story does so elsewhere. Act 2b should deepen the central mystery and build anticipation for the climax; a curiosity void here means the run-up to the finale is a sequence of events the audience can predict rather than questions they are eager to have answered.`,
+          description: `No scene in Act 2b (Scenes ${a2bStart401a + 1}–${a2bEnd401a}) raises curiosity — the escalation zone generates no new questions while the story does so elsewhere. Act 2b should deepen the central mystery and build anticipation for the climax; a curiosity void here means the run-up to the finale is a sequence of events the audience can predict rather than questions they are eager to have answered.`,
           suggestedFix: 'Plant a new question in Act 2b: a discovery that recasts the central problem, a character whose motives become suddenly unclear, or a clue that implies more is at stake than the audience realized. The escalation zone should not just raise the tension but renew the mystery.',
         });
       }
@@ -2198,10 +2198,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     );
     if (midRecs401b.length >= 2 && turnsOutside401b >= 2 && !midHasTurn401b) {
       issues.push({
-        location: `Midpoint zone (Scenes ${midStart401b}–${midEnd401b - 1}) — no dramatic turn`,
+        location: `Midpoint zone (Scenes ${midStart401b + 1}–${midEnd401b}) — no dramatic turn`,
         rule: 'MIDPOINT_DRAMATIC_TURN_VOID',
         severity: 'minor',
-        description: `No dramatic turn lands in the 40%–60% pivot zone (Scenes ${midStart401b}–${midEnd401b - 1}), though ${turnsOutside401b} turns exist elsewhere. The structural midpoint is typically the story's sharpest reversal — the moment where the protagonist's approach must change because the world has shifted. A pivot zone with no pivot passes the geographic center of the story without changing direction, and the second half inherits the same momentum as the first.`,
+        description: `No dramatic turn lands in the 40%–60% pivot zone (Scenes ${midStart401b + 1}–${midEnd401b}), though ${turnsOutside401b} turns exist elsewhere. The structural midpoint is typically the story's sharpest reversal — the moment where the protagonist's approach must change because the world has shifted. A pivot zone with no pivot passes the geographic center of the story without changing direction, and the second half inherits the same momentum as the first.`,
         suggestedFix: 'Place a genuine reversal at the midpoint: a revelation that recasts the protagonist\'s goal, an unexpected alliance or betrayal, or a discovery that forces a new plan. The midpoint turn is what separates Act 2a (approach) from Act 2b (escalation) — without it, the middle is one long undifferentiated stretch.',
       });
     }
@@ -2222,10 +2222,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const anyOverallSusp401c = records.some((r: any) => (r.suspenseDelta ?? 0) > 1);
     if (a3Recs401c.length >= 2 && anyOverallSusp401c && !a3Recs401c.some((r: any) => (r.suspenseDelta ?? 0) > 1)) {
       issues.push({
-        location: `Act 3 (Scenes ${a3Start401c}–${n - 1}) — suspense void`,
+        location: `Act 3 (Scenes ${a3Start401c + 1}–${n}) — suspense void`,
         rule: 'ACT3_SUSPENSE_VOID',
         severity: 'minor',
-        description: `No scene in Act 3 (Scenes ${a3Start401c}–${n - 1}) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The finale resolves without the audience being under pressure — the action happens and the resolution arrives, but no scene in the final act generates the sense of threat and uncertainty that makes an ending feel earned rather than merely arrived at.`,
+        description: `No scene in Act 3 (Scenes ${a3Start401c + 1}–${n}) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The finale resolves without the audience being under pressure — the action happens and the resolution arrives, but no scene in the final act generates the sense of threat and uncertainty that makes an ending feel earned rather than merely arrived at.`,
         suggestedFix: 'Build genuine tension in Act 3: a complication that threatens the resolution, a last-moment reversal, or a confrontation that could go either way. The audience should not be confident of the outcome until it arrives — Act 3 tension is what converts a satisfying plot conclusion into a felt experience.',
       });
     }
@@ -2248,10 +2248,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const anyOverallSusp415 = records.some((r: any) => (r.suspenseDelta ?? 0) > 1);
     if (a1Recs415.length >= 2 && anyOverallSusp415 && !a1Recs415.some((r: any) => (r.suspenseDelta ?? 0) > 1)) {
       issues.push({
-        location: `Act 1 (Scenes 0–${a1End415 - 1}) — suspense void`,
+        location: `Act 1 (Scenes 1–${a1End415}) — suspense void`,
         rule: 'ACT1_SUSPENSE_VOID',
         severity: 'minor',
-        description: `No scene in Act 1 (Scenes 0–${a1End415 - 1}) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The setup establishes the world with no flicker of threat or uncertainty, so the audience has nothing pulling them forward through the opening — the first quarter reads as pure exposition, and the story asks for patience before it has given a reason to keep watching.`,
+        description: `No scene in Act 1 (Scenes 1–${a1End415}) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The setup establishes the world with no flicker of threat or uncertainty, so the audience has nothing pulling them forward through the opening — the first quarter reads as pure exposition, and the story asks for patience before it has given a reason to keep watching.`,
         suggestedFix: 'Introduce a thread of tension in Act 1: a threat glimpsed, a deadline implied, a question of safety raised. The opening does not need a set-piece, but it needs at least one beat where something is at stake — a low hum of suspense in the setup is what makes the audience trust that the story is going somewhere.',
       });
     }
@@ -2273,10 +2273,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const a2aHasTurn415 = a2aRecs415.some((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing');
     if (a2aRecs415.length >= 3 && turnsOutside415a >= 2 && !a2aHasTurn415) {
       issues.push({
-        location: `Act 2a (Scenes ${a2aStart415}–${a2aEnd415 - 1}) — no dramatic turns`,
+        location: `Act 2a (Scenes ${a2aStart415 + 1}–${a2aEnd415}) — no dramatic turns`,
         rule: 'ACT2A_DRAMATIC_TURN_VOID',
         severity: 'minor',
-        description: `The Act 2a approach zone (Scenes ${a2aStart415}–${a2aEnd415 - 1}) contains no dramatic turn, even though ${turnsOutside415a} turns land elsewhere. The stretch where the protagonist first engages the central problem proceeds without a single reversal or recognition, so the approach plays as a flat ramp into the midpoint rather than a series of course-corrections that keep the audience recalibrating.`,
+        description: `The Act 2a approach zone (Scenes ${a2aStart415 + 1}–${a2aEnd415}) contains no dramatic turn, even though ${turnsOutside415a} turns land elsewhere. The stretch where the protagonist first engages the central problem proceeds without a single reversal or recognition, so the approach plays as a flat ramp into the midpoint rather than a series of course-corrections that keep the audience recalibrating.`,
         suggestedFix: 'Build a reversal into Act 2a: a first attempt that fails and forces a new tack, an ally who turns out to have an agenda, a discovery that complicates the protagonist\'s plan. The approach to the midpoint is more compelling as a sequence of small turns than as an uninterrupted build.',
       });
     }
@@ -2299,10 +2299,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const a2bHasTurn415 = a2bRecs415.some((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing');
     if (a2bRecs415.length >= 3 && turnsOutside415b >= 2 && !a2bHasTurn415) {
       issues.push({
-        location: `Act 2b (Scenes ${a2bStart415}–${a2bEnd415 - 1}) — no dramatic turns`,
+        location: `Act 2b (Scenes ${a2bStart415 + 1}–${a2bEnd415}) — no dramatic turns`,
         rule: 'ACT2B_DRAMATIC_TURN_VOID',
         severity: 'minor',
-        description: `The Act 2b escalation zone (Scenes ${a2bStart415}–${a2bEnd415 - 1}) contains no dramatic turn, even though ${turnsOutside415b} turns land elsewhere. The run-up to the climax — where stakes should compound and the situation should keep shifting under the protagonist — proceeds without a single reversal, so the back half of the middle act builds in a straight line into the finale instead of tightening through a series of pivots.`,
+        description: `The Act 2b escalation zone (Scenes ${a2bStart415 + 1}–${a2bEnd415}) contains no dramatic turn, even though ${turnsOutside415b} turns land elsewhere. The run-up to the climax — where stakes should compound and the situation should keep shifting under the protagonist — proceeds without a single reversal, so the back half of the middle act builds in a straight line into the finale instead of tightening through a series of pivots.`,
         suggestedFix: 'Place a reversal in Act 2b: a betrayal that strips away an advantage, a plan that backfires and raises the cost, a revelation that changes what winning requires. The escalation zone earns the climax by repeatedly raising the stakes through turns, not by simply accelerating toward it.',
       });
     }
@@ -2338,10 +2338,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const flat429 = (r: any) => (r.suspenseDelta ?? 0) <= 0 && (r.curiosityDelta ?? 0) <= 0;
       if (flat429(after1_429) && flat429(after2_429)) {
         issues.push({
-          location: `Scenes ${firstCatalystIdx429 + 1}–${firstCatalystIdx429 + 2} (after first catalyst at Scene ${firstCatalystIdx429})`,
+          location: `Scenes ${firstCatalystIdx429 + 2}–${firstCatalystIdx429 + 3} (after first catalyst at Scene ${firstCatalystIdx429 + 1})`,
           rule: 'INCITING_AFTERMATH_STALL',
           severity: 'minor',
-          description: `The story's first dramatic catalyst (Scene ${firstCatalystIdx429}) is followed by two scenes that raise neither suspense nor curiosity — both flat on both channels. The inciting spark fires and the story immediately stalls: the event that should launch the protagonist into the central problem generates no momentum in its wake, so the audience feels the engine catch and die before the journey begins.`,
+          description: `The story's first dramatic catalyst (Scene ${firstCatalystIdx429 + 1}) is followed by two scenes that raise neither suspense nor curiosity — both flat on both channels. The inciting spark fires and the story immediately stalls: the event that should launch the protagonist into the central problem generates no momentum in its wake, so the audience feels the engine catch and die before the journey begins.`,
           suggestedFix: 'Let the catalyst propel the next two scenes: a consequence the protagonist must react to, a question the event opens, a new pressure it introduces. An inciting incident is defined by what it sets in motion — the scenes immediately after it should accelerate, not idle.',
         });
       }
@@ -2383,10 +2383,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       );
       if (!runUpHasDevice429) {
         issues.push({
-          location: `Scenes ${runUpStart429}–${climaxIdx429} (climax run-up, peak suspense ${climaxSusp429.toFixed(1)})`,
+          location: `Scenes ${runUpStart429 + 1}–${climaxIdx429 + 1} (climax run-up, peak suspense ${climaxSusp429.toFixed(1)})`,
           rule: 'CLIMAX_UNPREPARED',
           severity: 'minor',
-          description: `The climax (Scene ${climaxIdx429}, peak suspense ${climaxSusp429.toFixed(1)}) and the two scenes before it carry no revelation and no dramatic turn, even though the story uses ${deviceScenes429} such device scenes elsewhere. The peak erupts without structural run-up — nothing in its approach discloses, pivots, or recontextualises — so the climax arrives as raw intensity the audience has not been armed to feel.`,
+          description: `The climax (Scene ${climaxIdx429 + 1}, peak suspense ${climaxSusp429.toFixed(1)}) and the two scenes before it carry no revelation and no dramatic turn, even though the story uses ${deviceScenes429} such device scenes elsewhere. The peak erupts without structural run-up — nothing in its approach discloses, pivots, or recontextualises — so the climax arrives as raw intensity the audience has not been armed to feel.`,
           suggestedFix: 'Arm the climax in its approach: place a revelation or a dramatic turn in the two scenes feeding it — a truth that surfaces, a reversal that lands, an advantage that vanishes just before the confrontation. The climax should be the detonation of a charge the run-up has been setting, not a sudden spike with no fuse.',
         });
       }
@@ -2420,10 +2420,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     if (bestRunLen429 >= 5 && bestRunLen429 < n) {
       const runPurpose429 = records[bestRunStart429].purpose ?? 'unknown';
       issues.push({
-        location: `Scenes ${bestRunStart429}–${bestRunStart429 + bestRunLen429 - 1} (purpose: "${runPurpose429}")`,
+        location: `Scenes ${bestRunStart429 + 1}–${bestRunStart429 + bestRunLen429} (purpose: "${runPurpose429}")`,
         rule: 'PURPOSE_MONOTONE_RUN',
         severity: 'minor',
-        description: `${bestRunLen429} consecutive scenes (Scenes ${bestRunStart429}–${bestRunStart429 + bestRunLen429 - 1}) all carry the purpose "${runPurpose429}" — a localized structural plateau where the story stops rotating through narrative functions. Even though the script uses other purposes elsewhere, this run serves the same structural job scene after scene with no change of gear, so the audience loses the sense of forward structural motion across the stretch.`,
+        description: `${bestRunLen429} consecutive scenes (Scenes ${bestRunStart429 + 1}–${bestRunStart429 + bestRunLen429}) all carry the purpose "${runPurpose429}" — a localized structural plateau where the story stops rotating through narrative functions. Even though the script uses other purposes elsewhere, this run serves the same structural job scene after scene with no change of gear, so the audience loses the sense of forward structural motion across the stretch.`,
         suggestedFix: `Break the run by varying scene purpose: between the "${runPurpose429}" scenes, insert a reversal, a character-moment that reframes the stakes, or a setup that plants a later payoff. A run of one structural function reads as the story marking time; rotating purposes keeps each scene advancing the architecture, not just the page count.`,
       });
     }
@@ -2489,10 +2489,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         const peakEmotion443b = peakRec443b.emotionalShift ?? 'neutral';
         if (peakEmotion443b !== 'positive' && peakEmotion443b !== 'negative') {
           issues.push({
-            location: `Scene ${peakIdx443b} (peak suspense ${peakSusp443b.toFixed(1)}, emotionalShift: ${peakEmotion443b})`,
+            location: `Scene ${peakIdx443b + 1} (peak suspense ${peakSusp443b.toFixed(1)}, emotionalShift: ${peakEmotion443b})`,
             rule: 'PEAK_SUSPENSE_EMOTIONAL_VACUUM',
             severity: 'minor',
-            description: `The single highest-suspense scene in the story (Scene ${peakIdx443b}, suspenseDelta ${peakSusp443b.toFixed(1)}) carries no emotional charge — emotionalShift is "${peakEmotion443b}" — even though ${emotionalScenes443b.length} other scenes use a non-neutral emotional register. The tensest moment in the script is emotionally blank: the audience feels the machinery of danger but not the human cost of it. A story's suspense peak should fuse both channels simultaneously — the weight of stakes and the feeling of what those stakes mean — so tension and emotion amplify each other rather than operating on separate tracks.`,
+            description: `The single highest-suspense scene in the story (Scene ${peakIdx443b + 1}, suspenseDelta ${peakSusp443b.toFixed(1)}) carries no emotional charge — emotionalShift is "${peakEmotion443b}" — even though ${emotionalScenes443b.length} other scenes use a non-neutral emotional register. The tensest moment in the script is emotionally blank: the audience feels the machinery of danger but not the human cost of it. A story's suspense peak should fuse both channels simultaneously — the weight of stakes and the feeling of what those stakes mean — so tension and emotion amplify each other rather than operating on separate tracks.`,
             suggestedFix: 'Give the peak suspense scene an emotional charge: what does this moment cost the protagonist personally? What relationship hangs in the balance? What hope or fear is crystallised here? The highest-tension scene is the moment when the audience most needs to feel something — align the emotional register with the dramatic register so the peak lands on both levels at once.',
           });
         }
@@ -2645,11 +2645,11 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const nonNeutralCount471a = (records as any[]).filter((r: any) => r.emotionalShift !== 'neutral').length;
       if (peakCurScene471a !== undefined && peakCurScene471a.emotionalShift === 'neutral' && nonNeutralCount471a >= 2) {
         issues.push({
-          location: `Scene ${peakCurScene471a.sceneIdx ?? '?'} — peak curiosity scene (curiosityDelta ${maxCurDelta471a}) is emotionally neutral`,
+          location: `Scene ${peakCurScene471a.sceneIdx != null ? peakCurScene471a.sceneIdx + 1 : '?'} — peak curiosity scene (curiosityDelta ${maxCurDelta471a}) is emotionally neutral`,
           rule: 'CURIOSITY_PEAK_EMOTIONAL_VOID',
           severity: 'minor',
           description: `The scene with the highest curiosityDelta (${maxCurDelta471a}) has emotionalShift = 'neutral' while ${nonNeutralCount471a} other scene(s) carry emotional charge. The script's strongest intellectual hook — the moment that most intensely raises new questions — arrives in an emotionally inert scene. Curiosity without emotional stake is cold: the audience will wonder, but without a concurrent feeling of risk, loss, or hope they lack urgency about finding out. Questions raised during a moment of grief, fear, or joy are felt as more pressing because the emotional investment makes the answer matter, not merely interest.`,
-          suggestedFix: `Give scene ${peakCurScene471a.sceneIdx ?? '?'} an emotional charge — shift its emotionalShift to 'positive' or 'negative' so the peak question arrives when the audience already has something at stake. Alternatively, move the question-raising moment to an existing emotionally charged scene so the intellectual and affective engines reinforce each other in the same beat.`,
+          suggestedFix: `Give scene ${peakCurScene471a.sceneIdx != null ? peakCurScene471a.sceneIdx + 1 : '?'} an emotional charge — shift its emotionalShift to 'positive' or 'negative' so the peak question arrives when the audience already has something at stake. Alternatively, move the question-raising moment to an existing emotionally charged scene so the intellectual and affective engines reinforce each other in the same beat.`,
         });
       }
     }
@@ -2822,11 +2822,11 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         ((next2485c?.relationshipShifts ?? []) as any[]).length > 0;
       if (!hasEmoAftermath485c && !hasRelAftermath485c) {
         issues.push({
-          location: `Scene ${climaxPos485c} — highest-suspense finale scene followed by 2 flat aftermath scenes`,
+          location: `Scene ${climaxPos485c + 1} — highest-suspense finale scene followed by 2 flat aftermath scenes`,
           rule: 'CLIMAX_AFTERMATH_FLAT',
           severity: 'minor',
-          description: `The story's climactic peak (Scene ${climaxPos485c}, suspenseDelta: ${climaxSusp485c}) is followed by two scenes that carry neither an emotional shift nor a relationship shift — the climax produces no human ripple. A climactic moment should detonate consequences: characters should feel what just happened, bonds should shift under the weight of what was resolved. When the two scenes after the highest-tension finale beat are emotionally neutral and relationally static, the climax has been delivered but not processed — the story reaches its peak and then returns to baseline without any character acknowledging what just occurred.`,
-          suggestedFix: `Let Scenes ${climaxPos485c + 1}–${climaxPos485c + 2} carry at least one emotional or relational consequence of what happened at the climax: a character registers relief, grief, or resolution; a bond shifts in the wake of what was just decided or revealed. The aftermath of a climax is where the audience learns what the story meant to the people who lived it — the scenes immediately after the peak are structurally as important as the peak itself.`,
+          description: `The story's climactic peak (Scene ${climaxPos485c + 1}, suspenseDelta: ${climaxSusp485c}) is followed by two scenes that carry neither an emotional shift nor a relationship shift — the climax produces no human ripple. A climactic moment should detonate consequences: characters should feel what just happened, bonds should shift under the weight of what was resolved. When the two scenes after the highest-tension finale beat are emotionally neutral and relationally static, the climax has been delivered but not processed — the story reaches its peak and then returns to baseline without any character acknowledging what just occurred.`,
+          suggestedFix: `Let Scenes ${climaxPos485c + 2}–${climaxPos485c + 3} carry at least one emotional or relational consequence of what happened at the climax: a character registers relief, grief, or resolution; a bond shifts in the wake of what was just decided or revealed. The aftermath of a climax is where the audience learns what the story meant to the people who lived it — the scenes immediately after the peak are structurally as important as the peak itself.`,
         });
       }
     }
@@ -3516,10 +3516,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       const clockScenes569c = (records as any[]).filter(r => r.clockRaised === true);
       if (midRecs569c.length >= 2 && clockScenes569c.length >= 2 && !midRecs569c.some(r => r.clockRaised === true)) {
         issues.push({
-          location: `Midpoint (Scenes ${midStart569c}–${midEnd569c - 1}) — clock void`,
+          location: `Midpoint (Scenes ${midStart569c + 1}–${midEnd569c}) — clock void`,
           rule: 'MIDPOINT_CLOCK_VOID',
           severity: 'minor',
-          description: `The midpoint zone (Scenes ${midStart569c}–${midEnd569c - 1}) contains no scene that raises a clock, even though the story raises deadlines in ${clockScenes569c.length} scenes elsewhere. The midpoint is the structural pivot where a strong story tightens its grip and accelerates the second half out of the turn, and a deadline imposed at the center is one of the most reliable engines for that acceleration. When the exact middle carries no time pressure while clocks fire elsewhere, the pivot passes without urgency — the back half launches without a contracting window to drive it, and the urgency engine goes quiet precisely where the story most needs to re-energize. The audience reaches the center with no felt sense that time is now working against the protagonist.`,
+          description: `The midpoint zone (Scenes ${midStart569c + 1}–${midEnd569c}) contains no scene that raises a clock, even though the story raises deadlines in ${clockScenes569c.length} scenes elsewhere. The midpoint is the structural pivot where a strong story tightens its grip and accelerates the second half out of the turn, and a deadline imposed at the center is one of the most reliable engines for that acceleration. When the exact middle carries no time pressure while clocks fire elsewhere, the pivot passes without urgency — the back half launches without a contracting window to drive it, and the urgency engine goes quiet precisely where the story most needs to re-energize. The audience reaches the center with no felt sense that time is now working against the protagonist.`,
           suggestedFix: `Raise a clock at the midpoint: let the pivot that reframes the story also impose a deadline — a countdown that starts at the center, a window that begins to close as the second half opens, a threat that now carries a timer. The middle of the story is one of the most powerful places to introduce time pressure, because it gives the back half a concrete reason to accelerate rather than merely continue.`,
         });
       }
@@ -3633,10 +3633,10 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           const peakRec583c = (records as any[])[peakIdx583c];
           if ((peakRec583c.curiosityDelta ?? 0) <= 0) {
             issues.push({
-              location: `Scene ${peakIdx583c} (peak suspenseDelta ${peakSusp583c}) — curiosityDelta ≤ 0`,
+              location: `Scene ${peakIdx583c + 1} (peak suspenseDelta ${peakSusp583c}) — curiosityDelta ≤ 0`,
               rule: 'PEAK_SUSPENSE_CURIOSITY_VOID',
               severity: 'minor',
-              description: `The story's highest-tension scene (Scene ${peakIdx583c}, suspenseDelta ${peakSusp583c}) generates no curiosity (curiosityDelta ≤ 0), while ${curiosityScenes583c.length} other scenes raise questions. The tensest scene is a closed pocket of high stakes — the audience's adrenaline spikes without their wondering intensifying. Peak suspense and peak curiosity coinciding makes for a thriller's best moments: not only does the danger spike, but a question opens that pulls the audience forward through it. When the tensest scene raises no question, the peak is climactic without being propulsive: the audience is locked into the moment of danger without the wondering that drives them to find out what comes next.`,
+              description: `The story's highest-tension scene (Scene ${peakIdx583c + 1}, suspenseDelta ${peakSusp583c}) generates no curiosity (curiosityDelta ≤ 0), while ${curiosityScenes583c.length} other scenes raise questions. The tensest scene is a closed pocket of high stakes — the audience's adrenaline spikes without their wondering intensifying. Peak suspense and peak curiosity coinciding makes for a thriller's best moments: not only does the danger spike, but a question opens that pulls the audience forward through it. When the tensest scene raises no question, the peak is climactic without being propulsive: the audience is locked into the moment of danger without the wondering that drives them to find out what comes next.`,
               suggestedFix: `Stage the peak suspense scene so it also opens a question — an unknown that the high-tension moment forces but does not yet answer. A confrontation peaking in danger while leaving the outcome uncertain, a chase that explodes in tension and reveals new information the audience wants to decipher, or a threat at its worst that implies a secret not yet understood all make the peak both gripping and propulsive.`,
             });
           }
@@ -4569,11 +4569,11 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     });
     if (r765c.fires) {
       issues.push({
-        location: `scene ${r765c.peakIdx} (peak curiosityDelta ${r765c.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r765c.peakIdx + 1} (peak curiosityDelta ${r765c.peakMagnitude}) — no preparing cause nearby`,
         rule: 'STRUCTURE_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r765c.peakIdx}, curiosityDelta ${r765c.peakMagnitude}) arrives with no dramatic turn, revelation, or clock raise in the 2 scenes leading into it, even though ${r765c.qualifyingCount} scenes elsewhere do spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the structure hasn't built toward the mystery it's about to pose.`,
-        suggestedFix: `Add a dramatic turn, revelation, or clock raise in one of the 2 scenes before scene ${r765c.peakIdx} so the structure earns its peak curiosity instead of springing it without preparation.`,
+        description: `The story's single highest-curiosity scene (Scene ${r765c.peakIdx + 1}, curiosityDelta ${r765c.peakMagnitude}) arrives with no dramatic turn, revelation, or clock raise in the 2 scenes leading into it, even though ${r765c.qualifyingCount} scenes elsewhere do spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the structure hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn, revelation, or clock raise in one of the 2 scenes before scene ${r765c.peakIdx + 1} so the structure earns its peak curiosity instead of springing it without preparation.`,
       });
     }
   }
@@ -6786,9 +6786,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         if (!eventuallyPaidOff1191 && !staysOpenToEnd1191) continue;
 
         issues.push({
-          location: `Scenes ${laterQualifying1191.join(', ')} (knower: ${knower1191}, since Scene ${k})`,
+          location: `Scenes ${laterQualifying1191.map(x => x + 1).join(', ')} (knower: ${knower1191}, since Scene ${k + 1})`,
           rule: 'IDIOT_PLOT',
-          description: `${knower1191} has known "${clueIds1191[0]}" since Scene ${k} and shares Scenes ${laterQualifying1191.join(', ')} with other characters while the conflict stays open — nobody on the page ever says the one thing that would end it, and there's no concealment motive (no secret/lie vocabulary) to explain the silence.`,
+          description: `${knower1191} has known "${clueIds1191[0]}" since Scene ${k + 1} and shares Scenes ${laterQualifying1191.map(x => x + 1).join(', ')} with other characters while the conflict stays open — nobody on the page ever says the one thing that would end it, and there's no concealment motive (no secret/lie vocabulary) to explain the silence.`,
           severity: 'major',
           suggestedFix: `Either give ${knower1191} an explicit, motivated reason to withhold "${clueIds1191[0]}" (fear, loyalty, a secret worth keeping), or have them share it — and build the next complication from what sharing it changes.`,
         });
@@ -6819,9 +6819,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           const anyOverlap1191 = keyWords1191.some(w => earlierText1191.includes(w));
           if (!anyOverlap1191) {
             issues.push({
-              location: `Scene ${peak1191.i} (${peak1191.r.slug})`,
+              location: `Scene ${peak1191.i + 1} (${peak1191.r.slug})`,
               rule: 'UNSEEDED_TWIST',
-              description: `Scene ${peak1191.i}'s late reversal ("${peak1191.r.dramaticTurn}") shares zero content words with any earlier scene — none of its key terms (${keyWords1191.slice(0, 4).join(', ')}) appear anywhere before it. The audience has no lexical foothold for this turn; it lands as information invented for the twist, not the payoff of anything planted.`,
+              description: `Scene ${peak1191.i + 1}'s late reversal ("${peak1191.r.dramaticTurn}") shares zero content words with any earlier scene — none of its key terms (${keyWords1191.slice(0, 4).join(', ')}) appear anywhere before it. The audience has no lexical foothold for this turn; it lands as information invented for the twist, not the payoff of anything planted.`,
               severity: 'major',
               suggestedFix: `Plant at least one of this turn's key terms in an earlier scene — a passing mention, an object glimpsed, a name spoken once — so an attentive rewatch finds the seed even if the first watch doesn't.`,
             });
@@ -6943,11 +6943,11 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         }
         for (const idx of breaks.slice(0, SCC_DETAIL_CAP)) {
           issues.push({
-            location: `Scene ${idx}`,
+            location: `Scene ${idx + 1}`,
             rule: 'SCENE_CONTINUITY_COLLAPSE',
             severity: 'major',
-            description: `Scene ${idx} opens with no speaking character carried over from the previous scene AND flips day/night at the same cut — in a document whose overall continuity index is already below the scrambled-order line (${Math.round(charCont * 100)}% adjacent-character continuity vs ${Math.round(thrash * 100)}% day/night thrash). Each such cut forces the reader to re-orient on both WHO and WHEN simultaneously.`,
-            suggestedFix: `Bridge the cut into Scene ${idx}: carry one character across it, or hold the time-of-day — re-orienting the reader on one axis per cut is craft; both at once, this often, is disorder.`,
+            description: `Scene ${idx + 1} opens with no speaking character carried over from the previous scene AND flips day/night at the same cut — in a document whose overall continuity index is already below the scrambled-order line (${Math.round(charCont * 100)}% adjacent-character continuity vs ${Math.round(thrash * 100)}% day/night thrash). Each such cut forces the reader to re-orient on both WHO and WHEN simultaneously.`,
+            suggestedFix: `Bridge the cut into Scene ${idx + 1}: carry one character across it, or hold the time-of-day — re-orienting the reader on one axis per cut is craft; both at once, this often, is disorder.`,
           });
         }
         if (breaks.length > SCC_DETAIL_CAP) {

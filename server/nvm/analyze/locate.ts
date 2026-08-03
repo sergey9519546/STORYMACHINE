@@ -144,7 +144,13 @@ function resolveLocation(
 ): { anchor: IssueAnchor; startLine?: number; endLine?: number } {
   const sceneMatch = SCENE_RE.exec(location);
   if (sceneMatch) {
-    const idx = parseInt(sceneMatch[1], 10);
+    // Labels are 1-based ("Scene 1" is the first scene — the numbering the
+    // writer sees, matching the heatmap), so decode to the 0-based span
+    // index here. Before the 2026-08 label migration the passes emitted raw
+    // 0-based sceneIdx values and this parse consumed them verbatim; the two
+    // bugs cancelled. Now the label is correct and this boundary owns the
+    // conversion.
+    const idx = parseInt(sceneMatch[1], 10) - 1;
     const span = sceneSpans[idx];
     return span
       ? { anchor: 'scene', startLine: span.startLine, endLine: span.endLine }

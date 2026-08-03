@@ -851,7 +851,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           issues.push({
             location: `Character: ${displayName}`,
             rule: 'CHARACTER_LATE_INTRODUCTION',
-            description: `${displayName} is a major character (${count} scenes) but first appears at Scene ${firstScene}, past the midpoint (Scene ${midpoint}) — the audience has no time to invest in them before they matter`,
+            description: `${displayName} is a major character (${count} scenes) but first appears at Scene ${firstScene + 1}, past the midpoint (Scene ${midpoint + 1}) — the audience has no time to invest in them before they matter`,
             severity: 'major',
             suggestedFix: `Introduce ${displayName} (or plant their existence) in the first half of the story so their later prominence feels earned, not arbitrary`,
           });
@@ -878,9 +878,9 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         alternations++;
         if (alternations === 3) {
           issues.push({
-            location: `Scenes ${whiplashStart}–${i}`,
+            location: `Scenes ${whiplashStart + 1}–${i + 1}`,
             rule: 'EMOTIONAL_WHIPLASH',
-            description: `Scenes ${whiplashStart}–${i} alternate emotional polarity 3+ times with no neutral grounding (positive↔negative) — rapid oscillation feels manipulative rather than earned`,
+            description: `Scenes ${whiplashStart + 1}–${i + 1} alternate emotional polarity 3+ times with no neutral grounding (positive↔negative) — rapid oscillation feels manipulative rather than earned`,
             severity: 'minor',
             suggestedFix: 'Let one emotional state breathe across two scenes before flipping. Give the audience a moment to absorb a feeling before reversing it.',
           });
@@ -932,7 +932,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       .filter(r => r.emotionalShift === 'positive').length;
     if (act2NegCount >= 2 && act3PosCount === 0) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start}–${records.length - 1})`,
+        location: `Act 3 (Scenes ${act3Start + 1}–${records.length})`,
         rule: 'ARC_RESOLUTION_ABSENT',
         description: `Act 2 has ${act2NegCount} negative emotional shifts (struggle) but Act 3 has no positive shifts — the protagonist's internal arc ends without catharsis or transformation`,
         severity: 'major',
@@ -988,7 +988,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const act2Records = records.slice(act2Start, act2End);
     if (act2Records.length >= 3 && act2Records.every(r => r.emotionalShift === 'neutral')) {
       issues.push({
-        location: `Act 2 (Scenes ${act2Start}–${act2End - 1})`,
+        location: `Act 2 (Scenes ${act2Start + 1}–${act2End})`,
         rule: 'ARC_STALL_IN_ACT2',
         description: `All ${act2Records.length} Act 2 scenes are emotionally neutral — the conflict zone registers no emotional charge. The protagonist neither grows nor suffers across the story's entire middle.`,
         severity: 'major',
@@ -1055,9 +1055,9 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         climaxRecord.revelation === null;
       if (isHollow) {
         issues.push({
-          location: `Scene ${climaxRecord.sceneIdx} (climax)`,
+          location: `Scene ${climaxRecord.sceneIdx + 1} (climax)`,
           rule: 'ARC_CLIMAX_VOID',
-          description: `The climax scene (Scene ${climaxRecord.sceneIdx}) is emotionally neutral, has no relationship shift, and contains no revelation — the story's designated peak moment carries no dramatic weight.`,
+          description: `The climax scene (Scene ${climaxRecord.sceneIdx + 1}) is emotionally neutral, has no relationship shift, and contains no revelation — the story's designated peak moment carries no dramatic weight.`,
           severity: 'major',
           suggestedFix: 'The climax must carry the maximum emotional charge of the story: a revelation that recontextualizes everything, a relationship that breaks or transforms, or a moment of profound personal cost. The peak cannot be empty.',
         });
@@ -1077,7 +1077,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     if (openA.emotionalShift === 'neutral' && openB.emotionalShift === 'neutral' &&
         openA.revelation === null && openB.revelation === null) {
       issues.push({
-        location: 'Scenes 0–1 (opening)',
+        location: 'Scenes 1–2 (opening)',
         rule: 'ARC_OPENING_VOID',
         description: 'The opening two scenes are emotionally neutral with no revelation — the story begins without establishing the protagonist\'s emotional baseline. The arc has no departure point to measure transformation against.',
         severity: 'minor',
@@ -1116,7 +1116,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const lastShiftB = records[records.length - 1].emotionalShift ?? 'neutral';
     if (firstShiftB !== 'neutral' && lastShiftB !== 'neutral' && firstShiftB === lastShiftB) {
       issues.push({
-        location: `Scene 0 → Scene ${records.length - 1}`,
+        location: `Scene 1 → Scene ${records.length}`,
         rule: 'ARC_BOOKEND_IDENTICAL',
         description: `The story opens and closes with the same emotional register (${firstShiftB}) — the first and final scenes are emotionally identical. The character returns to where they started rather than arriving somewhere new.`,
         severity: 'minor',
@@ -1172,10 +1172,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         const support213 = Math.max(...arcDyn213.slice(Math.max(0, i213 - 2), i213 + 1).map(d => d.catalyst));
         if (swing213 >= 1 && support213 === 0) {
           issues.push({
-            location: `Scene ${i213}`,
+            location: `Scene ${i213 + 1}`,
             rule: 'ARC_LATE_TURN_UNSUPPORTED',
             severity: 'major',
-            description: `Scene ${i213} delivers a positive emotional turn with a swing of ${swing213} (climbing from a trough of ${priorTrough213}), but the support window carries zero causal catalyst — no revelation, no payoff, no major relationship shift, and no suspense resolution motivates the change. The protagonist transforms without cause.`,
+            description: `Scene ${i213 + 1} delivers a positive emotional turn with a swing of ${swing213} (climbing from a trough of ${priorTrough213}), but the support window carries zero causal catalyst — no revelation, no payoff, no major relationship shift, and no suspense resolution motivates the change. The protagonist transforms without cause.`,
             suggestedFix: 'Motivate the turn with a real catalyst in the two scenes before it: a discovered truth (revelation), a planted setup paying off, a relationship decisively shifting (|amount| ≥ 0.3), or a clock/threat resolving. The magnitude of the emotional swing must be matched by the magnitude of its cause.',
           });
           break;
@@ -1203,10 +1203,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const midZoneLen213 = midEnd213 - midStart213;
     if (midZoneLen213 >= 2 && act2OutsideVelocity213 > 0 && midVelocity213 === 0) {
       issues.push({
-        location: `Scenes ${midStart213}–${midEnd213 - 1}`,
+        location: `Scenes ${midStart213 + 1}–${midEnd213}`,
         rule: 'ARC_MIDPOINT_INERT',
         severity: 'minor',
-        description: `The midpoint zone (scenes ${midStart213}–${midEnd213 - 1}) registers zero emotional velocity — the emotional state never turns — while act 2 on either side carries ${act2OutsideVelocity213} units of movement. The structural centre of the story, where the great reversal belongs, is dramatically static.`,
+        description: `The midpoint zone (scenes ${midStart213 + 1}–${midEnd213}) registers zero emotional velocity — the emotional state never turns — while act 2 on either side carries ${act2OutsideVelocity213} units of movement. The structural centre of the story, where the great reversal belongs, is dramatically static.`,
         suggestedFix: 'Engineer a true turn at the midpoint: drive the emotional state in one direction and then reverse it, or commit the protagonist irrevocably so the register flips. The midpoint must be the pivot of the arc, not a plateau — a held tone, even a positive one, is still a flat line through the story\'s spine.',
       });
     }
@@ -1266,10 +1266,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasMidRelOrRev228) {
         issues.push({
-          location: `Midpoint zone (Scenes ${midStart228}–${midEnd228 - 1})`,
+          location: `Midpoint zone (Scenes ${midStart228 + 1}–${midEnd228})`,
           rule: 'ARC_MIDPOINT_RELATIONAL_VOID',
           severity: 'major',
-          description: `Scenes ${midStart228}–${midEnd228 - 1} (the structural midpoint, 40%–60%) contain no relationship shifts and no revelations. The story's fulcrum — where arcs must reverse — is empty of interpersonal events. Nothing changes between characters at the moment the story needs its central pivot.`,
+          description: `Scenes ${midStart228 + 1}–${midEnd228} (the structural midpoint, 40%–60%) contain no relationship shifts and no revelations. The story's fulcrum — where arcs must reverse — is empty of interpersonal events. Nothing changes between characters at the moment the story needs its central pivot.`,
           suggestedFix: 'Plant a relationship-altering event or revelation in the midpoint zone: a disclosure that shifts an alliance, a secret exposed, or a relationship that decisively changes direction. The midpoint must carry the weight of the story\'s central dramatic reversal.',
         });
       }
@@ -1289,10 +1289,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasAct3RelShift228) {
         issues.push({
-          location: `Act 3 (Scenes ${act3Start228}–${records.length - 1})`,
+          location: `Act 3 (Scenes ${act3Start228 + 1}–${records.length})`,
           rule: 'ARC_FINAL_ACT_CHARACTER_STATIC',
           severity: 'major',
-          description: `Act 3 (scenes ${act3Start228}–${records.length - 1}, ${act3Records228.length} scenes) contains no relationship shifts — the resolution phase ends without any relational conclusion. Characters leave the story in the same relational positions they held at the start of Act 3.`,
+          description: `Act 3 (scenes ${act3Start228 + 1}–${records.length}, ${act3Records228.length} scenes) contains no relationship shifts — the resolution phase ends without any relational conclusion. Characters leave the story in the same relational positions they held at the start of Act 3.`,
           suggestedFix: 'The final act must contain at least one relationship shift that closes the story\'s central relational arc: a reconciliation, a final estrangement, an alliance confirmed or broken. A resolution without a relational event is hollow.',
         });
       }
@@ -1316,7 +1316,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     );
     if (!hasAct1Shift242) {
       issues.push({
-        location: `Act 1 (Scenes 0–${act1End242 - 1}) — relational layer`,
+        location: `Act 1 (Scenes 1–${act1End242}) — relational layer`,
         rule: 'ARC_ACT1_RELATIONAL_DESERT',
         severity: 'major',
         description: `Act 1 (the first ${act1End242} scenes) contains no relationship shifts — the setup establishes characters but leaves the relational world blank. The audience enters Act 2 with no established bonds, rivalries, or trust patterns to invest in.`,
@@ -1343,10 +1343,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasMidPosShift242) {
         issues.push({
-          location: `Midpoint zone (Scenes ${midStart242}–${midEnd242 - 1})`,
+          location: `Midpoint zone (Scenes ${midStart242 + 1}–${midEnd242})`,
           rule: 'ARC_POSITIVE_MIDPOINT_ABSENT',
           severity: 'minor',
-          description: `The midpoint zone (Scenes ${midStart242}–${midEnd242 - 1}) contains no positive relationship shift — the structural pivot carries only negative or absent relational movement. Without a "false dawn" at the midpoint, the story has no emotional contrast at its centre: just a continuous descent from Act 1 into Act 3.`,
+          description: `The midpoint zone (Scenes ${midStart242 + 1}–${midEnd242}) contains no positive relationship shift — the structural pivot carries only negative or absent relational movement. Without a "false dawn" at the midpoint, the story has no emotional contrast at its centre: just a continuous descent from Act 1 into Act 3.`,
           suggestedFix: "Add a positive relational beat at the midpoint: a trust restored, a new alliance forming, an unexpected warmth between adversaries. Even a small positive shift at the fulcrum creates the 'peak before the collapse' that gives Act 2b its emotional weight.",
         });
       }
@@ -1491,10 +1491,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const span270 = shiftIdxList270[shiftIdxList270.length - 1] - shiftIdxList270[0];
       if (span270 <= 2) {
         issues.push({
-          location: `Scenes ${shiftIdxList270.join(', ')} — relational concentration`,
+          location: `Scenes ${shiftIdxList270.map(x => x + 1).join(', ')} — relational concentration`,
           rule: 'ARC_SHIFT_CONCENTRATION',
           severity: 'minor',
-          description: `All ${shiftScenes270.size} scenes with relationship shifts are packed within a ${span270 + 1}-scene window (scenes ${shiftIdxList270.join(', ')}). Every relational change the story makes happens in a single concentrated burst — trust, power, and intimacy that should shift gradually across the arc are compressed into one stretch, reading as sudden event rather than organic development.`,
+          description: `All ${shiftScenes270.size} scenes with relationship shifts are packed within a ${span270 + 1}-scene window (scenes ${shiftIdxList270.map(x => x + 1).join(', ')}). Every relational change the story makes happens in a single concentrated burst — trust, power, and intimacy that should shift gradually across the arc are compressed into one stretch, reading as sudden event rather than organic development.`,
           suggestedFix: 'Distribute relationship shifts across the full arc. Let early scenes establish the baseline, mid-story scenes strain the relationship, and late scenes either repair or break it permanently. Relational change that accumulates over time reads as earned; concentrated change reads as contrived.',
         });
       }
@@ -1516,10 +1516,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const lateShiftScenes270 = (records as any[]).filter(r => r.sceneIdx >= finalActStart270 && (r.relationshipShifts as any[] ?? []).length > 0);
       if (lateShiftScenes270.length === 0) {
         issues.push({
-          location: `Final quarter (scene ${finalActStart270}+) — relational void`,
+          location: `Final quarter (scene ${finalActStart270 + 1}+) — relational void`,
           rule: 'ARC_LATE_RELATIONAL_VOID',
           severity: 'minor',
-          description: `${totalShifts270} relationship shifts occur across the story but none appear in the final quarter (scene ${finalActStart270}+). The climax has no relational movement — characters enter the resolution with fully settled bonds and the outcome costs nothing relationally. The final act confirms rather than completes the character arc.`,
+          description: `${totalShifts270} relationship shifts occur across the story but none appear in the final quarter (scene ${finalActStart270 + 1}+). The climax has no relational movement — characters enter the resolution with fully settled bonds and the outcome costs nothing relationally. The final act confirms rather than completes the character arc.`,
           suggestedFix: 'Add at least one relationship shift in the final act: a reconciliation, a definitive break, an unexpected alliance. The climax should change at least one relationship permanently — the audience needs to see the relational cost or reward of everything that came before it.',
         });
       }
@@ -1540,10 +1540,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const finalPosScenes284 = posShiftScenes284.filter(r => r.sceneIdx >= finalStart284);
       if (finalPosScenes284.length === 0) {
         issues.push({
-          location: `Final quarter (scene ${finalStart284}+) — no positive emotional shift`,
+          location: `Final quarter (scene ${finalStart284 + 1}+) — no positive emotional shift`,
           rule: 'ARC_EMOTIONAL_RESOLUTION_ABSENT',
           severity: 'minor',
-          description: `${posShiftScenes284.length} positive emotional shift scene(s) exist across the story but none occur in the final quarter (scene ${finalStart284}+). The arc never resolves upward — characters enter the climax with established positive capacity but the resolution denies any positive beat. Even in a tragedy, one moment of recognition, relief, or acceptance gives the ending its emotional weight.`,
+          description: `${posShiftScenes284.length} positive emotional shift scene(s) exist across the story but none occur in the final quarter (scene ${finalStart284 + 1}+). The arc never resolves upward — characters enter the climax with established positive capacity but the resolution denies any positive beat. Even in a tragedy, one moment of recognition, relief, or acceptance gives the ending its emotional weight.`,
           suggestedFix: 'Add at least one positive emotional shift in the final quarter — a brief triumph before the fall, a moment of clarity, a reconciliation, or a character accepting their fate with grace. Emotional resolution does not mean a happy ending; it means the arc completes rather than trailing off.',
         });
       }
@@ -1564,7 +1564,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const lateRevScenes284 = revScenes284.filter(r => r.sceneIdx >= finalStart284b);
       if (lateRevScenes284.length / revScenes284.length > 0.60) {
         issues.push({
-          location: `Final quarter (scene ${finalStart284b}+) — revelation cluster`,
+          location: `Final quarter (scene ${finalStart284b + 1}+) — revelation cluster`,
           rule: 'ARC_REVELATION_LATE_CLUSTER',
           severity: 'minor',
           description: `${lateRevScenes284.length} of ${revScenes284.length} revelation(s) (${Math.round(lateRevScenes284.length / revScenes284.length * 100)}%) occur in the final quarter. Revelations should be seeded throughout the arc to build accumulating understanding; clustering them at the end creates an information avalanche and flattens the earlier acts' dramatic stakes.`,
@@ -1589,10 +1589,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const avgCuriosity284 = act2bRecs284.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / act2bRecs284.length;
       if (avgCuriosity284 <= 0) {
         issues.push({
-          location: `Act 2b (scenes ${act2bStart284}–${act2bEnd284}) — curiosity plateau`,
+          location: `Act 2b (scenes ${act2bStart284 + 1}–${act2bEnd284}) — curiosity plateau`,
           rule: 'ARC_CURIOSITY_PLATEAU',
           severity: 'minor',
-          description: `Average curiosityDelta across Act 2b (scenes ${act2bStart284}–${act2bEnd284}) is ${avgCuriosity284.toFixed(2)} — audience curiosity stagnates or falls during the arc's escalation window. Act 2b should be the engine that drives the audience toward the climax; a plateau or descent here causes dramatic momentum to collapse before the finale.`,
+          description: `Average curiosityDelta across Act 2b (scenes ${act2bStart284 + 1}–${act2bEnd284}) is ${avgCuriosity284.toFixed(2)} — audience curiosity stagnates or falls during the arc's escalation window. Act 2b should be the engine that drives the audience toward the climax; a plateau or descent here causes dramatic momentum to collapse before the finale.`,
           suggestedFix: 'Escalate mystery and stakes in Act 2b: introduce new complications, deepen unanswered questions, and raise the cost of failure. Each scene in this window should leave the audience more uncertain about the outcome than the scene before it.',
         });
       }
@@ -1688,10 +1688,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const secondHalfCharged312 = secondHalf312.filter(r => r.emotionalShift !== 'neutral').length;
       if (firstHalfFlat312 && secondHalfCharged312 >= 2) {
         issues.push({
-          location: `First half (Scenes 0–${halfIdx312 - 1}) — emotionally flat`,
+          location: `First half (Scenes 1–${halfIdx312}) — emotionally flat`,
           rule: 'ARC_FIRST_HALF_EMOTIONALLY_FLAT',
           severity: 'minor',
-          description: `Every scene in the first half (0–${halfIdx312 - 1}) is emotionally neutral, while the second half carries ${secondHalfCharged312} charged beats — the character's emotional arc does not begin until the back half. The entire setup and early complication zone play out at one flat pitch, so the audience spends half the story with no emotional read on the protagonist.`,
+          description: `Every scene in the first half (1–${halfIdx312}) is emotionally neutral, while the second half carries ${secondHalfCharged312} charged beats — the character's emotional arc does not begin until the back half. The entire setup and early complication zone play out at one flat pitch, so the audience spends half the story with no emotional read on the protagonist.`,
           suggestedFix: 'Seed emotional movement in the first half: a loss, a hope, a fear, a small win that establishes the protagonist\'s emotional baseline and starts the arc early. A character the audience cannot feel for in the first half is one they have no reason to follow into the second.',
         });
       }
@@ -1832,10 +1832,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const firstHalfCharged351 = firstHalf351.filter(r => r.emotionalShift !== 'neutral').length;
       if (secondHalfFlat351 && firstHalfCharged351 >= 2) {
         issues.push({
-          location: `Second half (Scenes ${halfIdx351}–${records.length - 1}) — emotionally flat`,
+          location: `Second half (Scenes ${halfIdx351 + 1}–${records.length}) — emotionally flat`,
           rule: 'ARC_SECOND_HALF_EMOTIONALLY_FLAT',
           severity: 'minor',
-          description: `Every scene in the second half (${halfIdx351}–${records.length - 1}) is emotionally neutral, while the first half carried ${firstHalfCharged351} charged beats — the protagonist's emotional arc runs out of fuel exactly when the stakes should be peaking. The complication zone, climax, and resolution all play at one flat pitch, so the audience's emotional investment built in the first half is never paid off.`,
+          description: `Every scene in the second half (${halfIdx351 + 1}–${records.length}) is emotionally neutral, while the first half carried ${firstHalfCharged351} charged beats — the protagonist's emotional arc runs out of fuel exactly when the stakes should be peaking. The complication zone, climax, and resolution all play at one flat pitch, so the audience's emotional investment built in the first half is never paid off.`,
           suggestedFix: 'Carry emotion through the back half and intensify it toward the climax: the second half is where the costs come due, so the protagonist should feel them most sharply there. A character who stops reacting at the midpoint reads as a spectator to their own ending.',
         });
       }
@@ -1861,10 +1861,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const positiveAfterFall351 = (records as any[]).some((r, i) => i >= firstNegIdx351 && r.emotionalShift === 'positive');
       if (!positiveAfterFall351) {
         issues.push({
-          location: `Emotional recovery (first fall at Scene ${(records as any[])[firstNegIdx351].sceneIdx})`,
+          location: `Emotional recovery (first fall at Scene ${(records as any[])[firstNegIdx351].sceneIdx + 1})`,
           rule: 'ARC_EMOTIONAL_RECOVERY_ABSENT',
           severity: 'minor',
-          description: `The protagonist suffers ${negPositions351.length} negative emotional beats and the story shows positive emotion elsewhere, but no positive beat lands at or after the first fall (Scene ${(records as any[])[firstNegIdx351].sceneIdx}) — all the joy is front-loaded, and once the descent begins the character never rises again. A relentless downslope with no flicker of recovery exhausts the audience and removes the contrast that makes the lowest point land.`,
+          description: `The protagonist suffers ${negPositions351.length} negative emotional beats and the story shows positive emotion elsewhere, but no positive beat lands at or after the first fall (Scene ${(records as any[])[firstNegIdx351].sceneIdx + 1}) — all the joy is front-loaded, and once the descent begins the character never rises again. A relentless downslope with no flicker of recovery exhausts the audience and removes the contrast that makes the lowest point land.`,
           suggestedFix: 'Give the protagonist at least one moment of recovery after the descent begins — a small win, a kindness, a flash of hope — even if it is later snatched away. The rhythm of fall-and-partial-recovery is what keeps a downward arc dramatic rather than merely grim; an unbroken slide numbs.',
         });
       }
@@ -1887,10 +1887,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const secondHalfShiftScenes351 = secondHalf351b.filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0).length;
       if (!firstHalfHasShift351 && secondHalfShiftScenes351 >= 2) {
         issues.push({
-          location: `First half (Scenes 0–${halfIdx351b - 1}) — relationally flat`,
+          location: `First half (Scenes 1–${halfIdx351b}) — relationally flat`,
           rule: 'ARC_RELATIONAL_FIRST_HALF_FLAT',
           severity: 'minor',
-          description: `No scene in the first half (0–${halfIdx351b - 1}) carries a relationship shift, while the second half carries ${secondHalfShiftScenes351} — the protagonist's relational arc does not begin until the back half. The setup and first complication zone establish the world without ever moving a bond, so the audience reaches the midpoint with no felt relationships to invest in before the story starts changing them.`,
+          description: `No scene in the first half (1–${halfIdx351b}) carries a relationship shift, while the second half carries ${secondHalfShiftScenes351} — the protagonist's relational arc does not begin until the back half. The setup and first complication zone establish the world without ever moving a bond, so the audience reaches the midpoint with no felt relationships to invest in before the story starts changing them.`,
           suggestedFix: 'Move a relationship early: let a bond warm, fray, or shift in the first half so the audience has a relational stake before the midpoint. The connections the back half puts under pressure land harder when the first half has already made the audience care about them.',
         });
       }
@@ -1913,10 +1913,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const peakSusp365 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSuspense365);
       if (peakSusp365 && peakSusp365.emotionalShift === 'neutral') {
         issues.push({
-          location: `Scene ${peakSusp365.sceneIdx} — peak suspense (${maxSuspense365.toFixed(2)})`,
+          location: `Scene ${peakSusp365.sceneIdx + 1} — peak suspense (${maxSuspense365.toFixed(2)})`,
           rule: 'ARC_PEAK_SUSPENSE_EMOTION_ABSENT',
           severity: 'minor',
-          description: `The story's highest-suspense scene (Scene ${peakSusp365.sceneIdx}, suspenseDelta ${maxSuspense365.toFixed(2)}) carries a neutral emotional shift, even though the protagonist shows emotion in other scenes. At the single most tense moment of the story, the character feels nothing — the danger spikes but never touches them, so the audience experiences the peak as plot mechanics rather than as a crisis for someone they care about.`,
+          description: `The story's highest-suspense scene (Scene ${peakSusp365.sceneIdx + 1}, suspenseDelta ${maxSuspense365.toFixed(2)}) carries a neutral emotional shift, even though the protagonist shows emotion in other scenes. At the single most tense moment of the story, the character feels nothing — the danger spikes but never touches them, so the audience experiences the peak as plot mechanics rather than as a crisis for someone they care about.`,
           suggestedFix: "Charge the peak-suspense scene emotionally: the moment of maximum danger should be the moment the protagonist feels the most — terror, desperate resolve, the cost of what's at risk. The story's tensest scene is the worst possible place for the character to be a neutral observer.",
         });
       }
@@ -1938,10 +1938,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const peakCur365 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCuriosity365);
       if (peakCur365 && peakCur365.emotionalShift === 'neutral') {
         issues.push({
-          location: `Scene ${peakCur365.sceneIdx} — peak curiosity (${maxCuriosity365.toFixed(2)})`,
+          location: `Scene ${peakCur365.sceneIdx + 1} — peak curiosity (${maxCuriosity365.toFixed(2)})`,
           rule: 'ARC_PEAK_CURIOSITY_EMOTION_ABSENT',
           severity: 'minor',
-          description: `The story's highest-curiosity scene (Scene ${peakCur365.sceneIdx}, curiosityDelta ${maxCuriosity365.toFixed(2)}) carries a neutral emotional shift, even though the protagonist shows emotion elsewhere. At the moment the audience is most urgently wondering what happens next, the character feels nothing — the intrigue spikes but never lands as a personal stake, so the peak plays as a puzzle to solve rather than a crisis to dread or hope through.`,
+          description: `The story's highest-curiosity scene (Scene ${peakCur365.sceneIdx + 1}, curiosityDelta ${maxCuriosity365.toFixed(2)}) carries a neutral emotional shift, even though the protagonist shows emotion elsewhere. At the moment the audience is most urgently wondering what happens next, the character feels nothing — the intrigue spikes but never lands as a personal stake, so the peak plays as a puzzle to solve rather than a crisis to dread or hope through.`,
           suggestedFix: "Tie the peak-curiosity moment to the protagonist's emotional life: the question the audience is most desperate to answer should also be the one the character most fears or most hopes for. Intrigue becomes drama when the unknown threatens or promises something the protagonist feels.",
         });
       }
@@ -1989,7 +1989,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const span379 = chargedIdxs379[chargedIdxs379.length - 1] - chargedIdxs379[0];
       if (span379 <= Math.floor(records.length * 0.2) && neutralCount379 / records.length >= 0.5) {
         issues.push({
-          location: `Emotional beats clustered in Scenes ${(records as any[])[chargedIdxs379[0]].sceneIdx}–${(records as any[])[chargedIdxs379[chargedIdxs379.length - 1]].sceneIdx}`,
+          location: `Emotional beats clustered in Scenes ${(records as any[])[chargedIdxs379[0]].sceneIdx + 1}–${(records as any[])[chargedIdxs379[chargedIdxs379.length - 1]].sceneIdx + 1}`,
           rule: 'ARC_EMOTION_CONCENTRATION',
           severity: 'minor',
           description: `All ${chargedIdxs379.length} of the protagonist's emotional beats fall within a ${span379}-scene span (≤20% of the story), while ${neutralCount379} of ${records.length} scenes are emotionally neutral. The character's emotional life bursts in a single chapter and stays flat before and after it — feeling is a localized event rather than a through-line, so the audience's investment spikes once and then has nothing to ride.`,
@@ -2051,10 +2051,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const s379 = (records as any[])[maxNegStart379].sceneIdx;
       const e379 = (records as any[])[maxNegStart379 + maxNegRun379 - 1].sceneIdx;
       issues.push({
-        location: `Scenes ${s379}–${e379} — unbroken negative run (${maxNegRun379} scenes)`,
+        location: `Scenes ${s379 + 1}–${e379 + 1} — unbroken negative run (${maxNegRun379} scenes)`,
         rule: 'ARC_NEGATIVE_EMOTION_RUN',
         severity: 'minor',
-        description: `${maxNegRun379} consecutive scenes (${s379}–${e379}) carry a negative emotional shift with no positive or neutral beat to break the descent. An unbroken stretch of despair exhausts the audience and erases the contrast that makes any single low point land — relentless gloom reads as monotone rather than tragedy, and the audience numbs to suffering that never lets up.`,
+        description: `${maxNegRun379} consecutive scenes (${s379 + 1}–${e379 + 1}) carry a negative emotional shift with no positive or neutral beat to break the descent. An unbroken stretch of despair exhausts the audience and erases the contrast that makes any single low point land — relentless gloom reads as monotone rather than tragedy, and the audience numbs to suffering that never lets up.`,
         suggestedFix: 'Break the descent with at least one beat of relief, hope, or even grim humor inside the run — a small win later snatched away, a moment of connection before the next blow. The rhythm of fall-and-respite is what keeps a downward arc dramatic; an unbroken slide flattens into noise.',
       });
     }
@@ -2113,10 +2113,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const s393 = (records as any[])[maxPosStart393].sceneIdx;
       const e393 = (records as any[])[maxPosStart393 + maxPosRun393 - 1].sceneIdx;
       issues.push({
-        location: `Scenes ${s393}–${e393} — unbroken positive run (${maxPosRun393} scenes)`,
+        location: `Scenes ${s393 + 1}–${e393 + 1} — unbroken positive run (${maxPosRun393} scenes)`,
         rule: 'ARC_POSITIVE_EMOTION_RUN',
         severity: 'minor',
-        description: `${maxPosRun393} consecutive scenes (${s393}–${e393}) carry a positive emotional shift with no negative or neutral beat to interrupt the upswing. An unbroken run of good feeling drains tension — without a setback to threaten the gains, the ascent reads as frictionless and the audience stops worrying, so the run plays as wish-fulfillment rather than earned progress.`,
+        description: `${maxPosRun393} consecutive scenes (${s393 + 1}–${e393 + 1}) carry a positive emotional shift with no negative or neutral beat to interrupt the upswing. An unbroken run of good feeling drains tension — without a setback to threaten the gains, the ascent reads as frictionless and the audience stops worrying, so the run plays as wish-fulfillment rather than earned progress.`,
         suggestedFix: 'Interrupt the upswing with a complication or cost: a win that creates a new problem, a gain shadowed by what it threatens. The rhythm of progress-and-setback is what keeps a rising arc dramatic; an unbroken climb of good feeling lulls the audience instead of gripping them.',
       });
     }
@@ -2138,7 +2138,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const mid393b = Math.floor(records.length * 0.5);
     if (negIdxs393.length >= 2 && negIdxs393.every(i => i < mid393b)) {
       issues.push({
-        location: `Negative beats all in the first half (latest at Scene ${(records as any[])[negIdxs393[negIdxs393.length - 1]].sceneIdx})`,
+        location: `Negative beats all in the first half (latest at Scene ${(records as any[])[negIdxs393[negIdxs393.length - 1]].sceneIdx + 1})`,
         rule: 'ARC_LATE_LOW_POINT_ABSENT',
         severity: 'minor',
         description: `The protagonist suffers ${negIdxs393.length} negative emotional beats, but every one falls in the first half — the back half contains no emotional nadir before the climax. The "all is lost" low point that should precede the final push is missing from where it belongs, so the protagonist coasts into the climax without being broken down first, and the victory loses the contrast that would make it land.`,
@@ -2223,10 +2223,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const posAfterFirstNeg407 = posSceneIdx407.some(i => i > firstNeg407);
       if (!posAfterFirstNeg407) {
         issues.push({
-          location: `No relational repair after the first fracture (Scene ${(records as any[])[firstNeg407].sceneIdx})`,
+          location: `No relational repair after the first fracture (Scene ${(records as any[])[firstNeg407].sceneIdx + 1})`,
           rule: 'ARC_RELATIONAL_RECOVERY_ABSENT',
           severity: 'minor',
-          description: `The story breaks a bond ${negSceneIdx407.length} times and has the capacity for relational warmth (a positive shift exists), but no relationship ever moves the right way after the first fracture at Scene ${(records as any[])[firstNeg407].sceneIdx}. Once the first bond breaks, the relational world enters a one-way decline — all the warmth lives before the first betrayal, and the back half is unrelieved erosion with no repair to hope for.`,
+          description: `The story breaks a bond ${negSceneIdx407.length} times and has the capacity for relational warmth (a positive shift exists), but no relationship ever moves the right way after the first fracture at Scene ${(records as any[])[firstNeg407].sceneIdx + 1}. Once the first bond breaks, the relational world enters a one-way decline — all the warmth lives before the first betrayal, and the back half is unrelieved erosion with no repair to hope for.`,
           suggestedFix: 'Place at least one relational repair after the first fracture: a reconciliation, a new trust formed in the wreckage of an old one, an unexpected ally. Even a tragic arc lands harder when a moment of repair gives the audience something to lose again — relentless relational decline numbs where alternating break-and-mend keeps the bonds alive.',
         });
       }
@@ -2286,10 +2286,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       );
       if (peakShiftScene421b.emotionalShift === 'neutral' && hasEmotionElsewhere421b) {
         issues.push({
-          location: `Scene ${peakShiftScene421b.sceneIdx} (peak relationship shift — emotionally neutral)`,
+          location: `Scene ${peakShiftScene421b.sceneIdx + 1} (peak relationship shift — emotionally neutral)`,
           rule: 'ARC_PEAK_RELATIONAL_EMOTION_ABSENT',
           severity: 'minor',
-          description: `The scene with the story's largest relationship shift (Scene ${peakShiftScene421b.sceneIdx}) is emotionally neutral — the protagonist's most dramatic bond event, the sharpest deepening or worst fracture, registers as no emotional state change. When the peak relational moment produces no emotion while other scenes carry feeling, the audience learns that the bonds don't actually matter to anyone in the story, so the biggest relational event fails to land.`,
+          description: `The scene with the story's largest relationship shift (Scene ${peakShiftScene421b.sceneIdx + 1}) is emotionally neutral — the protagonist's most dramatic bond event, the sharpest deepening or worst fracture, registers as no emotional state change. When the peak relational moment produces no emotion while other scenes carry feeling, the audience learns that the bonds don't actually matter to anyone in the story, so the biggest relational event fails to land.`,
           suggestedFix: `Give the peak relational scene an emotional charge: the scene where a bond moves most sharply should be the scene where the protagonist feels most intensely — joy, grief, betrayal, or relief. The audience mirrors the protagonist's emotional state; if the protagonist registers nothing at their most extreme relational moment, the audience registers nothing either.`,
         });
       }
@@ -2319,10 +2319,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const hasOutsideMid421c = shiftIdxs421c.some(i => !(i >= midS421c && i < midE421c));
       if (!hasMidShift421c && hasOutsideMid421c) {
         issues.push({
-          location: `Midpoint zone (Scenes ${midS421c}–${midE421c - 1}) — no relationship shift`,
+          location: `Midpoint zone (Scenes ${midS421c + 1}–${midE421c}) — no relationship shift`,
           rule: 'ARC_RELATIONAL_MIDPOINT_VOID',
           severity: 'minor',
-          description: `No relationship shifts occurs in the story's midpoint zone (Scenes ${midS421c}–${midE421c - 1}) though shifts exist elsewhere. The midpoint is where the protagonist typically crosses from reactivity to agency, and it is the zone where their relational world should be most actively in motion — alliances forming or fracturing, loyalties tested, the cost of the protagonist's goal becoming visible through its impact on bonds. A relational void at the pivot means the story's structural fulcrum has no interpersonal weight.`,
+          description: `No relationship shifts occurs in the story's midpoint zone (Scenes ${midS421c + 1}–${midE421c}) though shifts exist elsewhere. The midpoint is where the protagonist typically crosses from reactivity to agency, and it is the zone where their relational world should be most actively in motion — alliances forming or fracturing, loyalties tested, the cost of the protagonist's goal becoming visible through its impact on bonds. A relational void at the pivot means the story's structural fulcrum has no interpersonal weight.`,
           suggestedFix: `Place at least one relationship shift in the midpoint zone: a trust extended or broken at the halfway point grounds the structural pivot in the protagonist's relational world, making the story's turn feel personal rather than mechanical. The scene where everything changes for the protagonist should also change something between them and at least one other character.`,
         });
       }
@@ -2436,10 +2436,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           const prior2_435c = (records as any[])[peakRelPos435c - 2];
           if (!isDriver435c(prior1_435c) && !isDriver435c(prior2_435c)) {
             issues.push({
-              location: `Scene ${peakRelRec435c.sceneIdx} — peak relational density (${peakRelCount435c} shifts), no causal setup`,
+              location: `Scene ${peakRelRec435c.sceneIdx + 1} — peak relational density (${peakRelCount435c} shifts), no causal setup`,
               rule: 'ARC_PEAK_RELATIONAL_UNCAUSED',
               severity: 'minor',
-              description: `Scene ${peakRelRec435c.sceneIdx} contains ${peakRelCount435c} relationship shifts — the densest relational moment in the story — but neither of the two preceding scenes carries a causal driver (emotional charge, revelation, clock raised, or dramatic turn). Relationships change most sharply when precipitated by something that forces the shift: a revelation that reframes trust, a deadline that collapses loyalty, a dramatic turn that reorganizes alliances. Without that preparation, the relational peak appears arbitrary — bonds change densely because the story requires it, not because the narrative made it inevitable.`,
+              description: `Scene ${peakRelRec435c.sceneIdx + 1} contains ${peakRelCount435c} relationship shifts — the densest relational moment in the story — but neither of the two preceding scenes carries a causal driver (emotional charge, revelation, clock raised, or dramatic turn). Relationships change most sharply when precipitated by something that forces the shift: a revelation that reframes trust, a deadline that collapses loyalty, a dramatic turn that reorganizes alliances. Without that preparation, the relational peak appears arbitrary — bonds change densely because the story requires it, not because the narrative made it inevitable.`,
               suggestedFix: `Plant a causal driver in one or two scenes before the densest relational moment: a revelation that reframes how characters see each other, a dramatic turn that forces a loyalty choice, a clock that concentrates allegiance under pressure. The scene where the most bonds shift at once should feel like the scene everything was pointing toward — prepared by the preceding scenes, not dropped from the sky.`,
             });
           }
@@ -2788,10 +2788,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       }
       if (!hasCause477c) {
         issues.push({
-          location: `Scene ${(records as any[])[peakPos477c].sceneIdx} — script's final positive-emotion scene, no prior causal driver`,
+          location: `Scene ${(records as any[])[peakPos477c].sceneIdx + 1} — script's final positive-emotion scene, no prior causal driver`,
           rule: 'ARC_PEAK_POSITIVE_UNCAUSED',
           severity: 'minor',
-          description: `The script's final positive-emotion scene (Scene ${(records as any[])[peakPos477c].sceneIdx}) — the most structurally climactic moment of joy or triumph — has no revelation, no dramatic turn, and no suspense rise in the two preceding scenes. The protagonist's peak positive moment arrives without any narrative driver: no discovery produced the victory, no reversal set it in motion, and no escalating pressure preceded the relief. The most emotionally significant positive beat should be the hardest-won — caused by a specific story event that the audience has watched build. An uncaused climactic joy feels like a tonal gift rather than a dramatic resolution.`,
+          description: `The script's final positive-emotion scene (Scene ${(records as any[])[peakPos477c].sceneIdx + 1}) — the most structurally climactic moment of joy or triumph — has no revelation, no dramatic turn, and no suspense rise in the two preceding scenes. The protagonist's peak positive moment arrives without any narrative driver: no discovery produced the victory, no reversal set it in motion, and no escalating pressure preceded the relief. The most emotionally significant positive beat should be the hardest-won — caused by a specific story event that the audience has watched build. An uncaused climactic joy feels like a tonal gift rather than a dramatic resolution.`,
           suggestedFix: `Plant a causal driver in one or both of the two scenes before the climactic positive moment: a revelation whose truth paves the way for the victory, a dramatic turn that opens the door to the positive outcome, or an escalating suspense beat that the positive scene resolves. The goal is that the audience can trace a line from a specific narrative event to the emotional peak — so the joy feels earned by the story, not granted by the author.`,
         });
       }
@@ -2824,11 +2824,11 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           if (peakIsNeutral491a) {
             const peakRec491a = (records as any[])[peakClockIdx491a];
             issues.push({
-              location: `Scene ${peakRec491a.sceneIdx} (${peakRec491a.slug}) — peak clockDelta (${maxClockDelta491a}) is emotionally neutral`,
+              location: `Scene ${peakRec491a.sceneIdx + 1} (${peakRec491a.slug}) — peak clockDelta (${maxClockDelta491a}) is emotionally neutral`,
               rule: 'ARC_CLOCK_PEAK_EMOTION_ABSENT',
               severity: 'minor',
               description: `The scene with the greatest time-pressure escalation (clockDelta ${maxClockDelta491a}) is emotionally neutral, while ${emotionalScenes491a.length} other scenes carry emotional charge. The story's maximum deadline moment — the single most urgent clock beat — passes without the protagonist registering any felt response. Clock pressure should generate experienced stakes: urgency that translates into the protagonist's emotional state, turning a logistical escalation into a felt crisis. When the clock peak is emotionally inert while the story otherwise carries feeling, the deadline system is decoupled from the character's inner life at precisely the moment of maximum urgency.`,
-              suggestedFix: `Give scene ${peakRec491a.sceneIdx} an emotional shift — negative (the weight of the deadline landing as dread or despair) or positive (desperate hope or defiance against the clock). The protagonist's peak urgency moment should also be their most emotionally pressured moment: the clock and the feeling should compound rather than run on parallel tracks.`,
+              suggestedFix: `Give scene ${peakRec491a.sceneIdx + 1} an emotional shift — negative (the weight of the deadline landing as dread or despair) or positive (desperate hope or defiance against the clock). The protagonist's peak urgency moment should also be their most emotionally pressured moment: the clock and the feeling should compound rather than run on parallel tracks.`,
             });
           }
         }
@@ -3137,10 +3137,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           const peakHasRel533a = ((peakRec533a.relationshipShifts ?? []) as any[]).length > 0;
           if (!peakHasRel533a) {
             issues.push({
-              location: `Scene ${peakRec533a.sceneIdx} (${peakRec533a.slug}) — peak curiosityDelta (${maxCur533a}) with no relationship shift`,
+              location: `Scene ${peakRec533a.sceneIdx + 1} (${peakRec533a.slug}) — peak curiosityDelta (${maxCur533a}) with no relationship shift`,
               rule: 'ARC_CURIOSITY_PEAK_RELATIONAL_VOID',
               severity: 'minor',
-              description: `The scene with the story's highest curiosityDelta (${maxCur533a} at scene ${peakRec533a.sceneIdx}) carries no relationship shift, despite the story having ${relScenes533a.length} scene(s) where bonds do move. The story's maximum moment of audience wonder — the apex of the mystery engine — is interpersonally inert: no bond is tested, deepened, or altered at the peak of intrigue. The most powerful wonder moments tend to be socially inhabited, because what we want to know about the plot is often entangled with what we want to know about the people. When the peak of curiosity is relationally void, the story's maximum intrigue is a purely intellectual event — audiences are gripped by the question but not by who will be affected by its answer.`,
+              description: `The scene with the story's highest curiosityDelta (${maxCur533a} at scene ${peakRec533a.sceneIdx + 1}) carries no relationship shift, despite the story having ${relScenes533a.length} scene(s) where bonds do move. The story's maximum moment of audience wonder — the apex of the mystery engine — is interpersonally inert: no bond is tested, deepened, or altered at the peak of intrigue. The most powerful wonder moments tend to be socially inhabited, because what we want to know about the plot is often entangled with what we want to know about the people. When the peak of curiosity is relationally void, the story's maximum intrigue is a purely intellectual event — audiences are gripped by the question but not by who will be affected by its answer.`,
               suggestedFix: `Give the scene with the highest curiosityDelta a relationship dimension: a bond tested by the mystery, a character whose relationship to another shifts as the intrigue peaks, or a disclosure that simultaneously raises a question and moves a human connection. The peak of audience wondering is the moment the story can most powerfully root the mystery in the people the audience cares about — the wonder becomes both intellectual and emotional.`,
             });
           }
@@ -3252,11 +3252,11 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         ).length;
         if (openingSuspCount547a === 0) {
           issues.push({
-            location: `Opening third (scenes 0–${third547a - 1}) — no suspense-positive scene`,
+            location: `Opening third (scenes 1–${third547a}) — no suspense-positive scene`,
             rule: 'ARC_SUSPENSE_OPENING_ZONE_ABSENT',
             severity: 'minor',
-            description: `The opening structural third of the story (scenes 0–${third547a - 1}) contains no scene with a positive suspenseDelta — the setup zone is entirely tension-free — while ${suspScenes547a.length} suspense-positive scenes exist in the remaining two-thirds. The opening third is when the audience forms their first understanding of the stakes: what the protagonist has to lose, what danger the world contains, what makes the situation feel pressing. When the setup zone carries no raised tension, the audience enters the story without the felt pressure that would give the protagonist's choices dramatic weight. Tension that only begins after the opening third asks the audience to invest in events before they have been given any reason to care what happens.`,
-            suggestedFix: `Place at least one suspense-positive scene in the opening third (scenes 0–${third547a - 1}): a moment where the stakes are made tangible through rising tension — a threat introduced, a deadline implied, a danger made real. The opening zone doesn't need the story's maximum tension, but it needs enough to tell the audience that what they are watching has consequences: that the protagonist's world is one where things can go wrong, and are beginning to.`,
+            description: `The opening structural third of the story (scenes 1–${third547a}) contains no scene with a positive suspenseDelta — the setup zone is entirely tension-free — while ${suspScenes547a.length} suspense-positive scenes exist in the remaining two-thirds. The opening third is when the audience forms their first understanding of the stakes: what the protagonist has to lose, what danger the world contains, what makes the situation feel pressing. When the setup zone carries no raised tension, the audience enters the story without the felt pressure that would give the protagonist's choices dramatic weight. Tension that only begins after the opening third asks the audience to invest in events before they have been given any reason to care what happens.`,
+            suggestedFix: `Place at least one suspense-positive scene in the opening third (scenes 1–${third547a}): a moment where the stakes are made tangible through rising tension — a threat introduced, a deadline implied, a danger made real. The opening zone doesn't need the story's maximum tension, but it needs enough to tell the audience that what they are watching has consequences: that the protagonist's world is one where things can go wrong, and are beginning to.`,
           });
         }
       }
@@ -4640,11 +4640,11 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     });
     if (r771a.fires) {
       issues.push({
-        location: `scene ${r771a.peakIdx} (peak suspenseDelta ${r771a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r771a.peakIdx + 1} (peak suspenseDelta ${r771a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'ARC_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r771a.peakIdx}, suspenseDelta ${r771a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r771a.qualifyingCount} scenes elsewhere carry tension. The moment the character is most gripped lands out of nowhere — the arc hasn't built toward the pressure it's about to test them with.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r771a.peakIdx} so the character's arc builds toward the peak instead of springing it without preparation.`,
+        description: `The story's single highest-suspense scene (Scene ${r771a.peakIdx + 1}, suspenseDelta ${r771a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r771a.qualifyingCount} scenes elsewhere carry tension. The moment the character is most gripped lands out of nowhere — the arc hasn't built toward the pressure it's about to test them with.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r771a.peakIdx + 1} so the character's arc builds toward the peak instead of springing it without preparation.`,
       });
     }
   }

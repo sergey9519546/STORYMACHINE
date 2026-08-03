@@ -707,9 +707,9 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     if (maxShiftScene < climaxStart && maxShiftMagnitude >= 1.5) {
       // Major shift happened before climax third
       issues.push({
-        location: `Scene ${maxShiftScene}`,
+        location: `Scene ${maxShiftScene + 1}`,
         rule: 'RELATIONSHIP_CLIMAX_TIMING',
-        description: `The story's most significant relationship shift (magnitude ${maxShiftMagnitude.toFixed(1)}, ${Math.abs(maxShiftMagnitude) > 0 ? (maxShiftMagnitude > 0 ? 'warming' : 'souring') : 'shifting'}) occurs at Scene ${maxShiftScene}, before the climax begins (Scene ${climaxStart}+) — the emotional high point lands early, not with maximum impact`,
+        description: `The story's most significant relationship shift (magnitude ${maxShiftMagnitude.toFixed(1)}, ${Math.abs(maxShiftMagnitude) > 0 ? (maxShiftMagnitude > 0 ? 'warming' : 'souring') : 'shifting'}) occurs at Scene ${maxShiftScene + 1}, before the climax begins (Scene ${climaxStart + 1}+) — the emotional high point lands early, not with maximum impact`,
         severity: 'major',
         suggestedFix: 'Delay or recontextualize the major relationship beat to occur during the climactic act so its emotional weight lands at the story\'s crescendo',
       });
@@ -746,9 +746,9 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         const [a, b] = pairKey.split('|');
         const direction = reversal.before > 0 ? 'warming to souring' : 'souring to warming';
         issues.push({
-          location: `${a} ↔ ${b} at Scene ${reversal.sceneIdx}`,
+          location: `${a} ↔ ${b} at Scene ${reversal.sceneIdx + 1}`,
           rule: 'RELATIONSHIP_UNEARNED_REVERSAL',
-          description: `The relationship between ${a} and ${b} reverses from ${direction} at Scene ${reversal.sceneIdx}, but no prior scene plants tension or conflict to justify the flip — the reversal feels arbitrary`,
+          description: `The relationship between ${a} and ${b} reverses from ${direction} at Scene ${reversal.sceneIdx + 1}, but no prior scene plants tension or conflict to justify the flip — the reversal feels arbitrary`,
           severity: 'major',
           suggestedFix: 'Add a setup scene 1-2 beats before the reversal that plants the seed for this relationship shift (a betrayal hint, a moment of doubt, or a hidden motive revealed)',
         });
@@ -815,9 +815,9 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       if (stats.shifts.length >= 3 && stats.shifts[0].sceneIdx >= midpoint) {
         const [a, b] = pairKey.split('|');
         issues.push({
-          location: `${a} ↔ ${b} (first shift: Scene ${stats.shifts[0].sceneIdx})`,
+          location: `${a} ↔ ${b} (first shift: Scene ${stats.shifts[0].sceneIdx + 1})`,
           rule: 'LATE_RELATIONSHIP_INTRODUCTION',
-          description: `The relationship between ${a} and ${b} (${stats.shifts.length} shifts) doesn't begin until Scene ${stats.shifts[0].sceneIdx} — past the story's midpoint. There isn't enough story left to earn the emotional weight of this bond.`,
+          description: `The relationship between ${a} and ${b} (${stats.shifts.length} shifts) doesn't begin until Scene ${stats.shifts[0].sceneIdx + 1} — past the story's midpoint. There isn't enough story left to earn the emotional weight of this bond.`,
           severity: 'major',
           suggestedFix: 'Introduce the first shift between these characters earlier — at least one beat before the midpoint — so the relationship has room to develop before it carries dramatic weight',
         });
@@ -840,7 +840,7 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
     if (firstHalfShifts >= 3 && secondHalfShifts === 0) {
       issues.push({
-        location: `Relational arc (Scenes ${midpoint}–${records.length - 1})`,
+        location: `Relational arc (Scenes ${midpoint + 1}–${records.length})`,
         rule: 'RELATIONSHIP_VELOCITY_COLLAPSE',
         description: `${firstHalfShifts} relationship shifts occur in the first half of the story but none in the second half — relational momentum collapses at the midpoint, when it should be building toward climax`,
         severity: 'major',
@@ -914,9 +914,9 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         if (!hasLater) {
           const [a, b] = pairKey.split('|');
           issues.push({
-            location: `${a} ↔ ${b} (rupture at Scene ${rupture.sceneIdx})`,
+            location: `${a} ↔ ${b} (rupture at Scene ${rupture.sceneIdx + 1})`,
             rule: 'UNRESOLVED_RELATIONSHIP_RUPTURE',
-            description: `The bond between ${a} and ${b} ruptures hard at Scene ${rupture.sceneIdx} (shift ${rupture.amount.toFixed(1)}) but the story never returns to them — no later beat addresses the break. The emotional thread is opened and left dangling with room to spare.`,
+            description: `The bond between ${a} and ${b} ruptures hard at Scene ${rupture.sceneIdx + 1} (shift ${rupture.amount.toFixed(1)}) but the story never returns to them — no later beat addresses the break. The emotional thread is opened and left dangling with room to spare.`,
             severity: 'major',
             suggestedFix: `Give this rupture a payoff before the end: a reconciliation, a final confrontation, or at least a beat that registers the cost of the break. A relationship the story bothered to fracture deserves a scene that closes the wound or names it as permanent.`,
           });
@@ -990,10 +990,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       const pairsShifted = new Set((r.relationshipShifts ?? []).map(s => s.pairKey));
       if (pairsShifted.size >= 3) {
         issues.push({
-          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          location: `Scene ${r.sceneIdx + 1} (${r.slug})`,
           rule: 'CLUSTER_SHIFT_SCENE',
           severity: 'minor',
-          description: `Scene ${r.sceneIdx} simultaneously shifts ${pairsShifted.size} different character pairs — a "relationship explosion" where every bond moves at once. This strains plausibility and dilutes the impact of each individual shift.`,
+          description: `Scene ${r.sceneIdx + 1} simultaneously shifts ${pairsShifted.size} different character pairs — a "relationship explosion" where every bond moves at once. This strains plausibility and dilutes the impact of each individual shift.`,
           suggestedFix: 'Distribute the relationship shifts across multiple scenes. Let each shift land separately so the audience can absorb and register it before the next one arrives.',
         });
         break;
@@ -1014,10 +1014,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       .some(r => (r.relationshipShifts ?? []).length > 0);
     if (!hasAct3Shift) {
       issues.push({
-        location: `Act 3 (Scenes ${act3Start203}–${records.length - 1})`,
+        location: `Act 3 (Scenes ${act3Start203 + 1}–${records.length})`,
         rule: 'RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT',
         severity: 'major',
-        description: `The story accumulates ${totalShifts} relationship shifts but none occur in Act 3 (Scene ${act3Start203} onward). The climax has no relational dimension — character bonds go silent at the story's highest-stakes moment.`,
+        description: `The story accumulates ${totalShifts} relationship shifts but none occur in Act 3 (Scene ${act3Start203 + 1} onward). The climax has no relational dimension — character bonds go silent at the story's highest-stakes moment.`,
         suggestedFix:
           'Add at least one relationship shift during the climax: a trust break under pressure, a reconciliation, or a power inversion. The audience needs to feel how the bonds resolve, not just how the plot resolves.',
       });
@@ -1045,10 +1045,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           if (maxSuspense203 < 1) {
             const [a, b] = pairKey.split('|');
             issues.push({
-              location: `${a} ↔ ${b} (Scenes ${rupture203.sceneIdx}–${recovery203.sceneIdx})`,
+              location: `${a} ↔ ${b} (Scenes ${rupture203.sceneIdx + 1}–${recovery203.sceneIdx + 1})`,
               rule: 'RAPID_RECONCILIATION',
               severity: 'minor',
-              description: `The bond between ${a} and ${b} ruptures (${rupture203.amount.toFixed(1)}) at Scene ${rupture203.sceneIdx} and reconciles (${recovery203.amount.toFixed(1)}) just ${dist203} scene(s) later with no tension in between — the wound heals before the audience can feel it.`,
+              description: `The bond between ${a} and ${b} ruptures (${rupture203.amount.toFixed(1)}) at Scene ${rupture203.sceneIdx + 1} and reconciles (${recovery203.amount.toFixed(1)}) just ${dist203} scene(s) later with no tension in between — the wound heals before the audience can feel it.`,
               suggestedFix:
                 'Let the rupture breathe: insert 2–3 scenes of genuine consequence before the reconciliation. The characters should earn their way back to each other through difficulty — not simply reset.',
             });
@@ -1073,7 +1073,7 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         if (Math.abs(earlyNet203) >= 0.8) {
           const [a, b] = pairKey.split('|');
           issues.push({
-            location: `${a} ↔ ${b} (last shift: Scene ${earlyShifts203[earlyShifts203.length - 1].sceneIdx})`,
+            location: `${a} ↔ ${b} (last shift: Scene ${earlyShifts203[earlyShifts203.length - 1].sceneIdx + 1})`,
             rule: 'RELATIONSHIP_PAYOFF_ABANDONED',
             severity: 'major',
             description: `The relationship between ${a} and ${b} builds a net arc of ${earlyNet203.toFixed(2)} in the first 60% of the story, then vanishes — no shifts occur in the final 40%. The relational engine cuts out before the ending it promised.`,
@@ -1220,7 +1220,7 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       );
       if (!hasPosResolution234) {
         issues.push({
-          location: `Act 3 (Scenes ${act3Start234}–${records.length - 1})`,
+          location: `Act 3 (Scenes ${act3Start234 + 1}–${records.length})`,
           rule: 'RELATIONSHIP_RESOLUTION_VOID',
           severity: 'major',
           description: `Act 3 contains relationship shifts but none are positive — the story's resolution phase ends without any relational closure. All Act 3 relational movement is negative or zero; no bond is brought to a positive conclusion in the finale.`,
@@ -1247,10 +1247,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         if (windowEnd248 - windowStart248 <= 2) {
           const [a248, b248] = pairKey248.split('|');
           issues.push({
-            location: `${a248} ↔ ${b248} (Scenes ${windowStart248}–${windowEnd248})`,
+            location: `${a248} ↔ ${b248} (Scenes ${windowStart248 + 1}–${windowEnd248 + 1})`,
             rule: 'PAIR_VELOCITY_SPIKE',
             severity: 'minor',
-            description: `The relationship between ${a248} and ${b248} accumulates ${3} shifts in a ${windowEnd248 - windowStart248 + 1}-scene window (Scenes ${windowStart248}–${windowEnd248}) — the bond changes more in a 3-scene burst than most relationships change in an entire arc. Rapid-fire relationship shifts feel imposed rather than earned.`,
+            description: `The relationship between ${a248} and ${b248} accumulates ${3} shifts in a ${windowEnd248 - windowStart248 + 1}-scene window (Scenes ${windowStart248 + 1}–${windowEnd248 + 1}) — the bond changes more in a 3-scene burst than most relationships change in an entire arc. Rapid-fire relationship shifts feel imposed rather than earned.`,
             suggestedFix: `Space the shifts for ${a248} and ${b248}: let each change settle and generate a consequence before the next arrives. A relationship that moves on three fronts simultaneously has no time to dramatise the cost of each shift.`,
           });
           break;
@@ -1274,7 +1274,7 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     );
     if (!hasAct1Shift248) {
       issues.push({
-        location: `Act 1 (Scenes 0–${act1End248 - 1}) — relationship layer`,
+        location: `Act 1 (Scenes 1–${act1End248}) — relationship layer`,
         rule: 'RELATIONSHIP_ACT1_DESERT',
         severity: 'major',
         description: `Act 1 (the first ${act1End248} scenes) contains no relationship shifts — the setup introduces characters but leaves the relational world blank. The audience enters Act 2 with no established bonds, rivalries, or alliances to invest in or see tested.`,
@@ -1304,10 +1304,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       const maxFinal248 = Math.max(...finalShiftScenes248);
       if (maxFinal248 - minFinal248 <= 2) {
         issues.push({
-          location: `Act 3 relational convergence (Scenes ${minFinal248}–${maxFinal248})`,
+          location: `Act 3 relational convergence (Scenes ${minFinal248 + 1}–${maxFinal248 + 1})`,
           rule: 'MULTI_PAIR_CLIMAX_CONVERGENCE',
           severity: 'minor',
-          description: `${finalShiftScenes248.length} relationship pairs each complete their final shift within a ${maxFinal248 - minFinal248 + 1}-scene window in Act 3 (Scenes ${minFinal248}–${maxFinal248}) — every arc resolves simultaneously. A relational pileup in the climax dilutes every individual bond's landing; none can receive the dramatic weight it deserves.`,
+          description: `${finalShiftScenes248.length} relationship pairs each complete their final shift within a ${maxFinal248 - minFinal248 + 1}-scene window in Act 3 (Scenes ${minFinal248 + 1}–${maxFinal248 + 1}) — every arc resolves simultaneously. A relational pileup in the climax dilutes every individual bond's landing; none can receive the dramatic weight it deserves.`,
           suggestedFix: 'Stagger the relational resolutions: let each significant pair have its own closing moment, spaced across Act 3. The final scene between two characters should stand out in the audience\'s memory; when all pairs close simultaneously, none of them does.',
         });
       }
@@ -1360,10 +1360,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       if (stats262b.shifts.every(s => s.sceneIdx === firstScene262b)) {
         const [a262b, b262b] = pairKey262b.split('|');
         issues.push({
-          location: `${a262b} ↔ ${b262b} (Scene ${firstScene262b})`,
+          location: `${a262b} ↔ ${b262b} (Scene ${firstScene262b + 1})`,
           rule: 'PAIR_SINGLE_SCENE_ARC',
           severity: 'minor',
-          description: `The entire relationship arc between ${a262b} and ${b262b} (${stats262b.shifts.length} shifts) happens inside a single scene (Scene ${firstScene262b}) — the bond changes completely in one beat and then never moves again. An arc compressed into one scene isn't an arc; it's an event the rest of the story leaves undeveloped.`,
+          description: `The entire relationship arc between ${a262b} and ${b262b} (${stats262b.shifts.length} shifts) happens inside a single scene (Scene ${firstScene262b + 1}) — the bond changes completely in one beat and then never moves again. An arc compressed into one scene isn't an arc; it's an event the rest of the story leaves undeveloped.`,
           suggestedFix: `Distribute the ${a262b}–${b262b} shifts across the story: plant the relationship early, complicate it in the middle, resolve it near the end. A relationship that does all its changing in one scene denies the audience the slow build that makes the change matter.`,
         });
         break;
@@ -1411,10 +1411,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     );
     if (!hasMiddleShift276) {
       issues.push({
-        location: `Middle act (Scenes ${midStart276}–${midEnd276 - 1})`,
+        location: `Middle act (Scenes ${midStart276 + 1}–${midEnd276})`,
         rule: 'RELATIONSHIP_MIDPOINT_FREEZE',
         severity: 'minor',
-        description: `No relationship shifts occur in the middle 50% of the story (Scenes ${midStart276}–${midEnd276 - 1}) — all relational activity is confined to the bookend acts. The long conflict zone, where pressure on bonds should peak, is relationally silent.`,
+        description: `No relationship shifts occur in the middle 50% of the story (Scenes ${midStart276 + 1}–${midEnd276}) — all relational activity is confined to the bookend acts. The long conflict zone, where pressure on bonds should peak, is relationally silent.`,
         suggestedFix: 'Plant at least one relationship shift in the middle act: a betrayal under pressure, an alliance tested by competing loyalties, or a trust shift driven by Act 2 reversals. The story\'s central conflict should leave marks on its central relationships.',
       });
     }
@@ -1479,10 +1479,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     );
     if (burstShifts290 === totalShifts) {
       issues.push({
-        location: `Opening 25% (scenes 0–${cutoff290 - 1}) — all relational activity`,
+        location: `Opening 25% (scenes 1–${cutoff290}) — all relational activity`,
         rule: 'RELATIONSHIP_OPENING_BURST',
         severity: 'minor',
-        description: `All ${totalShifts} relationship shift(s) occur in the first 25% of the story (scenes 0–${cutoff290 - 1}) — the relational world is fully established before Act 2 begins and then freezes. Bonds established this early with no further movement read as fixed character traits rather than living relationships.`,
+        description: `All ${totalShifts} relationship shift(s) occur in the first 25% of the story (scenes 1–${cutoff290}) — the relational world is fully established before Act 2 begins and then freezes. Bonds established this early with no further movement read as fixed character traits rather than living relationships.`,
         suggestedFix: 'Distribute relationship activity across all four acts: use Act 1 to establish bonds, Act 2 to stress-test them, and Act 3 to resolve them. A relationship that only moves at the start has no arc — just a starting position.',
       });
     }
@@ -1674,10 +1674,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     );
     if (!hasAct2bShift318) {
       issues.push({
-        location: `Act 2b (Scenes ${act2bStart318}–${act2bEnd318 - 1}) — relational silence`,
+        location: `Act 2b (Scenes ${act2bStart318 + 1}–${act2bEnd318}) — relational silence`,
         rule: 'RELATIONSHIP_ACT2B_DESERT',
         severity: 'minor',
-        description: `No relationship shifts occur in Act 2b (Scenes ${act2bStart318}–${act2bEnd318 - 1}) — the complication zone's second half is relationally silent. The run-up to the climax generates no bond movement. Character relationships should be under their maximum pressure in the lead-up to the Act 3 turn; silence here means the climax arrives without relational stakes.`,
+        description: `No relationship shifts occur in Act 2b (Scenes ${act2bStart318 + 1}–${act2bEnd318}) — the complication zone's second half is relationally silent. The run-up to the climax generates no bond movement. Character relationships should be under their maximum pressure in the lead-up to the Act 3 turn; silence here means the climax arrives without relational stakes.`,
         suggestedFix: 'Plant at least one relationship shift in Act 2b: a trust test under pressure, an alliance strained by competing goals, or a revelation that reframes a bond. The approach to climax should be the most relationally charged zone, not the quietest.',
       });
     }
@@ -1730,10 +1730,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
     if (activePairs329.length >= 3 && earlyPeakCount329 / activePairs329.length > 0.6) {
       issues.push({
-        location: `Opening 30% (scenes 0–${earlyEnd329 - 1}) — peak shift concentration`,
+        location: `Opening 30% (scenes 1–${earlyEnd329}) — peak shift concentration`,
         rule: 'PAIR_EARLY_PEAK_MAJORITY',
         severity: 'minor',
-        description: `${earlyPeakCount329} of ${activePairs329.length} pairs (${Math.round(earlyPeakCount329 / activePairs329.length * 100)}%) reach their maximum relational intensity in the first 30% of scenes (scenes 0–${earlyEnd329 - 1}). When most bonds peak before the complication zone, there is no relational escalation — the story has nowhere to go after Act 1 in terms of bond intensity.`,
+        description: `${earlyPeakCount329} of ${activePairs329.length} pairs (${Math.round(earlyPeakCount329 / activePairs329.length * 100)}%) reach their maximum relational intensity in the first 30% of scenes (scenes 1–${earlyEnd329}). When most bonds peak before the complication zone, there is no relational escalation — the story has nowhere to go after Act 1 in terms of bond intensity.`,
         suggestedFix: "Reserve each pair's most intense shift for its structural role: Act 2 peaks should surpass Act 1, and the climax should surpass both. Front-loaded intensity leaves no room for escalation and makes the later story feel like a cool-down rather than a build-up.",
       });
     }
@@ -1846,8 +1846,8 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       }
     }
     if (maxRun343 >= Math.ceil(records.length * 0.4)) {
-      const s343 = (records as any[])[maxStart343].sceneIdx;
-      const e343 = (records as any[])[maxStart343 + maxRun343 - 1].sceneIdx;
+      const s343 = (records as any[])[maxStart343].sceneIdx + 1;
+      const e343 = (records as any[])[maxStart343 + maxRun343 - 1].sceneIdx + 1;
       issues.push({
         location: `Scenes ${s343}–${e343} — relational silence`,
         rule: 'RELATIONSHIP_SHIFT_DROUGHT',
@@ -1880,10 +1880,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       );
       if (((peak357.relationshipShifts ?? []) as any[]).length === 0) {
         issues.push({
-          location: `Scene ${peak357.sceneIdx} — peak curiosity`,
+          location: `Scene ${peak357.sceneIdx + 1} — peak curiosity`,
           rule: 'RELATIONSHIP_CURIOSITY_PEAK_ABSENT',
           severity: 'minor',
-          description: `Scene ${peak357.sceneIdx} carries the story's highest curiosityDelta (${(peak357.curiosityDelta ?? 0).toFixed(2)}) but no relationship shift, even though ${curiosityShift357.length} other curiosity-positive scenes move a bond. The moment the audience is most urgently wondering what happens next never touches any character relationship — peak curiosity and relational stakes are completely disconnected.`,
+          description: `Scene ${peak357.sceneIdx + 1} carries the story's highest curiosityDelta (${(peak357.curiosityDelta ?? 0).toFixed(2)}) but no relationship shift, even though ${curiosityShift357.length} other curiosity-positive scenes move a bond. The moment the audience is most urgently wondering what happens next never touches any character relationship — peak curiosity and relational stakes are completely disconnected.`,
           suggestedFix: 'Let the peak curiosity moment also crack or shift a bond: a revelation that makes the audience wonder AND restructures a relationship, a question that lands in the same scene as a trust rupture or unexpected warmth. Curiosity peaks are the best place to deepen relational stakes.',
         });
       }
@@ -1965,10 +1965,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       );
       if (((peak371.relationshipShifts ?? []) as any[]).length === 0) {
         issues.push({
-          location: `Scene ${peak371.sceneIdx} — peak suspense`,
+          location: `Scene ${peak371.sceneIdx + 1} — peak suspense`,
           rule: 'RELATIONSHIP_SUSPENSE_PEAK_ABSENT',
           severity: 'minor',
-          description: `Scene ${peak371.sceneIdx} carries the story's highest suspenseDelta (${(peak371.suspenseDelta ?? 0).toFixed(2)}) but no relationship shift, even though ${suspShift371.length} other suspense-positive scenes move a bond. The moment the audience is most gripped never touches any character relationship — peak tension and relational stakes are completely disconnected, so the tensest beat plays as pure plot danger rather than danger to a bond the audience cares about.`,
+          description: `Scene ${peak371.sceneIdx + 1} carries the story's highest suspenseDelta (${(peak371.suspenseDelta ?? 0).toFixed(2)}) but no relationship shift, even though ${suspShift371.length} other suspense-positive scenes move a bond. The moment the audience is most gripped never touches any character relationship — peak tension and relational stakes are completely disconnected, so the tensest beat plays as pure plot danger rather than danger to a bond the audience cares about.`,
           suggestedFix: 'Let the peak-tension scene also move a bond: a betrayal exposed at the moment of maximum danger, an alliance forged under fire. When the suspense crests and a relationship shifts in the same beat, the tension carries relational weight rather than mere physical jeopardy.',
         });
       }
@@ -2053,10 +2053,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     const chargedShift385 = shiftScenes385.filter(r => (r.emotionalShift ?? 'neutral') !== 'neutral' && r.sceneIdx !== peakScene385);
     if (peakScene385 >= 0 && chargedShift385.length >= 2 && (emotionByScene385.get(peakScene385) ?? 'neutral') === 'neutral') {
       issues.push({
-        location: `Scene ${peakScene385} — largest relationship shift (|${peakMag385.toFixed(2)}|)`,
+        location: `Scene ${peakScene385 + 1} — largest relationship shift (|${peakMag385.toFixed(2)}|)`,
         rule: 'RELATIONSHIP_PEAK_EMOTION_FLAT',
         severity: 'minor',
-        description: `The story's largest relationship shift (Scene ${peakScene385}, magnitude ${peakMag385.toFixed(2)}) lands in an emotionally neutral scene, even though ${chargedShift385.length} other shift scenes carry emotion. The biggest bond change — the moment a relationship moves most — is registered as a status update rather than felt as a turning point, so the audience notes the shift without experiencing its weight on the people it changes.`,
+        description: `The story's largest relationship shift (Scene ${peakScene385 + 1}, magnitude ${peakMag385.toFixed(2)}) lands in an emotionally neutral scene, even though ${chargedShift385.length} other shift scenes carry emotion. The biggest bond change — the moment a relationship moves most — is registered as a status update rather than felt as a turning point, so the audience notes the shift without experiencing its weight on the people it changes.`,
         suggestedFix: 'Charge the peak shift emotionally: when the most consequential bond change in the story occurs, the protagonist should feel it most acutely — grief at the rupture, relief or fear at the reconciliation. The biggest relational swing deserves the sharpest emotional beat, not the flattest.',
       });
     }
@@ -2080,10 +2080,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
     if (voidPairs385.length > 0) {
       issues.push({
-        location: `Pair(s) ${voidPairs385.join(', ')} — midpoint void (Scenes ${midStart385}–${midEnd385 - 1})`,
+        location: `Pair(s) ${voidPairs385.join(', ')} — midpoint void (Scenes ${midStart385 + 1}–${midEnd385})`,
         rule: 'PAIR_MIDPOINT_VOID',
         severity: 'minor',
-        description: `${voidPairs385.length === 1 ? 'One pair' : `${voidPairs385.length} pairs`} (${voidPairs385.join('; ')}) shift${voidPairs385.length === 1 ? 's' : ''} both before and after the midpoint zone (Scenes ${midStart385}–${midEnd385 - 1}) but register${voidPairs385.length === 1 ? 's' : ''} no movement within it. The bond goes silent at the exact structural pivot while staying active on either side, so the midpoint reorganizes the plot without registering on a relationship the story otherwise keeps moving.`,
+        description: `${voidPairs385.length === 1 ? 'One pair' : `${voidPairs385.length} pairs`} (${voidPairs385.join('; ')}) shift${voidPairs385.length === 1 ? 's' : ''} both before and after the midpoint zone (Scenes ${midStart385 + 1}–${midEnd385}) but register${voidPairs385.length === 1 ? 's' : ''} no movement within it. The bond goes silent at the exact structural pivot while staying active on either side, so the midpoint reorganizes the plot without registering on a relationship the story otherwise keeps moving.`,
         suggestedFix: 'Move the pair at the midpoint: let the central pivot also turn this bond — a trust tested by the midpoint revelation, an alliance reshaped by the reversal. A relationship active on both sides of the center but frozen at it implies the story\'s biggest turn left this bond untouched, which rarely rings true.',
       });
     }
@@ -2512,11 +2512,11 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
     if (maxRupRun441b >= 3) {
       issues.push({
-        location: `Scenes ${maxRupStart441b}–${maxRupStart441b + maxRupRun441b - 1} — consecutive rupture run`,
+        location: `Scenes ${maxRupStart441b + 1}–${maxRupStart441b + maxRupRun441b} — consecutive rupture run`,
         rule: 'PAIR_RUPTURE_RUN',
         severity: 'minor',
-        description: `Scenes ${maxRupStart441b}–${maxRupStart441b + maxRupRun441b - 1} each carry at least one major relationship rupture — ${maxRupRun441b} consecutive scenes of back-to-back bond breaks with no non-rupture scene between them. When breaks stack consecutively, each one arrives before the previous has registered: the audience is ground through relational damage rather than being given time to feel any individual break's cost. A run of ruptures without pause also makes recovery feel narratively impossible, since the machine never slows enough for even a tentative repair.`,
-        suggestedFix: `Interrupt the rupture run at Scenes ${maxRupStart441b}–${maxRupStart441b + maxRupRun441b - 1}: insert at least one non-rupture scene between consecutive breaks. It need not be a repair — it can be a neutral scene, a scene with a different relational focus, or a moment of forced civility — but the break between breaks gives each rupture room to hurt before the next one arrives.`,
+        description: `Scenes ${maxRupStart441b + 1}–${maxRupStart441b + maxRupRun441b} each carry at least one major relationship rupture — ${maxRupRun441b} consecutive scenes of back-to-back bond breaks with no non-rupture scene between them. When breaks stack consecutively, each one arrives before the previous has registered: the audience is ground through relational damage rather than being given time to feel any individual break's cost. A run of ruptures without pause also makes recovery feel narratively impossible, since the machine never slows enough for even a tentative repair.`,
+        suggestedFix: `Interrupt the rupture run at Scenes ${maxRupStart441b + 1}–${maxRupStart441b + maxRupRun441b}: insert at least one non-rupture scene between consecutive breaks. It need not be a repair — it can be a neutral scene, a scene with a different relational focus, or a moment of forced civility — but the break between breaks gives each rupture room to hurt before the next one arrives.`,
       });
     }
   }
@@ -2552,11 +2552,11 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       );
       if (!hasClimaxShift441c) {
         issues.push({
-          location: `Climax zone (Scenes ${climaxStart441c}–${records.length - 1}) — relationally silent`,
+          location: `Climax zone (Scenes ${climaxStart441c + 1}–${records.length}) — relationally silent`,
           rule: 'RELATIONSHIP_CLIMAX_VOID',
           severity: 'minor',
-          description: `The climax zone (final 15% of scenes: Scenes ${climaxStart441c}–${records.length - 1}) contains no relationship shift of magnitude ≥ 0.3, while ${earlyShiftCount441c} meaningful shifts from ${earlyPairs441c.size} pairs occur in the preceding ${climaxStart441c} scenes. The story's most emotionally charged structural zone is relationally silent: bonds do not move at the moment when the audience is most invested in them. For any story with meaningful relational arcs, the climax should register in the relationship layer — as a bond that finally breaks, finally mends, or reaches its most acute state.`,
-          suggestedFix: `Give at least one pair a meaningful shift in the climax zone (Scenes ${climaxStart441c}–${records.length - 1}): the bond that the story has been tracing should reach its highest or lowest point at the climax rather than going quiet at the moment of maximum intensity. The relationship shift doesn't need to be the climax's primary focus — it can be a consequence, a cost, or a revelation — but the relational engine should not stall at the story's most emotionally loaded moment.`,
+          description: `The climax zone (final 15% of scenes: Scenes ${climaxStart441c + 1}–${records.length}) contains no relationship shift of magnitude ≥ 0.3, while ${earlyShiftCount441c} meaningful shifts from ${earlyPairs441c.size} pairs occur in the preceding ${climaxStart441c} scenes. The story's most emotionally charged structural zone is relationally silent: bonds do not move at the moment when the audience is most invested in them. For any story with meaningful relational arcs, the climax should register in the relationship layer — as a bond that finally breaks, finally mends, or reaches its most acute state.`,
+          suggestedFix: `Give at least one pair a meaningful shift in the climax zone (Scenes ${climaxStart441c + 1}–${records.length}): the bond that the story has been tracing should reach its highest or lowest point at the climax rather than going quiet at the moment of maximum intensity. The relationship shift doesn't need to be the climax's primary focus — it can be a consequence, a cost, or a revelation — but the relational engine should not stall at the story's most emotionally loaded moment.`,
         });
       }
     }
@@ -2680,11 +2680,11 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       }
       if (maxWarmRun455c >= 3) {
         issues.push({
-          location: `Scenes ${maxWarmStart455c}–${maxWarmStart455c + maxWarmRun455c - 1} — consecutive warmth run`,
+          location: `Scenes ${maxWarmStart455c + 1}–${maxWarmStart455c + maxWarmRun455c} — consecutive warmth run`,
           rule: 'RELATIONSHIP_WARMTH_RUN',
           severity: 'minor',
-          description: `Scenes ${maxWarmStart455c}–${maxWarmStart455c + maxWarmRun455c - 1} each carry at least one major positive relationship shift (amount ≥ 0.3) — ${maxWarmRun455c} consecutive scenes of back-to-back bond warmings with no neutral or rupture scene between them. Warmings land best when spaced: a positive move needs room to register before the next one arrives. A consecutive warmth run also signals a frictionless relational world — all bonds are improving simultaneously without any setback, complication, or tension to make the repairs feel earned. When warmth avalanches, each individual moment of connection is diluted by the one that immediately follows it.`,
-          suggestedFix: `Interrupt the warmth run at Scenes ${maxWarmStart455c}–${maxWarmStart455c + maxWarmRun455c - 1}: insert at least one non-warmth scene between consecutive positive moves. It need not be a rupture — it can be a neutral relational scene, a moment of uncertainty, or a beat where a character hesitates before fully committing to the repair. The non-warmth scene between warmings gives each positive moment space to breathe and makes the next warming feel earned rather than automatic.`,
+          description: `Scenes ${maxWarmStart455c + 1}–${maxWarmStart455c + maxWarmRun455c} each carry at least one major positive relationship shift (amount ≥ 0.3) — ${maxWarmRun455c} consecutive scenes of back-to-back bond warmings with no neutral or rupture scene between them. Warmings land best when spaced: a positive move needs room to register before the next one arrives. A consecutive warmth run also signals a frictionless relational world — all bonds are improving simultaneously without any setback, complication, or tension to make the repairs feel earned. When warmth avalanches, each individual moment of connection is diluted by the one that immediately follows it.`,
+          suggestedFix: `Interrupt the warmth run at Scenes ${maxWarmStart455c + 1}–${maxWarmStart455c + maxWarmRun455c}: insert at least one non-warmth scene between consecutive positive moves. It need not be a rupture — it can be a neutral relational scene, a moment of uncertainty, or a beat where a character hesitates before fully committing to the repair. The non-warmth scene between warmings gives each positive moment space to breathe and makes the next warming feel earned rather than automatic.`,
         });
       }
     }
@@ -2792,11 +2792,11 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       .length;
     if (act1ShiftCount469c === 0 && laterShiftCount469c >= 3) {
       issues.push({
-        location: `Act 1 (Scenes 0–${act1End469c - 1}) — relationally silent`,
+        location: `Act 1 (Scenes 1–${act1End469c}) — relationally silent`,
         rule: 'RELATIONSHIP_ACT1_VOID',
         severity: 'minor',
         description: `No relationship shift occurs in the first ${act1End469c} scenes (Act 1, the first 25%) while ${laterShiftCount469c} shifts appear in the remaining scenes — the story opens with no relational movement. The audience enters the complication zone without any sense of which bonds are at stake, without a dynamic to root for or a rift to track. Act 1 is where the relationships that will later be tested should be established, defined, or at least gestured at through the first cracks or warmings. A completely relationally silent opening means the audience has nothing invested in the people before the story begins pushing them.`,
-        suggestedFix: `Introduce at least one relational moment in Act 1 (Scenes 0–${act1End469c - 1}): a small warming between two characters that the audience will carry, a first hint of friction that will later become a rupture, or a demonstration of an established bond that later gets tested. The shift does not need to be large — even a minor positive or negative nudge gives the audience a relational anchor before the story's complications begin.`,
+        suggestedFix: `Introduce at least one relational moment in Act 1 (Scenes 1–${act1End469c}): a small warming between two characters that the audience will carry, a first hint of friction that will later become a rupture, or a demonstration of an established bond that later gets tested. The shift does not need to be large — even a minor positive or negative nudge gives the audience a relational anchor before the story's complications begin.`,
       });
     }
   }
@@ -2867,9 +2867,9 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         const maxZone483b = Math.max(zone1483b, zone2483b, zone3483b);
         const totalShifts483b = shiftPositions483b.length;
         if (maxZone483b / totalShifts483b > 0.75) {
-          const zoneLabel483b = maxZone483b === zone1483b ? `Scenes 0–${third483b - 1}` :
-            maxZone483b === zone2483b ? `Scenes ${third483b}–${2 * third483b - 1}` :
-            `Scenes ${2 * third483b}–${n483b - 1}`;
+          const zoneLabel483b = maxZone483b === zone1483b ? `Scenes 1–${third483b}` :
+            maxZone483b === zone2483b ? `Scenes ${third483b + 1}–${2 * third483b}` :
+            `Scenes ${2 * third483b + 1}–${n483b}`;
           issues.push({
             location: `Relationship shifts — ${maxZone483b}/${totalShifts483b} clustered in ${zoneLabel483b}`,
             rule: 'RELATIONSHIP_SHIFT_THIRDS_CLUSTER',
@@ -2911,11 +2911,11 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       .length;
     if (act2aShifts483c === 0 && outsideShifts483c >= 3) {
       issues.push({
-        location: `Act 2a (Scenes ${act2aStart483c}–${act2aEnd483c - 1}) — relationally silent`,
+        location: `Act 2a (Scenes ${act2aStart483c + 1}–${act2aEnd483c}) — relationally silent`,
         rule: 'RELATIONSHIP_ACT2A_VOID',
         severity: 'minor',
-        description: `No relationship shift occurs in the Act 2a zone (Scenes ${act2aStart483c}–${act2aEnd483c - 1}, 25%–50%) while ${outsideShifts483c} shifts appear in the rest of the story. The early-conflict zone is where established bonds should be tested: Act 1 introduced the relationships, and the complication that opens Act 2 should start cracking them. When Act 2a is relationally silent, the story's central complications begin but none of the human bonds move in response — the characters are under pressure but the pressure doesn't affect how they relate to each other.`,
-        suggestedFix: `Add at least one relationship shift in Scenes ${act2aStart483c}–${act2aEnd483c - 1}: an early complication that puts two characters at odds, a moment of unexpected alliance under pressure, or a subtle warming or cooling that foreshadows a larger Act 2b rupture or repair. The shift doesn't need to be large — even a minor bond move in the early-conflict zone tells the audience that the story's pressure is affecting the relationships, not just the plot.`,
+        description: `No relationship shift occurs in the Act 2a zone (Scenes ${act2aStart483c + 1}–${act2aEnd483c}, 25%–50%) while ${outsideShifts483c} shifts appear in the rest of the story. The early-conflict zone is where established bonds should be tested: Act 1 introduced the relationships, and the complication that opens Act 2 should start cracking them. When Act 2a is relationally silent, the story's central complications begin but none of the human bonds move in response — the characters are under pressure but the pressure doesn't affect how they relate to each other.`,
+        suggestedFix: `Add at least one relationship shift in Scenes ${act2aStart483c + 1}–${act2aEnd483c}: an early complication that puts two characters at odds, a moment of unexpected alliance under pressure, or a subtle warming or cooling that foreshadows a larger Act 2b rupture or repair. The shift doesn't need to be large — even a minor bond move in the early-conflict zone tells the audience that the story's pressure is affecting the relationships, not just the plot.`,
       });
     }
   }
@@ -3609,10 +3609,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         );
         if (revShiftOther567.length >= 2) {
           issues.push({
-            location: `Scene ${peakScene567} — largest relationship shift (|${peakMag567.toFixed(2)}|), no revelation`,
+            location: `Scene ${peakScene567 + 1} — largest relationship shift (|${peakMag567.toFixed(2)}|), no revelation`,
             rule: 'RELATIONSHIP_PEAK_REVELATION_ABSENT',
             severity: 'minor',
-            description: `The story's largest relationship shift (Scene ${peakScene567}, magnitude ${peakMag567.toFixed(2)}) carries no revelation, even though ${revShiftOther567.length} other shift scenes move a bond alongside a disclosure. The single most consequential relational turning point is not a moment of truth: the bond moves most at a beat where nothing is learned, so the peak relational swing and the peak epistemic event never coincide. When other bond changes are powered by discoveries but the biggest one is not, the story's most important relational moment reads as a change without a discovered cause — a swing the audience registers but is given no new knowledge to anchor.`,
+            description: `The story's largest relationship shift (Scene ${peakScene567 + 1}, magnitude ${peakMag567.toFixed(2)}) carries no revelation, even though ${revShiftOther567.length} other shift scenes move a bond alongside a disclosure. The single most consequential relational turning point is not a moment of truth: the bond moves most at a beat where nothing is learned, so the peak relational swing and the peak epistemic event never coincide. When other bond changes are powered by discoveries but the biggest one is not, the story's most important relational moment reads as a change without a discovered cause — a swing the audience registers but is given no new knowledge to anchor.`,
             suggestedFix: 'Tie the peak relationship shift to a revelation: let the moment the bond moves most also be the moment a crucial truth surfaces — a betrayal exposed, an identity confirmed, a hidden motive revealed. The biggest relational swing earns its weight when it is driven by a discovery, so the audience both feels the bond change and understands the truth that forced it.',
           });
         }
@@ -3636,10 +3636,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         );
         if (turnShiftOther567.length >= 2) {
           issues.push({
-            location: `Scene ${peakScene567} — largest relationship shift (|${peakMag567.toFixed(2)}|), no dramatic turn`,
+            location: `Scene ${peakScene567 + 1} — largest relationship shift (|${peakMag567.toFixed(2)}|), no dramatic turn`,
             rule: 'RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT',
             severity: 'minor',
-            description: `The story's largest relationship shift (Scene ${peakScene567}, magnitude ${peakMag567.toFixed(2)}) carries no dramatic turn, even though ${turnShiftOther567.length} other shift scenes move a bond inside a story pivot. The single most consequential relational swing is not a turning point in the narrative: the bond moves most at a beat the story does not register as a reversal or recognition, so the peak relational moment and the peak structural pivot never align. When other bond changes ride story turns but the biggest one does not, the relationship's defining moment is structurally inert — it transforms the bond without redirecting the story, leaving the largest relational swing disconnected from the plot's momentum.`,
+            description: `The story's largest relationship shift (Scene ${peakScene567 + 1}, magnitude ${peakMag567.toFixed(2)}) carries no dramatic turn, even though ${turnShiftOther567.length} other shift scenes move a bond inside a story pivot. The single most consequential relational swing is not a turning point in the narrative: the bond moves most at a beat the story does not register as a reversal or recognition, so the peak relational moment and the peak structural pivot never align. When other bond changes ride story turns but the biggest one does not, the relationship's defining moment is structurally inert — it transforms the bond without redirecting the story, leaving the largest relational swing disconnected from the plot's momentum.`,
             suggestedFix: 'Stage the peak relationship shift as a dramatic turn: let the moment the bond moves most also reverse the story\'s direction or reframe what the characters understand. The biggest relational swing should be a hinge for the whole narrative, not a change that happens off the story\'s main track — when the bond and the plot turn together, the moment carries both relational and structural weight.',
           });
         }
@@ -3664,10 +3664,10 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         );
         if (clockShiftOther567.length >= 2) {
           issues.push({
-            location: `Scene ${peakScene567} — largest relationship shift (|${peakMag567.toFixed(2)}|), no clock raised`,
+            location: `Scene ${peakScene567 + 1} — largest relationship shift (|${peakMag567.toFixed(2)}|), no clock raised`,
             rule: 'RELATIONSHIP_PEAK_CLOCK_ABSENT',
             severity: 'minor',
-            description: `The story's largest relationship shift (Scene ${peakScene567}, magnitude ${peakMag567.toFixed(2)}) raises no clock, even though ${clockShiftOther567.length} other shift scenes move a bond under deadline pressure. The single most consequential relational swing happens free of time pressure: the bond moves most in a beat with no ticking clock, so the peak relational moment and the urgency engine never meet. When other bond changes land under deadlines but the biggest one does not, the story's most important relational turn plays in calm water — it forfeits the doubled charge of a bond fracturing or forging precisely as time runs out, the convergence that makes a relational climax feel both urgent and inevitable.`,
+            description: `The story's largest relationship shift (Scene ${peakScene567 + 1}, magnitude ${peakMag567.toFixed(2)}) raises no clock, even though ${clockShiftOther567.length} other shift scenes move a bond under deadline pressure. The single most consequential relational swing happens free of time pressure: the bond moves most in a beat with no ticking clock, so the peak relational moment and the urgency engine never meet. When other bond changes land under deadlines but the biggest one does not, the story's most important relational turn plays in calm water — it forfeits the doubled charge of a bond fracturing or forging precisely as time runs out, the convergence that makes a relational climax feel both urgent and inevitable.`,
             suggestedFix: 'Place the peak relationship shift under a live clock: let the moment the bond moves most also be a moment when time is running out — a reconciliation forced by a closing window, a betrayal exposed in the scramble before a deadline. The biggest relational swing carries maximum force when urgency and relational change crest together, so the audience feels both the weight of the bond moving and the pressure of time at the same instant.',
           });
         }
@@ -4768,11 +4768,11 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     });
     if (r777a.fires) {
       issues.push({
-        location: `scene ${r777a.peakIdx} (peak suspenseDelta ${r777a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r777a.peakIdx + 1} (peak suspenseDelta ${r777a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'RELATIONAL_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r777a.peakIdx}, suspenseDelta ${r777a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r777a.qualifyingCount} scenes elsewhere carry tension. The moment the relationship is under the most external pressure lands out of nowhere — nothing has built toward the danger testing the bond.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r777a.peakIdx} so the relationship's peak moment of pressure reads as earned rather than arbitrary.`,
+        description: `The story's single highest-suspense scene (Scene ${r777a.peakIdx + 1}, suspenseDelta ${r777a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r777a.qualifyingCount} scenes elsewhere carry tension. The moment the relationship is under the most external pressure lands out of nowhere — nothing has built toward the danger testing the bond.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r777a.peakIdx + 1} so the relationship's peak moment of pressure reads as earned rather than arbitrary.`,
       });
     }
   }
@@ -4860,11 +4860,11 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     });
     if (r791b.fires) {
       issues.push({
-        location: `scene ${r791b.peakIdx} (peak curiosityDelta ${r791b.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r791b.peakIdx + 1} (peak curiosityDelta ${r791b.peakMagnitude}) — no preparing cause nearby`,
         rule: 'RELATIONAL_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r791b.peakIdx}, curiosityDelta ${r791b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r791b.qualifyingCount} scenes elsewhere provoke wonder. The moment the audience is most desperate for an answer lands out of nowhere — nothing has built toward the question testing the bond.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r791b.peakIdx} so the relationship's peak moment of curiosity reads as earned rather than arbitrary.`,
+        description: `The story's single highest-curiosity scene (Scene ${r791b.peakIdx + 1}, curiosityDelta ${r791b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r791b.qualifyingCount} scenes elsewhere provoke wonder. The moment the audience is most desperate for an answer lands out of nowhere — nothing has built toward the question testing the bond.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r791b.peakIdx + 1} so the relationship's peak moment of curiosity reads as earned rather than arbitrary.`,
       });
     }
   }
@@ -6950,7 +6950,7 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         const neverFlips1192 = chargedDyad1192.every(r => r.powerFlipped !== true);
         if (monotone1192 && neverFlips1192) {
           issues.push({
-            location: `Scenes ${chargedDyad1192.map(r => r.sceneIdx).join(', ')} (holder: ${holder1192})`,
+            location: `Scenes ${chargedDyad1192.map(r => r.sceneIdx + 1).join(', ')} (holder: ${holder1192})`,
             rule: 'POWER_STASIS',
             severity: 'major',
             description: `${chargedDyad1192.length} scenes are explicitly written in the vocabulary of domination and submission (power-dynamics intensity ${chargedDyad1192.map(r => r.powerDynamicsIntensity ?? 0).join(', ')}), and in every single one ${holder1192} holds control — never once out-maneuvered, never once losing the room even for half a scene. A relationship thread that keeps declaring itself to be about power while never letting power move is stasis wearing conflict's clothes: the audience is promised a contest four-plus times and never shown one.`,
@@ -7012,9 +7012,9 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           if (!hasCost1350 && !hasRepairText1350) {
             const [nameA1350, nameB1350] = pairKey.split('|');
             issues.push({
-              location: `Scenes ${sorted1350[a].sceneIdx}-${sorted1350[b].sceneIdx} (pair: ${pairKey})`,
+              location: `Scenes ${sorted1350[a].sceneIdx + 1}-${sorted1350[b].sceneIdx + 1} (pair: ${pairKey})`,
               rule: 'RELATIONSHIP_REPAIR_UNEARNED',
-              description: `${nameA1350} and ${nameB1350} rupture hard in Scene ${sorted1350[a].sceneIdx} (${sorted1350[a].amount.toFixed(2)}) and are back to warm in Scene ${sorted1350[b].sceneIdx} (+${sorted1350[b].amount.toFixed(2)}) with nothing in between — no apology, no acknowledgement, no cost paid, no changed behavior on the page. The repair is unearned.`,
+              description: `${nameA1350} and ${nameB1350} rupture hard in Scene ${sorted1350[a].sceneIdx + 1} (${sorted1350[a].amount.toFixed(2)}) and are back to warm in Scene ${sorted1350[b].sceneIdx + 1} (+${sorted1350[b].amount.toFixed(2)}) with nothing in between — no apology, no acknowledgement, no cost paid, no changed behavior on the page. The repair is unearned.`,
               severity: 'major',
               suggestedFix: `Give the repair its own beat: an apology, a visible cost paid, or an action that shows changed behavior, before the relationship is allowed to warm back up.`,
             });

@@ -204,7 +204,7 @@ function TensionView({ ledger }: { ledger: TensionLedger }) {
       <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
         <Metric label="Total Tension" value={ledger.totalTension.toFixed(1)} />
         <Metric label="Open Positions" value={String(positions.length)} />
-        <Metric label="Scene Index" value={String(ledger.sceneIdx)} />
+        <Metric label="Scene" value={String(ledger.sceneIdx + 1)} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {positions.map(p => (

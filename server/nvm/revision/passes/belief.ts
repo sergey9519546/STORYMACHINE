@@ -617,7 +617,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       // Only flag if the proposition seems significant (not trivial facts)
       if (told.proposition.split(' ').length >= 4) {
         issues.push({
-          location: `Scene ${told.sceneIdx} (${told.slug})`,
+          location: `Scene ${told.sceneIdx + 1} (${told.slug})`,
           rule: 'BELIEF_WITHOUT_CONTEXT',
           description: `A character asserts "${told.proposition.slice(0, 60)}..." with no prior contextual setup`,
           severity: 'minor',
@@ -633,7 +633,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const priorToldBeliefs = toldBeliefs.filter(t => t.sceneIdx < witnessed.sceneIdx);
     if (priorToldBeliefs.length === 0 && witnessed.sceneIdx > 1) {
       issues.push({
-        location: `Scene ${witnessed.sceneIdx}`,
+        location: `Scene ${witnessed.sceneIdx + 1}`,
         rule: 'REVELATION_UNEARNED',
         description: 'A revelation scene delivers new information but no prior misinformation/deception makes it land as a reversal',
         severity: 'major',
@@ -661,9 +661,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
     if (consecutiveTold >= expositionDumpStreak1188) {
       issues.push({
-        location: `Scenes ${expositionStartScene}–${r.sceneIdx}`,
+        location: `Scenes ${expositionStartScene + 1}–${r.sceneIdx + 1}`,
         rule: 'EXPOSITION_DUMP',
-        description: `Scenes ${expositionStartScene}–${r.sceneIdx}: ${expositionDumpStreak1188}+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert${genreNote1188}`,
+        description: `Scenes ${expositionStartScene + 1}–${r.sceneIdx + 1}: ${expositionDumpStreak1188}+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert${genreNote1188}`,
         severity: 'major',
         suggestedFix: 'Break the exposition streak with a scene that shows rather than tells the key information',
       });
@@ -698,9 +698,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
 
       if (!hasConsequence && contradiction.sceneIdx < records.length - 2) {
         issues.push({
-          location: `Scene ${told.sceneIdx} (${told.slug}) → Scene ${contradiction.sceneIdx}`,
+          location: `Scene ${told.sceneIdx + 1} (${told.slug}) → Scene ${contradiction.sceneIdx + 1}`,
           rule: 'DECEPTION_WITHOUT_CONSEQUENCE',
-          description: `Character is told "${told.proposition.slice(0, 60)}..." at Scene ${told.sceneIdx}, but the truth (revealed Scene ${contradiction.sceneIdx}) creates no relationship rupture or escalation — the lie is discovered but ignored`,
+          description: `Character is told "${told.proposition.slice(0, 60)}..." at Scene ${told.sceneIdx + 1}, but the truth (revealed Scene ${contradiction.sceneIdx + 1}) creates no relationship rupture or escalation — the lie is discovered but ignored`,
           severity: 'major',
           suggestedFix: 'Add a confrontation or consequence scene where the character discovering the lie reacts emotionally or shifts their relationship with the liar',
         });
@@ -733,9 +733,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
 
       if (!hasSetup) {
         issues.push({
-          location: `Scene ${i} (${curr.slug})`,
+          location: `Scene ${i + 1} (${curr.slug})`,
           rule: 'BELIEF_REVERSAL_UNSUPPORTED',
-          description: `Scene ${i} shows a major emotional or belief shift (suspense from ${prev.suspenseDelta} to ${curr.suspenseDelta}, mood ${prev.emotionalShift}→${curr.emotionalShift}) but no prior clue or revelation justifies the change — the reversal feels unmotivated`,
+          description: `Scene ${i + 1} shows a major emotional or belief shift (suspense from ${prev.suspenseDelta} to ${curr.suspenseDelta}, mood ${prev.emotionalShift}→${curr.emotionalShift}) but no prior clue or revelation justifies the change — the reversal feels unmotivated`,
           severity: 'major',
           suggestedFix: 'Plant a revelatory moment 1-2 scenes before that explains why the character changed their belief or emotional stance',
         });
@@ -755,9 +755,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       const isMiddle = scene.sceneIdx > 0 && scene.sceneIdx < records.length - 1;
       if (isMiddle) {
         issues.push({
-          location: `Scene ${scene.sceneIdx} (${scene.slug})`,
+          location: `Scene ${scene.sceneIdx + 1} (${scene.slug})`,
           rule: 'BELIEF_ISOLATION',
-          description: `Scene ${scene.sceneIdx} plants clues (seeding knowledge) but has no dialogue highlights — the character's belief or discovery is kept entirely internal, making their motivation invisible to the audience`,
+          description: `Scene ${scene.sceneIdx + 1} plants clues (seeding knowledge) but has no dialogue highlights — the character's belief or discovery is kept entirely internal, making their motivation invisible to the audience`,
           severity: 'major',
           suggestedFix: 'Add a line of dialogue or internal monologue where the character expresses or reacts to the clue they\'ve discovered',
         });
@@ -782,9 +782,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
 
       if (!prevHasDialogue && !currHasDialogue && !nextHasDialogue) {
         issues.push({
-          location: `Scene ${i} (${r.slug})`,
+          location: `Scene ${i + 1} (${r.slug})`,
           rule: 'REVELATION_ISOLATED',
-          description: `Scene ${i} contains a revelation ("${String(r.revelation).slice(0, 60)}") but no character dialogue appears in this or adjacent scenes — the discovery happens in silence with no human reaction`,
+          description: `Scene ${i + 1} contains a revelation ("${String(r.revelation).slice(0, 60)}") but no character dialogue appears in this or adjacent scenes — the discovery happens in silence with no human reaction`,
           severity: 'major',
           suggestedFix: 'Add dialogue in the revelation scene or the scene immediately after where a character processes, denies, or responds to what they\'ve just witnessed',
         });
@@ -856,9 +856,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       const revCount = window.filter(r => r.revelation !== null).length;
       if (revCount >= 3) {
         issues.push({
-          location: `Scenes ${i}–${i + 2}`,
+          location: `Scenes ${i + 1}–${i + 3}`,
           rule: 'REVELATION_CLUSTERING',
-          description: `Scenes ${i}–${i + 2} contain ${revCount} revelations in a row — a flood of reversals in a three-scene window. The audience has no room to absorb one discovery before the next arrives, and every surprise lands softer for it.`,
+          description: `Scenes ${i + 1}–${i + 3} contain ${revCount} revelations in a row — a flood of reversals in a three-scene window. The audience has no room to absorb one discovery before the next arrives, and every surprise lands softer for it.`,
           severity: 'major',
           suggestedFix: 'Space the revelations out. Let a reversal breathe — give the characters (and the audience) a scene to react and recalibrate before the next truth lands. Bank some of these discoveries for later acts.',
         });
@@ -895,9 +895,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     for (const r of records) {
       if (r.revelation === null && r.dialogueHighlights.length >= 5) {
         issues.push({
-          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          location: `Scene ${r.sceneIdx + 1} (${r.slug})`,
           rule: 'SINGLE_SCENE_BELIEF_OVERLOAD',
-          description: `Scene ${r.sceneIdx} packs ${r.dialogueHighlights.length} separate belief assertions into one scene with no witnessed payoff — the audience is asked to track too many propositions at once, and none of them register.`,
+          description: `Scene ${r.sceneIdx + 1} packs ${r.dialogueHighlights.length} separate belief assertions into one scene with no witnessed payoff — the audience is asked to track too many propositions at once, and none of them register.`,
           severity: 'minor',
           suggestedFix: 'Distribute these assertions across multiple scenes, or cut to the two or three that actually matter. A scene that establishes one belief clearly beats a scene that establishes five forgettably.',
         });
@@ -982,9 +982,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasMidBelief) {
         issues.push({
-          location: `Midpoint zone (Scenes ${beliefMidStart}–${beliefMidEnd - 1})`,
+          location: `Midpoint zone (Scenes ${beliefMidStart + 1}–${beliefMidEnd})`,
           rule: 'BELIEF_MIDPOINT_VOID',
-          description: `The midpoint zone (Scenes ${beliefMidStart}–${beliefMidEnd - 1}) contains no told beliefs and no revelations — the story's structural pivot has no information exchange to motivate it`,
+          description: `The midpoint zone (Scenes ${beliefMidStart + 1}–${beliefMidEnd}) contains no told beliefs and no revelations — the story's structural pivot has no information exchange to motivate it`,
           severity: 'minor',
           suggestedFix: 'Add at least one belief beat to the midpoint zone: a character asserting something important, or a scene that witnesses a key truth. The midpoint is where the story\'s question becomes most urgent — it should carry a belief beat.',
         });
@@ -1016,9 +1016,9 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const midpointThreshold = records.length * 0.5;
     if (firstRevIdx > midpointThreshold) {
       issues.push({
-        location: `First revelation at Scene ${firstRevIdx}`,
+        location: `First revelation at Scene ${firstRevIdx + 1}`,
         rule: 'REVELATION_DELAYED',
-        description: `Characters make assertions from the start but the first witnessed fact doesn't arrive until Scene ${firstRevIdx} — ${Math.round(firstRevIdx / records.length * 100)}% through the story. The audience spends the first half with no witnessed verification of what they're being told.`,
+        description: `Characters make assertions from the start but the first witnessed fact doesn't arrive until Scene ${firstRevIdx + 1} — ${Math.round(firstRevIdx / records.length * 100)}% through the story. The audience spends the first half with no witnessed verification of what they're being told.`,
         severity: 'major',
         suggestedFix: 'Move the first revelation before the midpoint. An early witnessed fact grounds the audience in what is objectively true, giving them a reference point to measure the characters\' assertions against.',
       });
@@ -1038,7 +1038,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const inAct3Rev211 = witnessedBeliefs.filter(w => w.sceneIdx >= act3RevStart211).length;
     if (inAct3Rev211 === 0 && witnessedBeliefs.length - inAct3Rev211 >= 2) {
       issues.push({
-        location: `Act 3 (Scenes ${act3RevStart211}–${records.length - 1}) — revelation zone`,
+        location: `Act 3 (Scenes ${act3RevStart211 + 1}–${records.length}) — revelation zone`,
         rule: 'REVELATION_ACT3_VOID',
         severity: 'minor',
         description: `${witnessedBeliefs.length} revelations land in the first 75% of the story but none reach Act 3 — the climax delivers no new discovery. The audience enters the final act with complete information and watches execution rather than revelation.`,
@@ -1061,10 +1061,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (contradiction211) {
         issues.push({
-          location: `Scene ${told211.sceneIdx} (${told211.slug})`,
+          location: `Scene ${told211.sceneIdx + 1} (${told211.slug})`,
           rule: 'LATE_DECEPTION_PLANT',
           severity: 'minor',
-          description: `A deception is introduced at Scene ${told211.sceneIdx} (${Math.round(told211.sceneIdx / records.length * 100)}% through the story) and contradicted by a revelation at Scene ${contradiction211.sceneIdx} — the lie is planted and exposed in the same act. The audience has no time to be genuinely misled.`,
+          description: `A deception is introduced at Scene ${told211.sceneIdx + 1} (${Math.round(told211.sceneIdx / records.length * 100)}% through the story) and contradicted by a revelation at Scene ${contradiction211.sceneIdx + 1} — the lie is planted and exposed in the same act. The audience has no time to be genuinely misled.`,
           suggestedFix: 'Move the false belief into Act 1 or early Act 2 so it has time to settle before the revelation overturns it. Effective deception requires the audience to carry the lie long enough to believe it — at least half the story.',
         });
         break;
@@ -1083,7 +1083,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const inFinalZone211 = witnessedBeliefs.filter(w => w.sceneIdx >= finalZoneStart211).length;
     if (inFinalZone211 === 0) {
       issues.push({
-        location: `Final zone (Scenes ${finalZoneStart211}–${records.length - 1}) — revelation`,
+        location: `Final zone (Scenes ${finalZoneStart211 + 1}–${records.length}) — revelation`,
         rule: 'BELIEF_RESOLUTION_ABSENT',
         severity: 'major',
         description: `${witnessedBeliefs.length} revelations land across the story but none reach the final 20% — the closing scenes deliver no new discovery. The belief arc resolves before the climax; the ending is informationally static.`,
@@ -1111,7 +1111,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           .map(t => `"${t.proposition.slice(0, 45)}${t.proposition.length > 45 ? '…' : ''}"`)
           .join('; ');
         issues.push({
-          location: `Act 1 belief layer (Scenes 0–${earlyBelCutoff225})`,
+          location: `Act 1 belief layer (Scenes 1–${earlyBelCutoff225 + 1})`,
           rule: 'DECEPTION_SETUP_VOID',
           severity: 'major',
           description: `${earlyOrphans225.length} told beliefs planted in the first 40% of the story are never confirmed or contradicted by any witnessed revelation — early-planted propositions (${sample225}) are promises to the audience that the story never redeems.`,
@@ -1188,7 +1188,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const act3ToldBeliefs239 = toldBeliefs.filter(t => t.sceneIdx >= act3Start239);
     if (act3ToldBeliefs239.length >= 3 && act3ToldBeliefs239.length / toldBeliefs.length > 0.4) {
       issues.push({
-        location: `Act 3 told beliefs (Scenes ${act3Start239}–${records.length - 1})`,
+        location: `Act 3 told beliefs (Scenes ${act3Start239 + 1}–${records.length})`,
         rule: 'TOLD_BELIEF_ACT3_SURGE',
         severity: 'minor',
         description: `${act3ToldBeliefs239.length} of ${toldBeliefs.length} told beliefs (${Math.round(act3ToldBeliefs239.length / toldBeliefs.length * 100)}%) land in Act 3 — the story is introducing new assertions in the climax rather than paying off established ones. Act 3 should execute on prior beliefs, not plant new ones.`,
@@ -1259,10 +1259,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const inAct2a253 = witnessedBeliefs.filter(w => w.sceneIdx >= act2aStart253 && w.sceneIdx < act2aEnd253).length;
     if (inAct2a253 === 0) {
       issues.push({
-        location: `Act 2a (Scenes ${act2aStart253}–${act2aEnd253 - 1}) — revelation zone`,
+        location: `Act 2a (Scenes ${act2aStart253 + 1}–${act2aEnd253}) — revelation zone`,
         rule: 'REVELATION_ACT2A_DESERT',
         severity: 'minor',
-        description: `${witnessedBeliefs.length} revelations land across the story but none occur in Act 2a (Scenes ${act2aStart253}–${act2aEnd253 - 1}) — the first complication zone delivers no discovery. The audience's understanding stops updating just as the protagonist starts testing the world.`,
+        description: `${witnessedBeliefs.length} revelations land across the story but none occur in Act 2a (Scenes ${act2aStart253 + 1}–${act2aEnd253}) — the first complication zone delivers no discovery. The audience's understanding stops updating just as the protagonist starts testing the world.`,
         suggestedFix: 'Plant a revelation in Act 2a: an early consequence of the protagonist\'s first moves that reveals something they (and the audience) did not know. The first complication should teach the protagonist that the world is more complicated than they assumed.',
       });
     }
@@ -1288,10 +1288,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         if (!witnessedResolves253) {
           const scenesList253 = [...echoScenes253].sort((a, b) => a - b);
           issues.push({
-            location: `Scenes ${scenesList253.join(', ')} — repeated assertion`,
+            location: `Scenes ${scenesList253.map(s => s + 1).join(', ')} — repeated assertion`,
             rule: 'BELIEF_ECHO_CHAMBER',
             severity: 'minor',
-            description: `The proposition "${anchor253.proposition.slice(0, 50)}${anchor253.proposition.length > 50 ? '…' : ''}" is asserted across ${echoScenes253.size} separate scenes (${scenesList253.join(', ')}) but no witnessed revelation ever confirms or contradicts it — the story repeats an unverified claim instead of resolving it. Repetition is being mistaken for emphasis.`,
+            description: `The proposition "${anchor253.proposition.slice(0, 50)}${anchor253.proposition.length > 50 ? '…' : ''}" is asserted across ${echoScenes253.size} separate scenes (${scenesList253.map(s => s + 1).join(', ')}) but no witnessed revelation ever confirms or contradicts it — the story repeats an unverified claim instead of resolving it. Repetition is being mistaken for emphasis.`,
             suggestedFix: 'Either pay the claim off with a witnessed scene that proves or disproves it, or cut the repetitions down to a single clear assertion. A belief that is restated three times without resolution reads as the story circling rather than advancing.',
           });
           break;
@@ -1315,10 +1315,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (adjacentReveal253) {
         issues.push({
-          location: `Scene ${told253.sceneIdx} (${told253.slug}) → Scene ${adjacentReveal253.sceneIdx}`,
+          location: `Scene ${told253.sceneIdx + 1} (${told253.slug}) → Scene ${adjacentReveal253.sceneIdx + 1}`,
           rule: 'ADJACENT_DECEPTION_PAYOFF',
           severity: 'minor',
-          description: `A belief asserted at Scene ${told253.sceneIdx} is contradicted by a witnessed revelation in the very next scene (Scene ${adjacentReveal253.sceneIdx}) — the lie and its unmasking are adjacent. The audience never has time to act on the false belief, so the deception has no dramatic payoff.`,
+          description: `A belief asserted at Scene ${told253.sceneIdx + 1} is contradicted by a witnessed revelation in the very next scene (Scene ${adjacentReveal253.sceneIdx + 1}) — the lie and its unmasking are adjacent. The audience never has time to act on the false belief, so the deception has no dramatic payoff.`,
           suggestedFix: 'Put distance between the deception and its revelation. Let the false belief drive at least two or three scenes of action before the truth surfaces — the cost of the lie is paid in everything the characters do while they still believe it.',
         });
         break;
@@ -1339,10 +1339,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const secondHalfTold267 = toldBeliefs.filter(t => t.sceneIdx >= midpoint267);
     if (secondHalfTold267.length === 0) {
       issues.push({
-        location: `First half only (scenes 0–${midpoint267 - 1})`,
+        location: `First half only (scenes 1–${midpoint267})`,
         rule: 'BELIEF_FRONT_LOADED',
         severity: 'minor',
-        description: `All ${toldBeliefs.length} told beliefs appear in the first half of the story (scenes 0–${midpoint267 - 1}); the second half has none. The deception layer is exhausted before the climax — the audience knows what every character believes long before the resolution, removing dramatic irony from the story's most consequential moments.`,
+        description: `All ${toldBeliefs.length} told beliefs appear in the first half of the story (scenes 1–${midpoint267}); the second half has none. The deception layer is exhausted before the climax — the audience knows what every character believes long before the resolution, removing dramatic irony from the story's most consequential moments.`,
         suggestedFix: 'Plant at least one new told belief in the second half — a misleading claim voiced near the climax, a false assumption a character holds into the final act. Late misdirection sustains dramatic irony and makes the resolution feel earned rather than mechanical.',
       });
     }
@@ -1362,10 +1362,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const earlyRevelations267 = witnessedBeliefs.filter(w => w.sceneIdx < finalActStart267);
     if (earlyRevelations267.length === 0) {
       issues.push({
-        location: `Final quarter only (scene ${finalActStart267}+)`,
+        location: `Final quarter only (scene ${finalActStart267 + 1}+)`,
         rule: 'REVELATION_FINAL_ACT_ONLY',
         severity: 'minor',
-        description: `All ${witnessedBeliefs.length} witnessed revelations are confined to the final quarter (scene ${finalActStart267}+). No earlier scene reveals a truth — every moment of discovery is deferred to the end. Acts 1 through 3a feel like setup without payoff, and the climax becomes overloaded with back-to-back discoveries the audience has no time to process.`,
+        description: `All ${witnessedBeliefs.length} witnessed revelations are confined to the final quarter (scene ${finalActStart267 + 1}+). No earlier scene reveals a truth — every moment of discovery is deferred to the end. Acts 1 through 3a feel like setup without payoff, and the climax becomes overloaded with back-to-back discoveries the audience has no time to process.`,
         suggestedFix: 'Distribute at least one discovery earlier — a partial truth revealed mid-story raises the stakes for everything that follows and gives the climax room to breathe. A revelation in Act 2 creates a new problem; a revelation saved for Act 4 only closes an existing one.',
       });
     }
@@ -1388,12 +1388,12 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
     for (const [sceneIdx267, count267] of byScene267) {
       if (count267 >= 3 && count267 < 5) {
-        const slug267 = toldBeliefs.find(t => t.sceneIdx === sceneIdx267)?.slug ?? `scene ${sceneIdx267}`;
+        const slug267 = toldBeliefs.find(t => t.sceneIdx === sceneIdx267)?.slug ?? `scene ${sceneIdx267 + 1}`;
         issues.push({
-          location: `Scene ${sceneIdx267} (${slug267})`,
+          location: `Scene ${sceneIdx267 + 1} (${slug267})`,
           rule: 'TOLD_BELIEF_CLUSTERING',
           severity: 'minor',
-          description: `Scene ${sceneIdx267} (${slug267}) contains ${count267} separate told beliefs — ${count267} distinct propositions asserted in the same scene. The scene becomes a belief-dump: the audience cannot process each claim before the next arrives, and none of the assertions carry the dramatic weight they need.`,
+          description: `Scene ${sceneIdx267 + 1} (${slug267}) contains ${count267} separate told beliefs — ${count267} distinct propositions asserted in the same scene. The scene becomes a belief-dump: the audience cannot process each claim before the next arrives, and none of the assertions carry the dramatic weight they need.`,
           suggestedFix: 'Distribute the beliefs across separate scenes. One scene, one central assertion — let each claim land and drive character behaviour before the next is introduced. Reserve multi-belief scenes for deliberate moments of information overload.',
         });
         break;
@@ -1444,10 +1444,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasAct2bBelief281) {
         issues.push({
-          location: `Act 2b (Scenes ${act2bStart281}–${act2bEnd281 - 1})`,
+          location: `Act 2b (Scenes ${act2bStart281 + 1}–${act2bEnd281})`,
           rule: 'BELIEF_ACT2B_VOID',
           severity: 'minor',
-          description: `Act 2b (Scenes ${act2bStart281}–${act2bEnd281 - 1}) contains no told beliefs and no witnessed revelations — the story's escalation zone is informationally inert. Characters should be learning and asserting toward the climax; a belief void in Act 2b means the story coasts through its own build phase with no information exchange.`,
+          description: `Act 2b (Scenes ${act2bStart281 + 1}–${act2bEnd281}) contains no told beliefs and no witnessed revelations — the story's escalation zone is informationally inert. Characters should be learning and asserting toward the climax; a belief void in Act 2b means the story coasts through its own build phase with no information exchange.`,
           suggestedFix: 'Plant at least one belief beat in Act 2b: a character asserts a key proposition that will be tested in the climax, or a partial revelation narrows the audience\'s uncertainty. Act 2b is where the story\'s informational tension should be at its tightest before the final break.',
         });
       }
@@ -1469,7 +1469,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     });
     if (finalHasToldBelief281 && finalRec281.revelation === null) {
       issues.push({
-        location: `Scene ${finalRec281.sceneIdx} (${finalRec281.slug}) — final scene`,
+        location: `Scene ${finalRec281.sceneIdx + 1} (${finalRec281.slug}) — final scene`,
         rule: 'TOLD_BELIEF_FINAL_SCENE',
         severity: 'minor',
         description: `The final scene contains a character assertion (told belief) with no accompanying revelation — the story ends with an unverified claim. The last word the story speaks to the audience is a character asserting something that is never shown to be true; the story closes on a proposition rather than a truth.`,
@@ -1543,10 +1543,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (restHasBeliefs295) {
         issues.push({
-          location: `Opening 25% (Scenes 0–${opening295End - 1}) — no belief content`,
+          location: `Opening 25% (Scenes 1–${opening295End}) — no belief content`,
           rule: 'BELIEF_OPENING_INERT',
           severity: 'minor',
-          description: `The opening (Scenes 0–${opening295End - 1}) contains no told beliefs and no revelations — the first act is informationally inert. The audience enters Act 2 with no proposition to hold or doubt, no claim to be suspicious of, and no discovery to process. An opening that establishes no epistemic stakes leaves the belief layer empty when the complications begin.`,
+          description: `The opening (Scenes 1–${opening295End}) contains no told beliefs and no revelations — the first act is informationally inert. The audience enters Act 2 with no proposition to hold or doubt, no claim to be suspicious of, and no discovery to process. An opening that establishes no epistemic stakes leaves the belief layer empty when the complications begin.`,
           suggestedFix: 'Plant at least one belief beat in the opening: a character makes a claim that will later be tested, a secret is hinted at, or a small discovery seeds a question the story will answer. The opening should leave the audience holding at least one unverified proposition — something to believe or disbelieve entering Act 2.',
         });
       }
@@ -1578,10 +1578,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
     if (maxRun309 >= 5) {
       issues.push({
-        location: `Scenes ${maxStart309}–${maxStart309 + maxRun309 - 1} — belief layer silent`,
+        location: `Scenes ${maxStart309 + 1}–${maxStart309 + maxRun309} — belief layer silent`,
         rule: 'TOLD_BELIEF_DROUGHT',
         severity: 'minor',
-        description: `${maxRun309} consecutive scenes (${maxStart309}–${maxStart309 + maxRun309 - 1}) contain no told beliefs and no revelations — the belief/deception layer goes completely silent. For this stretch no character asserts anything that could be tested and nothing is discovered; the epistemic engine that drives dramatic irony and surprise simply idles.`,
+        description: `${maxRun309} consecutive scenes (${maxStart309 + 1}–${maxStart309 + maxRun309}) contain no told beliefs and no revelations — the belief/deception layer goes completely silent. For this stretch no character asserts anything that could be tested and nothing is discovered; the epistemic engine that drives dramatic irony and surprise simply idles.`,
         suggestedFix: 'Seed the silent stretch with belief activity: a character voicing a conviction the story will later test, a partial discovery that narrows the audience\'s uncertainty, or a lie planted for a future unmasking. Every long scene-run should advance what someone believes or what the audience knows.',
       });
     }
@@ -1619,10 +1619,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const firstHalfTold309 = toldBeliefs.filter(t => t.sceneIdx < midIdx309).length;
     if (firstRevIdx309 >= midIdx309 && firstHalfTold309 >= 2) {
       issues.push({
-        location: `First revelation at Scene ${firstRevIdx309} (past midpoint ${midIdx309})`,
+        location: `First revelation at Scene ${firstRevIdx309 + 1} (past midpoint ${midIdx309 + 1})`,
         rule: 'REVELATION_LATE_FIRST',
         severity: 'minor',
-        description: `The first revelation does not arrive until Scene ${firstRevIdx309} — past the midpoint — even though the first half already carries ${firstHalfTold309} told beliefs. The epistemic layer is active early (characters assert) but the story confirms or overturns nothing until the back half, so the audience holds those claims for a long time with no payoff to reward their attention.`,
+        description: `The first revelation does not arrive until Scene ${firstRevIdx309 + 1} — past the midpoint — even though the first half already carries ${firstHalfTold309} told beliefs. The epistemic layer is active early (characters assert) but the story confirms or overturns nothing until the back half, so the audience holds those claims for a long time with no payoff to reward their attention.`,
         suggestedFix: 'Deliver a revelation in the first half that pays off one of the early assertions — a partial truth, a small unmasking, a confirmation that reframes what came before. An early first revelation teaches the audience that the claims they are tracking will pay off, which keeps them invested.',
       });
     }
@@ -1824,10 +1824,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const hasMidRevelation348 = witnessedBeliefs.some(w => w.sceneIdx >= midStart348 && w.sceneIdx < midEnd348);
     if (!hasMidRevelation348) {
       issues.push({
-        location: `Midpoint zone (Scenes ${midStart348}–${midEnd348 - 1}) — no revelation`,
+        location: `Midpoint zone (Scenes ${midStart348 + 1}–${midEnd348}) — no revelation`,
         rule: 'REVELATION_MIDPOINT_VOID',
         severity: 'minor',
-        description: `The midpoint zone (Scenes ${midStart348}–${midEnd348 - 1}) contains no revelation, though the story delivers ${witnessedBeliefs.length} revelations elsewhere. The structural midpoint is where a major discovery should turn the story — recasting the goal, raising the stakes, or flipping the protagonist's understanding. When revelations cluster around the center but skip it, the pivot lands without the discovery that should power it, and the story's middle sags.`,
+        description: `The midpoint zone (Scenes ${midStart348 + 1}–${midEnd348}) contains no revelation, though the story delivers ${witnessedBeliefs.length} revelations elsewhere. The structural midpoint is where a major discovery should turn the story — recasting the goal, raising the stakes, or flipping the protagonist's understanding. When revelations cluster around the center but skip it, the pivot lands without the discovery that should power it, and the story's middle sags.`,
         suggestedFix: 'Place a significant revelation at the midpoint: the truth that reframes what the protagonist is really up against, or the discovery that raises the cost of failure. The midpoint reversal is most powerful when it turns on something newly learned — let the center of the story be where the audience and the protagonist learn the thing that changes everything.',
       });
     }
@@ -1902,7 +1902,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const act3Assertions362 = toldBeliefs.filter(t => act3SceneIdxs362.has(t.sceneIdx));
     if (act12Assertions362.length >= 3 && act3Assertions362.length === 0) {
       issues.push({
-        location: `Act 3 (from Scene ${(records as any[])[act3Start362].sceneIdx}) — no assertions`,
+        location: `Act 3 (from Scene ${(records as any[])[act3Start362].sceneIdx + 1}) — no assertions`,
         rule: 'TOLD_BELIEF_ACT3_ABSENT',
         severity: 'minor',
         description: `${act12Assertions362.length} assertion(s) land in Acts 1–2 but none in Act 3 — the finale contains no moments where any character commits to a position or declares what they believe. The story tests and challenges beliefs through Acts 1 and 2, then resolves without anyone stating what they now hold to be true. An Act 3 without assertions means the ending resolves the plot but leaves the story's belief conflicts unresolved.`,
@@ -1932,10 +1932,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (!revSet362b.has(peakCur362.sceneIdx)) {
         issues.push({
-          location: `Scene ${peakCur362.sceneIdx} — peak curiosity, no revelation`,
+          location: `Scene ${peakCur362.sceneIdx + 1} — peak curiosity, no revelation`,
           rule: 'REVELATION_CURIOSITY_PEAK_ABSENT',
           severity: 'minor',
-          description: `Scene ${peakCur362.sceneIdx} carries the story's highest curiosityDelta (${(peakCur362.curiosityDelta ?? 0).toFixed(2)}) but no revelation, even though ${curiousRevScenes362.length} other curious scenes do deliver discoveries. The moment the audience is most urgently wondering what is true is precisely where no truth arrives — the peak of audience inquisitiveness passes without disclosure, and the most potent delivery slot for a revelation is left empty.`,
+          description: `Scene ${peakCur362.sceneIdx + 1} carries the story's highest curiosityDelta (${(peakCur362.curiosityDelta ?? 0).toFixed(2)}) but no revelation, even though ${curiousRevScenes362.length} other curious scenes do deliver discoveries. The moment the audience is most urgently wondering what is true is precisely where no truth arrives — the peak of audience inquisitiveness passes without disclosure, and the most potent delivery slot for a revelation is left empty.`,
           suggestedFix: 'Place a revelation at the peak-curiosity scene: when the audience is most urgently leaning forward wondering what is true, that is the moment to give them a discovery. The scene that raises the most questions should also deliver an answer — or a revelation that opens deeper ones. Curiosity at its peak is the best possible slot for a truth to land.',
         });
       }
@@ -1959,10 +1959,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         (r.suspenseDelta ?? 0) > (best.suspenseDelta ?? 0) ? r : best, (records as any[])[0]);
       if (peakSusp376 && !revSet376.has(peakSusp376.sceneIdx)) {
         issues.push({
-          location: `Scene ${peakSusp376.sceneIdx} — peak suspense, no revelation`,
+          location: `Scene ${peakSusp376.sceneIdx + 1} — peak suspense, no revelation`,
           rule: 'REVELATION_SUSPENSE_PEAK_ABSENT',
           severity: 'minor',
-          description: `Scene ${peakSusp376.sceneIdx} carries the story's highest suspenseDelta (${(peakSusp376.suspenseDelta ?? 0).toFixed(2)}) but no revelation, even though ${tenseRevScenes376.length} other suspense-positive scenes deliver discoveries. The moment the audience is most gripped delivers no truth — the most charged slot for a disclosure passes empty, so peak tension and the satisfaction of revelation never coincide.`,
+          description: `Scene ${peakSusp376.sceneIdx + 1} carries the story's highest suspenseDelta (${(peakSusp376.suspenseDelta ?? 0).toFixed(2)}) but no revelation, even though ${tenseRevScenes376.length} other suspense-positive scenes deliver discoveries. The moment the audience is most gripped delivers no truth — the most charged slot for a disclosure passes empty, so peak tension and the satisfaction of revelation never coincide.`,
           suggestedFix: 'Land a revelation at the peak-tension scene: when the audience is most on edge, the arrival of a truth — especially one that reframes the danger — hits with doubled force. The scene of maximum suspense is the most powerful place to disclose something, not to withhold.',
         });
       }
@@ -2006,10 +2006,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const afterMid376 = assertionScenes376.some(i => i >= midEnd376);
     if (!inMid376 && beforeMid376 && afterMid376) {
       issues.push({
-        location: `Midpoint zone (Scenes ${midStart376}–${midEnd376 - 1}) — no assertion`,
+        location: `Midpoint zone (Scenes ${midStart376 + 1}–${midEnd376}) — no assertion`,
         rule: 'ASSERTION_MIDPOINT_VOID',
         severity: 'minor',
-        description: `The midpoint zone (Scenes ${midStart376}–${midEnd376 - 1}) contains no assertion, though characters declare beliefs both before and after it — the belief layer goes silent at the structural pivot. The midpoint is where a character should be committing to or recommitting to a position as the story turns; an assertion void there means the pivot reorganizes the plot without anyone staking a claim on what it means.`,
+        description: `The midpoint zone (Scenes ${midStart376 + 1}–${midEnd376}) contains no assertion, though characters declare beliefs both before and after it — the belief layer goes silent at the structural pivot. The midpoint is where a character should be committing to or recommitting to a position as the story turns; an assertion void there means the pivot reorganizes the plot without anyone staking a claim on what it means.`,
         suggestedFix: 'Place an assertion at the midpoint: let a character declare what they now believe as the story turns — a vow renewed under new information, a conviction hardened or abandoned at the pivot. The center of the story is where beliefs should be most actively contested, not where they fall silent.',
       });
     }
@@ -2054,10 +2054,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         (r.suspenseDelta ?? 0) > (best.suspenseDelta ?? 0) ? r : best, (records as any[])[0]);
       if (peakSusp390 && !assertionSet390.has(peakSusp390.sceneIdx)) {
         issues.push({
-          location: `Scene ${peakSusp390.sceneIdx} — peak suspense, no assertion`,
+          location: `Scene ${peakSusp390.sceneIdx + 1} — peak suspense, no assertion`,
           rule: 'TOLD_BELIEF_SUSPENSE_PEAK_ABSENT',
           severity: 'minor',
-          description: `Scene ${peakSusp390.sceneIdx} carries the story's highest suspenseDelta (${(peakSusp390.suspenseDelta ?? 0).toFixed(2)}) but no assertion, even though ${tenseAssertion390.length} other suspense-positive scenes contain one. The peak-tension moment passes without anyone committing to a position — a conviction declared under maximum pressure is among the most charged beats available, and the story leaves that slot empty.`,
+          description: `Scene ${peakSusp390.sceneIdx + 1} carries the story's highest suspenseDelta (${(peakSusp390.suspenseDelta ?? 0).toFixed(2)}) but no assertion, even though ${tenseAssertion390.length} other suspense-positive scenes contain one. The peak-tension moment passes without anyone committing to a position — a conviction declared under maximum pressure is among the most charged beats available, and the story leaves that slot empty.`,
           suggestedFix: 'Place an assertion at the peak-tension scene: a vow, a refusal, a declaration of what the character believes made at the instant everything hangs in the balance. A conviction stated under fire is tested by the very pressure of the moment, which is what gives it weight.',
         });
       }
@@ -2079,10 +2079,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         (r.curiosityDelta ?? 0) > (best.curiosityDelta ?? 0) ? r : best, (records as any[])[0]);
       if (peakCur390 && !assertionSet390b.has(peakCur390.sceneIdx)) {
         issues.push({
-          location: `Scene ${peakCur390.sceneIdx} — peak curiosity, no assertion`,
+          location: `Scene ${peakCur390.sceneIdx + 1} — peak curiosity, no assertion`,
           rule: 'TOLD_BELIEF_CURIOSITY_PEAK_ABSENT',
           severity: 'minor',
-          description: `Scene ${peakCur390.sceneIdx} carries the story's highest curiosityDelta (${(peakCur390.curiosityDelta ?? 0).toFixed(2)}) but no assertion, even though ${curiousAssertion390.length} other curiosity-positive scenes contain one. The moment the audience is most intrigued passes without a character staking a claim — a confident assertion at the peak of curiosity, one the audience suspects may be wrong, is a potent dramatic-irony engine the story leaves unused.`,
+          description: `Scene ${peakCur390.sceneIdx + 1} carries the story's highest curiosityDelta (${(peakCur390.curiosityDelta ?? 0).toFixed(2)}) but no assertion, even though ${curiousAssertion390.length} other curiosity-positive scenes contain one. The moment the audience is most intrigued passes without a character staking a claim — a confident assertion at the peak of curiosity, one the audience suspects may be wrong, is a potent dramatic-irony engine the story leaves unused.`,
           suggestedFix: 'Place an assertion at the peak-curiosity scene: let a character commit to a belief precisely when the audience is most uncertain what is true. The gap between the character\'s certainty and the audience\'s doubt is where dramatic irony lives — the most intriguing moment is the best place to open it.',
         });
       }
@@ -2152,10 +2152,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const laterBeliefs404c = toldBeliefs.filter(t => t.sceneIdx >= act1End404c);
     if (act1Beliefs404c.length >= 3 && laterBeliefs404c.length === 0) {
       issues.push({
-        location: `Assertions concentrated in Scenes 0–${act1End404c - 1} (Act 1 only)`,
+        location: `Assertions concentrated in Scenes 1–${act1End404c} (Act 1 only)`,
         rule: 'ASSERTION_ACT1_ONLY',
         severity: 'minor',
-        description: `All ${toldBeliefs.length} of the story's assertions appear before Scene ${act1End404c} (the first 25%) — the belief layer closes at the point where it should begin complicating. The conflict and resolution zones contain no new claims, re-evaluations, or shifting certainties. Characters state their positions in the opening and are never heard from again on what they believe, leaving the bulk of the story without explicit intellectual or epistemic stakes.`,
+        description: `All ${toldBeliefs.length} of the story's assertions appear before Scene ${act1End404c + 1} (the first 25%) — the belief layer closes at the point where it should begin complicating. The conflict and resolution zones contain no new claims, re-evaluations, or shifting certainties. Characters state their positions in the opening and are never heard from again on what they believe, leaving the bulk of the story without explicit intellectual or epistemic stakes.`,
         suggestedFix: 'Distribute assertions across the full arc: characters should re-evaluate, double down, or contradict themselves as the conflict escalates. A claim made in Act 1 that a character defends under pressure in Act 2 and abandons (or dies for) in Act 3 gives the belief layer structural weight. The story\'s positions should be tested, not just stated.',
       });
     }
@@ -2187,10 +2187,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
     if (maxRun418a >= 3) {
       issues.push({
-        location: `Revelation run starting at Scene ${maxStart418a} (${maxRun418a} consecutive)`,
+        location: `Revelation run starting at Scene ${maxStart418a + 1} (${maxRun418a} consecutive)`,
         rule: 'REVELATION_CONSECUTIVE_FLOOD',
         severity: 'minor',
-        description: `A run of ${maxRun418a} consecutive revelation scenes occurs starting at Scene ${maxStart418a} — discoveries arrive back-to-back with no breathing room. When truths pile up in sequence, none of them lands as a turn because there is no space for the audience to absorb the change in what they believe. The second revelation arrives before the first has been processed; the third before the second.`,
+        description: `A run of ${maxRun418a} consecutive revelation scenes occurs starting at Scene ${maxStart418a + 1} — discoveries arrive back-to-back with no breathing room. When truths pile up in sequence, none of them lands as a turn because there is no space for the audience to absorb the change in what they believe. The second revelation arrives before the first has been processed; the third before the second.`,
         suggestedFix: 'Interleave non-revelation scenes between discoveries: after each truth is revealed, give one scene over to reaction, consequence, or dramatic use of the new knowledge before the next revelation arrives. A revelation earns its impact from the silence around it — the scene where everything changes is only perceptible against scenes where nothing changes.',
       });
     }
@@ -2214,10 +2214,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const hasOtherAssertion418b = toldBeliefs.some(t => !(t.sceneIdx >= act2aS418b && t.sceneIdx < act2aE418b));
     if (!hasAct2aAssertion418b && hasOtherAssertion418b) {
       issues.push({
-        location: `Act 2a (Scenes ${act2aS418b}–${act2aE418b - 1}) — no character assertions`,
+        location: `Act 2a (Scenes ${act2aS418b + 1}–${act2aE418b}) — no character assertions`,
         rule: 'ASSERTION_ACT2A_VOID',
         severity: 'minor',
-        description: `No told belief (character assertion) occurs in Act 2a (Scenes ${act2aS418b}–${act2aE418b - 1}), though assertions appear elsewhere in the story. Act 2a is where the protagonist first engages the central conflict — the zone where characters should be most actively staking and testing their positions. Without assertions in this zone, the belief battle sits silent exactly where it should be opening, and the audience enters the complication without knowing what characters think is true.`,
+        description: `No told belief (character assertion) occurs in Act 2a (Scenes ${act2aS418b + 1}–${act2aE418b}), though assertions appear elsewhere in the story. Act 2a is where the protagonist first engages the central conflict — the zone where characters should be most actively staking and testing their positions. Without assertions in this zone, the belief battle sits silent exactly where it should be opening, and the audience enters the complication without knowing what characters think is true.`,
         suggestedFix: 'Add at least one character assertion in Act 2a: a position staked, a claim defended, or a deliberate misdirection delivered as the conflict first escalates. The entry to complication is where the story\'s epistemic stakes should crystallize — what characters believe becomes the fuel the next acts will burn through.',
       });
     }
@@ -2321,10 +2321,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasPriorAssertion432b) {
         issues.push({
-          location: `Scene ${lastRevSceneIdx432b} — final revelation`,
+          location: `Scene ${lastRevSceneIdx432b + 1} — final revelation`,
           rule: 'REVELATION_UNPREPARED_CLIMAX',
           severity: 'minor',
-          description: `The story's final revelation (Scene ${lastRevSceneIdx432b}) is not preceded by any character assertion in the three scenes before it — there is no planted claim, defended position, or deliberate misdirection that the climactic disclosure is resolving. A revelation without a prior assertion has no dramatic irony behind it: the audience has not been given a false belief to correct, a mystery to solve, or a lie to unmask. The final truth arrives as information, not as the culmination of a belief arc.`,
+          description: `The story's final revelation (Scene ${lastRevSceneIdx432b + 1}) is not preceded by any character assertion in the three scenes before it — there is no planted claim, defended position, or deliberate misdirection that the climactic disclosure is resolving. A revelation without a prior assertion has no dramatic irony behind it: the audience has not been given a false belief to correct, a mystery to solve, or a lie to unmask. The final truth arrives as information, not as the culmination of a belief arc.`,
           suggestedFix: `Plant an assertion in the run-up to the final revelation: give a character a position they defend, a lie they maintain, or a belief they act on in the three scenes before the climactic disclosure. When the audience carries a planted claim into the revelation scene, the truth arriving feels earned — it resolves an epistemic debt rather than just delivering a fact.`,
         });
       }
@@ -2753,11 +2753,11 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
       );
       if (!peakHasRev488b && revCount488b >= 2 && relShiftCount488b >= 2 && otherRelWithRev488b) {
         issues.push({
-          location: `Scene ${records[peakRelIdx488b].sceneIdx} (${records[peakRelIdx488b].slug}) — peak relationship scene (magnitude ${maxRelMag488b.toFixed(2)}) has no revelation`,
+          location: `Scene ${records[peakRelIdx488b].sceneIdx + 1} (${records[peakRelIdx488b].slug}) — peak relationship scene (magnitude ${maxRelMag488b.toFixed(2)}) has no revelation`,
           rule: 'REVELATION_RELATIONSHIP_PEAK_ABSENT',
           severity: 'minor',
           description: `The scene with the largest relationship shift magnitude (${maxRelMag488b.toFixed(2)}) carries no revelation, even though other relationship-shift scenes do carry disclosures. The story's single biggest relational rupture is epistemically empty — no information changes hands at the moment of maximum bond stress. In a strong dramatic structure, the highest-charge relational beat is precisely where a character is most likely to reveal something: a truth they've withheld, a lie they can no longer maintain, or a secret that the bond's rupture finally forces into the open.`,
-          suggestedFix: `Give scene ${records[peakRelIdx488b].sceneIdx} a revelation — even a partial one. The moment when a relationship shifts most dramatically is the most natural place for disclosure: characters under maximum relational stress are most likely to speak truths they have been concealing. A revelation in the peak relational scene makes the bond shift dramatically legible by grounding it in newly disclosed information.`,
+          suggestedFix: `Give scene ${records[peakRelIdx488b].sceneIdx + 1} a revelation — even a partial one. The moment when a relationship shifts most dramatically is the most natural place for disclosure: characters under maximum relational stress are most likely to speak truths they have been concealing. A revelation in the peak relational scene makes the bond shift dramatically legible by grounding it in newly disclosed information.`,
         });
       }
     }
@@ -3197,11 +3197,11 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const earlyRevs544a = allRevIdxs544a.filter(({ i }) => i < closingStart544a);
     if (allRevIdxs544a.length >= 3 && closingRevs544a.length === 0 && earlyRevs544a.length >= 2) {
       issues.push({
-        location: `${allRevIdxs544a.length} revelation(s) in first 75%, 0 in closing 25% (scenes ${closingStart544a}–${records.length - 1})`,
+        location: `${allRevIdxs544a.length} revelation(s) in first 75%, 0 in closing 25% (scenes ${closingStart544a + 1}–${records.length})`,
         rule: 'REVELATION_CLOSING_QUARTER_ABSENT',
         severity: 'minor',
-        description: `The script has ${allRevIdxs544a.length} revelation scenes, all occurring before the 75% mark — the closing quarter (scenes ${closingStart544a}–${records.length - 1}) contains no disclosure. The audience enters the finale already knowing everything the script has decided to share: the climax is purely behavioral (characters act on prior knowledge), and the denouement has no fresh truth to settle. A revelation in the closing quarter is among the most structurally powerful placements: the final disclosure recontextualizes what came before, delivers the surprise that makes all preceding scenes retrospectively more meaningful, or gives the resolution its epistemic anchor. Without it, the closing quarter can only work with what the audience already knows — a structural limitation that removes an entire register of dramatic effect from the finale.`,
-        suggestedFix: `Move or add a revelation into the closing quarter (scenes ${closingStart544a}–${records.length - 1}): a disclosure that recontextualizes the climax, a final truth that answers the central question, or a late revelation that gives the resolution its emotional core. The most effective closing-quarter revelation is one the audience feels they should have anticipated but didn't — one that retrospectively illuminates all preceding scenes and makes the ending feel both surprising and inevitable.`,
+        description: `The script has ${allRevIdxs544a.length} revelation scenes, all occurring before the 75% mark — the closing quarter (scenes ${closingStart544a + 1}–${records.length}) contains no disclosure. The audience enters the finale already knowing everything the script has decided to share: the climax is purely behavioral (characters act on prior knowledge), and the denouement has no fresh truth to settle. A revelation in the closing quarter is among the most structurally powerful placements: the final disclosure recontextualizes what came before, delivers the surprise that makes all preceding scenes retrospectively more meaningful, or gives the resolution its epistemic anchor. Without it, the closing quarter can only work with what the audience already knows — a structural limitation that removes an entire register of dramatic effect from the finale.`,
+        suggestedFix: `Move or add a revelation into the closing quarter (scenes ${closingStart544a + 1}–${records.length}): a disclosure that recontextualizes the climax, a final truth that answers the central question, or a late revelation that gives the resolution its emotional core. The most effective closing-quarter revelation is one the audience feels they should have anticipated but didn't — one that retrospectively illuminates all preceding scenes and makes the ending feel both surprising and inevitable.`,
       });
     }
   }
@@ -3367,10 +3367,10 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         const laterRevCuriosity558b = revWithCuriosity558b.filter(x => x.pos > peakRev558b.pos);
         if (peakRev558b.pos < earlyThreshold558b && laterRevCuriosity558b.length >= 2) {
           issues.push({
-            location: `Peak-curiosity revelation at scene ${peakRev558b.pos} (first 25%) while ${laterRevCuriosity558b.length} curiosity-generating revelation(s) follow`,
+            location: `Peak-curiosity revelation at scene ${peakRev558b.pos + 1} (first 25%) while ${laterRevCuriosity558b.length} curiosity-generating revelation(s) follow`,
             rule: 'REVELATION_CURIOSITY_PEAK_EARLY',
             severity: 'minor',
-            description: `The revelation with the highest curiosityDelta (${maxCuriosity558b}) appears at scene ${peakRev558b.pos} — within the first 25% of the script — while ${laterRevCuriosity558b.length} other curiosity-generating revelation(s) follow with lower curiosityDelta. The script's most epistemically appetite-generating disclosure fires before the audience has fully invested in the story, while the disclosures that follow generate diminishing curiosity. A high-curiosity revelation is most powerful when it arrives at a point where the audience cares deeply about what is being discovered — typically in Act 2 or at a structural pivot when stakes are established. An early-peak revelation hooks the audience but delivers the best epistemic hook before the world is fully inhabited, making subsequent disclosures feel comparatively flat.`,
+            description: `The revelation with the highest curiosityDelta (${maxCuriosity558b}) appears at scene ${peakRev558b.pos + 1} — within the first 25% of the script — while ${laterRevCuriosity558b.length} other curiosity-generating revelation(s) follow with lower curiosityDelta. The script's most epistemically appetite-generating disclosure fires before the audience has fully invested in the story, while the disclosures that follow generate diminishing curiosity. A high-curiosity revelation is most powerful when it arrives at a point where the audience cares deeply about what is being discovered — typically in Act 2 or at a structural pivot when stakes are established. An early-peak revelation hooks the audience but delivers the best epistemic hook before the world is fully inhabited, making subsequent disclosures feel comparatively flat.`,
             suggestedFix: `Move the highest-curiosity revelation later in the script, or increase the curiosityDelta of the later revelations so the disclosure layer builds rather than peaks and declines. The most powerful revelation schedule generates escalating curiosity: each disclosure opens more questions than it closes, with the most curiosity-generating revelation arriving at the moment of greatest dramatic investment — typically at or just past the midpoint.`,
           });
         }
@@ -4613,11 +4613,11 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     });
     if (r782b.fires) {
       issues.push({
-        location: `scene ${r782b.peakIdx} (peak curiosityDelta ${r782b.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r782b.peakIdx + 1} (peak curiosityDelta ${r782b.peakMagnitude}) — no preparing cause nearby`,
         rule: 'BELIEF_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r782b.peakIdx}, curiosityDelta ${r782b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r782b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the belief-tracking layer hasn't built toward the mystery it's about to pose.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r782b.peakIdx} so the belief-tracking layer earns its peak curiosity instead of springing it without preparation.`,
+        description: `The story's single highest-curiosity scene (Scene ${r782b.peakIdx + 1}, curiosityDelta ${r782b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r782b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the belief-tracking layer hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r782b.peakIdx + 1} so the belief-tracking layer earns its peak curiosity instead of springing it without preparation.`,
       });
     }
   }

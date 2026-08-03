@@ -196,7 +196,7 @@ export function FixedPointsPanel({ onClose }: Props) {
           {bcResult && bcTargetIdx !== null && (
             <BackchainResultView
               result={bcResult}
-              fpDesc={fps[bcTargetIdx]?.description || `fixed point @ scene ${fps[bcTargetIdx]?.atScene}`}
+              fpDesc={fps[bcTargetIdx]?.description || `fixed point @ scene ${(fps[bcTargetIdx]?.atScene ?? 0) + 1}`}
             />
           )}
 
@@ -346,7 +346,7 @@ function PlanResultView({ result }: { result: PlanResult }) {
           <div style={{ color: 'var(--sm-ok)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Already satisfied</div>
           {result.alreadySatisfied.map((fp, i) => (
             <div key={i} style={{ color: 'var(--sm-ok)', fontSize: 12, padding: '3px 0' }}>
-              ✓ Scene {fp.atScene}: {fp.description || '(unnamed)'}
+              ✓ Scene {fp.atScene + 1}: {fp.description || '(unnamed)'}
             </div>
           ))}
         </div>
@@ -358,7 +358,7 @@ function PlanResultView({ result }: { result: PlanResult }) {
           <div style={{ color: 'var(--sm-stamp)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Blocked fixed points</div>
           {result.blocked.map((b, i) => (
             <div key={i} style={{ background: 'var(--sm-night-2)', border: '1px solid #991b1b', borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
-              <div style={{ color: 'var(--sm-stamp)', fontSize: 12 }}>✗ Scene {b.fixedPoint.atScene}: {b.fixedPoint.description || '(unnamed)'}</div>
+              <div style={{ color: 'var(--sm-stamp)', fontSize: 12 }}>✗ Scene {b.fixedPoint.atScene + 1}: {b.fixedPoint.description || '(unnamed)'}</div>
               <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{b.reason}</div>
             </div>
           ))}
@@ -371,7 +371,7 @@ function PlanResultView({ result }: { result: PlanResult }) {
           <div style={{ color: 'var(--sm-cool)', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Planned bias schedule</div>
           {scenes.map(sc => (
             <div key={sc} style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '8px 12px', marginBottom: 6 }}>
-              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 5 }}>INJECT AT SCENE {sc}</div>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 5 }}>INJECT AT SCENE {sc + 1}</div>
               {byScene.get(sc)!.map((bias, i) => (
                 <div key={i} style={{ marginBottom: i < byScene.get(sc)!.length - 1 ? 6 : 0 }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
@@ -426,7 +426,7 @@ function BackchainResultView({ result, fpDesc }: { result: BackchainResult; fpDe
           {result.schedule.map((s, i) => (
             <div key={i} style={{ background: '#0c1a2a', border: '1px solid #0e4166', borderRadius: 4, padding: '6px 10px', marginBottom: 4 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>scene {s.atScene}</span>
+                <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>scene {s.atScene + 1}</span>
                 <span style={{ background: '#0e4166', color: '#7dd3fc', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>{s.op.op}</span>
               </div>
               <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{s.reason}</div>
@@ -445,7 +445,7 @@ function BackchainResultView({ result, fpDesc }: { result: BackchainResult; fpDe
           <div style={{ color: '#38bdf8', fontSize: 11, marginBottom: 6 }}>{result.biases.length} bias(es) scheduled for injection</div>
           {result.biases.map((b, i) => (
             <div key={i} style={{ color: 'var(--sm-ink-mute)', fontSize: 11, padding: '2px 0' }}>
-              Scene {b.atScene}: {b.ops.map(o => o.op).join(', ')} — {b.rationale}
+              Scene {b.atScene + 1}: {b.ops.map(o => o.op).join(', ')} — {b.rationale}
             </div>
           ))}
         </div>

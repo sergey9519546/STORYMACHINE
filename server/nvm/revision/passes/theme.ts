@@ -648,7 +648,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
   // ── THEME_RESONANCE_GAP — >40% of scenes are theme-silent ─────────────────
   const silenceRatio = silentScenes.length / records.length;
   if (silenceRatio > 0.4 && records.length >= 4) {
-    const sample = silentScenes.slice(0, 3).map(s => `Scene ${s.idx} (${s.slug})`).join(', ');
+    const sample = silentScenes.slice(0, 3).map(s => `Scene ${s.idx + 1} (${s.slug})`).join(', ');
     const extra = silentScenes.length > 3 ? ` +${silentScenes.length - 3} more` : '';
     issues.push({
       location: sample + extra,
@@ -723,10 +723,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       const hits = sceneHitCounts.get(r.sceneIdx) ?? 0;
       if (hits >= 6 && hits > avgHits * 3 && avgHits > 0) {
         issues.push({
-          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          location: `Scene ${r.sceneIdx + 1} (${r.slug})`,
           rule: 'THEME_HEAVY_HANDED',
           description:
-            `Scene ${r.sceneIdx} repeats theme language ${hits} times (${(hits / avgHits).toFixed(1)}x the story average) — the theme "${themeRaw}" is stated on-the-nose rather than dramatized through subtext`,
+            `Scene ${r.sceneIdx + 1} repeats theme language ${hits} times (${(hits / avgHits).toFixed(1)}x the story average) — the theme "${themeRaw}" is stated on-the-nose rather than dramatized through subtext`,
           severity: 'major',
           suggestedFix:
             `Cut explicit theme statements in this scene. Let one image or action carry the meaning instead of having characters articulate it directly. Theme lands hardest when implied.`,
@@ -806,9 +806,9 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           !sceneHasResonance(prevText, expandedKeywords) &&
           !sceneHasResonance(nextText, expandedKeywords)) {
         issues.push({
-          location: `Scene ${records[midIdx]?.sceneIdx ?? midIdx} (midpoint ±1)`,
+          location: `Scene ${(records[midIdx]?.sceneIdx ?? midIdx) + 1} (midpoint ±1)`,
           rule: 'THEME_MIDPOINT_SILENT',
-          description: `The midpoint and adjacent scenes (Scenes ${Math.max(0, midIdx - 1)}–${Math.min(records.length - 1, midIdx + 1)}) have no thematic language — the structural pivot has no thematic voice`,
+          description: `The midpoint and adjacent scenes (Scenes ${Math.max(0, midIdx - 1) + 1}–${Math.min(records.length - 1, midIdx + 1) + 1}) have no thematic language — the structural pivot has no thematic voice`,
           severity: 'major',
           suggestedFix: `Add one thematic beat to the midpoint scene: a choice, image, or line of dialogue that resonates with "${themeRaw}". The midpoint is where the theme's second half begins — it should carry the question forward`,
         });
@@ -879,7 +879,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       );
       if (openingSilent) {
         issues.push({
-          location: `Scenes 0–${openingCount - 1} (opening)`,
+          location: `Scenes 1–${openingCount} (opening)`,
           rule: 'THEME_OPENING_SILENT',
           description: `The opening ${openingCount} scenes contain no language related to the theme "${themeRaw}" — the story complicates a question it never planted. The audience reaches the midpoint without knowing what the film is about.`,
           severity: 'major',
@@ -936,9 +936,9 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const climaxText = sceneTexts.get(records[climaxIdx].sceneIdx) ?? '';
         if (!sceneHasResonance(climaxText, expandedKeywords)) {
           issues.push({
-            location: `Scene ${records[climaxIdx].sceneIdx} (climax, peak suspense ${maxSus.toFixed(1)})`,
+            location: `Scene ${records[climaxIdx].sceneIdx + 1} (climax, peak suspense ${maxSus.toFixed(1)})`,
             rule: 'THEME_CLIMAX_SCENE_SILENT',
-            description: `Act 3 carries the theme "${themeRaw}", but the climax scene (Scene ${records[climaxIdx].sceneIdx}, the peak-suspense beat) has no thematic language — the story resolves its question beside the climax rather than inside it`,
+            description: `Act 3 carries the theme "${themeRaw}", but the climax scene (Scene ${records[climaxIdx].sceneIdx + 1}, the peak-suspense beat) has no thematic language — the story resolves its question beside the climax rather than inside it`,
             severity: 'major',
             suggestedFix: `Move the thematic payoff into the climax itself. The single most dramatic moment should also be the most thematically charged: the protagonist's decisive action should embody the answer to "${themeRaw}".`,
           });
@@ -960,7 +960,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         ).length;
         if (resonantInAct2 / act2DesertRecs.length < 0.3) {
           issues.push({
-            location: `Act 2 (scenes ${act2DesertStart}–${act2DesertEnd - 1})`,
+            location: `Act 2 (scenes ${act2DesertStart + 1}–${act2DesertEnd})`,
             rule: 'THEME_ACT2_DESERT',
             description:
               `Only ${resonantInAct2} of ${act2DesertRecs.length} Act 2 scenes (${Math.round(resonantInAct2 / act2DesertRecs.length * 100)}%) carry the theme "${themeRaw}" — the middle of the story is thematically inert`,
@@ -980,7 +980,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       const finalText = sceneTexts.get(finalRec.sceneIdx) ?? '';
       if (!sceneHasResonance(finalText, expandedKeywords)) {
         issues.push({
-          location: `Scene ${finalRec.sceneIdx} (final scene)`,
+          location: `Scene ${finalRec.sceneIdx + 1} (final scene)`,
           rule: 'THEME_RESOLUTION_SILENT',
           description:
             `The final scene contains no language related to the theme "${themeRaw}" — the screenplay ends on a plot beat rather than a thematic one`,
@@ -1042,7 +1042,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       if (maxRun208 >= 5) {
         const runEnd208 = Math.min(maxRunStart208 + maxRun208 - 1, records.length - 1);
         issues.push({
-          location: `Scenes ${records[maxRunStart208].sceneIdx}–${records[runEnd208].sceneIdx}`,
+          location: `Scenes ${records[maxRunStart208].sceneIdx + 1}–${records[runEnd208].sceneIdx + 1}`,
           rule: 'THEME_CONSECUTIVE_RESONANT_SURFEIT',
           severity: 'minor',
           description: `${maxRun208} consecutive scenes all carry the theme "${themeRaw}" with no breathing room — thematic saturation desensitizes the audience. Theme lands hardest when it has silence between its hits; without rest, the resonance becomes ambient noise.`,
@@ -1072,7 +1072,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         );
         if (act1ResonantEasy208 && !act1HasChallenge208) {
           issues.push({
-            location: `Act 1 (scenes 0–${act1End208 - 1})`,
+            location: `Act 1 (scenes 1–${act1End208})`,
             rule: 'THEME_FIRST_ACT_RESOLUTION',
             severity: 'major',
             description: `Act 1 contains a thematically resonant scene with a positive, unchallenged outcome — the story answers "${themeRaw}" before the question has been tested through drama. A thesis delivered before the antithesis is a lecture, not a story.`,
@@ -1126,7 +1126,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       }
       if (maxRun223 > stretchThreshold223) {
         issues.push({
-          location: `Scenes ${stretchStart223}–${stretchStart223 + maxRun223 - 1}`,
+          location: `Scenes ${stretchStart223 + 1}–${stretchStart223 + maxRun223}`,
           rule: 'THEME_SILENT_STRETCH',
           severity: 'major',
           description: `A consecutive run of ${maxRun223} theme-silent scenes (${stretchThreshold223} allowed for a ${records.length}-scene story) creates a thematic dead zone — the audience loses the story's meaning for an extended stretch before the theme returns.`,
@@ -1346,7 +1346,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       const lastSceneText251 = sceneTexts.get(lastRec251.sceneIdx) ?? '';
       if (lastSceneText251 && !sceneHasResonance(lastSceneText251, expandedKeywords)) {
         issues.push({
-          location: `Final scene (Scene ${lastRec251.sceneIdx})`,
+          location: `Final scene (Scene ${lastRec251.sceneIdx + 1})`,
           rule: 'THEME_FINAL_SCENE_SILENT',
           severity: 'minor',
           description: `The story's final scene carries no thematic language related to "${themeRaw}" — the closing moment is thematically mute. The last image the audience receives contains no trace of the central question the story raised.`,
@@ -1655,10 +1655,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       const midPos321 = Math.floor(records.length / 2);
       if (peakHits321 >= 2 && totalHits321 >= 4 && peakPos321 >= 0 && peakPos321 < midPos321) {
         issues.push({
-          location: `Scene ${records[peakPos321].sceneIdx} (thematic peak)`,
+          location: `Scene ${records[peakPos321].sceneIdx + 1} (thematic peak)`,
           rule: 'THEME_PEAK_BEFORE_MIDPOINT',
           severity: 'minor',
-          description: `The thematic peak — the scene with the most "${themeRaw}" language (${peakHits321} hits) — falls in the first half of the story (Scene ${records[peakPos321].sceneIdx} of ${records.length}). Theme should build toward its densest statement near the climax, where the audience is most invested; a peak in the setup states the idea before anyone cares, then lets it thin out toward the ending.`,
+          description: `The thematic peak — the scene with the most "${themeRaw}" language (${peakHits321} hits) — falls in the first half of the story (Scene ${records[peakPos321].sceneIdx + 1} of ${records.length}). Theme should build toward its densest statement near the climax, where the audience is most invested; a peak in the setup states the idea before anyone cares, then lets it thin out toward the ending.`,
           suggestedFix: `Shift the theme's strongest expression later: let the setup introduce the question lightly and reserve the most concentrated thematic beat for a scene at or near the climax, where the story's events give the idea its full weight. The theme should land hardest where the stakes are highest.`,
         });
       }
@@ -1756,10 +1756,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const peakRec332 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCuriosity332);
         if (peakRec332 && !sceneHasResonance(sceneTexts.get(peakRec332.sceneIdx) ?? '', expandedKeywords)) {
           issues.push({
-            location: `Scene ${peakRec332.sceneIdx} (peak curiosity: ${maxCuriosity332})`,
+            location: `Scene ${peakRec332.sceneIdx + 1} (peak curiosity: ${maxCuriosity332})`,
             rule: 'THEME_CURIOSITY_PEAK_ABSENT',
             severity: 'minor',
-            description: `The scene with the highest curiosityDelta (Scene ${peakRec332.sceneIdx}, delta ${maxCuriosity332}) carries no language related to "${themeRaw}" — the story's single most question-raising moment is thematically mute. While other scenes carry the theme, the moment of maximum curiosity leaves the audience wondering about plot mechanics rather than thematic meaning. The most urgent question posed should be the story's thematic question.`,
+            description: `The scene with the highest curiosityDelta (Scene ${peakRec332.sceneIdx + 1}, delta ${maxCuriosity332}) carries no language related to "${themeRaw}" — the story's single most question-raising moment is thematically mute. While other scenes carry the theme, the moment of maximum curiosity leaves the audience wondering about plot mechanics rather than thematic meaning. The most urgent question posed should be the story's thematic question.`,
             suggestedFix: `Embed the theme in the peak curiosity scene: let the question it raises be ultimately about "${themeRaw}" rather than purely about what happens next. The audience should leave that scene wondering about the theme, not just about the plot.`,
           });
         }
@@ -1816,10 +1816,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const peakRec346 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSuspense346);
         if (peakRec346 && !sceneHasResonance(sceneTexts.get(peakRec346.sceneIdx) ?? '', expandedKeywords)) {
           issues.push({
-            location: `Scene ${peakRec346.sceneIdx} (peak suspense: ${maxSuspense346})`,
+            location: `Scene ${peakRec346.sceneIdx + 1} (peak suspense: ${maxSuspense346})`,
             rule: 'THEME_SUSPENSE_PEAK_ABSENT',
             severity: 'minor',
-            description: `The scene with the highest suspenseDelta (Scene ${peakRec346.sceneIdx}, delta ${maxSuspense346}) carries no language related to "${themeRaw}" — the story's single most tense moment is thematically mute. While other scenes carry the theme, the peak of tension lands as pure plot danger rather than a collision with the thematic question. The most charged confrontation is exactly where the theme should be most at stake.`,
+            description: `The scene with the highest suspenseDelta (Scene ${peakRec346.sceneIdx + 1}, delta ${maxSuspense346}) carries no language related to "${themeRaw}" — the story's single most tense moment is thematically mute. While other scenes carry the theme, the peak of tension lands as pure plot danger rather than a collision with the thematic question. The most charged confrontation is exactly where the theme should be most at stake.`,
             suggestedFix: `Bind the theme to the peak-tension scene: let what is in jeopardy there be ultimately about "${themeRaw}", not just about who survives or wins. When the audience is most gripped, the stakes they feel should be thematic as well as physical.`,
           });
         }
@@ -1844,10 +1844,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       }
       if (firstResonantPos346 >= mid346) {
         issues.push({
-          location: `First thematic resonance at Scene ${(records as any[])[firstResonantPos346].sceneIdx} (past the midpoint)`,
+          location: `First thematic resonance at Scene ${(records as any[])[firstResonantPos346].sceneIdx + 1} (past the midpoint)`,
           rule: 'THEME_LATE_DEBUT',
           severity: 'minor',
-          description: `The first scene carrying any language related to "${themeRaw}" is Scene ${(records as any[])[firstResonantPos346].sceneIdx}, at or past the story's midpoint — the entire first half is thematically silent. A theme introduced only in the back half has no time to establish itself as the through-line; the audience reaches the midpoint with no sense of what the story is about, then is asked to invest in a meaning that arrives late.`,
+          description: `The first scene carrying any language related to "${themeRaw}" is Scene ${(records as any[])[firstResonantPos346].sceneIdx + 1}, at or past the story's midpoint — the entire first half is thematically silent. A theme introduced only in the back half has no time to establish itself as the through-line; the audience reaches the midpoint with no sense of what the story is about, then is asked to invest in a meaning that arrives late.`,
           suggestedFix: `Plant the theme early: let "${themeRaw}" surface — even quietly — in the opening act, through an image, a line, or a choice that frames the question the story will explore. The theme the audience meets in Act 1 is the one they feel resolve in Act 3.`,
         });
       }
@@ -1874,10 +1874,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         );
         if (earlierResonant346 && !finalResonant346) {
           issues.push({
-            location: `Closing quarter (Scenes ${finalStart346}–${records.length - 1}) — thematically silent`,
+            location: `Closing quarter (Scenes ${finalStart346 + 1}–${records.length}) — thematically silent`,
             rule: 'THEME_CLOSING_QUARTER_SILENT',
             severity: 'minor',
-            description: `The final quarter of the story (Scenes ${finalStart346}–${records.length - 1}) carries no language related to "${themeRaw}", though the theme appears earlier — the thematic frame is left open. The story raises its central question but lets it go quiet exactly where it should resolve, so the ending answers the plot without answering (or pointedly refusing to answer) what the story was about.`,
+            description: `The final quarter of the story (Scenes ${finalStart346 + 1}–${records.length}) carries no language related to "${themeRaw}", though the theme appears earlier — the thematic frame is left open. The story raises its central question but lets it go quiet exactly where it should resolve, so the ending answers the plot without answering (or pointedly refusing to answer) what the story was about.`,
             suggestedFix: `Return to the theme in the closing quarter: the climax and denouement should be where "${themeRaw}" reaches its sharpest statement — the moment the story's argument lands. Let the resolution of the plot also resolve the thematic question, so the ending feels like it meant something.`,
           });
         }
@@ -1911,7 +1911,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const act3Density360 = act3Resonant360 / act3Recs360.length;
         if (act3Density360 < act2Density360 * 0.5) {
           issues.push({
-            location: `Act 3 (Scenes ${act3Start360}–${records.length - 1}) — thematic density drop`,
+            location: `Act 3 (Scenes ${act3Start360 + 1}–${records.length}) — thematic density drop`,
             rule: 'THEME_ACT3_DENSITY_DROP',
             severity: 'minor',
             description: `Act 3 is ${Math.round(act3Density360 * 100)}% thematically resonant vs Act 2's ${Math.round(act2Density360 * 100)}% — the theme thins sharply at the approach to resolution. The story should be escalating its thematic argument toward the climax, not retreating from it; a density drop into Act 3 means the ending inherits a plot without a meaning.`,
@@ -1950,10 +1950,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         }
         if (peakRec360 && !sceneHasResonance(sceneTexts.get(peakRec360.sceneIdx) ?? '', expandedKeywords)) {
           issues.push({
-            location: `Scene ${peakRec360.sceneIdx} — largest relationship shift (|${peakAmount360.toFixed(2)}|)`,
+            location: `Scene ${peakRec360.sceneIdx + 1} — largest relationship shift (|${peakAmount360.toFixed(2)}|)`,
             rule: 'THEME_RELATIONSHIP_PEAK_ABSENT',
             severity: 'minor',
-            description: `The scene with the story's largest relationship shift (Scene ${peakRec360.sceneIdx}, magnitude ${peakAmount360.toFixed(2)}) carries no language related to "${themeRaw}", even though ${resonantShiftRecs360.length} other relationship-shift scenes do. The biggest relational swing in the story — the moment a bond moves most dramatically — happens without thematic resonance, so the audience registers the event but misses its meaning.`,
+            description: `The scene with the story's largest relationship shift (Scene ${peakRec360.sceneIdx + 1}, magnitude ${peakAmount360.toFixed(2)}) carries no language related to "${themeRaw}", even though ${resonantShiftRecs360.length} other relationship-shift scenes do. The biggest relational swing in the story — the moment a bond moves most dramatically — happens without thematic resonance, so the audience registers the event but misses its meaning.`,
             suggestedFix: `Let the peak relational moment carry the theme: when a bond breaks or deepens most severely, the language should echo what the story is about. If the theme is "${themeRaw}", the biggest shift should make explicit what value is at stake in that bond at that moment.`,
           });
         }
@@ -1979,10 +1979,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         );
         if (peakDualRec360 && !sceneHasResonance(sceneTexts.get(peakDualRec360.sceneIdx) ?? '', expandedKeywords)) {
           issues.push({
-            location: `Scene ${peakDualRec360.sceneIdx} — combined suspense + curiosity peak (${maxDual360.toFixed(2)})`,
+            location: `Scene ${peakDualRec360.sceneIdx + 1} — combined suspense + curiosity peak (${maxDual360.toFixed(2)})`,
             rule: 'THEME_DUAL_PEAK_ABSENT',
             severity: 'minor',
-            description: `Scene ${peakDualRec360.sceneIdx} has the story's highest combined suspense and curiosity charge (suspenseDelta + curiosityDelta = ${maxDual360.toFixed(2)}) but carries no language related to "${themeRaw}". The moment where tension and intrigue peak simultaneously — when the audience is most gripped and most curious — is thematically blank. The most engaged the audience will be all story, and the theme is nowhere in the scene.`,
+            description: `Scene ${peakDualRec360.sceneIdx + 1} has the story's highest combined suspense and curiosity charge (suspenseDelta + curiosityDelta = ${maxDual360.toFixed(2)}) but carries no language related to "${themeRaw}". The moment where tension and intrigue peak simultaneously — when the audience is most gripped and most curious — is thematically blank. The most engaged the audience will be all story, and the theme is nowhere in the scene.`,
             suggestedFix: `Bring "${themeRaw}" into the story's peak dramatic moment: when suspense and curiosity crest at the same scene, the thematic stakes should be explicit. The audience's maximum engagement is the most powerful moment to remind them what the story is ultimately about.`,
           });
         }
@@ -2010,7 +2010,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const restDensity374 = restResonant374 / restRecs374.length;
         if (act1Density374 < restDensity374 * 0.5) {
           issues.push({
-            location: `Act 1 (Scenes 0–${act1End374 - 1}) — thematic density drop`,
+            location: `Act 1 (Scenes 1–${act1End374}) — thematic density drop`,
             rule: 'THEME_ACT1_DENSITY_DROP',
             severity: 'minor',
             description: `Act 1 is ${Math.round(act1Density374 * 100)}% thematically resonant vs ${Math.round(restDensity374 * 100)}% across the rest of the story — the opening under-weights the theme relative to the body. The audience spends the setup with little sense of what "${themeRaw}" means to the story, so the through-line is established late and the early scenes don't frame the question the rest of the film will explore.`,
@@ -2033,10 +2033,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           (r.clockDelta ?? 0) > (best.clockDelta ?? 0) ? r : best, clockScenes374[0]);
         if (peakClock374 && !sceneHasResonance(sceneTexts.get(peakClock374.sceneIdx) ?? '', expandedKeywords)) {
           issues.push({
-            location: `Scene ${peakClock374.sceneIdx} — peak deadline (clockDelta ${(peakClock374.clockDelta ?? 0).toFixed(2)})`,
+            location: `Scene ${peakClock374.sceneIdx + 1} — peak deadline (clockDelta ${(peakClock374.clockDelta ?? 0).toFixed(2)})`,
             rule: 'THEME_CLOCK_PEAK_ABSENT',
             severity: 'minor',
-            description: `The story's most urgent deadline (Scene ${peakClock374.sceneIdx}, clockDelta ${(peakClock374.clockDelta ?? 0).toFixed(2)}) carries no language related to "${themeRaw}", though the theme appears elsewhere. The moment time pressure peaks has no thematic dimension, so the audience feels the clock tightening without connecting the urgency to what the story is ultimately about — the deadline is mechanical rather than meaningful.`,
+            description: `The story's most urgent deadline (Scene ${peakClock374.sceneIdx + 1}, clockDelta ${(peakClock374.clockDelta ?? 0).toFixed(2)}) carries no language related to "${themeRaw}", though the theme appears elsewhere. The moment time pressure peaks has no thematic dimension, so the audience feels the clock tightening without connecting the urgency to what the story is ultimately about — the deadline is mechanical rather than meaningful.`,
             suggestedFix: `Tie the peak deadline to "${themeRaw}": what thematic value is at stake when this clock runs out? When the most urgent moment of time pressure is also the moment the theme is most threatened, the ticking clock becomes unbearable because what it endangers is meaning, not just outcome.`,
           });
         }
@@ -2082,10 +2082,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const overallDensity388 = overallResonant388 / records.length;
         if (midDensity388 < overallDensity388 * 0.5) {
           issues.push({
-            location: `Midpoint (Scenes ${midS388}–${midE388 - 1}) — thematic density drop`,
+            location: `Midpoint (Scenes ${midS388 + 1}–${midE388}) — thematic density drop`,
             rule: 'THEME_MIDPOINT_DENSITY_DROP',
             severity: 'minor',
-            description: `The midpoint zone (Scenes ${midS388}–${midE388 - 1}) is ${Math.round(midDensity388 * 100)}% thematically resonant versus ${Math.round(overallDensity388 * 100)}% across the story — theme thins sharply at the structural pivot. The midpoint is where a strong story restates "${themeRaw}" with new force as the central question is reframed; a density drop there means the pivot turns the plot without deepening the meaning.`,
+            description: `The midpoint zone (Scenes ${midS388 + 1}–${midE388}) is ${Math.round(midDensity388 * 100)}% thematically resonant versus ${Math.round(overallDensity388 * 100)}% across the story — theme thins sharply at the structural pivot. The midpoint is where a strong story restates "${themeRaw}" with new force as the central question is reframed; a density drop there means the pivot turns the plot without deepening the meaning.`,
             suggestedFix: `Bring the theme back at the midpoint: the reframing turn should make "${themeRaw}" newly urgent — a revelation that recasts the thematic question, a choice that tests it under new terms. The center of the story is exactly where the theme should intensify, not recede.`,
           });
         }
@@ -2104,10 +2104,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       const laterResonant388 = (records as any[]).slice(1).some((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords));
       if (firstRec388 && laterResonant388 && !sceneHasResonance(sceneTexts.get(firstRec388.sceneIdx) ?? '', expandedKeywords)) {
         issues.push({
-          location: `Scene ${firstRec388.sceneIdx} — opening image`,
+          location: `Scene ${firstRec388.sceneIdx + 1} — opening image`,
           rule: 'THEME_OPENING_IMAGE_SILENT',
           severity: 'minor',
-          description: `The story's opening image (Scene ${firstRec388.sceneIdx}) carries no language related to "${themeRaw}", though the theme surfaces later. The first scene is a privileged thematic slot — it frames how the audience reads everything that follows — and an opening disconnected from the theme means the story's first impression sets up a different question than the one it ultimately answers.`,
+          description: `The story's opening image (Scene ${firstRec388.sceneIdx + 1}) carries no language related to "${themeRaw}", though the theme surfaces later. The first scene is a privileged thematic slot — it frames how the audience reads everything that follows — and an opening disconnected from the theme means the story's first impression sets up a different question than the one it ultimately answers.`,
           suggestedFix: `Plant "${themeRaw}" in the opening image: a detail, a choice, or a visual that quietly poses the thematic question from the very first beat. The image the audience meets first is the lens they watch the rest of the film through — make it carry the meaning.`,
         });
       }
@@ -2160,10 +2160,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const overallDensity402 = overallResonant402 / records.length;
         if (a2aDensity402 < overallDensity402 * 0.5) {
           issues.push({
-            location: `Act 2a (Scenes ${a2aStart402}–${a2aEnd402 - 1}) — thematic density drop`,
+            location: `Act 2a (Scenes ${a2aStart402 + 1}–${a2aEnd402}) — thematic density drop`,
             rule: 'THEME_ACT2A_DENSITY_DROP',
             severity: 'minor',
-            description: `Act 2a (Scenes ${a2aStart402}–${a2aEnd402 - 1}) is ${Math.round(a2aDensity402 * 100)}% thematically resonant versus ${Math.round(overallDensity402 * 100)}% across the story — the theme thins precisely as the protagonist enters the central conflict. Act 2a is where the struggle opens and the audience's investment in the theme should deepen; a density drop here means the conflict is engaged as pure plot mechanics with "${themeRaw}" absent from the scenes that should first test it.`,
+            description: `Act 2a (Scenes ${a2aStart402 + 1}–${a2aEnd402}) is ${Math.round(a2aDensity402 * 100)}% thematically resonant versus ${Math.round(overallDensity402 * 100)}% across the story — the theme thins precisely as the protagonist enters the central conflict. Act 2a is where the struggle opens and the audience's investment in the theme should deepen; a density drop here means the conflict is engaged as pure plot mechanics with "${themeRaw}" absent from the scenes that should first test it.`,
             suggestedFix: `Bring the theme into the early conflict: as the protagonist first engages the central struggle, let the scenes echo "${themeRaw}" — through a character's observation, a choice that embodies the theme's tension, or an image that reframes the conflict in thematic terms. The entry into Act 2 is where the audience learns that the story is about something, not just about someone.`,
           });
         }
@@ -2195,10 +2195,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           );
           if (peakSeedRec402b && !sceneHasResonance(sceneTexts.get(peakSeedRec402b.sceneIdx) ?? '', expandedKeywords)) {
             issues.push({
-              location: `Scene ${peakSeedRec402b.sceneIdx} (peak clue-planting: ${peakSeedCount402b} seed(s))`,
+              location: `Scene ${peakSeedRec402b.sceneIdx + 1} (peak clue-planting: ${peakSeedCount402b} seed(s))`,
               rule: 'THEME_SEED_PEAK_ABSENT',
               severity: 'minor',
-              description: `The scene that plants the most clues (Scene ${peakSeedRec402b.sceneIdx}, ${peakSeedCount402b} seed(s)) carries no language related to "${themeRaw}", though other seed scenes do carry the theme. The densest foreshadowing moment is thematically mute — the story plants evidence as a plot mechanic without the scene being about "${themeRaw}". The clues the audience will be asked to remember should feel thematically significant when they are planted.`,
+              description: `The scene that plants the most clues (Scene ${peakSeedRec402b.sceneIdx + 1}, ${peakSeedCount402b} seed(s)) carries no language related to "${themeRaw}", though other seed scenes do carry the theme. The densest foreshadowing moment is thematically mute — the story plants evidence as a plot mechanic without the scene being about "${themeRaw}". The clues the audience will be asked to remember should feel thematically significant when they are planted.`,
               suggestedFix: `Let the story's richest clue-planting scene also carry "${themeRaw}": the evidence being planted should feel dangerous or revealing in thematic terms, not just mechanically important. When a seed and a thematic note land in the same scene, the payoff that resolves the clue also resolves the thematic question — the most satisfying form of closure.`,
             });
           }
@@ -2229,10 +2229,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           );
           if (peakPayoffRec402c && !sceneHasResonance(sceneTexts.get(peakPayoffRec402c.sceneIdx) ?? '', expandedKeywords)) {
             issues.push({
-              location: `Scene ${peakPayoffRec402c.sceneIdx} (peak payoff: ${peakPayoffCount402c} setup(s) resolved)`,
+              location: `Scene ${peakPayoffRec402c.sceneIdx + 1} (peak payoff: ${peakPayoffCount402c} setup(s) resolved)`,
               rule: 'THEME_PAYOFF_PEAK_ABSENT',
               severity: 'minor',
-              description: `The scene that resolves the most setups (Scene ${peakPayoffRec402c.sceneIdx}, ${peakPayoffCount402c} payoff(s)) carries no language related to "${themeRaw}", though other payoff scenes do. The story's densest resolution moment — where the audience receives the largest return on its narrative investment — is thematically mute. The most important convergence of threads lands without any echo of what the story is ultimately about.`,
+              description: `The scene that resolves the most setups (Scene ${peakPayoffRec402c.sceneIdx + 1}, ${peakPayoffCount402c} payoff(s)) carries no language related to "${themeRaw}", though other payoff scenes do. The story's densest resolution moment — where the audience receives the largest return on its narrative investment — is thematically mute. The most important convergence of threads lands without any echo of what the story is ultimately about.`,
               suggestedFix: `Infuse the peak payoff scene with "${themeRaw}": the resolution of the story's most important threads should make the audience feel the theme being answered, not just the plot being closed. A payoff that resolves a setup AND speaks to the theme produces the deepest catharsis — the story closes two loops at once.`,
             });
           }
@@ -2297,10 +2297,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const aftermathRec416b = records[peakSuspPos416b + 1];
         if (!sceneHasResonance(sceneTexts.get(aftermathRec416b.sceneIdx) ?? '', expandedKeywords)) {
           issues.push({
-            location: `Scene ${aftermathRec416b.sceneIdx} (aftermath of peak-suspense Scene ${records[peakSuspPos416b].sceneIdx})`,
+            location: `Scene ${aftermathRec416b.sceneIdx + 1} (aftermath of peak-suspense Scene ${records[peakSuspPos416b].sceneIdx + 1})`,
             rule: 'THEME_PEAK_SUSPENSE_AFTERMATH_SILENT',
             severity: 'minor',
-            description: `The scene immediately following the story's highest-suspense moment (Scene ${records[peakSuspPos416b].sceneIdx}, suspenseDelta ${peakSuspVal416b.toFixed(1)}) carries no language related to "${themeRaw}". The aftermath of maximum tension is the story's most receptive delivery window for meaning — the audience is adrenaline-primed and looking for the point of what they just experienced — yet it is thematically blank.`,
+            description: `The scene immediately following the story's highest-suspense moment (Scene ${records[peakSuspPos416b].sceneIdx + 1}, suspenseDelta ${peakSuspVal416b.toFixed(1)}) carries no language related to "${themeRaw}". The aftermath of maximum tension is the story's most receptive delivery window for meaning — the audience is adrenaline-primed and looking for the point of what they just experienced — yet it is thematically blank.`,
             suggestedFix: `Give the aftermath scene thematic resonance: a character's first words or action after the peak tension should speak to "${themeRaw}" — crystallizing what the danger revealed about the story's central question or complicating the protagonist's relationship to it. The exhale beat is where meaning lands deepest because the audience's guard is down.`,
           });
         }
@@ -2402,10 +2402,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         const prior2_430b = records[peakPos430b - 2];
         if (!isCatalyst430b(prior1_430b) && !isCatalyst430b(prior2_430b)) {
           issues.push({
-            location: `Scene ${records[peakPos430b].sceneIdx} — thematic peak (${peakHits430b} keyword hits)`,
+            location: `Scene ${records[peakPos430b].sceneIdx + 1} — thematic peak (${peakHits430b} keyword hits)`,
             rule: 'THEME_PEAK_UNMOTIVATED',
             severity: 'minor',
-            description: `The story's thematic peak — Scene ${records[peakPos430b].sceneIdx} with ${peakHits430b} theme keyword hits for "${themeRaw}" — arrives without any structural catalyst in the two preceding scenes (no revelation, dramatic turn, clock-raised, or high suspense). The most concentrated thematic statement in the story surfaces without narrative preparation; there is no dramatic cause to explain why the theme peaks here. An unmotivated thematic peak reads as a thesis paragraph accidentally placed in the script rather than earned by what precedes it.`,
+            description: `The story's thematic peak — Scene ${records[peakPos430b].sceneIdx + 1} with ${peakHits430b} theme keyword hits for "${themeRaw}" — arrives without any structural catalyst in the two preceding scenes (no revelation, dramatic turn, clock-raised, or high suspense). The most concentrated thematic statement in the story surfaces without narrative preparation; there is no dramatic cause to explain why the theme peaks here. An unmotivated thematic peak reads as a thesis paragraph accidentally placed in the script rather than earned by what precedes it.`,
             suggestedFix: `Motivate the thematic peak: let the scene before (or two before) the densest theme moment carry a revelation, a turn, or a spike in suspense that opens the audience emotionally before the meaning lands at full force. The thematic peak must be earned — the audience needs to be primed by rising dramatic energy before the theme can land at its hardest. Move the peak, or add a catalyst that justifies its position.`,
           });
         }
@@ -2484,11 +2484,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       }
       if (maxResRun444a >= 4 && resonantScenes.length < records.length) {
         issues.push({
-          location: `Scenes ${maxResRunStart444a}–${maxResRunStart444a + maxResRun444a - 1} — consecutive resonant cluster (${maxResRun444a} scenes)`,
+          location: `Scenes ${maxResRunStart444a + 1}–${maxResRunStart444a + maxResRun444a} — consecutive resonant cluster (${maxResRun444a} scenes)`,
           rule: 'THEME_RESONANT_CLUSTER_FLOOD',
           severity: 'minor',
           description: `${maxResRun444a} consecutive scenes all carry language related to "${themeRaw}" — a local echo-chamber where theme becomes a relentless drumbeat rather than an accent. Thematic resonance lands hardest when it punctuates scenes that don't carry it; when every scene in a run speaks the theme, each occurrence dilutes the next. The contrast that makes individual resonant moments meaningful disappears when ${maxResRun444a} consecutive scenes all announce the same message.`,
-          suggestedFix: `Break the consecutive resonant cluster (Scenes ${maxResRunStart444a}–${maxResRunStart444a + maxResRun444a - 1}) by letting at least one or two scenes advance plot or character without explicitly carrying "${themeRaw}". The silence will make the next resonant scene land harder. Thematic meaning comes from pattern; patterns need variation to register as patterns.`,
+          suggestedFix: `Break the consecutive resonant cluster (Scenes ${maxResRunStart444a + 1}–${maxResRunStart444a + maxResRun444a}) by letting at least one or two scenes advance plot or character without explicitly carrying "${themeRaw}". The silence will make the next resonant scene land harder. Thematic meaning comes from pattern; patterns need variation to register as patterns.`,
         });
       }
     }
@@ -2758,11 +2758,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         );
         if (!peakIsResonant472c) {
           issues.push({
-            location: `Scene ${peakDlgScene472c.sceneIdx} (${peakDlgScene472c.slug}) — peak dialogue scene (${maxDlg472c} highlights) is thematically silent`,
+            location: `Scene ${peakDlgScene472c.sceneIdx + 1} (${peakDlgScene472c.slug}) — peak dialogue scene (${maxDlg472c} highlights) is thematically silent`,
             rule: 'THEME_DIALOGUE_PEAK_SILENT',
             severity: 'minor',
-            description: `The scene with the most dialogue highlights (${maxDlg472c} at scene ${peakDlgScene472c.sceneIdx}) carries no language related to "${themeRaw}", though ${resonantScenes.length} other scenes carry the theme. The script's most verbally active moment — the scene where characters speak most — is thematically silent. Dialogue is the primary channel through which characters voice ideas, make choices, and reveal meaning; the scene with the most dialogue should be among the most likely to carry thematic weight. When the verbal peak is mute, the theme has been written around the story's main talking point.`,
-            suggestedFix: `Give scene ${peakDlgScene472c.sceneIdx} at least one line of dialogue that touches "${themeRaw}": a character statement, question, or argument that invokes the theme directly or obliquely. The most dialogue-rich scene in the script is the most natural place for thematic language to appear — it's where characters are already speaking most fully, and thematic depth costs only one line.`,
+            description: `The scene with the most dialogue highlights (${maxDlg472c} at scene ${peakDlgScene472c.sceneIdx + 1}) carries no language related to "${themeRaw}", though ${resonantScenes.length} other scenes carry the theme. The script's most verbally active moment — the scene where characters speak most — is thematically silent. Dialogue is the primary channel through which characters voice ideas, make choices, and reveal meaning; the scene with the most dialogue should be among the most likely to carry thematic weight. When the verbal peak is mute, the theme has been written around the story's main talking point.`,
+            suggestedFix: `Give scene ${peakDlgScene472c.sceneIdx + 1} at least one line of dialogue that touches "${themeRaw}": a character statement, question, or argument that invokes the theme directly or obliquely. The most dialogue-rich scene in the script is the most natural place for thematic language to appear — it's where characters are already speaking most fully, and thematic depth costs only one line.`,
           });
         }
       }
@@ -2832,11 +2832,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         );
         if (!hasCause486b) {
           issues.push({
-            location: `Scene ${records[firstResIdx486b].sceneIdx} (${records[firstResIdx486b].slug}) — first resonant scene, causeless`,
+            location: `Scene ${records[firstResIdx486b].sceneIdx + 1} (${records[firstResIdx486b].slug}) — first resonant scene, causeless`,
             rule: 'THEME_FIRST_RESONANT_CAUSELESS',
             severity: 'minor',
-            description: `The first thematically resonant scene (scene ${records[firstResIdx486b].sceneIdx}) appears with no structural preparation — the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate a thematic surfacing. When the theme debuts without cause, it arrives as an editorial insertion rather than emerging from narrative pressure.`,
-            suggestedFix: `Add a structural catalyst in the scene immediately before scene ${records[firstResIdx486b].sceneIdx}: a revelation, a reversal, a moment of tension, or an emotional beat that makes the theme's debut feel earned. The first thematic moment should feel provoked by the story, not appended to it.`,
+            description: `The first thematically resonant scene (scene ${records[firstResIdx486b].sceneIdx + 1}) appears with no structural preparation — the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate a thematic surfacing. When the theme debuts without cause, it arrives as an editorial insertion rather than emerging from narrative pressure.`,
+            suggestedFix: `Add a structural catalyst in the scene immediately before scene ${records[firstResIdx486b].sceneIdx + 1}: a revelation, a reversal, a moment of tension, or an emotional beat that makes the theme's debut feel earned. The first thematic moment should feel provoked by the story, not appended to it.`,
           });
         }
       }
@@ -2945,11 +2945,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         );
         if (!hasCause500b) {
           issues.push({
-            location: `Scene ${records[lastResIdx500b].sceneIdx} (${records[lastResIdx500b].slug}) — last resonant scene, causeless`,
+            location: `Scene ${records[lastResIdx500b].sceneIdx + 1} (${records[lastResIdx500b].slug}) — last resonant scene, causeless`,
             rule: 'THEME_LAST_RESONANT_CAUSELESS',
             severity: 'minor',
-            description: `The last thematically resonant scene (scene ${records[lastResIdx500b].sceneIdx}) appears with no structural preparation — the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate a final thematic statement. The story's last voicing of its central meaning arrives as a coda rather than a conclusion: a thematic beat without narrative cause. When the final thematic moment is causeless, it reads as an authorial safety valve rather than the earned crystallization of everything that preceded it.`,
-            suggestedFix: `Add a structural catalyst in the scene immediately before scene ${records[lastResIdx500b].sceneIdx}: a revelation, a reversal, a moment of tension, or an emotional beat that makes the theme's final statement feel earned rather than appended. The last thematic moment should feel provoked by the story — the culmination of a narrative pressure — not added as a safety net.`,
+            description: `The last thematically resonant scene (scene ${records[lastResIdx500b].sceneIdx + 1}) appears with no structural preparation — the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate a final thematic statement. The story's last voicing of its central meaning arrives as a coda rather than a conclusion: a thematic beat without narrative cause. When the final thematic moment is causeless, it reads as an authorial safety valve rather than the earned crystallization of everything that preceded it.`,
+            suggestedFix: `Add a structural catalyst in the scene immediately before scene ${records[lastResIdx500b].sceneIdx + 1}: a revelation, a reversal, a moment of tension, or an emotional beat that makes the theme's final statement feel earned rather than appended. The last thematic moment should feel provoked by the story — the culmination of a narrative pressure — not added as a safety net.`,
           });
         }
       }
@@ -3197,11 +3197,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         if (!hasCause528b) {
           const midScene528b = records[firstMidRes528b];
           issues.push({
-            location: `Scene ${midScene528b.sceneIdx} (${midScene528b.slug}) — first midpoint resonant scene, causeless`,
+            location: `Scene ${midScene528b.sceneIdx + 1} (${midScene528b.slug}) — first midpoint resonant scene, causeless`,
             rule: 'THEME_MIDPOINT_RESONANT_CAUSELESS',
             severity: 'minor',
-            description: `The first thematically resonant scene in the story's midpoint zone (40%–60%) — scene ${midScene528b.sceneIdx} — appears without any structural preparation: the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate the theme's surfacing at this structural pivot, even though such catalysts exist elsewhere in the story. The midpoint is where the story's central question should crystallize with the full weight of the turn: the protagonist has committed, the opposition has materialized, and the theme should land as a consequence of the structural moment, not as an editorial aside dropped into the middle. A causeless thematic beat at the midpoint reads as a thesis statement placed at the center of the script rather than earned by what happened in the preceding scenes.`,
-            suggestedFix: `Add a structural catalyst in one of the two scenes before scene ${midScene528b.sceneIdx}: a revelation that makes the theme's question land with midpoint urgency, a dramatic turn that forces the characters to confront what the story is about, or a moment of tension or emotional charge that the midpoint's thematic beat then responds to. The midpoint resonant scene should feel provoked by the pivot, not inserted at it.`,
+            description: `The first thematically resonant scene in the story's midpoint zone (40%–60%) — scene ${midScene528b.sceneIdx + 1} — appears without any structural preparation: the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate the theme's surfacing at this structural pivot, even though such catalysts exist elsewhere in the story. The midpoint is where the story's central question should crystallize with the full weight of the turn: the protagonist has committed, the opposition has materialized, and the theme should land as a consequence of the structural moment, not as an editorial aside dropped into the middle. A causeless thematic beat at the midpoint reads as a thesis statement placed at the center of the script rather than earned by what happened in the preceding scenes.`,
+            suggestedFix: `Add a structural catalyst in one of the two scenes before scene ${midScene528b.sceneIdx + 1}: a revelation that makes the theme's question land with midpoint urgency, a dramatic turn that forces the characters to confront what the story is about, or a moment of tension or emotional charge that the midpoint's thematic beat then responds to. The midpoint resonant scene should feel provoked by the pivot, not inserted at it.`,
           });
         }
       }
@@ -3329,11 +3329,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         if (!hasCause542b) {
           const act2bScene542b = (records as any[])[firstAct2bRes542b];
           issues.push({
-            location: `Scene ${act2bScene542b.sceneIdx} (${act2bScene542b.slug}) — first Act 2b resonant scene, causeless`,
+            location: `Scene ${act2bScene542b.sceneIdx + 1} (${act2bScene542b.slug}) — first Act 2b resonant scene, causeless`,
             rule: 'THEME_ACT2B_RESONANT_CAUSELESS',
             severity: 'minor',
-            description: `The first thematically resonant scene in Act 2b (50%–75% of the story) — scene ${act2bScene542b.sceneIdx} — appears without any structural preparation: the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate the theme's surfacing at this escalation zone, even though such catalysts exist elsewhere. Act 2b is the story's pressure-maximum zone: the protagonist is failing, the stakes are highest, and the theme should arrive as a consequence of that mounting pressure rather than as an aside within it. A causeless thematic beat in Act 2b reads as a thesis statement dropped into the escalation rather than earned by it — the meaning surfaces without the pressure that should have generated it.`,
-            suggestedFix: `Add a structural catalyst in one of the two scenes before scene ${act2bScene542b.sceneIdx}: a revelation that makes the theme's question land with the urgency of the approach to the climax, a dramatic turn that forces the characters to confront what the story is about, or a moment of tension or emotional charge that the Act 2b thematic beat then responds to. In the escalation zone, theme should feel provoked by the story's mounting pressure, not inserted into a gap between pressures.`,
+            description: `The first thematically resonant scene in Act 2b (50%–75% of the story) — scene ${act2bScene542b.sceneIdx + 1} — appears without any structural preparation: the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate the theme's surfacing at this escalation zone, even though such catalysts exist elsewhere. Act 2b is the story's pressure-maximum zone: the protagonist is failing, the stakes are highest, and the theme should arrive as a consequence of that mounting pressure rather than as an aside within it. A causeless thematic beat in Act 2b reads as a thesis statement dropped into the escalation rather than earned by it — the meaning surfaces without the pressure that should have generated it.`,
+            suggestedFix: `Add a structural catalyst in one of the two scenes before scene ${act2bScene542b.sceneIdx + 1}: a revelation that makes the theme's question land with the urgency of the approach to the climax, a dramatic turn that forces the characters to confront what the story is about, or a moment of tension or emotional charge that the Act 2b thematic beat then responds to. In the escalation zone, theme should feel provoked by the story's mounting pressure, not inserted into a gap between pressures.`,
           });
         }
       }
@@ -4633,11 +4633,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
     });
     if (r766c.fires) {
       issues.push({
-        location: `scene ${r766c.peakIdx} (peak suspenseDelta ${r766c.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r766c.peakIdx + 1} (peak suspenseDelta ${r766c.peakMagnitude}) — no preparing cause nearby`,
         rule: 'THEME_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r766c.peakIdx}, suspenseDelta ${r766c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r766c.qualifyingCount} scenes elsewhere carry tension. The moment the audience is most gripped lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r766c.peakIdx} so the theme earns its peak suspense instead of springing it without preparation.`,
+        description: `The story's single highest-suspense scene (Scene ${r766c.peakIdx + 1}, suspenseDelta ${r766c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r766c.qualifyingCount} scenes elsewhere carry tension. The moment the audience is most gripped lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r766c.peakIdx + 1} so the theme earns its peak suspense instead of springing it without preparation.`,
       });
     }
   }
@@ -4701,11 +4701,11 @@ export async function themePass(input: PassInput): Promise<PassResult> {
     });
     if (r780c.fires) {
       issues.push({
-        location: `scene ${r780c.peakIdx} (peak curiosityDelta ${r780c.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r780c.peakIdx + 1} (peak curiosityDelta ${r780c.peakMagnitude}) — no preparing cause nearby`,
         rule: 'THEME_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r780c.peakIdx}, curiosityDelta ${r780c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r780c.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r780c.peakIdx} so the theme earns its peak curiosity instead of springing it without preparation.`,
+        description: `The story's single highest-curiosity scene (Scene ${r780c.peakIdx + 1}, curiosityDelta ${r780c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r780c.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r780c.peakIdx + 1} so the theme earns its peak curiosity instead of springing it without preparation.`,
       });
     }
   }

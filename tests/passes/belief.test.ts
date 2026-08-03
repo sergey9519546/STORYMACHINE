@@ -1253,7 +1253,7 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       assert.ok(dump.length >= 1, 'Should fire generically on the 3-scene told-only streak');
       assert.equal(
         dump[0].description,
-        'Scenes 2–4: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert',
+        'Scenes 3–5: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert',
         'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
       );
     });

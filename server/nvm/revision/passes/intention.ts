@@ -667,7 +667,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         ]);
         if (lowMomentumPurposes.has(streakPurpose)) {
           issues.push({
-            location: `Scenes ${streakStart}–${i} (${records[streakStart].slug})`,
+            location: `Scenes ${streakStart + 1}–${i + 1} (${records[streakStart].slug})`,
             rule: 'REPEATED_PURPOSE',
             description: `Three consecutive scenes share the same purpose (${streakPurpose}) — the story stalls without a shift in function`,
             severity: 'major',
@@ -734,9 +734,9 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const isMiddle = i > 0 && i < records.length - 1;
       if (isMiddle) {
         issues.push({
-          location: `Scene ${i} (${r.slug})`,
+          location: `Scene ${i + 1} (${r.slug})`,
           rule: 'ZERO_ENTROPY_SCENE',
-          description: `Scene ${i} has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character`,
+          description: `Scene ${i + 1} has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character`,
           severity: 'major',
           suggestedFix: 'Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely',
         });
@@ -773,9 +773,9 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
 
     if (lowMomentumCount === 3) {
       issues.push({
-        location: `Scenes ${clusterStart}–${i}`,
+        location: `Scenes ${clusterStart + 1}–${i + 1}`,
         rule: 'ENTROPY_CLUSTER',
-        description: `Three consecutive scenes (${clusterStart}–${i}) have low suspense and no relationship/clue advancement — the story stalls in a dead zone`,
+        description: `Three consecutive scenes (${clusterStart + 1}–${i + 1}) have low suspense and no relationship/clue advancement — the story stalls in a dead zone`,
         severity: 'major',
         suggestedFix: 'Add a turning point, revelation, or relationship shift to one of these scenes; or consolidate them into a single tighter scene',
       });
@@ -803,7 +803,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
 
     if (reactiveHighStakeScenes >= 3 && proactiveScenes === 0) {
       issues.push({
-        location: `Act 2 (Scenes ${act2Start}–${act2End - 1})`,
+        location: `Act 2 (Scenes ${act2Start + 1}–${act2End})`,
         rule: 'PROTAGONIST_REACTIVE_DOMINANCE',
         description: `Act 2 has ${reactiveHighStakeScenes} high-stakes scenes but the protagonist never initiates action (no clock raised, no clue planted) — the protagonist is entirely reactive, a passenger in their own story`,
         severity: 'major',
@@ -840,7 +840,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     for (const [char, count] of charEarlyCount) {
       if (count >= 2 && !charsInSecondHalf.has(char)) {
         issues.push({
-          location: `Character: ${char} (last seen before Scene ${act1TraceEnd})`,
+          location: `Character: ${char} (last seen before Scene ${act1TraceEnd + 1})`,
           rule: 'INTENTION_DROPOUT',
           description: `Character "${char}" has ${count} dialogue appearances in Act 1 but vanishes from the second half of the story — their intention is opened but never resolved`,
           severity: 'major',
@@ -945,7 +945,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       ).length;
       if (act3Proactive === 0) {
         issues.push({
-          location: `Act 3 (Scenes ${act3Start}–${n - 1})`,
+          location: `Act 3 (Scenes ${act3Start + 1}–${n})`,
           rule: 'PASSIVE_ACT3_INTENTION',
           description: `Across all ${act3Records.length} Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them`,
           severity: 'critical',
@@ -987,9 +987,9 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     // there is a genuine spread (peak isn't trivially flat across the story).
     if (peakIdx < act1End && peakEntropy > 2) {
       issues.push({
-        location: `Scene ${peakIdx} (${records[peakIdx].slug})`,
+        location: `Scene ${peakIdx + 1} (${records[peakIdx].slug})`,
         rule: 'ENTROPY_SPIKE_MISPLACED',
-        description: `The story's highest-momentum scene (Scene ${peakIdx}, entropy ${peakEntropy.toFixed(1)}) lands in Act 1 rather than near the climax — the most informationally dense moment is in the setup, so the story front-loads its peak and has nowhere left to build`,
+        description: `The story's highest-momentum scene (Scene ${peakIdx + 1}, entropy ${peakEntropy.toFixed(1)}) lands in Act 1 rather than near the climax — the most informationally dense moment is in the setup, so the story front-loads its peak and has nowhere left to build`,
         severity: 'major',
         suggestedFix: 'Redistribute momentum so the entropy peak lands in the back half: dial down the Act 1 spike, or escalate the climax so the densest concentration of suspense, relationship turns, and revelations arrives when the stakes are highest',
       });
@@ -1028,9 +1028,9 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const avgAct2b = avgE(act2bRecs);
       if (avgAct2a > 1.5 && avgAct2b <= avgAct2a) {
         issues.push({
-          location: `Act 2 (Scenes ${act2aStart}–${act2bEnd - 1})`,
+          location: `Act 2 (Scenes ${act2aStart + 1}–${act2bEnd})`,
           rule: 'ESCALATION_ENTROPY_FLAT',
-          description: `Act 2a (Scenes ${act2aStart}–${act2bStart - 1}) has average narrative entropy ${avgAct2a.toFixed(1)} but Act 2b (Scenes ${act2bStart}–${act2bEnd - 1}) drops to ${avgAct2b.toFixed(1)} — the composite momentum (suspense + relational turbulence + clue density) fails to build across the conflict zone.`,
+          description: `Act 2a (Scenes ${act2aStart + 1}–${act2bStart}) has average narrative entropy ${avgAct2a.toFixed(1)} but Act 2b (Scenes ${act2bStart + 1}–${act2bEnd}) drops to ${avgAct2b.toFixed(1)} — the composite momentum (suspense + relational turbulence + clue density) fails to build across the conflict zone.`,
           severity: 'major',
           suggestedFix: 'Escalate Act 2b: add a revelation, deepen a relationship rupture, or raise a new clock. The second half of the conflict zone must be denser with narrative event than the first — the audience should feel the story accelerating, not plateauing.',
         });
@@ -1082,9 +1082,9 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           const nextE = w188Entropy(records[i + 1]);
           if (nextE < 0.5) {
             issues.push({
-              location: `Scenes ${highStart}–${i + 1}`,
+              location: `Scenes ${highStart + 1}–${i + 2}`,
               rule: 'ENTROPY_CLIFF',
-              description: `${highRun} high-momentum scenes (Scenes ${highStart}–${i - 1}, entropy > 2.0) are followed by an immediate dead drop (Scenes ${i}–${i + 1}, entropy < 0.5) — the story loses all narrative momentum in two steps instead of de-escalating through a measured denouement.`,
+              description: `${highRun} high-momentum scenes (Scenes ${highStart + 1}–${i}, entropy > 2.0) are followed by an immediate dead drop (Scenes ${i + 1}–${i + 2}, entropy < 0.5) — the story loses all narrative momentum in two steps instead of de-escalating through a measured denouement.`,
               severity: 'minor',
               suggestedFix: 'Add 1-2 transitional scenes between the peak and the quiet ending: show the aftershock, the reckoning, or the changed world before the narrative fully relaxes. The audience needs to process the climax before the story goes quiet.',
             });
@@ -1113,7 +1113,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       ).length;
       if (act1Proactive205 === 0) {
         issues.push({
-          location: `Act 1 (Scenes 0–${act1End205 - 1})`,
+          location: `Act 1 (Scenes 1–${act1End205})`,
           rule: 'PROACTIVE_OPENING_ABSENT',
           severity: 'major',
           description: `Across all ${act1Recs205.length} Act 1 scenes the protagonist initiates no action — no clock raised, no clue planted. The story opens with a passive protagonist; the inciting situation happens to them rather than being set in motion by their own choice.`,
@@ -1141,7 +1141,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
     if (firstHalfProactive205 >= 2 && secondHalfProactive205 === 0) {
       issues.push({
-        location: `Second half (Scenes ${half205}–${n - 1})`,
+        location: `Second half (Scenes ${half205 + 1}–${n})`,
         rule: 'AGENCY_FRONTLOADED',
         severity: 'minor',
         description: `The protagonist initiates ${firstHalfProactive205} proactive beats in the first half but none in the second half — their agency burns out at the midpoint, exactly when the story should be accelerating toward the climax.`,
@@ -1340,10 +1340,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const passiveScenes230 = n - proactiveIdxs230.length;
       if (span230 <= Math.floor(n * 0.2) && passiveScenes230 / n >= 0.5) {
         issues.push({
-          location: `Proactive cluster (Scenes ${firstPro230}–${lastPro230})`,
+          location: `Proactive cluster (Scenes ${firstPro230 + 1}–${lastPro230 + 1})`,
           rule: 'PROACTIVE_OVERCLUSTERING',
           severity: 'minor',
-          description: `All ${proactiveIdxs230.length} proactive scenes are clustered within a ${span230}-scene span (Scenes ${firstPro230}–${lastPro230}, ≤20% of the story). The protagonist's initiative arrives in one burst and is absent for the rest of the arc — initiative must be threaded throughout, not discharged all at once.`,
+          description: `All ${proactiveIdxs230.length} proactive scenes are clustered within a ${span230}-scene span (Scenes ${firstPro230 + 1}–${lastPro230 + 1}, ≤20% of the story). The protagonist's initiative arrives in one burst and is absent for the rest of the arc — initiative must be threaded throughout, not discharged all at once.`,
           suggestedFix: 'Redistribute proactive beats across the full arc: move some earlier to establish agency from the outset, and reserve at least one for the final act to drive the climax. The protagonist must be continuously willing, not intermittently active.',
         });
       }
@@ -1398,10 +1398,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       );
       if (!hasAct3Proactive244) {
         issues.push({
-          location: `Act 3 (Scenes ${act3Start244}–${n - 1})`,
+          location: `Act 3 (Scenes ${act3Start244 + 1}–${n})`,
           rule: 'PROACTIVE_ACT3_VOID',
           severity: 'minor',
-          description: `Act 3 (scenes ${act3Start244}–${n - 1}, ${act3Records244.length} scenes) contains no proactive acts — no clocks raised, no clues planted. The protagonist stops initiating in the final act, reacting to a climax rather than engineering one.`,
+          description: `Act 3 (scenes ${act3Start244 + 1}–${n}, ${act3Records244.length} scenes) contains no proactive acts — no clocks raised, no clues planted. The protagonist stops initiating in the final act, reacting to a climax rather than engineering one.`,
           suggestedFix: "Give the protagonist at least one proactive move in Act 3: a decisive action, a gambit, or a piece of evidence planted. The climax should feel like the culmination of the protagonist's agency — a choice they made, not a situation they endured.",
         });
       }
@@ -1423,10 +1423,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const hasAct3Rev244 = records.slice(act3Start244b).some(r => r.revelation !== null);
       if (!hasAct3Rev244) {
         issues.push({
-          location: `Act 3 (Scenes ${act3Start244b}–${n - 1}) — discovery layer`,
+          location: `Act 3 (Scenes ${act3Start244b + 1}–${n}) — discovery layer`,
           rule: 'INTENTION_DISCOVERY_ABSENT',
           severity: 'minor',
-          description: `The story has ${proactiveCount244} proactive acts but no revelation lands in Act 3 (Scenes ${act3Start244b}–${n - 1}) — the protagonist's goal-pursuit produces no discovery in the climax zone. All discoveries precede the resolution; Act 3 is execution without revelation.`,
+          description: `The story has ${proactiveCount244} proactive acts but no revelation lands in Act 3 (Scenes ${act3Start244b + 1}–${n}) — the protagonist's goal-pursuit produces no discovery in the climax zone. All discoveries precede the resolution; Act 3 is execution without revelation.`,
           suggestedFix: "Engineer at least one discovery in Act 3: a truth the protagonist's pursuit finally uncovers, a consequence of their initiative that transforms the climax. The resolution should be earned by discovery, not just by effort.",
         });
       }
@@ -1486,10 +1486,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         records.slice(midEnd258).some(isProactive258);
       if (!midProactive258 && outsideProactive258) {
         issues.push({
-          location: `Midpoint zone (Scenes ${midStart258}–${midEnd258 - 1})`,
+          location: `Midpoint zone (Scenes ${midStart258 + 1}–${midEnd258})`,
           rule: 'PROACTIVE_MIDPOINT_VOID',
           severity: 'minor',
-          description: `The midpoint zone (Scenes ${midStart258}–${midEnd258 - 1}) contains no proactive act — no clock raised, no clue planted — though the protagonist initiates elsewhere. Initiative collapses at the structural pivot, exactly where the protagonist's goal should transform and their drive intensify.`,
+          description: `The midpoint zone (Scenes ${midStart258 + 1}–${midEnd258}) contains no proactive act — no clock raised, no clue planted — though the protagonist initiates elsewhere. Initiative collapses at the structural pivot, exactly where the protagonist's goal should transform and their drive intensify.`,
           suggestedFix: 'Give the protagonist a decisive proactive beat at the midpoint: a plan launched, a deadline set, a piece of evidence pursued. The midpoint is the gear-change — the protagonist should seize the wheel there, not drift through it.',
         });
       }
@@ -1515,10 +1515,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         }
         if (runLen258 >= 4) {
           issues.push({
-            location: `Scenes ${runStart258}–${i}`,
+            location: `Scenes ${runStart258 + 1}–${i + 1}`,
             rule: 'PROACTIVE_DESERT_RUN',
             severity: 'minor',
-            description: `Scenes ${runStart258}–${i} form a run of ${runLen258} consecutive scenes in which the protagonist initiates nothing — no clock raised, no clue planted — inside an otherwise active story. An extended passive stretch reads as the protagonist surrendering the wheel: events happen around them while they wait.`,
+            description: `Scenes ${runStart258 + 1}–${i + 1} form a run of ${runLen258} consecutive scenes in which the protagonist initiates nothing — no clock raised, no clue planted — inside an otherwise active story. An extended passive stretch reads as the protagonist surrendering the wheel: events happen around them while they wait.`,
             suggestedFix: 'Break the passive run with at least one proactive beat: a choice that commits the protagonist to a course, a deadline they impose, a lead they decide to chase. A protagonist who goes four scenes without initiating becomes a spectator in their own story.',
           });
           break;
@@ -1573,10 +1573,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const act2aProactive272 = records.slice(act2aStart272, act2aEnd272).filter(isProactive258).length;
       if (act2aProactive272 === 0) {
         issues.push({
-          location: `Act 2a (Scenes ${act2aStart272}–${act2aEnd272 - 1})`,
+          location: `Act 2a (Scenes ${act2aStart272 + 1}–${act2aEnd272})`,
           rule: 'PROACTIVE_ACT2A_VOID',
           severity: 'minor',
-          description: `Act 2a (Scenes ${act2aStart272}–${act2aEnd272 - 1}) contains no proactive act — no clock raised, no clue planted — though the protagonist initiates elsewhere. Act 2a is where the protagonist should start testing and investigating; leaving this entire zone initiative-free means they drift through the first complication zone as a passenger.`,
+          description: `Act 2a (Scenes ${act2aStart272 + 1}–${act2aEnd272}) contains no proactive act — no clock raised, no clue planted — though the protagonist initiates elsewhere. Act 2a is where the protagonist should start testing and investigating; leaving this entire zone initiative-free means they drift through the first complication zone as a passenger.`,
           suggestedFix: 'Give the protagonist at least one proactive move in Act 2a: a lead they decide to chase, a deadline they impose, a gambit they launch. The first complication zone should open with the protagonist in motion — their earliest tests of the world establish the audience\'s sense that they can drive events.',
         });
       }
@@ -1597,10 +1597,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     const secondHalfPro272 = records.slice(half272).filter(isProactive258).length;
     if (firstHalfPro272 === 0 && secondHalfPro272 >= 3) {
       issues.push({
-        location: `First half entirely passive (Scenes 0–${half272 - 1})`,
+        location: `First half entirely passive (Scenes 1–${half272})`,
         rule: 'PROACTIVE_LATE_SURGE',
         severity: 'minor',
-        description: `The protagonist initiates nothing in the first half (Scenes 0–${half272 - 1}) then launches ${secondHalfPro272} proactive acts in the second half. The agency that should be established gradually arrives as a sudden burst — the protagonist transforms from passive observer to hyperactive driver without buildup. A protagonist's drive should be visible from early scenes.`,
+        description: `The protagonist initiates nothing in the first half (Scenes 1–${half272}) then launches ${secondHalfPro272} proactive acts in the second half. The agency that should be established gradually arrives as a sudden burst — the protagonist transforms from passive observer to hyperactive driver without buildup. A protagonist's drive should be visible from early scenes.`,
         suggestedFix: 'Move at least one proactive beat into the first half — even a small act of initiative (a question pursued, a decision made, a deadline set) establishes that the protagonist is a driver from the start. The second-half surge will feel earned when the audience has seen the protagonist act with intention throughout.',
       });
     }
@@ -1670,10 +1670,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const climaxProactive286 = records.slice(climaxStart286).filter(isProactiveOrPayoff286).length;
       if (climaxProactive286 === 0) {
         issues.push({
-          location: `Climax zone (scene ${climaxStart286}+) — no protagonist initiative`,
+          location: `Climax zone (scene ${climaxStart286 + 1}+) — no protagonist initiative`,
           rule: 'INTENTION_REACTIVE_CLIMAX',
           severity: 'minor',
-          description: `The protagonist is proactive ${preClimaxProactive286} time(s) before the climax but takes no initiative in the final scenes (scene ${climaxStart286}+). The climax — where stakes peak — plays out as pure reaction. A passive climax undermines all the agency built through the arc: the protagonist is acted upon rather than acting.`,
+          description: `The protagonist is proactive ${preClimaxProactive286} time(s) before the climax but takes no initiative in the final scenes (scene ${climaxStart286 + 1}+). The climax — where stakes peak — plays out as pure reaction. A passive climax undermines all the agency built through the arc: the protagonist is acted upon rather than acting.`,
           suggestedFix: 'Give the protagonist at least one decisive action in the climax: a final gambit, a clock they raise, a choice that changes everything. The climax should be the story\'s most compressed expression of what the protagonist wants and fears — it demands initiative, not passivity.',
         });
       }
@@ -1693,10 +1693,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const secondHalfPayoffs286 = records.slice(half286).filter((r: any) => (r.payoffSetupIds?.length ?? 0) > 0).length;
       if (secondHalfPayoffs286 === 0) {
         issues.push({
-          location: `Second half (scenes ${half286}+) — no payoffs`,
+          location: `Second half (scenes ${half286 + 1}+) — no payoffs`,
           rule: 'INTENTION_SEED_GRAVEYARD',
           severity: 'minor',
-          description: `${firstHalfSeeds286} clue-seeding scene(s) appear in the first half but no payoff scene fires in the second half (scenes ${half286}+). Every seeded clue is a promise to the audience; leaving all of them unanswered by the story\'s midpoint and beyond signals the narrative has forgotten its own setup.`,
+          description: `${firstHalfSeeds286} clue-seeding scene(s) appear in the first half but no payoff scene fires in the second half (scenes ${half286 + 1}+). Every seeded clue is a promise to the audience; leaving all of them unanswered by the story\'s midpoint and beyond signals the narrative has forgotten its own setup.`,
           suggestedFix: 'Return to the seeds planted in the first half and pay them off in the second half — ideally with a twist that recontextualizes what was seeded. The payoff does not need to be triumphant; even a tragic resolution of a seeded clue closes the loop. An unresolved seed is a dangling thread.',
         });
       }
@@ -1992,10 +1992,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const peakSusp353 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSusp353);
       if (peakSusp353 && !isProactive258(peakSusp353)) {
         issues.push({
-          location: `Scene ${peakSusp353.sceneIdx} (peak suspense: ${maxSusp353}) — not protagonist-driven`,
+          location: `Scene ${peakSusp353.sceneIdx + 1} (peak suspense: ${maxSusp353}) — not protagonist-driven`,
           rule: 'PROACTIVE_SUSPENSE_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's highest-suspense scene (Scene ${peakSusp353.sceneIdx}, suspenseDelta ${maxSusp353}) is not a proactive scene — the most dangerous moment happens to the protagonist rather than because of them, even though they take initiative elsewhere. The tensest beat in the story lands hardest when the protagonist precipitated it: a gambit that backfires, a confrontation they forced.`,
+          description: `The story's highest-suspense scene (Scene ${peakSusp353.sceneIdx + 1}, suspenseDelta ${maxSusp353}) is not a proactive scene — the most dangerous moment happens to the protagonist rather than because of them, even though they take initiative elsewhere. The tensest beat in the story lands hardest when the protagonist precipitated it: a gambit that backfires, a confrontation they forced.`,
           suggestedFix: 'Tie the peak-suspense moment to the protagonist\'s initiative: let the scene of maximum danger be the consequence of a choice they made — the trap they sprang, the line they crossed. Suspense the protagonist causes implicates them; suspense that merely befalls them makes them a victim of the plot.',
         });
       }
@@ -2017,10 +2017,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const peakCur353 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCur353b);
       if (peakCur353 && !isProactive258(peakCur353)) {
         issues.push({
-          location: `Scene ${peakCur353.sceneIdx} (peak curiosity: ${maxCur353b}) — not protagonist-driven`,
+          location: `Scene ${peakCur353.sceneIdx + 1} (peak curiosity: ${maxCur353b}) — not protagonist-driven`,
           rule: 'PROACTIVE_CURIOSITY_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's highest-curiosity scene (Scene ${peakCur353.sceneIdx}, curiosityDelta ${maxCur353b}) is not a proactive scene — the most intriguing question opens by itself rather than through the protagonist's action, even though they take initiative elsewhere. The biggest hook in the story binds the audience to the protagonist when it is something their digging uncovered, not something that merely surfaced.`,
+          description: `The story's highest-curiosity scene (Scene ${peakCur353.sceneIdx + 1}, curiosityDelta ${maxCur353b}) is not a proactive scene — the most intriguing question opens by itself rather than through the protagonist's action, even though they take initiative elsewhere. The biggest hook in the story binds the audience to the protagonist when it is something their digging uncovered, not something that merely surfaced.`,
           suggestedFix: 'Let the protagonist\'s initiative open the story\'s biggest question: route the peak-curiosity beat through a choice they made — the door they opened, the lead they chased, the secret they pried loose. A mystery the protagonist triggers makes their agency the engine of intrigue.',
         });
       }
@@ -2122,10 +2122,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const a2bRecs381 = records.slice(a2bStart381, a2bEnd381);
       if (a2bRecs381.length >= 2 && a2bRecs381.filter(isProactive258).length === 0) {
         issues.push({
-          location: `Act 2b (Scenes ${a2bStart381}–${a2bEnd381 - 1})`,
+          location: `Act 2b (Scenes ${a2bStart381 + 1}–${a2bEnd381})`,
           rule: 'PROACTIVE_ACT2B_VOID',
           severity: 'minor',
-          description: `Act 2b (Scenes ${a2bStart381}–${a2bEnd381 - 1}) contains no proactive act — no clock raised, no clue planted — while the protagonist initiates elsewhere. The run-up to the climax is where they should be pushing hardest, springing the trap or forcing the confrontation; going passive here means the protagonist is carried toward the peak rather than driving toward it.`,
+          description: `Act 2b (Scenes ${a2bStart381 + 1}–${a2bEnd381}) contains no proactive act — no clock raised, no clue planted — while the protagonist initiates elsewhere. The run-up to the climax is where they should be pushing hardest, springing the trap or forcing the confrontation; going passive here means the protagonist is carried toward the peak rather than driving toward it.`,
           suggestedFix: 'Give the protagonist a decisive proactive beat in Act 2b: the gambit that sets up the climax, the deadline they impose, the lead they chase into the final confrontation. The approach to the peak should be the protagonist at their most driven, not their most passive.',
         });
       }
@@ -2211,10 +2211,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       }
       if (peakRelRec395a && peakRelMag395a > 0.4 && !isProactive258(peakRelRec395a)) {
         issues.push({
-          location: `Scene ${peakRelRec395a.sceneIdx} — peak relational shift (magnitude ${peakRelMag395a.toFixed(2)})`,
+          location: `Scene ${peakRelRec395a.sceneIdx + 1} — peak relational shift (magnitude ${peakRelMag395a.toFixed(2)})`,
           rule: 'PROACTIVE_RELATIONSHIP_PEAK_ABSENT',
           severity: 'minor',
-          description: `The story's largest relational shift (magnitude ${peakRelMag395a.toFixed(2)} at Scene ${peakRelRec395a.sceneIdx}) is not proactive — the most consequential bond change happens outside the protagonist's initiative. Though the protagonist takes agency in scenes that carry smaller relational shifts elsewhere, the single most important relational moment in the story occurs without their drive behind it: they are a bystander at the event that most reshapes the human relationships in the story.`,
+          description: `The story's largest relational shift (magnitude ${peakRelMag395a.toFixed(2)} at Scene ${peakRelRec395a.sceneIdx + 1}) is not proactive — the most consequential bond change happens outside the protagonist's initiative. Though the protagonist takes agency in scenes that carry smaller relational shifts elsewhere, the single most important relational moment in the story occurs without their drive behind it: they are a bystander at the event that most reshapes the human relationships in the story.`,
           suggestedFix: 'Route the story\'s biggest relational moment through the protagonist\'s agency: let the largest bond change — the deepest rupture or the most significant repair — happen because of a choice they made. The protagonist should be the agent of the story\'s most important relational consequence, not simply present when it happens.',
         });
       }
@@ -2273,7 +2273,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const firstHalfSeeds395c = seedRecs395c.filter(r => (records as any[]).indexOf(r) < half395c).length;
       if (firstHalfSeeds395c === 0) {
         issues.push({
-          location: `Clue seeds — all ${seedRecs395c.length} in the back half (Scenes ${half395c}+)`,
+          location: `Clue seeds — all ${seedRecs395c.length} in the back half (Scenes ${half395c + 1}+)`,
           rule: 'SEED_BACKLOADED',
           severity: 'minor',
           description: `All ${seedRecs395c.length} clue-seeding scenes fall in the second half (none in the first ${half395c} scenes) — the story plants no threads for the audience to carry through the opening and complication zones. Foreshadowing that arrives near the climax has no time to mature: an audience never taught to notice a detail cannot feel the satisfaction of seeing it return. Back-loaded seeds read as afterthoughts rather than architecture.`,
@@ -2305,10 +2305,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const peakPayoffRec409 = (records as any[]).find(r => ((r.payoffSetupIds ?? []) as string[]).length === peakPayoffCount409);
       if (peakPayoffRec409 && peakPayoffCount409 >= 1 && !isProactive258(peakPayoffRec409)) {
         issues.push({
-          location: `Scene ${peakPayoffRec409.sceneIdx} — peak payoff (${peakPayoffCount409} setup(s) resolved)`,
+          location: `Scene ${peakPayoffRec409.sceneIdx + 1} — peak payoff (${peakPayoffCount409} setup(s) resolved)`,
           rule: 'PROACTIVE_PAYOFF_PEAK_DECOUPLED',
           severity: 'minor',
-          description: `The story's largest payoff (Scene ${peakPayoffRec409.sceneIdx}, ${peakPayoffCount409} setup(s) resolved) is not proactive — the single biggest narrative return lands without the protagonist's agency behind it. Though smaller payoffs coincide with the protagonist's initiative elsewhere, the most satisfying resolution in the story — where the audience collects the largest return on its investment — happens to them rather than because of them, so the climax of the seeding/payoff architecture is not something they earned.`,
+          description: `The story's largest payoff (Scene ${peakPayoffRec409.sceneIdx + 1}, ${peakPayoffCount409} setup(s) resolved) is not proactive — the single biggest narrative return lands without the protagonist's agency behind it. Though smaller payoffs coincide with the protagonist's initiative elsewhere, the most satisfying resolution in the story — where the audience collects the largest return on its investment — happens to them rather than because of them, so the climax of the seeding/payoff architecture is not something they earned.`,
           suggestedFix: 'Route the story\'s biggest payoff through the protagonist\'s initiative: let the moment that resolves the most threads be the consequence of a choice they made — the plan that finally pays off, the lead they chased that delivers everything at once. The largest return on the audience\'s investment should be the protagonist\'s achievement, not a windfall the plot hands them.',
         });
       }
@@ -2332,10 +2332,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const secondHalfSeeds409 = seedRecs409.filter(r => (records as any[]).indexOf(r) >= half409s).length;
       if (secondHalfSeeds409 === 0) {
         issues.push({
-          location: `Clue seeds — all ${seedRecs409.length} in the front half (Scenes 0–${half409s - 1})`,
+          location: `Clue seeds — all ${seedRecs409.length} in the front half (Scenes 1–${half409s})`,
           rule: 'SEED_FRONTLOADED',
           severity: 'minor',
-          description: `All ${seedRecs409.length} clue-seeding scenes fall in the first half (none at or after Scene ${half409s}) — the back half plants no new threads. The story stops opening questions after the midpoint, so the audience enters the complication and climax zones with nothing new to wonder about: every thread it tracks was planted early, and the late story only closes loops rather than opening them. A back half that seeds nothing has no forward pull of its own.`,
+          description: `All ${seedRecs409.length} clue-seeding scenes fall in the first half (none at or after Scene ${half409s + 1}) — the back half plants no new threads. The story stops opening questions after the midpoint, so the audience enters the complication and climax zones with nothing new to wonder about: every thread it tracks was planted early, and the late story only closes loops rather than opening them. A back half that seeds nothing has no forward pull of its own.`,
           suggestedFix: 'Plant at least one seed in the second half: a fresh question raised as the climax nears, a new detail that complicates what the audience thought it understood. Late seeds keep the back half generative — the story should still be opening doors even as it begins closing them, so the run-up to the climax carries its own momentum rather than only paying off early promises.',
         });
       }
@@ -2403,10 +2403,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       });
       if (!hasMidSeed423a && hasOutsideMid423a) {
         issues.push({
-          location: `Midpoint zone (Scenes ${midS423a}–${midE423a - 1}) — no clue seeded`,
+          location: `Midpoint zone (Scenes ${midS423a + 1}–${midE423a}) — no clue seeded`,
           rule: 'SEED_MIDPOINT_VOID',
           severity: 'minor',
-          description: `No clue is seeded in the midpoint zone (Scenes ${midS423a}–${midE423a - 1}), though ${seedRecs423a.length} seeds land elsewhere. The midpoint is the story's pivot and its most generative moment for planting threads that will pay off in the second half — a seed planted here has the longest runway between promise and delivery. Without any new thread introduced at the pivot, the audience heads into Act 2b carrying only first-half questions, and the structural turn generates no wonder of its own.`,
+          description: `No clue is seeded in the midpoint zone (Scenes ${midS423a + 1}–${midE423a}), though ${seedRecs423a.length} seeds land elsewhere. The midpoint is the story's pivot and its most generative moment for planting threads that will pay off in the second half — a seed planted here has the longest runway between promise and delivery. Without any new thread introduced at the pivot, the audience heads into Act 2b carrying only first-half questions, and the structural turn generates no wonder of its own.`,
           suggestedFix: 'Plant at least one clue in the midpoint zone: a fragment of information that makes the audience wonder about something they have not wondered about before, timed specifically to the story\'s pivot point. A midpoint seed integrates foreshadowing into the structure — the thread introduced as everything changes will feel connected to the change, and its eventual payoff will feel like a consequence of the turn rather than of an arbitrary earlier beat.',
         });
       }
@@ -2511,11 +2511,11 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       }
       if (maxSeedRun437a >= 3) {
         issues.push({
-          location: `Scenes ${maxSeedStart437a}–${maxSeedStart437a + maxSeedRun437a - 1} — consecutive seed burst`,
+          location: `Scenes ${maxSeedStart437a + 1}–${maxSeedStart437a + maxSeedRun437a} — consecutive seed burst`,
           rule: 'SEED_RUN_ISOLATED',
           severity: 'minor',
-          description: `${maxSeedRun437a} consecutive scenes (${maxSeedStart437a}–${maxSeedStart437a + maxSeedRun437a - 1}) each plant at least one new clue — a rapid-fire burst of thread-laying. When questions arrive in back-to-back-to-back scenes without pause, individual threads compete for attention and each one lands with reduced weight: the audience is filling an inbox rather than holding a single thread in suspense. Seeds planted in isolation, separated by scenes where no new question is introduced, are far more memorable than seeds delivered in bursts.`,
-          suggestedFix: `Break the seed cluster at Scenes ${maxSeedStart437a}–${maxSeedStart437a + maxSeedRun437a - 1}: move one or two of the clue plants to a later scene, creating at least one non-seeding scene between consecutive seeds. The gap between seeds is part of their effect — the audience needs a scene to carry a question before they receive the next one. Spread the thread-laying so each clue gets its own moment of arrival.`,
+          description: `${maxSeedRun437a} consecutive scenes (${maxSeedStart437a + 1}–${maxSeedStart437a + maxSeedRun437a}) each plant at least one new clue — a rapid-fire burst of thread-laying. When questions arrive in back-to-back-to-back scenes without pause, individual threads compete for attention and each one lands with reduced weight: the audience is filling an inbox rather than holding a single thread in suspense. Seeds planted in isolation, separated by scenes where no new question is introduced, are far more memorable than seeds delivered in bursts.`,
+          suggestedFix: `Break the seed cluster at Scenes ${maxSeedStart437a + 1}–${maxSeedStart437a + maxSeedRun437a}: move one or two of the clue plants to a later scene, creating at least one non-seeding scene between consecutive seeds. The gap between seeds is part of their effect — the audience needs a scene to carry a question before they receive the next one. Spread the thread-laying so each clue gets its own moment of arrival.`,
         });
       }
     }
@@ -2799,7 +2799,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       }).length;
       if (firstHalfRevs465c / revRecs465c.length > 0.70) {
         issues.push({
-          location: `Revelations — ${firstHalfRevs465c}/${revRecs465c.length} in the front half (Scenes 0–${half465c - 1})`,
+          location: `Revelations — ${firstHalfRevs465c}/${revRecs465c.length} in the front half (Scenes 1–${half465c})`,
           rule: 'REVELATION_FRONTLOADED',
           severity: 'minor',
           description: `${firstHalfRevs465c} of the story's ${revRecs465c.length} revelations (${Math.round(firstHalfRevs465c / revRecs465c.length * 100)}%) fall in the first half — discoveries are front-loaded. When the narrative hands out most of its truths in the setup and early conflict, the protagonist enters Act 2b and Act 3 with the full picture already assembled: the back half runs on established fact rather than discovery, and the climax becomes a matter of execution rather than revelation. An audience that already knows what the protagonist is dealing with loses the forward pull of wondering what is still true.`,
@@ -2844,7 +2844,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
     if (maxRevRun479a >= 3) {
       issues.push({
-        location: `Revelation run — Scenes ${maxRevRunStart479a}–${maxRevRunStart479a + maxRevRun479a - 1} (${maxRevRun479a} consecutive)`,
+        location: `Revelation run — Scenes ${maxRevRunStart479a + 1}–${maxRevRunStart479a + maxRevRun479a} (${maxRevRun479a} consecutive)`,
         rule: 'REVELATION_RUN',
         severity: 'minor',
         description: `${maxRevRun479a} scenes in a row each contain a revelation — the story delivers information in an unbroken dump rather than distributing discoveries to build layered suspense. A rapid-fire succession of revelations crowds out the audience's processing time: each disclosure needs space around it to land with weight, raise questions, and shift allegiances before the next truth arrives. When revelations stack back-to-back, each one dilutes the impact of the previous; the cumulative effect is numbness rather than mounting dread or wonder.`,
@@ -2876,11 +2876,11 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       });
       if (finalZonePayoffs479b.length === 0) {
         issues.push({
-          location: `Payoffs — none in final zone (Scenes ${finalZoneStart479b}–${n479 - 1})`,
+          location: `Payoffs — none in final zone (Scenes ${finalZoneStart479b + 1}–${n479})`,
           rule: 'PAYOFF_FINAL_ZONE_VOID',
           severity: 'minor',
           description: `The story has ${allPayoffRecs479b.length} payoff scenes — every thread resolution fires before the final 25% of the story. Act 3 operates without a single planted-thread callback, leaving the climax to carry its weight on new invention rather than on accumulated promises fulfilled. An ending that resolves nothing previously seeded feels narratively lightweight: the audience entered Act 3 still holding threads and exits holding them still. Payoffs at the climax transform setup into destiny — the audience's long-held anticipation becomes the fuel that makes the ending feel earned rather than imposed.`,
-          suggestedFix: `Move at least one payoff into Act 3 (Scene ${finalZoneStart479b} onward) — ideally the highest-stakes planted thread. A seeded thread that resolves at the climax reframes everything that came before: the audience realises the story was leading here all along. Multiple Act 3 payoffs converging at once — threads planted in Act 1 snapping shut simultaneously — is the structural engine behind most satisfying endings.`,
+          suggestedFix: `Move at least one payoff into Act 3 (Scene ${finalZoneStart479b + 1} onward) — ideally the highest-stakes planted thread. A seeded thread that resolves at the climax reframes everything that came before: the audience realises the story was leading here all along. Multiple Act 3 payoffs converging at once — threads planted in Act 1 snapping shut simultaneously — is the structural engine behind most satisfying endings.`,
         });
       }
     }
@@ -2982,11 +2982,11 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         });
         if (act1Seeds493b.length === 0) {
           issues.push({
-            location: `Seed layer — Act 1 (scenes 0–${act1End493b - 1}) contains no planted clue`,
+            location: `Seed layer — Act 1 (scenes 1–${act1End493b}) contains no planted clue`,
             rule: 'SEED_ACT1_VOID',
             severity: 'minor',
-            description: `The story's first quarter (scenes 0–${act1End493b - 1}) plants no clue while ${allSeeds493b.length} seed(s) exist later in the script. Act 1 is the natural home for early thread-seeding: plants placed in the opening act pay off at the maximum possible distance from their origin, giving the audience the longest possible time to wonder and anticipate. When the first act is seed-free, it becomes pure exposition and scene-to-scene engagement rather than a set of narrative promises — the audience receives no forward hooks in the window when they are most primed to receive them. The earlier a question is planted, the more meaningful its eventual resolution becomes.`,
-            suggestedFix: `Plant at least one clue in the opening act (scenes 0–${act1End493b - 1}): an unexplained object, an overheard half-sentence, a behavior that doesn't quite fit. The audience should enter Act 2 carrying at least one unresolved question from Act 1, so the later revelation lands with the weight of accumulated anticipation rather than arriving as a new piece of information in the moment it's needed.`,
+            description: `The story's first quarter (scenes 1–${act1End493b}) plants no clue while ${allSeeds493b.length} seed(s) exist later in the script. Act 1 is the natural home for early thread-seeding: plants placed in the opening act pay off at the maximum possible distance from their origin, giving the audience the longest possible time to wonder and anticipate. When the first act is seed-free, it becomes pure exposition and scene-to-scene engagement rather than a set of narrative promises — the audience receives no forward hooks in the window when they are most primed to receive them. The earlier a question is planted, the more meaningful its eventual resolution becomes.`,
+            suggestedFix: `Plant at least one clue in the opening act (scenes 1–${act1End493b}): an unexplained object, an overheard half-sentence, a behavior that doesn't quite fit. The audience should enter Act 2 carrying at least one unresolved question from Act 1, so the later revelation lands with the weight of accumulated anticipation rather than arriving as a new piece of information in the moment it's needed.`,
           });
         }
       }
@@ -3029,7 +3029,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       }
       if (maxPayoffRun493c >= 3) {
         issues.push({
-          location: `Payoff run — Scenes ${maxPayoffRunStart493c}–${maxPayoffRunStart493c + maxPayoffRun493c - 1} (${maxPayoffRun493c} consecutive)`,
+          location: `Payoff run — Scenes ${maxPayoffRunStart493c + 1}–${maxPayoffRunStart493c + maxPayoffRun493c} (${maxPayoffRun493c} consecutive)`,
           rule: 'PAYOFF_RUN',
           severity: 'minor',
           description: `${maxPayoffRun493c} scenes in a row each resolve a planted setup — the story closes threads in a rapid burst rather than distributing resolutions to give each its full weight. Each payoff needs space to land: a scene of reaction and consequence, the audience absorbing that a long-held anticipation has been fulfilled, before the next callback fires. When payoffs stack consecutively, each resolution dilutes the one before; the cumulative effect is mechanical satisfaction rather than emotional culmination. Payoffs are the structural rewards the audience has been accumulating — spending them all at once leaves no time for the full weight of each to register, and the audience exits the burst having processed the information without feeling the full satisfaction each individual payoff warranted.`,
@@ -3105,10 +3105,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         });
         if (!anyRevInFinal507b) {
           issues.push({
-            location: `${revRecs507b.length} revelation(s) — none in final third (scenes ${2 * third507b}–${n507b - 1})`,
+            location: `${revRecs507b.length} revelation(s) — none in final third (scenes ${2 * third507b + 1}–${n507b})`,
             rule: 'REVELATION_CLOSING_VOID',
             severity: 'minor',
-            description: `The story has ${revRecs507b.length} revelations but none falls in the final structural third (scenes ${2 * third507b}–${n507b - 1}). The resolution zone contains no disclosure: the protagonist enters the climax having already received all the story's truths. A revelation in the final third is the classic engine of dramatic climax — the audience's existing understanding is overturned precisely as the story peaks, giving the ending the deepest possible sense of consequence and surprise. When the closing third is revelation-free, the climax must carry its weight on action alone, without the epistemic reversal that gives the final act its most powerful charge.`,
+            description: `The story has ${revRecs507b.length} revelations but none falls in the final structural third (scenes ${2 * third507b + 1}–${n507b}). The resolution zone contains no disclosure: the protagonist enters the climax having already received all the story's truths. A revelation in the final third is the classic engine of dramatic climax — the audience's existing understanding is overturned precisely as the story peaks, giving the ending the deepest possible sense of consequence and surprise. When the closing third is revelation-free, the climax must carry its weight on action alone, without the epistemic reversal that gives the final act its most powerful charge.`,
             suggestedFix: `Move at least one revelation into the final third, or introduce a new disclosure that can only happen once all the prior truths have been established. The most effective closing-act revelation recontextualizes everything the audience thought they knew — the identity of the real antagonist, the true cost of the protagonist's goal, or the secret that explains why the story was heading here all along.`,
           });
         }
@@ -3189,11 +3189,11 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           });
           if (!hasCause521a) {
             issues.push({
-              location: `scene ${peakSeedIdx521a}: densest foreshadowing (${maxSeedCount521a} seed(s)) — no cause in preceding 2 scenes`,
+              location: `scene ${peakSeedIdx521a + 1}: densest foreshadowing (${maxSeedCount521a} seed(s)) — no cause in preceding 2 scenes`,
               rule: 'SEED_PEAK_UNCAUSED',
               severity: 'minor',
-              description: `The single scene planting the most clues (scene ${peakSeedIdx521a}, ${maxSeedCount521a} seed(s)) has no revelation, dramatic turn, suspense rise, or raised deadline in either of the two preceding scenes. The story's peak foreshadowing moment arrives in a causal vacuum — the audience has not just been given any event of sufficient weight to make the planting feel earned. Clue-planting lands hardest when it follows a moment that heightens attention: a revelation that triggers the protagonist to place a contingency, a dramatic turn that forces them to prepare for what's coming, or a suspense rise that motivates covering a vulnerability. When the densest planting has no such anchor in the scene fabric, it reads as authorial distribution rather than character action.`,
-              suggestedFix: `In the 1–2 scenes preceding scene ${peakSeedIdx521a}, introduce at least one narrative event that motivates the clue-planting to follow: a revelation that raises stakes, a dramatic turn that pivots the protagonist's agenda, a suspense peak that makes them act preemptively, or a clock that starts counting down. This causal anchor transforms foreshadowing from distribution into consequence.`,
+              description: `The single scene planting the most clues (scene ${peakSeedIdx521a + 1}, ${maxSeedCount521a} seed(s)) has no revelation, dramatic turn, suspense rise, or raised deadline in either of the two preceding scenes. The story's peak foreshadowing moment arrives in a causal vacuum — the audience has not just been given any event of sufficient weight to make the planting feel earned. Clue-planting lands hardest when it follows a moment that heightens attention: a revelation that triggers the protagonist to place a contingency, a dramatic turn that forces them to prepare for what's coming, or a suspense rise that motivates covering a vulnerability. When the densest planting has no such anchor in the scene fabric, it reads as authorial distribution rather than character action.`,
+              suggestedFix: `In the 1–2 scenes preceding scene ${peakSeedIdx521a + 1}, introduce at least one narrative event that motivates the clue-planting to follow: a revelation that raises stakes, a dramatic turn that pivots the protagonist's agenda, a suspense peak that makes them act preemptively, or a clock that starts counting down. This causal anchor transforms foreshadowing from distribution into consequence.`,
             });
           }
         }
@@ -3344,11 +3344,11 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           if (!hasCause535b) {
             const peakRec535b = (records as any[])[peakPos535b];
             issues.push({
-              location: `Scene ${peakRec535b.sceneIdx} (${peakRec535b.slug}) — peak payoff density (${maxPayoff535b} resolved setups) without prior causal driver`,
+              location: `Scene ${peakRec535b.sceneIdx + 1} (${peakRec535b.slug}) — peak payoff density (${maxPayoff535b} resolved setups) without prior causal driver`,
               rule: 'PAYOFF_PEAK_UNCAUSED',
               severity: 'minor',
-              description: `The scene with the story's highest payoff density (${maxPayoff535b} planted promise(s) resolved at scene ${peakRec535b.sceneIdx}) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, or clock raise in the scenes immediately before the densest convergence of resolutions. The story's richest payoff moment arrives without a causal build: the maximum density of delivered promises lands in a structural vacuum rather than at the crest of an escalating wave. A payoff peak lands hardest when it follows a moment of heightened urgency or revelation that makes the audience feel the resolutions are arriving at exactly the right moment.`,
-              suggestedFix: `Give scene ${peakRec535b.sceneIdx - 1} or ${peakRec535b.sceneIdx - 2} a structural driver that motivates the dense payoff peak: a revelation that makes the resolutions feel inevitable, a dramatic turn that brings them to the surface, or a surge in suspense that makes the payoff both timely and necessary. The densest resolution moment in the story should feel earned through escalation, not arbitrary.`,
+              description: `The scene with the story's highest payoff density (${maxPayoff535b} planted promise(s) resolved at scene ${peakRec535b.sceneIdx + 1}) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, or clock raise in the scenes immediately before the densest convergence of resolutions. The story's richest payoff moment arrives without a causal build: the maximum density of delivered promises lands in a structural vacuum rather than at the crest of an escalating wave. A payoff peak lands hardest when it follows a moment of heightened urgency or revelation that makes the audience feel the resolutions are arriving at exactly the right moment.`,
+              suggestedFix: `Give scene ${peakRec535b.sceneIdx} or ${peakRec535b.sceneIdx - 1} a structural driver that motivates the dense payoff peak: a revelation that makes the resolutions feel inevitable, a dramatic turn that brings them to the surface, or a surge in suspense that makes the payoff both timely and necessary. The densest resolution moment in the story should feel earned through escalation, not arbitrary.`,
             });
           }
         }
@@ -4912,11 +4912,11 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     });
     if (r801a.fires) {
       issues.push({
-        location: `scene ${r801a.peakIdx} (peak suspenseDelta ${r801a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r801a.peakIdx + 1} (peak suspenseDelta ${r801a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'INTENTION_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r801a.peakIdx}, suspenseDelta ${r801a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r801a.qualifyingCount} scenes elsewhere carry tension. The moment the character's pursuit of their goal is under the most pressure lands out of nowhere — nothing has built toward the danger testing their intention.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r801a.peakIdx} so the character's peak moment of pressure reads as earned rather than arbitrary.`,
+        description: `The story's single highest-suspense scene (Scene ${r801a.peakIdx + 1}, suspenseDelta ${r801a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r801a.qualifyingCount} scenes elsewhere carry tension. The moment the character's pursuit of their goal is under the most pressure lands out of nowhere — nothing has built toward the danger testing their intention.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r801a.peakIdx + 1} so the character's peak moment of pressure reads as earned rather than arbitrary.`,
       });
     }
   }
@@ -4935,11 +4935,11 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     });
     if (r801b.fires) {
       issues.push({
-        location: `scene ${r801b.peakIdx} (peak curiosityDelta ${r801b.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r801b.peakIdx + 1} (peak curiosityDelta ${r801b.peakMagnitude}) — no preparing cause nearby`,
         rule: 'INTENTION_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r801b.peakIdx}, curiosityDelta ${r801b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r801b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — nothing in the character's pursuit of their goal prepared this peak.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r801b.peakIdx} so the character's peak curiosity reads as earned rather than arbitrary.`,
+        description: `The story's single highest-curiosity scene (Scene ${r801b.peakIdx + 1}, curiosityDelta ${r801b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r801b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — nothing in the character's pursuit of their goal prepared this peak.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r801b.peakIdx + 1} so the character's peak curiosity reads as earned rather than arbitrary.`,
       });
     }
   }
@@ -7117,7 +7117,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
             const reclaimed = protoLines1193.some(d => d.sceneIdx >= firstProxyScene && COMMITMENT_RE_1193.test(d.line));
             if (!reclaimed) {
               issues.push({
-                location: `Scenes ${[...scenes].sort((a, b) => a - b).join(', ')}`,
+                location: `Scenes ${[...scenes].sort((a, b) => a - b).map(s => s + 1).join(', ')}`,
                 rule: 'AGENCY_PROXY',
                 severity: 'major',
                 description: `${proxy} performs ${protagonist1193}'s decisions for them ${lines.length} times across ${scenes.size} scenes ("let me handle it", "I already reported everything", "no need for you to") and ${protagonist1193} never once takes an action back into their own hands afterward. The protagonist's agency has been outsourced to a supporting character — the audience is watching the wrong person's story.`,
@@ -7171,7 +7171,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         const finaleCommit = protoLines1193.some(d => d.sceneIdx >= finalStart && COMMITMENT_RE_1193.test(d.line));
         if (presentScenes >= 2 && receiptScenes >= 2 && !initiativeAnywhere && !finaleCommit) {
           issues.push({
-            location: `Final third (from scene ${finalStart})`,
+            location: `Final third (from scene ${finalStart + 1})`,
             rule: 'PROTAGONIST_ACTED_UPON_FINALE',
             severity: 'major',
             description: `Across the final third, every action line that names ${protagonist1193} shows things happening TO them — watching, waiting, being called in, carrying a box out in silence — and their dialogue commits to nothing. The story's resolution is executed entirely by other hands while its central character receives the outcome.`,

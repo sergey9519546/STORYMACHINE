@@ -339,7 +339,7 @@ export function ArcPlannerPanel({ onClose }: Props) {
             <tbody>
               {result.scenes.map(s => (
                 <tr key={s.sceneIdx} style={{ borderBottom: '1px solid var(--sm-night-2)' }}>
-                  <td style={{ padding: '5px 6px', color: 'var(--sm-cream-mute)' }}>{s.sceneIdx}</td>
+                  <td style={{ padding: '5px 6px', color: 'var(--sm-cream-mute)' }}>{s.sceneIdx + 1}</td>
                   <td style={{ padding: '5px 6px' }}>
                     <span style={{ color: s.converged ? 'var(--sm-ok)' : 'var(--sm-warn)', fontWeight: 700 }}>
                       {s.converged ? '✓' : '~'}

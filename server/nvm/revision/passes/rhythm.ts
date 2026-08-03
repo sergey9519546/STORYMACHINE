@@ -4191,11 +4191,11 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     });
     if (r792a.fires) {
       issues.push({
-        location: `scene ${r792a.peakIdx} (peak suspenseDelta ${r792a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r792a.peakIdx + 1} (peak suspenseDelta ${r792a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'RHYTHM_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r792a.peakIdx}, suspenseDelta ${r792a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r792a.qualifyingCount} scenes elsewhere carry tension. The story's rhythm hits its sharpest spike without any build punctuating the approach to it.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r792a.peakIdx} so the rhythm's peak tension reads as built toward rather than arbitrary.`,
+        description: `The story's single highest-suspense scene (Scene ${r792a.peakIdx + 1}, suspenseDelta ${r792a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r792a.qualifyingCount} scenes elsewhere carry tension. The story's rhythm hits its sharpest spike without any build punctuating the approach to it.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r792a.peakIdx + 1} so the rhythm's peak tension reads as built toward rather than arbitrary.`,
       });
     }
   }
@@ -4214,11 +4214,11 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     });
     if (r792b.fires) {
       issues.push({
-        location: `scene ${r792b.peakIdx} (peak curiosityDelta ${r792b.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r792b.peakIdx + 1} (peak curiosityDelta ${r792b.peakMagnitude}) — no preparing cause nearby`,
         rule: 'RHYTHM_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r792b.peakIdx}, curiosityDelta ${r792b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r792b.qualifyingCount} scenes elsewhere provoke wonder. The story's rhythm hits its sharpest question without any build punctuating the approach to it.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r792b.peakIdx} so the rhythm's peak curiosity reads as built toward rather than arbitrary.`,
+        description: `The story's single highest-curiosity scene (Scene ${r792b.peakIdx + 1}, curiosityDelta ${r792b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r792b.qualifyingCount} scenes elsewhere provoke wonder. The story's rhythm hits its sharpest question without any build punctuating the approach to it.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r792b.peakIdx + 1} so the rhythm's peak curiosity reads as built toward rather than arbitrary.`,
       });
     }
   }
