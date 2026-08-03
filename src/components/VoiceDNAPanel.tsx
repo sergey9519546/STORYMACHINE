@@ -76,8 +76,9 @@ export function VoiceDNAPanel({ onClose }: Props) {
     try {
       const res = await fetch('/api/nvm/voice-dna');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      const json = await res.json();
       if (!mountedRef.current) return;
-      setData(await res.json());
+      setData(json);
     } catch (e) { if (mountedRef.current) setError(e instanceof Error ? e.message : String(e)); }
     finally { if (mountedRef.current) setLoading(false); }
   }, []);

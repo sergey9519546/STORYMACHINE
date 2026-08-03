@@ -447,7 +447,7 @@ export function extractGenreModifiers(filePath: string = GENRE_FILE): GenreModif
   for (; i < lines.length; i++) {
     for (const ch of lines[i]) {
       if (ch === '{') depth++;
-      else if (ch === '}') { depth--; if (depth === 0) { i = lines.length; break; } }
+      else if (ch === '}') { depth--; if (depth === 0) break; }
     }
     if (depth === 0 && i !== objStart) break;
   }

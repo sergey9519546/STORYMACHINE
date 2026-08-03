@@ -94,7 +94,7 @@ export async function apdlPlan(
     
     // Check if goal is reached
     if (isGoalSatisfied(current.state, goal)) {
-      const plan = buildPlan(current, goal);
+      const plan = buildPlan(current, goal, initialState);
       if (!bestPlan || plan.total_cost < bestPlan.total_cost) {
         bestPlan = plan;
       }
@@ -283,11 +283,16 @@ function resolveCharacterTargets(
   }
   
   if (target === 'both' || target === 'actor' || target === 'target') {
-    // In a real implementation, would extract from action parameters
-    // For now, return empty to avoid errors
-    return [];
+    // Convention (see examples.ts): action.parameters[0] is the actor,
+    // action.parameters[1] is the target of the action.
+    const actorId = action.parameters[0];
+    const targetId = action.parameters[1];
+
+    if (target === 'actor') return actorId ? [actorId] : [];
+    if (target === 'target') return targetId ? [targetId] : [];
+    return [actorId, targetId].filter((id): id is string => !!id);
   }
-  
+
   return [target];
 }
 
@@ -480,9 +485,10 @@ function shouldStopSearch(plan: APDLPlan, constraints: APDLConstraints): boolean
 /**
  * Build a complete APDL plan from a planning node.
  */
-function buildPlan(node: PlanningNode, goal: APDLGoal): APDLPlan {
-  // Extract emotional trajectory
-  const states = extractEmotionalStates(node.actions, node.state, node.state);
+function buildPlan(node: PlanningNode, goal: APDLGoal, initialState: APDLWorldState): APDLPlan {
+  // Extract emotional trajectory (replay actions from the actual pre-plan
+  // state, not node.state, which already reflects the full sequence).
+  const states = extractEmotionalStates(node.actions, initialState, node.state);
   const trajectory = states.map(stateSet => {
     const intensities = stateSet.map(s => s.peakIntensity);
     if (intensities.length === 0) return 'flat';
@@ -500,7 +506,7 @@ function buildPlan(node: PlanningNode, goal: APDLGoal): APDLPlan {
   
   return {
     actions: node.actions,
-    initial_state: node.state,
+    initial_state: initialState,
     final_state: node.state,
     cost: node.causalCost,
     emotional_trajectory: trajectory,

@@ -31,6 +31,7 @@ import {
   type ScriptIDEServerSnapshot,
 } from "../lib/scriptide-draft-store";
 import { decideSampleInstall } from "../lib/sample-install-guard";
+import { isDraftStale } from "../lib/coverage-staleness";
 import { fountain as sampleScriptFountain } from "../lib/sample-script";
 import {
   AlertCircle,
@@ -1225,6 +1226,11 @@ export default function ScriptIDE({
     const abort = new AbortController();
     cleanActionAbortRef.current = abort;
     setIsCleaning(index);
+    // G0-02: captures the draft generation `parsedBlocks` is valid for.
+    // Rebuilding the whole script from that snapshot below is only safe if
+    // the draft hasn't moved since — otherwise it would silently erase
+    // edits made mid-flight.
+    const startDraftGen = getDraftGeneration();
     try {
       const response = await fetch("/api/scriptide/clean-action", {
         method: "POST",
@@ -1235,6 +1241,17 @@ export default function ScriptIDE({
       if (!response.ok) throw new Error(`Clean action failed: ${response.status}`);
       const data = await response.json();
       if (data.error) throw new Error(data.error);
+
+      if (isDraftStale(startDraftGen, getDraftGeneration())) {
+        // Writer edited the draft while this request was in flight — the
+        // captured `parsedBlocks` now describes a different document, so
+        // reconstructing the script from it would clobber those edits.
+        // Refuse the write-back instead (see coverage-staleness.ts).
+        if (cleanErrTimerRef.current) clearTimeout(cleanErrTimerRef.current);
+        setCleanError('Draft changed while cleaning — please retry.');
+        cleanErrTimerRef.current = setTimeout(() => setCleanError(null), 5000);
+        return;
+      }
 
       const newText = data.result;
       const blocks = parsedBlocks;

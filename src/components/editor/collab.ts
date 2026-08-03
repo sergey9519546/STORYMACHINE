@@ -32,9 +32,11 @@ export interface CollabOptions {
   userColor?: string;
   /**
    * Seed text used ONLY when this client is the first to populate an empty
-   * shared doc — prevents a blank doc from clobbering an existing draft.
+   * shared doc — prevents a blank doc from clobbering an existing draft. May be
+   * a getter, resolved at sync time, so the freshest editor content (not a stale
+   * mount-time snapshot) seeds the shared doc.
    */
-  initialText?: string;
+  initialText?: string | (() => string);
 }
 
 // A small palette of distinct, legible cursor colors.
@@ -86,7 +88,15 @@ export async function createCollabSession(opts: CollabOptions): Promise<CollabSe
   const doc = new Y.Doc();
   const ytext = doc.getText('script');
 
-  const token = await fetchCollabToken(opts.room);
+  let token: string;
+  try {
+    token = await fetchCollabToken(opts.room);
+  } catch (err) {
+    // Nothing downstream has a reference to `doc` yet (the promise rejects
+    // here), so it must be torn down before rethrowing or it leaks.
+    doc.destroy();
+    throw err;
+  }
   // y-websocket appends `/<room>` to the base url; our server parses /collab/<room>.
   // `params` is serialized as a query string by y-websocket, landing after the
   // room segment (…/collab/<room>?token=…), which the server parses separately
@@ -100,11 +110,14 @@ export async function createCollabSession(opts: CollabOptions): Promise<CollabSe
   });
 
   // Seed only an empty shared doc, and only after the initial sync, so we never
-  // overwrite content another collaborator already loaded.
+  // overwrite content another collaborator already loaded. initialText is
+  // resolved HERE (at sync time), not captured earlier, so a getter returns the
+  // live editor content rather than a stale mount-time value.
   if (opts.initialText) {
     provider.once('sync', (isSynced: boolean) => {
-      if (isSynced && ytext.length === 0 && opts.initialText) {
-        ytext.insert(0, opts.initialText);
+      const seed = typeof opts.initialText === 'function' ? opts.initialText() : opts.initialText;
+      if (isSynced && ytext.length === 0 && seed) {
+        ytext.insert(0, seed);
       }
     });
   }

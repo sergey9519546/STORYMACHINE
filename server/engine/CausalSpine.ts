@@ -445,35 +445,38 @@ export class CausalSpine {
           mutations.push(blockedMutation);
         }
       }
+    }
 
-      // ── GoalMutation: terminal_threatened on the DISCOVERER when high-severity ──
-      // If the contradiction is severe enough AND overlaps with the discoverer's terminal
-      // goal, the discoverer's core objective itself is now at risk.
-      const worstSeverity = Math.max(...edges.map(e => e.severity ?? 0));
-      if (worstSeverity >= 75 && discoverer.goalStack) {
-        const terminalDesc = discoverer.goalStack.terminal.description;
-        // Test overlap per-belief, not against a concatenation of all beliefs.
-        // Joining them creates a large blob where coincidental word matches across
-        // unrelated beliefs easily exceed the 0.4 threshold, causing spurious threats.
-        const contradictedPropositions = edges
-          .map(e => allBeliefs.find(b => b.id === e.from_belief_id)?.proposition ?? '')
-          .filter(Boolean);
-        const threatensTerminal = contradictedPropositions.some(
-          prop => this._overlap(prop, terminalDesc),
-        );
-        if (threatensTerminal) {
-          const threatenedMutation: GoalMutation = {
-            mutation_id: randomUUID(),
-            char_id: discoverer_id,
-            turn_index: turnIndex,
-            trigger_event_id: triggerEventId,
-            trigger_belief_id: edges[0]?.from_belief_id,
-            mutation_type: 'terminal_threatened',
-            description: `${discoverer.name}'s terminal objective is threatened: the contradiction undermines a core assumption`,
-          };
-          this.stage.recordGoalMutation(threatenedMutation);
-          mutations.push(threatenedMutation);
-        }
+    // ── GoalMutation: terminal_threatened on the DISCOVERER when high-severity ──
+    // If the contradiction is severe enough AND overlaps with the discoverer's terminal
+    // goal, the discoverer's core objective itself is now at risk. This check is
+    // suspect-independent (edges/terminalDesc don't vary by suspect), so it runs once
+    // per contradiction event here, after the per-suspect loop above — not once per
+    // suspect, which would record duplicate identical mutations for multi-suspect edges.
+    const worstSeverity = Math.max(...edges.map(e => e.severity ?? 0));
+    if (worstSeverity >= 75 && discoverer.goalStack) {
+      const terminalDesc = discoverer.goalStack.terminal.description;
+      // Test overlap per-belief, not against a concatenation of all beliefs.
+      // Joining them creates a large blob where coincidental word matches across
+      // unrelated beliefs easily exceed the 0.4 threshold, causing spurious threats.
+      const contradictedPropositions = edges
+        .map(e => allBeliefs.find(b => b.id === e.from_belief_id)?.proposition ?? '')
+        .filter(Boolean);
+      const threatensTerminal = contradictedPropositions.some(
+        prop => this._overlap(prop, terminalDesc),
+      );
+      if (threatensTerminal) {
+        const threatenedMutation: GoalMutation = {
+          mutation_id: randomUUID(),
+          char_id: discoverer_id,
+          turn_index: turnIndex,
+          trigger_event_id: triggerEventId,
+          trigger_belief_id: edges[0]?.from_belief_id,
+          mutation_type: 'terminal_threatened',
+          description: `${discoverer.name}'s terminal objective is threatened: the contradiction undermines a core assumption`,
+        };
+        this.stage.recordGoalMutation(threatenedMutation);
+        mutations.push(threatenedMutation);
       }
     }
 

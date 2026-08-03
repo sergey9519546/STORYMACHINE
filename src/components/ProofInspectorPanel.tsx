@@ -68,6 +68,11 @@ export function ProofInspectorPanel({ onClose }: Props) {
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
+  // requestIdRef guards against out-of-order responses: only the fetch
+  // launched by the most recent inspect() call is allowed to commit state,
+  // so a slower stale response can't clobber a newer scene's report.
+  const requestIdRef = useRef(0);
+
   const loadList = useCallback(async () => {
     setLoadingList(true);
     try {
@@ -86,6 +91,7 @@ export function ProofInspectorPanel({ onClose }: Props) {
   useEffect(() => { loadList(); }, [loadList]);
 
   async function inspect(commitId: string) {
+    const requestId = ++requestIdRef.current;
     setSelectedId(commitId);
     setReport(null);
     setLoadingReport(true);
@@ -93,12 +99,13 @@ export function ProofInspectorPanel({ onClose }: Props) {
     try {
       const res = await fetch(`/api/nvm/proof/${commitId}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
-      if (!mountedRef.current) return;
-      setReport(await res.json());
+      const data = await res.json();
+      if (!mountedRef.current || requestIdRef.current !== requestId) return;
+      setReport(data);
     } catch (e) {
-      if (mountedRef.current) setError(e instanceof Error ? e.message : String(e));
+      if (mountedRef.current && requestIdRef.current === requestId) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      if (mountedRef.current) setLoadingReport(false);
+      if (mountedRef.current && requestIdRef.current === requestId) setLoadingReport(false);
     }
   }
 

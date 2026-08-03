@@ -12,6 +12,9 @@ import type {
 import {
   isEmotionalPreconditionSatisfied,
   getEmotionIntensity,
+  setEmotionIntensity,
+  createEmptyEmotionalState,
+  cloneAPDLState,
   calculateTrajectory,
 } from './apdl';
 
@@ -104,14 +107,64 @@ export function validatePlanPreconditions(
       violations.push(...result.violations.map(v => `  ${v}`));
     }
     
-    // Advance state (simplified - in real implementation would use proper state evolution)
-    state = { ...state, timestamp: state.timestamp + 1 };
+    // Advance state, applying this action's emotional effects before checking the next one
+    state = applyActionEmotionalEffects(state, action);
   }
   
   return {
     valid: violations.length === 0,
     violations,
   };
+}
+
+// ── State Evolution ──────────────────────────────────────────────────────────
+
+/**
+ * Advance a world state past an action by applying its emotional effects, so
+ * later checks in a plan see the emotional state the action would actually
+ * produce (mirrors apdl-planner.ts's applyAPDLAction, simplified: only
+ * emotional_effects are applied here — no causal effects, audience effects,
+ * or decay).
+ */
+function applyActionEmotionalEffects(
+  state: APDLWorldState,
+  action: APDLAction
+): APDLWorldState {
+  const nextState = cloneAPDLState(state);
+  nextState.timestamp = state.timestamp + 1;
+
+  for (const effect of action.emotional_effects) {
+    // Resolve symbolic targets exactly as apdl-planner's resolveCharacterTargets
+    // does — action.parameters[0] is the actor, [1] the target — so symbolic
+    // effects ('actor'/'target'/'both') are neither dropped nor mistaken for a
+    // literal character id named "actor"/"target".
+    let targets: string[];
+    if (effect.character === 'all') {
+      targets = Array.from(nextState.emotional_state.keys());
+    } else if (effect.character === 'actor') {
+      targets = action.parameters[0] ? [action.parameters[0]] : [];
+    } else if (effect.character === 'target') {
+      targets = action.parameters[1] ? [action.parameters[1]] : [];
+    } else if (effect.character === 'both') {
+      targets = [action.parameters[0], action.parameters[1]].filter(
+        (id): id is string => !!id,
+      );
+    } else {
+      targets = [effect.character];
+    }
+
+    for (const charId of targets) {
+      let emotionalState = nextState.emotional_state.get(charId);
+      if (!emotionalState) {
+        emotionalState = createEmptyEmotionalState(nextState.timestamp);
+        nextState.emotional_state.set(charId, emotionalState);
+      }
+      const currentIntensity = getEmotionIntensity(emotionalState, effect.emotion);
+      setEmotionIntensity(emotionalState, effect.emotion, currentIntensity + effect.delta, nextState.timestamp);
+    }
+  }
+
+  return nextState;
 }
 
 // ── Coherence Validation ─────────────────────────────────────────────────────
@@ -221,7 +274,7 @@ function checkForUnearnedEmotions(plan: APDLPlan): CoherenceIssue[] {
       }
     }
     
-    state = { ...state, timestamp: state.timestamp + 1 };
+    state = applyActionEmotionalEffects(state, action);
   }
   
   return issues;
@@ -315,7 +368,7 @@ function checkForIncoherentTransitions(plan: APDLPlan): CoherenceIssue[] {
       }
     }
     
-    state = { ...state, timestamp: state.timestamp + 1 };
+    state = applyActionEmotionalEffects(state, action);
   }
   
   return issues;

@@ -95,9 +95,18 @@ export function NarrativeAnalyticsPanel({ onClose }: Props) {
   const loadingRef = useRef(loading);
   loadingRef.current = loading;
 
+  // requestIdRef gives each tab its own monotonic request counter. A forced
+  // refresh bypasses the dataRef/loadingRef guard below and can fire while a
+  // previous request for the same tab is still in flight; stamping each call
+  // with an id and checking it's still current before committing state
+  // ensures a slower, earlier request can never clobber a faster, later one.
+  const requestIdRef = useRef<Partial<Record<AnalyticsTab, number>>>({});
+
   const load = useCallback(async (tab: AnalyticsTab, force = false) => {
     const spec = TABS.find(t => t.id === tab)!;
     if (!force && (dataRef.current[tab] || loadingRef.current[tab])) return;
+    const requestId = (requestIdRef.current[tab] ?? 0) + 1;
+    requestIdRef.current[tab] = requestId;
     setLoading(l => ({ ...l, [tab]: true }));
     setErrors(e => ({ ...e, [tab]: undefined }));
     try {
@@ -107,13 +116,13 @@ export function NarrativeAnalyticsPanel({ onClose }: Props) {
         throw new Error(body.error ?? 'Server error');
       }
       const json = await res.json();
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || requestIdRef.current[tab] !== requestId) return;
       setData(d => ({ ...d, [tab]: json }));
     } catch (e) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || requestIdRef.current[tab] !== requestId) return;
       setErrors(err => ({ ...err, [tab]: e instanceof Error ? e.message : String(e) }));
     } finally {
-      if (mountedRef.current) setLoading(l => ({ ...l, [tab]: false }));
+      if (mountedRef.current && requestIdRef.current[tab] === requestId) setLoading(l => ({ ...l, [tab]: false }));
     }
   }, []);
 

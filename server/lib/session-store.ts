@@ -192,7 +192,7 @@ export const SESSION_BACKUP_DIR = process.env.SESSION_BACKUP_DIR
 // disabling this privacy and disk-use boundary.
 export const SESSION_RESET_BACKUP_KEEP = boundedIntegerEnv('SESSION_RESET_BACKUP_KEEP', 5, 1, 100);
 export const SESSION_RESET_BACKUP_TTL_HOURS = boundedIntegerEnv('SESSION_RESET_BACKUP_TTL_HOURS', 168, 1, 24 * 365);
-export const MAX_SESSIONS    = Number(process.env.MAX_SESSIONS ?? 100);
+export const MAX_SESSIONS    = boundedIntegerEnv('MAX_SESSIONS', 100, 1, 100_000);
 // Idle eviction TTL: how long a session may sit untouched in memory before the
 // sweep below closes it. Deliberately generous (24h default) — a writer
 // pausing over lunch, or a tab left open overnight, must not lose in-memory
@@ -205,7 +205,7 @@ export const MAX_SESSIONS    = Number(process.env.MAX_SESSIONS ?? 100);
 // operator-tunable; widened + parameterized, no other eviction-mechanism
 // change (the cap-based LRU eviction below already existed and already did
 // the right thing — close-only, never unlink, in PERSIST mode).
-export const SESSION_TTL_MS  = Number(process.env.SESSION_IDLE_TTL_MINUTES ?? 1440) * 60 * 1000;
+export const SESSION_TTL_MS  = boundedIntegerEnv('SESSION_IDLE_TTL_MINUTES', 1440, 1, 24 * 365 * 60) * 60 * 1000;
 
 // ── Session store ─────────────────────────────────────────────────────────────
 export const sessions     = new Map<string, Session>();
@@ -285,7 +285,15 @@ export function sessionId(req: express.Request): string {
   // substituting 'default' here could leak another user's session into an
   // otherwise-explicit request.
   if (raw !== undefined && raw !== null && raw !== '') {
-    if (typeof raw !== 'string' || !raw.trim()) return 'default';
+    // A non-string explicit value (e.g. Express parsing a duplicated
+    // ?sessionId=a&sessionId=b query into a string[]) is "present but
+    // malformed" exactly like a string that fails the regex below, so it
+    // gets the same 400 instead of silently falling back to 'default' — see
+    // the leak-prevention rationale in the comment above.
+    if (typeof raw !== 'string') {
+      throw new ValidationError('sessionId must match [a-zA-Z0-9_-]{1,64}');
+    }
+    if (!raw.trim()) return 'default';
     const cleaned = raw.trim().substring(0, 64);
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleaned)) {
       throw new ValidationError('sessionId must match [a-zA-Z0-9_-]{1,64}');

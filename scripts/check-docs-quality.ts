@@ -85,13 +85,18 @@ function scanFile(filePath: string): Finding[] {
   const content = readFileSync(filePath, 'utf-8');
   const lines = content.split('\n');
   const findings: Finding[] = [];
+  let inCodeBlock = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Skip code blocks (between ``` markers)
-    if (line.trim().startsWith('```')) continue;
-    
+    if (line.trim().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+
     for (const pattern of DOC_AI_PATTERNS) {
       const regex = new RegExp(pattern.pattern);
       const matches = line.match(regex);

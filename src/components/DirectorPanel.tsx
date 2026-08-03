@@ -252,7 +252,7 @@ export default function DirectorPanel({
 
   const filterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const tensionHistoryRef = useRef<Array<{ tension: number; menace: number }>>([]);
+  const [tensionHistory, setTensionHistory] = useState<Array<{ tension: number; menace: number }>>([]);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -278,10 +278,10 @@ export default function DirectorPanel({
   // ── Track tension history ─────────────────────────────────────────────────
 
   useEffect(() => {
-    tensionHistoryRef.current = [
-      ...tensionHistoryRef.current.slice(-29),
+    setTensionHistory((prev) => [
+      ...prev.slice(-29),
       { tension: directorState.tensionLevel ?? 0, menace: directorState.menaceGauge ?? 0 },
-    ];
+    ]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directorState.tensionLevel, directorState.menaceGauge]);
 
@@ -880,12 +880,12 @@ export default function DirectorPanel({
               ))}
 
               {/* Live tension/menace sparkline */}
-              {tensionHistoryRef.current.length >= 2 && (
+              {tensionHistory.length >= 2 && (
                 <div className="pt-4 border-t-[4px] border-black">
                   <span className="text-black font-bold uppercase tracking-wider text-xs block mb-2">Tension History</span>
                   <div className="bg-gray-50 sm-btn p-2 space-y-2">
-                    <SparkLine data={tensionHistoryRef.current.map((d) => d.tension)} color="var(--sm-stamp)" height={36} />
-                    <SparkLine data={tensionHistoryRef.current.map((d) => d.menace)} color="#000000" height={24} />
+                    <SparkLine data={tensionHistory.map((d) => d.tension)} color="var(--sm-stamp)" height={36} />
+                    <SparkLine data={tensionHistory.map((d) => d.menace)} color="#000000" height={24} />
                     <div className="flex gap-4 text-[9px] font-mono text-gray-500">
                       <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[var(--sm-stamp)] inline-block" />tension</span>
                       <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-black inline-block" />menace</span>

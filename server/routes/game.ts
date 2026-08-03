@@ -321,22 +321,30 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
     if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
+  // C3: Single-flag guard ensures res.end() is called exactly once even when
+  // the early-return paths, the error handler, or the wall-clock timer below
+  // all want to close the stream.
+  let ended = false;
+  const ensureEnded = () => {
+    if (!ended) { ended = true; res.end(); }
+  };
+
   // Hard wall-clock limit: if the simulation hasn't completed in 5 minutes, close
   // the SSE stream and release the runningRooms lock so the session isn't stranded.
+  // orchestrator.runRoomSimulation has no cancellation hook, so a genuinely stuck
+  // call keeps running to completion in the background — but ensureEnded and
+  // releaseSimulationRooms are both idempotent (single-flag guarded), so the
+  // normal completion path further below stays safe whenever that call
+  // eventually settles.
   const SSE_MAX_MS = 5 * 60 * 1000;
   const wallTimer = setTimeout(() => {
     if (!disconnected) {
       emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'error: stream timeout (5 min)' });
     }
-    disconnected = true; // triggers ensureEnded() to skip the write, but it still calls res.end()
+    disconnected = true; // stop the still-running background simulation from writing further events
+    releaseSimulationRooms(res);
+    ensureEnded();
   }, SSE_MAX_MS);
-
-  // C3: Single-flag guard ensures res.end() is called exactly once even when
-  // the early-return paths or the error handler both want to close the stream.
-  let ended = false;
-  const ensureEnded = () => {
-    if (!ended) { ended = true; res.end(); }
-  };
 
   try {
     const nodeId = requireString(req.query?.nodeId as string | undefined, 'nodeId', 128);

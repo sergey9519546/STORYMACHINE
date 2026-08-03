@@ -19,6 +19,14 @@ const PERSONA_DIR = path.dirname(fileURLToPath(import.meta.url));
 const builtins = new Map<string, CopilotPersona>();
 const userPersonas = new Map<string, CopilotPersona>();
 
+// userPersonas is keyed by a user-controlled id (any kebab-case string), so
+// without a cap a client could register unbounded distinct ids and grow the
+// process's memory indefinitely. Bound it as an LRU: once at capacity,
+// registering a *new* id evicts the oldest (first-inserted) entry first.
+// Overwriting an existing id is an update, not growth, so it never evicts.
+// Mirrors the bounded-Map pattern in lib/embeddings.ts.
+const MAX_USER_PERSONAS = 500;
+
 function loadBuiltins(): void {
   let files: string[];
   try {
@@ -66,6 +74,10 @@ export function registerUserPersona(raw: unknown): CopilotPersona | null {
   if (!persona) return null;
   // Never let a user persona claim builtin status.
   const normalized: CopilotPersona = { ...persona, builtin: false };
+  if (!userPersonas.has(normalized.id) && userPersonas.size >= MAX_USER_PERSONAS) {
+    const oldestId = userPersonas.keys().next().value;
+    if (oldestId !== undefined) userPersonas.delete(oldestId);
+  }
   userPersonas.set(normalized.id, normalized);
   return normalized;
 }

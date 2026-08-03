@@ -94,6 +94,11 @@ export function QualityEnginesPanel({ onClose }: Props) {
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
+  // activeRequestRef holds the most recently requested commitId so that a
+  // slower, earlier inspect() call can't clobber a later selection's report
+  // if the two fetches resolve out of order.
+  const activeRequestRef = useRef<string | null>(null);
+
   const loadScenes = useCallback(async () => {
     setListLoading(true);
     try {
@@ -112,6 +117,7 @@ export function QualityEnginesPanel({ onClose }: Props) {
   useEffect(() => { loadScenes(); }, [loadScenes]);
 
   async function inspect(commitId: string) {
+    activeRequestRef.current = commitId;
     setSelectedId(commitId);
     setReport(null);
     setLoading(true);
@@ -119,12 +125,15 @@ export function QualityEnginesPanel({ onClose }: Props) {
     try {
       const res = await fetch(`/api/nvm/quality/scene/${commitId}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
-      if (!mountedRef.current) return;
-      setReport(await res.json());
+      const data = await res.json();
+      if (!mountedRef.current || activeRequestRef.current !== commitId) return;
+      setReport(data);
     } catch (e) {
-      if (mountedRef.current) setError(e instanceof Error ? e.message : String(e));
+      if (mountedRef.current && activeRequestRef.current === commitId) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && activeRequestRef.current === commitId) setLoading(false);
     }
   }
 
