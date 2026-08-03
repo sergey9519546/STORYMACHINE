@@ -32,6 +32,13 @@ npm run generate-p0-sample
 Provenance (regenerate to verify): health 68.9, verdict CONSIDER, 14 scenes,
 contentHash `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f`.
 
+> **Update 2026-08-03:** after the 1-based scene-label migration the
+> regenerated artifact is **212,708 bytes** (issue labels shifted; health /
+> verdict / scene count / contentHash unchanged). References below to
+> 212,723 bytes describe the pre-migration artifact. Reproducibility and the
+> browser-DOM click-through were both re-certified on the migration branch
+> (`scripts/smoke-p0-live-flow.mjs` PASS, zero genuine console errors).
+
 **Fielding readiness (re-verified on HEAD `d733240`, 2026-07-28):** the
 committed static stimulus is reproducible — `npm run generate-p0-sample`
 reproduces health 68.9 / CONSIDER / 14 scenes / the hash above / 212723 bytes

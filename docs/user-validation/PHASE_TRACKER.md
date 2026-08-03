@@ -109,7 +109,21 @@ sample load — the report content itself was present and correct, so this is a
 freshness affordance rather than a missing render; worth a glance in a future
 pass if the gate intends a "fresh" first-load label.)
 
-## Allowed now
+**Re-certified after the scene-label migration (2026-08-03,
+`claude/fix-scene-numbering`).** The 1-based scene-number migration
+(presentation-only: issue labels + their three "Scene N" consumers; no
+scoring change) triggered a full re-run of this gate via the now-repeatable
+`scripts/smoke-p0-live-flow.mjs` (PASS: keyless boot → StartScreen → "Try
+sample coverage" → report rendered CONSIDER / health ~69, zero genuine
+console errors). The stimulus was regenerated through the same pipeline:
+health 68.9 / CONSIDER / 14 scenes / contentHash `33dcf214…` all unchanged;
+HTML is 212,708 bytes (earlier byte-size claims of 212,723 describe the
+pre-migration artifact — scene labels inside issue text shifted to 1-based,
+nothing else). Determinism re-verified: two consecutive generations differ
+only in the footer datestamp. The run also caught and fixed a real 404 every
+browser visit produced (no favicon existed; one was added and declared in
+`index.html`), which is what previously stood between the repeatable smoke
+script and a clean exit.
 
 - Recruit real screenwriters of any career tier who have real drafts in hand.
 - Show the existing sample coverage report and observe without pitching.
@@ -146,7 +160,7 @@ No decisions have been made.
 | Field | Value |
 |---|---|
 | Tracker status | Status-only |
-| Last reviewed | 2026-07-28 — browser DOM click-through certified on `main` tip `1a7f3b4` (StartScreen → "Try sample coverage" → ScriptDoctorPanel renders with zero genuine console errors; keyless posture confirmed). API-level smoke certified earlier on `c5749b9`. Static-stimulus reproducibility + honesty-audit re-verified on HEAD `d733240` (6 commits past `1a7f3b4`; intervening commits are docs/tests/a11y/security, render path untouched) — see `FIELDING_DECISION_BRIEF.md`. See "Browser DOM smoke" above. |
+| Last reviewed | 2026-08-03 — browser DOM click-through RE-certified on `claude/fix-scene-numbering` after the 1-based scene-label migration, via the repeatable `scripts/smoke-p0-live-flow.mjs` (PASS, zero genuine console errors); stimulus regenerated with health/verdict/sceneCount/contentHash unchanged. Prior certifications: browser DOM on `main` tip `1a7f3b4` (2026-07-28), API-level smoke on `c5749b9`, static-stimulus reproducibility on `d733240` — see `FIELDING_DECISION_BRIEF.md` and "Browser DOM smoke" above. |
 | Reviewed by | Agent session (Playwright/Chromium available this run) |
 | Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` — PLANNED, 0 sessions; static-report AND live-flow sessions now unblocked |
 | Session artifact directory | `docs/user-validation/sessions/` — empty (`.gitkeep` only) |

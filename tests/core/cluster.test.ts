@@ -29,10 +29,13 @@ function located(
 }
 
 describe('clusterIssues — scene/lines overlap clustering', () => {
+  // Scene labels are 1-based post-migration (sceneIdxsOf decodes "Scene N"
+  // to sceneIdx N-1) — fixtures below use the 1-based label for the physical
+  // scene each test means.
   it('rolls two issues sharing one scene span into a single finding with the worst severity', () => {
     const issues = [
-      located('THIN_SCENE', 'Scene 2 (INT. BAR)', 'scene', 'pacing', { severity: 'minor', startLine: 10, endLine: 20 }),
-      located('FLAT_CONFLICT', 'Scene 2 (INT. BAR)', 'scene', 'conflict', { severity: 'critical', startLine: 10, endLine: 20 }),
+      located('THIN_SCENE', 'Scene 3 (INT. BAR)', 'scene', 'pacing', { severity: 'minor', startLine: 10, endLine: 20 }),
+      located('FLAT_CONFLICT', 'Scene 3 (INT. BAR)', 'scene', 'conflict', { severity: 'critical', startLine: 10, endLine: 20 }),
     ];
     const findings = clusterIssues(issues);
     assert.equal(findings.length, 1);
@@ -47,7 +50,7 @@ describe('clusterIssues — scene/lines overlap clustering', () => {
 
   it('merges a lines-anchored issue into a scene cluster when its range overlaps the scene span', () => {
     const issues = [
-      located('THIN_SCENE', 'Scene 4 (EXT. ROOF)', 'scene', 'pacing', { startLine: 50, endLine: 70 }),
+      located('THIN_SCENE', 'Scene 5 (EXT. ROOF)', 'scene', 'pacing', { startLine: 50, endLine: 70 }),
       located('REDUNDANT_LINE', 'Lines 55-58', 'lines', 'voice', { startLine: 55, endLine: 58 }),
     ];
     const findings = clusterIssues(issues);
@@ -60,8 +63,8 @@ describe('clusterIssues — scene/lines overlap clustering', () => {
 
   it('does not merge two scene-anchored issues from non-overlapping scenes', () => {
     const issues = [
-      located('A', 'Scene 1', 'scene', 'pacing', { startLine: 1, endLine: 5 }),
-      located('B', 'Scene 2', 'scene', 'conflict', { startLine: 6, endLine: 10 }),
+      located('A', 'Scene 2', 'scene', 'pacing', { startLine: 1, endLine: 5 }),
+      located('B', 'Scene 3', 'scene', 'conflict', { startLine: 6, endLine: 10 }),
     ];
     assert.deepEqual(clusterIssues(issues), []);
   });
@@ -114,9 +117,11 @@ describe('clusterIssues — document-family clustering', () => {
 });
 
 describe('clusterIssues — singletons excluded', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule.
   it('never returns a finding for a lone issue in any anchor category', () => {
     const issues = [
-      located('LONE_SCENE_ISSUE', 'Scene 1', 'scene', 'pacing', { startLine: 1, endLine: 5 }),
+      located('LONE_SCENE_ISSUE', 'Scene 2', 'scene', 'pacing', { startLine: 1, endLine: 5 }),
       located('LONE_CHAR_ISSUE', 'Character: JAX', 'character', 'intention', { startLine: 20, endLine: 20 }),
       located('LONE_DOC_ISSUE', 'Act 1 pacing', 'document', 'structure'),
     ];
@@ -125,10 +130,12 @@ describe('clusterIssues — singletons excluded', () => {
 });
 
 describe('clusterIssues — no ALL_CAPS rule tokens in reader-facing text', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule.
   it('never surfaces a raw rule constant in title or explanation', () => {
     const issues = [
-      located('PAYOFF_TOO_QUICK', 'Scene 3', 'scene', 'payoff', { severity: 'critical', startLine: 30, endLine: 40 }),
-      located('PAYOFF_TOO_QUICK', 'Scene 3', 'scene', 'payoff', { severity: 'major', startLine: 30, endLine: 40 }),
+      located('PAYOFF_TOO_QUICK', 'Scene 4', 'scene', 'payoff', { severity: 'critical', startLine: 30, endLine: 40 }),
+      located('PAYOFF_TOO_QUICK', 'Scene 4', 'scene', 'payoff', { severity: 'major', startLine: 30, endLine: 40 }),
     ];
     const [finding] = clusterIssues(issues);
     assert.ok(finding, 'expected a finding to be produced');
@@ -142,10 +149,12 @@ describe('clusterIssues — no ALL_CAPS rule tokens in reader-facing text', () =
 });
 
 describe('clusterIssues — determinism and stable ids', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule.
   it('produces identical findings across two calls on the same input', () => {
     const issues = [
-      located('THIN_SCENE', 'Scene 2', 'scene', 'pacing', { startLine: 10, endLine: 20 }),
-      located('FLAT_CONFLICT', 'Scene 2', 'scene', 'conflict', { severity: 'major', startLine: 10, endLine: 20 }),
+      located('THIN_SCENE', 'Scene 3', 'scene', 'pacing', { startLine: 10, endLine: 20 }),
+      located('FLAT_CONFLICT', 'Scene 3', 'scene', 'conflict', { severity: 'major', startLine: 10, endLine: 20 }),
       located('WEAK_WANT', 'Character: JAX', 'character', 'intention', { startLine: 5, endLine: 5 }),
       located('FLAT_ARC', 'Character: JAX', 'character', 'character-arc', { startLine: 5, endLine: 5 }),
     ];
@@ -153,8 +162,8 @@ describe('clusterIssues — determinism and stable ids', () => {
   });
 
   it('assigns the same id to the same cluster regardless of member array order', () => {
-    const a = located('THIN_SCENE', 'Scene 2', 'scene', 'pacing', { startLine: 10, endLine: 20 });
-    const b = located('FLAT_CONFLICT', 'Scene 2', 'scene', 'conflict', { severity: 'major', startLine: 10, endLine: 20 });
+    const a = located('THIN_SCENE', 'Scene 3', 'scene', 'pacing', { startLine: 10, endLine: 20 });
+    const b = located('FLAT_CONFLICT', 'Scene 3', 'scene', 'conflict', { severity: 'major', startLine: 10, endLine: 20 });
 
     const [findingForward] = clusterIssues([a, b]);
     const [findingReversed] = clusterIssues([b, a]);
@@ -184,10 +193,12 @@ describe('clusterIssues — determinism and stable ids', () => {
 // the flat issue list from containing both rules somewhere in the script).
 
 describe('clusterIssues — root-cause template: "The middle has no engine" (midpoint-stall)', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule.
   it('fires when WEAK_MIDPOINT and MIDPOINT_EMOTIONAL_FLATLINE land in the same midpoint scene', () => {
     const issues = [
-      located('WEAK_MIDPOINT', 'Scene 5 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 100, endLine: 120 }),
-      located('MIDPOINT_EMOTIONAL_FLATLINE', 'Midpoint (Scene 5)', 'scene', 'structure', { severity: 'minor', startLine: 100, endLine: 120 }),
+      located('WEAK_MIDPOINT', 'Scene 6 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 100, endLine: 120 }),
+      located('MIDPOINT_EMOTIONAL_FLATLINE', 'Midpoint (Scene 6)', 'scene', 'structure', { severity: 'minor', startLine: 100, endLine: 120 }),
     ];
     const findings = clusterIssues(issues);
     const finding = findings.find(f => f.title === 'The middle has no engine');
@@ -203,8 +214,8 @@ describe('clusterIssues — root-cause template: "The middle has no engine" (mid
 
   it('does not form when the same two rules land in unrelated, distant scenes', () => {
     const issues = [
-      located('WEAK_MIDPOINT', 'Scene 5 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 100, endLine: 120 }),
-      located('MIDPOINT_EMOTIONAL_FLATLINE', 'Midpoint (Scene 9)', 'scene', 'structure', { severity: 'minor', startLine: 300, endLine: 320 }),
+      located('WEAK_MIDPOINT', 'Scene 6 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 100, endLine: 120 }),
+      located('MIDPOINT_EMOTIONAL_FLATLINE', 'Midpoint (Scene 10)', 'scene', 'structure', { severity: 'minor', startLine: 300, endLine: 320 }),
     ];
     const findings = clusterIssues(issues);
     assert.ok(
@@ -215,10 +226,12 @@ describe('clusterIssues — root-cause template: "The middle has no engine" (mid
 });
 
 describe('clusterIssues — root-cause template: "Consequences don\'t land" (aftermath-void)', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule.
   it('fires when DRAMATIC_TURN_AFTERMATH_VOID and INCITING_AFTERMATH_STALL land in the same turn scene', () => {
     const issues = [
-      located('DRAMATIC_TURN_AFTERMATH_VOID', 'Scene 3 (dramatic turn: reversal)', 'scene', 'causality', { severity: 'minor', startLine: 60, endLine: 80 }),
-      located('INCITING_AFTERMATH_STALL', 'Scenes 4-5 (after first catalyst at Scene 3)', 'scene', 'structure', { severity: 'minor', startLine: 60, endLine: 80 }),
+      located('DRAMATIC_TURN_AFTERMATH_VOID', 'Scene 4 (dramatic turn: reversal)', 'scene', 'causality', { severity: 'minor', startLine: 60, endLine: 80 }),
+      located('INCITING_AFTERMATH_STALL', 'Scenes 5-6 (after first catalyst at Scene 4)', 'scene', 'structure', { severity: 'minor', startLine: 60, endLine: 80 }),
     ];
     const findings = clusterIssues(issues);
     const finding = findings.find(f => f.title === "Consequences don't land");
@@ -234,8 +247,8 @@ describe('clusterIssues — root-cause template: "Consequences don\'t land" (aft
 
   it('does not form when the same two rules land in unrelated, distant scenes', () => {
     const issues = [
-      located('DRAMATIC_TURN_AFTERMATH_VOID', 'Scene 3 (dramatic turn: reversal)', 'scene', 'causality', { severity: 'minor', startLine: 60, endLine: 80 }),
-      located('INCITING_AFTERMATH_STALL', 'Scenes 9-10 (after first catalyst at Scene 8)', 'scene', 'structure', { severity: 'minor', startLine: 400, endLine: 420 }),
+      located('DRAMATIC_TURN_AFTERMATH_VOID', 'Scene 4 (dramatic turn: reversal)', 'scene', 'causality', { severity: 'minor', startLine: 60, endLine: 80 }),
+      located('INCITING_AFTERMATH_STALL', 'Scenes 10-11 (after first catalyst at Scene 9)', 'scene', 'structure', { severity: 'minor', startLine: 400, endLine: 420 }),
     ];
     const findings = clusterIssues(issues);
     assert.ok(
@@ -246,9 +259,11 @@ describe('clusterIssues — root-cause template: "Consequences don\'t land" (aft
 });
 
 describe('clusterIssues — root-cause template: "Everyone sounds the same about nothing" (inert-scene-flat-talk)', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule.
   it('fires when a ZERO_ENTROPY_SCENE span contains a DIALOGUE_ASSERTION_RUN line range', () => {
     const issues = [
-      located('ZERO_ENTROPY_SCENE', 'Scene 4 (INT. KITCHEN)', 'scene', 'intention', { severity: 'major', startLine: 80, endLine: 110 }),
+      located('ZERO_ENTROPY_SCENE', 'Scene 5 (INT. KITCHEN)', 'scene', 'intention', { severity: 'major', startLine: 80, endLine: 110 }),
       located('DIALOGUE_ASSERTION_RUN', 'Dialogue lines 90-95 — assertion run (6 consecutive declarative lines)', 'lines', 'voice', { severity: 'minor', startLine: 90, endLine: 95 }),
     ];
     const findings = clusterIssues(issues);
@@ -265,7 +280,7 @@ describe('clusterIssues — root-cause template: "Everyone sounds the same about
 
   it('does not form when the assertion run falls outside the zero-entropy scene\'s span', () => {
     const issues = [
-      located('ZERO_ENTROPY_SCENE', 'Scene 4 (INT. KITCHEN)', 'scene', 'intention', { severity: 'major', startLine: 80, endLine: 110 }),
+      located('ZERO_ENTROPY_SCENE', 'Scene 5 (INT. KITCHEN)', 'scene', 'intention', { severity: 'major', startLine: 80, endLine: 110 }),
       located('DIALOGUE_ASSERTION_RUN', 'Dialogue lines 500-505 — assertion run (6 consecutive declarative lines)', 'lines', 'voice', { severity: 'minor', startLine: 500, endLine: 505 }),
     ];
     const findings = clusterIssues(issues);
@@ -319,9 +334,13 @@ describe('clusterIssues — corpus-level proof (real script, real pipeline)', ()
 // the flat issue list from containing both rules somewhere in the script).
 
 describe('clusterIssues — root-cause template: "Page one has no hook and no air" (airless-opening)', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule. COLD_OPEN_INERT always
+  // anchors to the first scene, whose label is now "Scene 1" (never "Scene 0"
+  // — that label is impossible post-migration).
   it('fires when COLD_OPEN_INERT and ACTION_CONSECUTIVE_LONG_RUN land in the same opening span', () => {
     const issues = [
-      located('COLD_OPEN_INERT', 'Scene 0 (cold open)', 'scene', 'structure', { severity: 'minor', startLine: 1, endLine: 10 }),
+      located('COLD_OPEN_INERT', 'Scene 1 (cold open)', 'scene', 'structure', { severity: 'minor', startLine: 1, endLine: 10 }),
       located('ACTION_CONSECUTIVE_LONG_RUN', 'Action lines near line 3 — consecutive long-line run (5 lines ≥9w)', 'lines', 'rhythm', { severity: 'minor', startLine: 3, endLine: 3 }),
     ];
     const findings = clusterIssues(issues);
@@ -338,7 +357,7 @@ describe('clusterIssues — root-cause template: "Page one has no hook and no ai
 
   it('does not form when the dense-line run falls outside the cold-open scene span', () => {
     const issues = [
-      located('COLD_OPEN_INERT', 'Scene 0 (cold open)', 'scene', 'structure', { severity: 'minor', startLine: 1, endLine: 10 }),
+      located('COLD_OPEN_INERT', 'Scene 1 (cold open)', 'scene', 'structure', { severity: 'minor', startLine: 1, endLine: 10 }),
       located('ACTION_CONSECUTIVE_LONG_RUN', 'Action lines near line 500 — consecutive long-line run (5 lines ≥9w)', 'lines', 'rhythm', { severity: 'minor', startLine: 500, endLine: 500 }),
     ];
     const findings = clusterIssues(issues);
@@ -350,10 +369,15 @@ describe('clusterIssues — root-cause template: "Page one has no hook and no ai
 });
 
 describe('clusterIssues — root-cause template: "The reveal comes from nowhere and changes nothing" (hollow-reveal)', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule. sceneIdxsOf's SCENE_RE
+  // takes the FIRST "Scene N" match in a location, so only the revelation
+  // scene's own label (not the "→ Scene M" reaction-scene mention) drives
+  // the decoded sceneIdx below.
   it('fires when REVELATION_UNEARNED and REVELATION_WITHOUT_REACTION land in the same revelation scene', () => {
     const issues = [
-      located('REVELATION_UNEARNED', 'Scene 5', 'scene', 'belief', { severity: 'major', startLine: 39, endLine: 48 }),
-      located('REVELATION_WITHOUT_REACTION', 'Scene 5 → Scene 6', 'scene', 'causality', { severity: 'minor', startLine: 39, endLine: 48 }),
+      located('REVELATION_UNEARNED', 'Scene 6', 'scene', 'belief', { severity: 'major', startLine: 39, endLine: 48 }),
+      located('REVELATION_WITHOUT_REACTION', 'Scene 6 → Scene 7', 'scene', 'causality', { severity: 'minor', startLine: 39, endLine: 48 }),
     ];
     const findings = clusterIssues(issues);
     const finding = findings.find(f => f.title === 'The reveal comes from nowhere and changes nothing');
@@ -369,8 +393,8 @@ describe('clusterIssues — root-cause template: "The reveal comes from nowhere 
 
   it('does not form when the same two rules land in unrelated, distant scenes', () => {
     const issues = [
-      located('REVELATION_UNEARNED', 'Scene 5', 'scene', 'belief', { severity: 'major', startLine: 39, endLine: 48 }),
-      located('REVELATION_WITHOUT_REACTION', 'Scene 9 → Scene 10', 'scene', 'causality', { severity: 'minor', startLine: 300, endLine: 320 }),
+      located('REVELATION_UNEARNED', 'Scene 6', 'scene', 'belief', { severity: 'major', startLine: 39, endLine: 48 }),
+      located('REVELATION_WITHOUT_REACTION', 'Scene 10 → Scene 11', 'scene', 'causality', { severity: 'minor', startLine: 300, endLine: 320 }),
     ];
     const findings = clusterIssues(issues);
     assert.ok(
@@ -381,10 +405,12 @@ describe('clusterIssues — root-cause template: "The reveal comes from nowhere 
 });
 
 describe('clusterIssues — root-cause template: "A character turns, and nothing caused it" (causeless-turn)', () => {
+  // Scene labels are 1-based post-migration — see the "scene/lines overlap
+  // clustering" describe above for the decode rule.
   it('fires when BELIEF_REVERSAL_UNSUPPORTED and UNMOTIVATED_DECISION land in the same scene', () => {
     const issues = [
-      located('BELIEF_REVERSAL_UNSUPPORTED', 'Scene 9 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'belief', { severity: 'major', startLine: 73, endLine: 81 }),
-      located('UNMOTIVATED_DECISION', 'Scene 9 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'causality', { severity: 'major', startLine: 73, endLine: 81 }),
+      located('BELIEF_REVERSAL_UNSUPPORTED', 'Scene 10 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'belief', { severity: 'major', startLine: 73, endLine: 81 }),
+      located('UNMOTIVATED_DECISION', 'Scene 10 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'causality', { severity: 'major', startLine: 73, endLine: 81 }),
     ];
     const findings = clusterIssues(issues);
     const finding = findings.find(f => f.title === 'A character turns, and nothing caused it');
@@ -400,8 +426,8 @@ describe('clusterIssues — root-cause template: "A character turns, and nothing
 
   it('does not form when the same two rules land in unrelated, distant scenes', () => {
     const issues = [
-      located('BELIEF_REVERSAL_UNSUPPORTED', 'Scene 9 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'belief', { severity: 'major', startLine: 73, endLine: 81 }),
-      located('UNMOTIVATED_DECISION', 'Scene 3 (INT. OFFICE - DAY)', 'scene', 'causality', { severity: 'major', startLine: 20, endLine: 25 }),
+      located('BELIEF_REVERSAL_UNSUPPORTED', 'Scene 10 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'belief', { severity: 'major', startLine: 73, endLine: 81 }),
+      located('UNMOTIVATED_DECISION', 'Scene 4 (INT. OFFICE - DAY)', 'scene', 'causality', { severity: 'major', startLine: 20, endLine: 25 }),
     ];
     const findings = clusterIssues(issues);
     assert.ok(

@@ -4,11 +4,12 @@
 
 **PLANNED**
 
-- Study status: **PLANNED — STATIC-REPORT SESSIONS UNBLOCKED; LIVE-FLOW SESSIONS PENDING ONE MANUAL BROWSER CHECK**
+- Study status: **PLANNED — STATIC-REPORT AND LIVE-FLOW SESSIONS BOTH UNBLOCKED** (browser check certified 2026-07-28, re-certified 2026-08-03; see below)
 - Study dates: **Not started**
 - Intended stimulus commit SHA: `e7b9a946510da21f2cab4b8b3eaa8621e76e9cf1` (superseded — main has advanced; see certified SHA below)
 - Certified stimulus commit SHA (API-level only): **`c5749b9`** — exact-commit keyless instance boots and every live-flow route returns correct data; browser-DOM click-through still uncertified (no display/Playwright in the verifying sandbox)
 - Static-stimulus reproducibility re-verified on HEAD **`d733240`** (2026-07-28): `npm run generate-p0-sample` reproduces health 68.9 / CONSIDER / 14 scenes / contentHash `33dcf214…` / 212723 bytes, byte-identical to the committed artifact apart from the runtime datestamp; `npm run honesty-audit` clean. Last browser-DOM certification remains `1a7f3b4`/`4c131df` (6 commits prior; intervening commits are docs/tests/a11y/security, render path untouched). See `FIELDING_DECISION_BRIEF.md`.
+- Scene-label migration re-verification (2026-08-03, `claude/fix-scene-numbering`): writer-facing "Scene N" labels are now 1-based (presentation-only; the labels previously interpolated 0-based indices, pointing writers one scene early). Stimulus regenerated through the unchanged pipeline: health 68.9 / CONSIDER / 14 scenes / contentHash `33dcf214…` identical; HTML now 212,708 bytes (the 212,723 figure above describes the pre-migration artifact). Determinism re-verified (consecutive generations differ only in footer datestamp); browser-DOM click-through re-certified via `scripts/smoke-p0-live-flow.mjs` (PASS, zero genuine console errors, keyless).
 - Provisional UI inspection: an older local instance (`/health` reported `commit: dev`) reached StartScreen and rendered sample coverage, but is not an authorized study stimulus
 - Recruited / scheduled / completed / valid / fully documented: **0 / 0 / 0 / 0 / 0**
 - Required valid documented sessions: **>=5**

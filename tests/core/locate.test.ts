@@ -49,6 +49,10 @@ function issue(
 }
 
 describe('locateIssues — scene anchor', () => {
+  // Scene labels are 1-based post-migration (the writer-facing "Scene 1" is
+  // the first scene / sceneIdx 0) — fixtures below use the 1-based label for
+  // whichever physical scene the test means; SCENE_RE's own "-1" decode maps
+  // it back to the 0-based sceneSpans index.
   it('resolves "Scene N" to the exact 1-based span fountain-analyzer.ts assigns that scene', () => {
     // Sanity check the fixture against the real analyzer first — this test is
     // only meaningful if the scene indices genuinely line up.
@@ -57,7 +61,7 @@ describe('locateIssues — scene anchor', () => {
     assert.deepEqual(analysis.records.map(r => r.sceneIdx), [0, 1, 2]);
 
     const [scene0, scene1, scene2] = locateIssues(
-      [issue('Scene 0 (INT. KITCHEN)'), issue('Scene 1 (INT. GARAGE)'), issue('Scene 2 (EXT. HIGHWAY)')],
+      [issue('Scene 1 (INT. KITCHEN)'), issue('Scene 2 (INT. GARAGE)'), issue('Scene 3 (EXT. HIGHWAY)')],
       THREE_SCENE_FOUNTAIN,
     );
 
@@ -73,7 +77,7 @@ describe('locateIssues — scene anchor', () => {
   });
 
   it('is case-insensitive on the "Scene" keyword', () => {
-    const [located] = locateIssues([issue('scene 1 (INT. GARAGE)')], THREE_SCENE_FOUNTAIN);
+    const [located] = locateIssues([issue('scene 2 (INT. GARAGE)')], THREE_SCENE_FOUNTAIN);
     assert.equal(located.anchor, 'scene');
     assert.deepEqual([located.startLine, located.endLine], [8, 14]);
   });
@@ -90,12 +94,12 @@ describe('locateIssues — scene anchor', () => {
     assert.equal(located.anchor, 'document');
   });
 
-  it('resolves "Scene 0" against a headingless single-implicit-scene document', () => {
+  it('resolves "Scene 1" against a headingless single-implicit-scene document', () => {
     const headingless = 'Just some action.\n\nCHARACTER\nHello there, how are you.';
     const analysis = analyzeFountainText(headingless);
     assert.equal(analysis.sceneCount, 1);
 
-    const [located] = locateIssues([issue('Scene 0')], headingless);
+    const [located] = locateIssues([issue('Scene 1')], headingless);
     assert.equal(located.anchor, 'scene');
     assert.equal(located.startLine, 1);
     assert.equal(located.endLine, 4);
@@ -174,9 +178,11 @@ describe('locateIssues — document fallback', () => {
 });
 
 describe('locateIssues — determinism', () => {
+  // Scene labels are 1-based post-migration — see the "scene anchor" describe
+  // above for the decode rule; fixtures here follow the same convention.
   it('produces identical output across two calls on the same input', () => {
     const issues = [
-      issue('Scene 1 (INT. GARAGE)'),
+      issue('Scene 2 (INT. GARAGE)'),
       issue('Lines 3-4'),
       issue('Character: SARAH'),
       issue('Act 1 pacing'),
@@ -191,7 +197,7 @@ describe('locateIssues — determinism', () => {
     const analysis = analyzeFountainText('   \n  ');
     assert.equal(analysis.sceneCount, 0);
 
-    const [located] = locateIssues([issue('Scene 0')], '   \n  ');
+    const [located] = locateIssues([issue('Scene 1')], '   \n  ');
     assert.equal(located.anchor, 'document');
   });
 });

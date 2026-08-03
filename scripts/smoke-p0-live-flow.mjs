@@ -94,7 +94,14 @@ async function main() {
   // CJS interop: named exports may land on .default for index.js.
   const chromium = pw.chromium ?? pw.default?.chromium;
   if (!chromium) throw new Error('Playwright imported but `chromium` export not found.');
-  browser = await chromium.launch({ headless: true });
+  // PW_CHROMIUM_PATH: point at a system Chromium when the installed
+  // playwright's pinned browser build isn't provisioned (e.g. sandboxes that
+  // pre-install browsers under PLAYWRIGHT_BROWSERS_PATH for a different
+  // playwright version). Unset -> playwright's own resolution, as before.
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.PW_CHROMIUM_PATH || undefined,
+  });
   const page = await browser.newPage();
   page.on('console', (msg) => {
     const t = msg.type();
