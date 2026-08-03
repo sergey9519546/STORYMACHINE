@@ -25,6 +25,73 @@ import {
 import type { RoomProgressEvent } from '../engine/Orchestrator.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import type { OutlineBeat } from '../engine/types.ts';
+import {
+  withAiBudget, withDeadline, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits,
+} from '../lib/ai-budget.ts';
+import { sanitizeExternalError } from '../lib/safe-error.ts';
+
+// ── AI provider fan-out budgets (2026-08-03 audit, Task 1) ─────────────────
+// See server/lib/ai-budget.ts's header for the full design rationale and the
+// documented deviation from the 2026-07-15 plan (no server/engine/** edits in
+// this change's slice). Short version for the four budgets below: /api/turn,
+// /api/run-room, /api/run-scene all reach generateContent exclusively through
+// Agent.ts/agent/decision.ts/agent/memory.ts, deep inside server/engine/**,
+// with no injectable seam — there is nowhere in THIS file to call
+// consumeAiAttempt() before each real provider attempt. maxAttempts on these
+// three is therefore DOCUMENTED/INFORMATIONAL (the intended ceiling for a
+// future patch that instruments generateContent itself), not enforced;
+// timeoutMs is what this file actually enforces, via the coordinator-safe
+// withDeadline() pattern (see TURN_BUDGET's usage below) so a slow/hung
+// engine-internal fan-out can never hang the HTTP response forever, without
+// letting SessionCommandCoordinator admit the next queued command before this
+// one's real Stage writes are done.
+//
+// Every limit is env-overridable so an operator can tune it without a
+// redeploy, and so tests can drive timeoutMs down to prove a route's wiring
+// actually cuts a slow request off rather than merely existing on paper.
+const TURN_BUDGET: AiBudgetLimits = {
+  label: 'turn',
+  // Up to 4 generateContent calls per turn (Agent.ts, agent/decision.ts,
+  // agent/memory.ts x2 — see the aiLimiter comment on /api/turn below).
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_TURN_MAX_ATTEMPTS', 4),
+  // 60s: comfortably covers the normal case (a handful of successful calls,
+  // typically single-digit seconds each) while remaining well under the
+  // ~100-400s a genuinely stuck provider could otherwise cost across 4
+  // sequential 20-30s-timeout calls that each also retry internally.
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_TURN_TIMEOUT_MS', 60_000),
+};
+
+const RUN_ROOM_BUDGET: AiBudgetLimits = {
+  label: 'run-room',
+  // maxTurns is clamped to 12 by RunRoomBodySchema, x up to 4 calls/turn.
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_RUN_ROOM_MAX_ATTEMPTS', 48),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_RUN_ROOM_TIMEOUT_MS', 120_000),
+};
+
+const RUN_SCENE_BUDGET: AiBudgetLimits = {
+  label: 'run-scene',
+  // The worst engine-internal fan-out in this file: up to 8 locations
+  // (RunSceneBodySchema) x up to 12 rounds/room, each round running a full
+  // runRoomSimulation pass x up to 4 calls/turn.
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_RUN_SCENE_MAX_ATTEMPTS', 384),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_RUN_SCENE_TIMEOUT_MS', 180_000),
+};
+
+const SIMULATE_TO_FOUNTAIN_BUDGET: AiBudgetLimits = {
+  label: 'simulate-to-fountain',
+  // Up to 10 turns (route-clamped below) x up to 4 calls/turn — ~40 provider
+  // calls per request, per this route's own aiLimiter comment.
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_SIMULATE_TO_FOUNTAIN_MAX_ATTEMPTS', 40),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SIMULATE_TO_FOUNTAIN_TIMEOUT_MS', 120_000),
+};
+
+// Category A (direct generateContent call, right below in this file — see
+// server/lib/ai-budget.ts's header): full attempts+deadline enforcement.
+const INTERVIEW_BUDGET: AiBudgetLimits = {
+  label: 'game-interview',
+  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_INTERVIEW_MAX_ATTEMPTS', 1),
+  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_INTERVIEW_TIMEOUT_MS', 45_000),
+};
 
 // ── Fix B: psychology-field extraction (shared by /api/init and
 // /api/simulate-to-fountain) ─────────────────────────────────────────────────
@@ -190,7 +257,27 @@ router.post('/api/turn', aiLimiter, validate(TurnBodySchema), withSessionCommand
     res.status(404).json({ error: `Agent '${agentId}' does not exist in this session` });
     return;
   }
-  const action = await session.orchestrator.runTurn(agentId);
+
+  // TASK 1 (ai-budget, 2026-08-03 audit): `operation` starts immediately and
+  // is ALWAYS fully awaited below, even after an early deadline response —
+  // see TURN_BUDGET's comment above for why this route can only enforce the
+  // wall-clock half of the budget, and server/lib/ai-budget.ts's header for
+  // why the coordinator-safe withDeadline() (not the abandon-on-timeout
+  // withAiBudget()) is the correct primitive here: SessionCommandCoordinator
+  // must never admit the next queued command for this session before this
+  // turn's real Stage writes are done, so only the HTTP RESPONSE is early —
+  // the mutation ordering guarantee this route already had is untouched.
+  const operation = session.orchestrator.runTurn(agentId);
+  const raced = await withDeadline(operation, TURN_BUDGET.timeoutMs);
+  if (raced.timedOut) {
+    res.status(503).json({
+      error: 'This turn is taking longer than expected and was stopped to protect the server. Try again.',
+      code: 'AI_BUDGET_DEADLINE_EXCEEDED',
+    });
+    await operation.catch(() => {}); // preserve FIFO ordering; result discarded, response already sent.
+    return;
+  }
+  const action = raced.value;
   // Fix C: surface Tier-1 canon drops (previously only a server log) —
   // additive, only present when this turn actually dropped a commit.
   const droppedCommits = session.orchestrator.consumeDroppedCommits();
@@ -241,6 +328,11 @@ router.post('/api/game/interview', aiLimiter, validate(InterviewBodySchema), asy
 
   const MAX_ANSWER_LEN = 4000;
   const keylessNote = `${sanitizeForPrompt(agent.name, 256)}'s grounding is shown below — add an AI key in Settings to hear them actually speak.`;
+  // TASK 1 (ai-budget): distinct from keylessNote — a budget stop means a key
+  // IS configured and the call genuinely started; telling the writer to "add
+  // an AI key" here would be an inaccurate label, which is exactly what
+  // CLAUDE.md's honest-degradation rule forbids.
+  const budgetNote = `${sanitizeForPrompt(agent.name, 256)}'s grounding is shown below — the spoken answer took too long to generate and was stopped to protect the server. Try again.`;
 
   try {
     const contents = [
@@ -252,11 +344,17 @@ router.post('/api/game/interview', aiLimiter, validate(InterviewBodySchema), asy
       { role: 'user', parts: [{ text: sanitizeForPrompt(question, 2000) }] },
     ];
 
-    const response = await generateContent({
+    // TASK 1 (ai-budget): a single logical call, but generateContent's own
+    // internal retry (up to 3 attempts) means the underlying request could
+    // still hang well past its own 30s per-attempt timeout in a sustained
+    // outage — withAiBudget is safe to use here (abandon-on-timeout) because
+    // this route holds no SessionCommandCoordinator command and mutates no
+    // Stage state itself.
+    const response = await withAiBudget(INTERVIEW_BUDGET, () => generateContent({
       model: modelForTask('DIALOGUE'),
       contents,
       config: { temperature: getTemperature(), systemInstruction: systemPrompt },
-    }, { label: 'game-interview', timeoutMs: 30_000 });
+    }, { label: 'game-interview', timeoutMs: 30_000 }));
 
     const rawAnswer = typeof response.text === 'string' ? response.text.trim() : '';
     if (!rawAnswer) {
@@ -267,10 +365,17 @@ router.post('/api/game/interview', aiLimiter, validate(InterviewBodySchema), asy
     }
     const answer = rawAnswer.length > MAX_ANSWER_LEN ? rawAnswer.substring(0, MAX_ANSWER_LEN) : rawAnswer;
     res.json({ answer, receipts, usedLLM: true });
-  } catch {
-    // Missing GEMINI_API_KEY, network failure, or timeout — NEVER a 500 here.
-    // No raw error text is exposed to the client; the grounding still stands
-    // on its own per the keyless-analysis principle described above.
+  } catch (err) {
+    // Missing GEMINI_API_KEY, network failure, timeout, or an AI budget stop
+    // — NEVER a 500 here. No raw error text is exposed to the client; the
+    // grounding still stands on its own per the keyless-analysis principle
+    // described above. A budget stop gets its OWN accurate label rather than
+    // falling into the generic (and here inaccurate) keyless note.
+    if (isAiBudgetExceededError(err)) {
+      logger.warn('game_interview_ai_budget_exceeded', { code: err.code, ...sanitizeExternalError(err) });
+      res.json({ receipts, usedLLM: false, note: budgetNote });
+      return;
+    }
     res.json({ receipts, usedLLM: false, note: keylessNote });
   }
 }));
@@ -299,7 +404,20 @@ router.post('/api/run-room', aiLimiter, validate(RunRoomBodySchema), reserveSimu
     return;
   }
   try {
-    await orchestrator.runRoomSimulation(nodeId, maxTurns);
+    // TASK 1 (ai-budget): same coordinator-safe deadline pattern as /api/turn
+    // above — `operation` is always fully awaited so SessionCommandCoordinator
+    // never admits the next queued command early; only the HTTP response can
+    // return before the room simulation actually finishes.
+    const operation = orchestrator.runRoomSimulation(nodeId, maxTurns);
+    const raced = await withDeadline(operation, RUN_ROOM_BUDGET.timeoutMs);
+    if (raced.timedOut) {
+      res.status(503).json({
+        error: 'This room simulation is taking longer than expected and was stopped to protect the server. Try again with fewer turns.',
+        code: 'AI_BUDGET_DEADLINE_EXCEEDED',
+      });
+      await operation.catch(() => {});
+      return;
+    }
     // Fix C: surface Tier-1 canon drops — additive, only present when nonzero.
     const droppedCommits = orchestrator.consumeDroppedCommits();
     res.json({ status: 'completed', maxTurns, ...(droppedCommits ? { droppedCommits } : {}) });
@@ -329,15 +447,25 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
     if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
-  // Hard wall-clock limit: if the simulation hasn't completed in 5 minutes, close
-  // the SSE stream and release the runningRooms lock so the session isn't stranded.
-  const SSE_MAX_MS = 5 * 60 * 1000;
+  // Hard wall-clock limit: if the simulation hasn't completed in time, stop
+  // emitting further progress and tell the client so promptly. TASK 1
+  // (ai-budget, 2026-08-03 audit): reuses RUN_ROOM_BUDGET's env-tunable
+  // deadline instead of a private hardcoded constant, so this SSE sibling and
+  // the POST /api/run-room handler above share one operator-tunable ceiling.
+  // Coordinator-safe by construction, same as /api/turn/POST /api/run-room:
+  // this timer never touches `orchestrator.runRoomSimulation(...)`'s own
+  // promise below — it only stops further res.write() calls and emits one
+  // clearly-labeled terminal event early. The real operation is still fully
+  // awaited afterward (see the try block), so SessionCommandCoordinator only
+  // ever admits the next queued command once this room's Stage writes are
+  // actually done — res.end() itself still waits for that in the outer
+  // `finally` below, same as before this change.
   const wallTimer = setTimeout(() => {
     if (!disconnected) {
-      emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'error: stream timeout (5 min)' });
+      emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'AI_BUDGET_DEADLINE_EXCEEDED' });
     }
-    disconnected = true; // triggers ensureEnded() to skip the write, but it still calls res.end()
-  }, SSE_MAX_MS);
+    disconnected = true; // suppresses further res.write() calls; res.end() still awaits real completion below.
+  }, RUN_ROOM_BUDGET.timeoutMs);
 
   // C3: Single-flag guard ensures res.end() is called exactly once even when
   // the early-return paths or the error handler both want to close the stream.

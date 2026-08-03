@@ -17,14 +17,29 @@
 // Run:  node scripts/convert-crawl-scripts.mjs
 // Output: data/screenplays/crawl/<genre>/<name>.fountain + summary report
 
+// Safety: SRC_BASE below is a maintainer-machine-only path, and the CSV
+// report write at the end used to happen unconditionally — refusing only
+// via a raw ENOENT crash on readdirSync if SRC_BASE didn't exist at all,
+// and not at all if SRC_BASE existed but was empty/near-empty. It now
+// checks SRC_BASE explicitly with a clear message, and refuses to shrink
+// the committed conversion-report CSV by more than half unless --force is
+// passed (see scripts/lib/output-guard.mjs header for the incident this
+// class of guard responds to).
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 import { formatCanonicalFountain } from '../server/nvm/analyze/canonical-fountain.ts';
+import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 
 const SRC_BASE = 'O:/.cluster/scripts-crawl-20260713/DELIVERY/by-genre';
 const DEST_BASE = 'data/screenplays/crawl';
+
+if (!fs.existsSync(SRC_BASE)) {
+  console.error(`ERROR: ${SRC_BASE} does not exist — refusing to run.`);
+  console.error('This script requires the raw crawl delivery, which lives only on the maintainer machine that ran the crawl. Nothing was written.');
+  process.exit(1);
+}
 
 // ── Format converters ─────────────────────────────────────────────────────
 
@@ -170,6 +185,7 @@ const genres = fs.readdirSync(SRC_BASE).filter(d => {
   const stat = fs.statSync(path.join(SRC_BASE, d));
   return stat.isDirectory() && d !== 'ScriptSlug-PDFs';
 });
+requireCorpus(genres.length, { label: `${SRC_BASE} (genre subdirectories)` });
 
 let totalConverted = 0, totalSkipped = 0, totalFailed = 0;
 const results = [];
@@ -278,6 +294,4 @@ console.log(`\nParse quality: ${valid.length} valid (sceneCount>=5), ${broken.le
 // Write results CSV
 const csv = 'genre,file,sceneCount,wordCount,dialogueLines\n' +
   results.map(r => `${r.genre},${r.file},${r.sceneCount},${r.wordCount},${r.dialogueLines}`).join('\n') + '\n';
-fs.mkdirSync('scripts/output', { recursive: true });
-fs.writeFileSync('scripts/output/crawl-conversion-report.csv', csv, 'utf-8');
-console.log(`\nWrote conversion report to scripts/output/crawl-conversion-report.csv`);
+guardedWrite('scripts/output/crawl-conversion-report.csv', csv, { rowCount: results.length });

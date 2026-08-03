@@ -13,14 +13,30 @@
 //
 // Run:  node scripts/split-corpus.mjs
 
+// Safety: the two writes at the end used to happen unconditionally, so
+// re-running this against the local sample-only data/screenplays/ (instead
+// of the full private corpus) would silently overwrite the committed
+// 761-script split with a handful of entries (see
+// scripts/lib/output-guard.mjs header for the incident this class of guard
+// responds to). It now refuses to run against a missing/empty corpus dir,
+// and refuses to shrink the committed corpus-split.json by more than half
+// unless --force is passed. corpus-test-hash.txt is derived from the same
+// corpus and is only written once that guard has passed.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 
 const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
 const SPLIT_FILE = path.join(OUT_DIR, 'corpus-split.json');
 const TEST_HASH_FILE = path.join(OUT_DIR, 'corpus-test-hash.txt');
+
+if (!fs.existsSync(SRC_DIR)) {
+  console.error(`ERROR: ${SRC_DIR} does not exist — refusing to run.`);
+  console.error('This script requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md). Nothing was written.');
+  process.exit(1);
+}
 
 // Fixed seed per PRE_REGISTRATION_PROTOCOL §4 (CORPUS_SPLIT_SEED = 42).
 const SEED = 42;
@@ -59,6 +75,10 @@ function gatherFountain(dir) {
 }
 
 const allPaths = gatherFountain(SRC_DIR).sort();
+requireCorpus(allPaths.length, {
+  label: `${SRC_DIR} (.fountain/.fountain.txt files)`,
+  hint: 'This script requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md).',
+});
 // Store paths relative to SRC_DIR for the manifest
 const allFiles = allPaths.map(p => path.relative(SRC_DIR, p).replace(/\\/g, '/'));
 
@@ -133,8 +153,22 @@ const testHash = crypto.createHash('sha256').update(testManifest).digest('hex');
 splitRecord.testSetHash = testHash;
 
 // ── Write artifacts ────────────────────────────────────────────────────────
+// corpus-test-hash.txt is derived from (and meaningless without) the split
+// it locks, so it is written manually right after the guarded split write
+// succeeds — guardedWrite() only protects the file path given to it, and
+// gating a second, coupled write behind the first keeps them from drifting
+// out of sync if the split write is ever refused.
 fs.mkdirSync(OUT_DIR, { recursive: true });
-fs.writeFileSync(SPLIT_FILE, JSON.stringify(splitRecord, null, 2) + '\n', 'utf-8');
+let existingValidCount;
+if (fs.existsSync(SPLIT_FILE)) {
+  try {
+    existingValidCount = JSON.parse(fs.readFileSync(SPLIT_FILE, 'utf-8')).counts?.valid;
+  } catch { /* malformed/missing existing file — let guardedWrite fall back to line counting */ }
+}
+guardedWrite(SPLIT_FILE, JSON.stringify(splitRecord, null, 2) + '\n', {
+  rowCount: valid.length,
+  existingRowCount: existingValidCount,
+});
 fs.writeFileSync(TEST_HASH_FILE, testHash + '\n', 'utf-8');
 
 // ── Report ─────────────────────────────────────────────────────────────────

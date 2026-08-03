@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 import { REFERENCE_CORPUS } from '../server/nvm/analyze/calibration/corpus.ts';
+import { guardedWrite } from './lib/output-guard.mjs';
 
 const OUT_DIR = 'scripts/output';
 const OUT_FILE = path.join(OUT_DIR, 'probe-interscene-candidates.json');
@@ -439,9 +440,16 @@ reportCandidate('5_questionLatency_totalUnresolved', 'questionLatency', 'totalUn
   report.candidate5Coverage = { scriptsWithQuestions, scriptsTotal };
 }
 
-fs.mkdirSync(OUT_DIR, { recursive: true });
-fs.writeFileSync(OUT_FILE, JSON.stringify(report, null, 2), 'utf-8');
-console.log(`\nWrote full results to ${OUT_FILE}`);
+let existingScriptCount;
+if (fs.existsSync(OUT_FILE)) {
+  try {
+    existingScriptCount = JSON.parse(fs.readFileSync(OUT_FILE, 'utf-8')).scriptCount;
+  } catch { /* malformed/missing existing file — let guardedWrite fall back */ }
+}
+guardedWrite(OUT_FILE, JSON.stringify(report, null, 2), {
+  rowCount: report.scriptCount,
+  existingRowCount: existingScriptCount,
+});
 console.log('\nHONESTY NOTE: this is a 26-script falsification screen (20 hand-authored');
 console.log('calibration samples + 6 CC0 short screenplays), NOT the 761-script P1 real-');
 console.log('writing corpus. No number above is a P1 gate result. Any candidate deemed');

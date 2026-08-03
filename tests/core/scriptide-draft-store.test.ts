@@ -1,12 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  DEFAULT_TITLE_PAGE,
   SCRIPTIDE_DRAFT_KEY,
   applyServerScriptIDEDraft,
   decideScriptIDERestore,
   importScriptText,
   loadScriptIDEDraft,
   readScriptIDEDraft,
+  scriptIDEDraftStatesEqual,
   updateScriptIDEDraft,
   writeScriptIDEDraft,
   type ScriptIDEDraftEnvelope,
@@ -25,12 +27,13 @@ function memoryStorage(seed: Record<string, string> = {}) {
 }
 
 const envelope: ScriptIDEDraftEnvelope = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   scriptText: 'INT. ROOM - DAY',
   snapshots: [{ id: 's1' }],
   characters: [{ id: 'c1' }],
   researchNotes: [{ id: 'r1' }],
   isDarkMode: true,
+  titlePage: { title: 'THE LEDGER', author: 'J. Author', contact: 'j@example.com' },
   contentUpdatedAt: 123,
   serverRevision: 100,
   dirty: false,
@@ -46,10 +49,15 @@ const server = {
 };
 
 describe('scriptide draft store', () => {
-  it('roundtrips a valid versioned envelope and mirrors theme', () => {
+  it('roundtrips a valid versioned envelope (including titlePage) and mirrors theme', () => {
     const storage = memoryStorage();
     assert.equal(writeScriptIDEDraft(storage.write, envelope), true);
     assert.deepEqual(readScriptIDEDraft(storage.read), envelope);
+    assert.deepEqual(readScriptIDEDraft(storage.read)?.titlePage, {
+      title: 'THE LEDGER',
+      author: 'J. Author',
+      contact: 'j@example.com',
+    });
     assert.equal(storage.values.get('theme'), 'dark');
     assert.equal(storage.values.size, 2);
   });
@@ -58,13 +66,80 @@ describe('scriptide draft store', () => {
     const malformed = memoryStorage({ [SCRIPTIDE_DRAFT_KEY]: '{bad' });
     assert.equal(readScriptIDEDraft(malformed.read), null);
 
+    // A version newer than anything this build understands (NOT the
+    // pre-titlePage v1 shape below, which is a recognized migration case,
+    // not a rejection case) must still be refused rather than trusted as-is.
     const future = memoryStorage({
-      [SCRIPTIDE_DRAFT_KEY]: JSON.stringify({ ...envelope, schemaVersion: 2 }),
+      [SCRIPTIDE_DRAFT_KEY]: JSON.stringify({ ...envelope, schemaVersion: 3 }),
     });
     assert.equal(readScriptIDEDraft(future.read), null);
   });
 
-  it('migrates every legacy draft field', () => {
+  // ── Pre-change draft migration (schemaVersion 1, no titlePage) ───────────
+  // Every draft saved before titlePage was added to the envelope has this
+  // exact shape: valid content fields, schemaVersion 1, no titlePage key at
+  // all. Reading it must upgrade it in place — never crash, and never fall
+  // through to the flat pre-envelope legacy keys (which would silently
+  // discard real scriptText/snapshots/characters/researchNotes).
+  describe('migrates a pre-titlePage (schemaVersion 1) envelope on read', () => {
+    const legacyV1Envelope = {
+      schemaVersion: 1,
+      scriptText: 'INT. OLD DRAFT - DAY\n\nSaved before titlePage existed.',
+      snapshots: [{ id: 'snap-1', name: 'v1', text: 'x', date: '2026-01-01' }],
+      characters: [{ id: 'char-1', name: 'ADA' }],
+      researchNotes: [{ id: 'note-1', title: 'Theme', content: 'Betrayal' }],
+      isDarkMode: true,
+      contentUpdatedAt: 555,
+      serverRevision: 42,
+      dirty: true,
+    };
+
+    it('upgrades schemaVersion and backfills the default title page', () => {
+      const storage = memoryStorage({ [SCRIPTIDE_DRAFT_KEY]: JSON.stringify(legacyV1Envelope) });
+      const upgraded = readScriptIDEDraft(storage.read);
+      assert.ok(upgraded, 'expected a v1 envelope to be recognized and upgraded, not rejected');
+      assert.equal(upgraded!.schemaVersion, 2);
+      assert.deepEqual(upgraded!.titlePage, DEFAULT_TITLE_PAGE);
+    });
+
+    it('does not crash and does not clobber any pre-existing content field', () => {
+      const storage = memoryStorage({ [SCRIPTIDE_DRAFT_KEY]: JSON.stringify(legacyV1Envelope) });
+      assert.doesNotThrow(() => readScriptIDEDraft(storage.read));
+      const upgraded = readScriptIDEDraft(storage.read)!;
+      assert.equal(upgraded.scriptText, legacyV1Envelope.scriptText);
+      assert.deepEqual(upgraded.snapshots, legacyV1Envelope.snapshots);
+      assert.deepEqual(upgraded.characters, legacyV1Envelope.characters);
+      assert.deepEqual(upgraded.researchNotes, legacyV1Envelope.researchNotes);
+      assert.equal(upgraded.isDarkMode, legacyV1Envelope.isDarkMode);
+      assert.equal(upgraded.contentUpdatedAt, legacyV1Envelope.contentUpdatedAt);
+      assert.equal(upgraded.serverRevision, legacyV1Envelope.serverRevision);
+      assert.equal(upgraded.dirty, legacyV1Envelope.dirty);
+    });
+
+    it('loadScriptIDEDraft also returns the upgraded envelope (not the flat-key fallback)', () => {
+      // Seed BOTH the v1 envelope AND stale flat legacy keys, to prove the v1
+      // envelope wins — falling through to migrateLegacyScriptIDEDraft here
+      // would silently replace real saved content with whatever (possibly
+      // empty/stale) flat keys happen to exist.
+      const storage = memoryStorage({
+        [SCRIPTIDE_DRAFT_KEY]: JSON.stringify(legacyV1Envelope),
+        script_draft: 'STALE FLAT-KEY DRAFT — SHOULD NEVER WIN',
+      });
+      const loaded = loadScriptIDEDraft(storage.read);
+      assert.equal(loaded.scriptText, legacyV1Envelope.scriptText);
+      assert.equal(loaded.schemaVersion, 2);
+      assert.deepEqual(loaded.titlePage, DEFAULT_TITLE_PAGE);
+    });
+
+    it('a migrated draft round-trips cleanly through a subsequent write', () => {
+      const storage = memoryStorage({ [SCRIPTIDE_DRAFT_KEY]: JSON.stringify(legacyV1Envelope) });
+      const upgraded = readScriptIDEDraft(storage.read)!;
+      assert.equal(writeScriptIDEDraft(storage.write, upgraded), true);
+      assert.deepEqual(readScriptIDEDraft(storage.read), upgraded);
+    });
+  });
+
+  it('migrates every legacy (pre-envelope, flat-key) draft field, including a default title page', () => {
     const storage = memoryStorage({
       script_draft: 'LOCAL',
       script_snapshots: JSON.stringify([{ id: 's1' }]),
@@ -74,12 +149,13 @@ describe('scriptide draft store', () => {
       script_draft_updated_at: '456',
     });
     assert.deepEqual(loadScriptIDEDraft(storage.read), {
-      schemaVersion: 1,
+      schemaVersion: 2,
       scriptText: 'LOCAL',
       snapshots: [{ id: 's1' }],
       characters: [{ id: 'c1' }],
       researchNotes: [{ id: 'r1' }],
       isDarkMode: true,
+      titlePage: DEFAULT_TITLE_PAGE,
       contentUpdatedAt: 456,
       serverRevision: null,
       dirty: true,
@@ -148,27 +224,46 @@ describe('scriptide draft store', () => {
     assert.deepEqual(writes, [SCRIPTIDE_DRAFT_KEY, 'theme']);
   });
 
-  it('updates local content while preserving the server base revision', () => {
+  it('updates local content (including titlePage) while preserving the server base revision', () => {
     const next = updateScriptIDEDraft(envelope, {
       scriptText: '',
       snapshots: [],
       characters: [],
       researchNotes: [],
       isDarkMode: false,
+      titlePage: { title: 'NEW TITLE', author: '', contact: '' },
     }, 999);
     assert.equal(next.serverRevision, 100);
     assert.equal(next.contentUpdatedAt, 999);
     assert.equal(next.dirty, true);
     assert.equal(next.scriptText, '');
     assert.deepEqual(next.characters, []);
+    assert.deepEqual(next.titlePage, { title: 'NEW TITLE', author: '', contact: '' });
   });
 
-  it('imports script text without discarding metadata or the server base', () => {
+  it('imports script text without discarding metadata, titlePage, or the server base', () => {
     const next = importScriptText(envelope, 'EXT. ROAD - NIGHT', 1000);
     assert.equal(next.scriptText, 'EXT. ROAD - NIGHT');
     assert.deepEqual(next.characters, envelope.characters);
+    assert.deepEqual(next.titlePage, envelope.titlePage);
     assert.equal(next.serverRevision, 100);
     assert.equal(next.dirty, true);
+  });
+
+  describe('scriptIDEDraftStatesEqual', () => {
+    it('detects a titlePage-only change as a real difference', () => {
+      // This is what gates the ScriptIDE.tsx local-save effect — if titlePage
+      // were excluded here, editing ONLY the title/author/contact fields
+      // would never trigger a save, reproducing the original silent-loss bug
+      // one layer down.
+      const withDifferentTitle = { ...envelope, titlePage: { ...envelope.titlePage, title: 'DIFFERENT' } };
+      assert.equal(scriptIDEDraftStatesEqual(envelope, withDifferentTitle), false);
+    });
+
+    it('treats two states with identical titlePage content (different object identity) as equal', () => {
+      const clone = { ...envelope, titlePage: { ...envelope.titlePage } };
+      assert.equal(scriptIDEDraftStatesEqual(envelope, clone), true);
+    });
   });
 });
 
@@ -230,11 +325,20 @@ describe('decideScriptIDERestore', () => {
     );
   });
 
-  it('applies a clean server envelope with empty arrays intact', () => {
-    const applied = applyServerScriptIDEDraft(server);
+  it('applies a clean server envelope with empty arrays intact, preserving the supplied titlePage', () => {
+    const currentTitlePage = { title: 'KEPT LOCALLY', author: 'Me', contact: 'me@example.com' };
+    const applied = applyServerScriptIDEDraft(server, currentTitlePage);
     assert.equal(applied.dirty, false);
     assert.equal(applied.serverRevision, 200);
     assert.deepEqual(applied.characters, []);
     assert.equal(applied.isDarkMode, false);
+    // The server has no titlePage of its own — "server wins" for content
+    // must never be read as "reset the title page too."
+    assert.deepEqual(applied.titlePage, currentTitlePage);
+  });
+
+  it('applies a clean server envelope even when the caller has no local titlePage yet (falls back to defaults)', () => {
+    const applied = applyServerScriptIDEDraft(server, DEFAULT_TITLE_PAGE);
+    assert.deepEqual(applied.titlePage, DEFAULT_TITLE_PAGE);
   });
 });

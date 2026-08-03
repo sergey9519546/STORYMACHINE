@@ -9,10 +9,19 @@
 // defensible distinctions on real writing? — without requiring recruiter
 // access to 5+ screenwriters.
 //
-// Run:  node scripts/probe-real-corpus.mjs
+// Run:  node scripts/probe-real-corpus.mjs [--force]
+//
+// Safety: this probe used to write scripts/output/real-corpus-scores.csv
+// unconditionally, even when data/screenplays/ had only a handful of local
+// sample scripts instead of the full private corpus — silently overwriting
+// the committed evidence file with a near-empty result (see
+// scripts/lib/output-guard.mjs header for the incident). It now refuses to
+// run against a missing/empty corpus dir and refuses to shrink the
+// committed CSV by more than half, unless --force is passed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
+import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 
 const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
@@ -20,10 +29,21 @@ const OUT_FILE = path.join(OUT_DIR, 'real-corpus-scores.csv');
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
+if (!fs.existsSync(SRC_DIR)) {
+  console.error(`ERROR: ${SRC_DIR} does not exist — refusing to run.`);
+  console.error('This probe requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md). Nothing was written.');
+  process.exit(1);
+}
+
 const files = fs
   .readdirSync(SRC_DIR)
   .filter((f) => f.endsWith('.fountain') || f.endsWith('.fountain.txt'))
   .sort();
+
+requireCorpus(files.length, {
+  label: `${SRC_DIR} (.fountain/.fountain.txt files)`,
+  hint: 'This probe requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md).',
+});
 
 const rows = [];
 for (const file of files) {
@@ -73,5 +93,4 @@ const body = rows
   )
   .join('\n');
 
-fs.writeFileSync(OUT_FILE, header + '\n' + body + '\n', 'utf-8');
-console.log(`\nWrote ${rows.length} rows to ${OUT_FILE}`);
+guardedWrite(OUT_FILE, header + '\n' + body + '\n', { rowCount: rows.length });

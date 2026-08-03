@@ -12,6 +12,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname, basename, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const ROOT = process.cwd();
 
@@ -158,6 +159,180 @@ const PATTERNS = [
     scopeDirs: ['docs'],
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Docs-wide stale rule-count scan (narrow extension, 2026-08-03)
+// ---------------------------------------------------------------------------
+// PATTERNS above (and the SCAN_DIRS/SCAN_ROOT_FILES/SCAN_TRACKED_ARTIFACTS
+// it runs over) are UNCHANGED by this section. This is a second, independent
+// pass added because AGENTS.md and CHANGELOG.md both carried the disproven
+// "8,917 rules" figure, uncorrected, for weeks: neither file was ever
+// scanned (SCAN_ROOT_FILES covers only README.md of the root *.md files),
+// and docs/** was never scanned at all.
+//
+// This pass deliberately does NOT reuse the tone/superlative entries in
+// PATTERNS and does NOT lift the docs/** exemption in general — per the
+// scope comment above, docs/** is "the candid internal audit trail," and a
+// blanket extension would wrongly flag honest self-critical writing (this
+// repo's own audit reports discuss "8,917" by name dozens of times,
+// precisely BECAUSE they are the investigation that disproved it). Instead
+// it scans every git-tracked *.md for exactly the four fabricated/disproven
+// rule-count figures, and flags a match only when BOTH:
+//
+//   1. it reads as being about the rule catalog at all — the word
+//      "rule"/"rules"/"rulebook" appears somewhere in the same paragraph or
+//      table block as the number. This is what keeps the check narrow:
+//      e.g. a root-level doc's unrelated "12,700 systems" catalog is a
+//      different claim this audit has no opinion on, and never mentions
+//      rules near it, so it is not flagged.
+//   2. AND that same block carries no marker that the number is being
+//      discussed AS disproven/historical rather than asserted as current
+//      fact. CHANGELOG.md's "~8,917 rules ... that count was DISPROVEN by
+//      the 2026-07-14 audit" and AGENTS.md's 'the "8,917" figure this line
+//      used to carry ... DISPROVEN' both carry such a marker in the same
+//      sentence, so both keep passing; a bare, unqualified "the rulebook
+//      has 8,917 rules" would not.
+//
+// 3,216 — the CURRENT machine-counted count — is deliberately excluded from
+// this pass. PATTERNS above already bans it, but only in the user-facing
+// surface, for an unrelated reason (ROADMAP §4: even the TRUE count is an
+// unwanted marketing claim there), not because it is wrong. Banning it
+// repo-wide here would break ROADMAP.md, NORTH_STAR.md, CLAUDE.md, AGENTS.md
+// and most of docs/p1-benchmark/, which correctly and necessarily cite
+// 3,216 as fact.
+const DOC_STALE_NUMBER_PATTERNS = [
+  { name: 'doc-stale-count-8917', re: /\b8,?917\b/g },
+  { name: 'doc-stale-count-10523', re: /\b10,?523\b/g },
+  { name: 'doc-stale-count-5701', re: /\b5,?701\b/g },
+  { name: 'doc-stale-count-12700', re: /\b12,?700\b/g },
+];
+
+const RULE_TOPIC_RE = /\brules?\b|\brulebook\b/i;
+// Deliberately generous: this is a "does the surrounding prose visibly frame
+// the number as PAST/wrong rather than current?" check, not a strict single
+// keyword. Every phrase below is one actually used somewhere in this repo's
+// existing, legitimate historical mentions (CHANGELOG.md, AGENTS.md,
+// ROADMAP.md's "Earlier docs ... disagreed") — this list grows by finding
+// real phrasing, not by guessing.
+const HISTORICAL_LABEL_RE = /\b(disprove[nd]?|disproving|disprov(?:ed|es)|retract(?:ed|ion)?|superseded|fabricat(?:ed|ion)|unsupported|inaccurate|reject(?:ed|s)?|debunked|falsely|never happened|did not occur|no such|alleged(?:ly)?|used to (?:carry|say|claim|read)|originally said|no longer accurate|correction attached|shown to be|was (?:inaccurate|wrong|false)|is (?:false|wrong|incorrect)|not accurate|disagreed|earlier (?:docs|prose|version|plan|figure)|stale plan)\b/i;
+
+// Whole-file/directory exemptions for THIS pass only (PATTERNS above and the
+// surfaces it scans are unaffected). Every entry is a closed, dated,
+// point-in-time document from the same 2026-07-14/07-15 investigation that
+// this repo's own docs describe repeatedly — not living guidance a
+// contributor would read as current (CLAUDE.md's own orientation list names
+// ROADMAP/NORTH_STAR/ULTRAPLAN/ARCHITECTURE/README; none of these are on
+// it, and docs/user-validation/P1_BASELINE_INVENTORY.md's own header still
+// says "P1 HAS NOT STARTED" — itself superseded, same as this fix's item 1).
+// This repo's established convention for a disproven figure in a document
+// people still read (CHANGELOG.md's 1.0.0 entry) is to leave the record in
+// place with a correction attached NEARBY, not to silently rewrite it —
+// scattering ad hoc "disproven" markers through dozens of unrelated
+// sentences in these closed audit artifacts would be revisionist history,
+// not honesty. Exempting the file preserves the record intact instead.
+const DOC_STALE_NUMBER_EXEMPT_PREFIXES = [
+  'docs/audits/', // dated audit-report directory — forensic/retrospective genre, same idea as the tests/ directory exemption above
+  'docs/filed-backlog/', // CLAUDE.md: "filed backlog, not active direction"
+  'docs/superpowers/', // dated planning/spec docs for the same closed remediation effort (filenames carry 2026-07-14/07-15 stamps)
+  'docs/DEEP_AUDIT_2026-07-14.md', // the original dated gap-audit that first surfaced — and, at the time, itself repeated — the inflated count
+  'docs/VISION_REBUILD.md', // "written 2026-07-14 against the DEEP_AUDIT" (its own header) — a dated sketch, not current direction
+  'docs/PROJECT_GAP_ANALYSIS.md', // dated 2026-07-15 in its own header, same genre as DEEP_AUDIT
+  'docs/user-validation/SESSION_LOG_2026-07-15.md', // dated session log
+  'docs/user-validation/P1_BASELINE_INVENTORY.md', // dated pre-P1 inventory, superseded in full (see item 1 of this fix)
+];
+
+function isDocStaleNumberExempt(relPosixPath) {
+  return DOC_STALE_NUMBER_EXEMPT_PREFIXES.some(
+    (p) => relPosixPath === p || relPosixPath.startsWith(p)
+  );
+}
+
+// Every git-tracked *.md, via `git ls-files` so this automatically respects
+// .gitignore (e.g. data/, .claude/) and never touches generated/untracked
+// scratch files. Falls back to a manual whole-tree walk (same node_modules/
+// dist/.git exclusions as walk() below) if git is unavailable, so this pass
+// still runs — rather than silently vanishing — in a non-git checkout.
+function listTrackedMarkdown() {
+  try {
+    const out = execFileSync('git', ['ls-files', '-z', '--', '*.md'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    return out.split('\0').filter(Boolean).map((f) => join(ROOT, f));
+  } catch {
+    const files = [];
+    for (const f of walk(ROOT)) {
+      if (extname(f) === '.md') files.push(f);
+    }
+    return files;
+  }
+}
+
+// Splits text into blank-line-delimited blocks with their line ranges. A
+// long markdown table has no blank lines between rows, so it is one block —
+// a disproof marker two rows away in the same table still counts as
+// "explicitly labeled," which is the same generosity a human reader would
+// extend when skimming a table of audit findings.
+function paragraphBlocks(text) {
+  const lines = text.split('\n');
+  const blocks = []; // { startLine, endLine, text } — 0-based, inclusive
+  let curStart = -1;
+  let curLines = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].trim() === '') {
+      if (curLines.length) {
+        blocks.push({ startLine: curStart, endLine: i - 1, text: curLines.join('\n') });
+        curLines = [];
+        curStart = -1;
+      }
+    } else {
+      if (curStart === -1) curStart = i;
+      curLines.push(lines[i]);
+    }
+  }
+  if (curLines.length) {
+    blocks.push({ startLine: curStart, endLine: lines.length - 1, text: curLines.join('\n') });
+  }
+  return blocks;
+}
+
+function blockTextForLine(blocks, lineIdx) {
+  for (const b of blocks) {
+    if (lineIdx >= b.startLine && lineIdx <= b.endLine) return b.text;
+  }
+  return '';
+}
+
+function scanDocStaleNumbers(files) {
+  const hits = [];
+  for (const filePath of files) {
+    const rel = relative(ROOT, filePath);
+    const relPosix = rel.split(/[\\/]/).join('/');
+    if (isDocStaleNumberExempt(relPosix)) continue;
+    let raw;
+    try {
+      raw = readFileSync(filePath, 'utf8');
+    } catch {
+      continue; // stale ls-files entry (deleted-but-not-yet-committed) — skip
+    }
+    const lines = raw.split('\n');
+    const blocks = paragraphBlocks(raw);
+    for (const pattern of DOC_STALE_NUMBER_PATTERNS) {
+      lines.forEach((line, idx) => {
+        pattern.re.lastIndex = 0;
+        let m;
+        while ((m = pattern.re.exec(line)) !== null) {
+          const blockText = blockTextForLine(blocks, idx);
+          if (RULE_TOPIC_RE.test(blockText) && !HISTORICAL_LABEL_RE.test(blockText)) {
+            hits.push({ file: rel, line: idx + 1, match: m[0], pattern: pattern.name });
+          }
+          if (m[0].length === 0) pattern.re.lastIndex += 1; // guard zero-width
+        }
+      });
+    }
+  }
+  return hits;
+}
 
 // ---------------------------------------------------------------------------
 // Comment stripping
@@ -345,6 +520,9 @@ function main() {
     allHits.push(...scanFile(f));
   }
 
+  const mdFiles = listTrackedMarkdown();
+  allHits.push(...scanDocStaleNumbers(mdFiles));
+
   if (allHits.length > 0) {
     console.error(`honesty-audit: ${allHits.length} violation(s) found\n`);
     for (const h of allHits) {
@@ -354,7 +532,10 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`honesty-audit: scanned ${files.length} files — clean.`);
+  console.log(
+    `honesty-audit: scanned ${files.length} files, plus ${mdFiles.length} tracked ` +
+      `markdown files for stale rule-count numbers — clean.`
+  );
   process.exit(0);
 }
 

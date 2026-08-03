@@ -95,3 +95,39 @@ export function mergeSessionHeader(existing: FetchHeaders, sessionId: string): H
   result['X-Session-Id'] = sessionId;
   return result;
 }
+
+// ── same-origin '/api/' request detection ────────────────────────────────────
+// main.tsx's fetch wrapper only ever intended to touch same-origin '/api/'
+// calls (see its header comment) — attaching X-Session-Id to a cross-origin
+// request would leak this browser's session id to a third-party host. The
+// original check (`typeof input === 'string' && input.startsWith('/api/')`)
+// enforced that correctly for the plain-string call shape every panel in
+// this app actually uses, but silently fell through to "pass unmodified" for
+// a Request or URL input instead of resolving it the same way — a future
+// `fetch(new Request('/api/...'))` or `fetch(new URL('/api/...', ...))`
+// call would bypass session-header attachment with no error at all. No
+// current call site does this (verified), so this closes a latent gap
+// rather than fixing a live bug.
+//
+// Extracted as a pure function (currentOrigin passed in explicitly, never
+// read from `window.location` internally) for the same reason
+// mergeSessionHeader above is extracted: independently unit-testable under
+// plain Node, which has no DOM/`window` (see CLAUDE.md — this repo has no
+// jsdom/browser test harness).
+export function isSameOriginApiRequest(input: RequestInfo | URL, currentOrigin: string): boolean {
+  if (typeof input === 'string') {
+    // Relative paths are inherently same-origin. This matches the original,
+    // narrower string contract exactly: only a literal '/api/'-prefixed
+    // relative path matches — an absolute same-origin URL STRING (e.g.
+    // `` `${location.origin}/api/x` ``) is intentionally NOT matched here,
+    // unchanged from prior behavior. No call site in this app passes one.
+    return input.startsWith('/api/');
+  }
+  const href = input instanceof Request ? input.url : input.href;
+  try {
+    const parsed = new URL(href, currentOrigin);
+    return parsed.origin === currentOrigin && parsed.pathname.startsWith('/api/');
+  } catch {
+    return false;
+  }
+}

@@ -5,9 +5,24 @@
 // into POSITION-AWARE arc-shape features and fit to the six Reagan et al. (2016)
 // emotional archetypes. Measured (docs/scoring): a position-aware arc signal
 // lifts real-vs-act-swap separation from AUC≈0.48 (the engine's global-arc blind
-// spot, ROADMAP §5.1) toward ≈0.65. DIAGNOSTIC ONLY — surfaced in the report,
-// not (yet) fed into the health scalar (that step is gated on doctor-level AUC +
-// zero calibration regression).
+// spot, ROADMAP §5.1) toward ≈0.65.
+//
+// CORRECTION (2026-08-03): this header said "DIAGNOSTIC ONLY — not (yet) fed
+// into the health scalar (that step is gated on doctor-level AUC + zero
+// calibration regression)." That gate was crossed in the 2026-07-11B health
+// re-architecture and the comment was never updated. `arcHealth` IS scored:
+// doctor.ts computes `arcIncoherenceDeduction` = min(15, 8 * max(0, 1.2 -
+// arcHealth)) for any script with >= 15 scenes and subtracts it from health.
+// It is one of only three bounded deductions that bypass density dilution, so
+// it is a LARGER practical lever than most of the ~3,216 rule constants.
+// Anyone changing arcHealth's terms is making a scoring change, with all the
+// P1 evidence obligations that implies.
+//
+// Note the shape assumption this carries (see DETECTOR_DEFECTS D7): every
+// arcHealth term rewards monotonic rise, a late peak, a sharp post-peak fall,
+// and fit to one of six Reagan archetypes — none of which is a
+// juxtaposition/synthesis shape, so non-conflict-driven forms score low here
+// by construction rather than by craft.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

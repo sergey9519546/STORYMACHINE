@@ -134,6 +134,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { guardedWrite } from './lib/output-guard.mjs';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 
@@ -467,7 +468,24 @@ function migrateSplit(width, crosswalkRecords) {
     excluded: migrated.excluded,
   };
 
-  return { out, missing, counts: { train: migrated.train.length, val: migrated.val.length, test: migrated.test.length, excluded: migrated.excluded.length } };
+  // previousCounts records the PRE-migration entry counts (preferring the
+  // committed file's own `counts` field, falling back to array lengths for
+  // an older split shape without one) so the caller can guard the write
+  // against silently shrinking the committed split — see the SPLIT_FILE
+  // write site below and scripts/lib/output-guard.mjs.
+  const previousCounts = {
+    train: current.counts?.train ?? current.train?.length ?? 0,
+    val: current.counts?.val ?? current.val?.length ?? 0,
+    test: current.counts?.test ?? current.test?.length ?? 0,
+    excluded: current.counts?.excluded ?? current.excluded?.length ?? 0,
+  };
+
+  return {
+    out,
+    missing,
+    counts: { train: migrated.train.length, val: migrated.val.length, test: migrated.test.length, excluded: migrated.excluded.length },
+    previousCounts,
+  };
 }
 
 // ── migrate: tests/fixtures/real-corpus-manifest.json ───────────────────
@@ -738,7 +756,24 @@ function main() {
   }
 
   if (splitResult) {
-    fs.writeFileSync(SPLIT_FILE, JSON.stringify(splitResult.out, null, 2) + '\n', 'utf-8');
+    // Guard against silently shrinking the committed split: migrateSplit()
+    // DROPS any entry it cannot resolve against the corpus dir (see its
+    // `missing` array above) rather than failing the whole migration, which
+    // is correct when a handful of files moved — but if the corpus dir is
+    // mostly/entirely absent locally (the common case outside a
+    // maintainer's machine — the private corpus is gitignored), almost
+    // every entry resolves as "missing" and this write would otherwise
+    // silently collapse the committed 761-script split down to whatever
+    // tiny sample happens to be present locally. See
+    // scripts/lib/output-guard.mjs header for the incident this responds
+    // to.
+    const newTotal = splitResult.counts.train + splitResult.counts.val + splitResult.counts.test + splitResult.counts.excluded;
+    const previousTotal = splitResult.previousCounts.train + splitResult.previousCounts.val + splitResult.previousCounts.test + splitResult.previousCounts.excluded;
+    guardedWrite(SPLIT_FILE, JSON.stringify(splitResult.out, null, 2) + '\n', {
+      rowCount: newTotal,
+      existingRowCount: previousTotal,
+      label: path.relative(REPO_ROOT, SPLIT_FILE),
+    });
     console.log(`  wrote ${path.relative(REPO_ROOT, SPLIT_FILE)}`);
   }
   if (manifestResult) {

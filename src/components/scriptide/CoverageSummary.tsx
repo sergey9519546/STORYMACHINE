@@ -157,6 +157,23 @@ export default function CoverageSummary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLoadSample]);
 
+  // Escape closes the panel, matching ScriptDoctorPanel's overlay convention
+  // (same coverage flow, one click deeper — keyboard behavior should not
+  // differ between the two). Calling the onClose prop directly (rather than
+  // relying solely on ScriptIDE's document-level Escape ladder) matters: the
+  // ladder's generic "close the open tool slot" branch does not reset
+  // doctorAutoSample the way this panel's own close button does, so without
+  // this handler, Escape-closing a sample-driven run left doctorAutoSample
+  // stuck true and silently re-triggered the sample the next time Coverage
+  // opened instead of running on the writer's actual draft.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   const top = report?.topPriorities?.[0];
   const root = report?.rootCauses?.[0];
   const reportIsComplete = report ? isWholeDraftAnalysisComplete(report) : false;

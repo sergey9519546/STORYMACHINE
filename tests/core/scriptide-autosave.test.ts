@@ -7,12 +7,13 @@ import {
 import type { ScriptIDEDraftEnvelope } from '../../src/lib/scriptide-draft-store.ts';
 
 const dirtyDraft: ScriptIDEDraftEnvelope = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   scriptText: 'LOCAL',
   snapshots: [],
   characters: [],
   researchNotes: [],
   isDarkMode: false,
+  titlePage: { title: 'UNTITLED SCRIPT', author: 'AUTHOR NAME', contact: 'CONTACT INFO' },
   contentUpdatedAt: 10,
   serverRevision: 5,
   dirty: true,

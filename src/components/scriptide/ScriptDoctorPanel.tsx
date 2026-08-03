@@ -43,6 +43,7 @@ import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts
 import { diffLines } from "../../lib/diff.ts";
 import { decideWriteBack } from "../../lib/coverage-staleness.ts";
 import { trackDoctorRun, trackEvent } from "../../lib/analytics";
+import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -1666,6 +1667,9 @@ export default function ScriptDoctorPanel({
   // right now (the toggle can change after a run started).
   const [lastRunMode, setLastRunMode] = useState<"quick" | "deep">("quick");
 
+  // Dialog root — see the tabIndex={-1} on the outer motion.div below and the
+  // useModalFocusTrap call near the Escape-handling effect further down.
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadedNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2409,12 +2413,26 @@ export default function ScriptDoctorPanel({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Real focus management for this panel's role="dialog" aria-modal="true"
+  // contract (see the outer motion.div below): moves focus in on mount
+  // (including the auto-fired sample run above — this fires on mount
+  // regardless of autoLoadSample, so it is not affected by that async load),
+  // traps Tab/Shift+Tab within the panel while mounted, and restores focus
+  // to the triggering control on unmount. See use-modal-focus-trap.ts for
+  // the scope/limits of what this does and does not cover.
+  useModalFocusTrap(panelRef);
+
   const togglePass = (pass: PassName, currentlyOpen: boolean) => {
     setOpenPasses((prev) => ({ ...prev, [pass]: !currentlyOpen }));
   };
 
   return (
     <motion.div
+      ref={panelRef}
+      // -1: not part of the natural Tab order, but a valid .focus() target —
+      // the standard ARIA APG dialog pattern for a container that may (in
+      // rare states) have no focusable descendant to hand initial focus to.
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="script-doctor-title"

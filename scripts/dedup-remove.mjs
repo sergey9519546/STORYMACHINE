@@ -14,9 +14,18 @@
 // script appears in 2-4 genre folders. The genre folder assignment is NOT
 // meaningful for scoring (a comedy can land in /horror/), so we do not try
 // to pick the "right" genre — we just keep one copy.
+// Safety: the removal-log write at the end used to happen unconditionally,
+// even when data/screenplays/ was absent/near-empty locally (gather()
+// already tolerates a missing dir by returning []) — which produced zero
+// duplicate groups and silently overwrote the committed removal log with
+// an empty one. It now refuses to run against a missing/empty corpus dir,
+// and refuses to shrink the committed CSV by more than half unless --force
+// is passed (see scripts/lib/output-guard.mjs header for the incident this
+// class of guard responds to).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 
 function gather(dir) {
   const out = [];
@@ -35,6 +44,10 @@ function fingerprint(text) {
 }
 
 const all = gather('data/screenplays').filter(f => !f.includes('output'));
+requireCorpus(all.length, {
+  label: 'data/screenplays (non-output files)',
+  hint: 'This script requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md).',
+});
 const byFp = new Map();
 for (const f of all) {
   let text;
@@ -98,8 +111,6 @@ if (postDupes.length > 0) {
 }
 
 // Write removal log
-fs.mkdirSync('scripts/output', { recursive: true });
 const csv = 'fingerprint,kept,removed\n' +
   removalLog.map(r => `${r.fp},${r.kept},${r.removed}`).join('\n') + '\n';
-fs.writeFileSync('scripts/output/dedup-removal-log.csv', csv, 'utf-8');
-console.log(`\nWrote removal log to scripts/output/dedup-removal-log.csv`);
+guardedWrite('scripts/output/dedup-removal-log.csv', csv, { rowCount: removalLog.length });

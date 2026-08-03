@@ -36,11 +36,19 @@
 // --real-script so re-running this probe never re-introduces a title into
 // scripts/output/dimension-honesty.csv on its own.
 
+// Safety: this probe's output row count depends on whether --real-script is
+// passed (5 rows without it, 10 with it). It used to write
+// scripts/output/dimension-honesty.csv unconditionally, so a run without
+// --real-script silently halved the committed evidence file (see
+// scripts/lib/output-guard.mjs header for the incident this guards
+// against). It now refuses to shrink the committed CSV by more than half
+// unless --force is passed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
+import { guardedWrite } from './lib/output-guard.mjs';
 
 const OUT_DIR = 'scripts/output';
 const OUT_FILE = path.join(OUT_DIR, 'dimension-honesty.csv');
@@ -63,6 +71,12 @@ function parseArgs(argv) {
 }
 
 const { realScript, srcDir: SRC_DIR } = parseArgs(process.argv.slice(2));
+
+if (realScript && !fs.existsSync(path.join(SRC_DIR, realScript))) {
+  console.error(`ERROR: --real-script ${path.join(SRC_DIR, realScript)} does not exist — refusing to run.`);
+  console.error('Nothing was written.');
+  process.exit(1);
+}
 
 // The sample script is what P0 writers actually see; a --real-script arg
 // adds a real produced feature for external validity (opt-in, see note above).
@@ -227,5 +241,4 @@ for (const { file, label } of TEST_SCRIPTS) {
 }
 
 const header = 'script,degradation,channel,baseHealth,degradedHealth,healthDelta,baseDimensions,dimDeltas';
-fs.writeFileSync(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', 'utf-8');
-console.log(`\nWrote ${csvRows.length} rows to ${OUT_FILE}`);
+guardedWrite(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', { rowCount: csvRows.length });

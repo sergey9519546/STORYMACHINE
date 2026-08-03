@@ -18,6 +18,82 @@
  * - [7 inverses of the above]
  * 
  * Complexity: O(n³) constraint propagation, sub-10ms at screenplay scale (verified)
+ *
+ * ── Status (2026-08-03 wiring audit) ────────────────────────────────────────
+ * DIAGNOSTIC-WIRED as of this audit: `auditTemporalConsistency` is now called
+ * from doctor.ts's aggregateReport and attached as the report's optional
+ * `temporalConsistency` field (types.ts), the same pattern already used for
+ * emotionalArc/antiSlop/mirrorScenes/etc. — a pure diagnostic passenger,
+ * never read by computeHealthScore/aggregateReport's health/verdict math. Do
+ * NOT fold it into a score/verdict term without the P1 evidence described
+ * below; that remains a distinct, ungated-today change.
+ *
+ * FALSE-POSITIVE BUG FOUND AND FIXED THIS AUDIT: the FLASHBACK branch below
+ * used to add a "scene_idx before scene_0" constraint WITHOUT removing the
+ * default sequential chain (built up front, confidence 0.5, never discounted
+ * during propagation — detectTemporalContradictions does not read
+ * `.confidence` at all) that runs straight through the flashback scene. That
+ * chain transitively composes to "scene_0 before scene_idx" and directly
+ * contradicts the flashback constraint — not only for the flashback scene's
+ * neighbors but, via path-consistency propagation, for OTHER unrelated scene
+ * pairs in the same script. Measured before the fix: an ordinary 10-scene
+ * script with exactly one FLASHBACK scene and nothing else unusual produced
+ * **10 BLOCKER-severity contradictions**, most on scene pairs with no
+ * relationship to the flashback. The existing test suite did not catch this
+ * — its one test exercising this shape ("detects flashback paradox in real
+ * screenplay context") only asserted `Array.isArray(contradictions)`, never
+ * a count, which in hindsight reads as the original author already being
+ * unsure of the answer. Fixed by mirroring the CONTINUOUS/MEANWHILE
+ * branches' existing "splice out the weak default edge before asserting the
+ * stronger one" pattern (see the FLASHBACK branch below and the regression
+ * tests in temporal-consistency.test.ts). Re-verify against
+ * `formatTemporalReport`/`auditTemporalConsistency` on any FUTURE change to
+ * the extraction heuristics below — this class of bug (a default weak
+ * constraint left standing against a later stronger one) is easy to
+ * reintroduce and the unit-test suite alone did not catch it once already.
+ *
+ * ORDER-SENSITIVITY (2026-08-03 finding, reported per explicit ask): this
+ * module's constraint extraction is a direct function of scene ARRAY
+ * POSITION (idx), not scene content — the rarest property in
+ * server/nvm/analyze/, where nearly every other signal is content-derived
+ * and therefore provably invariant under SCENE_SHUFFLE (see doctor.ts's own
+ * comments on the rule channel's AUC ~0.076 and "with scene count held
+ * constant the doctor cannot detect reordering at all (AUC ~0.48)").
+ * Post-fix, a hand-built 14-scene fixture with a flashback+continuous pair,
+ * a MEANWHILE cross-cut, and a LATER jump — arranged so the ORIGINAL
+ * discourse order is fully consistent (0 contradictions) — was run through
+ * 20 seeded shuffles of the SAME scenes: 7/20 (35%) produced 1-2 BLOCKER
+ * contradictions, mean 0.50/shuffle, vs 0 on the intact order (probe:
+ * scratchpad probe-shuffle-sensitivity.mjs, reproducible, not checked in).
+ * This is a genuine, reproducible intact-vs-shuffled separation on a
+ * synthetic fixture — evidence the mechanism CAN separate, not a measured
+ * AUC. Known limitation: a script using none of the FLASHBACK/CONTINUOUS/
+ * MEANWHILE/LATER cue words produces zero signal regardless of order (20/20
+ * seeded shuffles of a marker-less fixture stayed at 0) — recall on a real
+ * corpus is unmeasured and depends on how often produced screenplays use
+ * these explicit discourse markers.
+ *
+ * P1 CANDIDATE (score-side; NOT implemented — spec only, per the freeze):
+ * doctor.ts already has a precedent shape for turning a bounded, rare,
+ * order-sensitive signal into a capped deduction outside the density-
+ * normalized instance count (see STRUCTURAL_ROLLUP_DEDUCTION /
+ * GLOBAL_ARC_DEDUCTION / arcIncoherenceDeduction in aggregateReport, each
+ * with its own "MEASURED MOTIVATION" comment). A `temporalDeduction` in the
+ * same family — e.g. a small fixed amount per BLOCKER-severity
+ * auditTemporalConsistency contradiction, capped like the others — is
+ * plausible ONLY after: (1) measuring SHUFFLE/DROP/RELOCATE AUC contribution
+ * on the real corpus (`REAL_SCRIPT_CORPUS_DIR`, `npm run measure-real`) the
+ * way every other structural deduction in doctor.ts was measured before
+ * shipping; (2) confirming the false-positive rate on INTACT real scripts
+ * that use flashbacks/cross-cuts is low enough not to punish ordinary craft
+ * (this file's own bug above shows that bar is easy to miss without a real
+ * probe); (3) a pre-registered fixture pair (positive = a genuine
+ * use-before-establishment timeline error; negative = a correctly-ordered
+ * flashback/cross-cut) per the same discipline
+ * docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md's D6 fix-shape spells out
+ * for the sibling clue-lifecycle defect. Until that evidence exists this
+ * stays diagnostic-only, per NORTH_STAR's "correct before reproducible" and
+ * "measure discrimination on runnable, real writing — always."
  */
 
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
@@ -367,6 +443,45 @@ export function extractTemporalConstraints(scenes: ScreenplaySceneRecord[]): {
     
     // FLASHBACK detection
     if (/FLASHBACK/.test(heading)) {
+      // A flashback scene's discourse position (idx) is not its story-time
+      // position: it happens BEFORE "the present" (scene_0), which the
+      // upfront default sequential chain (every scene 'before' the next,
+      // confidence 0.5, built in the loop above) has no way to know. Left
+      // in place, that chain composes transitively THROUGH this scene back
+      // to scene_0 (before∘before∘...∘before = before) and conflicts with
+      // the explicit flashback constraint below — not only for this
+      // scene's immediate neighbors, but, via detectTemporalContradictions'
+      // path-consistency propagation, for OTHER unrelated scene pairs
+      // elsewhere in the chain too (confidence is carried on
+      // TemporalConstraint but never read during propagation, so a 0.5
+      // default guess is treated as equally certain as a 0.9 explicit
+      // marker). CONFIRMED BY PROBE (not asserted by any existing test —
+      // the co-located test's own "flashback paradox" case only checked
+      // `Array.isArray(contradictions)`, not the count): an otherwise
+      // ordinary 10-scene script with exactly one FLASHBACK scene and no
+      // other markers produced 10 BLOCKER contradictions before this fix,
+      // most of them between scene pairs with no relationship to the
+      // flashback at all (e.g. scene_0/scene_1). See
+      // 'an ordinary flashback does not cascade into unrelated scene
+      // pairs' below for the locked-in regression.
+      //
+      // Fix mirrors the CONTINUOUS/MEANWHILE branches below, which already
+      // splice out the one default edge their own new relation directly
+      // replaces. FLASHBACK's new relation lands on a DIFFERENT pair
+      // (scene_idx <-> scene_0, not scene_idx's immediate neighbor), so
+      // here we remove BOTH default edges touching this scene's position
+      // in the chain (incoming from scene_{idx-1}, outgoing to
+      // scene_{idx+1}) rather than one matching edge on the same pair —
+      // that's what breaks the chain's ability to transitively reach back
+      // to scene_0 through this scene.
+      for (const [a, b] of [[`scene_${idx - 1}`, `scene_${idx}`], [`scene_${idx}`, `scene_${idx + 1}`]]) {
+        const weakConstraintIdx = constraints.findIndex(
+          c => c.intervalA === a && c.intervalB === b && c.confidence === 0.5
+        );
+        if (weakConstraintIdx >= 0) {
+          constraints.splice(weakConstraintIdx, 1);
+        }
+      }
       // This scene is BEFORE the main timeline
       constraints.push({
         intervalA: `scene_${idx}`,

@@ -13,11 +13,22 @@
 //   node scripts/measure-auc-split.mjs --partition test   # ONCE, at the end
 // Output: stdout table + scripts/output/discrimination-auc-<partition>.csv
 
+// Safety: this harness used to write
+// scripts/output/discrimination-auc-<partition>.csv unconditionally, and
+// read each split entry's file with no existence check — so running it
+// against the local sample-only data/screenplays/ (instead of the full
+// private corpus) either crashed with a raw ENOENT on the first missing
+// file, or (if enough files happened to resolve) silently shrank the
+// committed evidence file (see scripts/lib/output-guard.mjs header for the
+// incident this guards against). Missing per-file reads are now skipped
+// with a count reported at the end, and the final write refuses to shrink
+// the committed CSV by more than half, unless --force is passed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
+import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 
 const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
@@ -33,6 +44,10 @@ if (!['train', 'val', 'test'].includes(PARTITION)) {
 
 const split = JSON.parse(fs.readFileSync(SPLIT_FILE, 'utf-8'));
 const files = split[PARTITION].map(s => s.file);
+requireCorpus(files.length, {
+  label: `${PARTITION} partition of ${SPLIT_FILE}`,
+  hint: 'Run scripts/split-corpus.mjs first, or pick a different --partition.',
+});
 
 if (PARTITION === 'test') {
   // Verify the test set hash matches the lock — guards against silent test-set drift
@@ -148,9 +163,12 @@ const ctx = { theme: '', genre: '', directorStyle: '', characters: [] };
 const pairsByDeg = {};
 for (const d of DEGRADATIONS) pairsByDeg[d.id] = [];
 const csvRows = [];
+let missingLocally = 0;
 
 for (const file of files) {
-  const text = fs.readFileSync(path.join(SRC_DIR, file), 'utf-8');
+  let text;
+  try { text = fs.readFileSync(path.join(SRC_DIR, file), 'utf-8'); }
+  catch { missingLocally++; continue; } // corpus text not present locally (expected outside a maintainer's machine)
   let baseRep;
   try { baseRep = await runScriptDoctor(text, ctx, 'quick'); }
   catch { continue; }
@@ -185,9 +203,13 @@ if (allPairs.length > 0) {
   console.log(`${'ALL POOLED'.padEnd(22)} | ${String(allPairs.length).padStart(5)} | ${auc.toFixed(3).padStart(7)} | [${ci.lo.toFixed(3)}, ${ci.hi.toFixed(3)}] | ${auc >= 0.80 && ci.lo > 0.65 ? 'PASS' : auc >= 0.70 ? 'partial' : 'FAIL'}`);
 }
 
+if (missingLocally > 0) {
+  console.log(`\n${missingLocally}/${files.length} ${PARTITION}-partition file(s) not found under ${SRC_DIR} (expected outside a maintainer's machine) — skipped.`);
+}
+
 const header = 'file,degradation,realHealth,degradedHealth,delta';
-fs.writeFileSync(path.join(OUT_DIR, `discrimination-auc-${PARTITION}.csv`), header + '\n' + csvRows.join('\n') + '\n', 'utf-8');
-console.log(`\nWrote ${csvRows.length} rows to scripts/output/discrimination-auc-${PARTITION}.csv`);
+const OUT_FILE = path.join(OUT_DIR, `discrimination-auc-${PARTITION}.csv`);
+guardedWrite(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', { rowCount: csvRows.length, label: OUT_FILE });
 
 if (PARTITION === 'test') {
   console.log('\n⚠  TEST SET EVALUATED. Per pre-registration protocol, this is the FINAL');

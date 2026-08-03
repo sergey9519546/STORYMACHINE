@@ -248,16 +248,18 @@ export default function ScriptIDE({
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
   >(initialDraft.snapshots as { id: string; name: string; text: string; date: string }[]);
-  const [titlePage, setTitlePage] = useState({
-    title: "UNTITLED SCRIPT",
-    author: "AUTHOR NAME",
-    contact: "CONTACT INFO",
-  });
+  // Title/author/contact — persisted via the SAME draft envelope as
+  // snapshots/researchNotes/isDarkMode below (src/lib/scriptide-draft-store.ts).
+  // Previously this hardcoded placeholders unconditionally, ignoring
+  // initialDraft.titlePage entirely, so a writer's title/author/contact
+  // silently vanished on every reload or fresh export even though the
+  // envelope had room for it right next to snapshots/researchNotes.
+  const [titlePage, setTitlePage] = useState(initialDraft.titlePage);
   const [researchNotes, setResearchNotes] = useState<
     { id: string; title: string; content: string }[]
   >(initialDraft.researchNotes as { id: string; title: string; content: string }[]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const [saveConflict, setSaveConflict] = useState<(ScriptIDEDraftState & { updatedAt: number }) | null>(null);
+  const [saveConflict, setSaveConflict] = useState<ScriptIDEServerDraft | null>(null);
   // Persistence starts only after the mount-time server/local conflict has been
   // resolved. This prevents StrictMode cleanup and slow loads from saving stale
   // local state over a newer server revision.
@@ -332,7 +334,7 @@ export default function ScriptIDE({
   const charactersRef = useRef(characters);
   // Always-current draft payload for mount-stable server autosave (must NOT be
   // recreated on every keystroke — that starved the previous 30s interval).
-  const draftRef = useRef<ScriptIDEDraftState>({ scriptText, snapshots, characters, researchNotes, isDarkMode });
+  const draftRef = useRef<ScriptIDEDraftState>({ scriptText, snapshots, characters, researchNotes, isDarkMode, titlePage });
   const draftEnvelopeRef = useRef(initialDraft);
   const draftGenerationRef = useRef(0);
   // G0-02: monotonic counter bumped on every draft edit. Coverage / fix
@@ -376,7 +378,7 @@ export default function ScriptIDE({
   const skipNextLocalWriteRef = useRef(true);
   // Prevent setState-after-unmount from the flush-on-cleanup save path.
   const mountedRef = useRef(true);
-  draftRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode };
+  draftRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode, titlePage };
 
   // Sync document class for Tailwind `dark:` variants + CodeMirror theme.
   // Theme storage is mirrored from the draft envelope write path only.
@@ -426,7 +428,7 @@ export default function ScriptIDE({
       }
     }, 500);
     return () => clearTimeout(debounceTimer);
-  }, [persistenceReady, scriptText, snapshots, characters, researchNotes, isDarkMode]);
+  }, [persistenceReady, scriptText, snapshots, characters, researchNotes, isDarkMode, titlePage]);
 
   // ── Server-side persistence ────────────────────────────────────────────────
   // Versioned drafts compare opaque server revisions. Legacy drafts use the old
@@ -475,7 +477,12 @@ export default function ScriptIDE({
           return;
         }
         if (decision.action === 'use-server') {
-          const cleanEnvelope = applyServerScriptIDEDraft(decision.server);
+          // titlePage has no server-side counterpart (server/routes/scriptide.ts
+          // never reads or returns it) — read the ref rather than the `titlePage`
+          // React state closed over by this mount-only ([]) effect, which would
+          // be stale by the time this async response lands if the writer edited
+          // the title page while the fetch was in flight.
+          const cleanEnvelope = applyServerScriptIDEDraft(decision.server, draftEnvelopeRef.current.titlePage);
           draftEnvelopeRef.current = cleanEnvelope;
           skipNextLocalWriteRef.current = true;
           persistedGenerationRef.current = draftGenerationRef.current;
@@ -1381,7 +1388,9 @@ export default function ScriptIDE({
   const useServerConflictDraft = () => {
     const server = saveConflictRef.current;
     if (!server) return;
-    const cleanEnvelope = applyServerScriptIDEDraft(server);
+    // titlePage has no server-side counterpart — keep the writer's current
+    // title page rather than let "use server" reset it to nothing.
+    const cleanEnvelope = applyServerScriptIDEDraft(server, titlePage);
     draftEnvelopeRef.current = cleanEnvelope;
     skipNextLocalWriteRef.current = true;
     persistedGenerationRef.current = draftGenerationRef.current;

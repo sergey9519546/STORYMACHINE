@@ -175,6 +175,82 @@ plants. Corpus-measured before/after; the AUC-24 ratchet still applies.
 certified as "planted clues"). D4 is about *what counts* as a clue; D6 is about
 *how its lifecycle is ordered*. Fixing D4 alone would leave D6 intact.
 
+## D7 — The engine knows what Kishōtenketsu is, and that knowledge never reaches the score
+
+**Where:** the gap between `server/lib/structure-presets.ts` (~356-385) and
+`server/nvm/revision/passes/types.ts` (~50-65).
+
+**Found by:** a 2026-08-03 structural-form audit, prompted by
+`MEGA_CATALOG_12700_SYSTEMS.md` listing Kishōtenketsu and other non-Western
+forms. Recorded here because it is a construct-validity defect of exactly the
+D1-D3 family — a rule asserting something its signals cannot see — and because
+it is *self-contradicting*, which makes it unusually cheap to confirm.
+
+**The contradiction.** STORYMACHINE carries two unrelated things named
+"structure":
+
+- **Generation side.** `StoryStructure` (`server/engine/types.ts` ~209-231) is a
+  22-member taxonomy including `kishotenketsu`, and `structure-presets.ts` gives
+  it a well-researched four-beat template that says, verbatim: Ki — *"No
+  antagonism… avoid: Conflict as the driving force"*; Shō — *"avoid: An
+  antagonist or villain. Tension comes from discovery, not opposition"*; Ten —
+  *"avoid: Resolving the twist through conflict or confrontation"*; Ketsu —
+  *"No winners and losers."* This is correct and it is consumed only by
+  generation prompts.
+- **Analysis side.** `StructureState` (`server/nvm/screenplay/structure.ts`) is
+  computed from the submitted text and is, by its own comment, a *"Rough 3-act
+  model"* with `ActPosition = act1|act2a|midpoint|act2b|act3|epilogue`.
+
+`StoryContext` — the ONLY context the 14 scoring passes receive — has five
+fields (`theme`, `genre`, `tone`, `directorStyle`, `characters`) and **no
+`structure` field**. So the product can generate a screenplay using its own
+Kishōtenketsu preset, then score that same screenplay against hard-coded
+three-act assumptions, penalizing it for being exactly what it was told to be.
+
+**Consequence.** Rules whose firing conditions are the direct negation of the
+engine's own Kishōtenketsu template fire unconditionally and reach `health`:
+`FLAT_SUSPENSE_ARC` (fires on any ≥5-scene script that does not escalate),
+`NO_REVERSALS_LONG_STORY` (critical; `reversalCount` is defined only as scenes
+with `suspenseDelta < -1`, a magnitude dip, so a revelation-type turn does not
+register), `PROTAGONIST_PASSIVITY_CLIMAX` and the ~8 sibling agency rules (the
+same lexicon-only predicate already recorded as D1/D2), `WEAK_MIDPOINT`,
+`ACT2A_SUSPENSE_VOID` (no "tense elsewhere" escape clause), `ACT1_TOO_LONG`,
+`DARK_NIGHT_ABSENT`, and `FALSE_CLIMAX`/`CLIMAX_TOO_EARLY`.
+
+Note the two-layer subtlety on climax position: aggregate `CLIMAX_RELOCATE`
+discrimination measures at chance (test 0.523), yet individual positional rules
+*do* penalize an unexpected climax. Both are true — the aggregate signal is
+absorbed by density dilution at feature scale, while those rules are not.
+
+**No accommodation exists.** All 47 `GenreId` values and every `TONE_REGISTER`
+are content/mood categories; `GenreRuleThresholds` exposes six numeric knobs,
+only three of which touch `structure.ts`, and none disables the zone model.
+There is no code path by which a writer can declare a draft is not three-act.
+
+**Confidence.** High on mechanism (every rule read from source, unconditional,
+traced to `health`). Moderate on magnitude — no Kishōtenketsu script has been
+run. **Settling it is cheap and requires no scoring change:** write or generate
+2-3 scripts to the engine's own beat template, run `runScriptDoctor`, and diff
+the issue list, `arcIncoherenceDeduction`, and health against a
+matched-quality three-act control. That should happen before any fix.
+
+**Fix shape.** Cheapest honest mitigation is a report-level caveat (no scoring
+change, no P1 gate): when enough of the rules above co-fire, say plainly that
+the structural checks assume a conflict-escalation shape and may misjudge other
+legitimate forms. The real fix — threading the existing `StoryStructure` into
+`StoryContext` and adding a `STRUCTURE_RULE_MODIFIERS` axis alongside the
+genre/tone modifiers — is a scoring change, P1-gated, but it executes an
+existing pattern a fourth time rather than inventing machinery, and being
+opt-in it cannot regress the Western-commercial P1 corpus.
+
+**Related, and worth its own note:** `emotional-arc.ts`'s header claimed the arc
+signal was "DIAGNOSTIC ONLY — not (yet) fed into the health scalar" while
+`doctor.ts` was subtracting up to 15 points of `arcIncoherenceDeduction` from
+health. Corrected 2026-08-03. That deduction rewards monotonic rise, a late
+peak, and fit to one of six Reagan archetypes — none of which is a
+juxtaposition/synthesis shape — and unlike the ~150 zone rules it is NOT
+density-diluted, so it is the single largest score-side exposure here.
+
 ---
 
 ## Checked and cleared (did not survive adversarial review)

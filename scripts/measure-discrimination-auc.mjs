@@ -27,11 +27,19 @@
 //   node scripts/measure-discrimination-auc.mjs
 // Output: scripts/output/discrimination-auc.csv + stdout table.
 
+// Safety: this harness used to write scripts/output/discrimination-auc.csv
+// unconditionally, so running it against the local sample-only
+// data/screenplays/ (instead of the full private corpus) silently shrank
+// the committed evidence file (see scripts/lib/output-guard.mjs header for
+// the incident this guards against). It now refuses to run against a
+// missing/empty corpus dir and refuses to shrink the committed CSV by more
+// than half, unless --force is passed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
+import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 
 const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
@@ -148,7 +156,16 @@ const DEGRADATIONS = [
 fs.mkdirSync(OUT_DIR, { recursive: true });
 const ctx = { theme: '', genre: '', directorStyle: '', characters: [] };
 
+if (!fs.existsSync(SRC_DIR)) {
+  console.error(`ERROR: ${SRC_DIR} does not exist — refusing to run.`);
+  console.error('This harness requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md). Nothing was written.');
+  process.exit(1);
+}
 const files = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.fountain') || f.endsWith('.fountain.txt')).sort();
+requireCorpus(files.length, {
+  label: `${SRC_DIR} (.fountain/.fountain.txt files)`,
+  hint: 'This harness requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md).',
+});
 
 // Collect pairs per degradation: { real: health, degraded: health, file }
 const pairsByDeg = {};
@@ -236,5 +253,4 @@ console.log('AUC, confirming the document-scale structure blindness that P1\'s')
 console.log('bounded structural-deduction pathway is meant to close.');
 
 const header = 'file,degradation,realHealth,degradedHealth,delta';
-fs.writeFileSync(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', 'utf-8');
-console.log(`\nWrote ${csvRows.length} pair rows to ${OUT_FILE}`);
+guardedWrite(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', { rowCount: csvRows.length });

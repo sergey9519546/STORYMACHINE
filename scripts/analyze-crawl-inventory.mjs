@@ -1,11 +1,27 @@
 // CRAWL INVENTORY — deep analysis of every file in the O:\ crawl collection.
 // Reports: format, encoding, byte size, scene-heading count, word count,
 // parseability, and dedup status. Produces a full CSV inventory.
+//
+// Safety: BASE below is a maintainer-machine-only path (the raw crawl
+// delivery is never checked into the repo), so this used to crash with a
+// raw ENOENT stack trace everywhere else — and would have silently written
+// an empty-body CSV over the committed evidence file if BASE ever existed
+// but were empty. It now checks BASE explicitly with a clear message, and
+// refuses to shrink the committed CSV by more than half unless --force is
+// passed (see scripts/lib/output-guard.mjs header for the incident this
+// class of guard responds to).
 import fs from 'node:fs';
 import path from 'node:path';
+import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 
 const BASE = 'O:/.cluster/scripts-crawl-20260713/DELIVERY/by-genre';
 const OUT = 'scripts/output/crawl-inventory.csv';
+
+if (!fs.existsSync(BASE)) {
+  console.error(`ERROR: ${BASE} does not exist — refusing to run.`);
+  console.error('This script requires the raw crawl delivery, which lives only on the maintainer machine that ran the crawl. Nothing was written.');
+  process.exit(1);
+}
 
 function gatherFiles(dir) {
   const out = [];
@@ -54,6 +70,7 @@ function extractScreenplay(filePath, ext) {
 }
 
 const allFiles = gatherFiles(BASE).sort();
+requireCorpus(allFiles.length, { label: BASE });
 console.log(`Total files found: ${allFiles.length}`);
 console.log('');
 
@@ -137,5 +154,4 @@ const header = 'genre,name,ext,encoding,size,headings,words,status';
 const csv = header + '\n' + rows.map(r =>
   `${r.genre},${JSON.stringify(r.name)},${r.ext},${r.encoding},${r.size},${r.headings},${r.words},${r.status}`
 ).join('\n') + '\n';
-fs.writeFileSync(OUT, csv, 'utf-8');
-console.log(`\nWrote full inventory to ${OUT} (${rows.length} rows)`);
+guardedWrite(OUT, csv, { rowCount: rows.length });

@@ -52,11 +52,18 @@
 // re-running this script never re-introduces titles into
 // scripts/output/paired-discrimination.csv on its own.
 
+// Safety: this probe used to write scripts/output/paired-discrimination.csv
+// unconditionally, so a run given fewer/smaller files than a previous run
+// silently shrank the committed evidence file (see
+// scripts/lib/output-guard.mjs header for the incident this guards
+// against). It now refuses to shrink the committed CSV by more than half
+// unless --force is passed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { normalizeScreenplay } from '../server/nvm/analyze/screenplay-normalizer.ts';
 import { parseFountain } from '../src/lib/fountain.ts';
+import { guardedWrite } from './lib/output-guard.mjs';
 
 const OUT_DIR = 'scripts/output';
 const OUT_FILE = path.join(OUT_DIR, 'paired-discrimination.csv');
@@ -76,6 +83,14 @@ if (TEST_SCRIPTS.length === 0) {
   console.error('Usage: node scripts/probe-paired-discrimination.mjs [--src-dir <dir>] <file1.fountain> [file2.fountain ...]');
   console.error('Runs the 5 mechanical degradations against each given script (read from --src-dir, default data/screenplays/) and appends to scripts/output/paired-discrimination.csv.');
   console.error('Pick scripts with >=40 scenes so the structural degradations (MIDPOINT_DROP, CLIMAX_RELOCATE) have material to work on.');
+  process.exit(1);
+}
+
+const missingFiles = TEST_SCRIPTS.filter((f) => !fs.existsSync(path.join(SRC_DIR, f)));
+if (missingFiles.length > 0) {
+  console.error(`ERROR: ${missingFiles.length} file(s) not found under ${SRC_DIR}:`);
+  for (const f of missingFiles) console.error(`  ${path.join(SRC_DIR, f)}`);
+  console.error('Refusing to run. Nothing was written.');
   process.exit(1);
 }
 
@@ -264,5 +279,4 @@ for (const deg of DEGRADATIONS) {
 }
 
 const header = 'file,degradation,channel,baseHealth,degradedHealth,delta,baseScenes,degradedScenes,wordCount,totalIssues,verdict';
-fs.writeFileSync(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', 'utf-8');
-console.log(`\nWrote ${csvRows.length} rows to ${OUT_FILE}`);
+guardedWrite(OUT_FILE, header + '\n' + csvRows.join('\n') + '\n', { rowCount: csvRows.length });

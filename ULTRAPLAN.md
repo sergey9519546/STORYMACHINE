@@ -5,6 +5,30 @@ canonical plan and `NORTH_STAR.md` is the constitution. This file is the
 short cold-start answer to: **what do I do next?** If any detail here drifts
 from the roadmap, the roadmap wins.*
 
+> **Status note — 2026-08-03.** The phase framing below (§1 "P0: ACTIVE NOW",
+> §2-3 "P1/P2/P3/P4: NEXT/THEN") is dated 2026-07-14 and was not updated the
+> next day when the plan actually moved. **`ROADMAP.md` §3 is the current
+> authority on phase status.** As of 2026-07-29 it records: P0 still not
+> formally cleared (0/5 documented writer sessions — the §1 exit gate below
+> is still unmet), but work proceeded past it anyway, and now stands at
+> **P1 partial** (corpus expanded 48→761 scripts, pre-registered 60/20/20
+> split, dialogue-diversity deduction landed at test AUC 0.990, but pooled
+> test AUC 0.754 is still below the 0.80 exit gate — structural channels
+> SHUFFLE/DROP/RELOCATE remain the open gap), **P2 DONE** (Doctor + Editor is
+> the default surface; OASIS and the research panels sit behind a Labs
+> flag), and **P3 DONE** (every exported report carries a verify block, a
+> `#verify` route re-derives the score, and export/time-to-first-report are
+> instrumented). The authorization for proceeding past an uncleared P0 is
+> recorded in `docs/p1-benchmark/P1_STATUS_2026-07-29.md`'s "Phase-gate
+> status" section — "User directed P1 to begin; record shows this." — not
+> re-litigated here. The P0 field methodology (§1), the P1 work items and
+> exit gate (§2), the P2/P3 target descriptions (§3), and the foundations
+> and cautions (§4-§6) below remain accurate guidance for what each phase
+> requires; only the "what phase are we in right now" framing was stale.
+> §7's closing line ("Until P0 clears, the next task is user validation —
+> not another detector, rule, panel, agent, research intake, or architecture
+> layer") is superseded by the above for the same reason.
+
 ## 0. The decision
 
 StoryMachine is now one product by default: **private, instant, trustworthy,
@@ -223,3 +247,8 @@ roadmap advances only when evidence clears each phase gate:
 
 Until P0 clears, **the next task is user validation — not another detector,
 rule, panel, agent, research intake, or architecture layer.**
+
+*(Superseded in practice — see the 2026-08-03 status note at the top of this
+file: P1/P2/P3 work shipped without a formal P0 clear, on record direction to
+proceed. The definition-of-done gates above are unchanged; only the "P0 is
+the sole next task" framing didn't hold.)*
