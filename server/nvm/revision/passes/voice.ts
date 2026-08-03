@@ -681,9 +681,9 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         const sceneNum = freqList[i + 1][0];
         const record = records[sceneNum];
         issues.push({
-          location: `Scene ${sceneNum}${record ? ` (${record.slug})` : ''}`,
+          location: `Scene ${sceneNum + 1}${record ? ` (${record.slug})` : ''}`,
           rule: 'TONAL_WHIPLASH',
-          description: `Scene ${sceneNum} has a very high lexical distance from Scene ${sceneNum - 1} (${Math.round(distances[i] * 100)}% divergence) — abrupt tonal shift`,
+          description: `Scene ${sceneNum + 1} has a very high lexical distance from Scene ${sceneNum} (${Math.round(distances[i] * 100)}% divergence) — abrupt tonal shift`,
           severity: 'minor',
           suggestedFix: 'Add transitional language or bridging action to ease the shift between tones',
         });
@@ -711,17 +711,17 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const grimCount = [...grimWords].reduce((s, w) => s + (sceneFreq.get(w) ?? 0), 0);
       if (record.emotionalShift === 'negative' && elevatedCount > 2) {
         issues.push({
-          location: `Scene ${i} (${record.slug})`,
+          location: `Scene ${i + 1} (${record.slug})`,
           rule: 'TONE_REGISTER_MISMATCH',
-          description: `Scene ${i} has a negative emotional shift but the prose uses elevated/positive language (${elevatedCount} elevated words) — tone and affect are misaligned`,
+          description: `Scene ${i + 1} has a negative emotional shift but the prose uses elevated/positive language (${elevatedCount} elevated words) — tone and affect are misaligned`,
           severity: 'minor',
           suggestedFix: 'Align the prose register with the scene\'s emotional valence',
         });
       } else if (record.emotionalShift === 'positive' && grimCount > 2) {
         issues.push({
-          location: `Scene ${i} (${record.slug})`,
+          location: `Scene ${i + 1} (${record.slug})`,
           rule: 'TONE_REGISTER_MISMATCH',
-          description: `Scene ${i} has a positive emotional shift but the prose uses grim/dark language (${grimCount} grim words) — tone and affect are misaligned`,
+          description: `Scene ${i + 1} has a positive emotional shift but the prose uses grim/dark language (${grimCount} grim words) — tone and affect are misaligned`,
           severity: 'minor',
           suggestedFix: 'Align the prose register with the scene\'s emotional valence',
         });
@@ -848,9 +848,9 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
 
     if (directCount >= 3 && records.length >= 8) {
       issues.push({
-        location: `Scene ${i} (${record.slug})`,
+        location: `Scene ${i + 1} (${record.slug})`,
         rule: 'SUBTEXT_ABSENCE',
-        description: `Scene ${i} has ${directCount} instances of direct emotional exposition (characters literally stating feelings/intentions) in ${dialogueLines.length} dialogue lines — lacks subtext and implication`,
+        description: `Scene ${i + 1} has ${directCount} instances of direct emotional exposition (characters literally stating feelings/intentions) in ${dialogueLines.length} dialogue lines — lacks subtext and implication`,
         severity: 'major',
         suggestedFix: 'Rewrite dialogue to show emotions through indirection, humor, denial, or what\'s unsaid rather than explicit emotional statements',
       });
@@ -1060,7 +1060,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       if (act2Tones.size === 1) {
         const [tone] = act2Tones;
         issues.push({
-          location: `Act 2 (Scenes ${act2ToneStart}–${act2ToneEnd - 1})`,
+          location: `Act 2 (Scenes ${act2ToneStart + 1}–${act2ToneEnd})`,
           rule: 'TONAL_REGISTER_COLLAPSE_ACT2',
           severity: 'minor',
           description: `All ${act2Recs.length} Act 2 scenes carry the same emotional register ("${tone}") — the middle of the story has no tonal modulation. Act 2a and Act 2b blur into a single undifferentiated stretch.`,
@@ -4926,11 +4926,11 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     });
     if (r767b.fires) {
       issues.push({
-        location: `scene ${r767b.peakIdx} (peak curiosityDelta ${r767b.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r767b.peakIdx + 1} (peak curiosityDelta ${r767b.peakMagnitude}) — no preparing cause nearby`,
         rule: 'VOICE_CURIOSITY_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-curiosity scene (Scene ${r767b.peakIdx}, curiosityDelta ${r767b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r767b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the story's voice hasn't built toward the mystery it's about to pose.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r767b.peakIdx} so the story's voice earns its peak curiosity instead of springing it without preparation.`,
+        description: `The story's single highest-curiosity scene (Scene ${r767b.peakIdx + 1}, curiosityDelta ${r767b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r767b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the story's voice hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r767b.peakIdx + 1} so the story's voice earns its peak curiosity instead of springing it without preparation.`,
       });
     }
   }
@@ -5015,11 +5015,11 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     });
     if (r781c.fires) {
       issues.push({
-        location: `scene ${r781c.peakIdx} (peak suspenseDelta ${r781c.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r781c.peakIdx + 1} (peak suspenseDelta ${r781c.peakMagnitude}) — no preparing cause nearby`,
         rule: 'VOICE_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r781c.peakIdx}, suspenseDelta ${r781c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r781c.qualifyingCount} scenes elsewhere carry tension. The moment characters are most gripped lands out of nowhere — the story's voice has nothing building toward the peak to react against.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r781c.peakIdx} so the story's voice has something building toward the peak to react against instead of springing without preparation.`,
+        description: `The story's single highest-suspense scene (Scene ${r781c.peakIdx + 1}, suspenseDelta ${r781c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r781c.qualifyingCount} scenes elsewhere carry tension. The moment characters are most gripped lands out of nowhere — the story's voice has nothing building toward the peak to react against.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r781c.peakIdx + 1} so the story's voice has something building toward the peak to react against instead of springing without preparation.`,
       });
     }
   }

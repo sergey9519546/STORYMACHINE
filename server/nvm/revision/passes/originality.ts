@@ -881,7 +881,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (act3PurposeSet.size === 1) {
         const [onlyPurpose] = act3PurposeSet;
         issues.push({
-          location: `Act 3 (Scenes ${act3StartIdx}–${records.length - 1})`,
+          location: `Act 3 (Scenes ${act3StartIdx + 1}–${records.length})`,
           rule: 'SCENE_PURPOSE_MONOTONE_ACT3',
           description: `All ${act3Records.length} Act 3 scenes use the same purpose ("${onlyPurpose}") — the final act lacks the functional variety of climax, crisis, resolution, and falling action`,
           severity: 'major',
@@ -1437,7 +1437,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     const act3AvgAction231 = avgAct231(act3StartAct231, records.length);
     if (act1AvgAction231 >= 3 && act3AvgAction231 < act1AvgAction231 * 0.5) {
       issues.push({
-        location: `Act 3 (Scenes ${act3StartAct231}–${records.length - 1})`,
+        location: `Act 3 (Scenes ${act3StartAct231 + 1}–${records.length})`,
         rule: 'ACT3_ACTION_DROUGHT',
         severity: 'minor',
         description: `Act 3 averages ${act3AvgAction231.toFixed(1)} action lines per scene while Act 1 averaged ${act1AvgAction231.toFixed(1)} — the resolution rushes past in dialogue with half the visual specificity of the setup. The ending under-delivers physically at the moment the visual register should be most concentrated.`,
@@ -4077,10 +4077,10 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
     if (longestRun592b >= 4) {
       issues.push({
-        location: `Scenes ${longestStart592b}–${longestStart592b + longestRun592b - 1} — ${longestRun592b} consecutive "${longestPurpose592b}" scenes`,
+        location: `Scenes ${longestStart592b + 1}–${longestStart592b + longestRun592b} — ${longestRun592b} consecutive "${longestPurpose592b}" scenes`,
         rule: 'PURPOSE_CONSECUTIVE_RUN',
         severity: 'minor',
-        description: `Scenes ${longestStart592b} through ${longestStart592b + longestRun592b - 1} (${longestRun592b} in a row) all share the identical scene purpose "${longestPurpose592b}". Even when the surface content — dialogue, setting, characters — varies from scene to scene, four or more consecutive scenes performing the same functional job reads as structurally repetitive: the audience settles into a rhythm of "another one of these" rather than feeling the story's gears shift.`,
+        description: `Scenes ${longestStart592b + 1} through ${longestStart592b + longestRun592b} (${longestRun592b} in a row) all share the identical scene purpose "${longestPurpose592b}". Even when the surface content — dialogue, setting, characters — varies from scene to scene, four or more consecutive scenes performing the same functional job reads as structurally repetitive: the audience settles into a rhythm of "another one of these" rather than feeling the story's gears shift.`,
         suggestedFix: `Break up the run by inserting a scene with a different functional purpose somewhere in the middle of the streak — a confrontation, a revelation, or a decision point that performs a different structural job than the surrounding scenes. Varying the FUNCTION of consecutive scenes, not just their content, keeps the story's rhythm from flattening.`,
       });
     }
@@ -5023,11 +5023,11 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     });
     if (r774a.fires) {
       issues.push({
-        location: `scene ${r774a.peakIdx} (peak clockDelta magnitude ${r774a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r774a.peakIdx + 1} (peak clockDelta magnitude ${r774a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single sharpest clock movement (Scene ${r774a.peakIdx}, |clockDelta| ${r774a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r774a.qualifyingCount} scenes elsewhere shift the clock. An uncaused tightening of the deadline is itself a predictable pattern — the audience learns the clock moves for no dramatized reason.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r774a.peakIdx} so the story's sharpest clock movement reads as earned rather than arbitrary.`,
+        description: `The story's single sharpest clock movement (Scene ${r774a.peakIdx + 1}, |clockDelta| ${r774a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r774a.qualifyingCount} scenes elsewhere shift the clock. An uncaused tightening of the deadline is itself a predictable pattern — the audience learns the clock moves for no dramatized reason.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r774a.peakIdx + 1} so the story's sharpest clock movement reads as earned rather than arbitrary.`,
       });
     }
   }
@@ -5163,11 +5163,11 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     });
     if (r802a.fires) {
       issues.push({
-        location: `scene ${r802a.peakIdx} (peak suspenseDelta ${r802a.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r802a.peakIdx + 1} (peak suspenseDelta ${r802a.peakMagnitude}) — no preparing cause nearby`,
         rule: 'ORIGINALITY_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r802a.peakIdx}, suspenseDelta ${r802a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r802a.qualifyingCount} scenes elsewhere carry tension — an uncaused spike is itself a learnable pattern the audience can come to expect.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r802a.peakIdx} so the peak tension reads as earned rather than a predictable, uncaused spike.`,
+        description: `The story's single highest-suspense scene (Scene ${r802a.peakIdx + 1}, suspenseDelta ${r802a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r802a.qualifyingCount} scenes elsewhere carry tension — an uncaused spike is itself a learnable pattern the audience can come to expect.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r802a.peakIdx + 1} so the peak tension reads as earned rather than a predictable, uncaused spike.`,
       });
     }
   }

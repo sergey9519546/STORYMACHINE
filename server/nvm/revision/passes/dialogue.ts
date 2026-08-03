@@ -2631,10 +2631,10 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
       const peakHasDlg434a = dialogue.some(d => (lineToScene434a[d.lineNum - 1] ?? 0) === peakSceneIdx434a);
       if (!peakHasDlg434a) {
         issues.push({
-          location: `Scene ${peakSceneIdx434a} — peak suspense, no dialogue`,
+          location: `Scene ${peakSceneIdx434a + 1} — peak suspense, no dialogue`,
           rule: 'DIALOGUE_TENSION_PEAK_SILENT',
           severity: 'minor',
-          description: `Scene ${peakSceneIdx434a} carries the story's highest suspenseDelta (${peakVal434a.toFixed(2)}) but contains no dialogue — the most gripped moment of the story passes in complete silence. Film dialogue is most powerful under pressure: a question the character cannot hold back, a declaration they can no longer swallow, a fragment cut off by the crisis. When the peak-suspense scene is entirely unspoken, the most charged delivery slot for a voice goes empty.`,
+          description: `Scene ${peakSceneIdx434a + 1} carries the story's highest suspenseDelta (${peakVal434a.toFixed(2)}) but contains no dialogue — the most gripped moment of the story passes in complete silence. Film dialogue is most powerful under pressure: a question the character cannot hold back, a declaration they can no longer swallow, a fragment cut off by the crisis. When the peak-suspense scene is entirely unspoken, the most charged delivery slot for a voice goes empty.`,
           suggestedFix: `Add at least one line of dialogue to the peak-tension scene: a question asked at the worst possible moment, a vow or denial forced by the crisis, or a fragment of speech cut off before it finishes. A character who speaks under maximum pressure concentrates the scene's energy in a way that silence alone cannot — and what they manage to say (or fail to say) becomes the line the audience remembers.`,
         });
       }
@@ -2665,10 +2665,10 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     const finalDlgCount434b = dialogue.filter(d => (lineToScene434b[d.lineNum - 1] ?? 0) >= finalStart434b).length;
     if (finalDlgCount434b === 0 && earlyDlgCount434b >= 10) {
       issues.push({
-        location: `Final 20% (Scenes ${finalStart434b}+) — no dialogue`,
+        location: `Final 20% (Scenes ${finalStart434b + 1}+) — no dialogue`,
         rule: 'DIALOGUE_CLIMAX_VOID',
         severity: 'minor',
-        description: `The final 20% of scenes (from Scene ${finalStart434b}) contains no dialogue, even though the earlier story carries ${earlyDlgCount434b} spoken lines. The climax and denouement play out in complete silence: no character speaks through the resolution. When the ending is entirely unspoken, the story's verbal stakes — what characters believe, what they have lost, what the events mean — are never given voice. The resolution plays as spectacle rather than as drama.`,
+        description: `The final 20% of scenes (from Scene ${finalStart434b + 1}) contains no dialogue, even though the earlier story carries ${earlyDlgCount434b} spoken lines. The climax and denouement play out in complete silence: no character speaks through the resolution. When the ending is entirely unspoken, the story's verbal stakes — what characters believe, what they have lost, what the events mean — are never given voice. The resolution plays as spectacle rather than as drama.`,
         suggestedFix: `Add at least one dialogue line to the climax zone: a declaration, a question, or a silence broken at the decisive moment. The line does not have to explain what happened — it can be oblique, fragmented, or barely audible — but a character must speak. An ending without a voice resolves the plot while leaving the story's human meaning unspoken; the final spoken line is what the audience carries out of the theatre.`,
       });
     }
@@ -2738,10 +2738,10 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
       const peakHasDlg448a = dialogue.some(d => (lineToScene448a[d.lineNum - 1] ?? 0) === peakSceneIdx448a);
       if (!peakHasDlg448a) {
         issues.push({
-          location: `Scene ${peakSceneIdx448a} — peak curiosity, no dialogue`,
+          location: `Scene ${peakSceneIdx448a + 1} — peak curiosity, no dialogue`,
           rule: 'DIALOGUE_CURIOSITY_PEAK_SILENT',
           severity: 'minor',
-          description: `Scene ${peakSceneIdx448a} carries the story's highest curiosityDelta (${peakVal448a.toFixed(2)}) but contains no dialogue — the moment of maximum audience wonder passes without any character speaking. Curiosity and voice are natural partners: the question the character cannot hold back, the half-answer demanded, the fragment of truth that opens more than it closes. When the peak-curiosity scene is entirely unspoken, the story's most heightened epistemic moment — the audience's peak lean-forward — occurs without any human voice speaking to it.`,
+          description: `Scene ${peakSceneIdx448a + 1} carries the story's highest curiosityDelta (${peakVal448a.toFixed(2)}) but contains no dialogue — the moment of maximum audience wonder passes without any character speaking. Curiosity and voice are natural partners: the question the character cannot hold back, the half-answer demanded, the fragment of truth that opens more than it closes. When the peak-curiosity scene is entirely unspoken, the story's most heightened epistemic moment — the audience's peak lean-forward — occurs without any human voice speaking to it.`,
           suggestedFix: `Add at least one line of dialogue to the peak-curiosity scene: a question the character can no longer hold back, a demand for information, or a partial disclosure that invites more wonder rather than closing it. At the moment of maximum audience curiosity, a character voice concentrates the wondering — what they manage to ask or almost-say becomes the question the audience carries forward.`,
         });
       }
@@ -3045,11 +3045,11 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         if (!hasCause490a) {
           const peakRec490a = records[peakPos490a] as any;
           issues.push({
-            location: `Scene ${peakRec490a.sceneIdx} (${peakRec490a.slug}) — peak dialogue scene (${maxDlgCount490a} lines) has no prior causal driver`,
+            location: `Scene ${peakRec490a.sceneIdx + 1} (${peakRec490a.slug}) — peak dialogue scene (${maxDlgCount490a} lines) has no prior causal driver`,
             rule: 'DIALOGUE_VERBAL_PEAK_UNCAUSED',
             severity: 'minor',
-            description: `The most verbally dense scene (scene ${peakRec490a.sceneIdx}, ${maxDlgCount490a} dialogue lines) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, deadline, seeded clue, or emotional shift that would motivate an eruption of speech. The verbal peak arrives in narrative dead air: characters suddenly say a great deal without any story event having forced or provoked the expanded exchange. The most dialogue-rich scene in a script should feel earned — it should come BECAUSE something happened that demanded speech.`,
-            suggestedFix: `Give scene ${peakRec490a.sceneIdx - 1} or ${peakRec490a.sceneIdx - 2} a structural catalyst that provokes the verbal outpouring: a revelation that demands confrontation, a dramatic turn that opens new territory for speech, or an emotional escalation that forces characters to articulate what they have been suppressing.`,
+            description: `The most verbally dense scene (scene ${peakRec490a.sceneIdx + 1}, ${maxDlgCount490a} dialogue lines) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, deadline, seeded clue, or emotional shift that would motivate an eruption of speech. The verbal peak arrives in narrative dead air: characters suddenly say a great deal without any story event having forced or provoked the expanded exchange. The most dialogue-rich scene in a script should feel earned — it should come BECAUSE something happened that demanded speech.`,
+            suggestedFix: `Give scene ${peakRec490a.sceneIdx} or ${peakRec490a.sceneIdx - 1} a structural catalyst that provokes the verbal outpouring: a revelation that demands confrontation, a dramatic turn that opens new territory for speech, or an emotional escalation that forces characters to articulate what they have been suppressing.`,
           });
         }
       }
@@ -3547,11 +3547,11 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           if (!peakHasDlg546a && anyOtherRelHasDlg546a) {
             const peakRec546a = (records as any[])[peakPos546a];
             issues.push({
-              location: `Scene ${peakSceneIdx546a} (${peakRec546a?.slug}) — peak relationship magnitude (${peakMag546a.toFixed(2)}), no dialogue`,
+              location: `Scene ${peakSceneIdx546a + 1} (${peakRec546a?.slug}) — peak relationship magnitude (${peakMag546a.toFixed(2)}), no dialogue`,
               rule: 'DIALOGUE_RELATIONSHIP_PEAK_SILENT',
               severity: 'minor',
-              description: `Scene ${peakSceneIdx546a} carries the story's highest total relationship-shift magnitude (${peakMag546a.toFixed(2)}) — the single moment of most intense bond movement — yet contains no dialogue. Other relationship-shift scenes carry spoken language, but the peak interpersonal moment of the story passes in silence: no character speaks, argues, confesses, or responds in words during the scene where bonds move most dramatically. The peak relational moment is where the audience most needs to hear characters register the change — to speak it, deny it, process it aloud, or react to it with language that the audience can hold. Silence at the relational peak divorces the story's most intense interpersonal event from its verbal dimension.`,
-              suggestedFix: `Add dialogue to scene ${peakSceneIdx546a}: even a short exchange or a single line from one character responding to the most charged interpersonal moment of the story. The dialogue doesn't need to name what is happening directly — characters in high emotional charge rarely do — but spoken language in the relational peak gives the scene's intensity a voice and prevents the story's most profound bond movement from happening in a verbal vacuum.`,
+              description: `Scene ${peakSceneIdx546a + 1} carries the story's highest total relationship-shift magnitude (${peakMag546a.toFixed(2)}) — the single moment of most intense bond movement — yet contains no dialogue. Other relationship-shift scenes carry spoken language, but the peak interpersonal moment of the story passes in silence: no character speaks, argues, confesses, or responds in words during the scene where bonds move most dramatically. The peak relational moment is where the audience most needs to hear characters register the change — to speak it, deny it, process it aloud, or react to it with language that the audience can hold. Silence at the relational peak divorces the story's most intense interpersonal event from its verbal dimension.`,
+              suggestedFix: `Add dialogue to scene ${peakSceneIdx546a + 1}: even a short exchange or a single line from one character responding to the most charged interpersonal moment of the story. The dialogue doesn't need to name what is happening directly — characters in high emotional charge rarely do — but spoken language in the relational peak gives the scene's intensity a voice and prevents the story's most profound bond movement from happening in a verbal vacuum.`,
             });
           }
         }
@@ -4931,11 +4931,11 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     });
     if (r770b.fires) {
       issues.push({
-        location: `scene ${r770b.peakIdx} (peak suspenseDelta ${r770b.peakMagnitude}) — no preparing cause nearby`,
+        location: `scene ${r770b.peakIdx + 1} (peak suspenseDelta ${r770b.peakMagnitude}) — no preparing cause nearby`,
         rule: 'DIALOGUE_SUSPENSE_PEAK_UNCAUSED',
         severity: 'minor',
-        description: `The story's single highest-suspense scene (Scene ${r770b.peakIdx}, suspenseDelta ${r770b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r770b.qualifyingCount} scenes elsewhere carry tension. The moment characters are most gripped lands out of nowhere — dialogue has nothing building toward the peak to react against.`,
-        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r770b.peakIdx} so dialogue has something building toward the peak to react against instead of springing without preparation.`,
+        description: `The story's single highest-suspense scene (Scene ${r770b.peakIdx + 1}, suspenseDelta ${r770b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r770b.qualifyingCount} scenes elsewhere carry tension. The moment characters are most gripped lands out of nowhere — dialogue has nothing building toward the peak to react against.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r770b.peakIdx + 1} so dialogue has something building toward the peak to react against instead of springing without preparation.`,
       });
     }
   }
