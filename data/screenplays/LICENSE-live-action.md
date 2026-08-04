@@ -78,3 +78,60 @@ provenance and license, e.g.:
 
 This preamble is folded into scene 0 by the fountain parser and does not affect
 scene detection or analysis.
+
+## 2026-08-04 expansion — truth-extraction recall testbed + weak-band contrast material
+
+Fourteen more screenplays were added under the same CC0 dedication and the
+same force-add mechanism (the entire `data/` directory is gitignored by
+design; these files are `git add -f`'d individually because they are
+redistributable originals, exactly like the six files above). See
+`docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md` for the full method,
+per-script parse verification, and measurement results.
+
+**HONESTY NOTE, stated plainly:** all fourteen scripts below were written by
+an AI agent (Claude), not a human screenwriter. They are mechanism-test
+material for `server/nvm/analyze/truth-extraction.ts`'s recall/precision
+measurement and P1's missing weak-craft contrast band — they are NOT a
+substitute for professionally-authored "real writing" in P1's validation
+sense, and must not be cited as such. The existing six scripts above carry
+the same caveat implicitly (see "author-contributed drafts" in the
+Provenance section) but it is repeated here explicitly per this expansion's
+task brief.
+
+Six scripts (thriller/action) each stage an on-page death of a speaking
+character in explicit action text, phrased six different ways to measure
+`truth-extraction.ts`'s death-cue lexicon recall — some phrasings were
+chosen to match the lexicon, some deliberately were not, to produce an
+honest miss-list rather than a curated one. Two of the six additionally
+place the dead character in a later, explicitly marked FLASHBACK scene,
+to test whether the non-literal-scene exclusion guard actually prevents a
+false contradiction (verified directly: stripping the `(FLASHBACK)` marker
+from either script's heading turns 0 contradictions into 1 — see the
+results doc). Four scripts are competent, genre-varied, death-free dramas
+and comedies — clean negative material. Four scripts are DELIBERATELY WEAK,
+each labeled with one specific craft failure in its header comment (flat
+stakes never raised, a setup promised and never paid off, interchangeable
+character voices, a wandering midsection) — the weak-craft contrast class
+every prior P1 document names as a real gap in this corpus.
+
+| File | Genre | Category | Scenes | Words | Notes |
+|------|-------|----------|--------|-------|-------|
+| `red-line.fountain` | Home-invasion thriller | death (HIT), flashback | 14 | ~990 | Gunshot, "kills NAME" cue. |
+| `undertow.fountain` | Lake-house thriller | death (MISS) | 12 | ~890 | Drowning; "drowns" is not in the death-cue lexicon at all. |
+| `chain-of-custody.fountain` | Courier/freight procedural | death (HIT) | 13 | ~830 | Body discovered; "NAME's corpse" cue. |
+| `code-blue.fountain` | Medical/corporate thriller | death (HIT), flashback | 14 | ~960 | Hospital flatline, "NAME is dead" cue. |
+| `close-quarters.fountain` | Domestic thriller | death (HIT) | 13 | ~845 | Stabbing, "stabs NAME to death" cue. |
+| `high-voltage.fountain` | Industrial-sabotage thriller | death (MISS) | 13 | ~940 | Electrocution; no lexicon entry for this cause of death at all. |
+| `soft-launch.fountain` | Tech-startup workplace comedy | competent, no death | 12 | ~970 | Clean negative material. |
+| `mise.fountain` | Restaurant kitchen drama | competent, no death | 12 | ~920 | Clean negative material. |
+| `the-defense-rests.fountain` | Legal dramedy | competent, no death | 12 | ~960 | Clean negative material. |
+| `two-lane.fountain` | Road-trip dramedy | competent, no death | 13 | ~1010 | Clean negative material. |
+| `quiet-season.fountain` | Small-business drama | weak — flat stakes never raised | 10 | ~680 | Labeled weakness in file header. |
+| `the-key-under-the-mat.fountain` | Family inheritance drama | weak — setup never paid off | 11 | ~900 | Labeled weakness in file header. |
+| `same-page.fountain` | Workplace comedy | weak — interchangeable voices | 11 | ~815 | Labeled weakness in file header. |
+| `the-detour.fountain` | Outdoors/friendship drama | weak — wandering midsection | 11 | ~760 | Labeled weakness in file header. |
+
+Scene and word counts above were measured the same way as the original six
+(`analyzeFountainText()`), confirmed to parse cleanly with the intended
+scene count and no truncation — see the results doc for the exact per-file
+figures and the command used to reproduce them.
