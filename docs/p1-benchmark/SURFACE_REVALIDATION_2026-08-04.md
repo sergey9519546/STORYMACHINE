@@ -217,3 +217,166 @@ PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node scripts/verify-p2-p3-surfaces.mj
 Exit 0 only once Finding 1 (or any future regression it catches) is
 resolved and no assertion fails. Not wired into `npm test` — CI has no
 provisioned browser, matching `scripts/verify-focus-traps.mjs`'s precedent.
+
+---
+
+## Addendum (2026-08-04) — Finding 1 resolved: ACCEPT CURRENT BEHAVIOR
+
+**Decision (maintainer-delegated):** the Ship/Studio Labs-gate bypass
+documented as Finding 1 above is resolved as **ACCEPT CURRENT BEHAVIOR**,
+not fixed. The always-visible "Ship" task tab keeps opening the Studio
+panel (`toolSlot="studio"`) with Labs off; the Toolbar's Labs-gated "Open
+Studio" overflow item stays as-is, i.e. a second, redundant door onto the
+same panel rather than the only one. `scripts/verify-p2-p3-surfaces.mjs`
+was rewritten accordingly (detail below) and now passes 89/89.
+
+### Rationale, verified rather than assumed
+
+The task delegating this decision offered three supporting points. Each was
+checked directly against source before being restated here, per this
+session's instruction not to parrot them on faith.
+
+**1. Removing the Ship tab risks removing load-bearing functionality.**
+Verified true, with one nuance. `ScriptIDE.tsx`'s Title tab
+(`activeTab === "titlePage"`, the title/author/contact editor at
+`renderTitlePage()`) is reachable from exactly one `setActiveTab("titlePage")`
+call site — the Studio panel's own tab-button row (`ScriptIDE.tsx:2120`),
+which only renders when `toolSlot === "studio"` (`ScriptIDE.tsx:2086`).
+`toolSlot` is set to `"studio"` from exactly two places in the whole tree:
+`Toolbar.tsx`'s Labs-gated `"Open Studio"` overflow item (via
+`openToolSlot("studio")`) and `handleTaskChange`'s `"ship"` branch
+(`ScriptIDE.tsx:1187`, behind the always-visible Ship task tab). No other
+button, route, or default-surface affordance sets `toolSlot` to `"studio"`
+or `activeTab` to `"titlePage"`. **So for Title editing, Ship→Studio is
+genuinely the only default-surface (Labs-off) path** — gating Ship without
+another door would make title/author/contact editing Labs-only, which is
+exactly the kind of core Editor affordance the task's rationale describes
+as load-bearing, and lines up with the title-page-persistence data-loss fix
+landed this same week.
+
+For Versions, the claim holds for the load-bearing half but not
+monolithically — worth reporting honestly rather than restating flat. The
+Ship task tab's own toolbar row (rendered when `task === "ship"`, which is
+a *separate* piece of state from `toolSlot`) includes a "Snapshot" button
+(`ScriptIDE.tsx:1854`, `onClick={takeSnapshot}`) that saves a new version
+snapshot without ever opening the Studio subpanel or setting
+`toolSlot === "studio"`. So "save a version" has a path that doesn't route
+through the Studio panel specifically. It is, however, still gated by
+clicking the same always-visible Ship tab, not an independent bypass of
+Ship itself — the decision is about the Ship gate as a whole, not about
+Studio's Versions tab in isolation, so this doesn't undercut the rationale.
+What genuinely is Ship→Studio-only is *viewing, restoring, or deleting*
+existing versions: `SnapshotManager`'s full list only mounts with
+`hideList={false}`, which only happens when `toolSlot === "studio" &&
+activeTab === "versions"` (`ScriptIDE.tsx:2611-2626`) — everywhere else it
+mounts with `hideList` (modals only, no list, no restore/delete). So the
+read/restore/delete half of version management is exactly as load-bearing
+and exactly as Ship-gated as Title; only "create a new snapshot" has a
+second entry point, and that entry point is still behind Ship, not a way
+around it.
+
+One adjacent observation, out of scope for this decision but worth flagging
+for a future pass: that same Ship-tab toolbar row also has a "Simulate"
+button (`handleSimulateScript`, `ScriptIDE.tsx:1463`) that posts to
+`/api/reset` and builds an OASIS-style agent scenario — a Labs-agnostic path
+to the same simulate action that otherwise requires Labs ON (StartScreen's
+"Advanced: Simulation" / Toolbar's "Open Simulate" overflow item). It
+doesn't open a panel and wasn't part of Finding 1's `toolSlot="studio"`
+reachability question, so it isn't covered by today's assertion rewrite —
+noting it here so it isn't lost.
+
+**2. The live-verified content is Production/Analysis/Codex/Research-notes/
+Title/Versions — none of the 38 Labs-gated research panels.** Confirmed:
+this is the same `OASIS_JARGON_RE` check the original Finding 1 already ran
+(`OASIS`, `NVM`, "causal twin", "epistemic map", "converge panel",
+"fixed-points", "self-play", "agent roster"), re-run against the Ship-opened
+Studio panel's body text on both stability runs below — zero matches both
+times. Re-reading the tab list itself (`ScriptIDE.tsx:2107-2116`:
+Production/Analysis/Engine/Codex/Research/Title/Versions) against the ~38
+files gated exclusively behind `StoryMachine.tsx` (the static cross-check's
+`labsOnlyViaStoryMachine` set) confirms none of the seven tabs' backing
+components appear in that set — "Engine" is `AIPanel.tsx` (a co-writing
+assistant), "Research" is `ResearchNotes.tsx` (freeform writer notes), the
+rest is script-management chrome. Holds.
+
+**3. The Toolbar's Labs-gated "Open Studio" is a shortcut, not the sole
+gate.** Confirmed directly from point 1's source read: two independent call
+sites (`openToolSlot("studio")` from the Labs-gated overflow item,
+`handleTaskChange`'s `"ship"` branch from the ungated Ship tab) both set the
+same `toolSlot === "studio"` state. Neither is downstream of the other, so
+"shortcut, not sole gate" is a literal description of the code, not a
+reframing.
+
+**Net assessment:** all three points check out against source. The one
+place the rationale needed sharpening rather than just restating is
+Versions' "save" affordance having a second entry point — but since that
+entry point is still inside the Ship tab (not a way to reach version-saving
+with Labs off *and* without clicking Ship), it doesn't weaken the "Ship is
+the door" framing the decision rests on.
+
+### What the reshaped assertion now protects
+
+The two assertions previously logged under `P2-finding` (one of which was
+Finding 1's deliberate, permanent FAIL) are now logged under `P2-decision`
+and both PASS by encoding the accepted decision as the expected state,
+while remaining live tripwires:
+
+1. **Ship reachability with Labs off must stay true.** The assertion now
+   asserts `studioReachableViaShip === true` (inverted from the pre-decision
+   version, which asserted the opposite). If a future change guards the
+   Ship tab's `setToolSlot("studio")` call — silently reversing today's
+   accepted decision without updating this document — this assertion flips
+   to FAIL, forcing whoever made that change to reconcile it with the
+   decision recorded here rather than have it pass unnoticed.
+2. **The panel it opens must carry zero OASIS/NVM jargon.** Unchanged in
+   substance from the original Finding 1 check, but now framed explicitly
+   as the condition the accept decision depends on: if a future change ever
+   routes an actual gated research panel through the Ship→Studio door (not
+   just Production/Analysis/Codex/Research-notes/Title/Versions), this
+   assertion fails loudly, because that would violate the P2 exit gate the
+   whole decision was conditioned on holding.
+
+Both assertions' messages cite this addendum's decision date (2026-08-04)
+and this document's filename directly, so a future reader who lands on a
+failing assertion finds the reasoning in one hop instead of having to
+reconstruct it.
+
+### Stability — post-fix runs
+
+Ran `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node
+scripts/verify-p2-p3-surfaces.mjs` four times total while making this
+change. Two consecutive runs at the end, back to back: **89/89 both times**,
+exit code 0 both times, same `P2-decision` PASS lines, same P3 contentHash/
+health/verdict/totalIssues as the original revalidation
+(`33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` / `68.9`
+/ `CONSIDER` / `200`), zero genuine browser console errors both runs.
+
+For full honesty: one of the four total runs (the second of the four, not
+one of the two consecutive stability runs reported above) failed at 69/70
+on an unrelated, pre-existing flake — "P3 :: Sample coverage produces a
+rendered verdict" timed out, which then cascaded into a `Full report`
+button wait failing and aborting the rest of that run early (hence 70
+total instead of 89 — the crash happened mid-run, not a clean stop). This
+is the same kind of DOM-timing flake the original document's own
+`waitForTimeout(400)` calls are already exposed to; it reproduced on
+neither the run immediately before nor the two runs immediately after, and
+it has nothing to do with the `P2-decision` assertions changed today (both
+of those had already recorded PASS before the crash in that run). Not
+swept under the rug — flagged here in case a future session sees it
+recur and needs a starting pointer.
+
+### Verify / build gates (this addendum)
+
+- `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node
+  scripts/verify-p2-p3-surfaces.mjs` — 89/89, exit 0, run twice consecutively
+  for stability (see above).
+- `npm run lint` — 0 errors (`tsc --noEmit` clean).
+- `npm test` — 0 failures (10195 passed, 78 skipped, 2 todo, 10275 total).
+  Full suite; this change touched only `scripts/verify-p2-p3-surfaces.mjs`
+  and this doc, no `server/**` or `src/**` production code.
+- `honesty-audit`/`check-docs` — same scope note as the original document:
+  `scripts/honesty-audit.mjs` excludes `docs/**` by construction, so it
+  passes trivially on this file; `check-docs-quality.ts` was run directly:
+  `node --experimental-strip-types scripts/check-docs-quality.ts
+  docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md` → "No AI writing
+  patterns detected. Documentation is clean!"
