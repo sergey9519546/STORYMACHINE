@@ -151,6 +151,155 @@ describe('truth-extraction — negative fixtures (precision guards)', () => {
   });
 });
 
+describe('truth-extraction — drowning death-cue patterns (2026-08-04 lexicon gap closure)', () => {
+  // See docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md §4: the CC0
+  // measurement found NO death-cue pattern covered drowning at all.
+
+  it('fires on the direct verb ("Mara drowns")', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKE - DAY', '', 'Mara drowns before anyone can reach her.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 1);
+  });
+
+  it('near-miss: does NOT fire on the "drowns out" idiom (masking a sound is not a death)', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKE - DAY', '', 'Mara drowns out the alarm with her own laughter.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+
+  it('near-miss: does NOT fire on a hedged drowning ("nearly drowns")', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKE - DAY', '', 'Mara nearly drowns but Jonah pulls her out in time.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+
+  it('fires on the fixture-literal combo: "went under" + sentence-final "does not come back up."', () => {
+    // Mirrors data/screenplays/undertow.fountain's actual phrasing.
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKE - DAY', '', 'The current drags the boat away from where Mara went under. Long minutes pass, and she does not come back up.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 1);
+  });
+
+  it('near-miss: "went under" ALONE (no non-resurfacing clause) does NOT fire', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKE - DAY', '', 'Mara went under to grab her sunglasses off the bottom.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+
+  it('near-miss: a resurfacing/recovery continuation does NOT fire even with "doesn\'t come back up" present', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKE - DAY', '', "Mara went under to retrieve the line and doesn't come back up right away, surfacing moments later with it in hand."],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+});
+
+describe('truth-extraction — electrocution death-cue patterns (2026-08-04 lexicon gap closure)', () => {
+  // See docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md §4: the CC0
+  // measurement found NO death-cue pattern covered electrocution at all.
+
+  it('fires on the direct verb ("electrocutes Mara")', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. SUBSTATION - NIGHT', '', 'The exposed panel electrocutes Mara instantly.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 1);
+  });
+
+  it('fires on the passive form ("Mara is electrocuted")', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. SUBSTATION - NIGHT', '', 'Mara is electrocuted the moment her hand touches the live panel.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 1);
+  });
+
+  it('near-miss: does NOT fire on mere injury language ("shocked") alone', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. SUBSTATION - NIGHT', '', 'The panel shocks Mara. She yanks her hand back, swearing.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+
+  it('fires on the fixture-literal combo: name near an arc + "doesn\'t let go" + "isn\'t moving"', () => {
+    // Mirrors data/screenplays/high-voltage.fountain's actual phrasing.
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. SUBSTATION - NIGHT', '', "Mara's hand is still on the panel when the surge hits — a blue-white arc that throws her back and doesn't let go until the breaker finally trips. By the time it does, she isn't moving."],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 1);
+  });
+
+  it('near-miss: "isn\'t moving" ALONE (no arc / no "doesn\'t let go") does NOT fire', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. APARTMENT - NIGHT', '', "Mara isn't moving, asleep on the couch with the television still on."],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+
+  it('near-miss: an arc and a stunned reaction that recovers does NOT fire without "isn\'t moving"', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. SUBSTATION - NIGHT', '', "A blue-white arc jumps off the panel and throws Mara back against the wall. She shakes it off and gets back on her feet."],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+
+  it('near-miss: does NOT fire on a hedged electrocution ("if the panel electrocutes Mara")', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. SUBSTATION - NIGHT', '', 'Jonah warns that if the panel electrocutes Mara, the whole investigation dies with her.'],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+});
+
+describe('truth-extraction — corpse-phrasing alternation extension (drowned/electrocuted body)', () => {
+  it('fires on "drowned body" (parallel to the existing "dead body/corpse" phrasing)', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKESHORE - DAY', '', "Divers pull Mara's drowned body from the shallows at dawn."],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 1);
+  });
+
+  it('near-miss: does NOT fire on an unrelated "body" mention with no death phrasing', () => {
+    const text = fountain(
+      MARA_INTRO,
+      ['INT. LAKESHORE - DAY', '', "Mara's body language shifts the moment she sees the water."],
+    );
+    const { facts } = detectTruthContradictions(text);
+    assert.equal(facts.filter(f => f.object === 'dead').length, 0);
+  });
+});
+
 describe('truth-extraction — order sensitivity (small controlled fixture)', () => {
   it('reordering the death scene before the character\'s other dialogue creates contradictions the original order does not have', () => {
     const office = ['INT. OFFICE - DAY', '', 'Mara reviews the file.', '', 'MARA', 'This changes everything.'];

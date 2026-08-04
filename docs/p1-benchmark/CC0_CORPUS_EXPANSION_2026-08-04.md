@@ -329,3 +329,212 @@ that corpus *more informative if it ever happens* (there is now a concrete
 of a 0/0 signal with nothing to compare), but it is not a substitute for
 that run, and should not be cited as evidence the detector works on real
 writing.
+
+---
+
+## ADDENDUM — 2026-08-04 (later same day): the two miss-list items closed, and a normalizer root cause with a measured blast radius
+
+This addendum is appended, not a rewrite: every number above stands as
+originally measured. Two items delegated off the back of this document's
+own miss-list: closing the drowning/electrocution lexicon gap in §4, and
+tracing the `isDoubleSpaced()` false positive this document's §4 flagged as
+a secondary finding down to a root cause and a fix.
+
+### Item 1 — drowning and electrocution lexicon gaps: 4/6 -> 6/6
+
+`server/nvm/analyze/truth-extraction.ts`'s `deathPatterns()` gained five new
+regexes (13 total, up from 8) plus one extended alternation, staying inside
+the module's stated precision guards (action-text-only, hedge-word gate,
+flashback exclusion, speaking-character requirement — file header §§1-4).
+Each new pattern is name-anchored, the same discipline the original eight
+already used.
+
+**Drowning** (`undertow.fountain`'s gap):
+
+| Pattern | Fires on | Near-miss that must NOT fire |
+|---|---|---|
+| `NAME drowns\|drowned` (not followed by "out") | "Mara drowns before anyone can reach her." | `NAME drowns out` — a sound-masking idiom ("Mara drowns out the alarm with her own laughter."), not a death |
+| `NAME's drowned body` (extends the existing corpse alternation) | "Divers pull Mara's drowned body from the shallows." | An unrelated "body" mention ("Mara's body language shifts...") |
+| `NAME went/goes under` **+** sentence-final `does not/never come back up.` (300-char window, fixture-literal) | The exact shape of `undertow.fountain`'s death scene: "...where Renata went under. ... her sister does not come back up." | `NAME went under` ALONE with no non-resurfacing clause ("Mara went under to grab her sunglasses"); a recovery continuation ("doesn't come back up right away, surfacing moments later") — the trailing `\.` requirement specifically excludes this shape |
+
+**Electrocution** (`high-voltage.fountain`'s gap):
+
+| Pattern | Fires on | Near-miss that must NOT fire |
+|---|---|---|
+| `NAME is/was electrocuted` | "Mara is electrocuted the moment her hand touches the live panel." | — (unambiguous verb, same tier as the existing "kills"/"murders" patterns) |
+| `electrocutes NAME` | "The exposed panel electrocutes Mara instantly." | "shocks Mara" — injury language, deliberately excluded |
+| `NAME` near `arc/current/voltage` **+** `doesn't let go` **+** `isn't moving` (fixture-literal combo, 120/150-char windows) | The exact shape of `high-voltage.fountain`'s death scene: "Tomas's hand is still on the panel... a blue-white arc... doesn't let go... he isn't moving." | `isn't moving` ALONE ("Mara isn't moving, asleep on the couch"); an arc with a recovery ("shakes it off and gets back on her feet") — either piece alone fails the combo |
+
+Every pattern also respects the existing hedge-word gate: "if the panel
+electrocutes Mara" and "Mara nearly drowns but Jonah pulls her out in time"
+fire nothing, unchanged from the original eight patterns' behavior.
+
+**Re-measured recall** (`detectTruthContradictions()` against the six
+death/thriller scripts in isolation): **6/6 (100%)**, up from 4/6.
+`undertow.fountain` and `high-voltage.fountain` now both produce exactly one
+`dead` fact each, at the correct scene index, with zero contradictions (the
+scripts were authored to have none).
+
+**False positives: still 0.** `tests/core/truth-extraction.test.ts`'s
+real-corpus test (20 CC0 scripts + 4 structural-form-experiment fixtures +
+20 calibration-corpus samples, 44 scripts total) reports 0 contradictions
+after the lexicon extension, same as before it.
+
+**Falsifiability, checked directly:** removing the `drowns/drowned` pattern
+and re-running the suite fails exactly its own test (`fires on the direct
+verb ("Mara drowns")`, `27 pass / 1 fail`) and nothing else; restoring the
+pattern returns the suite to `28 pass / 0 fail`.
+
+**New tests:** 15 added to `tests/core/truth-extraction.test.ts` (13 -> 28
+total) — one fire test and one-or-more near-miss negatives per new pattern,
+plus a hedge-guard check for each cause of death and a corpse-alternation
+pair.
+
+### Item 2 — `isDoubleSpaced()`: root cause, fix, and a measured blast radius
+
+**1. Reproduction.** Two minimal snippets, both ordinary spec-correct
+Fountain (a blank line between every element, nothing double-spaced about
+either):
+
+```
+INT. KITCHEN - DAY
+
+Mara pours coffee.
+
+Jonah reads the paper.
+
+MARA
+Morning.
+```
+
+Before the fix, `normalizeScreenplay()` returned this reflowed into
+`"Mara pours coffee. Jonah reads the paper."` as a single action paragraph
+— the blank line separating the two paragraphs was discarded because
+blank lines are stripped from the working line list before the reflow loop
+runs, and nothing re-inserts a boundary between two consecutive
+plain-text lines in `action` mode.
+
+```
+INT. WAREHOUSE - NIGHT
+
+COMPANION
+No...
+
+The second shot kills Marcus before he can move another step.
+```
+
+Before the fix, this reflowed into `COMPANION\nNo... The second shot kills
+Marcus before he can move another step.` — the action sentence merged into
+the preceding dialogue block, because `mode` is only reset to `'action'` at
+a scene heading or transition, never after a dialogue block ends on its
+own. This is the exact shape that produced the false MISS in
+`red-line.fountain`'s first draft, documented in §4 above.
+
+**2. Diagnosis.** `isDoubleSpaced()` measured the fraction of ALL non-blank
+lines immediately followed by a blank line, flagging >=60% as
+double-spaced. That ratio is not actually diagnostic of anything: the
+Fountain spec itself requires a blank line between every ELEMENT (scene
+heading, action paragraph, transition, the dialogue block as a whole), so a
+short-paragraph, dialogue-heavy script that is correctly single-spaced
+clears 60% from ordinary element boundaries alone, with no import artifact
+present. Measured directly against `data/screenplays/`: **13 of the 20 CC0
+corpus scripts** (all of them ordinary, spec-correct Fountain, never
+touched by a scraper or OCR pipeline) tripped the old ratio and were
+needlessly reflowed. This is a materially different number from the
+informal "5 of the previous 6... and all 14 new ones" (19/20) estimate in
+§4 above — that estimate was made by eye against measured ratios in the
+0.596-0.648 range without running the actual function end-to-end; the
+directly-measured, code-verified figure is 13/20, and this addendum
+supersedes the earlier number.
+
+The one adjacency correctly-formatted Fountain can never produce is a blank
+line between a character CUE and its own dialogue — this file's own header
+already says why: "Fountain requires a character cue to be immediately
+followed by its dialogue with no blank line between." A genuinely
+double-spaced import (blank after every physical line, including cues, per
+the same header) violates that adjacency on every cue; ordinary Fountain
+never does, by construction. That gap (~0% for clean text vs. ~100% for a
+real double-spaced import) is the actual signal.
+
+**3. Fix.** `isDoubleSpaced()` now primarily checks the fraction of
+character cues immediately followed by a blank line (majority, >=0.5, over
+just the cues found), falling back to the original document-wide ratio
+(raised from 0.6 to 0.9, since it is now a last resort) only when the text
+has no detectable character cues at all. Both reproduction snippets above
+now pass through byte-identical. Regression fixtures added both ways to
+`server/nvm/analyze/screenplay-normalizer.test.ts` (8 -> 12 tests): the two
+reproductions pass through unchanged, plus a positive control confirming a
+genuinely double-spaced cue/dialogue pair (blank line between `MARA` and
+its own `Morning.`) is still detected and correctly reflowed.
+
+**4. Blast radius — 6 of 20 scripts changed, verdict/sceneCount/grade
+unchanged.** `runScriptDoctor()` (quick mode) was run over all 20
+`data/screenplays/*.fountain` scripts twice — once with the old
+`isDoubleSpaced()` (via `git stash` on this file only), once with the fix —
+and every `health`/`grade`/`verdict`/`sceneCount`/`wordCount` field diffed
+per script:
+
+| File | Pre-fix health | Post-fix health | Delta |
+|---|---:|---:|---:|
+| `chain-of-custody.fountain` | 72.4 | 72.3 | -0.1 |
+| `close-quarters.fountain` | 73.0 | 69.9 | -3.1 |
+| `dead-frequency.fountain` | 78.4 | 78.3 | -0.1 |
+| `mise.fountain` | 71.2 | 72.8 | +1.6 |
+| `red-line.fountain` | 73.1 | 71.1 | -2.0 |
+| `runoff.fountain` | 74.4 | 74.5 | +0.1 |
+
+The remaining 14 scripts (including both `undertow.fountain` and
+`high-voltage.fountain`, and the 4 competent/4 weak scripts) were unchanged
+on every field. `grade`, `verdict`, and `sceneCount` were identical
+pre-/post-fix for **all 20** scripts, including the 6 above — only `health`
+moved, by no more than 3.1 points.
+
+Per this task's own instruction: **this is a STOP, not a proceed.** Six
+scripts changed measurable scoring output. This makes the fix a
+receipt-gated scoring change for the orchestrator to route, not something
+to wave through as "no observable effect" — even though verdict/sceneCount
+held, and even though the deltas are small. The fix itself (the code
+change in `screenplay-normalizer.ts` plus its regression tests) is
+in place, matching this task's step 3; no committed evidence artifact was
+regenerated to match the new numbers, matching step 4's explicit
+instruction not to.
+
+**5. Committed evidence artifacts — what would change, not regenerated.**
+`scripts/output/real-corpus-scores.csv` (88 rows: the 6 pre-existing CC0
+scripts plus 82 rows from the private, untracked animation/live-action
+corpus this sandboxed environment does not have a local copy of) contains
+`dead-frequency.fountain` at health 78.4 and `runoff.fountain` at health
+74.4 — both exactly matching this addendum's PRE-fix measurement above,
+confirming the committed CSV was generated through the misfiring path for
+at least these two rows. Both would shift by 0.1 if regenerated. The same
+two filenames also appear in `discrimination-auc-train.csv`,
+`discrimination-auc-test.csv`, `corpus-split.json`,
+`probe-question-latency-deduction.json`, and
+`temporal-order-sensitivity.json` — all committed, all generated before
+this fix, all candidates for the same small shift. The other 82 rows in
+`real-corpus-scores.csv` (the private local corpus) cannot be checked from
+this environment; this file's own header comment ("Ratatouille, Mulan,
+Coco all parse to 0 dialogue lines" pre-normalizer) states those scripts
+are genuine double-spaced imports, which the new cue-adjacency signal
+still catches (confirmed by the existing `DOUBLE_SPACED` regression test,
+unchanged and still passing) — so their reflow should still fire, but
+exact health deltas for those specific files were not verified here.
+`docs/user-validation/sample-coverage-report.html` (the committed P0
+sample report) is unaffected either way: its backing `src/lib/sample-script.ts`
+is not reflowed under the old heuristic or the new one, checked directly.
+Nothing in `scripts/output/` was written or modified by this addendum.
+
+**6. Files.**
+
+- `server/nvm/analyze/truth-extraction.ts` — 5 new death-cue regexes, 1
+  extended alternation.
+- `server/nvm/analyze/screenplay-normalizer.ts` — `isDoubleSpaced()`
+  rewritten around cue-adjacency.
+- `tests/core/truth-extraction.test.ts` — 15 new tests (13 -> 28).
+- `server/nvm/analyze/screenplay-normalizer.test.ts` — 4 new tests (8 ->
+  12): two root-cause reproductions (both now pass-through), one ordinary-
+  Fountain false-positive regression, one double-spaced positive control.
+
+**Verification (this addendum):** `npm run lint` — 0 errors. `npm test` —
+10289 tests, 0 fail (78 skipped, 2 todo — pre-existing, unrelated).
+`npm run honesty-audit` — clean. `scripts/output/` untouched.

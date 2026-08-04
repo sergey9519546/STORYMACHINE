@@ -56,6 +56,52 @@ test('clean single-spaced Fountain passes through unchanged (no double-spacing)'
   assert.equal(normalizeScreenplay(clean), clean, 'clean input is returned verbatim');
 });
 
+// ── isDoubleSpaced root-cause regressions (2026-08-04 fix) ─────────────────
+// The old heuristic (ratio of ALL non-blank lines followed by a blank,
+// threshold 0.6) misfired on ordinary, spec-correct Fountain: the spec
+// requires a blank line between every ELEMENT, so short-paragraph,
+// dialogue-heavy scripts legitimately clear 60% with no import artifact
+// present. Measured directly against data/screenplays/ (see the dated CC0
+// addendum): 13 of the 20 CC0 corpus scripts tripped the old heuristic and
+// were needlessly reflowed despite being clean. The fix keys off the one
+// adjacency correctly-formatted Fountain can never produce — a blank line
+// between a character CUE and its own dialogue.
+
+test('ordinary multi-paragraph action + one dialogue exchange does NOT trip isDoubleSpaced (was a false positive: ratio 4/6 = 0.667 >= old 0.6 threshold)', () => {
+  const ordinary = 'INT. KITCHEN - DAY\n\nMara pours coffee.\n\nJonah reads the paper.\n\nMARA\nMorning.\n\nJONAH\nMorning yourself.\n';
+  assert.equal(normalizeScreenplay(ordinary), ordinary, 'ordinary Fountain must pass through byte-identical');
+});
+
+test('root cause reproduction A: two ordinary action paragraphs no longer get merged into one', () => {
+  const text = 'INT. KITCHEN - DAY\n\nMara pours coffee.\n\nJonah reads the paper.\n\nMARA\nMorning.\n';
+  const out = normalizeScreenplay(text);
+  assert.equal(out, text, 'must pass through unchanged, not merge the two action paragraphs');
+  assert.doesNotMatch(out, /Mara pours coffee\. Jonah reads the paper\./,
+    'the two action paragraphs must stay separate, not get silently merged into one line');
+});
+
+test('root cause reproduction B: action text after a dialogue line (no intervening heading) no longer gets merged into the dialogue block', () => {
+  // Mirrors the exact shape that produced a false MISS in
+  // data/screenplays/red-line.fountain's first draft (see the CC0 addendum):
+  // a death-cue action sentence sitting directly after dialogue, with only a
+  // blank line (correct Fountain spacing) between them.
+  const text = 'INT. WAREHOUSE - NIGHT\n\nCOMPANION\nNo...\n\nThe second shot kills Marcus before he can move another step.\n';
+  const out = normalizeScreenplay(text);
+  assert.equal(out, text, 'must pass through unchanged, not fold the action line into COMPANION\'s dialogue');
+  assert.doesNotMatch(out, /No\.\.\. The second shot kills Marcus/,
+    'the action sentence must not be merged into the preceding dialogue block');
+});
+
+test('genuinely double-spaced dialogue (blank line between cue and its own dialogue) is still detected and reflowed', () => {
+  // Positive control for the new cue-adjacency signal: this is the one
+  // shape correctly-formatted Fountain can never produce, so it must still
+  // fire even though the coarse document-wide ratio is no longer primary.
+  const text = 'INT. KITCHEN - DAY\n\nA table.\n\nMARA\n\nMorning.\n\nJONAH\n\nMorning yourself.\n';
+  const out = normalizeScreenplay(text);
+  assert.notEqual(out, text, 'a blank line between a cue and its dialogue must still trigger reflow');
+  assert.match(out, /MARA\nMorning\./, 'cue is reattached directly to its own dialogue with no blank line');
+});
+
 test('forced (.) scene headings are preserved as scene boundaries', () => {
   const forced = ['.KITCHEN - DAY', '', 'Action.', '', 'REMY', '', 'Hi.', '', '.STREET - NIGHT', '', 'More.', ''].join('\n');
   const after = analyzeFountainText(normalizeScreenplay(forced));

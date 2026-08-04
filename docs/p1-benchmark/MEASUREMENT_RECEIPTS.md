@@ -110,6 +110,51 @@ honestly rather than backfilled with a guess.
 
 ---
 
+### 2026-08-04 — normalizer `isDoubleSpaced()` root-cause fix (cue-adjacency rekey) + truth-extraction lexicon extension
+
+- **Date:** 2026-08-04
+- **Git SHA:** measured against the working tree at `7f57119` (the commit
+  immediately preceding the commit that carries this entry — the change and
+  its receipt land together, per the guard's same-range rule).
+- **Command:** not an AUC run — the private corpus is not present in this
+  environment, so no AUC statistic could honestly be produced. The
+  measurement actually performed is a full pre/post blast-radius diff:
+  `runScriptDoctor()` (quick mode) over all 20 `data/screenplays/*.fountain`
+  scripts, once with the old `isDoubleSpaced()` (via `git stash` on that
+  file only) and once with the fix, diffing `health` / `grade` / `verdict`
+  / `sceneCount` / `wordCount` per script. Full method and per-script table:
+  `docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md`, addendum §Item 2.
+- **Measured AUC-24:** **not re-measured** — recorded as an open obligation,
+  not a pass. The maintainer must run `npm run measure-real`
+  (`REAL_SCRIPT_CORPUS_DIR=<local corpus>`) locally before treating the
+  ratchet as re-verified on this change. Two committed rows in
+  `scripts/output/real-corpus-scores.csv` (`dead-frequency` 78.4,
+  `runoff` 74.4) are known to shift by 0.1 under the fix; the 82
+  private-corpus rows could not be checked from this environment.
+- **Flag-run AUCs:** none — see above.
+- **Blast radius (the measurement this receipt certifies):** 6 of 20
+  tracked CC0 scripts changed `health` (chain-of-custody −0.1,
+  close-quarters −3.1, dead-frequency −0.1, mise +1.6, red-line −2.0,
+  runoff +0.1); `grade`/`verdict`/`sceneCount` identical pre/post for all
+  20. The truth-extraction lexicon change in the same range is unwired
+  into scoring and moved nothing (recall 6/6, false positives 0/44).
+- **Committed evidence artifacts:** deliberately NOT regenerated here.
+  `real-corpus-scores.csv` and the five downstream artifacts listing the
+  two affected filenames are 82-parts private-corpus rows this environment
+  cannot recompute; regenerating only the CC0 rows would produce a
+  mixed-provenance file. Regeneration is deferred to the maintainer's
+  local `measure-real` run, which reproduces all rows from one pipeline.
+- **Corpus fingerprint:** the 20 tracked `data/screenplays/*.fountain`
+  files at `7f57119` (git-content-addressed; no titles beyond the
+  fixture-slug filenames, which are original CC0 works authored in-repo,
+  not produced-screenplay titles).
+- **Runner attestation:** "Agent session (Claude, remote sandbox,
+  2026-08-04) measured this in-environment under the maintainer's blanket
+  delegation; the AUC re-measurement obligation above is explicitly NOT
+  discharged by this entry."
+
+---
+
 ## 3. Entry template (copy for new entries)
 
 ```

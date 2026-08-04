@@ -217,9 +217,41 @@ function deathPatterns(nameEsc: string): RegExp[] {
     new RegExp(`\\bkills?\\s+${nameEsc}\\b`, 'i'),
     new RegExp(`\\bmurders?\\s+${nameEsc}\\b`, 'i'),
     new RegExp(`\\bshoots?\\s+${nameEsc}\\s+dead\\b`, 'i'),
-    new RegExp(`\\b${nameEsc}'s\\s+(?:dead body|corpse|lifeless body)\\b`, 'i'),
+    new RegExp(`\\b${nameEsc}'s\\s+(?:dead body|corpse|lifeless body|drowned body|electrocuted body)\\b`, 'i'),
     new RegExp(`\\bstabs?\\s+${nameEsc}\\s+to\\s+death\\b`, 'i'),
     new RegExp(`\\bstrangles?\\s+${nameEsc}\\s+to\\s+death\\b`, 'i'),
+    // ── Drowning (closed 2026-08-04 — CC0_CORPUS_EXPANSION addendum) ──────
+    // Direct verb, guarded against the common "drowns out" (masks a sound)
+    // idiom, which is not a death cue and would otherwise false-positive on
+    // any script with a character's laugh/voice/music "drowning out" noise.
+    new RegExp(`\\b${nameEsc}\\s+(?:drowns|drowned)\\b(?!\\s+out)`, 'i'),
+    // Fixture-literal reasonable variant (undertow.fountain's actual
+    // phrasing): "went under" ALONE is not unambiguous-death language (a
+    // character can go underwater and resurface), so this pattern requires
+    // BOTH the submersion clause AND an explicit, sentence-final
+    // non-resurfacing clause ("does not come back up.") in the same scene's
+    // action text before it counts as a death cue. The trailing `\.`
+    // deliberately excludes non-terminal continuations like "doesn't come
+    // back up right away, but surfaces moments later" — a recovery, not a
+    // death.
+    new RegExp(`\\b${nameEsc}\\s+(?:goes|went)\\s+under\\b[\\s\\S]{0,300}\\b(?:does\\s+not|doesn't|never)\\s+(?:come\\s+(?:back\\s+)?up|surfaces?\\s+again)\\.`, 'i'),
+    // ── Electrocution (closed 2026-08-04) ──────────────────────────────────
+    // "Electrocuted" (unlike "shocked") denotes death by electric current in
+    // ordinary usage, not mere injury — same unambiguous-verb tier as
+    // "kills"/"murders" above, so no hedge-window special-casing beyond the
+    // existing HEDGE_RE gate is needed.
+    new RegExp(`\\b${nameEsc}\\s+(?:is|was)\\s+electrocuted\\b`, 'i'),
+    new RegExp(`\\belectrocutes?\\s+${nameEsc}\\b`, 'i'),
+    // Fixture-literal reasonable variant (high-voltage.fountain's actual
+    // phrasing): "isn't moving" ALONE is injury-tier, not death-tier
+    // language (a stunned or unconscious character also "isn't moving"), so
+    // this pattern requires the full combination the fixture actually
+    // stages — the character's name near an arc/current/voltage event, an
+    // inability to let go of it, AND the unresponsive tail — before it
+    // counts. Any one piece alone (an arc without a death, "doesn't let go"
+    // of an unrelated object, "isn't moving" from being merely stunned)
+    // does not match.
+    new RegExp(`\\b${nameEsc}(?:'s)?\\b[\\s\\S]{0,120}\\b(?:arc|current|voltage)\\b[\\s\\S]{0,150}\\b(?:doesn't|does\\s+not|didn't|did\\s+not)\\s+let\\s+go\\b[\\s\\S]{0,150}\\bisn'?t\\s+moving\\b`, 'i'),
   ];
 }
 
