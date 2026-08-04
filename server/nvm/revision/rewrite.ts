@@ -128,12 +128,26 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
     priorBlock.push('Do NOT undo any of the above improvements.');
   }
 
+  // Craft-spec injection (user-directed P0 exception — see
+  // server/nvm/generate/craft-spec.ts header): compact form so the block
+  // stays proportionate next to the pass-scoped issue list and the full
+  // draft text below. Dynamic import mirrors the other lazy imports in this
+  // function and keeps the module out of the diagnose-only cost entirely
+  // (this line only runs after the early diagnose-only return above).
+  const { buildCraftPromptSection, looksLikeAnimationGenre } = await import('../generate/craft-spec.ts');
+  const craftBlock = buildCraftPromptSection({
+    compact: true,
+    animation: looksLikeAnimationGenre(storyContext?.genre),
+  });
+
   const prompt = [
     ...(contextBlock.length > 0 ? [...contextBlock, ''] : []),
     `You are a screenplay editor performing the "${passName}" revision pass.`,
     `Rewrite the following Fountain screenplay to fix ONLY the issues listed below.`,
     `Preserve the story's theme, tone, and character voices. Do not change anything outside the scope of the "${passName}" pass.`,
     `Return the COMPLETE revised Fountain text with no extra commentary.`,
+    '',
+    craftBlock,
     '',
     ...(priorBlock.length > 0 ? [...priorBlock, ''] : []),
     'Issues to fix:',

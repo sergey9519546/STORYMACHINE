@@ -9,6 +9,7 @@ import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { SceneFunction } from '../ir/NarrativeTransitionIR.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { genrePromptBlock } from '../../lib/genre-router.ts';
+import { buildCraftPromptSection, looksLikeAnimationGenre } from './craft-spec.ts';
 
 export interface SceneTarget {
   sceneIdx: number;
@@ -291,6 +292,15 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
   // This ensures every candidate generation call respects the story's genre contract.
   const genreBlock = genrePromptBlock(state.authorIntent.genre);
 
+  // Craft-spec injection (user-directed P0 exception — see craft-spec.ts
+  // header): compact form here since the preamble already carries a dense
+  // state snapshot above; full directive text would crowd out the proof
+  // constraints that are load-bearing for the compiler contract below.
+  const craftBlock = buildCraftPromptSection({
+    compact: true,
+    animation: looksLikeAnimationGenre(state.authorIntent.genre),
+  });
+
   const constraintLines = constraints
     .map((c, i) => `${i + 1}. [${c.kind}] ${sanitizeForPrompt(c.description, 400)}`)
     .join('\n');
@@ -300,6 +310,8 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
     `Known characters: ${knownChars}. Active facts: ${activeFacts}.`,
     stateLines,
     genreBlock,
+    '',
+    craftBlock,
     '',
     'PROOF CONSTRAINTS (your output must satisfy all of these):',
     constraintLines,
