@@ -80,6 +80,12 @@ export interface ScreenplaySceneRecord {
   unresolvedClues: string[];
   /** Clue IDs seeded (SEED_CLUE) in this specific scene */
   seededClueIds: string[];
+  /** Recurring-imagery thread ids this scene participates in (D4 demotion,
+   *  2026-08-04): objects that recur across scenes but never pass the clue
+   *  information test. NOT a plant — no payoff is owed — but participation in
+   *  a tracked visual thread is real scene work, which the entropy rules read
+   *  as momentum evidence. Optional so pre-existing fixtures stay valid. */
+  recurringImageryIds?: string[];
   /** Setup IDs paid off (PAYOFF_SETUP) in this specific scene */
   payoffSetupIds: string[];
   /** Whether a clock was raised this scene */

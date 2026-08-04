@@ -197,6 +197,24 @@ honestly rather than backfilled with a guess.
   delegation; the AUC re-measurement and manifest re-lock obligations
   above are explicitly NOT discharged by this entry."
 
+**Same-day follow-up (same range, supersedes the blast table above):**
+integration surfaced a compensating-errors coupling — the
+dramatized-vs-told discrimination pair INVERTED (good 71.8 < bad 72.6)
+because the Shell's discovery scene's only momentum evidence was exactly
+the false clue D4 demoted, so `ZERO_ENTROPY_SCENE` began firing on a scene
+that visibly does story work. Fix: records now carry
+`recurringImageryIds`, and the entropy rule reads recurring-imagery
+participation as momentum evidence (a demoted object is not a plant, but
+its tracked recurrence is not nothing). The pair is restored to its
+pre-change gap (+1.4) with the false promise still gone. FINAL blast
+radius after the follow-through: 19 of 41 health moves (transfer-window
+−10.8 — its false paid-clues; Lockdown +10.3, Low Tide +3.8 — false
+zero-entropy majors lifted), four grade shifts (Lockdown and Low Tide
+uneven→solid, two-lane solid→strong, transfer-window uneven→troubled),
+still ZERO verdict/sceneCount changes, P0 sample still unchanged. All six
+discrimination pairs order correctly; calibration band monotonicity
+holds (full suite green at the commit carrying this note).
+
 ---
 
 ## 3. Entry template (copy for new entries)

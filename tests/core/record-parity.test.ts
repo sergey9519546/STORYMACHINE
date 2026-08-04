@@ -363,6 +363,7 @@ const PARITY_MATRIX: Record<keyof ScreenplaySceneRecord, ParityTier> = {
   dialogueHighlights: 'NOT_COMPARED_FREEFORM', // ops-path pulls raw belief.proposition; text-path pulls raw dialogue lines (incl. the "(believing) " prefix) — never textually equal
   unresolvedClues: 'PRESENCE',
   seededClueIds: 'PRESENCE',
+  recurringImageryIds: 'NOT_COMPARED_FREEFORM', // text-path only (D4 demotion, 2026-08-04): derived from raw prose recurrence; the ops path has no imagery channel and leaves it undefined
   payoffSetupIds: 'PRESENCE',
   clockRaised: 'PRESENCE',                    // ±1 scene tolerance — RAISE_CLOCK itself renders no text; only an adjacent belief/reason carries the deadline lexicon
   clockDelta: 'NOT_COMPARED_FREEFORM',        // magnitude, not classified into SIGN/PRESENCE — no spec requirement to compare it numerically
@@ -778,15 +779,16 @@ describe('record parity — drift tripwire', () => {
     }
   });
 
-  it('PARITY_MATRIX classifies all 26 known ScreenplaySceneRecord fields (sanity count)', () => {
+  it('PARITY_MATRIX classifies all 30 known ScreenplaySceneRecord fields (sanity count)', () => {
     // Not a substitute for the compile-time Record<keyof ScreenplaySceneRecord, ParityTier>
     // check above (that's what actually fails `npm run lint` on a new field) —
     // this just guards against someone hand-editing PARITY_MATRIX's runtime
     // shape independently of the type. 22 through Wave 1182, +3 for Wave
     // 1186's powerHolder/powerBalance/powerFlipped, +1 for Wave 1190's
     // speakingCharacterCount, +3 for Wave 1192's betrayalSignal/
-    // powerDynamicsIntensity/ironyMarkerCount.
-    assert.equal(Object.keys(PARITY_MATRIX).length, 29);
+    // powerDynamicsIntensity/ironyMarkerCount, +1 for the 2026-08-04 D4
+    // demotion's recurringImageryIds.
+    assert.equal(Object.keys(PARITY_MATRIX).length, 30);
   });
 });
 

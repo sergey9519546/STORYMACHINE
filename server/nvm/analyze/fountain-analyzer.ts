@@ -2325,6 +2325,9 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
     dialogueHighlights: dialogueHighlightsList[idx],
     unresolvedClues: unresolvedByScene[idx] ?? [],
     seededClueIds: seedsByScene[idx] ?? [],
+    recurringImageryIds: recurringImagery
+      .filter((img) => img.scenes.includes(idx))
+      .map((img) => img.id),
     payoffSetupIds: payoffsByScene[idx] ?? [],
     clockRaised: clocks[idx].clockRaised,
     clockDelta: clocks[idx].clockDelta,

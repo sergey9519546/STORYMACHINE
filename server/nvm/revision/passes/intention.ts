@@ -726,8 +726,16 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     const isHighDrama = r.suspenseDelta > 2;
     const hasPayoff = (r.payoffSetupIds?.length ?? 0) > 0;
     const hasRevelation = r.revelation !== null;
+    // D4 demotion follow-through (2026-08-04): an object demoted from "clue"
+    // to recurring imagery is no longer a plant, but a scene participating in
+    // a tracked recurring-object thread is still doing visible story work —
+    // the pre-demotion false clue was silently serving as this scene's only
+    // momentum evidence (found live: the dramatized-vs-told pair inverted
+    // when the Shell's discovery scene lost its false clue and gained a
+    // ZERO_ENTROPY_SCENE major it does not deserve).
+    const hasRecurringImagery = (r.recurringImageryIds?.length ?? 0) > 0;
 
-    const hasAnyMomentum = hasEmotionalShift || hasRelationshipShift || hasPlantedClues || hasClockPressure || isHighDrama || hasPayoff || hasRevelation;
+    const hasAnyMomentum = hasEmotionalShift || hasRelationshipShift || hasPlantedClues || hasClockPressure || isHighDrama || hasPayoff || hasRevelation || hasRecurringImagery;
 
     if (!hasAnyMomentum && records.length >= 6) {
       // Only flag if this is a middle scene (not opening setup, not closing epilogue)
