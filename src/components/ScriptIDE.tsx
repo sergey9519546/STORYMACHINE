@@ -1754,7 +1754,11 @@ export default function ScriptIDE({
           onExportFDX={exportFDX}
           onExportPDF={exportPDF}
           onExportDOCX={exportDOCX}
-          onSimulateScript={handleSimulateScript}
+          // P2 surface collapse: simulation is a Labs surface — withhold the
+          // handler entirely when Labs is off so Toolbar's persistent
+          // Simulate control collapses out of the default surface, same
+          // onOpenStoryMachine truthiness gate as the Ship-row button.
+          onSimulateScript={onOpenStoryMachine ? handleSimulateScript : undefined}
           onOpenStoryMachine={onOpenStoryMachine}
           onNewStory={onNewStory ? () => setNewStoryConfirm(true) : undefined}
           onGoHome={onNewStory ? () => setNewStoryConfirm(true) : undefined}

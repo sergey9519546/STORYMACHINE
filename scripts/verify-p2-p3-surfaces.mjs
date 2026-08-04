@@ -413,6 +413,19 @@ async function main() {
     `found ${simulateCountOff} matching button(s) on the Ship toolbar row`,
   );
 
+  // The persistent top Toolbar's own Simulate control (distinct element,
+  // aria-label "Simulate in Story Machine") was the adjacent finding logged
+  // when the Ship-row button was gated. It is hidden — not merely disabled —
+  // when Labs is off, because ScriptIDE withholds onSimulateScript entirely.
+  const persistentSimOff = pageA.getByRole('button', { name: 'Simulate in Story Machine', exact: true });
+  const persistentSimCountOff = await persistentSimOff.count();
+  record(
+    'P2',
+    'Persistent Toolbar: "Simulate in Story Machine" control ABSENT with Labs OFF (adjacent finding closed)',
+    persistentSimCountOff === 0,
+    `found ${persistentSimCountOff} matching control(s) in the persistent Toolbar`,
+  );
+
   await pageA.getByRole('button', { name: 'Write', exact: true }).first().click();
   await pageA.waitForTimeout(150);
 
@@ -648,6 +661,15 @@ async function main() {
     'Ship toolbar row: "Simulate" button (reachable equivalent) APPEARS with Labs ON',
     simulateVisibleOn,
     simulateVisibleOn ? '' : 'button not found/visible on Ship toolbar row with Labs ON',
+  );
+
+  const persistentSimOn = pageB.getByRole('button', { name: 'Simulate in Story Machine', exact: true }).first();
+  const persistentSimVisibleOn = await persistentSimOn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+  record(
+    'P2',
+    'Persistent Toolbar: "Simulate in Story Machine" control APPEARS with Labs ON',
+    persistentSimVisibleOn,
+    persistentSimVisibleOn ? '' : 'control not found/visible in persistent Toolbar with Labs ON',
   );
 
   await contextB.close();

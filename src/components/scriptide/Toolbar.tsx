@@ -330,23 +330,29 @@ export default function Toolbar({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={onSimulateScript}
-          disabled={isSimulating || !onSimulateScript}
-          aria-label={isSimulating ? "Simulating script" : "Simulate in Story Machine"}
-          aria-busy={isSimulating}
-          className={`flex min-h-[40px] min-w-[40px] items-center gap-1.5 border border-[var(--sm-cream)]/30 px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)] ${
-            isSimulating ? "cursor-wait opacity-50" : "disabled:opacity-40"
-          }`}
-        >
-          {isSimulating ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-          ) : (
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-          )}
-          <span className="hidden sm:inline">{isSimulating ? "Simulating" : "Simulate"}</span>
-        </button>
+        {/* P2 surface collapse: simulation is a Labs surface. ScriptIDE
+            withholds onSimulateScript when Labs is off, and the control is
+            hidden (not merely disabled) so no research affordance survives
+            on the default Doctor+Editor surface. */}
+        {onSimulateScript && (
+          <button
+            type="button"
+            onClick={onSimulateScript}
+            disabled={isSimulating}
+            aria-label={isSimulating ? "Simulating script" : "Simulate in Story Machine"}
+            aria-busy={isSimulating}
+            className={`flex min-h-[40px] min-w-[40px] items-center gap-1.5 border border-[var(--sm-cream)]/30 px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)] ${
+              isSimulating ? "cursor-wait opacity-50" : "disabled:opacity-40"
+            }`}
+          >
+            {isSimulating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            <span className="hidden sm:inline">{isSimulating ? "Simulating" : "Simulate"}</span>
+          </button>
+        )}
 
         <div className="relative" ref={overflowRef}>
           <button

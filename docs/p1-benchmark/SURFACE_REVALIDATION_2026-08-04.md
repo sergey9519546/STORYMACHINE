@@ -476,3 +476,20 @@ of that control's presence.
   unit test.
 - Files changed: `src/components/ScriptIDE.tsx`,
   `scripts/verify-p2-p3-surfaces.mjs`, this document.
+
+### Addendum — 2026-08-04 (same day, follow-up): the adjacent persistent-Toolbar Simulate control is ALSO closed
+
+The adjacent finding logged above (the persistent top-Toolbar "Simulate"
+control, aria-label "Simulate in Story Machine",
+`scriptide/Toolbar.tsx` — Labs-agnostic because `ScriptIDE.tsx` passed
+`onSimulateScript` unconditionally) did not wait for a future pass. It is
+now gated by the same mechanism at both ends: `ScriptIDE` withholds the
+handler entirely unless `onOpenStoryMachine` is truthy (i.e. Labs is on),
+and `Toolbar` hides — not merely disables — the control when no handler is
+supplied, so no research affordance survives on the default Doctor+Editor
+surface.
+
+Verified in a real browser: `verify-p2-p3-surfaces.mjs` grew 91 → 93
+(persistent control ABSENT with Labs OFF, APPEARS with Labs ON), all 93
+passing, exit 0, zero genuine console errors. With this, no known
+Labs-agnostic research affordance remains on the default surface.
