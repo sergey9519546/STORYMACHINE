@@ -23,7 +23,9 @@ rules to compensate.
 ## What you show them
 
 `sample-coverage-report.html` (in this folder) — the deterministic coverage
-report for the built-in sample "The Second Key". Regenerate any time with:
+report for the built-in sample, now **"Dead Frequency"** (see the 2026-08-04
+update below; the section immediately after this one describes the retired
+"The Second Key" provenance, kept for history). Regenerate any time with:
 
 ```
 npm run generate-p0-sample
@@ -31,6 +33,8 @@ npm run generate-p0-sample
 
 Provenance (regenerate to verify): health 68.9, verdict CONSIDER, 14 scenes,
 contentHash `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f`.
+**SUPERSEDED 2026-08-04 — see the update block immediately below; this
+paragraph describes the retired "The Second Key" stimulus only.**
 
 > **Update 2026-08-03:** after the 1-based scene-label migration the
 > regenerated artifact is **212,708 bytes** (issue labels shifted; health /
@@ -49,6 +53,24 @@ intervening commits are docs/tests/a11y/security only and do not touch the
 render path, so for **live-flow** sessions the operating kit's pre-session
 "sample loads correctly" browser check still applies. See
 `FIELDING_DECISION_BRIEF.md` for the go/no-go package.
+
+> **Update 2026-08-04 — stimulus swap, "The Second Key" -> "Dead Frequency"
+> (all provenance above this line describes the RETIRED sample):** the P0
+> sample was upgraded from a ~47.5 words/scene skeleton to
+> `data/screenplays/dead-frequency.fountain`, a corpus-density stimulus at
+> ~152.6 words/scene (12 scenes, 1,831 words) — see the dated addendum in
+> `FIELDING_DECISION_BRIEF.md` for the full rationale and comparison table.
+> Newly measured provenance (HEAD `0cf12c9` at swap time): **health 78.3,
+> verdict CONSIDER, sceneCount 12**, contentHash
+> `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`,
+> regenerated `sample-coverage-report.html` is **193,132 bytes**. The old
+> stimulus's fountain text is preserved verbatim at
+> `docs/user-validation/ARCHIVED_SAMPLE_THE_SECOND_KEY.md`. Zero P0 sessions
+> had been run against the retired stimulus, so no session comparability is
+> lost by this swap. Re-verified: `npm run generate-p0-sample` reproduces the
+> figures above byte-identical apart from the runtime datestamp;
+> `scripts/smoke-p0-live-flow.mjs` PASS (zero genuine console errors,
+> keyless); `npm run honesty-audit` clean.
 
 **Exposure caveat:** the static HTML is the *report artifact only*. If your
 session shows only this file (not the live StartScreen → Doctor → export flow),

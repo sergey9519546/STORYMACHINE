@@ -83,6 +83,11 @@ Successfully reconciled 10+ contradictory planning documents into a single unifi
    - Report: "The Second Key" (14 scenes, health 68.9, CONSIDER)
    - ContentHash: `33dcf21462118381...` (deterministic)
    - Size: 210KB HTML
+   - **SUPERSEDED 2026-08-04:** the sample was swapped to "Dead Frequency"
+     (12 scenes, health 78.3, CONSIDER, contentHash `a1b44eff859d…`) to fix a
+     corpus-density thinness limitation. This filed-backlog record is kept
+     as-is for history; see `docs/user-validation/FIELDING_DECISION_BRIEF.md`'s
+     2026-08-04 "RESOLVED" addendum for current provenance.
 
 ---
 

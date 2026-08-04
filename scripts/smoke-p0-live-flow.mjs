@@ -29,9 +29,14 @@ const REPO = process.cwd();
 const ISOLATED_PORT = await pickFreePort();
 const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 
-// Expected deterministic facts for "The Second Key" (regenerate-verified;
-// must match docs/user-validation/P0_QUICK_START.md provenance).
-const EXPECT = { verdict: 'CONSIDER', health: 69, minScenes: 14 };
+// Expected deterministic facts for "Dead Frequency" (regenerate-verified;
+// must match docs/user-validation/P0_QUICK_START.md provenance). Re-locked
+// 2026-08-04 for the stimulus swap ("The Second Key" -> "Dead Frequency",
+// see src/lib/sample-script.ts's header) — measured health is 78.3, and the
+// live-flow UI rounds it to an integer for display, hence 78 here (the same
+// rounding relationship the prior EXPECT.health: 69 had to the old exported
+// 68.9).
+const EXPECT = { verdict: 'CONSIDER', health: 78, minScenes: 12 };
 
 function pickFreePort() {
   return new Promise((resolve, reject) => {

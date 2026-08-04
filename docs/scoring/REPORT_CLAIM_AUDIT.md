@@ -12,6 +12,14 @@
 > (`src/components/scriptide/ScriptDoctorPanel.tsx`). The HTML export is the
 > P0 stimulus artifact (`docs/user-validation/sample-coverage-report.html`).
 >
+> **SUPERSEDED VALUE NOTE (2026-08-04):** this ledger's worked example was
+> generated against the "The Second Key" sample (health 68.9). The P0
+> stimulus was swapped that day to "Dead Frequency" (health 78.3) — see
+> `docs/user-validation/FIELDING_DECISION_BRIEF.md`'s "RESOLVED" addendum.
+> The 68.9 figure below is now a stale illustrative number, not current
+> provenance; the claim-substantiation analysis it supports (the formula
+> mechanics, not the specific value) is unaffected.
+>
 > Authority: `ROADMAP.md`, `NORTH_STAR.md`, `AGENTS.md`,
 > `docs/reference/STORYMACHINE_ACTIVE_WORK_PROMPT.md` (Lever 1),
 > `docs/user-validation/P1_BASELINE_INVENTORY.md`. The constitution's load-

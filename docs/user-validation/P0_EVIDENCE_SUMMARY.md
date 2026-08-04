@@ -234,6 +234,10 @@ Provenance of the committed artifact (regenerate to re-verify):
 | Scene count | 14 |
 | contentHash | `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` |
 
+**SUPERSEDED 2026-08-04 — this table describes the RETIRED "The Second Key"
+stimulus.** See "Update 2026-08-04 — stimulus swap" at the end of this
+document for the current provenance table.
+
 **Scope caveat (do not overclaim):** the static report is the report artifact
 only. It does not exercise the interactive flow (loading, running, scrolling
 through the live panel), and any P0 session that shows only the static report
@@ -242,3 +246,85 @@ kit's exposure-controls rule. Whether a static-report-only session satisfies
 the operating kit's "existing sample flow and coverage report" requirement is
 a decision-owner call, recorded per session — this note does not relax that
 requirement.
+
+## Update 2026-08-04 — stimulus swap, "The Second Key" -> "Dead Frequency"
+(RESOLVES the thinness limitation FIELDING_DECISION_BRIEF.md recorded)
+
+Performed under the maintainer's 2026-08-04 blanket delegation (the same
+delegation that recorded the GO decision) — this is stimulus-quality
+remediation, not a re-opening of the field/no-field decision, and it does
+not fabricate or alter session evidence (the gate counter stays **0 of
+>=5**, unchanged by this entry).
+
+**Why:** `FIELDING_DECISION_BRIEF.md` recorded, as a known and un-fixed
+limitation, that "The Second Key" was thin — ~665 words across 14 scenes
+(~47.5 words/scene) against a real-corpus median of ~161–181 words/scene —
+and that this thinness inflated minor-issue counts and made sub-scores read
+as false precision (`docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md`
+defect D5). That limitation is now resolved by upgrading the sample to a
+corpus-density stimulus.
+
+**What changed:** `src/lib/sample-script.ts` now embeds
+`data/screenplays/dead-frequency.fountain` ("Dead Frequency"), one of the 20
+tracked CC0 screenplays in the STORYMACHINE benchmark corpus — see
+`data/screenplays/LICENSE-live-action.md` for full provenance/license. It
+was selected by measuring words/scene across all 20 candidates and picking
+the closest-to-band match (152.6 words/scene against the 161–181 target)
+among candidates that also clear the >=12-scene preference; the full
+comparison table is in the 2026-08-04 addendum of `FIELDING_DECISION_BRIEF.md`.
+The retired stimulus is preserved verbatim at
+`docs/user-validation/ARCHIVED_SAMPLE_THE_SECOND_KEY.md`.
+
+**Old vs new (both measured the same way — `npm run generate-p0-sample` on
+the committed stimulus):**
+
+| Field | Old ("The Second Key") | New ("Dead Frequency") |
+|---|---|---|
+| Words / scenes | 665 / 14 | 1831 / 12 |
+| Words per scene | ~47.5 | **~152.6** |
+| Health | 68.9 | **78.3** |
+| Verdict | CONSIDER | CONSIDER |
+| contentHash | `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` | **`a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`** |
+| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes** |
+
+**Re-verification performed on HEAD `0cf12c9` (the commit whose
+`isDoubleSpaced()` normalizer rekey last shifted the corpus's health
+numbers):**
+
+- `npm run generate-p0-sample` — reproduces the new figures above
+  byte-identical apart from the runtime datestamp.
+- `npm run honesty-audit` — clean.
+- `npm run lint` — clean (`tsc --noEmit`, 0 errors).
+- `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node scripts/smoke-p0-live-flow.mjs`
+  — PASS, verdict=CONSIDER, health~78, zero genuine console errors, keyless.
+- `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node scripts/verify-p2-p3-surfaces.mjs`
+  — 89/89 assertions PASS (no stimulus-dependent EXPECT values needed
+  updating; this script reads `src/lib/sample-script.ts` directly and derives
+  its own checks from whatever is there).
+- `demo/corpus/MANIFEST.json` bumped to version 2 (sha256, title, frozen
+  date) with the retired version 1 entry preserved in a `history` array, so
+  `tests/core/demo-corpus-freeze.test.ts` (G0-10) stays green.
+
+**Known collateral test impact (NOT fixed by this entry — outside this
+session's lane, `tests/` is owned by a concurrent session):** two `tests/`
+files couple to the exact content of the live sample and fail after this
+swap, independent of which replacement script was chosen:
+`tests/core/scene-label-consistency.test.ts` (three subtests assert
+`checked >= 5` slug-paired-label occurrences; "Dead Frequency" produces only
+3, likely because denser, longer scenes trigger fewer of the
+short-scene-format structural rules that emit that label shape — every
+words/scene-band-matched candidate measured showed the same 3-occurrence
+count, so this is not specific to the chosen script) and
+`tests/core/reversal-detection.test.ts` (its positive fixture hardcodes "The
+Second Key"'s specific Vance-betrayal reveal text and scene index as a
+canonical worked example for a detector — this is unavoidable for ANY
+stimulus swap, not a symptom of the chosen replacement). Both need a
+`tests/`-lane follow-up: the scene-label test's `>=5` threshold should be
+re-measured against the new stimulus (with a comment noting the number is
+measured, not aspirational, per this task's own guidance), and the
+reversal-detection test should probably carry its own dedicated fixture text
+(e.g. the archived "The Second Key" content) instead of depending on the
+mutable `demo/corpus/sample-script.fountain`.
+
+Zero P0 sessions had been run against the retired stimulus at the time of
+this swap, so no session comparability is lost.

@@ -203,3 +203,71 @@ do" says — recruiting, running, and documenting sessions are human work,
 and zero sessions have been fabricated. The gate's counters still read
 0 of >= 5 valid sessions; GO changes what is *authorized*, not what is
 *evidenced*.
+
+---
+
+## RESOLVED — 2026-08-04: the thinness limitation (§"A limitation the
+decision owner should weigh") is fixed by a stimulus upgrade
+
+The limitation recorded above — "the sample script ('The Second Key') is
+thin — ~665 words across 14 scenes, about 47.5 words per scene, against a
+median of roughly 161–181 words per scene in the 761-script corpus" — is now
+**RESOLVED**, not merely re-weighed. Performed under the same 2026-08-04
+blanket delegation as the GO decision above (owner-delegated, not a new
+human decision — this is stimulus-quality remediation of an already-decided
+GO, not a re-opening of the field/no-field question).
+
+**What changed:** `src/lib/sample-script.ts`'s built-in sample was swapped
+from "The Second Key" to `data/screenplays/dead-frequency.fountain`
+("Dead Frequency"), one of the 20 tracked CC0 original screenplays in the
+STORYMACHINE benchmark corpus (`data/screenplays/LICENSE-live-action.md`).
+It now plays a dual role: P1 discrimination-corpus member AND P0 stimulus —
+nothing was removed from the corpus. The retired stimulus's fountain text is
+preserved verbatim at
+`docs/user-validation/ARCHIVED_SAMPLE_THE_SECOND_KEY.md` per the standing
+keep-as-reference rule.
+
+**Candidate comparison (all 20 tracked `data/screenplays/*.fountain`
+scripts, measured via `runScriptDoctor` on HEAD `0cf12c9` — the same HEAD
+`isDoubleSpaced()` normalizer rekey that shifted six scripts' health):**
+
+| File | Scenes | Words | Words/scene | Health | Verdict |
+|---|---:|---:|---:|---:|---|
+| `runoff.fountain` | 9 | 1449 | 161.0 | 74.5 | CONSIDER |
+| **`dead-frequency.fountain`** | **12** | **1831** | **152.6** | **78.3** | **CONSIDER** |
+| `counter-offer.fountain` | 10 | 1522 | 152.2 | 76.0 | CONSIDER |
+| `off-season.fountain` | 9 | 756 | 84.0 | 71.6 | CONSIDER |
+| `the-key-under-the-mat.fountain` | 11 | 903 | 82.1 | 72.9 | CONSIDER |
+| `soft-launch.fountain` | 12 | 972 | 81.0 | 76.3 | CONSIDER |
+| `the-defense-rests.fountain` | 12 | 963 | 80.3 | 76.1 | CONSIDER |
+| ...11 more scripts... | 9–14 | 434–1011 | 43.4–77.8 | 27.3–77.4 | CONSIDER/PASS |
+| `transfer-window.fountain` | 10 | 459 | 45.9 | 38.4 | PASS |
+| `room-12.fountain` | 10 | 434 | 43.4 | 27.3 | PASS |
+
+**Why `dead-frequency.fountain` won:** it is the closest-to-band
+words/scene (152.6, against the 161–181 real-corpus median) among every
+candidate that also clears the >=12-scene preference — the one candidate
+closer in density (`runoff.fountain`, 161.0 words/scene) has only 9 scenes.
+It is independently documented in the corpus's own manifest
+(`LICENSE-live-action.md`) as "strong"-band craft-calibration material with
+a genuinely mixed profile ("Clue paid off late; revelation past midpoint;
+clock honored in both halves; escalating danger into climax; full
+relationship arc"), and its measured report is mid-band CONSIDER — not
+suspiciously perfect, not a wall of red.
+
+**Old vs new stimulus facts:**
+
+| | Old ("The Second Key") | New ("Dead Frequency") |
+|---|---|---|
+| Words / scenes | 665 / 14 | 1831 / 12 |
+| Words per scene | **~47.5** | **~152.6** |
+| Health | 68.9 | **78.3** |
+| Verdict | CONSIDER | CONSIDER (unchanged) |
+| contentHash | `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` | `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` |
+| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes** |
+
+The new figures are the current, live provenance — see the 2026-08-04
+addendum in `P0_EVIDENCE_SUMMARY.md` for the fuller re-verification record
+(smoke test, verify-p2-p3-surfaces, honesty-audit, lint, full test suite).
+**Zero P0 sessions had been run against the retired stimulus** (the gate
+counter is still 0 of >=5), so this swap loses no session comparability.

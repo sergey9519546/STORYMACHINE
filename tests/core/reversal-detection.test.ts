@@ -16,11 +16,14 @@
 //     a synthetic ScreenplaySceneRecord would just be hand-authoring the
 //     exact string the module is supposed to classify, proving nothing about
 //     whether the text pipeline actually produces that string in the first
-//     place. The positive fixture reuses demo/corpus/sample-script.fountain
-//     ("The Second Key") verbatim — the canonical D3 worked example from the
-//     ledger itself (Vance's reveal, ~line 122), read-only, so this suite
-//     stays byte-identical to the frozen demo corpus guarded by
-//     tests/core/demo-corpus-freeze.test.ts.
+//     place. The positive fixture is tests/fixtures/reversal-detection/
+//     the-second-key.fountain — the canonical D3 worked example from the
+//     ledger itself (Vance's reveal, ~line 122), a byte-verbatim copy of
+//     demo/corpus/sample-script.fountain v1 ("The Second Key") taken
+//     2026-08-04 when the live demo corpus moved to v2 ("Dead Frequency",
+//     the P0 stimulus upgrade). The ledger's worked example depends on THIS
+//     exact text and its exact scene indexes, so it lives as a dedicated
+//     immutable fixture instead of tracking the mutable live sample.
 //   - Channel 2 (relationship-shift sign flip) is exercised through
 //     synthetic makeSceneRecord fixtures with explicit relationshipShifts,
 //     because that channel's rolling-sum logic needs exact, unambiguous
@@ -37,7 +40,7 @@ import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.
 import { makeSceneRecord } from '../passes/helpers.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 
-const demoCorpusDir = path.resolve(import.meta.dirname, '../../demo/corpus');
+const fixtureDir = path.resolve(import.meta.dirname, '../fixtures/reversal-detection');
 
 function fountain(...scenes: string[][]): string {
   return scenes.map(s => s.join('\n')).join('\n\n');
@@ -46,7 +49,7 @@ function fountain(...scenes: string[][]): string {
 // ── Positive fixture: real betrayal-revelation script (channel 1) ─────────
 
 describe('detectReversals — positive fixture: the canonical D3 betrayal-revelation script', () => {
-  const text = fs.readFileSync(path.join(demoCorpusDir, 'sample-script.fountain'), 'utf8');
+  const text = fs.readFileSync(path.join(fixtureDir, 'the-second-key.fountain'), 'utf8');
   const { records } = analyzeFountainText(text);
 
   it('legacy suspense-dip definition reports ZERO reversals on this script (reproduces D3 exactly)', () => {
@@ -229,7 +232,7 @@ describe('detectReversals — channel 2: relationship-shift sign flip against an
 
 describe('detectReversals — determinism', () => {
   it('is deterministic: repeated calls on the same records produce identical results', () => {
-    const text = fs.readFileSync(path.join(demoCorpusDir, 'sample-script.fountain'), 'utf8');
+    const text = fs.readFileSync(path.join(fixtureDir, 'the-second-key.fountain'), 'utf8');
     const { records } = analyzeFountainText(text);
     assert.deepEqual(detectReversals(records), detectReversals(records));
     assert.deepEqual(computeReversalDelta(records), computeReversalDelta(records));

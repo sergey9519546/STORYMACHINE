@@ -1,8 +1,18 @@
 {
-  "version": 1,
-  "title": "The Second Key",
+  "version": 2,
+  "title": "Dead Frequency",
   "file": "sample-script.fountain",
-  "sha256": "5c6df225f22db6ddf54efe98b59132b83a477d8e3c12b9975c7c50b9fa530cc3",
-  "frozen": "2026-07-24",
-  "note": "Immutable moderator demo corpus. Any change to the live sample requires a new version entry here — tests/core/demo-corpus-freeze.test.ts enforces the match."
+  "sha256": "9e8a715208da015211ab180535728b967a379bb289c5b9b9591c26612472f4ad",
+  "frozen": "2026-08-04",
+  "note": "Immutable moderator demo corpus. Any change to the live sample requires a new version entry here — tests/core/demo-corpus-freeze.test.ts enforces the match.",
+  "history": [
+    {
+      "version": 1,
+      "title": "The Second Key",
+      "sha256": "5c6df225f22db6ddf54efe98b59132b83a477d8e3c12b9975c7c50b9fa530cc3",
+      "frozen": "2026-07-24",
+      "retired": "2026-08-04",
+      "retiredReason": "P0 stimulus corpus-density thinness (~47.5 words/scene vs ~161-181 real-corpus median); see docs/user-validation/FIELDING_DECISION_BRIEF.md addendum and docs/user-validation/ARCHIVED_SAMPLE_THE_SECOND_KEY.md for the archived text."
+    }
+  ]
 }

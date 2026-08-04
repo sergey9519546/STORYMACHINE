@@ -32,7 +32,7 @@ import type { PassName, RevisionIssue } from '../../server/nvm/revision/passes/t
 
 const root = path.resolve(import.meta.dirname, '../..');
 
-/** The committed demo screenplay — a real 14-scene script the full pipeline
+/** The committed demo screenplay — a real 12-scene script the full pipeline
  *  runs on, dense enough that many passes fire. */
 function sampleFountain(): string {
   const src = fs.readFileSync(path.join(root, 'src/lib/sample-script.ts'), 'utf8');
@@ -45,6 +45,15 @@ function sampleFountain(): string {
 // also emit descriptive parentheticals — "Scene 13 (climax peak)",
 // "Scene 8 (midpoint)" — which carry no slug to check against.
 const SLUG_PAIRED = /Scene (\d+) \(((?:INT|EXT)[^)]*)\)/i;
+
+// MEASURED, not aspirational: the count of slug-paired labels the current
+// sample ("Dead Frequency", the 2026-08-04 corpus-density stimulus upgrade)
+// actually produces — a denser script trips fewer of the passes that emit
+// slug-paired locations than the retired thin skeleton did (3 vs 19). The
+// floor exists so the cross-checks below can never silently pass on zero
+// matches; re-lock it to the newly measured count whenever the sample
+// changes, and treat an unexplained drop to 0 as the regression it is.
+const MIN_SLUG_PAIRED = 3;
 
 describe('scene-label consistency — 1-based labels, agreeing consumers', () => {
   let fountain: string;
@@ -81,7 +90,7 @@ describe('scene-label consistency — 1-based labels, agreeing consumers', () =>
         wrong.push(`${issue.location} [${hint}]`);
       }
     }
-    assert.ok(checked >= 5, `expected several slug-paired labels to check, got ${checked}`);
+    assert.ok(checked >= MIN_SLUG_PAIRED, `expected several slug-paired labels to check, got ${checked}`);
     assert.deepEqual(wrong, [], `labels whose number contradicts their own slug:\n  ${wrong.join('\n  ')}`);
   });
 
@@ -147,7 +156,7 @@ describe('scene-label consistency — 1-based labels, agreeing consumers', () =>
       );
       checked++;
     }
-    assert.ok(checked >= 5, `expected several heatmap cross-checks, got ${checked}`);
+    assert.ok(checked >= MIN_SLUG_PAIRED, `expected several heatmap cross-checks, got ${checked}`);
   });
 
   it('editor anchoring agrees with the label text (locate.ts decode)', () => {
@@ -167,7 +176,7 @@ describe('scene-label consistency — 1-based labels, agreeing consumers', () =>
       );
       checked++;
     }
-    assert.ok(checked >= 5, `expected several anchored cross-checks, got ${checked}`);
+    assert.ok(checked >= MIN_SLUG_PAIRED, `expected several anchored cross-checks, got ${checked}`);
   });
 
   it('cluster sceneIdxs stay 0-based and in range (cluster.ts decode)', () => {

@@ -1,5 +1,17 @@
 # Surface re-validation — P2/P3 DONE claims vs. the current tree (2026-08-04)
 
+**SUPERSEDED VALUE NOTE (later same day, 2026-08-04):** every contentHash /
+health / verdict / totalIssues figure below (`33dcf214…` / `68.9` /
+`CONSIDER` / `200`) describes the run against the "The Second Key" sample,
+before that day's later stimulus swap to "Dead Frequency" (health 78.3,
+contentHash `a1b44eff859d…`) — see
+`docs/user-validation/FIELDING_DECISION_BRIEF.md`'s "RESOLVED" addendum. The
+89/89 pass count and every structural (P2/P4-instrumentation) finding below
+are unaffected — re-run post-swap and confirmed still 89/89 with the new
+values substituted (this script derives its own checks from whatever
+`src/lib/sample-script.ts` currently contains, so no script edit was
+needed).
+
 **Scope note:** this is NOT `PATH_TO_DONE.md` task 6 ("re-validate P2/P3
 against what P0/P1 learn") — that task is evidence-driven and correctly
 NOT STARTED, since no P0 session or P1 human-label evidence exists yet.
