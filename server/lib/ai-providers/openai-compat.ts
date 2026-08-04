@@ -411,7 +411,7 @@ export function makeOpenAICompatLLMProvider(cfg: {
   apiKey: string;
 }): LLMProvider {
   return {
-    generate: async (params: GenerateContentParameters): Promise<GenerateContentResponse> => {
+    generate: async (params: GenerateContentParameters, signal?: AbortSignal): Promise<GenerateContentResponse> => {
       const messages = buildMessages(params);
       const body: Record<string, unknown> = { model: params.model, messages };
 
@@ -440,6 +440,11 @@ export function makeOpenAICompatLLMProvider(cfg: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
+        // SECURITY (audit H2): forward the caller's AbortSignal so the in-flight
+        // socket is actually cancelled when ai.ts withTimeout fires the hard
+        // deadline. fetchOpenAICompat spreads init (incl. signal) into every
+        // hop's undici fetch, matching the FreeRide/Gemini abort guarantee.
+        signal,
       });
 
       if (!res.ok) {

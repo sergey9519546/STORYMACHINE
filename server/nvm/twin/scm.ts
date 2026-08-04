@@ -27,7 +27,7 @@ function opId(commitId: string, opIdx: number): string {
 
 export function buildSCM(stage: Stage): StructuralCausalModel {
   const nodes = new Map<string, SCMNode>();
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
 
   // First pass: create all nodes
   for (const commit of commits) {

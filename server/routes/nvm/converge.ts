@@ -211,7 +211,7 @@ router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req,
       directorPolicy = mineCorpus(fakeReport).policy;
     }
 
-    const allCommitsForArc = stage.getCommits().filter((c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+    const allCommitsForArc = stage.getLiveCommits();
     const arcReport = analyzeArcCompletion(allCommitsForArc.map((c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops })));
     const bibleSummary = buildStoryBibleSummary(stage);
 
@@ -347,7 +347,7 @@ router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema),
   const bibleSummaryArc = buildStoryBibleSummary(stage);
   // Wave 77: compute open promises once upfront for the arc run.
   const { analyzeArcCompletion: analyzeArcForBudget } = await import('../../nvm/quality/arc-tracker.ts');
-  const arcCommitsForBudget = stage.getCommits().filter((c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+  const arcCommitsForBudget = stage.getLiveCommits();
   const arcReportForBudget = analyzeArcForBudget(arcCommitsForBudget.map((c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops })));
   const baseBudget = {
     maxIterations: Math.min(Number(rawBudgetArc.maxIterations ?? 3), 10),

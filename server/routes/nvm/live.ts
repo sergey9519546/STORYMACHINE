@@ -49,7 +49,7 @@ router.post('/api/nvm/room/critique', gameLimiter, validate(RoomCritiqueBodySche
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   type NarrativeTransitionIRT = import('../../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
 
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   const lastCommit = commits.length > 0 ? commits[commits.length - 1] : null;
   const priorCommits = lastCommit ? commits.slice(0, -1) : [];
 
@@ -110,7 +110,7 @@ router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), wit
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
-  const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+  const allCommits = stage.getLiveCommits();
 
   // Fold committed ops into state for accurate proof-gate evaluation
   const baseState = buildNarrativeState(stage);
@@ -179,7 +179,7 @@ router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), wit
 router.get('/api/nvm/live/feed', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
-  const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+  const allCommits = stage.getLiveCommits();
 
   const feed = allCommits.map(c => {
     const beliefCount = c.ops.filter(o => o.op === 'UPDATE_BELIEF').length;

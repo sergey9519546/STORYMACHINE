@@ -31,6 +31,8 @@ import {
   predicateToKey,
 } from './pddl-types';
 
+import { resolveEffectTargets } from './effect-targets';
+
 // ── Planning Node ────────────────────────────────────────────────────────────
 
 /**
@@ -272,28 +274,15 @@ function applyAudienceEffect(
 
 /**
  * Resolve character targets ('actor', 'target', 'both', 'all', or specific ID).
+ * Thin wrapper over the shared resolver (effect-targets.ts) — the single source
+ * of truth for the actor/target/both/all convention.
  */
 function resolveCharacterTargets(
   target: string,
   action: APDLAction,
   state: APDLWorldState
 ): CharacterId[] {
-  if (target === 'all') {
-    return Array.from(state.emotional_state.keys());
-  }
-  
-  if (target === 'both' || target === 'actor' || target === 'target') {
-    // Convention (see examples.ts): action.parameters[0] is the actor,
-    // action.parameters[1] is the target of the action.
-    const actorId = action.parameters[0];
-    const targetId = action.parameters[1];
-
-    if (target === 'actor') return actorId ? [actorId] : [];
-    if (target === 'target') return targetId ? [targetId] : [];
-    return [actorId, targetId].filter((id): id is string => !!id);
-  }
-
-  return [target];
+  return resolveEffectTargets(target, action, () => state.emotional_state.keys());
 }
 
 // ── Cost Functions ───────────────────────────────────────────────────────────

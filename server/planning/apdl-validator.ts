@@ -18,6 +18,8 @@ import {
   calculateTrajectory,
 } from './apdl';
 
+import { resolveEffectTargets } from './effect-targets';
+
 // ── Validation Results ───────────────────────────────────────────────────────
 
 /**
@@ -134,24 +136,14 @@ function applyActionEmotionalEffects(
   nextState.timestamp = state.timestamp + 1;
 
   for (const effect of action.emotional_effects) {
-    // Resolve symbolic targets exactly as apdl-planner's resolveCharacterTargets
-    // does — action.parameters[0] is the actor, [1] the target — so symbolic
-    // effects ('actor'/'target'/'both') are neither dropped nor mistaken for a
-    // literal character id named "actor"/"target".
-    let targets: string[];
-    if (effect.character === 'all') {
-      targets = Array.from(nextState.emotional_state.keys());
-    } else if (effect.character === 'actor') {
-      targets = action.parameters[0] ? [action.parameters[0]] : [];
-    } else if (effect.character === 'target') {
-      targets = action.parameters[1] ? [action.parameters[1]] : [];
-    } else if (effect.character === 'both') {
-      targets = [action.parameters[0], action.parameters[1]].filter(
-        (id): id is string => !!id,
-      );
-    } else {
-      targets = [effect.character];
-    }
+    // Resolve symbolic targets ('all'/'actor'/'target'/'both') and literal ids
+    // through the shared single source of truth (effect-targets.ts), so this
+    // path stays byte-identical to apdl-planner's applyAPDLAction.
+    const targets = resolveEffectTargets(
+      effect.character,
+      action,
+      () => nextState.emotional_state.keys(),
+    );
 
     for (const charId of targets) {
       let emotionalState = nextState.emotional_state.get(charId);

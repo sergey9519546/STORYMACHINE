@@ -1,3 +1,5 @@
+import { scenesFromFountain } from './scene-split.ts';
+
 // Bonding / affiliation ("oxytocin") excellence signal — ROADMAP §5 detector.
 // Deterministic, no LLM. Credits a script for staging genuine interpersonal
 // bonding beats between two present characters: cooperation, shared
@@ -87,14 +89,6 @@ function extractCharacterName(line: string): string | null {
   const match = line.trim().match(CHARACTER_CUE);
   if (!match) return null;
   return match[1].trim();
-}
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). Local,
- * modest re-derivation matching emotional-arc.ts's convention — no import of
- * a private helper. */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
 }
 
 function speakingCharactersInScene(scene: string): Set<string> {
