@@ -1823,8 +1823,8 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
 
   // ── Wave 400: LONG_LINE_FLOOD, LINE_ENDING_REPETITION, PROGRESSIVE_VERB_OVERUSE ──
 
-  // LONG_LINE_FLOOD (minor, ≥10 action lines, >60% are ≥12 words): The action prose is
-  // uniformly dense — more than 60% of all action lines carry ≥12 words, leaving no
+  // LONG_LINE_FLOOD (minor, ≥10 action lines, >60% are ≥20 words): The action prose is
+  // uniformly dense — more than 60% of all action lines carry ≥20 words, leaving no
   // white-space breathing room on the page. Dense prose is exhausting to read and signals
   // a writer who treats action like a novel excerpt rather than a screenplay — every moment
   // fully described, nothing implied by what's shown. The upper-end complement of SHORT_
@@ -1832,14 +1832,34 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // fires on the opposite failure. Distinct from RUN_ON_ACTION (≥5 consecutive lines >20
   // words — a streak check at a higher threshold) and MONOTONOUS_RHYTHM (uniformity in
   // length variance, not upper-end distribution).
+  //
+  // DENSITY-BIAS GUARD (Lane H, 2026-08-04) — "long" bar raised 12w → 20w.
+  // MEASURED DEFECT: 81% of ALL action lines in the 20 CC0 reference screenplays
+  // are already ≥12 words (p25=13, median=19, mean=20.0), so ">60% of lines ≥12w"
+  // was satisfied by 18/20 (90%) of the reference corpus — the rule reported the
+  // NORMAL condition of screenplay action prose as a flaw. On the calibration
+  // corpus it was also inverted: 3/10 known-strong band vs 0/10 known-weak band.
+  // A "long line" must be long relative to the corpus it is judged against; at a
+  // 12-word bar the rule was really measuring "this writer wrote action prose at
+  // all", which taxes dramatized writing for being dramatized — the same
+  // false-positive-density defect as the D1/D2/D4 family.
+  // 20w is the measured re-anchor: the CC0 mean (20.0) / median (19) action line,
+  // so >60% of lines must exceed the TYPICAL produced action line before the page
+  // counts as a wall of text. Re-measured base rates at 20w: CC0 3/20 (15%),
+  // calibration-strong 0/9, calibration-weak 0/7 (inversion eliminated).
+  // RECALL COST (stated honestly): scripts whose action lines cluster in the
+  // 12–19 word band no longer fire. That band IS the reference corpus's own
+  // interquartile range, so those fires were describing ordinary prose. Scripts
+  // that genuinely run a majority of ≥20-word lines still fire — see
+  // rhythm.density-guard.test.ts for the retained-true-positive fixture.
   if (actionLines.length >= 10) {
-    const longCount400a = actionLines.filter(l => countWords(l.text) >= 12).length;
+    const longCount400a = actionLines.filter(l => countWords(l.text) >= 20).length;
     if (longCount400a / actionLines.length > 0.6) {
       issues.push({
         location: 'Action lines throughout',
         rule: 'LONG_LINE_FLOOD',
         severity: 'minor',
-        description: `${longCount400a} of ${actionLines.length} action lines (${Math.round(longCount400a / actionLines.length * 100)}%) are 12 words or longer — the prose is uniformly dense with no visual breathing room. A screenplay page reads fastest when long description is broken by short, punchy beats. When most lines are long, the page becomes a wall of text that slows the reader and buries the moments that should land fast.`,
+        description: `${longCount400a} of ${actionLines.length} action lines (${Math.round(longCount400a / actionLines.length * 100)}%) are 20 words or longer — the prose is uniformly dense with no visual breathing room. A screenplay page reads fastest when long description is broken by short, punchy beats. When most lines are long, the page becomes a wall of text that slows the reader and buries the moments that should land fast.`,
         suggestedFix: 'Break up the density: after a long descriptive line, let a short one land — "She stares." or "Nothing." or "A beat." give the eye a rest and make the longer lines feel deliberate rather than exhausting. Vary line length as a rhythmic tool, not just a consequence of how much there is to describe.',
       });
     }
@@ -2124,8 +2144,28 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // zone averages. LONGEST_ACTION_OUTLIER isolates a single peak by word count. This is the FIRST
   // aftermath/sequence check in this pass — it asks what follows a long line rather than how many
   // exist or where they cluster. Orthogonal to all existing analytical modes in use here.
+  //
+  // DENSITY-BIAS GUARD (Lane H, 2026-08-04) — now requires that a recovery-length
+  // (≤7w) action line EXIST somewhere in the script before its PLACEMENT is
+  // audited. Same defect and same argument as ACTION_LONG_BEAT_UNCAUSED below
+  // (see that rule's guard comment for the full measurement): the rule claims to
+  // audit the "density peak → recovery beat" PATTERN, but a script with no short
+  // line anywhere cannot exhibit the pattern, so the trigger was forced rather
+  // than observed. Measured over the same 52 scripts:
+  //     P(fire | script has NO ≤7w action line) = 13/28 = 0.46
+  //     P(fire | script HAS a ≤7w action line)  =  1/21 = 0.05
+  // Only 1 of its 14 fires was an informative placement failure; the rest restate
+  // an absence that SHORT_LINE_POVERTY / SENTENCE_FRAGMENT_STARVATION already
+  // report, so the same prose property was charged two to four times over —
+  // and always against the script that wrote more action prose.
+  // RECALL COST (stated honestly): 13 of 14 fires removed, every one a duplicate
+  // of a still-reported finding. The retained fire is the genuine placement
+  // failure (short lines exist, never deployed after a density peak).
   if (actionLines.length >= 8) {
-    const qualifying442b = actionLines.filter(
+    const hasRecoveryRegister442b = actionLines.some(
+      l => l.text.split(/\s+/).filter(Boolean).length <= 7,
+    );
+    const qualifying442b = !hasRecoveryRegister442b ? [] : actionLines.filter(
       (l, idx) => l.text.split(/\s+/).filter(Boolean).length >= 14 && idx < actionLines.length - 2,
     );
     if (qualifying442b.length >= 2) {
@@ -2182,8 +2222,8 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
 
   // ── Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK ──
 
-  // ACTION_CONSECUTIVE_LONG_RUN — Run-based × long action lines (n≥8, 5+ consecutive lines ≥9w):
-  // Five or more consecutive action lines each containing ≥9 words creates a dense-prose avalanche
+  // ACTION_CONSECUTIVE_LONG_RUN — Run-based × long action lines (n≥8, 5+ consecutive lines ≥15w):
+  // Five or more consecutive action lines each containing ≥15 words creates a dense-prose avalanche
   // with no breathing room in a localized stretch. Dense lines demand more reading effort; when five
   // or more stack with no short beat between them, the reader is forced through a wall of description
   // with no rhythmic relief. Good screen prose alternates density — a long image followed by a shorter
@@ -2194,11 +2234,33 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // ≤7w recovery within 2 lines; this checks a global consecutive-run count, not aftermath per-line),
   // ACTION_FINALE_BLOAT (Wave 428: zone average word count in final 25%; this checks a local run, not
   // a zone average), and LONGEST_ACTION_OUTLIER (Wave 428: single-peak isolation).
+  //
+  // DENSITY-BIAS GUARD (Lane H, 2026-08-04) — per-line bar raised 9w → 15w.
+  // MEASURED DEFECT: at the original 9-word bar this rule fired on 10/10 of the
+  // calibration corpus's KNOWN-STRONG band (strong+competent) versus 7/10 of the
+  // known-weak band, and on 18/20 (90%) of the CC0 reference screenplays — i.e.
+  // it fired on nearly everything, and where it varied it varied the WRONG WAY.
+  // The cause is that 9 words sits below the 25th percentile of action-line
+  // length in every corpus measured (CC0 p25=13 / median=19 / mean=20.0;
+  // calibration-strong p25=11; calibration-weak p25=9). A bar beneath the
+  // corpus's own lower quartile does not detect a "dense-prose avalanche" — it
+  // detects the presence of ordinary screenplay prose, so the penalty accrued to
+  // whichever script simply WROTE MORE ACTION. That is the false-positive-density
+  // family (a proxy — raw line length — that tracks prose volume, not weakness).
+  // 15w is the measured re-anchor: above the p25 of every set, so a run must be
+  // long relative to normal action prose before it counts. Re-measured base rates
+  // at 15w: calibration-strong 0/10, calibration-weak 0/10 (inversion eliminated),
+  // CC0 13/20 (65%) — genuine feature-length dense runs still fire.
+  // RECALL COST (stated honestly): runs of 5+ consecutive lines in the 9–14 word
+  // band no longer fire anywhere. Those are ordinary-length screenplay lines; the
+  // rule's own claim ("a wall of description with nowhere to breathe") was never
+  // true of them. Runs of genuinely long lines (≥15w) are unaffected — see
+  // rhythm.density-guard.test.ts for the retained-true-positive fixture.
   if (actionLines.length >= 8) {
     let maxLongRun456a = 0, curLongRun456a = 0;
     let maxLongStart456a = -1, curLongStart456a = -1;
     for (let i = 0; i < actionLines.length; i++) {
-      if (wordCounts[i] >= 9) {
+      if (wordCounts[i] >= 15) {
         if (curLongRun456a === 0) curLongStart456a = actionLines[i].lineNum;
         if (++curLongRun456a > maxLongRun456a) {
           maxLongRun456a = curLongRun456a;
@@ -2215,16 +2277,16 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     // action lines) to be a diagnosable habit rather than a single passage.
     let longRunCount456a = 0, inRun456a = 0;
     for (let i = 0; i < actionLines.length; i++) {
-      if (wordCounts[i] >= 9) { if (++inRun456a === 5) longRunCount456a++; }
+      if (wordCounts[i] >= 15) { if (++inRun456a === 5) longRunCount456a++; }
       else inRun456a = 0;
     }
     const requiredRuns456a = Math.max(1, Math.floor(actionLines.length / 150));
     if (maxLongRun456a >= 5 && longRunCount456a >= requiredRuns456a) {
       issues.push({
-        location: `Action lines near line ${maxLongStart456a} — consecutive long-line run (${maxLongRun456a} lines ≥9w)`,
+        location: `Action lines near line ${maxLongStart456a} — consecutive long-line run (${maxLongRun456a} lines ≥15w)`,
         rule: 'ACTION_CONSECUTIVE_LONG_RUN',
         severity: 'minor',
-        description: `${maxLongRun456a} consecutive action lines each contain 9 or more words — a dense-prose avalanche with no rhythmic relief between them. Dense action lines demand sustained reading effort; when five or more stack without a short punctuating beat, the reader is forced through a wall of description with nowhere to breathe. Good screenplay prose alternates density: a long image or staging note followed by a shorter beat that lets it settle before the next dense line arrives. The consecutive long-line run also signals that the writer is not consciously shaping rhythm in this passage — lines are being generated at uniform density rather than sculpted for pace.`,
+        description: `${maxLongRun456a} consecutive action lines each contain 15 or more words — a dense-prose avalanche with no rhythmic relief between them. Dense action lines demand sustained reading effort; when five or more stack without a short punctuating beat, the reader is forced through a wall of description with nowhere to breathe. Good screenplay prose alternates density: a long image or staging note followed by a shorter beat that lets it settle before the next dense line arrives. The consecutive long-line run also signals that the writer is not consciously shaping rhythm in this passage — lines are being generated at uniform density rather than sculpted for pace.`,
         suggestedFix: `Insert a short action beat (1–5 words) somewhere within the run of ${maxLongRun456a} long lines near line ${maxLongStart456a}: a reaction, a pause, a single image in sharp focus. The short line does not have to carry much information — "A beat." or "She stops." is enough — but it breaks the density and gives the reader's eye a place to exhale before the next dense line arrives.`,
       });
     }
@@ -2877,8 +2939,34 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     // that a short beat was preceded by a long; this is the mirror, checking that a long beat
     // is preceded by a short), ACTION_LONG_RECOVERY_ABSENT (Wave 442: long→short aftermath,
     // not antecedent), ACTION_SHORT_EXPANSION_ABSENT (Wave 540: short→long aftermath direction).
+    //
+    // DENSITY-BIAS GUARD (Lane H, 2026-08-04) — now requires that a short (≤4w)
+    // action line EXIST somewhere in the script before its PLACEMENT is audited.
+    // MEASURED DEFECT: this rule claims to be a placement/backward-cause finding
+    // ("elaboration arrives without setup"), but placement was never actually
+    // tested against opportunity. If a script contains no ≤4-word action line at
+    // all, then no long line CAN have a short predecessor, so the trigger is
+    // arithmetically forced. Measured over the 20 CC0 screenplays + 20 calibration
+    // samples + all 12 discrimination-pair halves:
+    //     P(fire | script has NO ≤4w action line) = 36/36 = 1.00
+    //     P(fire | script HAS a ≤4w action line)  =  1/13 = 0.08
+    // So 36 of its 37 fires were a mechanical restatement of "this script has no
+    // short action lines" — a fact voice.ts's SENTENCE_FRAGMENT_STARVATION already
+    // reports at the identical ≤4-word bar. One property was being charged twice
+    // across two passes, and because the property tracks how much dense action
+    // prose a writer produced, the double charge fell hardest on the most
+    // dramatized scripts. That is the false-positive-density family.
+    // The guard makes the rule measure what its own comment says it measures:
+    // the writer HAS the compression register and never places it before density.
+    // RECALL COST (stated honestly and precisely): 36 of 37 fires are removed.
+    // Every removed fire is a duplicate of a still-reported finding, not a lost
+    // detection — the underlying "no short lines" condition continues to be
+    // reported by SENTENCE_FRAGMENT_STARVATION (≤4w) and SHORT_LINE_POVERTY (≤3w).
+    // The 1 retained fire (data/screenplays/the-detour.fountain) is the genuine
+    // placement failure: short lines exist, but never adjacent to a long one.
     if (actionLines.length >= 8) {
-      const qualLongs554a = wordCounts
+      const hasShortRegister554a = wordCounts.some(w => w <= 4);
+      const qualLongs554a = !hasShortRegister554a ? [] : wordCounts
         .map((w, i) => ({ w, i }))
         .filter(x => x.i >= 2 && x.w >= 12);
       if (qualLongs554a.length >= 3) {

@@ -32,15 +32,24 @@
 // existing calibration/length-invariance guarantee, is untouched (that
 // branch of densityPenalty is byte-identical code).
 //
-// Current measured state (P6: all 6 axes now discriminate on plain ordering;
-// only the stricter composite minimum-gap guard remains a todo):
+// Current measured state — re-measured 2026-08-04 AFTER the Lane H
+// density-bias guard (see the DENSITY-BIAS CLOSURE note below). All 6 axes
+// discriminate on plain ordering AND the composite minimum-gap guard now
+// passes as a hard assertion; this file has NO remaining todo:
 //
-//   escalation-vs-flat-repetition:    good 76.1 > bad 70.0  (gap +6.1) PASS
-//   setup-payoff-vs-orphaned-setups:  good 74.6 > bad 70.0  (gap +4.6) PASS
-//   subtext-vs-on-the-nose:           good 79.1 > bad 77.7  (gap +1.4) PASS (flipped by W1)
-//   dramatized-vs-told-exposition:    good 74.0 > bad 72.6  (gap +1.4) PASS (flipped by W1)
-//   composite-reviewer-scenario:      good 72.2 > bad 70.0  (gap +2.2) PASS ordering; 5.0-pt min-gap still FAILS
-//   active-vs-passive-protagonist:    good 76.6 > bad 70.4  (gap +6.2, measured post-merge — the two
+//   active-vs-passive-protagonist:    good 77.3 > bad 70.1  (gap +7.2) PASS
+//   escalation-vs-flat-repetition:    good 76.9 > bad 70.0  (gap +6.9) PASS
+//   composite-reviewer-scenario:      good 76.5 > bad 70.0  (gap +6.5) PASS — clears the 5.0 floor
+//   setup-payoff-vs-orphaned-setups:  good 76.4 > bad 70.1  (gap +6.3) PASS
+//   dramatized-vs-told-exposition:    good 77.5 > bad 72.6  (gap +4.9) PASS
+//   subtext-vs-on-the-nose:           good 79.7 > bad 75.4  (gap +4.3) PASS
+//
+// Every BAD half is within 0.1 of its pre-guard score; the entire movement is
+// on the GOOD halves. Prior (pre-Lane-H) measured state, kept for comparison:
+//   escalation +6.1 · setup-payoff +4.6 · subtext +4.0 · dramatized +1.4 ·
+//   composite +2.2 · active-vs-passive +6.5.
+//
+//   [historical] active-vs-passive-protagonist:  good 76.6 > bad 70.4  (gap +6.2, measured post-merge — the two
 //                                     parallel fixes COMPOUND: P6's climax fix lifts the good half while
 //                                     both rule families fire on the passive half)
 //                                     — closed INDEPENDENTLY by two parallel sessions
@@ -110,6 +119,46 @@
 // narrower than "a detector") closes the gap. Do NOT delete a todo without
 // first re-running this file and confirming the gap actually closed.
 //
+// ── DENSITY-BIAS CLOSURE 2026-08-04 (Lane H) ──────────────────────────────
+// The blind spot described below is CLOSED. It was not closed by a threshold
+// tweak and not by touching this pair: six MINOR rules were guarded, each one
+// justified by a measurement against two independent ground truths — the
+// calibration corpus's band labels and the pair sides — with the per-rule
+// recall cost stated. The offenders and their measured defects:
+//
+//   rhythm/ACTION_CONSECUTIVE_LONG_RUN  bar 9w → 15w. Fired on 10/10 of the
+//     known-STRONG calibration band vs 7/10 known-weak, and 18/20 CC0 — 9
+//     words sits below the p25 of every corpus measured (CC0 p25=13).
+//   rhythm/LONG_LINE_FLOOD              bar 12w → 20w. 81% of all CC0 action
+//     lines are already ≥12w, so ">60% ≥12w" held for 18/20 CC0 scripts: the
+//     rule reported the normal condition of screenplay prose as a flaw.
+//   rhythm/ACTION_LONG_BEAT_UNCAUSED    now needs a ≤4w line to EXIST before
+//     auditing its placement. P(fire | no short line) was 36/36 = 1.00 vs
+//     1/13 = 0.08 otherwise — 36 of 37 fires merely restated an absence that
+//     voice/SENTENCE_FRAGMENT_STARVATION already reports at the same bar.
+//   rhythm/ACTION_LONG_RECOVERY_ABSENT  same defect on the aftermath side
+//     (0.46 vs 0.05; 1 of 14 fires informative).
+//   dialogue/TALKING_HEADS              a run must carry ≥80 words of speech,
+//     not just 5 cues. Counting cues rewards VERBOSITY: terse subtextual
+//     exchanges accumulate cues faster, so it fired earlier on better
+//     dialogue. Every genuine CC0 run carries 88–174 words; every fixture-
+//     scale false positive carried 20–61. The bar sits in that empty gap.
+//   originality/DIALOGUE_MONOLOGUE_DROUGHT  now requires the script to be
+//     dialogue-driven. It audited the dialogue channel for a missing upper
+//     tail without checking whether the drama lives there, so it punished
+//     scripts told in images (calibration strong 10/10 vs weak 6/10).
+//
+// Blast radius over 53 scripts (20 CC0 + 20 calibration + live P0 sample +
+// 12 pair halves): 42 health changes, ALL upward, median +0.2 on CC0; ZERO
+// verdict changes, ZERO sceneCount changes, calibration band monotonicity
+// preserved (strong 61.76 > competent 51.64 > weak 40.58 > troubled 35.40).
+// Three display-grade changes, all solid→strong on pair GOOD halves.
+// Fixtures + per-guard falsifiability: tests/core/density-bias-guards.test.ts.
+// Receipt: docs/p1-benchmark/MEASUREMENT_RECEIPTS.md (2026-08-04, Lane H).
+//
+// The note below is retained as the HISTORICAL diagnosis that this work
+// closed — it is no longer the current state.
+//
 // RE-VERIFIED 2026-08-04 (ULTRAREVIEW closure pass, Lane F): re-ran this
 // harness and a full rule-level diff (report.passes[].issues, not just the
 // 10-entry topPriorities) against current doctor.ts. The gap is UNCHANGED at
@@ -173,7 +222,9 @@ const BLIND_SPOT_NOTE: Record<string, string> = {
     + 'REACTIVE_CLIMAX fix, merged) — retained so a regression here surfaces the history: pre-fix no signal '
     + 'distinguished a protagonist who drives decisions from one things merely happen to',
   'composite-reviewer-scenario':
-    "reproduces the reviewer's original finding directly: an overall well-crafted script and an overall "
+    'CLOSED 2026-08-04 by the Lane H density-bias guard (gap +2.2 → +6.5, bad half unmoved at 70.0) — '
+    + 'retained so a regression here surfaces the history. HISTORICAL diagnosis follows: '
+    + "reproduces the reviewer's original finding directly: an overall well-crafted script and an overall "
     + 'poorly-crafted one of matched size scores only a modest gap (+2.2 as of the W1 health-formula wave, up '
     + 'from a dead tie) — real but short of the 5.0-point floor below. DIAGNOSED 2026-07-10 (rule-level diff), '
     + 'RE-MEASURED 2026-08-04 with no material change: the bad half fires 22 rules the good half does not '
@@ -310,17 +361,22 @@ describe('discrimination harness — good craft must outscore bad craft', () => 
 describe('composite reviewer scenario — minimum-gap regression guard', () => {
   const COMPOSITE_MIN_GAP = 5.0;
 
+  // CLOSED 2026-08-04 (Lane H — rhythm-minor density-bias guard). This was the
+  // suite's last `todo`; it is now a hard assertion. Measured gap moved +2.2 →
+  // +6.5 (good 72.2 → 76.5, bad 70.0 → 70.0), clearing the 5.0 floor with 1.5
+  // points of headroom — 30% above the floor, not a 5.1 squeak.
+  //
+  // The BAD half did not move AT ALL (70.0 before and after). That is the
+  // load-bearing evidence that this is a fix and not a tuning: the guards
+  // removed penalties that well-crafted prose was paying and left poorly-crafted
+  // writing's score untouched. Six rules were guarded, each justified against
+  // TWO independent ground truths (calibration band labels AND pair sides) —
+  // never against this pair. Full offender table, per-rule recall cost, and the
+  // 53-script blast radius: docs/p1-benchmark/MEASUREMENT_RECEIPTS.md (Lane H),
+  // with positive/negative fixtures and a per-guard falsifiability result in
+  // tests/core/density-bias-guards.test.ts.
   it(
     `composite pair shows a health gap of at least ${COMPOSITE_MIN_GAP} points, not just a bare ordering`,
-    {
-      todo: 'BLIND SPOT (composite-reviewer-scenario), RE-VERIFIED 2026-08-04: current gap measures +2.2 '
-      + '(good 72.2, bad 70.0), unchanged from the W1 measurement and still far below the '
-      + `${COMPOSITE_MIN_GAP}-point floor — see BLIND_SPOT_NOTE above for the current rule-level diff. Not `
-      + 'closeable with existing in-repo machinery (order-sensitive proof family / reversal-detection / '
-      + 'agency-signal / normalizer fix / Dead Frequency stimulus all landed and none moved this number) — '
-      + 'needs a dedicated rhythm-minor false-positive-density guard wave, not yet scheduled. Flip off todo '
-      + 'once that wave is measured to clear the floor with headroom.',
-    },
     async () => {
       const pair = DISCRIMINATION_PAIRS.find(p => p.id === 'composite-reviewer-scenario');
       assert.ok(pair, 'composite-reviewer-scenario pair must exist in discrimination-pairs.ts');

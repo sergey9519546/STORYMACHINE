@@ -580,10 +580,20 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
 
     it('dialoguePass detects TALKING_HEADS for long dialogue run with no action beats', async () => {
       const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
-      // 12+ character-cue/dialogue lines with no action between them
+      // 12+ character-cue/dialogue lines with no action between them, carrying 120
+      // words of speech in total. The word volume is required by the Lane H
+      // density-bias guard (2026-08-04): a run must now carry ≥80 words, not just 5
+      // cues. Counting cues alone rewarded VERBOSITY — terse, clipped exchanges
+      // accumulate cues faster, so the rule fired earlier on better-written dialogue.
+      // Measured: every genuine qualifying run in the 20 CC0 reference screenplays
+      // carries 88–174 words; every fixture-scale false positive carried 20–61. The
+      // 80-word bar sits in that empty gap, and CC0 recall is unchanged at 3/20.
+      // This fixture's speeches were lengthened so it still represents what the rule
+      // exists to catch: a genuinely disembodied stretch of talk.
       let block = `INT. ROOM - DAY\n`;
       for (let i = 0; i < 6; i++) {
-        block += `ALICE\nSomething important.\n\nBOB\nI disagree with that.\n\n`;
+        block += `ALICE\nSomething important is happening here and nobody wants to say it.\n\n`
+          + `BOB\nI disagree with that assessment for reasons I have already explained.\n\n`;
       }
       const result = await dialoguePass({
         fountain: block, original: block,

@@ -959,11 +959,36 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // Characters become disembodied voices; the physical world disappears.
   // We count consecutive dialogue *exchanges* (each character-cue block) without
   // any action line between them. Blank lines are Fountain formatting, not breaks.
+  //
+  // DENSITY-BIAS GUARD (Lane H, 2026-08-04) — a qualifying run must also carry
+  // ≥80 words of actual speech (TALKING_HEADS_MIN_RUN_WORDS below).
+  // MEASURED DEFECT: the trigger counted character CUES only, which is a proxy
+  // for how FINELY the dialogue is cut rather than for how much talk there is.
+  // Terse, clipped, subtextual exchanges — the craft virtue this repo's
+  // discrimination fixtures exist to reward — accumulate cues FASTER than
+  // verbose ones, so the rule fired earlier on better-written dialogue: a
+  // 5-cue/30-word volley tripped it while a 4-cue/400-word slab did not. It
+  // fired on the composite-reviewer fixture's GOOD half (a 5-cue, ~30-word
+  // mother/daughter confrontation) even though that run is bracketed by staged
+  // physical action on both sides — i.e. the rule's own stated premise ("the
+  // physical world disappears") was demonstrably false at the firing site.
+  // MEASUREMENT that sets the bar: across the 20 CC0 reference screenplays every
+  // genuine qualifying run carries 88–174 words (6 runs, min 88). Across the 12
+  // discrimination-pair fixture halves every qualifying run carries 20–61 words
+  // (11 runs, max 61). 80 words sits in the empty gap between those two
+  // populations — measured, not tuned.
+  // RECALL COST: ZERO on the reference corpus. CC0 fires on 3/20 scripts both
+  // before and after the guard (verified at every bar from 0 to 120 words), so
+  // no real talking-heads finding is lost. The guard removes fixture-scale false
+  // positives on BOTH the good AND bad halves (pairGood 4→0, pairBad 3→0), which
+  // is why it cannot be an attempt to flatter one side of a pair.
+  const TALKING_HEADS_MIN_RUN_WORDS = 80;
   {
     const fountainLines = fountain.split('\n');
     let exchangeCount = 0;       // how many char-cue blocks in a row without action
     let exchangeStartLine = -1;  // line number when the current run began
     let lastExchangeLine = -1;
+    let runWords = 0;            // words of speech carried by the current run
     let insideDialogueBlock = false; // true from char cue until blank line or action
 
     for (let i = 0; i < fountainLines.length; i++) {
@@ -977,28 +1002,28 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
 
       if (isSlug) {
         // New scene — flush and reset
-        if (exchangeCount >= 5) {
+        if (exchangeCount >= 5 && runWords >= TALKING_HEADS_MIN_RUN_WORDS) {
           issues.push({
             location: `Lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}`,
             rule: 'TALKING_HEADS',
-            description: `${exchangeCount} consecutive dialogue exchanges with no action beat — characters lack physical presence in the scene`,
+            description: `${exchangeCount} consecutive dialogue exchanges carrying ${runWords} words with no action beat — characters lack physical presence in the scene`,
             severity: 'minor',
             suggestedFix: 'Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space',
           });
         }
-        exchangeCount = 0; exchangeStartLine = -1; insideDialogueBlock = false;
+        exchangeCount = 0; exchangeStartLine = -1; runWords = 0; insideDialogueBlock = false;
       } else if (isAction) {
         // Action line breaks the talking-heads run
-        if (exchangeCount >= 5) {
+        if (exchangeCount >= 5 && runWords >= TALKING_HEADS_MIN_RUN_WORDS) {
           issues.push({
             location: `Lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}`,
             rule: 'TALKING_HEADS',
-            description: `${exchangeCount} consecutive dialogue exchanges with no action beat (lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}) — characters become disembodied voices`,
+            description: `${exchangeCount} consecutive dialogue exchanges carrying ${runWords} words with no action beat (lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}) — characters become disembodied voices`,
             severity: 'minor',
             suggestedFix: 'Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space',
           });
         }
-        exchangeCount = 0; exchangeStartLine = -1; insideDialogueBlock = false;
+        exchangeCount = 0; exchangeStartLine = -1; runWords = 0; insideDialogueBlock = false;
       } else if (isCharCue) {
         // Start of a new exchange block
         if (exchangeCount === 0) exchangeStartLine = i;
@@ -1009,14 +1034,15 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         insideDialogueBlock = false;
       } else if (insideDialogueBlock) {
         lastExchangeLine = i; // dialogue content line
+        runWords += t.split(/\s+/).filter(Boolean).length;
       }
     }
     // Flush any open run at end-of-file
-    if (exchangeCount >= 5 && exchangeStartLine >= 0) {
+    if (exchangeCount >= 5 && exchangeStartLine >= 0 && runWords >= TALKING_HEADS_MIN_RUN_WORDS) {
       issues.push({
         location: `Lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}`,
         rule: 'TALKING_HEADS',
-        description: `${exchangeCount} consecutive dialogue exchanges with no action beat — characters become disembodied voices`,
+        description: `${exchangeCount} consecutive dialogue exchanges carrying ${runWords} words with no action beat — characters become disembodied voices`,
         severity: 'minor',
         suggestedFix: 'Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space',
       });

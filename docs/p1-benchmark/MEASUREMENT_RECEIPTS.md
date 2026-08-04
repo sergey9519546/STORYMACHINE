@@ -217,6 +217,106 @@ holds (full suite green at the commit carrying this note).
 
 ---
 
+### 2026-08-04 — Lane H: the rhythm-minor false-positive density guard (composite blind spot closed)
+
+- **Date:** 2026-08-04
+- **Git SHA:** measured against a worktree based at `b4b58d7` with the Lane H
+  guards applied; the change and this receipt land in the same commit range,
+  per the guard's same-range rule.
+- **Command:** not an AUC run — the private corpus is not present in this
+  environment. The measurement performed is a full pre/post blast-radius diff:
+  `runScriptDoctor()` (quick mode) over **53** scripts — all 20
+  `data/screenplays/*.fountain`, all 20 calibration `REFERENCE_CORPUS`
+  samples, the live P0 sample ("Dead Frequency"), and both halves of all 6
+  `calibration/discrimination-pairs.ts` pairs — comparing
+  `health`/`grade`/`verdict`/`sceneCount` per script before and after, plus a
+  per-rule fire-count table split by the two independent ground truths.
+- **Measured AUC-24:** **not re-measured** — recorded as an OPEN, EXPLICITLY
+  UNDISCHARGED obligation, exactly as in the D4/D6 and normalizer entries
+  above. Discharge path: `npm run discharge-obligations` on the maintainer
+  machine. **The real-corpus manifest re-lock requirement applies and is also
+  NOT discharged here:** this change shifts `health` on 16 of the 20 tracked
+  real scripts, so `tests/core/real-script-corpus.test.ts`'s manifest must be
+  re-locked in that same local run. No `verdict` or `sceneCount` moved, which
+  bounds — but does not eliminate — the re-lock surface.
+- **Flag-run AUCs:** none — see above.
+- **What was diagnosed (the evidence base, not the fix):** the last remaining
+  `todo` in `tests/core/discrimination.test.ts` — the composite-reviewer pair
+  at a +2.2 gap against a 5.0 floor. Rule-level enumeration over all 53
+  scripts produced an inverted-signal table: rules that fire MORE on the side
+  two independent ground truths label BETTER (calibration band labels; pair
+  good/bad side). Seven rules were inverted on BOTH. The mechanism in every
+  case is a proxy that tracks prose VOLUME rather than weakness — the same
+  false-positive-density family as D1/D2 and D4.
+- **The six guards and their measured justification + recall cost:**
+
+  | Rule | Measured defect | Guard | Recall cost |
+  |---|---|---|---|
+  | `rhythm/ACTION_CONSECUTIVE_LONG_RUN` | fired 10/10 known-STRONG calibration band vs 7/10 known-weak, 18/20 CC0; 9w bar is below the p25 of every corpus (CC0 p25=13, median=19) | per-line bar 9w → 15w | runs of 5+ lines in the 9–14w band no longer fire — that band is the corpus's own IQR |
+  | `rhythm/LONG_LINE_FLOOD` | 81% of all CC0 action lines are already ≥12w, so ">60% ≥12w" held for 18/20 CC0; inverted 3/10 strong vs 0/10 weak | "long" bar 12w → 20w (CC0 mean 20.0 / median 19) | scripts clustered in the 12–19w band no longer fire |
+  | `rhythm/ACTION_LONG_BEAT_UNCAUSED` | P(fire \| no ≤4w line) = **36/36 = 1.00** vs 1/13 = 0.08 otherwise — a mechanical restatement of an absence `voice/SENTENCE_FRAGMENT_STARVATION` already reports at the identical bar | require a ≤4w line to EXIST before auditing its placement | 36 of 37 fires removed, every one a duplicate of a still-reported finding |
+  | `rhythm/ACTION_LONG_RECOVERY_ABSENT` | same defect, aftermath side: 13/28 = 0.46 vs 1/21 = 0.05 | require a ≤7w line to EXIST | 13 of 14 fires removed, all duplicates |
+  | `dialogue/TALKING_HEADS` | counted character CUES — a proxy for how finely dialogue is CUT, so terse subtextual exchanges trip it FASTER than verbose ones; fired on a 5-cue/~30-word volley bracketed by staged action on both sides | run must carry ≥80 words of speech | **ZERO on the reference corpus** — CC0 fires on 3/20 before and after; removes fixture-scale false positives on BOTH good (4→0) and bad (3→0) halves |
+  | `originality/DIALOGUE_MONOLOGUE_DROUGHT` | audited the dialogue channel for a missing upper tail with no gate on whether the drama lives there; inverted 10/10 strong vs 6/10 weak | require dialogue-driven (dlg ≥ 1.5 × action lines) | CC0 2/20 → 0/20; for those the finding was never applicable |
+
+  The 80-word `TALKING_HEADS` bar is measured, not chosen: every genuine
+  qualifying run in the 20 CC0 screenplays carries 88–174 words, every
+  fixture-scale false positive carries 20–61. The bar sits in that empty gap.
+- **Measured negative result (recorded because it was tested and rejected):**
+  the deepest candidate root-cause fix was re-gating the absence-rule family on
+  action WORDS instead of action LINES (lines being author-chosen paragraph
+  breaks, so line-count gating exempts under-written scripts — the composite
+  bad half writes 5 action lines/107 words and is structurally ineligible for
+  ~40 rhythm rules). Measured before shipping: at a ≥120w gate
+  `SIMULTANEOUS_ACTION_ABSENT` would fire 3/5 on the calibration STRONG band vs
+  1/1 weak — i.e. it would make the inversion WORSE, and no word gate above the
+  composite bad half's 107 words reaches it anyway. **Not shipped.** Recorded
+  here so the idea is not silently re-attempted.
+- **Blast radius (the measurement this receipt certifies):** 42 of 53 scripts
+  changed `health`, **all upward**, median +0.2 on CC0 (largest CC0:
+  transfer-window +2.3, room-12 +0.6; largest calibration: The Dead Drop +2.7,
+  Merge +1.9). **ZERO `verdict` changes and ZERO `sceneCount` changes on all
+  53** — the STOP rule was not tripped. Three display-`grade` shifts, all
+  solid→strong and all on pair GOOD halves (setup-payoff, dramatized,
+  composite). The live P0 sample ("Dead Frequency") is **unchanged on every
+  field** — no stimulus re-lock required. Calibration band monotonicity
+  preserved and band separation essentially unchanged: strong 61.76 >
+  competent 51.64 > weak 40.58 > troubled 35.40 (was 60.70 / 50.52 / 39.34 /
+  34.52).
+- **Discrimination outcome:** all six pairs order correctly and every gap
+  widened. composite +2.2 → **+6.5** (good 72.2 → 76.5, **bad 70.0 → 70.0,
+  unmoved**); dramatized +1.4 → +4.9; setup-payoff +4.6 → +6.3; subtext +4.0 →
+  +4.3; escalation +6.1 → +6.9; active-vs-passive +6.5 → +7.2. The composite
+  clears the 5.0 floor with 1.5 points of headroom (30% above the floor), so
+  the `todo` in `tests/core/discrimination.test.ts` was flipped to a hard
+  assertion — that suite now has zero todos. **That every BAD half is within
+  0.1 of its pre-guard score is the load-bearing evidence that this is a
+  false-positive fix and not a tuning:** the guards removed penalties
+  well-crafted prose was paying and left weak writing's score alone.
+- **Tests:** `tests/core/density-bias-guards.test.ts` — 12 tests, one POSITIVE
+  (must still fire on genuinely weak writing) and one NEGATIVE (the false
+  positive it must no longer produce) per guarded rule. Falsifiability: each
+  of the six guards was individually reverted in place and the suite re-run;
+  each time **exactly its own negative fixture failed and nothing else did**,
+  and the restored state returned to 12/12. That check caught three initially
+  VACUOUS negative fixtures (G1/G2/G4 sat below their rule's own line-count
+  gate, so they were passing for the wrong reason) and one FALSE PASS (the G6
+  negative was hidden by `originality.ts`'s 8-issue output cap); all four were
+  rebuilt and re-verified.
+- **Committed evidence artifacts:** deliberately NOT regenerated here, for the
+  same mixed-provenance reason as the normalizer and D4/D6 entries; deferred
+  to the maintainer's `discharge-obligations` run.
+- **Corpus fingerprint:** the 20 tracked `data/screenplays/*.fountain` files,
+  `calibration/corpus.ts`'s 20 `REFERENCE_CORPUS` samples, and
+  `calibration/discrimination-pairs.ts`'s 6 pairs at the commit carrying this
+  entry. No corpus or fixture content was modified by this change.
+- **Runner attestation:** "Agent session (Claude, remote sandbox, 2026-08-04)
+  measured this in-environment under the maintainer's blanket delegation. The
+  AUC-24 re-measurement and the `real-script-corpus.test.ts` manifest re-lock
+  obligations named above are explicitly NOT discharged by this entry."
+
+---
+
 ## 3. Entry template (copy for new entries)
 
 ```

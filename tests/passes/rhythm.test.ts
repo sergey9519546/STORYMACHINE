@@ -4071,8 +4071,15 @@ Running now, she turns the corner.
       sentCounts.map((ns, i) => `INT. SC${i} - DAY\n\n${Array(ns).fill('She acts.').join(' ')}`).join('\n\n');
 
     it('ACTION_LONG_BEAT_UNCAUSED fires when all long ≥12w lines have no short ≤4w predecessor within 2', async () => {
-      // 10 lines: [8,9,12,7,8,12,9,7,12,8] — long at pos 2,5,8; prior-2 of each: [8,9],[7,8],[9,7] — no short ≤4w → fire
-      const f554a = makeF554Wc([8, 9, 12, 7, 8, 12, 9, 7, 12, 8]);
+      // 10 lines: [8,9,12,7,8,12,9,7,12,3] — long at pos 2,5,8; prior-2 of each: [8,9],[7,8],[9,7] — no short ≤4w → fire.
+      // The trailing 3-word line is required by the Lane H density-bias guard (2026-08-04):
+      // the rule now only audits PLACEMENT when the short-line register actually exists.
+      // Measured: P(fire | script has NO ≤4w line) was 36/36 = 1.00 vs 1/13 = 0.08
+      // otherwise — 36 of 37 fires merely restated an absence that voice.ts's
+      // SENTENCE_FRAGMENT_STARVATION already reports at the identical ≤4w bar. The short
+      // line sits LAST so it is outside every long line's 2-line predecessor window, which
+      // keeps this fixture's asserted behaviour (a genuine placement failure) unchanged.
+      const f554a = makeF554Wc([8, 9, 12, 7, 8, 12, 9, 7, 12, 3]);
       const res = await runR554(f554a);
       assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_LONG_BEAT_UNCAUSED'), 'ACTION_LONG_BEAT_UNCAUSED should fire');
     });
@@ -4979,20 +4986,26 @@ Running now, she turns the corner.
       return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
     };
 
-    it('ACTION_CONSECUTIVE_LONG_RUN fires when 5+ consecutive action lines are each ≥9 words', async () => {
-      // 5 long lines (≥9w each) followed by 3 shorter lines → run of 5 triggers the check
+    it('ACTION_CONSECUTIVE_LONG_RUN fires when 5+ consecutive action lines are each ≥15 words', async () => {
+      // 5 long lines (≥15w each) followed by 3 shorter lines → run of 5 triggers the check.
+      // Per-line bar re-anchored 9w → 15w by the Lane H density-bias guard (2026-08-04):
+      // at 9w this rule fired on 10/10 of the known-STRONG calibration band and 18/20 CC0
+      // reference screenplays, because 9 words sits below the 25th percentile of action-line
+      // length in every corpus measured. This fixture was rescaled to the new bar; it still
+      // asserts the same behaviour (a genuine consecutive dense-prose run fires the rule).
+      // See rhythm.ts's guard comment and docs/p1-benchmark/MEASUREMENT_RECEIPTS.md.
       const f456a = [
         'INT. ROOM - DAY',
         '',
-        'He opens the front door and steps quietly into the hallway.',
+        'He opens the front door and steps quietly into the hallway without waiting for an answer.',
         '',
-        'She stares at the phone resting on the table by the window.',
+        'She stares at the phone resting on the table by the window and does not reach for it.',
         '',
-        'The curtain stirs gently in the breeze coming from the street.',
+        'The curtain stirs gently in the breeze coming from the street below the open sash.',
         '',
-        'He reaches into his pocket and pulls out a small folded note.',
+        'He reaches into his pocket and pulls out a small folded note he has carried all day.',
         '',
-        'A long moment passes while neither of them says anything at all.',
+        'A long moment passes while neither of them says anything at all to break the silence.',
         '',
         'He stops.',
         '',
@@ -5191,8 +5204,17 @@ Running now, she turns the corner.
     });
 
     it('ACTION_LONG_RECOVERY_ABSENT fires when no long action line (≥14w) is followed by a short beat (≤7w) within 2 lines', async () => {
-      // 8 lines: 2 qualifying long lines (idx 0, idx 3), each followed only by lines ≥13 words
+      // 9 lines: qualifying long lines each followed only by lines ≥13 words.
+      // The leading 2-word beat is required by the Lane H density-bias guard
+      // (2026-08-04): the rule now only audits PLACEMENT of the "density peak →
+      // recovery beat" pattern when a recovery-length (≤7w) line actually exists.
+      // Measured: P(fire | script has NO ≤7w line) was 13/28 = 0.46 vs 1/21 = 0.05
+      // otherwise — only 1 of 14 fires was an informative placement failure; the rest
+      // restated an absence SHORT_LINE_POVERTY / SENTENCE_FRAGMENT_STARVATION already
+      // report. Placing the beat FIRST keeps it outside every long line's 2-line
+      // successor window, so this fixture still asserts the same genuine failure.
       const lines442b = [
+        'She waits.',
         'She crosses to the window and stands there looking out at the grey afternoon light spread thin.',
         'He picks up the telephone and dials a number he does not want to dial at all.',
         'The room settles into silence as the call connects and no one speaks or moves first.',
@@ -5435,9 +5457,15 @@ Running now, she turns the corner.
     const makeScene400 = (lines: string[]) =>
       `INT. ROOM - DAY\n\n${lines.join('\n\n')}`;
 
-    it('LONG_LINE_FLOOD fires when more than 60% of action lines are 12+ words', async () => {
-      // 10 action lines, 8 are ≥12 words (80%) → fires
-      const longLine400 = 'She walks across the room and picks up the glass sitting on the table.';
+    it('LONG_LINE_FLOOD fires when more than 60% of action lines are 20+ words', async () => {
+      // 10 action lines, 8 are ≥20 words (80%) → fires.
+      // "Long" re-anchored 12w → 20w by the Lane H density-bias guard (2026-08-04):
+      // 81% of ALL action lines in the 20 CC0 reference screenplays are already ≥12
+      // words (p25=13, median=19, mean=20.0), so the old bar made this rule fire on
+      // 18/20 of the reference corpus — reporting the normal condition of screenplay
+      // prose as a flaw. 20w is the measured CC0 mean/median action line. Fixture
+      // rescaled to the new bar; the asserted behaviour is unchanged.
+      const longLine400 = 'She walks across the room and picks up the glass sitting on the table beside the lamp she left on.';
       const shortLine400 = 'She stops.';
       const f400a = makeScene400([
         longLine400, longLine400, longLine400, longLine400, longLine400,

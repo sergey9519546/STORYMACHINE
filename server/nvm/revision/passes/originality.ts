@@ -2646,9 +2646,36 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   // and DIALOGUE_QUESTION_DROUGHT (Wave 396: dialogue interrogativeness — a register quality,
   // not a length distribution). This is the first check auditing the upper tail of dialogue
   // line length.
+  //
+  // DENSITY-BIAS GUARD (Lane H, 2026-08-04) — now also requires the script to be
+  // DIALOGUE-DRIVEN (dialogue lines ≥ 1.5 × action lines) before firing.
+  // MEASURED DEFECT: this rule audits the dialogue channel for a missing upper
+  // tail, but it had no gate on whether the script's dramatic weight actually
+  // sits in that channel. It therefore fired hardest on scripts that tell their
+  // story in IMAGES and keep speech deliberately terse — penalising dramatization
+  // for not being talky. Measured inversion on both independent ground truths:
+  // the calibration corpus's known-strong band fired it 10/10 versus 6/10 for the
+  // known-weak band, and it fired on 3 of 6 discrimination-pair GOOD halves vs 2
+  // of 6 BAD halves. On the composite-reviewer fixture it fired on the GOOD half
+  // (71% action prose, 12 dialogue lines) while the BAD half instead fired this
+  // rule's exact complement, DIALOGUE_LONG_SPEECH_FLOOD — the two halves were
+  // penalised from opposite directions for the same axis, which is the signature
+  // of an unnormalised channel measurement rather than a real finding.
+  // The 1.5× bar is measured, not guessed: calibration-strong samples run
+  // 12–15 dialogue lines against 9–10 action lines (ratio ≈1.3, correctly exempt)
+  // while calibration-weak samples run 16–18 against 9–10 (ratio ≈1.8, correctly
+  // still audited) — so the gate removes the inversion rather than merely damping
+  // the rule.
+  // RECALL COST (stated honestly): action-driven scripts with uniformly clipped
+  // dialogue no longer fire (CC0 2/20 → 0/20). For those scripts the finding was
+  // never applicable — "no character ever holds the floor" is only a diagnosis
+  // about a script whose drama is carried by speech. Dialogue-driven scripts with
+  // a genuinely telegraphic register still fire — see the retained-true-positive
+  // fixture in tests/core/density-bias-guards.test.ts.
   {
     let dlgTotal438b = 0;
     let longDlgCount438b = 0;
+    let actionTotal438b = 0;
     let inDlg438b = false;
     for (const line of lines) {
       const t = line.trim();
@@ -2656,11 +2683,12 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg438b = false; continue; }
       if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg438b = true; continue; }
       if (t.startsWith('(')) continue;
-      if (!inDlg438b) continue;
+      if (!inDlg438b) { actionTotal438b++; continue; }
       dlgTotal438b++;
       if (t.split(/\s+/).filter(Boolean).length > 15) longDlgCount438b++;
     }
-    if (dlgTotal438b >= 12 && longDlgCount438b / dlgTotal438b < 0.05) {
+    const dialogueDriven438b = dlgTotal438b >= 1.5 * actionTotal438b;
+    if (dialogueDriven438b && dlgTotal438b >= 12 && longDlgCount438b / dlgTotal438b < 0.05) {
       issues.push({
         location: `${longDlgCount438b} of ${dlgTotal438b} dialogue lines exceed 15 words`,
         rule: 'DIALOGUE_MONOLOGUE_DROUGHT',
