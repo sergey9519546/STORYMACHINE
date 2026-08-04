@@ -43,7 +43,7 @@ export interface EmotionalArc {
   tensionVolatility: number;  // stdev of scene-to-scene tension change
   reaganArc: ReaganArc;       // best-fit valence archetype
   reaganFit: number;          // |corr| to that archetype — shape coherence
-  arcHealth: number;          // composite, position-aware. Diagnostic only.
+  arcHealth: number;          // composite, position-aware. SCORED — feeds doctor.ts's arcIncoherenceDeduction (see header CORRECTION)
   lexCoverage: number;        // mean fraction of words found in the lexicon
   scored: boolean;
 }

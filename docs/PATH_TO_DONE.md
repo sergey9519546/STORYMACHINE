@@ -353,7 +353,9 @@ tasks 1-5 above.
   OASIS/eval-tooling adjacent, non-gating.
 
 - **Repo hygiene.** `docs/rulebook/README.md`'s 3,216-rule count vs. any
-  remaining stale "8,917"/"10,523" mentions in older filed docs (the
+  remaining stale legacy rule-count figures in older filed docs — the two
+  disproven larger counts the 2026-07-14 audit retired; `npm run
+  honesty-audit` now scans all tracked markdown for them by pattern (the
   landing-footer/ROADMAP/NORTH_STAR numbers are already reconciled per
   ROADMAP §4 and §6's changelog); `npm audit fix` for the 4 transitive
   dev-dep CVEs noted in ROADMAP §7; the SHOULD-tier pre-deployment security

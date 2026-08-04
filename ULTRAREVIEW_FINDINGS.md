@@ -4,6 +4,33 @@ Scope: 178 files / 64,971 LOC (server/nvm vendored + tests excluded). 41 sonnet 
 
 **Totals:** {'all': 61, 'confirmed': 55, 'plausible': 2, 'rejected': 4}
 
+> **INTEGRITY NOTE (2026-08-04 cross-session verification).** This ledger was
+> committed TRUNCATED by the session that produced it: the totals above claim
+> 61 findings, but the file contains only the 55 CONFIRMED and 2 PLAUSIBLE
+> entries (57), the REJECTED section is absent entirely, and the final
+> PLAUSIBLE entry cuts off mid-sentence at the end of this file. Verified
+> against the original commit (`0e9ac81`) — it was authored this way, not
+> damaged later. The 4 REJECTED findings and the tail of the last entry are
+> lost unless the producing session's transcript is recovered.
+>
+> A 12-finding sample across severities was independently re-verified against
+> source on 2026-08-04: all 12 genuinely fixed in code. Two divergences from
+> this ledger's claims, both intentional and both invisible from the merge
+> alone:
+> - **personas registry**: this ledger's fix (LRU eviction, cap 500) never
+>   landed — the merge kept an independent, stronger fix from earlier the
+>   same day (`3a4a905`: cap 64, reject-on-capacity, builtin-id hijack
+>   refusal, which also closes a prompt-injection vector this ledger did not
+>   identify). The bug is fixed; the credit here is inaccurate.
+> - **game.ts SSE wall-timer**: this ledger's fix (force-close + lock release
+>   on timeout) was deliberately superseded by later ai-budget work — the
+>   timer now emits an early completion event but does NOT close the stream
+>   or release the room lock until the underlying call settles, a documented
+>   SessionCommandCoordinator-safety tradeoff. The original HIGH finding's
+>   core scenario (a stranded lock on a genuinely hung provider call) is
+>   therefore STILL LIVE by design and sits in the maintainer decision queue
+>   (see docs/PATH_TO_DONE.md).
+
 ## CONFIRMED (55)
 
 ### [CRITICAL] server/planning/apdl-planner.ts:285 — correctness
