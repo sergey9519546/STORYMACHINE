@@ -155,6 +155,15 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
   const rows = dimensions.map(dim => {
     const band = healthBandColor(dim.score);
     const width = Math.max(0, Math.min(100, dim.score));
+    // D5 (docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md) false-precision
+    // fix: a 0-100 score built from 2-4 passes' worth of issues is not the
+    // same evidentiary claim as the headline health (all 14 passes). Name
+    // the basis so the number reads as scoped rather than absolute — no
+    // score changes, this only adds the already-computed issueCount/passes
+    // fields (types.ts's DimensionScore) that were previously silent.
+    const passList = dim.passes.map(titleCase).join(', ');
+    const basis = `Based on ${formatNumber(dim.issueCount)} issue${dim.issueCount === 1 ? '' : 's'} `
+      + `across ${dim.passes.length} pass${dim.passes.length === 1 ? '' : 'es'} (${escapeHtml(passList)}).`;
     return `
     <div class="dim-row">
       <div class="dim-label">${escapeHtml(dim.label)}</div>
@@ -163,6 +172,7 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
       </div>
       <div class="dim-score">${Math.round(dim.score)}/100</div>
       <div class="dim-summary">${escapeHtml(dim.summary)}</div>
+      <div class="dim-basis">${basis}</div>
     </div>`;
   }).join('\n');
 
@@ -520,7 +530,7 @@ const STYLES = `
     .dim-row {
       display: grid;
       grid-template-columns: 150px 1fr 70px;
-      grid-template-areas: "label bar score" "summary summary summary";
+      grid-template-areas: "label bar score" "summary summary summary" "basis basis basis";
       row-gap: 4px;
       column-gap: 12px;
       align-items: center;
@@ -542,6 +552,7 @@ const STYLES = `
       color: #3f3f46;
     }
     .dim-summary { grid-area: summary; font-size: 13px; color: #3f3f46; }
+    .dim-basis { grid-area: basis; font-size: 11px; color: #a3a3a3; }
     /* ── Checklist ── */
     .checklist { margin: 0; padding-left: 0; list-style: none; }
     .checklist li {

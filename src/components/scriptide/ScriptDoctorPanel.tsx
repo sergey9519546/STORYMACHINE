@@ -217,6 +217,24 @@ function ordinal(n: number): string {
   }
 }
 
+/** D5 (docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md) — false-precision
+ *  presentation fix. The calibration reference set backing every percentile
+ *  is 20 hand-authored synthetic scripts (server/nvm/analyze/calibration/
+ *  corpus.ts) — each sample is worth 5 raw points of resolution, so an exact
+ *  ordinal ("100th") reads as far more precise than 20 data points can
+ *  support, and is the same tell as a one-decimal sub-score on thin
+ *  evidence. This buckets to the nearest 10 for the glanceable text; the
+ *  exact ordinal stays available in the element's `title` tooltip, so
+ *  nothing is deleted — only the headline precision is scoped down to what
+ *  the sample size actually backs. */
+function percentileBand(pct: number): string {
+  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  if (clamped >= 90) return 'top 10%';
+  if (clamped <= 10) return 'bottom 10%';
+  const topShare = Math.ceil((100 - clamped) / 10) * 10;
+  return `top ${topShare}%`;
+}
+
 // ─── Story metrics (server/nvm/analyze/metrics.ts via report.metrics) ───────
 // Deterministic narrative-shape metrics, rendered only when the report
 // carries them (old cached/serialized reports predate the field and degrade
@@ -2883,8 +2901,11 @@ export default function ScriptDoctorPanel({
                   {report.totalIssues === 1 ? "" : "s"}
                 </div>
                 {typeof report.healthPercentile === "number" && (
-                  <div className="text-[10px] font-mono text-ink/60 mt-0.5">
-                    Health percentile: {ordinal(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
+                  <div
+                    className="text-[10px] font-mono text-ink/60 mt-0.5"
+                    title={`Exact rank: ${ordinal(report.healthPercentile)} of 20 reference samples`}
+                  >
+                    Health percentile: {percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
                   </div>
                 )}
                 <p className="text-xs font-mono leading-relaxed mt-3 pt-3 border-t border-ink/15 text-ink/80">
@@ -2928,8 +2949,11 @@ export default function ScriptDoctorPanel({
                       {report.totalIssues === 1 ? "" : "s"}
                     </div>
                     {typeof report.healthPercentile === "number" && (
-                      <div className="text-[10px] font-mono opacity-70 mt-0.5">
-                        Health percentile: {ordinal(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
+                      <div
+                        className="text-[10px] font-mono opacity-70 mt-0.5"
+                        title={`Exact rank: ${ordinal(report.healthPercentile)} of 20 reference samples`}
+                      >
+                        Health percentile: {percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
                       </div>
                     )}
                   </div>
@@ -3093,9 +3117,9 @@ export default function ScriptDoctorPanel({
                             {typeof dim.percentile === "number" && (
                               <span
                                 className={PERCENTILE_BADGE_CLASS}
-                                title={dim.percentileDescriptor ?? `${ordinal(dim.percentile)} percentile`}
+                                title={`${dim.percentileDescriptor ?? `${ordinal(dim.percentile)} percentile`} (exact rank: ${ordinal(dim.percentile)} of 20 reference samples)`}
                               >
-                                {ordinal(dim.percentile)} pct
+                                {percentileBand(dim.percentile)}
                               </span>
                             )}
                             <span className={`text-xs font-bold ${band.text}`}>{pct}</span>
@@ -3113,6 +3137,14 @@ export default function ScriptDoctorPanel({
                         </div>
                         <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-1">
                           {dim.summary}
+                        </p>
+                        {/* D5 false-precision fix: name how much evidence backs this
+                            number — a 0-100 score from 2-4 passes on a handful of
+                            fired issues is not the same claim as one from all 14. */}
+                        <p className="text-[10px] font-mono text-gray-400 dark:text-gray-500 leading-snug mt-0.5">
+                          Based on {dim.issueCount} issue{dim.issueCount === 1 ? "" : "s"} across{" "}
+                          {dim.passes.length} pass{dim.passes.length === 1 ? "" : "es"} (
+                          {dim.passes.map(formatPassName).join(", ")}).
                         </p>
                       </div>
                     );

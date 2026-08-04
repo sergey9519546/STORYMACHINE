@@ -153,6 +153,18 @@ function ordinal(n: number): string {
   }
 }
 
+/** Coarse percentile band for the slate table — same D5 false-precision fix
+ *  as ScriptDoctorPanel.tsx's percentileBand(), duplicated for the same
+ *  reason ordinal() above is: the 20-sample synthetic reference set backing
+ *  this number has ~5-point resolution, so an exact ordinal overstates it. */
+function percentileBand(pct: number): string {
+  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  if (clamped >= 90) return "top 10%";
+  if (clamped <= 10) return "bottom 10%";
+  const topShare = Math.ceil((100 - clamped) / 10) * 10;
+  return `top ${topShare}%`;
+}
+
 function parseFilenameFromContentDisposition(header: string | null): string | null {
   if (!header) return null;
   const extended = /filename\*=(?:UTF-8''|utf-8'')?([^;]+)/i.exec(header);
@@ -712,9 +724,16 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
-                        <td className="px-2 py-2 text-gray-500 dark:text-gray-400">
+                        <td
+                          className="px-2 py-2 text-gray-500 dark:text-gray-400"
+                          title={
+                            typeof entry.healthPercentile === "number"
+                              ? `Exact rank: ${ordinal(entry.healthPercentile)} of 20 reference samples`
+                              : undefined
+                          }
+                        >
                           {typeof entry.healthPercentile === "number"
-                            ? ordinal(entry.healthPercentile)
+                            ? percentileBand(entry.healthPercentile)
                             : "—"}
                         </td>
                         <td className="px-2 py-2 text-gray-500 dark:text-gray-400">

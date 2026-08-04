@@ -148,7 +148,7 @@
     .dim-row {
       display: grid;
       grid-template-columns: 150px 1fr 70px;
-      grid-template-areas: "label bar score" "summary summary summary";
+      grid-template-areas: "label bar score" "summary summary summary" "basis basis basis";
       row-gap: 4px;
       column-gap: 12px;
       align-items: center;
@@ -170,6 +170,7 @@
       color: #3f3f46;
     }
     .dim-summary { grid-area: summary; font-size: 13px; color: #3f3f46; }
+    .dim-basis { grid-area: basis; font-size: 11px; color: #a3a3a3; }
     /* ── Checklist ── */
     .checklist { margin: 0; padding-left: 0; list-style: none; }
     .checklist li {
@@ -376,6 +377,7 @@
       </div>
       <div class="dim-score">91/100</div>
       <div class="dim-summary">Structure &amp; Pacing is in good shape — a handful of minor notes, mostly around weak midpoint.</div>
+      <div class="dim-basis">Based on 50 issues across 3 passes (Structure, Pacing, Rhythm).</div>
     </div>
 
     <div class="dim-row">
@@ -385,6 +387,7 @@
       </div>
       <div class="dim-score">95/100</div>
       <div class="dim-summary">Character is in good shape — a handful of minor notes, mostly around intention invisible.</div>
+      <div class="dim-basis">Based on 39 issues across 3 passes (Character Arc, Intention, Relationship Arc).</div>
     </div>
 
     <div class="dim-row">
@@ -394,6 +397,7 @@
       </div>
       <div class="dim-score">98/100</div>
       <div class="dim-summary">Dialogue &amp; Voice is in good shape — a handful of minor notes, mostly around question dodge.</div>
+      <div class="dim-basis">Based on 22 issues across 2 passes (Dialogue, Voice).</div>
     </div>
 
     <div class="dim-row">
@@ -403,6 +407,7 @@
       </div>
       <div class="dim-score">88/100</div>
       <div class="dim-summary">Plot Logic &amp; Payoff is in good shape — a handful of minor notes, mostly around revelation unearned.</div>
+      <div class="dim-basis">Based on 58 issues across 4 passes (Causality, Belief, Payoff, Conflict).</div>
     </div>
 
     <div class="dim-row">
@@ -412,6 +417,7 @@
       </div>
       <div class="dim-score">100/100</div>
       <div class="dim-summary">Theme &amp; Originality is in good shape — a handful of minor notes, mostly around scene shape templating.</div>
+      <div class="dim-basis">Based on 7 issues across 2 passes (Theme, Originality).</div>
     </div>
     </div>
   </section>
@@ -792,7 +798,7 @@
           <span class="chip chip-major">MAJOR</span>
           <span class="issue-location">Scenes 1–6 (setup zone)</span>
         </div>
-        <div class="issue-description">10 clue(s) seeded in the first half (storymachine, maya-okonkwo, detective-ray-okonkwo) have no matching payoff anywhere in the story — Chekhov&#39;s gun shown but never fired</div>
+        <div class="issue-description">9 clue(s) seeded in the first half (storymachine, maya-okonkwo, detective-ray-okonkwo) have no matching payoff anywhere in the story — Chekhov&#39;s gun shown but never fired</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Either fire the gun: add a payoff scene that calls back each planted clue. Or remove the clue from Act 1 if you don&#39;t intend to resolve it.</div>
       </li>
 
@@ -810,7 +816,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Setup/payoff distribution</span>
         </div>
-        <div class="issue-description">15 causal threads are seeded across the story but only 1 payoff(s) close them — the story plants 15 guns and fires almost none. The audience accumulates a growing load of unfulfilled promises.</div>
+        <div class="issue-description">14 causal threads are seeded across the story but only 1 payoff(s) close them — the story plants 14 guns and fires almost none. The audience accumulates a growing load of unfulfilled promises.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Audit the seeded clues and add payoff scenes that close each major thread. Alternatively, cut threads you don&#39;t intend to resolve — every seeded clue is a promise, and every unfired gun is a broken one.</div>
       </li>
 
@@ -1014,7 +1020,7 @@
           <span class="chip chip-major">MAJOR</span>
           <span class="issue-location">Act 2 (Scenes 4–9)</span>
         </div>
-        <div class="issue-description">Act 2a (Scenes 4–6) has average narrative entropy 3.0 but Act 2b (Scenes 7–9) drops to 2.0 — the composite momentum (suspense + relational turbulence + clue density) fails to build across the conflict zone.</div>
+        <div class="issue-description">Act 2a (Scenes 4–6) has average narrative entropy 2.7 but Act 2b (Scenes 7–9) drops to 2.0 — the composite momentum (suspense + relational turbulence + clue density) fails to build across the conflict zone.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Escalate Act 2b: add a revelation, deepen a relationship rupture, or raise a new clock. The second half of the conflict zone must be denser with narrative event than the first — the audience should feel the story accelerating, not plateauing.</div>
       </li>
 
@@ -1980,7 +1986,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Around Scene 10</span>
         </div>
-        <div class="issue-description">By Scene 10 the audience is tracking 14 open clues at once — too many simultaneous unresolved threads overload working memory, and the mysteries start to blur together.</div>
+        <div class="issue-description">By Scene 10 the audience is tracking 13 open clues at once — too many simultaneous unresolved threads overload working memory, and the mysteries start to blur together.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Resolve or consolidate some threads before opening new ones. Pay off an early clue to free up the audience&#39;s attention before planting the next, so each mystery has room to register.</div>
       </li>
 
@@ -1998,7 +2004,7 @@
           <span class="chip chip-major">MAJOR</span>
           <span class="issue-location">Scene 10 (peak open threads)</span>
         </div>
-        <div class="issue-description">At Scene 10 the story holds 14 planted-but-unresolved threads open simultaneously — the audience is asked to track 14 live questions at once. Beyond roughly five concurrent threads, individual mysteries blur together and each eventual payoff loses its charge.</div>
+        <div class="issue-description">At Scene 10 the story holds 13 planted-but-unresolved threads open simultaneously — the audience is asked to track 13 live questions at once. Beyond roughly five concurrent threads, individual mysteries blur together and each eventual payoff loses its charge.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Close some threads before opening new ones: pay off or fold together a few of the early clues so the concurrent open-thread count stays manageable. Suspense comes from a few sharp questions held in focus, not from a dozen blurred ones.</div>
       </li>
 
@@ -2007,7 +2013,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Setup/payoff ledger</span>
         </div>
-        <div class="issue-description">14 of 15 planted clues (93%) are never paid off — the majority of the story&#39;s setup investments go unrewarded. A high orphan rate depletes the audience&#39;s trust in the setup engine.</div>
+        <div class="issue-description">13 of 14 planted clues (93%) are never paid off — the majority of the story&#39;s setup investments go unrewarded. A high orphan rate depletes the audience&#39;s trust in the setup engine.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Either pay off the orphaned clues, or fold them into a shared payoff scene that resolves multiple threads at once. The audience remembers what the story promised — they need resolution, not abandonment.</div>
       </li>
 
@@ -2034,7 +2040,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Setup distribution</span>
         </div>
-        <div class="issue-description">11 of 15 planted clues (73%) are seeded in the first half of the story — the setup engine front-loads its work. The back half introduces few new threads, so the midpoint-onward stretch coasts on early plants and the audience stops actively processing new setups precisely when the story should be deepening.</div>
+        <div class="issue-description">10 of 14 planted clues (71%) are seeded in the first half of the story — the setup engine front-loads its work. The back half introduces few new threads, so the midpoint-onward stretch coasts on early plants and the audience stops actively processing new setups precisely when the story should be deepening.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Move some clue plants into the second half: a new thread seeded at the midpoint or in Act 2b keeps the audience processing fresh setups and gives the climax something recently planted to pay off. A setup engine that goes quiet after the midpoint leaves the back half with nothing new to anticipate.</div>
       </li>
 
@@ -2241,7 +2247,7 @@
         <div><dt>Total issues</dt><dd><code>176</code></dd></div>
       </dl>
     </div>
-    <div class="footer-generated">Generated August 4, 2026 at 06:24:54 AM UTC</div>
+    <div class="footer-generated">Generated August 4, 2026 at 11:48:24 AM UTC</div>
   </footer>
   </div>
 </body>

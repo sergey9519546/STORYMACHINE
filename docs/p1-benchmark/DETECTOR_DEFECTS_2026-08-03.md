@@ -252,6 +252,109 @@ Adversarially confirmed but sits at the presentation/aggregation boundary:
   migration; only two scenes total carry clockRaised, which "appears in both
   halves" states in the most generous possible framing.
 
+### D5 — 2026-08-04 addendum: false-precision presentation fixed, re-measured against the current stimulus
+
+**Re-measured first, per the task's own instruction.** The stimulus changed
+2026-08-04 (`FIELDING_DECISION_BRIEF.md`'s "thinness limitation" addendum):
+the P0 sample is now `dead-frequency.fountain`, 1831 words / 12 scenes,
+health 78.3, verdict CONSIDER. The exact "Theme & Originality 98.8" /
+"99/100" instance this entry named is **gone** — not because it was hand-
+tuned away, but because it no longer exists on the new stimulus (Theme &
+Originality now reads 100/100) and, independently, because both render paths
+(`server/lib/coverage-html.ts`'s `buildDimensionsSection`, `ScriptDoctorPanel
+.tsx`'s dimension row) were already rounding `DimensionScore.score` to a
+whole number before this session touched either file — checked by grep
+(`toFixed(1)` does not appear near `dim.score` in either file) and by reading
+`doctor.ts`'s `computeDimensionScore`, which itself only emits a one-decimal
+value at `sceneCount >= 3` for INTERNAL ranking; nothing downstream displays
+that decimal. So the literal defect as worded is retired on both counts.
+
+**The underlying problem survives, in a sharper form than the original
+example.** Measured on the current stimulus via `runScriptDoctor`:
+
+| Numeric | Rendered | Backing evidence | Honest at that precision? |
+|---|---|---|---|
+| Health | 78.3 (1 decimal) | All 14 passes, whole-script formula, the only number combining every signal the engine has | Yes — kept as-is, the most-backed number in the report |
+| Structure & Pacing | 91/100 | 50 issues across 3 passes (structure, pacing, rhythm) | Integer already coarse; now paired with its basis |
+| Character | 95/100 | 39 issues across 3 passes | same |
+| Dialogue & Voice | 98/100 | 22 issues across 2 passes | same |
+| Plot Logic & Payoff | 88/100 | 58 issues across 4 passes | same |
+| Theme & Originality | 100/100 | 7 issues across 2 passes — and one of those two passes (`theme`) fired **zero** issues | Weakest case: a literal maximum score, on the dimension with the fewest passes and the only pass in the whole report that found nothing |
+| Health percentile | rendered as "100th" (ordinal) | rank against a 20-sample **synthetic**, hand-authored reference set — each sample is worth 5 raw points of resolution | No — an exact ordinal claims precision the sample size cannot support |
+| Each dimension's percentile | rendered as "100th pct" (ordinal badge) | same 20-sample set, ranked on the unclamped statistic | No — same problem, and in this stimulus **all six** numbers (health + 5 dimensions) independently land at the 100th rank simultaneously, which is exactly the "the tool does not know what it does not know" tell this entry names |
+
+The sharper finding: a perfect 100/100 on Theme & Originality is backed by
+one pass finding literally nothing (`theme: 0 issues`) and the other finding
+7 — "nothing was flagged" is being read as "nothing is wrong," which is a
+confidence claim the lexicon-based passes cannot make on their own. And
+100th-percentile-on-every-axis at once, against a 20-item reference set, is
+the same overconfidence pattern the original 98.8 example flagged, just
+distributed across six numbers instead of concentrated in one.
+
+**Presentation rule applied (no computed value touched — verified below):**
+
+1. **Percentiles get bucketed, not zeroed out.** Both `ScriptDoctorPanel.tsx`
+   and `SlatePanel.tsx` (the multi-draft comparison table, same defect,
+   same fix) gained a `percentileBand()` helper that rounds the already-
+   computed `healthPercentile` / `dimension.percentile` to the nearest 10
+   ("top 10%", "top 30%", "bottom 10%" …) for the glanceable text. The exact
+   ordinal (`ordinal()`, unchanged) moves to the element's `title` tooltip
+   instead of disappearing — deletion moratorium respected, only the
+   headline precision is scoped down to what a 20-sample set backs.
+   `coverage-html.ts` never rendered percentile at all and still doesn't —
+   nothing to fix there.
+2. **Dimension sub-scores keep their number and gain a basis line.**
+   `coverage-html.ts`'s `buildDimensionsSection` and `ScriptDoctorPanel.tsx`'s
+   dimension row both now render "Based on N issue(s) across M pass(es)
+   (pass names)" beneath the existing summary sentence, built from
+   `DimensionScore.issueCount` and `.passes` — fields the type already
+   carried but no renderer surfaced. A reader can now see "100/100" and, in
+   the same glance, see it is backed by 2 passes and 7 issues rather than
+   assume it means "checked everything, found nothing."
+3. **Health stays exactly as rendered.** It is the one number built from the
+   full 14-pass signal set; bucketing or hedging it would be dishonest in
+   the other direction (hiding a real measurement behind false humility).
+
+**Proof no computed value moved.** `npm run generate-p0-sample` before and
+after this change, on the current HEAD:
+
+```
+health:      78.3            (unchanged)
+verdict:     CONSIDER        (unchanged)
+sceneCount:  12              (unchanged)
+contentHash: a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca  (unchanged)
+```
+
+`diff` of the two generated HTML files shows exactly the new `.dim-basis`
+lines, one CSS grid-area addition, and the `Generated <timestamp>` footer
+line — plus a set of unrelated clue-count/entropy differences already
+present on HEAD before this session touched anything (`b4b58d7`'s D4
+follow-through, committed 2026-08-04 11:23:52, landed after the committed
+artifact's last regeneration at 06:40:42 — confirmed by regenerating twice
+in a row post-change and diffing byte-identical except the timestamp). That
+staleness is pre-existing and orthogonal to this entry; regenerating the
+artifact here picks it up as a side effect, which is why the committed
+`sample-coverage-report.html` byte size moved from 193,132 to 193,725 bytes
+even though the presentation change itself only adds ~600 bytes of basis
+captions across 5 dimension rows.
+
+**Files touched:** `src/components/scriptide/ScriptDoctorPanel.tsx`,
+`src/components/SlatePanel.tsx`, `server/lib/coverage-html.ts`,
+`docs/user-validation/sample-coverage-report.html` (regenerated).
+No file under `server/nvm/revision/passes/**`, `doctor.ts`, `fountain-
+analyzer.ts`, or `calibration/**` was edited by this addendum — confirmed
+by `node scripts/check-scoring-receipt.mjs`, which reports no scoring-path
+files changed for this work.
+
+**What this does NOT do:** it does not touch `DIMENSION_LOW_CONFIDENCE_SCENES`,
+`computeDimensionScore`, `percentileRank`, or any threshold; it does not
+reduce the 5-dimension rollup to fewer dimensions (the "three CRITICALs are
+one finding stated three ways" bullet above and the grade/verdict-coexistence
+bullet are both untouched — they are aggregation/synthesis problems, not
+precision-of-display problems, and are out of this lane's scope by the task's
+own boundary: presentation, not scoring, and not a rewrite of what gets
+computed or which findings get deduplicated).
+
 ## D6 — Clue lifecycle assigns setup/payoff order instead of observing it
 
 **Where:** `server/nvm/analyze/fountain-analyzer.ts` — `applyClueLifecycle`
