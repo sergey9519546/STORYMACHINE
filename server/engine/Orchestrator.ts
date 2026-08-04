@@ -256,7 +256,26 @@ export class Orchestrator {
     return contradictions >= 3;
   }
 
-  public async runTurn(agentId: string) {
+  // `signal` (2026-08-04 — extends the between-turn cancellation pattern
+  // documented on runRoomSimulation's own `signal` param, below, to this
+  // single-agent caller): a single /api/turn call has no per-agent loop to
+  // check a signal "between turns" the way runRoomSimulation does — the
+  // takeTurn() call below IS this method's one in-flight unit of work, and
+  // like every other in-flight call this codebase's cancellation hook honors,
+  // it is always allowed to finish, never abandoned mid-call. What a single
+  // turn DOES have, mirroring runRoomSimulation's own two gated phases, is
+  // two NOT-YET-STARTED generateContent phases after that: the epistemic
+  // update, and the Director pass. Both are skipped (using each phase's own
+  // pre-existing empty/no-op result shape) if `signal` is already tripped by
+  // the write-safe boundary just before they would start — see the two
+  // checkpoints below for the exact reasoning at each one, which is
+  // deliberately the SAME reasoning as runRoomSimulation's "skip the
+  // round-end epistemic batch"/"skip Director eval" comments, not a new
+  // pattern. When `signal` is omitted (every caller before this change, and
+  // every caller besides /api/turn today — server/nvm/live/loop.ts,
+  // v5-loop.ts, routes/nvm/live.ts), this is a complete no-op:
+  // `signal?.aborted` is always false.
+  public async runTurn(agentId: string, signal?: AbortSignal) {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error('Agent not found');
 
@@ -361,12 +380,24 @@ export class Orchestrator {
     const tomBefore = this._snapshotTom(agentId);
     const emotionBeforePrimary = this._snapshotEmotion(agentId);
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
-    const update = await agent.updateEpistemics(recentActions);
-    try {
-      this._runSpineForUpdate(update, action_id, currentNodeId);
-      this.appraiser.appraise(update);
-    } catch (err) {
-      logger.warn('spine_epistemic_failed', { agentId, error: (err as Error).message });
+    // Checkpoint 1 (write-safe boundary): the action above is already
+    // recorded to Stage/the spine — recordAction + spine.processEvent already
+    // ran synchronously — so a trip observed here means only a NOT-YET-
+    // STARTED generateContent call is skipped, never an abandoned one. The
+    // skip reuses updateEpistemics' OWN empty-update shape (Agent.ts returns
+    // exactly this whenever recentActions is empty), so this degrade path is
+    // already exercised elsewhere, not new.
+    let truncated = signal?.aborted === true;
+    const update: EpistemicUpdate = truncated
+      ? { char_id: agentId, new_beliefs: [], contradiction_detected: false, contradicted_propositions: [] }
+      : await agent.updateEpistemics(recentActions);
+    if (!truncated) {
+      try {
+        this._runSpineForUpdate(update, action_id, currentNodeId);
+        this.appraiser.appraise(update);
+      } catch (err) {
+        logger.warn('spine_epistemic_failed', { agentId, error: (err as Error).message });
+      }
     }
     const relationshipDeltas = [
       ...immediateRelationshipDeltas,
@@ -379,20 +410,34 @@ export class Orchestrator {
     // ── Director evaluation ──
     // Single turns run the full Director pass (perspective evaluation, illusion-state
     // advance, pacing / arc / consistency / pivot checks) so they are first-class —
-    // not a degraded path that silently skips narrative progression.
-    const roomActions = this.stage.getSensoryFilter(currentNodeId, 6);
-    const directorUpdates = await this.director.evaluateRoom(currentNodeId, roomActions);
-    for (const u of directorUpdates) {
-      const emotionBeforeDirector = this._snapshotEmotion(u.char_id);
-      try {
-        this._runSpineForUpdate(u, action_id, currentNodeId);
-        this.appraiser.appraise(u);
-      } catch (err) {
-        logger.warn('spine_director_failed', { agentId, error: (err as Error).message });
+    // not a degraded path that silently skips narrative progression — UNLESS
+    // Checkpoint 2 below finds `signal` already tripped: updateEpistemics'
+    // own call above, when it ran, may itself have taken long enough to cross
+    // the deadline, so this is re-checked rather than trusting Checkpoint 1's
+    // read. Starting a brand-new generateContent call after the wall timer
+    // has already fired would defeat the entire point of the between-call
+    // hook — mirrors runRoomSimulation's own "skip Director eval when
+    // truncated" comment, verbatim reasoning, same codebase pattern.
+    if (signal?.aborted) truncated = true;
+    const directorUpdates: EpistemicUpdate[] = [];
+    if (!truncated) {
+      const roomActions = this.stage.getSensoryFilter(currentNodeId, 6);
+      directorUpdates.push(...await this.director.evaluateRoom(currentNodeId, roomActions));
+      for (const u of directorUpdates) {
+        const emotionBeforeDirector = this._snapshotEmotion(u.char_id);
+        try {
+          this._runSpineForUpdate(u, action_id, currentNodeId);
+          this.appraiser.appraise(u);
+        } catch (err) {
+          logger.warn('spine_director_failed', { agentId, error: (err as Error).message });
+        }
+        const directorEmotionDelta = diffEmotion(u.char_id, emotionBeforeDirector, this._snapshotEmotion(u.char_id));
+        if (directorEmotionDelta) emotionAppraisals.push(directorEmotionDelta);
       }
-      const directorEmotionDelta = diffEmotion(u.char_id, emotionBeforeDirector, this._snapshotEmotion(u.char_id));
-      if (directorEmotionDelta) emotionAppraisals.push(directorEmotionDelta);
     }
+    // Always runs, even when truncated — purely synchronous/deterministic (no
+    // generateContent anywhere in AppraisalEngine.ts), matching
+    // runRoomSimulation's identical "contagion always runs" comment.
     this.appraiser.applyContagion(currentNodeId);
 
     // ── Wave 32: bridge action → StoryOp[] → StoryCommit (canon ledger) ────────
@@ -887,13 +932,31 @@ export class Orchestrator {
   // sorted by their current tension accumulator (highest first) so hotter rooms
   // run first and get more turns. RELOCATE agents move between rooms at round
   // boundaries, so a fleeing character naturally joins the next room's simulation.
+  //
+  // `signal` (2026-08-04 — extends the between-turn cancellation pattern to
+  // this multi-room caller): the SAME optional, opt-in AbortSignal
+  // runRoomSimulation already accepts, checked at the two write-safe
+  // boundaries this method's own loop structure provides — between ROUNDS
+  // (nothing has started for the next round yet) and between ROOMS within a
+  // round (the next room's runRoomSimulation call hasn't started yet) —
+  // mirroring runRoomSimulation's own between-round/between-agent checks at
+  // one level up. Critically, `signal` is also threaded straight into each
+  // nested runRoomSimulation call below: without that, a deadline firing
+  // MID-ROOM would have no effect until that room's own simulation finished
+  // on its own (which could itself run many turns/rounds), defeating the
+  // whole point — the between-turn check one level down is what actually
+  // bounds the in-flight room's tail. When `signal` is omitted (every caller
+  // before this change), this is a complete no-op, same as
+  // runRoomSimulation's own doc.
   public async runFullScene(
     locationIds: string[],
     turnsPerRoom = 3,
     maxRounds = 4,
     onProgress?: (event: RoomProgressEvent) => void,
-  ): Promise<{ totalTurns: number; roundsRun: number; locationIds: string[] }> {
+    signal?: AbortSignal,
+  ): Promise<{ totalTurns: number; roundsRun: number; locationIds: string[]; truncated: boolean }> {
     let roundsRun = 0;
+    let truncated = false;
     // Resolve locations that have ≥1 agent
     let activeLocations = locationIds.filter(lid => {
       const agents = this.stage.getAgentsInLocation(lid);
@@ -902,6 +965,9 @@ export class Orchestrator {
 
     for (let round = 0; round < maxRounds; round++) {
       if (activeLocations.length === 0) break;
+      // Checked BETWEEN rounds, not mid-round — same write-safe boundary
+      // runRoomSimulation's own between-round check uses.
+      if (signal?.aborted) { truncated = true; break; }
       roundsRun = round + 1;
 
       // Sort rooms by dramatic tension: rooms with more agents and more accumulated
@@ -926,11 +992,21 @@ export class Orchestrator {
       });
 
       for (const lid of sorted) {
+        // Checked BETWEEN rooms, never mid-room — an in-flight room's own
+        // runRoomSimulation call (if any) is never abandoned outright here;
+        // `signal` is passed straight into it below so it winds down at its
+        // OWN between-turn boundary instead.
+        if (signal?.aborted) { truncated = true; break; }
         const aliveHere = this.stage.getAgentsInLocation(lid).filter(a => a.is_alive !== false);
         if (aliveHere.length === 0) continue;
 
         logger.info('full_scene_room', { round, location_id: lid, agents: aliveHere.length });
-        await this.runRoomSimulation(lid, turnsPerRoom, onProgress);
+        const roomResult = await this.runRoomSimulation(lid, turnsPerRoom, onProgress, signal);
+        // A nested room can itself observe `signal` tripping mid-simulation
+        // (between ITS OWN turns/rounds) before this outer between-room check
+        // runs again — propagate that so the round loop below also stops
+        // rather than starting another room or another round.
+        if (roomResult.truncated) { truncated = true; break; }
       }
 
       // After each full round, re-discover active locations (agents may have relocated)
@@ -941,6 +1017,8 @@ export class Orchestrator {
 
       onProgress?.({ type: 'round_complete', round, agentCount: activeLocations.reduce((s, lid) =>
         s + this.stage.getAgentsInLocation(lid).filter(a => a.is_alive !== false).length, 0) });
+
+      if (truncated) break;
     }
 
     // Fix C: peek (not drain) — see the identical comment on runRoomSimulation's
@@ -951,8 +1029,9 @@ export class Orchestrator {
     onProgress?.({
       type: 'simulation_complete', totalTurns,
       ...(droppedSoFar ? { droppedCommits: droppedSoFar } : {}),
+      ...(truncated ? { truncated: true } : {}),
     });
-    return { totalTurns, roundsRun, locationIds };
+    return { totalTurns, roundsRun, locationIds, truncated };
   }
 
   // ── X1 — new action-type side effects ───────────────────────────────────────

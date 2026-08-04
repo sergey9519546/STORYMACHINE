@@ -267,9 +267,33 @@ router.post('/api/turn', aiLimiter, validate(TurnBodySchema), withSessionCommand
   // must never admit the next queued command for this session before this
   // turn's real Stage writes are done, so only the HTTP RESPONSE is early —
   // the mutation ordering guarantee this route already had is untouched.
-  const operation = session.orchestrator.runTurn(agentId);
+  //
+  // CORRECTION (2026-08-04, Lane D — finishing the cancellation story): this
+  // comment used to end there, and /api/turn was one of two routes
+  // deliberately left out of the 2026-08-04 SSE wall-timer resolution (the
+  // other being /api/run-scene below) because "operation is always fully
+  // awaited" used to mean exactly what it meant for run-room/simulate-to-
+  // fountain BEFORE that resolution: a genuinely hung provider call kept the
+  // abandoned background `operation` — and this session's
+  // SessionCommandCoordinator FIFO behind it — occupied for as long as
+  // generateContent()'s own internal retry ceiling took (up to ~100-400s
+  // across a turn's up to 4 calls), even though the CLIENT already had its
+  // 503. `controller` below now wires Orchestrator.runTurn's new between-call
+  // AbortSignal hook to this SAME deadline, exactly like run-room's identical
+  // `controller` above: it does not change what the client sees (still one
+  // 503, same deadline), it only bounds how long the abandoned operation
+  // takes to actually settle, so the FIFO frees up for this session's next
+  // command promptly instead of only once the turn's full (up to 4-call)
+  // chain would have finished on its own. A single turn has no per-agent
+  // loop to check `signal` "between turns" the way run-room does — see
+  // runTurn's own doc for why the two checkpoints it gets are the two
+  // NOT-YET-STARTED phases after the in-flight takeTurn() call, not a
+  // mid-call abort.
+  const controller = new AbortController();
+  const operation = session.orchestrator.runTurn(agentId, controller.signal);
   const raced = await withDeadline(operation, TURN_BUDGET.timeoutMs);
   if (raced.timedOut) {
+    controller.abort();
     res.status(503).json({
       error: 'This turn is taking longer than expected and was stopped to protect the server. Try again.',
       code: 'AI_BUDGET_DEADLINE_EXCEEDED',
@@ -595,9 +619,30 @@ router.post('/api/run-scene', aiLimiter, validate(RunSceneBodySchema), reserveSi
     // and /api/run-room above — this is the worst engine-internal fan-out in
     // the file (see RUN_SCENE_BUDGET's comment), so it gets the largest
     // timeout of the three, still finite.
-    const operation = orchestrator.runFullScene(locationIds, roundsPerRoom ?? 3);
+    //
+    // CORRECTION (2026-08-04, Lane D — finishing the cancellation story):
+    // this comment used to end there, and /api/run-scene was one of two
+    // routes deliberately left out of the 2026-08-04 SSE wall-timer
+    // resolution (the other being /api/turn above) — "operation is always
+    // fully awaited" used to mean this route's abandoned background
+    // `operation` (and the room reservations `finally` below releases only
+    // once it settles) stayed occupied for as long as the WORST nested
+    // room's own natural completion took, up to this route's own fan-out
+    // ceiling (8 rooms x several rounds x a full runRoomSimulation pass
+    // each — see RUN_SCENE_BUDGET's comment), even though the client already
+    // had its 503. `controller` below now wires Orchestrator.runFullScene's
+    // new between-round/between-room AbortSignal hook — which itself
+    // threads `signal` into every nested runRoomSimulation call so a
+    // deadline firing mid-room is bounded by THAT room's own between-turn
+    // check, not its full natural duration — to this SAME deadline, exactly
+    // like run-room's identical `controller` above. The client-visible
+    // response is unchanged: still exactly one 503, still only after the
+    // same deadline.
+    const controller = new AbortController();
+    const operation = orchestrator.runFullScene(locationIds, roundsPerRoom ?? 3, undefined, undefined, controller.signal);
     const raced = await withDeadline(operation, RUN_SCENE_BUDGET.timeoutMs);
     if (raced.timedOut) {
+      controller.abort();
       res.status(503).json({
         error: 'This scene simulation is taking longer than expected and was stopped to protect the server. Try again with fewer rooms or rounds.',
         code: 'AI_BUDGET_DEADLINE_EXCEEDED',
@@ -605,11 +650,21 @@ router.post('/api/run-scene', aiLimiter, validate(RunSceneBodySchema), reserveSi
       await operation.catch(() => {});
       return;
     }
-    const result = raced.value;
+    // `truncated` is split out rather than spread verbatim so a normally-
+    // completed run (the only way this success branch is ever reached —
+    // `controller.abort()` above only ever fires on the timeout branch,
+    // which already returned) doesn't carry a spurious `truncated: false`
+    // in every response, matching this file's droppedCommits convention of
+    // only surfacing a field when it's actually true/nonzero.
+    const { truncated, ...result } = raced.value;
     // Fix C: surface Tier-1 canon drops accumulated across every room/round
     // this scene ran — additive, only present when nonzero.
     const droppedCommits = orchestrator.consumeDroppedCommits();
-    res.json({ status: 'completed', ...result, ...(droppedCommits ? { droppedCommits } : {}) });
+    res.json({
+      status: 'completed', ...result,
+      ...(truncated ? { truncated: true } : {}),
+      ...(droppedCommits ? { droppedCommits } : {}),
+    });
   } finally {
     releaseSimulationRooms(res);
   }
