@@ -1,3 +1,5 @@
+import { scenesFromFountain } from './scene-split.ts';
+
 // Cold-open promise tracker — excellence detector (STORY GOD SG3).
 //
 // A strong opening plants a concrete dramatic question / promise (a threat, a
@@ -39,12 +41,6 @@ export interface ColdOpenReport {
 }
 
 const tokenize = (s: string): string[] => s.toLowerCase().match(/[a-z][a-z']+/g) ?? [];
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). Local re-derivation. */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
-}
 
 // Words too common/structural to count as concrete "promise" nouns.
 const STOPWORDS = new Set([

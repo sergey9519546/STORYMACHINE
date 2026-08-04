@@ -1,3 +1,5 @@
+import { scenesFromFountain } from './scene-split.ts';
+
 // Silence / Subtext excellence signal — ROADMAP §5 "silence detector".
 // Deterministic, no LLM. Credits a script for crafted ACTION-ONLY (wordless)
 // beats at structurally meaningful positions — a hallmark of visual
@@ -37,12 +39,6 @@ export interface SilenceReport {
 }
 
 const tokenize = (s: string): string[] => s.toLowerCase().match(/[a-z][a-z']+/g) ?? [];
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). Local re-derivation. */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
-}
 
 /**
  * Determine whether a trimmed non-empty line is a dialogue character cue,

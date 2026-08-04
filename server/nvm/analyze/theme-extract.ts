@@ -9,6 +9,8 @@
 // not fed into health scalar yet.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { scenesFromFountain } from './scene-split.ts';
+export { scenesFromFountain };
 
 // word → [valence ∈ [-1,1], arousal ∈ [0,1]]
 type Affect = readonly [number, number];
@@ -164,10 +166,4 @@ export function extractTheme(fountain: string): ThemeExtract {
     confidence,
     scored: true,
   };
-}
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). */
-export function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
 }

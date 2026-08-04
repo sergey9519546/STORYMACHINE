@@ -57,6 +57,7 @@
 // file is the closest existing implementation of that spec's SHAPE, not
 // (yet) a working instance of it.
 import type { SupportState } from '../proof/surfacing.ts';
+import { scenesFromFountain } from './scene-split.ts';
 
 export type DisclosureKind = 'setup' | 'payoff' | 'reveal';
 
@@ -163,15 +164,6 @@ export function assessFairReveal(events: readonly DisclosureEvent[]): FairReveal
 
   const fair = violations.length === 0;
   return { fair, violations, support: fair ? 'ENTAILED' : 'CONTRADICTED' };
-}
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). Local
- *  re-derivation of the same splitting approach used elsewhere in analyze/
- *  (see emotional-arc.ts's scenesFromFountain) -- kept private/local per the
- *  no-cross-import instruction for this module. */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
 }
 
 const REVEAL_CUE = /\b(?:reveal(?:s|ed)?|twist|turns out|it was)\b/i;

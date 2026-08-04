@@ -1,3 +1,5 @@
+import { scenesFromFountain } from './scene-split.ts';
+
 // Pattern-establishment (rule-of-three / running motif) excellence detector —
 // STORY GOD SG4. Deterministic, no LLM. Credits a script for deliberately
 // ESTABLISHING a repeated pattern: a distinctive recurring phrase, object, or
@@ -45,12 +47,6 @@ function isDialogueCueLine(line: string): boolean {
 function extractCueName(line: string): string | null {
   const m = line.match(CHARACTER_CUE);
   return m ? m[1].trim().toLowerCase() : null;
-}
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries) — matches mirror-scene.ts / emotional-arc.ts. */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
 }
 
 // Broad, documented stop-word list: function words + generic screenplay

@@ -11,6 +11,8 @@ import type {
   CharacterId,
 } from './apdl';
 
+import { resolveEffectTargets } from './effect-targets';
+
 // ── Emotional Validator Interface ────────────────────────────────────────────
 
 /**
@@ -214,7 +216,11 @@ export class DeterministicEmotionalValidator implements EmotionalValidator {
 
     // Simple deterministic prediction: effects are exactly as specified
     for (const effect of action.emotional_effects) {
-      const characters = this.resolveCharacters(effect.character, action, state);
+      const characters = resolveEffectTargets(
+        effect.character,
+        action,
+        () => state.emotional_state.keys(),
+      );
       
       for (const charId of characters) {
         if (!effects.has(charId)) {
@@ -272,26 +278,6 @@ export class DeterministicEmotionalValidator implements EmotionalValidator {
     };
   }
 
-  private resolveCharacters(
-    target: string,
-    action: APDLAction,
-    state: APDLWorldState
-  ): CharacterId[] {
-    if (target === 'all') {
-      return Array.from(state.emotional_state.keys());
-    }
-    if (target === 'both' || target === 'actor' || target === 'target') {
-      // Convention (see examples.ts): action.parameters[0] is the actor,
-      // action.parameters[1] is the target of the action.
-      const actorId = action.parameters[0];
-      const targetId = action.parameters[1];
-
-      if (target === 'actor') return actorId ? [actorId] : [];
-      if (target === 'target') return targetId ? [targetId] : [];
-      return [actorId, targetId].filter((id): id is CharacterId => !!id);
-    }
-    return [target];
-  }
 }
 
 // ── Validator Registry ───────────────────────────────────────────────────────

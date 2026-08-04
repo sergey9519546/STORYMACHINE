@@ -122,8 +122,8 @@ export function computeEmotionalArc(sceneTexts: readonly string[]): EmotionalArc
   return { perScene, peakPosition, rampCorrelation, resolutionDrop, valenceShift, tensionVolatility, reaganArc, reaganFit, arcHealth, lexCoverage, scored: true };
 }
 
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). */
-export function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
-}
+/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries).
+ *  Re-exported from the shared dialect-B splitter (`./scene-split.ts`) to keep
+ *  this module's public surface stable — doctor.ts, the arc-shuffle probe, and
+ *  tests all import scenesFromFountain from here. */
+export { scenesFromFountain } from './scene-split.ts';

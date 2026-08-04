@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
 import { logger } from '../lib/logger.ts';
 import { metrics } from '../lib/metrics.ts';
-import { aiProviderManager, FreeRideProvider, GeminiProvider } from './ai-provider.ts';
+import { aiProviderManager, FreeRideProvider, GeminiProvider, type AIProvider } from './ai-provider.ts';
 
 let _shared: GoogleGenAI | null = null;
 
@@ -79,6 +79,21 @@ export interface ImageProvider {
 
 export interface TTSProvider {
   speak(text: string): Promise<{ dataUrl: string; mimeType: string } | undefined>;
+}
+
+// ── Delegating provider wrapper ───────────────────────────────────────────────
+// Adapts an AIProvider (from the multi-provider manager) to the LLMProvider seam
+// used throughout this module. SECURITY (audit H2): the caller's AbortSignal is
+// forwarded to the active provider so withTimeout can cancel the in-flight fetch
+// on a hard timeout. When the active provider can't stream, generateStream falls
+// back to a one-shot generate yielded as a single chunk. Extracted so the three
+// _provider assignment sites (module load, resetLLMProvider, resetAllProviders)
+// share one definition instead of a copy-pasted object literal.
+function makeDelegatingProvider(activeProvider: AIProvider): LLMProvider {
+  return {
+    generate: (params, signal) => activeProvider.generate(params, signal),
+    generateStream: (params, signal) => activeProvider.generateStream?.(params, signal) ?? activeProvider.generate(params, signal).then(async function* (r) { yield r; }),
+  };
 }
 
 // ── No-op providers for graceful degradation ─────────────────────────────────
@@ -224,12 +239,7 @@ let _ttsProvider:       TTSProvider       = geminiTTSProvider;
 // Override _provider if multi-provider system has a provider available
 if (aiProviderManager.hasProvider()) {
   const activeProvider = aiProviderManager.getProvider();
-  _provider = {
-    // SECURITY (audit H2): forward the caller's AbortSignal to the active
-    // provider so withTimeout can cancel the in-flight fetch on timeout.
-    generate: (params, signal) => activeProvider.generate(params, signal),
-    generateStream: (params, signal) => activeProvider.generateStream?.(params, signal) ?? activeProvider.generate(params, signal).then(async function* (r) { yield r; }),
-  };
+  _provider = makeDelegatingProvider(activeProvider);
 }
 
 export function setLLMProvider(p: LLMProvider): void         { _provider = p; }
@@ -237,12 +247,7 @@ export function resetLLMProvider(): void                     {
   // Reset to multi-provider system if available, otherwise Gemini
   if (aiProviderManager.hasProvider()) {
     const activeProvider = aiProviderManager.getProvider();
-    _provider = {
-      // SECURITY (audit H2): forward the caller's AbortSignal to the active
-      // provider so withTimeout can cancel the in-flight fetch on timeout.
-      generate: (params, signal) => activeProvider.generate(params, signal),
-      generateStream: (params, signal) => activeProvider.generateStream?.(params, signal) ?? activeProvider.generate(params, signal).then(async function* (r) { yield r; }),
-    };
+    _provider = makeDelegatingProvider(activeProvider);
   } else {
     _provider = geminiProvider;
   }
@@ -256,12 +261,7 @@ export function getTTSProvider(): TTSProvider                    { return _ttsPr
 export function resetAllProviders(): void {
   if (aiProviderManager.hasProvider()) {
     const activeProvider = aiProviderManager.getProvider();
-    _provider = {
-      // SECURITY (audit H2): forward the caller's AbortSignal to the active
-      // provider so withTimeout can cancel the in-flight fetch on timeout.
-      generate: (params, signal) => activeProvider.generate(params, signal),
-      generateStream: (params, signal) => activeProvider.generateStream?.(params, signal) ?? activeProvider.generate(params, signal).then(async function* (r) { yield r; }),
-    };
+    _provider = makeDelegatingProvider(activeProvider);
   } else {
     _provider = geminiProvider;
   }

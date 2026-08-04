@@ -69,7 +69,7 @@ router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), w
   const { ops, sceneIdx: bodySceneIdx, label } = req.body as { ops: StoryOpT[]; sceneIdx?: number; label?: string };
 
   const state = buildEnrichedState(stage);
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   const parentId = commits[commits.length - 1]?.commitId ?? null;
   const sceneIdx = typeof bodySceneIdx === 'number' ? bodySceneIdx : state.turn;
 
@@ -158,7 +158,7 @@ router.post('/api/nvm/converge/commit', gameLimiter, validate(ConvergeCommitBody
   }
 
   const newState = applyStoryOps(state, ops);
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   const parentId = commits[commits.length - 1]?.commitId ?? null;
   // StoryCommit (server/nvm/state/StoryCommit.ts) has no dedicated origin/author
   // field — inject-ops's own "marker" (the `label` in its response, defaulting to

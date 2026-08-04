@@ -132,7 +132,7 @@ export class CausalSpine {
       const existingProps = new Set((examiner.beliefs ?? []).map(b => b.proposition.toLowerCase()));
       const fresh = newBeliefs.filter(b => !existingProps.has(b.proposition.toLowerCase()));
       if (fresh.length > 0) {
-        this.stage.updateAgentBeliefs(examinerId, [...(examiner.beliefs ?? []), ...fresh]);
+        this.stage.addBeliefs(examinerId, fresh);
       }
     }
 

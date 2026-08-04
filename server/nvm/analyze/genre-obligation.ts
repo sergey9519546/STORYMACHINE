@@ -38,6 +38,7 @@
 // detector discipline (same guard rigor as defect rules).
 
 import type { GenreId } from '../../lib/genre-router.ts';
+import { scenesFromFountain } from './scene-split.ts';
 
 export interface GenreObligation {
   /** Short obligation name, e.g. "threat established". */
@@ -60,12 +61,6 @@ export interface GenreObligationReport {
 }
 
 const MIN_SCENES = 6;
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
-}
 
 interface ObligationDef {
   name: string;

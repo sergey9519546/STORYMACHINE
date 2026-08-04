@@ -68,6 +68,6 @@ export function manifestFromStage(
   seed: Seed,
   scenario: string,
 ): StoryManifest {
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   return buildManifest(manifestId, seed, scenario, commits);
 }
