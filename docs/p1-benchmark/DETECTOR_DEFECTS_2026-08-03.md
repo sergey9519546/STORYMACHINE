@@ -196,6 +196,44 @@ CAN report open clues — verified).
 recurrence; or demote content-word pairs to "recurring imagery." Fixtures
 from corpus scripts with genuinely dropped threads.
 
+### D4 — 2026-08-04 addendum: FIXED, both halves of the fix shape
+
+The information test is live in `fountain-analyzer.ts`
+(`partitionContentWordClusters`): a content-word cluster enters the clue
+lifecycle only when some occurrence carries introduction-shaped language
+(`CLUE_INTRODUCTION_MARKERS` — a dedicated list, deliberately NOT reusing
+`MYSTERY_WORDS`, and deliberately excluding handling vocabulary like
+"sealed", which this defect's own worked example pays a false clue off on).
+Everything that recurs but fails the test is DEMOTED, not deleted: it is
+reported as `recurringImagery` on `FountainAnalysis`, so the observation
+stays available. The worked example now behaves: `photograph`/`table` land
+in recurring imagery, zero clue ids. The `>= 2` floor's blindness is also
+dead — a marked, distinctive, never-repeated object is now reportable as an
+open thread.
+
+Two integration regressions were found live and are pinned in
+`tests/core/clue-information-test.test.ts` (8 tests, falsifiability
+spot-checked — breaking the lone-mention gate fails exactly its own test):
+
+- **Channel-overlap dedup**: "a strange BRASS KEY" briefly produced BOTH
+  the exact-token id and a same-scene content-word twin, double-reporting
+  one object as two unpaid promises. A cluster whose anchor word is part of
+  an exact-token id occurring in the cluster's own scenes is now skipped —
+  the exact-token channel owns the object.
+- **Lone-mention marker bar**: the indefinite-article first-mention basis
+  ("a" + rare noun) briefly qualified action beats ("A knife flashes!") as
+  open threads. A LONE mention now requires an explicit marker word
+  (`markerIntroduced`); the article basis still strengthens recurring
+  clusters, which is what it was measured for.
+
+Blast radius (41 scripts: 20 CC0 + 20 calibration + the P0 sample):
+19 health values moved (max −12.5 on `transfer-window`, whose only two
+"paid" promises were exactly this defect's false paid-clues — payment
+ratio 0.25 → 0), five grade shifts, ZERO verdict/sceneCount changes, P0
+sample untouched. Receipt: `MEASUREMENT_RECEIPTS.md` 2026-08-04 (D4/D6
+entry); the real-corpus AUC re-measurement obligation is recorded there
+and NOT discharged in-sandbox.
+
 ## D5 — Scoring-presentation coherence (report layer, borderline)
 
 Adversarially confirmed but sits at the presentation/aggregation boundary:
@@ -254,6 +292,23 @@ plants. Corpus-measured before/after; the AUC-24 ratchet still applies.
 **Note on D4:** this is a distinct defect from D4 (content-word co-occurrence
 certified as "planted clues"). D4 is about *what counts* as a clue; D6 is about
 *how its lifecycle is ordered*. Fixing D4 alone would leave D6 intact.
+
+### D6 — 2026-08-04 addendum: FIXED, the fix shape verbatim
+
+`applyClueLifecycle` no longer defines seed = `occ[0]` and payoff =
+`occ[last]`. The seed is placed at the occurrence carrying introduction
+evidence; the payoff is any later use at a >= 2-scene remove (both
+channels — a stricter resolution-language payoff gate was built, MEASURED,
+and rejected: it drove content-word payoffs to 0 on 38 of 41 scripts,
+recreating the dead channel, and pushed one calibration sample across a
+verdict boundary; the rejection is recorded at the site so it is not
+silently re-proposed). The inversion case this defect said the engine
+"cannot detect" — resolution language before the introduction — is now
+representable as `payoffScene < seedScene`, which makes `payoff.ts`'s
+long-dormant `PAYOFF_BEFORE_SETUP` rule reachable from the text path and
+the statistic non-constant under order-destroying degradations. Tests:
+`tests/core/clue-information-test.test.ts` (inversion + normal-order
+cases). Shared blast radius and receipt with the D4 addendum above.
 
 ## D7 — The engine knows what Kishōtenketsu is, and that knowledge never reaches the score
 

@@ -450,11 +450,16 @@ describe('analyzeFountainText — clue lifecycle content-word matching (no-fire)
     const fountain = [
       'INT. GARAGE - DAY',
       '',
-      'Dad grips the rusty attic key tightly.',
+      // 2026-08-04 (D4/D6): the content-word channel now requires
+      // introduction-shaped language to seed ("unfamiliar", "mysterious"),
+      // so both clue sentences carry a marker. This test's subject is
+      // CROSS-MATCHING between two clues sharing an anchor noun — the
+      // information gate itself is covered in clue-information-test.test.ts.
+      'Dad grips an unfamiliar rusty attic key tightly.',
       '',
       'INT. STREET - DAY',
       '',
-      'He spins the spare toolbox key on his finger.',
+      'He spins a mysterious spare toolbox key on his finger.',
       '',
       'INT. PARK - DAY',
       '',

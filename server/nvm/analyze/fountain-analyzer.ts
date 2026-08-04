@@ -163,7 +163,7 @@ import { normalizeScreenplay } from './screenplay-normalizer.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
 import type { SceneAnnotation } from '../screenplay/compile.ts';
-import type { FountainAnalysis } from './types.ts';
+import type { FountainAnalysis, RecurringImage } from './types.ts';
 
 // ── Lexicons (module constants) ──────────────────────────────────────────────
 // Kept compact and topic-scoped on purpose: each list backs exactly one signal,
@@ -829,30 +829,286 @@ function slugifyToken(raw: string): string {
   return raw.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
+// ── Clue lifecycle: the information test (D4/D6 fix, 2026-08-04) ─────────────
+// WHY these two lexicons exist and why they are SEPARATE lists, per this
+// file's one-list-per-signal convention (see CLUE_FUNCTION_STOPWORDS's header
+// for the same argument): DETECTOR_DEFECTS_2026-08-03.md D4 recorded that the
+// content-word channel below certified plain noun co-occurrence as "planted
+// clues" ("photograph-spread", "table-spread" — two sentences that happen to
+// share a noun), and D6 recorded that applyClueLifecycle DEFINED the seed as
+// an id's first occurrence and the payoff as its last, so the setup->payoff
+// relation was assigned by construction and a use-before-introduction error
+// was not representable at all (measured: 0 inversions across 26 scripts x 3
+// order-destroying degradations — a constant, not a weak signal).
+//
+// Both defects need the same missing thing: EVIDENCE, read off the text, that
+// an occurrence introduces its object as not-yet-understood, or converts it
+// into knowledge. These are the two halves of D4's "information test
+// (introduced as unknown/marked, resolved as knowledge)".
+//
+// MYSTERY_WORDS (above) is deliberately NOT reused: it backs curiosityDelta,
+// an intensity score over a whole scene, and it contains interrogatives
+// ('why', 'who') and pursuit verbs ('investigate', 'detective') that say
+// nothing about whether THIS object is marked as unknown. Tuning one list must
+// never silently move the other signal.
+
+/** Introduction-shaped language: the sentence presents its object as
+ *  informationally LIVE — concealed, unlabeled, missing, illegible, strange.
+ *  This is the "introduced as unknown/marked" half of D4's information test,
+ *  and the "introduction-shaped language" D6's fix shape asks the seeding
+ *  occurrence to carry.
+ *
+ *  Deliberately excludes words that merely describe an object's HANDLING or
+ *  storage ('sealed', 'untouched', 'wrapped', 'folded'): D4's own worked
+ *  example pays a false clue off on exactly that vocabulary ("the photographs
+ *  … sealed in an evidence bag"), so admitting them would re-certify the
+ *  finding this list exists to kill. Verified against
+ *  tests/fixtures/agency-signal/the-second-key.fountain in
+ *  tests/core/clue-information-test.test.ts. */
+const CLUE_INTRODUCTION_MARKERS = new Set([
+  'hidden', 'hides', 'hide', 'hiding', 'hid', 'concealed', 'conceals', 'conceal',
+  'buried', 'stashed', 'tucked', 'unmarked', 'unlabeled', 'unlabelled',
+  'unsigned', 'anonymous', 'mysterious', 'strange', 'unfamiliar', 'unknown',
+  'secret', 'secrets', 'missing', 'vanished', 'disappeared', 'forgotten',
+  'faded', 'illegible', 'smudged', 'cryptic', 'coded', 'encrypted', 'unopened',
+  'locked', 'scrawled', 'suspicious', 'peculiar', 'puzzling', 'unexplained',
+  'nameless', 'blank', 'stolen', 'disguised', 'shredded', 'redacted',
+]);
+
+/** Resolution-shaped language: the sentence converts its object into
+ *  KNOWLEDGE — the "resolved as knowledge" half of D4's information test.
+ *  A payoff claim on the content-word channel requires a hit here; without
+ *  one the object merely RECURS, which is D4's whole complaint.
+ *
+ *  Deliberately excludes the bare noun 'evidence' for the same reason
+ *  'sealed' is excluded above — D4's worked example contains it ("in an
+ *  evidence bag") while resolving nothing. */
+const CLUE_RESOLUTION_MARKERS = new Set([
+  'realizes', 'realize', 'realized', 'realizing', 'understands', 'understand',
+  'understood', 'recognizes', 'recognize', 'recognized', 'identifies',
+  'identify', 'identified', 'proves', 'prove', 'proved', 'proven', 'confirms',
+  'confirm', 'confirmed', 'reveals', 'reveal', 'revealed', 'explains',
+  'explain', 'explained', 'answers', 'answer', 'answered', 'matches', 'match',
+  'matched', 'realise', 'realises', 'realised', 'recognise', 'recognises',
+  'recognised',
+  'solves', 'solve', 'solved', 'deciphers', 'decipher', 'deciphered',
+  'unlocks', 'unlock', 'unlocked', 'locates', 'locate', 'located', 'recovers',
+  'recover', 'recovered', 'retrieves', 'retrieve', 'retrieved', 'confesses',
+  'confess', 'confessed', 'discovers', 'discover', 'discovered', 'uncovers',
+  'uncover', 'uncovered', 'exposes', 'expose', 'exposed', 'proof',
+]);
+
+/** What one occurrence of a recurring object was observed to DO. Both flags
+ *  are read off that occurrence's own sentence text — never inferred from its
+ *  position in the document, which is the D6 defect. */
+interface ClueEvidence {
+  /** The occurrence marks its object as not-yet-understood. Settled either by
+   *  an explicit marker word (then `markerIntroduced` is also true) or by the
+   *  first-mention promotion in computeContentWordClueClusters. */
+  introduced: boolean;
+  /** `introduced` came from an explicit CLUE_INTRODUCTION_MARKERS hit on this
+   *  occurrence's own sentence — never from the indefinite-article promotion.
+   *  A LONE mention may claim open-thread status only on this stronger basis:
+   *  "a knife flashes!" is an action beat, not a promise, and admitting bare
+   *  "a <rare noun>" as a lone-mention plant re-creates D4's noise one grammar
+   *  rule further down (found live: the STRONG_SCRIPT story-graph fixture grew
+   *  a phantom unpaid "knife" promise). */
+  markerIntroduced: boolean;
+  /** The occurrence reads as a FIRST mention (indefinite noun phrase). A
+   *  CANDIDATE introduction, not a settled one — it is promoted to
+   *  `introduced` in computeContentWordClueClusters only for anchors that are
+   *  also distinctive in this script, because document-wide frequency is not
+   *  knowable one sentence at a time. See CLUE_INDEFINITE_DETERMINERS. */
+  firstMention: boolean;
+  /** The occurrence converts its object into knowledge. */
+  resolved: boolean;
+}
+
+function emptyClueEvidence(): ClueEvidence {
+  return { introduced: false, markerIntroduced: false, firstMention: false, resolved: false };
+}
+
+function mergeClueEvidence(into: ClueEvidence, from: ClueEvidence): void {
+  into.introduced ||= from.introduced;
+  into.markerIntroduced ||= from.markerIntroduced;
+  into.firstMention ||= from.firstMention;
+  into.resolved ||= from.resolved;
+}
+
+/** How many words either side of an anchor noun a marker may sit and still
+ *  count as describing THAT anchor. Measured, not guessed: at sentence scope
+ *  (no window at all) D4's own worked-example fixture produced two fresh
+ *  false clues — "June works a hidden panel while Marcus watches the door,
+ *  one hand steady on the frame" credited `hidden` to `door` (6 words away)
+ *  and to `hand` (9 words away), the exact co-occurrence error D4 exists to
+ *  kill, just one level up. 3 covers the ordinary English shapes a marker
+ *  actually takes around its noun — attributive ("a hidden panel", distance
+ *  1), separated by a determiner/quantifier/adjective stack ("hides three
+ *  rusty keys", distance 3), and postposed ("the ledger, unsigned") — while
+ *  excluding the cross-clause reach that caused the false positives. */
+const CLUE_MARKER_ANCHOR_WINDOW = 3;
+
+/** Indefinite determiners — the grammatical signal of a FIRST mention, which
+ *  is the other introduction-shaped language D6's fix shape names ("a
+ *  first-time noun phrase") alongside the marked-as-unknown lexicon above.
+ *  "Grace Lin slides A FLASH DRIVE across the table" introduces an object the
+ *  audience has not met; "the photographs from Marcus's apartment" does not.
+ *
+ *  On its own this basis is far too generous — "across A CLUTTERED TABLE" is
+ *  also an indefinite noun phrase — which is why it is admitted ONLY for
+ *  anchors outside CLUE_GENERIC_OBJECT_WORDS. That blocklist already exists
+ *  for precisely this distinction ("ordinary scene dressing, in almost any
+ *  screenplay"), is already measured against the calibration corpus's
+ *  length-invariance check, and is already the guard the rare-anchor-alone
+ *  shortcut leans on — so this reuses a tested boundary rather than drawing a
+ *  new one. Verified against D4's own worked example: `table` is blocklisted,
+ *  and `photographs` never carries a determiner at all in either sentence, so
+ *  both stay demoted. */
+const CLUE_INDEFINITE_DETERMINERS = new Set(['a', 'an', 'another', 'some']);
+
+function isIntroductionMarker(word: string, stem: string): boolean {
+  return CLUE_INTRODUCTION_MARKERS.has(word) || CLUE_INTRODUCTION_MARKERS.has(stem);
+}
+
+function isResolutionMarker(word: string, stem: string): boolean {
+  return CLUE_RESOLUTION_MARKERS.has(word) || CLUE_RESOLUTION_MARKERS.has(stem);
+}
+
+function tokenizeClueSentence(sentence: string): string[] {
+  return sentence.toLowerCase().replace(/[^a-z0-9' ]/g, ' ').split(/\s+/).filter(Boolean);
+}
+
+/** Sentence-scoped evidence read, used by the EXACT-TOKEN channel only.
+ *  Matches the raw word AND its clueStem so the light plural/possessive
+ *  stemming this section already uses elsewhere applies here too, without a
+ *  second stemming convention.
+ *
+ *  Sentence scope is right here and wrong for the content-word channel: an
+ *  exact token is a phrase the writer explicitly emphasized, so there is at
+ *  most a handful per scene and the sentence containing one is about it. The
+ *  content-word channel's anchors are ordinary object nouns, several per
+ *  sentence, which is why readAnchoredClueEvidence below exists. */
+function readClueEvidence(sentence: string): ClueEvidence {
+  const raw = tokenizeClueSentence(sentence);
+  const evidence = emptyClueEvidence();
+  for (const w of raw) {
+    const stem = clueStem(w);
+    if (isIntroductionMarker(w, stem)) { evidence.introduced = true; evidence.markerIntroduced = true; }
+    if (isResolutionMarker(w, stem)) evidence.resolved = true;
+  }
+  return evidence;
+}
+
+/** Anchor-scoped evidence read for the content-word channel: a marker counts
+ *  for an anchor noun only when it sits within CLUE_MARKER_ANCHOR_WINDOW
+ *  words of it. Returns one entry per anchor STEM found in the sentence. */
+function readAnchoredClueEvidence(sentence: string): Map<string, ClueEvidence> {
+  const raw = tokenizeClueSentence(sentence);
+  const stems = raw.map(clueStem);
+  const byAnchor = new Map<string, ClueEvidence>();
+  for (let i = 0; i < stems.length; i++) {
+    if (!CLUE_ANCHOR_NOUN_STEMS.has(stems[i])) continue;
+    let evidence = byAnchor.get(stems[i]);
+    if (!evidence) { evidence = emptyClueEvidence(); byAnchor.set(stems[i], evidence); }
+    const lo = Math.max(0, i - CLUE_MARKER_ANCHOR_WINDOW);
+    const hi = Math.min(stems.length - 1, i + CLUE_MARKER_ANCHOR_WINDOW);
+    for (let j = lo; j <= hi; j++) {
+      if (j === i) continue;
+      if (isIntroductionMarker(raw[j], stems[j])) { evidence.introduced = true; evidence.markerIntroduced = true; }
+      if (isResolutionMarker(raw[j], stems[j])) evidence.resolved = true;
+      // First-mention basis: an indefinite determiner BEFORE the anchor, the
+      // anchor is not ordinary scene dressing, and the anchor is the HEAD of
+      // its noun phrase rather than a modifier of another object noun — "a
+      // flash DRIVE" introduces a drive, "an EVIDENCE bag" introduces a bag.
+      // Without the head check the fixture reports "an evidence bag" as a
+      // planted-and-dropped `evidence` thread. Recorded as a candidate; the
+      // rareness half of the guard is applied later.
+      if (
+        j < i
+        && CLUE_INDEFINITE_DETERMINERS.has(raw[j])
+        && !CLUE_GENERIC_OBJECT_WORDS.has(stems[i])
+        && !(i + 1 < stems.length && CLUE_ANCHOR_NOUN_STEMS.has(stems[i + 1]))
+      ) {
+        evidence.firstMention = true;
+      }
+    }
+  }
+  return byAnchor;
+}
+
 /** Shared seed/payoff/unresolved bookkeeping for one recurring-object id,
  *  reused by both the exact-token channel and the content-word channel below
  *  so the two independent recall paths land in one consistent shape. Guards
  *  against a duplicate id (the same object caught by both channels in the
  *  same scene, e.g. an ALL-CAPS prop that is also a clue-anchor noun) so
- *  seededClueIds/payoffSetupIds never carry a repeated entry. */
+ *  seededClueIds/payoffSetupIds never carry a repeated entry.
+ *
+ *  D6 fix (2026-08-04). The seed is no longer unconditionally occ[0] and the
+ *  payoff is no longer unconditionally occ[last]:
+ *
+ *  - INVERSION (the case D6 says the engine "cannot detect"): when an
+ *    occurrence carrying RESOLUTION language precedes the first occurrence
+ *    carrying INTRODUCTION language, the object is used as known before the
+ *    draft establishes it. The seed is placed at the introduction and the
+ *    payoff at the earlier resolution, so payoffScene < seedScene is
+ *    representable at all — which is what makes payoff.ts's long-dormant
+ *    PAYOFF_BEFORE_SETUP rule reachable from the text path, and what makes
+ *    the statistic non-constant under order-destroying degradations.
+ *  - PAYOFF: still "any later use" at a >= 2-scene remove, on BOTH channels,
+ *    which is D6's fix shape verbatim ("let the payoff be any later *use*").
+ *    A stricter variant — requiring resolution language at the paying
+ *    occurrence on the content-word channel — was built and MEASURED first, and
+ *    rejected on the evidence: across the 20 CC0 scripts and the 20
+ *    calibration samples it drove content-word payoffs to 0 on 38 of 41
+ *    scripts, i.e. it re-created the dead channel the content-word path was
+ *    added to fix (0/20 payoff fires), and pushed one calibration sample
+ *    across a verdict boundary. Resolution language earns its keep in the
+ *    inversion test above, not as a payoff gate. Recorded here so the
+ *    rejected variant is not silently re-proposed.
+ *  - OPEN: any id for which no payoff was emitted is reported unresolved, not
+ *    silently dropped. Under the old code only a single-occurrence id could
+ *    be unresolved, which is the second half of D4 ("a content-word clue that
+ *    is genuinely left open cannot exist by construction on that channel"). */
 function applyClueLifecycle(
   id: string,
   occ: number[],
+  evidence: ClueEvidence[],
   seedsByScene: Record<number, string[]>,
   payoffsByScene: Record<number, string[]>,
   unresolvedByScene: Record<number, string[]>,
 ): void {
-  const first = occ[0];
-  const last = occ[occ.length - 1];
-  const seeds = (seedsByScene[first] ??= []);
+  const introAt = evidence.findIndex(e => e.introduced);
+  const resolveAt = evidence.findIndex(e => e.resolved);
+  const inverted = introAt > 0 && resolveAt >= 0 && resolveAt < introAt;
+
+  const seedPos = inverted ? introAt : 0;
+  const seedScene = occ[seedPos];
+  const seeds = (seedsByScene[seedScene] ??= []);
   if (!seeds.includes(id)) seeds.push(id);
-  if (occ.length >= 2 && last - first >= 2) {
-    const payoffs = (payoffsByScene[last] ??= []);
-    if (!payoffs.includes(id)) payoffs.push(id);
-  } else if (occ.length === 1) {
-    const unresolved = (unresolvedByScene[first] ??= []);
-    if (!unresolved.includes(id)) unresolved.push(id);
+
+  let payoffScene: number | null = null;
+  if (inverted) {
+    // The order error itself is the claim: the resolution landed first.
+    payoffScene = occ[resolveAt];
+  } else {
+    const last = occ[occ.length - 1];
+    if (occ.length > seedPos + 1 && last - seedScene >= 2) payoffScene = last;
   }
+
+  if (payoffScene !== null) {
+    const payoffs = (payoffsByScene[payoffScene] ??= []);
+    if (!payoffs.includes(id)) payoffs.push(id);
+    return;
+  }
+
+  // No observed payoff. A gap-1 re-mention is still "re-mentioned, just not
+  // distant enough to read as a deliberate callback" — the accepted heuristic
+  // gap documented on detectClueLifecycle — so it stays neither paid off nor
+  // unresolved, exactly as before. Everything else is an open thread.
+  const rementionedTooSoon = occ.length > 1 && occ[occ.length - 1] - seedScene < 2;
+  if (rementionedTooSoon) return;
+  const unresolved = (unresolvedByScene[seedScene] ??= []);
+  if (!unresolved.includes(id)) unresolved.push(id);
 }
 
 // ── Clue lifecycle: content-word recall channel ──────────────────────────────
@@ -1101,6 +1357,9 @@ function extractClueContentWords(sentence: string, characterNameWords: Set<strin
 interface ClueContentCandidate {
   anchor: string;
   words: Set<string>;
+  /** D4/D6: what this scene's mentions of the anchor were observed to do,
+   *  unioned across the scene's sentences that mention it. */
+  evidence: ClueEvidence;
 }
 
 /** Per-scene, per-anchor content-word candidates: every sentence in the
@@ -1110,23 +1369,42 @@ interface ClueContentCandidate {
  *  times in one scene still counts once toward that scene's occurrence
  *  list. */
 function extractSceneClueCandidates(text: string, characterNameWords: Set<string>): ClueContentCandidate[] {
-  const byAnchor = new Map<string, Set<string>>();
+  const byAnchor = new Map<string, { words: Set<string>; evidence: ClueEvidence }>();
   for (const sentence of splitClueSentences(text)) {
     const words = extractClueContentWords(sentence, characterNameWords);
+    // D4/D6: read the evidence off the SAME sentence the anchor was found in
+    // AND within a few words of the anchor itself (readAnchoredClueEvidence),
+    // so a marker describing one noun is never credited to another noun that
+    // merely shares the sentence — the co-occurrence error one level up.
+    let anchored: Map<string, ClueEvidence> | null = null;
     for (const w of words) {
       if (!CLUE_ANCHOR_NOUN_STEMS.has(w)) continue;
+      anchored ??= readAnchoredClueEvidence(sentence);
+      const evidence = anchored.get(w) ?? emptyClueEvidence();
       const existing = byAnchor.get(w);
-      if (existing) { for (const x of words) existing.add(x); }
-      else byAnchor.set(w, new Set(words));
+      if (existing) {
+        for (const x of words) existing.words.add(x);
+        mergeClueEvidence(existing.evidence, evidence);
+      } else {
+        byAnchor.set(w, { words: new Set(words), evidence: { ...evidence } });
+      }
     }
   }
-  return [...byAnchor.entries()].map(([anchor, words]) => ({ anchor, words }));
+  return [...byAnchor.entries()].map(([anchor, v]) => ({ anchor, words: v.words, evidence: v.evidence }));
 }
 
 interface ClueCluster {
   anchor: string;
   words: Set<string>;
+  /** True when the anchor is distinctive in THIS script — rare (<=
+   *  CLUE_RARE_ANCHOR_MAX_OCCURRENCES document-wide) and not a
+   *  CLUE_GENERIC_OBJECT_WORDS entry. The same bar the clustering rule uses
+   *  to pair two mentions on the anchor alone. */
+  distinctiveAnchor: boolean;
   occurrences: number[];
+  /** Parallel to `occurrences` — element i is what the object was observed to
+   *  do in scene `occurrences[i]`. */
+  evidence: ClueEvidence[];
   id: string;
 }
 
@@ -1148,21 +1426,18 @@ function clueClusterId(anchor: string, words: Set<string>): string {
  *  creation order), matching this file's existing "first occurrence is the
  *  seed" convention.
  *
- *  Only clusters that actually RECUR (>= 2 occurrences) are returned. A
- *  single mention of a clue-anchor noun ("a map on the table", once, never
- *  again) is NOT reported as a seeded-but-unresolved clue the way the
- *  exact-token channel's quoted/CAPS tokens are: those are a deliberate,
- *  sparse authorial signal (a screenwriter choosing to emphasize a prop), so
- *  treating even a single instance as a planted-but-dropped clue is a
- *  reasonable inference. CLUE_ANCHOR_NOUNS is, by necessity, a much broader
- *  net (~100 common object words) so that its ORDINARY, incidental use in
- *  scene description doesn't get manufactured into a false "unresolved
- *  clue" on every single mention — measured against the calibration corpus,
- *  reporting single mentions here inflated unresolved-clue volume 6-9x on
- *  some samples with no corresponding craft signal, which is exactly the
- *  kind of noise this file's rules are supposed to guard against. This
- *  channel's job is recall for PAYOFFS the exact-token channel misses, not a
- *  second census of every prop word in the script. */
+ *  Every cluster is returned, including single-mention ones; the CLUE vs
+ *  RECURRING-IMAGERY decision (and the >= 2-occurrence question) belongs to
+ *  partitionContentWordClusters below, which is the D4 fix site. Before
+ *  2026-08-04 this function ended in `.filter(c => c.occurrences.length >= 2)`
+ *  — the filter D4 records as making "a content-word clue that is genuinely
+ *  left open impossible by construction on that channel." The original
+ *  rationale for that filter (a single mention of an anchor noun is ordinary
+ *  scene description, and reporting every one of them inflated unresolved-
+ *  clue volume 6-9x on calibration samples with no corresponding craft
+ *  signal) is still correct and is still enforced — but by the information
+ *  test rather than by recurrence, so a single mention that the writer
+ *  explicitly marks as unknown CAN now be reported open. */
 // DoS guard (S1-b), defense-in-depth: the pre-fix loop below scanned EVERY
 // existing cluster (`if (cluster.anchor !== cand.anchor) continue`) for every
 // new candidate, making the whole function O(totalCandidates^2) even for a
@@ -1188,6 +1463,25 @@ function computeContentWordClueClusters(scenes: SceneUnit[]): ClueCluster[] {
     for (const cand of list) anchorCounts.set(cand.anchor, (anchorCounts.get(cand.anchor) ?? 0) + 1);
   }
 
+  // Promote the FIRST-MENTION candidate flag now that document-wide anchor
+  // frequency is known (D4/D6, 2026-08-04). An indefinite noun phrase is
+  // credible evidence of a plant only when the object is ALSO distinctive in
+  // this script — the same rareness bar the clustering rule below already
+  // uses to decide two mentions are the same object. Without this half, the
+  // basis re-certifies D4's own worked example: `photograph` carries a real
+  // indefinite mention in the fixture ("There's a photograph of the door
+  // underneath this stack") while appearing in 5 separate scenes, which is
+  // script vocabulary, not a plant. Measured on the fixture: with the
+  // rareness guard `photograph-spread` stays demoted; without it, it is
+  // re-certified as a paid-off clue and D4 is unfixed.
+  for (const list of perScene) {
+    for (const cand of list) {
+      if (!cand.evidence.firstMention) continue;
+      if ((anchorCounts.get(cand.anchor) ?? 0) > CLUE_RARE_ANCHOR_MAX_OCCURRENCES) continue;
+      cand.evidence.introduced = true;
+    }
+  }
+
   const clusters: ClueCluster[] = [];
   const clustersByAnchor = new Map<string, ClueCluster[]>();
   for (let i = 0; i < scenes.length; i++) {
@@ -1210,12 +1504,22 @@ function computeContentWordClueClusters(scenes: SceneUnit[]): ClueCluster[] {
         }
       }
       if (matched) {
-        if (matched.occurrences[matched.occurrences.length - 1] !== sceneIdx) matched.occurrences.push(sceneIdx);
+        if (matched.occurrences[matched.occurrences.length - 1] !== sceneIdx) {
+          matched.occurrences.push(sceneIdx);
+          matched.evidence.push({ ...cand.evidence });
+        } else {
+          // Same scene, second anchor mention: union the evidence into the
+          // occurrence already recorded rather than adding a phantom one.
+          mergeClueEvidence(matched.evidence[matched.evidence.length - 1], cand.evidence);
+        }
       } else {
         const newCluster: ClueCluster = {
           anchor: cand.anchor,
           words: cand.words,
+          distinctiveAnchor: !CLUE_GENERIC_OBJECT_WORDS.has(cand.anchor)
+            && (anchorCounts.get(cand.anchor) ?? 0) <= CLUE_RARE_ANCHOR_MAX_OCCURRENCES,
           occurrences: [sceneIdx],
+          evidence: [{ ...cand.evidence }],
           id: clueClusterId(cand.anchor, cand.words),
         };
         clusters.push(newCluster);
@@ -1224,28 +1528,104 @@ function computeContentWordClueClusters(scenes: SceneUnit[]): ClueCluster[] {
       }
     }
   }
-  return clusters.filter(c => c.occurrences.length >= 2);
+  return clusters;
 }
 
-/** Cross-scene clue lifecycle: a distinctive token is SEEDED at its first
- *  occurrence. If it reappears at least 2 scenes later, that reappearance is
- *  its PAYOFF. A token that is never mentioned again anywhere (a true single
- *  occurrence) is an unresolved clue at its seed scene — "seeds never
+interface ClueClusterPartition {
+  /** Clusters that pass the information test's introduction half — these
+   *  feed seededClueIds / payoffSetupIds / unresolvedClues. */
+  clues: ClueCluster[];
+  /** Everything else that recurs (D4). */
+  recurringImagery: RecurringImage[];
+}
+
+/** D4 fix site. A content-word cluster is a CLUE only when some occurrence of
+ *  it carries CLUE_INTRODUCTION_MARKERS language — i.e. the writer marked the
+ *  object as not-yet-understood somewhere in its life. Bare noun recurrence,
+ *  however many times it repeats and however distinctive the anchor, is
+ *  RECURRING IMAGERY: a real and reportable observation, but not a promise the
+ *  story owes the audience a payoff on.
+ *
+ *  Note the asymmetry with the exact-token channel, which is deliberate and is
+ *  exactly what D4's "checked and cleared" section found: there, ALL-CAPS or
+ *  quotation IS the writer explicitly flagging a prop, so introduction is
+ *  author-supplied evidence and no lexical marker is required. Here there is
+ *  no such signal — the anchor lexicon is a ~100-word net over ordinary object
+ *  vocabulary — so the marker is the only thing standing between "a clue" and
+ *  "two sentences that both mention a table." */
+function partitionContentWordClusters(clusters: ClueCluster[]): ClueClusterPartition {
+  const clues: ClueCluster[] = [];
+  const recurringImagery: RecurringImage[] = [];
+  for (const cluster of clusters) {
+    const introduced = cluster.evidence.some(e => e.introduced);
+    // A LONE mention has to clear a higher bar to be called an open thread:
+    // EXPLICITLY marked as unknown (a real marker word, not just an
+    // indefinite article — see markerIntroduced's comment) AND distinctive
+    // in this script. Measured reason, not caution — see the header note on
+    // the calibration sample this guard spares, and the phantom "a knife
+    // flashes!" promise the marker requirement kills.
+    const markerIntroduced = cluster.evidence.some(e => e.markerIntroduced);
+    if (introduced && (cluster.occurrences.length >= 2 || (cluster.distinctiveAnchor && markerIntroduced))) {
+      clues.push(cluster);
+    } else if (cluster.occurrences.length >= 2) {
+      recurringImagery.push({
+        id: cluster.id,
+        anchor: cluster.anchor,
+        scenes: [...cluster.occurrences],
+      });
+    }
+    // Single, unmarked mention of an ordinary object noun: not a clue, not
+    // even recurring imagery — just scene description. Dropped, as before.
+  }
+  return { clues, recurringImagery };
+}
+
+/** Per-scene evidence for one exact-token id: the union of the evidence on
+ *  every sentence in that scene which contains the token's surface text.
+ *
+ *  Accepted gap (documented, matching this file's "no heavy NLP" style): a
+ *  CAPS token whose id had an interior stopword removed ("KEY TO THE VAULT"
+ *  -> "key vault") no longer appears verbatim in any sentence, so it reads as
+ *  no evidence. That costs an inversion detection, never a false one — the
+ *  conservative direction. */
+function tokenEvidenceByScene(text: string, token: string): ClueEvidence {
+  const evidence = emptyClueEvidence();
+  for (const sentence of splitClueSentences(text)) {
+    if (!sentence.toLowerCase().includes(token)) continue;
+    mergeClueEvidence(evidence, readClueEvidence(sentence));
+  }
+  return evidence;
+}
+
+/** Cross-scene clue lifecycle: a distinctive token is SEEDED where the text
+ *  introduces it. If it is used again at least 2 scenes later, that later use
+ *  is its PAYOFF. A token that is never mentioned again anywhere (a true
+ *  single occurrence) is an unresolved clue at its seed scene — "seeds never
  *  re-mentioned," per spec. A token that reappears too soon to count as a
  *  formal payoff (gap < 2 scenes) is seeded but neither paid off nor flagged
  *  unresolved — it was re-mentioned, just not distant enough to read as a
  *  deliberate callback; this is an accepted heuristic gap, not a bug.
  *
  *  Two independent recall channels feed this bookkeeping: the exact-token
- *  channel (quoted phrases / CAPS tokens, unchanged) and the content-word
- *  channel (computeContentWordClueClusters, see the section above) — added
+ *  channel (quoted phrases / CAPS tokens) and the content-word channel
+ *  (computeContentWordClueClusters, see the section above) — the latter added
  *  because the exact-token channel alone measured 0/20 payoff fires across
  *  the calibration corpus; every sample seeds clues via CAPS/quotes but real
- *  scripts almost never repeat the exact phrasing verbatim. */
+ *  scripts almost never repeat the exact phrasing verbatim.
+ *
+ *  2026-08-04 (D4/D6): the two channels no longer enter applyClueLifecycle on
+ *  equal terms. The exact-token channel enters unconditionally — the writer's
+ *  own ALL-CAPS / quoted-phrase convention IS an author-supplied introduction,
+ *  which is why D4's "checked and cleared" section records that channel as
+ *  sound — and behaves exactly as before EXCEPT that a resolution-before-
+ *  introduction ordering is now detected instead of being silently relabeled.
+ *  The content-word channel enters only for clusters that pass the information
+ *  test; the rest are returned as recurring imagery. */
 function detectClueLifecycle(scenes: SceneUnit[]): {
   seedsByScene: Record<number, string[]>;
   payoffsByScene: Record<number, string[]>;
   unresolvedByScene: Record<number, string[]>;
+  recurringImagery: RecurringImage[];
 } {
   const tokenScenes = new Map<string, number[]>();
   // Speaker-name guard (clue-channel precision wave): a caps token equal to
@@ -1265,12 +1645,14 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
       }
     }
   }
+  const tokenEvidence = new Map<string, ClueEvidence[]>();
   for (const s of scenes) {
     for (const token of extractDistinctiveTokens(s.rawText)) {
       if (speakerNames.has(token)) continue;
       const arr = tokenScenes.get(token);
-      if (arr) arr.push(s.sceneIdx);
-      else tokenScenes.set(token, [s.sceneIdx]);
+      const ev = tokenEvidenceByScene(s.rawText, token);
+      if (arr) { arr.push(s.sceneIdx); tokenEvidence.get(token)!.push(ev); }
+      else { tokenScenes.set(token, [s.sceneIdx]); tokenEvidence.set(token, [ev]); }
     }
   }
 
@@ -1285,7 +1667,10 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   // byte-identical).
   for (const [token, occ] of tokenScenes) {
     if (occ.length >= 4 && occ.length / scenes.length > 0.25) continue;
-    applyClueLifecycle(slugifyToken(token), occ, seedsByScene, payoffsByScene, unresolvedByScene);
+    applyClueLifecycle(
+      slugifyToken(token), occ, tokenEvidence.get(token)!,
+      seedsByScene, payoffsByScene, unresolvedByScene,
+    );
   }
 
   // Ubiquity guard, cluster channel (content-word precision wave,
@@ -1295,12 +1680,41 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   // one shared descriptor recurring through a whole act) flooded feature-
   // length seeds. Same floor (>= 4 occurrences) keeps every short-fixture
   // behavior byte-identical.
-  for (const cluster of computeContentWordClueClusters(scenes)) {
+  const partition = partitionContentWordClusters(computeContentWordClueClusters(scenes));
+  const recurringImagery: RecurringImage[] = [];
+  for (const image of partition.recurringImagery) {
+    if (image.scenes.length >= 4 && image.scenes.length / scenes.length > 0.25) continue;
+    recurringImagery.push(image);
+  }
+  // Channel-overlap dedup (2026-08-04, found by the D4/D6 integration
+  // sweep): one physical object must not be reported twice. A sentence like
+  // "a strange BRASS KEY glinting under the mat" used to produce both the
+  // exact-token id (brass-key) AND a same-scene content-word cluster
+  // (key-…) once the information test let marked single occurrences
+  // through. When a cluster's anchor word is already part of an exact-token
+  // id that occurs in the cluster's own seed scene, the exact-token channel
+  // owns the object — the cluster is redundant, not additional evidence.
+  // Anchor-word collisions WITHOUT a shared scene are left alone: a CAPS
+  // "attic KEY" and an unrelated lowercase key elsewhere stay two objects.
+  const tokenWordScenes = new Map<string, Set<number>>();
+  for (const [token, occ] of tokenScenes) {
+    for (const word of slugifyToken(token).split('-')) {
+      const set = tokenWordScenes.get(word) ?? new Set<number>();
+      for (const idx of occ) set.add(idx);
+      tokenWordScenes.set(word, set);
+    }
+  }
+  for (const cluster of partition.clues) {
     if (cluster.occurrences.length >= 4 && cluster.occurrences.length / scenes.length > 0.25) continue;
-    applyClueLifecycle(cluster.id, cluster.occurrences, seedsByScene, payoffsByScene, unresolvedByScene);
+    const owningScenes = tokenWordScenes.get(slugifyToken(cluster.anchor));
+    if (owningScenes && cluster.occurrences.some((idx) => owningScenes.has(idx))) continue;
+    applyClueLifecycle(
+      cluster.id, cluster.occurrences, cluster.evidence,
+      seedsByScene, payoffsByScene, unresolvedByScene,
+    );
   }
 
-  return { seedsByScene, payoffsByScene, unresolvedByScene };
+  return { seedsByScene, payoffsByScene, unresolvedByScene, recurringImagery };
 }
 
 // ── Question-answer latency (cross-scene) — Wave 1182 ────────────────────────
@@ -1798,6 +2212,7 @@ function emptyAnalysis(): FountainAnalysis {
     dialogueLineCount: 0,
     actionLineCount: 0,
     wordCount: 0,
+    recurringImagery: [],
   };
 }
 
@@ -1878,7 +2293,7 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   const ironyMarkerCounts = computeIronyMarkerCount(sceneRawTexts);
 
   // ── Phase 2: cross-scene clue seeding/payoff ──────────────────────────────
-  const { seedsByScene, payoffsByScene, unresolvedByScene } = detectClueLifecycle(sceneUnits);
+  const { seedsByScene, payoffsByScene, unresolvedByScene, recurringImagery } = detectClueLifecycle(sceneUnits);
 
   // ── Phase 2b: cross-scene question-answer latency (Wave 1182) ────────────
   const questionLatency = detectQuestionLatency(sceneUnits);
@@ -1983,6 +2398,7 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
 
   return {
     records, annotations, structure, characters, sceneCount, dialogueLineCount, actionLineCount, wordCount,
+    recurringImagery,
     // Only ever present when the ceiling actually engaged — omitted (not
     // `false`/`undefined`-valued-but-present) for every script at or under
     // ANALYZER_SCENE_CEILING, so JSON.stringify output for normal-sized

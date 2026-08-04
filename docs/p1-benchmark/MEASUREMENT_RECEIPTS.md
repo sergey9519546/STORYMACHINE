@@ -155,6 +155,50 @@ honestly rather than backfilled with a guess.
 
 ---
 
+### 2026-08-04 — D4/D6 clue-channel fix: the information test + observed setup→payoff order
+
+- **Date:** 2026-08-04
+- **Git SHA:** measured against a worktree based at `55941de` with the
+  D4/D6 change applied; the change and this receipt land in the same
+  commit range, per the guard's same-range rule.
+- **Command:** not an AUC run — the private corpus is not present in this
+  environment. The measurement performed is a full pre/post blast-radius
+  diff: `runScriptDoctor()` (quick mode) over 41 scripts — all 20
+  `data/screenplays/*.fountain`, all 20 calibration `REFERENCE_CORPUS`
+  samples, and the live P0 sample ("Dead Frequency") — comparing
+  `health`/`grade`/`verdict`/`sceneCount` per script between the pre-change
+  scoring path and the post-change one. Method and per-script analysis:
+  `DETECTOR_DEFECTS_2026-08-03.md`, D4/D6 addenda (2026-08-04).
+- **Measured AUC-24:** **not re-measured** — recorded as an open
+  obligation, same as the 2026-08-04 normalizer entry above. Discharge
+  path: `npm run discharge-obligations` on the maintainer machine (runs
+  `measure-real` + the artifact regeneration + the unwired-flag AUC runs
+  in one command). The real-corpus manifest re-lock requirement applies:
+  this change shifts health on real scripts, so
+  `tests/core/real-script-corpus.test.ts`'s manifest must be re-locked in
+  that same local run.
+- **Flag-run AUCs:** none — see above.
+- **Blast radius (the measurement this receipt certifies):** 19 of 41
+  scripts changed `health` (largest: transfer-window −12.5, whose only two
+  "paid" promises were D4's false paid-clues — payment ratio 0.25 → 0;
+  Yard Signs −7.1; Lockdown +7.5; two-lane +2.0). Five `grade` shifts
+  (two-lane solid→strong, Low Tide uneven→solid, Second Wind solid→uneven,
+  Yard Signs uneven→troubled, transfer-window uneven→troubled). ZERO
+  `verdict` or `sceneCount` changes on all 41. The P0 sample is unchanged
+  on every field — no stimulus re-lock required.
+- **Committed evidence artifacts:** deliberately NOT regenerated here, for
+  the same mixed-provenance reason as the normalizer entry; deferred to
+  the maintainer's `discharge-obligations` run.
+- **Corpus fingerprint:** the 20 tracked `data/screenplays/*.fountain`
+  files plus `calibration/corpus.ts`'s 20 `REFERENCE_CORPUS` samples at
+  the commit carrying this entry.
+- **Runner attestation:** "Agent session (Claude, remote sandbox,
+  2026-08-04) measured this in-environment under the maintainer's blanket
+  delegation; the AUC re-measurement and manifest re-lock obligations
+  above are explicitly NOT discharged by this entry."
+
+---
+
 ## 3. Entry template (copy for new entries)
 
 ```

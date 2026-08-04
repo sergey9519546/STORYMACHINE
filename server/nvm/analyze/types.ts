@@ -16,6 +16,21 @@ import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { NarrativeMetricsReport } from './metrics.ts';
 import type { StoryGraphReport } from './story-graph.ts';
 
+/** One recurring content-word object that did NOT earn clue status: it
+ *  recurs across scenes, but nothing in the text ever marks it as unknown.
+ *  D4's two named examples ("photograph-spread", "table-spread") land here.
+ *  Kept as a reported category rather than deleted — the channel is demoted,
+ *  not removed. See fountain-analyzer.ts's partitionContentWordClusters. */
+export interface RecurringImage {
+  /** Same id shape the clue channel would have used, so a reader comparing a
+   *  pre-2026-08-04 report against a new one can see exactly what moved. */
+  id: string;
+  /** The clue-anchor noun the cluster formed around, stemmed. */
+  anchor: string;
+  /** Scene indices, ascending. */
+  scenes: number[];
+}
+
 /** Output of the heuristic Fountain analyzer — everything the revision
  *  pipeline needs, reconstructed from raw text instead of StoryCommits. */
 export interface FountainAnalysis {
@@ -28,6 +43,15 @@ export interface FountainAnalysis {
   dialogueLineCount: number;
   actionLineCount: number;
   wordCount: number;
+  /** Recurring content-word objects that did NOT earn clue status (D4,
+   *  DETECTOR_DEFECTS_2026-08-03.md): a noun that recurs across scenes with
+   *  nothing in the text ever marking it as unknown. Reported so the
+   *  observation stays available — it is real, and a writer may want to see
+   *  it — while being kept out of seededClueIds / payoffSetupIds /
+   *  unresolvedClues, which are reserved for objects the text actually
+   *  introduces as information. Optional so pre-existing FountainAnalysis
+   *  constructions (tests, fixtures, the ops path) stay valid. */
+  recurringImagery?: RecurringImage[];
   /** DoS guard (S1-b): set only when the script exceeded
    *  fountain-analyzer.ts's ANALYZER_SCENE_CEILING and was analyzed on its
    *  first `sceneCount` scenes only. Absent (not `false`) for every script at
