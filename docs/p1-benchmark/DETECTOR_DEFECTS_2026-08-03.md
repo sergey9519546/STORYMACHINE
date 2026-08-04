@@ -71,6 +71,86 @@ turns the key that opens the vault. Every one is initiated by her.
 hole. Also note the act label ("Scenes 10–13" for a 14-scene script) was the
 0-based rendering; the 1-based range is 11–14.
 
+### D1/D2 — 2026-08-04 addendum: unwired agency-signal detector built
+
+Per the ROADMAP's unwired-first amendment (the same pattern D3's
+`reversal-detection.ts` fix already follows): `server/nvm/analyze/
+agency-signal.ts` now exists as a candidate agency signal for the shared D1/D2
+mechanism above. **Built unwired** — nothing in `doctor.ts`,
+`structure.ts`'s `PROTAGONIST_PASSIVITY_CLIMAX`, or `intention.ts`'s
+`PASSIVE_ACT3_INTENTION` imports it; confirmed by running
+`node scripts/check-scoring-receipt.mjs` against the range that introduced
+the file (`check-scoring-receipt: range "origin/main" — no scoring-path
+files changed. OK.`) and by `grep -rl "agency-signal" server/` returning only
+the file itself.
+
+**Design.** Two exported reads, both built only from fields already on
+`ScreenplaySceneRecord` (`dramaticTurn`, `visualBeats`, `powerHolder`, no raw
+text access, no LLM call):
+
+- `detectPeakAgency` — at the script's peak-suspense scene(s) (the same
+  "suspense 3.0" proxy this doc's own D1 worked example uses), checks
+  whether the protagonist is the near-leading grammatical subject of a
+  decisive-action verb (`turns`, `grabs`, `works`, `eases`, `unlocks`, …) or
+  the scene's dialogue `powerHolder`, with a passive-voice guard ("June was
+  grabbed" is not credited to June) and a counterweight spectator-verb
+  lexicon (`watches`, `waits`, `stares`, …) for the positive-passivity case.
+- `detectAct3Agency` — the same read across the script's final
+  fraction-of-scenes window (default 0.25, which reproduces D2's own "4 Act
+  3 scenes" on the 14-scene worked example exactly:
+  `Math.ceil(14 * 0.25) === 4`, not tuned to that script on purpose).
+- `computeD1AgencyDelta` / `computeD2AgencyDelta` — bounded comparison stats
+  (not rules, not deductions) reproducing the legacy `emotionalShift ===
+  'neutral' && !clockRaised && seededClueIds.length === 0` predicate exactly
+  and flagging disagreement when the legacy predicate calls a scene/window
+  passive while the agency read finds real agency there — D1/D2's exact
+  failure mode.
+
+**Fixture-level behavior.** On the canonical vault-scene fixture (a
+standalone, decoupled copy of this doc's own worked example, taken
+2026-08-04 into `tests/fixtures/agency-signal/the-second-key.fountain` ahead
+of `src/lib/sample-script.ts` being replaced in the same working session):
+peak scene = sceneIdx 12 (the VAULT scene, suspense 3.0, matching D1
+exactly); legacy predicate calls it passive; the detector finds June
+decisively acting (`"June turns the brass teeth in her palm"`) —
+disagreement confirmed. Act-3 window = sceneIdx 10–13 (matching D2's "4 Act 3
+scenes" exactly); legacy calls all four passive; the detector finds
+initiative in 2 of 4 (STUDY: "works a hidden panel"; VAULT: "turns the brass
+teeth") — disagreement confirmed. The ANTECHAMBER scene (sceneIdx 11, "June
+eases past it into the dark") is a documented miss, not a false negative:
+its action line never clears `visualBeats`' own `CONCRETE_NOUNS` filter, so
+it is invisible to this detector by construction — see the module's own
+header for the full CAN/CANNOT boundary.
+
+**Measured on the 20 tracked CC0 scripts** (`data/screenplays/*.fountain`,
+protagonist = most-frequently-speaking character): fires selectively, not
+universally — `anyAgencyAtPeak` on 4/20, `allSpectatorAtPeak` on 8/20, D1
+disagreement (legacy-passive-but-detector-finds-agency) on 1/20
+(`mise.fountain`), D2 disagreement on 3/20 (`quiet-season.fountain`,
+`the-detour.fountain`, `undertow.fountain`). Full per-script table and 52
+passing tests (positive/negative fixtures, near-miss negatives including a
+documented residual false-positive case, both channels, all edge cases,
+falsifiability-verified) in `tests/core/agency-signal.test.ts`.
+
+**Maintainer command to measure on the real corpus** (761-script corpus,
+local-only, never uploaded — see CLAUDE.md's "Which floor, exactly"
+section):
+
+```
+node scripts/measure-auc-split.mjs --partition train --with-agency-signal
+```
+
+This is **purely diagnostic** — it does not touch health, the AUC pairs, or
+any committed baseline CSV; it logs a legacy-vs-detected disagreement table
+per script to a separate `agency-signal-diagnostic-<partition>.csv`. Whether
+to wire either channel into `PROTAGONIST_PASSIVITY_CLIMAX` /
+`PASSIVE_ACT3_INTENTION` — as a new agency-aware predicate term, a
+confidence downgrade, or something else — is a **separate, receipt-gated
+scoring decision**, contingent on what that corpus run shows, requiring the
+full P1 evidence protocol (positive/negative fixtures — already built;
+corpus-measured before/after AUC) and respecting the AUC-24 >= 0.622 ratchet
+in `tests/core/real-script-corpus.test.ts`. Not decided here.
+
 ## D3 — NO_REVERSALS_LONG_STORY / NO_REVERSALS: reversal channel blind to the story's reversal
 
 **Where:** `server/nvm/revision/passes/conflict.ts` (critical) +

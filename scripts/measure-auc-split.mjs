@@ -58,6 +58,34 @@
 // discrimination-auc-<partition>.csv baseline.
 //   node scripts/measure-auc-split.mjs --partition train --with-reversal-detection
 //   REV_DETECTION=1 node scripts/measure-auc-split.mjs --partition train
+//
+// ── OPT-IN: --with-agency-signal / AGENCY_SIGNAL=1 (P1, 2026-08-04) ──
+// Off by default; the default path (no flag, no env var) is byte-identical to
+// this harness's pre-existing behavior — verified by diffing a real run
+// before/after this flag was added, exactly like --with-reversal-detection
+// above. See server/nvm/analyze/agency-signal.ts for the module this
+// measures (responds to detector defects D1/D2:
+// docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md — the
+// PROTAGONIST_PASSIVITY_CLIMAX / PASSIVE_ACT3_INTENTION predicate is blind
+// to protagonist-as-subject action, since it is built only from
+// emotionalShift/clockRaised/seededClueIds). Like --with-reversal-detection,
+// this flag does NOT touch health, the AUC pairs, or the CSV rows at all —
+// there is no agreed deduction/rule shape yet. It is PURELY DIAGNOSTIC: for
+// each script's REAL (undegraded) text, it additionally runs
+// computeD1AgencyDelta and computeD2AgencyDelta (protagonist =
+// analyzeFountainText's characters[0], the most-frequently-speaking
+// character — a reasonable default; see agency-signal.ts's file header) and
+// logs a disagreement table after the AUC table — for each script, whether
+// the legacy neutral/clock/clue predicate disagrees with this module's
+// agency read at the peak scene (D1) and across the Act-3 window (D2), plus
+// aggregate disagreement rates, so a maintainer can see whether an
+// agency-aware read disagrees with the legacy predicate on real writing at
+// all, and in which direction, before any deduction/rule shape is designed.
+// Output additionally routes to a SEPARATE csv
+// (agency-signal-diagnostic-<partition>.csv) — never the committed
+// discrimination-auc-<partition>.csv baseline.
+//   node scripts/measure-auc-split.mjs --partition train --with-agency-signal
+//   AGENCY_SIGNAL=1 node scripts/measure-auc-split.mjs --partition train
 
 // Safety: this harness used to write
 // scripts/output/discrimination-auc-<partition>.csv unconditionally, and
@@ -78,6 +106,7 @@ import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 import { computeQuestionLatencyDeduction } from '../server/nvm/analyze/question-latency-deduction.ts';
 import { computeReversalDelta } from '../server/nvm/analyze/reversal-detection.ts';
+import { computeD1AgencyDelta, computeD2AgencyDelta } from '../server/nvm/analyze/agency-signal.ts';
 
 const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
@@ -137,6 +166,53 @@ function diagnoseReversalDelta(file, text) {
   } catch {
     // skipped — not counted in the diagnostic table, matches the AUC path's
     // own "skip on error, don't crash the whole run" convention.
+  }
+}
+
+// OPT-IN flag — see file header "OPT-IN: --with-agency-signal" for the full
+// contract. Default false: nothing below this flag's guard runs, and
+// nothing it computes touches baseHealth/degHealth/pairsByDeg/csvRows.
+const AGENCY_SIGNAL = process.argv.includes('--with-agency-signal') ||
+  process.env.AGENCY_SIGNAL === '1';
+/** Per-script diagnostic rows for the agency-signal disagreement table —
+ *  populated only when AGENCY_SIGNAL is set, on the REAL (undegraded) text
+ *  only, mirroring diagnoseReversalDelta's own shape exactly. */
+const agencyDiagnosticRows = [];
+/** Best-effort: analyzeFountainText + computeD1AgencyDelta/
+ *  computeD2AgencyDelta on text runScriptDoctor already tolerated
+ *  (defense-in-depth only, mirroring diagnoseReversalDelta's own try/catch)
+ *  — a failure here is recorded as skipped, never thrown, and never affects
+ *  the AUC path. Protagonist = the most-frequently-speaking character
+ *  (characters[0]) — see agency-signal.ts's file header for why this
+ *  module leaves protagonist inference to the caller rather than importing
+ *  a choice of its own. A script with no speaking characters at all (no
+ *  dialogue anywhere) has no defensible protagonist guess and is skipped,
+ *  same as an analysis failure. */
+function diagnoseAgencyDelta(file, text) {
+  if (!AGENCY_SIGNAL) return;
+  try {
+    const { records, characters } = analyzeFountainText(text);
+    const protagonist = characters[0];
+    if (!protagonist) return;
+    const d1 = computeD1AgencyDelta(records, protagonist);
+    const d2 = computeD2AgencyDelta(records, protagonist);
+    // d1.disagreement and d2.disagreement are DISTINCT statistics (D1: peak
+    // scene; D2: Act-3 window) — kept under their own d1Disagreement/
+    // d2Disagreement keys rather than spread-merged, which would otherwise
+    // silently let d2's `disagreement` field overwrite d1's identically-named
+    // one.
+    agencyDiagnosticRows.push({
+      file, protagonist,
+      legacyPassiveAtPeak: d1.legacyPassiveAtPeak,
+      detectedAgencyAtPeak: d1.detectedAgencyAtPeak,
+      d1Disagreement: d1.disagreement,
+      legacyAllPassiveAct3: d2.legacyAllPassiveAct3,
+      detectedInitiativeCount: d2.detectedInitiativeCount,
+      act3SceneCount: d2.act3SceneCount,
+      d2Disagreement: d2.disagreement,
+    });
+  } catch {
+    // skipped — matches diagnoseReversalDelta's own convention.
   }
 }
 
@@ -273,6 +349,7 @@ for (const file of files) {
   if (!baseRep.sceneCount || baseRep.sceneCount < 5) continue;
   const baseHealth = healthWithOptionalQlDeduction(text, baseRep.health);
   diagnoseReversalDelta(file, text);
+  diagnoseAgencyDelta(file, text);
   for (const d of DEGRADATIONS) {
     const degradedText = d.fn(text);
     if (degradedText === null) continue;
@@ -341,6 +418,43 @@ if (REV_DETECTION) {
   const revRows = reversalDiagnosticRows.map(r => [r.file, r.legacyCount, r.detectedCount, r.delta].join(','));
   const REV_OUT_FILE = path.join(OUT_DIR, `reversal-detection-diagnostic-${PARTITION}.csv`);
   guardedWrite(REV_OUT_FILE, revHeader + '\n' + revRows.join('\n') + '\n', { rowCount: revRows.length, label: REV_OUT_FILE });
+}
+
+// ── Agency-signal diagnostic (--with-agency-signal / AGENCY_SIGNAL=1) ────
+// DIAGNOSTIC ONLY — see file header. Does not touch health, AUC, or the
+// baseline CSV above; reported and written separately.
+if (AGENCY_SIGNAL) {
+  console.log('\n[--with-agency-signal ON] Legacy (neutral/no-clock/no-clue) vs. agency-aware read at the');
+  console.log('peak scene (D1) and across the Act-3 window (D2), per script\'s REAL text. Both delta');
+  console.log('functions are UNWIRED — this table answers only whether an agency-aware read disagrees');
+  console.log('with the legacy predicate at all.');
+  console.log('\nfile                                              | protagonist  | D1 disagree | D2 disagree | D2 initiative/scenes');
+  console.log('---------------------------------------------------|--------------|-------------|--------------|----------------------');
+  let d1DisagreeCount = 0;
+  let d2DisagreeCount = 0;
+  for (const row of agencyDiagnosticRows) {
+    console.log(
+      `${row.file.padEnd(51)} | ${row.protagonist.padEnd(12)} | ${String(row.d1Disagreement).padStart(11)} | `
+      + `${String(row.d2Disagreement).padStart(12)} | ${row.detectedInitiativeCount}/${row.act3SceneCount}`,
+    );
+    if (row.d1Disagreement) d1DisagreeCount++;
+    if (row.d2Disagreement) d2DisagreeCount++;
+  }
+  const agencyN = agencyDiagnosticRows.length;
+  console.log('---------------------------------------------------|--------------|-------------|--------------|----------------------');
+  if (agencyN > 0) {
+    console.log(`${agencyN} script(s) scored | D1 disagreement rate ${(d1DisagreeCount / agencyN * 100).toFixed(1)}% (${d1DisagreeCount}/${agencyN}) | D2 disagreement rate ${(d2DisagreeCount / agencyN * 100).toFixed(1)}% (${d2DisagreeCount}/${agencyN})`);
+  } else {
+    console.log('0 scripts scored — nothing to report (check --partition, local corpus availability, and that scripts have at least one speaking character).');
+  }
+
+  const agencyHeader = 'file,protagonist,legacyPassiveAtPeak,detectedAgencyAtPeak,d1Disagreement,legacyAllPassiveAct3,detectedInitiativeCount,act3SceneCount,d2Disagreement';
+  const agencyRows = agencyDiagnosticRows.map(r => [
+    r.file, r.protagonist, r.legacyPassiveAtPeak, r.detectedAgencyAtPeak, r.d1Disagreement,
+    r.legacyAllPassiveAct3, r.detectedInitiativeCount, r.act3SceneCount, r.d2Disagreement,
+  ].join(','));
+  const AGENCY_OUT_FILE = path.join(OUT_DIR, `agency-signal-diagnostic-${PARTITION}.csv`);
+  guardedWrite(AGENCY_OUT_FILE, agencyHeader + '\n' + agencyRows.join('\n') + '\n', { rowCount: agencyRows.length, label: AGENCY_OUT_FILE });
 }
 
 const header = 'file,degradation,realHealth,degradedHealth,delta';
