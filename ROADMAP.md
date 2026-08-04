@@ -112,7 +112,29 @@ that got us here.
 - Show them the existing sample coverage report; watch, don't pitch.
 - Capture the single core question: *does this make you want to run your own draft — why or why not?*
 - Log objections, moments of trust, and moments of disbelief verbatim.
-- Write zero new product or engine code until the P0 exit gate clears. Critical security fixes are the only exception.
+- ~~Write zero new product or engine code until the P0 exit gate clears. Critical security fixes are the only exception.~~
+  **AMENDED 2026-08-04 (owner decision, recorded in PHASE_TRACKER's decision
+  log): the blanket freeze is RETIRED and replaced by machine-checked
+  evidence gates.** The freeze was written when nothing enforced anything;
+  every risk it guarded against now has a tripwire that fails CI or a
+  verification suite instead of a prohibition:
+  1. **Scoring-path changes fail CI without a measurement receipt**
+     (`scripts/check-scoring-receipt.mjs`, blocking step — reachability-
+     aware, so unwired candidates stay free to build).
+  2. **New signals follow build-unwired → measure → wire-with-receipt**
+     (the established pattern: question-latency, reversal-detection,
+     truth-extraction).
+  3. **Surface changes must keep the browser verification suites green**
+     (`smoke-p0-live-flow`, `verify-focus-traps`, `verify-p2-p3-surfaces`)
+     plus the honesty gates (honesty-audit, check-docs, scene-label
+     tripwire).
+  4. **Demand evidence remains the highest-priority HUMAN lane, run in
+     parallel** — P0 sessions are GO (see decision log) and nothing
+     engineering does substitutes for them. The one prohibition that
+     SURVIVES the amendment: P4-class retention/lock-in features still
+     wait for a P0 PASS — building retention before demand is the exact
+     failure this roadmap exists to prevent, and no tripwire can catch it
+     mechanically.
 
 **Exit gate:** >=5 documented sessions with a clear signal on the core
 question. If the signal is negative or ambiguous, **STOP, reframe, and repeat

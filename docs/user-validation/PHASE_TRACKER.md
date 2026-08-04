@@ -135,17 +135,30 @@ script and a clean exit.
 - Maintain an inventory-only map of P1's current assets and gaps; run no P1 experiment.
 - Fix critical security issues, the ROADMAP's sole exception to the P0 product/engine-code freeze.
 
-## Blocked now
+## Gated now (the freeze is retired — see ROADMAP's 2026-08-04 amendment)
 
-- New product or engine code other than critical security fixes.
-- Scoring formula, constant, rule, detector, calibration, or emotional-arc integration changes.
-- P1 benchmark construction, corpus acquisition, human scoring-label collection, reader assignment, metric reruns, or evaluation scripts.
-- UI/report redesign, default-surface changes, panel/Labs gating, or terminology changes (P2).
-- Shareable-report, verification-link, export-redesign, or sharing/instrumentation work (P3).
-- Retention, draft-history, analytics, auth/account expansion, or workflow-lock-in work (P4).
-- Engine refactors, broad type cleanup, OASIS work, or other filed-backlog work.
-- Any re-sequencing not explicitly approved in the canonical ROADMAP.
-- Treating recruitment, undocumented conversations, templates, or this tracker as satisfying the P0 exit gate.
+The blanket "blocked" list is replaced by evidence gates. What each former
+block became:
+
+- **Scoring changes** (formula, constant, rule, detector, calibration,
+  arc integration): GATED by the CI receipt guard — a scoring-path change
+  fails the build without a `MEASUREMENT_RECEIPTS.md` entry in range, and
+  the AUC-24 >= 0.622 ratchet still applies to the measurement itself.
+- **New signals/detectors**: GATED by the unwired-first pattern — build
+  unwired with fixtures and an opt-in measure flag, wire only with a
+  receipt.
+- **UI/report/surface changes**: GATED by the browser verification suites
+  (smoke, focus-traps, p2-p3 surfaces) and the honesty gates, all of which
+  must stay green.
+- **P1 benchmark work**: OPEN (and already under way — corpus expansion,
+  labeling kit, pre-registered split). Human blind-labeling still requires
+  real readers; zero labels may be fabricated.
+- **P4 retention/lock-in work**: STILL PROHIBITED until the P0 gate reads
+  PASS. This is the one block the amendment keeps: no mechanism can
+  substitute for demand evidence.
+- **Unchanged and permanent**: recruitment, templates, or this tracker
+  never satisfy the P0 exit gate — only >=5 valid documented human
+  sessions do; fabricating any part of them remains prohibited.
 
 ## Decision log
 
