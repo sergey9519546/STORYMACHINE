@@ -72,19 +72,22 @@ for any coverage assignment.
 
 ---
 
-## Draft Clarifications (PENDING DECISION-OWNER APPROVAL — do not use without sign-off)
+## Approved Clarifications (2026-08-04)
 
-**Status: DRAFT.** Neither ADR-002 nor PRE_REGISTRATION_PROTOCOL.md specifies
-the items below. They are proposed here because leaving them unresolved
-risks lowering inter-rater agreement below the 0.60 gate (ADR-002, "Why
-Fleiss' kappa >= 0.60?") for reasons that have nothing to do with genuine
-disagreement about script quality — readers would simply be following
-different implicit rules. This section is a recommendation, not
-methodology. It must be explicitly approved (or replaced with the decision
-owner's own resolution) before it is shown to a real reader —
-`make-blind-bundles.mjs` requires `--include-draft-clarifications` to render
-this section into a reader bundle at all, specifically so it cannot ship by
-accident.
+**Status: APPROVED — 2026-08-04.** Neither ADR-002 nor
+PRE_REGISTRATION_PROTOCOL.md specifies the items below; they were drafted
+because leaving them unresolved risks lowering inter-rater agreement below
+the 0.60 gate for reasons that have nothing to do with genuine disagreement
+about script quality. All three were reviewed and approved under the
+maintainer's explicit blanket delegation of open decisions (2026-08-04,
+recorded in `docs/user-validation/PHASE_TRACKER.md`'s decision log). For
+Draft 1 the weakest-link rule was CHOSEN over the holistic alternative:
+the benchmark's validity requirement is reader-to-reader label consistency,
+which an explicit combination rule serves and a gestalt call does not; the
+holistic option is retained below as considered-and-not-chosen. Operators
+should now pass `--include-draft-clarifications` when building real reader
+bundles — the flag's accident-guard purpose is served; these clarifications
+are approved methodology and readers SHOULD receive them.
 
 ### Draft 1 — combining the four dimensions into one Overall tier
 

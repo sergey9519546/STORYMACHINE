@@ -184,3 +184,22 @@ and build it.
   the owner. I will not auto-field to "make progress."
 - **Touch the scoring formula, constants, rules, detectors, calibration, or
   report math.** Frozen under P0; the only exception is critical security.
+
+---
+
+## DECIDED — 2026-08-04: GO
+
+The decision this brief exists to enable has been made and recorded in
+`PHASE_TRACKER.md`'s decision log, which is the authoritative entry (the
+pre-registered signal rule lives there; this addendum is a pointer, not a
+second copy).
+
+Summary: **GO** — field P0, static-report sessions first, live-flow
+permitted per the certifications above. Decision owner of record: Project
+Maintainer (role). The recording was performed under the maintainer's
+explicit 2026-08-04 blanket delegation of open decisions to the agent
+session; what CANNOT be delegated remains exactly what §"What I will not
+do" says — recruiting, running, and documenting sessions are human work,
+and zero sessions have been fabricated. The gate's counters still read
+0 of >= 5 valid sessions; GO changes what is *authorized*, not what is
+*evidenced*.

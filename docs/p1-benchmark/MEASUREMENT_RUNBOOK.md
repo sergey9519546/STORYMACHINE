@@ -560,7 +560,18 @@ The following gaps or conflicts exist across the P1 docs and should be addressed
 
 The "0.622" is an OLD AUC-24 floor (first 24 manifest entries); the current 761-script corpus gives 0.734. Which one is the operative floor?
 
-**Recommendation:** Update CLAUDE.md §7 to state: "shuffle-drop AUC on the 761-script test partition must not regress below 0.734 (measured 2026-07-29)." Clarify that the 0.622 floor is historical (smaller corpus) and is superseded.
+**Recommendation:** ~~Update CLAUDE.md §7 to state: "shuffle-drop AUC on the 761-script test partition must not regress below 0.734 (measured 2026-07-29)." Clarify that the 0.622 floor is historical (smaller corpus) and is superseded.~~
+
+> **DO NOT ACTION — superseded 2026-08-04 (decision recorded).** CLAUDE.md's
+> current "Which floor, exactly" section explicitly forbids this exact move,
+> and it is right: the 0.622 ratchet and the 0.734 baseline are THREE-WAY
+> non-comparable statistics — different corpus (24-script subset vs 153-script
+> hash-locked test partition), different degradation (one combined
+> shuffle+drop vs separate SCENE_SHUFFLE/MIDPOINT_DROP), different
+> denominator. "Updating" the enforced 0.622 assertion to a P1 number would
+> break `tests/core/real-script-corpus.test.ts` with no real regression
+> having occurred. Both floors coexist on purpose; this subsection is kept
+> as the record of a plausible-looking mistake so it is not re-proposed.
 
 ### 7.4 "measure-real-script-discrimination.ts" vs "measure-auc-split.mjs"
 

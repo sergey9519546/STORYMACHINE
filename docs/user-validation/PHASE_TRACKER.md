@@ -149,11 +149,30 @@ script and a clean exit.
 
 ## Decision log
 
-No decisions have been made.
-
 | Date | Phase | Decision | Evidence reference | Reviewer | Notes |
 |---|---|---|---|---|---|
-| — | — | — | — | — | No entries |
+| 2026-08-04 | P0 | **GO — field P0.** Static-report sessions first; live-flow sessions permitted per the existing certifications. | `FIELDING_DECISION_BRIEF.md` (incl. 2026-08-03 update: browser caveat cleared, stimulus corrected, thinness recorded) | Project Maintainer (role) — recording delegated, see Notes | The maintainer explicitly delegated all open decisions to the agent session on 2026-08-04 ("make all the decisions for me … always proceed"). This entry records the GO under that delegation. Sessions themselves remain HUMAN-RUN: recruitment, moderation, and documentation cannot be delegated to an agent, and fabricating session data remains prohibited under this tracker's own constitutional guard. |
+
+**Pre-registered signal rule** (fixed before any session; no post-hoc
+reinterpretation): each valid documented session is classified per the
+operating kit as Positive / Qualified / Negative / Ambiguous / Invalid on
+the core question (*does this make you want to run your own draft?*).
+
+- **PASS:** among the first 5 valid sessions, >= 3 are Positive or
+  Qualified, AND at least 1 is fully Positive.
+- **STOP:** >= 3 of the first 5 valid sessions are Negative.
+- **Otherwise INCONCLUSIVE:** extend to 8 valid sessions; then PASS
+  requires >= 5 of 8 Positive-or-Qualified with >= 2 fully Positive;
+  anything else is STOP.
+- Ambiguous sessions never count toward PASS. Invalid sessions count
+  toward no threshold. The rule is evaluated in session order as sessions
+  complete; the first threshold reached decides.
+
+**Sample-thinness caveat carried into the decision** (per the brief): the
+stimulus is a competent skeleton (~47.5 words/scene vs. a 161–181 corpus
+median). Fielding on it is a deliberate choice to measure whether the
+report's *shape* creates pull; participant remarks about script thinness
+should be logged but do not make a session Invalid.
 
 ## Review metadata
 
