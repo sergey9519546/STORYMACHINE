@@ -90,9 +90,23 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
   });
 
   it('the ci.yml gates that must block are not continue-on-error', () => {
-    // These three are the hard gates. `Check documentation quality` is
+    // These four are the hard gates. `Check documentation quality` is
     // deliberately non-blocking and is intentionally NOT listed here.
-    for (const name of ['Type check', 'Enforce no console.* under server/', 'Honesty string audit']) {
+    //
+    // 'Scoring-path change requires a measurement receipt' extends this list
+    // for the same #236-241 reason as the rest: it is CI's only mechanical
+    // enforcement of the AUC-floor human-measurement step (CLAUDE.md — the
+    // corpus itself can never reach CI, so the VALUE stays unverifiable, but
+    // the step existing at all must not be silently bypassable). If this
+    // ever grows a `continue-on-error: true`, the gap it closes reopens
+    // invisibly, exactly like the dependency-review bypass this file exists
+    // to catch.
+    for (const name of [
+      'Type check',
+      'Enforce no console.* under server/',
+      'Honesty string audit',
+      'Scoring-path change requires a measurement receipt',
+    ]) {
       const block = stepBlock(ci, name);
       assert.ok(block, `ci.yml must keep a step named "${name}"`);
       assert.doesNotMatch(

@@ -132,11 +132,20 @@ gate. Do not "update" the 0.622 ratchet to a P1 number — different corpus,
 different degradation, different denominator; raising it that way breaks that
 test for no real regression.
 
-**That floor is NOT automatically enforced, despite the word "ratchet."** CI
-sets only `GEMINI_API_KEY`; `REAL_SCRIPT_CORPUS_DIR` appears nowhere in
-`.github/`, `scripts/pre-commit.sh`, or `package.json`, so the assertion is
-SKIPPED on every CI run (2026-08-03 audit). A change that made the doctor more
-structure-blind would merge with `npm test` reporting 0 failures. Until the
-corpus reaches CI, running `npm run measure-real` locally before merging any
-scoring change is a HUMAN step nothing checks for you — treat it as part of
-the change, not as something the suite covers.
+**The floor's VALUE is still not CI-verifiable — the corpus physically cannot
+reach CI (local-only, copyright; mounting it via secrets was rejected, since
+secrets are not a corpus transport and uploading the text anywhere is the
+exact exposure the de-identification work exists to avoid) — but omitting the
+human measurement step is no longer silent.** CI still sets only
+`GEMINI_API_KEY`; `REAL_SCRIPT_CORPUS_DIR` still appears nowhere in
+`.github/`, `scripts/pre-commit.sh`, or `package.json`, so the AUC-24
+assertion itself is still SKIPPED on every CI run. What changed
+(2026-08-04): `scripts/check-scoring-receipt.mjs` runs as a blocking CI step
+and fails the build when a scoring-path file (doctor.ts, emotional-arc.ts,
+fountain-analyzer.ts, calibration/**, revision/passes/**, or anything
+reachable from doctor.ts's import graph) changes without a same-range,
+content-bearing update to `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`. CI
+still cannot confirm the recorded AUC is real — a fabricated receipt still
+passes — but it can no longer merge a scoring change where nobody ran
+`npm run measure-real` at all. The human step is checked-for now, not hoped
+for.

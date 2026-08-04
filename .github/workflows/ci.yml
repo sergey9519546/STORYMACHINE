@@ -11,6 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history (not the default shallow depth-1 clone): the scoring-
+          # receipt guard below runs `git diff origin/main...HEAD`, which needs
+          # both a resolvable `origin/main` ref and the actual commit range —
+          # neither exists in a depth-1 checkout on a PR's merge ref.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -84,6 +90,23 @@ jobs:
         env:
           RUN_E2E: "1"
         run: npm test
+
+      # Required-receipt enforcement for the AUC-24 structural-degradation
+      # floor (CLAUDE.md). CI cannot verify the AUC VALUE — the corpus is
+      # local-only and copyright-restricted, and mounting it via secrets was
+      # rejected as a corpus-transport mechanism. What CI CAN do is make
+      # silent omission of the human measurement step impossible: this step
+      # fails the build when a scoring-path file (doctor.ts, emotional-arc.ts,
+      # fountain-analyzer.ts, calibration/**, revision/passes/**, or anything
+      # reachable from doctor.ts's import graph — see the script's own header
+      # for the full reasoning) changed in this PR/push without a matching,
+      # content-bearing update to docs/p1-benchmark/MEASUREMENT_RECEIPTS.md in
+      # the same range. Deliberately BLOCKING (no continue-on-error) — a gate
+      # that can be silently disabled by the thing it gates is not a gate
+      # (see tests/core/ci-gates-intact.test.ts's header for why that matters
+      # here specifically).
+      - name: Scoring-path change requires a measurement receipt
+        run: npm run check-scoring-receipt
 
       # Reports which env-gated suites did NOT run. Non-blocking by design:
       # it does not fix the gap, it stops the gap being invisible. "0 failures"
