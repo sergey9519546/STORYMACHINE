@@ -30,6 +30,7 @@ Scope: 178 files / 64,971 LOC (server/nvm vendored + tests excluded). 41 sonnet 
 >   core scenario (a stranded lock on a genuinely hung provider call) is
 >   therefore STILL LIVE by design and sits in the maintainer decision queue
 >   (see docs/PATH_TO_DONE.md).
+>   **RESOLVED 2026-08-04**: between-turn cancellation built (Orchestrator.runRoomSimulation's optional `signal`, wired from game.ts's wall-timer in GET /api/run-room-stream, POST /api/run-room, and POST /api/simulate-to-fountain) — the promise now settles promptly at the next turn boundary instead of running to natural completion, so the stream ends and the lock releases without waiting out a hung call; scenario closed.
 
 ## CONFIRMED (55)
 

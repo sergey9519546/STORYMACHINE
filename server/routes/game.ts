@@ -408,9 +408,24 @@ router.post('/api/run-room', aiLimiter, validate(RunRoomBodySchema), reserveSimu
     // above — `operation` is always fully awaited so SessionCommandCoordinator
     // never admits the next queued command early; only the HTTP response can
     // return before the room simulation actually finishes.
-    const operation = orchestrator.runRoomSimulation(nodeId, maxTurns);
+    //
+    // 2026-08-04 (SSE wall-timer resolution, ULTRAREVIEW_FINDINGS.md's
+    // integrity note): `controller` wires Orchestrator.runRoomSimulation's new
+    // between-turn AbortSignal hook to this SAME deadline. Previously, once
+    // the deadline fired the client got its 503 promptly but `operation` kept
+    // running in the background to full, UNBOUNDED completion before the
+    // `finally` below could release the room lock — the exact same
+    // stranded-lock risk the SSE sibling below had, just without the visible
+    // hung stream. Aborting here does not change what the CLIENT sees (still
+    // exactly one 503, still only after the same deadline) — it only bounds
+    // how long the abandoned background operation takes to actually settle,
+    // so the room lock frees up promptly instead of only once the simulation
+    // would have finished on its own.
+    const controller = new AbortController();
+    const operation = orchestrator.runRoomSimulation(nodeId, maxTurns, undefined, controller.signal);
     const raced = await withDeadline(operation, RUN_ROOM_BUDGET.timeoutMs);
     if (raced.timedOut) {
+      controller.abort();
       res.status(503).json({
         error: 'This room simulation is taking longer than expected and was stopped to protect the server. Try again with fewer turns.',
         code: 'AI_BUDGET_DEADLINE_EXCEEDED',
@@ -447,24 +462,55 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
     if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
-  // Hard wall-clock limit: if the simulation hasn't completed in time, stop
-  // emitting further progress and tell the client so promptly. TASK 1
-  // (ai-budget, 2026-08-03 audit): reuses RUN_ROOM_BUDGET's env-tunable
-  // deadline instead of a private hardcoded constant, so this SSE sibling and
-  // the POST /api/run-room handler above share one operator-tunable ceiling.
-  // Coordinator-safe by construction, same as /api/turn/POST /api/run-room:
-  // this timer never touches `orchestrator.runRoomSimulation(...)`'s own
-  // promise below — it only stops further res.write() calls and emits one
-  // clearly-labeled terminal event early. The real operation is still fully
-  // awaited afterward (see the try block), so SessionCommandCoordinator only
-  // ever admits the next queued command once this room's Stage writes are
-  // actually done — res.end() itself still waits for that in the outer
-  // `finally` below, same as before this change.
-  const wallTimer = setTimeout(() => {
-    if (!disconnected) {
-      emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'AI_BUDGET_DEADLINE_EXCEEDED' });
+  // 2026-08-04 (SSE wall-timer resolution — decision recorded in
+  // ULTRAREVIEW_FINDINGS.md's integrity note, closing that ledger's HIGH
+  // "SSE wall-timer" finding): `emitTruncationLabeled` intercepts ONLY the
+  // final 'simulation_complete' event so a truncated run gets an accurate,
+  // caller-facing `stoppedBy` label. Orchestrator.runRoomSimulation itself
+  // has no notion of "why" its signal fired (it only knows THAT it did — see
+  // that method's `signal` param doc) and already marks a truncated final
+  // event with `truncated: true`; this route is the one place that knows the
+  // reason is specifically this wall-clock deadline, using the SAME
+  // AI_BUDGET_DEADLINE_EXCEEDED code every other budget-timeout response in
+  // this file already uses (see /api/turn, POST /api/run-room above,
+  // /api/run-scene, /api/simulate-to-fountain).
+  const emitTruncationLabeled = (event: RoomProgressEvent) => {
+    if (event.type === 'simulation_complete' && event.truncated) {
+      emit({ ...event, stoppedBy: 'AI_BUDGET_DEADLINE_EXCEEDED' });
+      return;
     }
-    disconnected = true; // suppresses further res.write() calls; res.end() still awaits real completion below.
+    emit(event);
+  };
+
+  // Hard wall-clock limit. TASK 1 (ai-budget, 2026-08-03 audit): reuses
+  // RUN_ROOM_BUDGET's env-tunable deadline instead of a private hardcoded
+  // constant, so this SSE sibling and the POST /api/run-room handler above
+  // share one operator-tunable ceiling.
+  //
+  // 2026-08-04 (SSE wall-timer resolution): this used to only set
+  // `disconnected = true` and emit an early, synthetic 'simulation_complete'
+  // event WITHOUT ever ending the response or releasing the room lock — both
+  // still waited for `orchestrator.runRoomSimulation(...)`'s own promise to
+  // settle, however long that took (ULTRAREVIEW_FINDINGS.md's HIGH finding:
+  // a genuinely hung provider call left the stream looking hung to the
+  // browser AND the room lock stranded, with no operator-visible recovery
+  // path). The decision (maintainer-delegated, recorded in that ledger's
+  // integrity note): build the real cancellation hook instead of accepting
+  // that tradeoff. `controller.abort()` trips
+  // Orchestrator.runRoomSimulation's between-turn AbortSignal check — it
+  // does NOT end the response or release the lock directly, and it does NOT
+  // abandon or race the promise below. It only asks the loop to wind down at
+  // its next write-safe boundary (never mid-turn), so `await
+  // orchestrator.runRoomSimulation(...)` below now actually settles promptly
+  // once the in-flight turn (bounded by that turn's own existing per-call
+  // timeout/ai-budget deadline) finishes, instead of running to whatever
+  // natural completion the simulation would otherwise take. Every
+  // SessionCommandCoordinator/lock guarantee this route already had is
+  // unchanged: res.end() (ensureEnded()) and releaseSimulationRooms() below
+  // still only run once that same promise has truly settled.
+  const controller = new AbortController();
+  const wallTimer = setTimeout(() => {
+    controller.abort();
   }, RUN_ROOM_BUDGET.timeoutMs);
 
   // C3: Single-flag guard ensures res.end() is called exactly once even when
@@ -490,7 +536,7 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
       return;
     }
     try {
-      await orchestrator.runRoomSimulation(nodeId, maxTurns, emit);
+      await orchestrator.runRoomSimulation(nodeId, maxTurns, emitTruncationLabeled, controller.signal);
       // Fix C: the final 'simulation_complete' event (emitted from inside
       // runRoomSimulation) already carries a non-destructive peek of any
       // dropped commits — drain here purely to reset the counter so it
@@ -790,9 +836,19 @@ router.post('/api/simulate-to-fountain', aiLimiter, validate(SimulateToFountainB
     // closed it, which better-sqlite3 would surface as a background unhandled
     // rejection (logged, not fatal, per server.ts's crash-safety net — but
     // avoidable, so avoided). Only the HTTP response is early.
-    const operation = simOrchestrator.runRoomSimulation(String(runLocationId), turns);
+    //
+    // 2026-08-04 (SSE wall-timer resolution): same reasoning as POST
+    // /api/run-room above — `controller` wires the between-turn AbortSignal
+    // hook to this SAME deadline so the still-awaited background operation
+    // winds down promptly (bounded by the in-flight turn's own per-call
+    // timeout) instead of running to full natural completion before
+    // simStage.close() can safely run. The client-visible response is
+    // unchanged: still exactly one 503, at the same deadline.
+    const controller = new AbortController();
+    const operation = simOrchestrator.runRoomSimulation(String(runLocationId), turns, undefined, controller.signal);
     const raced = await withDeadline(operation, SIMULATE_TO_FOUNTAIN_BUDGET.timeoutMs);
     if (raced.timedOut) {
+      controller.abort();
       res.status(503).json({
         error: 'This simulation is taking longer than expected and was stopped to protect the server. Try again with fewer turns.',
         code: 'AI_BUDGET_DEADLINE_EXCEEDED',

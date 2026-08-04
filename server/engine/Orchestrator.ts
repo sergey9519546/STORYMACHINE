@@ -20,7 +20,14 @@ export type RoomProgressEvent =
   | { type: 'director_eval'; totalTurns: number }
   // Fix C: additive — droppedCommits is only present when this call dropped
   // at least one Tier-1-rejected commit from canon (see consumeDroppedCommits()).
-  | { type: 'simulation_complete'; totalTurns: number; stoppedBy?: string; droppedCommits?: DroppedCommits };
+  // `truncated` (2026-08-04, SSE wall-timer resolution — see ULTRAREVIEW_FINDINGS.md's
+  // integrity note and runRoomSimulation's `signal` param doc below): additive,
+  // present (and `true`) ONLY when the AbortSignal fired between turns and the
+  // loop returned early. A run that finished on its own (maxTurns reached,
+  // climax detected, room emptied below 2 agents) never sets this field — the
+  // absence of `truncated` IS the "completed normally" signal, matching Fix
+  // C's droppedCommits convention of only being present when true/nonzero.
+  | { type: 'simulation_complete'; totalTurns: number; stoppedBy?: string; droppedCommits?: DroppedCommits; truncated?: true };
 
 // Fix C (silent canon drops): buildTurnCommit returns null and only logs a
 // warning when a turn's ops fail the Tier-1 proof gate — the user previously
@@ -430,15 +437,42 @@ export class Orchestrator {
     return action;
   }
 
+  // `signal` (2026-08-04 — decision recorded in ULTRAREVIEW_FINDINGS.md's
+  // integrity note, resolving that ledger's HIGH "SSE wall-timer" finding):
+  // an optional, OPT-IN cancellation hook checked BETWEEN TURNS ONLY — never
+  // mid-turn. Turn boundaries are the write-safe points this codebase already
+  // treats as atomic (see the "Fix (canon-drop)" comment further down: a
+  // round ending early via RELOCATE/FLEE already follows the exact same
+  // shape — break the per-agent loop, then still run that round's batched
+  // epistemic update + StoryCommit for whatever actions already happened).
+  // Tripping `signal` mid-round therefore reuses an existing, already-correct
+  // early-exit path rather than inventing a new one: the in-flight agent turn
+  // (if any) is allowed to finish — bounded by ITS OWN existing per-call
+  // generateContent timeout/ai-budget deadline, never abandoned mid-call —
+  // then the loop checks the signal again before starting the next agent's
+  // turn or the next round, and if tripped, finishes the current round's
+  // Stage-safe wrap-up (batch epistemic commit if any actions happened this
+  // round) and returns normally with `{ truncated: true, completedTurns }`
+  // instead of throwing. A truncated simulation is a valid partial result,
+  // not an error — matching this codebase's honest-degradation style (see
+  // e.g. /api/game/interview's keyless/budget notes in game.ts). The final
+  // `onProgress` 'simulation_complete' event this method emits carries the
+  // same `truncated: true` marker so an SSE caller can label it honestly
+  // instead of presenting a cut-short run as a normal completion. When
+  // `signal` is omitted (every existing caller before this change —
+  // runFullScene, and any other call site not explicitly wired), this is a
+  // complete no-op: `signal?.aborted` is always false, so control flow is
+  // byte-for-byte unchanged from before this method gained the parameter.
   public async runRoomSimulation(
     location_id: string,
     maxTurns: number = 5,
     onProgress?: (event: RoomProgressEvent) => void,
-  ) {
+    signal?: AbortSignal,
+  ): Promise<{ truncated: boolean; completedTurns: number }> {
     let agentsInRoom = this.stage.getAgentsInLocation(location_id);
     if (agentsInRoom.length < 2) {
       logger.warn('dialogue_lock_insufficient_agents', { location_id, count: agentsInRoom.length });
-      return;
+      return { truncated: false, completedTurns: 0 };
     }
 
     logger.info('dialogue_lock_start', { location_id, agents: agentsInRoom.length });
@@ -456,8 +490,17 @@ export class Orchestrator {
     let turnCount = 0;
     let round = 0;
     let incitingActionEmitted = false;  // only one inciting_action per room simulation
+    // Set the moment `signal` is observed tripped (between turns) — see the
+    // `signal` param doc above. Read at every remaining early-exit checkpoint
+    // instead of re-checking `signal?.aborted` (a signal that fires and is
+    // then somehow cleared mid-call is not a real Node.js AbortSignal
+    // behavior, but latching the observation keeps every downstream check
+    // consistent regardless).
+    let truncated = false;
 
     while (turnCount < maxTurns) {
+      // Checked BETWEEN rounds, not mid-round — see the `signal` param doc.
+      if (signal?.aborted) { truncated = true; break; }
       round++;
       let lastActionId = '';
       // X1: relationship deltas produced by THREATEN/BETRAY/PROTECT/FORM_ALLIANCE
@@ -467,6 +510,13 @@ export class Orchestrator {
       const roundExtraRelationshipDeltas: RelationshipDeltaInput[] = [];
 
       for (const agentSheet of agentsInRoom) {
+        // Checked BETWEEN each agent's turn — never mid-turn. A trip here
+        // ends the round exactly like the existing RELOCATE/FLEE early-break
+        // above/below: whatever actions already happened this round still
+        // get the round-end batch epistemic update + StoryCommit further
+        // down (guarded by `if (lastActionId)`), so no already-recorded
+        // action is ever dropped from canon by a truncation.
+        if (signal?.aborted) { truncated = true; break; }
         const agent = this.agents.get(agentSheet.char_id);
         if (!agent) continue;
 
@@ -612,7 +662,24 @@ export class Orchestrator {
       // agent relocated/fled and ended the round early. A relocate ending the
       // round early is no different from maxTurns ending it early elsewhere;
       // neither may drop already-recorded actions from canon.
-      if (lastActionId) {
+      //
+      // `&& !truncated` (2026-08-04, SSE wall-timer resolution) is a DIFFERENT
+      // case from the RELOCATE/FLEE one above, deliberately NOT covered by
+      // that fix: this batch calls agent.updateEpistemics() for EVERY agent
+      // still in the room (not just the ones whose turn already completed
+      // this round) — up to `agentsInRoom.length` more generateContent calls,
+      // each with its own per-call timeout. Running it right after observing
+      // `signal` tripped would mean starting brand-new, potentially-slow AI
+      // work at the exact moment cancellation was requested — defeating the
+      // between-turn hook the same way NOT skipping the Director eval pass
+      // below would (see that skip's comment). The already-recorded actions
+      // from the partial round stay in Action_Log/the spine (recordAction +
+      // spine.processEvent already ran synchronously per completed turn,
+      // above) — only THIS round's epistemic-reaction StoryCommit is
+      // deferred, which is consistent with the caller being told
+      // `truncated: true`: a partial round's canon bundling was never
+      // promised complete.
+      if (lastActionId && !truncated) {
         const recentActions = this.stage.getSensoryFilter(location_id, maxTurns);
         // Snapshot suspicion scores before epistemic updates for persuasion outcome tracking
         const suspicionBefore = new Map<string, number>(
@@ -715,6 +782,17 @@ export class Orchestrator {
 
       onProgress?.({ type: 'round_complete', round, agentCount: agentsInRoom.length });
 
+      // Checked once more after this round's Stage writes are fully done
+      // (the batch epistemic commit above already ran, so nothing is
+      // in-flight) — the round-boundary check at the top of `while` above
+      // only fires on the NEXT iteration, so a trip observed mid-round (the
+      // per-agent check above) must also stop the loop HERE, immediately,
+      // rather than proceeding through the re-sort and starting another round.
+      if (truncated) {
+        logger.info('dialogue_lock_truncated_by_signal', { location_id, turnCount, round });
+        break;
+      }
+
       agentsInRoom = this.stage.getAgentsInLocation(location_id);
       const aliveInRoom = agentsInRoom.filter(a => a.is_alive !== false);
       if (aliveInRoom.length < 2) {
@@ -750,21 +828,38 @@ export class Orchestrator {
     }
 
     // ── Director Node: perspective-bounded room evaluation ──
-    logger.info('director_eval_start', { location_id });
-    const allActions = this.stage.getSensoryFilter(location_id, turnCount);
-    const directorUpdates = await this.director.evaluateRoom(location_id, allActions);
-    const lastActionId = allActions[allActions.length - 1]?.action_id ?? '';
-    for (const update of directorUpdates) {
-      try {
-        this._runSpineForUpdate(update, lastActionId, location_id);
-        this.appraiser.appraise(update);
-      } catch (dirErr) {
-        logger.warn('director_spine_appraise_error', { location_id, error: (dirErr as Error).message });
+    // Skipped when truncated: evaluateRoom makes its OWN generateContent call
+    // (DirectorNode.ts), and starting a brand-new AI call after `signal` has
+    // already fired would defeat the entire point of the between-turn
+    // cancellation hook — the bound this method promises is "finish what's
+    // already in flight, then return," not "finish what's in flight, then
+    // start one more thing." A truncated run simply carries no fresh
+    // director-derived updates for its final (incomplete) round; every
+    // director pass from EARLIER, fully-completed rounds already ran and
+    // committed normally.
+    if (!truncated) {
+      logger.info('director_eval_start', { location_id });
+      const allActions = this.stage.getSensoryFilter(location_id, turnCount);
+      const directorUpdates = await this.director.evaluateRoom(location_id, allActions);
+      const lastActionId = allActions[allActions.length - 1]?.action_id ?? '';
+      for (const update of directorUpdates) {
+        try {
+          this._runSpineForUpdate(update, lastActionId, location_id);
+          this.appraiser.appraise(update);
+        } catch (dirErr) {
+          logger.warn('director_spine_appraise_error', { location_id, error: (dirErr as Error).message });
+        }
       }
+      onProgress?.({ type: 'director_eval', totalTurns: turnCount });
+    } else {
+      logger.info('director_eval_skipped_truncated', { location_id, turnCount });
     }
-    onProgress?.({ type: 'director_eval', totalTurns: turnCount });
 
     // ── OCC contagion: emotions diffuse between co-present agents ──
+    // Always runs, even when truncated — purely synchronous/deterministic
+    // (no generateContent anywhere in AppraisalEngine.ts), so it adds no
+    // unbounded latency and keeps the partial result's emotional state
+    // internally consistent rather than leaving it stale mid-diffusion.
     try {
       this.appraiser.applyContagion(location_id);
       // Suspicion contagion: distressed/fearful agents raise others' suspicion,
@@ -782,7 +877,9 @@ export class Orchestrator {
     onProgress?.({
       type: 'simulation_complete', totalTurns: turnCount,
       ...(droppedSoFar ? { droppedCommits: droppedSoFar } : {}),
+      ...(truncated ? { truncated: true } : {}),
     });
+    return { truncated, completedTurns: turnCount };
   }
 
   // ── Multi-room orchestration ─────────────────────────────────────────────────
