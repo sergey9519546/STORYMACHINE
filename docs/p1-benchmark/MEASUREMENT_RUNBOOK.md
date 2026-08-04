@@ -182,6 +182,39 @@ committed baseline CSV. This does not change production health/verdict/grade by 
 separate future change gated on this measurement plus the AUC-24 ratchet in
 `tests/core/real-script-corpus.test.ts` holding (see CLAUDE.md's "Which floor, exactly").
 
+### 2.1c Optional: measure the reversal-detection disagreement rate (P1, 2026-08-04)
+
+`server/nvm/analyze/reversal-detection.ts` is an UNWIRED candidate responding to detector
+defect D3 (`docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md`): the current
+`structure.reversalCount` definition (`suspenseDelta < -1`, a magnitude dip) is blind to
+revelation-type reversals — a twist ending can register zero reversals even though the
+engine's own `revelation` extraction correctly identifies the same beat as the climax. This
+module detects reversals via two deterministic channels (revelation-text allegiance/identity
+inversion, and a large relationship-shift sign flip against an established pair — see the
+module's header for the exact CAN/CANNOT boundary of each). `measure-auc-split.mjs` takes an
+opt-in flag to report the legacy-vs-detected disagreement on the real corpus, OFF by default
+(default behavior is unchanged):
+
+```bash
+CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=train --with-reversal-detection
+# or: REV_DETECTION=1 CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=train
+```
+
+Unlike `--with-question-latency-deduction`, this flag does NOT subtract anything from health
+before pairing — there is no agreed deduction shape yet, so the first question is only whether
+detection disagrees with legacy on real writing at all, and in which direction. It logs a
+per-script `legacyCount | detectedCount | delta` table plus an aggregate disagreement rate and
+a "legacy misses entirely" rate (legacyCount == 0 and detectedCount >= 1 — D3's exact failure
+direction), computed from each script's REAL (undegraded) text only. Output goes to a separate
+file (`reversal-detection-diagnostic-train.csv`) so it can never collide with or shrink the
+committed baseline CSV, and the AUC table/pairs/baseline CSV above are unaffected byte-for-byte
+by this flag (verified by diffing a real run before/after — see the module's own commit for the
+diff). This does not change production health/verdict/grade/reversalCount by itself
+(`detectReversals`/`computeReversalDelta` are not called from `doctor.ts` or `structure.ts`);
+designing a deduction/rule shape from this measurement, and wiring it in, is separate future
+work gated on the AUC-24 ratchet in `tests/core/real-script-corpus.test.ts` holding (see
+CLAUDE.md's "Which floor, exactly") and the full P1 evidence protocol.
+
 ### 2.2 Run Validation Partition (Checkpoint, No Tuning)
 
 ```bash

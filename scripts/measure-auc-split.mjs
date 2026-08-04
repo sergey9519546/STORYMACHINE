@@ -34,6 +34,30 @@
 // collide with or shrink the committed baseline CSV.
 //   node scripts/measure-auc-split.mjs --partition train --with-question-latency-deduction
 //   QL_DEDUCTION=1 node scripts/measure-auc-split.mjs --partition train
+//
+// ── OPT-IN: --with-reversal-detection / REV_DETECTION=1 (P1, 2026-08-04) ──
+// Off by default; the default path (no flag, no env var) is byte-identical to
+// this harness's pre-existing behavior — verified by diffing a real run
+// before/after this flag was added. See server/nvm/analyze/
+// reversal-detection.ts for the module this measures (responds to detector
+// defect D3: docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md — the reversal
+// counter behind NO_REVERSALS/NO_REVERSALS_LONG_STORY is blind to
+// revelation-type reversals). UNLIKE --with-question-latency-deduction, this
+// flag does NOT touch health, the AUC pairs, or the CSV rows at all — there
+// is no agreed deduction shape yet for reversal detection, so nothing here
+// is subtracted from anything. It is PURELY DIAGNOSTIC: for each script's
+// REAL (undegraded) text, it additionally runs
+// computeReversalDelta(analyzeFountainText(text).records) and logs a
+// disagreement table after the AUC table — legacyCount (the current
+// structure.reversalCount definition) vs. detectedCount (this module's
+// candidate) vs. delta, plus an aggregate disagreement rate, so a maintainer
+// can see whether detection disagrees with legacy on real writing at all,
+// and in which direction, before any deduction/rule shape is designed.
+// Output additionally routes to a SEPARATE csv
+// (reversal-detection-diagnostic-<partition>.csv) — never the committed
+// discrimination-auc-<partition>.csv baseline.
+//   node scripts/measure-auc-split.mjs --partition train --with-reversal-detection
+//   REV_DETECTION=1 node scripts/measure-auc-split.mjs --partition train
 
 // Safety: this harness used to write
 // scripts/output/discrimination-auc-<partition>.csv unconditionally, and
@@ -53,6 +77,7 @@ import { parseFountain } from '../src/lib/fountain.ts';
 import { requireCorpus, guardedWrite } from './lib/output-guard.mjs';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 import { computeQuestionLatencyDeduction } from '../server/nvm/analyze/question-latency-deduction.ts';
+import { computeReversalDelta } from '../server/nvm/analyze/reversal-detection.ts';
 
 const SRC_DIR = 'data/screenplays';
 const OUT_DIR = 'scripts/output';
@@ -86,6 +111,32 @@ function healthWithOptionalQlDeduction(text, health) {
     // (defense-in-depth only — not observed in practice); fall back to the
     // undeducted health rather than dropping the pair.
     return health;
+  }
+}
+
+// OPT-IN flag — see file header "OPT-IN: --with-reversal-detection" for the
+// full contract. Default false: nothing below this flag's guard runs, and
+// nothing it computes touches baseHealth/degHealth/pairsByDeg/csvRows.
+const REV_DETECTION = process.argv.includes('--with-reversal-detection') ||
+  process.env.REV_DETECTION === '1';
+/** Per-script diagnostic rows for the reversal-detection disagreement table
+ *  — populated only when REV_DETECTION is set, on the REAL (undegraded) text
+ *  only (this is not an AUC measurement, so degraded variants are not run
+ *  through it). */
+const reversalDiagnosticRows = [];
+/** Best-effort: analyzeFountainText + computeReversalDelta on text
+ *  runScriptDoctor already tolerated (defense-in-depth only, mirroring
+ *  healthWithOptionalQlDeduction's own try/catch) — a failure here is
+ *  recorded as skipped, never thrown, and never affects the AUC path. */
+function diagnoseReversalDelta(file, text) {
+  if (!REV_DETECTION) return;
+  try {
+    const { records } = analyzeFountainText(text);
+    const { legacyCount, detectedCount, delta } = computeReversalDelta(records);
+    reversalDiagnosticRows.push({ file, legacyCount, detectedCount, delta });
+  } catch {
+    // skipped — not counted in the diagnostic table, matches the AUC path's
+    // own "skip on error, don't crash the whole run" convention.
   }
 }
 
@@ -221,6 +272,7 @@ for (const file of files) {
   catch { continue; }
   if (!baseRep.sceneCount || baseRep.sceneCount < 5) continue;
   const baseHealth = healthWithOptionalQlDeduction(text, baseRep.health);
+  diagnoseReversalDelta(file, text);
   for (const d of DEGRADATIONS) {
     const degradedText = d.fn(text);
     if (degradedText === null) continue;
@@ -259,6 +311,36 @@ if (allPairs.length > 0) {
 
 if (missingLocally > 0) {
   console.log(`\n${missingLocally}/${files.length} ${PARTITION}-partition file(s) not found under ${SRC_DIR} (expected outside a maintainer's machine) — skipped.`);
+}
+
+// ── Reversal-detection diagnostic (--with-reversal-detection / REV_DETECTION=1) ──
+// DIAGNOSTIC ONLY — see file header. Does not touch health, AUC, or the
+// baseline CSV above; reported and written separately.
+if (REV_DETECTION) {
+  console.log('\n[--with-reversal-detection ON] Legacy (suspense-dip) vs. detected (allegiance-reveal +');
+  console.log('relationship-swing) reversal counts on each script\'s REAL text. computeReversalDelta is');
+  console.log('UNWIRED — this table answers only whether detection disagrees with legacy at all.');
+  console.log('\nfile                                              | legacy | detected | delta');
+  console.log('---------------------------------------------------|--------|----------|------');
+  let disagreeCount = 0;
+  let legacyMissesCount = 0; // legacy 0, detected >= 1 — D3's exact failure direction
+  for (const row of reversalDiagnosticRows) {
+    console.log(`${row.file.padEnd(51)} | ${String(row.legacyCount).padStart(6)} | ${String(row.detectedCount).padStart(8)} | ${row.delta >= 0 ? '+' : ''}${row.delta}`);
+    if (row.delta !== 0) disagreeCount++;
+    if (row.legacyCount === 0 && row.detectedCount >= 1) legacyMissesCount++;
+  }
+  const n = reversalDiagnosticRows.length;
+  console.log('---------------------------------------------------|--------|----------|------');
+  if (n > 0) {
+    console.log(`${n} script(s) scored | disagreement rate ${(disagreeCount / n * 100).toFixed(1)}% (${disagreeCount}/${n}) | legacy-misses-entirely rate ${(legacyMissesCount / n * 100).toFixed(1)}% (${legacyMissesCount}/${n})`);
+  } else {
+    console.log('0 scripts scored — nothing to report (check --partition and local corpus availability).');
+  }
+
+  const revHeader = 'file,legacyCount,detectedCount,delta';
+  const revRows = reversalDiagnosticRows.map(r => [r.file, r.legacyCount, r.detectedCount, r.delta].join(','));
+  const REV_OUT_FILE = path.join(OUT_DIR, `reversal-detection-diagnostic-${PARTITION}.csv`);
+  guardedWrite(REV_OUT_FILE, revHeader + '\n' + revRows.join('\n') + '\n', { rowCount: revRows.length, label: REV_OUT_FILE });
 }
 
 const header = 'file,degradation,realHealth,degradedHealth,delta';
