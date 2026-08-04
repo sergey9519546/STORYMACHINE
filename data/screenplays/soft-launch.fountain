@@ -1,0 +1,140 @@
+// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+// Live-action genre: tech-startup workplace comedy. AGENT-AUTHORED (Claude,
+// 2026-08-04) as clean-negative-material corpus contribution for
+// server/nvm/analyze/truth-extraction.ts's false-positive testbed — see
+// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+// professionally-authored "real writing" in P1's validation sense.
+// No character death; competent band, clean negative material.
+
+INT. LUMEN LABS - OPEN OFFICE - MORNING
+
+Whiteboards covered in launch checklists. NADIA VASQUEZ, 30s, founder, paces with a tablet while OMAR FASEEH, 30s, lead engineer, trails her with a laptop open to a wall of error logs.
+
+NADIA
+Six hours to the livestream, Omar. Tell me the good news first, then whatever this face is about.
+
+OMAR
+There isn't a good-news version today. The sync service is dropping about one request in forty under real load, and we've never load-tested past half our expected launch traffic.
+
+NADIA
+One in forty is a rounding error. I need you focused on the demo path, not chasing a number that small.
+
+INT. LUMEN LABS - NADIA'S OFFICE - MORNING
+
+Nadia paces behind her desk, phone on speaker, a countdown clock visible on her monitor.
+
+INVESTOR (V.O.)
+(filtered)
+We've got three outlets confirmed to cover the launch live. This needs to go flawlessly, Nadia. You understand what's riding on today.
+
+NADIA
+It will. We've tested every demo path a dozen times over. Today is the easy part.
+
+She hangs up and stares at the countdown a beat longer than she'd like anyone to see.
+
+INT. LUMEN LABS - SERVER ROOM - MORNING
+
+Omar sits cross-legged on the floor between two racks, running a script that spits out a growing column of red text.
+
+OMAR
+(to himself)
+One in forty at low load. What does that number do to us at ten times the traffic.
+
+He doesn't like the answer forming in his head and keeps digging anyway.
+
+INT. LUMEN LABS - OPEN OFFICE - MIDDAY
+
+Omar corners Nadia by the whiteboard, laptop turned toward her.
+
+OMAR
+I ran the numbers at projected launch traffic. That one-in-forty becomes a full outage window somewhere in the first ten minutes of the stream.
+
+NADIA
+You said the same thing about the pricing page bug in March and we launched fine. I can't rebuild the sync layer six hours before three outlets go live.
+
+OMAR
+You also didn't listen about the pricing page bug, Nadia. It broke checkout for two days. I'd rather be wrong loudly now than quietly right later.
+
+INT. LUMEN LABS - KITCHEN - MIDDAY
+
+Marketing intern PIP OYELARAN, 20s, restocks a fridge with branded sparkling water, eavesdropping shamelessly on Omar and Nadia's raised voices down the hall.
+
+PIP
+(to a coworker passing by)
+I give it even odds they're either fixing this in the next four hours or one of them is quitting on camera at five.
+
+INT. LUMEN LABS - CONFERENCE ROOM - AFTERNOON
+
+A full dress rehearsal of the livestream in progress. Nadia delivers her opening line smoothly, then the demo screen behind her freezes mid-sentence, frozen on a loading spinner.
+
+NADIA
+(under her breath, to the room)
+That is exactly the failure mode Omar was describing three hours ago.
+
+STAGE MANAGER
+We can cut around it in editing for the rehearsal, but live we don't get a cut.
+
+INT. LUMEN LABS - OPEN OFFICE - AFTERNOON
+
+Nadia finds Omar still at the whiteboard, dry-erase marker in hand, diagramming the sync path.
+
+NADIA
+Fine. You were right about the pricing page and you might be right about this too. What do you actually need from me in the next four hours?
+
+OMAR
+Time in the server room, no interruptions, and someone to keep the marketing team out of my hair while I work.
+
+NADIA
+Take the time. I'll handle marketing myself.
+
+INT. LUMEN LABS - SERVER ROOM - AFTERNOON
+
+Omar works alone, headphones on, rewriting a retry policy line by line while a live counter of failed requests slowly ticks down beside his terminal.
+
+OMAR
+(to himself)
+Come on. One in forty becomes one in four thousand or this whole thing isn't worth doing tonight.
+
+The counter finally settles near zero and holds there.
+
+INT. LUMEN LABS - STUDIO SET - EVENING
+
+Cameras roll. Nadia stands at a podium under bright light, calm and rehearsed, a live viewer count climbing in the corner of a monitor only the crew can see.
+
+NADIA
+Today we're showing you something we've rebuilt from the ground up, live, no safety net. Let's begin.
+
+INT. LUMEN LABS - STUDIO SET - EVENING (CONTINUOUS)
+
+The demo screen flickers once, the exact stutter from rehearsal, and then steadies. In the control booth, Omar watches his retry counter absorb the spike without a single dropped request.
+
+PIP
+(whispering, to Omar)
+It held. It actually held.
+
+OMAR
+(quiet, not looking away from the monitor)
+Barely. Ask me again in four thousand and one requests.
+
+INT. LUMEN LABS - OPEN OFFICE - NIGHT
+
+The livestream ends to applause from the crew. Nadia finds Omar still at his monitor instead of celebrating with everyone else.
+
+NADIA
+You fixed in four hours what I was ready to gamble the whole launch on ignoring. I owe you an apology, not just a thank-you.
+
+OMAR
+Apology accepted. Next time, though, I'd rather you hear the loud wrong-sounding warning before we're six hours out.
+
+NADIA
+Deal. I'll even write it on the whiteboard so I can't pretend I didn't see it.
+
+EXT. LUMEN LABS - ROOFTOP - NIGHT
+
+Nadia and Omar sit on the ledge overlooking the city, two warm sparkling waters between them, the office lights below finally starting to thin out for the night.
+
+NADIA
+One in forty. I'm never going to hear that phrase again without breaking into a cold sweat.
+
+OMAR
+Good. That's exactly the reaction I was going for the first time I said it this morning.

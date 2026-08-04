@@ -1,0 +1,133 @@
+// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+// Live-action genre: medical/corporate whistleblower thriller. AGENT-AUTHORED
+// (Claude, 2026-08-04) as recall-testbed material for
+// server/nvm/analyze/truth-extraction.ts — see
+// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+// professionally-authored "real writing" in P1's validation sense.
+// DEATH-RECALL TAG: hospital flatline, phrased via the "NAME is dead" cue.
+// Expected: HIT. Also contains a post-death FLASHBACK scene (August alive)
+// to test the extractor's non-literal-scene exclusion guard.
+
+INT. ST. AGATHA'S HOSPITAL - PRESS ROOM - DAY
+
+A folding table crowded with microphones. DR. AUGUST FENWICK, 50s, reads from a printed statement, hands steady despite the flashbulbs.
+
+AUGUST
+The trial data Halvert Pharmaceutical submitted to regulators omitted eleven adverse cardiac events. I know because I ran the study that produced them. I'm releasing the full dataset today.
+
+REPORTER (O.S.)
+Dr. Fenwick, are you prepared for what this company is going to do to your career?
+
+AUGUST
+I've already lost the version of my career that required staying quiet. This one I can live with.
+
+INT. ST. AGATHA'S HOSPITAL - HALLWAY - DAY
+
+RIVA CHEN, 30s, August's former research partner, catches up to him outside the press room, badge still clipped to her lab coat.
+
+RIVA
+You could have told me before you told a room full of cameras. I co-authored half that dataset, August.
+
+AUGUST
+I tried to tell you in March. You told me to let legal handle it, and legal has been "handling it" for eleven months.
+
+RIVA
+Because I was trying to protect both our names. You just burned mine down with yours.
+
+INT. ST. AGATHA'S HOSPITAL - CAFETERIA - DAY
+
+August sits alone with a coffee he isn't drinking, a small USB drive turning over and over between his fingers before he pockets it.
+
+AUGUST
+(to himself)
+Eleven months of handling. Let's see how fast this handles itself now.
+
+INT. ST. AGATHA'S HOSPITAL - HALLWAY - DAY (CONTINUOUS)
+
+August stands, takes two steps toward the elevator, and goes down hard, his coffee cup rolling across the tile in a widening brown stain. A nurse shouts for a crash cart.
+
+INT. ST. AGATHA'S HOSPITAL - ER BAY - DAY
+
+A trauma team works over August, one nurse compressing his chest, another calling out vitals that keep dropping no matter what they try.
+
+DR. NAKASHIMA
+Push another round of epi. Whatever's in his system, it's not responding to standard protocol.
+
+NURSE OKONJO
+Pressure's still falling. We're losing him.
+
+INT. ST. AGATHA'S HOSPITAL - ER BAY - DAY (CONTINUOUS)
+
+The monitor holds a flat, unbroken tone. Nakashima calls the time, and nobody in the room argues with the number. August is dead before Riva even makes it through the doors down the hall.
+
+INT. ST. AGATHA'S HOSPITAL - WAITING ROOM - DAY
+
+Riva sits across from Nakashima, who delivers the news in the flat, careful register doctors use for the worst sentence of someone's day.
+
+NAKASHIMA
+His toxicology's already back. It wasn't cardiac. There's a compound in his system I don't recognize, and I've been doing this fifteen years.
+
+RIVA
+Then somebody put it there. He was about to name names in a hearing on Thursday.
+
+INT. ST. AGATHA'S HOSPITAL - SECURITY OFFICE - DAY
+
+Riva reviews cafeteria footage with hospital security beside DETECTIVE MARLOWE, who freezes a frame on a figure at August's table minutes before he collapsed.
+
+MARLOWE
+That's not hospital staff. That badge doesn't match anyone on today's roster.
+
+RIVA
+I know that jacket. That's Halvert Pharmaceutical's compliance division. I've sat across a table from that exact jacket.
+
+INT. ST. AGATHA'S HOSPITAL - LAB - DAY
+
+Riva goes through August's desk drawer and finds a small evidence bag holding the USB drive, a sticky note in his handwriting reading ONLY IF SOMETHING HAPPENS TO ME.
+
+RIVA
+(to herself)
+You didn't trust legal to handle it. You trusted me.
+
+INT. FENWICK HOME - LIVING ROOM - DAY (FLASHBACK)
+
+Years earlier. August, younger, sits across from a much younger Riva at a kitchen table covered in printed data tables, red pen in hand.
+
+AUGUST
+The day you find a number that makes the company happy and the patients unsafe, you report the number. Every time. No exceptions for whose name is on the funding.
+
+YOUNGER RIVA
+Even if it costs you everything?
+
+AUGUST
+Especially then. That's the only version of this job worth doing.
+
+INT. HALVERT PHARMACEUTICAL - EXECUTIVE OFFICE - DAY
+
+Riva sets the USB drive on DR. HALVERT's desk along with the security still from the cafeteria.
+
+RIVA
+Your compliance officer sat across from him nine minutes before he collapsed. Toxicology's going to match whatever's on this drive to whatever's in his system.
+
+HALVERT
+I had nothing to do with what happened to Dr. Fenwick. Whatever data he had was already compromised, unreliable—
+
+RIVA
+Detective Marlowe's waiting in your lobby. Tell her that part yourself.
+
+INT. POLICE STATION - DAY
+
+Marlowe lays out toxicology results beside the badge access logs on a table in front of Halvert's compliance officer, now in custody.
+
+MARLOWE
+The compound in Fenwick's system matches an experimental synthesis your own division patented four years ago. That's not a coincidence a jury's going to accept.
+
+INT. ST. AGATHA'S HOSPITAL - MEMORIAL - DAY
+
+A modest gathering in the hospital courtyard. Riva stands at a podium, the released dataset now public and cited in three ongoing investigations.
+
+RIVA
+He told me once that reporting the number was the only version of this job worth doing. I didn't understand what that would cost until I watched him pay it.
+
+EXT. ST. AGATHA'S HOSPITAL - DAY
+
+Riva walks out past the press room where August gave his last statement, USB drive's contents now printed in every major outlet, and doesn't look back at the cameras still camped outside.

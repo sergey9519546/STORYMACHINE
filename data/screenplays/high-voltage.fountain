@@ -1,0 +1,120 @@
+// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+// Live-action genre: industrial-sabotage thriller. AGENT-AUTHORED (Claude,
+// 2026-08-04) as recall-testbed material for
+// server/nvm/analyze/truth-extraction.ts — see
+// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+// professionally-authored "real writing" in P1's validation sense.
+// DEATH-RECALL TAG: electrocution, phrased naturally (no lexicon trigger
+// words). Expected: MISS.
+
+INT. RIVERSIDE POWER STATION - CONTROL ROOM - NIGHT
+
+Banks of monitors track load across a substation grid. TOMAS EKWUEME, 40s, cross-references a maintenance log against a tablet, brow furrowed. JUNE OSEI, 30s, leans over his shoulder.
+
+TOMAS
+This lockout-tagout entry for Substation Four says it was signed off Tuesday. I was on that panel Tuesday, June. Nobody signed anything in front of me.
+
+JUNE
+Maybe somebody backfilled the paperwork. It happens more than corporate wants to admit.
+
+TOMAS
+Backfilled paperwork on a de-energization log is how somebody gets killed on that panel. I'm flagging it before the storm crew rotation tonight.
+
+INT. RIVERSIDE POWER STATION - BREAK ROOM - NIGHT
+
+FOREMAN DALE HUTTON, 50s, pours coffee, unbothered, while Tomas lays the tablet on the table between them.
+
+TOMAS
+I need Substation Four taken fully offline before anyone touches that panel again. The paper trail on it doesn't match what I saw with my own hands.
+
+HUTTON
+You flag every panel on this site eventually, Tomas. The grid can't run on your personal comfort level. That storm's bringing load spikes we can't afford to lose Four for.
+
+TOMAS
+Then I'll verify it myself before I touch it. I'm not asking permission for that part.
+
+INT. RIVERSIDE POWER STATION - MAINTENANCE BAY - NIGHT
+
+Tomas gears up — insulated gloves, a voltage tester clipped to his belt — while June checks a weather feed on her phone, thunder already audible outside.
+
+JUNE
+Storm's twenty minutes out. Whatever you're doing at Four, do it fast and get clear before that first surge hits.
+
+TOMAS
+Twenty minutes is enough to confirm what I already suspect. I'll radio you the second I'm in.
+
+INT. RIVERSIDE POWER STATION - SUBSTATION FOUR - NIGHT
+
+Tomas clips his tester to the panel housing, working methodically down a row of breakers by flashlight, his radio clipped to his shoulder.
+
+TOMAS
+(into radio)
+June, I'm reading load on a breaker that's logged as de-energized. Somebody didn't just backfill paperwork. Somebody actively falsified this.
+
+INT. RIVERSIDE POWER STATION - SUBSTATION FOUR - NIGHT (CONTINUOUS)
+
+Lightning flickers through the high windows as the storm's first surge rolls through the grid. Tomas's hand is still on the panel when it happens — a blue-white arc that throws him back against the housing and doesn't let go until the breaker finally trips on its own, long seconds later. By the time it does, he isn't moving, and the radio on his shoulder is still open, broadcasting nothing but static back to the control room.
+
+INT. RIVERSIDE POWER STATION - CONTROL ROOM - NIGHT
+
+June watches the open channel on her console hiss static, calling into it again and again with no answer.
+
+JUNE
+Tomas, come back. Tomas, you copy?
+
+She's already running for the door before she finishes the sentence.
+
+EXT. RIVERSIDE POWER STATION - NIGHT
+
+Emergency lights wash the substation yard red. Paramedics wheel a stretcher out through the gate while June stands at the fence line, unable to get closer, unable to look away.
+
+INT. RIVERSIDE POWER STATION - MANAGER'S OFFICE - DAY
+
+June sits across from SAFETY INSPECTOR CORDOVA, a state investigator, a copy of the falsified maintenance log between them.
+
+CORDOVA
+Walk me through what he told you before he went into that substation. Exactly as he said it, in order.
+
+JUNE
+He said somebody backfilled a de-energization signature on a panel he'd personally worked the day before. He said it like he already knew what that meant.
+
+INT. RIVERSIDE POWER STATION - CONTROL ROOM - DAY
+
+June pulls badge-access records alongside the falsified log, cross-referencing timestamps on her own monitor now.
+
+JUNE
+(to herself)
+Tuesday, four-oh-two PM. Same minute the log claims to be signed. Same minute Hutton's badge cleared the substation door.
+
+She stares at the match a long moment before printing it.
+
+EXT. HUTTON'S HOUSE - DAY
+
+Cordova and two officers approach Dale Hutton on his own front porch, June a step behind them with the printed timestamps in hand.
+
+CORDOVA
+Your badge cleared Substation Four at four-oh-two Tuesday, the exact minute the de-energization log claims to have been signed off by someone else entirely.
+
+HUTTON
+I was behind on paperwork, that's all that is. I didn't put anyone in front of a live panel on purpose.
+
+JUNE
+You put him in front of it by lying about it being dead in the first place, Dale. That's the part that isn't paperwork.
+
+INT. POLICE STATION - DAY
+
+Hutton sits across from a detective, the falsified log and badge records laid out in front of him, June's timestamp comparison stapled on top.
+
+DETECTIVE PARK
+Falsifying a safety record that leads directly to a fatality isn't a scheduling shortcut, Mr. Hutton. The DA's calling it criminal negligence.
+
+INT. RIVERSIDE POWER STATION - SUBSTATION FOUR - DAY
+
+Weeks later. June walks the same row of breakers with a new safety officer, a fresh lockout-tagout tag hanging correctly on the panel this time, verified in front of two witnesses.
+
+JUNE
+Every tag gets a second signature from now on. No exceptions, no matter whose paperwork it slows down.
+
+EXT. RIVERSIDE POWER STATION - DAY
+
+A small brass plaque has been mounted by the substation gate: TOMAS EKWUEME — HE CHECKED THE PANEL HIMSELF. June touches it once on her way in and starts her shift.

@@ -1,0 +1,142 @@
+// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+// Live-action genre: home-invasion thriller. AGENT-AUTHORED (Claude, 2026-08-04)
+// as recall-testbed material for server/nvm/analyze/truth-extraction.ts — see
+// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+// professionally-authored "real writing" in P1's validation sense.
+// DEATH-RECALL TAG: gunshot aftermath, phrased via the "kills NAME" cue.
+// Expected: HIT. Also contains a post-death FLASHBACK scene (Marcus alive)
+// to test the extractor's non-literal-scene exclusion guard.
+
+INT. OYELARAN HOUSE - LIVING ROOM - NIGHT
+
+A lamp knocked sideways throws long shadows across a room mid-argument. PRIYA OYELARAN, 20s, stands with her phone already dialing. Her older brother MARCUS OYELARAN, 30s, takes it out of her hand and ends the call.
+
+MARCUS
+Not yet. If it's nothing, a squad car in the driveway makes us the story on every porch camera on the block by morning.
+
+PRIYA
+That thing downstairs is not a raccoon, Marcus. You always do this. You decide first and ask me after.
+
+MARCUS
+I decide first because I'm the one who has to explain it to Mom if I'm wrong. Get in your room. Lock it.
+
+INT. OYELARAN HOUSE - HALLWAY - CONTINUOUS
+
+Marcus pulls a bat from behind the hall closet door. Priya lingers at her doorway, unconvinced, watching him check the stairwell.
+
+PRIYA
+At least take my phone. If something happens I want a way to know.
+
+MARCUS
+Nothing is happening. Lock the door, Priya. I mean it this time.
+
+She goes in. The latch clicks. Marcus starts down the stairs one at a time, bat low.
+
+EXT. OYELARAN HOUSE - BACK PORCH - NIGHT
+
+The kitchen door's window is broken from the outside in, glass scattered on the mat. A gloved hand reaches through and turns the deadbolt.
+
+INT. OYELARAN HOUSE - KITCHEN - NIGHT
+
+DEV KASPRZAK, 30s, jacket zipped to the chin, is already inside when Marcus rounds the corner. Neither man expected the other to be this close.
+
+MARCUS
+You're in the wrong house. Whatever Ellis told you I owe him, it isn't here.
+
+DEV
+Ellis didn't send me for money, Marcus. He sent me for the ledger you've been holding over him since March.
+
+MARCUS
+There's no ledger. Get out before I make you leave the way you came in.
+
+Dev's hand comes out of his jacket holding a pistol, low and unsteady.
+
+INT. OYELARAN HOUSE - KITCHEN - NIGHT (CONTINUOUS)
+
+Marcus raises the bat a half-second too late. The shot catches him in the shoulder and he staggers into the counter, refusing to go down, reaching for the drawer behind him.
+
+DEV
+Don't. Don't make me do this again.
+
+MARCUS
+Priya, stay upstairs—
+
+INT. OYELARAN HOUSE - KITCHEN - NIGHT (SECONDS LATER)
+
+The second shot kills Marcus before he can move another step. Dev stands over him a moment, then bolts through the broken door into the dark.
+
+INT. OYELARAN HOUSE - BEDROOM - NIGHT
+
+Priya, phone pressed to her ear, hears the second shot through the floor and goes still.
+
+PRIYA
+(to dispatcher)
+Two shots. My brother's downstairs. Please, someone needs to come now.
+
+She's already moving for the door despite everything he told her.
+
+EXT. OYELARAN HOUSE - NIGHT
+
+Red and blue light washes the front lawn. Priya sits on the porch step wrapped in a paramedic's blanket, staring at nothing while officers move in and out of the house behind her.
+
+INT. POLICE STATION - INTERVIEW ROOM - NIGHT
+
+Fluorescent light, a scratched table. DETECTIVE OKAFOR, 50s, slides a legal pad toward Priya, who hasn't touched the coffee in front of her.
+
+OKAFOR
+Take your time. I know how tonight went. I just need what you remember, in order, as close to exact as you can get it.
+
+PRIYA
+He said "not yet" and "get in your room" and then he went down the stairs by himself, because that's what he always does. That's the order.
+
+OKAFOR
+Did your brother know somebody named Ellis? Or a Kasprzak?
+
+PRIYA
+Ellis owed him money for a job neither of them will admit was under the table. I don't know a Kasprzak.
+
+INT. OYELARAN HOUSE - KITCHEN - DAY (FLASHBACK)
+
+Sunlight instead of shadow. A YOUNGER PRIYA, twelve, stands on a step stool at the counter while MARCUS, twenties, guides her hands over a mixing bowl.
+
+MARCUS
+Fold it, don't stir it. Stirring knocks the air back out — you'll spend an hour getting it back in.
+
+YOUNGER PRIYA
+You're just making that up so I do it your way.
+
+MARCUS
+Maybe. Try it my way once and tell me I'm wrong.
+
+He steals a fingerful of batter off the spoon before she can stop him. She swats his arm, laughing.
+
+INT. POLICE STATION - HALLWAY - DAY
+
+Okafor meets Priya outside the interview room, folder under his arm.
+
+OKAFOR
+Ellis rolled on him inside an hour. Kasprzak did three debt collections for Ellis this year alone, all off the books. This wasn't random.
+
+PRIYA
+So the ledger was real. He never once mentioned it to me.
+
+OKAFOR
+People protect the ones they love from the parts that could hurt them. Looks like that's what got him killed.
+
+EXT. KASPRZAK'S APARTMENT COMPLEX - DAY
+
+Two unmarked cars flank the entrance. Priya watches from across the street as officers walk Dev out in cuffs, head down, not looking at anyone.
+
+INT. OYELARAN HOUSE - KITCHEN - DAY
+
+Weeks later. Priya stands at the same counter, the same mixing bowl in front of her, folding batter the way she was taught instead of stirring it.
+
+PRIYA
+(to herself)
+Fold it, don't stir it.
+
+She almost smiles. It's the first time she has, in this room, since the night the window broke.
+
+EXT. OYELARAN HOUSE - DAY
+
+Priya steps out onto the porch where she once sat wrapped in a blanket, coffee in hand this time, and looks at the street like she's deciding whether it's still hers. She decides it is, and goes back inside.
