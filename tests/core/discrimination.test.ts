@@ -104,10 +104,24 @@
 // stricter composite minimum-gap guard (COMPOSITE_MIN_GAP=5.0, below) stays
 // `todo`: composite's ordering passes but its margin (+2.2) doesn't clear
 // that floor yet. That remaining todo is a standing invitation to flip to a
-// hard assertion the moment a Wave Program v2 detector (excellence detectors
-// and root-cause templates are the most directly relevant wave types) closes
-// the gap. Do NOT delete a todo without first re-running this file and
-// confirming the gap actually closed.
+// hard assertion the moment a dedicated rhythm-minor guard wave (see the
+// BLIND_SPOT_NOTE below — NOT a generic "Wave Program v2 detector": the wave
+// program itself is retired per CLAUDE.md, and the specific missing thing is
+// narrower than "a detector") closes the gap. Do NOT delete a todo without
+// first re-running this file and confirming the gap actually closed.
+//
+// RE-VERIFIED 2026-08-04 (ULTRAREVIEW closure pass, Lane F): re-ran this
+// harness and a full rule-level diff (report.passes[].issues, not just the
+// 10-entry topPriorities) against current doctor.ts. The gap is UNCHANGED at
+// +2.2 (good 72.2, bad 70.0) — byte-identical to the number this file already
+// documented. The order-sensitive proof family, reversal-detection,
+// agency-signal work, the normalizer fix, and the Dead Frequency stimulus
+// have all landed since this todo was written; none of them touch this pair's
+// actual residual (confirmed below) — they weren't aimed at it. The 22-vs-~19
+// rule-level diagnosis below still holds almost exactly (now measured as
+// 22 bad-only vs 23 good-only, 20 of those 23 minor). This is a genuinely
+// still-open blind spot, not a stale todo — see BLIND_SPOT_NOTE for the
+// current evidence and what would actually close it.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -161,13 +175,25 @@ const BLIND_SPOT_NOTE: Record<string, string> = {
   'composite-reviewer-scenario':
     "reproduces the reviewer's original finding directly: an overall well-crafted script and an overall "
     + 'poorly-crafted one of matched size scores only a modest gap (+2.2 as of the W1 health-formula wave, up '
-    + 'from a dead tie) — real but short of the 5.0-point floor below. DIAGNOSED 2026-07-10 (rule-level diff): '
-    + 'the bad half already fires 22 rules the good half does not (EXPOSITION_DUMP x2, NO_RELATIONSHIP_MOVEMENT, '
-    + 'dialogue floods) — the residual gap is ~19 STYLE-MINOR false positives on the GOOD half (rhythm/dialogue '
-    + 'line-shape rules: LONG_LINE_FLOOD, ACTION_CONSECUTIVE_LONG_RUN, DIALOGUE_ANAPHORA_RUN, etc.) tripping on '
-    + 'dramatized action prose, the same D2 pattern spread thin across many rules. Closing it honestly is a '
-    + 'dedicated guard wave over those rhythm minors (each measured against calibration), not a lexicon chase '
-    + 'on this fixture',
+    + 'from a dead tie) — real but short of the 5.0-point floor below. DIAGNOSED 2026-07-10 (rule-level diff), '
+    + 'RE-MEASURED 2026-08-04 with no material change: the bad half fires 22 rules the good half does not '
+    + '(belief/EXPOSITION_DUMP x2, relationship-arc/NO_RELATIONSHIP_MOVEMENT, causality/ACTION_WITHOUT_CONSEQUENCE, '
+    + 'causality/CHEKHOV_GUN_UNFIRED, intention/PROTAGONIST_DECISION_VACUUM, dialogue/negation-and-hedge floods, '
+    + "originality/DIALOGUE_DOMINANCE, character-arc/ARC_EMOTIONAL_MONOTONE — a real, earned majors-heavy list); "
+    + 'the residual gap is 23 rules firing on the GOOD half that the bad half does not, 20 of them STYLE-MINOR '
+    + '(rhythm/LONG_LINE_FLOOD, rhythm/ACTION_CONSECUTIVE_LONG_RUN, rhythm/TRIADIC_LIST_OVERLOAD, '
+    + 'dialogue/DIALOGUE_ANAPHORA_RUN, dialogue/TALKING_HEADS, originality/ACTION_OPENER_MONOTONY, etc.) tripping '
+    + "on the good half's denser, more dramatized prose — the same D2 false-positive-density pattern spread thin "
+    + 'across many rules, unchanged since the original diagnosis. The other 3 good-only issues are 2 previously '
+    + 'audited-and-accepted false positives named in this file\'s own header (structure/CLIMAX_TOO_EARLY, '
+    + 'causality/GOAL_WITHOUT_OPPOSITION — left AS-IS on principle, not part of this gap) plus '
+    + 'causality/REVELATION_WITHOUT_REACTION. None of the machinery that landed since this todo was written — '
+    + 'order-sensitive proof family, reversal-detection, agency-signal work, the normalizer fix, Dead Frequency '
+    + "stimulus — targets rhythm-minor false-positive DENSITY on well-crafted prose, so none of it moved this "
+    + 'pair. Closing it honestly needs a dedicated guard wave over those ~20 rhythm/dialogue-shape minors (each '
+    + 'measured against calibration so a fix here does not regress the bands those rules were tuned against), not '
+    + 'a lexicon chase on this one fixture. That guard wave has not been scheduled — this is a genuine, currently '
+    + 'unclosed blind spot, not a stale placeholder.',
 };
 
 function topIssues(report: ScriptDoctorReport, n = 3): string {
@@ -275,18 +301,25 @@ describe('discrimination harness — good craft must outscore bad craft', () => 
 // +2.2 (good 72.2, bad 70.0) — real, measured progress, and this pair's
 // good > bad ordering above is now a genuine (non-todo) pass — but 2.2 is
 // still short of the 5.0-point floor here, so this specific assertion
-// stays `todo` until a further wave (most likely an excellence detector or
-// root-cause template — see BLIND_SPOT_NOTE above for why this is a
-// composite-of-several-missing-signals gap, not a pure formula-sensitivity
-// one) closes the remaining ~2.8 points.
+// stays `todo` until a dedicated rhythm-minor guard wave (see
+// BLIND_SPOT_NOTE above — RE-VERIFIED 2026-08-04, gap still +2.2, unchanged
+// since this comment was written) closes the remaining ~2.8 points. This is
+// NOT a pure formula-sensitivity gap (that class was already closed by W1 for
+// the other 3 pairs it affected) — it's a rule-density gap: ~20 rhythm/
+// dialogue-shape MINOR rules over-firing on the good half's denser prose.
 describe('composite reviewer scenario — minimum-gap regression guard', () => {
   const COMPOSITE_MIN_GAP = 5.0;
 
   it(
     `composite pair shows a health gap of at least ${COMPOSITE_MIN_GAP} points, not just a bare ordering`,
     {
-      todo: 'BLIND SPOT (composite-reviewer-scenario): current gap measures ~0.0 (a dead tie), far below the '
-      + `${COMPOSITE_MIN_GAP}-point floor — flip off todo once the gap is measured to clear it with headroom.`,
+      todo: 'BLIND SPOT (composite-reviewer-scenario), RE-VERIFIED 2026-08-04: current gap measures +2.2 '
+      + '(good 72.2, bad 70.0), unchanged from the W1 measurement and still far below the '
+      + `${COMPOSITE_MIN_GAP}-point floor — see BLIND_SPOT_NOTE above for the current rule-level diff. Not `
+      + 'closeable with existing in-repo machinery (order-sensitive proof family / reversal-detection / '
+      + 'agency-signal / normalizer fix / Dead Frequency stimulus all landed and none moved this number) — '
+      + 'needs a dedicated rhythm-minor false-positive-density guard wave, not yet scheduled. Flip off todo '
+      + 'once that wave is measured to clear the floor with headroom.',
     },
     async () => {
       const pair = DISCRIMINATION_PAIRS.find(p => p.id === 'composite-reviewer-scenario');

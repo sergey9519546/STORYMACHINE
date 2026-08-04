@@ -629,3 +629,131 @@ _Failure:_ Planner calls cloneWorldState(state) to speculatively simulate an act
 
 _Verify (PLAUSIBLE/high):_ Confirmed by direct code read: cloneWorldState (pddl-types.ts:136-142) does `entities: new Map(state.entities)`, a shallow copy of the map — Entity objects (and each Entity's internal `properties: Map<string,any>`, defined at line 30) are shared by reference between the original and cloned state. This is a genuine aliasing bug consistent with the claim's description. However, I searched the entire server/planning directory (and broader server/) for any code that actually mutates `entity.properties` (e.g. `.properties.set(...)`) after cloning, and found none — applyEffect (line 128-131) only ev
 
+---
+
+## CLOSURE — full-sweep re-verification (2026-08-04, Lane F)
+
+This section closes the ledger honestly. It does not rewrite anything above —
+every finding's original text stands as originally recorded, including the
+2026-08-04 INTEGRITY NOTE that opens this file (which itself already disclosed
+the truncation and the personas/SSE supersession pattern before this pass
+started). What follows is a full re-verification, not a re-sample: every one
+of the 57 findings actually present in this file (55 CONFIRMED + 2 PLAUSIBLE)
+was individually checked against the CURRENT repository state — the cited
+file and line(s) read directly, and for several the actual runtime behavior
+re-exercised (discrimination.test.ts run, a rule-level doctor diff script run
+against the composite fixture) rather than just re-read.
+
+### On the truncation (findings 58–61 and the REJECTED section)
+
+Confirmed again, independently: the file has 631 lines and the last PLAUSIBLE
+entry (pddl-types.ts:136) cuts off mid-sentence at "found none — applyEffect
+(line 128-131) only ev" with no closing punctuation, section header, or the
+promised totals breakdown anywhere after it. This matches the INTEGRITY NOTE's
+account exactly (verified against commit `0e9ac81`, unchanged). **Nothing was
+fabricated to fill the gap.** The 4 REJECTED findings and the remainder of
+finding 57 are unrecoverable from this file; they would require the producing
+session's transcript, which this pass does not have access to. The tally
+below is therefore out of the 57 findings this file actually contains, not
+out of the 61 the header claims — that discrepancy is the point of this
+closure, not an error in it.
+
+### Per-finding status table
+
+Every row was independently re-verified this pass by reading the current file
+at the cited location (not by trusting the ledger's own "Verify" paragraph,
+though in every case below the current code matches what a fix for the
+described failure would look like). "Commit" is the fix commit identified via
+`git log` where a single commit is clearly responsible; the two bulk-fix
+commits (`8fb20ed` / merge `9181abc`, titled "resolve 55 confirmed + 2
+plausible ultrareview findings") account for the great majority of rows and
+are abbreviated **[bulk]** below rather than repeated 50+ times.
+
+| # | Sev | Finding (file:line) | Status | Note |
+|---|-----|----------------------|--------|------|
+| 1 | CRITICAL | apdl-planner.ts:285 resolveCharacterTargets drops actor/target/both | FIXED | Delegates to shared `resolveEffectTargets` (effect-targets.ts), which resolves actor/target/both correctly. [bulk] |
+| 2 | HIGH | app.ts:197 error handler registered before static serving | FIXED | Error handler now registered *after* the static-serving block (line ~220, after line ~207); comment at the site explains why. [bulk] |
+| 3 | HIGH | yjs-server.ts:138 closeConn removes wrong awareness clientID | FIXED | `Room.connAwareness: Map<WebSocket, Set<number>>` now tracks each connection's real clientIDs; `closeConn` removes exactly those. [bulk] |
+| 4 | HIGH | yjs-server.ts:224 parseRoomId unguarded decodeURIComponent | FIXED | `parseRoomId` now wraps `decodeURIComponent` in try/catch, returns null on `URIError`. [bulk] |
+| 5 | HIGH | CausalSpine.ts:449 terminal_threatened duplicated per suspect | FIXED | The suspect-independent block was moved *outside* the `for (const suspectId of suspectIds)` loop; runs once per contradiction event. [bulk] |
+| 6 | HIGH | Orchestrator.ts:603 round StoryCommit skipped on relocate | FIXED | Gate is now `if (lastActionId && !truncated)` — the `!didRelocate` condition is gone; a documented "Fix (canon-drop)" comment explains the change. [bulk] |
+| 7 | HIGH | ai.ts:224 module-load provider wrapper drops AbortSignal | FIXED | Module-load path now calls shared `makeDelegatingProvider()`, which forwards `signal` to both `generate` and `generateStream`, same as the reset paths. [bulk] |
+| 8 | HIGH | apdl-planner.ts:503 buildPlan initial_state===final_state, double-applies actions | FIXED | `buildPlan` now takes a separate `initialState` parameter, distinct from `node.state`; `extractEmotionalStates` is called with the true pre-plan state; `initial_state`/`final_state` are no longer the same object. [bulk] |
+| 9 | HIGH | oasis-integration.ts:283 resolveCharacters drops actor/target/both | FIXED | Same shared-resolver fix as #1 — `simulateEmotionalEffects` now calls `resolveEffectTargets`. [bulk] |
+| 10 | HIGH | game.ts:326 SSE wall-timer doesn't stop simulation/release lock | RESOLVED (superseded twice) | Ledger's own INTEGRITY NOTE already tracked this: original fix superseded by ai-budget work, then genuinely resolved by `7f57119` ("sse: between-turn cancellation — the wall timer now actually stops the run"), which wires an `AbortSignal` through `run-room-stream`/`run-room`/`simulate-to-fountain` into `Orchestrator.runRoomSimulation`'s new optional `signal` param, checked between turns/rounds. Re-verified directly in Orchestrator.ts: `if (signal?.aborted) { truncated = true; break; }` at both the per-round and per-agent checkpoints. Confirmed still live at HEAD. |
+| 11 | HIGH | analysis.ts:202 /compare crashes when corpus < 3 vectors | FIXED | `numClusters > 0 ? clusterCorpus(allVectors, numClusters) : []` — degrades to no cluster instead of throwing. [bulk] |
+| 12 | HIGH | scriptide.ts:224 script save silently truncates >500k chars | FIXED (different mechanism than literal ask) | `ScriptideSaveBodySchema` now has `scriptText: z.string().max(500_000)` — an oversized payload is now rejected with a 400 by validation *before* the route's `.substring(0, 500_000)` can ever fire (that line is now unreachable dead code for the truncation case). The originally-described failure — silent 200 OK with data loss — no longer occurs; the client instead gets an explicit rejection. [bulk] |
+| 13 | HIGH | AIPanel.tsx:188 error text offered for "Insert into Script" | FIXED | Component now has a dedicated `isError` state; render gate is `result && !isError`. [bulk] |
+| 14 | HIGH | ScriptIDE.tsx:1223 handleCleanAction overwrites mid-flight edits | FIXED | Captures `startDraftGen = getDraftGeneration()` before the await, checks `isDraftStale(startDraftGen, getDraftGeneration())` after, and refuses the write-back (shows "Draft changed while cleaning") instead of applying stale reconstruction. [bulk] |
+| 15 | HIGH | Sidebar.tsx:115 LongTextField truncates fields >500 chars on edit | FIXED | `displayValue = value` (full value, no `.slice`); `onChange` now passes back `e.target.value` unmodified — only the native `maxLength` attribute blocks *new* growth, no more truncation of pre-existing longer content. [bulk] |
+| 16 | HIGH | StoryMachine.tsx:372 submitScenario desyncs UI when /api/init fails after /api/reset | FIXED | Catch block now calls `if (resetSucceeded) await refreshAll();` to resync client state to the post-reset server reality. [bulk] |
+| 17 | HIGH | FountainEditor.tsx:332 Yjs seed uses stale mount-time value | FIXED | `initialText` is now passed as a getter (`() => valueRef.current`); `collab.ts`'s `createCollabSession` resolves it at actual sync time (`provider.once('sync', ...)`), not at mount. [bulk] |
+| 18 | MEDIUM | check-docs-quality.ts:92 code-block skip doesn't track state | FIXED | `inCodeBlock` boolean now toggled on fence lines and checked before pattern-matching each line. [bulk] |
+| 19 | MEDIUM | generate-rulebook.ts:446 objEnd clobbered to lines.length | FIXED | The `i = lines.length` clobber is gone; the outer loop's own break condition now leaves `i` at the real closing-brace line. [bulk] |
+| 20 | MEDIUM | convert-screenplays.ts:83 slug collisions overwrite output | FIXED | New `dedupeSlug()` helper + `usedSlugs` Set; a collision gets a `-2`/`-3`… suffix instead of silently overwriting. [bulk] |
+| 21 | MEDIUM | DirectorNode.ts:912 "oldest" lie sorted by random UUID | FIXED | New `_oldestUnexposedProposition()` resolves the real origin turn via `stage.getEventCard(...).turn_index`, not UUID string sort. [bulk] |
+| 22 | MEDIUM | DirectorNode.ts:87 all beliefs attributed to one "last external action" | FIXED | Each belief is now attributed via `source_action_index` resolved per-belief against `recentActions`, falling back to `lastExternalAction` only when the model omits/mis-indexes it. [bulk] |
+| 23 | MEDIUM | Orchestrator.ts:811 tension-tiebreak comparator not antisymmetric | FIXED | Comparator now actually compares `a` vs `b`: `return tensionState.accumulator > 50 ? (a < b ? -1 : 1) : (a < b ? 1 : -1);` with an `a === b` short-circuit. [bulk] |
+| 24 | MEDIUM | Orchestrator.ts:293 RELOCATE leaves target in target_char_id | FIXED | Both the `runTurn` and `runRoomSimulation` success branches now set `action.target = null` after consuming the destination into `content`, matching the two failure branches. [bulk] |
+| 25 | MEDIUM | ai-provider.ts:184 FreeRideProvider drops systemInstruction/schema | FIXED | `FreeRideProvider.generate` now forwards `config.systemInstruction` as a leading `system` message and translates `responseSchema`/`responseMimeType` into an OpenAI-style `response_format`. [bulk] |
+| 26 | MEDIUM | ai-config.ts:71 wireProviders leaves stale provider wired | FIXED | The openai-compat branch now has an `else` that fails closed with a throwing `generate` stub when `baseURL` is empty, instead of silently leaving the previous provider wired. [bulk] |
+| 27 | MEDIUM | embeddings.ts:9 unbounded process-wide cache | FIXED | `_cache` is now a bounded LRU (`EMBEDDING_CACHE_CAPACITY = 2000`) with delete-then-reset-on-hit and evict-oldest-on-insert. [bulk] |
+| 28 | MEDIUM | session-store.ts:195 MAX_SESSIONS unvalidated (NaN disables cap) | FIXED | Now `boundedIntegerEnv('MAX_SESSIONS', 100, 1, 100_000)`, which throws on a malformed value instead of silently producing NaN. [bulk] |
+| 29 | MEDIUM | session-store.ts:208 SESSION_TTL_MS unvalidated (NaN disables eviction) | FIXED | Now `boundedIntegerEnv('SESSION_IDLE_TTL_MINUTES', 1440, 1, 24*365) * 60_000`. [bulk] |
+| 30 | MEDIUM | structure-presets.ts:1454 turn_end can exceed expectedTurns | FIXED | Now clamped: `turn_end: Math.min(n, Math.max(...))`. [bulk] |
+| 31 | MEDIUM | personas/registry.ts:64 unbounded userPersonas map | SUPERSEDED | Already flagged by this ledger's own INTEGRITY NOTE. Re-confirmed directly: current code has `MAX_USER_PERSONAS = 64`, capacity-rejection, and `builtin_id` refusal — matching the note's description of `3a4a905`'s independent, stronger same-day fix, not this ledger's own (never-landed) LRU/cap-500 fix. |
+| 32 | MEDIUM | apdl-validator.ts:108 validatePlanPreconditions never evolves emotional_state | FIXED | New `applyActionEmotionalEffects()` (using the same shared `resolveEffectTargets`) is now called after each precondition check in `validatePlanPreconditions`, `checkForUnearnedEmotions`, and `checkForIncoherentTransitions` — all three sibling functions fixed, not just the one cited line. [bulk] |
+| 33 | MEDIUM | DirectorPanel.tsx:280 tension sparkline lags one render behind | FIXED | `tensionHistory` is now `useState`, updated via `setTensionHistory` inside the effect — no longer a plain ref mutation that can't trigger a re-render. [bulk] |
+| 34 | MEDIUM | FixedPointsPanel.tsx:196 bcTargetIdx stale after removeFP shifts array | FIXED | A `bcTargetDesc` snapshot is captured at request time and rendered directly (`bcResult && bcTargetDesc !== null`) instead of re-deriving the label from `fps[bcTargetIdx]` after the array may have shifted. [bulk] |
+| 35 | MEDIUM | NarrativeAnalyticsPanel.tsx:143 forced refresh has no request sequencing | FIXED | `requestIdRef` per-tab monotonic counter; a response is only committed if `requestIdRef.current[tab] === requestId` at resolution time. [bulk] |
+| 36 | MEDIUM | ProofInspectorPanel.tsx:88 inspect() has no out-of-order guard | FIXED | `requestIdRef` counter; state is only applied if `requestIdRef.current === requestId`. [bulk] |
+| 37 | MEDIUM | QualityEnginesPanel.tsx:114 inspect() same missing guard | FIXED | `activeRequestRef` holds the current `commitId`; state only applied if it still matches. [bulk] |
+| 38 | MEDIUM | StoryMachine.tsx:500 handleRunRoom onerror closes on first error | FIXED | `onerror` now checks `evtSource.readyState !== EventSource.CLOSED) return;` — only a genuinely closed connection is treated as fatal; transient drops are left to the browser's own reconnect. [bulk] |
+| 39 | MEDIUM | fountain.ts:80 dual-dialogue `^` retags unbounded prior character block | FIXED | The reverse search now `break`s on `scene_heading`, bounding the retag to the current scene. [bulk] |
+| 40 | MEDIUM | director.ts:25 already-aborted externalSignal silently ignored | FIXED | `if (externalSignal?.aborted) controller.abort(); else externalSignal?.addEventListener(...)`. [bulk] |
+| 41 | LOW | Stage.ts:1407 shadow-write timer never cleared on fast path | FIXED | `Promise.race([...]).catch(...).finally(() => clearTimeout(timeoutHandle))`. [bulk] |
+| 42 | LOW | openai-compat.ts:483 embed() swallows HTTP failures as `[]` | FIXED | Now throws `Error('OpenAI-compat embedding error ${status}: ...')` on `!res.ok`, matching the LLM adapter's behavior. [bulk] |
+| 43 | LOW | embeddings.ts:54 cap only bounds inner loop, not outer | FIXED | `candidateNew` is now also `.slice(-10)`, bounding total calls regardless of how many beliefs are passed in. [bulk] |
+| 44 | LOW | fountain.ts:201 (server) RELOCATE fallback uses target_char_id | FIXED | Fallback is now `entry.content || 'another room'` — never falls back to `target_char_id`, which RELOCATE never semantically has. [bulk] |
+| 45 | LOW | session-store.ts:288 array sessionId silently falls back to 'default' | FIXED | `typeof raw !== 'string'` now throws `ValidationError` (400) instead of falling through to `'default'`. [bulk] |
+| 46 | LOW | validation.ts:79 isPrivateIPv6 matches literal hextet prefix, not value | FIXED | Now parses the numeric first hextet and range-checks it (`(firstHextet & 0xffc0) === 0xfe80`, etc.) instead of string-prefix matching. [bulk] |
+| 47 | LOW | App.tsx:38 persisted config cast with only a typeof check | FIXED | New `isValidStoryConfig()` does real shape validation before the cast, not just `typeof === 'object'`. [bulk] |
+| 48 | LOW | FixedPointsPanel.tsx:159 keyed by array index, state bleeds on removal | FIXED | Cards now keyed by a stable, monotonically-issued `fpKeys[i]` (via `nextFpKeyRef`), independent of array position. [bulk] |
+| 49 | LOW | ProjectionGalleryPanel.tsx:122 exportFountainAs silently no-ops on failure | FIXED | Failures are now caught and surfaced via `setErrors(err => ({ ...err, fountain: ... }))` instead of a bare `return`. [bulk] |
+| 50 | LOW | StoryMachine.tsx:509 handleRunRoom finally lacks mountedRef guard | FIXED | `finally` block is now `if (mountedRef.current) { setLoading(false); setStreamLog([]); }`. [bulk] |
+| 51 | LOW | collab.ts:85 Y.Doc leaked when token fetch fails | FIXED | `fetchCollabToken` call now wrapped in try/catch; catch block calls `doc.destroy()` before rethrowing. [bulk] |
+| 52 | LOW | VoiceDNAPanel.tsx:76 mountedRef checked before, not after, the second await | FIXED (different mechanism) | File no longer uses manual `mountedRef` checks around a raw fetch; it now uses the shared `useLatestRequest()` hook (`src/hooks/useLatestRequest.ts` / `latest-request.ts`), a "latest-wins" request core that structurally cannot apply a stale or post-unmount result. [bulk] |
+| 53 | LOW | screenplay-complete.ts:137 lastIndexOf('-') hijacked by location hyphens | FIXED | New `lastSeparatorDashIndex()` only matches a `-` preceded by whitespace (a real ` - TIME` separator), not any hyphen in the typed text. [bulk] |
+| 54 | LOW | ScriptDoctorPanel.tsx:1781 FDX sniff is an unanchored substring match | FIXED | Now `/^\s*<FinalDraft\b/.test(text)` — anchored to the start of the file, not a substring search anywhere in the content. [bulk] |
+| 55 | LOW | director.ts:25 abort listener never removed, accumulates | FIXED | Listener now registered with `{ once: true }` and explicitly `removeEventListener`'d in the catch path. [bulk] |
+| 56 | LOW (PLAUSIBLE) | metamorphic-cases.ts:9 seededShuffle LCG loses precision above 2^53 | FIXED | `s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff;` — `Math.imul` does the multiply in exact int32, eliminating the double-precision overflow the finding described. [bulk] |
+| 57 | LOW (PLAUSIBLE) | pddl-types.ts:136 cloneWorldState shares Entity objects/properties Maps | FIXED | `cloneWorldState` now deep-copies each `Entity` and its `properties` Map: `{ ...e, properties: new Map(e.properties) }`. [bulk] |
+
+### Final tally
+
+- **FIXED: 54** (of the 55 CONFIRMED entries, all but #10 and #31 fixed by the
+  straightforward bulk remediation commits `8fb20ed`/`9181abc`)
+- **RESOLVED-via-supersession: 1** (#10, game.ts SSE wall-timer — already
+  disclosed by this ledger's own INTEGRITY NOTE; independently re-confirmed
+  still live at HEAD via `7f57119`)
+- **SUPERSEDED: 1** (#31, personas registry — already disclosed by this
+  ledger's own INTEGRITY NOTE; independently re-confirmed still live at HEAD
+  via `3a4a905`)
+- **FIXED (of the 2 PLAUSIBLE): 2** (#56, #57)
+- **STILL OPEN: 0**
+- **NOT VERIFIABLE: 0**
+- **Lost to truncation, not fabricated: 4 REJECTED findings + the tail of
+  finding 57's own verify paragraph** — see "On the truncation" above.
+
+Every one of the 57 findings this file actually contains is now closed —
+either genuinely fixed in place, or (for the 2 the ledger's own integrity
+note already flagged) fixed via a different, independently-verified
+mechanism than the one this ledger originally credited. There are no STILL
+OPEN findings from the ULTRAREVIEW ledger to route to a maintainer as of this
+pass. The unresolved item surfaced by this same session is unrelated to any
+numbered finding here: `tests/core/discrimination.test.ts`'s
+`composite-reviewer-scenario` minimum-gap regression guard remains an honest
+`todo` (re-verified 2026-08-04, gap unchanged at +2.2 against a 5.0 floor) —
+see that file's own `BLIND_SPOT_NOTE` for the current rule-level diagnosis
+and what would actually close it.
+
