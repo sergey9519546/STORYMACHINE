@@ -17,7 +17,7 @@ export function buildStoryBibleSummary(stage: Stage): string {
   const illusionState = stage.getIllusionState();
   const agents = stage.getAllAgents();
   const allBeats = stage.getAllBeatTraces();
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
 
   if (commits.length === 0 && agents.length === 0) return '';
 

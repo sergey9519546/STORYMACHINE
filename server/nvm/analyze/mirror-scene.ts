@@ -1,3 +1,5 @@
+import { scenesFromFountain } from './scene-split.ts';
+
 // Mirror-Scene / Structural-Echo excellence detector — ROADMAP §5 "mirror-scene".
 // Deterministic, no LLM. Credits a script for deliberate structural rhyming:
 // a scene near the end that echoes a scene near the beginning (same location
@@ -29,12 +31,6 @@ const EDGE_FRACTION = 0.15; // "first/last ~15% of scenes"
 interface ParsedScene {
   index: number;
   location: string; // normalized location key, '' if unparseable
-}
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
 }
 
 /**

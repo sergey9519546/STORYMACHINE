@@ -27,7 +27,7 @@ router.get('/api/nvm/tension', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { deriveTensionLedger } = await import('../../nvm/valuation/futures.ts');
   const state = buildEnrichedState(stage);
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
   res.json(deriveTensionLedger(state, sceneIdx));
 }));
@@ -52,7 +52,7 @@ router.get('/api/nvm/metrics', gameLimiter, asyncHandler(async (req, res) => {
   const { computeNarrativeMetrics } = await import('../../nvm/analyze/metrics.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
-  const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+  const allCommits = stage.getLiveCommits();
   const records = buildScreenplayMemory(allCommits);
   const emotionalArc = stage.getIllusionState().emotional_arc;
 
@@ -66,7 +66,7 @@ router.get('/api/nvm/two-reader', gameLimiter, asyncHandler(async (req, res) => 
   const { deriveTensionLedger } = await import('../../nvm/valuation/futures.ts');
   const { twoReaderReport } = await import('../../nvm/valuation/two-reader.ts');
   const state = buildEnrichedState(stage);
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
   const ledger = deriveTensionLedger(state, sceneIdx);
   res.json(twoReaderReport(state, ledger));
@@ -78,7 +78,7 @@ router.get('/api/nvm/topology', gameLimiter, asyncHandler(async (req, res) => {
   const { deriveTensionLedger } = await import('../../nvm/valuation/futures.ts');
   const { computeTopology } = await import('../../nvm/valuation/topology.ts');
   const state = buildEnrichedState(stage);
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   const ledgers = commits.map((c, i) => deriveTensionLedger(state, c.sceneIdx ?? i));
   res.json(computeTopology(ledgers));
 }));
@@ -98,7 +98,7 @@ router.post('/api/nvm/quality', gameLimiter, validate(QualityBodySchema), asyncH
 router.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { momentumScore } = await import('../../nvm/valuation/futures.ts');
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   res.json({ momentumScore: momentumScore(commits), commitCount: commits.length });
 }));
 
@@ -122,9 +122,7 @@ router.get('/api/nvm/quality/scene/:commitId', gameLimiter, validateParams(Commi
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   const targetId = req.params.commitId;
-  const allCommits = stage.getCommits().filter(
-    (c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
-  );
+  const allCommits = stage.getLiveCommits();
   const targetIdx = allCommits.findIndex(
     (c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => c.commitId === targetId,
   );
@@ -367,7 +365,7 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   const state = buildEnrichedState(stage);
-  const allCommits = stage.getCommits().filter((c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+  const allCommits = stage.getLiveCommits();
   const commitCount = allCommits.length;
   const sceneIdx = commitCount > 0 ? allCommits[commitCount - 1].sceneIdx : 0;
 
@@ -460,9 +458,7 @@ router.get('/api/nvm/character-arc', gameLimiter, asyncHandler(async (req, res) 
   const { emptyState, relationshipKey } = await import('../../nvm/state/NarrativeState.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
-  const allCommits = stage.getCommits().filter(
-    (c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
-  );
+  const allCommits = stage.getLiveCommits();
 
   // Per-character timeline
   const arcs: Record<string, Array<{
@@ -559,7 +555,7 @@ router.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) =
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   const { deriveTensionLedger } = await import('../../nvm/valuation/futures.ts');
   const { runQualityEngine } = await import('../../nvm/quality/index.ts');
-  const commits = stage.getCommits().filter((c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+  const commits = stage.getLiveCommits();
   let rollingState = emptyState();
 
   const scenes = [];
@@ -604,9 +600,7 @@ router.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) =
 router.get('/api/nvm/arc-completion', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { analyzeArcCompletion } = await import('../../nvm/quality/arc-tracker.ts');
-  const allCommits = stage.getCommits().filter(
-    (c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
-  );
+  const allCommits = stage.getLiveCommits();
   const scenes = allCommits.map(
     (c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops }),
   );
@@ -635,7 +629,7 @@ router.get('/api/nvm/momentum-dashboard', gameLimiter, asyncHandler(async (req, 
   type StoryCommit = import('../../nvm/state/StoryCommit.ts').StoryCommit;
   type NarrativeTransitionIR = import('../../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
 
-  const allCommits = (stage.getCommits() as StoryCommit[]).filter(c => !c.reverted);
+  const allCommits = stage.getLiveCommits();
   const points: Array<{
     sceneIdx: number; commitId: string; opCount: number;
     qualityScore: number; qualityWarnings: number;
@@ -686,7 +680,7 @@ router.get('/api/nvm/momentum-dashboard', gameLimiter, asyncHandler(async (req, 
 router.get('/api/nvm/voice-dna', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   type StoryCommit = import('../../nvm/state/StoryCommit.ts').StoryCommit;
-  const allCommits = (stage.getCommits() as StoryCommit[]).filter(c => !c.reverted);
+  const allCommits = stage.getLiveCommits();
 
   // Build per-character word frequency maps from proposition vocabulary
   const charWords = new Map<string, Map<string, number>>(); // charId → word → count
@@ -790,7 +784,7 @@ router.get('/api/nvm/conflicts', gameLimiter, asyncHandler(async (req, res) => {
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
-  const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+  const allCommits = stage.getLiveCommits();
 
   const base = buildNarrativeState(stage);
   let folded = emptyState();

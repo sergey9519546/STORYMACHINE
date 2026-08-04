@@ -3,7 +3,8 @@
 // epistemic state, quality, proof pass-rate, and momentum. Glanceable
 // vital-signs grid + sparklines + open-promise urgency.
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLatestRequest } from '../hooks/useLatestRequest.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,26 +51,26 @@ export function StoryHealthPanel({ onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
-  // mountedRef guards setState after the panel unmounts (e.g. user closes
-  // it mid-fetch). Mirrors CharacterArcPanel.tsx's idiom.
-  const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  // useLatestRequest routes each fetch through a latest-wins guard: a slow
+  // earlier response (e.g. the initial load still in flight when the user hits
+  // Refresh) can't overwrite a newer one, and nothing fires after unmount.
+  const run = useLatestRequest();
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetch('/api/nvm/health');
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
-      if (!mountedRef.current) return;
-      setReport(await res.json());
-    } catch (e) {
-      if (!mountedRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
+    run(
+      async (signal): Promise<HealthReport> => {
+        const res = await fetch('/api/nvm/health', { signal });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+        return await res.json();
+      },
+      {
+        onResult: (r) => { setReport(r); setLoading(false); },
+        onError: (e) => { setError(e instanceof Error ? e.message : String(e)); setLoading(false); },
+      },
+    );
+  }, [run]);
 
   useEffect(() => { load(); }, [load]);
 

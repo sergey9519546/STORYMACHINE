@@ -84,7 +84,7 @@ router.post('/api/nvm/whatif/explore', gameLimiter, validate(WhatIfExploreBodySc
   };
 
   const state = buildEnrichedState(stage);
-  const commits = stage.getCommits().filter(c => !c.reverted);
+  const commits = stage.getLiveCommits();
   const scm = buildSCM(stage);
 
   const result = exploreWhatIf({
@@ -171,7 +171,7 @@ router.get('/api/nvm/branch/field', gameLimiter, asyncHandler(async (req, res) =
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
-  const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+  const allCommits = stage.getLiveCommits();
 
   // Fold commits into state for accurate scoring
   const base = buildNarrativeState(stage);

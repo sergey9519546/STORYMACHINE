@@ -114,7 +114,7 @@ export class DirectorNode {
         });
 
       if (freshBeliefs.length > 0) {
-        this.stage.updateAgentBeliefs(observer.char_id, [...existingBeliefs, ...freshBeliefs]);
+        this.stage.addBeliefs(observer.char_id, freshBeliefs);
       }
 
       const triggerEventId = lastExternalAction?.action_id

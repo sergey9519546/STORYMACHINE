@@ -1,3 +1,6 @@
+import { scenesFromFountain } from './scene-split.ts';
+export { scenesFromFountain };
+
 // Scene-economy signal — ROADMAP R-wave task #101. Deterministic, no LLM.
 //
 // Scores how much each scene EARNS its length: how much new information it
@@ -127,12 +130,6 @@ function median(nums: number[]): number {
   const sorted = [...nums].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-}
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). */
-export function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
 }
 
 /**

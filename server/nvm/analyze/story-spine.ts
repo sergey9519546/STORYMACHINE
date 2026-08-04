@@ -1,3 +1,5 @@
+import { scenesFromFountain } from './scene-split.ts';
+
 // Story-Spine detector — Pixar Axiom 3 (task #116).
 //
 // Pixar's third storytelling axiom holds that a strong story has a single
@@ -52,12 +54,6 @@ export interface StorySpineReport {
 }
 
 const tokenize = (s: string): string[] => s.toLowerCase().match(/[a-z][a-z']+/g) ?? [];
-
-/** Split raw Fountain into ordered scene texts (INT./EXT. boundaries). Local re-derivation. */
-function scenesFromFountain(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
-}
 
 // Words too common/structural to count as protagonist names or goal tokens.
 const STOPWORDS = new Set([

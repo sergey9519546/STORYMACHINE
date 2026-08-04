@@ -155,8 +155,10 @@ export interface APDLWorldState extends PDDLWorldState {
  * How an action changes a character's emotional state.
  */
 export interface EmotionalEffect {
-  /** Target character ID (or 'all' for everyone, 'both' for actor+target) */
-  character: CharacterId | 'all' | 'both';
+  /** Target character ID, or a symbolic target: 'all' (everyone),
+   *  'actor' (parameters[0]), 'target' (parameters[1]), or 'both'
+   *  (actor + target). Resolved via resolveEffectTargets in effect-targets.ts. */
+  character: CharacterId | 'all' | 'both' | 'actor' | 'target';
   
   /** The emotion being affected */
   emotion: Emotion;

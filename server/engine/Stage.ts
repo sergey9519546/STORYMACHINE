@@ -735,6 +735,28 @@ export class Stage {
       .run(JSON.stringify(beliefs), char_id);
   }
 
+  /**
+   * Atomically append beliefs to an agent's persisted set. Inside ONE SQLite
+   * transaction, re-reads the agent's current beliefs_json, plain-concatenates
+   * the given beliefs (NO dedup — matches updateAgentBeliefs and the
+   * read-modify-write call sites this replaces), and writes back. The
+   * transaction closes the interleaving race a bare getAgent()/
+   * updateAgentBeliefs() append pair leaves open when two writers overlap
+   * (e.g. updateEpistemics landing between an async reflection's read and write).
+   */
+  public addBeliefs(char_id: string, beliefs: Belief[]): void {
+    if (beliefs.length === 0) return;
+    this.db.transaction(() => {
+      const row = this.db.prepare('SELECT beliefs_json FROM Character_State WHERE char_id = ?')
+        .get(char_id) as { beliefs_json: string } | undefined;
+      if (!row) return;
+      const parsed = safeJsonParse<unknown>(row.beliefs_json, []);
+      const existing = Array.isArray(parsed) ? (parsed as Belief[]) : [];
+      this.db.prepare('UPDATE Character_State SET beliefs_json = ? WHERE char_id = ?')
+        .run(JSON.stringify([...existing, ...beliefs]), char_id);
+    })();
+  }
+
   public updateTheoryOfMind(char_id: string, tom: Record<string, TheoryOfMind>) {
     this.db.prepare('UPDATE Character_State SET theory_of_mind_json = ? WHERE char_id = ?')
       .run(JSON.stringify(tom), char_id);
@@ -1505,6 +1527,13 @@ export class Stage {
     const rows = this.db.prepare('SELECT * FROM Story_Commits ORDER BY rowid')
       .all() as Array<Record<string, unknown>>;
     return rows.map(r => this._mapCommit(r));
+  }
+
+  // Current-canon commits: every commit not marked reverted. Narrows
+  // getCommits() so the duplicated `.getCommits().filter(c => !c.reverted)`
+  // call sites share one predicate instead of each re-deriving the filter.
+  public getLiveCommits(): StoryCommit[] {
+    return this.getCommits().filter(c => !c.reverted);
   }
 
   public getCommit(commitId: string): StoryCommit | undefined {

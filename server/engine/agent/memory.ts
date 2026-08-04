@@ -92,7 +92,7 @@ export async function synthesizeReflectionsFor(charId: string, stage: Stage): Pr
     }));
 
   if (reflectionBeliefs.length > 0) {
-    stage.updateAgentBeliefs(charId, [...existingBeliefsFull, ...reflectionBeliefs]);
+    stage.addBeliefs(charId, reflectionBeliefs);
     logger.info('agent_reflection', { agent: sheet.name, new_insights: reflectionBeliefs.length });
   }
 }

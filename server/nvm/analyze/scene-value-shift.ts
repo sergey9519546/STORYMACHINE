@@ -1,3 +1,5 @@
+import { scenesFromFountain as scenesFromFountainLocal } from './scene-split.ts';
+
 // Scene-value-shift signal — OASIS §30 scene-contract detectors (task #71).
 // Deterministic, no LLM.
 //
@@ -90,12 +92,6 @@ function valenceOf(words: string[]): number {
     else if (NEGATIVE_WORDS.has(w)) { score -= 1; matched++; }
   }
   return matched ? score / matched : 0;
-}
-
-/** Split raw Fountain into ordered scene texts on INT./EXT. boundaries. */
-function scenesFromFountainLocal(fountain: string): string[] {
-  const parts = fountain.split(/^(?=(?:INT|EXT)\.)/mi);
-  return parts.filter(p => /^(?:INT|EXT)\./i.test(p));
 }
 
 const SHIFT_THRESHOLD = 0.15;

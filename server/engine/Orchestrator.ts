@@ -907,7 +907,7 @@ export class Orchestrator {
       source_event_id: actionId,
       acquired_at: turnIndex,
     };
-    this.stage.updateAgentBeliefs(observerId, [...existing, belief]);
+    this.stage.addBeliefs(observerId, [belief]);
   }
 
   // LISTEN: surfaces a real, already-tracked signal — the TARGET's own
@@ -940,7 +940,7 @@ export class Orchestrator {
       source_event_id: actionId,
       acquired_at: turnIndex,
     };
-    this.stage.updateAgentBeliefs(listenerId, [...existing, belief]);
+    this.stage.addBeliefs(listenerId, [belief]);
   }
 
   // SEARCH: the room-wide counterpart of EXAMINE — sweeps every co-present
@@ -988,7 +988,7 @@ export class Orchestrator {
       source_event_id: actionId,
       acquired_at: turnIndex,
     };
-    this.stage.updateAgentBeliefs(targetId, [...existing, belief]);
+    this.stage.addBeliefs(targetId, [belief]);
   }
 
   // THREATEN / BETRAY / PROTECT / FORM_ALLIANCE: direct, guaranteed
