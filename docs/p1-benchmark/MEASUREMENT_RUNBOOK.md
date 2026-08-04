@@ -607,6 +607,84 @@ This is easy to miss or misinterpret. A future user might not realize the hash v
 
 ---
 
+## 8. Discharging Accumulated Obligations in One Command
+
+**Added:** 2026-08-04, alongside `scripts/discharge-obligations.mjs`.
+
+Sections 1–7 above walk through each maintainer-machine measurement
+individually. In practice these obligations accumulate faster than they get
+discharged — they're scattered across this runbook, `docs/p1-benchmark/
+MEASUREMENT_RECEIPTS.md`, and `CLAUDE.md`, each with its own env var, flag,
+and output shape. `scripts/discharge-obligations.mjs` is the single command
+that runs all of them in one pass and prints a receipt block ready to paste
+into `MEASUREMENT_RECEIPTS.md`.
+
+### 8.1 Run it
+
+```bash
+REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run discharge-obligations
+```
+
+`CORPUS_DIR` also satisfies the env contract (either name is accepted; if
+only one is set, it backfills the other for stages keyed to the other
+name — see the script's own header for why two historical names exist).
+The script fails fast, before running anything, if neither is set.
+
+Useful flags:
+
+```bash
+# Run only one stage (see the five stage ids below):
+REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run discharge-obligations -- --only=measure-real
+
+# Run everything except one stage:
+REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run discharge-obligations -- --skip=corpus-migration
+
+# Label the run for the receipt header:
+REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run discharge-obligations -- --reason="pre-release sweep"
+```
+
+### 8.2 The five stages
+
+1. **`measure-real`** — `npm run measure-real` (the AUC-24 ratchet
+   statistic — §1–2 above measure the split-aware version of this; this is
+   the full-corpus, no-split version), plus `node scripts/probe-real-
+   corpus.mjs` to regenerate `scripts/output/real-corpus-scores.csv` (the
+   artifact `measure-real` itself does NOT write — it is stdout-only; the
+   CSV is a separate script's job, wired here so one command covers both).
+2. **`auc-split-unwired-flags`** — runs `scripts/measure-auc-split.mjs`
+   with each currently-unwired signal candidate
+   (`--with-question-latency-deduction`, `--with-reversal-detection`,
+   `--with-agency-signal`) against **train and val only, never test** — the
+   test partition is evaluate-once (§2.3's "ONCE, Final Evaluation Only"
+   rule); this orchestrator's own code has no path that can construct a
+   `--partition=test` invocation for these flags.
+3. **`truth-extraction-recall`** — `scripts/probe-truth-order-
+   sensitivity.mjs`'s RECALL MODE, answering "does the truth-ledger
+   contradiction detector fire on real thrillers at all?" over the real
+   corpus (per-script fire counts print in the stage log).
+4. **`corpus-migration`** — the de-id migration
+   (`scripts/migrate-corpus-ids.mjs --write` + `scripts/verify-corpus-
+   layout.mjs`), skipped automatically (no-op, clearly reported) if
+   `scripts/output/corpus-split.json` is already in the migrated schema.
+5. **`rebuild-experiment`** — optional, feature-detected: runs
+   `scripts/rebuild-experiment.mjs` only if that file exists in the tree.
+
+Each stage streams its underlying command's output live and records
+pass/fail independently — a failing stage does not stop the remaining
+stages from running (the final summary reports every stage's outcome).
+
+### 8.3 The final step is still manual, on purpose
+
+The script prints a ready-to-paste `MEASUREMENT_RECEIPTS.md` §3-template
+entry to stdout and also writes it to a file under the OS temp directory
+(never under `scripts/output/`, and never auto-appended to the ledger — see
+`MEASUREMENT_RECEIPTS.md`'s own "What this ledger is NOT" section for why
+that step stays human). Review the numbers, fill in the **Runner
+attestation** line, and paste the block into `MEASUREMENT_RECEIPTS.md`
+yourself, above its `## 3. Entry template` heading.
+
+---
+
 ## References
 
 - **PRE_REGISTRATION_PROTOCOL.md** — The full pre-registration covenant; sections §3–6 define iteration discipline.

@@ -21,6 +21,7 @@
     "measure-slop": "node --experimental-strip-types scripts/measure-slop-discrimination.ts",
     "measure-real": "node --experimental-strip-types scripts/measure-real-script-discrimination.ts",
     "honesty-audit": "node scripts/honesty-audit.mjs",
+    "discharge-obligations": "node scripts/discharge-obligations.mjs",
     "check-scoring-receipt": "node scripts/check-scoring-receipt.mjs",
     "backup": "node --experimental-strip-types scripts/backup-sessions.ts",
     "check-docs": "node --experimental-strip-types scripts/check-docs-quality.ts --all",

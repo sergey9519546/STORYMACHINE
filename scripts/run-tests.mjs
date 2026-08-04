@@ -16,6 +16,7 @@ const TEST_ROOTS = [
   'tests/nvm',
   'tests/passes',
   'tests/routes',
+  'tests/scripts',
 ];
 
 function collectTestFiles(directory) {
