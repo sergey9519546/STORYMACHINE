@@ -1,0 +1,2085 @@
+--- PAGE 1 ---
+MA ViS: A Multi-Agent Framework for Long-Sequence Video Storytelling
+Qian Wang
+Virginia Tech. University
+USA
+yqwq1996@vt.edu
+Ziqi Huang
+Nanyang Technological University
+Singapore
+ZIQI002@e.ntu.edu.sg
+Ruoxi Jia
+Virginia Tech. University
+USA
+ruoxijia@vt.edug
+Paul Debevec
+Netflix Eyeline Studios
+USA
+debevec@scanlinevfx.com
+Ning Yu*
+Netflix Eyeline Studios
+USA
+ning.yu@scanlinevfx.com
+I want a mystery-themed 
+video. It tells a story of 
+exploring survival, 
+following an interstellar 
+archaeologist in an alien 
+market. The length of 
+the final video should be 
+about 1 minute.
+User
+User
+I want a courage-themed 
+video in a dreamlike 
+style. It tells a story of  a 
+cursed prince in an 
+fantanstic  marketplace. 
+The length of the final 
+video should be about 1 
+minute.
+User
+User
+I want a mystery-themed 
+video. It tells a story of 
+exploring survival, 
+following an interstellar 
+archaeologist in an alien 
+market. The length of 
+the final video should be 
+about 1 minute.
+User
+I want a courage-themed 
+video in a dreamlike 
+style. It tells a story of  a 
+cursed prince in an 
+fantanstic  marketplace. 
+The length of the final 
+video should be about 1 
+minute.
+User
+Figure 1: With just a brief idea description, MA ViS enables users to rapidly explore diverse visual storytelling
+and creative directions for sequential video generation by efficiently crafting high-quality, complete long-sequence
+videos.
+Abstract
+Despite recent advances, long-sequence video
+generation frameworks still suffer from signifi-
+cant limitations: poor assistive capability, sub-
+optimal visual quality, and limited expressive-
+ness. To mitigate these limitations, we propose
+MA ViS, a multi-agent collaborative framework
+designed to assist in long-sequence video sto-
+rytelling by efficiently translating ideas into
+visual narratives. MA ViS orchestrates special-
+ized agents across multiple stages, including
+script writing, shot designing, character model-
+ing, keyframe generation, video animation, and
+audio generation.In each stage, agents operate
+under the3E Principle—Explore, Examine,
+and Enhance—to ensure the completeness of
+intermediate outputs. Considering the capabil-
+ity limitations of current generative models, we
+propose the Script Writing Guidelines to opti-
+mize compatibility between scripts and genera-
+tive tools. Experimental results demonstrate
+that MA ViS achieves state-of-the-art perfor-
+mance in assistive capability, visual quality, and
+video expressiveness. Its modular framework
+further enables scalability with diverse gener-
+ative models and tools. With just a brief idea
+description, MA ViS enables users to rapidly
+explore diverse visual storytelling and creative
+directions for sequential video generation by
+*Corresponding author and project lead
+efficiently crafting high-quality, complete long-
+sequence videos. To the best of our knowledge,
+MA ViS is the only framework that provides
+multimodal design output – videos with narra-
+tives and background music.
+1 Introduction
+In recent years, video generative models (OpenAI,
+2024; MiniMax, 2024; GenmoTeam, 2024) have
+made substantial strides in text-to-video (T2V)
+and image-to-video (I2V) generation. While these
+methods demonstrate promising capabilities for
+shot-level creation, the generation of long videos
+remains a formidable challenge. Besides, the cur-
+rent scale of computing and data is insufficient to
+train a single end-to-end model capable of crafting
+high-quality, minute-long videos.
+To overcome this limitation, prior works have
+explored extending existing video clips (KlingAI,
+2024; Henschel et al., 2024; Ge et al., 2022), or
+composing sequences of keyframes (Liu et al.,
+2024; Yang et al., 2024b; Rahman et al., 2023;
+Wang et al., 2024a), or integrating storytelling and
+video generation (Yin et al., 2023b; Zheng et al.,
+2025). However, these approaches suffer from
+repetitive motion, lack of narrative cohesion, or
+result in static image series with limited visual ex-
+pressions. To better align narrative planning with
+arXiv:2508.08487v4  [cs.CV]  9 Oct 2025
+--- PAGE 2 ---
+Methods Agentic Script Writing Shot Designing Dynamic ID Consistency Audio Assistive
+Mora (Yuan et al., 2024) ✓× ×✓× ×✓
+AesopAgent (Wang et al., 2024a) ✓ ✓× ×✓×✓
+MovieDreamer (Zhao et al., 2024) × × ×✓ ✓× ×
+DreamFactory (Xie et al., 2024) ✓×✓ ✓ ✓× ×
+VGoT (Zheng et al., 2025) ×✓×✓ ✓×✓
+LCT (Guo et al., 2025) × × ×✓ ✓× ×
+MovieAgent (Wu et al., 2025b) ✓×✓ ✓ ✓ ✓×
+MA ViS (ours) ✓ ✓ ✓ ✓ ✓ ✓ ✓
+Table 1:Properties of MA ViS vs Other Methods: We summarize seven metrics for long-sequence video storytelling
+works."Agentic": whether the system employs a multi-agent architecture; "Script Writing": ability generate scripts
+from user prompt; "Shot Designing.": support for structured shot designing and controllable narrative flow;
+"Dynamic": whether the generated video exhibits dynamic features; "ID Consistency": consistency in character
+identity across multiple shots; "Audio": whether the output includes synchronized audio; "Assistive": whether
+the pipeline is designed to support users in script writing, script planning, or model fine-tuning by streamlining
+processes.
+video animation, MovieDreamer (Zhao et al., 2024)
+adopts an auto-regressive approach to generate key
+frames from input scripts, while Dreamfactory (Xie
+et al., 2024) and MovieAgent (Wu et al., 2025b)
+propose a hierarchical script–scene–shot pipeline.
+However, as shown in Table 1, these methods re-
+quire substantial laborious effort from users for
+script writing and training LoRA models to main-
+tain ID consistency, which significantly limits their
+assistive capability and hinders large-scale deploy-
+ment.
+In summary, current long-sequence video sto-
+rytelling methods face three major limitations: 1)
+poor assistive capability, not supporting script writ-
+ing, shot designing, and LoRA training to maintain
+ID consistency; 2) suboptimal visual quality, mani-
+fested in visual distortions, unnatural actions, and
+inaccurate object proportions; and 3) limited ex-
+pressiveness, often resulting in repetitive actions
+and poorly structured shot compositions.
+To address this, we introduceMA ViS, a multi-
+agent collaborative framework designed to assist
+in long-sequence video storytelling by efficiently
+translating ideas into visual narratives. MA ViS en-
+compasses various stages, including script writ-
+ing, shot designing, character modeling, keyframe
+generation, video animation, and audio genera-
+tion. Given a brief idea description from the user,
+the script writing stage first generates a structured
+script with character definitions and shot outlines.
+The shot designing stage defines a series of shot-
+level elements to guide subsequent content gener-
+ation, while character modeling ensures ID con-
+sistency via LoRA-trained appearances. During
+the keyframe generation stage, T2I models are em-
+ployed to create the initial static frames for each
+shot, i.e., the keyframes, which are then expanded
+into full video sequences in the video animation
+stage through I2V models, maintaining visual co-
+herence and narrative fluency. Finally, voice-overs
+and background music (BGM) are added to each
+shot during the voice generation stage, resulting in
+a cohesive, long-sequence video.
+Crucially, all stages operate under the3E Prin-
+ciple: -Explore: Initial generation of candidate
+outputs; -Examine: Reviewing the quality and
+completeness of the output; -Enhance: Iterative
+refinement and optimization. After multiple itera-
+tions, each stage passes the most complete version
+of its output to the next, enabling gradual optimiza-
+tion throughout the pipeline.
+To mitigate the limitations of current genera-
+tive models in maintaining background consis-
+tency, executing complex actions, and rendering
+fine-grained details, we propose the Script Writ-
+ing Guidelines aimed at enhancing the compati-
+bility between scripts and generative models, ulti-
+mately improving the expressiveness of the video
+storytelling. As illustrated in Figure 1, with just
+a brief idea description, MA ViS enables users to
+rapidly explore diverse visual storytelling and cre-
+ative directions for sequential video generation
+by efficiently crafting high-quality, complete long-
+sequence videos. Furthermore, its modular archi-
+tecture ensures scalability with various generative
+tools and models.
+Our contributions are summarized in three
+thrusts:
+•We proposeMA ViS, a multi-agent collabora-
+tive framework that encompasses various stages
+including script writing, shot designing, character
+modeling, keyframe generation, video animation,
+and audio generation — forming a complete and
+scalable workflow for long video storytelling.
+• We introduce the3E Principle—Explore,Ex-
+amine,Enhance—to continuously optimize the out-
+--- PAGE 3 ---
+put of each stage. This iterative design ensures the
+completeness of the output at each stage.
+• We propose the Script Writing Guidelines for
+long-sequence video storytelling to enhance the
+script-tool compatibility, ultimately improving the
+expressiveness of the video storytelling.
+• Experiments demonstrate that MA ViS achieves
+state-of-the-art performance and wins the most user
+preferences in terms of expressiveness and visual
+quality. With just a brief idea description from the
+user, MA ViS efficiently generates high-quality and
+complete long-sequence video storytelling. To the
+best of our knowledge, MA ViS is the only frame-
+work that provides multimodal design output.
+2 Related Works
+2.1 Video Generation
+Long video generation (He et al., 2022; Ge et al.,
+2022; Wang et al., 2024c) aims to produce longer
+videos than previous text-to-video (T2V) (Mod-
+elScopeTeam, 2023; Wang et al., 2024b) and image-
+to-video (I2V) (Girdhar et al., 2023; Xing et al.,
+2025; Zhang et al., 2023) models. Auto-regressive
+approaches (Weng et al., 2024; Henschel et al.,
+2024) and video storytelling methods (Yin et al.,
+2023b; Zheng et al., 2025) suffer from repetitive
+motions with limited narrative development and
+poor visual quality. Meanwhile, commercial mod-
+els (KlingAI, 2024; Runway, 2024a,b) support tem-
+poral extension. However, the duration of the gen-
+erated videos remains constrained. In this work,
+MA ViS uses cutting-edge video generation models
+to synthesize high-quality video clips and assem-
+bles them into long-sequence video storytelling.
+2.2 AI Agents
+AI agents (Yang et al., 2023a; Yin et al., 2023a; Li
+et al., 2023; Hong et al., 2023; Park et al., 2023),
+empowered by large language models (Brown et al.,
+2020; Touvron et al., 2023a,b), have shown broad
+applicability in reasoning, planning, web interac-
+tion, and visual generation. In video generation,
+systems (Yang et al., 2024a; Yuan et al., 2024;
+Wang et al., 2024a) explore world modeling, multi-
+agent coordination, and retrieval-augmented syn-
+thesis, yet often yield static content with limited
+transitions. Hierarchical pipelines (Xie et al., 2024;
+Wu et al., 2025b) introduce script-to-shot work-
+flows but still rely on laborious scripting and LoRA
+tuning. In contrast, our MA ViS leverages multi-
+agent collaboration to enable long-sequence video
+storytelling.
+3 MA ViS
+We proposeMA ViS, a multi-agent collaborative
+framework for long-sequence video storytelling
+that consists of various stages, including script writ-
+ing, shot designing, character modeling, keyframe
+generation, video animation, and audio generation.
+Given a user prompt P , as illustrated in Figure 2
+MA ViS aims to generate a long-sequence video
+storytelling that comprisesNshots:
+F:P→ ˆV, ˆV={{V j, A j} |j= 1,2, . . . , N},(1)
+where ˆVj is the video clip and ˆAj is the audio track.
+To ensure the completeness and reliability of the
+generation pipeline, agents in each stage follow
+a unified3E Principle:Explore,Examine, and
+Enhance. Section 3.1 details the 3E principle, and
+Section 3.2 outlines the Script Writing Guidelines,
+followed by Section 3.3 to 3.6 introducing the agent
+design and working procedures of each stage.
+3.1 3E Principle
+Existing frameworks for long-sequence video story-
+telling adopt one-shot generation strategies. How-
+ever, such approaches often prove inadequate in
+practice—scripts may not align with user intent,
+images or videos can exhibit distortions or unnat-
+ural actions, and audio tracks may be misaligned
+in duration. These issues highlight the necessity
+of adopting a multi-round generation–modification
+loop, rather than relying on one-shot generation.
+To address this, we introduce the3E Princi-
+ple—Explore, Examine, Enhance—to guide intra-
+stage agents’ collaboration and progressively im-
+prove generation quality across iterations:
+Explore: This stage represents the first attempt
+to generate content based on the current request
+and specification:
+r1 =G(p 1;g),(2)
+where p1 denotes the initial generation request, g is
+the generation guidelines, such as guides of script-
+tool compatibility and output completeness. G is
+the generator, andr 1 is the resulting output.
+Examine: The generated output is then examined
+to determine whether it satisfies the specification:
+f1 =E(r 1, g),(3)
+where E is the reviewer, and f1 is the examination
+feedback of resultr 1 based on the guidelinesg.
+--- PAGE 4 ---
+3E3E 3E3E
+3E3E
+3E3E
+Shot Designing Stage
+Shot 
+Reviewer
+Shot 
+Reviewer
+Shot DesignerShot Designer
+Shot 1
+Character:  Ethan
+Background:  The marketplace 
+is teeming with vibrant stalls 
+and alien vendors. An 
+enormous crystal hangs 
+overhead... 
+Character Pose:  Ethan walks 
+purposefully...
+Character Action:  Ethan 
+scans the surrounding…
+Prop Description:  None
+Camera Position:  Medium 
+shot, slightly elevated...
+Camera Movement:  Static.
+Lighting Design:  Artificial 
+multicolored light from the 
+crystal above...
+Shot 2
+Character:  None
+Background:  The artifact is 
+placed on a polished wooden 
+stall...
+Character Pose:  None
+Character Action:  None
+Prop Description:  A small, 
+spherical artifact with 
+intricate...
+Camera Pose:  Close-up shot, 
+front view centering on the 
+artifact...
+Camera Movement:  Slight 
+zoom in...
+Lighting Design:  Soft spot 
+lighting highlights the glowing 
+inscriptions....
+•••
+I2V Model Pool
+I2V Model Pool
+Script Writing Stage
+Structure 
+Reviewer
+Structure 
+Reviewer
+Content 
+Reviewer
+Content 
+Reviewer
+Style 
+Reviewer
+Style 
+Reviewer
+Title:  Echoes in the Alien Bazaar  
+Genre:  Sci-Fi Adventure  
+Style:  Visually rich and character-driven 
+narrative with a strong sense of mystery 
+and adventure.
+Character Profile:
+Elias Morgan:  Around 30 years old, 
+Caucasian, with short, wavy blond hair 
+and fair skin...
+Shot 1:  
+Character:  Ethan 
+Content:  Ethan walks through a bustling 
+alien marketplace filled with colorful 
+stalls, under the artificial light of an 
+enormous hanging crystal. He Is scanning 
+the myriad artifacts displayed around him.  
+Subtitle/Voice-over:  In this alien sea of 
+trinkets and echoes, survival meant 
+unraveling the past.
+Shot 2: 
+Character:  None  
+Content:  Close-up of a mysterious artifact 
+resting on a stall, a small, intricate sphere 
+with glowing inscriptions. 
+Subtitle/Voice-over:  Each artifact held 
+whispered secrets... pieces of a forgotten 
+puzzle.
+3E3E
+3E Principle
+3E
+3E Principle
+ScriptwriterScriptwriter
+Audio Generation Stage
+BGM: Dark Fog
+Shot 1: 
+Voice ID:  Deep_Voice_Man
+Emotion:  Neutral
+Voice-over:   In this alien sea 
+of trinkets and echoes...  
+Shot 2: 
+Voice ID:  Deep_Voice_Man
+Emotion:  Neutral
+Voice-over:   Each artifact 
+held whispered secrets...
+...Voice  
+Reviewer
+Voice  
+Reviewer
+Subtitle 
+Refiner
+Subtitle 
+Refiner
+Voice 
+Designer
+Voice 
+Designer
+T2A 
+Model
+T2A 
+Model
+ AudiosAudiosAudios
+Output Long-
+Sequence Video
+Output Long-
+Sequence Video
+Character Video
+Character Video
+Character Image
+Character Image
+Character Modeling Stage
+T2I Prompt, Ethan:  A 30-year-
+old Caucasian man with short, 
+wavy blond hair and fair skin, 
+wearing a dusty red leather jacket 
+and cargo pants... 
+I2V Prompt, Ethan:  Begin with 
+Ethan standing in a surreal alien 
+realm, the background featuring 
+twilight colors. The camera 
+rotates around him...
+T2I Process
+I2V Process
+• A photo of Ethan 
+standing in a 
+rugged landscape 
+with towering rock 
+formations...
+• A photo of Ethan 
+standing in a 
+dramatic landscape 
+....
+Sample
+Caption 
+Generator
+Caption 
+Generator
+Train
+Character Prompt GeneratorCharacter Prompt Generator
+LoRA
+LoRA
+Multi-View 
+Character Images
+• • •
+ • • •
+Multi-View 
+Character Images
+• • •
+3E3E
+Keyframe Generation Stage
+Shot 1:  Ethan walks 
+purposefully through a 
+bustling alien 
+marketplace under a...
+Shot 2:  A small 
+intricate spherical 
+artifact with subtly 
+shifting glowing...
+...
+T2I Process
+T2I Model Pool
+T2I 
+Prompt 
+Generator
+T2I 
+Prompt 
+Generator
+T2I RefinerT2I Refiner T2I EvaluatorT2I Evaluator
+•••
+•••
+Key Frames
+•••
+Key Frames
+3E3E
+•••
+•••
+Video Clips
+•••
+Video Clips
+Video Animation Stage
+Shot 1:  A man around 30 
+with short wavy blond 
+hair, fair skin, and a dusty 
+red leather jacket walks...
+Shot 2: A small, intricate 
+spherical artifact with 
+glowing inscriptions that 
+subtly shift rests on a...
+...
+I2V Process
+I2V 
+Prompt 
+Generator
+I2V 
+Prompt 
+Generator
+I2V Model Pool
+I2V RefinerI2V Refiner I2V EvaluatorI2V Evaluator
+3E
+•••
+Video Clips
+Video Animation Stage
+Shot 1:  A man around 30 
+with short wavy blond 
+hair, fair skin, and a dusty 
+red leather jacket walks...
+Shot 2: A small, intricate 
+spherical artifact with 
+glowing inscriptions that 
+subtly shift rests on a...
+...
+I2V Process
+I2V 
+Prompt 
+Generator
+I2V Model Pool
+I2V Refiner I2V Evaluator
+T2I Model Pool
+LoRA
+LoRA
+T2I Model Pool
+LoRA
+I want a mystery-themed video. It tells a story of exploring survival, following an interstellar 
+archaeologist in an alien market. The length of the final video should be at least 1 minute.
+User
+User
+I want a mystery-themed video. It tells a story of exploring survival, following an interstellar 
+archaeologist in an alien market. The length of the final video should be at least 1 minute.
+User
+3E 3E
+3E
+3E
+Shot Designing Stage
+Shot 
+Reviewer
+Shot Designer
+Shot 1
+Character:  Ethan
+Background:  The marketplace 
+is teeming with vibrant stalls 
+and alien vendors. An 
+enormous crystal hangs 
+overhead... 
+Character Pose:  Ethan walks 
+purposefully...
+Character Action:  Ethan 
+scans the surrounding…
+Prop Description:  None
+Camera Position:  Medium 
+shot, slightly elevated...
+Camera Movement:  Static.
+Lighting Design:  Artificial 
+multicolored light from the 
+crystal above...
+Shot 2
+Character:  None
+Background:  The artifact is 
+placed on a polished wooden 
+stall...
+Character Pose:  None
+Character Action:  None
+Prop Description:  A small, 
+spherical artifact with 
+intricate...
+Camera Pose:  Close-up shot, 
+front view centering on the 
+artifact...
+Camera Movement:  Slight 
+zoom in...
+Lighting Design:  Soft spot 
+lighting highlights the glowing 
+inscriptions....
+•••
+I2V Model Pool
+Script Writing Stage
+Structure 
+Reviewer
+Content 
+Reviewer
+Style 
+Reviewer
+Title:  Echoes in the Alien Bazaar  
+Genre:  Sci-Fi Adventure  
+Style:  Visually rich and character-driven 
+narrative with a strong sense of mystery 
+and adventure.
+Character Profile:
+Elias Morgan:  Around 30 years old, 
+Caucasian, with short, wavy blond hair 
+and fair skin...
+Shot 1:  
+Character:  Ethan 
+Content:  Ethan walks through a bustling 
+alien marketplace filled with colorful 
+stalls, under the artificial light of an 
+enormous hanging crystal. He Is scanning 
+the myriad artifacts displayed around him.  
+Subtitle/Voice-over:  In this alien sea of 
+trinkets and echoes, survival meant 
+unraveling the past.
+Shot 2: 
+Character:  None  
+Content:  Close-up of a mysterious artifact 
+resting on a stall, a small, intricate sphere 
+with glowing inscriptions. 
+Subtitle/Voice-over:  Each artifact held 
+whispered secrets... pieces of a forgotten 
+puzzle.
+3E
+3E Principle
+Scriptwriter
+Audio Generation Stage
+BGM: Dark Fog
+Shot 1: 
+Voice ID:  Deep_Voice_Man
+Emotion:  Neutral
+Voice-over:   In this alien sea 
+of trinkets and echoes...  
+Shot 2: 
+Voice ID:  Deep_Voice_Man
+Emotion:  Neutral
+Voice-over:   Each artifact 
+held whispered secrets...
+...Voice  
+Reviewer
+Subtitle 
+Refiner
+Voice 
+Designer
+T2A 
+Model
+ Audios
+Output Long-
+Sequence Video
+Character Video
+Character Image
+Character Modeling Stage
+T2I Prompt, Ethan:  A 30-year-
+old Caucasian man with short, 
+wavy blond hair and fair skin, 
+wearing a dusty red leather jacket 
+and cargo pants... 
+I2V Prompt, Ethan:  Begin with 
+Ethan standing in a surreal alien 
+realm, the background featuring 
+twilight colors. The camera 
+rotates around him...
+T2I Process
+I2V Process
+• A photo of Ethan 
+standing in a 
+rugged landscape 
+with towering rock 
+formations...
+• A photo of Ethan 
+standing in a 
+dramatic landscape 
+....
+Sample
+Caption 
+Generator
+Train
+Character Prompt Generator
+LoRA
+Multi-View 
+Character Images
+• • •
+3E
+Keyframe Generation Stage
+Shot 1:  Ethan walks 
+purposefully through a 
+bustling alien 
+marketplace under a...
+Shot 2:  A small 
+intricate spherical 
+artifact with subtly 
+shifting glowing...
+...
+T2I Process
+T2I Model Pool
+T2I 
+Prompt 
+Generator
+T2I Refiner T2I Evaluator
+•••
+Key Frames
+3E
+•••
+Video Clips
+Video Animation Stage
+Shot 1:  A man around 30 
+with short wavy blond 
+hair, fair skin, and a dusty 
+red leather jacket walks...
+Shot 2: A small, intricate 
+spherical artifact with 
+glowing inscriptions that 
+subtly shift rests on a...
+...
+I2V Process
+I2V 
+Prompt 
+Generator
+I2V Model Pool
+I2V Refiner I2V Evaluator
+T2I Model Pool
+LoRA
+I want a mystery-themed video. It tells a story of exploring survival, following an interstellar 
+archaeologist in an alien market. The length of the final video should be at least 1 minute.
+User
+Figure 2: Illustration of MA ViS framework.
+Enhance: Based on the feedback and guidelines,
+the request is refined to improve quality in the next
+iteration:
+pi+1 =R(p i;f i, g),(4)
+where R denotes the refiner, andpi+1 is the updated
+request for iteration i+ 1 . This new request serves
+as the input to the next round of Explore-Examine-
+Enhance, and the process continues iteratively until
+the output fully satisfies the specification.
+After multiple Explore-Examine-Enhance itera-
+tions, each stage passes the most complete version
+of its output to the next, enabling gradual optimiza-
+tion throughout the pipeline. Given the limitations
+of individual agents, it may need to deploy mul-
+tiple reviewers in parallel to ensure comprehen-
+sive assessment. Additionally, generating multiple
+candidates per iteration and enhancing the highest-
+scoring one can effectively reduce the total number
+of required iterations. Moreover, depending on the
+design, the generator and refiner may be imple-
+mented as a unified component.
+3.2 Script Writing Guidelines
+Given the limitations of current generative models
+in maintaining background consistency, executing
+complex actions, and rendering fine-grained details,
+certain scripts remain infeasible for video gener-
+ation. To address this gap and improve the com-
+patibility between scripts and generative models,
+we propose the Script Writing Guidelines for long-
+sequence storytelling. The Script Writing Guide-
+lines comprises three components: the Structure
+Guide, which focuses on how scenes and shots are
+segmented and arranged; the Content Guide, which
+defines how much content a single shot should in-
+clude; and the Style Guide, which ensures user-
+centric alignment, coherent pacing, logical flow,
+and structural completeness. Together, these guide-
+lines constrain agent-based script writing and im-
+prove the expressiveness of the ultimate video sto-
+rytelling.
+Structure GuideCurrent video generation mod-
+els have limited contextual modeling capacity; as a
+result, adjacent shots set within the same spatial en-
+vironment often suffer from inconsistency in back-
+ground elements. Therefore, scriptwriters should
+avoid placing successive shots in the same back-
+ground and should minimize transitions between
+tightly connected spatial locations (e.g., from "out-
+side the door" to "inside the room," or from one
+room to another). Moreover, to reduce the jarring
+effect of spatial jumps, it is recommended not to
+place the same character in consecutive shots un-
+less narrative necessity dictates it.
+To mitigate these issues while preserving narra-
+tive flow, transitional shots can be inserted. These
+may include close-ups of different characters, par-
+tial views of a character (e.g., hands, back), de-
+tailed shots of the environment, or important props.
+Such insertions help avoid background duplication
+while reinforcing the spatial or character continuity.
+Additionally, enhanced descriptions of both back-
+--- PAGE 5 ---
+ground and character appearance are encouraged to
+improve model alignment with visual and narrative
+consistency.
+Content GuideCurrent video generation models
+struggle to synthesize multiple sequential actions
+within a single shot (e.g., running followed by walk-
+ing and then dancing). Therefore, it is advisable
+to limit each shot to a single, simple action. Fur-
+thermore, generative models often fail to craft fine-
+grained visual elements accurately, such as textual
+content on smartphone screens or small patterns
+on objects. Scripts should avoid specifying such
+details.
+Style GuideWithin the Structure Guide and the
+Content Guide, a script may risk becoming frag-
+mented or visually monotonous if not properly
+orchestrated. The style guide thus ensures har-
+monious pacing, visual diversity, and narrative
+logic. Moreover, the script’s tone and theme must
+align with the user’s request, and different gen-
+res require distinct narrative pacing—emotional
+and family-oriented scripts benefit from a slow,
+layered progression, while action-oriented scripts
+demand rapid and dynamic developments. Addi-
+tionally, structural completeness is essential: every
+script must contain a title, character definitions,
+and a shot-by-shot script. Each shot should specify
+the character (or "None" if absent), shot content,
+and accompanying subtitle or voice-over. Subtitles
+must align semantically with the shot content.
+3.3 Script Writing Stage
+Upon receiving a brief user prompt, four
+agents—the Scriptwriter, the Structure Reviewer,
+the Content Reviewer, and the Style Re-
+viewer—work collaboratively in the script writing
+stage to form a structured script.
+The Scriptwriter Gscr first generate a draft script
+S1 based on the user prompt P and the Script Writ-
+ing Guidelinesg scr:
+S1 =G scr(P, gscr).(5)
+Following the 3E principle, at each iteration, the
+Structure Reviewer Estr, Content Reviewer Econ,
+and Style Reviewer Esty examine the script Si
+against the Structure Guide gstr, Content Guide
+gcon and Style Guide gsty respectively, and provide
+feedback:
+f i
+scr = [E str(Si, gstr), E con(Si, gcon), E sty(Si, gsty)],(6)
+where gscr = [g str, g con, g sty]. The Scriptwriter
+integrates these feedback to improve the script iter-
+atively:
+Si+1 =G scr(f i
+scr;S i, gscr)(7)
+The Explore-Examine-Enhance loop continues
+until all reviewers reach a consensus that the script
+fully satisfies the guidelines after n iterations, and
+the Scriptwriter outputs the finalized version, rep-
+resented asS=C scr(Sn).
+3.4 Shot Designing Stage
+In the shot-designing stage, the Shot De-
+signer—responsible for generating detailed shot
+designs—and the Shot Reviewer—tasked with as-
+sessing the completeness and adherence of shot de-
+signs to predefined guidelines—play pivotal roles
+in transforming the high-level script into detailed
+shot elements suitable for downstream image and
+video generation. In detail, each shot is enriched
+with seven essential elements to enable precise vi-
+sual control:
+• Background: Specifies the spatial and environ-
+mental context of the shot, including location, time
+of day, season, weather conditions, and foreground-
+background composition.
+• Character Pose: Describes the initial static
+state of characters, including posture, expression,
+and position when the shot begins.
+• Character Action: Captures dynamic interac-
+tions or movements of characters throughout the
+shot.
+• Prop Description: Defines non-character ob-
+jects, including their form, texture, behavior, and
+placement.
+• Camera Position: Specifies the camera’s initial
+angle, orientation, and distance from the scene.
+• Camera Movement: Describes the movement
+mode and direction of the camera during the shot.
+• Lighting Design: Defines lighting characteris-
+tics such as type, tone, brightness, and color tem-
+perature to convey atmosphere.
+Similarly, following the 3E Principle, the Shot
+Designer generates an initial shot design from the
+script:
+ˆS1 =G shot(S),(8)
+where the shot designing guide provides essential
+constraints to ensure completeness and stylistic
+alignment with the original script.
+In each iteration i, the Shot Reviewer examines
+the completeness and appropriateness of the current
+design ˆSi and provides feedback:
+f i
+shot =E shot( ˆSi).(9)
+--- PAGE 6 ---
+The Shot Designer then uses this feedback to en-
+hance the design, until the Shot Reviewer deems
+the result satisfactory:
+ˆSi+1 =G shot(f i
+shot; ˆSi), ˆS= ˆSn.(10)
+3.5 Character Modeling Stage
+To ensure the ID consistency of characters across
+shots, in the character modeling stage, agents con-
+struct visual representations for each character and
+train a LoRA model. This process incorporates the
+Character Prompt Generator and Caption Genera-
+tor, supported by reviewer agents for both image
+generation (T2I Evaluator and T2I Refiner) and
+video animation (I2V Evaluator and I2V Refiner).
+The process begins with the Character Prompt
+Generator, which generates both text-to-image
+(T2I) and image-to-video (I2V) prompts for each
+character. T2I prompts aim to generate a frontal
+and naturally posed character image, while I2V
+prompts are used—together with the T2I im-
+ages—to synthesize character-centric video clips
+that capture the subject from multiple angles. After
+both T2I and I2V processes, multi-view character
+images are sampled from the generated character
+video. The Caption Generator then generates struc-
+tured captions for each sampled frame. These im-
+ages and captions are subsequently used to train
+LoRA models (if needed).
+Both the T2I and I2V processes follow the 3E
+Principle, but differ from script writing and shot
+designing in that each iteration generates multiple
+samples from the generative model pools. Specifi-
+cally, in the i-th iteration, a set of candidate images
+is generated by the pool of T2I models MI using
+the current T2I promptp i
+I:
+Ii ={G k
+I (pi
+I ), G k
+I ∈ M I , k= 1,2, . . . ,|M I |}.(11)
+T2I Evaluator EI scores candidates according to
+the image evaluation guide gI, selects the best one
+Ii, and provides evaluation resultf i
+I:
+[Ii, f i
+I ] =E I (Ii, gI )(12)
+The T2I Refiner RI then updates the prompt ac-
+cordingly:
+pi+1
+I =R I (f i
+I , pi
+I )(13)
+After n iterations, the final image I=I n initiates
+the I2V process.
+The I2V process mirrors the T2I process. First,
+a set of candidate videos is generated by the I2V
+model poolMI:
+Vi ={G k
+V (I, pi
+V ), G k
+V ∈ M I , k= 1,2, . . . ,|M V |}.
+(14)
+The I2V Evaluator EV evaluates these candidates
+according to the video evaluation guide gI, selects
+the best one Vi, and provides evaluation result f i
+V .
+The I2V Refiner RV updates the I2V prompt and
+generates the final videoV n afterniterations:
+[Vi, f i
+V ] =E V (Vi, gV ), p i+1
+V =R V (f i
+V , pi
+I ), V=V n.
+(15)
+The difference is that the I2V process incorpo-
+rates additional evaluation complexity. The image
+evaluation guide assesses candidates based on three
+primary axes: 1)Visual Quality: clarity, detail res-
+olution, and aesthetic harmony; 2)Naturalness:
+identifying distortions, anatomical inaccuracies, or
+proportion inconsistencies; and 3)Prompt Consis-
+tency: if the image content aligns with the input
+prompt. In contrast, the video evaluation guide
+extends these criteria by introducing: 1)Subject
+Consistency: temporal stability in facial features,
+attire, hairstyle, and skin tone across frames; and 2)
+Dynamics: the richness, fluidity, and pacing of char-
+acter movement throughout the clip. Together, the
+image and video evaluation guides work in concert
+to enforce the completeness of the final generation.
+3.6 Generation Stages
+The generation stages include: 1) the keyframe
+generation stage, which comprises the T2I Prompt
+Generator, T2I Evaluator, and T2I Refiner, respon-
+sible for generating the initial reference image for
+each shot; 2) the video animation stage, which
+includes the I2V Prompt Generator, I2V Evalua-
+tor, and I2V Refiner, and completes the video shot
+based on the keyframes; and 3) the audio genera-
+tion stage, which consists of the V oice Designer,
+V oice Reviewer, and Subtitle Refiner, synthesizes
+voice-overs and background music aligned with the
+emotional rhythm of each shot.
+First, in the keyframe generation stage,
+the T2I Prompt Generator uses shot-level ele-
+ments—Character,Background,Character Pose,
+Prop Description,Camera Position, andLighting
+Design—to construct T2I prompts, which are re-
+fined via the same T2I process in Section 3.5, uti-
+lizing the T2I model pool and the trained LoRA
+model, resulting in a set of keyframes {Ij |j=
+1,2, . . . , N}.
+Second, in the video animation stage, the I2V
+Prompt Generator formulates I2V prompts using
+Character,Background,Character Action,Prop
+Description,Camera Movement, andLighting De-
+sign. Again, following the same I2V process in-
+--- PAGE 7 ---
+Method Keyframe Generation Video Animation
+CLIP↑Inception↑ T. Flick.↑M. Smooth.↑Sub. Cons.↑Bg. Cons.↑Aesthetic↑I. Quality↑
+VGoT (Zheng et al., 2025) 22.37 8.53 99.00 99.3198.94 98.74 80.1164.59
+Mora (Yuan et al., 2024) 33.98 12.68 97.32 99.23 95.23 94.88 64.36 71.48
+MovieAgent (Wu et al., 2025b) 31.71 10.72 97.07 99.20 93.29 94.51 63.39 71.26
+MA ViS (ours) 34.22 12.81 99.09 99.5395.72 96.12 63.1772.91
+Table 2:Evaluation of Automatic Metrics for Keyframe Generation and Video Animation."T. Flick.", "M.
+Smooth.", "Sub. Cons.", "Bg. Cons.", "Aesthetic", and "I. Quality" refer to "Temporal Flickering", "Motion
+Smoothness", "Subject Consistency", "Background Consistency", ‘Aesthetic Quality’, and "Imaging Quality" from
+metrics in VBench (Huang et al., 2024), respectively. ↑ indicates a higher value is more desired.Boldindicates the
+best results.
+Method Narrative↑Visual↑User Align.↑Sub. Cons.↑Sub. Natural.↑Bg. Cons.↑Bg. Real.↑
+VGoT (Zheng et al., 2025) 3.39 3.39 6.79 5.56 3.07 4.14 3.24
+Mora (Yuan et al., 2024) 15.18 16.96 13.57 15.77 13.00 13.69 15.29
+MovieAgent (Wu et al., 2025b) 9.46 11.79 11.96 12.37 12.27 12.07 10.97
+MA ViS (ours) 71.96 67.86 67.68 66.31 71.66 70.09 70.50
+Table 3:User Study on the Performance of Long-Sequence Video Storytelling(V oting Results). "Narrative",
+"Visual", "User Align.", "Sub. Cons.", "Sub. Natural.", "Bg. Cons.", and "Bg. Real." refer to "Narrative
+Expressiveness", "Visual Quality", "User Prompt Alignment", "Subject Consistency", "Character Naturalness",
+"Background Consistency", and "Background Realism", respectively. ↑ indicates a higher value is more desired.
+Boldindicates the best results.
+troduced in Section 3.5, these prompts are used to
+generate video clips{V j |j= 1,2, . . . , N}.
+After video animation, voice and music planning
+are initiated in the audio generation stage based
+on the 3E principle. The V oice Designer GA se-
+lects background music for the entire script and
+configures voice IDs and emotional tones for each
+individual shot. The voice design is then reviewed
+by the V oice ReviewerEA, who checks for com-
+pliance (e.g., music availability and voice–emotion
+appropriateness) and provides iterative feedback
+f i
+A to assist in refinement:
+S1
+A =G A(S), f i
+A =E A(Si
+A), S i+1
+A =G A(S, f i
+A),
+SA =S n
+A.(16)
+Next, the T2A modelGA generates speech audio
+for each shot. The Subtitle Refiner RA shortens the
+voice-over pA to fit temporal constraints, ensuring
+compatibility with video animation:
+Ai
+j =G A(pi
+A,j), p i+1
+A,j =R A(pi
+A,j;A i
+j, Vj), A j =A n
+j .
+(17)
+Finally, audio tracks are synchronized with
+video clips to form the final long-sequence video
+telling with synchronized visuals and sound: ˆV=
+{{Vj, A j} |j= 1,2, . . . , N}.
+4 Experiment
+To evaluate the effectiveness of MA ViS, we bench-
+mark it against three three long video generation
+baselines: VGoT, Mora, and MovieAgent, and con-
+duct detailed ablation studies. We constructed a test
+set of 20 user prompts, each targeting a one-minute
+video for evaluation. We employ CLIP, Inception
+Score, and VBench (Huang et al., 2024) for quan-
+titative evaluation, and conduct a user study for
+subjective assessment. Further experimental set-
+tings, metrics, and baseline details are provided in
+the Appendix.
+4.1 Performance Comparisons
+We evaluate each method via automatic metrics
+and user study. It’s worth noting that MA ViS is the
+only framework that provides multimodal output –
+videos with narratives and BGM.
+4.1.1 Automatic Metrics
+Table 2 presents the shot-level evaluation results
+for both keyframe generation and video animation.
+MA ViS achieves the highest scores in CLIP (4.22)
+and Inception (12.81) scores, attributed to the en-
+hanced T2I quality enabled by the 3E Principle
+in the T2I process. In video animation, MA ViS
+slightly lags behind VGoT in subject consistency
+and background consistency but outperforms all
+baselines in temporal flickering, motion smooth-
+ness, and image quality. This is partly because
+VGoT crafts videos with limited dynamics and
+highly saturated visuals, which improves intra-shot
+consistency and aesthetic quality but at the cost of
+realism. Overall, MA ViS achieves the best compre-
+hensive performance.
+4.1.2 User Study
+Table 3 summarizes the voting results from 60
+evaluators across multiple aspects of comparison
+among the baselines. MA ViS consistently outper-
+forms all other methods in every evaluation dimen-
+sion, with an average voting share of69.44%. This
+highlights both the effectiveness of our architecture
+and the critical role of the 3E Principle.
+--- PAGE 8 ---
+Ablation Narrative↑Visual↑User Align.↑
+w/oE str 13.67 25.67 26.67
+w/oE con 32.33 18.67 26.67
+w/oE sty 20.00 26.67 20.00
+MA ViS (ours) 34.00 26.00 26.67
+Table 4:Ablation study on the Structure Reviewer
+Estr, the Content Reviewer Econ, and the Style Re-
+viewer Esty. ↑ indicates a higher value is more desired.
+Gray-shaded cells indicate values that are significantly
+lower than the others.
+Ablation CLIP↑Inception↑Natural.↑ Sub. Cons.↑Dyn. Deg.↑
+T2I w/o 3E 31.25 10.54 72.00 - -
+w 3E 34.22 12.81 98.00 - -
+I2V w/o 3E 32.05 11.22 60.00 3.0 44.58
+w 3E 34.53 13.22 92.50 95.72 35.62
+Table 5:Ablation study of the 3E Principle in the T2I
+and I2V Processes. "Natural." refers to the Natural-
+ness score, ↑ indicates a higher value is more desired.
+Gray-shaded cells indicate values that are significantly
+lower.
+4.2 Ablation Study
+We conduct an ablation study to demonstrate the
+impact of the 3E Principle across different modules
+of the framework.
+4.2.1 Script Writing Guidelines
+In the script writing stage, based on the Script Writ-
+ing Guidelines, the Structure Reviewer focuses on
+how scenes and shots are segmented and arranged,
+the Content Reviewer ensures that each shot can
+fully convey its intended content, and the Style Re-
+viewer oversees global pacing, logical flow, struc-
+tural coherence, and alignment with user require-
+ments. Table 4 presents the effects of removing
+each reviewer from the pipeline. As shown, exclud-
+ing the Structure Reviewer significantly impairs
+narrative expressiveness, removing the Content Re-
+viewer degrades visual quality, and omitting the
+Style Reviewer leads to a loss in both narrative
+alignment and consistency with user intent. Op-
+timal script generation is achieved only when all
+three reviewers collaborate.
+4.2.2 3E Principle in T2I and I2V Processes
+Since the evaluators and refiners in both the T2I
+and I2V processes cannot operate independently,
+we conduct an ablation study to evaluate the over-
+all impact of the 3E Principle on these modules.
+The CLIP score, Inception score, Naturalness score
+(defined as the proportion of generated images or
+videos that appear physically plausible and nat-
+urally rendered), along with Subject Consistency
+and Dynamic Degree from the VBench metrics, are
+used to assess key aspects targeted by the T2I and
+I2V Evaluators—specifically, prompt consistency,
+Ablation C. Rate↑ Ablation C. Rate↑ Ablation C. Rate↑
+w/oE shot 84.5 w/oE A 92.0 w/oR A 56.5
+wE shot 100.0 w/oE A 100.0 w/oR A 100.0
+Table 6:Ablation study on the Shot Reviewer Eshot,
+the Voice Reviewer EA, and the Subtitle Refiner RA.
+"C. Rate" refers to "Compliance Rate". ↑ indicates a
+higher value is more desired. Gray-shaded cells indi-
+cate values that are significantly lower.
+visual quality, naturalness, subject consistency, and
+dynamics. As shown in Table 5, removing the
+3E Principle leads to a noticeable drop in perfor-
+mance across both T2I and I2V outputs, particu-
+larly in terms of naturalness (72.0→98.0 in T2I
+and 60.0→92.5 in I2V). This highlights the criti-
+cal role of the 3E Principle in improving generation
+quality. An exception is observed in the I2V pro-
+cess: the Dynamic Degree is higher without the 3E
+Principle (44.58>35.63 ). This may be because
+high-dynamic videos are more prone to physical
+inconsistencies and instability, leading the agents
+to favor lower-dynamic, more stable results.
+4.2.3 Shot Reviewer, Voice Reviewer, and
+Subtitle Refiner
+As related, the Shot Reviewer assesses the com-
+pleteness of the shot designs, the V oice Reviewer
+ensures the music availability and voice-emotion
+appropriateness of voice design, and the Subti-
+tle Refiner shortens voice-over to match the du-
+ration limits of video clips. We use Compliance
+Rate—defined as the proportion of outputs that
+fully adhere to their respective guidelines—to eval-
+uate the contributions of these agents. As shown
+in Table 6, removing these agents leads to a no-
+ticeable drop in compliance, particularly in voice-
+over generation, which in turn negatively impacts
+downstream content generation. These results un-
+derscore the necessity of the 3E Principle in shot
+designing, voice designing, and the speech audio
+generation.
+5 Conclution
+In this work, we presentedMA ViS, a multi-agent
+collaborative framework designed to assist in long-
+sequence video storytelling. By orchestrating mul-
+tiple stages within a unified pipeline, MA ViS ef-
+fectively addresses the key limitations of prior ap-
+proaches — poor assistive capability, limited visual
+expressiveness, and incomplete outputs. Central to
+our framework is the 3E Principle (Explore, Exam-
+ine, Enhance), which enables iterative refinement
+across all stages, maximizing output quality. Ad-
+--- PAGE 9 ---
+ditionally, our proposed Script Writing Guidelines
+improve compatibility between narrative structure
+and generative tools. Experimental results validate
+that MA ViS significantly advances the assistive ca-
+pability, visual quality, and expressiveness of long-
+sequence video storytelling.
+References
+Josh Achiam, Steven Adler, Sandhini Agarwal, Lama
+Ahmad, Ilge Akkaya, Florencia Leoni Aleman,
+Diogo Almeida, Janko Altenschmidt, Sam Altman,
+Shyamal Anadkat, and 1 others. 2023. Gpt-4 techni-
+cal report.arXiv preprint arXiv:2303.08774.
+Wang Ang and Ai et al. Baole. 2025. Wan: Open and
+advanced large-scale video generative models.arXiv
+preprint arXiv:2503.20314.
+Rohan Anil, Sebastian Borgeaud, Yonghui Wu, Jean-
+Baptiste Alayrac, Jiahui Yu, Radu Soricut, Johan
+Schalkwyk, Andrew M Dai, Anja Hauth, Katie Mil-
+lican, and 1 others. 2023. Gemini: A family of
+highly capable multimodal models.arXiv preprint
+arXiv:2312.11805, 1.
+BlackForestLabs. 2023. Flux. https://github.com/
+black-forest-labs/flux.
+Tom Brown, Benjamin Mann, Nick Ryder, Melanie
+Subbiah, Jared D Kaplan, Prafulla Dhariwal, Arvind
+Neelakantan, Pranav Shyam, Girish Sastry, Amanda
+Askell, and 1 others. 2020. Language models are
+few-shot learners.Advances in neural information
+processing systems, 33:1877–1901.
+Siyu Cao, Hangting Chen, Peng Chen, Yiji Cheng, Yu-
+tao Cui, Xinchi Deng, Ying Dong, Kipper Gong,
+Tianpeng Gu, Xiusen Gu, and 1 others. 2025. Hun-
+yuanimage 3.0 technical report.arXiv preprint
+arXiv:2509.23951.
+Rinon Gal, Yuval Alaluf, Yuval Atzmon, Or Patashnik,
+Amit H Bermano, Gal Chechik, and Daniel Cohen-
+Or. 2022. An image is worth one word: Personaliz-
+ing text-to-image generation using textual inversion.
+arXiv preprint arXiv:2208.01618.
+Songwei Ge, Thomas Hayes, Harry Yang, Xi Yin, Guan
+Pang, David Jacobs, Jia-Bin Huang, and Devi Parikh.
+2022. Long video generation with time-agnostic vq-
+gan and time-sensitive transformer. InEuropean
+Conference on Computer Vision, pages 102–118.
+Springer.
+GenmoTeam. 2024. Mochi 1. https://github.com/
+genmoai/models.
+Rohit Girdhar, Mannat Singh, Andrew Brown, Quentin
+Duval, Samaneh Azadi, Sai Saketh Rambhatla, Ak-
+bar Shah, Xi Yin, Devi Parikh, and Ishan Misra.
+2023. Emu video: Factorizing text-to-video genera-
+tion by explicit image conditioning.arXiv preprint
+arXiv:2311.10709.
+DeepMind Google. 2024. Veo-2.
+DeepMind Google. 2025. Introducing gemini 2.5 flash
+image, our state-of-the-art image model.
+Yuwei Guo, Ceyuan Yang, Ziyan Yang, Zhibei Ma, Zhi-
+jie Lin, Zhenheng Yang, Dahua Lin, and Lu Jiang.
+2025. Long context tuning for video generation.
+arXiv preprint arXiv:2503.10589.
+Tiankai Hang, Shuyang Gu, Dong Chen, Xin Geng,
+and Baining Guo. 2024. Cca: Collaborative com-
+petitive agents for image editing.arXiv preprint
+arXiv:2401.13011.
+Yingqing He, Tianyu Yang, Yong Zhang, Ying Shan,
+and Qifeng Chen. 2022. Latent video diffusion mod-
+els for high-fidelity long video generation.arXiv
+preprint arXiv:2211.13221.
+Roberto Henschel, Levon Khachatryan, Daniil
+Hayrapetyan, Hayk Poghosyan, Vahram Tade-
+vosyan, Zhangyang Wang, Shant Navasardyan, and
+Humphrey Shi. 2024. Streamingt2v: Consistent,
+dynamic, and extendable long video generation from
+text.arXiv preprint arXiv:2403.14773.
+Sirui Hong, Xiawu Zheng, Jonathan Chen, Yuheng
+Cheng, Jinlin Wang, Ceyao Zhang, Zili Wang, Steven
+Ka Shing Yau, Zijuan Lin, Liyang Zhou, and 1
+others. 2023. Metagpt: Meta programming for
+multi-agent collaborative framework.arXiv preprint
+arXiv:2308.00352.
+Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang,
+Chenyang Si, Yuming Jiang, Yuanhan Zhang, Tianx-
+ing Wu, Qingyang Jin, Nattapol Chanpaisit, Yao-
+hui Wang, Xinyuan Chen, Limin Wang, Dahua Lin,
+Yu Qiao, and Ziwei Liu. 2024. VBench: Comprehen-
+sive benchmark suite for video generative models. In
+Proceedings of the IEEE/CVF Conference on Com-
+puter Vision and Pattern Recognition.
+Sangwon Jang, Jaehyeong Jo, Kimin Lee, and Sung Ju
+Hwang. 2024. Identity decoupling for multi-subject
+personalization of text-to-image models. InThe
+Thirty-eighth Annual Conference on Neural Infor-
+mation Processing Systems.
+KlingAI. 2024. Kling-v1.5.
+Weijie Kong, Qi Tian, Zijian Zhang, Rox Min, Zuozhuo
+Dai, Jin Zhou, Jiangfeng Xiong, Xin Li, Bo Wu,
+Jianwei Zhang, and 1 others. 2024. Hunyuanvideo:
+A systematic framework for large video generative
+models.arXiv preprint arXiv:2412.03603.
+Guohao Li, Hasan Hammoud, Hani Itani, Dmitrii
+Khizbullin, and Bernard Ghanem. 2023. Camel:
+Communicative agents for" mind" exploration of
+large language model society.Advances in Neural
+Information Processing Systems, 36:51991–52008.
+Yitong Li, Zhe Gan, Yelong Shen, Jingjing Liu,
+Yu Cheng, Yuexin Wu, Lawrence Carin, David Carl-
+son, and Jianfeng Gao. 2019. Storygan: A sequential
+--- PAGE 10 ---
+conditional gan for story visualization. InProceed-
+ings of the IEEE/CVF conference on computer vision
+and pattern recognition, pages 6329–6338.
+Xinyao Liao, Xianfang Zeng, Liao Wang, Gang Yu,
+Guosheng Lin, and Chi Zhang. 2025. Motionagent:
+Fine-grained controllable video generation via mo-
+tion field agent.arXiv preprint arXiv:2502.03207.
+Chang Liu, Haoning Wu, Yujie Zhong, Xiaoyun Zhang,
+Yanfeng Wang, and Weidi Xie. 2024. Intelligent
+grimm-open-ended visual storytelling via latent dif-
+fusion models. InProceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recog-
+nition, pages 6190–6200.
+Shilong Liu, Hao Cheng, Haotian Liu, Hao Zhang, Feng
+Li, Tianhe Ren, Xueyan Zou, Jianwei Yang, Hang
+Su, Jun Zhu, and 1 others. 2025. Llava-plus: Learn-
+ing to use tools for creating multimodal agents. In
+European Conference on Computer Vision, pages
+126–142. Springer.
+Luma. 2024. Dream machine.
+MiniMax. 2024. Hailuoai.
+The ModelScopeTeam. 2023. Modelscope: bring the
+notion of model-as-a-service to life.
+OpenAI. 2024. Creating video from text.
+OpenAI. 2025. Gpt image - openai platform. Accessed:
+2025-04-30.
+Joon Sung Park, Joseph C O’Brien, Carrie J Cai, Mered-
+ith Ringel Morris, Percy Liang, and Michael S Bern-
+stein. 2023. Generative agents: Interactive sim-
+ulacra of human behavior. arxiv.arXiv preprint
+ArXiv:2304.03442.
+Tanzila Rahman, Hsin-Ying Lee, Jian Ren, Sergey
+Tulyakov, Shweta Mahajan, and Leonid Sigal. 2023.
+Make-a-story: Visual memory conditioned consistent
+story generation. InProceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recog-
+nition, pages 2493–2502.
+Aditya Ramesh, Mikhail Pavlov, Gabriel Goh, Scott
+Gray, Chelsea V oss, Alec Radford, Mark Chen, and
+Ilya Sutskever. 2021. Zero-shot text-to-image gener-
+ation. InInternational conference on machine learn-
+ing, pages 8821–8831. Pmlr.
+Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+Patrick Esser, and Björn Ommer. 2022. High-
+resolution image synthesis with latent diffusion mod-
+els. InProceedings of the IEEE/CVF conference
+on computer vision and pattern recognition, pages
+10684–10695.
+Nataniel Ruiz, Yuanzhen Li, Varun Jampani, Yael
+Pritch, Michael Rubinstein, and Kfir Aberman. 2023.
+Dreambooth: Fine tuning text-to-image diffusion
+models for subject-driven generation. InProceed-
+ings of the IEEE/CVF conference on computer vision
+and pattern recognition, pages 22500–22510.
+Runway. 2024a. Gen-3.
+Runway. 2024b. Gen-4.
+Christoph Schuhmann, Romain Beaumont, Richard
+Vencu, Cade Gordon, Ross Wightman, Mehdi Cherti,
+Theo Coombes, Aarush Katta, Clayton Mullis,
+Mitchell Wortsman, and 1 others. 2022. Laion-5b:
+An open large-scale dataset for training next genera-
+tion image-text models.Advances in neural informa-
+tion processing systems, 35:25278–25294.
+StabilityAI. 2024. Stable diffusion 3.5.
+Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier
+Martinet, Marie-Anne Lachaux, Timothée Lacroix,
+Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal
+Azhar, and 1 others. 2023a. Llama: Open and ef-
+ficient foundation language models.arXiv preprint
+arXiv:2302.13971.
+Hugo Touvron, Louis Martin, Kevin Stone, Peter Al-
+bert, Amjad Almahairi, Yasmine Babaei, Nikolay
+Bashlykov, Soumya Batra, Prajjwal Bhargava, Shruti
+Bhosale, and 1 others. 2023b. Llama 2: Open foun-
+dation and fine-tuned chat models.arXiv preprint
+arXiv:2307.09288.
+Jiuniu Wang, Zehua Du, Yuyuan Zhao, Bo Yuan,
+Kexiang Wang, Jian Liang, Yaxi Zhao, Yihen
+Lu, Gengliang Li, Junlong Gao, and 1 others.
+2024a. Aesopagent: Agent-driven evolutionary sys-
+tem on story-to-video production.arXiv preprint
+arXiv:2403.07952.
+Yaohui Wang, Xinyuan Chen, Xin Ma, Shangchen Zhou,
+Ziqi Huang, Yi Wang, Ceyuan Yang, Yinan He, Ji-
+ashuo Yu, Peiqing Yang, and 1 others. 2024b. Lavie:
+High-quality video generation with cascaded latent
+diffusion models.IJCV.
+Yaohui Wang, Xin Ma, Xinyuan Chen, Cunjian Chen,
+Antitza Dantcheva, Bo Dai, and Yu Qiao. 2024c. Leo:
+Generative latent image animator for human video
+synthesis.International Journal of Computer Vision,
+pages 1–13.
+Zhenyu Wang, Aoxue Li, Zhenguo Li, and Xihui Liu.
+2024d. Genartist: Multimodal llm as an agent for
+unified image generation and editing.arXiv preprint
+arXiv:2407.05600.
+Zihao Wang, Shaofei Cai, Anji Liu, Yonggang Jin, Jin-
+bing Hou, Bowei Zhang, Haowei Lin, Zhaofeng
+He, Zilong Zheng, Yaodong Yang, and 1 others.
+2024e. Jarvis-1: Open-world multi-task agents with
+memory-augmented multimodal language models.
+IEEE Transactions on Pattern Analysis and Machine
+Intelligence.
+Wenming Weng, Ruoyu Feng, Yanhui Wang, Qi Dai,
+Chunyu Wang, Dacheng Yin, Zhiyuan Zhao, Kai
+Qiu, Jianmin Bao, Yuhui Yuan, and 1 others. 2024.
+Art-v: Auto-regressive text-to-video generation with
+diffusion models. InProceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recog-
+nition, pages 7395–7405.
+--- PAGE 11 ---
+Qingyun Wu, Gagan Bansal, Jieyu Zhang, Yiran Wu,
+Beibin Li, Erkang Zhu, Li Jiang, Xiaoyun Zhang,
+Shaokun Zhang, Jiale Liu, and 1 others. 2024. Au-
+togen: Enabling next-gen llm applications via multi-
+agent conversations. InFirst Conference on Lan-
+guage Modeling.
+Weijia Wu, Mingyu Liu, Zeyu Zhu, Xi Xia, Haoen
+Feng, Wen Wang, Kevin Qinghong Lin, Chunhua
+Shen, and Mike Zheng Shou. 2025a. Moviebench:
+A hierarchical movie level dataset for long video
+generation. InProceedings of the Computer Vision
+and Pattern Recognition Conference, pages 28984–
+28994.
+Weijia Wu, Zeyu Zhu, and Mike Zheng Shou. 2025b.
+Automated movie generation via multi-agent cot plan-
+ning.arXiv preprint arXiv:2503.07314.
+Zhifei Xie, Daniel Tang, Dingwei Tan, Jacques Klein,
+Tegawend F Bissyand, and Saad Ezzini. 2024.
+Dreamfactory: Pioneering multi-scene long video
+generation with a multi-agent framework.arXiv
+preprint arXiv:2408.11788.
+Jinbo Xing, Menghan Xia, Yong Zhang, Haoxin Chen,
+Wangbo Yu, Hanyuan Liu, Gongye Liu, Xintao Wang,
+Ying Shan, and Tien-Tsin Wong. 2025. Dynami-
+crafter: Animating open-domain images with video
+diffusion priors. InEuropean Conference on Com-
+puter Vision, pages 399–417. Springer.
+Tao Xu, Pengchuan Zhang, Qiuyuan Huang, Han Zhang,
+Zhe Gan, Xiaolei Huang, and Xiaodong He. 2018.
+Attngan: Fine-grained text to image generation with
+attentional generative adversarial networks. InPro-
+ceedings of the IEEE conference on computer vision
+and pattern recognition, pages 1316–1324.
+Deshun Yang, Luhui Hu, Yu Tian, Zihao Li, Chris Kelly,
+Bang Yang, Cindy Yang, and Yuexian Zou. 2024a.
+Worldgpt: a sora-inspired video ai agent as rich world
+models from text and image inputs.arXiv preprint
+arXiv:2403.07944.
+Hui Yang, Sifu Yue, and Yunzhong He. 2023a. Auto-gpt
+for online decision making: Benchmarks and addi-
+tional opinions.arXiv preprint arXiv:2306.02224.
+Shuai Yang, Yuying Ge, Yang Li, Yukang Chen, Yixiao
+Ge, Ying Shan, and Yingcong Chen. 2024b. Seed-
+story: Multimodal long story generation with large
+language model.arXiv preprint arXiv:2407.08683.
+Zhengyuan Yang, Linjie Li, Jianfeng Wang, Kevin
+Lin, Ehsan Azarnasab, Faisal Ahmed, Zicheng Liu,
+Ce Liu, Michael Zeng, and Lijuan Wang. 2023b.
+Mm-react: Prompting chatgpt for multimodal rea-
+soning and action.Preprint, arXiv:2303.11381.
+Da Yin, Faeze Brahman, Abhilasha Ravichander, Khy-
+athi Chandu, Kai-Wei Chang, Yejin Choi, and
+Bill Yuchen Lin. 2023a. Lumos: Learning agents
+with unified data, modular design, and open-source
+llms. InICLR 2024 Workshop on Large Language
+Model (LLM) Agents.
+Shengming Yin, Chenfei Wu, Huan Yang, Jianfeng
+Wang, Xiaodong Wang, Minheng Ni, Zhengyuan
+Yang, Linjie Li, Shuguang Liu, Fan Yang, and 1
+others. 2023b. Nuwa-xl: Diffusion over diffusion
+for extremely long video generation.arXiv preprint
+arXiv:2303.12346.
+Zhengqing Yuan, Yixin Liu, Yihan Cao, Weixiang
+Sun, Haolong Jia, Ruoxi Chen, Zhaoxu Li, Bin Lin,
+Li Yuan, Lifang He, and 1 others. 2024. Mora: En-
+abling generalist video generation via a multi-agent
+framework.arXiv preprint arXiv:2403.13248.
+Han Zhang, Tao Xu, Hongsheng Li, Shaoting Zhang,
+Xiaogang Wang, Xiaolei Huang, and Dimitris N
+Metaxas. 2017. Stackgan: Text to photo-realistic
+image synthesis with stacked generative adversarial
+networks. InProceedings of the IEEE international
+conference on computer vision, pages 5907–5915.
+Shiwei Zhang, Jiayu Wang, Yingya Zhang, Kang Zhao,
+Hangjie Yuan, Zhiwu Qin, Xiang Wang, Deli Zhao,
+and Jingren Zhou. 2023. I2vgen-xl: High-quality
+image-to-video synthesis via cascaded diffusion mod-
+els.arXiv preprint arXiv:2311.04145.
+Zhuosheng Zhang and Aston Zhang. 2024. You only
+look at screens: Multimodal chain-of-action agents.
+Preprint, arXiv:2309.11436.
+Canyu Zhao, Mingyu Liu, Wen Wang, Weihua Chen,
+Fan Wang, Hao Chen, Bo Zhang, and Chunhua
+Shen. 2024. Moviedreamer: Hierarchical generation
+for coherent long visual sequence.arXiv preprint
+arXiv:2407.16655.
+Boyuan Zheng, Boyu Gou, Jihyung Kil, Huan Sun, and
+Yu Su. 2024. Gpt-4v (ision) is a generalist web agent,
+if grounded.arXiv preprint arXiv:2401.01614.
+Mingzhe Zheng, Yongqi Xu, Haojian Huang, Xuran
+Ma, Yexin Liu, Wenjie Shu, Yatian Pang, Feilong
+Tang, Qifeng Chen, Harry Yang, and 1 others. 2025.
+Videogen-of-thought: Step-by-step generating multi-
+shot video with minimal manual intervention.arXiv
+preprint arXiv:2503.15138.
+Cailin Zhuang, Ailin Huang, Wei Cheng, Jingwei Wu,
+Yaoqi Hu, Jiaqi Liao, Hongyuan Wang, Xinyao Liao,
+Weiwei Cai, Hengyuan Xu, and 1 others. 2025. Vis-
+torybench: Comprehensive benchmark suite for story
+visualization.arXiv preprint arXiv:2505.24862.
+--- PAGE 12 ---
+A More Related Works
+A.1 Video Generation
+Long video generation (He et al., 2022; Ge et al.,
+2022; Wang et al., 2024c) aims to produce longer
+videos than previous text-to-video (T2V) (Mod-
+elScopeTeam, 2023; Wang et al., 2024b) and image-
+to-video (I2V) (Girdhar et al., 2023; Xing et al.,
+2025; Zhang et al., 2023) models. Auto-regressive
+approaches (Weng et al., 2024; Henschel et al.,
+2024) extend videos by conditioning on earlier
+frames, yet often result in repetitive motions with
+limited narrative development. Attempts to directly
+integrate storytelling and video generation (Yin
+et al., 2023b; Zheng et al., 2025) suffer from
+poor visual quality and unstructured video com-
+position, leading to subpar viewer experiences.
+Meanwhile, commercial models have achieved no-
+table success in both T2V (GenmoTeam, 2024;
+Kong et al., 2024; OpenAI, 2024) and I2V genera-
+tion (Google, 2024; Luma, 2024; MiniMax, 2024;
+Ang and Baole, 2025), and some (KlingAI, 2024;
+Runway, 2024a,b) support temporal extension.
+A.2 Image Generation
+Recent advances in image generation (Li et al.,
+2019; Xu et al., 2018; Zhang et al., 2017; Ramesh
+et al., 2021) have been propelled by deep learn-
+ing techniques.To fulfill the task of visual sto-
+rytelling, some works (Liu et al., 2024; Yang
+et al., 2024b; Rahman et al., 2023) generate im-
+age sequences from text and image-caption pairs.
+To ensure subject consistency (Gal et al., 2022),
+DreamBooth (Ruiz et al., 2023) adopts subject-
+specific fine-tuning, while GPT-Image-1 (Ope-
+nAI, 2025) introduces context-aware generation
+for identity preservation. Recent models such
+as NanoBanana (Google, 2025) and HunyuanIm-
+age 3.0 (Cao et al., 2025) further advance high-
+fidelity and instruction-following generation, offer-
+ing stronger semantic control and compositional
+reasoning capabilities. In this work, MA ViS lever-
+ages off-the-shelf models to generate keyframes for
+each shot, which serve as the basis for subsequent
+video animation.
+A.3 AI Agents
+AI agents, empowered by large language mod-
+els (Brown et al., 2020; Touvron et al., 2023a,b),
+have shown broad applicability in reasoning, plan-
+ning, web interaction, and visual generation.
+General-purpose LLMs underpin agent frame-
+works (Yang et al., 2023a; Yin et al., 2023a; Li et al.,
+2023; Hong et al., 2023; Park et al., 2023), while
+multimodal models (Achiam et al., 2023; Anil
+et al., 2023) extend agent capabilities across modal-
+ities (Yang et al., 2023b; Zhang and Zhang, 2024;
+Zheng et al., 2024; Wang et al., 2024e; Liu et al.,
+2025; Wang et al., 2024d; Hang et al., 2024; Liao
+et al., 2025). In video generation, systems (Yang
+et al., 2024a; Yuan et al., 2024; Wang et al., 2024a)
+explore world modeling, multi-agent coordination,
+and retrieval-augmented synthesis, yet often yield
+static content with limited transitions. Hierarchi-
+cal pipelines (Xie et al., 2024; Wu et al., 2025b)
+introduce script-to-shot workflows but still rely on
+laborious scripting and LoRA tuning.
+B Explanation and Discuss about the
+Script Writing Guideline
+Due to space limitations in the main text, we pro-
+vided only a brief overview of the Script Writing
+Guideline. In this section, we offer a more detailed
+explanation of the guideline and elaborate on the
+rationale behind each design constraint.
+In the Script Writing Guideline, "Scriptwrit-
+ers should minimize transitions between tightly
+connected spatial locations" refers to avoiding
+consecutive shots set in spatially adjacent back-
+grounds—for example, the first shot showing the
+character entering a room by going through a door,
+and the next shot showing the character from the
+front inside the room. Such transitions can break
+immersion due to background inconsistencies, such
+as mismatched door appearances between shots.
+The script writing guidelines are based on prac-
+tical experience to improve compatibility with gen-
+eration tools. E.g., "not to place the same char-
+acter in consecutive shots" stems from the fact
+that such sequences often involve multi-angle cuts
+in the same setting. Given current model limita-
+tions in maintaining background consistency, this
+approach is not yet reliably achievable.
+The constraints in the script writing guideline
+are based on the following empirical observations:
+• Avoid placing successive shots in the same back-
+ground: We measured VBench background con-
+sistency for adjacent shots sharing the same back-
+ground and found it to be only 78.42, compared to
+95.88 of single-shot. This justifies avoiding such
+situations.
+• Minimize transitions between tightly connected
+spatial locations: For pairs of shots with strong spa-
+--- PAGE 13 ---
+Methods FID↓Inception↑CLIP↑
+DreamFactory 7.03† 169.71† 30.92†
+MA ViS - 12.81 34.22
+Table 7: Compare with DreamFactory (Xie et al., 2024).
+† denotes the reported score in the paper of the baseline
+method.
+Methods CLIP↑Inception↑AS↑CLIP-sim↑
+MovieDreamer 19.52† 8.64† 6.05† 0.70†
+MA ViS 34.22 12.81 7.25 0.71
+Table 8: Compare with MovieDreamer (Zhao et al.,
+2024). † denotes the reported score in the paper of the
+baseline method. "AS" denotes Aesthetic Score used
+in (Schuhmann et al., 2022).
+tial connections, we used GPT to assess whether
+their backgrounds were spatially related as de-
+scribed in the script. Only 26 out of 100 pairs were
+judged to be consistent, indicating such transitions
+should be avoided.
+• Avoid complex actions within a single shot:
+Shots with complex actions achieved a VBench
+overall consistency of 23.25, compared to 27.76
+for simple actions, suggesting simpler actions im-
+prove generation reliability.
+• Avoid fine-grained visual elements within a sin-
+gle shot: Shots containing fine-grained visual ele-
+ments scored 22.68 in VBench overall consistency,
+while those without such elements scored 27.76.
+Thus, they should be avoided.
+• Align style with user’s quest: Using GPT to judge
+alignment with user instructions, only 82 out of
+100 scripts were fully aligned without constraints,
+compared to 100 with constraints in place.
+• Ensure script structural completeness: A com-
+plete structure is essential for enabling subsequent
+stages of the generation pipeline.
+For more details, refer to the Script Writing
+Guideline, please refer to the system messages.
+To evaluate the performance of MA ViS, we com-
+pared it with three open-sourced long video genera-
+tion frameworks. Further experimental details and
+results are provided in the Appendix.
+C Implementation Details
+All agents in our framework are implemented us-
+ing AutoGen (Wu et al., 2024) and powered by
+GPT-4o (Achiam et al., 2023). The T2I model pool
+comprises FLUX.1 (BlackForestLabs, 2023), Sta-
+ble Diffusion 3.5 (Rombach et al., 2022), and GPT-
+Image (OpenAI, 2025), while the I2V model pool
+includes Veo2 (Google, 2024), Gen-3 (Runway,
+2024a), Gen-4 (Runway, 2024b), LUMA (Luma,
+Methods Aesthetic↑Image Quality↑Consistency (avg.)↑P. Consistency↑
+LCT 60.79† 67.44† 95.65† 30.14†
+MA ViS 63.17 72.91 95.92 34.22
+Table 9: Compare with LCT (Guo et al., 2025). † de-
+notes the reported score in the paper of the baseline
+method. “Consistency (avg.)” represents the average
+score of subject and background consistency. "P. Con-
+sistency" denotes Prompt Consistency.
+2024), HunyuanVideo-I2V (Kong et al., 2024),
+and Wan2.1 (Ang and Baole, 2025). We use
+MUDI (Jang et al., 2024) for LoRA training and
+Hailuo (MiniMax, 2024) for the T2A generation.
+The maximum number of 3E iterations is set to 4
+for script writing, shot designing, and voice design-
+ing; 2 for the T2I process; 1 for the I2V process;
+and 5 for subtitle refining. As the first work tar-
+geting the efficient translation of single lines of
+ideas to long-sequence video storytelling, no suit-
+able benchmark dataset exists. Therefore, we con-
+structed a test set of 20 user prompts, each targeting
+a one-minute video for evaluation.
+To standardize intermediate outputs for down-
+stream processes, we introduced a Script Consol-
+idator agent in the Script Writing stage. This agent
+formats the script after each 3E iteration to ensure
+consistency. In both the T2I and I2V processes,
+due to limitations on the number of images that
+can be processed simultaneously, the T2I Evaluator
+and I2V Evaluator adopt a batched evaluation strat-
+egy. Following this, T2I Selector and I2V Selector
+agents are employed to select the best candidates
+based on all evaluation results. Specifically, the
+I2V Evaluator samples 8 evenly sampled frames
+from each video candidate for evaluation.
+The T2I process in the Shot Designing stage mir-
+rors that of Character Modeling, with the difference
+being that the T2I model pool in the Shot Design-
+ing stage incorporates the LoRA models trained
+during Character Modeling. We use MUDI (Jang
+et al., 2024) for LoRA training, which supports
+multi-subject generation, allowing a single LoRA
+to serve an entire script.
+Given that different models in the I2V model
+pool require reference images at different resolu-
+tions, keyframes are center-cropped and resized
+before I2V execution according to model-specific
+requirements. To ensure consistency, all generated
+videos are center-cropped and resized to 1280×720
+resolution.
+The T2I model pool includes the open-source
+models FLUX (BlackForestLabs, 2023) and Sta-
+--- PAGE 14 ---
+Metric Question
+Narrative Expressiveness Which video performed best overall in terms of narrative engagement, story coherence, and viewing experience?
+Visual Quality Which video was the most visually expressive in terms of emotion, atmosphere, and cinematic feel?
+User Prompt Alignment Which video best aligns with the original user prompt (e.g., character setup, plot elements, or keywords)?
+Character Consistency Which video had the most consistent character appearances across scenes? (clothing, hairstyle, facial features)
+Character Naturalness Which video had the most natural and correct character generation? Consider anatomical realism, physical motion plausibility,
+and the absence of duplicate or mistakenly generated characters.
+Background Consistency Which video had the most consistent and logically coherent background style across shots?
+Background Realism Which video had the most natural background elements and physically plausible movements?
+Table 10: Metrics and Questions for User Study.
+Method Keyframe Generation Video Animation
+CLIP↑Inception↑ T. Flick.↑M. Smooth.↑Sub. Cons.↑Bg. Cons.↑Aesthetic↑I. Quality↑
+VGoT (Zheng et al., 2025) 22.32 8.41 99.00 99.2898.98 98.76 79.9564.62
+Mora (Yuan et al., 2024) 34.02 12.70 97.25 99.21 94.58 95.01 64.41 71.39
+MovieAgent (Wu et al., 2025b) 31.64 10.69 97.05 99.18 93.44 94.62 63.38 91.25
+MA ViS (ours) 34.15 12.79 99.08 99.5295.54 96.10 64.0572.68
+Table 11: Compare with baselines on MovieBench and ViStoryBench.
+ble Diffusion 3.5 (StabilityAI, 2024), as well as
+the API-based GPT-Image (OpenAI, 2025). The
+I2V model pool comprises open-source models
+Hunyuan (Kong et al., 2024) and Wan2.1 (Ang
+and Baole, 2025), along with API-based models
+Gen3 (Runway, 2024a), Gen4 (Runway, 2024b),
+LUMA (Luma, 2024), and Veo2 (Google, 2024).
+For T2A, we use the Minimax Hailuo API (Mini-
+Max, 2024). All experiments were conducted on
+one NVIDIA V100 GPUs.
+More samples generated by MA ViS framework
+are shown in Figure. 6 and Figure. 7.
+C.1 Metrics
+we constructed a test set of 20 user prompts,
+each targeting a one-minute video for evalua-
+tion. We employ CLIP and Inception Score to
+evaluate prompt consistency and generation qual-
+ity in the keyframe generation stage, and use
+VBench (Huang et al., 2024) to assess video an-
+imation performance. Additionally, a user study
+is conducted to assess real user preferences and
+validate the practical effectiveness of MA ViS and
+baselines. For all evaluation metrics, higher values
+indicate better performance.
+C.2 Baselines
+We compare MA ViS with three long video gener-
+ation baselines: VGoT, Mora, and MovieAgent.
+Among them, Mora and MovieAgent adopt a mod-
+ular design and are equipped with the same im-
+age and video generation models as MA ViS, and
+are also powered by GPT-4o. Since Mora and
+MovieAgent do not support script generation, we
+provide them with scripts formed by our script writ-
+ing stge. For MovieAgent, which requires manual
+training of LoRA models, we generate character im-
+ages based on the provided scripts and train LoRA
+models for each script.
+D Compare with More Baselines
+In our experiments, we conducted direct com-
+parisons with three open-source baselines:
+VGoT (Zheng et al., 2025), Mora (Yuan et al.,
+2024), and MovieAgent (Wu et al., 2025b).
+Subsequently, we compared our results with
+the reported performances of non-open-source
+baselines.
+We first compare our method with DreamFac-
+tory (Xie et al., 2024). Given the scarcity of real
+videos in long-sequence video storytelling with
+assistive generation, computing the FID metric is
+not feasible. As shown in Table 7, MA ViS achieves
+higher scores across most metrics; however, there is
+a substantial gap in Inception Score. We adopted a
+widely used implementation of the Inception Score,
+which may differ from the version used by Dream-
+Factory, potentially leading to differences in score
+range. Since the baseline is not open-sourced, we
+are unable to verify the exact cause of this discrep-
+ancy.
+Next, we compare our method with
+MovieDreamer (Zhao et al., 2024). As shown in
+Table 8, MA ViS outperforms this baseline across
+all evaluation metrics.
+Subsequently, we compare our method with
+LCT (Guo et al., 2025), using evaluation metrics
+sourced entirely from VBench. As shown in Ta-
+ble 9, MA ViS consistently outperforms this base-
+line across all metrics.
+E User Study
+In the User Study, participants were asked to vote
+for the best video in each group based on seven eval-
+uation criteria. As listed in Table 10, the criteria
+include: Narrative Expressiveness, Visual Quality,
+--- PAGE 15 ---
+I Narrative Visual User Align. C.Rate Time(Second)
+0 12.58 18.44 19.56 74.00 9.80
+1 25.32 22.85 24.40 86.00 20.90
+2 32.54 24.82 26.49 94.50 28.24
+3 33.48 25.60 26.52 98.50 36.13
+4 34.00 26.00 26.67 100.00 41.58
+Table 12: Quality-Efficiency Analysis on scriptwriting.
+I CLIP Inception Natural. C.Rate Time(Second)
+0 31.25 10.54 72.00 68.00 175.19
+1 32.25 11.30 84.00 81.00 381.32
+2 34.22 12.81 98.00 92.50 557.47
+3 34.26 12.78 98.50 96.00 602.06
+Table 13: Quality-Efficiency Analysis on Keyframe
+Generation.
+User Prompt Alignment, Character Consistency,
+Character Naturalness, Background Consistency,
+and Background Realism. Prior to voting, detailed
+guidelines for each metric were provided to ensure
+consistency and reliability in evaluation. Some
+screenshots of the user study HTML interface is
+shown in Figures 3, 4, and 5.
+F Evaluation on the Existing Dataset
+We are establishing an efficient agentic system
+from users’ single line of ideas to final pixels
+plus other multimodalities. However, existing long
+video benchmarks, MovieBench (Wu et al., 2025a)
+and ViStoryBench (Zhuang et al., 2025), focus only
+on benchmarking T2I and I2V models’, not on the
+entire agentic system. In particular, they ignore the
+script generation and scripts’ compatibility with
+existing T2I and I2V models’ capabilities.
+Nevertheless, we sampled three examples (each
+consisting of 10 shots) from both MovieBench and
+ViStoryBench. As shown in Table 11, MA ViS con-
+sistently outperforms the compared methods.
+G Quality-Efficiency Analysis
+In the stages where the 3E principle is applied,
+we evaluated the impact of the maximum iteration
+number (I) on generation quality and time using
+the same metrics as in our paper.It’s worth noting
+that C. Rate refers to Compliance Rate, defined as
+the proportion of outputs that fully adhere to their
+respective guidelines. It is used to measure the
+success rate of each stage’s generation.
+For script writing, as shown in Tabel 12, the
+performance is already satisfactory at I= 2 . In-
+creasing I further can improve generation quality
+with minimal impact on overall efficiency.
+For keyframe generation, as shown in Tabel 13,
+the performance is already satisfactory at I= 2 .
+I CLIP Inception Natural. Sub. Cons. Dyn. Deg. C.Rate Time(Minute)
+0 32.05 11.22 60.00 93.00 44.58 72.50 61.17
+1 34.53 13.22 92.50 95.72 35.62 86.00 124.21
+2 34.62 13.31 95.00 95.51 35.68 94.00 176.77
+3 34.35 13.18 96.50 95.46 35.54 98.00 215.38
+Table 14: Quality-Efficiency Analysis on Video Anima-
+tion.
+Shot Designing V oice Designing Subtitle Refining
+I C.Rate Time(Second) C.Rate Time(Second) C.Rate Time(Second)
+0 84.50 24.34 92.00 5.62 56.50 1.58
+1 89.00 73.49 95.00 13.48 86.00 2.83
+2 94.00 122.352 98.50 26.19 92.50 3.95
+3 97.00 161.21 97.00 161.21 98.00 4.36
+4 98.50 195.86 99.00 29.84 99.50 4.84
+5 100.00 231.60 100.00 31.68 100.00 4.89
+Table 15: Quality-Efficiency Analysis on shot designing,
+voice designing, and subtitle refining.
+Increasing I further can enhance generation quality,
+with only a slight impact on overall efficiency.
+For video animation, as shown in Tabel 14, the
+performance is already satisfactory atI= 2 . While
+increasing I can further improve quality, it has a
+significant impact on overall efficiency. Therefore,
+we set I= 1 for video animation in our experi-
+ments.
+For shot designing, voice designing, and subtitle
+refining, as shown in Tabel 15, increasing I im-
+proves generation quality with minimal impact on
+overall efficiency. However, since errors in these
+stages can critically affect the entire generation
+process, we set I= 5 for these tasks in our experi-
+ments.
+Additionally, since iterations may terminate be-
+fore reaching the maximum iteration number, the
+generation time does not scale linearly withI.
+--- PAGE 16 ---
+Figure 3: Screenshot of the user study HTML interface with instructions and generated video candidates.
+Figure 4: Screenshot of the user study HTML interface with seven evaluation questions.
+--- PAGE 17 ---
+Figure 5: Screenshot of the user study HTML interface with generated video candidates and seven evaluation
+questions.
+--- PAGE 18 ---
+I want a drama-themed 
+video. It tells a story 
+about survival, following 
+an alien linguist in a 
+medieval kingdom. The 
+length of the final video 
+should be about 1 
+minute.
+User
+User
+I want a thriller-themed 
+video. It tells a story 
+about hope, following a 
+street artist in an 
+underwater city. The 
+length of the final video 
+should be about 1 
+minute.
+User
+User
+I want a sci-fi-themed 
+video. It tells a story 
+about love, following a 
+creature of myth in a 
+magical academy. The 
+length of the final video 
+should be about 1 
+minute.
+User
+User
+I want a mystery-themed 
+video. It tells a story of  
+legacy, following an 
+alien linguist in a 
+forgotten moon colony. 
+The length of the final 
+video should be about 1 
+minute.
+User
+User
+I want a drama-themed 
+video. It tells a story 
+about survival, following 
+an alien linguist in a 
+medieval kingdom. The 
+length of the final video 
+should be about 1 
+minute.
+User
+I want a thriller-themed 
+video. It tells a story 
+about hope, following a 
+street artist in an 
+underwater city. The 
+length of the final video 
+should be about 1 
+minute.
+User
+I want a sci-fi-themed 
+video. It tells a story 
+about love, following a 
+creature of myth in a 
+magical academy. The 
+length of the final video 
+should be about 1 
+minute.
+User
+I want a mystery-themed 
+video. It tells a story of  
+legacy, following an 
+alien linguist in a 
+forgotten moon colony. 
+The length of the final 
+video should be about 1 
+minute.
+User
+Figure 6: More samples generated by MA ViS framework.
+--- PAGE 19 ---
+I want a sci-fi-themed 
+video. It tells a story 
+about A astronaut 
+encountering a high-
+dimensionial being. The 
+length of the final video 
+should be about 1 
+minute.
+User
+User
+I want a Cthulhu-style 
+video, depicting an 
+explorer who discovers 
+signs of the impending 
+apocalypse. The length 
+of the final video should 
+be about 1 minute.
+User
+User
+I want a sci-fi-themed 
+video. It tells a story 
+about rebirth, following 
+a cursed prince in a 
+haunted forest. The 
+length of the final video 
+should be about 1 
+minute.
+User
+User
+I want a sci-fi-themed 
+video. It tells a story 
+about sacrifice, 
+following a young 
+orphan in a war-torn 
+future Earth. The length 
+of the final video should 
+be about 1 minute.
+User
+User
+I want a sci-fi-themed 
+video. It tells a story 
+about A astronaut 
+encountering a high-
+dimensionial being. The 
+length of the final video 
+should be about 1 
+minute.
+User
+I want a Cthulhu-style 
+video, depicting an 
+explorer who discovers 
+signs of the impending 
+apocalypse. The length 
+of the final video should 
+be about 1 minute.
+User
+I want a sci-fi-themed 
+video. It tells a story 
+about rebirth, following 
+a cursed prince in a 
+haunted forest. The 
+length of the final video 
+should be about 1 
+minute.
+User
+I want a sci-fi-themed 
+video. It tells a story 
+about sacrifice, 
+following a young 
+orphan in a war-torn 
+future Earth. The length 
+of the final video should 
+be about 1 minute.
+User
+Figure 7: More samples generated by MA ViS framework.
