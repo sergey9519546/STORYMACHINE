@@ -392,3 +392,87 @@ recur and needs a starting pointer.
   `node --experimental-strip-types scripts/check-docs-quality.ts
   docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md` → "No AI writing
   patterns detected. Documentation is clean!"
+
+## Addendum (2026-08-04, Lane E) — flagged "Simulate" leak CLOSED
+
+The item noted above as out of scope for a future pass — the Ship-tab
+toolbar row's "Simulate" button (`ScriptIDE.tsx:1463`,
+`handleSimulateScript`) rendering unconditionally, a Labs-agnostic path to
+the same simulate action that otherwise requires Labs ON — is now closed.
+
+### Fix
+
+`src/components/ScriptIDE.tsx`'s Ship-task action strip (the `task ===
+"ship"` branch of the director's-slate row, `ScriptIDE.tsx:1845` onward)
+wraps the "Simulate" `<button>` in `{onOpenStoryMachine && (...)}` — the
+exact same truthiness gate already used by:
+
+- `scriptide/Toolbar.tsx`'s "Open Simulate" overflow item
+  (`{onOpenStoryMachine && (<OverflowItem label="Open Simulate" ... />)}`,
+  `Toolbar.tsx:469`), and
+- `StartScreen.tsx`'s "Advanced: Simulation" button (`{onOpenStoryMachine &&
+  (...)}`, `StartScreen.tsx:361`).
+
+No new state was introduced. `App.tsx` only ever passes a real
+`onOpenStoryMachine` callback into `ScriptIDE` when `labsEnabled` is true
+(`onOpenStoryMachine={labsEnabled ? () => setShowStoryMachine(true) :
+undefined}`, `App.tsx:217`); with Labs OFF the prop is `undefined`, so the
+new conditional collapses the button out of the tree along with every
+other Labs-gated control that already keys off this same prop. The button
+itself, and `handleSimulateScript`, were left otherwise untouched — this is
+a visibility gate, not a deletion, per the standing deletion moratorium.
+
+One button was found to be genuinely out of scope for this fix and is
+called out rather than silently left alone: `scriptide/Toolbar.tsx:333-349`
+has its own persistent "Simulate" control (Sparkles icon, `aria-label`
+"Simulate in Story Machine") in the always-visible top nav bar, disabled
+only by `isSimulating || !onSimulateScript`. `ScriptIDE.tsx` passes
+`onSimulateScript={handleSimulateScript}` to `Toolbar` unconditionally
+(`ScriptIDE.tsx:1757`), so that control is *also* Labs-agnostic today. It is
+a distinct element from the one this addendum's originating note flagged
+(a different row, a different accessible name — `aria-label` overrides its
+visible "Simulate" text, so it did not collide with the new assertions
+below) and was not part of this task's scope. Flagging it here so it is not
+lost, matching this document's own established practice for adjacent
+findings.
+
+### New verify-script assertions
+
+`scripts/verify-p2-p3-surfaces.mjs` gained two `record(...)` calls in the
+existing `P2` phase, mirroring the file's established Labs-OFF/Labs-ON pair
+pattern:
+
+- Labs OFF (CONTEXT A, immediately after the existing Ship-tab/Studio-bypass
+  checks): `Ship toolbar row: "Simulate" button ABSENT with Labs OFF
+  (closes SURFACE_REVALIDATION_2026-08-04.md flagged item)` — asserts
+  `page.getByRole('button', { name: 'Simulate', exact: true })` has zero
+  matches while the Ship tab is open.
+- Labs ON (CONTEXT B, after the existing Toolbar-overflow-ON checks): `Ship
+  toolbar row: "Simulate" button (reachable equivalent) APPEARS with Labs
+  ON` — clicks the Ship task tab, then asserts the same locator becomes
+  visible.
+
+Both assertions use `exact: true` specifically so they do not collide with
+the unrelated `Toolbar.tsx` "Simulate in Story Machine" control noted above
+— confirmed live (see run below): the new assertions passed independently
+of that control's presence.
+
+### Verify / build gates (this addendum)
+
+- `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node
+  scripts/verify-p2-p3-surfaces.mjs` — **91/91**, exit 0 (up from 89/89;
+  the two new assertions above both PASS). Zero genuine browser console
+  errors.
+- `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node
+  scripts/smoke-p0-live-flow.mjs` — PASS, exit 0 (`verdict=CONSIDER,
+  health~78`, zero genuine console errors).
+- `npm run lint` — 0 errors (`tsc --noEmit` clean).
+- `npm test` — 0 failures (10261 passed, 78 skipped, 2 todo, 10341 total).
+  No test exercises `ScriptIDE.tsx`'s Ship-row JSX directly (the existing
+  `tests/core/scenario-from-script.test.ts` and `tests/core/core-0{1,2,3}
+  .test.ts` cover the pure `buildScenarioFromScript` logic
+  `handleSimulateScript` calls, unaffected by this visibility-only change);
+  behavioral proof for the gate itself is the live browser run above, not a
+  unit test.
+- Files changed: `src/components/ScriptIDE.tsx`,
+  `scripts/verify-p2-p3-surfaces.mjs`, this document.

@@ -1854,14 +1854,20 @@ export default function ScriptIDE({
               <button type="button" onClick={takeSnapshot} disabled={isEmptyDraft} className="sm-btn py-1.5 disabled:opacity-40">
                 Snapshot
               </button>
-              <button
-                type="button"
-                onClick={handleSimulateScript}
-                disabled={isSimulating || isEmptyDraft}
-                className="sm-btn py-1.5 disabled:opacity-40"
-              >
-                {isSimulating ? "…" : "Simulate"}
-              </button>
+              {/* P2 surface collapse: same onOpenStoryMachine truthiness gate used by
+                  Toolbar.tsx's "Open Simulate" overflow item and StartScreen's
+                  "Advanced: Simulation" — Labs OFF means App.tsx never passes
+                  onOpenStoryMachine, so this stays absent from the Ship row. */}
+              {onOpenStoryMachine && (
+                <button
+                  type="button"
+                  onClick={handleSimulateScript}
+                  disabled={isSimulating || isEmptyDraft}
+                  className="sm-btn py-1.5 disabled:opacity-40"
+                >
+                  {isSimulating ? "…" : "Simulate"}
+                </button>
+              )}
             </>
           ) : (
             <>

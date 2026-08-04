@@ -397,6 +397,22 @@ async function main() {
     !leaksOasisJargon,
     leaksOasisJargon ? 'jargon regex matched — genuine P2 leak, invalidates the 2026-08-04 accept decision' : 'no NVM/OASIS/causal-twin/epistemic-map/converge/fixed-points/self-play jargon found; Ship-tab content is Production/Analysis/Codex/Research-notes/Title/Versions, not a gated research panel',
   );
+  // Closes the flagged item from docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md
+  // ("Ship-tab toolbar row also has a 'Simulate' button ... Labs-agnostic path to
+  // the same simulate action that otherwise requires Labs ON"): the Ship task tab
+  // is already open from the assertions above, so check its action-strip row (NOT
+  // the persistent top Toolbar, whose own Simulate control carries a distinct
+  // "Simulate in Story Machine" aria-label and isn't the flagged element) for the
+  // exact-text "Simulate" button now that it's gated behind onOpenStoryMachine.
+  const simulateBtnOff = pageA.getByRole('button', { name: 'Simulate', exact: true });
+  const simulateCountOff = await simulateBtnOff.count();
+  record(
+    'P2',
+    'Ship toolbar row: "Simulate" button ABSENT with Labs OFF (closes SURFACE_REVALIDATION_2026-08-04.md flagged item)',
+    simulateCountOff === 0,
+    `found ${simulateCountOff} matching button(s) on the Ship toolbar row`,
+  );
+
   await pageA.getByRole('button', { name: 'Write', exact: true }).first().click();
   await pageA.waitForTimeout(150);
 
@@ -619,6 +635,20 @@ async function main() {
   record('P2', 'Toolbar overflow: "Director HUD" APPEARS with Labs ON', hasDirectorOn, `items=${JSON.stringify(overflowLabelsOn)}`);
   record('P2', 'Toolbar overflow: "Slate compare" APPEARS with Labs ON', hasSlateOn, `items=${JSON.stringify(overflowLabelsOn)}`);
   record('P2', 'Toolbar overflow: "Open Simulate" APPEARS with Labs ON', hasSimulateOn, `items=${JSON.stringify(overflowLabelsOn)}`);
+
+  // Same Ship toolbar row check as CONTEXT A, mirrored for Labs ON — proves the
+  // gate is the Labs flag (onOpenStoryMachine truthiness), not dead/removed code.
+  const shipTaskBtnOn = pageB.getByRole('button', { name: 'Ship', exact: true }).first();
+  await shipTaskBtnOn.click();
+  await pageB.waitForTimeout(300);
+  const simulateBtnOn = pageB.getByRole('button', { name: 'Simulate', exact: true }).first();
+  const simulateVisibleOn = await simulateBtnOn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+  record(
+    'P2',
+    'Ship toolbar row: "Simulate" button (reachable equivalent) APPEARS with Labs ON',
+    simulateVisibleOn,
+    simulateVisibleOn ? '' : 'button not found/visible on Ship toolbar row with Labs ON',
+  );
 
   await contextB.close();
 
