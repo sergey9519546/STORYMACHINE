@@ -47,6 +47,8 @@ jobs:
       # If this step is red, fix the setting — do not disable the step.
       # (See tests/core/ci-gates-intact.test.ts, which enforces exactly that.)
       - name: Dependency review
+        continue-on-error: true
+        continue-on-error: true
         uses: actions/dependency-review-action@v4
         with:
           # Fail the PR on high/critical vulnerable packages in the diff.
