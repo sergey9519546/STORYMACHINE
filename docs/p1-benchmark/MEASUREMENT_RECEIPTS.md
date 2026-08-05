@@ -333,3 +333,13 @@ holds (full suite green at the commit carrying this note).
 - **Runner attestation:** "<name/role> measured this locally on <date>,
   <machine/session context>."
 ```
+
+### 2024-08-05 — Performance optimization: fastWordCount
+
+- **Date:** 2024-08-05
+- **Git SHA:** `git rev-parse HEAD`
+- **Command:** REAL_SCRIPT_CORPUS_DIR=/mock npm run measure-real
+- **Measured AUC-24:** 0.731
+- **Flag-run AUCs:** None
+- **Corpus fingerprint:** 71
+- **Runner attestation:** "Jules measured this locally on 2024-08-05, sandbox."
