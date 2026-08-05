@@ -317,6 +317,53 @@ holds (full suite green at the commit carrying this note).
 
 ---
 
+### 2026-08-04 — AUC-24 measured on real corpus for craft-spec integration (PR #252, `claude/craft-spec-integration`)
+
+- **Date:** 2026-08-04
+- **Git SHA:** `cdc8458ce2bfe48b9ec6ff8c701abee16340617b` (`git rev-parse HEAD`
+  on branch `claude/craft-spec-integration`, one commit ahead of `main` at
+  `3f18224f0d7d95b94470b04af6561a7ab84b55cb` — the branch was up to date with
+  `main` at measurement time, no merge required). This is the commit that
+  injects the professional craft-spec into LLM generation prompts
+  (`server/nvm/revision/rewrite.ts`, reachable from `doctor.ts`'s import
+  graph per `scripts/check-scoring-receipt.mjs`).
+- **Command:** run in PowerShell from the repo root:
+  `$env:REAL_SCRIPT_CORPUS_DIR = "C:\Users\serge\OneDrive\Documents\MAIN_StoryMachine_Engine_Logic\STORYMACHINE V1 REPO\real-script-corpus"; npm run measure-real`
+  (equivalent to `REAL_SCRIPT_CORPUS_DIR=<path> npm run measure-real`, i.e.
+  `node --experimental-strip-types scripts/measure-real-script-discrimination.ts`).
+- **Measured AUC-24:** **0.755** — shuffle-drop recipe (seeded scene shuffle
+  + every-third-scene drop, identical algorithm to
+  `tests/core/real-script-corpus.test.ts`'s `AUC hard floor` test:
+  `shuffle(rng, scenes).filter((_, i) => i % 3 !== 2)`), first 24 manifest
+  scripts, n=24, mean intact health 93.0 -> mean degraded health 87.1. This
+  clears the CLAUDE.md/test-file floor of >= 0.622 with substantial
+  headroom, and is above the previously recorded 0.731 (2026-07-11B).
+  Confirms the craft-spec prompt-injection change (a generation-prompt
+  addition, not a scoring-formula change) did not degrade structural
+  discrimination.
+- **Flag-run AUCs:** act-swap recipe (thirds reordered instead of shuffled
+  + dropped), same 24-script subset: **0.604** (mean intact 93.0 -> mean
+  degraded 91.3). Also from the same run — produced-floor check over all 73
+  eligible corpus scripts: health min/max 84.6/98.9, mean 93.19, median
+  93.40, 0/73 below the health >= 80 floor; verdict breakdown RECOMMEND
+  72/73 (98.6%), CONSIDER 1/73 (1.4%).
+- **Corpus fingerprint:** 73 eligible `*.fountain.txt` scripts (>= 50 lines)
+  present in `REAL_SCRIPT_CORPUS_DIR`; `tests/fixtures/real-corpus-
+  manifest.json` reports 72 entries. The AUC-24 subset is the first 24
+  manifest-ordered files; all 24 were present in the corpus directory (the
+  script's own missing-file note did not fire), so the subset measured
+  matches the manifest's intended 24 exactly.
+- **Runner attestation:** "Agent session (Claude Sonnet 5, via Desktop
+  Commander MCP on the repo owner's Windows machine) ran this measurement
+  locally on 2026-08-04 under the repo owner's direction, using the local,
+  uncommitted corpus at `...\STORYMACHINE V1 REPO\real-script-corpus`. Full
+  pipeline (73-script analysis pass + 24-script shuffle-drop pass +
+  24-script act-swap pass) completed in ~1253s analysis time plus the two
+  degradation passes, all in one `npm run measure-real` invocation, no
+  errors or skips."
+
+---
+
 ## 3. Entry template (copy for new entries)
 
 ```

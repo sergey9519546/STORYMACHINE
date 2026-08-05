@@ -7,6 +7,7 @@ import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import { composePromptModifiers, GENRE_NAMES } from '../lib/genre-router.ts';
+import { buildCraftPromptSection, looksLikeAnimationGenre } from '../nvm/generate/craft-spec.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
   withSessionCommand, gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
@@ -1140,6 +1141,17 @@ ${emotionalArc ? `- Emotional Arc: ${emotionalArc.replace(/_/g, ' ')} — evalua
 ${dirStyle ? `- Cinematic Style: ${dirStyle} — ${STYLE_MODIFIERS[dirStyle as DirectorStyle]?.agentInstruction?.split('.')[0] ?? dirStyle}. Let this style govern composition choices, information position bias, and commentary tone.` : ''}
 ` : '';
 
+  // Craft-spec injection (user-directed P0 exception — see
+  // server/nvm/generate/craft-spec.ts header): compact form since this route
+  // already carries director-state, throughline, and codex context blocks —
+  // it informs director commentary / structural node judgment, never the
+  // deterministic doctor score.
+  const configGenre = typeof storyConfig.genre === 'string' ? storyConfig.genre : null;
+  const craftBlock = buildCraftPromptSection({
+    compact: true,
+    animation: looksLikeAnimationGenre(configGenre),
+  });
+
   const prompt = `Analyze the following screenplay script.
 Current Director State: ${JSON.stringify(engineState?.directorState ?? {}).substring(0, 5000)}
 Characters Profile: ${JSON.stringify(characters).substring(0, 2000)}${infoPosBias}${activeTl}${codexBlock}
@@ -1170,7 +1182,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
         model: modelForTask('ANALYSIS'),
         contents: prompt,
         config: {
-          systemInstruction: 'You are the AI Director, a strict narrative dungeon master enforcing psychological and structural rules of screenwriting.',
+          systemInstruction: `You are the AI Director, a strict narrative dungeon master enforcing psychological and structural rules of screenwriting.\n\n${craftBlock}`,
           responseMimeType: 'application/json',
           responseSchema: AnalyzeScriptSchema,
         },
