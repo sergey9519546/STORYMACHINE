@@ -217,10 +217,21 @@ command away:
   **EFFORT:** One command.
   **EVIDENCE REQUIRED:** Two AUC tables (flag-on vs flag-off) compared;
   written up per `MEASUREMENT_RUNBOOK.md` §5 if it moves the number.
-  **STATUS:** BUILT, UNWIRED, NOT YET RUN on the real corpus
-  (`MEASUREMENT_RUNBOOK.md` §2.1b). Verified in this session: no
-  761-script corpus is present in this sandbox, confirming the "local-only"
-  claim.
+  **STATUS:** DIAGNOSTICALLY DISCHARGED 2026-08-05 — see
+  `MEASUREMENT_RECEIPTS.md`'s 2026-08-05 entry. A standalone diagnostic
+  (`scripts/diagnose-detectors-standalone.mjs`, same detector functions
+  as `measure-auc-split.mjs` but skipping its 5×-doctor AUC scaffolding)
+  measured QL/D1/D2/D3 disagreement across all 761 scripts (train+val+test,
+  ~37s total). QL fires on only ~6–10% of scripts with a mean deduction of
+  0.06–0.11 health points — an order of magnitude below the ~6-point
+  intact-vs-degraded gap the AUC discriminates on. **Wiring QL would not
+  meaningfully move the discrimination AUC; the full on/off run is not worth
+  its multi-hour cost.** D1/D2 disagree with legacy on ~0% of produced
+  features (1/761); D3 is the only detector with non-negligible signal
+  (~4–6%). Also corrects the prior status line below: **the full 761-script
+  corpus IS present in this environment** (`data/screenplays/`, all 761
+  `corpus-split.json` entries resolve, 0 missing) — the earlier "no
+  761-script corpus is present in this sandbox" claim was incorrect.
 
   **5b. Fix the D6 clue-lifecycle tautology, then re-test
   setup-before-payoff ordering.**
@@ -241,7 +252,22 @@ command away:
   **EVIDENCE REQUIRED:** Fixtures (positive = genuine use-before-setup
   error, negative = correctly ordered plants) + `npm run measure-real`
   before/after, AUC-24 floor respected.
-  **STATUS:** NOT STARTED. Diagnosed, fix shape specified, not built.
+  **STATUS:** DONE 2026-08-04 (commit `50b8f7c`, "D4 and D6 are fixed").
+  DETECTOR_DEFECTS_2026-08-03.md's D6 addendum records the fix verbatim:
+  `applyClueLifecycle` (`fountain-analyzer.ts:1072`) no longer defines
+  seed = `occ[0]` / payoff = `occ[last]`; the seed is placed at the
+  introduction-evidence occurrence and the payoff at any later use ≥2
+  scenes removed, so `payoffScene < seedScene` (use-before-introduction)
+  is now representable and `payoff.ts`'s `PAYOFF_BEFORE_SETUP` rule
+  (`payoff.ts:827`) is reachable from the text path. Tests:
+  `tests/core/clue-information-test.test.ts` (inversion + normal-order
+  cases). The "NOT STARTED" status this entry previously carried was
+  stale — it predated the 2026-08-04 fix. What REMAINS open under this
+  task is the **corpus-measured AUC before/after** for the now-reachable
+  `PAYOFF_BEFORE_SETUP` signal (the AUC-24 floor was respected on the
+  41-script blast-radius check per the D4/D6 receipt, but the full
+  real-corpus AUC re-measurement obligation is recorded in
+  MEASUREMENT_RECEIPTS.md and not yet discharged on the 761-script set).
 
 ### 6. Re-validate P2/P3's already-shipped surfaces against what P0/P1 learn
 
@@ -357,11 +383,24 @@ tasks 1-5 above.
   disproven larger counts the 2026-07-14 audit retired; `npm run
   honesty-audit` now scans all tracked markdown for them by pattern (the
   landing-footer/ROADMAP/NORTH_STAR numbers are already reconciled per
-  ROADMAP §4 and §6's changelog); `npm audit fix` for the 4 transitive
-  dev-dep CVEs noted in ROADMAP §7; the SHOULD-tier pre-deployment security
-  items (CSV formula injection, collab room-ownership, run-room limiter
-  tier mismatch, no prod CSP, container running as root) — real, not
-  urgent enough to have blocked S-wave, still open per ROADMAP §7.
+  ROADMAP §4 and §6's changelog); the SHOULD-tier pre-deployment security
+  items, **re-verified 2026-08-05** (see CHANGELOG 2026-08-05 entry): the
+  `ip-address` HIGH CVE cluster (3 SSRF/trust-bypass advisories on the
+  express-rate-limit request path) is **CLOSED** via the 10.2.0→10.4.0
+  bump within express-rate-limit's declared range, with a regression
+  guard at `tests/routes/ip-address-cve.test.ts` (observed red on the
+  vulnerable version). Of the other five SHOULD items ROADMAP §7 flagged
+  as "verify": CSV formula injection (**CLOSED** — `CSV_FORMULA_LEAD`
+  guard in `server/lib/breakdown.ts`), run-room limiter tier mismatch
+  (**CLOSED** — `/api/run-room`, `/api/turn`, `/api/game/interview` all
+  on `aiLimiter` now), no prod CSP (**CLOSED** — CSP middleware in
+  `server/app.ts`, gated to `NODE_ENV==='production'`), container runs
+  root (**CLOSED** — `USER node` + chown in `Dockerfile`), collab token
+  room-ownership (**DEFERRED BY DESIGN** — `server/routes/collab.ts:12`
+  documents it as an intentional bearer-capability model, not a gap).
+  Remaining: 1 low-severity `esbuild` advisory (dev-server-only, Windows
+  dev path) — `npm audit fix` addresses it but it is not on any
+  production request path.
 
 - **Corpus de-identification migration (maintainer's local run).**
   `scripts/migrate-corpus-ids.mjs` and `scripts/verify-corpus-layout.mjs`

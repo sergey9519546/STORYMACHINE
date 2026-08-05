@@ -11,13 +11,13 @@ import {
   validate as validateOutline, OutlineBodySchema, ImportBodySchema,
   PacingTargetBodySchema, EmotionalArcBodySchema, DirectorStyleBodySchema,
   StoryGenreBodySchema, CharacterArcModeBodySchema, StoryThemeBodySchema,
-  ApplyPresetBodySchema,
+  ApplyPresetBodySchema, RotateSessionBodySchema,
 } from '../lib/validation.ts';
 import { z } from 'zod';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
   asyncHandler, gameLimiter, aiLimiter, sessions, sessionId, getOrCreateSession,
-  withSessionCommand, metrics,
+  withSessionCommand, metrics, rotateSession,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
 import { withAiBudget, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
@@ -93,6 +93,14 @@ router.get('/health', (_req, res) => {
     commit: buildCommit,
   });
 });
+
+// Session Rotation — rotates a bearer session ID safely (Docs/AUTH.md recommendation)
+router.post('/api/session/rotate', gameLimiter, validate(RotateSessionBodySchema), asyncHandler(async (req, res) => {
+  const oldId = sessionId(req);
+  const body = req.body as z.infer<typeof RotateSessionBodySchema>;
+  const result = rotateSession(oldId, body?.newSessionId);
+  res.json({ status: 'ok', ...result });
+}));
 
 // Metrics — Gemini call volume, latency, retries and failures per category
 // (audit finding S1-a-2, BLOCKER). token usage / est_cost_usd / session

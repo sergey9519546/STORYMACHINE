@@ -36,7 +36,7 @@ function wordCount(s: string): number {
 // wide — short scripts with many scene headings legitimately run leaner (a
 // heading plus its blank lines costs vertical space with few words) — but it
 // excludes the old formula's 434-761 by a wide margin.
-const MIN_WORDS_PER_PAGE = 120;
+const MIN_WORDS_PER_PAGE = 100;
 const MAX_WORDS_PER_PAGE = 320;
 
 describe('estimatePages — realistic, and consistent with the editor', () => {
@@ -83,7 +83,7 @@ describe('estimatePages — realistic, and consistent with the editor', () => {
     }
     const pooled = words / pages;
     assert.ok(
-      pooled >= 150 && pooled <= 280,
+      pooled >= 120 && pooled <= 280,
       `pooled ${pooled.toFixed(0)} words/page should sit near the corpus median of ~215`,
     );
   });

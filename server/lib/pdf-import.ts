@@ -95,7 +95,7 @@ interface RawLine {
 // Scene heading: same INT/EXT/EST/I-E prefix test src/lib/fountain.ts and
 // fdx-import.ts use, so a heading recognized here is recognized identically
 // downstream by the Fountain analyzer.
-const SCENE_HEADING_RE = /^(INT|EXT|EST|I\/E|INT\.\/EXT)[.\s]/i;
+const SCENE_HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN|INT\.\/EXT)[.\s]/iu;
 
 // A scene-heading-band line that reads like a heading (ends in a time-of-day
 // tag, or uses the "LOCATION - WHEN" dash convention) but is missing the

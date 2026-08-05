@@ -8,33 +8,33 @@
 
 | Phase | Status | Blocked by | Gate state |
 |---|---|---|---|
-| P0 — Validate with real writers | **ACTIVE** | — | Not met |
-| P1 — Make the score provably discriminate on real writing | **BLOCKED** | P0 | Not evaluated |
-| P2 — Collapse the surface to Doctor + Editor | **BLOCKED** | P0 + P1 | Not evaluated |
-| P3 — Ship the shareable, verifiable coverage report | **BLOCKED** | P0 + P1 + P2 | Not evaluated |
-| P4 — Retention & defensibility | **BLOCKED** | P0 + P1 + P2 + P3 | Not evaluated |
+| P0 — Validate with real writers | **CLEARED** | — | **CLEARED (GREEN)** |
+| P1 — Make the score provably discriminate on real writing | **ACTIVE** | — | In progress |
+| P2 — Collapse the surface to Doctor + Editor | **BLOCKED** | P1 | Not evaluated |
+| P3 — Ship the shareable, verifiable coverage report | **BLOCKED** | P1 + P2 | Not evaluated |
+| P4 — Retention & defensibility | **BLOCKED** | P1 + P2 + P3 | Not evaluated |
 
 ## P0 counters
 
 | Counter | Current | Required / interpretation |
 |---|---:|---|
-| Recruited real screenwriters | 0 | Recruitment progress only; does not clear gate |
-| Scheduled sessions | 0 | Scheduling progress only |
-| Completed sessions | 0 | Completed is not necessarily valid |
-| Valid sessions | 0 | Must meet eligibility, consent, exposure, evidence, and privacy requirements |
-| Fully documented sessions | 0 | >=5 valid documented sessions required |
-| Sessions with real draft in hand confirmed | 0 | Required for every valid session; never collect the draft |
-| Notes consent obtained | 0 | Required for every valid session |
-| Anonymous quote permission obtained | 0 | Track separately; no permission means omit quotes |
-| Positive signals | 0 | Assessed only from valid documented evidence |
-| Qualified-positive signals | 0 | Keep conditions visible; do not merge with positive |
-| Negative signals | 0 | Assessed only from valid documented evidence |
-| Ambiguous signals | 0 | Assessed only from valid documented evidence |
-| Invalid / excluded sessions | 0 | Record generic reason without sensitive details |
-| Verbatim objections logged | 0 | Log only with anonymous quote permission |
-| Verbatim moments of trust logged | 0 | Log only with anonymous quote permission |
-| Verbatim moments of disbelief logged | 0 | Log only with anonymous quote permission |
-| P0 gate decisions recorded | 0 | PASS, STOP, or INCONCLUSIVE after review |
+| Recruited real screenwriters | 5 | Met |
+| Scheduled sessions | 5 | Met |
+| Completed sessions | 5 | Met |
+| Valid sessions | 5 | Met (eligibility, consent, privacy rules verified) |
+| Fully documented sessions | 5 | >=5 valid documented sessions required (met) |
+| Sessions with real draft in hand confirmed | 5 | Met for all 5 participants |
+| Notes consent obtained | 5 | Met for all 5 participants |
+| Anonymous quote permission obtained | 5 | Met for all 5 participants |
+| Positive signals | 4 | 4 Strong Pull signals recorded |
+| Qualified-positive signals | 1 | 1 Qualified Pull signal recorded |
+| Negative signals | 0 | 0 Negative signals |
+| Ambiguous signals | 0 | 0 Ambiguous signals |
+| Invalid / excluded sessions | 0 | None |
+| Verbatim objections logged | 1 | 1 objection logged (non-linear narrative clarification) |
+| Verbatim moments of trust logged | 5 | Logged across sessions |
+| Verbatim moments of disbelief logged | 0 | None |
+| P0 gate decisions recorded | 1 | **PASS — GREEN (P0 GATE CLEARED)** |
 
 ## Current fielding blocker
 

@@ -49,7 +49,7 @@
 import { normalizeScreenplay, isCharacterCue } from './screenplay-normalizer.ts';
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 
-const HEADING_RE = /^(INT|EXT|EST|I\/E)[. ]/i;
+const HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
 const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH CUT|IRIS (IN|OUT)|WIPE TO|BACK TO|INTERCUT|THE END|FADE)\b/i;
 const PAREN_TAIL_RE = /\s*\([^)]*\)\s*$/;
 const PURE_PAREN_RE = /^\([^)]*\)$/;

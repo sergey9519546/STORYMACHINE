@@ -29,7 +29,7 @@
 // change scene segmentation, only reflow the text between headings. Several
 // corpus scripts (Ratatouille, Coco, Up) mark scenes with '.'-forced headings
 // instead of INT/EXT, which is exactly why alignment matters.
-const HEADING_RE = /^(INT|EXT|EST|I\/E)[. ]/i;
+const HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
 const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH CUT|IRIS (IN|OUT)|WIPE TO|BACK TO|INTERCUT|THE END|FADE)\b/i;
 // A caps "cue candidate": the bare name (minus a trailing parenthetical like
 // (V.O.)/(CONT'D)/(O.S.)) is short, up to 4 words, all-caps letters + a few
@@ -37,7 +37,7 @@ const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH 
 const PAREN_TAIL_RE = /\s*\([^)]*\)\s*$/;
 const PURE_PAREN_RE = /^\([^)]*\)$/;
 
-function isHeading(t: string): boolean { return HEADING_RE.test(t) || t.startsWith('.'); }
+export function isHeading(t: string): boolean { return HEADING_RE.test(t) || t.startsWith('.'); }
 function isTransition(t: string): boolean {
   return TRANSITION_RE.test(t) || (/[A-Z]\s*TO:\s*$/.test(t) && t === t.toUpperCase() && t.length <= 20);
 }

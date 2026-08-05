@@ -58,6 +58,16 @@ export function getSessionId(): string {
   }
 }
 
+/** Replaces the current browser's persistent session id (e.g. after rotation). */
+export function setSessionId(newId: string): void {
+  if (!VALID_ID_RE.test(newId)) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, newId);
+  } catch {
+    memoryFallbackId = newId;
+  }
+}
+
 /**
  * Append the current session id as a `sessionId` query param. Use this ONLY
  * for EventSource URLs — EventSource has no headers API, so the X-Session-Id

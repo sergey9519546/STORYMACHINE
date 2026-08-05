@@ -60,7 +60,7 @@ export function parseFountain(text: string): FountainBlock[] {
     let type: FountainBlockType = 'action';
 
     // Basic Fountain parsing rules
-    if (trimmed.match(/^(INT|EXT|EST|I\/E)[. ]/i) || trimmed.startsWith('.')) {
+    if (trimmed.match(/^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu) || trimmed.startsWith('.')) {
       type = 'scene_heading';
     } else if (trimmed.startsWith('#')) {
       type = 'section';
