@@ -35,19 +35,30 @@ if (!fs.existsSync(SRC_DIR)) {
   process.exit(1);
 }
 
-const files = fs
-  .readdirSync(SRC_DIR)
-  .filter((f) => f.endsWith('.fountain') || f.endsWith('.fountain.txt'))
-  .sort();
+function walkDir(dir) {
+  let results = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results = results.concat(walkDir(fullPath));
+    } else if (entry.name.endsWith('.fountain') || entry.name.endsWith('.fountain.txt')) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
 
-requireCorpus(files.length, {
+const filePaths = walkDir(SRC_DIR).sort();
+
+requireCorpus(filePaths.length, {
   label: `${SRC_DIR} (.fountain/.fountain.txt files)`,
   hint: 'This probe requires the private research corpus locally (see MEASUREMENT_RUNBOOK.md).',
 });
 
 const rows = [];
-for (const file of files) {
-  const text = fs.readFileSync(path.join(SRC_DIR, file), 'utf-8');
+for (const fullPath of filePaths) {
+  const file = path.relative(SRC_DIR, fullPath).replace(/\\/g, '/');
+  const text = fs.readFileSync(fullPath, 'utf-8');
   const r = await runScriptDoctor(
     text,
     { theme: '', genre: '', directorStyle: '', characters: [] },

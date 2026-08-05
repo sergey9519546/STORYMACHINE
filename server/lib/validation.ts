@@ -1084,6 +1084,10 @@ export const FountainTitleBodySchema = z.object({
   title: z.string().max(2000).optional(),
 }).passthrough();
 
+export const RotateSessionBodySchema = z.object({
+  newSessionId: z.string().trim().regex(/^[a-zA-Z0-9_-]{8,64}$/, 'newSessionId must match [a-zA-Z0-9_-]{8,64}').optional(),
+}).strict().or(z.undefined());
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.

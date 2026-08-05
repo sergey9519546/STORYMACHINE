@@ -253,3 +253,60 @@ describe('src/lib/session.ts — mergeSessionHeader (fetch header-merge helper)'
     assert.equal(existing.get('X-Session-Id'), 'stale');
   });
 });
+
+describe('routes — POST /api/session/rotate (session bearer key rotation)', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  it('rotates a valid bearer session to a fresh unguessable ID and preserves session state', async () => {
+    const oldSid = freshSessionId();
+
+    // 1. Initialize state under oldSid
+    const initRes = await fetch(`${server.baseUrl}/api/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': oldSid },
+      body: JSON.stringify({
+        nodes: [{ location_id: 'vault', name: 'Vault', description: 'Secure vault.', adjacent_locations: [] }],
+        agents: [{
+          char_id: 'agent-rot',
+          name: 'Rotator',
+          public_mask: 'mask', hidden_motive: 'motive',
+          knowledge_vector: [], suspicion_score: 0, current_location_id: 'vault',
+        }],
+      }),
+    });
+    assert.equal(initRes.status, 200);
+
+    // 2. Rotate session via POST /api/session/rotate
+    const rotateRes = await fetch(`${server.baseUrl}/api/session/rotate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': oldSid },
+      body: JSON.stringify({}),
+    });
+    assert.equal(rotateRes.status, 200);
+    const rotateBody = await rotateRes.json();
+    assert.equal(rotateBody.status, 'ok');
+    assert.equal(rotateBody.oldSessionId, oldSid);
+    assert.ok(rotateBody.newSessionId && rotateBody.newSessionId !== oldSid);
+
+    const newSid = rotateBody.newSessionId;
+
+    // 3. State under newSid contains the original data
+    const newSessionStateRes = await fetch(`${server.baseUrl}/api/state`, {
+      headers: { 'X-Session-Id': newSid },
+    });
+    assert.equal(newSessionStateRes.status, 200);
+    const newSessionState = await newSessionStateRes.json();
+    assert.equal(newSessionState.agents.length, 1);
+    assert.equal(newSessionState.agents[0].char_id, 'agent-rot');
+
+    // 4. Old session ID now accesses a fresh/empty session
+    const oldSessionStateRes = await fetch(`${server.baseUrl}/api/state`, {
+      headers: { 'X-Session-Id': oldSid },
+    });
+    assert.equal(oldSessionStateRes.status, 200);
+    const oldSessionState = await oldSessionStateRes.json();
+    assert.deepEqual(oldSessionState.agents, []);
+  });
+});

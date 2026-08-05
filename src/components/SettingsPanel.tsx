@@ -10,6 +10,7 @@ import {
 } from "../lib/story-axes";
 import { AIProviderSettings } from "./AIProviderSettings";
 import { getLabsEnabled, setLabsEnabled } from "../lib/feature-flags";
+import { getSessionId, setSessionId } from "../lib/session";
 
 type AiProviderName  = "gemini" | "openai-compat";
 type AiMediaProvider = "gemini" | "openai-compat" | "none";
@@ -43,7 +44,7 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-type Tab = "llm" | "image" | "tts" | "embeddings" | "story" | "providers" | "labs";
+type Tab = "llm" | "image" | "tts" | "embeddings" | "story" | "providers" | "session" | "labs";
 
 const TAB_LABELS: Record<Tab, string> = {
   providers:  "Providers",
@@ -52,6 +53,7 @@ const TAB_LABELS: Record<Tab, string> = {
   tts:        "TTS",
   embeddings: "Embeddings",
   story:      "Story",
+  session:    "Session",
   labs:       "Labs",
 };
 
@@ -536,6 +538,79 @@ function StoryTab() {
   );
 }
 
+// ── Session tab ───────────────────────────────────────────────────────────────
+// Writer-facing session bearer capability key management & rotation (Docs/AUTH.md).
+
+function SessionTab() {
+  const [currentId, setCurrentId] = useState(getSessionId());
+  const [rotating, setRotating]   = useState(false);
+  const [rotated, setRotated]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+
+  const handleRotate = async () => {
+    setRotating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/session/rotate", { method: "POST" });
+      if (!res.ok) throw new Error(`Rotation failed: ${res.statusText}`);
+      const data = await res.json() as { status: string; newSessionId: string };
+      if (data.status === "ok" && data.newSessionId) {
+        setSessionId(data.newSessionId);
+        setCurrentId(data.newSessionId);
+        setRotated(true);
+        setTimeout(() => setRotated(false), 4000);
+      } else {
+        throw new Error("Invalid rotation response");
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRotating(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+          Current Session ID
+        </label>
+        <div className="p-3 border-2 border-black bg-gray-50 font-mono text-xs break-all select-all">
+          {currentId}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 border-2 border-black p-4 bg-gray-50">
+        <div className="font-bold text-sm uppercase tracking-wider">
+          Rotate Session Security Key
+        </div>
+        <p className="text-xs text-gray-600 font-mono leading-relaxed">
+          If you shared a URL containing your session parameter or suspect your session bearer ID was exposed, click below to mint a new unguessable session ID and migrate your local state. The old ID will be invalidated immediately.
+        </p>
+        <div className="mt-2 flex items-center justify-between">
+          <button
+            onClick={handleRotate}
+            disabled={rotating}
+            className="px-4 py-2 font-bold uppercase tracking-wider text-xs sm-btn--ink border-2 border-black hover:bg-[var(--sm-stamp)] transition-colors disabled:opacity-50"
+          >
+            {rotating ? "Rotating…" : "Rotate Session ID"}
+          </button>
+          {rotated && (
+            <span className="text-xs font-mono font-bold text-green-700 uppercase">
+              Session Rotated Successfully ✓
+            </span>
+          )}
+          {error && (
+            <span className="text-xs font-mono text-red-600 truncate">
+              {error}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Labs tab ──────────────────────────────────────────────────────────────────
 // ROADMAP P2 requirement: Gate OASIS and research panels behind a Labs toggle.
 // Default OFF — writers see Doctor + Editor only. Enabling Labs reveals
@@ -793,12 +868,13 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               )}
               {activeTab === "story" && <StoryTab />}
+              {activeTab === "session" && <SessionTab />}
               {activeTab === "labs" && <LabsTab />}
             </div>
 
-            {/* Footer — AI-config actions only; the Story tab, Providers tab, and
-                Labs tab save immediately, so Test/Save would be misleading there. */}
-            {activeTab !== "story" && activeTab !== "providers" && activeTab !== "labs" && (
+            {/* Footer — AI-config actions only; the Story, Session, Providers, and
+                Labs tabs handle their own actions, so Test/Save would be misleading there. */}
+            {activeTab !== "story" && activeTab !== "providers" && activeTab !== "session" && activeTab !== "labs" && (
             <div className="px-6 py-4 border-t-4 border-black flex flex-col gap-2">
               {/* Status messages */}
               <div className="flex items-center min-h-[20px]">

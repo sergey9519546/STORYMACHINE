@@ -212,7 +212,7 @@ function escapeRegExp(s: string): string {
 
 function deathPatterns(nameEsc: string): RegExp[] {
   return [
-    new RegExp(`\\b${nameEsc}\\s+(?:is|was)\\s+dead\\b`, 'i'),
+    new RegExp(`\\b${nameEsc}\\s+(?:is|was)\\s+dead\\b(?!\\s+(?:asleep|tired|quiet|silent|serious|set|drunk|center|ahead|on|in|to|wrong))`, 'i'),
     new RegExp(`\\b${nameEsc}(?:'s)?\\s+(?:dies|died)\\b`, 'i'),
     new RegExp(`\\bkills?\\s+${nameEsc}\\b`, 'i'),
     new RegExp(`\\bmurders?\\s+${nameEsc}\\b`, 'i'),

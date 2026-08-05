@@ -266,6 +266,49 @@ export function destroySession(sessionId: string): void {
   }
 }
 
+// Safely rotate a bearer session ID to a new unguessable ID (see docs/AUTH.md).
+export function rotateSession(
+  oldSessionId: string,
+  requestedNewId?: string,
+): { oldSessionId: string; newSessionId: string } {
+  const session = sessions.get(oldSessionId);
+  if (session && !session.commands.isIdle) {
+    throw new SessionBusyError('Cannot rotate an active session while commands are running.');
+  }
+
+  const newSessionId = (requestedNewId && HEADER_SESSION_ID_RE.test(requestedNewId))
+    ? requestedNewId
+    : crypto.randomUUID().replace(/-/g, '');
+
+  if (sessions.has(newSessionId)) {
+    throw new ValidationError('Requested new session ID is already in use.');
+  }
+
+  if (PERSIST_SESSIONS) {
+    const oldBase = path.join(SESSION_DB_DIR, `${oldSessionId}.db`);
+    const newBase = path.join(SESSION_DB_DIR, `${newSessionId}.db`);
+    for (const suffix of ['', '-wal', '-shm', '-journal']) {
+      const oldFile = oldBase + suffix;
+      const newFile = newBase + suffix;
+      if (fs.existsSync(oldFile)) {
+        try {
+          fs.renameSync(oldFile, newFile);
+        } catch (err) {
+          logger.warn('session_rotate_file_rename_failed', { oldFile, newFile, error: (err as Error).message });
+        }
+      }
+    }
+  }
+
+  if (session) {
+    sessions.delete(oldSessionId);
+    sessions.set(newSessionId, session);
+  }
+
+  logger.info('session_rotated', { oldSessionId, newSessionId });
+  return { oldSessionId, newSessionId };
+}
+
 // Header-supplied ids come from src/lib/session.ts's crypto.randomUUID()-based
 // generator (32 chars after dash-stripping) — 8-64 gives comfortable headroom
 // without accepting near-empty values that would collide easily.

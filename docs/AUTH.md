@@ -74,27 +74,6 @@ no account record, no way to prove "this session belongs to user X" beyond
   permissions, no multi-device sync tied to an identity rather than a
   browser's local storage.
 - **No cross-device access.** Since the id lives in one browser's storage,
-  a writer has no way to deliberately access their own session from a
-  second device without manually copying the id (which is itself a leak
-  vector, per above).
-
-## Recommended path forward
-
-1. **Cheap near-term win: a session-id rotation endpoint.** Add a route
-   (e.g. `POST /api/session/rotate`) that, given a valid current session id,
-   creates a new id, migrates/renames the underlying `Stage`/db file to it,
-   and returns the new id for the client to store — then the old id stops
-   working. This gives writers a self-serve "I think my link leaked" reset
-   without waiting on a full accounts system, and costs roughly one route +
-   a rename in `server/lib/session-store.ts` (`dbPathFor`/`destroySession`
-   are the existing analogues to extend). Not built in Run 16 — filed here
-   as the recommended first increment.
-2. **The real fix: accounts.** Bearer-capability sessions are a reasonable
-   fit for a keyless, no-signup, try-it-now product surface, but they cap
-   out at "the id is the only proof of identity there will ever be." Actual
-   accounts (even a lightweight passwordless/magic-link scheme) would add:
-   ownership independent of possession, real revocation, cross-device access
-   by identity instead of by copying a secret, and a foundation for
    per-user rate limits/quotas instead of per-IP ones (see the `TRUST_PROXY`
    note in `README.md`'s Deployment section for the current per-IP
    limitation). This is a genuinely new subsystem — schema, session

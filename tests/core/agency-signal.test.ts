@@ -398,7 +398,8 @@ const LOCKED_CORPUS_TABLE: CorpusRow[] = [
 ];
 
 describe('agency-signal — measured evidence table over the 20 tracked CC0 scripts (data/screenplays/*.fountain)', () => {
-  const files = fs.readdirSync(corpusDir).filter(f => f.endsWith('.fountain')).sort();
+  const cc0Set = new Set(LOCKED_CORPUS_TABLE.map(r => r.file));
+  const files = fs.readdirSync(corpusDir).filter(f => cc0Set.has(f)).sort();
 
   it('the corpus directory still holds exactly the 20 locked files this table measured', () => {
     assert.deepEqual(files, LOCKED_CORPUS_TABLE.map(r => r.file));

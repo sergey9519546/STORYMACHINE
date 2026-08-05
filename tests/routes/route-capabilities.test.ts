@@ -207,7 +207,7 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'POST /api/emotional-arc', 'POST /api/director-style', 'POST /api/story-genre',
   'POST /api/story-tone', 'POST /api/character-arc-mode', 'POST /api/story-theme',
   'GET /api/outline', 'POST /api/outline', 'DELETE /api/outline', 'POST /api/outline/apply-preset',
-  'GET /api/session/export', 'POST /api/session/import',
+  'GET /api/session/export', 'POST /api/session/import', 'POST /api/session/rotate',
   // server/routes/ai-providers.ts
   'GET /api/ai-providers', 'POST /api/ai-providers/switch',
   // server/routes/collab.ts

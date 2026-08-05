@@ -102,16 +102,31 @@ const MANIFEST_BY_FILE = new Map(MANIFEST.map(m => [m.file, m]));
 const PRODUCED_FLOOR = 80;
 const MIN_LINES = 50; // skip < 50-line fragments/stubs (same cutoff as measure-slop)
 
-// ── Discovery: every eligible .fountain.txt in the corpus dir ──────────────
+// ── Discovery: every eligible screenplay in the corpus dir ──────────────────
 interface CorpusFile {
   file: string;
   text: string;
   lines: number;
 }
 const corpusFiles: CorpusFile[] = [];
-for (const f of readdirSync(CORPUS_DIR).sort()) {
-  if (!f.endsWith('.fountain.txt') && !f.endsWith('.txt')) continue;
-  const full = path.join(CORPUS_DIR, f);
+
+function walkCorpusDir(dir: string): string[] {
+  let results: string[] = [];
+  const list = readdirSync(dir, { withFileTypes: true });
+  for (const entry of list) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results = results.concat(walkCorpusDir(fullPath));
+    } else if (entry.name.endsWith('.fountain') || entry.name.endsWith('.fountain.txt') || entry.name.endsWith('.txt')) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+const discoveredFiles = walkCorpusDir(CORPUS_DIR).sort();
+for (const full of discoveredFiles) {
+  const f = path.relative(CORPUS_DIR, full).replace(/\\/g, '/');
   let text: string;
   try {
     text = readFileSync(full, 'utf8');
@@ -123,7 +138,7 @@ for (const f of readdirSync(CORPUS_DIR).sort()) {
   corpusFiles.push({ file: f, text, lines });
 }
 if (corpusFiles.length === 0) {
-  console.error(`\n[FATAL] no eligible screenplays (>= ${MIN_LINES} lines, *.fountain.txt) in ${CORPUS_DIR}`);
+  console.error(`\n[FATAL] no eligible screenplays (>= ${MIN_LINES} lines, *.fountain/*.fountain.txt) in ${CORPUS_DIR}`);
   process.exit(1);
 }
 
