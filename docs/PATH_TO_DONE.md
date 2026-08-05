@@ -357,11 +357,24 @@ tasks 1-5 above.
   disproven larger counts the 2026-07-14 audit retired; `npm run
   honesty-audit` now scans all tracked markdown for them by pattern (the
   landing-footer/ROADMAP/NORTH_STAR numbers are already reconciled per
-  ROADMAP §4 and §6's changelog); `npm audit fix` for the 4 transitive
-  dev-dep CVEs noted in ROADMAP §7; the SHOULD-tier pre-deployment security
-  items (CSV formula injection, collab room-ownership, run-room limiter
-  tier mismatch, no prod CSP, container running as root) — real, not
-  urgent enough to have blocked S-wave, still open per ROADMAP §7.
+  ROADMAP §4 and §6's changelog); the SHOULD-tier pre-deployment security
+  items, **re-verified 2026-08-05** (see CHANGELOG 2026-08-05 entry): the
+  `ip-address` HIGH CVE cluster (3 SSRF/trust-bypass advisories on the
+  express-rate-limit request path) is **CLOSED** via the 10.2.0→10.4.0
+  bump within express-rate-limit's declared range, with a regression
+  guard at `tests/routes/ip-address-cve.test.ts` (observed red on the
+  vulnerable version). Of the other five SHOULD items ROADMAP §7 flagged
+  as "verify": CSV formula injection (**CLOSED** — `CSV_FORMULA_LEAD`
+  guard in `server/lib/breakdown.ts`), run-room limiter tier mismatch
+  (**CLOSED** — `/api/run-room`, `/api/turn`, `/api/game/interview` all
+  on `aiLimiter` now), no prod CSP (**CLOSED** — CSP middleware in
+  `server/app.ts`, gated to `NODE_ENV==='production'`), container runs
+  root (**CLOSED** — `USER node` + chown in `Dockerfile`), collab token
+  room-ownership (**DEFERRED BY DESIGN** — `server/routes/collab.ts:12`
+  documents it as an intentional bearer-capability model, not a gap).
+  Remaining: 1 low-severity `esbuild` advisory (dev-server-only, Windows
+  dev path) — `npm audit fix` addresses it but it is not on any
+  production request path.
 
 - **Corpus de-identification migration (maintainer's local run).**
   `scripts/migrate-corpus-ids.mjs` and `scripts/verify-corpus-layout.mjs`

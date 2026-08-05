@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 2026-08-05 — Security: ip-address CVE cluster patched (rate-limiter path)
+
+#### Fixed
+- **Bumped `ip-address` 10.2.0 → 10.4.0**, closing three HIGH-severity advisories
+  (`GHSA-mwp4-54f8-5fhr`, `GHSA-4xrf-jv44-h6hh`, `GHSA-22jq-vg5j-6vgg`) that
+  were inside the vulnerable advisory range (`<= 10.3.0`). `ip-address` is a
+  transitive runtime dependency of `express-rate-limit`, and
+  express-rate-limit's default `ipKeyGenerator` feeds every rate-limited
+  request through `new Address6(...)` / `Address6.to4()`, so a parser
+  misclassification on the rate-limiter path could let an attacker mint
+  distinct-looking keys for the same source and evade the per-IP limit
+  (and, under `app.set('trust proxy')`, evade it via spoofed
+  `X-Forwarded-For`). The bump is within express-rate-limit@8.5.2's declared
+  `^10.2.0` range, so no upstream API change. Verified the specific primitive
+  — `new Address4('010.0.0.1')` decimal-decoded `'010'` as `10` pre-fix
+  (the leading-zero-octet SSRF/trust-bypass), and now throws
+  "IPv4 addresses can't have leading zeroes" post-fix.
+- Added `tests/routes/ip-address-cve.test.ts` as a regression guard: pins
+  the version floor, asserts the leading-zero-octet primitive stays closed,
+  and asserts `express-rate-limit.ipKeyGenerator` still keys legitimate
+  IPv4/IPv6/IPv4-mapped addresses correctly. Observed red against the
+  vulnerable `10.2.0`, green against `10.4.0`.
+
+#### Verification
+- `npm ci` reconciles on-disk `node_modules/ip-address` to 10.4.0 (the
+  lockfile was updated by `npm audit fix` but `node_modules` required a
+  clean reinstall to replace the files — a plain `npm audit fix` left the
+  vulnerable 10.2.0 files on disk while reporting success).
+- `npm test` route suite: 458/458 pass. `npm run lint` (tsc --noEmit):
+  clean. `npm run test:metamorphic`: 6/6 hard invariants pass.
+  Pre-existing corpus-gated failures (`truth-extraction`,
+  `layoutScreenplay` density band, locked-files) are unchanged — they
+  require the local 761-script `REAL_SCRIPT_CORPUS_DIR` not present in
+  this environment, and fail identically on the clean tree.
+
 ### 2026-07-29 — P1 corpus expansion + discrimination baseline, P2 surface collapse, P3 shareable report
 
 #### Added
