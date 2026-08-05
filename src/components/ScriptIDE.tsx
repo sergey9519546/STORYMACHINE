@@ -56,6 +56,7 @@ import SnapshotManager from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
 import Toolbar, { type IdeTask, type IdeToolSlot } from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
+import { StateDeltaCard, StateDeltaCardType } from "./StateDeltaCard";
 
 // Lazy-loaded — each is a conditionally-rendered tab/overlay, never needed on
 // first paint. AIPanel/AnalysisPanel render only behind their respective
@@ -341,6 +342,8 @@ export default function ScriptIDE({
   // ── Core state ──────────────────────────────────────────────────────────────
   const [engineState, setEngineState] = useState<EngineState | null>(null);
   const [scriptText, setScriptText] = useState<string>(initialDraft.scriptText);
+  const [deltaCard, setDeltaCard] = useState<StateDeltaCardType | null>(null);
+  const lastIntentTextRef = useRef<string>(initialDraft.scriptText);
   const [activeTab, setActiveTab] = useState<
     | "production"
     | "analysis"
@@ -989,6 +992,33 @@ export default function ScriptIDE({
     return () => clearTimeout(timer);
   }, [scriptText]);
 
+  // Phase 2 MVP: Live Intent Debounce
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const snippet = scriptText.slice(-2000);
+      const lastSnippet = lastIntentTextRef.current.slice(-2000);
+      if (snippet === lastSnippet) return;
+      lastIntentTextRef.current = scriptText;
+
+      try {
+        const res = await fetch('/api/live/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userInput: snippet })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.card && data.card.requiresConfirmation) {
+            setDeltaCard(data.card);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse intent', e);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [scriptText]);
+
   // handleScroll removed — CM6 editor manages its own scroll internally
 
   // ── AI analysis ──────────────────────────────────────────────────────────────
@@ -1291,6 +1321,19 @@ export default function ScriptIDE({
       const newPos = Math.min(cursor + insertion.length, view.state.doc.length);
       view.dispatch({ selection: { anchor: newPos }, scrollIntoView: true });
     }, 50);
+  };
+
+  const confirmStateDelta = async (card: StateDeltaCardType) => {
+    try {
+      await fetch('/api/nvm/live/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: `INJECT ${card.action}` })
+      });
+    } catch (e) {
+      console.error('Failed to commit state delta', e);
+    }
+    setDeltaCard(null);
   };
 
   // ── Navigation ───────────────────────────────────────────────────────────────
@@ -2077,6 +2120,20 @@ export default function ScriptIDE({
                 onSkip={() => submitActionModal(true)}
                 onInsert={() => submitActionModal(false)}
               />
+            )}
+          </AnimatePresence>
+
+          {/* State Delta Card Modal */}
+          <AnimatePresence>
+            {deltaCard && (
+              <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                <StateDeltaCard
+                  card={deltaCard}
+                  onConfirm={() => confirmStateDelta(deltaCard)}
+                  onEdit={() => setDeltaCard(null)}
+                  onReject={() => setDeltaCard(null)}
+                />
+              </div>
             )}
           </AnimatePresence>
         </div>

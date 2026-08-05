@@ -10,6 +10,7 @@ import exportRouter      from './routes/export.ts';
 import collabRouter      from './routes/collab.ts';
 import eventsRouter      from './routes/events.ts';
 import aiProvidersRouter from './routes/ai-providers.ts';
+import liveRouter        from './routes/live.ts';
 
 export interface CreateAppOptions {
   /**
@@ -174,6 +175,7 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   app.use(exportRouter);
   app.use(collabRouter);
   app.use(eventsRouter);
+  app.use(liveRouter);
 
   // ── Unknown-/api-path 404 guard ──────────────────────────────────────────────
   // Terminal handler for any request (all methods) whose path starts with /api

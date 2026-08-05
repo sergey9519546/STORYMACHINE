@@ -170,6 +170,8 @@ const llmRoutes: ReadonlySet<string> = new Set([
   'POST /api/scriptide/clean-action',    // direct generateContent call
   'POST /api/scriptide/character-profile', // direct generateContent call
   'POST /api/analyze-script',            // direct generateContent call
+  // server/routes/live.ts
+  'POST /api/live/intent',               // intent parser generation
   // server/routes/nvm/converge.ts — all three reach the LLM via
   // makeLLMCandidateGenerator() -> geminiProvider.generate()
   'POST /api/nvm/converge',
