@@ -460,6 +460,55 @@ holds (full suite green at the commit carrying this note).
 
 ---
 
+### 2026-08-05 — D6 signal-existence probe: PAYOFF_BEFORE_SETUP is reachable but NOT order-discriminating (DIAGNOSTIC ONLY)
+
+- **Date:** 2026-08-05
+- **Git SHA:** `df799b7` (same branch as the 2026-08-05 task 5a entry; no
+  scoring-path file changed — `check-scoring-receipt.mjs` confirms).
+- **Command:** `node scripts/probe-d6-signal.mjs` (new probe script; 12
+  eligible `*.fountain.txt` scripts × 3 variants [intact / CLIMAX_RELOCATE
+  / seeded-SCENE_SHUFFLE] = 36 doctor runs, ~14 min wall-clock).
+- **Measured AUC-24:** N/A — this is a signal-existence check, not an AUC
+  measurement. The AUC-24 floor is untouched.
+- **Flag-run AUCs:** N/A. The question this probe answers: did the D6 fix
+  (`50b8f7c`, 2026-08-04, which made `applyClueLifecycle` seed at
+  introduction evidence rather than scan-order position, making
+  `PAYOFF_BEFORE_SETUP` reachable for the first time) actually create a
+  signal that varies under the order-destroying degradations P1 measures?
+  The Jul 29 baseline CSVs predate D6; this checks whether they are stale.
+- **Result:** `PAYOFF_BEFORE_SETUP` fires on **3/11 intact, 3/11 relocated,
+  3/11 shuffled — identical counts and identical per-script counts** (the 3
+  scripts where it fires — `9_2009`, `Frozen`, `Heavy Metal` — fire it
+  exactly once in all three variants). The rule is reachable (D6 worked as
+  designed) but its firing does NOT change under CLIMAX_RELOCATE or
+  SCENE_SHUFFLE. It is detecting a property of these scripts that is
+  invariant to global scene order.
+- **Diagnostic conclusion:** **D6 did not create usable structural-
+  discrimination signal.** The rule notices some property (likely a clue
+  whose introduction and payoff sit close together regardless of where the
+  climax scene lands in the array) but that property doesn't move under the
+  degradations P1 measures. The Jul 29 baseline CSVs are **not stale in
+  D6's favor** — D6 did not move the discrimination needle on these
+  scripts. This discharges the "is the Jul 29 baseline stale post-D6"
+  question without needing a full re-run.
+- **Validation of the probe itself:** the health column independently
+  reproduces the known degradation asymmetry on this fresh sample —
+  SHUFFLE drops health hard (e.g. `89.0 → 65.8`, `88.9 → 68.9`, `92.3 →
+  72.1`) while CLIMAX_RELOCATE barely moves it (`98.1 → 98.2`, `92.3 →
+  92.7`). That matches the committed test-partition AUCs (shuffle 0.734
+  strong, climax 0.498 chance) on a disjoint script set, so the probe is
+  trustworthy and the negative result on PAYOFF_BEFORE_SETUP is real.
+- **Corpus fingerprint:** first 12 `*.fountain.txt` scripts (alphabetical)
+  under `data/screenplays/`, 11 with ≥3 scenes (1 dropped: `9-matched` —
+  the alphabetical list's first eligible). Per-script per-variant counts
+  in the probe's stdout, captured in this entry.
+- **Runner attestation:** "Agent session (ZCode, builtin:zai-coding-plan/
+  GLM-5.2) ran this probe locally on 2026-08-05 on the repo owner's
+  Windows machine, 36 doctor runs in ~14 min, 0 errors. No scoring-path
+  file changed in this git range."
+
+---
+
 ## 3. Entry template (copy for new entries)
 
 ```
