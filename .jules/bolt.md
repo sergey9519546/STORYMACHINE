@@ -7,3 +7,6 @@
 ## 2024-07-15 - [Zero-Allocation CodeMirror Rendering]
 **Learning:** Found O(N) intermediate array allocations caused by `block.text.split('\n')` inside high-frequency CodeMirror plugin update loops (`fountain-highlight.ts` and `screenplay-format.ts`). Since plugins run synchronously on keystrokes, these allocations cause frame stuttering in large documents.
 **Action:** When extracting line offsets in rendering or highlighting loops, replace `.split('\n')` with native `while (startIndex <= text.length)` loops using `text.indexOf('\n', startIndex)`. This guarantees zero allocation for multiline text processing on hot paths.
+## 2024-08-05 - [Zero-Allocation fastWordCount Usage]
+**Learning:** `.split(/\s+/)` causes significant overhead via intermediate array allocation, especially in loops over many lines of script text. While `(str.match(/\S+/g) || []).length` is an improvement, `fastWordCount(str)` using custom `charCodeAt` loops is substantially faster.
+**Action:** When migrating `.split(/\s+/)` patterns to `fastWordCount`, be careful because `.split` natively handles strings where you just need array length, but sometimes subsequent logic expects an actual extracted array of words (e.g. for `indexOf` or finding character names). ONLY replace `.split(/\s+/)` with `fastWordCount()` when the ONLY operation on the resulting array is checking `.length`.

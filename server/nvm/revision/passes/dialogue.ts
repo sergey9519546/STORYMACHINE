@@ -579,6 +579,7 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { fastWordCount } from '../../../lib/string-utils.ts';
 
 /** Extract dialogue lines from fountain text with speaker attribution */
 function extractDialogue(fountain: string): Array<{ speaker: string; line: string; lineNum: number }> {
@@ -723,7 +724,7 @@ function dialogueLineEngages(priorLine: string, replyLine: string, priorWords: S
     if (priorTokens.some(t => replyTokens.has(t))) return true;
   }
   // A short reactive fragment (under 4 raw words) is a reaction, not a topic change.
-  const replyRawWordCount = replyLine.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const replyRawWordCount = fastWordCount(replyLine);
   if (replyRawWordCount < 4) return true;
   return false;
 }
@@ -1403,7 +1404,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // collapses into monotone brevity. Requires 12+ dialogue lines.
   if (dialogue.length >= 12) {
     const staccatoCount204 = dialogue.filter(d => {
-      const wordCount204 = d.line.trim().split(/\s+/).filter(w => w.length > 0).length;
+      const wordCount204 = fastWordCount(d.line);
       return wordCount204 <= 5;
     }).length;
     const staccatoRatio204 = staccatoCount204 / dialogue.length;
@@ -1512,7 +1513,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // measures the rhythmic texture of the dialogue as a whole. Real speech alternates
   // clipped ripostes with longer reaches; a metronomic line length drains the rhythm.
   if (dialogue.length >= 12) {
-    const wordCounts215 = dialogue.map(d => d.line.trim().split(/\s+/).filter(w => w.length > 0).length);
+    const wordCounts215 = dialogue.map(d => fastWordCount(d.line));
     const meanLen215 = wordCounts215.reduce((a, b) => a + b, 0) / wordCounts215.length;
     if (meanLen215 >= 3) {
       const variance215 = wordCounts215.reduce((a, l) => a + (l - meanLen215) ** 2, 0) / wordCounts215.length;
