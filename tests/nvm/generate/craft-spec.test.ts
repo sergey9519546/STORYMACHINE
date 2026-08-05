@@ -164,3 +164,92 @@ test('integration: buildSystemPreamble omits the craft block when the escape hat
     else process.env.STORYMACHINE_DISABLE_CRAFT_SPEC = prevEnv;
   }
 });
+
+// ── v2: per-scene craft directive routing ─────────────────────────────────
+// The v2 addition widens CraftPromptOptions with an optional sceneContext.
+// When absent, the output must be byte-identical to v1 (existing callers
+// proof-spec.ts and rewrite.ts see zero change). When present, a
+// scene-relevant emphasis block is prepended so scene 0 and the climax no
+// longer receive identical guidance.
+
+test('v2 regression: buildCraftPromptSection() with no sceneContext is byte-identical to v1', () => {
+  // The v1 flat render: header + FOUR_STEP_FRAMING + body + failureModes + OUTPUT_DISCIPLINE,
+  // with NO "SCENE-RELEVANT EMPHASIS" block. This is the contract existing callers rely on.
+  const out = buildCraftPromptSection();
+  assert.ok(!out.includes('SCENE-RELEVANT EMPHASIS'),
+    'no-context output must not contain the v2 emphasis block');
+  assert.ok(out.includes('CRAFT SPEC'), 'header present');
+  assert.ok(out.includes('RECOGNIZE'), 'FOUR_STEP_FRAMING present');
+  assert.ok(out.includes('Scene Construction:'), 'body section present');
+  assert.ok(out.includes('Common Failure Modes'), 'failureModes present');
+  assert.ok(out.includes('OUTPUT DISCIPLINE'), 'output discipline present');
+});
+
+test('v2 regression: sceneContext absent on both call sites (compact + full) produces no emphasis block', () => {
+  for (const compact of [true, false]) {
+    const out = buildCraftPromptSection({ compact });
+    assert.ok(!out.includes('SCENE-RELEVANT EMPHASIS'),
+      `compact=${compact}: no emphasis block without sceneContext`);
+  }
+});
+
+test('v2 routing: act-3 climax-zone context emphasizes cross-cut + escalate-cut-frequency', () => {
+  const out = buildCraftPromptSection({
+    sceneContext: { actPosition: '3', pctThroughScript: 0.85 },
+  });
+  assert.ok(out.includes('SCENE-RELEVANT EMPHASIS'), 'emphasis block present');
+  assert.ok(out.includes('CLIMAX ZONE'), 'act-3 climax emphasis present');
+  assert.ok(out.includes('escalate cut frequency'), 'cross-cut directive emphasized');
+  assert.ok(out.includes('Scene Construction:'), 'full body still present after emphasis');
+});
+
+test('v2 routing: act-1 first-half context emphasizes enter-late + world-establishment', () => {
+  const out = buildCraftPromptSection({
+    sceneContext: { actPosition: '1', pctThroughScript: 0.1 },
+  });
+  assert.ok(out.includes('ACT 1 emphasis'), 'act-1 emphasis present');
+  assert.ok(out.includes('enter late'), 'enter-late directive emphasized');
+});
+
+test('v2 routing: sceneFunction drives function-specific emphasis', () => {
+  const setupOut = buildCraftPromptSection({
+    sceneContext: { sceneFunction: 'set_up_payoff' },
+  });
+  assert.ok(setupOut.includes('SETUP/PAYOFF function'), 'setup/payoff emphasis present');
+  assert.ok(setupOut.includes('long-range setup'), 'long-range-setup directive emphasized');
+
+  const worldOut = buildCraftPromptSection({
+    sceneContext: { sceneFunction: 'establish_world' },
+  });
+  assert.ok(worldOut.includes('WORLD-ESTABLISHMENT function'), 'world-establishment emphasis present');
+});
+
+test('v2 routing: structuralTags drive tag-specific emphasis', () => {
+  const out = buildCraftPromptSection({
+    sceneContext: { structuralTags: ['two-hander', 'montage', 'cold-open'] },
+  });
+  assert.ok(out.includes('TWO-HANDER'), 'two-hander tag emphasis present');
+  assert.ok(out.includes('MONTAGE'), 'montage tag emphasis present');
+  assert.ok(out.includes('COLD OPEN'), 'cold-open tag emphasis present');
+});
+
+test('v2 routing: empty sceneContext (all fields undefined) produces no emphasis block', () => {
+  const out = buildCraftPromptSection({ sceneContext: {} });
+  assert.ok(!out.includes('SCENE-RELEVANT EMPHASIS'),
+    'empty sceneContext should not emit an emphasis block');
+});
+
+test('v2 routing: different scenes get different emphasis (anti-flattening core property)', () => {
+  // The whole point of v2: scene 0 and the climax must NOT receive identical
+  // craft guidance. Verify two materially different contexts produce different
+  // emphasis blocks — this is the anti-flattening property.
+  const opening = buildCraftPromptSection({
+    sceneContext: { actPosition: '1', pctThroughScript: 0.05, sceneFunction: 'establish_world', structuralTags: ['cold-open', 'new-location'] },
+  });
+  const climax = buildCraftPromptSection({
+    sceneContext: { actPosition: '3', pctThroughScript: 0.9, sceneFunction: 'build_tension', structuralTags: ['two-hander'] },
+  });
+  assert.notEqual(opening, climax, 'opening and climax contexts must produce different craft blocks');
+  assert.ok(opening.includes('ACT 1') && !opening.includes('CLIMAX ZONE'), 'opening has act-1 not act-3');
+  assert.ok(climax.includes('CLIMAX ZONE') && !climax.includes('ACT 1 emphasis'), 'climax has act-3 not act-1');
+});
