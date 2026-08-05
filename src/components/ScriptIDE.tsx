@@ -994,6 +994,7 @@ export default function ScriptIDE({
 
   // Phase 2 MVP: Live Intent Debounce
   useEffect(() => {
+    if (llmReady === false) return;
     const timer = setTimeout(async () => {
       const snippet = scriptText.slice(-2000);
       const lastSnippet = lastIntentTextRef.current.slice(-2000);
@@ -1017,7 +1018,7 @@ export default function ScriptIDE({
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [scriptText]);
+  }, [scriptText, llmReady]);
 
   // handleScroll removed — CM6 editor manages its own scroll internally
 

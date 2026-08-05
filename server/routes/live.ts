@@ -2,6 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import { logger } from '../lib/logger.ts';
 import { aiLimiter } from '../lib/session-store.ts';
+import { llmReady } from '../lib/ai-config.ts';
 import { parseIntent, proposeStateDelta } from '../nvm/live/intent-parser.ts';
 
 const router = express.Router();
@@ -14,7 +15,12 @@ const IntentRequestSchema = z.object({
  * POST /api/live/intent
  * Parses writer intent and returns a state delta proposal.
  */
-router.post('/api/live/intent', aiLimiter, async (req, res, next) => {
+router.post('/api/live/intent', aiLimiter, async (req, res) => {
+  if (!llmReady()) {
+    res.status(503).json({ error: 'AI features unavailable in keyless mode (GEMINI_API_KEY unset).' });
+    return;
+  }
+
   try {
     const parsedBody = IntentRequestSchema.safeParse(req.body);
     if (!parsedBody.success) {
@@ -36,7 +42,7 @@ router.post('/api/live/intent', aiLimiter, async (req, res, next) => {
     });
   } catch (error) {
     logger.error('live_intent_route_error', { error: (error as Error).message });
-    next(error);
+    res.status(503).json({ error: 'AI processing failed' });
   }
 });
 
