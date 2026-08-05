@@ -364,6 +364,102 @@ holds (full suite green at the commit carrying this note).
 
 ---
 
+### 2026-08-05 — Task 5a diagnostic: QL/D1/D2/D3 detector disagreement on the full 761-script corpus (DIAGNOSTIC ONLY — no scoring change)
+
+- **Date:** 2026-08-05
+- **Git SHA:** `463086d` (branch `security/ip-address-cve-2026-08-05`, two
+  commits ahead of `main` at `5018fe5` — both commits are a dependency bump
+  and a `.gitignore` hygiene change, NEITHER touches any scoring-path file,
+  confirmed by `node scripts/check-scoring-receipt.mjs`).
+- **Command:** `node scripts/diagnose-detectors-standalone.mjs --partition=<train|val|test>`
+  run three times (once per partition). New script — see "Method note" below
+  for why this is a separate runner rather than `measure-auc-split.mjs`.
+- **Measured AUC-24:** N/A — this run does NOT measure AUC. It is a
+  per-detector disagreement diagnostic only. The AUC-24 floor
+  (0.622, `tests/core/real-script-corpus.test.ts`) is untouched and was
+  not re-evaluated; no scoring-path file changed in this range.
+- **Flag-run AUCs:** N/A — by design. The three diagnostics measured here
+  (QL question-latency deduction, D1/D2 agency-signal disagreement, D3
+  reversal-detection disagreement) are all UNWIRED candidates. This run
+  answers "do these detectors disagree with legacy at all, and at what
+  rate, on the real corpus?" — the prerequisite to deciding whether the
+  full AUC on/off comparison (PATH_TO_DONE task 5a) is even worth running.
+- **Method note — why a new runner, not `measure-auc-split.mjs`:** the
+  existing harness computes these diagnostics INSIDE its main AUC loop,
+  so even with `--with-question-latency-deduction` /
+  `--with-agency-signal` / `--with-reversal-detection` it still runs
+  `runScriptDoctor` 5× per script (1 base + 4 degradations). On the
+  152-script val partition that is ~760 doctor runs and exceeded one hour
+  wall-clock on this machine (the run was killed at ~60 min, ~half done).
+  The diagnostics themselves only need `analyzeFountainText` on the REAL
+  (undegraded) text — ~0.15s/script. `diagnose-detectors-standalone.mjs`
+  does exactly that: one analysis pass per script, all three detector
+  diagnostics, no degradations, no doctor. Full 761-script corpus in
+  ~37s total (23s train + 7s val + 7s test) instead of multiple hours.
+  The diagnostic is IDENTICAL to what `measure-auc-split.mjs` computes
+  (it imports the same `computeReversalDelta` / `computeD1AgencyDelta` /
+  `computeD2AgencyDelta` / `computeQuestionLatencyDeduction` functions);
+  only the expensive AUC scaffolding around them is skipped.
+- **Results across all three partitions (761 scripts total, 0 skipped):**
+
+  | Detector | train (456) | val (152) | test (153) | Reading |
+  |---|---|---|---|---|
+  | D1 agency @ peak — disagreement | 0.2% (1) | 0.0% (0) | 0.0% (0) | Essentially never fires on produced features |
+  | D2 agency in Act 3 — disagreement | 0.0% (0) | 0.0% (0) | 0.0% (0) | Never fires on produced features |
+  | D3 reversal — any disagreement | 6.4% (29) | 4.6% (7) | 3.9% (6) | Modest signal — legacy misses a few reversals |
+  | D3 reversal — legacy-misses-entirely (legacy=0, detected≥1) | 3.7% (17) | 3.9% (6) | 2.6% (4) | The D3 defect direction, ~3-4% of scripts |
+  | QL question-latency — mean deduction | 0.11 | 0.06 | 0.07 | Near-zero |
+  | QL question-latency — max deduction | 5.91 | 4.55 | 5.00 | Rare outlier scripts only |
+  | QL question-latency — fires (>0) on | 10.3% (47) | 7.9% (12) | 6.5% (10) | ~9 in 10 scripts get zero deduction |
+
+- **Diagnostic conclusion for task 5a (the question-latency deduction):**
+  wiring the QL deduction into the scoring path would **not meaningfully
+  move the discrimination AUC**. It fires on only ~6–10% of scripts and
+  its mean deduction is 0.06–0.11 health points — an order of magnitude
+  below the ~6-point intact-vs-degraded health gap the AUC discriminates
+  on. The three already-implemented order-sensitive rules it would
+  re-route (`UNANSWERED_QUESTION_FLOOD`, `INSTANT_GRATIFICATION_PATTERN`,
+  `DEAD_QUESTION_ZONE`) are currently in the AUC-~0.076 density channel;
+  moving them to a bounded deduction that averages 0.1 points cannot
+  rescue a channel at chance. **Recommendation: do NOT wire QL; the full
+  AUC on/off comparison (`measure-auc-split.mjs --with-question-latency-
+  deduction`) is not worth the multi-hour run given this diagnostic shows
+  the upper bound on its effect is negligible.** This discharges task 5a's
+  "is the experiment worth running" question without the expensive run.
+- **Diagnostic conclusion for D1/D2 (agency signal):** the agency-aware
+  read disagrees with the legacy passivity predicate on effectively zero
+  produced features (1/761 across all partitions). DETECTOR_DEFECTS's
+  D1/D2 addendum already showed this on 20 CC0 scripts; this extends it
+  to the full 761-script produced-feature corpus. The defect is real in
+  mechanism (the sample report's vault scene is a genuine false positive)
+  but does NOT fire at feature scale — consistent with the engine's
+  broader order-blindness (D7's finding that a score which cannot detect
+  scene order cannot notice agency ordering either). Not a candidate for
+  wiring without first closing the structural-discrimination gap.
+- **Diagnostic conclusion for D3 (reversal detection):** the only detector
+  with non-negligible signal — disagrees with legacy on ~4–6% of scripts
+  and finds reversals legacy misses entirely on ~3%. Still modest, and
+  the AUC on/off comparison would be needed to confirm it helps rather
+  than hurts, but unlike QL/D1/D2 it is at least worth that comparison.
+- **Corpus fingerprint:** `scripts/output/corpus-split.json` (committed,
+  `generatedAt: 2026-07-29T12:16:14.874Z`, seed 42, testSetHash
+  `e19e6cc2...`) — 761 valid scripts (456 train / 152 val / 153 test),
+  all 761 `file` entries resolved present under `data/screenplays/`
+  (verified: 0 missing across all three partitions, 0 skipped as
+  unanalyzable). Per-script rows in `scripts/output/detector-
+  diagnostics-<partition>.csv`.
+- **Runner attestation:** "Agent session (ZCode, builtin:zai-coding-plan/
+  GLM-5.2) ran these diagnostics locally on 2026-08-05 on the repo owner's
+  Windows machine, against the local `data/screenplays/` corpus (the full
+  761-script split — PATH_TO_DONE's repeated claim that 'no 761-script
+  corpus is present in this sandbox' is factually incorrect for this
+  environment; all 761 split entries resolve). Three partition runs
+  (train/val/test), 761 scripts total, ~37s combined wall-clock, 0
+  errors, 0 skips. No scoring-path file was changed in this measurement's
+  git range."
+
+---
+
 ## 3. Entry template (copy for new entries)
 
 ```
