@@ -67,6 +67,38 @@ intact. The peak is in the wrong place on real writing by construction.
 No positional gate on `max(suspenseDelta)` can work until the climax
 locator itself changes.
 
+## Downstream consequence: `SUSPENSE_PEAK_UNCAUSED` is a dead rule
+
+The degeneracy has a second downstream effect beyond CLIMAX_RELOCATE
+discrimination: it makes `SUSPENSE_PEAK_UNCAUSED` (pacing.ts:~2814,
+`n >= 8` gate) effectively dead on produced features. That rule finds
+the `max(suspenseDelta)` scene and audits whether it has an upstream
+cause (clock/turn/revelation in itself or the two preceding scenes).
+Its own guard requires `peakSuspensePos481b >= 2` — but the degenerate
+peak sits at scene 0-1 on 27/27 produced scripts (median scene 1), so
+the guard suppresses the rule before it can fire.
+
+Measured: **0/12 produced features** trigger `SUSPENSE_PEAK_UNCAUSED`.
+It is not a live false-positive on produced writing; it is a rule that
+*cannot* fire because the locator it depends on points at the cold open,
+which the rule's own `>= 2` guard excludes.
+
+**On user drafts** the situation is different and worse: a draft whose
+peak danger-word density happens to land at scene 2+ with no cause signal
+will trip the rule — but it will be auditing *whatever random scene has
+the most danger vocabulary*, not the dramatic climax. The rule's message
+("the highest-suspense scene has no upstream cause") is only honest when
+"highest-suspense scene" means the dramatic climax, which on this signal
+it does not.
+
+This is a documented consequence of the known locator degeneracy, **not
+an independently fixable bug**. Patching the `>= 2` guard would just move
+where the dead rule fails; the only real fix is replacing the
+`suspenseDelta` climax-locator, which is the unsolved problem the
+CLIMAX_LOCATOR_PROBE and NOVELTY_SIGNAL docs address. Do not attempt to
+"fix" this rule without solving the locator — that would be the
+scoring-change-without-evidence pattern CLAUDE.md forbids.
+
 ## What CAN work (directions not disproven here)
 
 The diagnosis doc's conclusion holds: the fix is analyzer-layer,
