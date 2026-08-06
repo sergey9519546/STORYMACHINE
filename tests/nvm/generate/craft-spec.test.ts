@@ -15,7 +15,7 @@ import {
   craftSpecEnabled,
   looksLikeAnimationGenre,
 } from '../../../server/nvm/generate/craft-spec.ts';
-import { buildSystemPreamble } from '../../../server/nvm/generate/proof-spec.ts';
+import { buildSystemPreamble, buildGenerationSpec } from '../../../server/nvm/generate/proof-spec.ts';
 import { emptyState } from '../../../server/nvm/state/NarrativeState.ts';
 
 // ── Module shape ──────────────────────────────────────────────────────────
@@ -252,4 +252,70 @@ test('v2 routing: different scenes get different emphasis (anti-flattening core 
   assert.notEqual(opening, climax, 'opening and climax contexts must produce different craft blocks');
   assert.ok(opening.includes('ACT 1') && !opening.includes('CLIMAX ZONE'), 'opening has act-1 not act-3');
   assert.ok(climax.includes('CLIMAX ZONE') && !climax.includes('ACT 1 emphasis'), 'climax has act-3 not act-1');
+});
+
+// ── v2 wiring: buildGenerationSpec threads the target into the preamble ────
+// These integration tests prove the sceneContext routing actually fires at the
+// real generation call site (not just when buildCraftPromptSection is called
+// directly with a hand-built context). buildGenerationSpec is the function
+// the converge loop calls; its preamble must now carry scene-differentiated
+// craft emphasis.
+
+test('v2 wiring: buildGenerationSpec for scene 0 emphasizes act-1 cold-open craft', () => {
+  const state = emptyState();
+  const spec = buildGenerationSpec(
+    state,
+    { sceneIdx: 0, sceneFunction: 'establish_world', activeMechanisms: [], tensionTarget: 30 },
+    [],
+  );
+  assert.ok(spec.systemPreamble.includes('CRAFT SPEC'), 'craft block present');
+  assert.ok(spec.systemPreamble.includes('SCENE-RELEVANT EMPHASIS'), 'emphasis block wired in');
+  assert.ok(spec.systemPreamble.includes('ACT 1 emphasis'), 'scene 0 gets act-1 emphasis');
+  assert.ok(spec.systemPreamble.includes('WORLD-ESTABLISHMENT'), 'establish_world function emphasized');
+  assert.ok(!spec.systemPreamble.includes('CLIMAX ZONE'), 'scene 0 does not get climax emphasis');
+});
+
+test('v2 wiring: buildGenerationSpec in climax-zone audience state emphasizes act-3 craft', () => {
+  const state = emptyState();
+  // Climax-zone audience state: suspense + investment near ceiling (the
+  // signal buildSystemPreamble uses to infer the act-3 position)
+  const climaxState = {
+    ...state,
+    audienceState: { ...state.audienceState, suspense: 90, investment: 88 },
+  };
+  const spec = buildGenerationSpec(
+    climaxState,
+    { sceneIdx: 8, sceneFunction: 'build_tension', activeMechanisms: [], tensionTarget: 95 },
+    [],
+  );
+  assert.ok(spec.systemPreamble.includes('CLIMAX ZONE'), 'climax-zone state gets act-3 emphasis');
+  assert.ok(spec.systemPreamble.includes('escalate cut frequency'), 'cross-cut directive emphasized');
+  assert.ok(!spec.systemPreamble.includes('ACT 1 emphasis'), 'climax does not get act-1 emphasis');
+});
+
+test('v2 wiring: buildSystemPreamble with no target is byte-identical to v1 (existing callers)', () => {
+  // proof-spec.ts's buildSystemPreamble gains an optional 3rd `target` param.
+  // Existing callers that don't pass it (e.g. some tests, any future caller)
+  // must get the exact v1 preamble — no sceneContext, no emphasis block.
+  const state = emptyState();
+  const preamble = buildSystemPreamble([], state);
+  assert.ok(!preamble.includes('SCENE-RELEVANT EMPHASIS'),
+    'no-target preamble must not contain the v2 emphasis block');
+  assert.ok(preamble.includes('CRAFT SPEC'), 'craft block still present');
+  assert.ok(preamble.includes('PROOF CONSTRAINTS'), 'rest of preamble intact');
+});
+
+test('v2 wiring: scene 0 and climax preambles are different (end-to-end anti-flattening)', () => {
+  const base = emptyState();
+  const opening = buildGenerationSpec(
+    base,
+    { sceneIdx: 0, sceneFunction: 'establish_world', activeMechanisms: [], tensionTarget: 30 },
+    [],
+  ).systemPreamble;
+  const climax = buildGenerationSpec(
+    { ...base, audienceState: { ...base.audienceState, suspense: 92, investment: 90 } },
+    { sceneIdx: 10, sceneFunction: 'build_tension', activeMechanisms: [], tensionTarget: 98 },
+    [],
+  ).systemPreamble;
+  assert.notEqual(opening, climax, 'opening and climax preambles must differ');
 });

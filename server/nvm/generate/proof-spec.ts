@@ -9,7 +9,7 @@ import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { SceneFunction } from '../ir/NarrativeTransitionIR.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { genrePromptBlock } from '../../lib/genre-router.ts';
-import { buildCraftPromptSection, looksLikeAnimationGenre } from './craft-spec.ts';
+import { buildCraftPromptSection, looksLikeAnimationGenre, type SceneCraftContext } from './craft-spec.ts';
 
 export interface SceneTarget {
   sceneIdx: number;
@@ -164,7 +164,18 @@ export function proofsToConstraints(
 // Build the system preamble that encodes constraints as LLM instructions.
 // Includes a rich snapshot of current story state so the generator has full
 // emotional, structural, and relational context — not just a character list.
-export function buildSystemPreamble(constraints: GenerationConstraint[], state: NarrativeState): string {
+//
+// v2 (2026-08-05): the optional `target` param threads the scene being
+// generated (its function + index) into the craft-spec routing, so the
+// preamble's craft guidance is scene-appropriate rather than one global
+// block. When `target` is absent (e.g. existing tests, the diagnose-only
+// path), the craft block is byte-identical to v1 — see craft-spec.ts's
+// sceneContext contract.
+export function buildSystemPreamble(
+  constraints: GenerationConstraint[],
+  state: NarrativeState,
+  target?: SceneTarget,
+): string {
   const knownChars = Object.keys(state.characterBeliefs)
     .map(id => sanitizeForPrompt(id, 64))
     .join(', ') || 'none yet';
@@ -296,9 +307,35 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
   // header): compact form here since the preamble already carries a dense
   // state snapshot above; full directive text would crowd out the proof
   // constraints that are load-bearing for the compiler contract below.
+  //
+  // v2: when a target is provided, derive a sceneContext so the craft block
+  // carries scene-relevant emphasis (act-1 cold-opens, act-3 climax zones,
+  // scene-function-specific directives). The act estimate uses the
+  // audience-state climax signal already computed above (a suspense+investment
+  // near-ceiling reliably indicates the climax zone) plus the scene index as a
+  // rough positional fallback. This is intentionally coarse — precise act
+  // boundaries require a sceneCount the state doesn't carry — but it is enough
+  // to route the emphasis (the routing falls back gracefully to no emphasis
+  // when none of the signals fire). When no target is passed, sceneContext is
+  // undefined and the craft block is byte-identical to v1.
+  let sceneContext: SceneCraftContext | undefined;
+  if (target) {
+    const inClimaxZone = safeSuspense >= 85 && safeInvestment >= 85;
+    const actPosition = inClimaxZone
+      ? '3'
+      : target.sceneIdx === 0
+        ? '1'
+        : undefined; // mid-script scenes get no act estimate rather than a wrong one
+    sceneContext = {
+      sceneFunction: target.sceneFunction,
+      actPosition,
+      genre: state.authorIntent.genre,
+    };
+  }
   const craftBlock = buildCraftPromptSection({
     compact: true,
     animation: looksLikeAnimationGenre(state.authorIntent.genre),
+    sceneContext,
   });
 
   const constraintLines = constraints
@@ -330,7 +367,7 @@ export function buildGenerationSpec(
   if (target.sceneIdx < 0) throw new Error('buildGenerationSpec: sceneIdx must be >= 0');
   if (!target.sceneFunction) throw new Error('buildGenerationSpec: sceneFunction is required');
   const constraints = proofsToConstraints(state, target, failures);
-  const systemPreamble = buildSystemPreamble(constraints, state);
+  const systemPreamble = buildSystemPreamble(constraints, state, target);
   return { state, target, constraints, systemPreamble };
 }
 
