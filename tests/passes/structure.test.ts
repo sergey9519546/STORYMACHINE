@@ -793,6 +793,43 @@ describe('Wave 152 — structurePass: revelation drought, false climax, act symm
       assert.ok(imbalance.length >= 1, 'Should detect SETUP_RESOLUTION_IMBALANCE for 8:1 setup-to-payoff ratio');
       assert.ok(imbalance[0].severity === 'minor');
     });
+
+    // ── Pilot session 2026-08-07 fix #2: FALSE_CLIMAX tie-break ────────────
+    // (PILOT_SESSION_REPORT.md §6.2). The old `>` peak scan always kept the
+    // FIRST scene to reach the max suspenseDelta; on the pilot draft, Scene 1
+    // (calm banter, tension-lexicon words like "debt"/"forfeit") tied exactly
+    // with Scene 9 (the real climax) at suspense 5.0, and the loop reported
+    // the false peak at Scene 1. `>=` makes a later scene win an exact tie.
+    it('structurePass: FALSE_CLIMAX does NOT fire when the peak suspense scene ties between an early scene and the true late-story climax', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      // 10 scenes, climaxZoneStart = floor(10*0.7) = 7 (0-based). Scene 1
+      // (idx 0) ties exactly with Scene 9 (idx 8, inside the climax zone) at
+      // suspense 5 — the pilot draft's exact shape.
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 0 || i === 8 ? 5 : 1 }));
+      const result = await structurePass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const falseClimax = result.issues.filter(i => i.rule === 'FALSE_CLIMAX');
+      assert.ok(
+        falseClimax.length === 0,
+        `FALSE_CLIMAX must not fire when the tied peak is also present in the climax zone; got: ${falseClimax.map(i => i.description).join(' | ')}`,
+      );
+    });
+
+    it('structurePass: FALSE_CLIMAX still fires when the peak suspense scene is uniquely early with no late-story tie', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 1 ? 5 : 1 })); // unique peak at idx 1, no tie anywhere
+      const result = await structurePass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const falseClimax = result.issues.filter(i => i.rule === 'FALSE_CLIMAX');
+      assert.ok(falseClimax.length >= 1, 'FALSE_CLIMAX must still fire on a genuinely early, untied peak (tie-break fix must not regress the true-positive case)');
+      assert.match(falseClimax[0].location, /Scene 2/);
+    });
   });
 
 
@@ -7007,3 +7044,90 @@ describe('I1-a — structurePass: DARK_NIGHT_ABSENT tone-composed thresholds (co
     );
   });
 });
+
+// ── Pilot session 2026-08-07 fix #2 regression tests (PILOT_SESSION_REPORT.md §6) ──
+
+describe('analyzeStructure — tightestScene tie-break (pilot session 2026-08-07)', () => {
+  it('an exact suspenseDelta tie between an early and a late scene resolves to the LATER scene, not the first-visited one', () => {
+    // Was `>` in the reduce, which always kept the earliest scene on a tie —
+    // silently pinning "tightest scene" to Scene 1 on the pilot draft (Scene 1
+    // and Scene 9 both scored suspense 5.0), which fed a false CLIMAX_TOO_EARLY.
+    const suspenseBySceneIdx = [5, 1, 1, 1, 1, 1, 1, 1, 5, 1]; // ties at idx 0 and idx 8
+    const commits = suspenseBySceneIdx.map((suspense, i) =>
+      makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense } } as StoryOp]));
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+
+    assert.equal(structure.tightestScene, 8, 'a tie between Scene 1 (idx 0) and Scene 9 (idx 8) must resolve to the later scene');
+  });
+
+  it('no tie: the single unique peak scene still wins regardless of position (tie-break fix must not regress the ordinary case)', () => {
+    const suspenseBySceneIdx = [1, 1, 1, 4, 1, 1, 1, 1, 2, 1]; // unique peak at idx 3
+    const commits = suspenseBySceneIdx.map((suspense, i) =>
+      makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense } } as StoryOp]));
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+
+    assert.equal(structure.tightestScene, 3, 'a unique peak must still be picked exactly as before');
+  });
+});
+
+describe('structurePass — NO_REVERSALS honesty hedge (pilot session 2026-08-07)', () => {
+  it('NO_REVERSALS names the suspense-dip signal and its blind spot instead of a flat "no opposition" claim', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const records = Array.from({ length: 5 }, (_, i) =>
+      ({
+        commitId: `c${i}`, sceneIdx: i, slug: `INT. SC${i} - DAY`,
+        purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+        clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+        payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      } as any));
+    const fountain = Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: records as any,
+      structure: { ...baseStructureFor152(), reversalCount: 0 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    const noReversals = result.issues.filter(i => i.rule === 'NO_REVERSALS');
+    assert.ok(noReversals.length >= 1, 'NO_REVERSALS must still fire when reversalCount is 0 on a 5+ scene story');
+    assert.match(noReversals[0].description, /suspenseDelta < -1/, 'must name the exact signal being measured');
+    assert.match(noReversals[0].description, /betrayal|broken deal|backfir/i, 'must name what the signal cannot see');
+    assert.ok(
+      !/^No dramatic reversals detected — the story progresses in a single direction without opposition$/.test(noReversals[0].description),
+      'must not still render the old flat, unqualified claim',
+    );
+  });
+
+  it('NO_REVERSALS does not fire when a real reversal was detected (reversalCount > 0)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const records = Array.from({ length: 5 }, (_, i) =>
+      ({
+        commitId: `c${i}`, sceneIdx: i, slug: `INT. SC${i} - DAY`,
+        purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+        clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+        payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      } as any));
+    const fountain = Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: records as any,
+      structure: { ...baseStructureFor152(), reversalCount: 1 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(!result.issues.some(i => i.rule === 'NO_REVERSALS'), 'must not fire once a reversal is detected');
+  });
+});
+
+/** Minimal StructureState shared by the NO_REVERSALS hedge tests above —
+ *  mirrors the Wave 152 describe block's own baseStructure shape so these
+ *  fixtures need no fields structurePass doesn't already read elsewhere in
+ *  this file. */
+function baseStructureFor152() {
+  return {
+    actPosition: 'act2a' as const, completionPercent: 50, totalClockPressure: 5,
+    midpointPressure: 2, reversalCount: 1, tightestScene: 2, avgSuspensePerScene: 1,
+    escalating: false, reversalDensity: 0.2, approachingClimax: false,
+    openClues: 0, revelationCount: 0,
+  };
+}

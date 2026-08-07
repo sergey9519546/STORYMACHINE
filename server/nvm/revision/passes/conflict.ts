@@ -608,13 +608,24 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Reversal density too low ──────────────────────────────────────────────
+  // Honesty hedge (pilot session 2026-08-07, PILOT_SESSION_REPORT.md §6.1) —
+  // same underlying blind spot as structure.ts's NO_REVERSALS sibling rule:
+  // `structure.reversalDensity` is derived from `reversalCount`, itself only
+  // scenes with `suspenseDelta < -1` (a tension-lexicon magnitude dip). It
+  // cannot see a betrayal, broken deal, or backfire that doesn't also read as
+  // a tension-language drop — this rule fired CRITICAL on the pilot draft
+  // even though its climax (a trade Barrow reneges on, then a MacGuffin he
+  // destroys rather than surrenders) is a reversal by any craft definition.
+  // Named the actual signal and its blind spot rather than the flat "lacks
+  // conflict texture" claim a reread can falsify in one page. No
+  // detection-logic change — reversalDensity itself is untouched.
   if (structure.reversalDensity === 0 && records.length >= 8) {
     issues.push({
       location: 'Conflict layer',
       rule: 'NO_REVERSALS_LONG_STORY',
-      description: 'An 8+ scene story with zero dramatic reversals lacks conflict texture',
+      description: 'An 8+ scene story with zero suspense-dip reversals detected — this reads only for a sharp scene-level drop in the engine\'s danger/tension language (suspenseDelta < -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as "no conflict texture."',
       severity: 'critical',
-      suggestedFix: 'Add at least one scene where a character\'s plan fails or backfires unexpectedly',
+      suggestedFix: 'If a reread confirms no plan ever fails or backfires anywhere in the story, add one. If a reversal already exists on the page but isn\'t registering here, that\'s a gap in this detector\'s tension-language coverage, not necessarily a craft problem.',
     });
   }
 

@@ -652,13 +652,29 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Missing reversal means flat structure ─────────────────────────────────
+  // Honesty hedge (pilot session 2026-08-07, PILOT_SESSION_REPORT.md §6.1):
+  // `structure.reversalCount` is defined ONLY as scenes with `suspenseDelta
+  // < -1` — a magnitude dip in the danger/relief lexicon (see D3,
+  // docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md, and
+  // reversal-detection.ts's own header for the full analysis). It cannot see
+  // a reversal conveyed as a broken deal, a betrayal, or a plan backfiring in
+  // the plot unless that beat also happens to read as a tension-language
+  // drop. The pilot draft's climax IS a reversal by any craft definition —
+  // Barrow takes the trade then immediately reneges, and destroys the
+  // MacGuffin rather than lose it — and this rule still fired, flatly
+  // asserting "no dramatic reversals" on a script whose ending is one. A
+  // confident false claim here is worse than not flagging the dimension at
+  // all (NORTH_STAR §1: hedged claims over confident wrong ones), so this
+  // names the exact signal being measured and its blind spot instead of
+  // overclaiming "no opposition anywhere." No detection-logic change:
+  // reversalCount's definition and every other rule reading it are untouched.
   if (structure.reversalCount === 0 && n >= 5) {
     issues.push({
       location: 'Overall structure',
       rule: 'NO_REVERSALS',
-      description: 'No dramatic reversals detected — the story progresses in a single direction without opposition',
+      description: 'No suspense-dip reversals detected — this checks only for a scene where the engine\'s danger/tension language drops sharply (suspenseDelta < -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn\'t also read as a tension drop. Reread the draft for that kind of turn before treating this as "no opposition anywhere."',
       severity: 'major',
-      suggestedFix: 'Add a scene where a character\'s plan backfires or a situation inverts',
+      suggestedFix: 'If a reread confirms the story truly never turns, add a scene where a character\'s plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector\'s coverage, not necessarily a craft problem.',
     });
   }
 
@@ -757,8 +773,17 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   if (n >= 8) {
     let peakScene = -1;
     let peakSuspense = -Infinity;
+    // Tie-break fix (pilot session 2026-08-07, PILOT_SESSION_REPORT.md §6.2):
+    // `>=` (was `>`) so a later scene overwrites an earlier one on an exact
+    // suspenseDelta tie. `>` always keeps the FIRST scene to reach the max —
+    // on the pilot draft, Scene 1's suspense (5.0, off tension-lexicon words
+    // like "debt"/"forfeit"/"collectors") tied exactly with Scene 9's (the
+    // actual climax, also 5.0), so this loop reported "peak suspense occurs
+    // at Scene 1" even though the true climax scene matched it. Same fix
+    // applied to structure.tightestScene (screenplay/structure.ts), the
+    // other whole-document peak-suspense scan feeding CLIMAX_TOO_EARLY.
     for (let i = 0; i < n; i++) {
-      if (records[i].suspenseDelta > peakSuspense) {
+      if (records[i].suspenseDelta >= peakSuspense) {
         peakSuspense = records[i].suspenseDelta;
         peakScene = i;
       }

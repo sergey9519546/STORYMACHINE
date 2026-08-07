@@ -18,7 +18,7 @@
 // escapeHtml(); there is no raw-interpolation path anywhere in this file.
 
 import type {
-  ScriptDoctorReport, DimensionScore, SceneDiagnostics, CoverageVerdict,
+  ScriptDoctorReport, DimensionScore, SceneDiagnostics, CoverageVerdict, RootCauseFinding,
 } from '../nvm/analyze/types.ts';
 import type { RevisionIssue, PassName } from '../nvm/revision/passes/types.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
@@ -262,6 +262,55 @@ function buildTopPrioritiesSection(topPriorities: Array<RevisionIssue & { pass: 
   return `
   <section class="section">
     <h2>Top Priorities</h2>
+    <ol class="priority-list">
+      ${items}
+    </ol>
+  </section>`;
+}
+
+// Pilot session 2026-08-07 finding #3 (PILOT_SESSION_REPORT.md §0.3, §6, §9.3):
+// the API report (POST /api/scriptide/doctor) carries a root-causes synthesis
+// that collapses the raw issue list into named underlying problems — exactly
+// the "bounded deduction, not issue-count density" collapsing CLAUDE.md's
+// standing task calls for — but the exported coverage.html previously jumped
+// straight from Top Priorities to the raw 181-item Full Pass Appendix, so the
+// most reader-friendly layer of the system was computed and never shown to
+// the person receiving the static report (one of the two documented P0
+// exposure modes). Placed between Top Priorities and the appendix: the
+// appendix stays as the exhaustive record, but a reader now has the collapsed
+// synthesis first.
+function buildRootCausesSection(rootCauses: RootCauseFinding[] | undefined): string {
+  // Guard: only render when the report actually carries a synthesis — an
+  // absent/empty rootCauses means the caller never attached one (this field
+  // is optional on ScriptDoctorReport; only the /doctor, /doctor/deep, and
+  // /doctor/pdf routes attach it today, per each route's own clustering step
+  // in server/routes/scriptide.ts), not that clustering ran and found nothing
+  // to group. Matches buildStrengthsSection's own "omit entirely rather than
+  // render a hollow section" convention.
+  if (!rootCauses || rootCauses.length === 0) return '';
+
+  const items = rootCauses.map(rc => {
+    const scenes = rc.sceneIdxs.length > 0
+      ? rc.sceneIdxs.map(i => `Scene ${i + 1}`).join(', ')
+      : null;
+    const memberLine = `Subsumes ${formatNumber(rc.memberCount)} issue${rc.memberCount === 1 ? '' : 's'}`
+      + (scenes ? ` &mdash; ${escapeHtml(scenes)}` : '')
+      + (rc.memberRules.length > 0 ? ` &mdash; rules: ${escapeHtml(rc.memberRules.join(', '))}` : '');
+    return `
+    <li class="priority-item">
+      <div class="priority-head">
+        ${severityChip(rc.severity)}
+        <span class="issue-location">${escapeHtml(rc.title)}</span>
+      </div>
+      <div class="issue-description">${escapeHtml(rc.explanation)}</div>
+      <div class="issue-fix">${memberLine}</div>
+    </li>`;
+  }).join('\n');
+
+  return `
+  <section class="section">
+    <h2>Root Causes</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(rootCauses.length)} finding${rootCauses.length === 1 ? '' : 's'} below cluster the detailed issue list into named underlying problems &mdash; read this before the full appendix.</p>
     <ol class="priority-list">
       ${items}
     </ol>
@@ -765,6 +814,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildStrengthsSection(strengths),
     buildHeatmapSection(report.sceneHeatmap ?? []),
     buildTopPrioritiesSection(report.topPriorities ?? []),
+    buildRootCausesSection(report.rootCauses),
     buildAppendixSection(report.passes ?? []),
     buildFooterSection(report),
   ].join('\n');

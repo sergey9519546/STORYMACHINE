@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import {
   runScriptDoctor, computeHealthScore, gradeForHealth, verdictFor, buildStrengths,
   computeDimensionScore, computeDimensionRawScore, aggregateReport, clearDoctorCache,
+  reconcileStrengthsWithCriticalFindings,
 } from '../../server/nvm/analyze/doctor.ts';
 import { runDiagnoseOnly, rewritePass } from '../../server/nvm/revision/rewrite.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
@@ -16,7 +17,7 @@ import type { DimensionKey, DimensionScore, FountainAnalysis } from '../../serve
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { RevisionResult } from '../../server/nvm/revision/pipeline.ts';
-import type { PassResult, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
+import type { PassResult, RevisionIssue, PassName } from '../../server/nvm/revision/passes/types.ts';
 
 const PASS_ORDER = [
   'structure', 'causality', 'intention', 'belief', 'conflict', 'character-arc', 'dialogue',
@@ -488,6 +489,60 @@ describe('buildStrengths — earned, never-padded bullets', () => {
       !strengths.some(s => s.includes('gets paid off')),
       'must not claim payoff completeness when nothing was ever seeded',
     );
+  });
+});
+
+// ── Pilot session 2026-08-07 fix #1: strengths/critical-finding consistency ──
+// guard (PILOT_SESSION_REPORT.md §6.3). The "What's Working" section praised
+// Scene 9's suspense build as the report's only strength while topPriorities[0]
+// (critical, PROTAGONIST_PASSIVITY_CLIMAX) called the same scene the story's
+// core failure, with no acknowledgment either way.
+describe('reconcileStrengthsWithCriticalFindings — pilot session 2026-08-07 self-contradiction guard', () => {
+  const suspenseStrength =
+    'The draft\'s highest-suspense scene sits in the final quartile (Scene 9, suspense delta 5) '
+    + 'and tops every earlier quarter\'s average tension.';
+
+  function makeTopPriority(overrides: Partial<RevisionIssue & { pass: PassName }> = {}): RevisionIssue & { pass: PassName } {
+    return {
+      location: 'Scene 9 (climax peak)',
+      rule: 'PROTAGONIST_PASSIVITY_CLIMAX',
+      description: 'Peak-intensity climax scene shows no protagonist engagement.',
+      severity: 'critical',
+      pass: 'structure',
+      ...overrides,
+    };
+  }
+
+  it('fire: appends a tension acknowledgment when a strength names the same scene a CRITICAL top-priority finding condemns', () => {
+    const result = reconcileStrengthsWithCriticalFindings([suspenseStrength], [makeTopPriority()]);
+
+    assert.equal(result.length, 1);
+    assert.ok(result[0].startsWith(suspenseStrength), 'must not delete or reword the original earned signal');
+    assert.ok(result[0].length > suspenseStrength.length, 'must append an acknowledgment, not silently pass the strength through unchanged');
+    assert.match(result[0], /top-priority critical finding/i);
+  });
+
+  it('no-fire: leaves strengths untouched when no top-priority finding is CRITICAL severity', () => {
+    const majorOnly = [makeTopPriority({ severity: 'major' })];
+    const result = reconcileStrengthsWithCriticalFindings([suspenseStrength], majorOnly);
+    assert.deepEqual(result, [suspenseStrength]);
+  });
+
+  it('no-fire: leaves strengths untouched when the critical finding names a different scene than any strength', () => {
+    const differentScene = [makeTopPriority({ location: 'Scene 3 (climax peak)' })];
+    const result = reconcileStrengthsWithCriticalFindings([suspenseStrength], differentScene);
+    assert.deepEqual(result, [suspenseStrength]);
+  });
+
+  it('no-fire: leaves a strength untouched when it names no scene at all', () => {
+    const genericStrength = 'No fatal flaws surfaced across 10 scenes — nothing here would sink the draft outright.';
+    const result = reconcileStrengthsWithCriticalFindings([genericStrength], [makeTopPriority()]);
+    assert.deepEqual(result, [genericStrength]);
+  });
+
+  it('no-fire: an empty strengths array stays empty regardless of critical findings', () => {
+    const result = reconcileStrengthsWithCriticalFindings([], [makeTopPriority()]);
+    assert.deepEqual(result, []);
   });
 });
 

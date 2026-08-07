@@ -7382,3 +7382,47 @@ describe('Wave 1186 — conflictPass (Program v2, Type 1 — signal channel): po
       );
     });
   });
+
+// ── Pilot session 2026-08-07 fix #2 regression tests (PILOT_SESSION_REPORT.md §6.1) ──
+describe('conflictPass — NO_REVERSALS_LONG_STORY honesty hedge (pilot session 2026-08-07)', () => {
+  const makeStructureNR = (reversalDensity: number) => ({
+    actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 10,
+    midpointPressure: 3, reversalCount: reversalDensity === 0 ? 0 : 1, tightestScene: 3,
+    avgSuspensePerScene: 1.5, escalating: false, reversalDensity,
+    approachingClimax: false, openClues: 0, revelationCount: 0,
+  });
+
+  it('NO_REVERSALS_LONG_STORY names the suspense-dip signal and its blind spot instead of a flat "lacks conflict texture" claim', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) => makeRecord79({ sceneIdx: i }));
+    const result = await conflictPass({
+      fountain: Array.from({ length: 8 }, (_, i) => `INT. SCENE${i} - DAY\n\nAction.`).join('\n\n'),
+      original: '', annotations: [], approvedSpans: [],
+      structure: makeStructureNR(0),
+      records,
+    } as import('../../server/nvm/revision/passes/types.ts').PassInput);
+
+    const longStory = result.issues.filter(i => i.rule === 'NO_REVERSALS_LONG_STORY');
+    assert.ok(longStory.length >= 1, 'NO_REVERSALS_LONG_STORY must still fire when reversalDensity is 0 on an 8+ scene story');
+    assert.equal(longStory[0].severity, 'critical', 'severity must stay critical — only the wording changed');
+    assert.match(longStory[0].description, /suspenseDelta < -1/, 'must name the exact signal being measured');
+    assert.match(longStory[0].description, /betrayal|broken deal|backfir/i, 'must name what the signal cannot see');
+    assert.ok(
+      !/^An 8\+ scene story with zero dramatic reversals lacks conflict texture$/.test(longStory[0].description),
+      'must not still render the old flat, unqualified claim',
+    );
+  });
+
+  it('NO_REVERSALS_LONG_STORY does not fire once reversalDensity is above zero', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) => makeRecord79({ sceneIdx: i }));
+    const result = await conflictPass({
+      fountain: Array.from({ length: 8 }, (_, i) => `INT. SCENE${i} - DAY\n\nAction.`).join('\n\n'),
+      original: '', annotations: [], approvedSpans: [],
+      structure: makeStructureNR(0.2),
+      records,
+    } as import('../../server/nvm/revision/passes/types.ts').PassInput);
+
+    assert.ok(!result.issues.some(i => i.rule === 'NO_REVERSALS_LONG_STORY'), 'must not fire once reversalDensity is nonzero');
+  });
+});

@@ -1771,6 +1771,49 @@ function buildTopPriorities(passes: DoctorPassSummary[]): Array<RevisionIssue & 
   return tagged.slice(0, 10).map(({ passOrder: _passOrder, ...rest }) => rest);
 }
 
+// ── Strengths / critical-finding consistency guard ──────────────────────────
+// Pilot session 2026-08-07 (pilot-session-2026-08-07/PILOT_SESSION_REPORT.md
+// §6.3): the "What's Working" section praised Scene 9's suspense build as the
+// report's ONLY strength, while topPriorities[0] — severity critical,
+// PROTAGONIST_PASSIVITY_CLIMAX — called that exact same scene the story's
+// core failure ("the protagonist is absent from their own story's highest
+// moment"). Both claims are independently TRUE (the suspense-lexicon signal
+// really does peak there; the protagonist really is passive there) but
+// presented side by side with no acknowledgment of the tension, the report
+// reads as self-contradicting and costs trust on every other number in it
+// (pilot §8). Neither claim is wrong, so suppressing the strength would
+// throw away a genuinely earned signal — the fix is to name the tension
+// explicitly, in the style the pilot's own fix list (§9.1) asked for:
+// "Scene 9's suspense engine works; the problem is what it's aimed at."
+//
+// Deterministic post-pass over already-built output, not a new signal: reuses
+// SCENE_LOCATION_RE (the same "Scene N" extraction buildSceneHeatmap already
+// trusts) so a strength is only ever reconciled against a finding that names
+// the identical scene number in its own prose — never a guess, never a
+// scene-adjacency heuristic.
+export function reconcileStrengthsWithCriticalFindings(
+  strengths: string[],
+  topPriorities: Array<RevisionIssue & { pass: PassName }>,
+): string[] {
+  const criticalScenes = new Set<number>();
+  for (const p of topPriorities) {
+    if (p.severity !== 'critical') continue;
+    const m = SCENE_LOCATION_RE.exec(p.location);
+    if (m) criticalScenes.add(parseInt(m[1], 10));
+  }
+  if (criticalScenes.size === 0) return strengths;
+
+  return strengths.map(s => {
+    const m = SCENE_LOCATION_RE.exec(s);
+    if (!m) return s;
+    if (!criticalScenes.has(parseInt(m[1], 10))) return s;
+    return (
+      `${s} That same scene is also this report's top-priority critical finding below — ` +
+      `the signal above is real, but the problem is what it's aimed at; read the two together, not the strength alone.`
+    );
+  });
+}
+
 // Exported (rather than module-private) solely so
 // tests/core/pipeline-parallel.test.ts can drive it directly from a
 // forced-sequential RevisionResult to build an independent reference report
@@ -1959,15 +2002,18 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     ? 'CONSIDER'
     : verdictFor(health, analysis.sceneCount);
   const anyClueSeeded = analysis.records.some(r => r.seededClueIds.length > 0);
-  const strengths = buildStrengths({
-    structure: analysis.structure,
-    anyClueSeeded,
-    sceneCount: analysis.sceneCount,
-    bySeverity,
-    dimensions,
-    records: analysis.records,
-    fountain,
-  });
+  const strengths = reconcileStrengthsWithCriticalFindings(
+    buildStrengths({
+      structure: analysis.structure,
+      anyClueSeeded,
+      sceneCount: analysis.sceneCount,
+      bySeverity,
+      dimensions,
+      records: analysis.records,
+      fountain,
+    }),
+    topPriorities,
+  );
   let plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
   // DoS guard (S1-b) notice: analysis.sceneCount is already the
   // ceiling-truncated count (every formula above — health, dimensions,
