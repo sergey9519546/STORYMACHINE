@@ -509,6 +509,86 @@ holds (full suite green at the commit carrying this note).
 
 ---
 
+### 2026-08-07 — pilot-session-2026-08-07 trust-bug fixes (branch `claude/pilot-report-trust-fixes`)
+
+- **Date:** 2026-08-07
+- **Git SHA:** `aebfeb30dc78037b3c9a6f7c0d83701aecc56e20` (`git rev-parse HEAD`
+  on branch `claude/pilot-report-trust-fixes`, one commit ahead of `main`
+  at `fe5550a5` — the commit that fixes the three pilot-session report bugs:
+  the tie-break fix in `screenplay/structure.ts` (`tightestScene`) and
+  `revision/passes/structure.ts` (`FALSE_CLIMAX`'s peak scan), plus the
+  `NO_REVERSALS`/`NO_REVERSALS_LONG_STORY` wording-only hedge in
+  `revision/passes/structure.ts` and `revision/passes/conflict.ts`. Both
+  files are reachable from `doctor.ts`'s import graph, so
+  `check-scoring-receipt.mjs` gates this range.
+- **Command:** run in PowerShell from the repo root:
+  `$env:REAL_SCRIPT_CORPUS_DIR = "C:\Users\serge\OneDrive\Documents\MAIN_StoryMachine_Engine_Logic\STORYMACHINE V1 REPO\real-script-corpus"; npm run measure-real`
+  (equivalent to `REAL_SCRIPT_CORPUS_DIR=<path> npm run measure-real`, i.e.
+  `node --experimental-strip-types scripts/measure-real-script-discrimination.ts`).
+  Also ran `tests/core/real-script-corpus.test.ts` directly under the same
+  env var as an independent cross-check of the same ratchet.
+- **Measured AUC-24:** **0.761** — shuffle-drop recipe (seeded scene
+  shuffle + every-third-scene drop, identical algorithm to
+  `tests\core\real-script-corpus.test.ts`'s `AUC hard floor` test), first
+  24 manifest scripts, n=24, mean intact health 93.10 -> mean degraded
+  health 87.15 (mean drop 5.95 pts). Clears the CLAUDE.md/test-file floor
+  of >= 0.622 with substantial headroom, and is above both the previously
+  recorded 0.755 (2026-08-04) and 0.731 (2026-07-11B) — the tie-break fix
+  removes two false-positive structural findings (CLIMAX_TOO_EARLY,
+  FALSE_CLIMAX) without weakening genuine structural-degradation
+  discrimination; if anything this run reads slightly stronger than the
+  last recorded value, consistent with "no regression."
+  `tests/core/real-script-corpus.test.ts`'s own "AUC hard floor: never
+  regress below the measured baseline (0.622)" assertion **passed** on
+  this same corpus state (confirmed via its checkmark; the test only
+  prints its live numeric value on failure, so the exact figure from that
+  specific harness run is not separately captured — the `measure-real`
+  number above is the authoritative, printed-on-success figure for this
+  entry).
+- **Flag-run AUCs:** act-swap recipe (thirds reordered instead of shuffled
+  + dropped), same 24-script subset: **0.608** (mean intact 93.10 -> mean
+  degraded 91.37, mean drop 1.74 pts) — matches the 2026-08-04 entry's
+  0.604 within noise, no regression. Produced-floor check over all 73
+  eligible corpus scripts: 0/73 below health >= 80 (mean 93.26, median
+  93.20, min/max 84.6/98.9); verdict breakdown RECOMMEND 72/73 (98.6%),
+  CONSIDER 1/73 (1.4%) — identical shape to the 2026-08-04 entry.
+- **Manifest-staleness note (not a regression, an expected consequence):**
+  `tests/core/real-script-corpus.test.ts`'s per-script `contentHash:
+  exact when byte-identical, floor otherwise` assertions failed on 40 of
+  the 72 manifest entries this run (vs. a smaller pre-existing baseline
+  documented in the session's task brief) — expected, because this
+  change's tie-break fix legitimately alters `health`/issue counts on
+  real scripts beyond the pilot draft alone (removing false-positive
+  `CLIMAX_TOO_EARLY`/`FALSE_CLIMAX` findings wherever a real script's peak
+  suspense happens to tie), which is exactly the class of change
+  CLAUDE.md's own gotcha names ("its manifest must be re-locked whenever a
+  rule change shifts a produced script's health/verdict/sceneCount"). The
+  3 graph-AUC target failures (`forwardEdgeRatio`, `arcCoherence`,
+  `graphHealth` composite, all pre-existing `todo`-class informational
+  targets) are unchanged and unaffected by this change. Re-locking the
+  manifest is an explicit, separate, approved migration per that same
+  gotcha — not performed as a side effect of this receipt.
+- **Corpus fingerprint:** 73 eligible `*.fountain.txt` scripts (>= 50
+  lines) present in `REAL_SCRIPT_CORPUS_DIR`; `tests/fixtures/real-corpus-
+  manifest.json` reports 72 entries (all 72 byte-identical to their
+  manifest-recorded source text this run — "hash exact match: 72" in the
+  `measure-real` output). The AUC-24 subset is the first 24
+  manifest-ordered files, all present in the corpus directory.
+- **Runner attestation:** "Agent session (Claude Sonnet 5, via Desktop
+  Commander MCP on the repo owner's Windows machine) ran this measurement
+  locally on 2026-08-07 under the repo owner's direction (STORYMACHINE
+  pilot-report-trust-fixes task, motivated by
+  `pilot-session-2026-08-07/PILOT_SESSION_REPORT.md`), using the local,
+  uncommitted corpus at `...\STORYMACHINE V1 REPO\real-script-corpus`.
+  `npm run measure-real` (73-script analysis pass + 24-script shuffle-drop
+  pass + 24-script act-swap pass) completed in ~2151s, no errors.
+  `tests/core/real-script-corpus.test.ts` was also run directly (~2371s,
+  exit code 1 from the pre-existing/expected `todo`-class and
+  manifest-staleness failures described above; the AUC hard-floor
+  assertion itself passed)."
+
+---
+
 ## 3. Entry template (copy for new entries)
 
 ```
