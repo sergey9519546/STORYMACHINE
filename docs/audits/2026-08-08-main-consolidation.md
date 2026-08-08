@@ -65,8 +65,8 @@ of `main`; it adds no unintegrated commits. `origin/HEAD` is an alias for
 | `origin/p1/bounded-deduction-and-p2-surface-collapse` | `13ec9db` | legacy checkpoint with no unique changes | Ancestor of `main`. |
 | `origin/ultrareview-fixes` | `8fb20ed` | legacy checkpoint with no unique changes | Ancestor of `main`. |
 | `origin/work/2026-08-05-security-and-p1-diagnostics` | `c9023b8` | legacy checkpoint with no unique changes | Ancestor of `main`. |
-| `craft-knowledge/v2-scene-routing-voice-constraint` | `1aa2eea` | patch-equivalent/duplicate | The reviewed static scene-routing slice is represented by the consolidation commits; its unreviewed KB/voice portions remain excluded. |
-| `origin/craft-knowledge/v2-scene-routing-voice-constraint` | `1aa2eea` | patch-equivalent/duplicate | Same source as the local Craft-v2 branch. |
+| `craft-knowledge/v2-scene-routing-voice-constraint` | `1aa2eea` | partially integrated; remainder deferred | The reviewed static scene-routing slice was reimplemented on `main`; unique KB/voice and other source-branch work remains unmerged. |
+| `origin/craft-knowledge/v2-scene-routing-voice-constraint` | `1aa2eea` | partially integrated; remainder deferred | Same source as the local Craft-v2 branch; retain it because its unmerged remainder is not patch-equivalent to `main`. |
 | `origin/claude/pilot-report-trust-fixes` | `ba2b559` | patch-equivalent/duplicate | Functionally already represented by `ae3f04c` plus its real-corpus manifest re-lock; do not merge again. |
 | `p1/corpus-expansion-and-canonical-formatter` | `1b7fe32` | research deferred | Retained pending the unmet P1 structural gate. |
 | `origin/p1/corpus-expansion-and-canonical-formatter` | `1b7fe32` | research deferred | Same retained P1 corpus source. |

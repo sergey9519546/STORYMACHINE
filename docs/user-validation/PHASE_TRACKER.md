@@ -193,11 +193,12 @@ the core question (*does this make you want to run your own draft?*).
   toward no threshold. The rule is evaluated in session order as sessions
   complete; the first threshold reached decides.
 
-**Sample-thinness caveat carried into the decision** (per the brief): the
-stimulus is a competent skeleton (~47.5 words/scene vs. a 161–181 corpus
-median). Fielding on it is a deliberate choice to measure whether the
-report's *shape* creates pull; participant remarks about script thinness
-should be logged but do not make a session Invalid.
+**Historical retired-stimulus caveat:** the ~47.5-words/scene warning applied
+to the retired "The Second Key" stimulus. The current fielding stimulus is
+"Dead Frequency" (~152.6 words/scene), as recorded in
+`P0_EVIDENCE_SUMMARY.md`. Remarks about stimulus quality should still be
+logged, but the retired sample's thinness must not be attributed to the
+current stimulus or used to change the pre-registered validity rules.
 
 ## Review metadata
 

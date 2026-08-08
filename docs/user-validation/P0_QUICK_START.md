@@ -93,13 +93,13 @@ session. See the stimulus note in `P0_EVIDENCE_SUMMARY.md`.
 1. **Read the protocol.** `P0_OPERATING_KIT.md` — authority, consent, privacy,
    session script, stop rules, evidence classification. This is the real
    playbook; the steps below are just its table of contents.
-2. **Recruit (when the decision to field is made).** Recruitment is **deferred**
-   until a decision owner decides whether, when, and on what signal rule to run
-   P0 — building fielding machinery ahead of that decision is premature. The
-   earlier ready-to-send outreach/screening kit has been filed to
+2. **Recruit under the authorized protocol.** P0 fielding has been **GO /
+   authorized since 2026-08-04**. There are still **0 valid documented human
+   sessions** and no gate verdict. The earlier ready-to-send outreach/screening
+   kit has been filed to
    `docs/filed-backlog/premature-p0-machinery/` (recoverable if/when P0 is
-   re-opened, but re-check each template against the kit). When you do recruit,
-   the operating kit's eligibility and neutral-invitation rules govern directly
+   fielded, but re-check each template against the kit). When recruiting, the
+   operating kit's eligibility and neutral-invitation rules govern directly
    (do not pitch "objective/accurate/trusted"; do not lead the answer).
 3. **Per session, before you start.** Copy `P0_SESSION_TEMPLATE.md` to
    `sessions/P0-S##.md` (kept anonymous). Run the operating kit's pre-session
@@ -120,12 +120,15 @@ session. See the stimulus note in `P0_EVIDENCE_SUMMARY.md`.
 - Don't commit PII, contacts, recordings, transcripts, or screenplay content.
 - Don't pitch, teach the "right" answer, or defend the report against objections.
 - Don't treat P0 evidence as P1 labels.
-- Don't start engine/product work to "improve" the report mid-P0 — the freeze
-  holds until the gate clears (critical security fixes are the only exception).
+- Don't change the fielded stimulus mid-cohort to manufacture a better result.
+  The old blanket engine/product freeze is retired; `ROADMAP.md` now uses
+  machine-checked evidence gates. That does not make P0 passed or authorize
+  unsupported scoring, P4 retention, or other work whose gate has not cleared.
 
 ## Current status
 
-See `PHASE_TRACKER.md` and `P0_EVIDENCE_SUMMARY.md`. As of this writing: 0
-completed sessions; the live-flow stimulus had a pre-session smoke blocker
-(server port binding), which the static report above works around for the
-report-reaction portion.
+See `PHASE_TRACKER.md` and `P0_EVIDENCE_SUMMARY.md`. P0 fielding is authorized
+(GO, 2026-08-04), with **0 valid documented human sessions** and **no verdict**.
+Both static-report and live-flow sessions are unblocked. The former live-flow
+boot/port symptom was diagnosed as an import-time boot crash and is resolved;
+it is retained only as historical evidence in `P0_EVIDENCE_SUMMARY.md`.

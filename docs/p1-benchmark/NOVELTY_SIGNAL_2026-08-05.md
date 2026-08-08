@@ -1,33 +1,39 @@
-# Novelty-against-prior signal — first discriminator of CLIMAX_RELOCATE (local), hard to globalize
+# Novelty-against-prior signal — historical targeted note, not reproduced
 
-**Status:** Mixed result, 2026-08-05. Opens a real direction (first signal to
-discriminate CLIMAX_RELOCATE in any form) but does NOT yet yield a shippable
-global detector. Records both the breakthrough and the four failed attempts to
-globalize it, so the next session does not repeat them.
+**Status:** **HISTORICAL / UNREPRODUCIBLE AS CURRENT EVIDENCE (2026-08-08).**
+The 2026-08-05 commit recorded targeted 10/11 measurements but did not commit
+the inline source or a receipt containing per-script results. The sanitized
+checkout also has no sanctioned produced-script corpus. The numbers below
+therefore cannot be independently checked and are not current P1 evidence.
+Two global probe scripts are committed, but they do not reproduce the targeted
+10/11 claim.
 
-## The breakthrough (per-scene, targeted)
+## Historical targeted observation (unreproduced)
 
-The relocated scene's **proper-noun novelty against its prior scenes** is the
-first signal in this project's history that discriminates CLIMAX_RELOCATE.
+The prior note reported that the relocated scene's **proper-noun novelty
+against its prior scenes** discriminated CLIMAX_RELOCATE in a targeted test.
+Because the targeted probe source and per-script receipt are missing, this is
+a historical hypothesis-generating note, not an established discriminator.
 
-Measured on 11 scripts: take the original last scene (the climax) and compute
+The reported method used 11 scripts: take the original last scene (the climax)
+and compute
 what fraction of its proper nouns (All-CAPS tokens + Capitalized words) do NOT
 appear in any scene before it. Then relocate it to position 1 and recompute
 against the new (near-empty) prior set.
 
-| arrangement | mean novelty | range |
+| historical reported arrangement | mean novelty | range |
 |---|---|---|
 | intact (climax at end) | 0.31 | 0.12–0.55 |
 | relocated (climax at idx 1) | 0.76 | 0.59–0.92 |
 | **delta** | **+0.45** | +0.10 to +0.72 |
 
-**10/11 scripts** show the relocated scene's novelty rising by >0.1. This is
-the opposite of every per-scene field (all invariant to reorder) and every
-prior candidate locator (all degenerate or non-traveling). Novelty-against-
-prior is genuinely order-dependent by construction: the "prior" set is defined
-by scene position, so reordering changes it.
+The missing inline probe was reported to show **10/11 scripts** with a rise
+greater than 0.1. That count is not independently reproducible from committed
+artifacts. Novelty-against-prior is order-dependent by definition because the
+"prior" set follows scene position, but that property alone does not validate
+the reported discrimination rate.
 
-**Why it works where `forwardEdgeRatio` didn't:** `forwardEdgeRatio` derived
+**Historical rationale:** `forwardEdgeRatio` derived
 its edges from content-defined clue seed/payoff (tautologically forward).
 Novelty-against-prior derives its "prior" set from raw array position — it
 reads the actual ordering, not a content-derived proxy for it.
@@ -45,10 +51,10 @@ degraded without that knowledge:
 | **"Second cold open"** (max novelty among scenes 1..end) | 3/10 | 5/10 | 1/10 ✓ | noisy; many intact scripts have a high-novelty scene 1 legitimately |
 | **Forward-reference density** (novel nouns in first quartile) | 1/11 | 1/11 | — | degenerate — proper-noun density saturated (0.56–1.00) |
 
-The control (MIDPOINT_DROP) correctly stays at ~0 for the outlier/cold-open
-formulations (dropping scenes doesn't reorder, so novelty shouldn't rise) —
-confirming the signal is real but the global formulations can't isolate it
-from the noise of 40+ intact scenes.
+The historical note reported that the MIDPOINT_DROP control stayed at ~0 for
+the outlier/cold-open formulations. Those two formulations were also inline
+and their source was not committed, so this table is retained as an
+unreproduced observation rather than confirmation that the signal is valid.
 
 ## Why globalizing is hard (the structural reason)
 
@@ -74,11 +80,11 @@ documents this gap).
 
 ## What this opens (and does not)
 
-- **OPEN:** novelty-against-prior is a real, order-dependent signal — the
-  first. A detector that combines it with noun *type* (proper name vs
+- **HYPOTHESIS TO RETEST:** novelty-against-prior is order-dependent by
+  construction. A detector that combines it with noun *type* (proper name vs
   relational/anaphoric) or with a lightweight coreference pass could plausibly
-  close CLIMAX_RELOCATE. This is now the named next direction, replacing the
-  closed `forwardEdgeRatio` / `purpose` / `suspenseDelta` candidates.
+  help with CLIMAX_RELOCATE, but the targeted effect must first be reproduced
+  from committed source against the sanctioned corpus.
 - **NOT OPEN / not shippable as-is:** the raw proper-noun novelty count, in
   any of the four global forms tested here, is too noisy to drive a bounded
   deduction. Do not wire any of the four formulations above.
@@ -86,13 +92,14 @@ documents this gap).
 ## Reproduction
 
 ```sh
-# the breakthrough (per-scene, targeted) — the only clean win
-node --experimental-strip-types -e "<see commit for the inline probe>"
-# the four global formulations:
+# committed global formulations only; neither reproduces the targeted 10/11 claim
 node scripts/probe-forward-reference.mjs        # forward-ref density (degenerate)
 node scripts/probe-novelty-global.mjs           # global early-third burden (degenerate)
-# (outlier + second-cold-open were inline probes; reproduce from this doc's tables)
 ```
 
-Run 2026-08-05 against `data/screenplays/` (27 eligible `*.fountain.txt`,
-10-11 with ≥3 scenes). All probes are analyzer-only (no doctor), <2s each.
+The targeted novelty probe and the outlier/second-cold-open probes were never
+committed, so no command in this repository can reproduce their tables. The
+2026-08-05 note says the probes ran against `data/screenplays/` (27 eligible
+`*.fountain.txt`, 10–11 with at least 3 scenes), but that sanctioned corpus is
+absent from this checkout. A valid rerun requires committed executable source,
+the sanctioned corpus version, per-script output, and an exact-build receipt.

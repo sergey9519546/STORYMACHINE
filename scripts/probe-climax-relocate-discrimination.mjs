@@ -29,6 +29,7 @@
 // No full doctor run needed — analyzeFountainText exposes all these fields.
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 import { readdirSync, readFileSync } from 'node:fs';
+import { computeProbeStats } from './lib/climax-probe-stats.mjs';
 
 const files = readdirSync('data/screenplays').filter(f => f.endsWith('.fountain.txt')).slice(0, 12);
 console.log('=== CLIMAX_RELOCATE DISCRIMINATION SIGNAL-EXISTENCE PROBE ===');
@@ -47,23 +48,6 @@ function relocate(text) {
   return [...pre, ...scenes.flat()].join('\n');
 }
 
-function stats(a) {
-  const recs = a.records, n = recs.length;
-  if (n < 5) return null;
-  const climaxIdx = recs.map((r, i) => r.purpose === 'climax' ? i : -1).filter(i => i >= 0);
-  const turnIdx = recs.map((r, i) => (r.dramaticTurn && r.dramaticTurn !== 'nothing') ? i : -1).filter(i => i >= 0);
-  let suspP = -1, suspV = -Infinity;
-  recs.forEach((r, i) => { if ((r.suspenseDelta ?? 0) > suspV) { suspV = r.suspenseDelta ?? 0; suspP = i; } });
-  return {
-    n,
-    lastClimaxPos: climaxIdx.length ? climaxIdx[climaxIdx.length - 1] / n * 100 : -1,
-    climaxCount: climaxIdx.length,
-    lastTurnPos: turnIdx.length ? turnIdx[turnIdx.length - 1] / n * 100 : -1,
-    climaxSpread: climaxIdx.length >= 2 ? (climaxIdx[climaxIdx.length - 1] - climaxIdx[0]) / n * 100 : 0,
-    suspPeakPos: suspP >= 0 ? suspP / n * 100 : -1,
-  };
-}
-
 console.log('script'.padEnd(32) + '| lastClimax% (I->R) | climaxN (I->R) | lastTurn% (I->R) | spread (I->R) | susp% (I->R)');
 console.log('-'.repeat(115));
 let intactLate = 0, relocLate = 0, processed = 0;
@@ -71,7 +55,7 @@ const deltas = { lastClimax: [], lastTurn: [], spread: [], susp: [] };
 for (const f of files) {
   let text; try { text = readFileSync('data/screenplays/' + f, 'utf-8'); } catch { continue; }
   const rel = relocate(text); if (!rel) continue;
-  let si, sr; try { si = stats(analyzeFountainText(text)); sr = stats(analyzeFountainText(rel)); } catch { continue; }
+  let si, sr; try { si = computeProbeStats(analyzeFountainText(text)); sr = computeProbeStats(analyzeFountainText(rel)); } catch { continue; }
   if (!si || !sr) continue;
   processed++;
   if (si.lastClimaxPos >= 66) intactLate++;
