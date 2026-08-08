@@ -28,16 +28,8 @@ import {
   selectPersuasionStrategy,
   getReadyGoals,
 } from '../../server/engine/agent/psychology.ts';
-import { validatePersona, PERSONA_LIMITS } from '../../server/personas/types.ts';
 import { renderTemplate, getPrompt, hasPrompt } from '../../server/lib/prompts.ts';
 import { parseRoomId, collabRoomCount } from '../../server/collab/yjs-server.ts';
-import {
-  listPersonas,
-  getPersona,
-  registerUserPersona,
-  personaPromptBlock,
-  _resetUserPersonas,
-} from '../../server/personas/registry.ts';
 import { STORY_OP_KINDS } from '../../server/nvm/ops/StoryOp.ts';
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
 import { PROOF_TIERS, passResult, failResult } from '../../server/nvm/proof/contract.ts';

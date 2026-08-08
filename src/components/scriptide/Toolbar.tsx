@@ -57,7 +57,6 @@ interface ToolbarProps {
   onNewStory?: () => void;
   onGoHome?: () => void;
   onOpenCollab?: () => void;
-  onOpenCopilot?: () => void;
   onOpenSettings?: () => void;
   onToggleSidebar?: () => void;
 }
@@ -104,7 +103,6 @@ export default function Toolbar({
   onNewStory,
   onGoHome,
   onOpenCollab,
-  onOpenCopilot,
   onOpenSettings,
   onToggleSidebar,
 }: ToolbarProps) {
@@ -439,15 +437,6 @@ export default function Toolbar({
                   setOverflowOpen(false);
                 }}
               />
-              {onOpenCopilot && (
-                <OverflowItem
-                  label="Copilot voice"
-                  onClick={() => {
-                    onOpenCopilot();
-                    setOverflowOpen(false);
-                  }}
-                />
-              )}
               {onOpenCollab && (
                 <OverflowItem
                   label="Collaborate"

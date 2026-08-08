@@ -7,11 +7,16 @@ describe('routes/scriptide — HTTP behavior', async () => {
   before(async () => { server = await startTestServer(); });
   after(async () => { await server.close(); });
 
-  it('GET /api/scriptide/personas returns 200 with a personas array', async () => {
-    const res = await fetch(`${server.baseUrl}/api/scriptide/personas`);
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.ok(Array.isArray(body.personas));
+  it('GET and POST /api/scriptide/personas are not exposed after inline completion retirement', async () => {
+    const getRes = await fetch(`${server.baseUrl}/api/scriptide/personas`);
+    assert.equal(getRes.status, 404);
+
+    const postRes = await fetch(`${server.baseUrl}/api/scriptide/personas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 'retired-persona', name: 'Retired Persona', systemPreamble: 'No-op.' }),
+    });
+    assert.equal(postRes.status, 404);
   });
 
   it('GET /api/scriptide/load returns 200 "empty" status for a fresh session', async () => {
@@ -152,15 +157,6 @@ describe('routes/scriptide — HTTP behavior', async () => {
     assert.equal(res.status, 409);
     const body = await res.json();
     assert.equal(body.server.scriptText, 'EXISTING');
-  });
-
-  it('POST /api/scriptide/personas rejects an invalid persona with 400', async () => {
-    const res = await fetch(`${server.baseUrl}/api/scriptide/personas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ notAValidPersona: true }),
-    });
-    assert.equal(res.status, 400);
   });
 
   // /api/scriptide/clean-action is aiLimiter-protected but this asserts only the

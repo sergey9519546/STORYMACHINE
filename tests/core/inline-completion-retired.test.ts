@@ -41,8 +41,10 @@ describe('inline completion retirement — shipping source contract', () => {
     assert.equal(existsSync(resolve(ROOT, 'server/prompts/scriptide-complete.txt')), false);
   });
 
-  it('removes the inline-only task tier while preserving explicit editor workflows', () => {
+  it('retires the unreachable persona/FIM contract while preserving live editor workflows', () => {
     assert.doesNotMatch(read('server/engine/ai.ts'), /GHOST_TEXT/);
+    assert.doesNotMatch(read('.env.example'), /GHOST_TEXT/);
+    assert.equal(existsSync(resolve(ROOT, 'server/personas')), false);
 
     const editor = read('src/components/editor/FountainEditor.tsx');
     assert.match(editor, /autocompletion\s*\(/, 'ordinary Fountain autocomplete must remain');
@@ -51,9 +53,19 @@ describe('inline completion retirement — shipping source contract', () => {
 
     const scriptIde = read('src/components/ScriptIDE.tsx');
     assert.match(scriptIde, /autoAnalysis/, 'opt-in auto-analysis must remain');
-    assert.match(scriptIde, /copilotPersona/, 'explicit Copilot persona workflow must remain');
+    assert.doesNotMatch(
+      scriptIde,
+      /copilotPersona|copilot_persona|personaList|copilot-persona|\/api\/scriptide\/personas|prefsOpen\s*===\s*["']copilot["']/,
+      'ScriptIDE must not retain an inert persona picker or persisted selection',
+    );
 
     const toolbar = read('src/components/scriptide/Toolbar.tsx');
-    assert.match(toolbar, /onOpenCopilot/, 'explicit Copilot UI must remain');
+    assert.doesNotMatch(toolbar, /onOpenCopilot|Copilot voice/);
+
+    const routes = read('server/routes/scriptide.ts');
+    assert.doesNotMatch(routes, /\/api\/scriptide\/personas|listPersonas|registerUserPersona|isPersonaRegisterError|PersonaBodySchema/);
+    assert.match(routes, /\/api\/scriptide\/world-build/, 'explicit world-build route must remain');
+    assert.match(routes, /modelForTask\('WORLDBUILD'\)/, 'world-build must retain its provider task selection');
+    assert.doesNotMatch(read('server/lib/validation.ts'), /PersonaBodySchema/);
   });
 });

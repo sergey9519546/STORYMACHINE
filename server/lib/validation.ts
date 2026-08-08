@@ -971,17 +971,6 @@ export const ScriptideSaveBodySchema = z.object({
   expectedUpdatedAt: z.number().int().nonnegative().nullable().optional(),
 }).passthrough();
 
-// POST /api/scriptide/personas — registerUserPersona (server/personas/
-// registry.ts) already performs its own normalization/validation and
-// returns null on anything malformed (the route 400s on that null already);
-// this schema only guards the outer shape (an object) so a non-object body
-// 400s with the standard shape before ever reaching registerUserPersona.
-export const PersonaBodySchema = z.object({
-  id: z.unknown().optional(),
-  name: z.unknown().optional(),
-  systemPreamble: z.unknown().optional(),
-}).passthrough();
-
 // Shared by /api/scriptide/{world-build,refine-dialogue,analyze-tension,
 // clean-action}: each route reads one primary text field via requireString
 // (session-store.ts) — which throws a plain Error that previously fell

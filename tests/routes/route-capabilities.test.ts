@@ -234,7 +234,6 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'POST /api/scriptide/doctor',          // runDiagnoseOnly-gated, pure CPU (route's own comment)
   'POST /api/scriptide/doctor/pdf',      // pdfToFountain + runScriptDoctor with NO deepRead — heavyBodyLimiter, not aiLimiter
   'POST /api/scriptide/diagnose',        // runDiagnoseOnly-gated, pure CPU (route's own comment)
-  'GET /api/scriptide/personas', 'POST /api/scriptide/personas',
   'POST /api/characters/export', 'POST /api/characters/import',
   // server/routes/nvm/analysis.ts
   'GET /api/nvm/tension', 'GET /api/nvm/metrics', 'GET /api/nvm/two-reader', 'GET /api/nvm/topology',

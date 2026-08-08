@@ -13,11 +13,10 @@ import {
   withSessionCommand, gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
-import { listPersonas, registerUserPersona, isPersonaRegisterError } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
 import {
   validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema,
-  ScriptideSaveBodySchema, PersonaBodySchema, WorldBuildBodySchema, RefineDialogueBodySchema,
+  ScriptideSaveBodySchema, WorldBuildBodySchema, RefineDialogueBodySchema,
   AnalyzeTensionBodySchema, CleanActionBodySchema, CharacterProfileBodySchema, AnalyzeScriptBodySchema,
   CharactersExportBodySchema, CharactersImportBodySchema,
 } from '../lib/validation.ts';
@@ -702,34 +701,6 @@ router.get('/api/scriptide/complete', gameLimiter, (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.status(410).json({ error: 'inline_completion_retired' });
 });
-
-// ── Copilot persona routes (P9) ─────────────────────────────────────────────
-// GET /api/scriptide/personas — list available copilot personas for the picker.
-router.get('/api/scriptide/personas', gameLimiter, asyncHandler(async (_req, res) => {
-  res.json({ personas: listPersonas() });
-}));
-
-// POST /api/scriptide/personas — register a custom (user-uploaded) persona.
-// Body: a CopilotPersona JSON object. Returns the normalized persona, or 400.
-router.post('/api/scriptide/personas', gameLimiter, validate(PersonaBodySchema), asyncHandler(async (req, res) => {
-  const result = registerUserPersona(req.body);
-  if (isPersonaRegisterError(result)) {
-    // 409 for the id collision: the request is well-formed, it just names an
-    // id that is already taken by a built-in (see registerUserPersona's
-    // security note — shadowing a builtin replaced it for every user of this
-    // process). 400 for a malformed body, 429 for the capacity ceiling.
-    const { status, error } =
-      result === 'builtin_id'
-        ? { status: 409, error: 'That id belongs to a built-in persona. Choose a different id.' }
-        : result === 'capacity'
-          ? { status: 429, error: 'Too many custom personas registered on this server.' }
-          : { status: 400, error: 'Invalid persona: requires id (kebab-case), name, and systemPreamble.' };
-    res.status(status).json({ error });
-    return;
-  }
-  logger.info('persona_registered', { id: result.id });
-  res.json({ persona: result });
-}));
 
 // ── ScriptIDE AI routes ────────────────────────────────────────────────────
 // Optional script context — the current editor contents, capped, so AI
