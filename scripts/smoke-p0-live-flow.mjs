@@ -24,6 +24,7 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { assertKeylessAiConfig, keylessBrowserServerEnv } from './lib/keyless-browser-certification.mjs';
 
 const REPO = process.cwd();
 const ISOLATED_PORT = await pickFreePort();
@@ -55,11 +56,12 @@ let browser = null;
 const genuineErrors = [];
 
 async function main() {
-  // 1. Boot the server keyless (no GEMINI_API_KEY) on the isolated port.
+  // 1. Boot the server keyless on the isolated port, neutralizing inherited
+  // provider configuration as well as Gemini's direct environment key.
   console.log(`[smoke] booting keyless server on port ${ISOLATED_PORT}...`);
   serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd: REPO,
-    env: { ...process.env, PORT: String(ISOLATED_PORT), GEMINI_API_KEY: '' },
+    env: keylessBrowserServerEnv(process.env, ISOLATED_PORT),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;
@@ -75,6 +77,7 @@ async function main() {
     throw new Error(`server did not report server_started: ${e.message}`);
   }
   if (!booted) throw new Error('server started without emitting server_started');
+  await assertKeylessAiConfig(BASE);
   console.log('[smoke] server booted (keyless).');
 
   // 2. Drive the live flow with headless Chromium.

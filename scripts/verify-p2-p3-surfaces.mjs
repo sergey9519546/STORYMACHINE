@@ -40,6 +40,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
+import { assertKeylessAiConfig, keylessBrowserServerEnv } from './lib/keyless-browser-certification.mjs';
 
 const REPO = process.cwd();
 
@@ -75,7 +76,7 @@ async function bootServer() {
   console.log(`[verify] booting keyless server on port ${ISOLATED_PORT}...`);
   serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd: REPO,
-    env: { ...process.env, PORT: String(ISOLATED_PORT), GEMINI_API_KEY: '' },
+    env: keylessBrowserServerEnv(process.env, ISOLATED_PORT),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;
@@ -91,6 +92,7 @@ async function bootServer() {
     throw new Error(`server did not report server_started: ${e.message}`);
   }
   if (!booted) throw new Error('server started without emitting server_started');
+  await assertKeylessAiConfig(BASE);
   console.log('[verify] server booted (keyless).');
 }
 
