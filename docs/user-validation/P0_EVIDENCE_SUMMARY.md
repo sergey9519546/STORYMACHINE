@@ -191,9 +191,10 @@ Final decision must be one of:
 | Evidence reviewed | None |
 | Dissent / uncertainty | Not evaluated |
 
-## Allowed P1 inputs only after PASS
+## P1 validity inputs and evidence gates
 
-These inputs may begin only after P0 is explicitly recorded as **PASS**:
+The following inputs are required before P1 can support a human-label validity
+claim:
 
 - Legally distributable real-draft benchmark materials: Creative-Commons/public-domain screenplay material and explicitly licensed author-contributed drafts.
 - Blinded pairwise judgments from >=3 independent experienced readers, including inter-rater agreement and preserved disagreements.
@@ -201,7 +202,10 @@ These inputs may begin only after P0 is explicitly recorded as **PASS**:
 - A held-out set unavailable for implementer tuning.
 - Versioned and hashed fixture and label artifacts.
 
-Until PASS, P1 product/engine work is blocked. Critical security fixes remain the ROADMAP's only exception to the P0 product/engine-code freeze.
+P1 measurement and validity work may proceed only within ROADMAP's
+machine-checked evidence gates. It never substitutes for the P0 human outcome
+gate: P0 fielding is GO, but there are 0 valid documented sessions and no P0
+outcome verdict. P4 retention/lock-in work remains prohibited until P0 PASS.
 
 ## Artifact index
 

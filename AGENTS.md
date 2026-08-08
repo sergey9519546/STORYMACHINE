@@ -82,18 +82,21 @@ before every push. CI runs lint + test + build on every branch, plus a
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.
 
-## Current Priority — P0 User Validation (BLOCKS ALL NEW WORK)
+## Current Priority — P0 User Validation (human-evidence priority)
 
-**Status**: Phase 0 (documentation reconciliation) complete, Phase 1 (fix broken) next, Phase 2 (P0 validation) starts this week
+**Status**: P0 fielding is authorized (GO, 2026-08-04), but 0 valid human
+sessions are documented and no outcome verdict exists. P0 human evidence is
+the highest-priority lane; it is not replaced by engineering work.
 
 See `ROADMAP.md` for full plan. Key points:
 
-**P0 Gate (Hard Blocker)**:
+**P0 outcome gate**:
 - Recruit 5+ real screenwriters
 - Show them the sample coverage report with Story Graph
 - Ask: "Would you run your own draft?"
 - Count pull signals: strong (4+) / weak (2-3) / none (<2)
-- Decision: GREEN → proceed to V5 activation + P1 corpus | YELLOW → iterate | RED → stop/pivot
+- Apply the pre-registered PASS / STOP / INCONCLUSIVE rule only after valid
+  sessions are documented; no result may be inferred from recruitment or code.
 
 **What's Working**:
 - Story Graph Phase 1-2 (697 LOC) — fully integrated, shows in P0 sessions
@@ -101,7 +104,9 @@ See `ROADMAP.md` for full plan. Key points:
 - Deterministic core — production-ready
 
 **What's Gated**:
-- No new engine work until P0 clears (exception: security fixes)
+- P1 measurement/validity work may proceed only within its machine-checked
+  evidence gates; it never substitutes for the P0 human outcome gate.
+- P4 retention/lock-in work remains prohibited until P0 PASS.
 - No Phase 3-4 Story Graph until P0 GREEN + P1 validation
 - No Infinity Gate expansion until P0 GREEN
 - No new rules (frozen at 3,216 pass-scoped constants — machine-counted by
