@@ -117,25 +117,38 @@ a real script."
 
 ## The state of the gate, honestly
 
+Two different decisions live in this file, and conflating them is exactly
+the trap that misled a fast reader — keep them separate.
+
+| Decision | State | Dated | Where recorded |
+|---|---|---|---|
+| **Fielding authorization** (may recruiting/sessions begin?) | **GO** | 2026-08-04 | `PHASE_TRACKER.md` decision log; see "DECIDED — 2026-08-04: GO" below |
+| **Outcome gate** (PASS / STOP / INCONCLUSIVE on the core question, per the pre-registered signal rule) | **Not yet evaluable — 0 of >=5 valid sessions documented** | — | `P0_EVIDENCE_SUMMARY.md` |
+
 | Counter | Current | Required |
 |---|---:|---|
 | Valid, fully-documented sessions | **0** | **≥5** |
 | Recruited / scheduled | 0 / 0 | progress only |
-| Gate decision | INCONCLUSIVE (placeholder) | PASS / STOP |
 
 `P0_EVIDENCE_SUMMARY.md` records the constitutional guard correctly: *"Absence
 of contrary evidence with zero sessions is not favorable evidence."* Zero
-sessions means the gate is genuinely unmet. Nothing an agent does changes this
-counter — only human recruitment + human sessions do.
+sessions at this point is expected, not a blocker — fielding was only just
+authorized (above) and no session has been run yet. Nothing an agent does
+changes the outcome-gate counter — only human recruitment + human sessions
+do; the outcome gate cannot be evaluated before then, and no session has
+been fabricated to make it appear otherwise.
 
-## If you say GO — exactly what happens next (and who does it)
+## Now that GO is decided — exactly what happens next (and who does it)
 
 This is the path the operating kit governs. I am listing it so the decision is
 concrete, not so I can execute it — every step after the decision is human
 work.
 
 1. **You** record the GO + signal rule + decision-owner role in
-   `PHASE_TRACKER.md`'s decision log (it currently has zero entries).
+   `PHASE_TRACKER.md`'s decision log. **Done** — recorded 2026-08-04; the
+   log now carries two entries (the GO decision and the subsequent
+   stimulus-swap decision). This step is complete; steps 2-7 below remain
+   open (0 of >=5 sessions run as of this writing).
 2. **Recruiter** screens for eligibility per the kit: real screenwriters with a
    real draft in hand, can view the sample, can consent. No career-tier quota.
    Exclude anyone who can't consent, is pressured, helped design the report,

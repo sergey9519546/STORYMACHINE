@@ -134,22 +134,25 @@ in order:
 - **Never build or store a participant-ID-to-identity crosswalk anywhere in
   the repository** — the session template's own privacy-review checklist
   (§12) requires confirming this explicitly before commit.
-- **`docs/user-validation/sessions/` is currently listed in `.gitignore`**
-  (repo root `.gitignore`, line 15: `docs/user-validation/sessions/`) —
-  everything under that path is excluded from Git by default right now,
-  the same way `.claude/` and `data/` are (per `CLAUDE.md`: "nothing placed
-  there is shared via git unless `.gitignore` changes first"). `P0_EVIDENCE_SUMMARY.md`
-  and `PHASE_TRACKER.md` both already describe this directory as "empty;
-  `.gitkeep` only" — as of this writing there is no `.gitkeep`, and no
-  session file will actually reach `git status` as stageable until that
-  `.gitignore` entry is deliberately narrowed (e.g., to allow tracked
-  `.md` files while still excluding any accidental raw export). **That
-  `.gitignore` change is outside this document's lane — a maintainer with
-  the authority to edit `.gitignore` must make and review that change
-  before `P0-001.md`'s privacy-reviewed record can actually be committed.**
-  Do not work around this by force-adding (`git add -f`) without that
-  review — the ignore entry may exist precisely to catch an accidental raw
-  export landing in the same directory.
+- **`docs/user-validation/sessions/` is narrowed in `.gitignore`, not
+  blanket-excluded.** Repo root `.gitignore` ignores everything in that
+  directory by default (`docs/user-validation/sessions/*`) but explicitly
+  un-ignores tracked `.md` files and `.gitkeep`
+  (`!docs/user-validation/sessions/*.md`,
+  `!docs/user-validation/sessions/.gitkeep`), while continuing to exclude
+  common raw-artifact extensions inside the same directory (`.mp3`, `.mp4`,
+  `.wav`, `.m4a`, `.txt`, `.json`, `.csv`, `.pdf`, `.docx`). This means a
+  privacy-reviewed session record IS committable once you've run the §12
+  privacy-review checklist:
+  ```
+  git add docs/user-validation/sessions/P0-001.md
+  git status   # confirm ONLY the .md record is staged, nothing else
+  git commit -m "docs(user-validation): add P0-001 session record"
+  ```
+  Any raw export, recording, or transcript you drop in the same directory
+  during work stays ignored automatically — you do not need `git add -f`
+  and should not use it here; if `git status` ever shows a raw artifact as
+  stageable, stop and check the `.gitignore` entry before committing.
 - Only commit the **anonymized, privacy-reviewed** record or an aggregate
   artifact — never raw notes, and never before the §12 privacy-review
   checklist passes (`P0_OPERATING_KIT.md` → "Post-session handling," item 8).
