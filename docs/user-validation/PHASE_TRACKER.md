@@ -141,8 +141,11 @@ script and a clean exit.
 - Log objections, moments of trust, and moments of disbelief verbatim.
 - Maintain P0 evidence and status-only tracking artifacts.
 - Run existing sample-flow smoke checks and existing test/build verification without modifying them.
-- Maintain an inventory-only map of P1's current assets and gaps; run no P1 experiment.
-- Fix critical security issues, the ROADMAP's sole exception to the P0 product/engine-code freeze.
+- Keep P1 work within its machine-checked measurement-receipt gates; no P1
+  experiment substitutes for the still-unmet P0 human gate.
+- Fix critical security issues immediately. The former blanket P0
+  product/engine-code freeze is retired; P4 retention/lock-in work remains
+  barred until P0 passes.
 
 ## Gated now (the freeze is retired — see ROADMAP's 2026-08-04 amendment)
 

@@ -10,9 +10,12 @@ the kit.
 
 > **does this make you want to run your own draft — why or why not?**
 
-P0 is demand validation. It does **not** test whether the score is correct
-(that is P1, and P1 is frozen until P0 clears). Never relabel a P0 reaction as
-a P1/benchmark/quality/ground-truth label.
+P0 is demand validation. It does **not** test whether the score is correct;
+P1 has its own machine-checked evidence gates and may proceed without turning a
+P0 reaction into benchmark evidence. Never relabel a P0 reaction as a
+P1/benchmark/quality/ground-truth label. Fielding is GO, but P0 remains
+unvalidated: 0 valid documented human sessions and no verdict. P4 retention or
+lock-in work remains barred until P0 passes.
 
 ## Exit gate
 
