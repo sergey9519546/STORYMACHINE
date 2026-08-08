@@ -21,12 +21,15 @@ import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { logger } from '../lib/logger.ts';
 import { verifyCollabToken } from '../lib/collab-auth.ts';
+import { boundedIntegerEnv } from '../lib/runtime-limits.ts';
 
 // y-protocols message type tags (wire constants).
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
 
-const MAX_ROOMS = Number(process.env.COLLAB_MAX_ROOMS ?? 200);
+// Local in-process memory ceiling only; this does not advertise hosted
+// collaboration capacity or enable the gated collaboration UI.
+export const COLLAB_MAX_ROOMS = boundedIntegerEnv('COLLAB_MAX_ROOMS', 200, 1, 1000);
 // A room id must be a safe, bounded token (it comes from the URL). Exported so
 // the token-issuing route (server/routes/collab.ts) validates against the
 // exact same pattern rather than a hand-duplicated copy that could drift.
@@ -48,7 +51,7 @@ const rooms = new Map<string, Room>();
 function getRoom(name: string): Room | null {
   let room = rooms.get(name);
   if (room) return room;
-  if (rooms.size >= MAX_ROOMS) {
+  if (rooms.size >= COLLAB_MAX_ROOMS) {
     // Evict an empty room if we are at capacity; refuse if none are empty.
     const emptyId = [...rooms.entries()].find(([, r]) => r.conns.size === 0)?.[0];
     if (emptyId) destroyRoom(emptyId);
@@ -275,6 +278,6 @@ export function attachCollabServer(server: HttpServer): WebSocketServer {
     });
   });
 
-  logger.info('collab_server_attached', { path: '/collab/:room', maxRooms: MAX_ROOMS });
+  logger.info('collab_server_attached', { path: '/collab/:room', maxRooms: COLLAB_MAX_ROOMS });
   return wss;
 }

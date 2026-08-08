@@ -10,6 +10,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { STORY_OP_KINDS } from '../nvm/ops/StoryOp.ts';
 import { TONE_NAME_LIST, GENRE_NAMES } from './genre-router.ts';
 import { ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES, STRUCTURE_NAMES } from './structure-presets.ts';
+import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
 
 // ── SSRF-safe outbound URL guard (audit finding S1-a-1, BLOCKER) ────────────
 // POST /api/ai-config lets an ANONYMOUS caller set baseUrl/imgBaseUrl/
@@ -654,8 +655,8 @@ export const ReviseBodySchema = z.object({
 // otherwise be rejected by the body parser with a less specific 413 instead
 // of this schema's message.
 export const DoctorBodySchema = z.object({
-  fountain: z.string().min(1).max(900_000).optional(),
-  fdx: z.string().min(1).max(900_000).optional(),
+  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
   title: z.string().max(300).optional(),
 }).refine(
   (body) => (body.fountain !== undefined) !== (body.fdx !== undefined),
@@ -683,7 +684,7 @@ export const DeepDoctorBodySchema = DoctorBodySchema;
 // max-length check is the one that actually fires and returns a clean,
 // specific 400 instead of the body parser's generic 413.
 export const DiagnoseBodySchema = z.object({
-  fountain: z.string().min(1).max(900_000),
+  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
 });
 
 // POST /api/game/interview — character-interview feature. History entries are
@@ -734,7 +735,7 @@ const FixIssueItemSchema = z.object({
 });
 
 export const FixBodySchema = z.object({
-  fountain: z.string().min(1).max(900_000),
+  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
   span: FixSpanSchema,
   issues: z.array(FixIssueItemSchema).min(1).max(10),
 });
@@ -754,14 +755,14 @@ export const FixBodySchema = z.object({
 // actually fires for an oversized slate instead of a less-specific 413.
 const SlateScriptItemSchema = z.object({
   title: z.string().min(1).max(200),
-  fountain: z.string().min(1).max(900_000),
+  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
 }).passthrough();
 
 export const SlateBodySchema = z.object({
   scripts: z.array(SlateScriptItemSchema).min(2).max(20),
   format: z.enum(['json', 'html']).optional(),
 }).refine(
-  (body) => body.scripts.reduce((sum, s) => sum + s.fountain.length, 0) <= 900_000,
+  (body) => body.scripts.reduce((sum, s) => sum + s.fountain.length, 0) <= MAX_FOUNTAIN_CHARS,
   {
     message: 'combined fountain length across all scripts must not exceed 900,000 characters — split into a smaller slate',
     path: ['scripts'],
@@ -789,8 +790,8 @@ const VerifyExpectedSchema = z.object({
 });
 
 export const VerifyBodySchema = z.object({
-  fountain: z.string().min(1).max(900_000).optional(),
-  fdx: z.string().min(1).max(900_000).optional(),
+  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
   expected: VerifyExpectedSchema,
 }).refine(
   (body) => (body.fountain !== undefined) !== (body.fdx !== undefined),
@@ -880,7 +881,7 @@ export const NcpStoryformBodySchema = z.object({
 // the one that fires with a clean, specific 400 instead of the body
 // parser's generic 413.
 export const StoryVectorCompareBodySchema = z.object({
-  scriptText: z.string().min(1).max(900_000),
+  scriptText: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
 });
 
 // Path-param schema shared by GET /api/dramatic-pressure/:charId,
@@ -1080,7 +1081,7 @@ export const AiProviderSwitchSchema = z.object({
 // silently truncating) plus a free-text optional title, sanitized by the
 // route's own sanitizeForPrompt call exactly as before.
 export const FountainTitleBodySchema = z.object({
-  fountain: z.string().min(1).max(900_000),
+  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
   title: z.string().max(2000).optional(),
 }).passthrough();
 

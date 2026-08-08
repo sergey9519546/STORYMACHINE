@@ -355,6 +355,76 @@ describe('pdfToFountain — invalid input', () => {
   });
 });
 
+describe('pdfToFountain — bounded extraction', () => {
+  it('accepts exactly 300 pages but rejects 301 before extracting them', async () => {
+    const firstPage: Page = [
+      { y: 700, runs: [{ x: X_ACTION, text: 'INT. ARCHIVE - DAY' }] },
+    ];
+    const acceptedPdf = buildScreenplayPdf([firstPage, ...Array.from({ length: 299 }, () => [])]);
+    const accepted = await pdfToFountain(new Uint8Array(acceptedPdf));
+    assert.match(accepted.fountain, /^INT\. ARCHIVE - DAY$/m);
+
+    const rejectedPdf = buildScreenplayPdf([firstPage, ...Array.from({ length: 300 }, () => [])]);
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(rejectedPdf)),
+      {
+        message: 'This PDF exceeds the 300-page limit. Split it into smaller files and try again.',
+      },
+    );
+  });
+
+  it('rejects 900,001 extractable characters and still converts a valid PDF afterward', async () => {
+    const oversizedLines = Array.from(
+      { length: 100_001 },
+      (_, index): Line => ({
+        y: 350_000 - index * 3,
+        runs: [{ x: X_ACTION, text: index === 100_000 ? 'A' : 'A'.repeat(9) }],
+      }),
+    );
+    const oversizedPdf = buildScreenplayPdf([oversizedLines], { height: 400_000 });
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(oversizedPdf)),
+      {
+        message: 'This PDF contains more than 900,000 extractable text characters. Split it into smaller files and try again.',
+      },
+    );
+
+    const validPdf = buildScreenplayPdf([[
+      { y: 700, runs: [{ x: X_ACTION, text: 'INT. CLEAN ROOM - DAY' }] },
+    ]]);
+    const converted = await pdfToFountain(new Uint8Array(validPdf));
+    assert.match(converted.fountain, /^INT\. CLEAN ROOM - DAY$/m);
+  });
+
+  it('rejects more than 200,000 streamed text items', async () => {
+    const lines = Array.from(
+      { length: 200_001 },
+      (_, index): Line => ({ y: 650_000 - index * 3, runs: [{ x: X_ACTION, text: 'a' }] }),
+    );
+    const oversizedPdf = buildScreenplayPdf([lines], { height: 700_000 });
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(oversizedPdf)),
+      {
+        message: 'This PDF contains more than 200,000 text items. Export a simplified PDF or split it into smaller files and try again.',
+      },
+    );
+  });
+
+  it('rejects Fountain output that grows beyond the canonical character limit', async () => {
+    const lines = Array.from(
+      { length: 100_001 },
+      (_, index): Line => ({ y: 350_000 - index * 3, runs: [{ x: X_ACTION, text: 'abcdefgh' }] }),
+    );
+    const oversizedPdf = buildScreenplayPdf([lines], { height: 400_000 });
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(oversizedPdf)),
+      {
+        message: 'This PDF converts to more than 900,000 Fountain characters. Split it into smaller files and try again.',
+      },
+    );
+  });
+});
+
 describe('pdfToFountain — determinism', () => {
   it('produces byte-identical output across repeated conversions of the same bytes', async () => {
     const pdf = buildScreenplayPdf([
