@@ -17,6 +17,7 @@ const TEST_ROOTS = [
   'tests/passes',
   'tests/routes',
   'tests/scripts',
+  'tests/security',
 ];
 
 function collectTestFiles(directory) {

@@ -27,12 +27,17 @@ import { pdfToFountain } from '../../server/lib/pdf-import.ts';
 interface Run { x: number; text: string }
 interface Line { y: number; runs: Run[] }
 type Page = Line[];
+interface PdfOptions {
+  width?: number;
+  height?: number;
+  openActionJavaScript?: string;
+}
 
 function escapePdfString(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
-function buildScreenplayPdf(pages: Page[], opts: { width?: number; height?: number } = {}): Buffer {
+function buildScreenplayPdf(pages: Page[], opts: PdfOptions = {}): Buffer {
   const width = opts.width ?? 612;
   const height = opts.height ?? 792;
 
@@ -47,7 +52,9 @@ function buildScreenplayPdf(pages: Page[], opts: { width?: number; height?: numb
     contentObjNums.push(nextObj++);
   }
 
-  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  const openActionObjNum = opts.openActionJavaScript === undefined ? undefined : nextObj++;
+
+  objects[1] = `<< /Type /Catalog /Pages 2 0 R${openActionObjNum === undefined ? '' : ` /OpenAction ${openActionObjNum} 0 R`} >>`;
   objects[2] = `<< /Type /Pages /Kids [${pageObjNums.map(n => `${n} 0 R`).join(' ')}] /Count ${pages.length} >>`;
   // WinAnsiEncoding explicitly, so apostrophes/quotes in test fixtures decode
   // as plain ASCII rather than a bare Type1 font's built-in StandardEncoding
@@ -71,6 +78,10 @@ function buildScreenplayPdf(pages: Page[], opts: { width?: number; height?: numb
     ops.push('ET');
     const content = ops.join('\n');
     objects[contentObjNum] = `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`;
+  }
+
+  if (openActionObjNum !== undefined) {
+    objects[openActionObjNum] = `<< /S /JavaScript /JS (${escapePdfString(opts.openActionJavaScript!)}) >>`;
   }
 
   return assemblePdf(objects, nextObj - 1);
@@ -188,6 +199,31 @@ describe('pdfToFountain — classification by position', () => {
     const { fountain } = await pdfToFountain(new Uint8Array(pdf));
     assert.match(fountain, /^She waits\.$/m);
     assert.doesNotMatch(fountain, /^\.She waits\.$/m);
+  });
+});
+
+describe('pdfToFountain — document actions', () => {
+  it('extracts screenplay text without executing a JavaScript OpenAction', async () => {
+    const sentinelKey = '__storymachinePdfOpenActionSecuritySentinel';
+    const scope = globalThis as unknown as Record<string, unknown>;
+    scope[sentinelKey] = 'untouched';
+
+    try {
+      const pdf = buildScreenplayPdf([[
+        { y: 700, runs: [{ x: X_ACTION, text: 'INT. SAFE ROOM - DAY' }] },
+        { y: 680, runs: [{ x: X_ACTION, text: 'A sealed envelope rests on the table.' }] },
+      ]], {
+        openActionJavaScript: `globalThis.${sentinelKey} = 'executed'`,
+      });
+
+      const { fountain } = await pdfToFountain(new Uint8Array(pdf));
+
+      assert.match(fountain, /^INT\. SAFE ROOM - DAY$/m);
+      assert.match(fountain, /^A sealed envelope rests on the table\.$/m);
+      assert.equal(scope[sentinelKey], 'untouched');
+    } finally {
+      delete scope[sentinelKey];
+    }
   });
 });
 

@@ -7,7 +7,7 @@ AI provider is contacted at any point (CI proves this on every commit:
 
 ## Prerequisites (one-time)
 
-1. Install **Node.js 22.6 or newer** (https://nodejs.org — the LTS installer
+1. Install **Node.js matching `>=22.13.0 || >=24`** (https://nodejs.org — the LTS installer
    is fine; confirm with `node --version` in a fresh terminal).
 2. Get the code onto the machine (either):
    - `git clone https://github.com/sergey9519546/STORYMACHINE.git`, or
