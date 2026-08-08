@@ -1,18 +1,21 @@
 # Pass: `causality`
 
-Founding wave: 39. Total distinct rules: 236 (184 attributed to a specific wave, 52 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 237 (187 attributed to a specific wave, 50 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1191
 
-Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story-sin list; see WAVE_QUALITY_GUARANTEE.md and the ROADMAP blueprint docs): PLOT_ARMOR (the protagonist repeatedly survives lethal/high-danger scenes with zero recorded cost — no injury, no negative emotional aftermath, no relationship/resource loss — across 3+ danger scenes, a genre-aware threshold for comedy-coded scripts), COINCIDENCE_RESOLUTION (a payoff scene closes the story using lucky-arrival phrasing and a brand-new proper noun/object never mentioned before, tracing to no seeded clue — distinct in scope from DEUS_EX_MACHINA, which is revelation-only, position-gated, and phrasing-agnostic), UNMOTIVATED_BETRAYAL (an established-ally relationship flips to hostile with zero prior strain anywhere in the run-up, zero suspicion/deception vocabulary, and no earlier revelation naming either party — distinct from MOTIVATION_REVERSAL_UNCAUSED, which uses a tight 2-scene window and only three numeric guards), and PROTAGONIST_UNTESTED (the protagonist never suffers ANY setback anywhere in the script — emotional, textual, or relational — while the story demonstrably can render one elsewhere; distinct from character-arc.ts's ARC_PROTAGONIST_UNTESTED_SOCIALLY, which is relationship-shift-only and requires 2+ shifts, not a scene-presence population). All four share a small file-local text/speaker infrastructure block (composite per-scene text, cue-based speaker/protagonist detection) duplicated here rather than added to lib/checks.ts, which is reserved for numeric analytical-mode templates, not lexicon extraction — matches the precedent of theme.ts's buildSceneText (Wave 130) and dialogue.ts's extractDialogue.
+Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story-sin list; see WAVE_QUALITY_GUARANTEE.md and the ROADMAP blueprint docs): PLOT_ARMOR (the protagonist repeatedly survives lethal/high-danger scenes with zero recorded cost — no injury, no negative emotional aftermath, no relationship/resource loss — across 3+ danger scenes, a genre-aware threshold for comedy-coded scripts), COINCIDENCE_RESOLUTION (a payoff scene closes the story using lucky-arrival phrasing and a brand-new proper noun/object never mentioned before, tracing to no seeded clue — distinct in scope from DEUS_EX_MACHINA, which is revelation-only, position-gated, and phrasing-agnostic), UNMOTIVATED_BETRAYAL (an established-ally relationship flips to hostile with zero prior strain anywhere in the run-up, zero suspicion/deception vocabulary, and no earlier revelation naming either party — distinct from MOTIVATION_REVERSAL_UNCAUSED, which uses a tight 2-scene window and only three numeric guards), and PROTAGONIST_UNTESTED (the protagonist never suffers ANY setback anywhere in the script — emotional, textual, or relational — while the story demonstrably can render one elsewhere; distinct from character-arc.ts's ARC_PROTAGONIST_UNTESTED_SOCIALLY, which is relationship-shift-only and requires 2+ shifts, not a scene-presence population). All four share a small file-local text/speaker infrastructure block (composite per-scene text, cue-based speaker/protagonist detection) duplicated here rather than added to lib/checks.ts, which is reserved for numeric analytical-mode templates, not lexicon extraction — matches the precedent of theme.ts's buildSceneText (Wave 130) and dialogue.ts's extractDialogue. 2026-08-07 addition — INVERSE_CHEKHOV_GUN: the mirror image of Wave 166's CHEKHOV_GUN_UNFIRED. A concrete weapon/tool/device that first appears in the story's peak-intensity scene and is actively used to resolve it, with zero prior mention anywhere earlier in the script — a payoff with no setup, rather than a setup with no payoff. Added in response to a proven gap: the 2026-08-07 pilot session's sidekick produced a concealed cutting blade at the climax with no prior setup, and none of CHEKHOV_GUN_UNFIRED/SETUP_PAYOFF_IMBALANCE/ PAYOFF_ORPHAN_RATE (all forward-direction only) caught it. Lives in the Wave 1191 infrastructure block below (reuses its composite per-scene text) rather than starting a new one. See that block's own header comment for the full precision-guard rationale.
 
 Rules named in this wave's header:
 
+- `CHEKHOV_GUN_UNFIRED`
 - `COINCIDENCE_RESOLUTION`
 - `DEUS_EX_MACHINA`
+- `INVERSE_CHEKHOV_GUN`
 - `MOTIVATION_REVERSAL_UNCAUSED`
 - `PLOT_ARMOR`
 - `PROTAGONIST_UNTESTED`
+- `SETUP_PAYOFF_IMBALANCE`
 - `UNMOTIVATED_BETRAYAL`
 
 ## Wave 1175
@@ -576,7 +579,6 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `CAUSAL_ACT1_VOID` — Wave 197: Causal Act1 void, Act3 discharge absent, motivation reversal
 - `CAUSAL_DENSITY_INVERSION` — Wave 226: CAUSAL_DENSITY_INVERSION
 - `CAUSAL_MIDPOINT_VOID` — Wave 212: Setup-payoff imbalance, act2 causal desert, causal midpoint void
-- `CHEKHOV_GUN_UNFIRED` — Wave 166: Chekhov's gun, consequence delay, revelation front-loading
 - `CLOCK_DELTA_WITHOUT_RAISE` — Wave 296: CLOCK_DELTA_WITHOUT_RAISE
 - `CLOCK_GHOST` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
 - `CLOCK_PEAK_UNCAUSED` — Wave 489: DRAMATIC_TURN_TEMPORAL_CLUSTER, CLOCK_PEAK_UNCAUSED, SEED_AFTERMATH_CURIOSITY_VOID
@@ -612,7 +614,6 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `SEED_AFTERMATH_SUSPENSE_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
 - `SEED_SCENE_EMOTION_VOID` — Wave 461: PAYOFF_RELATIONSHIP_VOID, SEED_SCENE_EMOTION_VOID, RELATIONSHIP_STASIS_RUN
 - `SEED_STASIS_RUN` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `SETUP_PAYOFF_IMBALANCE` — Wave 212: Setup-payoff imbalance, act2 causal desert, causal midpoint void
 - `STATED_BELIEF_REVELATION_DECOUPLED` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
 - `STATED_BELIEF_ZONE_IMBALANCE` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
 - `SUSPENSE_PLATEAU_FLATLINE` — Wave 254: SUSPENSE_PLATEAU_FLATLINE
