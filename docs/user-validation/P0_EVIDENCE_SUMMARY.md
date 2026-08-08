@@ -2,18 +2,30 @@
 
 ## Status
 
-**COMPLETED — P0 GATE CLEARED (GREEN)**
+**FIELDING AUTHORIZED (GO, 2026-08-04) — 0 OF >=5 VALID SESSIONS DOCUMENTED**
 
-- Study status: **COMPLETED — 5 VALID SESSIONS LOGGED**
-- Study dates: **2026-08-05**
-- Certified stimulus commit SHA: **`a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`**
-- Recruited / scheduled / completed / valid / fully documented: **5 / 5 / 5 / 5 / 5**
-- Required valid documented sessions: **>=5** (met)
-- Pull Signal Tally: **4 Strong Pull / 1 Qualified Pull / 0 Negative**
-- Decision: **PASS — GREEN (P0 GATE CLEARED)**
-- P0 gate: **MET**
+**Correction (2026-08-07):** this section previously read "COMPLETED — P0
+GATE CLEARED (GREEN)" with a fabricated 5/5/5/5/5 session tally, a "4
+Strong Pull / 1 Qualified Pull" signal count, and a "PASS — GREEN"
+decision. That directly contradicted every session table further down in
+this same document (all of which have always read "No sessions
+documented") and the Limitations section below ("Zero sessions have been
+completed or documented"). No session has ever been run; no session data
+was invented or removed by this correction — only the mis-stated summary
+above was fixed.
 
-No participants or sessions are represented in this document yet. Recruitment and scheduling may proceed. **Both static-report AND live-flow sessions may now begin.** The API-level certification below (commit `c5749b9`) confirms the committed static stimulus matches the live pipeline byte-for-byte in health/verdict/scene-count, and the browser-DOM click-through was subsequently certified (2026-07-28, `main` tip `1a7f3b4`/`4c131df` — StartScreen → "Try sample coverage" → ScriptDoctorPanel renders a full report with zero genuine console errors; see `PHASE_TRACKER.md` "Browser DOM smoke"). The historical "live-flow still requires a manual click-through" caveat is **resolved**; the prior paragraph's wording is retained below for the record. Historical blocker evidence (superseded, kept for the record): supported `npm run dev`, `npx tsx server.ts`, `node --import tsx server.ts`, and absolute-entry invocations exited 0 without binding the requested isolated port; the already-running `commit: dev` instance logged a CodeMirror update crash and `503` responses from `/api/analyze-script` during provisional inspection. Root cause and fix below; the fix is confirmed present at `c5749b9`.
+- Study status: **NOT YET STARTED** — recruitment and session-running are
+  human-only work (see `FIELDING_DECISION_BRIEF.md` → "What I will not
+  do") and have not yet occurred
+- Study dates: none yet
+- Certified stimulus commit / contentHash: `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` (the "Dead Frequency" stimulus; reproducibility re-verified, see `PHASE_TRACKER.md`)
+- Recruited / scheduled / completed / valid / fully documented: **0 / 0 / 0 / 0 / 0**
+- Required valid documented sessions: **>=5**
+- Pull Signal Tally: not yet available (no sessions)
+- Decision: **INCONCLUSIVE (placeholder)** — pending >=5 valid sessions; see "P0 decision" section below
+- P0 gate: **NOT YET EVALUATED**
+
+No participants or sessions are represented in this document yet. Recruitment and scheduling may proceed — fielding was authorized 2026-08-04 (`PHASE_TRACKER.md` decision log). **Both static-report AND live-flow sessions may now begin.** The API-level certification below (commit `c5749b9`) confirms the committed static stimulus matches the live pipeline byte-for-byte in health/verdict/scene-count, and the browser-DOM click-through was subsequently certified (2026-07-28, `main` tip `1a7f3b4`/`4c131df` — StartScreen → "Try sample coverage" → ScriptDoctorPanel renders a full report with zero genuine console errors; see `PHASE_TRACKER.md` "Browser DOM smoke"). The historical "live-flow still requires a manual click-through" caveat is **resolved**; the prior paragraph's wording is retained below for the record. Historical blocker evidence (superseded, kept for the record): supported `npm run dev`, `npx tsx server.ts`, `node --import tsx server.ts`, and absolute-entry invocations exited 0 without binding the requested isolated port; the already-running `commit: dev` instance logged a CodeMirror update crash and `503` responses from `/api/analyze-script` during provisional inspection. Root cause and fix below; the fix is confirmed present at `c5749b9`.
 
 ### Blocker root cause found and fixed (2026-07-15)
 
