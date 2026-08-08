@@ -174,8 +174,10 @@ describe('POST /api/events — rejects invalid and privacy-bearing payloads with
 });
 
 describe('POST /api/events — product-event logger privacy', () => {
-  it('logs exactly the accepted event name and never session ids, props, script text, or arbitrary values', async () => {
-    const sessionSentinel = 'SESSION_SENTINEL_DO_NOT_LOG';
+  it('keeps accepted header/query capabilities and rejected body values out of product and request logs', async () => {
+    const bodySessionSentinel = 'BODY_SESSION_SENTINEL_DO_NOT_LOG';
+    const headerSessionSentinel = 'HEADER_SESSION_SENTINEL_DO_NOT_LOG';
+    const querySessionSentinel = 'QUERY_SESSION_SENTINEL_DO_NOT_LOG';
     const textSentinel = 'INT. SECRET SET - NIGHT TEXT_SENTINEL_DO_NOT_LOG';
     const propSentinel = 'PROP_SENTINEL_DO_NOT_LOG';
     const captured: string[] = [];
@@ -188,26 +190,50 @@ describe('POST /api/events — product-event logger privacy', () => {
     try {
       assert.equal((await postEvent({
         name: 'doctor_run',
-        sessionId: sessionSentinel,
+        sessionId: bodySessionSentinel,
         props: { source: 'draft', arbitrary: propSentinel, scriptText: textSentinel },
       })).status, 400);
-      assert.equal((await postEvent({ name: 'doctor_run', props: { source: 'upload' } })).status, 202);
+      const accepted = await fetch(
+        `${server.baseUrl}/api/events?sessionId=${encodeURIComponent(querySessionSentinel)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Session-Id': headerSessionSentinel,
+          },
+          body: JSON.stringify({ name: 'doctor_run', props: { source: 'upload' } }),
+        },
+      );
+      assert.equal(accepted.status, 202, 'valid events stay accepted with transport-level session sentinels');
     } finally {
       process.stdout.write = originalWrite;
     }
 
-    const productEventLines = captured
-      .flatMap((chunk) => chunk.split('\n'))
+    const lines = captured.flatMap((chunk) => chunk.split('\n')).filter(Boolean);
+    const productEventLines = lines
       .filter((line) => line.includes('"msg":"product_event"'));
     assert.equal(productEventLines.length, 1, `expected one product event log, got: ${captured.join('')}`);
+    const requestEventLines = lines.filter(
+      (line) => line.includes('"msg":"request"') && line.includes('"path":"/api/events"'),
+    );
+    assert.equal(requestEventLines.length, 2, `expected rejected and accepted request logs, got: ${captured.join('')}`);
+
     const productEvent = JSON.parse(productEventLines[0]!) as Record<string, unknown>;
     assert.deepEqual(Object.keys(productEvent).sort(), ['level', 'msg', 'name', 'time']);
     assert.equal(productEvent.name, 'doctor_run');
-    assert.ok(!productEventLines[0]!.includes(sessionSentinel));
-    assert.ok(!productEventLines[0]!.includes(textSentinel));
-    assert.ok(!productEventLines[0]!.includes(propSentinel));
     assert.ok(!Object.hasOwn(productEvent, 'props'));
     assert.ok(!Object.hasOwn(productEvent, 'sessionId'));
+
+    const eventLogs = [...productEventLines, ...requestEventLines].join('\n');
+    for (const sentinel of [
+      bodySessionSentinel,
+      headerSessionSentinel,
+      querySessionSentinel,
+      textSentinel,
+      propSentinel,
+    ]) {
+      assert.ok(!eventLogs.includes(sentinel), `event log leaked sentinel ${sentinel}: ${eventLogs}`);
+    }
   });
 });
 
