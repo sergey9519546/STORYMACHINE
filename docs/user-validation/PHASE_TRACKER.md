@@ -10,9 +10,9 @@
 |---|---|---|---|
 | P0 — Validate with real writers | **ACTIVE — fielding authorized (GO, 2026-08-04)** | — | **Not yet evaluated — 0 of >=5 valid sessions documented** |
 | P1 — Make the score provably discriminate on real writing | **ACTIVE** | — | In progress |
-| P2 — Collapse the surface to Doctor + Editor | **BLOCKED** | P1 | Not evaluated |
-| P3 — Ship the shareable, verifiable coverage report | **BLOCKED** | P1 + P2 | Not evaluated |
-| P4 — Retention & defensibility | **BLOCKED** | P1 + P2 + P3 | Not evaluated |
+| P2 — Collapse the surface to Doctor + Editor | **COMPLETE** | — | Exit gate met (2026-07-29): Doctor + Editor is the default surface, Labs is default-OFF, and P3 added the required first-report measurement. |
+| P3 — Ship the shareable, verifiable coverage report | **COMPLETE** | — | Exit gate met (2026-07-29): exported reports carry verification material and the export-rate event is measured. |
+| P4 — Retention & defensibility | **BLOCKED** | P0 demand outcome + P1 real-writing evidence | Not evaluated; retention/lock-in work remains prohibited until P0 PASS, and P1 has not met its real-writing validity gate. |
 
 ## P0 counters
 

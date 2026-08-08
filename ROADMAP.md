@@ -341,13 +341,23 @@ isolation" to "prove value to a real writer, then harden it."
 
 ---
 
-## 7. Pre-deployment audit (2026-07-10) — open security items
+## 7. Pre-deployment audit (2026-07-10) — re-verification record
 
-Verify against current code before assuming any are stale. Two read-only
-audits (ops + security) found BLOCKERS; most were closed in S-wave (see
-changelog), but re-verify these specifically:
+Two read-only audits (ops + security) found BLOCKERS. The following status
+records the current re-verification rather than treating the original findings
+as permanently open:
 
-- **SEC-1**: `/api/ai-config` SSRF + unauthenticated GLOBAL provider hijack — `baseUrl` has no host/scheme allowlist; config is process-global; `/test` fires the request. (`validation.ts:143`, `ai-config.ts:55`, `openai-compat.ts:75`) — PARTIALLY ADDRESSED by PR #200's `ADMIN_TOKEN` gate on config writes; re-verify the SSRF allowlist specifically is still open.
+- **SEC-1**: **CLOSED / re-verified.** `AiConfigSchema` rejects unsafe
+  `baseUrl` values at the configuration boundary; config writes are protected
+  by the admin write gate; and the OpenAI-compatible fetch path re-validates
+  every redirect and resolves-and-pins DNS targets before connecting. The
+  route and adapter tests cover private/metadata targets, redirects, and DNS
+  rebinding (`tests/routes/ai-config-live-path.test.ts`,
+  `tests/core/openai-compat-redirect.test.ts`). **Separate future concern:**
+  provider configuration remains process-global and bearer-session based; it
+  is not a multi-tenant configuration model. Any hosted multi-tenant release
+  needs authenticated, tenant-scoped provider ownership and credentials, not
+  merely this SSRF control.
 - **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` / `detectQuestionLatency` / `computeContentWordClueClusters` unbounded; `DoctorBodySchema` caps bytes, not scene count. (`cluster.ts:591`, `fountain-analyzer.ts:1118`/`1314`) — mitigated via `ANALYZER_SCENE_CEILING` in S-wave; confirm coverage.
 - **OPS-1 / OPS-2**: crash handlers + `/metrics` gate — closed in S-wave; confirm still present.
 

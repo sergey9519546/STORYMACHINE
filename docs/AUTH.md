@@ -63,11 +63,18 @@ no account record, no way to prove "this session belongs to user X" beyond
     lint/test, not built here).
   - **Browser history / referrer headers** for the same query-string reason,
     on any client that navigates rather than `fetch()`s.
-  - **No revocation.** A writer who suspects their id leaked (pasted a link
-    publicly, shared a machine) has no way to invalidate it and get a fresh
-    one. `POST /api/reset` only clears simulation state; it neither rotates
-    the bearer id nor deletes the writer project. `destroySession()` is an
-    internal lifecycle helper, not a public session-rotation route.
+  - **Limited self-service rotation, not identity revocation.** A caller that
+    still possesses the old bearer id can `POST /api/session/rotate` with that
+    id in `X-Session-Id`. With an empty body, the server returns a newly
+    generated id and moves the in-memory session to it; with persistent
+    sessions it also attempts to rename the SQLite sidecar files. The client
+    must replace its stored id with the returned `newSessionId`. An optional
+    `newSessionId` is accepted only when it matches the session-id format.
+    Rotation refuses an active command and an already-loaded target id. It is
+    not a deletion endpoint, does not establish a user identity, and cannot
+    protect a capability that has already leaked: another holder of the old
+    id can use or rotate it too. `POST /api/reset` still only clears
+    simulation state; `destroySession()` remains an internal lifecycle helper.
 - **No user-level accountability.** Nothing distinguishes "this session's
   legitimate owner" from "whoever currently holds the id" — no audit trail
   of which human performed an action, no per-account rate limits or
@@ -80,3 +87,9 @@ no account record, no way to prove "this session belongs to user X" beyond
    management, probably a UI flow — and is explicitly **out of scope** for
    this audit; do not build it opportunistically as a side effect of a
    hardening pass.
+
+The rotation route reduces the lifetime of a capability only for a caller who
+can update their local storage and coordinate their own clients. It does not
+change the central ceiling of this model: without accounts, authenticated
+ownership, or server-side revocation records, StoryMachine cannot provide
+account recovery, reliable logout-all-devices, or multi-user authorization.

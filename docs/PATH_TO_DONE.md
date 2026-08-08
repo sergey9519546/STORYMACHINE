@@ -26,12 +26,11 @@ with a clear signal on the core question [does this make you want to run
 your own draft — why or why not?]. If the signal is negative or ambiguous,
 STOP, reframe, and repeat P0."* Status: **NOT MET.** 0/5 sessions
 (`docs/user-validation/P0_EVIDENCE_SUMMARY.md`, `PHASE_TRACKER.md`). The
-fielding *decision itself* — go/no-go, signal rule, decision owner — has
-not been made (`docs/user-validation/FIELDING_DECISION_BRIEF.md`). All
-technical blockers to fielding are cleared: boot blocker resolved, API-level
-smoke certified, browser-DOM click-through certified and re-certified after
-the scene-numbering fix (`PHASE_TRACKER.md`, 2026-08-03 entry). P0 is a pure
-human-decision-and-recruitment gate now, nothing else.
+fielding authorization is **GO** (2026-08-04, recorded in
+`PHASE_TRACKER.md`'s decision log); that is not an outcome verdict. All
+technical blockers to fielding are cleared, so the current work is the
+human fielding itself: recruit, moderate, and document valid sessions. P0
+remains a human-evidence gate; the outcome is still unassessed.
 
 **P1 — Make the score provably discriminate on real writing (the One
 Bet).** Exit gate: *"On a pre-registered held-out set large enough to
@@ -72,7 +71,8 @@ on.
 **P4 — Retention & defensibility.** Exit gate: *"Returning-user rate and
 multi-revision session rate are measured."* Status: **NOT STARTED, by
 design** — ROADMAP explicitly sequences this last, after the score is
-"real, quiet, and shareable." No work should start here before P1 passes.
+"real, quiet, and shareable." P4 is blocked by both an actual P0 PASS and
+the P1 real-writing validity evidence; neither requirement is met.
 
 **Craft-v2 status.** Static scene-dependent prompt differentiation is
 integrated and controlled by the server-only
@@ -89,25 +89,7 @@ The ordered list of tasks that actually gate project completion. Tasks
 outside this list (§3) do not move the finish line no matter how much work
 they represent.
 
-### 1. Make the P0 fielding decision
-
-**WHAT:** A named decision owner records GO/NO-GO/NOT-YET, the signal rule
-for reading >=5 sessions, and their own name/role in
-`PHASE_TRACKER.md`'s decision log (currently empty).
-**WHY IT GATES:** Nothing in P0 can proceed without this — not
-recruitment, not scheduling, not a single session. It is explicitly
-reserved to a human (`FIELDING_DECISION_BRIEF.md`: "Nothing else in P0 can
-move until that decision is made... Reserved to the owner. I will not
-auto-field to make progress.").
-**OWNER:** HUMAN-ONLY.
-**EFFORT:** One command's worth of reading (this brief is already written
-and current) + a decision. Not an engineering task.
-**EVIDENCE REQUIRED:** A dated entry in `PHASE_TRACKER.md`'s decision log
-naming the decision, the signal rule, and the decision owner.
-**STATUS:** NOT DONE. Zero entries in the decision log
-(`PHASE_TRACKER.md` "No decisions have been made").
-
-### 2. Recruit and run >=5 valid, documented P0 sessions
+### 1. Recruit and run >=5 valid, documented P0 sessions
 
 **WHAT:** Recruit real screenwriters with real drafts in hand, show them the
 existing sample coverage report (static or live-flow, both certified ready),
@@ -115,14 +97,10 @@ ask the exact core question verbatim, document each session per
 `docs/user-validation/P0_SESSION_TEMPLATE.md`.
 **WHY IT GATES:** This *is* the P0 exit gate. Everything from P1 onward is
 blocked until this produces a PASS.
-**OWNER:** HUMAN-ONLY (recruiter, moderator, evidence reviewer roles — all
-explicitly reserved; `FIELDING_DECISION_BRIEF.md`: "No human contacts, no
-outreach channel, and these are explicitly human work per the freeze.").
-Recruitment machinery (outreach drafts, templates, tracker) exists but is
-archived at `docs/filed-backlog/premature-p0-machinery/` pending the task-1
-decision to re-open it — it must be re-checked line-by-line against the
-operating kit before use (some archived drafts violate the neutral-invitation
-rule).
+**OWNER:** HUMAN-ONLY. The P0 GO is already documented in
+`PHASE_TRACKER.md`; recruitment, moderation, and evidence review remain human
+work. Use the current operating kit and neutral invitation rules; do not
+misrepresent a research session as a product result.
 **EFFORT:** Human recruitment timeline — not estimable from this repo; no
 invented estimate is given here per the honesty rules governing this
 document.
@@ -132,7 +110,7 @@ exposure/evidence/privacy requirements, aggregated into
 `P0_EVIDENCE_SUMMARY.md`.
 **STATUS:** NOT STARTED. 0/5 (`P0_EVIDENCE_SUMMARY.md`).
 
-### 3. Record the P0 gate verdict (PASS / STOP / INCONCLUSIVE)
+### 2. Record the P0 gate verdict (PASS / STOP / INCONCLUSIVE)
 
 **WHAT:** The decision owner aggregates the >=5 session records, applies
 the pre-declared signal rule, and records PASS/STOP/INCONCLUSIVE in
@@ -140,17 +118,17 @@ the pre-declared signal rule, and records PASS/STOP/INCONCLUSIVE in
 **WHY IT GATES:** This is the literal P0/P1 boundary. A STOP or
 INCONCLUSIVE sends the project back to "reframe and repeat P0," not
 forward.
-**OWNER:** HUMAN-ONLY (the decision owner named in task 1).
+**OWNER:** HUMAN-ONLY (the decision owner recorded in the P0 GO entry).
 **EFFORT:** Hours, once >=5 sessions exist.
 **EVIDENCE REQUIRED:** A completed `P0_EVIDENCE_SUMMARY.md` "P0 decision"
 table with owner, date, rationale, evidence reviewed.
 **STATUS:** NOT DONE (placeholder INCONCLUSIVE, 0 sessions).
 
-*(If PASS: continue below. If STOP/INCONCLUSIVE: return to task 2 with a
+*(If PASS: continue below. If STOP/INCONCLUSIVE: return to task 1 with a
 reframed approach — this is not a dead end, it is the loop ROADMAP §3
 explicitly designs for.)*
 
-### 4. Build the human-blind-labeled P1 benchmark
+### 3. Build the human-blind-labeled P1 benchmark
 
 **WHAT:** A legally distributable real-draft corpus (CC0/public-domain +
 explicitly licensed author-contributed drafts) scored by >=3 independent
@@ -162,8 +140,8 @@ after PASS" and `PRE_REGISTRATION_PROTOCOL.md`.
 notices its own mechanical damage" — never that it agrees with a reader's
 taste, which is what the product actually claims. `docs/p1-benchmark/README.md`
 names this explicitly as the thing P1 has NOT done. It also requires
-sourcing a **weak-craft human contrast class** — the current 761-script
-corpus is 100% produced/professional writing, so there is no legitimate
+sourcing a **weak-craft human contrast class** — the historically measured
+produced-script corpus is 100% produced/professional writing, so there is no legitimate
 "bad" writing to discriminate against yet (`SCREENPLAY_SOURCING_TODO.md`).
 **OWNER:** HYBRID — corpus sourcing/licensing and reader recruitment are
 HUMAN-ONLY (same class of work as P0 recruitment); the benchmark
@@ -175,10 +153,10 @@ invented finer estimate given.
 artifacts, inter-rater agreement statistics, held-out set unavailable for
 implementer tuning — all five items on `P0_EVIDENCE_SUMMARY.md`'s "Allowed
 P1 inputs" list.
-**STATUS:** NOT STARTED. Blocked on task 3 (P0 PASS) per
+**STATUS:** NOT STARTED. Blocked on task 2 (P0 PASS) per
 `P0_EVIDENCE_SUMMARY.md`: "Until PASS, P1 product/engine work is blocked."
 
-### 5. Close the structural-discrimination gap to >=0.80 on real writing
+### 4. Close the structural-discrimination gap to >=0.80 on real writing
 
 **WHAT:** Get SCENE_SHUFFLE, MIDPOINT_DROP, and CLIMAX_RELOCATE test AUC to
 >=0.80 (currently 0.734/0.766/0.523) without regressing dialogue (0.990) or
@@ -195,17 +173,17 @@ bar — a step nothing in CI currently checks (see §4 below).
 experiment is cheap (see 5a below); closing the full gate to 0.80 is not
 estimated here.
 **EVIDENCE REQUIRED:** `npm run measure-real` / `measure-auc-split.mjs
---partition=test` (run once, after freeze) showing all three channels
+--partition=test` (run once, after the pre-registered split is frozen) showing all three channels
 >=0.80 with 95% CI lower bound >0.65, shuffle-drop AUC not regressed below
 its current floor, composite min-gap guard passing.
-**STATUS:** IN PROGRESS / BLOCKED behind task 4 for "counts as the P1
+**STATUS:** IN PROGRESS / BLOCKED behind task 3 for "counts as the P1
 gate" purposes — but the underlying engineering is unblocked and explicitly
 license-permitted to continue per `docs/p1-benchmark/README.md`'s
 authorization boundary (this is P1 continuation work, already authorized
 past the P0 override). Two of the five named next-experiments are one
 command away:
 
-  **5a. Run the question-latency deduction experiment on the real corpus
+  **4a. Historical question-latency deduction experiment on the real corpus
   (maintainer's local machine).**
   **WHAT:** `CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs
   --partition=train --with-question-latency-deduction`, compared against
@@ -218,9 +196,11 @@ command away:
   **WHY IT GATES:** It's the named next concrete P1 experiment; a positive
   result is the most direct path toward closing the structural gap.
   **OWNER:** HYBRID — the command is one line, but it requires the
-  761-script corpus, which is local-only on the maintainer's machine (not
-  present in any cloud/container environment this project has been built
-  in). AGENT-DOABLE only on a machine with `CORPUS_DIR` set.
+  externally held corpus. Its screenplay text is not a capability of a clean
+  checkout: the supported local interface is `REAL_SCRIPT_CORPUS_DIR` (for
+  example, `REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run measure-real`).
+  AGENT-DOABLE only on a machine where that local-only corpus is deliberately
+  made available.
   **EFFORT:** One command.
   **EVIDENCE REQUIRED:** Two AUC tables (flag-on vs flag-off) compared;
   written up per `MEASUREMENT_RUNBOOK.md` §5 if it moves the number.
@@ -235,12 +215,12 @@ command away:
   meaningfully move the discrimination AUC; the full on/off run is not worth
   its multi-hour cost.** D1/D2 disagree with legacy on ~0% of produced
   features (1/761); D3 is the only detector with non-negligible signal
-  (~4–6%). Also corrects the prior status line below: **the full 761-script
-  corpus IS present in this environment** (`data/screenplays/`, all 761
-  `corpus-split.json` entries resolve, 0 missing) — the earlier "no
-  761-script corpus is present in this sandbox" claim was incorrect.
+  (~4–6%). This is a **historical measurement receipt**, not evidence that
+  a clean checkout contains the source corpus. Reproducing or extending it
+  requires the separately held, copyright-bound screenplay text via
+  `REAL_SCRIPT_CORPUS_DIR`; no current-checkout corpus capability is claimed.
 
-  **5b. Fix the D6 clue-lifecycle tautology, then re-test
+  **4b. Fix the D6 clue-lifecycle tautology, then re-test
   setup-before-payoff ordering.**
   **WHAT:** Change `applyClueLifecycle` (`fountain-analyzer.ts` ~line 838)
   to derive seed/payoff from evidence of introduction (first-time noun
@@ -274,9 +254,10 @@ command away:
   `PAYOFF_BEFORE_SETUP` signal (the AUC-24 floor was respected on the
   41-script blast-radius check per the D4/D6 receipt, but the full
   real-corpus AUC re-measurement obligation is recorded in
-  MEASUREMENT_RECEIPTS.md and not yet discharged on the 761-script set).
+  MEASUREMENT_RECEIPTS.md and not yet discharged on the externally held
+  corpus set).
 
-### 6. Re-validate P2/P3's already-shipped surfaces against what P0/P1 learn
+### 5. Re-validate P2/P3's already-shipped surfaces against what P0/P1 learn
 
 **WHAT:** Once P0 produces real session evidence and P1 produces a real
 human-agreement number, revisit the Doctor+Editor surface (P2) and the
@@ -293,14 +274,14 @@ still makes sense." Not doing this risks a shipped surface that quietly
 outlives the assumptions it was built on.
 **OWNER:** AGENT-DOABLE for the audit/proposal; product decisions from it
 may need maintainer sign-off (HYBRID).
-**EFFORT:** Days, once tasks 3 and 4/5 produce real evidence.
+**EFFORT:** Days, once tasks 2 and 3/4 produce real evidence.
 **EVIDENCE REQUIRED:** A written reconciliation of P0 session findings and
 P1 discrimination results against current P2/P3 report language and UI
 claims.
 **STATUS:** NOT STARTED — correctly so, since it depends on evidence that
 doesn't exist yet. Not a current-sprint task.
 
-### 7. P4 — Retention & defensibility
+### 6. P4 — Retention & defensibility
 
 **WHAT:** Draft-history loop ("watch your score climb across revisions"),
 jump-to-line + one-click deterministic fixes, auth/accounts.
@@ -320,7 +301,7 @@ measured (ROADMAP §3 P4 exit gate).
 
 None of the following moves the finish line in §2. It is worth doing, but
 motion here is not progress on the spine — do not let it substitute for
-tasks 1-5 above.
+tasks 1-6 above.
 
 - **Detector defects D1-D5, D7 fix shapes** (`DETECTOR_DEFECTS_2026-08-03.md`).
   D1/D2 (protagonist-passivity lexicon blindness), D3 (reversal-channel blind
@@ -330,7 +311,7 @@ tasks 1-5 above.
   claim was tested and REFUTED at short-fixture scale in
   `STRUCTURAL_FORM_EXPERIMENT_2026-08-03.md`; treat as a design constraint
   on future structural work, not an active bug to patch). D6 is promoted to
-  the critical path (task 5b) because it blocks a Tier-1 structural
+  the critical path (task 4b) because it blocks a Tier-1 structural
   candidate; D1-D5/D7 remain here because fixing them requires the same
   fixture-plus-corpus-measurement discipline but none is currently blocking
   the P1 gate number. Each requires positive/negative fixtures + corpus
@@ -416,7 +397,7 @@ tasks 1-5 above.
   72-script corpora because that text isn't present in any environment
   this tooling was built in (`CORPUS_IDENTIFICATION.md` §6). This is
   provenance hygiene — it does NOT change the corpus's copyright or
-  redistribution status, and does NOT unblock task 4 above (a
+  redistribution status, and does NOT unblock task 3 above (a
   de-identified private corpus is still not "legally distributable").
   **WHAT:** Run the 6-step migration procedure in `CORPUS_IDENTIFICATION.md`
   §4 on the maintainer's machine, commit only the migrated manifests, never
@@ -462,13 +443,11 @@ confirmation of what setting is even being referred to (GitHub's dependency
 graph / Dependabot feature is the most likely reading, but this document
 does not assert that without a source).
 
-**Fielding GO/NO-GO.** This is task 1 on the critical path (§2), restated
-here because it is also, definitionally, a standing decision on the
-maintainer's queue, not an engineering task. Per
-`FIELDING_DECISION_BRIEF.md`: the decision owner must state (1) do we field
-P0 now — yes/no/not yet, (2) the signal rule for reading >=5 sessions
-before any session runs, (3) who the decision owner of record is (named
-role, not PII in git).
+**P0 outcome verdict.** Fielding GO is already recorded (2026-08-04); it is
+not a remaining maintainer decision. The next human decision is made only
+after valid sessions exist: apply the pre-registered signal rule to the
+documented evidence and record PASS, STOP, or INCONCLUSIVE. Until then, the
+active work is fielding, not another go/no-go review.
 
 ---
 
