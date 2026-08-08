@@ -520,7 +520,21 @@ router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asy
     const { records } = analyzeFountainText(fountain);
     const logline = buildLogline(report, records, fountain);
 
-    const html = renderCoverageHtml({ ...report, contentHash }, title, {
+    // Root-cause clustering (pilot session 2026-08-07 finding #3,
+    // PILOT_SESSION_REPORT.md §0.3/§6/§9.3): POST /api/scriptide/doctor
+    // attaches this at the route layer via the exact same locateIssues +
+    // clusterIssues pair (see server/routes/scriptide.ts's own comment for
+    // why it lives at the route rather than inside doctor.ts), but this
+    // export route never did — so the exported coverage.html had nothing to
+    // feed renderCoverageHtml's Root Causes section even after that section
+    // existed, and a static-report reader never saw the synthesis at all.
+    // Same two-call pattern, same inputs already in scope here.
+    const { locateIssues } = await import('../nvm/analyze/locate.ts');
+    const { clusterIssues } = await import('../nvm/analyze/cluster.ts');
+    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+    const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+
+    const html = renderCoverageHtml({ ...report, contentHash, rootCauses }, title, {
       titlePageTitle: titlePage.title,
       titlePageAuthor: titlePage.author,
       logline,

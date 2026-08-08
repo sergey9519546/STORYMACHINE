@@ -160,4 +160,33 @@ describe('routes/export/coverage — HTTP behavior', async () => {
     assert.ok(!/<script/i.test(html), 'no <script> tag anywhere in the response');
     assert.ok(html.includes('&lt;b&gt;Bad&lt;/b&gt;'), 'the title must appear HTML-escaped rather than dropped');
   });
+
+  // Pilot session 2026-08-07 finding #3: this route never attached rootCauses
+  // to the report it fed renderCoverageHtml, so the exported document had
+  // nothing to show even after coverage-html.ts grew a Root Causes section.
+  // Cross-checks against POST /api/scriptide/doctor (which has attached
+  // rootCauses at the route layer since before this fix) rather than
+  // hardcoding an assumption about what this fixture clusters into, so the
+  // test proves the two routes now agree instead of asserting a brittle
+  // fixture-specific outcome.
+  it('surfaces a Root Causes section exactly when the live doctor report would cluster one for the same script', async () => {
+    const doctorRes = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: MULTI_SCENE_FOUNTAIN }),
+    });
+    assert.equal(doctorRes.status, 200);
+    const doctorBody = await doctorRes.json() as { rootCauses?: unknown[] };
+
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait' });
+    assert.equal(res.status, 200);
+    const html = await res.text();
+
+    if (Array.isArray(doctorBody.rootCauses) && doctorBody.rootCauses.length > 0) {
+      assert.match(html, /<h2>Root Causes<\/h2>/, 'coverage export must surface Root Causes when the doctor would cluster one for this script');
+      assert.match(html, /Subsumes \d+ issue/);
+    } else {
+      assert.ok(!html.includes('<h2>Root Causes</h2>'), 'no Root Causes heading when nothing clusters for this script');
+    }
+  });
 });
