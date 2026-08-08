@@ -98,7 +98,7 @@ router.get('/health', (_req, res) => {
 router.post('/api/session/rotate', gameLimiter, validate(RotateSessionBodySchema), asyncHandler(async (req, res) => {
   const oldId = sessionId(req);
   const body = req.body as z.infer<typeof RotateSessionBodySchema>;
-  const result = rotateSession(oldId, body?.newSessionId);
+  const result = await rotateSession(oldId, body?.newSessionId);
   res.json({ status: 'ok', ...result });
 }));
 

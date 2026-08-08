@@ -1,0 +1,365 @@
+import { after, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn, type ChildProcess } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+interface ChildServer {
+  baseUrl: string;
+  waitForRotationPause: () => Promise<void>;
+  releaseRotation: () => void;
+  close: () => Promise<void>;
+}
+
+const isChild = process.env.STORYMACHINE_ROTATION_CHILD === '1';
+
+if (isChild) {
+  const sessionDir = process.env.SESSION_DB_DIR;
+  if (!sessionDir) throw new Error('SESSION_DB_DIR is required for the rotation child');
+
+  const failTarget = process.env.STORYMACHINE_TEST_FAIL_ROTATION_TARGET;
+  if (failTarget) {
+    const targetPath = path.join(sessionDir, `${failTarget}.db`);
+    const originalRename = fs.renameSync.bind(fs);
+    fs.renameSync = ((oldPath: fs.PathLike, newPath: fs.PathLike) => {
+      if (path.resolve(String(newPath)) === path.resolve(targetPath)) {
+        const error = new Error('injected publication failure') as NodeJS.ErrnoException;
+        error.code = 'EACCES';
+        throw error;
+      }
+      return originalRename(oldPath, newPath);
+    }) as typeof fs.renameSync;
+  }
+
+  let releaseBackup: (() => void) | undefined;
+  if (process.env.STORYMACHINE_TEST_PAUSE_ROTATION === '1') {
+    const { Stage } = await import('../../server/engine/Stage.ts');
+    const originalBackupTo = Stage.prototype.backupTo;
+    Stage.prototype.backupTo = async function pausedBackup(destination: string): Promise<void> {
+      process.send?.({ type: 'backup-entered' });
+      await new Promise<void>(resolve => { releaseBackup = resolve; });
+      await originalBackupTo.call(this, destination);
+    };
+  }
+
+  const { createApp } = await import('../../server/app.ts');
+  const app = await createApp({ serveStatic: false });
+  const server = app.listen(0, '127.0.0.1', () => {
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('child server did not bind a TCP port');
+    process.send?.({ type: 'ready', port: address.port });
+  });
+
+  process.on('message', async message => {
+    if (message === 'release-backup') {
+      releaseBackup?.();
+      releaseBackup = undefined;
+      return;
+    }
+    if (message !== 'close') return;
+    releaseBackup?.();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    const { sessions } = await import('../../server/lib/session-store.ts');
+    for (const session of sessions.values()) session.stage.close();
+    sessions.clear();
+    process.send?.({ type: 'closed' });
+    process.disconnect?.();
+  });
+} else {
+  const roots: string[] = [];
+
+  after(() => {
+    for (const root of roots) fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  async function startChildServer(
+    sessionDir: string,
+    options: { failPublishTarget?: string; pauseRotation?: boolean } = {},
+  ): Promise<ChildServer> {
+    const child = spawn(process.execPath, [
+      '--experimental-strip-types',
+      fileURLToPath(import.meta.url),
+    ], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        SESSION_DB_DIR: sessionDir,
+        STORYMACHINE_ROTATION_CHILD: '1',
+        ...(options.failPublishTarget
+          ? { STORYMACHINE_TEST_FAIL_ROTATION_TARGET: options.failPublishTarget }
+          : {}),
+        ...(options.pauseRotation ? { STORYMACHINE_TEST_PAUSE_ROTATION: '1' } : {}),
+      },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      windowsHide: true,
+    });
+
+    let diagnostics = '';
+    child.stdout?.on('data', chunk => { diagnostics += chunk.toString(); });
+    child.stderr?.on('data', chunk => { diagnostics += chunk.toString(); });
+
+    const ready = await waitForMessage(child, 'ready', diagnostics);
+    return {
+      baseUrl: `http://127.0.0.1:${ready.port}`,
+      waitForRotationPause: async () => {
+        await waitForMessage(child, 'backup-entered', diagnostics);
+      },
+      releaseRotation: () => { child.send('release-backup'); },
+      close: async () => {
+        if (child.exitCode !== null) return;
+        child.send('close');
+        await waitForMessage(child, 'closed', diagnostics);
+        await new Promise<void>((resolve, reject) => {
+          child.once('exit', code => code === 0 ? resolve() : reject(new Error(`child exited ${code}\n${diagnostics}`)));
+          child.once('error', reject);
+        });
+      },
+    };
+  }
+
+  function waitForMessage(
+    child: ChildProcess,
+    type: 'ready' | 'closed' | 'backup-entered',
+    diagnostics: string,
+  ): Promise<{ type: string; port?: number }> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error(`timed out waiting for child ${type}\n${diagnostics}`));
+      }, 15_000);
+      const onMessage = (message: unknown) => {
+        if (!message || typeof message !== 'object' || (message as { type?: unknown }).type !== type) return;
+        cleanup();
+        resolve(message as { type: string; port?: number });
+      };
+      const onExit = (code: number | null) => {
+        cleanup();
+        reject(new Error(`child exited ${code} before ${type}\n${diagnostics}`));
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const cleanup = () => {
+        clearTimeout(timeout);
+        child.off('message', onMessage);
+        child.off('exit', onExit);
+        child.off('error', onError);
+      };
+      child.on('message', onMessage);
+      child.on('exit', onExit);
+      child.on('error', onError);
+    });
+  }
+
+  function makeSessionDir(): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'storymachine-session-rotation-'));
+    roots.push(root);
+    const sessionDir = path.join(root, 'sessions');
+    fs.mkdirSync(sessionDir, { recursive: true });
+    return sessionDir;
+  }
+
+  async function saveMarker(baseUrl: string, sessionId: string, marker: string): Promise<void> {
+    const response = await fetch(`${baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        scriptText: marker,
+        snapshots: [],
+        characters: [],
+        researchNotes: [],
+        isDarkMode: false,
+      }),
+    });
+    assert.equal(response.status, 200);
+  }
+
+  async function loadMarker(baseUrl: string, sessionId: string): Promise<{ status: string; scriptText: string }> {
+    const response = await fetch(`${baseUrl}/api/scriptide/load?sessionId=${sessionId}`);
+    assert.equal(response.status, 200);
+    return await response.json() as { status: string; scriptText: string };
+  }
+
+  async function rotate(baseUrl: string, oldSessionId: string, newSessionId: string): Promise<Response> {
+    return fetch(`${baseUrl}/api/session/rotate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': oldSessionId },
+      body: JSON.stringify({ newSessionId }),
+    });
+  }
+
+  describe('persistent session rotation', () => {
+    it('publishes a restart-verifiable database under only the replacement id', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'old-session-id';
+      const newId = 'new-session-id';
+      const marker = 'ROTATION MARKER SURVIVES RESTART';
+      let server = await startChildServer(sessionDir);
+      try {
+        await saveMarker(server.baseUrl, oldId, marker);
+        const response = await rotate(server.baseUrl, oldId, newId);
+        assert.equal(response.status, 200);
+        assert.deepEqual(await response.json(), {
+          status: 'ok',
+          oldSessionId: oldId,
+          newSessionId: newId,
+        });
+      } finally {
+        await server.close();
+      }
+
+      assert.equal(fs.existsSync(path.join(sessionDir, `${oldId}.db`)), false);
+      assert.equal(fs.existsSync(path.join(sessionDir, `${newId}.db`)), true);
+
+      server = await startChildServer(sessionDir);
+      try {
+        const restored = await loadMarker(server.baseUrl, newId);
+        assert.equal(restored.status, 'ok');
+        assert.equal(restored.scriptText, marker);
+        assert.equal((await loadMarker(server.baseUrl, oldId)).status, 'empty');
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('fails closed when database publication fails and preserves the old authority across restart', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'publish-failure-old';
+      const newId = 'publish-failure-new';
+      const marker = 'OLD AUTHORITY MUST SURVIVE';
+      let server = await startChildServer(sessionDir, { failPublishTarget: newId });
+      try {
+        await saveMarker(server.baseUrl, oldId, marker);
+        const response = await rotate(server.baseUrl, oldId, newId);
+        assert.equal(response.status, 503);
+        assert.match((await response.json() as { error: string }).error, /retry/i);
+        const intact = await loadMarker(server.baseUrl, oldId);
+        assert.equal(intact.status, 'ok');
+        assert.equal(intact.scriptText, marker);
+        assert.equal(fs.existsSync(path.join(sessionDir, `${newId}.db`)), false);
+      } finally {
+        await server.close();
+      }
+
+      server = await startChildServer(sessionDir);
+      try {
+        const restored = await loadMarker(server.baseUrl, oldId);
+        assert.equal(restored.status, 'ok');
+        assert.equal(restored.scriptText, marker);
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('rejects an unloaded target with any existing SQLite artifact', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'collision-source';
+      const targetId = 'collision-target';
+      const sourceMarker = 'SOURCE REMAINS AUTHORITATIVE';
+      const targetMarker = 'EXISTING TARGET MUST NOT BE OVERWRITTEN';
+      let server = await startChildServer(sessionDir);
+      try {
+        await saveMarker(server.baseUrl, targetId, targetMarker);
+      } finally {
+        await server.close();
+      }
+
+      server = await startChildServer(sessionDir);
+      try {
+        await saveMarker(server.baseUrl, oldId, sourceMarker);
+        const response = await rotate(server.baseUrl, oldId, targetId);
+        assert.equal(response.status, 400);
+        assert.match((await response.json() as { error: string }).error, /already.*use/i);
+        const source = await loadMarker(server.baseUrl, oldId);
+        const target = await loadMarker(server.baseUrl, targetId);
+        assert.equal(source.status, 'ok');
+        assert.equal(source.scriptText, sourceMarker);
+        assert.equal(target.status, 'ok');
+        assert.equal(target.scriptText, targetMarker);
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('rejects a requested replacement id that is not already in canonical form', async () => {
+      const sessionDir = makeSessionDir();
+      const server = await startChildServer(sessionDir);
+      try {
+        await saveMarker(server.baseUrl, 'invalid-target-old', 'INTACT');
+        const response = await rotate(server.baseUrl, 'invalid-target-old', ' padded-target-id ');
+        assert.equal(response.status, 400);
+        assert.match((await response.json() as { error: string }).error, /newSessionId/);
+        const intact = await loadMarker(server.baseUrl, 'invalid-target-old');
+        assert.equal(intact.scriptText, 'INTACT');
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('refuses later reads and mutations while rotation owns the old Stage lifecycle', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'lifecycle-barrier-old';
+      const newId = 'lifecycle-barrier-new';
+      const server = await startChildServer(sessionDir, { pauseRotation: true });
+      try {
+        await saveMarker(server.baseUrl, oldId, 'BEFORE ROTATION');
+        const rotation = rotate(server.baseUrl, oldId, newId);
+        await server.waitForRotationPause();
+
+        const read = fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${oldId}`);
+        const mutation = fetch(`${server.baseUrl}/api/scriptide/save`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: oldId,
+            scriptText: 'MUST NOT RUN ON THE ROTATING STAGE',
+            snapshots: [],
+            characters: [],
+            researchNotes: [],
+            isDarkMode: false,
+          }),
+        });
+
+        const [readResponse, mutationResponse] = await Promise.race([
+          Promise.all([read, mutation]),
+          new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('later requests waited instead of receiving a retryable response')), 2_000)),
+        ]);
+        assert.equal(readResponse.status, 409);
+        assert.equal(mutationResponse.status, 409);
+
+        server.releaseRotation();
+        assert.equal((await rotation).status, 200);
+      } finally {
+        server.releaseRotation();
+        await server.close();
+      }
+    });
+
+    it('does not delete a target artifact that appears while the backup is running', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'target-race-old';
+      const newId = 'target-race-new';
+      const targetPath = path.join(sessionDir, `${newId}.db`);
+      const server = await startChildServer(sessionDir, { pauseRotation: true });
+      try {
+        await saveMarker(server.baseUrl, oldId, 'OLD REMAINS');
+        const rotation = rotate(server.baseUrl, oldId, newId);
+        await server.waitForRotationPause();
+        fs.writeFileSync(targetPath, 'EXTERNAL TARGET ARTIFACT');
+        server.releaseRotation();
+
+        assert.equal((await rotation).status, 503);
+        assert.equal(fs.readFileSync(targetPath, 'utf8'), 'EXTERNAL TARGET ARTIFACT');
+        const old = await loadMarker(server.baseUrl, oldId);
+        assert.equal(old.scriptText, 'OLD REMAINS');
+      } finally {
+        server.releaseRotation();
+        await server.close();
+      }
+    });
+  });
+}

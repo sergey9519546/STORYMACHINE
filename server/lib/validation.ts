@@ -1085,7 +1085,9 @@ export const FountainTitleBodySchema = z.object({
 }).passthrough();
 
 export const RotateSessionBodySchema = z.object({
-  newSessionId: z.string().trim().regex(/^[a-zA-Z0-9_-]{8,64}$/, 'newSessionId must match [a-zA-Z0-9_-]{8,64}').optional(),
+  // A bearer id is an exact capability, not display text: do not trim and
+  // silently rotate to a value different from the one the caller supplied.
+  newSessionId: z.string().regex(/^[a-zA-Z0-9_-]{8,64}$/, 'newSessionId must match [a-zA-Z0-9_-]{8,64}').optional(),
 }).strict().or(z.undefined());
 
 // ── Middleware factory ───────────────────────────────────────────────────────

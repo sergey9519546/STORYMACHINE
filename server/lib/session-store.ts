@@ -14,6 +14,7 @@ export interface Session {
   orchestrator: Orchestrator;
   lastAccess: number;
   commands: SessionCommandCoordinator;
+  rotating: boolean;
 }
 
 /**
@@ -49,6 +50,16 @@ export class SessionCapacityError extends Error {
   constructor(message = 'Server session capacity is temporarily busy. Please retry shortly.') {
     super(message);
     this.name = 'SessionCapacityError';
+  }
+}
+
+/** Durable rotation could not be completed; callers may safely retry. */
+export class SessionRotationError extends SessionCapacityError {
+  readonly retryable = true;
+
+  constructor(message = 'Session rotation could not be completed. Please retry.') {
+    super(message);
+    this.name = 'SessionRotationError';
   }
 }
 
@@ -210,12 +221,21 @@ export const SESSION_TTL_MS  = boundedIntegerEnv('SESSION_IDLE_TTL_MINUTES', 144
 // ── Session store ─────────────────────────────────────────────────────────────
 export const sessions     = new Map<string, Session>();
 export const runningRooms = new Set<string>();
+const rotatingSessionIds = new Set<string>();
+const SQLITE_ARTIFACT_SUFFIXES = ['', '-wal', '-shm', '-journal'] as const;
 
 export function dbPathFor(sessionId: string): string {
   return PERSIST_SESSIONS ? path.join(SESSION_DB_DIR, `${sessionId}.db`) : ':memory:';
 }
 
 export function getOrCreateSession(sessionId: string): Session {
+  // Rotation reserves both the old and replacement ids before it queues
+  // behind earlier commands. This check covers direct read routes as well as
+  // withSessionCommand(): neither may obtain a Stage whose handle is about to
+  // be closed and replaced by the lifecycle operation.
+  if (rotatingSessionIds.has(sessionId)) {
+    throw new SessionBusyError('Session rotation is in progress. Please retry.');
+  }
   let session = sessions.get(sessionId);
   if (!session) {
     if (sessions.size >= MAX_SESSIONS) {
@@ -246,7 +266,13 @@ export function getOrCreateSession(sessionId: string): Session {
     // For a persisted session this opens the existing file; the Orchestrator
     // constructor re-hydrates agents + locations, so the session resumes intact.
     const s = new Stage(dbPathFor(sessionId));
-    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now(), commands: new SessionCommandCoordinator() };
+    session = {
+      stage: s,
+      orchestrator: new Orchestrator(s),
+      lastAccess: Date.now(),
+      commands: new SessionCommandCoordinator(),
+      rotating: false,
+    };
     sessions.set(sessionId, session);
   }
   session.lastAccess = Date.now();
@@ -260,53 +286,181 @@ export function destroySession(sessionId: string): void {
   if (session) { session.stage.close(); sessions.delete(sessionId); }
   if (PERSIST_SESSIONS) {
     const base = path.join(SESSION_DB_DIR, `${sessionId}.db`);
-    for (const suffix of ['', '-wal', '-shm', '-journal']) {
+    for (const suffix of SQLITE_ARTIFACT_SUFFIXES) {
       try { fs.unlinkSync(base + suffix); } catch { /* file absent — fine */ }
     }
   }
 }
 
+function sqliteArtifactPaths(base: string): string[] {
+  return SQLITE_ARTIFACT_SUFFIXES.map(suffix => base + suffix);
+}
+
+function hasSqliteArtifact(base: string): boolean {
+  return sqliteArtifactPaths(base).some(file => fs.existsSync(file));
+}
+
+function removeSqliteArtifacts(base: string): void {
+  // Delete the main database last. If sidecar cleanup fails, the authoritative
+  // database is still present and can be reopened under the old id.
+  for (const suffix of ['-wal', '-shm', '-journal', ''] as const) {
+    const file = base + suffix;
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+}
+
+function chooseReplacementSessionId(requestedNewId?: string): string {
+  // Keep the library interface fail-closed even when called outside the HTTP
+  // route (whose zod schema enforces the same canonical representation).
+  if (requestedNewId !== undefined && !HEADER_SESSION_ID_RE.test(requestedNewId)) {
+    throw new ValidationError('newSessionId must match [a-zA-Z0-9_-]{8,64}');
+  }
+
+  const isCollision = (candidate: string): boolean => {
+    if (sessions.has(candidate) || rotatingSessionIds.has(candidate)) return true;
+    return PERSIST_SESSIONS && hasSqliteArtifact(path.join(SESSION_DB_DIR, `${candidate}.db`));
+  };
+
+  if (requestedNewId !== undefined) {
+    if (isCollision(requestedNewId)) {
+      throw new ValidationError('Requested new session ID is already in use.');
+    }
+    return requestedNewId;
+  }
+
+  let generated: string;
+  do generated = crypto.randomUUID().replace(/-/g, ''); while (isCollision(generated));
+  return generated;
+}
+
 // Safely rotate a bearer session ID to a new unguessable ID (see docs/AUTH.md).
-export function rotateSession(
+export async function rotateSession(
   oldSessionId: string,
   requestedNewId?: string,
-): { oldSessionId: string; newSessionId: string } {
-  const session = sessions.get(oldSessionId);
-  if (session && !session.commands.isIdle) {
-    throw new SessionBusyError('Cannot rotate an active session while commands are running.');
-  }
+): Promise<{ oldSessionId: string; newSessionId: string }> {
+  const newSessionId = chooseReplacementSessionId(requestedNewId);
+  const session = getOrCreateSession(oldSessionId);
 
-  const newSessionId = (requestedNewId && HEADER_SESSION_ID_RE.test(requestedNewId))
-    ? requestedNewId
-    : crypto.randomUUID().replace(/-/g, '');
+  // Set the lifecycle barrier before entering the FIFO. Commands already
+  // admitted are allowed to settle first; every later old-id/target-id request
+  // is rejected by getOrCreateSession() instead of touching a closing Stage.
+  rotatingSessionIds.add(oldSessionId);
+  rotatingSessionIds.add(newSessionId);
+  session.rotating = true;
 
-  if (sessions.has(newSessionId)) {
-    throw new ValidationError('Requested new session ID is already in use.');
-  }
-
-  if (PERSIST_SESSIONS) {
-    const oldBase = path.join(SESSION_DB_DIR, `${oldSessionId}.db`);
-    const newBase = path.join(SESSION_DB_DIR, `${newSessionId}.db`);
-    for (const suffix of ['', '-wal', '-shm', '-journal']) {
-      const oldFile = oldBase + suffix;
-      const newFile = newBase + suffix;
-      if (fs.existsSync(oldFile)) {
-        try {
-          fs.renameSync(oldFile, newFile);
-        } catch (err) {
-          logger.warn('session_rotate_file_rename_failed', { oldFile, newFile, error: (err as Error).message });
-        }
+  try {
+    return await session.commands.run(async () => {
+      if (!PERSIST_SESSIONS) {
+        const draft = session.stage.loadScriptIDEState(oldSessionId);
+        if (draft) session.stage.saveScriptIDEState(newSessionId, draft);
+        sessions.delete(oldSessionId);
+        sessions.set(newSessionId, session);
+        logger.info('session_rotated', { oldSessionId, newSessionId, persistent: false });
+        return { oldSessionId, newSessionId };
       }
-    }
-  }
 
-  if (session) {
-    sessions.delete(oldSessionId);
-    sessions.set(newSessionId, session);
-  }
+      const oldBase = path.join(SESSION_DB_DIR, `${oldSessionId}.db`);
+      const newBase = path.join(SESSION_DB_DIR, `${newSessionId}.db`);
+      const temporaryBase = path.join(
+        SESSION_DB_DIR,
+        `.${newSessionId}.rotate-${crypto.randomUUID()}.tmp`,
+      );
+      const oldStage = session.stage;
+      let oldStageClosed = false;
+      let replacementPublished = false;
+      let verificationStage: Stage | undefined;
+      let replacementStage: Stage | undefined;
 
-  logger.info('session_rotated', { oldSessionId, newSessionId });
-  return { oldSessionId, newSessionId };
+      try {
+        // Online backup captures committed data still resident in the live WAL
+        // without renaming files underneath SQLite's open Windows handles.
+        await oldStage.backupTo(temporaryBase);
+        oldStage.close();
+        oldStageClosed = true;
+
+        // Reopen the backup before publication and migrate the one table keyed
+        // by bearer id. Constructing the Orchestrator exercises persisted
+        // simulation hydration as part of verification too.
+        verificationStage = new Stage(temporaryBase);
+        const draft = verificationStage.loadScriptIDEState(oldSessionId);
+        if (draft) verificationStage.saveScriptIDEState(newSessionId, draft);
+        new Orchestrator(verificationStage);
+        verificationStage.close();
+        verificationStage = undefined;
+
+        // An external process could create the target during the backup. Treat
+        // that race as a retryable lifecycle failure; never overwrite it.
+        if (hasSqliteArtifact(newBase)) {
+          throw new Error('replacement database appeared during rotation');
+        }
+        fs.renameSync(temporaryBase, newBase);
+        replacementPublished = true;
+
+        // A 200 is allowed only after the published path itself is reopenable.
+        replacementStage = new Stage(newBase);
+        const replacementOrchestrator = new Orchestrator(replacementStage);
+        if (draft && !replacementStage.loadScriptIDEState(newSessionId)) {
+          throw new Error('replacement database did not retain ScriptIDE state');
+        }
+
+        removeSqliteArtifacts(oldBase);
+        if (hasSqliteArtifact(oldBase)) {
+          throw new Error('source SQLite artifacts remain after rotation');
+        }
+
+        session.stage = replacementStage;
+        session.orchestrator = replacementOrchestrator;
+        replacementStage = undefined;
+        sessions.delete(oldSessionId);
+        sessions.set(newSessionId, session);
+        logger.info('session_rotated', { oldSessionId, newSessionId, persistent: true });
+        return { oldSessionId, newSessionId };
+      } catch (error) {
+        verificationStage?.close();
+        replacementStage?.close();
+
+        // Publication may have succeeded before a later verification/cleanup
+        // failure. Restore the durable old path before removing the candidate.
+        if (!fs.existsSync(oldBase)) {
+          const recoverySource = replacementPublished && fs.existsSync(newBase)
+            ? newBase
+            : (fs.existsSync(temporaryBase) ? temporaryBase : undefined);
+          if (recoverySource) fs.copyFileSync(recoverySource, oldBase);
+        }
+        // If the target appeared during backup, it belongs to another actor;
+        // only remove newBase when this rotation actually published it.
+        if (replacementPublished) {
+          try { removeSqliteArtifacts(newBase); } catch { /* old path remains authoritative */ }
+        }
+        try { removeSqliteArtifacts(temporaryBase); } catch { /* temporary file is never loadable by an id */ }
+
+        if (oldStageClosed) {
+          try {
+            const restoredStage = new Stage(oldBase);
+            session.stage = restoredStage;
+            session.orchestrator = new Orchestrator(restoredStage);
+          } catch (restoreError) {
+            sessions.delete(oldSessionId);
+            logger.error('session_rotate_restore_failed', {
+              oldSessionId,
+              error: (restoreError as Error).message,
+            });
+          }
+        }
+
+        logger.warn('session_rotate_failed', {
+          oldSessionId,
+          newSessionId,
+          error: (error as Error).message,
+        });
+        throw new SessionRotationError();
+      }
+    });
+  } finally {
+    session.rotating = false;
+    rotatingSessionIds.delete(oldSessionId);
+    rotatingSessionIds.delete(newSessionId);
+  }
 }
 
 // Header-supplied ids come from src/lib/session.ts's crypto.randomUUID()-based
