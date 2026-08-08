@@ -21,7 +21,12 @@ const KEYLESS_OVERRIDES = Object.freeze({
 });
 
 export function keylessBrowserServerEnv(parentEnv, port) {
-  return { ...parentEnv, ...KEYLESS_OVERRIDES, PORT: String(port) };
+  const env = { ...parentEnv, ...KEYLESS_OVERRIDES, PORT: String(port) };
+  // dotenv/config honors this flag before loading .env. It must be absent,
+  // rather than the string "false", so the forced blank credentials above
+  // cannot be overwritten by a developer's local provider configuration.
+  delete env.DOTENV_CONFIG_OVERRIDE;
+  return env;
 }
 
 export async function assertKeylessAiConfig(baseUrl, fetchImpl = fetch) {

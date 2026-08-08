@@ -25,6 +25,7 @@ describe('keyless browser certification environment', () => {
       AI_EMBEDDING_PROVIDER: 'openai-compat',
       AI_EMBEDDING_BASE_URL: 'https://embeddings.example/v1',
       AI_EMBEDDING_API_KEY: 'inherited-embedding-key',
+      DOTENV_CONFIG_OVERRIDE: 'true',
     });
 
     for (const name of [
@@ -38,6 +39,11 @@ describe('keyless browser certification environment', () => {
     assert.equal(env.AI_IMG_PROVIDER, 'none');
     assert.equal(env.AI_TTS_PROVIDER, 'none');
     assert.equal(env.AI_EMBEDDING_PROVIDER, 'none');
+    assert.equal(
+      'DOTENV_CONFIG_OVERRIDE' in env,
+      false,
+      'the spawned keyless server must not let dotenv override its forced blank credentials',
+    );
   });
 
   it('fails closed unless the server reports llmReady:false', async () => {
