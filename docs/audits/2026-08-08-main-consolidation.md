@@ -105,9 +105,10 @@ under the operating kit. No agent may fabricate them.
 
 ## Final code/repository verification gate
 
-Task 6 is complete as a **code/repository verification gate**. On `main`
-commit `70d55532bf5c765b28f196a1480103e412286287`, the following commands
-passed:
+Task 6 is complete as a **code/repository verification gate**. The full
+gate was re-run after the final truth/reproducibility reconciliation and
+browser-verifier hardening on the final code-bearing `main` commit
+`40d58949f80210e6a61143bacc51a6d088447f6c`; the following commands passed:
 
 - `git diff --check`
 - `npm run lint`
@@ -120,9 +121,15 @@ passed:
 - `node scripts/verify-focus-traps.mjs` (14/14)
 - `node scripts/verify-p2-p3-surfaces.mjs` (94/94)
 
+The browser surface verifier's Ship-to-Studio check now waits for the unique,
+active `Versions` tab instead of a fixed delay and CSS-class selector. This
+preserves the accepted tripwire while eliminating a non-reproducible
+render-timing false-negative risk; it does not change product behavior.
+
 The test run emitted the expected keyless-mode Gemini rewrite fallback logs.
 The build emitted Vite's warning that ScriptIDE exceeds 500 kB. Neither
-warning changed the passing result.
+warning changed the passing result. This audit update is documentation-only;
+the commit above remains the exact verified code-bearing artifact.
 
 This gate does not establish P0 demand validation, P1 score validity, user
 retention, release or production readiness, or a public launch. The next task
