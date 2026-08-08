@@ -94,7 +94,7 @@ before the next begins, because every downstream promise (private, instant,
 deterministic, reproducible coverage) rests on the score being provably real,
 and by our own numbers it isn't yet. We build demand-out, not rigor-first.
 
-### P0 — Validate with real writers (this week; blocks everything)
+### P0 — Validate with real writers (demand/human gate; P1 evidence work may run in parallel, P4 remains blocked until P0 PASS)
 
 **Goal:** Confirm that a screenwriter, shown the existing sample coverage
 report, actually wants to run their own draft.

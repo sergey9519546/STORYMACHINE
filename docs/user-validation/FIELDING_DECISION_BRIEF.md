@@ -1,13 +1,16 @@
 # P0 Fielding Decision Brief — for the decision owner
 
-> **This is the actual first step of Track 1.** Per the active-work prompt and
-> the freeze, recruitment, session-running, and the field-the-study decision
-> are *reserved to a human owner* — an agent cannot perform them. What an
-> agent *can* do is hand the owner a verified, decision-ready package so the
-> one thing that actually moves the gate (the go/no-go) can be made against
-> current reality, not stale SHAs. That is what this file is.
+> **Current status — read this first.** Fielding was authorized **GO** on
+> 2026-08-04, but P0 has 0 valid documented human sessions and no outcome
+> verdict. The opening decision request and freeze language below are preserved
+> as a **historical pre-GO record**. They are superseded by ROADMAP's 2026-08-04
+> amendment: P1 measurement/validity work may proceed within its
+> machine-checked evidence gates, in parallel with P0, and never substitutes
+> for human P0 evidence. P4 retention/lock-in remains prohibited until P0
+> PASS. The human-only, consent, privacy, and no-fabrication constraints remain
+> controlling.
 
-## What I need from you (the decision)
+## Historical pre-GO decision request (superseded)
 
 One decision, and it's yours, not mine:
 
@@ -174,29 +177,37 @@ work.
    `P0_EVIDENCE_SUMMARY.md`, applies the signal rule, records PASS/STOP/
    INCONCLUSIVE, links from ROADMAP §3.
 
-## If you say NO or NOT YET — what's still useful
+## Historical pre-GO contingency — if the owner said NO or NOT YET
 
-The freeze stays. The highest-leverage agent work that *doesn't* touch the gate
-or the frozen score is **Track 2, Lever 2**: stand up a real-script
+The blanket-freeze premise in this section applied before the 2026-08-04 GO and
+ROADMAP amendment; it does not control current P1 policy. The described
+real-script measurement work remains useful when it follows the current
+machine-checked evidence gates: **Track 2, Lever 2** stands up a real-script
 discrimination harness (`REAL_SCRIPT_CORPUS_DIR`, 261+ `.fountain` on this
 machine) that runs the *current* Doctor over real writing and reports — without
 changing the score — whether it orders strong-above-weak, by what margin, and
 where it ties or inverts. That evidence sharpens whatever you show writers in
 P0 and pre-arms the P1 decision. It's the active-work prompt's named
-highest-value lever and is fully freeze-permitted. Say the word and I'll plan
-and build it.
+highest-value lever. Its results remain P1 evidence only and do not alter the
+P0 outcome gate.
 
-## What I will not do (and why these aren't mine to do)
+## Human-only and no-fabrication constraints that remain controlling
+
+These constraints protect P0 evidence integrity. They do **not** revive the
+former blanket P1 freeze: P1 work is governed by ROADMAP's machine-checked
+evidence gates, while P4 retention/lock-in remains prohibited until P0 PASS.
 
 - **Fabricate sessions or participants.** Zero sessions is the truth. Inventing
   any would be the exact fabrication the operating kit and evidence summary
   exist to prevent, and would poison the gate.
-- **Recruit, outreach, or run sessions.** No human contacts, no outreach
-  channel, and these are explicitly human work per the freeze.
+- **Recruit, outreach, or run sessions.** No human contacts or outreach
+  channel may be fabricated or conducted by an agent; these are human work.
 - **Make the field-the-study decision or pick the signal rule.** Reserved to
   the owner. I will not auto-field to "make progress."
-- **Touch the scoring formula, constants, rules, detectors, calibration, or
-  report math.** Frozen under P0; the only exception is critical security.
+- **Bypass scoring evidence gates.** Formula, constants, rules, detectors,
+  calibration, and report-math changes must follow ROADMAP's machine-checked
+  evidence gates; the retired blanket P0 freeze and its security-only exception
+  do not govern current P1 work.
 
 ---
 
@@ -211,9 +222,9 @@ Summary: **GO** — field P0, static-report sessions first, live-flow
 permitted per the certifications above. Decision owner of record: Project
 Maintainer (role). The recording was performed under the maintainer's
 explicit 2026-08-04 blanket delegation of open decisions to the agent
-session; what CANNOT be delegated remains exactly what §"What I will not
-do" says — recruiting, running, and documenting sessions are human work,
-and zero sessions have been fabricated. The gate's counters still read
+session; the human-only constraints above remain controlling for recruiting,
+running, and documenting sessions, and zero sessions have been fabricated.
+The gate's counters still read
 0 of >= 5 valid sessions; GO changes what is *authorized*, not what is
 *evidenced*.
 

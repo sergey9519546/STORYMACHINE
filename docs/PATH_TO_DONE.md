@@ -95,8 +95,10 @@ they represent.
 existing sample coverage report (static or live-flow, both certified ready),
 ask the exact core question verbatim, document each session per
 `docs/user-validation/P0_SESSION_TEMPLATE.md`.
-**WHY IT GATES:** This *is* the P0 exit gate. Everything from P1 onward is
-blocked until this produces a PASS.
+**WHY IT GATES:** This *is* the P0 exit gate. A P0 PASS gates
+demand-dependent advancement and P4 retention/lock-in work. P1 measurement and
+validity work may run in parallel only within its machine-checked evidence
+gates; it never substitutes for this human outcome evidence.
 **OWNER:** HUMAN-ONLY. The P0 GO is already documented in
 `PHASE_TRACKER.md`; recruitment, moderation, and evidence review remain human
 work. Use the current operating kit and neutral invitation rules; do not
@@ -115,9 +117,10 @@ exposure/evidence/privacy requirements, aggregated into
 **WHAT:** The decision owner aggregates the >=5 session records, applies
 the pre-declared signal rule, and records PASS/STOP/INCONCLUSIVE in
 `P0_EVIDENCE_SUMMARY.md`, linked from `ROADMAP.md` §3.
-**WHY IT GATES:** This is the literal P0/P1 boundary. A STOP or
-INCONCLUSIVE sends the project back to "reframe and repeat P0," not
-forward.
+**WHY IT GATES:** This records the P0 human-outcome boundary. A STOP or
+INCONCLUSIVE sends the project back to "reframe and repeat P0." P1
+measurement and validity work may remain evidence-gated in parallel, but it
+cannot convert or replace the P0 outcome.
 **OWNER:** HUMAN-ONLY (the decision owner recorded in the P0 GO entry).
 **EFFORT:** Hours, once >=5 sessions exist.
 **EVIDENCE REQUIRED:** A completed `P0_EVIDENCE_SUMMARY.md` "P0 decision"
