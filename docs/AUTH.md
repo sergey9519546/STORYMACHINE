@@ -9,10 +9,13 @@ system was built as part of Run 16.
 
 ## Current model: session id as bearer capability
 
-Every browser tab gets a random session id (`crypto.randomUUID()`-derived,
-`src/lib/session.ts`), sent on every `/api/*` request via the `X-Session-Id`
-header (or `?sessionId=`/body `sessionId` for explicit/SSE call sites — see
-`server/lib/session-store.ts`'s `sessionId()` for the full precedence).
+Each browser profile stores a random session id (`crypto.randomUUID()`-derived,
+`src/lib/session.ts`) in `localStorage`; tabs on that same origin normally
+share it. When storage is unavailable, the client falls back to an in-memory
+id for that tab lifetime only. The id is sent on every `/api/*` request via
+the `X-Session-Id` header (or `?sessionId=`/body `sessionId` for explicit/SSE
+call sites — see `server/lib/session-store.ts`'s `sessionId()` for the full
+precedence).
 The server keys all per-user state — simulation `Stage`, agents, action log,
 in-flight editor state — off that id (`getOrCreateSession()`), with no
 further check of *who* is presenting it.
@@ -80,13 +83,14 @@ no account record, no way to prove "this session belongs to user X" beyond
   of which human performed an action, no per-account rate limits or
   permissions, no multi-device sync tied to an identity rather than a
   browser's local storage.
-- **No cross-device access.** Since the id lives in one browser's storage,
-   per-user rate limits/quotas instead of per-IP ones (see the `TRUST_PROXY`
-   note in `README.md`'s Deployment section for the current per-IP
-   limitation). This is a genuinely new subsystem — schema, session
-   management, probably a UI flow — and is explicitly **out of scope** for
-   this audit; do not build it opportunistically as a side effect of a
-   hardening pass.
+- **No account-mediated cross-device access or reliable global logout.** A
+  copied session id can be used on another device because it is a bearer
+  capability, which makes copying it a leak risk rather than a supported
+  account feature. There are no account records, per-user quotas, or
+  server-side logout-all-devices capability; current rate limits are per IP
+  (see the `TRUST_PROXY` note in `README.md`'s Deployment section). Accounts,
+  authenticated ownership, and server-side revocation are separate systems
+  and explicitly **out of scope** for this audit.
 
 The rotation route reduces the lifetime of a capability only for a caller who
 can update their local storage and coordinate their own clients. It does not

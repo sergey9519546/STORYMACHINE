@@ -354,10 +354,11 @@ as permanently open:
   route and adapter tests cover private/metadata targets, redirects, and DNS
   rebinding (`tests/routes/ai-config-live-path.test.ts`,
   `tests/core/openai-compat-redirect.test.ts`). **Separate future concern:**
-  provider configuration remains process-global and bearer-session based; it
-  is not a multi-tenant configuration model. Any hosted multi-tenant release
-  needs authenticated, tenant-scoped provider ownership and credentials, not
-  merely this SSRF control.
+  provider configuration remains process-global and is protected by the
+  operator-facing admin/loopback write gate; it is not writer session state or
+  a multi-tenant configuration model. Any hosted multi-tenant release needs
+  authenticated, tenant-scoped provider ownership and credentials, not merely
+  this SSRF control.
 - **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` / `detectQuestionLatency` / `computeContentWordClueClusters` unbounded; `DoctorBodySchema` caps bytes, not scene count. (`cluster.ts:591`, `fountain-analyzer.ts:1118`/`1314`) — mitigated via `ANALYZER_SCENE_CEILING` in S-wave; confirm coverage.
 - **OPS-1 / OPS-2**: crash handlers + `/metrics` gate — closed in S-wave; confirm still present.
 

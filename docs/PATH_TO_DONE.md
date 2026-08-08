@@ -47,8 +47,8 @@ shuffle/drop/relocate/flatten degradation of a script against itself, not
 against >=3 independent readers' blinded judgment of real strong-vs-weak
 writing, which is what the exit gate and `PRE_REGISTRATION_PROTOCOL.md`
 actually require (`docs/p1-benchmark/README.md` "What P1 has NOT done"). P1
-work proceeded ahead of a cleared P0 gate by explicit user direction, recorded
-in `docs/p1-benchmark/P1_STATUS_2026-07-29.md` ("User directed P1 to begin;
+work proceeded before a P0 PASS by explicit user direction, recorded in
+`docs/p1-benchmark/P1_STATUS_2026-07-29.md` ("User directed P1 to begin;
 record shows this") — not re-litigated here, cited as the authorization.
 
 **P2 — Collapse the surface to Doctor + Editor.** Exit gate: *"A new user
