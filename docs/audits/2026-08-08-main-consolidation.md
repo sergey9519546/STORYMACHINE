@@ -135,3 +135,30 @@ This gate does not establish P0 demand validation, P1 score validity, user
 retention, release or production readiness, or a public launch. The next task
 remains human-only: conduct and document five complete P0 sessions under the
 operating kit.
+
+## Post-consolidation security exception (2026-08-08)
+
+A production-tree dependency audit after consolidation found three current
+advisories: direct `pdfjs-dist@6.1.200` in the affected range of
+GHSA-hq66-cqwq-w95j, two vulnerable `nanoid` resolutions, and a development
+`tsx`/`esbuild` advisory. The server PDF route uses PDF.js only for text
+extraction; it does not import the PDF.js viewer or scripting-manager
+surfaces. A real `/OpenAction /JavaScript` fixture confirms that the server
+extracts screenplay text without executing the embedded action. That narrower
+behavioral check does not replace the required dependency upgrade.
+
+Security commit `4f8f0ec3c5ac76b27923a55cbf0e577af2d5c15c` locks
+`pdfjs-dist` to `6.2.108`, refreshes the affected `nanoid`, `tsx`, and
+`esbuild` resolutions, raises the declared Node floor to `>=22.13.0 || >=24`,
+and adds committed-resolution and hostile-PDF regressions. The subsequent
+documentation-only commit `1aa161a2c4caa341247682225966ee41665edb98`
+reconciles active phase, security, and session-model documentation.
+
+On `1aa161a2c4caa341247682225966ee41665edb98`, a clean `npm ci` and
+`npm audit --omit=dev --audit-level=high` both reported zero vulnerabilities.
+`git diff --check`, `npm run lint`, `npm test` (194 files), `npm run build`,
+`npm run honesty-audit`, `npm run check-docs`, `npm run check-scoring-receipt`,
+`node scripts/smoke-p0-live-flow.mjs`, `node scripts/verify-focus-traps.mjs`
+(14/14), and `node scripts/verify-p2-p3-surfaces.mjs` (94/94) also passed.
+The expected keyless provider-fallback logs, npm deprecation notices, and the
+existing Vite ScriptIDE chunk-size warning did not change those results.
