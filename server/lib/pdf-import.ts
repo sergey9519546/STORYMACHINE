@@ -310,50 +310,55 @@ function dedupe(list: string[]): string[] {
 // materializes an entire page before the caller can enforce any budget.
 interface ExtractionBudget { chars: number; textItems: number }
 
-async function extractPageLines(
-  page: PdfPageLike,
-  pageIndex: number,
+export async function readBoundedPdfTextItems(
+  reader: ReadableStreamDefaultReader<PdfTextContentChunk>,
   budget: ExtractionBudget,
-): Promise<{ lines: RawLine[]; hasText: boolean }> {
+): Promise<PdfTextItem[]> {
   const items: PdfTextItem[] = [];
-  const reader = page.streamTextContent().getReader();
-  let completed = false;
-  let limitError: Error | undefined;
+  let readerSettled = false;
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        completed = true;
+        readerSettled = true;
         break;
       }
-      // Once a ceiling is crossed, retain nothing else. Drain the already-
-      // opened PDF.js stream so its producer settles before document/task
-      // cleanup; cancelling this installed PDF.js stream races its producer
-      // and can surface an asynchronous ERR_INVALID_STATE after cancellation.
-      if (limitError) continue;
       for (const item of value.items) {
         budget.textItems++;
         if (budget.textItems > MAX_PDF_TEXT_ITEMS) {
-          limitError = new Error('This PDF contains more than 200,000 text items. Export a simplified PDF or split it into smaller files and try again.');
-          break;
+          const safeError = new Error('This PDF contains more than 200,000 text items. Export a simplified PDF or split it into smaller files and try again.');
+          try { await reader.cancel(new Error('PDF text extraction limit exceeded')); } catch { /* safe cap error remains authoritative */ }
+          readerSettled = true;
+          throw safeError;
         }
         if (typeof (item as PdfTextItem).str !== 'string') continue;
         const textItem = item as PdfTextItem;
         budget.chars += textItem.str.length;
         if (budget.chars > MAX_FOUNTAIN_CHARS) {
-          limitError = new Error('This PDF contains more than 900,000 extractable text characters. Split it into smaller files and try again.');
-          break;
+          const safeError = new Error('This PDF contains more than 900,000 extractable text characters. Split it into smaller files and try again.');
+          try { await reader.cancel(new Error('PDF text extraction limit exceeded')); } catch { /* safe cap error remains authoritative */ }
+          readerSettled = true;
+          throw safeError;
         }
         if (textItem.str.trim() !== '') items.push(textItem);
       }
     }
-    if (limitError) throw limitError;
   } finally {
-    if (!completed) {
+    if (!readerSettled) {
       try { await reader.cancel(); } catch { /* document/loading-task cleanup still follows */ }
+      readerSettled = true;
     }
     reader.releaseLock();
   }
+  return items;
+}
+
+async function extractPageLines(
+  page: PdfPageLike,
+  pageIndex: number,
+  budget: ExtractionBudget,
+): Promise<{ lines: RawLine[]; hasText: boolean }> {
+  const items = await readBoundedPdfTextItems(page.streamTextContent().getReader(), budget);
 
   if (items.length === 0) return { lines: [], hasText: false };
 
