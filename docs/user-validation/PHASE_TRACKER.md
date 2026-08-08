@@ -8,7 +8,7 @@
 
 | Phase | Status | Blocked by | Gate state |
 |---|---|---|---|
-| P0 — Validate with real writers | **CLEARED** | — | **CLEARED (GREEN)** |
+| P0 — Validate with real writers | **ACTIVE — fielding authorized (GO, 2026-08-04)** | — | **Not yet evaluated — 0 of >=5 valid sessions documented** |
 | P1 — Make the score provably discriminate on real writing | **ACTIVE** | — | In progress |
 | P2 — Collapse the surface to Doctor + Editor | **BLOCKED** | P1 | Not evaluated |
 | P3 — Ship the shareable, verifiable coverage report | **BLOCKED** | P1 + P2 | Not evaluated |
@@ -16,25 +16,34 @@
 
 ## P0 counters
 
+**Correction (2026-08-07):** this table previously showed fabricated
+values (5 recruited/scheduled/completed/valid sessions, a 4-Strong/
+1-Qualified pull tally, and a "PASS — GREEN (P0 GATE CLEARED)" decision).
+No session has ever been run — `docs/user-validation/sessions/` contains no
+session files, and `P0_EVIDENCE_SUMMARY.md`'s own session tables have
+always read "No sessions documented." The table below reflects the actual
+state: fielding is authorized (GO, see decision log below) but zero
+sessions have occurred.
+
 | Counter | Current | Required / interpretation |
 |---|---:|---|
-| Recruited real screenwriters | 5 | Met |
-| Scheduled sessions | 5 | Met |
-| Completed sessions | 5 | Met |
-| Valid sessions | 5 | Met (eligibility, consent, privacy rules verified) |
-| Fully documented sessions | 5 | >=5 valid documented sessions required (met) |
-| Sessions with real draft in hand confirmed | 5 | Met for all 5 participants |
-| Notes consent obtained | 5 | Met for all 5 participants |
-| Anonymous quote permission obtained | 5 | Met for all 5 participants |
-| Positive signals | 4 | 4 Strong Pull signals recorded |
-| Qualified-positive signals | 1 | 1 Qualified Pull signal recorded |
-| Negative signals | 0 | 0 Negative signals |
-| Ambiguous signals | 0 | 0 Ambiguous signals |
-| Invalid / excluded sessions | 0 | None |
-| Verbatim objections logged | 1 | 1 objection logged (non-linear narrative clarification) |
-| Verbatim moments of trust logged | 5 | Logged across sessions |
-| Verbatim moments of disbelief logged | 0 | None |
-| P0 gate decisions recorded | 1 | **PASS — GREEN (P0 GATE CLEARED)** |
+| Recruited real screenwriters | 0 | Track toward >=5 |
+| Scheduled sessions | 0 | Track toward >=5 |
+| Completed sessions | 0 | Track toward >=5 |
+| Valid sessions | 0 | >=5 valid documented sessions required |
+| Fully documented sessions | 0 | >=5 valid documented sessions required |
+| Sessions with real draft in hand confirmed | 0 | None yet |
+| Notes consent obtained | 0 | None yet |
+| Anonymous quote permission obtained | 0 | None yet |
+| Positive signals | 0 | None yet |
+| Qualified-positive signals | 0 | None yet |
+| Negative signals | 0 | None yet |
+| Ambiguous signals | 0 | None yet |
+| Invalid / excluded sessions | 0 | None yet |
+| Verbatim objections logged | 0 | None yet |
+| Verbatim moments of trust logged | 0 | None yet |
+| Verbatim moments of disbelief logged | 0 | None yet |
+| P0 gate decisions recorded | 1 | **GO — field P0** (fielding-authorization decision only; the separate outcome gate (PASS/STOP) cannot be evaluated until >=5 valid sessions exist — see decision log below) |
 
 ## Current fielding blocker
 
@@ -166,6 +175,7 @@ block became:
 |---|---|---|---|---|---|
 | 2026-08-04 | P0 | **GO — field P0.** Static-report sessions first; live-flow sessions permitted per the existing certifications. | `FIELDING_DECISION_BRIEF.md` (incl. 2026-08-03 update: browser caveat cleared, stimulus corrected, thinness recorded) | Project Maintainer (role) — recording delegated, see Notes | The maintainer explicitly delegated all open decisions to the agent session on 2026-08-04 ("make all the decisions for me … always proceed"). This entry records the GO under that delegation. Sessions themselves remain HUMAN-RUN: recruitment, moderation, and documentation cannot be delegated to an agent, and fabricating session data remains prohibited under this tracker's own constitutional guard. |
 | 2026-08-04 | P0 | **Stimulus swap — "The Second Key" -> "Dead Frequency"**, resolving the sample-thinness limitation recorded in the row above (~47.5 -> ~152.6 words/scene). `src/lib/sample-script.ts` now embeds `data/screenplays/dead-frequency.fountain`, a tracked CC0 corpus script, chosen as the closest-to-band words/scene (152.6, vs. the 161–181 real-corpus median) among candidates that also clear the >=12-scene preference (full 20-script comparison table in `FIELDING_DECISION_BRIEF.md`'s 2026-08-04 "RESOLVED" addendum). New provenance: health 78.3, verdict CONSIDER (unchanged), sceneCount 12, contentHash `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`, `sample-coverage-report.html` regenerated at 193,132 bytes. Retired stimulus preserved verbatim at `docs/user-validation/ARCHIVED_SAMPLE_THE_SECOND_KEY.md`; `demo/corpus/MANIFEST.json` bumped to version 2 with the retired version kept in a `history` field. | `FIELDING_DECISION_BRIEF.md` 2026-08-04 "RESOLVED" addendum; `P0_EVIDENCE_SUMMARY.md` 2026-08-04 "stimulus swap" addendum | Project Maintainer (role) — recording delegated, see Notes | Same 2026-08-04 blanket delegation as the GO decision above — this is stimulus-quality remediation of an already-decided GO, not a re-opening of the field/no-field question. **Zero P0 sessions had been run against the retired stimulus**, so no session comparability is lost. Re-verified green: `npm run lint`, `npm run honesty-audit`, `scripts/smoke-p0-live-flow.mjs` (PASS, keyless, zero genuine console errors), `scripts/verify-p2-p3-surfaces.mjs` (89/89). Full `npm test` has 6 pre-existing-shape failures in `tests/core/scene-label-consistency.test.ts` (3) and `tests/core/reversal-detection.test.ts` (3) that couple to the exact content of the live sample and are unavoidable for any stimulus swap (not specific to this choice) — see the evidence-summary addendum's "Known collateral test impact" note; that `tests/` lane was owned by a concurrent session at swap time and needs a follow-up to re-lock the coupled thresholds/fixtures. |
+| 2026-08-07 | P0 | **Doc-consistency correction (no session data changed).** Reverted fabricated "P0 GATE CLEARED (GREEN)" / "5 valid sessions" claims that had been introduced into this table's Phase-status row, this file's P0-counters table, and `P0_EVIDENCE_SUMMARY.md`'s Status block — all contradicted by those same documents' own session tables, which have always read "No sessions documented." No real-writer session has occurred; `docs/user-validation/sessions/` contains no session files. This entry records the correction only; it does not re-open or change the 2026-08-04 GO decision above. | This entry; `FIELDING_DECISION_BRIEF.md` "The state of the gate, honestly"; `P0_EVIDENCE_SUMMARY.md` "Status" | Agent session (docs-consistency pass) | Session counters remain 0 of >=5 after this correction; only the mis-stated claims were changed. |
 
 **Pre-registered signal rule** (fixed before any session; no post-hoc
 reinterpretation): each valid documented session is classified per the

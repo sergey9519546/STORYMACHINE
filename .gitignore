@@ -20,7 +20,24 @@ graphify-out/
 .playwright-cli/
 output/playwright/**
 !output/playwright/whole_site_qa.py
-docs/user-validation/sessions/
+# docs/user-validation/sessions/: privacy-reviewed session markdown records
+# ARE committable (P0_OPERATING_KIT.md's post-session handling requires
+# filing the final, redacted record at sessions/P0-00N.md) -- everything
+# else in this directory (raw exports, recordings, transcripts, and other
+# PII-bearing artifacts) stays excluded by default. See
+# FIRST_SESSION_QUICKSTART.md "Commit rules" for the flow this unblocks.
+docs/user-validation/sessions/*
+!docs/user-validation/sessions/*.md
+!docs/user-validation/sessions/.gitkeep
+docs/user-validation/sessions/*.mp3
+docs/user-validation/sessions/*.mp4
+docs/user-validation/sessions/*.wav
+docs/user-validation/sessions/*.m4a
+docs/user-validation/sessions/*.txt
+docs/user-validation/sessions/*.json
+docs/user-validation/sessions/*.csv
+docs/user-validation/sessions/*.pdf
+docs/user-validation/sessions/*.docx
 data/
 
 # The `data/` rule above is for the root runtime dir (per-visitor SQLite
