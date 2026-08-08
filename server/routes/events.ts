@@ -2,20 +2,23 @@
 // runs that export is measured"; also carries P2's deferred time-to-first-
 // report measurement). Deliberately minimal and privacy-bounded:
 //
-//   - The event vocabulary is a closed enum (validation.ts's
-//     PRODUCT_EVENT_NAMES) and props are capped scalar records — no script
-//     text, no PII, no free-form keys can accumulate here.
-//   - Storage is in-memory aggregate counters only (plus one structured log
-//     line per event for the persistent stream). No database, no per-event
-//     history — the exit-gate questions are ratios and averages, which
-//     counters answer exactly.
-//   - Keyless/stateless like the rest of the analysis surface: no LLM, no
-//     session store, no auth. GET /api/events/summary exposes only
-//     aggregates, never individual events.
+//   - A strict discriminated schema accepts only the props each closed event
+//     requires. No arbitrary metadata, free text, or session capability.
+//   - Metrics are unauthenticated, client-reported, in-memory, process-local
+//     aggregates. They reset on restart and are neither durable nor
+//     deployment-wide, authoritative P0 evidence, or proof of unique users.
+//   - The aggregate sink is session-unlinked, not absolutely anonymous:
+//     ordinary HTTP/network metadata can still exist outside this sink.
+//   - The optional structured product-event log records the event name only.
 
 import express from 'express';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
-import { validate, EventBodySchema, PRODUCT_EVENT_NAMES } from '../lib/validation.ts';
+import {
+  validate,
+  EventBodySchema,
+  PRODUCT_EVENT_NAMES,
+  type EventPayload,
+} from '../lib/validation.ts';
 import { logger } from '../lib/logger.ts';
 
 const router = express.Router();
@@ -55,23 +58,18 @@ export function resetEventAggregatesForTests(): void {
 }
 
 router.post('/api/events', gameLimiter, validate(EventBodySchema), asyncHandler(async (req, res) => {
-  const { name, sessionId, props } = req.body as {
-    name: ProductEventName;
-    sessionId?: string;
-    props?: Record<string, string | number | boolean>;
-  };
+  const event = req.body as EventPayload;
+  const { name } = event;
 
   aggregates.counts[name] += 1;
 
-  if (name === 'first_report' && typeof props?.elapsedMs === 'number' && Number.isFinite(props.elapsedMs) && props.elapsedMs >= 0) {
-    aggregates.firstReportElapsedMsSum += props.elapsedMs;
+  if (event.name === 'first_report') {
+    aggregates.firstReportElapsedMsSum += event.props.elapsedMs;
     aggregates.firstReportElapsedMsCount += 1;
   }
 
-  // The persistent stream: counters answer the exit-gate ratios, but the log
-  // line is the only durable record of an individual event — keep it
-  // aggregate-safe (no props beyond the bounded scalars the schema allows).
-  logger.info('product_event', { name, sessionId, props });
+  // Do not turn the logging stream into a second, richer telemetry sink.
+  logger.info('product_event', { name });
 
   res.status(202).json({ accepted: true });
 }));

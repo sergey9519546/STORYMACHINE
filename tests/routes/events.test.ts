@@ -1,17 +1,5 @@
-// P3 product-instrumentation sink — route tests for server/routes/events.ts.
-// Conventions: node:test + assert/strict over the real Express app (see
-// tests/routes/helpers.ts), matching tests/routes/export-verify.test.ts.
-//
-// What matters here is not "does a counter increment" but the three
-// properties the exit-gate metric depends on:
-//   1. exportRate is a HONEST ratio — null (not 0) before any Doctor run, so
-//      an empty deployment can't be read as "nobody exports".
-//   2. The event vocabulary is CLOSED — an open namespace would let any
-//      client plant arbitrary keys in the counters that gate P3, and a
-//      caller could inflate/deflate the rate with invented event names.
-//   3. The payload is privacy-BOUNDED — oversized props (the shape a
-//      script-text leak would take) are rejected at the schema, not stored
-//      and trimmed later.
+// P3 product-instrumentation sink — strict payload, privacy, and aggregate
+// regressions over the real Express route.
 
 import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,139 +20,220 @@ async function postEvent(body: unknown): Promise<Response> {
   });
 }
 
-async function getSummary(): Promise<{
+async function postRawEvent(body: string): Promise<Response> {
+  return fetch(`${server.baseUrl}/api/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
+}
+
+interface EventSummary {
   since: string;
   counts: Record<string, number>;
   exportRate: number | null;
   avgTimeToFirstReportMs: number | null;
-}> {
+}
+
+async function getSummary(): Promise<EventSummary> {
   const res = await fetch(`${server.baseUrl}/api/events/summary`);
   assert.equal(res.status, 200);
   return await res.json();
 }
 
-describe('POST /api/events — accepting product events', () => {
-  it('accepts each event in the closed vocabulary and counts it', async () => {
-    for (const name of ['doctor_run', 'export_report', 'first_report', 'verify_run']) {
-      const res = await postEvent({ name });
-      assert.equal(res.status, 202, `${name} must be accepted`);
+async function assertRejectedWithoutMutation(
+  body: unknown,
+  label: string,
+  raw = false,
+): Promise<void> {
+  const beforeSummary = await getSummary();
+  const res = raw ? await postRawEvent(body as string) : await postEvent(body);
+  assert.equal(res.status, 400, `${label} must be rejected`);
+  assert.deepEqual(await getSummary(), beforeSummary, `${label} must not mutate aggregates`);
+}
+
+describe('POST /api/events — exactly four strict payloads', () => {
+  it('accepts doctor_run for every closed source value', async () => {
+    for (const source of ['sample', 'draft', 'upload']) {
+      const res = await postEvent({ name: 'doctor_run', props: { source } });
+      assert.equal(res.status, 202, `${source} must be accepted`);
       assert.deepEqual(await res.json(), { accepted: true });
     }
-
-    const summary = await getSummary();
-    assert.deepEqual(summary.counts, {
-      doctor_run: 1, export_report: 1, first_report: 1, verify_run: 1,
-    });
+    assert.equal((await getSummary()).counts.doctor_run, 3);
   });
 
-  it('accepts a bounded scalar props record and an optional sessionId', async () => {
-    const res = await postEvent({
-      name: 'doctor_run',
-      sessionId: 'abc-123',
-      props: { source: 'draft', elapsedMs: 1234, verified: true },
-    });
-    assert.equal(res.status, 202);
-    assert.equal((await getSummary()).counts.doctor_run, 1);
+  it('accepts bounded first_report timing payloads', async () => {
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    for (const body of [
+      { name: 'first_report', props: { source: 'sample', elapsedMs: 0 } },
+      { name: 'first_report', props: { source: 'draft', elapsedMs: 3000 } },
+      { name: 'first_report', props: { source: 'upload', elapsedMs: sevenDaysMs } },
+    ]) {
+      assert.equal((await postEvent(body)).status, 202);
+    }
+    const summary = await getSummary();
+    assert.equal(summary.counts.first_report, 3);
+    assert.equal(summary.avgTimeToFirstReportMs, (sevenDaysMs + 3000) / 3);
+  });
+
+  it('accepts export_report for every closed verdict value', async () => {
+    for (const verdict of ['RECOMMEND', 'CONSIDER', 'PASS', 'unknown']) {
+      assert.equal((await postEvent({ name: 'export_report', props: { verdict } })).status, 202);
+    }
+    assert.equal((await getSummary()).counts.export_report, 4);
+  });
+
+  it('accepts verify_run for both boolean outcomes', async () => {
+    assert.equal((await postEvent({ name: 'verify_run', props: { verified: true } })).status, 202);
+    assert.equal((await postEvent({ name: 'verify_run', props: { verified: false } })).status, 202);
+    assert.equal((await getSummary()).counts.verify_run, 2);
   });
 });
 
-describe('POST /api/events — the vocabulary is closed', () => {
-  it('rejects an event name outside PRODUCT_EVENT_NAMES', async () => {
-    // An open namespace would let a client mint event names that land in the
-    // same counters the P3 exit gate reads. 400, and nothing recorded.
-    const res = await postEvent({ name: 'doctor_run_but_fake' });
-    assert.equal(res.status, 400);
-
-    const summary = await getSummary();
-    assert.equal(summary.counts.doctor_run, 0);
-    assert.equal(summary.exportRate, null, 'a rejected event must not create a rate');
+describe('POST /api/events — rejects invalid and privacy-bearing payloads without mutation', () => {
+  it('rejects unknown top-level fields, including a body sessionId', async () => {
+    await assertRejectedWithoutMutation(
+      { name: 'doctor_run', sessionId: 'private-session-sentinel', props: { source: 'draft' } },
+      'body sessionId',
+    );
+    await assertRejectedWithoutMutation(
+      { name: 'doctor_run', props: { source: 'draft' }, scriptText: 'INT. VAULT - NIGHT' },
+      'unknown top-level scriptText',
+    );
   });
 
-  it('rejects a missing name outright', async () => {
-    assert.equal((await postEvent({ props: { source: 'draft' } })).status, 400);
+  it('rejects unknown and cross-event prop keys', async () => {
+    for (const [label, body] of [
+      ['unknown prop', { name: 'doctor_run', props: { source: 'draft', arbitrary: 'sentinel' } }],
+      ['doctor/verify cross-event prop', { name: 'doctor_run', props: { source: 'draft', verified: true } }],
+      ['first/export cross-event prop', { name: 'first_report', props: { source: 'draft', elapsedMs: 1, verdict: 'PASS' } }],
+      ['export/doctor cross-event prop', { name: 'export_report', props: { verdict: 'PASS', source: 'draft' } }],
+      ['verify/first cross-event prop', { name: 'verify_run', props: { verified: true, elapsedMs: 1 } }],
+    ] as const) {
+      await assertRejectedWithoutMutation(body, label);
+    }
+  });
+
+  it('rejects missing names, props, and required prop fields', async () => {
+    for (const [label, body] of [
+      ['missing name', { props: { source: 'draft' } }],
+      ['missing doctor props', { name: 'doctor_run' }],
+      ['missing doctor source', { name: 'doctor_run', props: {} }],
+      ['missing first elapsedMs', { name: 'first_report', props: { source: 'draft' } }],
+      ['missing export verdict', { name: 'export_report', props: {} }],
+      ['missing verify outcome', { name: 'verify_run', props: {} }],
+    ] as const) {
+      await assertRejectedWithoutMutation(body, label);
+    }
+  });
+
+  it('rejects invalid source and verdict enums', async () => {
+    await assertRejectedWithoutMutation(
+      { name: 'doctor_run', props: { source: 'clipboard' } },
+      'invalid source',
+    );
+    await assertRejectedWithoutMutation(
+      { name: 'export_report', props: { verdict: 'MAYBE' } },
+      'invalid verdict',
+    );
+  });
+
+  it('rejects negative, non-finite, and unreasonable elapsed time', async () => {
+    await assertRejectedWithoutMutation(
+      { name: 'first_report', props: { source: 'draft', elapsedMs: -1 } },
+      'negative elapsedMs',
+    );
+    await assertRejectedWithoutMutation(
+      '{"name":"first_report","props":{"source":"draft","elapsedMs":1e999}}',
+      'non-finite elapsedMs',
+      true,
+    );
+    await assertRejectedWithoutMutation(
+      { name: 'first_report', props: { source: 'draft', elapsedMs: 7 * 24 * 60 * 60 * 1000 + 1 } },
+      'elapsedMs above seven days',
+    );
+  });
+
+  it('rejects nested values and screenplay-like free text', async () => {
+    await assertRejectedWithoutMutation(
+      { name: 'doctor_run', props: { source: { nested: 'draft' } } },
+      'nested prop value',
+    );
+    await assertRejectedWithoutMutation(
+      { name: 'doctor_run', props: { source: 'INT. WAREHOUSE - NIGHT\nA writer enters.' } },
+      'screenplay-like free text',
+    );
+  });
+
+  it('rejects event names outside the closed vocabulary', async () => {
+    await assertRejectedWithoutMutation(
+      { name: 'doctor_run_but_fake', props: { source: 'draft' } },
+      'unknown event name',
+    );
   });
 });
 
-describe('POST /api/events — the payload is privacy-bounded', () => {
-  it('rejects a props value long enough to carry script text', async () => {
-    const res = await postEvent({
-      name: 'doctor_run',
-      props: { leak: 'INT. WAREHOUSE - NIGHT\n'.repeat(200) },
-    });
-    assert.equal(res.status, 400, 'oversized prop values must never reach the sink');
-    assert.equal((await getSummary()).counts.doctor_run, 0);
-  });
+describe('POST /api/events — product-event logger privacy', () => {
+  it('logs exactly the accepted event name and never session ids, props, script text, or arbitrary values', async () => {
+    const sessionSentinel = 'SESSION_SENTINEL_DO_NOT_LOG';
+    const textSentinel = 'INT. SECRET SET - NIGHT TEXT_SENTINEL_DO_NOT_LOG';
+    const propSentinel = 'PROP_SENTINEL_DO_NOT_LOG';
+    const captured: string[] = [];
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: unknown, ...args: unknown[]) => {
+      captured.push(String(chunk));
+      return (originalWrite as (...values: unknown[]) => boolean)(chunk, ...args);
+    }) as typeof process.stdout.write;
 
-  it('rejects a props record with more than 8 keys', async () => {
-    const props: Record<string, number> = {};
-    for (let i = 0; i < 9; i += 1) props[`k${i}`] = i;
-    assert.equal((await postEvent({ name: 'doctor_run', props })).status, 400);
-  });
+    try {
+      assert.equal((await postEvent({
+        name: 'doctor_run',
+        sessionId: sessionSentinel,
+        props: { source: 'draft', arbitrary: propSentinel, scriptText: textSentinel },
+      })).status, 400);
+      assert.equal((await postEvent({ name: 'doctor_run', props: { source: 'upload' } })).status, 202);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
 
-  it('rejects a non-scalar props value', async () => {
-    const res = await postEvent({ name: 'doctor_run', props: { nested: { a: 1 } } });
-    assert.equal(res.status, 400);
+    const productEventLines = captured
+      .flatMap((chunk) => chunk.split('\n'))
+      .filter((line) => line.includes('"msg":"product_event"'));
+    assert.equal(productEventLines.length, 1, `expected one product event log, got: ${captured.join('')}`);
+    const productEvent = JSON.parse(productEventLines[0]!) as Record<string, unknown>;
+    assert.deepEqual(Object.keys(productEvent).sort(), ['level', 'msg', 'name', 'time']);
+    assert.equal(productEvent.name, 'doctor_run');
+    assert.ok(!productEventLines[0]!.includes(sessionSentinel));
+    assert.ok(!productEventLines[0]!.includes(textSentinel));
+    assert.ok(!productEventLines[0]!.includes(propSentinel));
+    assert.ok(!Object.hasOwn(productEvent, 'props'));
+    assert.ok(!Object.hasOwn(productEvent, 'sessionId'));
   });
 });
 
-describe('GET /api/events/summary — the exit-gate metric', () => {
-  it('reports exportRate as null (not 0) before any Doctor run', async () => {
+describe('GET /api/events/summary — process-local aggregate math', () => {
+  it('reports null rates before any accepted runs', async () => {
     const summary = await getSummary();
-    // 0% export rate over zero runs is a measurement artifact, not a finding
-    // — the difference matters when reading a fresh deployment's numbers.
     assert.equal(summary.exportRate, null);
     assert.equal(summary.avgTimeToFirstReportMs, null);
-    assert.equal(summary.counts.doctor_run, 0);
+    assert.deepEqual(summary.counts, {
+      doctor_run: 0, export_report: 0, first_report: 0, verify_run: 0,
+    });
     assert.ok(typeof summary.since === 'string' && summary.since.length > 0);
   });
 
-  it('computes exportRate as exports / doctor runs', async () => {
-    for (let i = 0; i < 4; i += 1) await postEvent({ name: 'doctor_run' });
-    await postEvent({ name: 'export_report' });
-
-    const summary = await getSummary();
-    assert.equal(summary.counts.doctor_run, 4);
-    assert.equal(summary.counts.export_report, 1);
-    assert.equal(summary.exportRate, 0.25);
+  it('computes exportRate as exports / doctor runs without inventing unique users', async () => {
+    for (let i = 0; i < 4; i += 1) {
+      await postEvent({ name: 'doctor_run', props: { source: 'draft' } });
+    }
+    await postEvent({ name: 'export_report', props: { verdict: 'PASS' } });
+    assert.equal((await getSummary()).exportRate, 0.25);
   });
 
-  it('reports an exportRate above 1 honestly when a run is exported more than once', async () => {
-    // Re-exporting one report is real behavior, not a bug to clamp away: the
-    // metric is "exports per run", and hiding >1 would erase the signal that
-    // people re-share the same report.
-    await postEvent({ name: 'doctor_run' });
-    await postEvent({ name: 'export_report' });
-    await postEvent({ name: 'export_report' });
-
+  it('reports an exportRate above 1 when one client reports multiple exports', async () => {
+    await postEvent({ name: 'doctor_run', props: { source: 'draft' } });
+    await postEvent({ name: 'export_report', props: { verdict: 'PASS' } });
+    await postEvent({ name: 'export_report', props: { verdict: 'PASS' } });
     assert.equal((await getSummary()).exportRate, 2);
-  });
-
-  it('averages first_report elapsedMs across sessions', async () => {
-    await postEvent({ name: 'first_report', props: { elapsedMs: 1000 } });
-    await postEvent({ name: 'first_report', props: { elapsedMs: 3000 } });
-
-    const summary = await getSummary();
-    assert.equal(summary.counts.first_report, 2);
-    assert.equal(summary.avgTimeToFirstReportMs, 2000);
-  });
-
-  it('ignores a first_report with a negative or non-numeric elapsedMs', async () => {
-    // A clock skew or a hand-crafted payload must not drag the average into
-    // nonsense — the event still counts, the timing sample doesn't.
-    await postEvent({ name: 'first_report', props: { elapsedMs: -500 } });
-    await postEvent({ name: 'first_report', props: { elapsedMs: 'soon' } });
-    await postEvent({ name: 'first_report' });
-
-    const summary = await getSummary();
-    assert.equal(summary.counts.first_report, 3, 'the events themselves still count');
-    assert.equal(summary.avgTimeToFirstReportMs, null, 'no valid timing sample was recorded');
-  });
-
-  it('does not expose individual events or session ids', async () => {
-    await postEvent({ name: 'doctor_run', sessionId: 'session-should-not-leak', props: { source: 'draft' } });
-
-    const raw = await (await fetch(`${server.baseUrl}/api/events/summary`)).text();
-    assert.ok(!raw.includes('session-should-not-leak'), 'summary must be aggregate-only');
-    assert.ok(!raw.includes('"events"'), 'summary must not carry a per-event list');
   });
 });

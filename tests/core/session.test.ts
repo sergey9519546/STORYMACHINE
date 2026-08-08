@@ -12,7 +12,11 @@
 // mirroring why mergeSessionHeader itself was already extracted this way.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isSameOriginApiRequest, mergeSessionHeader } from "../../src/lib/session.ts";
+import {
+  isSameOriginApiRequest,
+  mergeSessionHeader,
+  shouldAttachSessionHeader,
+} from "../../src/lib/session.ts";
 
 const ORIGIN = "https://storymachine.example";
 
@@ -118,5 +122,36 @@ describe("isSameOriginApiRequest — defensive behavior", () => {
     // the URL-parse branch and must not throw even on garbage input.
     assert.doesNotThrow(() => isSameOriginApiRequest("not a url at all", ORIGIN));
     assert.equal(isSameOriginApiRequest("not a url at all", ORIGIN), false);
+  });
+});
+
+describe("shouldAttachSessionHeader — product events stay session-unlinked", () => {
+  it("skips the exact relative /api/events route with query and trailing-slash variants", () => {
+    assert.equal(shouldAttachSessionHeader("/api/events", ORIGIN), false);
+    assert.equal(shouldAttachSessionHeader("/api/events?source=draft", ORIGIN), false);
+    assert.equal(shouldAttachSessionHeader("/api/events/", ORIGIN), false);
+    assert.equal(shouldAttachSessionHeader("/api/events/?source=draft", ORIGIN), false);
+  });
+
+  it("skips same-origin URL and Request event inputs", () => {
+    assert.equal(shouldAttachSessionHeader(new URL("/api/events?x=1", ORIGIN), ORIGIN), false);
+    assert.equal(
+      shouldAttachSessionHeader(new Request(`${ORIGIN}/api/events?x=1`, { method: "POST" }), ORIGIN),
+      false,
+    );
+  });
+
+  it("keeps existing attachment behavior for ordinary same-origin API requests", () => {
+    assert.equal(shouldAttachSessionHeader("/api/scriptide/save", ORIGIN), true);
+    assert.equal(shouldAttachSessionHeader(new URL("/api/state", ORIGIN), ORIGIN), true);
+    assert.equal(shouldAttachSessionHeader(new Request(`${ORIGIN}/api/state`), ORIGIN), true);
+    assert.equal(shouldAttachSessionHeader(new URL("/api/events/summary", ORIGIN), ORIGIN), true);
+  });
+
+  it("preserves cross-origin protection and the existing absolute-string contract", () => {
+    assert.equal(shouldAttachSessionHeader(new URL("https://evil.example/api/state"), ORIGIN), false);
+    assert.equal(shouldAttachSessionHeader(new Request("https://evil.example/api/state"), ORIGIN), false);
+    assert.equal(shouldAttachSessionHeader("https://evil.example/api/state", ORIGIN), false);
+    assert.equal(shouldAttachSessionHeader(`${ORIGIN}/api/state`, ORIGIN), false);
   });
 });
