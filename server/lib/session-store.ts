@@ -304,8 +304,19 @@ function sqliteArtifactPaths(base: string): string[] {
   return SQLITE_ARTIFACT_SUFFIXES.map(suffix => base + suffix);
 }
 
+/** Directory-entry existence without following a symlink target. */
+function directoryEntryExists(file: string): boolean {
+  try {
+    fs.lstatSync(file);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 function hasSqliteArtifact(base: string): boolean {
-  return sqliteArtifactPaths(base).some(file => fs.existsSync(file));
+  return sqliteArtifactPaths(base).some(file => directoryEntryExists(file));
 }
 
 const DURABLE_ROTATION_DENY_SUFFIX = '.rotation-deny';
@@ -321,7 +332,35 @@ function durableRotationDenyPath(sessionId: string): string | undefined {
 function hasDurableRotationDeny(sessionId: string): boolean {
   if (!PERSIST_SESSIONS) return false;
   const marker = durableRotationDenyPath(sessionId);
-  return marker !== undefined && fs.existsSync(marker);
+  if (!marker) return false;
+
+  try {
+    if (!directoryEntryExists(marker)) return false;
+  } catch (error) {
+    logger.error('session_rotate_deny_inspection_failed', { error: (error as Error).message });
+    return true;
+  }
+
+  const candidateBase = path.join(SESSION_DB_DIR, `${sessionId}.db`);
+  try {
+    if (hasSqliteArtifact(candidateBase)) return true;
+  } catch (error) {
+    logger.error('session_rotate_candidate_inspection_failed', { error: (error as Error).message });
+    return true;
+  }
+
+  // A deny without any candidate artifacts is stale (for example after the
+  // orphan sweep removed a failed database). Retire only the marker directory
+  // entry. unlinkSync does not follow a symlink, so an external symlink target
+  // is never deleted. Any ambiguous failure remains fail-closed.
+  try {
+    fs.unlinkSync(marker);
+    return directoryEntryExists(marker);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    logger.error('session_rotate_stale_deny_cleanup_failed', { error: (error as Error).message });
+    return true;
+  }
 }
 
 /**
