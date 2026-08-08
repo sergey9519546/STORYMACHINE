@@ -237,7 +237,11 @@ export function getOrCreateSession(sessionId: string): Session {
   // behind earlier commands. This check covers direct read routes as well as
   // withSessionCommand(): neither may obtain a Stage whose handle is about to
   // be closed and replaced by the lifecycle operation.
-  if (rotatingSessionIds.has(sessionId) || quarantinedSessionIds.has(sessionId)) {
+  if (
+    rotatingSessionIds.has(sessionId)
+    || quarantinedSessionIds.has(sessionId)
+    || hasDurableRotationDeny(sessionId)
+  ) {
     throw new SessionBusyError('Session rotation lifecycle is unavailable. Please retry with the authoritative session ID.');
   }
   let session = sessions.get(sessionId);
@@ -304,6 +308,59 @@ function hasSqliteArtifact(base: string): boolean {
   return sqliteArtifactPaths(base).some(file => fs.existsSync(file));
 }
 
+const DURABLE_ROTATION_DENY_SUFFIX = '.rotation-deny';
+
+/** Return a marker path only for one safe filename segment inside the root. */
+function durableRotationDenyPath(sessionId: string): string | undefined {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(sessionId)) return undefined;
+  const root = path.resolve(SESSION_DB_DIR);
+  const marker = path.resolve(root, `.${sessionId}${DURABLE_ROTATION_DENY_SUFFIX}`);
+  return path.dirname(marker) === root ? marker : undefined;
+}
+
+function hasDurableRotationDeny(sessionId: string): boolean {
+  if (!PERSIST_SESSIONS) return false;
+  const marker = durableRotationDenyPath(sessionId);
+  return marker !== undefined && fs.existsSync(marker);
+}
+
+/**
+ * Persist the failed replacement-id deny before releasing the HTTP lifecycle.
+ * The marker contains no session data or secret; its durable existence is the
+ * authority barrier checked before any Stage can open `<sessionId>.db`.
+ */
+function persistDurableRotationDeny(sessionId: string): void {
+  const marker = durableRotationDenyPath(sessionId);
+  if (!marker) throw new Error('Cannot persist deny marker for an invalid session ID.');
+
+  let descriptor: number;
+  try {
+    descriptor = fs.openSync(marker, 'wx', 0o600);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return;
+    throw error;
+  }
+  try {
+    fs.writeSync(descriptor, 'StoryMachine failed session rotation deny marker\n');
+    fs.fsyncSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+
+  // POSIX needs the directory entry synced separately. Some Windows
+  // filesystems do not permit opening/fsyncing a directory; the marker file
+  // itself has already been fsynced there, so unsupported directory sync is a
+  // best-effort enhancement rather than reason to discard the durable deny.
+  let directoryDescriptor: number | undefined;
+  try {
+    directoryDescriptor = fs.openSync(path.dirname(marker), 'r');
+    fs.fsyncSync(directoryDescriptor);
+  } catch { /* directory fsync is not portable */ }
+  finally {
+    if (directoryDescriptor !== undefined) fs.closeSync(directoryDescriptor);
+  }
+}
+
 function removeSqliteArtifacts(base: string): void {
   // Delete the main database last. If sidecar cleanup fails, the authoritative
   // database is still present and can be reopened under the old id.
@@ -336,7 +393,12 @@ function chooseReplacementSessionId(requestedNewId?: string): string {
   }
 
   const isCollision = (candidate: string): boolean => {
-    if (sessions.has(candidate) || rotatingSessionIds.has(candidate) || quarantinedSessionIds.has(candidate)) return true;
+    if (
+      sessions.has(candidate)
+      || rotatingSessionIds.has(candidate)
+      || quarantinedSessionIds.has(candidate)
+      || hasDurableRotationDeny(candidate)
+    ) return true;
     return PERSIST_SESSIONS && hasSqliteArtifact(path.join(SESSION_DB_DIR, `${candidate}.db`));
   };
 
@@ -473,8 +535,19 @@ export async function rotateSession(
             }
           }
           // The failed candidate must be either absent from the addressable
-          // namespace or guarded indefinitely for this process lifetime.
-          if (hasSqliteArtifact(newBase)) quarantinedSessionIds.add(newSessionId);
+          // namespace or denied durably across restarts (with the in-memory
+          // set retaining the same barrier immediately in this process).
+          if (hasSqliteArtifact(newBase)) {
+            try {
+              persistDurableRotationDeny(newSessionId);
+            } catch (denyError) {
+              logger.error('session_rotate_durable_deny_failed', {
+                newSessionId,
+                error: (denyError as Error).message,
+              });
+            }
+            quarantinedSessionIds.add(newSessionId);
+          }
         }
         try { removeSqliteArtifacts(temporaryBase); } catch { /* temporary file is never loadable by an id */ }
 

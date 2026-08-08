@@ -78,6 +78,24 @@ if (isChild) {
     }) as typeof fs.unlinkSync;
   }
 
+  const quarantineRenameFailure = process.env.STORYMACHINE_TEST_QUARANTINE_RENAME_FAILURE;
+  if (quarantineRenameFailure) {
+    const candidatePath = path.resolve(path.join(sessionDir, `${quarantineRenameFailure}.db`));
+    const quarantinePrefix = path.resolve(path.join(sessionDir, `.${quarantineRenameFailure}.failed-rotation-`));
+    const originalRename = fs.renameSync.bind(fs);
+    fs.renameSync = ((oldPath: fs.PathLike, newPath: fs.PathLike) => {
+      if (
+        path.resolve(String(oldPath)) === candidatePath
+        && path.resolve(String(newPath)).startsWith(quarantinePrefix)
+      ) {
+        const error = new Error('injected quarantine rename failure') as NodeJS.ErrnoException;
+        error.code = 'EACCES';
+        throw error;
+      }
+      return originalRename(oldPath, newPath);
+    }) as typeof fs.renameSync;
+  }
+
   let releaseBackup: (() => void) | undefined;
   if (process.env.STORYMACHINE_TEST_PAUSE_ROTATION === '1') {
     const { Stage } = await import('../../server/engine/Stage.ts');
@@ -126,6 +144,7 @@ if (isChild) {
       pauseRotation?: boolean;
       publishRaceTarget?: string;
       cleanupFailure?: { oldId: string; newId: string };
+      quarantineRenameFailure?: string;
     } = {},
   ): Promise<ChildServer> {
     const child = spawn(process.execPath, [
@@ -146,6 +165,9 @@ if (isChild) {
           : {}),
         ...(options.cleanupFailure
           ? { STORYMACHINE_TEST_CLEANUP_FAILURE: JSON.stringify(options.cleanupFailure) }
+          : {}),
+        ...(options.quarantineRenameFailure
+          ? { STORYMACHINE_TEST_QUARANTINE_RENAME_FAILURE: options.quarantineRenameFailure }
           : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
@@ -456,6 +478,38 @@ if (isChild) {
         assert.equal(old.scriptText, 'ROLLBACK AUTHORITY');
         const replacement = await loadMarker(server.baseUrl, newId);
         assert.notEqual(replacement.scriptText, 'ROLLBACK AUTHORITY');
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('durably denies the replacement after cleanup and quarantine both fail', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'durable-deny-old';
+      const newId = 'durable-deny-new';
+      const unrelatedPath = path.join(sessionDir, 'unrelated-operator-file.txt');
+      fs.writeFileSync(unrelatedPath, 'DO NOT DELETE');
+      let server = await startChildServer(sessionDir, {
+        cleanupFailure: { oldId, newId },
+        quarantineRenameFailure: newId,
+      });
+      try {
+        await saveMarker(server.baseUrl, oldId, 'DURABLE OLD AUTHORITY');
+        assert.equal((await rotate(server.baseUrl, oldId, newId)).status, 503);
+        assert.equal(fs.existsSync(path.join(sessionDir, `${newId}.db`)), true);
+        assert.equal(fs.existsSync(path.join(sessionDir, `.${newId}.rotation-deny`)), true);
+      } finally {
+        await server.close();
+      }
+
+      server = await startChildServer(sessionDir);
+      try {
+        const old = await loadMarker(server.baseUrl, oldId);
+        assert.equal(old.scriptText, 'DURABLE OLD AUTHORITY');
+        const replacement = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${newId}`);
+        assert.equal(replacement.status, 409);
+        assert.match((await replacement.json() as { error: string }).error, /authoritative session ID/i);
+        assert.equal(fs.readFileSync(unrelatedPath, 'utf8'), 'DO NOT DELETE');
       } finally {
         await server.close();
       }
