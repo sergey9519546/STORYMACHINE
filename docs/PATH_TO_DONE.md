@@ -1,7 +1,7 @@
 # Path to Done
 
-**This document reflects state as of 2026-08-03 EOD** (measured against
-docs current as of 2026-08-04 review). Re-date the header when materially
+**This document reflects state as of 2026-08-08** (measured against
+docs current as of 2026-08-08 review). Re-date the header when materially
 updated — a task list that quietly drifts from reality is worse than none.
 
 **`ROADMAP.md` remains canonical on sequence.** This document expands
@@ -73,6 +73,13 @@ on.
 multi-revision session rate are measured."* Status: **NOT STARTED, by
 design** — ROADMAP explicitly sequences this last, after the score is
 "real, quiet, and shareable." No work should start here before P1 passes.
+
+**Craft-v2 status.** Static scene-dependent prompt differentiation is
+integrated and controlled by the server-only
+`STORYMACHINE_DISABLE_CRAFT_SPEC` kill switch. It has no scoring effect and
+no measured output-quality claim. KB retrieval is deferred because its source
+and data are absent from a clean checkout. Analyzer-to-generation voice
+feedback is also deferred because the adapter has no real production data seam.
 
 ---
 

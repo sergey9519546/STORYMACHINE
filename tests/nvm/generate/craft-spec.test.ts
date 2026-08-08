@@ -15,8 +15,9 @@ import {
   craftSpecEnabled,
   looksLikeAnimationGenre,
 } from '../../../server/nvm/generate/craft-spec.ts';
-import { buildSystemPreamble } from '../../../server/nvm/generate/proof-spec.ts';
+import { buildGenerationSpec, buildSystemPreamble } from '../../../server/nvm/generate/proof-spec.ts';
 import { emptyState } from '../../../server/nvm/state/NarrativeState.ts';
+import { CRAFT_V1_OUTPUT_FIXTURE } from './fixtures/craft-v1-output.fixture.ts';
 
 // ── Module shape ──────────────────────────────────────────────────────────
 
@@ -163,4 +164,89 @@ test('integration: buildSystemPreamble omits the craft block when the escape hat
     if (prevEnv === undefined) delete process.env.STORYMACHINE_DISABLE_CRAFT_SPEC;
     else process.env.STORYMACHINE_DISABLE_CRAFT_SPEC = prevEnv;
   }
+});
+
+test('v2 regression: full and compact output without sceneContext remain byte-identical to v1', () => {
+  assert.equal(
+    buildCraftPromptSection({ enabled: true, compact: false }),
+    CRAFT_V1_OUTPUT_FIXTURE.full,
+  );
+  assert.equal(
+    buildCraftPromptSection({ enabled: true, compact: true }),
+    CRAFT_V1_OUTPUT_FIXTURE.compact,
+  );
+});
+
+test('v2 routing: opening context contains only applicable static emphasis', () => {
+  const output = buildCraftPromptSection({
+    enabled: true,
+    sceneContext: {
+      actPosition: '1',
+      sceneFunction: 'establish_world',
+      structuralTags: ['cold-open', 'new-location'],
+    },
+  });
+  assert.match(output, /SCENE-RELEVANT EMPHASIS/);
+  assert.match(output, /ACT 1 emphasis/);
+  assert.match(output, /WORLD-ESTABLISHMENT function/);
+  assert.match(output, /COLD OPEN/);
+  assert.match(output, /NEW LOCATION/);
+  assert.doesNotMatch(output, /CLIMAX ZONE emphasis/);
+});
+
+test('v2 routing: climax tension context contains only applicable static emphasis', () => {
+  const output = buildCraftPromptSection({
+    enabled: true,
+    sceneContext: {
+      actPosition: '3',
+      sceneFunction: 'build_tension',
+      structuralTags: ['two-hander'],
+    },
+  });
+  assert.match(output, /CLIMAX ZONE emphasis/);
+  assert.match(output, /TENSION-BUILD function/);
+  assert.match(output, /TWO-HANDER/);
+  assert.doesNotMatch(output, /ACT 1 emphasis/);
+  assert.doesNotMatch(output, /WORLD-ESTABLISHMENT function/);
+});
+
+test('v2 routing: empty sceneContext adds no emphasis block', () => {
+  assert.doesNotMatch(
+    buildCraftPromptSection({ enabled: true, sceneContext: {} }),
+    /SCENE-RELEVANT EMPHASIS/,
+  );
+});
+
+test('v2 wiring: buildGenerationSpec constructs opening target-aware craft context', () => {
+  const state = emptyState();
+  const spec = buildGenerationSpec(
+    state,
+    { sceneIdx: 0, sceneFunction: 'establish_world', activeMechanisms: [], tensionTarget: 30 },
+    [],
+  );
+  assert.match(spec.systemPreamble, /ACT 1 emphasis/);
+  assert.match(spec.systemPreamble, /WORLD-ESTABLISHMENT function/);
+  assert.doesNotMatch(spec.systemPreamble, /CLIMAX ZONE emphasis/);
+});
+
+test('v2 wiring: buildGenerationSpec constructs climax target-aware craft context', () => {
+  const base = emptyState();
+  const state = {
+    ...base,
+    audienceState: { ...base.audienceState, suspense: 90, investment: 88 },
+  };
+  const spec = buildGenerationSpec(
+    state,
+    { sceneIdx: 8, sceneFunction: 'build_tension', activeMechanisms: [], tensionTarget: 95 },
+    [],
+  );
+  assert.match(spec.systemPreamble, /CLIMAX ZONE emphasis/);
+  assert.match(spec.systemPreamble, /TENSION-BUILD function/);
+  assert.doesNotMatch(spec.systemPreamble, /ACT 1 emphasis/);
+});
+
+test('v2 wiring: buildSystemPreamble without a target remains flat', () => {
+  const preamble = buildSystemPreamble([], emptyState());
+  assert.match(preamble, /CRAFT SPEC/);
+  assert.doesNotMatch(preamble, /SCENE-RELEVANT EMPHASIS/);
 });
