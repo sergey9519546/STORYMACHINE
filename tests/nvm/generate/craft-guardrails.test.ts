@@ -7,26 +7,25 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..', '..');
 const GENERATE_DIR = join(REPO_ROOT, 'server', 'nvm', 'generate');
+const CRAFT_SPEC_FILE = join(GENERATE_DIR, 'craft-spec.ts');
+const LEGACY_SCRIPTIDE_ROUTE = join(REPO_ROOT, 'server', 'routes', 'scriptide.ts');
+const CRAFT_EXPORTS = Array.from(
+  readFileSync(CRAFT_SPEC_FILE, 'utf8').matchAll(/^export\s+(?:interface|const|function)\s+(\w+)/gm),
+  match => match[1],
+);
 const CRAFT_V2_MARKERS = [
   'craft-spec',
-  'buildCraftPromptSection',
-  'craftSpecEnabled',
-  'SceneCraftContext',
-  'looksLikeAnimationGenre',
-  'CRAFT_SPEC_VERSION',
-  'CRAFT_SPEC',
-  'CraftSpec',
-  'CraftSection',
-  'CraftPromptOptions',
+  ...CRAFT_EXPORTS,
   'SCENE-RELEVANT EMPHASIS',
 ];
 const EXPECTED_CRAFT_PROMPT_FILES = [
-  join(GENERATE_DIR, 'craft-spec.ts'),
+  CRAFT_SPEC_FILE,
   join(GENERATE_DIR, 'proof-spec.ts'),
-  // Pre-existing server-side direct-generation prompt consumer (5018fe5):
-  // retains static guidance on its private LLM call without publishing config
-  // or adding a Craft-v2 route. Every other route remains protected below.
-  join(REPO_ROOT, 'server', 'routes', 'scriptide.ts'),
+];
+const LEGACY_SCRIPTIDE_ALLOWLIST = [
+  'craft-spec',
+  'buildCraftPromptSection',
+  'looksLikeAnimationGenre',
 ];
 
 function listTypeScriptFiles(dir: string): string[] {
@@ -66,7 +65,7 @@ test('craft guardrail: generation does not import deterministic scoring modules'
 });
 
 test('craft guardrail: craft-spec is pure static prompt construction', () => {
-  const source = readFileSync(join(GENERATE_DIR, 'craft-spec.ts'), 'utf8');
+  const source = readFileSync(CRAFT_SPEC_FILE, 'utf8');
   assert.doesNotMatch(source, /^\s*import\s/m, 'craft-spec must remain dependency-free');
   assert.doesNotMatch(source, /generateContent|makeLLM|@google|geminiProvider/i);
 });
@@ -80,11 +79,7 @@ test('craft guardrail: source enumeration includes client .tsx files', () => {
 });
 
 test('craft guardrail: craft-v2 stays in explicitly allowed server prompt files', () => {
-  const promptFiles = [
-    ...listTypeScriptFiles(GENERATE_DIR),
-    join(REPO_ROOT, 'server', 'routes', 'scriptide.ts'),
-  ];
-  const craftV2Files = promptFiles.filter(file => {
+  const craftV2Files = listTypeScriptFiles(GENERATE_DIR).filter(file => {
     const source = readFileSync(file, 'utf8');
     return CRAFT_V2_MARKERS.some(marker => source.includes(marker));
   });
@@ -92,12 +87,24 @@ test('craft guardrail: craft-v2 stays in explicitly allowed server prompt files'
   assert.deepEqual(craftV2Files, EXPECTED_CRAFT_PROMPT_FILES);
 });
 
-test('craft guardrail: only the explicit direct-generation exception may contain Craft markers in protected trees', () => {
+test('craft guardrail: legacy ScriptIDE usage is limited to its static allowlist', () => {
+  const source = readFileSync(LEGACY_SCRIPTIDE_ROUTE, 'utf8');
+  const presentMarkers = CRAFT_V2_MARKERS.filter(marker => source.includes(marker));
+
+  assert.deepEqual(presentMarkers.sort(), [...LEGACY_SCRIPTIDE_ALLOWLIST].sort());
+  assert.match(
+    source,
+    /import\s*{\s*buildCraftPromptSection\s*,\s*looksLikeAnimationGenre\s*}\s*from\s*['"][^'"]*craft-spec\.ts['"];/,
+    'the legacy route may import only its two static prompt helpers',
+  );
+});
+
+test('craft guardrail: every protected surface except legacy ScriptIDE is Craft-free', () => {
   const protectedFiles = [
     ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'nvm', 'analyze')),
     ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'nvm', 'quality')),
     ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'nvm', 'proof')),
-    ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'routes')),
+    ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'routes')).filter(file => file !== LEGACY_SCRIPTIDE_ROUTE),
     join(REPO_ROOT, 'server', 'lib', 'ai-config.ts'),
     ...listTypeScriptFiles(join(REPO_ROOT, 'src')),
   ];
@@ -105,7 +112,7 @@ test('craft guardrail: only the explicit direct-generation exception may contain
     const source = readFileSync(file, 'utf8');
     return CRAFT_V2_MARKERS.some(marker => source.includes(marker));
   });
-  assert.deepEqual(craftMarkerFiles, [join(REPO_ROOT, 'server', 'routes', 'scriptide.ts')]);
+  assert.deepEqual(craftMarkerFiles, []);
 });
 
 test('craft guardrail: the kill switch stays out of public config and client code', () => {
