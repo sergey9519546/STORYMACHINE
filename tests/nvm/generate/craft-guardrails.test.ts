@@ -97,6 +97,16 @@ test('craft guardrail: legacy ScriptIDE usage is limited to its static allowlist
     /import\s*{\s*buildCraftPromptSection\s*,\s*looksLikeAnimationGenre\s*}\s*from\s*['"][^'"]*craft-spec\.ts['"];/,
     'the legacy route may import only its two static prompt helpers',
   );
+  assert.match(
+    source,
+    /buildCraftPromptSection\s*\(\s*{\s*compact\s*:\s*true\s*,\s*animation\s*:\s*looksLikeAnimationGenre\s*\(\s*configGenre\s*\)\s*,?\s*}\s*\)/,
+    'the legacy route may pass only compact and animation options to the static craft prompt',
+  );
+  assert.doesNotMatch(
+    source,
+    /\bsceneContext\b/,
+    'the legacy route must not pass scene-aware Craft context',
+  );
 });
 
 test('craft guardrail: every protected surface except legacy ScriptIDE is Craft-free', () => {
