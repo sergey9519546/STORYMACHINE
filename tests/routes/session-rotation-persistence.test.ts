@@ -595,5 +595,39 @@ if (isChild) {
         await server.close();
       }
     });
+
+    it('retires the in-memory quarantine after candidate cleanup without a restart', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'same-process-cleanup-old';
+      const newId = 'same-process-cleanup-new';
+      const markerPath = path.join(sessionDir, `.${newId}.rotation-deny`);
+      const server = await startChildServer(sessionDir, {
+        cleanupFailure: { oldId, newId },
+        quarantineRenameFailure: newId,
+      });
+      try {
+        await saveMarker(server.baseUrl, oldId, 'SAME PROCESS OLD AUTHORITY');
+        assert.equal((await rotate(server.baseUrl, oldId, newId)).status, 503);
+
+        const denied = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${newId}`);
+        assert.equal(denied.status, 409, 'candidate presence must keep the quarantine active');
+
+        const candidateBase = path.join(sessionDir, `${newId}.db`);
+        for (const suffix of ['', '-wal', '-shm', '-journal']) {
+          try { fs.unlinkSync(candidateBase + suffix); } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          }
+        }
+
+        const released = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${newId}`);
+        assert.equal(released.status, 200);
+        assert.equal((await released.json() as { status: string }).status, 'empty');
+        assert.equal(fs.existsSync(markerPath), false);
+        const old = await loadMarker(server.baseUrl, oldId);
+        assert.equal(old.scriptText, 'SAME PROCESS OLD AUTHORITY');
+      } finally {
+        await server.close();
+      }
+    });
   });
 }

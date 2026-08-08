@@ -239,7 +239,7 @@ export function getOrCreateSession(sessionId: string): Session {
   // be closed and replaced by the lifecycle operation.
   if (
     rotatingSessionIds.has(sessionId)
-    || quarantinedSessionIds.has(sessionId)
+    || hasActiveInMemoryQuarantine(sessionId)
     || hasDurableRotationDeny(sessionId)
   ) {
     throw new SessionBusyError('Session rotation lifecycle is unavailable. Please retry with the authoritative session ID.');
@@ -317,6 +317,25 @@ function directoryEntryExists(file: string): boolean {
 
 function hasSqliteArtifact(base: string): boolean {
   return sqliteArtifactPaths(base).some(file => directoryEntryExists(file));
+}
+
+function hasActiveInMemoryQuarantine(sessionId: string): boolean {
+  if (!quarantinedSessionIds.has(sessionId)) return false;
+  if (!PERSIST_SESSIONS) return true;
+
+  try {
+    if (hasSqliteArtifact(path.join(SESSION_DB_DIR, `${sessionId}.db`))) return true;
+  } catch (error) {
+    logger.error('session_rotate_memory_quarantine_inspection_failed', { error: (error as Error).message });
+    return true;
+  }
+
+  // Candidate cleanup can happen while the process remains alive (operator
+  // repair or the orphan sweep). Once absence is proven without following
+  // symlinks, retire the transient barrier and let the durable marker path
+  // below perform its independently fail-closed retirement.
+  quarantinedSessionIds.delete(sessionId);
+  return false;
 }
 
 const DURABLE_ROTATION_DENY_SUFFIX = '.rotation-deny';
@@ -435,7 +454,7 @@ function chooseReplacementSessionId(requestedNewId?: string): string {
     if (
       sessions.has(candidate)
       || rotatingSessionIds.has(candidate)
-      || quarantinedSessionIds.has(candidate)
+      || hasActiveInMemoryQuarantine(candidate)
       || hasDurableRotationDeny(candidate)
     ) return true;
     return PERSIST_SESSIONS && hasSqliteArtifact(path.join(SESSION_DB_DIR, `${candidate}.db`));
