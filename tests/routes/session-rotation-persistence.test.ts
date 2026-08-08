@@ -20,17 +20,62 @@ if (isChild) {
   if (!sessionDir) throw new Error('SESSION_DB_DIR is required for the rotation child');
 
   const failTarget = process.env.STORYMACHINE_TEST_FAIL_ROTATION_TARGET;
-  if (failTarget) {
-    const targetPath = path.join(sessionDir, `${failTarget}.db`);
+  const publishRaceTarget = process.env.STORYMACHINE_TEST_PUBLISH_RACE_TARGET;
+  if (failTarget || publishRaceTarget) {
+    const failTargetPath = failTarget ? path.join(sessionDir, `${failTarget}.db`) : undefined;
+    const raceTargetPath = publishRaceTarget ? path.join(sessionDir, `${publishRaceTarget}.db`) : undefined;
     const originalRename = fs.renameSync.bind(fs);
     fs.renameSync = ((oldPath: fs.PathLike, newPath: fs.PathLike) => {
-      if (path.resolve(String(newPath)) === path.resolve(targetPath)) {
+      const resolvedNewPath = path.resolve(String(newPath));
+      if (failTargetPath && resolvedNewPath === path.resolve(failTargetPath)) {
         const error = new Error('injected publication failure') as NodeJS.ErrnoException;
         error.code = 'EACCES';
         throw error;
       }
+      if (raceTargetPath && resolvedNewPath === path.resolve(raceTargetPath)) {
+        // Create a real target at the final publication boundary, after the
+        // production preflight check. Windows rename is no-clobber already, so
+        // remove it immediately before rename to emulate POSIX rename's atomic
+        // replacement semantics and expose code that relies on check+rename.
+        fs.writeFileSync(raceTargetPath, 'EXTERNAL TARGET CREATED AT PUBLISH');
+        fs.unlinkSync(raceTargetPath);
+      }
       return originalRename(oldPath, newPath);
     }) as typeof fs.renameSync;
+
+    const originalLink = fs.linkSync.bind(fs);
+    fs.linkSync = ((existingPath: fs.PathLike, newPath: fs.PathLike) => {
+      const resolvedNewPath = path.resolve(String(newPath));
+      if (failTargetPath && resolvedNewPath === path.resolve(failTargetPath)) {
+        const error = new Error('injected publication failure') as NodeJS.ErrnoException;
+        error.code = 'EACCES';
+        throw error;
+      }
+      if (raceTargetPath && resolvedNewPath === path.resolve(raceTargetPath)) {
+        // A hard-link publication primitive must observe EEXIST and preserve
+        // this target rather than replacing it.
+        fs.writeFileSync(raceTargetPath, 'EXTERNAL TARGET CREATED AT PUBLISH');
+      }
+      return originalLink(existingPath, newPath);
+    }) as typeof fs.linkSync;
+  }
+
+  const cleanupFailure = process.env.STORYMACHINE_TEST_CLEANUP_FAILURE;
+  if (cleanupFailure) {
+    const { oldId, newId } = JSON.parse(cleanupFailure) as { oldId: string; newId: string };
+    const blocked = new Set([
+      path.resolve(path.join(sessionDir, `${oldId}.db`)),
+      path.resolve(path.join(sessionDir, `${newId}.db`)),
+    ]);
+    const originalUnlink = fs.unlinkSync.bind(fs);
+    fs.unlinkSync = ((file: fs.PathLike) => {
+      if (blocked.has(path.resolve(String(file)))) {
+        const error = new Error('injected candidate cleanup failure') as NodeJS.ErrnoException;
+        error.code = 'EACCES';
+        throw error;
+      }
+      return originalUnlink(file);
+    }) as typeof fs.unlinkSync;
   }
 
   let releaseBackup: (() => void) | undefined;
@@ -76,7 +121,12 @@ if (isChild) {
 
   async function startChildServer(
     sessionDir: string,
-    options: { failPublishTarget?: string; pauseRotation?: boolean } = {},
+    options: {
+      failPublishTarget?: string;
+      pauseRotation?: boolean;
+      publishRaceTarget?: string;
+      cleanupFailure?: { oldId: string; newId: string };
+    } = {},
   ): Promise<ChildServer> {
     const child = spawn(process.execPath, [
       '--experimental-strip-types',
@@ -91,6 +141,12 @@ if (isChild) {
           ? { STORYMACHINE_TEST_FAIL_ROTATION_TARGET: options.failPublishTarget }
           : {}),
         ...(options.pauseRotation ? { STORYMACHINE_TEST_PAUSE_ROTATION: '1' } : {}),
+        ...(options.publishRaceTarget
+          ? { STORYMACHINE_TEST_PUBLISH_RACE_TARGET: options.publishRaceTarget }
+          : {}),
+        ...(options.cleanupFailure
+          ? { STORYMACHINE_TEST_CLEANUP_FAILURE: JSON.stringify(options.cleanupFailure) }
+          : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       windowsHide: true,
@@ -358,6 +414,49 @@ if (isChild) {
         assert.equal(old.scriptText, 'OLD REMAINS');
       } finally {
         server.releaseRotation();
+        await server.close();
+      }
+    });
+
+    it('cannot clobber a target created at the final publication boundary', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'publish-toctou-old';
+      const newId = 'publish-toctou-new';
+      const targetPath = path.join(sessionDir, `${newId}.db`);
+      const server = await startChildServer(sessionDir, { publishRaceTarget: newId });
+      try {
+        await saveMarker(server.baseUrl, oldId, 'OLD AUTHORITY');
+        const response = await rotate(server.baseUrl, oldId, newId);
+        assert.equal(response.status, 503);
+        assert.equal(fs.readFileSync(targetPath, 'utf8'), 'EXTERNAL TARGET CREATED AT PUBLISH');
+        const old = await loadMarker(server.baseUrl, oldId);
+        assert.equal(old.scriptText, 'OLD AUTHORITY');
+      } finally {
+        await server.close();
+      }
+    });
+
+    it('quarantines a published candidate when rollback cannot unlink it', async () => {
+      const sessionDir = makeSessionDir();
+      const oldId = 'cleanup-failure-old';
+      const newId = 'cleanup-failure-new';
+      const server = await startChildServer(sessionDir, {
+        cleanupFailure: { oldId, newId },
+      });
+      try {
+        await saveMarker(server.baseUrl, oldId, 'ROLLBACK AUTHORITY');
+        const response = await rotate(server.baseUrl, oldId, newId);
+        assert.equal(response.status, 503);
+        assert.equal(fs.existsSync(path.join(sessionDir, `${newId}.db`)), false);
+        assert.ok(
+          fs.readdirSync(sessionDir).some(file => file.startsWith(`.${newId}.failed-rotation-`)),
+          'the valid but unremovable candidate must be moved outside the session-id namespace',
+        );
+        const old = await loadMarker(server.baseUrl, oldId);
+        assert.equal(old.scriptText, 'ROLLBACK AUTHORITY');
+        const replacement = await loadMarker(server.baseUrl, newId);
+        assert.notEqual(replacement.scriptText, 'ROLLBACK AUTHORITY');
+      } finally {
         await server.close();
       }
     });

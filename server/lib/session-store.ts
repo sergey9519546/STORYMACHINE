@@ -222,6 +222,10 @@ export const SESSION_TTL_MS  = boundedIntegerEnv('SESSION_IDLE_TTL_MINUTES', 144
 export const sessions     = new Map<string, Session>();
 export const runningRooms = new Set<string>();
 const rotatingSessionIds = new Set<string>();
+// Last-resort lifecycle barrier when rollback cannot remove or rename a
+// candidate published by this process. Never let that valid database become
+// addressable merely because the HTTP request returned a failure.
+const quarantinedSessionIds = new Set<string>();
 const SQLITE_ARTIFACT_SUFFIXES = ['', '-wal', '-shm', '-journal'] as const;
 
 export function dbPathFor(sessionId: string): string {
@@ -233,8 +237,8 @@ export function getOrCreateSession(sessionId: string): Session {
   // behind earlier commands. This check covers direct read routes as well as
   // withSessionCommand(): neither may obtain a Stage whose handle is about to
   // be closed and replaced by the lifecycle operation.
-  if (rotatingSessionIds.has(sessionId)) {
-    throw new SessionBusyError('Session rotation is in progress. Please retry.');
+  if (rotatingSessionIds.has(sessionId) || quarantinedSessionIds.has(sessionId)) {
+    throw new SessionBusyError('Session rotation lifecycle is unavailable. Please retry with the authoritative session ID.');
   }
   let session = sessions.get(sessionId);
   if (!session) {
@@ -309,6 +313,21 @@ function removeSqliteArtifacts(base: string): void {
   }
 }
 
+/**
+ * Move rollback debris outside the `<sessionId>.db` namespace. Each rename is
+ * same-directory, and the caller verifies the original paths are all absent.
+ */
+function quarantineSqliteArtifacts(base: string, sessionId: string): void {
+  const quarantineBase = path.join(
+    SESSION_DB_DIR,
+    `.${sessionId}.failed-rotation-${crypto.randomUUID()}.db`,
+  );
+  for (const suffix of SQLITE_ARTIFACT_SUFFIXES) {
+    const source = base + suffix;
+    if (fs.existsSync(source)) fs.renameSync(source, quarantineBase + suffix);
+  }
+}
+
 function chooseReplacementSessionId(requestedNewId?: string): string {
   // Keep the library interface fail-closed even when called outside the HTTP
   // route (whose zod schema enforces the same canonical representation).
@@ -317,7 +336,7 @@ function chooseReplacementSessionId(requestedNewId?: string): string {
   }
 
   const isCollision = (candidate: string): boolean => {
-    if (sessions.has(candidate) || rotatingSessionIds.has(candidate)) return true;
+    if (sessions.has(candidate) || rotatingSessionIds.has(candidate) || quarantinedSessionIds.has(candidate)) return true;
     return PERSIST_SESSIONS && hasSqliteArtifact(path.join(SESSION_DB_DIR, `${candidate}.db`));
   };
 
@@ -388,13 +407,18 @@ export async function rotateSession(
         verificationStage.close();
         verificationStage = undefined;
 
-        // An external process could create the target during the backup. Treat
-        // that race as a retryable lifecycle failure; never overwrite it.
+        // Keep the early check for a clear diagnostic, but correctness does not
+        // depend on it: linkSync below is the atomic no-clobber publication
+        // primitive. Unlike POSIX rename, a hard link fails with EEXIST if a
+        // target appears between this check and publication. The backup lives
+        // in this same directory, so Windows/NTFS and POSIX both link within
+        // one filesystem.
         if (hasSqliteArtifact(newBase)) {
           throw new Error('replacement database appeared during rotation');
         }
-        fs.renameSync(temporaryBase, newBase);
+        fs.linkSync(temporaryBase, newBase);
         replacementPublished = true;
+        fs.unlinkSync(temporaryBase);
 
         // A 200 is allowed only after the published path itself is reopenable.
         replacementStage = new Stage(newBase);
@@ -430,7 +454,27 @@ export async function rotateSession(
         // If the target appeared during backup, it belongs to another actor;
         // only remove newBase when this rotation actually published it.
         if (replacementPublished) {
-          try { removeSqliteArtifacts(newBase); } catch { /* old path remains authoritative */ }
+          try {
+            removeSqliteArtifacts(newBase);
+          } catch (cleanupError) {
+            logger.warn('session_rotate_candidate_cleanup_failed', {
+              newSessionId,
+              error: (cleanupError as Error).message,
+            });
+          }
+          if (hasSqliteArtifact(newBase)) {
+            try {
+              quarantineSqliteArtifacts(newBase, newSessionId);
+            } catch (quarantineError) {
+              logger.error('session_rotate_candidate_quarantine_failed', {
+                newSessionId,
+                error: (quarantineError as Error).message,
+              });
+            }
+          }
+          // The failed candidate must be either absent from the addressable
+          // namespace or guarded indefinitely for this process lifetime.
+          if (hasSqliteArtifact(newBase)) quarantinedSessionIds.add(newSessionId);
         }
         try { removeSqliteArtifacts(temporaryBase); } catch { /* temporary file is never loadable by an id */ }
 
