@@ -151,8 +151,9 @@ Security commit `4f8f0ec3c5ac76b27923a55cbf0e577af2d5c15c` locks
 `pdfjs-dist` to `6.2.108`, refreshes the affected `nanoid`, `tsx`, and
 `esbuild` resolutions, raises the declared Node floor to `>=22.13.0 || >=24`,
 and adds committed-resolution and hostile-PDF regressions. The subsequent
-documentation-only commit `1aa161a2c4caa341247682225966ee41665edb98`
-reconciles active phase, security, and session-model documentation.
+documentation-only commits `7d2ea6c`, `1aa161a`, `1ee3f8e`, `15962fe`, and
+`20eef4d` reconcile active phase, security, session-model, and concurrent
+P0/P1 policy documentation without changing user evidence or product code.
 
 On `1aa161a2c4caa341247682225966ee41665edb98`, a clean `npm ci` and
 `npm audit --omit=dev --audit-level=high` both reported zero vulnerabilities.
