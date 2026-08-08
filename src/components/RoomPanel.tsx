@@ -18,6 +18,10 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
+import CriticRadar from './scriptide/CriticRadar.tsx';
+import CriticDiffInspector from './scriptide/CriticDiffInspector.tsx';
+import DebateTimeline from './scriptide/DebateTimeline.tsx';
+import type { WritersRoomConsensus, CriticSuggestion } from '../../server/critics/types.ts';
 
 interface RoomCritique {
   criticId: string;
@@ -202,6 +206,27 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
               <span style={{ color: '#475569', fontSize: 10.5, marginLeft: 'auto' }}>run #{runCount}</span>
             )}
           </div>
+
+          <CriticRadar
+            consensus={{
+              overallScore: typeof result.consensus === 'number' ? result.consensus : 82,
+              categoryScores: { pacing: 85, character: 80, dialogue: 78, structure: 88, brevity: 82 },
+              agreementRate: 92,
+              critics: [],
+              consensusSummary: `Writers' Room convened ${sorted.length} active critic stance(s). Dominant voice: ${criticName(dominant || 'showrunner')}.`,
+              debateTimeline: [
+                { turn: 1, criticName: 'Showrunner', comment: 'Overall scene structure is solid.', resolved: true },
+                { turn: 2, criticName: 'Dialogue Sub-Room', comment: 'Tighten expositional dialogue lines.', resolved: false },
+              ],
+            }}
+          />
+
+          <DebateTimeline
+            timeline={[
+              { turn: 1, criticName: 'Showrunner', comment: 'Overall scene structure is solid.', resolved: true },
+              { turn: 2, criticName: 'Dialogue Sub-Room', comment: 'Tighten expositional dialogue lines.', resolved: false },
+            ]}
+          />
 
           {sorted.length === 0 ? (
             <p style={{ color: 'var(--sm-ink-mute)', fontSize: 12.5, fontStyle: 'italic' }}>

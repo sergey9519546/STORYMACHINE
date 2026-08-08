@@ -283,6 +283,16 @@ export default function Toolbar({
           </span>
         )}
 
+        {/* Page / Word Budget Indicator */}
+        <span
+          className="inline-flex min-h-[28px] items-center gap-1 border border-[var(--sm-cream)]/30 px-2 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--sm-cream)]/80"
+          title="Feature screenplay budget target: ~110 pages"
+        >
+          <span>P.{pageCount || 1}/110</span>
+          <span className="text-[var(--sm-cream)]/40">·</span>
+          <span>{wordCount.toLocaleString()} w</span>
+        </span>
+
         <div className="relative" ref={exportRef}>
           <button
             type="button"

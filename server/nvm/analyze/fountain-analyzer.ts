@@ -164,6 +164,7 @@ import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
 import type { SceneAnnotation } from '../screenplay/compile.ts';
 import type { FountainAnalysis, RecurringImage } from './types.ts';
+import { analyzeVoices } from './voice-delta.ts';
 
 // ── Lexicons (module constants) ──────────────────────────────────────────────
 // Kept compact and topic-scoped on purpose: each list backs exactly one signal,
@@ -2399,13 +2400,39 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   }, 0);
   const wordCount = truncatedForAnalysis ? analyzedWordCount : fullWordCount;
 
+  // Character voice distinctiveness (Burrows's Delta)
+  const dialogueByCharacter: Record<string, string[]> = {};
+  for (const s of sceneUnits) {
+    for (const dl of s.dialogueLines) {
+      if (!dl.speaker) continue;
+      if (!dialogueByCharacter[dl.speaker]) dialogueByCharacter[dl.speaker] = [];
+      dialogueByCharacter[dl.speaker].push(dl.text);
+    }
+  }
+  const voiceAnalysis = analyzeVoices(dialogueByCharacter);
+
+  // Subtext ratio (action/beat word ratio vs total text)
+  const totalActionWords = sceneUnits.reduce((sum, s) => sum + s.actionLines.join(' ').split(/\s+/).filter(Boolean).length, 0);
+  const totalDialogueWords = sceneUnits.reduce((sum, s) => sum + s.dialogueLines.map(d => d.text).join(' ').split(/\s+/).filter(Boolean).length, 0);
+  const subtextRatio = (totalActionWords + totalDialogueWords) > 0
+    ? Math.round((totalActionWords / (totalActionWords + totalDialogueWords)) * 100) / 100
+    : 0.5;
+
+  // Question latency summary
+  const totalQuestions = questionLatency.raisedByScene.reduce((a, b) => a + b, 0);
+  const totalResolved = questionLatency.resolvedByScene.reduce((a, b) => a + b, 0);
+  const questionLatencyOverall = {
+    totalQuestions,
+    totalResolved,
+    avgScenesToResolve: totalQuestions > 0 ? Math.round((totalResolved / totalQuestions) * 10) / 10 : 0,
+  };
+
   return {
     records, annotations, structure, characters, sceneCount, dialogueLineCount, actionLineCount, wordCount,
     recurringImagery,
-    // Only ever present when the ceiling actually engaged — omitted (not
-    // `false`/`undefined`-valued-but-present) for every script at or under
-    // ANALYZER_SCENE_CEILING, so JSON.stringify output for normal-sized
-    // scripts is byte-identical to before this guard existed.
+    voiceAnalysis,
+    subtextRatio,
+    questionLatencyOverall,
     ...(truncatedForAnalysis ? { truncatedForAnalysis, totalSceneCount } : {}),
   };
 }

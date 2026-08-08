@@ -61,6 +61,19 @@ export interface FountainAnalysis {
    *  truncatedForAnalysis === true (sceneCount above is the smaller,
    *  actually-analyzed count in that case). */
   totalSceneCount?: number;
+  /** Character voice distinctiveness (Burrows's Delta) */
+  voiceAnalysis?: {
+    pairs: Array<{ a: string; b: string; delta: number; swapRisk: boolean }>;
+    scored: boolean;
+  };
+  /** Subtext ratio (ratio of subtext/action/indirect dialogue to direct exposition) */
+  subtextRatio?: number;
+  /** Question latency summary across script */
+  questionLatencyOverall?: {
+    totalQuestions: number;
+    totalResolved: number;
+    avgScenesToResolve: number;
+  };
 }
 
 /** Per-pass rollup: the issues one pass found, with severity counts. */
@@ -281,6 +294,16 @@ export interface ScriptDoctorReport {
   sceneCount: number;
   wordCount: number;
   analyzedAt: number;
+  voiceAnalysis?: {
+    pairs: Array<{ a: string; b: string; delta: number; swapRisk: boolean }>;
+    scored: boolean;
+  };
+  subtextRatio?: number;
+  questionLatencyOverall?: {
+    totalQuestions: number;
+    totalResolved: number;
+    avgScenesToResolve: number;
+  };
 
   // ── Coverage layer (optional so older report consumers stay valid; the
   //    doctor always populates all four on every non-degenerate run) ────────

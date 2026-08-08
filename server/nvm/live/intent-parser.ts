@@ -30,6 +30,19 @@ export async function parseIntent(userInput: string): Promise<IntentParseResult>
         type: Type.STRING,
         enum: ["A", "B", "C"],
         description: "The risk level of the action. A = ambient/minor, B = belief shift, C = major irreversible revelation or state change."
+      },
+      confidenceScore: {
+        type: Type.INTEGER,
+        description: "Certainty percentage (0 to 100) of this state prediction based on context."
+      },
+      dramaticIrony: {
+        type: Type.BOOLEAN,
+        description: "True if the audience is aware of a secret or state shift that the active scene characters do not know."
+      },
+      suggestionChips: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "3 short next-move suggestion chips (e.g. 'Escalate confrontation', 'Lie to cover tracks', 'Leave the room')."
       }
     },
     required: ["action", "intent", "possibleStateEffects", "riskCategory"]
@@ -84,6 +97,14 @@ export function proposeStateDelta(parsed: IntentParseResult): StateDeltaCard | n
     action: parsed.action,
     dialogue: parsed.line,
     effects: parsed.possibleStateEffects,
-    requiresConfirmation: parsed.riskCategory === 'C'
+    requiresConfirmation: parsed.riskCategory === 'C',
+    confidenceScore: parsed.confidenceScore ?? 85,
+    dramaticIrony: parsed.dramaticIrony ?? false,
+    characterBeliefMap: parsed.characterBeliefMap,
+    suggestionChips: parsed.suggestionChips?.length ? parsed.suggestionChips : [
+      "Escalate confrontation",
+      "Offer a quiet compromise",
+      "Deflect with a lie"
+    ]
   };
 }

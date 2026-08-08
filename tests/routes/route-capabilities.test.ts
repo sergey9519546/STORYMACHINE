@@ -214,6 +214,8 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'GET /api/ai-providers', 'POST /api/ai-providers/switch',
   // server/routes/collab.ts
   'POST /api/collab/token',
+  // server/routes/critics.ts
+  'POST /api/critics/evaluate', 'POST /api/critics/export',
   // server/routes/events.ts
   'POST /api/events', 'GET /api/events/summary',
   // server/routes/export.ts

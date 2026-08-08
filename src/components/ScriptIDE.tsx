@@ -57,6 +57,7 @@ import ResearchNotes from "./scriptide/ResearchNotes";
 import Toolbar, { type IdeTask, type IdeToolSlot } from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
 import { StateDeltaCard, StateDeltaCardType } from "./StateDeltaCard";
+import ShortcutModal from "./scriptide/ShortcutModal";
 
 // Lazy-loaded — each is a conditionally-rendered tab/overlay, never needed on
 // first paint. AIPanel/AnalysisPanel render only behind their respective
@@ -363,6 +364,19 @@ export default function ScriptIDE({
   // In-app confirm for "Change setup" — replaces window.confirm (QA P1-5: native
   // confirms block the thread, are unstyleable, and can't be dismissed by Esc).
   const [newStoryConfirm, setNewStoryConfirm] = useState(false);
+  const [showShortcutModal, setShowShortcutModal] = useState(false);
+
+  // Global Keyboard Shortcuts (Ctrl+/ or Cmd+/)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        setShowShortcutModal((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   // StartScreen's "Try the sample script" handoff (sessionStorage flag, same
   // idiom as sm_fdx_import_pending below): when set, the doctor overlay opens
   // on mount and auto-runs the built-in sample through its own loadSample
@@ -2130,8 +2144,8 @@ export default function ScriptIDE({
               <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
                 <StateDeltaCard
                   card={deltaCard}
-                  onConfirm={() => confirmStateDelta(deltaCard)}
-                  onEdit={() => setDeltaCard(null)}
+                  onConfirm={(edited) => confirmStateDelta(edited || deltaCard)}
+                  onEdit={() => {}}
                   onReject={() => setDeltaCard(null)}
                 />
               </div>
@@ -2139,6 +2153,13 @@ export default function ScriptIDE({
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Keyboard Shortcut Cheat Sheet Modal */}
+      <AnimatePresence>
+        {showShortcutModal && (
+          <ShortcutModal onClose={() => setShowShortcutModal(false)} />
+        )}
+      </AnimatePresence>
 
       {/* Change-setup confirm modal — replaces window.confirm (QA P1-5). */}
       <AnimatePresence>

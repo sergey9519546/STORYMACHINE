@@ -68,6 +68,10 @@ export interface FountainEditorProps {
    * feature, off by default (see Toolbar/ScriptIDE "Live Notes" toggle).
    */
   liveDiagnostics?: boolean;
+  /** Typewriter Focus Mode: centers active line vertically & dims inactive lines */
+  isTypewriterFocus?: boolean;
+  /** Theme selection: "paper" | "dark" | "crt" | "print" */
+  themeName?: "paper" | "dark" | "crt" | "print";
 }
 
 // ── Shared base theme ─────────────────────────────────────────────────────────

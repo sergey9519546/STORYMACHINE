@@ -346,6 +346,28 @@ export default function CoverageSummary({
               </div>
             </div>
 
+            {/* Batch 2 Metrics: Subtext, Voice Separation & Question Latency */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="sm-card py-2 text-center">
+                <p className="sm-h">Subtext Ratio</p>
+                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]">
+                  {typeof report.subtextRatio === 'number' ? `${Math.round(report.subtextRatio * 100)}%` : '—'}
+                </p>
+              </div>
+              <div className="sm-card py-2 text-center">
+                <p className="sm-h">Voice Separation</p>
+                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]">
+                  {report.voiceAnalysis?.scored ? `${report.voiceAnalysis.pairs.filter(p => !p.swapRisk).length}/${report.voiceAnalysis.pairs.length} Pairs` : 'N/A'}
+                </p>
+              </div>
+              <div className="sm-card py-2 text-center">
+                <p className="sm-h">Resolved Qs</p>
+                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]">
+                  {report.questionLatencyOverall ? `${report.questionLatencyOverall.totalResolved}/${report.questionLatencyOverall.totalQuestions}` : '—'}
+                </p>
+              </div>
+            </div>
+
             <div className="sm-card sm-card--sel">
               <p className="sm-h">What next</p>
               <p className="mt-2 text-sm font-medium leading-snug text-[var(--sm-ink)]">{nextLabel}</p>
