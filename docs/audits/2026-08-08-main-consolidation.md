@@ -102,3 +102,29 @@ approval.
 
 The next task is human-only: conduct and document five complete P0 sessions
 under the operating kit. No agent may fabricate them.
+
+## Final code/repository verification gate
+
+Task 6 is complete as a **code/repository verification gate**. On `main`
+commit `70d55532bf5c765b28f196a1480103e412286287`, the following commands
+passed:
+
+- `git diff --check`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npm run honesty-audit`
+- `npm run check-docs`
+- `npm run check-scoring-receipt`
+- `node scripts/smoke-p0-live-flow.mjs`
+- `node scripts/verify-focus-traps.mjs` (14/14)
+- `node scripts/verify-p2-p3-surfaces.mjs` (94/94)
+
+The test run emitted the expected keyless-mode Gemini rewrite fallback logs.
+The build emitted Vite's warning that ScriptIDE exceeds 500 kB. Neither
+warning changed the passing result.
+
+This gate does not establish P0 demand validation, P1 score validity, user
+retention, release or production readiness, or a public launch. The next task
+remains human-only: conduct and document five complete P0 sessions under the
+operating kit.

@@ -80,6 +80,6 @@
 **Files:**
 - Modify: `docs/DECISION_LOG.md` only if a durable decision is not already captured by the consolidation audit.
 
-- [ ] Run `git diff --check`, `npm run lint`, `npm test`, `npm run build`, `npm run honesty-audit`, and `npm run check-docs` on one exact `main` commit.
-- [ ] Record the exact main commit, test results, integrated commits, and quarantined sources.
-- [ ] Leave the human-only next task explicit: conduct and document five complete P0 sessions; do not manufacture demand evidence.
+- [x] Run `git diff --check`, `npm run lint`, `npm test`, `npm run build`, `npm run honesty-audit`, and `npm run check-docs` on `main` commit `70d55532bf5c765b28f196a1480103e412286287`; `npm run check-scoring-receipt`, `node scripts/smoke-p0-live-flow.mjs`, `node scripts/verify-focus-traps.mjs` (14/14), and `node scripts/verify-p2-p3-surfaces.mjs` (94/94) also passed.
+- [x] Record the exact main commit, test results, integrated commits, and quarantined sources in the consolidation audit. Expected keyless-mode Gemini rewrite fallback logs appeared during tests, and Vite warned that ScriptIDE exceeds 500 kB during the build.
+- [x] Leave the human-only next task explicit: conduct and document five complete P0 sessions; do not manufacture demand evidence. This is a code/repository verification gate only; it does not establish P0 demand validation, P1 score validity, user retention, release or production readiness, or a public launch.
