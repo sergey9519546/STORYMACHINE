@@ -1,7 +1,7 @@
 // ── Copilot persona registry (P9) ────────────────────────────────────────────
 // Loads built-in personas from JSON files in this directory and holds any
 // user-uploaded personas in memory. Provides lookup + prompt-block construction
-// for the inline copilot completion endpoint.
+// for explicit Copilot/persona workflows.
 
 import fs from 'fs';
 import path from 'path';

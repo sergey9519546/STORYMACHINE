@@ -79,12 +79,11 @@ every route the live sample flow actually calls:
 The live `/api/scriptide/doctor` route's health/verdict/scene-count
 (68.9 / CONSIDER / 14) match this document's static-stimulus provenance table
 below exactly, confirming the static report and the live in-app report are
-consistent on this commit. Source inspection also confirms the previously
-diagnosed CodeMirror crash cause is fixed at HEAD:
-`src/components/editor/inline-complete.ts`'s trigger plugin now defers its
-dismiss-dispatch via `setTimeout(..., 0)` (comment: "dispatching synchronously
-from a plugin update crashes") instead of calling `view.dispatch()`
-synchronously inside the ViewPlugin `update()` lifecycle method.
+consistent on this commit. The previously diagnosed CodeMirror
+synchronous-dispatch defect was fixed before the URL-based inline-completion
+surface was retired. At HEAD that client module is absent and
+`GET /api/scriptide/complete` is a game-limited, zero-work 410 compatibility
+tombstone; ordinary Fountain autocomplete remains active.
 
 **What this does NOT certify:** the sandbox used has no display and no
 Playwright/browser install (verified absent — not a dependency, no cached

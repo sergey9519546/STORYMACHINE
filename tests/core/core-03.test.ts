@@ -2386,20 +2386,8 @@ describe('lib/prompts', () => {
     assert.equal(renderTemplate('[{{  k  }}]', { k: 'v' }), '[v]');
   });
 
-  it('getPrompt loads and interpolates the bundled scriptide-complete template', () => {
-    const out = getPrompt('scriptide-complete', {
-      personaLead: 'You are a noir writer.',
-      stylePreamble: '', genrePreamble: '', charPreamble: '', bibleBlock: '',
-      prefix: 'INT. BAR - NIGHT', suffix: '(end of document)',
-    });
-    assert.match(out, /You are a noir writer\./);
-    assert.match(out, /INT\. BAR - NIGHT/);
-    assert.match(out, /OUTPUT ONLY THE CONTINUATION TEXT/);
-    assert.ok(!out.includes('{{'), 'no unresolved placeholders remain');
-  });
-
   it('hasPrompt is true for a bundled prompt and false for an unknown one', () => {
-    assert.equal(hasPrompt('scriptide-complete'), true);
+    assert.equal(hasPrompt('scriptide-complete'), false, 'retired inline-completion template must stay absent');
     assert.equal(hasPrompt('definitely-not-a-real-prompt'), false);
   });
 

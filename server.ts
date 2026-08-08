@@ -20,7 +20,7 @@ const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
 if (AI_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
   logger.warn('startup_keyless', {
     message: 'GEMINI_API_KEY is not set — starting in analysis-only mode. ' +
-      'Diagnostics, coverage, and exploration work fully; generation (copilot, ' +
+      'Diagnostics, coverage, and exploration work fully; explicit generation (world-building, ' +
       'simulation turns, rewrites, interview voices) stays disabled until a key is configured.',
   });
 }

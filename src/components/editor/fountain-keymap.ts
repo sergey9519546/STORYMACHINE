@@ -9,8 +9,8 @@
 //   - Tab space-indent/character-cycle → indentation is a pure view
 //     decoration now (screenplay-format.ts never touches the buffer), and
 //     character-name cycling is superseded by the same autocomplete dropdown.
-//     Tab is intentionally left unbound here so it falls through to
-//     inline-complete's Tab-accept binding.
+//     Tab remains intentionally unbound here; screenplay autocomplete uses
+//     Enter/click acceptance and does not need a competing Tab binding.
 //   - Enter-after-cue → onCharacterEnter modal → replaced below by Final
 //     Draft's actual behavior: Enter always inserts a normal newline (via
 //     defaultKeymap's insertNewlineAndIndent, which runs immediately after

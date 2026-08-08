@@ -6,14 +6,14 @@ import { isWholeDraftAnalysisComplete } from '../lib/analysis-completeness.ts';
 import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
-import { composePromptModifiers, GENRE_NAMES } from '../lib/genre-router.ts';
+import { composePromptModifiers } from '../lib/genre-router.ts';
 import { buildCraftPromptSection, looksLikeAnimationGenre } from '../nvm/generate/craft-spec.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
   withSessionCommand, gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
-import { listPersonas, getPersona, registerUserPersona, isPersonaRegisterError, personaPromptBlock } from '../personas/registry.ts';
+import { listPersonas, registerUserPersona, isPersonaRegisterError } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
 import {
   validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema,
@@ -24,7 +24,7 @@ import {
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
-import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
+import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
 import { sanitizeExternalError } from '../lib/safe-error.ts';
@@ -44,17 +44,6 @@ const SIMPLE_GENERATION_BUDGET: AiBudgetLimits = {
   label: 'scriptide-simple-generation',
   maxAttempts: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_SIMPLE_MAX_ATTEMPTS', 1),
   timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_SIMPLE_TIMEOUT_MS', 45_000),
-};
-
-// /api/scriptide/complete: inline copilot completion stream. Previously had
-// NO timeout at all when the active provider supports streaming
-// (generateContentStream's opts type carries no timeoutMs — see
-// server/engine/ai.ts) — a hung stream could hold the SSE connection open
-// indefinitely. This is a genuinely new bound, not a tightened existing one.
-const COMPLETE_BUDGET: AiBudgetLimits = {
-  label: 'scriptide-complete',
-  maxAttempts: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_COMPLETE_MAX_ATTEMPTS', 1),
-  timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_COMPLETE_TIMEOUT_MS', 30_000),
 };
 
 // /api/analyze-script: one analysis call (45s) then image+audio generation
@@ -695,7 +684,7 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
   }
 }));
 
-// ── Keyless guard for the seven generation-only ScriptIDE routes ───────────
+// ── Keyless guard for the remaining generation-only ScriptIDE routes ───────
 // The server's front door is analysis-only (no AI key). These routes call the
 // LLM directly, so with no key configured generateContent throws and the route
 // 500s — a NORTH_STAR "honest degradation" violation. Degrade to a labeled
@@ -706,150 +695,12 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
 const KEYLESS_AI_NOTE =
   'This AI feature needs a model key — add one in Settings to enable it.';
 
-// ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
-// G0-03: this was the one generation route with no llmReady() guard at all —
-// every other generative route in this file degrades honestly when keyless;
-// this one instead reached generateContentStream() unconditionally, which
-// throws with no key and gets caught by the route's own try/catch as an SSE
-// `{type:'error'}` event after a 200 had already been flushed. Guard before
-// any header is written, matching /api/analyze-script's 503 JSON shape
-// (the other keyless generation routes return 200 + `{usedLLM:false}` since
-// they have a natural non-streaming success shape to degrade into; this
-// SSE route doesn't, so it degrades exactly like analyze-script instead).
-router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
-  if (!llmReady()) { res.status(503).json({ error: KEYLESS_AI_NOTE }); return; }
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
-  let disconnected = false;
-  let ended = false;
-  req.on('close', () => { disconnected = true; });
-  req.on('error', () => { disconnected = true; });
-  const emitSSE = (data: unknown) => {
-    if (!disconnected && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);
-  };
-  const ensureEnded = () => { if (!ended) { ended = true; res.end(); } };
-
-  try {
-    const q = req.query as Record<string, string>;
-    const rawPrefix    = typeof q['prefix']       === 'string' ? q['prefix']       : '';
-    const rawSuffix    = typeof q['suffix']       === 'string' ? q['suffix']       : '';
-    const dirStyle     = typeof q['directorStyle'] === 'string' ? q['directorStyle'] : '';
-    const genre        = typeof q['genre']        === 'string' ? q['genre']        : '';
-    const charNames    = typeof q['characters']   === 'string'
-      ? q['characters'].split(',').filter(Boolean).slice(0, 30)
-      : [];
-    const personaId    = typeof q['persona']      === 'string' ? q['persona']      : '';
-
-    if (rawPrefix.length < 10) {
-      emitSSE({ type: 'done' });
-      ensureEnded();
-      return;
-    }
-
-    // P9: resolve the active copilot persona (custom voice / genre specialist).
-    // The persona's preamble replaces the generic lead-in and its sampling knobs
-    // override the route defaults.
-    const persona = getPersona(personaId);
-    const personaLead = persona ? personaPromptBlock(persona) : 'You are an expert screenplay writer. Continue the Fountain-format screenplay from where the cursor is.';
-
-    // Sanitize all user-controlled strings before embedding in the prompt (C1)
-    const prefix  = sanitizeForPrompt(rawPrefix,  4000);
-    const suffix  = sanitizeForPrompt(rawSuffix,  1000);
-
-    // P8: use the full composed modifier (synergy override when available) instead
-    // of the simple "DIRECTOR STYLE: X" / "GENRE: Y" string fragments.
-    //
-    // Validity checks against the SAME live roster tables every other genre/
-    // style-consuming route in this codebase uses (validation.ts's
-    // StoryGenreBodySchema/DirectorStyleBodySchema both refine on
-    // `k in GENRE_NAMES` / `k in STYLE_MODIFIERS`) — not a separately
-    // hand-maintained literal list. This used to be a hardcoded 8-genre/
-    // 6-style allowlist left over from before the genre-completion wave
-    // (engine/types.ts's StoryGenre union: 8 -> 47 members; DirectorStyle:
-    // 6 -> 27), which silently dropped the genre/style modifier block for
-    // every value added since — the inline-copilot completion route was the
-    // one place in the app that still only recognized the original roster.
-    const isValidGenre = (s: string): s is StoryGenre => s in GENRE_NAMES;
-    const isValidStyle = (s: string): s is DirectorStyle => s in STYLE_MODIFIERS;
-    const composedGenre  = isValidGenre(genre)   ? genre   : undefined;
-    const composedStyle  = isValidStyle(dirStyle) ? dirStyle : undefined;
-    const { block: composedBlock } = composePromptModifiers(composedGenre, composedStyle);
-    const stylePreamble = composedBlock ? `${composedBlock}\n` : '';
-    const genrePreamble = '';  // merged into stylePreamble via composePromptModifiers
-    const charPreamble  = charNames.length > 0
-      ? `CHARACTERS ESTABLISHED IN SCRIPT: ${charNames.map(n => sanitizeForPrompt(n, 64)).join(', ')}\n`
-      : '';
-
-    // Grab story bible from the session if available — provides accumulated context
-    const sessionData = sessions.get(sessionId(req));
-    const bibleBlock = (() => {
-      const b = sessionData ? buildStoryBibleSummary(sessionData.stage) : '';
-      return b ? `\nSTORY BIBLE (maintain consistency):\n${b}\n` : '';
-    })();
-
-    // FIM (Fill-In-the-Middle) prompt assembled from the versioned template
-    // registry (M3). All interpolated values are already sanitized above (C1).
-    const prompt = getPrompt('scriptide-complete', {
-      personaLead,
-      stylePreamble,
-      genrePreamble,
-      charPreamble,
-      bibleBlock,
-      prefix,
-      suffix: suffix || '(end of document)',
-    });
-
-    const { generateContentStream, modelForTask: mft } = await import('../engine/ai.ts');
-
-    // TASK 1 (ai-budget): generateContentStream() has NO timeout of its own
-    // when the active provider supports streaming (see COMPLETE_BUDGET's
-    // comment above) — a hung stream could hold this SSE connection open
-    // indefinitely. withAiBudget's abandon-on-timeout deadline is safe here:
-    // this route holds no SessionCommandCoordinator command, and the
-    // existing `disconnected`/`ended` guards on emitSSE/ensureEnded already
-    // make any late writes from an abandoned, still-running stream a no-op.
-    await withAiBudget(COMPLETE_BUDGET, async () => {
-      // Stream tokens via the provider abstraction (testable + metered).
-      // Persona sampling knobs override the route defaults when present.
-      const stream = await generateContentStream({
-        model: mft('GHOST_TEXT'),
-        contents: prompt,
-        config: {
-          maxOutputTokens: persona?.maxOutputTokens ?? 256,
-          temperature: persona?.temperature ?? 0.85,
-        },
-      }, { label: 'scriptide-complete' });
-
-      let hasTokens = false;
-      for await (const chunk of stream) {
-        if (disconnected) break;
-        const token = chunk.text ?? '';
-        if (token) {
-          hasTokens = true;
-          emitSSE({ type: 'token', token });
-        }
-      }
-
-      if (!hasTokens) emitSSE({ type: 'token', token: '' });
-      emitSSE({ type: 'done' });
-    });
-  } catch (err) {
-    if (isAiBudgetExceededError(err)) {
-      emitSSE({ type: 'error', message: 'ai_budget_exceeded' });
-    } else {
-      // SECURITY (M2/F2): never forward raw error text to the browser — it can
-      // leak API keys / internal paths / upstream detail. Emit a fixed category
-      // and log the SANITIZED detail server-side only (TASK 2, safe-error).
-      logger.error('sse-error', { route: 'scriptide-complete', ...sanitizeExternalError(err) });
-      emitSSE({ type: 'error', message: 'internal_error' });
-    }
-  } finally {
-    ensureEnded();
-  }
+// The legacy keystroke-triggered inline completion surface is retired. Keep a
+// game-limited compatibility tombstone so old clients fail explicitly without
+// reading draft/session query data, checking provider readiness, or doing work.
+router.get('/api/scriptide/complete', gameLimiter, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(410).json({ error: 'inline_completion_retired' });
 });
 
 // ── Copilot persona routes (P9) ─────────────────────────────────────────────

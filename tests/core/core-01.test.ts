@@ -1419,7 +1419,6 @@ describe('modelForTask', () => {
     assert.equal(modelForTask('AGENT_TURN'), fast);
     assert.equal(modelForTask('EPISTEMICS'), fast);
     assert.equal(modelForTask('ACTION'), fast);
-    assert.equal(modelForTask('GHOST_TEXT'), fast);
   });
 
   it('routes quality-critical single-shot tasks to the pro tier', () => {
@@ -2572,7 +2571,7 @@ describe('ai — LLM provider seam', () => {
     }
   });
 
-  it('generateContentStream yields each provider chunk in order (P1 ghost text)', async () => {
+  it('generateContentStream yields each provider chunk in order for remaining streaming workflows', async () => {
     setLLMProvider({
       generate: async () => ({ text: 'X' } as never),
       generateStream: async () => {

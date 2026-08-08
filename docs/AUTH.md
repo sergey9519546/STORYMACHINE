@@ -14,8 +14,10 @@ Each browser profile stores a random session id (`crypto.randomUUID()`-derived,
 share it. When storage is unavailable, the client falls back to an in-memory
 id for that tab lifetime only. The id is sent on every `/api/*` request via
 the `X-Session-Id` header (or `?sessionId=`/body `sessionId` for explicit/SSE
-call sites — see `server/lib/session-store.ts`'s `sessionId()` for the full
-precedence).
+call sites such as `/api/run-room-stream` — see
+`server/lib/session-store.ts`'s `sessionId()` for the full precedence). The
+former URL-based inline-completion surface is retired and its compatibility
+route performs no session lookup or provider work.
 The server keys all per-user state — simulation `Stage`, agents, action log,
 in-flight editor state — off that id (`getOrCreateSession()`), with no
 further check of *who* is presenting it.
@@ -48,10 +50,11 @@ no account record, no way to prove "this session belongs to user X" beyond
   anyone who obtains it can act as that session with no further check —
   there's no secondary factor, no binding to an IP/device/cookie-with-
   `HttpOnly`-flag. Leak vectors that matter in practice:
-  - **Shared links.** SSE/GET call sites carry the id as `?sessionId=` in
-    the URL (custom headers aren't available to `EventSource`) — a URL a
-    writer pastes into Slack, email, or a support ticket now hands out their
-    session.
+  - **Shared links.** Remaining SSE/GET call sites such as
+    `/api/run-room-stream` carry the id as `?sessionId=` in the URL (custom
+    headers aren't available to `EventSource`) — a URL a writer pastes into
+    Slack, email, or a support ticket now hands out their session. Inline
+    completion is retired and is no longer one of these call sites.
   - **Logs.** This is the existing log-hygiene tripwire: `server/app.ts`'s
     request logger and error handler both deliberately log `req.path`
     (Express's parsed pathname, which structurally excludes the query

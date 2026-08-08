@@ -11,8 +11,8 @@
 // into. When `enabled` is false (the default a caller should pass), no timer
 // is scheduled at all — `run` is never invoked, so there is zero possibility
 // of the debounced analysis firing, regardless of how much or how long the
-// user types. This mirrors G0-03's inlineCompletionExtension(): the decision
-// lives in a plain, JSX-free module so it can be unit-tested directly (no
+// user types. The decision lives in a plain, JSX-free module so it can be
+// unit-tested directly (no
 // React/JSDOM in this repo's test runner), and the UI component (ScriptIDE.tsx,
 // which cannot itself be imported under `node --experimental-strip-types`)
 // just calls it.

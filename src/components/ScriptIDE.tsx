@@ -383,17 +383,11 @@ export default function ScriptIDE({
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
   );
-  // G0-03: inline AI ghost-text completion — off by default, same rationale
-  // as Live Notes above (a keyless-by-default provider feature the writer
-  // has to opt into, not one that fires on every debounced keystroke).
-  const [inlineCompletion, setInlineCompletion] = useState(
-    () => lsGet("inline_completion") === "1"
-  );
   // G0-04: idle/background AI analysis (triggerAnalysis, fired 2s after the
   // last keystroke via handleScriptChange below) — off by default. It POSTs
   // /api/analyze-script, which runs generateContent + image + TTS provider
-  // calls in parallel, so it must stay opt-in the same way Live Notes and
-  // inline completion are. Explicit "Analyze" actions elsewhere still call
+  // calls in parallel, so it must stay opt-in. Explicit "Analyze" actions
+  // elsewhere still call
   // triggerAnalysis directly and are unaffected by this flag.
   const [autoAnalysis, setAutoAnalysis] = useState(
     () => lsGet("auto_analysis") === "1"
@@ -446,7 +440,7 @@ export default function ScriptIDE({
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulateStatus, setSimulateStatus] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
   const simulateStatusTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // P9: inline copilot persona (custom ghost-text voice/specialty).
+  // P9: explicit Copilot persona selection (custom voice/specialty).
   const [copilotPersona, setCopilotPersona] = useState<string>(() => lsGet("copilot_persona") || "default");
   const [personaList, setPersonaList] = useState<Array<{ id: string; name: string; description: string }>>([]);
   // P4: real-time collaboration room.
@@ -454,8 +448,8 @@ export default function ScriptIDE({
   const [collabUserName, setCollabUserName] = useState<string>(() => lsGet("collab_username") || "Writer");
   const [collabInput, setCollabInput] = useState("");
   const [collabNameInput, setCollabNameInput] = useState("");
-  // Keyless-honesty banner (finding E): whether generation-dependent features
-  // (copilot, simulation turns, rewriting) have an AI key behind them.
+  // Keyless-honesty banner (finding E): whether explicit generation features
+  // (world-building, simulation turns, rewriting) have an AI key behind them.
   // null = not yet fetched; the banner only ever renders once we know for
   // sure, so first paint never flashes a false "no key" warning.
   const [llmReady, setLlmReady] = useState<boolean | null>(null);
@@ -1171,11 +1165,6 @@ export default function ScriptIDE({
     lsSet("live_diagnostics", liveDiagnostics ? "1" : "0");
   }, [liveDiagnostics]);
 
-  // Persist the inline-completion toggle the same way (G0-03).
-  useEffect(() => {
-    lsSet("inline_completion", inlineCompletion ? "1" : "0");
-  }, [inlineCompletion]);
-
   // Persist the auto-analysis toggle the same way (G0-04).
   useEffect(() => {
     lsSet("auto_analysis", autoAnalysis ? "1" : "0");
@@ -1772,7 +1761,6 @@ export default function ScriptIDE({
           isAnalyzing={engineState.isAnalyzing}
           directorsLayer={directorsLayer}
           liveDiagnostics={liveDiagnostics}
-          inlineCompletion={inlineCompletion}
           autoAnalysis={autoAnalysis}
           wordCount={stats.wordCount}
           pageCount={pageCount}
@@ -1786,7 +1774,6 @@ export default function ScriptIDE({
           onOpenSlate={() => openToolSlot("slate")}
           onOpenStudio={() => openToolSlot("studio")}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
-          onToggleInlineCompletion={() => setInlineCompletion((prev) => !prev)}
           onToggleAutoAnalysis={() => setAutoAnalysis((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound((prev) => {
@@ -2036,7 +2023,7 @@ export default function ScriptIDE({
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
         >
           {/* CodeMirror 6 editor — replaces the textarea + syntax-highlight overlay.
-              Syntax highlighting, inline AI ghost-text, and Fountain keybindings
+              Syntax highlighting, screenplay autocomplete, and Fountain keybindings
               are all handled as CM6 extensions inside FountainEditor. */}
           <FountainEditor
             ref={editorRef}
@@ -2044,16 +2031,10 @@ export default function ScriptIDE({
             onChange={handleScriptChange}
             onUserEdit={handleUserEdit}
             characters={characters.map(c => c.name)}
-            completionCtx={{
-              directorStyle: initialConfig?.directorStyle,
-              characters: characters.map(c => c.name),
-              persona: copilotPersona,
-            }}
             collabRoom={collabRoom}
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
-            inlineCompletionEnabled={inlineCompletion}
           />
 
           {/* Page furniture — quiet manuscript metadata in the right gutter */}

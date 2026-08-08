@@ -4,11 +4,12 @@ Story Machine's analysis surface (Doctor, diagnose, coverage, what-if, room,
 interview receipts) is **deterministic and needs no key at all** — it is the
 product's front door and boots in analysis-only mode.
 
-The *generation* features (copilot completion, world-build, refine-dialogue,
-clean-action, analyze-tension, and other `/api/scriptide/*` LLM routes) call an
-LLM. You can exercise every one of them **without a paid API** in three ways.
-All three route through the app's existing OpenAI-compatible provider seam —
-no code changes on your side, just environment variables.
+The *generation* features (world-build, refine-dialogue, clean-action,
+analyze-tension, simulation turns, rewrites, and other explicit LLM routes)
+call an LLM. The legacy URL-based inline completion is retired. You can
+exercise the remaining generation workflows **without a paid API** in three
+ways. All three route through the app's existing OpenAI-compatible provider
+seam — no code changes on your side, just environment variables.
 
 ---
 

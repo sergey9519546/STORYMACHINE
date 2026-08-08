@@ -22,7 +22,7 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 
 ## Environment Variables
 
-The server deliberately boots **without any key** into analysis-only mode (the deterministic surface — Script Doctor, coverage export, What-If Lab, Writers' Room, interview receipts — works keyless). Keys are only needed to enable generation (copilot, simulation dialogue, rewrites). See `.env.example` and `docs/LOCAL_AI_TESTING.md` for the authoritative, fully-commented list.
+The server deliberately boots **without any key** into analysis-only mode (the deterministic surface — Script Doctor, coverage export, What-If Lab, Writers' Room, interview receipts — works keyless). Keys are only needed to enable explicit generation workflows such as world-building, simulation dialogue, and rewrites. The legacy URL-based inline completion is retired. See `.env.example` and `docs/LOCAL_AI_TESTING.md` for the authoritative, fully-commented list.
 
 | Variable | Required | Description |
 |---|---|---|

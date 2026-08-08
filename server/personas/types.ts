@@ -1,5 +1,5 @@
 // ── Copilot persona plugin contract (P9) ─────────────────────────────────────
-// A CopilotPersona customizes the inline ghost-text copilot's voice and behavior.
+// A CopilotPersona customizes explicit Copilot voice and behavior.
 // Built-in personas ship as JSON in this directory; users may upload their own.
 //
 // The persona's `systemPreamble` is injected into the completion prompt ahead of
