@@ -1,5 +1,10 @@
 # CRITICAL PATH COMPLETE — Story Graph UI + P0 Ready
 
+> **ARCHIVED STATUS — historical implementation report.** The
+> production-ready and current-status claims below describe the 2026-07-15
+> delivery snapshot, not the project's current phase or evidence state. See
+> `ROADMAP.md` for current truth.
+
 **Date:** 2026-07-15  
 **Status:** ✅ UI Built, ✅ P0 Materials Ready, Ready to Execute  
 

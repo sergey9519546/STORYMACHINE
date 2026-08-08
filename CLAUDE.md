@@ -18,7 +18,7 @@ quality reference, not an instruction to author another wave.
 ## Commands
 
 `npm run dev|build|lint|test` are standard (`lint` = `tsc --noEmit`;
-Node ≥ 22.6). The one non-obvious command:
+Node >=22.13.0 || >=24). The one non-obvious command:
 
 ```
 node --experimental-strip-types tests/<area>/<file>.test.ts   # one file, fast

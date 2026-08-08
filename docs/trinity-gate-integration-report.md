@@ -1,5 +1,9 @@
 # Trinity Gate Integration — Final Report
 
+> **ARCHIVED STATUS — historical experimental integration report.** The
+> production-ready and current-status claims below describe a dated subsystem
+> milestone, not current product authority. See `ROADMAP.md` for current truth.
+
 ## Executive Summary
 
 Successfully completed the full Trinity Gate integration with all 3 verification layers working together. The system now catches plot holes that Story Graph alone would miss, achieving maximum accuracy through multi-layer validation.

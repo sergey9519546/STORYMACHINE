@@ -1,5 +1,9 @@
 # Quantum Narrative Field
 
+> **ARCHIVED STATUS — experimental subsystem record.** The capability and
+> current-status claims below describe a V5 research surface, not current
+> product readiness or direction. See `ROADMAP.md` for current truth.
+
 **StoryMachine V5.0 — Parallel Story-State Management**
 
 Maintains 100-1000 parallel story-states in superposition with automatic probability calculation, entanglement tracking, and Trinity Gate validation.

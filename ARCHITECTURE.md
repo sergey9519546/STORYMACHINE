@@ -35,7 +35,7 @@ Keyless analysis is the product’s front door, not a degraded afterthought.
 
 | Concern | Choice |
 |---|---|
-| Runtime | Node ≥ 22.6 (ESM, `tsx` / `--experimental-strip-types`) |
+| Runtime | Node >=22.13.0 \|\| >=24 (ESM, `tsx` / `--experimental-strip-types`) |
 | HTTP | Express 4 |
 | Persistence | better-sqlite3, one DB per session |
 | Collab | `ws` + Yjs |
