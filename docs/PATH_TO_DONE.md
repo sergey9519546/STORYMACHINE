@@ -134,8 +134,8 @@ explicitly designs for.)*
 explicitly licensed author-contributed drafts) scored by >=3 independent
 experienced readers giving blinded pairwise judgments, with inter-rater
 agreement measured and disagreements preserved, per
-`docs/user-validation/P0_EVIDENCE_SUMMARY.md`'s "Allowed P1 inputs only
-after PASS" and `PRE_REGISTRATION_PROTOCOL.md`.
+`docs/user-validation/P0_EVIDENCE_SUMMARY.md`'s "P1 validity inputs and
+evidence gates" section and `PRE_REGISTRATION_PROTOCOL.md`.
 **WHY IT GATES:** Without this, "P1 passing" only ever means "the score
 notices its own mechanical damage" — never that it agrees with a reader's
 taste, which is what the product actually claims. `docs/p1-benchmark/README.md`
@@ -151,10 +151,12 @@ AGENT-DOABLE once source material and labels exist.
 invented finer estimate given.
 **EVIDENCE REQUIRED:** A pre-registered split, versioned/hashed label
 artifacts, inter-rater agreement statistics, held-out set unavailable for
-implementer tuning — all five items on `P0_EVIDENCE_SUMMARY.md`'s "Allowed
-P1 inputs" list.
-**STATUS:** NOT STARTED. Blocked on task 2 (P0 PASS) per
-`P0_EVIDENCE_SUMMARY.md`: "Until PASS, P1 product/engine work is blocked."
+implementer tuning — all five items in `P0_EVIDENCE_SUMMARY.md`'s P1
+validity-inputs section.
+**STATUS:** The human-label validity study is not started and the P1 gate is
+unmet. Its measurement and preparation work may proceed only under the
+machine-checked evidence gates; it does not substitute for task 2's human P0
+outcome evidence.
 
 ### 4. Close the structural-discrimination gap to >=0.80 on real writing
 

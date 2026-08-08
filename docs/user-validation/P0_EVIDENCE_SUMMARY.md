@@ -219,7 +219,7 @@ outcome verdict. P4 retention/lock-in work remains prohibited until P0 PASS.
 | Session artifacts | `docs/user-validation/sessions/` | Empty; `.gitkeep` only | — |
 | Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` | PLANNED | — |
 | Phase tracker | `docs/user-validation/PHASE_TRACKER.md` | P0 ACTIVE | — |
-| P1 baseline inventory | `docs/user-validation/P1_BASELINE_INVENTORY.md` | Inventory only; P1 blocked | — |
+| P1 baseline inventory | `docs/user-validation/P1_BASELINE_INVENTORY.md` | Inventory only; P1 measurement is evidence-gated and its validity gate is unmet (P0: 0/5, no verdict; P4 remains barred) | — |
 | Canonical sequencing and gates | `ROADMAP.md` §3 | Canonical | — |
 | Short execution brief | `ULTRAPLAN.md` §1 | Canonical summary | — |
 
