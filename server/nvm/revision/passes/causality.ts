@@ -607,6 +607,15 @@
 // based speaker/protagonist detection) duplicated here rather than added to lib/checks.ts,
 // which is reserved for numeric analytical-mode templates, not lexicon extraction — matches
 // the precedent of theme.ts's buildSceneText (Wave 130) and dialogue.ts's extractDialogue.
+// 2026-08-07 addition — INVERSE_CHEKHOV_GUN: the mirror image of Wave 166's CHEKHOV_GUN_
+// UNFIRED. A concrete weapon/tool/device that first appears in the story's peak-intensity
+// scene and is actively used to resolve it, with zero prior mention anywhere earlier in the
+// script — a payoff with no setup, rather than a setup with no payoff. Added in response to
+// a proven gap: the 2026-08-07 pilot session's sidekick produced a concealed cutting blade at
+// the climax with no prior setup, and none of CHEKHOV_GUN_UNFIRED/SETUP_PAYOFF_IMBALANCE/
+// PAYOFF_ORPHAN_RATE (all forward-direction only) caught it. Lives in the Wave 1191
+// infrastructure block below (reuses its composite per-scene text) rather than starting a new
+// one. See that block's own header comment for the full precision-guard rationale.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -7304,6 +7313,95 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
               suggestedFix: `Give ${protagonistName1191b} at least one real defeat: a plan that fails, a cost that lands, a moment where losing is genuinely on the table and happens.`,
             });
           }
+        }
+      }
+    }
+
+    // ── INVERSE_CHEKHOV_GUN (2026-08-07, pilot session gap) ─────────────────────────
+    // The mirror image of CHEKHOV_GUN_UNFIRED (above, Wave 166): a concrete weapon/
+    // tool/device that surfaces for the FIRST time in the story's peak-intensity scene
+    // and is actively wielded to resolve or materially alter that scene's outcome, with
+    // zero prior mention anywhere earlier in the script. Proven gap: the 2026-08-07
+    // pilot session's sidekick produced a concealed cutting blade at the climax, never
+    // shown/mentioned/hinted at in five prior appearances, and nothing in the existing
+    // CHEKHOV_GUN_UNFIRED/SETUP_PAYOFF_IMBALANCE/PAYOFF_ORPHAN_RATE trio caught it —
+    // see pilot-session-2026-08-07/PILOT_SESSION_REPORT.md §5 MISS.
+    //
+    // Distinct from COINCIDENCE_RESOLUTION (above, this wave): that check requires an
+    // EXISTING payoffSetupIds entry (a formally tracked thread) AND coincidence-lexicon
+    // phrasing ("suddenly", "by chance"...) AND a brand-new PROPER noun (capitalized —
+    // named characters/places). This check requires none of those: an unearned
+    // capability is never seeded as a clue in the first place, so payoffSetupIds is
+    // always empty for it, and the writer isn't claiming coincidence — they simply never
+    // planted the object. Distinct from the clue-lifecycle pipeline entirely (fountain-
+    // analyzer.ts's CHEKHOV_GUN_UNFIRED/SETUP_PAYOFF_IMBALANCE machinery): that pipeline
+    // requires either exact-token (CAPS/quoted) emphasis or 2+ occurrences or explicit
+    // "unknown"-marker language before a single mention counts as a promise at all — by
+    // design, to avoid false-firing on ordinary scene description (see fountain-
+    // analyzer.ts's own "a knife flashes!" counterexample). A single unmarked mention at
+    // the climax structurally cannot reach that pipeline, which is exactly the blind
+    // spot this rule exists to cover from the opposite direction.
+    //
+    // Precision guards, applied in order: (1) requires records.length >= 8 and gates to
+    // the single scene with the highest suspenseDelta in the final 30% of the story —
+    // the same climax-zone convention PROTAGONIST_PASSIVITY_CLIMAX uses in structure.ts,
+    // so this fires only on the scene the report already treats as decisive, never an
+    // arbitrary late scene; (2) the noun must come from a small, deliberately narrow
+    // lexicon of unambiguous physical weapon/tool nouns — NOT CLUE_ANCHOR_NOUNS from
+    // fountain-analyzer.ts (that list is tuned and calibrated for the forward-direction
+    // pipeline; importing it here would couple this brand-new rule's precision to a
+    // calibration budget spent on a different problem) — and deliberately excludes
+    // idiom-prone words (gun, key, code, chip, trigger, remote, switch) that would
+    // false-fire on figurative use ("the key to the plan", "gun it"); (3) an
+    // instrumental-use verb (telescopes, shears, unlocks, wields...) must land in the
+    // SAME SENTENCE as the noun, not merely the same scene, using the composite scene
+    // text this block already builds (sceneTextRaw1191); (4) the noun (singular or
+    // simple plural) must not appear ANYWHERE in the composite text of any EARLIER
+    // scene — genuine absence, not merely unresolved. Measured on the 73-script real
+    // corpus before shipping — see docs/p1-benchmark/MEASUREMENT_RECEIPTS.md.
+    if (records.length >= 8) {
+      const n1420 = records.length;
+      const climaxZoneStart1420 = Math.floor(n1420 * 0.7);
+      let peakScene1420 = -1;
+      let peakSuspense1420 = -Infinity;
+      for (let i = climaxZoneStart1420; i < n1420; i++) {
+        const s1420 = records[i].suspenseDelta ?? 0;
+        if (s1420 > peakSuspense1420) { peakSuspense1420 = s1420; peakScene1420 = i; }
+      }
+
+      if (peakScene1420 >= 0) {
+        // Deliberately narrow: unambiguous physical weapon/tool/device nouns only.
+        // Excludes multi-purpose or idiom-prone words (gun, key, code, chip, trigger,
+        // remote, switch, weapon) that would false-fire on figurative or generic use.
+        const INSTRUMENT_NOUNS_1420 = [
+          'blade', 'knife', 'dagger', 'sword', 'pistol', 'revolver', 'rifle', 'taser',
+          'grenade', 'blaster', 'detonator', 'antidote', 'serum', 'lockpick', 'scalpel',
+          'machete', 'hatchet',
+        ];
+        const useVerbRe1420 = /\b(telescopes?|telescoping|telescoped|unsheathes?|unsheathing|slices?|slicing|sliced|shears?|shearing|sheared|stabs?|stabbing|stabbed|slashes?|slashing|slashed|swings?|swinging|swung|wields?|wielding|wielded|draws?|drawing|drawn|fires?|firing|fired|shoots?|shooting|unlocks?|unlocking|unlocked|disarms?|disarming|disarmed|frees?|freeing|freed|activates?|activating|activated|deploys?|deploying|deployed)\b/;
+        const sentenceSplitRe1420 = /[^.!?]+[.!?]+|[^.!?]+$/g;
+        const peakSentences1420 = (sceneTextRaw1191[peakScene1420].match(sentenceSplitRe1420) ?? [sceneTextRaw1191[peakScene1420]])
+          .map(sent => sent.toLowerCase());
+        const earlierTextBlob1420 = sceneTextLower1191.slice(0, peakScene1420).join(' \n ');
+
+        let matchedNoun1420: string | null = null;
+        let matchedSentence1420: string | null = null;
+        for (const noun of INSTRUMENT_NOUNS_1420) {
+          const nounRe1420 = new RegExp(`\\b${noun}s?\\b`, 'i');
+          if (nounRe1420.test(earlierTextBlob1420)) continue; // genuine-absence guard failed
+          const hitSentence1420 = peakSentences1420.find(sent => nounRe1420.test(sent) && useVerbRe1420.test(sent));
+          if (hitSentence1420) { matchedNoun1420 = noun; matchedSentence1420 = hitSentence1420.trim(); break; }
+        }
+
+        if (matchedNoun1420 && matchedSentence1420) {
+          const snippet1420 = matchedSentence1420.length > 140 ? `${matchedSentence1420.slice(0, 140)}…` : matchedSentence1420;
+          issues.push({
+            location: `Scene ${peakScene1420 + 1} (climax peak)`,
+            rule: 'INVERSE_CHEKHOV_GUN',
+            description: `Scene ${peakScene1420 + 1} — the story's peak-intensity scene (suspense ${peakSuspense1420.toFixed(1)}) — resolves the moment using "${matchedNoun1420}" ("${snippet1420}"), but "${matchedNoun1420}" never appears anywhere in the script before this scene. The payoff has no setup: an inverse Chekhov's gun.`,
+            severity: 'major',
+            suggestedFix: `Plant "${matchedNoun1420}" earlier — a glimpse, a line of dialogue, or a scene establishing it exists — so this capability reads as earned rather than a last-minute reveal.`,
+          });
         }
       }
     }
