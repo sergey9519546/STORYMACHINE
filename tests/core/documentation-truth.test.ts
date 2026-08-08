@@ -18,8 +18,30 @@ const LEGACY_REPORTS = [
   'server/planning/IMPLEMENTATION_SUMMARY.md',
 ];
 
-function assertCurrentPhaseTruth(document: string, label: string) {
-  const normalized = document.replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
+function extractFirstScreenBanner(document: string, label: string) {
+  const firstScreenLines = document.split(/\r?\n/).slice(0, 24);
+  const start = firstScreenLines.findIndex((line) => /^>\s?/.test(line));
+  assert.notEqual(start, -1, `${label} needs a first-screen banner block`);
+
+  const bannerLines: string[] = [];
+  for (let index = start; index < firstScreenLines.length; index += 1) {
+    const line = firstScreenLines[index];
+    if (!/^>\s?/.test(line)) break;
+    bannerLines.push(line.replace(/^>\s?/, ''));
+  }
+
+  assert.ok(bannerLines.length > 0, `${label} needs a non-empty first-screen banner block`);
+  return bannerLines.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function extractCurrentStatusBlock(document: string, label: string) {
+  const banner = extractFirstScreenBanner(document, label);
+  assert.match(banner, /current (?:truth|status)/i, `${label} must identify this banner as current status`);
+  return banner;
+}
+
+function assertCurrentPhaseTruth(statusBlock: string, label: string) {
+  const normalized = statusBlock.replace(/\s+/g, ' ');
   assert.match(normalized, /P0 fielding is GO/i, `${label} must state that P0 fielding is GO`);
   assert.match(normalized, /0 valid documented human sessions/i, `${label} must state the documented session count`);
   assert.match(normalized, /no (?:P0 )?outcome verdict/i, `${label} must not imply a P0 verdict`);
@@ -35,12 +57,59 @@ function assertCurrentPhaseTruth(document: string, label: string) {
   );
 }
 
+function assertLegacyAuthorityBanner(document: string, label: string) {
+  const banner = extractFirstScreenBanner(document, label);
+  assert.match(banner, /(?:archiv|histor|experimental)/i, `${label} needs an archival or historical designation`);
+  assert.match(
+    banner,
+    /(?:production-ready|production targets|product readiness|current-(?:status|state)|current direction).{0,240}\bnot\b.{0,120}(?:current|product|direction|authority|readiness|phase|evidence)/i,
+    `${label} must disclaim its production-ready or current-status claims in the banner`,
+  );
+  assert.match(banner, /ROADMAP\.md/, `${label} must name ROADMAP.md in the same banner`);
+  assert.match(banner, /current (?:truth|status|authority|direction)/i, `${label} must identify ROADMAP.md as current authority`);
+}
+
+test('phase truth cannot be supplied by facts appended outside a weak status block', () => {
+  const weakenedDocument = `# Execution guide
+
+> **Current status.** This block contains no phase facts.
+
+P0 fielding is GO with 0 valid documented human sessions and no P0 outcome verdict.
+P1 is active/partial, may run in parallel, never substitutes for P0 human evidence,
+and its exit gate is not met. P2 and P3 are complete. P4 remains blocked until
+P0 PASS and the required P1 evidence.
+`;
+
+  assert.throws(
+    () => assertCurrentPhaseTruth(extractCurrentStatusBlock(weakenedDocument, 'synthetic weakened document'), 'synthetic weakened document'),
+    /must state that P0 fielding is GO/,
+  );
+});
+
+test('legacy banner truth cannot be assembled from scattered first-screen keywords', () => {
+  const weakenedDocument = `# Legacy report
+
+> **ARCHIVED STATUS.** Historical implementation record.
+
+The current-status claims are not current product authority.
+See ROADMAP.md for current truth.
+`;
+
+  assert.throws(
+    () => assertLegacyAuthorityBanner(weakenedDocument, 'synthetic weakened legacy report'),
+    /must disclaim its production-ready or current-status claims in the banner/,
+  );
+});
+
 test('active execution guidance states the canonical phase truth without stale gates', () => {
   const ultraplans = read('ULTRAPLAN.md');
   const inventory = read('docs/user-validation/P1_BASELINE_INVENTORY.md');
 
-  assertCurrentPhaseTruth(ultraplans, 'ULTRAPLAN.md');
-  assertCurrentPhaseTruth(inventory, 'P1_BASELINE_INVENTORY.md');
+  assertCurrentPhaseTruth(extractCurrentStatusBlock(ultraplans, 'ULTRAPLAN.md'), 'ULTRAPLAN.md');
+  assertCurrentPhaseTruth(
+    extractCurrentStatusBlock(inventory, 'P1_BASELINE_INVENTORY.md'),
+    'P1_BASELINE_INVENTORY.md',
+  );
 
   assert.doesNotMatch(ultraplans, /P0 blocks new product and engine work/i);
   assert.doesNotMatch(ultraplans, /P1 begins only after P0 clears/i);
@@ -50,11 +119,10 @@ test('active execution guidance states the canonical phase truth without stale g
 
 test('the old P1 inventory is clearly historical and cannot restate stale current truth', () => {
   const inventory = read('docs/user-validation/P1_BASELINE_INVENTORY.md');
-  const firstScreen = inventory.split(/\r?\n/).slice(0, 24).join('\n');
+  const statusBlock = extractCurrentStatusBlock(inventory, 'P1_BASELINE_INVENTORY.md');
 
-  assert.match(firstScreen, /pre-P1 historical snapshot/i);
-  assert.match(firstScreen, /ROADMAP\.md/);
-  assert.match(firstScreen, /current (?:truth|status|authority)/i);
+  assert.match(statusBlock, /pre-P1 historical snapshot/i);
+  assert.match(statusBlock, /ROADMAP\.md/);
   assert.doesNotMatch(inventory, /P1 HAS NOT STARTED/i);
   assert.doesNotMatch(inventory, /P1 remains \*\*not started\*\*/i);
   assert.doesNotMatch(inventory, /8,917/);
@@ -73,10 +141,7 @@ test('the discrimination baseline separates pre-deduction results from final tes
 
 test('discoverable legacy reports identify their authority and historical status near the top', () => {
   for (const relativePath of LEGACY_REPORTS) {
-    const firstScreen = read(relativePath).split(/\r?\n/).slice(0, 24).join('\n');
-    assert.match(firstScreen, /(?:archiv|histor|experimental)/i, `${relativePath} needs an archival-status banner`);
-    assert.match(firstScreen, /ROADMAP\.md/, `${relativePath} must point to ROADMAP.md`);
-    assert.match(firstScreen, /current (?:truth|status|authority|direction)/i, `${relativePath} must identify current authority`);
+    assertLegacyAuthorityBanner(read(relativePath), relativePath);
   }
 });
 
