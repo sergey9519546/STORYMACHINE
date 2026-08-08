@@ -7,9 +7,9 @@
 // (server/nvm/analyze/doctor.ts and friends). It only shapes what generation
 // prompts ask the model to attempt; it never touches how a script is judged.
 //
-// Source: data/craft/CRAFT_SPEC_V1.md, distilled from close reading of 22
-// professional screenplays (8 animation, 14 live-action). That document
-// states directives only — no screenplay text is reproduced there or here.
+// Static guidance source: this checked-in module is the complete supported
+// static prompt-guidance source. It does not read data/craft/** and does not
+// imply shipped KB retrieval or measured output quality.
 //
 // Integration note: this module was added as a user-directed, explicitly
 // approved exception to the ROADMAP P0 "validate with real writers before

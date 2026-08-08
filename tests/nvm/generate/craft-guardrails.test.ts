@@ -7,14 +7,35 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..', '..');
 const GENERATE_DIR = join(REPO_ROOT, 'server', 'nvm', 'generate');
+const CRAFT_V2_MARKERS = [
+  'craft-spec',
+  'buildCraftPromptSection',
+  'craftSpecEnabled',
+  'SceneCraftContext',
+  'looksLikeAnimationGenre',
+  'CRAFT_SPEC_VERSION',
+  'CRAFT_SPEC',
+  'CraftSpec',
+  'CraftSection',
+  'CraftPromptOptions',
+  'SCENE-RELEVANT EMPHASIS',
+];
+const EXPECTED_CRAFT_PROMPT_FILES = [
+  join(GENERATE_DIR, 'craft-spec.ts'),
+  join(GENERATE_DIR, 'proof-spec.ts'),
+  // Pre-existing server-side direct-generation prompt consumer (5018fe5):
+  // retains static guidance on its private LLM call without publishing config
+  // or adding a Craft-v2 route. Every other route remains protected below.
+  join(REPO_ROOT, 'server', 'routes', 'scriptide.ts'),
+];
 
-function listTsFiles(dir: string): string[] {
+function listTypeScriptFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap(entry => {
     const path = join(dir, entry);
     return statSync(path).isDirectory()
-      ? listTsFiles(path)
-      : extname(entry) === '.ts'
+      ? listTypeScriptFiles(path)
+      : ['.ts', '.tsx'].includes(extname(entry))
         ? [path]
         : [];
   });
@@ -31,7 +52,7 @@ test('craft guardrail: generation does not import deterministic scoring modules'
   ];
   const violations: string[] = [];
 
-  for (const file of listTsFiles(GENERATE_DIR)) {
+  for (const file of listTypeScriptFiles(GENERATE_DIR)) {
     const source = readFileSync(file, 'utf8');
     for (const modulePath of forbidden) {
       const escaped = modulePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -50,27 +71,48 @@ test('craft guardrail: craft-spec is pure static prompt construction', () => {
   assert.doesNotMatch(source, /generateContent|makeLLM|@google|geminiProvider/i);
 });
 
-test('craft guardrail: scene routing does not enter scoring, routes, public config, or client code', () => {
-  const protectedFiles = [
-    ...listTsFiles(join(REPO_ROOT, 'server', 'nvm', 'analyze')),
-    ...listTsFiles(join(REPO_ROOT, 'server', 'nvm', 'quality')),
-    ...listTsFiles(join(REPO_ROOT, 'server', 'nvm', 'proof')),
-    ...listTsFiles(join(REPO_ROOT, 'server', 'routes')),
-    join(REPO_ROOT, 'server', 'lib', 'ai-config.ts'),
-    ...listTsFiles(join(REPO_ROOT, 'src')),
+test('craft guardrail: source enumeration includes client .tsx files', () => {
+  const clientFiles = listTypeScriptFiles(join(REPO_ROOT, 'src'));
+  assert.ok(
+    clientFiles.includes(join(REPO_ROOT, 'src', 'components', 'SettingsPanel.tsx')),
+    'client .tsx files must be included in source isolation checks',
+  );
+});
+
+test('craft guardrail: craft-v2 stays in explicitly allowed server prompt files', () => {
+  const promptFiles = [
+    ...listTypeScriptFiles(GENERATE_DIR),
+    join(REPO_ROOT, 'server', 'routes', 'scriptide.ts'),
   ];
-  const violations = protectedFiles.filter(file => {
+  const craftV2Files = promptFiles.filter(file => {
     const source = readFileSync(file, 'utf8');
-    return /SceneCraftContext|SCENE-RELEVANT EMPHASIS/.test(source);
+    return CRAFT_V2_MARKERS.some(marker => source.includes(marker));
   });
-  assert.deepEqual(violations, []);
+
+  assert.deepEqual(craftV2Files, EXPECTED_CRAFT_PROMPT_FILES);
+});
+
+test('craft guardrail: only the explicit direct-generation exception may contain Craft markers in protected trees', () => {
+  const protectedFiles = [
+    ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'nvm', 'analyze')),
+    ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'nvm', 'quality')),
+    ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'nvm', 'proof')),
+    ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'routes')),
+    join(REPO_ROOT, 'server', 'lib', 'ai-config.ts'),
+    ...listTypeScriptFiles(join(REPO_ROOT, 'src')),
+  ];
+  const craftMarkerFiles = protectedFiles.filter(file => {
+    const source = readFileSync(file, 'utf8');
+    return CRAFT_V2_MARKERS.some(marker => source.includes(marker));
+  });
+  assert.deepEqual(craftMarkerFiles, [join(REPO_ROOT, 'server', 'routes', 'scriptide.ts')]);
 });
 
 test('craft guardrail: the kill switch stays out of public config and client code', () => {
   const publicSurface = [
     join(REPO_ROOT, 'server', 'lib', 'ai-config.ts'),
-    ...listTsFiles(join(REPO_ROOT, 'server', 'routes')),
-    ...listTsFiles(join(REPO_ROOT, 'src')),
+    ...listTypeScriptFiles(join(REPO_ROOT, 'server', 'routes')),
+    ...listTypeScriptFiles(join(REPO_ROOT, 'src')),
   ];
   const violations = publicSurface.filter(file =>
     readFileSync(file, 'utf8').includes('STORYMACHINE_DISABLE_CRAFT_SPEC'),
