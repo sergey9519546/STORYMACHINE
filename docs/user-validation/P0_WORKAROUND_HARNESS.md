@@ -1,7 +1,9 @@
 # P0 Validation Workaround Harness — 24-Hour Async Batch Execution
 
 **Date:** August 5, 2026  
-**Status:** Certified & Ready for Deployment  
+**Status:** **SUPERSEDED — do not use as current P0 protocol.** Fielding is
+authorized, but there are zero valid human sessions and no P0 outcome verdict;
+use `P0_OPERATING_KIT.md`, `ROADMAP.md` §3, and `P0_QUICK_START.md` instead.
 **Authority:** Operationalizes [`P0_OPERATING_KIT.md`](file:///c:/Users/serge/OneDrive/Documents/MAIN_StoryMachine_Engine_Logic/STORYMACHINE%20V1%20REPO/STORYMACHINE/docs/user-validation/P0_OPERATING_KIT.md) and [`ROADMAP.md`](file:///c:/Users/serge/OneDrive/Documents/MAIN_StoryMachine_Engine_Logic/STORYMACHINE%20V1%20REPO/STORYMACHINE/ROADMAP.md) §3 without violating constitutional boundaries.
 
 ---
@@ -16,6 +18,9 @@ It serves the certified static stimulus ([`sample-coverage-report.html`](file://
 - **Script:** `Dead Frequency` (`data/screenplays/dead-frequency.fountain`)
 - **Health:** 78.3 | **Verdict:** CONSIDER | **Scene Count:** 12
 - **Content Hash:** `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`
+- **Current generated artifact:** 207,740 bytes (regenerated 2026-08-08 via
+  `npm run generate-p0-sample`; the hash/health/verdict/scene count above are
+  current)
 - **Smoke Check:** `scripts/smoke-p0-live-flow.mjs` PASS (Certified Keyless)
 
 ---

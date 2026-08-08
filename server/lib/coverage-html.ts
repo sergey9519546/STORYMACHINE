@@ -819,7 +819,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildFooterSection(report),
   ].join('\n');
 
-  return `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -835,4 +835,8 @@ ${body}
   </div>
 </body>
 </html>`;
+
+  // Generated reports are committed as reproducible artifacts. Keep blank
+  // lines truly blank so a renderer run never needs manual whitespace cleanup.
+  return html.replace(/[ \t]+(?=\r?\n|$)/g, '');
 }

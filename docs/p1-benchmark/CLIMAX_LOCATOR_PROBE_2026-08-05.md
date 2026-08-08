@@ -1,7 +1,20 @@
-# Climax-locator candidate probe — purpose/dramaticTurn don't discriminate either
+# Climax-locator candidate probe — historical pre-tie-break measurement
 
-**Status:** Corroborating measurement, 2026-08-05. Closes two of the three
-candidate directions named in `SUSPENSE_DELTA_DEGENERACY_2026-08-05.md`.
+**Status:** **SUPERSEDED AS CURRENT EVIDENCE (2026-08-08).** The 2026-08-05
+probe selected the first scene at an equal `suspenseDelta` peak (`>`), whereas
+the live analyzer now selects the later equal peak (`>=`). The produced-script
+corpus required to remeasure was not present in this integration worktree, so
+the numeric tables and closure claims below are retained only as historical
+pre-tie-break observations—not current P1 evidence. Re-run
+`node scripts/probe-climax-locators.mjs` against the sanctioned corpus and
+record a receipt before making a current discrimination conclusion.
+
+**Source correction:** `revelation` and `dramaticTurn` are independently
+extracted from each scene's ordered lines before `detectPurpose` is assigned
+(`fountain-analyzer.ts` Phase 1, then Phase 3). They are not position-derived
+through `detectPurpose`; only `purpose` is assigned with that later
+position-aware heuristic. The prior explanation and conclusion below that
+said otherwise are historical and incorrect on this provenance point.
 
 ## The question
 
@@ -68,15 +81,16 @@ This is the **mirror image** of the suspenseDelta problem:
 Neither alone discriminates CLIMAX_RELOCATE. A hybrid (content that both
 travels AND peaks late) does not exist in the current per-scene field set.
 
-## Conclusion: ALL THREE candidate categories closed
+## Historical conclusion (not a current P1 closure)
 
 - **`purpose==='climax'` locator: CLOSED.** Position-assigned, doesn't
   travel. (This also explains why the existing `positionFrac >= 0.85`
   gate in detectPurpose never helped CLIMAX_RELOCATE AUC.)
-- **`revelation`/`dramaticTurn` locator: CLOSED.** Localize late on intact
-  features (good), but — being position-re-derived via the same
-  `detectPurpose`/`positionFrac` machinery — they also don't travel
-  meaningfully under relocation (mean Δ −0.8 to −1.2%, 2/11 scripts).
+- **`revelation`/`dramaticTurn` locator: historical, not closed.** Their
+  previous non-movement figures are not current evidence and the former claim
+  that they were position-re-derived through `detectPurpose` was false: both
+  are independently text-extracted before purpose assignment. A sanctioned
+  remeasurement is required to determine their current relocation behavior.
 - **Causal-link ordering (`story-graph.ts` `forwardEdgeRatio`): CLOSED.**
   Tested 2026-08-05: `forwardEdgeRatio` is **1.000 on all 12 scripts, intact
   AND relocated, identical edge counts** — literally zero signal.
@@ -89,7 +103,7 @@ travels AND peaks late) does not exist in the current per-scene field set.
   change relative to each other. `forwardEdgeRatio` is a promise-payment
   metric, not an ordering metric; it cannot see reordering by construction.
 
-### The fundamental ceiling, now proven exhaustively
+### Historical ceiling claim (requires remeasurement)
 
 Every field in `ScreenplaySceneRecord` is derived from each scene's own
 text. Scene reordering preserves every per-scene field; therefore any
@@ -101,7 +115,8 @@ This is a mathematical ceiling, not a missing rule:
 | Candidate category | Signal | Result | Why |
 |---|---|---|---|
 | Per-scene content | `suspenseDelta` peak | degenerate (0/27 late) | lexicon density, peaks on cold opens |
-| Per-scene position-derived | `purpose`/`revelation`/`turn` | doesn't travel (Δ −0.8%) | re-derived from new position |
+| Purpose tag | `purpose` | historical pre-tie-break result | assigned after extraction with position context |
+| Independent per-scene text | `revelation`/`dramaticTurn` | historical pre-tie-break result | extracted before purpose assignment; requires remeasurement |
 | Inter-scene (from per-scene fields) | `forwardEdgeRatio` | tautologically 1.000 | seed-before-payoff is content-defined |
 
 **No per-scene field, and no inter-scene relationship derived from

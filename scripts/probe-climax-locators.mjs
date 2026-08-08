@@ -44,7 +44,9 @@ for (const f of files) {
 
   // 1. suspenseDelta peak
   let suspP = -1, suspV = -Infinity;
-  recs.forEach((r, i) => { if ((r.suspenseDelta ?? 0) > suspV) { suspV = r.suspenseDelta ?? 0; suspP = i; } });
+  // Match the live structural peak tie-break: a later scene wins an exact
+  // suspense tie, rather than preserving the first scene visited.
+  recs.forEach((r, i) => { if ((r.suspenseDelta ?? 0) >= suspV) { suspV = r.suspenseDelta ?? 0; suspP = i; } });
 
   // 2. last revelation-bearing scene
   let revP = -1;

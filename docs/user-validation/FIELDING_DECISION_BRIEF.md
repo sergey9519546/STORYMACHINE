@@ -277,10 +277,11 @@ suspiciously perfect, not a wall of red.
 | Health | 68.9 | **78.3** |
 | Verdict | CONSIDER | CONSIDER (unchanged) |
 | contentHash | `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` | `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` |
-| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes** |
+| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes at the 2026-08-04 swap** |
 
-The new figures are the current, live provenance — see the 2026-08-04
-addendum in `P0_EVIDENCE_SUMMARY.md` for the fuller re-verification record
-(smoke test, verify-p2-p3-surfaces, honesty-audit, lint, full test suite).
+The score/content figures remain current; the generated HTML was most recently
+regenerated on 2026-08-08 through `npm run generate-p0-sample` at **207,740
+bytes** (contentHash unchanged). See the 2026-08-08 provenance repair in
+`P0_EVIDENCE_SUMMARY.md` for the current artifact record.
 **Zero P0 sessions had been run against the retired stimulus** (the gate
 counter is still 0 of >=5), so this swap loses no session comparability.

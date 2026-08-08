@@ -63,7 +63,8 @@ render path, so for **live-flow** sessions the operating kit's pre-session
 > Newly measured provenance (HEAD `0cf12c9` at swap time): **health 78.3,
 > verdict CONSIDER, sceneCount 12**, contentHash
 > `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`,
-> regenerated `sample-coverage-report.html` is **193,132 bytes**. The old
+> regenerated `sample-coverage-report.html` was **193,132 bytes at the
+> 2026-08-04 swap**. The old
 > stimulus's fountain text is preserved verbatim at
 > `docs/user-validation/ARCHIVED_SAMPLE_THE_SECOND_KEY.md`. Zero P0 sessions
 > had been run against the retired stimulus, so no session comparability is
@@ -71,6 +72,14 @@ render path, so for **live-flow** sessions the operating kit's pre-session
 > figures above byte-identical apart from the runtime datestamp;
 > `scripts/smoke-p0-live-flow.mjs` PASS (zero genuine console errors,
 > keyless); `npm run honesty-audit` clean.
+
+> **Current artifact provenance (2026-08-08):** regenerated with
+> `npm run generate-p0-sample` after the live tie-break/report fixes:
+> health **78.3**, verdict **CONSIDER**, sceneCount **12**, contentHash
+> `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`,
+> and `sample-coverage-report.html` **207,740 bytes**. This updates only the
+> generated report artifact; P0 remains fielding-authorized with **zero valid
+> human sessions** and **no outcome verdict**.
 
 **Exposure caveat:** the static HTML is the *report artifact only*. If your
 session shows only this file (not the live StartScreen → Doctor → export flow),

@@ -442,6 +442,18 @@ function makeRootCause(overrides: Partial<RootCauseFinding> = {}): RootCauseFind
 }
 
 describe('renderCoverageHtml — Root Causes section', () => {
+  it('ends at the closing html tag without trailing whitespace', () => {
+    const html = renderCoverageHtml(buildReport({ rootCauses: [makeRootCause()] }), 'Whitespace-Free Export');
+
+    assert.equal(html, html.trimEnd(), 'generated exports must be reproducible without post-render whitespace cleanup');
+    assert.ok(html.endsWith('</html>'));
+    const trailingWhitespaceLines = html
+      .split('\n')
+      .map((line, index) => ({ line, number: index + 1 }))
+      .filter(({ line }) => /[ \t]+$/.test(line));
+    assert.deepEqual(trailingWhitespaceLines, [], 'no generated line may need manual trailing-whitespace cleanup');
+  });
+
   it('omits the Root Causes section entirely when the report carries no rootCauses field', () => {
     const html = renderCoverageHtml(buildReport(), 'A Draft With No Clustering');
     assert.ok(!html.includes('<h2>Root Causes</h2>'), 'heading must not render when rootCauses is absent');

@@ -1,6 +1,10 @@
 # suspenseDelta peak degeneracy — corroborating measurement
 
-**Status:** Corroborating measurement, 2026-08-05. Sharpens
+**Status:** **HISTORICAL / REQUIRES RE-MEASUREMENT (2026-08-08).** This
+pre-tie-break probe used first-equal-peak selection (`>`), while live code
+now uses later-equal-peak selection (`>=`). Its numeric peak-position and
+closure claims remain historical only until re-run against the sanctioned
+corpus with a receipt. It originally sharpened
 `STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29.md`'s general root cause
 ("per-scene fields are position-blind") with a specific, measured
 degeneracy in the field most climax-detection code reads as a structural
@@ -94,7 +98,7 @@ import { readdirSync, readFileSync } from 'fs';
 for (const f of readdirSync('data/screenplays').filter(f=>f.endsWith('.fountain.txt'))) {
   const a = analyzeFountainText(readFileSync('data/screenplays/'+f,'utf8'));
   const n = a.records.length; if (n<5) continue;
-  let p=-1,v=-Infinity; a.records.forEach((r,i)=>{if((r.suspenseDelta??0)>v){v=r.suspenseDelta??0;p=i}});
+  let p=-1,v=-Infinity; a.records.forEach((r,i)=>{if((r.suspenseDelta??0)>=v){v=r.suspenseDelta??0;p=i}});
   console.log(f.slice(0,30).padEnd(32), 'peak', (p/n*100).toFixed(0)+'%', 'val', v);
 }"
 ```

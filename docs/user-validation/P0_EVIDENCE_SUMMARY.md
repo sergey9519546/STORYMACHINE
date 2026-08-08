@@ -18,7 +18,7 @@ above was fixed.
   human-only work (see `FIELDING_DECISION_BRIEF.md` → "What I will not
   do") and have not yet occurred
 - Study dates: none yet
-- Certified stimulus commit / contentHash: `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` (the "Dead Frequency" stimulus; reproducibility re-verified, see `PHASE_TRACKER.md`)
+- Certified stimulus contentHash: `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` (the "Dead Frequency" stimulus; regenerated 2026-08-08 at 207,740 bytes, see current provenance below)
 - Recruited / scheduled / completed / valid / fully documented: **0 / 0 / 0 / 0 / 0**
 - Required valid documented sessions: **>=5**
 - Pull Signal Tally: not yet available (no sessions)
@@ -294,7 +294,7 @@ the committed stimulus):**
 | Health | 68.9 | **78.3** |
 | Verdict | CONSIDER | CONSIDER |
 | contentHash | `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` | **`a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`** |
-| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes** |
+| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes at the 2026-08-04 swap** |
 
 **Re-verification performed on HEAD `0cf12c9` (the commit whose
 `isDoubleSpaced()` normalizer rekey last shifted the corpus's health
@@ -337,3 +337,16 @@ mutable `demo/corpus/sample-script.fountain`.
 
 Zero P0 sessions had been run against the retired stimulus at the time of
 this swap, so no session comparability is lost.
+
+## Current artifact provenance — 2026-08-08 repair
+
+`npm run generate-p0-sample` regenerated the committed "Dead Frequency"
+artifact through the canonical `runScriptDoctor` + `renderCoverageHtml`
+pipeline after the live equal-peak tie-break and report-rendering repairs.
+The current generated file is **207,740 bytes** with contentHash
+`a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`,
+health **78.3**, verdict **CONSIDER**, and sceneCount **12**. The prior
+193,132-byte figure above is preserved as historical swap-time provenance.
+
+This is artifact provenance only: fielding remains authorized, no valid human
+session is documented, and the P0 outcome gate has no verdict.
