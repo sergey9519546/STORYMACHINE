@@ -6761,4 +6761,64 @@ ${sceneSixBody}
       assert.ok(!result.issues.some(i => i.rule === 'PROTAGONIST_UNTESTED'), 'no negativity anywhere means the absence is not meaningful');
     });
   });
+
+  // ── INVERSE_CHEKHOV_GUN ───────────────────────────────────────────────────────
+  describe('INVERSE_CHEKHOV_GUN', () => {
+    const invChekSlugs = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY`);
+    const invChekFountain = invChekSlugs.map(s => `${s}\n\nSomething happens.`).join('\n\n');
+
+    function baseRecords(lastOverride: Partial<any>) {
+      return [
+        makeRec1191(0, invChekSlugs[0]),
+        makeRec1191(1, invChekSlugs[1]),
+        makeRec1191(2, invChekSlugs[2]),
+        makeRec1191(3, invChekSlugs[3]),
+        makeRec1191(4, invChekSlugs[4]),
+        makeRec1191(5, invChekSlugs[5], { suspenseDelta: 1 }),
+        makeRec1191(6, invChekSlugs[6], { suspenseDelta: 2 }),
+        makeRec1191(7, invChekSlugs[7], { suspenseDelta: 5, ...lastOverride }),
+      ];
+    }
+
+    it('fires when a weapon/tool first appears in the peak-intensity scene and resolves it, with no earlier mention', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = baseRecords({
+        visualBeats: ['A thin cutting blade telescopes out of the housing, freeing her wrist.'],
+      });
+      const result = await causalityPass(makeInput1191(records, invChekFountain));
+      const fired = result.issues.filter(i => i.rule === 'INVERSE_CHEKHOV_GUN');
+      assert.ok(fired.length >= 1, `should fire INVERSE_CHEKHOV_GUN; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.strictEqual(fired[0].severity, 'major');
+      assert.match(fired[0].location, /Scene 8/);
+    });
+
+    it('does NOT fire for a properly set-up payoff (the object was mentioned earlier)', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = baseRecords({
+        visualBeats: ['A thin cutting blade telescopes out of the housing, freeing her wrist.'],
+      });
+      records[0] = { ...records[0], visualBeats: ["A hidden blade glints under the housing's plating."] };
+      const result = await causalityPass(makeInput1191(records, invChekFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'INVERSE_CHEKHOV_GUN'), 'a previously-mentioned object should not fire');
+    });
+
+    it('does NOT fire for a late-introduced but non-instrumental noun (mentioned, not used to resolve anything)', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = baseRecords({
+        visualBeats: ['A rusted blade lies forgotten in the corner, ignored.'],
+      });
+      const result = await causalityPass(makeInput1191(records, invChekFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'INVERSE_CHEKHOV_GUN'), 'a noun with no instrumental-use verb in the same sentence should not fire');
+    });
+
+    it('does NOT fire with fewer than 8 scenes', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = baseRecords({
+        visualBeats: ['A thin cutting blade telescopes out of the housing, freeing her wrist.'],
+      }).slice(0, 7);
+      const shortFountain = invChekSlugs.slice(0, 7).map(s => `${s}\n\nSomething happens.`).join('\n\n');
+      const result = await causalityPass(makeInput1191(records, shortFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'INVERSE_CHEKHOV_GUN'), 'fewer than 8 scenes should not fire (matches PROTAGONIST_PASSIVITY_CLIMAX convention)');
+    });
+  });
 });
