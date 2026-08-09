@@ -934,15 +934,7 @@ export default function ScriptIDE({
     // reruns on every scriptText change), which shows up as real GC pressure
     // on feature-length (90-120pp) scripts. A single char-code scan needs no
     // intermediate array and has no empty-string special case to get wrong.
-    let wordCount = 0;
-    let inWord = false;
-    for (let i = 0; i < scriptText.length; i++) {
-      if (scriptText.charCodeAt(i) > 32) {
-        if (!inWord) { wordCount++; inWord = true; }
-      } else {
-        inWord = false;
-      }
-    }
+        let wordCount = (scriptText.match(/\S+/g) || []).length;
 
     blocks.forEach((block) => {
       if (block.type === "character") {
