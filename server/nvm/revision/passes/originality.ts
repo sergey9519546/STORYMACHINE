@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../../lib/string-utils.ts';
 // Wave 137 — Pass 10: Originality
 // Checks for clichés, generic scene descriptions, and predictable outcomes.
 // Wave 137 additions: emotion-naming in action lines (show-don't-tell violation).

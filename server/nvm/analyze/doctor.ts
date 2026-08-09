@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../lib/string-utils.ts';
 // Script Doctor — half 2 of the bridge described in ./types.ts. Takes raw
 // Fountain text, runs it through the analyzer (half 1) and then all 14
 // revision passes in diagnose-only mode, and aggregates the result into the

@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../lib/string-utils.ts';
 // Script Doctor — Fountain-native heuristic analyzer (half 1 of the bridge
 // described in ./types.ts). Turns raw Fountain text directly into the same
 // ScreenplaySceneRecord[]/StructureState shapes the live NVM screenplay memory

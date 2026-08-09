@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../../lib/string-utils.ts';
 // Wave 138 — Pass 12: Tone/Voice
 // Checks voice consistency: tonal shifts without justification, register
 // mismatches, generic vs. authored prose texture.

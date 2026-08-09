@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../../lib/string-utils.ts';
 // Wave 39 — Pass 4: Belief/Deception
 // Checks belief tracking and deception layers: lies that aren't set up,
 // belief reversals without evidence, deception without consequence.

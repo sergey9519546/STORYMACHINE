@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../../lib/string-utils.ts';
 // Wave 135 — Pass 7: Dialogue/Subtext (Level 1 + Level 2)
 // Level 1: surface pattern matching — on-the-nose, as-you-know, sycophancy,
 //          monologue, trait labeling.

@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../../lib/string-utils.ts';
 // Wave 137 — Pass 8: Rhythm/Prosody
 // Checks sentence rhythm in action lines: monotonous sentence lengths,
 // run-on action blocks, staccato beats that need expansion.

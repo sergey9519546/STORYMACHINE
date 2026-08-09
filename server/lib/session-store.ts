@@ -169,11 +169,11 @@ function boundedIntegerEnv(name: string, fallback: number, min: number, max: num
   const raw = process.env[name];
   if (raw === undefined || raw === '') return fallback;
   if (!/^\d+$/.test(raw)) {
-    throw new Error(`${name} must be an integer between ${min} and ${max}`);
+    throw new ValidationError(`${name} must be an integer between ${min} and ${max}`);
   }
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(`${name} must be an integer between ${min} and ${max}`);
+    throw new ValidationError(`${name} must be an integer between ${min} and ${max}`);
   }
   return value;
 }

@@ -1,3 +1,4 @@
+import { fastWordCount } from '../../lib/string-utils.ts';
 // Quality Engines (Wave 11 closeout — _CLEVER_MOVES §21).
 // These are narrative quality checks that run *below* the proof kernel's hard
 // blocks — they produce weighted warnings that the Convergence Loop uses as
