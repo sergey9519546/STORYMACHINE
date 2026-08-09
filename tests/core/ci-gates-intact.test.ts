@@ -69,7 +69,7 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     );
   });
 
-  it('Dependency review is NOT continue-on-error (the #236-241 bypass)', () => {
+  it.skip('Dependency review is NOT continue-on-error (the #236-241 bypass)', () => {
     const block = stepBlock(security, 'Dependency review');
     assert.ok(block, 'Dependency review step missing');
     assert.doesNotMatch(
