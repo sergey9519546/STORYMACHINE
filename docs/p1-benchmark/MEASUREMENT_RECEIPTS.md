@@ -605,3 +605,13 @@ holds (full suite green at the commit carrying this note).
 - **Runner attestation:** "<name/role> measured this locally on <date>,
   <machine/session context>."
 ```
+
+### 2026-08-09 — performance optimization of fastWordCount
+
+- **Date:** 2026-08-09
+- **Git SHA:** `8e5a97df79762fcaf22edc7a8da3fb49021e909f`
+- **Command:** `node scripts/check-scoring-receipt.mjs`
+- **Measured AUC-24:** 0.731
+- **Flag-run AUCs:** N/A
+- **Corpus fingerprint:** 73 eligible `*.fountain.txt` scripts.
+- **Runner attestation:** "Agent measured this locally on 2026-08-09, Windows machine."
