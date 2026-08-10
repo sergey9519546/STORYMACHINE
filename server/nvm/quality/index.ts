@@ -17,6 +17,7 @@
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { StoryOp } from '../ops/StoryOp.ts';
+import { fastWordCount } from '../../lib/string-utils.ts';
 
 // ── Shared result types ───────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ export function specificityScore(ops: StoryOp[]): number {
     if (!text) continue; // skip ops with no extractable text (SEED_CLUE, RAISE_CLOCK, etc.)
     scoredOps++;
     const vagueCount = VAGUE_TERMS.filter(t => text.includes(t)).length;
-    const wordCount = text.split(/\s+/).length;
+    const wordCount = fastWordCount(text);
     const opScore = Math.max(0, 1 - (vagueCount * 0.25) - (wordCount < 3 ? 0.3 : 0));
     totalScore += opScore;
   }

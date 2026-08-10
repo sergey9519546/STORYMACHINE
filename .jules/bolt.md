@@ -7,3 +7,6 @@
 ## 2024-07-15 - [Zero-Allocation CodeMirror Rendering]
 **Learning:** Found O(N) intermediate array allocations caused by `block.text.split('\n')` inside high-frequency CodeMirror plugin update loops (`fountain-highlight.ts` and `screenplay-format.ts`). Since plugins run synchronously on keystrokes, these allocations cause frame stuttering in large documents.
 **Action:** When extracting line offsets in rendering or highlighting loops, replace `.split('\n')` with native `while (startIndex <= text.length)` loops using `text.indexOf('\n', startIndex)`. This guarantees zero allocation for multiline text processing on hot paths.
+## 2024-08-10 - [Zero-Allocation Word Count]
+**Learning:** Found O(N) allocation issues when calculating word counts via split(/\s+/) during quality checks.
+**Action:** Replaced with fastWordCount helper for zero-allocation parsing.
