@@ -127,6 +127,8 @@ export function arcConstraintsFromTracker(
         return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. The character holds contradictory beliefs — reconcile via an UPDATE_BELIEF that resolves the contradiction, or let it drive a decisive dramatic choice.` };
       case 'AUDIENCE_QUESTION':
         return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Provide a knownFact via UPDATE_READER_STATE to answer the audience's open question — unresolved suspense/curiosity is losing the audience.` };
+      case 'SCENE_DEAD_AIR':
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. The last scene(s) had no state-changing action — the next scene MUST deliver: change a belief, shift a relationship, raise a clock, seed or pay off a clue, or advance the theme. Do not write another scene of pure texture.` };
       default: {
         // Exhaustiveness guard — if a new OpenPromise kind is added without updating this switch,
         // TypeScript will infer 'never' here and the build will fail.

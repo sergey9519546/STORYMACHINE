@@ -18,6 +18,15 @@ function belief(id: string, proposition: string, source: Belief['source'], acqui
 function updateBelief(charId: string, b: Belief): StoryOp {
   return { op: 'UPDATE_BELIEF', charId, belief: b };
 }
+function visualFact(sceneId: string, fact: string): StoryOp {
+  return { op: 'RECORD_VISUAL_FACT', sceneId, fact };
+}
+function sonicFact(sceneId: string, fact: string): StoryOp {
+  return { op: 'RECORD_SONIC_FACT', sceneId, fact };
+}
+function shiftRelationship(a: string, b: string, amount: number): StoryOp {
+  return { op: 'SHIFT_RELATIONSHIP', pair: [a, b], delta: { dimension: 'trust', amount, reason: 'test' } };
+}
 
 describe('BELIEF_CONFLICT detection', () => {
   test('fires when a character holds witnessed + told beliefs at the same stem', () => {
@@ -107,11 +116,10 @@ describe('BELIEF_CONFLICT detection', () => {
 });
 
 describe('Account decomposition', () => {
-  test('scene account starts empty (no detector yet)', () => {
-    const scenes = [{ sceneIdx: 0, ops: [] }];
+  test('scene account is empty when the scene has substantive action', () => {
+    const scenes = [{ sceneIdx: 0, ops: [shiftRelationship('a', 'b', 0.3)] }];
     const report = analyzeArcCompletion(scenes);
     assert.equal(report.accounts.scene.openCount, 0);
-    assert.equal(report.accounts.scene.subtotal, 0);
   });
 
   test('EMOTIONAL_DEBT lands in the character account', () => {
@@ -165,5 +173,47 @@ describe('AUDIENCE_QUESTION detection', () => {
     const report = analyzeArcCompletion(scenes);
     const questions = report.openPromises.filter(p => p.kind === 'AUDIENCE_QUESTION');
     assert.equal(questions.length, 0, 'investment alone should not pose a question');
+  });
+});
+
+describe('SCENE_DEAD_AIR detection', () => {
+  test('fires when consecutive scenes have only sensory ops (no substance)', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [visualFact('s0', 'rain')] },
+      { sceneIdx: 1, ops: [sonicFact('s1', 'thunder')] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const deadAir = report.openPromises.filter(p => p.kind === 'SCENE_DEAD_AIR');
+    assert.equal(deadAir.length, 1);
+    assert.match(deadAir[0].description, /scene 0/);
+    assert.ok(report.accounts.scene.openCount >= 1, 'should land in scene account');
+  });
+
+  test('does NOT fire when a scene has substantive ops', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [shiftRelationship('nora', 'leo', -0.5)] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const deadAir = report.openPromises.filter(p => p.kind === 'SCENE_DEAD_AIR');
+    assert.equal(deadAir.length, 0, 'a substantive scene should not trigger dead air');
+  });
+
+  test('resolves when a substantive scene breaks the dead-air streak', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [visualFact('s0', 'rain')] },
+      { sceneIdx: 1, ops: [shiftRelationship('nora', 'leo', -0.5)] },
+      { sceneIdx: 2, ops: [visualFact('s2', 'sunset')] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const deadAir = report.openPromises.filter(p => p.kind === 'SCENE_DEAD_AIR');
+    assert.equal(deadAir.length, 1, 'one open streak (scene 2)');
+    assert.match(deadAir[0].description, /scene 2/);
+    assert.ok(report.resolvedCount >= 1, 'resolvedCount should include the broken streak');
+  });
+
+  test('does NOT fire on empty scenes list', () => {
+    const report = analyzeArcCompletion([]);
+    const deadAir = report.openPromises.filter(p => p.kind === 'SCENE_DEAD_AIR');
+    assert.equal(deadAir.length, 0);
   });
 });

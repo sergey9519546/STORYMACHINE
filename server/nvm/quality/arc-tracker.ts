@@ -14,7 +14,7 @@ import type { StoryOp } from '../ops/StoryOp.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT' | 'BELIEF_CONFLICT' | 'AUDIENCE_QUESTION';
+export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT' | 'BELIEF_CONFLICT' | 'AUDIENCE_QUESTION' | 'SCENE_DEAD_AIR';
 export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 
 /**
@@ -33,6 +33,7 @@ export const PROMISE_KIND_TO_ACCOUNT: Record<PromiseKind, StressAccount> = {
   CLUE: 'epistemic',
   BELIEF_CONFLICT: 'epistemic',
   AUDIENCE_QUESTION: 'audience',
+  SCENE_DEAD_AIR: 'scene',
   THEME: 'thematic',
 };
 
@@ -96,6 +97,17 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   let audienceQuestionsRaised = 0;
   let audienceQuestionsAnswered = 0;
   let lastQuestionScene = -1;
+  // SCENE_DEAD_AIR: consecutive scenes with no substantive state-changing ops.
+  // Sensory-only ops (RECORD_VISUAL_FACT, RECORD_SONIC_FACT) don't count —
+  // they add texture without changing canon, beliefs, relationships, etc.
+  const SUBSTANTIVE_OPS = new Set<StoryOp['op']>([
+    'ADD_FACT', 'EXPIRE_FACT', 'UPDATE_BELIEF', 'APPRAISE_EMOTION',
+    'SHIFT_RELATIONSHIP', 'ADVANCE_OBJECT_ARC', 'TRIGGER_RULE',
+    'SEED_CLUE', 'PAYOFF_SETUP', 'RAISE_CLOCK', 'ADVANCE_THEME_ARGUMENT',
+    'UPDATE_READER_STATE',
+  ]);
+  let deadAirStreakStart = -1;
+  const resolvedDeadAirStreaks: number[] = [];
   let resolvedCount      = 0;
 
   const HIGH_DISTRESS_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame']);
@@ -104,6 +116,17 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   const TERMINAL_OBJECT_STATES = new Set(['destroyed', 'resolved', 'returned', 'complete', 'found', 'lost_permanently']);
 
   for (const { sceneIdx, ops } of scenes) {
+    // SCENE_DEAD_AIR: check substance before processing ops
+    const hasSubstance = ops.some(o => SUBSTANTIVE_OPS.has(o.op));
+    if (hasSubstance) {
+      if (deadAirStreakStart >= 0) {
+        resolvedDeadAirStreaks.push(deadAirStreakStart);
+        deadAirStreakStart = -1;
+      }
+    } else if (deadAirStreakStart < 0) {
+      deadAirStreakStart = sceneIdx;
+    }
+
     for (const op of ops) {
       switch (op.op) {
         case 'SEED_CLUE':
@@ -241,6 +264,9 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
     }
   }
 
+  // Close resolved dead-air streaks
+  resolvedCount += resolvedDeadAirStreaks.length;
+
   // Build open promise list with pacing recommendations
   const openPromises: OpenPromise[] = [];
 
@@ -377,6 +403,22 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
       urgency: computeUrgency(totalScenes - 1, targetWindow),
       suggestedOp: 'UPDATE_READER_STATE',
       pacingScore: computePacingScore(age, 2, 8),
+    });
+  }
+
+  // SCENE_DEAD_AIR — consecutive scenes with no substantive state change
+  if (deadAirStreakStart >= 0) {
+    const age = totalScenes - deadAirStreakStart;
+    const targetWindow: [number, number] = [deadAirStreakStart + 1, deadAirStreakStart + 3];
+    openPromises.push({
+      promiseId: `scene:dead_air:${deadAirStreakStart}`,
+      kind: 'SCENE_DEAD_AIR',
+      description: `Dead-air streak since scene ${deadAirStreakStart} (${age} scenes) — no canon/belief/relationship/object/theme/clue/clock change. The next scene must deliver substantive dramatic action.`,
+      openedAtScene: deadAirStreakStart,
+      targetWindow,
+      urgency: computeUrgency(totalScenes - 1, targetWindow),
+      suggestedOp: 'SHIFT_RELATIONSHIP',
+      pacingScore: computePacingScore(age, 1, 3),
     });
   }
 
