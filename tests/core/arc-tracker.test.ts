@@ -107,21 +107,19 @@ describe('BELIEF_CONFLICT detection', () => {
 });
 
 describe('Account decomposition', () => {
-  test('scene and audience accounts start empty (no detectors yet)', () => {
+  test('scene account starts empty (no detector yet)', () => {
     const scenes = [{ sceneIdx: 0, ops: [] }];
     const report = analyzeArcCompletion(scenes);
     assert.equal(report.accounts.scene.openCount, 0);
     assert.equal(report.accounts.scene.subtotal, 0);
-    assert.equal(report.accounts.audience.openCount, 0);
-    assert.equal(report.accounts.audience.subtotal, 0);
   });
 
   test('EMOTIONAL_DEBT lands in the character account', () => {
     const scenes = [
       { sceneIdx: 0, ops: [{
-        op: 'APPRAISE_EMOTION',
+        op: 'APPRAISE_EMOTION' as const,
         charId: 'nora',
-        emotion: { joy: 0, distress: 90, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 90, last_updated_at: 0 },
+        emotion: { joy: 0, distress: 90, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress' as const, intensity: 90, last_updated_at: 0 },
       }] },
     ];
     const report = analyzeArcCompletion(scenes);
@@ -130,5 +128,42 @@ describe('Account decomposition', () => {
       'EMOTIONAL_DEBT should appear in the character account',
     );
     assert.ok(report.accounts.character.openCount >= 1);
+  });
+});
+
+describe('AUDIENCE_QUESTION detection', () => {
+  function readerState(delta: Record<string, unknown>): StoryOp {
+    return { op: 'UPDATE_READER_STATE', delta } as StoryOp;
+  }
+
+  test('fires when suspense is raised but never answered by a knownFact', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [readerState({ suspense: 10 })] },
+      { sceneIdx: 1, ops: [readerState({ curiosity: 5 })] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const questions = report.openPromises.filter(p => p.kind === 'AUDIENCE_QUESTION');
+    assert.equal(questions.length, 1, 'one consolidated audience-question promise');
+    assert.match(questions[0].description, /2 audience question/);
+    assert.ok(report.accounts.audience.openCount >= 1, 'should land in audience account');
+  });
+
+  test('does NOT fire when raised suspense is answered by a knownFact', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [readerState({ suspense: 10 })] },
+      { sceneIdx: 1, ops: [readerState({ knownFact: 'The butler did it' })] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const questions = report.openPromises.filter(p => p.kind === 'AUDIENCE_QUESTION');
+    assert.equal(questions.length, 0, 'knownFact should answer the question');
+  });
+
+  test('does NOT fire when no suspense or curiosity is raised', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [readerState({ investment: 5 })] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const questions = report.openPromises.filter(p => p.kind === 'AUDIENCE_QUESTION');
+    assert.equal(questions.length, 0, 'investment alone should not pose a question');
   });
 });

@@ -14,7 +14,7 @@ import type { StoryOp } from '../ops/StoryOp.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT' | 'BELIEF_CONFLICT';
+export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT' | 'BELIEF_CONFLICT' | 'AUDIENCE_QUESTION';
 export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 
 /**
@@ -32,6 +32,7 @@ export const PROMISE_KIND_TO_ACCOUNT: Record<PromiseKind, StressAccount> = {
   EMOTIONAL_DEBT: 'character',
   CLUE: 'epistemic',
   BELIEF_CONFLICT: 'epistemic',
+  AUDIENCE_QUESTION: 'audience',
   THEME: 'thematic',
 };
 
@@ -91,6 +92,10 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   // BELIEF_CONFLICT: character holds contradictory beliefs (witnessed + told at same proposition stem)
   const charBeliefs = new Map<string, Array<{ id: string; proposition: string; source: string }>>();
   const openBeliefConflicts = new Map<string, { scene: number; charId: string; stem: string }>();
+  // AUDIENCE_QUESTION: suspense/curiosity raised without a resolving knownFact
+  let audienceQuestionsRaised = 0;
+  let audienceQuestionsAnswered = 0;
+  let lastQuestionScene = -1;
   let resolvedCount      = 0;
 
   const HIGH_DISTRESS_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame']);
@@ -214,6 +219,21 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
               openBeliefConflicts.delete(key);
               resolvedCount++;
             }
+          }
+          break;
+        }
+
+        case 'UPDATE_READER_STATE': {
+          const d = op.delta;
+          const fin = (n: number | undefined): number => (typeof n === 'number' && isFinite(n) ? n : 0);
+          // A positive suspense or curiosity delta poses an audience question
+          if (fin(d.suspense) > 0 || fin(d.curiosity) > 0) {
+            audienceQuestionsRaised++;
+            lastQuestionScene = sceneIdx;
+          }
+          // A knownFact answers the audience's most recent open question
+          if (d.knownFact) {
+            audienceQuestionsAnswered++;
           }
           break;
         }
@@ -341,6 +361,22 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
       urgency,
       suggestedOp: 'UPDATE_BELIEF',
       pacingScore: computePacingScore(age, 4, 12),
+    });
+  }
+
+  // AUDIENCE_QUESTION — suspense/curiosity raised but not yet answered by a knownFact
+  if (audienceQuestionsRaised > audienceQuestionsAnswered && lastQuestionScene >= 0) {
+    const age = totalScenes - lastQuestionScene;
+    const targetWindow: [number, number] = [lastQuestionScene + 2, lastQuestionScene + 8];
+    openPromises.push({
+      promiseId: 'audience:open_questions',
+      kind: 'AUDIENCE_QUESTION',
+      description: `${audienceQuestionsRaised - audienceQuestionsAnswered} audience question(s) unanswered — suspense/curiosity raised without a resolving knownFact`,
+      openedAtScene: lastQuestionScene,
+      targetWindow,
+      urgency: computeUrgency(totalScenes - 1, targetWindow),
+      suggestedOp: 'UPDATE_READER_STATE',
+      pacingScore: computePacingScore(age, 2, 8),
     });
   }
 
