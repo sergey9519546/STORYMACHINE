@@ -436,6 +436,14 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
       resolvedCount: arcReport.resolvedCount,
       debtScore: arcReport.debtScore,
       mostUrgent: arcReport.openPromises.slice(0, 3).map(p => ({ kind: p.kind, description: p.description, urgency: p.urgency })),
+      // Per-account breakdown (subtotals only — full promises via /api/nvm/arc-completion)
+      accounts: Object.fromEntries(
+        Object.entries(arcReport.accounts).map(([key, val]) => [
+          key,
+          { subtotal: val.subtotal, openCount: val.openCount, overdueCount: val.overdueCount },
+        ]),
+      ),
+      temporalDynamics: arcReport.temporalDynamics,
     },
     epistemic: {
       characterCount,
