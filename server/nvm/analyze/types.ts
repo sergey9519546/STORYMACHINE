@@ -353,6 +353,20 @@ export interface ScriptDoctorReport {
    *  Prefix-only analysis must not present a graph-health reading as a
    *  whole-draft assessment. */
   storyGraph?: StoryGraphReport;
+  /** GODMODE L4/L19: Disclosure & epistemic analysis — fair-reveal
+   *  assessment, setup/payoff ordering violations, and character knowledge
+   *  gaps. Optional; populated for complete analyses. */
+  disclosureAnalysis?: import('../quality/disclosure-analysis.ts').DisclosureAnalysisReport;
+  /** GODMODE L8: Character function classification — assigns each
+   *  character to one of 14 supporting-function types. */
+  characterFunctions?: import('../quality/character-function.ts').CharacterFunctionProfile[];
+  /** GODMODE L13: Subplot architecture — identifies secondary dramatic
+   *  threads (relationship arcs, mystery threads, theme arguments) and
+   *  their intersection points with the main plot. */
+  subplots?: import('../quality/subplot-tracker.ts').SubplotAnalysisReport;
+  /** GODMODE L5: Story-graph health contribution — a scored deduction
+   *  (0-15 points) from graph metrics, suitable for the health formula. */
+  graphHealth?: import('../quality/graph-health.ts').GraphHealthContribution;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
   /** Present ONLY on deep-read reports (POST /api/scriptide/doctor/deep).

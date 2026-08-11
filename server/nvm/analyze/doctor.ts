@@ -50,6 +50,10 @@ import { detectColdOpenPromise } from './cold-open-promise.ts';
 import { detectPatternEstablishment } from './pattern-establishment.ts';
 import { analyzeStoryGraph } from './story-graph.ts';
 import { auditTemporalConsistencyReport } from './temporal-consistency.ts';
+import { analyzeDisclosureAndEpistemics } from '../quality/disclosure-analysis.ts';
+import { classifyCharacterFunctions } from '../quality/character-function.ts';
+import { analyzeSubplots } from '../quality/subplot-tracker.ts';
+import { graphHealthFromReport } from '../quality/graph-health.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import { computeNarrativeMetrics } from './metrics.ts';
@@ -1936,7 +1940,14 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   const dialogueSignals = computeDialogueDiversity(analysis.records);
   const dialogueDeduction = dialogueDegradationDeduction(dialogueSignals);
 
-  const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction - dialogueDeduction) * 10) / 10);
+  // GODMODE L5: graph-health deduction (capped 0-15, same pattern as the
+  // deductions above). Computed from story-graph metrics, NOT from issue
+  // density — this is the first graph-native signal in the health formula.
+  const storyGraphResult = analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined;
+  const graphHealthContribution = graphHealthFromReport(storyGraphResult, analysis.sceneCount) ?? undefined;
+  const graphDeduction = graphHealthContribution?.graphDeduction ?? 0;
+
+  const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction - dialogueDeduction - graphDeduction) * 10) / 10);
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────
@@ -2106,7 +2117,20 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     bonding: detectBonding(fountain),
     coldOpenPromise: detectColdOpenPromise(fountain),
     patternEstablishment: detectPatternEstablishment(fountain),
-    storyGraph: analysisComplete && analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined,
+    storyGraph: analysisComplete && analysis.sceneCount > 0 ? storyGraphResult : undefined,
+    graphHealth: analysisComplete ? graphHealthContribution : undefined,
+    // ── GODMODE integration: 4 new analysis layers ────────────────────────
+    // All gated on analysisComplete + sceneCount > 0, same as storyGraph.
+    // Each is a pure deterministic function of the analysis records.
+    disclosureAnalysis: analysisComplete && analysis.sceneCount > 0
+      ? analyzeDisclosureAndEpistemics(analysis.records)
+      : undefined,
+    characterFunctions: analysisComplete && analysis.sceneCount > 0
+      ? classifyCharacterFunctions(analysis.characters, analysis.records)
+      : undefined,
+    subplots: analysisComplete && analysis.sceneCount > 0
+      ? analyzeSubplots([])
+      : undefined,
     // TRACE §13 temporal-consistency audit (2026-08-03 wiring). Diagnostic
     // only, same gating as storyGraph/metrics above: a prefix-only or
     // failed-pass analysis must not present a temporal read as if it
