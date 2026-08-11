@@ -60,6 +60,27 @@ export interface AccountBreakdown {
   promises: OpenPromise[];
 }
 
+/** Path-dependence lock mode — restricts stress transitions (spec §16). */
+export type HysteresisLockMode = 'none' | 'tense_truce' | 'aftermath_lock' | 'burnout_lock';
+
+/**
+ * Temporal dynamics across scenes: fatigue accumulation, catharsis recency,
+ * and hysteresis lock mode. These are the mechanisms that make the ledger
+ * qualitatively different from a flat promise tracker (spec §16–17).
+ */
+export interface TemporalDynamics {
+  /** Fatigue scalar 0–1: sustained high distress numbs sensitivity. */
+  fatigue: number;
+  highStressBeatCount: number;
+  recoveryBeatCount: number;
+  /** 1.0 = normal sensitivity, lower = numb. effective_delta = raw_delta * sensitivityMultiplier. */
+  sensitivityMultiplier: number;
+  /** Scenes since the last catharsis (EMOTIONAL_DEBT resolution). totalScenes if none occurred. */
+  beatsSinceCatharsis: number;
+  /** Lock mode derived from fatigue + catharsis recency. */
+  lockMode: HysteresisLockMode;
+}
+
 export interface ArcCompletionReport {
   totalScenes: number;
   openPromises: OpenPromise[];
@@ -70,6 +91,8 @@ export interface ArcCompletionReport {
   /** Per-account decomposition of open promises. Accounts with no detectors
    *  yet (scene, audience) appear with empty promise lists. */
   accounts: Record<StressAccount, AccountBreakdown>;
+  /** Temporal dynamics: fatigue, catharsis recency, hysteresis lock mode. */
+  temporalDynamics: TemporalDynamics;
 }
 
 // ── Promise accumulator ───────────────────────────────────────────────────────
@@ -108,6 +131,11 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   ]);
   let deadAirStreakStart = -1;
   const resolvedDeadAirStreaks: number[] = [];
+  // Fatigue + hysteresis: temporal dynamics across scenes (spec §16–17)
+  let fatigue = 0;
+  let highStressBeatCount = 0;
+  let recoveryBeatCount = 0;
+  let lastCatharsisScene = -1;
   let resolvedCount      = 0;
 
   const HIGH_DISTRESS_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame']);
@@ -126,6 +154,10 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
     } else if (deadAirStreakStart < 0) {
       deadAirStreakStart = sceneIdx;
     }
+
+    // Fatigue: per-scene flags for high-stress exposure and catharsis recovery
+    let sceneHadHighStress = false;
+    let sceneHadCatharsis = false;
 
     for (const op of ops) {
       switch (op.op) {
@@ -194,11 +226,13 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
           if (HIGH_DISTRESS_EMOTIONS.has(dominant) && intensity >= 75) {
             // Character enters peak distress — open an emotional debt
             openEmotionalDebts.set(op.charId, { scene: sceneIdx, dominant, intensity });
+            sceneHadHighStress = true;
           } else if (openEmotionalDebts.has(op.charId)) {
             // Cathartic resolution: calming emotion or intensity drops below 40
             if (CATHARTIC_EMOTIONS.has(dominant) || intensity < 40) {
               openEmotionalDebts.delete(op.charId);
               resolvedCount++;
+              sceneHadCatharsis = true;
             }
           }
           break;
@@ -261,6 +295,17 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
           break;
         }
       }
+    }
+
+    // Fatigue: update after processing the scene (spec §17)
+    if (sceneHadHighStress) {
+      highStressBeatCount++;
+      fatigue = Math.min(1, fatigue + 0.08);
+    }
+    if (sceneHadCatharsis) {
+      recoveryBeatCount++;
+      fatigue = Math.max(0, fatigue - 0.12);
+      lastCatharsisScene = sceneIdx;
     }
   }
 
@@ -458,7 +503,25 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
     }),
   ) as Record<StressAccount, AccountBreakdown>;
 
-  return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore), accounts };
+  // Temporal dynamics: fatigue, catharsis recency, hysteresis lock mode (spec §16–17)
+  const sensitivityMultiplier = 1 - 0.6 * fatigue;
+  const beatsSinceCatharsis = lastCatharsisScene >= 0 ? totalScenes - 1 - lastCatharsisScene : totalScenes;
+  let lockMode: HysteresisLockMode = 'none';
+  if (fatigue >= 0.7) {
+    lockMode = 'burnout_lock';
+  } else if (beatsSinceCatharsis <= 1 && lastCatharsisScene >= 0) {
+    lockMode = 'aftermath_lock';
+  }
+  const temporalDynamics: TemporalDynamics = {
+    fatigue: Math.round(fatigue * 100) / 100,
+    highStressBeatCount,
+    recoveryBeatCount,
+    sensitivityMultiplier: Math.round(sensitivityMultiplier * 100) / 100,
+    beatsSinceCatharsis,
+    lockMode,
+  };
+
+  return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore), accounts, temporalDynamics };
 }
 
 // ── Pacing helpers ────────────────────────────────────────────────────────────

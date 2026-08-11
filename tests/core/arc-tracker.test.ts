@@ -27,6 +27,13 @@ function sonicFact(sceneId: string, fact: string): StoryOp {
 function shiftRelationship(a: string, b: string, amount: number): StoryOp {
   return { op: 'SHIFT_RELATIONSHIP', pair: [a, b], delta: { dimension: 'trust', amount, reason: 'test' } };
 }
+function appraiseEmotion(charId: string, dominant: string, intensity: number): StoryOp {
+  return {
+    op: 'APPRAISE_EMOTION',
+    charId,
+    emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant, intensity, last_updated_at: 0 },
+  } as StoryOp;
+}
 
 describe('BELIEF_CONFLICT detection', () => {
   test('fires when a character holds witnessed + told beliefs at the same stem', () => {
@@ -215,5 +222,69 @@ describe('SCENE_DEAD_AIR detection', () => {
     const report = analyzeArcCompletion([]);
     const deadAir = report.openPromises.filter(p => p.kind === 'SCENE_DEAD_AIR');
     assert.equal(deadAir.length, 0);
+  });
+});
+
+describe('Temporal dynamics: fatigue + hysteresis', () => {
+  test('fatigue accumulates with sustained high distress', () => {
+    const scenes = Array.from({ length: 5 }, (_, i) => ({
+      sceneIdx: i,
+      ops: [appraiseEmotion('nora', 'distress', 90)],
+    }));
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.temporalDynamics.highStressBeatCount, 5);
+    assert.equal(report.temporalDynamics.fatigue, 0.40); // 5 × 0.08
+    assert.equal(report.temporalDynamics.sensitivityMultiplier, 0.76); // 1 − 0.6 × 0.40
+  });
+
+  test('fatigue decreases with catharsis recovery', () => {
+    const scenes = [
+      ...Array.from({ length: 5 }, (_, i) => ({
+        sceneIdx: i,
+        ops: [appraiseEmotion('nora', 'distress', 90)],
+      })),
+      { sceneIdx: 5, ops: [appraiseEmotion('nora', 'joy', 60)] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.temporalDynamics.recoveryBeatCount, 1);
+    assert.equal(report.temporalDynamics.fatigue, 0.28); // 0.40 − 0.12
+  });
+
+  test('burnout_lock triggers when fatigue >= 0.7', () => {
+    const scenes = Array.from({ length: 9 }, (_, i) => ({
+      sceneIdx: i,
+      ops: [appraiseEmotion('nora', 'distress', 90)],
+    }));
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.temporalDynamics.fatigue >= 0.7, `fatigue was ${report.temporalDynamics.fatigue}`);
+    assert.equal(report.temporalDynamics.lockMode, 'burnout_lock');
+  });
+
+  test('aftermath_lock triggers when catharsis just happened', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [appraiseEmotion('nora', 'distress', 90)] },
+      { sceneIdx: 1, ops: [appraiseEmotion('nora', 'joy', 60)] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.temporalDynamics.lockMode, 'aftermath_lock');
+    assert.equal(report.temporalDynamics.beatsSinceCatharsis, 0);
+  });
+
+  test('lockMode is none with low fatigue and no recent catharsis', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [appraiseEmotion('nora', 'distress', 90)] },
+      { sceneIdx: 1, ops: [shiftRelationship('nora', 'leo', -0.5)] },
+      { sceneIdx: 2, ops: [shiftRelationship('nora', 'leo', 0.3)] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.temporalDynamics.lockMode, 'none');
+    assert.equal(report.temporalDynamics.beatsSinceCatharsis, 3); // no catharsis → totalScenes
+  });
+
+  test('empty script has zero fatigue and no lock', () => {
+    const report = analyzeArcCompletion([]);
+    assert.equal(report.temporalDynamics.fatigue, 0);
+    assert.equal(report.temporalDynamics.lockMode, 'none');
+    assert.equal(report.temporalDynamics.beatsSinceCatharsis, 0);
   });
 });
