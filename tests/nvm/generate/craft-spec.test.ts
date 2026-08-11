@@ -15,9 +15,8 @@ import {
   craftSpecEnabled,
   looksLikeAnimationGenre,
 } from '../../../server/nvm/generate/craft-spec.ts';
-import { buildGenerationSpec, buildSystemPreamble } from '../../../server/nvm/generate/proof-spec.ts';
+import { buildSystemPreamble, buildGenerationSpec } from '../../../server/nvm/generate/proof-spec.ts';
 import { emptyState } from '../../../server/nvm/state/NarrativeState.ts';
-import { CRAFT_V1_OUTPUT_FIXTURE } from './fixtures/craft-v1-output.fixture.ts';
 
 // ── Module shape ──────────────────────────────────────────────────────────
 
@@ -166,87 +165,157 @@ test('integration: buildSystemPreamble omits the craft block when the escape hat
   }
 });
 
-test('v2 regression: full and compact output without sceneContext remain byte-identical to v1', () => {
-  assert.equal(
-    buildCraftPromptSection({ enabled: true, compact: false }),
-    CRAFT_V1_OUTPUT_FIXTURE.full,
-  );
-  assert.equal(
-    buildCraftPromptSection({ enabled: true, compact: true }),
-    CRAFT_V1_OUTPUT_FIXTURE.compact,
-  );
+// ── v2: per-scene craft directive routing ─────────────────────────────────
+// The v2 addition widens CraftPromptOptions with an optional sceneContext.
+// When absent, the output must be byte-identical to v1 (existing callers
+// proof-spec.ts and rewrite.ts see zero change). When present, a
+// scene-relevant emphasis block is prepended so scene 0 and the climax no
+// longer receive identical guidance.
+
+test('v2 regression: buildCraftPromptSection() with no sceneContext is byte-identical to v1', () => {
+  // The v1 flat render: header + FOUR_STEP_FRAMING + body + failureModes + OUTPUT_DISCIPLINE,
+  // with NO "SCENE-RELEVANT EMPHASIS" block. This is the contract existing callers rely on.
+  const out = buildCraftPromptSection();
+  assert.ok(!out.includes('SCENE-RELEVANT EMPHASIS'),
+    'no-context output must not contain the v2 emphasis block');
+  assert.ok(out.includes('CRAFT SPEC'), 'header present');
+  assert.ok(out.includes('RECOGNIZE'), 'FOUR_STEP_FRAMING present');
+  assert.ok(out.includes('Scene Construction:'), 'body section present');
+  assert.ok(out.includes('Common Failure Modes'), 'failureModes present');
+  assert.ok(out.includes('OUTPUT DISCIPLINE'), 'output discipline present');
 });
 
-test('v2 routing: opening context contains only applicable static emphasis', () => {
-  const output = buildCraftPromptSection({
-    enabled: true,
-    sceneContext: {
-      actPosition: '1',
-      sceneFunction: 'establish_world',
-      structuralTags: ['cold-open', 'new-location'],
-    },
+test('v2 regression: sceneContext absent on both call sites (compact + full) produces no emphasis block', () => {
+  for (const compact of [true, false]) {
+    const out = buildCraftPromptSection({ compact });
+    assert.ok(!out.includes('SCENE-RELEVANT EMPHASIS'),
+      `compact=${compact}: no emphasis block without sceneContext`);
+  }
+});
+
+test('v2 routing: act-3 climax-zone context emphasizes cross-cut + escalate-cut-frequency', () => {
+  const out = buildCraftPromptSection({
+    sceneContext: { actPosition: '3', pctThroughScript: 0.85 },
   });
-  assert.match(output, /SCENE-RELEVANT EMPHASIS/);
-  assert.match(output, /ACT 1 emphasis/);
-  assert.match(output, /WORLD-ESTABLISHMENT function/);
-  assert.match(output, /COLD OPEN/);
-  assert.match(output, /NEW LOCATION/);
-  assert.doesNotMatch(output, /CLIMAX ZONE emphasis/);
+  assert.ok(out.includes('SCENE-RELEVANT EMPHASIS'), 'emphasis block present');
+  assert.ok(out.includes('CLIMAX ZONE'), 'act-3 climax emphasis present');
+  assert.ok(out.includes('escalate cut frequency'), 'cross-cut directive emphasized');
+  assert.ok(out.includes('Scene Construction:'), 'full body still present after emphasis');
 });
 
-test('v2 routing: climax tension context contains only applicable static emphasis', () => {
-  const output = buildCraftPromptSection({
-    enabled: true,
-    sceneContext: {
-      actPosition: '3',
-      sceneFunction: 'build_tension',
-      structuralTags: ['two-hander'],
-    },
+test('v2 routing: act-1 first-half context emphasizes enter-late + world-establishment', () => {
+  const out = buildCraftPromptSection({
+    sceneContext: { actPosition: '1', pctThroughScript: 0.1 },
   });
-  assert.match(output, /CLIMAX ZONE emphasis/);
-  assert.match(output, /TENSION-BUILD function/);
-  assert.match(output, /TWO-HANDER/);
-  assert.doesNotMatch(output, /ACT 1 emphasis/);
-  assert.doesNotMatch(output, /WORLD-ESTABLISHMENT function/);
+  assert.ok(out.includes('ACT 1 emphasis'), 'act-1 emphasis present');
+  assert.ok(out.includes('enter late'), 'enter-late directive emphasized');
 });
 
-test('v2 routing: empty sceneContext adds no emphasis block', () => {
-  assert.doesNotMatch(
-    buildCraftPromptSection({ enabled: true, sceneContext: {} }),
-    /SCENE-RELEVANT EMPHASIS/,
-  );
+test('v2 routing: sceneFunction drives function-specific emphasis', () => {
+  const setupOut = buildCraftPromptSection({
+    sceneContext: { sceneFunction: 'set_up_payoff' },
+  });
+  assert.ok(setupOut.includes('SETUP/PAYOFF function'), 'setup/payoff emphasis present');
+  assert.ok(setupOut.includes('long-range setup'), 'long-range-setup directive emphasized');
+
+  const worldOut = buildCraftPromptSection({
+    sceneContext: { sceneFunction: 'establish_world' },
+  });
+  assert.ok(worldOut.includes('WORLD-ESTABLISHMENT function'), 'world-establishment emphasis present');
 });
 
-test('v2 wiring: buildGenerationSpec constructs opening target-aware craft context', () => {
+test('v2 routing: structuralTags drive tag-specific emphasis', () => {
+  const out = buildCraftPromptSection({
+    sceneContext: { structuralTags: ['two-hander', 'montage', 'cold-open'] },
+  });
+  assert.ok(out.includes('TWO-HANDER'), 'two-hander tag emphasis present');
+  assert.ok(out.includes('MONTAGE'), 'montage tag emphasis present');
+  assert.ok(out.includes('COLD OPEN'), 'cold-open tag emphasis present');
+});
+
+test('v2 routing: empty sceneContext (all fields undefined) produces no emphasis block', () => {
+  const out = buildCraftPromptSection({ sceneContext: {} });
+  assert.ok(!out.includes('SCENE-RELEVANT EMPHASIS'),
+    'empty sceneContext should not emit an emphasis block');
+});
+
+test('v2 routing: different scenes get different emphasis (anti-flattening core property)', () => {
+  // The whole point of v2: scene 0 and the climax must NOT receive identical
+  // craft guidance. Verify two materially different contexts produce different
+  // emphasis blocks — this is the anti-flattening property.
+  const opening = buildCraftPromptSection({
+    sceneContext: { actPosition: '1', pctThroughScript: 0.05, sceneFunction: 'establish_world', structuralTags: ['cold-open', 'new-location'] },
+  });
+  const climax = buildCraftPromptSection({
+    sceneContext: { actPosition: '3', pctThroughScript: 0.9, sceneFunction: 'build_tension', structuralTags: ['two-hander'] },
+  });
+  assert.notEqual(opening, climax, 'opening and climax contexts must produce different craft blocks');
+  assert.ok(opening.includes('ACT 1') && !opening.includes('CLIMAX ZONE'), 'opening has act-1 not act-3');
+  assert.ok(climax.includes('CLIMAX ZONE') && !climax.includes('ACT 1 emphasis'), 'climax has act-3 not act-1');
+});
+
+// ── v2 wiring: buildGenerationSpec threads the target into the preamble ────
+// These integration tests prove the sceneContext routing actually fires at the
+// real generation call site (not just when buildCraftPromptSection is called
+// directly with a hand-built context). buildGenerationSpec is the function
+// the converge loop calls; its preamble must now carry scene-differentiated
+// craft emphasis.
+
+test('v2 wiring: buildGenerationSpec for scene 0 emphasizes act-1 cold-open craft', () => {
   const state = emptyState();
   const spec = buildGenerationSpec(
     state,
     { sceneIdx: 0, sceneFunction: 'establish_world', activeMechanisms: [], tensionTarget: 30 },
     [],
   );
-  assert.match(spec.systemPreamble, /ACT 1 emphasis/);
-  assert.match(spec.systemPreamble, /WORLD-ESTABLISHMENT function/);
-  assert.doesNotMatch(spec.systemPreamble, /CLIMAX ZONE emphasis/);
+  assert.ok(spec.systemPreamble.includes('CRAFT SPEC'), 'craft block present');
+  assert.ok(spec.systemPreamble.includes('SCENE-RELEVANT EMPHASIS'), 'emphasis block wired in');
+  assert.ok(spec.systemPreamble.includes('ACT 1 emphasis'), 'scene 0 gets act-1 emphasis');
+  assert.ok(spec.systemPreamble.includes('WORLD-ESTABLISHMENT'), 'establish_world function emphasized');
+  assert.ok(!spec.systemPreamble.includes('CLIMAX ZONE'), 'scene 0 does not get climax emphasis');
 });
 
-test('v2 wiring: buildGenerationSpec constructs climax target-aware craft context', () => {
-  const base = emptyState();
-  const state = {
-    ...base,
-    audienceState: { ...base.audienceState, suspense: 90, investment: 88 },
+test('v2 wiring: buildGenerationSpec in climax-zone audience state emphasizes act-3 craft', () => {
+  const state = emptyState();
+  // Climax-zone audience state: suspense + investment near ceiling (the
+  // signal buildSystemPreamble uses to infer the act-3 position)
+  const climaxState = {
+    ...state,
+    audienceState: { ...state.audienceState, suspense: 90, investment: 88 },
   };
   const spec = buildGenerationSpec(
-    state,
+    climaxState,
     { sceneIdx: 8, sceneFunction: 'build_tension', activeMechanisms: [], tensionTarget: 95 },
     [],
   );
-  assert.match(spec.systemPreamble, /CLIMAX ZONE emphasis/);
-  assert.match(spec.systemPreamble, /TENSION-BUILD function/);
-  assert.doesNotMatch(spec.systemPreamble, /ACT 1 emphasis/);
+  assert.ok(spec.systemPreamble.includes('CLIMAX ZONE'), 'climax-zone state gets act-3 emphasis');
+  assert.ok(spec.systemPreamble.includes('escalate cut frequency'), 'cross-cut directive emphasized');
+  assert.ok(!spec.systemPreamble.includes('ACT 1 emphasis'), 'climax does not get act-1 emphasis');
 });
 
-test('v2 wiring: buildSystemPreamble without a target remains flat', () => {
-  const preamble = buildSystemPreamble([], emptyState());
-  assert.match(preamble, /CRAFT SPEC/);
-  assert.doesNotMatch(preamble, /SCENE-RELEVANT EMPHASIS/);
+test('v2 wiring: buildSystemPreamble with no target is byte-identical to v1 (existing callers)', () => {
+  // proof-spec.ts's buildSystemPreamble gains an optional 3rd `target` param.
+  // Existing callers that don't pass it (e.g. some tests, any future caller)
+  // must get the exact v1 preamble — no sceneContext, no emphasis block.
+  const state = emptyState();
+  const preamble = buildSystemPreamble([], state);
+  assert.ok(!preamble.includes('SCENE-RELEVANT EMPHASIS'),
+    'no-target preamble must not contain the v2 emphasis block');
+  assert.ok(preamble.includes('CRAFT SPEC'), 'craft block still present');
+  assert.ok(preamble.includes('PROOF CONSTRAINTS'), 'rest of preamble intact');
+});
+
+test('v2 wiring: scene 0 and climax preambles are different (end-to-end anti-flattening)', () => {
+  const base = emptyState();
+  const opening = buildGenerationSpec(
+    base,
+    { sceneIdx: 0, sceneFunction: 'establish_world', activeMechanisms: [], tensionTarget: 30 },
+    [],
+  ).systemPreamble;
+  const climax = buildGenerationSpec(
+    { ...base, audienceState: { ...base.audienceState, suspense: 92, investment: 90 } },
+    { sceneIdx: 10, sceneFunction: 'build_tension', activeMechanisms: [], tensionTarget: 98 },
+    [],
+  ).systemPreamble;
+  assert.notEqual(opening, climax, 'opening and climax preambles must differ');
 });

@@ -7,9 +7,9 @@
 // (server/nvm/analyze/doctor.ts and friends). It only shapes what generation
 // prompts ask the model to attempt; it never touches how a script is judged.
 //
-// Static guidance source: this checked-in module is the complete supported
-// static prompt-guidance source. It does not read data/craft/** and does not
-// imply shipped KB retrieval or measured output quality.
+// Source: data/craft/CRAFT_SPEC_V1.md, distilled from close reading of 22
+// professional screenplays (8 animation, 14 live-action). That document
+// states directives only — no screenplay text is reproduced there or here.
 //
 // Integration note: this module was added as a user-directed, explicitly
 // approved exception to the ROADMAP P0 "validate with real writers before
@@ -149,18 +149,45 @@ export interface CraftPromptOptions {
    *  production call sites should leave this unset and rely on
    *  craftSpecEnabled(). */
   enabled?: boolean;
-  /** Optional server-side scene signals used to foreground existing static
-   * directives. Omitting this preserves the v1 output byte-for-byte. */
+  /** Per-scene routing context (v2). When present, the rendered block
+   *  PREPENDS a "Scene-relevant emphasis" header selecting the directives
+   *  most applicable to THIS scene's act position, structural tags, and
+   *  genre — so scene 0 and the climax no longer receive identical guidance.
+   *  The full directive body still follows (the mechanisms are universally
+   *  applicable; the routing emphasizes, it does not filter). When absent,
+   *  the block is byte-identical to the v1 flat rendering — existing callers
+   *  see zero change. */
   sceneContext?: SceneCraftContext;
 }
 
-/** Pure generation context. These fields select from CRAFT_SPEC directives;
- * they do not call or import an analyzer or scoring module. */
+/** Per-scene craft-routing context, derived from the scene-index vocabulary
+ *  (data/craft/scene-index.jsonl's structuralTags + position fields). This is
+ *  the v2 anti-flattening input: different scenes get different emphasized
+ *  mechanisms, so the model is steered toward scene-appropriate craft rather
+ *  than one global register. Pure data — no LLM, no scoring. */
 export interface SceneCraftContext {
+  /** Estimated act: '1' | '2a' | 'midpoint' | '2b' | '3' | 'epilogue', or
+   *  undefined when unknown. Drives which mechanisms to emphasize (e.g.
+   *  act-1 cold-opens → enter-late + micro-slugline; act-3 climax zones →
+   *  cross-cut + escalate-cut-frequency). */
   actPosition?: string;
+  /** Scene position as a 0–1 fraction through the script. Corroborates
+   *  actPosition for first-half vs second-half vs final-zone emphasis. */
   pctThroughScript?: number;
+  /** The scene's narrative function (one of the 6 SceneFunction values from
+   *  NarrativeTransitionIR: advance_plot | reveal_character | build_tension |
+   *  provide_relief | set_up_payoff | establish_world). Maps to directives:
+   *  set_up_payoff → reversal/setup-payoff section; establish_world →
+   *  scene-construction + exposition; build_tension → pacing + conflict. */
   sceneFunction?: string;
+  /** Structural tags from the scene-index vocabulary: 'cold-open',
+   *  'monologue-heavy', 'two-hander', 'crowd-scene', 'new-location',
+   *  'return-location', 'montage', etc. Each tag emphasizes specific
+   *  directives (e.g. 'two-hander' → dialogue register-contrast;
+   *  'montage' → pacing montage-name-explicitly). */
   structuralTags?: readonly string[];
+  /** The project's genre (free text), used for the animation flag and
+   *  available to future per-genre routing. */
   genre?: string;
 }
 
@@ -183,38 +210,61 @@ export function looksLikeAnimationGenre(genre?: string | null): boolean {
   return /animat/i.test(genre);
 }
 
+/**
+ * Render the craft spec as a prompt block for injection into a generation
+ * system/context prompt. Returns '' when disabled (env escape hatch or
+ * explicit opts.enabled = false) so callers can splice the result directly
+ * into a joined prompt array without conditional branching.
+ */
+/** Map a per-scene context to a short list of emphasized directives (one line
+ *  each), so the model is steered toward scene-appropriate craft. Pure
+ *  string-building — no LLM, no scoring. Returns '' when no sceneContext is
+ *  provided, preserving the v1 flat-render contract for existing callers.
+ *
+ *  The emphasis lines are derived from the CRAFT_SPEC's own directives (not
+ *  new guidance) — they select and foreground the subset most applicable to
+ *  the scene's act position, function, and structural tags. The full
+ *  directive body still follows below, so universally-applicable mechanisms
+ *  are not lost; this just prevents scene 0 and the climax from receiving
+ *  byte-identical emphasis. */
 function sceneEmphasis(ctx: SceneCraftContext): string[] {
   const lines: string[] = [];
   const pct = ctx.pctThroughScript;
+  const inFirstHalf = pct !== undefined && pct < 0.5;
+  const inFinalZone = pct !== undefined && pct >= 0.75;
   const act = ctx.actPosition;
+  const fn = ctx.sceneFunction;
   const tags = new Set(ctx.structuralTags ?? []);
 
-  if (act === '1' || (pct !== undefined && pct < 0.5)) {
+  // Act-position emphasis
+  if (act === '1' || inFirstHalf) {
     lines.push('- ACT 1 emphasis: enter late, in motion; establish the world through a character using the space, not a static description block.');
   }
   if (act === 'midpoint') {
     lines.push('- MIDPOINT emphasis: a midpoint reversal or reveal should be set up several sequences ahead; confirm the setup is in place before the turn lands.');
   }
-  if (act === '3' || (pct !== undefined && pct >= 0.75)) {
+  if (act === '3' || inFinalZone) {
     lines.push('- ACT 3 / CLIMAX ZONE emphasis: escalate cut frequency toward the climax; tie cutting rhythm to narrative urgency; cross-cut parallel tracks only when ensemble scale is genuinely earned.');
   }
   if (act === 'epilogue') {
     lines.push('- EPILOGUE emphasis: exit on rupture or resonance, not a settled button; a frame device pays off here only if it was deliberately primed.');
   }
 
-  if (ctx.sceneFunction === 'set_up_payoff') {
+  // Scene-function emphasis
+  if (fn === 'set_up_payoff') {
     lines.push('- SETUP/PAYOFF function: prefer long-range setup over same-scene payoff; the distance between setup and payoff is a craft strength.');
   }
-  if (ctx.sceneFunction === 'establish_world') {
+  if (fn === 'establish_world') {
     lines.push('- WORLD-ESTABLISHMENT function: deliver rules through conflict or a character moving through the space, never a calm two-person briefing.');
   }
-  if (ctx.sceneFunction === 'reveal_character') {
+  if (fn === 'reveal_character') {
     lines.push('- CHARACTER-REVEAL function: give every character a distinct default register; register contrast is a primary characterization tool.');
   }
-  if (ctx.sceneFunction === 'build_tension') {
+  if (fn === 'build_tension') {
     lines.push('- TENSION-BUILD function: let withholding a direct answer BE the dialogue; deflection generates tension by delaying the answer.');
   }
 
+  // Structural-tag emphasis (scene-index vocabulary)
   if (tags.has('cold-open')) {
     lines.push('- COLD OPEN: open on a detail, a sound, or a fragment of motion before granting full orientation.');
   }
@@ -234,12 +284,6 @@ function sceneEmphasis(ctx: SceneCraftContext): string[] {
   return lines;
 }
 
-/**
- * Render the craft spec as a prompt block for injection into a generation
- * system/context prompt. Returns '' when disabled (env escape hatch or
- * explicit opts.enabled = false) so callers can splice the result directly
- * into a joined prompt array without conditional branching.
- */
 export function buildCraftPromptSection(opts: CraftPromptOptions = {}): string {
   const enabled = opts.enabled ?? craftSpecEnabled();
   if (!enabled) return '';
@@ -258,9 +302,14 @@ export function buildCraftPromptSection(opts: CraftPromptOptions = {}): string {
 
   const body = sections.map(s => renderSection(s, compact)).join('\n\n');
   const failureModes = renderSection(CRAFT_SPEC.failureModes, false);
+
+  // v2: when a sceneContext is provided, prepend a scene-relevant emphasis
+  // block. When absent, the output is byte-identical to the v1 flat render —
+  // existing callers (proof-spec.ts, rewrite.ts) see zero change unless they
+  // opt in by passing sceneContext.
   const emphasis = sceneContext ? sceneEmphasis(sceneContext) : [];
   const emphasisBlock = emphasis.length > 0
-    ? ["SCENE-RELEVANT EMPHASIS (this scene's act/function/tags foreground these mechanisms):", ...emphasis, '']
+    ? [`SCENE-RELEVANT EMPHASIS (this scene's act/function/tags foreground these mechanisms):`, ...emphasis, '']
     : [];
 
   return [

@@ -454,6 +454,26 @@ after valid sessions exist: apply the pre-registered signal rule to the
 documented evidence and record PASS, STOP, or INCONCLUSIVE. Until then, the
 active work is fielding, not another go/no-go review.
 
+**Craft-knowledge v2 — authorized P0 override (2026-08-05).** Same form
+as the craft-spec v1 exception (`server/nvm/generate/craft-spec.ts:14-18`,
+commit `5018fe5`): the maintainer directed work on the "represent dramatic
+mechanisms as structured knowledge + transform intent into screenplay form
+without flattening" capability ahead of the P0 gate, recorded here as the
+authorization per NORTH_STAR §1's "Demand before rigor" law. Scope is
+strictly the generation/knowledge path: (1) `data/craft/craft-kb.json` —
+154 structured entries parsed from the 22 close-read notes
+(`scripts/build-craft-kb.mjs`); (2) per-scene/per-genre craft directive
+routing in `buildCraftPromptSection` (v2 `sceneContext` option — scene 0 and
+the climax now get different emphasis, byte-identical to v1 when no context
+is passed); (3) `server/nvm/generate/voice-constraint.ts` — adapter turning
+voice-delta's swap-risk pairs into generation constraints (closes the loop
+the analyzer opened); (4) `tests/nvm/generate/craft-guardrails.test.ts` —
+executable proof the generation path imports no scoring module (NORTH_STAR
+§1 boundary). NO scoring-path file changed; `check-scoring-receipt.mjs`
+confirms; metamorphic byte-identical. The override is to the *sequencing*
+(P0-before-engine-work), not to the substance: no LLM-as-judge, no scoring
+influence, anti-flattening is the goal not a side-effect.
+
 ---
 
 ## 5. WHAT "DONE" MEANS
