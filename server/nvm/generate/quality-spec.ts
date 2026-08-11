@@ -123,6 +123,8 @@ export function arcConstraintsFromTracker(
         return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found, lost_permanently).` };
       case 'EMOTIONAL_DEBT':
         return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Give this character a cathartic release — an APPRAISE_EMOTION with joy, pride, or neutral at lower intensity. Characters cannot stay in peak distress indefinitely.` };
+      case 'BELIEF_CONFLICT':
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. The character holds contradictory beliefs — reconcile via an UPDATE_BELIEF that resolves the contradiction, or let it drive a decisive dramatic choice.` };
       default: {
         // Exhaustiveness guard — if a new OpenPromise kind is added without updating this switch,
         // TypeScript will infer 'never' here and the build will fail.

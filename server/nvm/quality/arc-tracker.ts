@@ -14,7 +14,7 @@ import type { StoryOp } from '../ops/StoryOp.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT';
+export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT' | 'BELIEF_CONFLICT';
 export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 
 /**
@@ -31,6 +31,7 @@ export const PROMISE_KIND_TO_ACCOUNT: Record<PromiseKind, StressAccount> = {
   REL: 'relational',
   EMOTIONAL_DEBT: 'character',
   CLUE: 'epistemic',
+  BELIEF_CONFLICT: 'epistemic',
   THEME: 'thematic',
 };
 
@@ -87,6 +88,9 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   const openObjects      = new Map<string, { scene: number; currentState: string }>();
   // EMOTIONAL_DEBT: character in peak distress/fear with no catharsis yet
   const openEmotionalDebts = new Map<string, { scene: number; dominant: string; intensity: number }>();
+  // BELIEF_CONFLICT: character holds contradictory beliefs (witnessed + told at same proposition stem)
+  const charBeliefs = new Map<string, Array<{ id: string; proposition: string; source: string }>>();
+  const openBeliefConflicts = new Map<string, { scene: number; charId: string; stem: string }>();
   let resolvedCount      = 0;
 
   const HIGH_DISTRESS_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame']);
@@ -166,6 +170,48 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
             // Cathartic resolution: calming emotion or intensity drops below 40
             if (CATHARTIC_EMOTIONS.has(dominant) || intensity < 40) {
               openEmotionalDebts.delete(op.charId);
+              resolvedCount++;
+            }
+          }
+          break;
+        }
+
+        case 'UPDATE_BELIEF': {
+          const { belief, charId } = op;
+          const existing = charBeliefs.get(charId) ?? [];
+          // Upsert by id (same semantics as the dispatcher)
+          const updated = existing.some(b => b.id === belief.id)
+            ? existing.map(b => b.id === belief.id
+                ? { id: belief.id, proposition: belief.proposition, source: belief.source }
+                : b)
+            : [...existing, { id: belief.id, proposition: belief.proposition, source: belief.source }];
+          charBeliefs.set(charId, updated);
+
+          // Recompute stem conflicts for this character (reuses the heuristic
+          // from belief-revision.ts:reviseBelief — same 40-char proposition
+          // stem with witnessed/told source asymmetry = contradiction).
+          const stemSources = new Map<string, { witnessed: boolean; told: boolean }>();
+          for (const b of updated) {
+            const stem = b.proposition.slice(0, 40);
+            const entry = stemSources.get(stem) ?? { witnessed: false, told: false };
+            if (b.source === 'witnessed') entry.witnessed = true;
+            if (b.source === 'told') entry.told = true;
+            stemSources.set(stem, entry);
+          }
+          // Open new conflicts, close resolved ones for this character
+          const currentConflictKeys = new Set<string>();
+          for (const [stem, { witnessed, told }] of stemSources) {
+            if (witnessed && told) {
+              const key = `${charId}:${stem}`;
+              currentConflictKeys.add(key);
+              if (!openBeliefConflicts.has(key)) {
+                openBeliefConflicts.set(key, { scene: sceneIdx, charId, stem });
+              }
+            }
+          }
+          for (const [key, conflict] of openBeliefConflicts) {
+            if (conflict.charId === charId && !currentConflictKeys.has(key)) {
+              openBeliefConflicts.delete(key);
               resolvedCount++;
             }
           }
@@ -278,6 +324,23 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
       urgency,
       suggestedOp: 'APPRAISE_EMOTION',
       pacingScore: computePacingScore(age, 2, 5),
+    });
+  }
+
+  // BELIEF_CONFLICT promises — character holds contradictory beliefs; reconcile within 4–12 scenes
+  for (const [key, { scene: openedAtScene, charId, stem }] of openBeliefConflicts) {
+    const age = totalScenes - openedAtScene;
+    const targetWindow: [number, number] = [openedAtScene + 4, openedAtScene + 12];
+    const urgency = computeUrgency(totalScenes - 1, targetWindow);
+    openPromises.push({
+      promiseId: `belief:${key}`,
+      kind: 'BELIEF_CONFLICT',
+      description: `"${charId}" holds contradictory beliefs about "${stem}..." — needs reconciliation`,
+      openedAtScene,
+      targetWindow,
+      urgency,
+      suggestedOp: 'UPDATE_BELIEF',
+      pacingScore: computePacingScore(age, 4, 12),
     });
   }
 
