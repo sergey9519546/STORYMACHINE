@@ -45,9 +45,10 @@ design; the AI-dependent surfaces stay dark and say so honestly.
 4. Optional honesty checks to show a skeptical audience:
    - The sample never overwrites an existing draft (guarded; try it with
      text in the editor — it refuses with a notice).
-   - AI features are **off by default**: no inline copilot, no background
-     analysis, zero network calls to any provider (the smoke test asserts
-     zero at the provider seam *and* zero non-loopback requests).
+   - The legacy inline copilot is **retired**, background analysis is off by
+     default, and this path makes zero network calls to any provider (the
+     smoke test asserts zero at the provider seam *and* zero non-loopback
+     requests). Explicit AI tools remain available when configured and chosen.
    - An interrupted analysis shows "incomplete" — never a fake score.
 
 ## Verifying the zero-AI claim yourself

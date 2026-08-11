@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { getSessionId, isSameOriginApiRequest, mergeSessionHeader } from "./lib/session.ts";
+import { getSessionId, mergeSessionHeader, shouldAttachSessionHeader } from "./lib/session.ts";
 
 // ── Per-session identity: monkey-patch fetch before anything else runs ──────
 // Installed here, first, before React ever mounts: dozens of panels across
@@ -10,18 +10,17 @@ import { getSessionId, isSameOriginApiRequest, mergeSessionHeader } from "./lib/
 // comment), so patching fetch once at the entry point covers every existing
 // call site AND any future one, which 60-odd individual edits could not
 // guarantee. Only same-origin requests whose path starts with '/api/' are
-// touched; anything else (cross-origin, non-API paths) passes through
-// unmodified — EventSource-based SSE panels are a separate case (EventSource
-// has no headers API) and instead append `?sessionId=` directly via
-// src/lib/session.ts's withSession() at their own call sites.
+// touched except the session-unlinked /api/events sink; anything else
+// (cross-origin, non-API paths) passes through unmodified. EventSource-based
+// SSE panels are a separate case (EventSource has no headers API) and instead
+// append `?sessionId=` directly via src/lib/session.ts's withSession().
 //
-// isSameOriginApiRequest handles all three fetch input shapes (string,
-// Request, URL) — every call site in this app today passes a plain string,
-// but a future `fetch(new Request(...))` or `fetch(new URL(...))` must be
-// recognized too rather than silently bypassing session-header attachment.
+// shouldAttachSessionHeader handles all three fetch input shapes (string,
+// Request, URL), preserves cross-origin protection, and keeps event requests
+// outside StoryMachine's session capability boundary.
 const originalFetch = window.fetch.bind(window);
 window.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  if (!isSameOriginApiRequest(input, window.location.origin)) {
+  if (!shouldAttachSessionHeader(input, window.location.origin)) {
     return originalFetch(input, init);
   }
   // Prefer init.headers (it overrides a Request input's own headers per the

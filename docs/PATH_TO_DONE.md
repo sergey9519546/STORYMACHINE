@@ -64,9 +64,11 @@ of Doctor runs that export is measured."* Status: **DONE** (`ROADMAP.md`
 §3, 2026-07-29). Every export carries a verify block with the full
 64-hex contentHash; `#verify` route re-derives the score server-side;
 `tests/routes/export-verify.test.ts` proves the loop end to end including
-two forgery cases. Known limit: event counters are in-memory/per-process,
-not durable — acceptable per ROADMAP until the rate itself is being acted
-on.
+two forgery cases. Known limit: these session-unlinked aggregate counters are
+unauthenticated and client-reported, in-memory/process-local, and reset on
+restart. They are not durable or deployment-wide, not authoritative P0
+evidence, and not proof of unique users. Session-unlinked is not absolute
+anonymity because ordinary HTTP/network metadata remains outside the sink.
 
 **P4 — Retention & defensibility.** Exit gate: *"Returning-user rate and
 multi-revision session rate are measured."* Status: **NOT STARTED, by

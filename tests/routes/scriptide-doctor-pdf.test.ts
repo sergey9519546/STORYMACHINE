@@ -39,7 +39,7 @@ function assemblePdf(objects: string[], totalObjs: number): Buffer {
   return Buffer.from(pdf, 'binary');
 }
 
-function buildScreenplayPdf(pages: Page[]): Buffer {
+function buildScreenplayPdf(pages: Page[], height = 792): Buffer {
   const objects: string[] = [];
   const pageObjNums: number[] = [];
   const contentObjNums: number[] = [];
@@ -56,7 +56,7 @@ function buildScreenplayPdf(pages: Page[]): Buffer {
   for (let p = 0; p < pages.length; p++) {
     const pageObjNum = pageObjNums[p]!;
     const contentObjNum = contentObjNums[p]!;
-    objects[pageObjNum] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+    objects[pageObjNum] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 ${height}] `
       + `/Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjNum} 0 R >>`;
 
     const ops = ['BT', '/F1 12 Tf'];
@@ -173,6 +173,33 @@ describe('routes/scriptide/doctor/pdf — HTTP behavior', async () => {
     assert.equal(res.status, 400);
     const body = await res.json();
     assert.match(body.error, /no text layer/);
+  });
+
+  it('POST a 301-page PDF returns the exact safe page-cap 400', async () => {
+    const pages = Array.from({ length: 301 }, (_, index): Page => index === 0
+      ? [{ y: 700, runs: [{ x: X_ACTION, text: 'INT. ARCHIVE - DAY' }] }]
+      : []);
+    const res = await postPdf(buildScreenplayPdf(pages));
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), {
+      error: 'This PDF exceeds the 300-page limit. Split it into smaller files and try again.',
+    });
+  });
+
+  it('POST a PDF with 900,001 extractable characters returns the exact safe text-cap 400', async () => {
+    const lines = Array.from(
+      { length: 100_001 },
+      (_, index): Line => ({
+        y: 350_000 - index * 3,
+        runs: [{ x: X_ACTION, text: index === 100_000 ? 'A' : 'A'.repeat(9) }],
+      }),
+    );
+    const oversizedPdf = buildScreenplayPdf([lines], 400_000);
+    const res = await postPdf(oversizedPdf);
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), {
+      error: 'This PDF contains more than 900,000 extractable text characters. Split it into smaller files and try again.',
+    });
   });
 
   it('a GET request to the PDF doctor route is not allowed (POST-only)', async () => {

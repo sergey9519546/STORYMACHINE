@@ -7,6 +7,7 @@ import { Orchestrator } from '../engine/Orchestrator.ts';
 import { logger } from './logger.ts';
 import { metrics } from './metrics.ts';
 import { pruneAllSessionResetBackups } from './backup.ts';
+import { boundedIntegerEnv } from './runtime-limits.ts';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface Session {
@@ -176,19 +177,6 @@ export const heavyBodyLimiter = rateLimit({
 });
 
 // ── Session constants ─────────────────────────────────────────────────────────
-function boundedIntegerEnv(name: string, fallback: number, min: number, max: number): number {
-  const raw = process.env[name];
-  if (raw === undefined || raw === '') return fallback;
-  if (!/^\d+$/.test(raw)) {
-    throw new Error(`${name} must be an integer between ${min} and ${max}`);
-  }
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(`${name} must be an integer between ${min} and ${max}`);
-  }
-  return value;
-}
-
 export const SESSION_DB_DIR  = process.env.SESSION_DB_DIR ?? path.join(process.cwd(), 'data', 'sessions');
 export const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
 // Recovery artifacts deliberately live outside the live session root so file
@@ -736,7 +724,8 @@ setInterval(() => sweepIdleSessions(), 60_000).unref();
 
 // Disk cleanup: remove orphaned session DB files that are older than SESSION_FILE_TTL_MS
 // and are not currently loaded in memory. Runs every 6 hours.
-const SESSION_FILE_TTL_MS = Number(process.env.SESSION_FILE_TTL_HOURS ?? 168) * 60 * 60 * 1000; // default 7 days
+export const SESSION_FILE_TTL_HOURS = boundedIntegerEnv('SESSION_FILE_TTL_HOURS', 168, 1, 24 * 365);
+const SESSION_FILE_TTL_MS = SESSION_FILE_TTL_HOURS * 60 * 60 * 1000; // default 7 days
 if (PERSIST_SESSIONS) {
   setInterval(() => {
     const now = Date.now();

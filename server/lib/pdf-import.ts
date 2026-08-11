@@ -1,3 +1,5 @@
+import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
+
 // PDF screenplay import — converts a screenplay PDF (Final Draft, WriterDuet,
 // Arc Studio, or any app exporting the industry-standard US Letter screenplay
 // layout) into Fountain text, mirroring server/lib/fdx-import.ts's module
@@ -74,6 +76,8 @@ const DIALOGUE_PARENTHETICAL_SPLIT = 0.6;
 // extraction is still emitted (best effort), but the caller is warned the
 // result may be unreliable for that page.
 const UNCLASSIFIABLE_WARNING_RATIO = 0.2;
+const MAX_PDF_PAGES = 300;
+const MAX_PDF_TEXT_ITEMS = 200_000;
 
 type ColumnRole = 'action' | 'dialogue' | 'parenthetical' | 'character';
 interface ColumnBand { role: ColumnRole; x: number }
@@ -184,43 +188,52 @@ export async function pdfToFountain(pdfBytes: Uint8Array): Promise<{ fountain: s
   // documented determinism guarantee (calling it twice with the same
   // Uint8Array must work, not throw on the second call).
   const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(), verbosity: pdfjsLib.VerbosityLevel.ERRORS });
-  let doc: PdfDocumentLike;
+  let doc: PdfDocumentLike | undefined;
   try {
-    // pdfjs's real PDFDocumentProxy is structurally compatible with our own
-    // narrow PdfDocumentLike (see the "Minimal structural types" note at the
-    // bottom of this file for why we declare our own instead of importing
-    // pdfjs-dist's types here).
-    doc = await loadingTask.promise;
-  } catch (err) {
-    const name = (err as { name?: string })?.name;
-    if (name === 'PasswordException') {
-      throw new Error('This PDF is password-protected. Remove the password and try again.');
+    try {
+      // pdfjs's real PDFDocumentProxy is structurally compatible with our own
+      // narrow PdfDocumentLike (see the "Minimal structural types" note at the
+      // bottom of this file for why we declare our own instead of importing
+      // pdfjs-dist's types here).
+      doc = await loadingTask.promise;
+    } catch (err) {
+      const name = (err as { name?: string })?.name;
+      if (name === 'PasswordException') {
+        throw new Error('This PDF is password-protected. Remove the password and try again.');
+      }
+      if (name === 'InvalidPDFException') {
+        throw new Error('This PDF is corrupted or not a valid PDF document.');
+      }
+      throw new Error('Could not read this PDF. It may be corrupted or use an unsupported PDF feature.');
     }
-    if (name === 'InvalidPDFException') {
-      throw new Error('This PDF is corrupted or not a valid PDF document.');
-    }
-    throw new Error(`Could not read this PDF: ${(err as Error).message ?? 'unknown error'}`);
-  }
 
   const warnings: string[] = [];
   const pageCount = doc.numPages;
+  if (pageCount > MAX_PDF_PAGES) {
+    throw new Error('This PDF exceeds the 300-page limit. Split it into smaller files and try again.');
+  }
 
   // ── Phase 1: extract every page's visual lines, tagging which pages have
   // no text layer at all (the scanned-image case) ────────────────────────────
   const perPageLines: RawLine[][] = [];
   const perPageHeight: number[] = [];
+  const extractionBudget: ExtractionBudget = { chars: 0, textItems: 0 };
   let pagesWithText = 0;
 
   for (let i = 0; i < pageCount; i++) {
     const page = await doc.getPage(i + 1);
-    const [, viewY0, , viewY1] = page.view;
-    perPageHeight.push(viewY1 - viewY0);
-    const { lines, hasText } = await extractPageLines(page, i);
-    perPageLines.push(lines);
-    if (hasText) {
-      pagesWithText++;
-    } else {
-      warnings.push(`Page ${i + 1}: no text layer found — this page may be a scanned image.`);
+    try {
+      const [, viewY0, , viewY1] = page.view;
+      perPageHeight.push(viewY1 - viewY0);
+      const { lines, hasText } = await extractPageLines(page, i, extractionBudget);
+      perPageLines.push(lines);
+      if (hasText) {
+        pagesWithText++;
+      } else {
+        warnings.push(`Page ${i + 1}: no text layer found — this page may be a scanned image.`);
+      }
+    } finally {
+      try { page.cleanup(); } catch { /* best-effort release; document cleanup still follows */ }
     }
   }
 
@@ -250,6 +263,9 @@ export async function pdfToFountain(pdfBytes: Uint8Array): Promise<{ fountain: s
   // unclassifiable-line ratios for the warnings list and merging dialogue
   // that a page break split mid-speech ───────────────────────────────────────
   const { fountain, perPageUnclassifiable } = classifyAndEmit(contentLines, bands);
+  if (fountain.length > MAX_FOUNTAIN_CHARS) {
+    throw new Error('This PDF converts to more than 900,000 Fountain characters. Split it into smaller files and try again.');
+  }
 
   for (const [pageIdx, ratio] of perPageUnclassifiable) {
     if (ratio > UNCLASSIFIABLE_WARNING_RATIO) {
@@ -262,6 +278,12 @@ export async function pdfToFountain(pdfBytes: Uint8Array): Promise<{ fountain: s
   }
 
   return { fountain, warnings: dedupe(warnings) };
+  } finally {
+    if (doc) {
+      try { await doc.cleanup(); } catch { /* preserve the conversion result/error */ }
+    }
+    try { await loadingTask.destroy(); } catch { /* preserve the conversion result/error */ }
+  }
 }
 
 // ── PDF header check ──────────────────────────────────────────────────────────
@@ -282,13 +304,61 @@ function dedupe(list: string[]): string[] {
 }
 
 // ── Phase 1 helper: per-page line extraction ─────────────────────────────────
-// pdfjs's getTextContent() returns items in content-stream draw order, not
-// reading order — sort top-to-bottom (PDF y increases upward, so descending y
-// is reading order) then left-to-right, and merge runs whose y falls within
-// Y_TOLERANCE of the line already being built.
-async function extractPageLines(page: PdfPageLike, pageIndex: number): Promise<{ lines: RawLine[]; hasText: boolean }> {
-  const content = await page.getTextContent();
-  const items = content.items.filter((it): it is PdfTextItem => typeof (it as PdfTextItem).str === 'string' && (it as PdfTextItem).str.trim() !== '');
+// pdfjs streams items in content-stream draw order, not reading order. Count
+// every item and character as each bounded chunk arrives, before retaining the
+// useful items needed for layout sorting. This avoids getTextContent(), which
+// materializes an entire page before the caller can enforce any budget.
+interface ExtractionBudget { chars: number; textItems: number }
+
+export async function readBoundedPdfTextItems(
+  reader: ReadableStreamDefaultReader<PdfTextContentChunk>,
+  budget: ExtractionBudget,
+): Promise<PdfTextItem[]> {
+  const items: PdfTextItem[] = [];
+  let readerSettled = false;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        readerSettled = true;
+        break;
+      }
+      for (const item of value.items) {
+        budget.textItems++;
+        if (budget.textItems > MAX_PDF_TEXT_ITEMS) {
+          const safeError = new Error('This PDF contains more than 200,000 text items. Export a simplified PDF or split it into smaller files and try again.');
+          try { await reader.cancel(new Error('PDF text extraction limit exceeded')); } catch { /* safe cap error remains authoritative */ }
+          readerSettled = true;
+          throw safeError;
+        }
+        if (typeof (item as PdfTextItem).str !== 'string') continue;
+        const textItem = item as PdfTextItem;
+        budget.chars += textItem.str.length;
+        if (budget.chars > MAX_FOUNTAIN_CHARS) {
+          const safeError = new Error('This PDF contains more than 900,000 extractable text characters. Split it into smaller files and try again.');
+          try { await reader.cancel(new Error('PDF text extraction limit exceeded')); } catch { /* safe cap error remains authoritative */ }
+          readerSettled = true;
+          throw safeError;
+        }
+        if (textItem.str.trim() !== '') items.push(textItem);
+      }
+    }
+  } finally {
+    if (!readerSettled) {
+      try { await reader.cancel(); } catch { /* document/loading-task cleanup still follows */ }
+      readerSettled = true;
+    }
+    reader.releaseLock();
+  }
+  return items;
+}
+
+async function extractPageLines(
+  page: PdfPageLike,
+  pageIndex: number,
+  budget: ExtractionBudget,
+): Promise<{ lines: RawLine[]; hasText: boolean }> {
+  const items = await readBoundedPdfTextItems(page.streamTextContent().getReader(), budget);
 
   if (items.length === 0) return { lines: [], hasText: false };
 
@@ -612,11 +682,14 @@ function formatParentheticalLine(text: string): string {
 // package to be resolvable at type-check time for code that never calls this
 // function.
 interface PdfTextItem { str: string; transform: number[]; width: number; height: number }
+interface PdfTextContentChunk { items: Array<PdfTextItem | { type: string }> }
 interface PdfPageLike {
   view: number[];
-  getTextContent(): Promise<{ items: Array<PdfTextItem | { type: string }> }>;
+  streamTextContent(): ReadableStream<PdfTextContentChunk>;
+  cleanup(): boolean;
 }
 interface PdfDocumentLike {
   numPages: number;
   getPage(pageNumber: number): Promise<PdfPageLike>;
+  cleanup(): Promise<unknown>;
 }

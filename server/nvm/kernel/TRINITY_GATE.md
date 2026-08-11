@@ -1,5 +1,10 @@
 # Trinity Verification Gate
 
+> **ARCHIVED STATUS — experimental subsystem record.** The production-ready
+> and current-status claims below describe the Trinity Gate design at the time
+> of writing, not the current shipped-product surface. See `ROADMAP.md` for
+> current truth.
+
 **Three-layer verification system that prevents plot holes by construction.**
 
 The Trinity Gate is a production-ready verification orchestrator that ensures narrative consistency before events are committed to the EventStore. All three layers must pass for an event to be accepted.

@@ -13,14 +13,17 @@ import path from "node:path";
 
 const MAIN_SRC = path.resolve(import.meta.dirname, "../../src/main.tsx");
 
-describe("main.tsx fetch wrapper — Request/URL inputs are handled, not silently bypassed", () => {
+describe("main.tsx fetch wrapper — session-header decision wiring", () => {
   const source = fs.readFileSync(MAIN_SRC, "utf8");
 
-  it("imports isSameOriginApiRequest from session.ts", () => {
+  it("imports and calls the telemetry-aware session-header decision helper", () => {
     assert.match(
       source,
-      /import\s*\{[^}]*isSameOriginApiRequest[^}]*\}\s*from\s*["']\.\/lib\/session\.ts["']/,
+      /import\s*\{[^}]*shouldAttachSessionHeader[^}]*\}\s*from\s*["']\.\/lib\/session\.ts["']/,
     );
+    const idx = source.indexOf("window.fetch = ((input");
+    const body = source.slice(idx, idx + 900);
+    assert.match(body, /shouldAttachSessionHeader\(input, window\.location\.origin\)/);
   });
 
   it("no longer gates on `typeof input === \"string\"` alone", () => {
@@ -31,11 +34,11 @@ describe("main.tsx fetch wrapper — Request/URL inputs are handled, not silentl
     );
   });
 
-  it("the wrapper's early-return guard calls isSameOriginApiRequest with the live origin", () => {
+  it("the wrapper's early-return guard calls shouldAttachSessionHeader with the live origin", () => {
     const idx = source.indexOf("window.fetch = ((input");
     assert.ok(idx > -1, "expected the fetch override assignment");
     const body = source.slice(idx, idx + 900);
-    assert.match(body, /isSameOriginApiRequest\(input, window\.location\.origin\)/);
+    assert.match(body, /shouldAttachSessionHeader\(input, window\.location\.origin\)/);
   });
 
   it("falls back to the Request's own headers when init carries none, instead of dropping them", () => {

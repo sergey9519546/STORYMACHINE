@@ -230,9 +230,9 @@ receipts already exist; this phase productizes them.
   editor, and outside the Labs gate.
 - `server/routes/events.ts` + `EventBodySchema`: instrumentation sink over a
   **closed** event vocabulary (`doctor_run`, `export_report`, `first_report`,
-  `verify_run`) with bounded scalar props — an open namespace would let any
-  client plant keys in the counters that gate this phase. Aggregate counters
-  only (no per-event history, no PII, no script text); `GET
+  `verify_run`) with strict per-event props. Unknown fields, free text, and
+  StoryMachine session capabilities are rejected. The sink keeps
+  session-unlinked aggregate counters only; `GET
   /api/events/summary` reports `exportRate` and `avgTimeToFirstReportMs`,
   both `null` rather than `0` before any run.
 - `src/lib/analytics.ts` + `ScriptDoctorPanel.tsx` wiring: fire-and-forget
@@ -250,9 +250,12 @@ real route, plus the two forgeries the mechanism exists to catch: an inflated
 health figure on untouched text, and a genuine report paired with a different
 script.
 
-**Known limit:** counters are in-memory and per-process — they answer the
-exit-gate ratios for a single deployment since boot, and reset on restart. A
-durable store is only worth adding once the rate itself is being acted on.
+**Known limit:** counters are unauthenticated and client-reported, in-memory
+and process-local, and reset on restart. They are not durable, not
+deployment-wide, not authoritative P0 evidence, and not proof of unique users.
+"Session-unlinked" describes this aggregate sink, not absolute anonymity:
+normal HTTP/network metadata can still exist outside it. A durable store is
+only worth adding once the rate itself is being acted on.
 
 ### P4 — Retention & defensibility (later; only after the score is trusted)
 

@@ -7,7 +7,7 @@ setup walkthrough see **README.md**; for working constraints see
 
 ## Dev setup
 
-Requires Node.js 22.6+ (CI pins Node 22).
+Requires Node.js >=22.13.0 || >=24 (CI pins Node 22).
 
 ```bash
 npm ci          # install pinned deps

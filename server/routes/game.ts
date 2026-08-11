@@ -478,9 +478,20 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
   res.setHeader('X-Accel-Buffering', 'no'); // disable nginx proxy buffering
   res.flushHeaders();
 
+  // The cancellation authority must exist before either client-disconnect
+  // listener is registered: a close/error can arrive as soon as the stream
+  // headers have been flushed.  The listener only asks the simulation to
+  // stop at its next write-safe boundary; it deliberately never ends the
+  // response or releases the coordinator/room reservation itself.
+  const controller = new AbortController();
   let disconnected = false;
-  req.on('close', () => { disconnected = true; });
-  req.on('error', () => { disconnected = true; });
+  const cancelDisconnectedStream = () => {
+    if (disconnected) return;
+    disconnected = true;
+    controller.abort();
+  };
+  req.on('close', cancelDisconnectedStream);
+  req.on('error', cancelDisconnectedStream);
 
   const emit = (event: RoomProgressEvent) => {
     if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -498,8 +509,9 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
   // AI_BUDGET_DEADLINE_EXCEEDED code every other budget-timeout response in
   // this file already uses (see /api/turn, POST /api/run-room above,
   // /api/run-scene, /api/simulate-to-fountain).
+  let wallTimedOut = false;
   const emitTruncationLabeled = (event: RoomProgressEvent) => {
-    if (event.type === 'simulation_complete' && event.truncated) {
+    if (event.type === 'simulation_complete' && event.truncated && wallTimedOut) {
       emit({ ...event, stoppedBy: 'AI_BUDGET_DEADLINE_EXCEEDED' });
       return;
     }
@@ -532,8 +544,8 @@ router.get('/api/run-room-stream', aiLimiter, reserveSimulationRooms(req => [
   // SessionCommandCoordinator/lock guarantee this route already had is
   // unchanged: res.end() (ensureEnded()) and releaseSimulationRooms() below
   // still only run once that same promise has truly settled.
-  const controller = new AbortController();
   const wallTimer = setTimeout(() => {
+    wallTimedOut = true;
     controller.abort();
   }, RUN_ROOM_BUDGET.timeoutMs);
 

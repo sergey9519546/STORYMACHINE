@@ -621,7 +621,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {llmReady === false && !llmBannerDismissed && (
         <div className="mb-6 flex items-center justify-between gap-4 border-[1.5px] border-[var(--sm-warn)] bg-[var(--sm-panel-2)] px-4 py-3 font-[family-name:var(--sm-font-mono)] text-xs text-[var(--sm-ink-soft)]">
           <span>
-            Analysis &amp; exports work now. Generation (copilot, simulation turns, rewriting) needs an AI key — Settings explains.
+            Analysis &amp; exports work now. Explicit generation (world-building, simulation turns, rewriting) needs an AI key — Settings explains.
           </span>
           <button onClick={dismissLlmBanner} className="sm-btn shrink-0 py-1">
             Dismiss

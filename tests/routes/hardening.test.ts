@@ -103,24 +103,9 @@ describe('hardening — request-log query-string hygiene (regression guard)', as
   let server: TestServer;
   const originalWrite = process.stdout.write.bind(process.stdout);
   let captured: string[] = [];
-  // G0-03: /api/scriptide/complete now guards on llmReady() before ever
-  // reaching the SSE branch this test exercises (see server/routes/scriptide.ts
-  // — the same "keyless guard" the other six generation routes already had).
-  // Set a dummy key for this describe block's duration so the request still
-  // reaches the real SSE code path this test is about, rather than short-
-  // circuiting to the (also query-string-bearing, so equally in-scope, but
-  // not what this test claims to cover) 503 keyless response.
-  const prevGeminiKey = process.env.GEMINI_API_KEY;
 
-  before(async () => {
-    process.env.GEMINI_API_KEY = 'test-key-for-request-log-hygiene';
-    server = await startTestServer();
-  });
-  after(async () => {
-    if (prevGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
-    else process.env.GEMINI_API_KEY = prevGeminiKey;
-    await server.close();
-  });
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
 
   it('an SSE-style request carrying a capability-bearing ?sessionId= query param never has that value appear in the request log line', async () => {
     captured = [];
@@ -134,13 +119,12 @@ describe('hardening — request-log query-string hygiene (regression guard)', as
 
     const secretSessionId = 'sekrit-session-value-must-not-leak-into-logs';
     try {
-      // /api/scriptide/complete is the real SSE call site that carries
-      // sessionId in the query string (src/lib/session.ts's withSession()) —
-      // see server/app.ts's documenting comment. rawPrefix is intentionally
-      // short (<10 chars) so the handler short-circuits to `{type:'done'}`
-      // immediately rather than attempting a real model call.
+      // /api/run-room-stream is a live SSE call site that carries sessionId
+      // in the query string (src/lib/session.ts's withSession()) — see
+      // server/app.ts's documenting comment. A nonexistent node closes the
+      // stream deterministically before any provider call.
       const res = await fetch(
-        `${server.baseUrl}/api/scriptide/complete?sessionId=${secretSessionId}&prefix=hi`,
+        `${server.baseUrl}/api/run-room-stream?sessionId=${secretSessionId}&nodeId=missing-log-hygiene-node`,
       );
       assert.equal(res.status, 200);
       await res.text(); // drain the SSE stream so 'finish' fires and the request log line is emitted
@@ -160,7 +144,7 @@ describe('hardening — request-log query-string hygiene (regression guard)', as
       );
       // Positive control: confirms this assertion isn't vacuously true
       // because the path field was empty or the route didn't match.
-      assert.ok(line.includes('/api/scriptide/complete'), `expected the path in the log line: ${line}`);
+      assert.ok(line.includes('/api/run-room-stream'), `expected the path in the log line: ${line}`);
     }
   });
 });

@@ -7,7 +7,7 @@
 // getImageProvider().generate + getTTSProvider().speak in Promise.all: three
 // provider calls per debounced keystroke, with zero user opt-in.
 //
-// Same JSX/JSDOM constraint as G0-03 (see tests/core/inline-complete-default-off.test.ts):
+// Same JSX/JSDOM constraint as the editor source contracts:
 // ScriptIDE.tsx can't be imported under `node --experimental-strip-types`
 // (this repo's test runner has no JSX transform and no jsdom). This test
 // instead exercises the real production gating seam, scheduleAutoAnalysis

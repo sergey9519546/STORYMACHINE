@@ -80,10 +80,10 @@ verbatim to every route the live sample flow actually calls:
 The live doctor route's health/verdict/scene-count (68.9 / CONSIDER / 14) match
 the committed static stimulus's provenance table exactly — the static report
 and the live in-app report are confirmed consistent on this commit. The
-previously-flagged CodeMirror synchronous-dispatch crash cause is fixed in
-source at HEAD: `src/components/editor/inline-complete.ts` now defers the
-dismiss-dispatch via `setTimeout(..., 0)`, with an inline comment recording the
-prior crash cause.
+previously flagged CodeMirror synchronous-dispatch defect was fixed before
+the URL-based inline-completion surface was retired. At HEAD that client
+module is absent and `GET /api/scriptide/complete` is a game-limited, zero-work
+410 compatibility tombstone; ordinary Fountain autocomplete remains active.
 
 **Browser DOM smoke: CERTIFIED (2026-07-28, current `main` tip `1a7f3b4`,
 on a machine with a real browser).** Drove the exact flow the operating kit

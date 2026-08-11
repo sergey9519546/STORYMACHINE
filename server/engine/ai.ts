@@ -286,8 +286,8 @@ export function getModel(tier: 'fast' | 'pro' = 'pro'): string {
 // quality-critical tasks route to the Pro tier; high-volume, low-latency, or
 // simple-transform tasks route to the Fast tier. Centralizing the mapping here
 // means callers declare WHAT they're doing, not WHICH model — so the whole
-// routing policy can be tuned in one place (or overridden per task via env:
-// e.g. AI_TASK_TIER_GHOST_TEXT=pro).
+// routing policy can be tuned in one place (or overridden per task via env,
+// e.g. AI_TASK_TIER_REVISION=fast).
 export type TaskType =
   | 'OUTLINE'      // structure / beat-sheet generation — high reasoning, long context
   | 'CANDIDATE'    // NVM scene-candidate generation — quality critical
@@ -298,8 +298,7 @@ export type TaskType =
   | 'CHARACTER'    // character profile synthesis — reasoning
   | 'ACTION'       // clean-action transform — simple, mechanical
   | 'AGENT_TURN'   // per-agent ToT action selection — high volume
-  | 'EPISTEMICS'   // per-agent belief update — high volume
-  | 'GHOST_TEXT';  // inline copilot completion — latency critical
+  | 'EPISTEMICS';  // per-agent belief update — high volume
 
 const TASK_TIER: Record<TaskType, 'fast' | 'pro'> = {
   OUTLINE:    'pro',
@@ -316,7 +315,6 @@ const TASK_TIER: Record<TaskType, 'fast' | 'pro'> = {
   ACTION:     'fast',  // mechanical camera-direction strip — no reasoning needed
   AGENT_TURN: 'fast',  // high volume per turn
   EPISTEMICS: 'fast',  // high volume per turn
-  GHOST_TEXT: 'fast',  // latency critical (inline copilot)
 };
 
 /**

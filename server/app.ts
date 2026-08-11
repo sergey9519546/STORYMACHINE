@@ -74,7 +74,7 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   // *pathname only*; per Express/Node's `url.parse` semantics, `req.path`
   // never includes the query string (that's `req.url` / `req.originalUrl`,
   // neither of which this logger reads). This is deliberate and load-bearing,
-  // not incidental: SSE call sites (e.g. GET /api/scriptide/complete) can't
+  // not incidental: SSE call sites (e.g. GET /api/run-room-stream) can't
   // set the X-Session-Id header the way fetch()-based callers do, so
   // src/lib/session.ts's withSession() instead appends the session id as a
   // `?sessionId=...` query param (see server/lib/session-store.ts's
@@ -129,8 +129,8 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   //     dist/assets/ScriptIDE-*.js) — those need img-src, not style-src, to
   //     load.
   //   - font-src 'self': no data:/CDN font URLs found in dist/assets/*.css.
-  //   - connect-src 'self': every API call and the /api/scriptide/complete
-  //     SSE stream is same-origin fetch/EventSource; per the CSP spec,
+  //   - connect-src 'self': every API call and the /api/run-room-stream SSE
+  //     stream is same-origin fetch/EventSource; per the CSP spec,
   //     'self' for connect-src also covers same-origin ws:/wss: (the collab
   //     WebSocket at /collab/:room), so no separate ws: entry is needed.
   //   - object-src 'none', base-uri 'self', frame-ancestors 'none': no
