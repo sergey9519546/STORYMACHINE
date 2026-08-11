@@ -18,9 +18,18 @@ export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTI
 export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 
 /**
- * Stress accounts — the Narrative Stress Ledger decomposes dramatic pressure
- * into typed categories (spec §4). Existing PromiseKinds regroup under these
- * accounts; 'scene' and 'audience' start empty until their detectors land.
+ * Stress accounts — decomposes dramatic pressure into typed categories
+ * aligned with the GODMODE Screenplay Understanding Standard
+ * (docs/GODMODE_SCREENPLAY_UNDERSTANDING_STANDARD.md).
+ *
+ * GODMODE level mapping:
+ *   systemic    ← L21 (Setup/Payoff Architecture), L3 (World/Rules)
+ *   relational  ← L10 (Relationship Architecture)
+ *   character   ← L27 (Emotional Architecture), L6 (Protagonist)
+ *   epistemic   ← L19 (Reveal & Clue Architecture), L4 (Fabula/Syuzhet)
+ *   thematic    ← L23 (Theme as Argument)
+ *   scene       ← L14 (Scene Function Intelligence), L26 (Pacing & Rhythm)
+ *   audience    ← L20 (Audience-State Architecture)
  */
 export type StressAccount = 'systemic' | 'relational' | 'character' | 'epistemic' | 'thematic' | 'scene' | 'audience';
 
@@ -81,6 +90,29 @@ export interface TemporalDynamics {
   lockMode: HysteresisLockMode;
 }
 
+/**
+ * Per-sequence structural summary (GODMODE L12 — Sequence Architecture).
+ * Sequences are the most useful unit between whole script and scene.
+ * Grouping adapts to script length: target 8 sequences, minimum 3 scenes each.
+ */
+export interface SequenceGroup {
+  index: number;
+  startScene: number;
+  endScene: number;
+  /** Promise kinds that opened during this sequence. */
+  kindsOpened: PromiseKind[];
+  /** Count of promises opened during this sequence (from final openPromises). */
+  promisesOpened: number;
+  /** Whether this sequence contains a catharsis beat (EMOTIONAL_DEBT resolved). */
+  hasCatharsis: boolean;
+  /** Whether this sequence contains high distress (EMOTIONAL_DEBT opened). */
+  hasDistress: boolean;
+  /** Whether this sequence contains a reveal (knownFact delivered). */
+  hasReveal: boolean;
+  /** Whether this sequence is entirely dead air (no substance in any scene). */
+  isDeadAir: boolean;
+}
+
 export interface ArcCompletionReport {
   totalScenes: number;
   openPromises: OpenPromise[];
@@ -93,6 +125,8 @@ export interface ArcCompletionReport {
   accounts: Record<StressAccount, AccountBreakdown>;
   /** Temporal dynamics: fatigue, catharsis recency, hysteresis lock mode. */
   temporalDynamics: TemporalDynamics;
+  /** Per-sequence structural summary (GODMODE L12). */
+  sequences: SequenceGroup[];
 }
 
 // ── Promise accumulator ───────────────────────────────────────────────────────
@@ -136,6 +170,8 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   let highStressBeatCount = 0;
   let recoveryBeatCount = 0;
   let lastCatharsisScene = -1;
+  // Per-scene flags for sequence analysis (GODMODE L12)
+  const sceneFlags = new Map<number, { distress?: boolean; catharsis?: boolean; reveal?: boolean; deadAir?: boolean }>();
   let resolvedCount      = 0;
 
   const HIGH_DISTRESS_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame']);
@@ -154,10 +190,16 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
     } else if (deadAirStreakStart < 0) {
       deadAirStreakStart = sceneIdx;
     }
+    if (!hasSubstance) {
+      const f = sceneFlags.get(sceneIdx) ?? {};
+      f.deadAir = true;
+      sceneFlags.set(sceneIdx, f);
+    }
 
     // Fatigue: per-scene flags for high-stress exposure and catharsis recovery
     let sceneHadHighStress = false;
     let sceneHadCatharsis = false;
+    let sceneHadReveal = false;
 
     for (const op of ops) {
       switch (op.op) {
@@ -291,6 +333,7 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
           // A knownFact answers the audience's most recent open question
           if (d.knownFact) {
             audienceQuestionsAnswered++;
+            sceneHadReveal = true;
           }
           break;
         }
@@ -307,6 +350,12 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
       fatigue = Math.max(0, fatigue - 0.12);
       lastCatharsisScene = sceneIdx;
     }
+    // Record per-scene flags for sequence analysis (GODMODE L12)
+    const flags = sceneFlags.get(sceneIdx) ?? {};
+    if (sceneHadHighStress) flags.distress = true;
+    if (sceneHadCatharsis) flags.catharsis = true;
+    if (sceneHadReveal) flags.reveal = true;
+    sceneFlags.set(sceneIdx, flags);
   }
 
   // Close resolved dead-air streaks
@@ -521,7 +570,30 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
     lockMode,
   };
 
-  return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore), accounts, temporalDynamics };
+  // Sequence architecture (GODMODE L12 — groups scenes into structural units)
+  const seqSize = totalScenes > 0 ? Math.max(3, Math.ceil(totalScenes / 8)) : 1;
+  const sequences: SequenceGroup[] = [];
+  for (let s = 0; s * seqSize < totalScenes; s++) {
+    const startScene = s * seqSize;
+    const endScene = Math.min(startScene + seqSize - 1, Math.max(totalScenes - 1, 0));
+    const seqPromises = openPromises.filter(p => p.openedAtScene >= startScene && p.openedAtScene <= endScene);
+    const kindsOpened = [...new Set(seqPromises.map(p => p.kind))];
+    let hasDistress = false, hasCatharsis = false, hasReveal = false, isDeadAir = true;
+    for (let i = startScene; i <= endScene; i++) {
+      const f = sceneFlags.get(i);
+      if (f?.distress) hasDistress = true;
+      if (f?.catharsis) hasCatharsis = true;
+      if (f?.reveal) hasReveal = true;
+      if (!f?.deadAir) isDeadAir = false;
+    }
+    sequences.push({
+      index: s, startScene, endScene,
+      kindsOpened, promisesOpened: seqPromises.length,
+      hasCatharsis, hasDistress, hasReveal, isDeadAir,
+    });
+  }
+
+  return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore), accounts, temporalDynamics, sequences };
 }
 
 // ── Pacing helpers ────────────────────────────────────────────────────────────

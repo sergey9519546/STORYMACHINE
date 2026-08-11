@@ -444,6 +444,7 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
         ]),
       ),
       temporalDynamics: arcReport.temporalDynamics,
+      sequences: arcReport.sequences,
     },
     epistemic: {
       characterCount,

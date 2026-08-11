@@ -288,3 +288,41 @@ describe('Temporal dynamics: fatigue + hysteresis', () => {
     assert.equal(report.temporalDynamics.beatsSinceCatharsis, 0);
   });
 });
+
+describe('Sequence architecture (GODMODE L12)', () => {
+  test('groups scenes into sequences with structural flags', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [shiftRelationship('a', 'b', -0.5)] },
+      { sceneIdx: 1, ops: [shiftRelationship('a', 'b', -0.3)] },
+      { sceneIdx: 2, ops: [appraiseEmotion('a', 'distress', 90)] },
+      { sceneIdx: 3, ops: [shiftRelationship('a', 'b', -0.2)] },
+      { sceneIdx: 4, ops: [appraiseEmotion('a', 'distress', 90)] },
+      { sceneIdx: 5, ops: [{ op: 'UPDATE_READER_STATE' as const, delta: { knownFact: 'truth' } }] },
+      { sceneIdx: 6, ops: [shiftRelationship('a', 'b', -0.1)] },
+      { sceneIdx: 7, ops: [appraiseEmotion('a', 'distress', 90)] },
+      { sceneIdx: 8, ops: [shiftRelationship('a', 'b', 0.3)] },
+      { sceneIdx: 9, ops: [shiftRelationship('a', 'b', -0.4)] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.sequences.length >= 3, `expected 3+ sequences, got ${report.sequences.length}`);
+    assert.ok(report.sequences.some(s => s.hasDistress), 'a sequence should contain distress');
+    assert.ok(report.sequences.some(s => s.hasReveal), 'a sequence should contain reveal');
+  });
+
+  test('marks sequence as dead air when all scenes lack substance', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [shiftRelationship('a', 'b', -0.5)] },
+      { sceneIdx: 1, ops: [visualFact('s1', 'rain')] },
+      { sceneIdx: 2, ops: [visualFact('s2', 'sun')] },
+      { sceneIdx: 3, ops: [visualFact('s3', 'clouds')] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const deadAirSeq = report.sequences.find(s => s.isDeadAir);
+    assert.ok(deadAirSeq, 'at least one sequence should be marked dead air');
+  });
+
+  test('produces zero sequences for an empty script', () => {
+    const report = analyzeArcCompletion([]);
+    assert.equal(report.sequences.length, 0);
+  });
+});
