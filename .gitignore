@@ -55,3 +55,11 @@ test_results.txt
 # accident and is actively misleading if read as current lint output.
 # 2026-08-03 hygiene audit.
 tsc_errors.txt
+
+# screenplay-training/ — local-only model training corpus (~269MB of
+# screenplay text + training blueprints). Not referenced by the app code,
+# not produced or consumed by any build/test path. Gitignored to prevent
+# an accidental mass-commit of copyrighted screenplay text. If this dir
+# is needed for a future training pipeline, track it via LFS or a separate
+# data repo, not as a regular git tree.
+screenplay-training/
