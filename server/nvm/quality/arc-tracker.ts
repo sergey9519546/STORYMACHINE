@@ -17,6 +17,23 @@ import type { StoryOp } from '../ops/StoryOp.ts';
 export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT';
 export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 
+/**
+ * Stress accounts — the Narrative Stress Ledger decomposes dramatic pressure
+ * into typed categories (spec §4). Existing PromiseKinds regroup under these
+ * accounts; 'scene' and 'audience' start empty until their detectors land.
+ */
+export type StressAccount = 'systemic' | 'relational' | 'character' | 'epistemic' | 'thematic' | 'scene' | 'audience';
+
+/** Maps each PromiseKind to the stress account it feeds. */
+export const PROMISE_KIND_TO_ACCOUNT: Record<PromiseKind, StressAccount> = {
+  CLOCK: 'systemic',
+  OBJECT: 'systemic',
+  REL: 'relational',
+  EMOTIONAL_DEBT: 'character',
+  CLUE: 'epistemic',
+  THEME: 'thematic',
+};
+
 export interface OpenPromise {
   promiseId: string;
   kind: PromiseKind;
@@ -31,6 +48,15 @@ export interface OpenPromise {
   pacingScore: number;
 }
 
+export interface AccountBreakdown {
+  account: StressAccount;
+  /** Debt score for this account alone (0–100, same weighting as overall). */
+  subtotal: number;
+  openCount: number;
+  overdueCount: number;
+  promises: OpenPromise[];
+}
+
 export interface ArcCompletionReport {
   totalScenes: number;
   openPromises: OpenPromise[];
@@ -38,6 +64,9 @@ export interface ArcCompletionReport {
   overdueCount: number;
   /** Debt score: 0 = no debt, 100 = all promises overdue. */
   debtScore: number;
+  /** Per-account decomposition of open promises. Accounts with no detectors
+   *  yet (scene, audience) appear with empty promise lists. */
+  accounts: Record<StressAccount, AccountBreakdown>;
 }
 
 // ── Promise accumulator ───────────────────────────────────────────────────────
@@ -267,7 +296,28 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
         (dueSoonCount  / openPromises.length) * 20,
       );
 
-  return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore) };
+  // Per-account breakdown: regroup open promises into the 7 stress accounts.
+  // Accounts without detectors yet (scene, audience) get empty promise lists.
+  const ACCOUNTS: readonly StressAccount[] = ['systemic', 'relational', 'character', 'epistemic', 'thematic', 'scene', 'audience'];
+  const accounts = Object.fromEntries(
+    ACCOUNTS.map(account => {
+      const promises = openPromises.filter(p => PROMISE_KIND_TO_ACCOUNT[p.kind] === account);
+      const accountOverdue = promises.filter(p => p.urgency === 'overdue').length;
+      const accountDueSoon = promises.filter(p => p.urgency === 'due_soon').length;
+      const subtotal = promises.length === 0
+        ? 0
+        : Math.min(100, Math.round((accountOverdue / promises.length) * 80 + (accountDueSoon / promises.length) * 20));
+      return [account, {
+        account,
+        subtotal,
+        openCount: promises.length,
+        overdueCount: accountOverdue,
+        promises,
+      }];
+    }),
+  ) as Record<StressAccount, AccountBreakdown>;
+
+  return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore), accounts };
 }
 
 // ── Pacing helpers ────────────────────────────────────────────────────────────
