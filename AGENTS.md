@@ -82,7 +82,7 @@ before every push. CI runs lint + test + build on every branch, plus a
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.
 
-## Current Priority — P0 User Validation (human-evidence priority)
+## Current Priority — P0 User Validation (recommended evidence lane; no longer blocks engine work)
 
 **Status**: P0 fielding is authorized (GO, 2026-08-04), but 0 valid human
 sessions are documented and no outcome verdict exists. P0 human evidence is
@@ -103,12 +103,12 @@ See `ROADMAP.md` for full plan. Key points:
 - V5 systems (5,000+ LOC) — shadow mode OFF, activates if P0 GREEN
 - Deterministic core — production-ready
 
-**What's Gated**:
-- P1 measurement/validity work may proceed only within its machine-checked
-  evidence gates; it never substitutes for the P0 human outcome gate.
-- P4 retention/lock-in work remains prohibited until P0 PASS.
-- No Phase 3-4 Story Graph until P0 GREEN + P1 validation
-- No Infinity Gate expansion until P0 GREEN
+**Standing constraints (the P0 hard-gate was RETIRED 2026-08-11 by the
+maintainer — engine work proceeds in parallel with P0; P0 is a recommended
+evidence lane, not a prerequisite)**:
+- Scoring-path changes proceed within their machine-checked evidence gates
+  (measurement receipts, AUC ratchet) — see the 2026-08-04 amendment in
+  `ROADMAP.md` §3 and `docs/user-validation/PHASE_TRACKER.md`.
 - No new rules (frozen at 3,216 pass-scoped constants — machine-counted by
   `scripts/generate-rulebook.ts`; the "8,917" figure this line used to carry
   was DISPROVEN by the 2026-07-14 audit, see
@@ -116,7 +116,9 @@ See `ROADMAP.md` for full plan. Key points:
   R2-C01), no new waves (program RETIRED)
 
 **Constitutional Laws** (NORTH_STAR.md):
-- *Demand before rigor* — validated user need gates engine work
+- *Demand before rigor* — validated user need is the highest-priority signal;
+  pursued in parallel with engine work (amended 2026-08-11: no longer a hard
+  gate — see `docs/DECISION_LOG.md` Decision #2)
 - *Correct before reproducible* — score validity before determinism claims
 - *Measure on runnable real writing* — synthetic tests necessary but insufficient
 

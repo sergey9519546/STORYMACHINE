@@ -65,12 +65,16 @@ Measured proof points (honest, as of 2026-07-14):
 
 ## 1. Non-negotiables (the constitution proper)
 
-- **Demand before rigor.** No new engine work ships without a validated user
-  need behind it. The project's central failure mode — the one this
-  constitution now exists to prevent — was optimizing rigor (rule counts,
-  AUC ratchets, research intake) in isolation from any evidence a real
-  writer wants the output. `ROADMAP.md` P0 (validate with real writers) is a
-  hard gate, not a preference: it blocks everything downstream.
+- **Demand before rigor.** *[Amended 2026-08-11 by maintainer decision — see
+  `docs/DECISION_LOG.md` Decision #2.]* Validated user need is the project's
+  highest-priority signal and should be actively pursued (`ROADMAP.md` P0:
+  validate with real writers). The project's historical failure mode — the one
+  this constitution exists to prevent — was optimizing rigor (rule counts, AUC
+  ratchets, research intake) in isolation from any evidence a real writer wants
+  the output. **The prior hard-gate framing ("no new engine work ships without
+  a validated user need"; "P0 is a hard gate that blocks everything
+  downstream") is RETIRED.** Engine work may proceed in parallel with P0
+  evidence-gathering; P0 is recommended, not a prerequisite.
 - **Correct before reproducible.** Reproducibility is earned *after* the
   score is shown valid on real writing, never instead of it. A broken ruler
   is perfectly reproducible; determinism is worthless if the verdict is

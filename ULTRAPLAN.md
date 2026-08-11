@@ -9,9 +9,10 @@ from the roadmap, the roadmap wins.*
 > fielding is GO, but there are **0 valid documented human sessions** and no
 > P0 outcome verdict. **P1 is active/partial**: evidence-gated work may run in
 > parallel, never substitutes for P0 human evidence, and the P1 exit gate is
-> not met. **P2 and P3 are complete.** P4 retention/lock-in remains blocked
-> until P0 PASS and the required P1 evidence. The sections below summarize
-> those lanes and their gates without replacing the roadmap.
+> not met. **P2 and P3 are complete.** The P0 hard-gate was retired
+> 2026-08-11 (`docs/DECISION_LOG.md` Decision #2): engine work proceeds in
+> parallel with P0; P4 retention/lock-in is sequenced last, not blocked on a
+> P0 PASS. The sections below summarize those lanes and their gates.
 
 ## 0. The decision
 
@@ -157,8 +158,9 @@ rate is measured.
 
 ### P4 — Retention and defensibility
 
-**Blocked:** do not begin retention/lock-in work until P0 PASS and the required
-P1 evidence. Only after those gates: draft-history progress, jump-to-line and
+**Last in sequence:** the P0-PASS hard-block was retired 2026-08-11
+(`docs/DECISION_LOG.md` Decision #2). P4 is sequenced last, not blocked on
+P0. When reached: draft-history progress, jump-to-line and
 deterministic fixes, then auth/accounts for durable multi-user use.
 
 **Exit:** returning-user and multi-revision-session rates are measured.
@@ -232,4 +234,5 @@ roadmap advances only when evidence clears each phase gate:
 Current execution has two active lanes: P0 human fielding and bounded,
 evidence-gated P1 work. P0 remains at 0 valid documented human sessions with
 no outcome verdict; P1 remains partial with its exit gate unmet; P2 and P3 are
-complete. P4 remains blocked until P0 PASS and the required P1 evidence.
+complete. The P0 hard-gate was retired 2026-08-11 (Decision #2); P4 is
+sequenced last, not blocked on a P0 PASS.

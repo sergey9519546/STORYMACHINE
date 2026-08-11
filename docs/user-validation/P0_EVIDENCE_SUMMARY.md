@@ -204,7 +204,8 @@ claim:
 P1 measurement and validity work may proceed only within ROADMAP's
 machine-checked evidence gates. It never substitutes for the P0 human outcome
 gate: P0 fielding is GO, but there are 0 valid documented sessions and no P0
-outcome verdict. P4 retention/lock-in work remains prohibited until P0 PASS.
+outcome verdict. The P0 hard-gate was retired 2026-08-11 (Decision #2);
+engine work proceeds in parallel with P0 evidence-gathering.
 
 ## Artifact index
 

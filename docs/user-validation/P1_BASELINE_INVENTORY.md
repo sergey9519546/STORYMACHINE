@@ -7,8 +7,8 @@
 > P0 fielding is GO with 0 valid documented human sessions and no P0 outcome
 > verdict; P1 is active/partial, may run in parallel under evidence gates,
 > never substitutes for P0 human evidence, and its exit gate is not met; P2 and
-> P3 are complete; P4 remains blocked until P0 PASS and the required P1
-> evidence.
+> P3 are complete. The P0 hard-gate was retired 2026-08-11 (Decision #2); P4
+> is sequenced last, not blocked on a P0 PASS.
 
 ## Scope and evidence rule
 

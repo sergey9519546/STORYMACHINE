@@ -94,7 +94,7 @@ before the next begins, because every downstream promise (private, instant,
 deterministic, reproducible coverage) rests on the score being provably real,
 and by our own numbers it isn't yet. We build demand-out, not rigor-first.
 
-### P0 — Validate with real writers (demand/human gate; P1 evidence work may run in parallel, P4 remains blocked until P0 PASS)
+### P0 — Validate with real writers (recommended evidence lane; P0 hard-gate RETIRED 2026-08-11 — engine work proceeds in parallel)
 
 **Goal:** Confirm that a screenwriter, shown the existing sample coverage
 report, actually wants to run their own draft.
@@ -299,7 +299,7 @@ These replace the old rigor-first principles while keeping the engineering
 constraints that genuinely carry weight. The shift is from "prove rigor in
 isolation" to "prove value to a real writer, then harden it."
 
-- **Demand before rigor.** No new engine work ships without a validated user need. This is a P0 gate, not a preference.
+- **Demand before rigor.** Validated user need is the highest-priority signal. *(Amended 2026-08-11: the prior hard-gate framing — "no new engine work ships without a validated user need; this is a P0 gate, not a preference" — is RETIRED. Engine work proceeds in parallel with P0 evidence-gathering. See `docs/DECISION_LOG.md` Decision #2.)*
 - **Correct before reproducible.** Reproducibility is earned *after* the score is shown valid on real writing. A broken ruler is perfectly reproducible; determinism is worthless if the verdict is wrong.
 - **Measure discrimination on runnable, real writing — always.** Synthetic fixtures are necessary but never sufficient. A test that skips in CI proves nothing; the score must separate strong drafts from weak ones on actual screenplays.
 - **One honest claim over a big number.** Lead with verifiable reproducibility receipts, not a rule count. A defensible small claim beats an impressive inflated one.

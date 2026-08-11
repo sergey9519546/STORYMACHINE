@@ -65,9 +65,10 @@ constitution — see AGENTS.md "Security constraints" for the authoritative list
 
 P0 fielding is authorized (GO, 2026-08-04), but there are 0 valid documented
 sessions and no P0 outcome verdict. P0 human evidence remains the highest
-priority and cannot be replaced by implementation work. P1 measurement and
-validity work may proceed only within the machine-checked evidence gates in
-`ROADMAP.md`; P4 retention/lock-in work remains prohibited until P0 PASS.
+priority and cannot be replaced by implementation work. The P0 hard-gate
+was retired 2026-08-11 (`docs/DECISION_LOG.md` Decision #2): engine work
+proceeds in parallel with P0; P4 retention/lock-in is last in sequence, no
+longer hard-blocked on a P0 PASS.
 
 P0 has not passed (0/5 documented writer sessions as of this writing), while
 `ROADMAP.md` §3 records P1 as partial and P2/P3 as DONE. That does not change

@@ -12,7 +12,7 @@
 | P1 — Make the score provably discriminate on real writing | **ACTIVE** | — | In progress |
 | P2 — Collapse the surface to Doctor + Editor | **COMPLETE** | — | Exit gate met (2026-07-29): Doctor + Editor is the default surface, Labs is default-OFF, and P3 added the required first-report measurement. |
 | P3 — Ship the shareable, verifiable coverage report | **COMPLETE** | — | Exit gate met (2026-07-29): exported reports carry verification material and the export-rate event is measured. |
-| P4 — Retention & defensibility | **BLOCKED** | P0 demand outcome + P1 real-writing evidence | Not evaluated; retention/lock-in work remains prohibited until P0 PASS, and P1 has not met its real-writing validity gate. |
+| P4 — Retention & defensibility | **LAST IN SEQUENCE** | — | Not yet started. The prior P0-PASS hard-block was retired 2026-08-11 (`docs/DECISION_LOG.md` Decision #2); P4 is sequenced last, not gated on P0. |
 
 ## P0 counters
 

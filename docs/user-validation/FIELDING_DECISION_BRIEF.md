@@ -195,7 +195,8 @@ P0 outcome gate.
 
 These constraints protect P0 evidence integrity. They do **not** revive the
 former blanket P1 freeze: P1 work is governed by ROADMAP's machine-checked
-evidence gates, while P4 retention/lock-in remains prohibited until P0 PASS.
+evidence gates. The P0 hard-gate was retired 2026-08-11 (`docs/DECISION_LOG.md`
+Decision #2); P4 retention/lock-in is sequenced last, not blocked on a P0 PASS.
 
 - **Fabricate sessions or participants.** Zero sessions is the truth. Inventing
   any would be the exact fabrication the operating kit and evidence summary
