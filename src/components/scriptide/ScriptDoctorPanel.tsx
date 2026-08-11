@@ -3276,6 +3276,67 @@ export default function ScriptDoctorPanel({
                 diagnostics with impact + actionable suggestions. */}
             {reportIsComplete && report.storyGraph && <StoryGraphSection storyGraph={report.storyGraph} />}
 
+            {/* GODMODE structural analysis — disclosure violations, character
+                functions, subplots, graph health. Each renders only when present. */}
+            {reportIsComplete && (report.graphHealth || report.disclosureAnalysis?.scored || (report.characterFunctions?.length ?? 0) > 0 || (report.subplots?.totalSubplots ?? 0) > 0) && (
+              <div>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
+                  Structural Analysis
+                </h3>
+                <div className="space-y-2">
+                  {report.graphHealth && (
+                    <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold">Graph Health</span>
+                        <span className="text-xs font-mono">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-red-500">−{report.graphHealth.graphDeduction}hp</span>}</span>
+                      </div>
+                      {report.graphHealth.findings.length > 0 && (
+                        <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
+                          {report.graphHealth.findings.map((f, i) => <li key={i}>• {f}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  {report.disclosureAnalysis?.scored && (
+                    <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold">Disclosure & Epistemics</span>
+                        <span className="text-xs font-mono">{report.disclosureAnalysis.violationCount} violations, {report.disclosureAnalysis.epistemicGaps.length} gaps</span>
+                      </div>
+                      {report.disclosureAnalysis.epistemicGaps.length > 0 && (
+                        <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
+                          {report.disclosureAnalysis.epistemicGaps.slice(0, 3).map((g, i) => <li key={i}>• {g.description}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  {report.characterFunctions && report.characterFunctions.length > 0 && (
+                    <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
+                      <span className="text-xs font-bold">Character Functions</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {report.characterFunctions.map((cf, i) => (
+                          <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 border border-gray-300 dark:border-gray-700">
+                            {cf.characterId}: {cf.function}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {report.subplots && report.subplots.totalSubplots > 0 && (
+                    <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold">Subplots</span>
+                        <span className="text-xs font-mono">{report.subplots.totalSubplots} threads ({report.subplots.unresolvedSubplots} unresolved, {report.subplots.intersectionCount} intersections)</span>
+                      </div>
+                      <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
+                        {report.subplots.subplots.slice(0, 5).map((sp, i) => <li key={i}>• {sp.description}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Top priorities */}
             {report.topPriorities.length > 0 && (
               <div>

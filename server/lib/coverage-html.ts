@@ -729,6 +729,60 @@ export interface CoverageHtmlOptions {
   logline?: string | null;
 }
 
+/** GODMODE analysis section — surfaces the new structural analysis layers
+ *  (disclosure/epistemic, character functions, subplots, graph health) in
+ *  the exported coverage report. Each subsection renders only when data
+ *  is present, so reports from older runs don't break. */
+function buildGodmodeSection(report: ScriptDoctorReport): string {
+  const parts: string[] = [];
+
+  // Graph Health (L5)
+  if (report.graphHealth) {
+    const gh = report.graphHealth;
+    const meter = '█'.repeat(Math.round(gh.graphHealthScore / 5));
+    parts.push(`<div class="metric-row"><span class="metric-label">Graph Health</span><span class="metric-value">${gh.graphHealthScore}/100</span></div>`);
+    if (gh.graphDeduction > 0) {
+      parts.push(`<div class="metric-row sub"><span class="metric-label">→ Health deduction</span><span class="metric-value">−${gh.graphDeduction}</span></div>`);
+    }
+    for (const finding of gh.findings) {
+      parts.push(`<li class="issue-minor">${escapeHtml(finding)}</li>`);
+    }
+  }
+
+  // Disclosure & Epistemics (L4/L19)
+  if (report.disclosureAnalysis?.scored) {
+    const da = report.disclosureAnalysis;
+    parts.push(`<div class="metric-row"><span class="metric-label">Disclosure Violations</span><span class="metric-value">${da.violationCount}</span></div>`);
+    if (da.epistemicGaps.length > 0) {
+      parts.push(`<div class="metric-row sub"><span class="metric-label">Epistemic gaps</span><span class="metric-value">${da.epistemicGaps.length}</span></div>`);
+      for (const gap of da.epistemicGaps.slice(0, 3)) {
+        parts.push(`<li class="issue-minor">${escapeHtml(gap.description)}</li>`);
+      }
+    }
+  }
+
+  // Character Functions (L8)
+  if (report.characterFunctions && report.characterFunctions.length > 0) {
+    const funcs = report.characterFunctions.map(cf =>
+      `${escapeHtml(cf.characterId)}: ${cf.function} (${(cf.confidence * 100).toFixed(0)}%)`,
+    ).join(' · ');
+    parts.push(`<div class="metric-row"><span class="metric-label">Character Functions</span><span class="metric-value">${funcs}</span></div>`);
+  }
+
+  // Subplots (L13)
+  if (report.subplots && report.subplots.totalSubplots > 0) {
+    const sp = report.subplots;
+    parts.push(`<div class="metric-row"><span class="metric-label">Subplots</span><span class="metric-value">${sp.totalSubplots} (${sp.unresolvedSubplots} unresolved, ${sp.intersectionCount} intersections)</span></div>`);
+    for (const subplot of sp.subplots.slice(0, 5)) {
+      parts.push(`<li class="issue-minor">${escapeHtml(subplot.description)}</li>`);
+    }
+  }
+
+  if (parts.length === 0) return '';
+
+  return `<section class="section"><h2>Structural Analysis</h2><div class="metrics-grid">${parts.join('\n')}</div></section>`;
+}
+
 /**
  * Render a ScriptDoctorReport into a complete, standalone, print-quality
  * HTML document — the shareable coverage report writers download, print to
@@ -763,6 +817,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildHealthSection(report),
     buildDimensionsSection(dimensions),
     buildStrengthsSection(strengths),
+    buildGodmodeSection(report),
     buildHeatmapSection(report.sceneHeatmap ?? []),
     buildTopPrioritiesSection(report.topPriorities ?? []),
     buildAppendixSection(report.passes ?? []),
