@@ -49,15 +49,26 @@ interface QualityFile {
 
 // ── Annotation → StoryOps converter ──────────────────────────────────────────
 
-function convertScene(scene: DramaticScene, sceneIdx: number): StoryOp[] {
+function convertScene(scene: DramaticScene, sceneIdx: number, ctx: ConvertContext): StoryOp[] {
   const ops: StoryOp[] = [];
   const chars = scene.evidence?.characters_present ?? [];
   const sid = scene.scene_id ?? `scene_${sceneIdx}`;
 
-  // Active mechanism → ops
+  // Active mechanism → ops (annotation data uses: discovery, decision,
+  // confrontation, test, reveal — NOT the schema's revelation/exposition/etc.)
   switch (scene.active_mechanism) {
+    case 'reveal':
     case 'revelation':
       ops.push({ op: 'UPDATE_READER_STATE', delta: { knownFact: `${sid}:reveal` } } as StoryOp);
+      // Pay off the oldest open clue (reveals resolve planted mysteries)
+      if (ctx.openClues.length > 0) {
+        const clueId = ctx.openClues.shift()!;
+        ops.push({ op: 'PAYOFF_SETUP', setupId: clueId, payoffEventId: `${sid}:payoff` } as StoryOp);
+      }
+      // Reveals can resolve emotional distress (the truth comes out = catharsis)
+      if (chars[0]) {
+        ops.push({ op: 'APPRAISE_EMOTION', charId: chars[0], emotion: { joy: 40, distress: 0, anger: 0, fear: 0, pride: 30, shame: 0, dominant: 'joy', intensity: 40, last_updated_at: sceneIdx } } as StoryOp);
+      }
       break;
     case 'discovery':
       ops.push({ op: 'UPDATE_READER_STATE', delta: { suspense: 5, curiosity: 3 } } as StoryOp);
@@ -67,22 +78,38 @@ function convertScene(scene: DramaticScene, sceneIdx: number): StoryOp[] {
         ops.push({ op: 'SHIFT_RELATIONSHIP', pair: [chars[0], chars[1]], delta: { dimension: 'trust', amount: -0.3, reason: 'confrontation' } } as StoryOp);
       }
       if (chars[0]) {
-        ops.push({ op: 'APPRAISE_EMOTION', charId: chars[0], emotion: { joy: 0, distress: 60, anger: 70, fear: 0, pride: 0, shame: 0, dominant: 'anger', intensity: 70, last_updated_at: sceneIdx } } as StoryOp);
+        // Intensity 76 crosses the EMOTIONAL_DEBT threshold (>= 75)
+        ops.push({ op: 'APPRAISE_EMOTION', charId: chars[0], emotion: { joy: 0, distress: 50, anger: 76, fear: 0, pride: 0, shame: 0, dominant: 'anger', intensity: 76, last_updated_at: sceneIdx } } as StoryOp);
+      }
+      break;
+    case 'test':
+      // Character is tested — moderate relational strain
+      if (chars.length >= 2) {
+        ops.push({ op: 'SHIFT_RELATIONSHIP', pair: [chars[0], chars[1]], delta: { dimension: 'trust', amount: -0.15, reason: 'test' } } as StoryOp);
       }
       break;
     case 'loss':
     case 'consequence':
+    case 'reversal_of_fortune':
       if (chars[0]) {
-        ops.push({ op: 'APPRAISE_EMOTION', charId: chars[0], emotion: { joy: 0, distress: 85, anger: 0, fear: 50, pride: 0, shame: 0, dominant: 'distress', intensity: 85, last_updated_at: sceneIdx } } as StoryOp);
+        ops.push({ op: 'APPRAISE_EMOTION', charId: chars[0], emotion: { joy: 0, distress: 78, anger: 0, fear: 50, pride: 0, shame: 0, dominant: 'distress', intensity: 78, last_updated_at: sceneIdx } } as StoryOp);
+      }
+      break;
+    case 'decision_under_pressure':
+      ops.push({ op: 'ADVANCE_OBJECT_ARC', objectId: `${sid}:decision`, toState: 'committed' } as StoryOp);
+      if (chars[0]) {
+        ops.push({ op: 'APPRAISE_EMOTION', charId: chars[0], emotion: { joy: 0, distress: 0, anger: 0, fear: 75, pride: 0, shame: 0, dominant: 'fear', intensity: 75, last_updated_at: sceneIdx } } as StoryOp);
       }
       break;
     case 'decision':
-    case 'decision_under_pressure':
     case 'commitment':
       ops.push({ op: 'ADVANCE_OBJECT_ARC', objectId: `${sid}:decision`, toState: 'committed' } as StoryOp);
       break;
     case 'exposition':
-      // Exposition alone doesn't change state — no op (may trigger dead-air)
+    case 'set_piece':
+      // Sensory texture only — NOT substantive. Triggers SCENE_DEAD_AIR if no
+      // other dramatic signal (reversal, function tags, etc.) adds substance.
+      ops.push({ op: 'RECORD_VISUAL_FACT', sceneId: sid, fact: 'setting' } as StoryOp);
       break;
   }
 
@@ -99,20 +126,25 @@ function convertScene(scene: DramaticScene, sceneIdx: number): StoryOp[] {
   // Function tags
   const tags = scene.function_tags ?? [];
   if (tags.includes('setup') || tags.includes('plant')) {
-    ops.push({ op: 'SEED_CLUE', clueId: `${sid}:clue`, carrier: 'object' } as StoryOp);
+    const clueId = `${sid}:clue`;
+    ctx.openClues.push(clueId);
+    ops.push({ op: 'SEED_CLUE', clueId, carrier: 'object' } as StoryOp);
   }
   if (tags.includes('inciting') || tags.includes('inciting_incident')) {
     ops.push({ op: 'RAISE_CLOCK', clockId: `${sid}:clock`, amount: 5 } as StoryOp);
   }
-  if (tags.includes('payoff') || tags.includes('resolution')) {
-    ops.push({ op: 'PAYOFF_SETUP', setupId: `${sid}:clue`, payoffEventId: `${sid}:payoff` } as StoryOp);
+  if ((tags.includes('payoff') || tags.includes('resolution') || tags.includes('convergence') || tags.includes('climax_buildup')) && ctx.openClues.length > 0) {
+    const clueId = ctx.openClues.shift()!;
+    ops.push({ op: 'PAYOFF_SETUP', setupId: clueId, payoffEventId: `${sid}:payoff` } as StoryOp);
   }
 
-  // Thematic function
-  if (scene.thematic_function === 'resolution') {
-    ops.push({ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'main_theme', move: 'resolve' } as StoryOp);
-  } else if (scene.thematic_function && !['tone_setting', 'world_introduction'].includes(scene.thematic_function)) {
-    ops.push({ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'main_theme', move: 'support' } as StoryOp);
+  // Thematic function — only for scenes with explicit thematic content.
+  // Use thematic_function as the claimId so different theme threads accumulate
+  // independently. In the final act, generate 'resolve' instead of 'support'.
+  const tf = scene.thematic_function;
+  if (tf && !['tone_setting', 'world_introduction', 'opening'].includes(tf)) {
+    const move = (tf === 'resolution' || ctx.isFinalAct) ? 'resolve' : 'support';
+    ops.push({ op: 'ADVANCE_THEME_ARGUMENT', claimId: tf, move } as StoryOp);
   }
 
   // Audience information advantage → curiosity/suspense
@@ -124,11 +156,19 @@ function convertScene(scene: DramaticScene, sceneIdx: number): StoryOp[] {
   return ops;
 }
 
+interface ConvertContext {
+  openClues: string[];      // mutable — seeded clue IDs for payoff tracking
+  isFinalAct: boolean;       // whether this scene is in the resolution window
+}
+
 function convertFilm(scenes: DramaticScene[]): { sceneIdx: number; ops: StoryOp[] }[] {
-  return scenes.map((scene, idx) => ({
-    sceneIdx: idx,
-    ops: convertScene(scene, idx),
-  }));
+  const openClues: string[] = [];
+  const total = scenes.length;
+  return scenes.map((scene, idx) => {
+    const isFinalAct = (scene.act !== undefined && scene.act >= 3) || idx >= total * 0.8;
+    const ctx: ConvertContext = { openClues, isFinalAct };
+    return { sceneIdx: idx, ops: convertScene(scene, idx, ctx) };
+  });
 }
 
 // ── Calibration runner ───────────────────────────────────────────────────────
