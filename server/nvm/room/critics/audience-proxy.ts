@@ -73,5 +73,20 @@ export function audienceProxyCritic(ir: NarrativeTransitionIR, state: NarrativeS
     }
   }
 
+  // Gate 4 (GODMODE L20): audience question overload — suspense/curiosity
+  // have accumulated past a threshold without resolution. The audience is
+  // carrying too many open questions and confusion risk is rising.
+  if (state.audienceState.suspense > 50 || state.audienceState.curiosity > 50) {
+    const unresolved = Math.round(state.audienceState.suspense + state.audienceState.curiosity);
+    if (unresolved > 80) {
+      critiques.push({
+        criticId: 'audience_proxy', severity: 35, targetOpIdx: null,
+        objection: `Audience question load is ${unresolved} (suspense ${state.audienceState.suspense}, curiosity ${state.audienceState.curiosity}) — too many open threads for the audience to track. Consider answering one before raising another.`,
+        suggestedOperator: 'reveal_asymmetry',
+        attentionBid: 40,
+      });
+    }
+  }
+
   return critiques;
 }

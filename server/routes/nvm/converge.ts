@@ -241,6 +241,8 @@ router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req,
             ghostReason: step.ghostReason,
             writersRoomSummary: step.writersRoomSummary,
             operator: step.operator,
+            // GODMODE: per-position tension from the tension ledger
+            openPositions: step.tensionLedger.positions.length,
           },
         });
       },
