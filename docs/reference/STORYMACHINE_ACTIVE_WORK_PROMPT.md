@@ -112,11 +112,11 @@ math. Concrete examples:
 - A short summary in docs/scoring/ states, in plain language, what the
   current score actually does and does not do on real writing.
 
-## Out of scope (do not start)
+## Out of scope (do not start without explicit direction)
 
-- P1 benchmark construction, blind human labels, AUC targets — blocked
-  until P0 clears.
-- Any engine/scoring/rule/detector change.
+- P1 benchmark construction, blind human labels, AUC targets — the P0
+  hard-gate was retired 2026-08-11, but these still need the real corpus
+  (not in this environment) and explicit direction.
 - Deployment, accounts, billing, multi-tenancy, observability stack.
 - Recruitment, session running, the ship decision — human work.
 - A godmode 12-phase hardening sweep.

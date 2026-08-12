@@ -141,3 +141,24 @@ export function isSameOriginApiRequest(input: RequestInfo | URL, currentOrigin: 
     return false;
   }
 }
+
+/** Decide whether main.tsx should attach the browser session capability.
+ * Product event posts are deliberately session-unlinked, so the exact
+ * `/api/events` path is excluded for every fetch input form. All other
+ * same-origin API requests retain isSameOriginApiRequest's existing behavior.
+ */
+export function shouldAttachSessionHeader(input: RequestInfo | URL, currentOrigin: string): boolean {
+  if (!isSameOriginApiRequest(input, currentOrigin)) return false;
+
+  const href = typeof input === 'string'
+    ? input
+    : input instanceof Request
+      ? input.url
+      : input.href;
+  try {
+    const pathname = new URL(href, currentOrigin).pathname;
+    return pathname !== '/api/events' && pathname !== '/api/events/';
+  } catch {
+    return false;
+  }
+}

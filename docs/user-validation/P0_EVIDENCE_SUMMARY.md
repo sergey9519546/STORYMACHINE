@@ -2,18 +2,30 @@
 
 ## Status
 
-**COMPLETED — P0 GATE CLEARED (GREEN)**
+**FIELDING AUTHORIZED (GO, 2026-08-04) — 0 OF >=5 VALID SESSIONS DOCUMENTED**
 
-- Study status: **COMPLETED — 5 VALID SESSIONS LOGGED**
-- Study dates: **2026-08-05**
-- Certified stimulus commit SHA: **`a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`**
-- Recruited / scheduled / completed / valid / fully documented: **5 / 5 / 5 / 5 / 5**
-- Required valid documented sessions: **>=5** (met)
-- Pull Signal Tally: **4 Strong Pull / 1 Qualified Pull / 0 Negative**
-- Decision: **PASS — GREEN (P0 GATE CLEARED)**
-- P0 gate: **MET**
+**Correction (2026-08-07):** this section previously read "COMPLETED — P0
+GATE CLEARED (GREEN)" with a fabricated 5/5/5/5/5 session tally, a "4
+Strong Pull / 1 Qualified Pull" signal count, and a "PASS — GREEN"
+decision. That directly contradicted every session table further down in
+this same document (all of which have always read "No sessions
+documented") and the Limitations section below ("Zero sessions have been
+completed or documented"). No session has ever been run; no session data
+was invented or removed by this correction — only the mis-stated summary
+above was fixed.
 
-No participants or sessions are represented in this document yet. Recruitment and scheduling may proceed. **Both static-report AND live-flow sessions may now begin.** The API-level certification below (commit `c5749b9`) confirms the committed static stimulus matches the live pipeline byte-for-byte in health/verdict/scene-count, and the browser-DOM click-through was subsequently certified (2026-07-28, `main` tip `1a7f3b4`/`4c131df` — StartScreen → "Try sample coverage" → ScriptDoctorPanel renders a full report with zero genuine console errors; see `PHASE_TRACKER.md` "Browser DOM smoke"). The historical "live-flow still requires a manual click-through" caveat is **resolved**; the prior paragraph's wording is retained below for the record. Historical blocker evidence (superseded, kept for the record): supported `npm run dev`, `npx tsx server.ts`, `node --import tsx server.ts`, and absolute-entry invocations exited 0 without binding the requested isolated port; the already-running `commit: dev` instance logged a CodeMirror update crash and `503` responses from `/api/analyze-script` during provisional inspection. Root cause and fix below; the fix is confirmed present at `c5749b9`.
+- Study status: **NOT YET STARTED** — recruitment and session-running are
+  human-only work (see `FIELDING_DECISION_BRIEF.md` → "What I will not
+  do") and have not yet occurred
+- Study dates: none yet
+- Certified stimulus contentHash: `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` (the "Dead Frequency" stimulus; regenerated 2026-08-08 at 207,740 bytes, see current provenance below)
+- Recruited / scheduled / completed / valid / fully documented: **0 / 0 / 0 / 0 / 0**
+- Required valid documented sessions: **>=5**
+- Pull Signal Tally: not yet available (no sessions)
+- Decision: **INCONCLUSIVE (placeholder)** — pending >=5 valid sessions; see "P0 decision" section below
+- P0 gate: **NOT YET EVALUATED**
+
+No participants or sessions are represented in this document yet. Recruitment and scheduling may proceed — fielding was authorized 2026-08-04 (`PHASE_TRACKER.md` decision log). **Both static-report AND live-flow sessions may now begin.** The API-level certification below (commit `c5749b9`) confirms the committed static stimulus matches the live pipeline byte-for-byte in health/verdict/scene-count, and the browser-DOM click-through was subsequently certified (2026-07-28, `main` tip `1a7f3b4`/`4c131df` — StartScreen → "Try sample coverage" → ScriptDoctorPanel renders a full report with zero genuine console errors; see `PHASE_TRACKER.md` "Browser DOM smoke"). The historical "live-flow still requires a manual click-through" caveat is **resolved**; the prior paragraph's wording is retained below for the record. Historical blocker evidence (superseded, kept for the record): supported `npm run dev`, `npx tsx server.ts`, `node --import tsx server.ts`, and absolute-entry invocations exited 0 without binding the requested isolated port; the already-running `commit: dev` instance logged a CodeMirror update crash and `503` responses from `/api/analyze-script` during provisional inspection. Root cause and fix below; the fix is confirmed present at `c5749b9`.
 
 ### Blocker root cause found and fixed (2026-07-15)
 
@@ -67,12 +79,11 @@ every route the live sample flow actually calls:
 The live `/api/scriptide/doctor` route's health/verdict/scene-count
 (68.9 / CONSIDER / 14) match this document's static-stimulus provenance table
 below exactly, confirming the static report and the live in-app report are
-consistent on this commit. Source inspection also confirms the previously
-diagnosed CodeMirror crash cause is fixed at HEAD:
-`src/components/editor/inline-complete.ts`'s trigger plugin now defers its
-dismiss-dispatch via `setTimeout(..., 0)` (comment: "dispatching synchronously
-from a plugin update crashes") instead of calling `view.dispatch()`
-synchronously inside the ViewPlugin `update()` lifecycle method.
+consistent on this commit. The previously diagnosed CodeMirror
+synchronous-dispatch defect was fixed before the URL-based inline-completion
+surface was retired. At HEAD that client module is absent and
+`GET /api/scriptide/complete` is a game-limited, zero-work 410 compatibility
+tombstone; ordinary Fountain autocomplete remains active.
 
 **What this does NOT certify:** the sandbox used has no display and no
 Playwright/browser install (verified absent — not a dependency, no cached
@@ -179,9 +190,10 @@ Final decision must be one of:
 | Evidence reviewed | None |
 | Dissent / uncertainty | Not evaluated |
 
-## Allowed P1 inputs only after PASS
+## P1 validity inputs and evidence gates
 
-These inputs may begin only after P0 is explicitly recorded as **PASS**:
+The following inputs are required before P1 can support a human-label validity
+claim:
 
 - Legally distributable real-draft benchmark materials: Creative-Commons/public-domain screenplay material and explicitly licensed author-contributed drafts.
 - Blinded pairwise judgments from >=3 independent experienced readers, including inter-rater agreement and preserved disagreements.
@@ -189,7 +201,11 @@ These inputs may begin only after P0 is explicitly recorded as **PASS**:
 - A held-out set unavailable for implementer tuning.
 - Versioned and hashed fixture and label artifacts.
 
-Until PASS, P1 product/engine work is blocked. Critical security fixes remain the ROADMAP's only exception to the P0 product/engine-code freeze.
+P1 measurement and validity work may proceed only within ROADMAP's
+machine-checked evidence gates. It never substitutes for the P0 human outcome
+gate: P0 fielding is GO, but there are 0 valid documented sessions and no P0
+outcome verdict. The P0 hard-gate was retired 2026-08-11 (Decision #2);
+engine work proceeds in parallel with P0 evidence-gathering.
 
 ## Artifact index
 
@@ -203,7 +219,7 @@ Until PASS, P1 product/engine work is blocked. Critical security fixes remain th
 | Session artifacts | `docs/user-validation/sessions/` | Empty; `.gitkeep` only | — |
 | Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` | PLANNED | — |
 | Phase tracker | `docs/user-validation/PHASE_TRACKER.md` | P0 ACTIVE | — |
-| P1 baseline inventory | `docs/user-validation/P1_BASELINE_INVENTORY.md` | Inventory only; P1 blocked | — |
+| P1 baseline inventory | `docs/user-validation/P1_BASELINE_INVENTORY.md` | Inventory only; P1 measurement is evidence-gated and its validity gate is unmet (P0: 0/5, no verdict; P4 remains barred) | — |
 | Canonical sequencing and gates | `ROADMAP.md` §3 | Canonical | — |
 | Short execution brief | `ULTRAPLAN.md` §1 | Canonical summary | — |
 
@@ -282,7 +298,7 @@ the committed stimulus):**
 | Health | 68.9 | **78.3** |
 | Verdict | CONSIDER | CONSIDER |
 | contentHash | `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` | **`a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`** |
-| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes** |
+| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes at the 2026-08-04 swap** |
 
 **Re-verification performed on HEAD `0cf12c9` (the commit whose
 `isDoubleSpaced()` normalizer rekey last shifted the corpus's health
@@ -325,3 +341,16 @@ mutable `demo/corpus/sample-script.fountain`.
 
 Zero P0 sessions had been run against the retired stimulus at the time of
 this swap, so no session comparability is lost.
+
+## Current artifact provenance — 2026-08-08 repair
+
+`npm run generate-p0-sample` regenerated the committed "Dead Frequency"
+artifact through the canonical `runScriptDoctor` + `renderCoverageHtml`
+pipeline after the live equal-peak tie-break and report-rendering repairs.
+The current generated file is **207,740 bytes** with contentHash
+`a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`,
+health **78.3**, verdict **CONSIDER**, and sceneCount **12**. The prior
+193,132-byte figure above is preserved as historical swap-time provenance.
+
+This is artifact provenance only: fielding remains authorized, no valid human
+session is documented, and the P0 outcome gate has no verdict.

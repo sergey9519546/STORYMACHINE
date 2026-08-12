@@ -5,29 +5,14 @@ canonical plan and `NORTH_STAR.md` is the constitution. This file is the
 short cold-start answer to: **what do I do next?** If any detail here drifts
 from the roadmap, the roadmap wins.*
 
-> **Status note — 2026-08-03.** The phase framing below (§1 "P0: ACTIVE NOW",
-> §2-3 "P1/P2/P3/P4: NEXT/THEN") is dated 2026-07-14 and was not updated the
-> next day when the plan actually moved. **`ROADMAP.md` §3 is the current
-> authority on phase status.** As of 2026-07-29 it records: P0 still not
-> formally cleared (0/5 documented writer sessions — the §1 exit gate below
-> is still unmet), but work proceeded past it anyway, and now stands at
-> **P1 partial** (corpus expanded 48→761 scripts, pre-registered 60/20/20
-> split, dialogue-diversity deduction landed at test AUC 0.990, but pooled
-> test AUC 0.754 is still below the 0.80 exit gate — structural channels
-> SHUFFLE/DROP/RELOCATE remain the open gap), **P2 DONE** (Doctor + Editor is
-> the default surface; OASIS and the research panels sit behind a Labs
-> flag), and **P3 DONE** (every exported report carries a verify block, a
-> `#verify` route re-derives the score, and export/time-to-first-report are
-> instrumented). The authorization for proceeding past an uncleared P0 is
-> recorded in `docs/p1-benchmark/P1_STATUS_2026-07-29.md`'s "Phase-gate
-> status" section — "User directed P1 to begin; record shows this." — not
-> re-litigated here. The P0 field methodology (§1), the P1 work items and
-> exit gate (§2), the P2/P3 target descriptions (§3), and the foundations
-> and cautions (§4-§6) below remain accurate guidance for what each phase
-> requires; only the "what phase are we in right now" framing was stale.
-> §7's closing line ("Until P0 clears, the next task is user validation —
-> not another detector, rule, panel, agent, research intake, or architecture
-> layer") is superseded by the above for the same reason.
+> **Current status — 2026-08-08.** `ROADMAP.md` §3 is the authority. P0
+> fielding is GO, but there are **0 valid documented human sessions** and no
+> P0 outcome verdict. **P1 is active/partial**: evidence-gated work may run in
+> parallel, never substitutes for P0 human evidence, and the P1 exit gate is
+> not met. **P2 and P3 are complete.** The P0 hard-gate was retired
+> 2026-08-11 (`docs/DECISION_LOG.md` Decision #2): engine work proceeds in
+> parallel with P0; P4 retention/lock-in is sequenced last, not blocked on a
+> P0 PASS. The sections below summarize those lanes and their gates.
 
 ## 0. The decision
 
@@ -44,18 +29,20 @@ constants (the earlier "8,917" figure was shown to be inaccurate by the
 ~0.076 versus scene-count scarcity AUC ~0.938. Reproducibility is real; score
 validity on real writing is not yet proven.
 
-Therefore the order is fixed:
+The dependency order remains:
 
 > **Validate demand → prove the score → simplify the product → make the report
 > shareable → build retention.**
 
-Do not parallelize phases. The ordering is the strategy.
+This is a dependency order, not a blanket serial-work freeze. The roadmap's
+machine-checked evidence gates permit bounded P1 work in parallel with the P0
+human lane; they do not permit engineering output to stand in for P0 evidence.
 
-## 1. ACTIVE NOW — P0: validate with real writers
+## 1. ACTIVE HUMAN LANE — P0: validate with real writers
 
-**Status:** No completed user-validation sessions are documented in the repo.
-P0 blocks new product and engine work. Critical security fixes are the only
-exception.
+**Status:** P0 fielding is GO. There are 0 valid documented human sessions and
+no P0 outcome verdict. This evidence lane remains the highest priority and
+nothing in P1, P2, or P3 can satisfy its exit gate.
 
 **Field materials:** [operating kit](docs/user-validation/P0_OPERATING_KIT.md)
 · [session template](docs/user-validation/P0_SESSION_TEMPLATE.md) ·
@@ -88,28 +75,27 @@ exception.
 At least **5 documented sessions** produce a clear answer to whether the
 report creates pull toward running a writer's own draft.
 
-- **Positive/qualified signal:** proceed to P1 using the objections and trust
-  requirements as P1 inputs.
+- **Positive/qualified signal:** record the P0 verdict and feed the objections
+  and trust requirements into the active P1 evidence work.
 - **Negative/ambiguous signal:** STOP. Reframe the persona, report, or problem
   and repeat P0. Do not compensate by adding features or rules.
 
-## 2. NEXT — P1: prove the score on runnable real writing
+## 2. ACTIVE / PARTIAL — P1: prove the score on runnable real writing
 
-P1 begins only after P0 clears. The One Bet is a score that demonstrably
-separates strong from weak real writing — not a larger rulebook.
+P1 is active/partial under the roadmap's evidence gates and may run in parallel
+with P0 fielding. It never substitutes for P0 human evidence. The One Bet is a
+score that demonstrably separates strong from weak real writing — not a larger
+rulebook — and the P1 exit gate is not met.
 
 ### Known baseline
 
-- 6 synthetic discrimination pairs; two hard pairs clear by only +1.4 and the
-  composite pair still misses its 5.0-point minimum-gap guard.
-- 20-sample calibration corpus is synthetic controlled-richness data.
-- The 72-produced-script corpus text is outside the repo, so its harness skips
-  without `REAL_SCRIPT_CORPUS_DIR`; it is a produced-floor check, not a
-  strong-vs-weak discrimination test. Manifest: 71 RECOMMEND + 1 CONSIDER.
-- Shuffle-drop AUC ~0.652 (hard floor 0.622).
-- Raw act-swap ~0.48; doctor-level bounded deduction ~0.62; emotional-arc
-  diagnostic signal ~0.647.
-- Rule-channel AUC ~0.076; scene-count scarcity AUC ~0.938.
+- The corpus is 761 scripts with a pre-registered 60/20/20 split and a
+  hash-locked test set.
+- The dialogue-diversity deduction reached test AUC 0.990.
+- Final pooled test AUC is 0.754, below the 0.80 gate; SHUFFLE/DROP/RELOCATE
+  remain the structural gap at 0.73/0.77/0.52.
+- The composite synthetic minimum-gap guard remains below its 5.0 threshold.
+- The generated rule inventory remains frozen at 3,216 pass-scoped constants.
 
 ### P1 work
 
@@ -151,31 +137,31 @@ If the thresholds cannot be met without unstable proxies or benchmark
 leakage, report that result and revisit the product claim. Do not hide it
 behind another rule expansion.
 
-## 3. THEN — P2 through P4
+## 3. CURRENT STATE — P2/P3 complete; P4 blocked
 
-### P2 — Collapse to Doctor + Editor
+### P2 — Collapse to Doctor + Editor ✅ COMPLETE
 
-Default journey: **open/paste script → coverage report → per-scene fixes →
-export.** Gate OASIS and the ~38 research panels behind one Labs flag. Remove
-NVM/converge/twin/simulation vocabulary from first-run paths.
+The default journey is **open/paste script → coverage report → per-scene fixes
+→ export.** OASIS and the research panels are gated behind the Labs flag.
 
 **Exit:** a new user reaches a first report with zero Labs jargon exposure;
 time-to-first-report is instrumented.
 
-### P3 — Make the report the growth unit
+### P3 — Make the report the growth unit ✅ COMPLETE
 
-Turn the existing authentic server-side coverage export into a presentable
-PDF/HTML artifact: verdict, five craft dimensions, top five fixes, and a
-third-party verification path that re-derives the score against the script's
-`contentHash`.
+Exported reports carry the claims needed for re-attestation, and the in-app
+verification path re-derives the score against the script's `contentHash`.
+Export rate and time-to-first-report are instrumented.
 
 **Exit:** a recipient can independently verify a shared report; export/share
 rate is measured.
 
 ### P4 — Retention and defensibility
 
-Only after trust: draft-history progress, jump-to-line and deterministic fixes,
-then auth/accounts for durable multi-user use.
+**Last in sequence:** the P0-PASS hard-block was retired 2026-08-11
+(`docs/DECISION_LOG.md` Decision #2). P4 is sequenced last, not blocked on
+P0. When reached: draft-history progress, jump-to-line and
+deterministic fixes, then auth/accounts for durable multi-user use.
 
 **Exit:** returning-user and multi-revision-session rates are measured.
 
@@ -245,10 +231,8 @@ roadmap advances only when evidence clears each phase gate:
 4. The report is shareable and independently verifiable.
 5. Returning writers use it across revisions.
 
-Until P0 clears, **the next task is user validation — not another detector,
-rule, panel, agent, research intake, or architecture layer.**
-
-*(Superseded in practice — see the 2026-08-03 status note at the top of this
-file: P1/P2/P3 work shipped without a formal P0 clear, on record direction to
-proceed. The definition-of-done gates above are unchanged; only the "P0 is
-the sole next task" framing didn't hold.)*
+Current execution has two active lanes: P0 human fielding and bounded,
+evidence-gated P1 work. P0 remains at 0 valid documented human sessions with
+no outcome verdict; P1 remains partial with its exit gate unmet; P2 and P3 are
+complete. The P0 hard-gate was retired 2026-08-11 (Decision #2); P4 is
+sequenced last, not blocked on a P0 PASS.

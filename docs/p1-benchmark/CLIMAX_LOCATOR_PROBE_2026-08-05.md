@@ -1,7 +1,22 @@
-# Climax-locator candidate probe — purpose/dramaticTurn don't discriminate either
+# Climax-locator candidate probe — historical pre-tie-break measurement
 
-**Status:** Corroborating measurement, 2026-08-05. Closes two of the three
-candidate directions named in `SUSPENSE_DELTA_DEGENERACY_2026-08-05.md`.
+**Status:** **SUPERSEDED AS CURRENT EVIDENCE (2026-08-08).** The 2026-08-05
+discrimination probe selected the first scene at an equal `suspenseDelta` peak
+(`>`), whereas the current probe/reference structural-peak convention selects
+the later equal peak (`>=`). This is a probe convention, not a claim that the
+analyzer itself chooses one singular peak. The produced-script corpus required
+to remeasure was not present in this integration worktree, so the numeric
+tables and closure claims below are retained only as historical pre-tie-break
+observations—not current P1 evidence. Re-run
+`node scripts/probe-climax-locators.mjs` against the sanctioned corpus and
+record a receipt before making a current discrimination conclusion.
+
+**Source correction:** `revelation` and `dramaticTurn` are independently
+extracted from each scene's ordered lines before `detectPurpose` is assigned
+(`fountain-analyzer.ts` Phase 1, then Phase 3). They are not position-derived
+through `detectPurpose`; only `purpose` is assigned with that later
+position-aware heuristic. The prior explanation and conclusion below that
+said otherwise are historical and incorrect on this provenance point.
 
 ## The question
 
@@ -9,7 +24,9 @@ candidate directions named in `SUSPENSE_DELTA_DEGENERACY_2026-08-05.md`.
 climax locator (peaks at scene 0-2 on 27/27 scripts). It named three
 not-disproven candidates: (a) causal-link ordering (`forwardEdgeRatio`),
 (b) the `revelation` channel, (c) a `purpose==='climax'`-based locator.
-This document closes (b) and (c).
+This document historically evaluated (b) and (c). Its pre-tie-break results do
+not currently close either candidate; sanctioned-corpus remeasurement is
+required.
 
 ## What was measured
 
@@ -65,21 +82,27 @@ This is the **mirror image** of the suspenseDelta problem:
 - `purpose==='climax'` is effectively pure position: peaks right (85-100%),
   but doesn't travel with the relocated scene.
 
-Neither alone discriminates CLIMAX_RELOCATE. A hybrid (content that both
-travels AND peaks late) does not exist in the current per-scene field set.
+In the historical run, neither alone discriminated CLIMAX_RELOCATE. That run
+did not identify a hybrid field whose content both traveled and peaked late;
+this is an observation awaiting corrected remeasurement, not a current
+exhaustiveness claim.
 
-## Conclusion: ALL THREE candidate categories closed
+## Historical conclusion (not a current P1 closure)
 
-- **`purpose==='climax'` locator: CLOSED.** Position-assigned, doesn't
-  travel. (This also explains why the existing `positionFrac >= 0.85`
-  gate in detectPurpose never helped CLIMAX_RELOCATE AUC.)
-- **`revelation`/`dramaticTurn` locator: CLOSED.** Localize late on intact
-  features (good), but — being position-re-derived via the same
-  `detectPurpose`/`positionFrac` machinery — they also don't travel
-  meaningfully under relocation (mean Δ −0.8 to −1.2%, 2/11 scripts).
-- **Causal-link ordering (`story-graph.ts` `forwardEdgeRatio`): CLOSED.**
-  Tested 2026-08-05: `forwardEdgeRatio` is **1.000 on all 12 scripts, intact
-  AND relocated, identical edge counts** — literally zero signal.
+- **`purpose==='climax'` locator: historical result, not currently closed.**
+  The pre-tie-break run suggested the position-aware tag did not travel with
+  relocated content. Corrected sanctioned-corpus remeasurement is required
+  before using that result as current evidence.
+- **`revelation`/`dramaticTurn` locator: historical, not closed.** Their
+  previous non-movement figures are not current evidence and the former claim
+  that they were position-re-derived through `detectPurpose` was false: both
+  are independently text-extracted before purpose assignment. A sanctioned
+  remeasurement is required to determine their current relocation behavior.
+- **Causal-link ordering (`story-graph.ts` `forwardEdgeRatio`): historical
+  result, not a current closure.** The 2026-08-05 run reported
+  `forwardEdgeRatio` as **1.000 on all 12 scripts, intact and relocated, with
+  identical edge counts**. Those values are retained as historical context
+  until rerun on the sanctioned corpus.
   Source-level why (story-graph.ts:247-258): "forward" is defined as
   `promise.seedIdx < promise.payoffIdx`, where seedIdx/payoffIdx come from
   the D6 content-derived clue lifecycle (introduction-evidence-based).
@@ -89,29 +112,26 @@ travels AND peaks late) does not exist in the current per-scene field set.
   change relative to each other. `forwardEdgeRatio` is a promise-payment
   metric, not an ordering metric; it cannot see reordering by construction.
 
-### The fundamental ceiling, now proven exhaustively
+### Historical ceiling hypothesis (requires remeasurement)
 
-Every field in `ScreenplaySceneRecord` is derived from each scene's own
-text. Scene reordering preserves every per-scene field; therefore any
-signal built only from per-scene fields (directly, or via inter-scene
-relationships that derive their edges from per-scene fields — like
-`forwardEdgeRatio`'s setup→payoff links) is invariant to that reordering.
-This is a mathematical ceiling, not a missing rule:
+The prior write-up treated per-scene fields and inter-scene relationships
+derived from them as invariant under reordering. That framing was too broad:
+`purpose` also uses position context, and the corrected equal-peak convention
+has not been remeasured on the sanctioned corpus. The table below therefore
+records historical hypotheses/results, not a proven mathematical ceiling:
 
 | Candidate category | Signal | Result | Why |
 |---|---|---|---|
 | Per-scene content | `suspenseDelta` peak | degenerate (0/27 late) | lexicon density, peaks on cold opens |
-| Per-scene position-derived | `purpose`/`revelation`/`turn` | doesn't travel (Δ −0.8%) | re-derived from new position |
+| Purpose tag | `purpose` | historical pre-tie-break result | assigned after extraction with position context |
+| Independent per-scene text | `revelation`/`dramaticTurn` | historical pre-tie-break result | extracted before purpose assignment; requires remeasurement |
 | Inter-scene (from per-scene fields) | `forwardEdgeRatio` | tautologically 1.000 | seed-before-payoff is content-defined |
 
-**No per-scene field, and no inter-scene relationship derived from
-per-scene fields, can discriminate scene reordering.** The only thing
-that can is a signal that reads the *textual coherence of adjacent
-scenes* — e.g., "does scene N's pronoun/continuation references resolve
-in scene N-1?" — which is a fundamentally different analyzer primitive
-(this project does not currently have). That is the sole remaining
-direction for closing CLIMAX_RELOCATE/SCENE_SHUFFLE to ≥0.80, and it is
-new analyzer-layer engineering, not a rule or formula change.
+The historical analysis proposed textual coherence across adjacent scenes —
+for example, whether scene N's pronoun/continuation references resolve in
+scene N-1 — as one candidate direction that the analyzer did not then expose.
+It is not established as the sole remaining direction. No new direction or
+closure claim is authorized until the corrected probe is rerun and recorded.
 
 ## Reproduction
 
@@ -119,3 +139,8 @@ new analyzer-layer engineering, not a rule or formula change.
 node scripts/probe-climax-locators.mjs            # position probe, ~1s
 node scripts/probe-climax-relocate-discrimination.mjs  # discrimination probe, ~1s
 ```
+
+Both commands now use the latest-equal-peak probe convention. They require the
+sanctioned produced-script corpus; running them in this sanitized checkout
+does not reproduce the historical tables. Record the corpus version, exact
+commit, and output receipt when remeasurement becomes authorized.

@@ -390,24 +390,18 @@ export default function ScriptIDE({
   /** Current cursor line (1-based) for sidebar scene highlighting. */
   const [currentLine, setCurrentLine] = useState(1);
   const currentLineRef = useRef(1);
-  const [prefsOpen, setPrefsOpen] = useState<"none" | "copilot" | "collab" | "settings">("none");
+  const [prefsOpen, setPrefsOpen] = useState<"none" | "collab" | "settings">("none");
   const [directorsLayer, setDirectorsLayer] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
   // a first pass doesn't want squiggles until they ask for them.
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
   );
-  // G0-03: inline AI ghost-text completion — off by default, same rationale
-  // as Live Notes above (a keyless-by-default provider feature the writer
-  // has to opt into, not one that fires on every debounced keystroke).
-  const [inlineCompletion, setInlineCompletion] = useState(
-    () => lsGet("inline_completion") === "1"
-  );
   // G0-04: idle/background AI analysis (triggerAnalysis, fired 2s after the
   // last keystroke via handleScriptChange below) — off by default. It POSTs
   // /api/analyze-script, which runs generateContent + image + TTS provider
-  // calls in parallel, so it must stay opt-in the same way Live Notes and
-  // inline completion are. Explicit "Analyze" actions elsewhere still call
+  // calls in parallel, so it must stay opt-in. Explicit "Analyze" actions
+  // elsewhere still call
   // triggerAnalysis directly and are unaffected by this flag.
   const [autoAnalysis, setAutoAnalysis] = useState(
     () => lsGet("auto_analysis") === "1"
@@ -460,16 +454,13 @@ export default function ScriptIDE({
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulateStatus, setSimulateStatus] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
   const simulateStatusTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // P9: inline copilot persona (custom ghost-text voice/specialty).
-  const [copilotPersona, setCopilotPersona] = useState<string>(() => lsGet("copilot_persona") || "default");
-  const [personaList, setPersonaList] = useState<Array<{ id: string; name: string; description: string }>>([]);
   // P4: real-time collaboration room.
   const [collabRoom, setCollabRoom] = useState<string | undefined>(undefined);
   const [collabUserName, setCollabUserName] = useState<string>(() => lsGet("collab_username") || "Writer");
   const [collabInput, setCollabInput] = useState("");
   const [collabNameInput, setCollabNameInput] = useState("");
-  // Keyless-honesty banner (finding E): whether generation-dependent features
-  // (copilot, simulation turns, rewriting) have an AI key behind them.
+  // Keyless-honesty banner (finding E): whether explicit generation features
+  // (world-building, simulation turns, rewriting) have an AI key behind them.
   // null = not yet fetched; the banner only ever renders once we know for
   // sure, so first paint never flashes a false "no key" warning.
   const [llmReady, setLlmReady] = useState<boolean | null>(null);
@@ -1113,18 +1104,6 @@ export default function ScriptIDE({
     }
   }, [isTypewriterSound]);
 
-  // P9: load the available copilot personas once for the picker.
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/scriptide/personas")
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error("personas_fetch_failed"))))
-      .then((data: { personas?: Array<{ id: string; name: string; description: string }> }) => {
-        if (!cancelled && Array.isArray(data.personas)) setPersonaList(data.personas);
-      })
-      .catch(() => { /* picker falls back to the default-only list */ });
-    return () => { cancelled = true; };
-  }, []);
-
   // Finding E: fetch AI readiness once on mount so first-time users learn up
   // front what works keyless (analysis, exports) vs what needs a key
   // (generation). Non-fatal on failure — the banner simply never shows if we
@@ -1176,19 +1155,11 @@ export default function ScriptIDE({
     } catch { /* sessionStorage unavailable — notice just never appears */ }
   }, []);
 
-  // Persist persona selection so it survives reloads.
-  useEffect(() => { lsSet("copilot_persona", copilotPersona); }, [copilotPersona]);
-
   // Persist the Live Notes toggle so it survives reloads (same idiom as
   // typewriter sound's on/off flag).
   useEffect(() => {
     lsSet("live_diagnostics", liveDiagnostics ? "1" : "0");
   }, [liveDiagnostics]);
-
-  // Persist the inline-completion toggle the same way (G0-03).
-  useEffect(() => {
-    lsSet("inline_completion", inlineCompletion ? "1" : "0");
-  }, [inlineCompletion]);
 
   // Persist the auto-analysis toggle the same way (G0-04).
   useEffect(() => {
@@ -1786,7 +1757,6 @@ export default function ScriptIDE({
           isAnalyzing={engineState.isAnalyzing}
           directorsLayer={directorsLayer}
           liveDiagnostics={liveDiagnostics}
-          inlineCompletion={inlineCompletion}
           autoAnalysis={autoAnalysis}
           wordCount={stats.wordCount}
           pageCount={pageCount}
@@ -1800,7 +1770,6 @@ export default function ScriptIDE({
           onOpenSlate={() => openToolSlot("slate")}
           onOpenStudio={() => openToolSlot("studio")}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
-          onToggleInlineCompletion={() => setInlineCompletion((prev) => !prev)}
           onToggleAutoAnalysis={() => setAutoAnalysis((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound((prev) => {
@@ -1825,7 +1794,6 @@ export default function ScriptIDE({
             setCollabNameInput(collabUserName);
             setPrefsOpen("collab");
           }}
-          onOpenCopilot={() => setPrefsOpen("copilot")}
           onOpenSettings={() => setPrefsOpen("settings")}
         />
 
@@ -1954,34 +1922,7 @@ export default function ScriptIDE({
           )}
         </div>
 
-        {/* Progressive depth: prefs only when requested from overflow */}
-        {prefsOpen === "copilot" && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
-            <label htmlFor="copilot-persona" className="font-mono text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink)]/60">
-              Copilot
-            </label>
-            <select
-              id="copilot-persona"
-              value={copilotPersona}
-              onChange={(e) => setCopilotPersona(e.target.value)}
-              className="border border-black bg-[var(--sm-panel)] px-2 py-1 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-black"
-            >
-              {(personaList.length > 0
-                ? personaList
-                : [{ id: "default", name: "Staff Writer", description: "" }]
-              ).map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setPrefsOpen("none")}
-              className="ml-auto font-mono text-[10px] uppercase tracking-wider underline"
-            >
-              Done
-            </button>
-          </div>
-        )}
+        {/* Progressive depth: collaboration and settings only when requested from overflow. */}
         {prefsOpen === "collab" && !collabRoom && (
           <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
             <input
@@ -2050,7 +1991,7 @@ export default function ScriptIDE({
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
         >
           {/* CodeMirror 6 editor — replaces the textarea + syntax-highlight overlay.
-              Syntax highlighting, inline AI ghost-text, and Fountain keybindings
+              Syntax highlighting, screenplay autocomplete, and Fountain keybindings
               are all handled as CM6 extensions inside FountainEditor. */}
           <FountainEditor
             ref={editorRef}
@@ -2058,16 +1999,10 @@ export default function ScriptIDE({
             onChange={handleScriptChange}
             onUserEdit={handleUserEdit}
             characters={characters.map(c => c.name)}
-            completionCtx={{
-              directorStyle: initialConfig?.directorStyle,
-              characters: characters.map(c => c.name),
-              persona: copilotPersona,
-            }}
             collabRoom={collabRoom}
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
-            inlineCompletionEnabled={inlineCompletion}
           />
 
           {/* Page furniture — quiet manuscript metadata in the right gutter */}

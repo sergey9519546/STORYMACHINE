@@ -94,7 +94,7 @@ before the next begins, because every downstream promise (private, instant,
 deterministic, reproducible coverage) rests on the score being provably real,
 and by our own numbers it isn't yet. We build demand-out, not rigor-first.
 
-### P0 — Validate with real writers (this week; blocks everything)
+### P0 — Validate with real writers (recommended evidence lane; P0 hard-gate RETIRED 2026-08-11 — engine work proceeds in parallel)
 
 **Goal:** Confirm that a screenwriter, shown the existing sample coverage
 report, actually wants to run their own draft.
@@ -230,9 +230,9 @@ receipts already exist; this phase productizes them.
   editor, and outside the Labs gate.
 - `server/routes/events.ts` + `EventBodySchema`: instrumentation sink over a
   **closed** event vocabulary (`doctor_run`, `export_report`, `first_report`,
-  `verify_run`) with bounded scalar props — an open namespace would let any
-  client plant keys in the counters that gate this phase. Aggregate counters
-  only (no per-event history, no PII, no script text); `GET
+  `verify_run`) with strict per-event props. Unknown fields, free text, and
+  StoryMachine session capabilities are rejected. The sink keeps
+  session-unlinked aggregate counters only; `GET
   /api/events/summary` reports `exportRate` and `avgTimeToFirstReportMs`,
   both `null` rather than `0` before any run.
 - `src/lib/analytics.ts` + `ScriptDoctorPanel.tsx` wiring: fire-and-forget
@@ -250,9 +250,12 @@ real route, plus the two forgeries the mechanism exists to catch: an inflated
 health figure on untouched text, and a genuine report paired with a different
 script.
 
-**Known limit:** counters are in-memory and per-process — they answer the
-exit-gate ratios for a single deployment since boot, and reset on restart. A
-durable store is only worth adding once the rate itself is being acted on.
+**Known limit:** counters are unauthenticated and client-reported, in-memory
+and process-local, and reset on restart. They are not durable, not
+deployment-wide, not authoritative P0 evidence, and not proof of unique users.
+"Session-unlinked" describes this aggregate sink, not absolute anonymity:
+normal HTTP/network metadata can still exist outside it. A durable store is
+only worth adding once the rate itself is being acted on.
 
 ### P4 — Retention & defensibility (later; only after the score is trusted)
 
@@ -296,7 +299,7 @@ These replace the old rigor-first principles while keeping the engineering
 constraints that genuinely carry weight. The shift is from "prove rigor in
 isolation" to "prove value to a real writer, then harden it."
 
-- **Demand before rigor.** No new engine work ships without a validated user need. This is a P0 gate, not a preference.
+- **Demand before rigor.** Validated user need is the highest-priority signal. *(Amended 2026-08-11: the prior hard-gate framing — "no new engine work ships without a validated user need; this is a P0 gate, not a preference" — is RETIRED. Engine work proceeds in parallel with P0 evidence-gathering. See `docs/DECISION_LOG.md` Decision #2.)*
 - **Correct before reproducible.** Reproducibility is earned *after* the score is shown valid on real writing. A broken ruler is perfectly reproducible; determinism is worthless if the verdict is wrong.
 - **Measure discrimination on runnable, real writing — always.** Synthetic fixtures are necessary but never sufficient. A test that skips in CI proves nothing; the score must separate strong drafts from weak ones on actual screenplays.
 - **One honest claim over a big number.** Lead with verifiable reproducibility receipts, not a rule count. A defensible small claim beats an impressive inflated one.
@@ -341,13 +344,24 @@ isolation" to "prove value to a real writer, then harden it."
 
 ---
 
-## 7. Pre-deployment audit (2026-07-10) — open security items
+## 7. Pre-deployment audit (2026-07-10) — re-verification record
 
-Verify against current code before assuming any are stale. Two read-only
-audits (ops + security) found BLOCKERS; most were closed in S-wave (see
-changelog), but re-verify these specifically:
+Two read-only audits (ops + security) found BLOCKERS. The following status
+records the current re-verification rather than treating the original findings
+as permanently open:
 
-- **SEC-1**: `/api/ai-config` SSRF + unauthenticated GLOBAL provider hijack — `baseUrl` has no host/scheme allowlist; config is process-global; `/test` fires the request. (`validation.ts:143`, `ai-config.ts:55`, `openai-compat.ts:75`) — PARTIALLY ADDRESSED by PR #200's `ADMIN_TOKEN` gate on config writes; re-verify the SSRF allowlist specifically is still open.
+- **SEC-1**: **CLOSED / re-verified.** `AiConfigSchema` rejects unsafe
+  `baseUrl` values at the configuration boundary; config writes are protected
+  by the admin write gate; and the OpenAI-compatible fetch path re-validates
+  every redirect and resolves-and-pins DNS targets before connecting. The
+  route and adapter tests cover private/metadata targets, redirects, and DNS
+  rebinding (`tests/routes/ai-config-live-path.test.ts`,
+  `tests/core/openai-compat-redirect.test.ts`). **Separate future concern:**
+  provider configuration remains process-global and is protected by the
+  operator-facing admin/loopback write gate; it is not writer session state or
+  a multi-tenant configuration model. Any hosted multi-tenant release needs
+  authenticated, tenant-scoped provider ownership and credentials, not merely
+  this SSRF control.
 - **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` / `detectQuestionLatency` / `computeContentWordClueClusters` unbounded; `DoctorBodySchema` caps bytes, not scene count. (`cluster.ts:591`, `fountain-analyzer.ts:1118`/`1314`) — mitigated via `ANALYZER_SCENE_CEILING` in S-wave; confirm coverage.
 - **OPS-1 / OPS-2**: crash handlers + `/metrics` gate — closed in S-wave; confirm still present.
 

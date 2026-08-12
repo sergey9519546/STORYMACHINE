@@ -275,7 +275,7 @@ export default function StartScreen({
                       Try sample coverage
                     </span>
                     <span className="max-w-[46ch] text-[15px] leading-relaxed text-[var(--sm-cream)]/80">
-                      See Script Doctor in action. Load a professional screenplay, get instant analysis with verdict, craft dimensions, and top issues. No setup required.
+                      See Script Doctor in action. Load the built-in sample screenplay, get instant analysis with verdict, craft dimensions, and top issues. No setup required.
                     </span>
                   </button>
 

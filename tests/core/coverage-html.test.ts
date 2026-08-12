@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
 import type {
-  ScriptDoctorReport, DimensionScore, CoverageVerdict, DoctorGrade,
+  ScriptDoctorReport, DimensionScore, CoverageVerdict, DoctorGrade, RootCauseFinding,
 } from '../../server/nvm/analyze/types.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
@@ -420,5 +420,98 @@ describe('renderCoverageHtml — the verify block (P3 independent verification)'
 
     assert.ok(html.includes('<code>1234</code>'), 'totalIssues must be raw digits, not locale-grouped ("1,234")');
     assert.ok(html.includes('<code>72.5</code>'), 'health must be the plain numeric value');
+  });
+});
+
+// Pilot session 2026-08-07 finding #3 (PILOT_SESSION_REPORT.md §0.3/§6/§9.3):
+// the API report carries a rootCauses synthesis that the exported coverage.html
+// never rendered — it jumped straight from Top Priorities to the raw Full Pass
+// Appendix. renderCoverageHtml now renders a Root Causes section between the
+// two, only when the report actually carries one.
+function makeRootCause(overrides: Partial<RootCauseFinding> = {}): RootCauseFinding {
+  return {
+    id: 'rc-1',
+    title: 'Protagonist checks out at the climax',
+    explanation: 'The climax scene shows no protagonist engagement — neutral emotion, no clock pressure, no discovery.',
+    severity: 'critical',
+    memberRules: ['PROTAGONIST_PASSIVITY_CLIMAX', 'UNMOTIVATED_DECISION'],
+    memberCount: 4,
+    sceneIdxs: [8],
+    ...overrides,
+  };
+}
+
+describe('renderCoverageHtml — Root Causes section', () => {
+  it('ends at the closing html tag without trailing whitespace', () => {
+    const html = renderCoverageHtml(buildReport({ rootCauses: [makeRootCause()] }), 'Whitespace-Free Export');
+
+    assert.equal(html, html.trimEnd(), 'generated exports must be reproducible without post-render whitespace cleanup');
+    assert.ok(html.endsWith('</html>'));
+    const trailingWhitespaceLines = html
+      .split('\n')
+      .map((line, index) => ({ line, number: index + 1 }))
+      .filter(({ line }) => /[ \t]+$/.test(line));
+    assert.deepEqual(trailingWhitespaceLines, [], 'no generated line may need manual trailing-whitespace cleanup');
+  });
+
+  it('omits the Root Causes section entirely when the report carries no rootCauses field', () => {
+    const html = renderCoverageHtml(buildReport(), 'A Draft With No Clustering');
+    assert.ok(!html.includes('<h2>Root Causes</h2>'), 'heading must not render when rootCauses is absent');
+  });
+
+  it('omits the Root Causes section when rootCauses is an empty array', () => {
+    const html = renderCoverageHtml(buildReport({ rootCauses: [] }), 'A Draft With No Clustering');
+    assert.ok(!html.includes('<h2>Root Causes</h2>'), 'heading must not render for an empty rootCauses array');
+    assert.ok(!html.includes('Subsumes'), 'no root-cause list markup when nothing clustered');
+  });
+
+  it('renders a Root Causes section, positioned after Top Priorities and before the Full Pass Appendix, when rootCauses is non-empty', () => {
+    const report = buildReport({
+      rootCauses: [
+        makeRootCause(),
+        makeRootCause({
+          id: 'rc-2',
+          title: 'On-the-nose exposition in the office scene',
+          explanation: 'Ottie delivers backstory in one unbroken speech with no witnessed confirmation.',
+          severity: 'major',
+          memberRules: ['UNINTERRUPTED_MONOLOGUE', 'REVELATION_UNEARNED'],
+          memberCount: 3,
+          sceneIdxs: [4],
+        }),
+      ],
+    });
+    const html = renderCoverageHtml(report, 'Has Root Causes');
+
+    assert.match(html, /<h2>Root Causes<\/h2>/);
+    assert.match(html, /Protagonist checks out at the climax/);
+    assert.match(html, /neutral emotion, no clock pressure, no discovery/);
+    assert.match(html, /Subsumes 4 issues/);
+    assert.match(html, /Scene 9/, 'sceneIdxs must render 1-based, matching the codebase-wide display convention');
+    assert.match(html, /PROTAGONIST_PASSIVITY_CLIMAX/);
+
+    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
+    const rootCausesIdx = html.indexOf('<h2>Root Causes</h2>');
+    const appendixIdx = html.indexOf('<h2>Full Pass Appendix</h2>');
+    assert.ok(topPrioritiesIdx >= 0 && rootCausesIdx > topPrioritiesIdx, 'Root Causes must render after Top Priorities');
+    assert.ok(appendixIdx > rootCausesIdx, 'Root Causes must render before the Full Pass Appendix, which must still be kept');
+  });
+
+  it('escapes an XSS payload in a root cause title, explanation, and member rule', () => {
+    const report = buildReport({
+      rootCauses: [
+        makeRootCause({
+          title: '<script>alert(1)</script>',
+          explanation: 'He said "hello" and then <script>alert(document.cookie)</script> ran.',
+          memberRules: ['<script>alert(2)</script>'],
+        }),
+      ],
+    });
+    const html = renderCoverageHtml(report, 'Malicious Root Cause');
+
+    assert.ok(!/<script/i.test(html), 'no raw <script> tag may appear in the output');
+    assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), 'title must be HTML-escaped, not dropped');
+    assert.ok(html.includes('&lt;script&gt;alert(document.cookie)&lt;/script&gt;'), 'explanation must be HTML-escaped');
+    assert.ok(html.includes('&lt;script&gt;alert(2)&lt;/script&gt;'), 'member rule names must be HTML-escaped');
+    assert.ok(html.includes('&quot;hello&quot;'), 'quotes in the explanation must be escaped');
   });
 });

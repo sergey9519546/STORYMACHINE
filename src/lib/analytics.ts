@@ -1,17 +1,23 @@
 // P3 — Client-side product instrumentation (ROADMAP §3 P3 exit gate:
 // "% of Doctor runs that export is measured"; also P2's deferred
 // time-to-first-report). Fire-and-forget counterpart to server/routes/
-// events.ts: a closed event vocabulary, bounded scalar props, no script
-// text, no PII. Every call fails silent — analytics must never break the
-// product surface it measures (offline dev, blocked by an ad-blocker,
-// server down: all fine, all ignored).
+// events.ts: a closed payload map with no arbitrary metadata, free text, or
+// telemetry identifier. These unauthenticated, client-reported aggregates are
+// session-unlinked; that is not a claim of absolute anonymity because normal
+// HTTP/network metadata remains outside this sink. Every call fails silent —
+// analytics must never break the product surface it measures.
 //
 // The vocabulary here must stay in lockstep with PRODUCT_EVENT_NAMES in
 // server/lib/validation.ts — the server rejects anything outside the enum.
 
-export type ProductEventName = 'doctor_run' | 'export_report' | 'first_report' | 'verify_run';
+export interface ProductEventPayloadMap {
+  doctor_run: { source: 'sample' | 'draft' | 'upload' };
+  first_report: { source: 'sample' | 'draft' | 'upload'; elapsedMs: number };
+  export_report: { verdict: 'RECOMMEND' | 'CONSIDER' | 'PASS' | 'unknown' };
+  verify_run: { verified: boolean };
+}
 
-export type ProductEventProps = Record<string, string | number | boolean>;
+export type ProductEventName = keyof ProductEventPayloadMap;
 
 // Module-load timestamp ≈ app boot. time-to-first-report is measured from
 // here to the first successful Doctor run of the session — close enough to
@@ -19,33 +25,20 @@ export type ProductEventProps = Record<string, string | number | boolean>;
 // without pulling in Navigation Timing API complexity.
 const APP_START_TS = Date.now();
 
-const SESSION_ID_KEY = 'sm_session_id';
 const FIRST_REPORT_SENT_KEY = 'sm_first_report_sent';
-
-function getSessionId(): string | undefined {
-  try {
-    let id = sessionStorage.getItem(SESSION_ID_KEY);
-    if (!id) {
-      id = crypto.randomUUID();
-      sessionStorage.setItem(SESSION_ID_KEY, id);
-    }
-    return id;
-  } catch {
-    // sessionStorage unavailable (private mode, quota) — events still send,
-    // just without a session correlate.
-    return undefined;
-  }
-}
 
 /** Fire-and-forget event post. Never throws, never awaits, never retries —
  *  the server meters this route with gameLimiter, so a retry storm from a
  *  flapping client would only burn the caller's own rate budget. */
-export function trackEvent(name: ProductEventName, props?: ProductEventProps): void {
+export function trackEvent<Name extends ProductEventName>(
+  name: Name,
+  props: ProductEventPayloadMap[Name],
+): void {
   try {
     void fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, sessionId: getSessionId(), props }),
+      body: JSON.stringify({ name, props }),
       keepalive: true,
     }).catch(() => { /* analytics must never surface */ });
   } catch {

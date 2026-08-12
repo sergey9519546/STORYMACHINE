@@ -21,7 +21,7 @@ quality reference, not an instruction to author another wave.
 ## Commands
 
 `npm run dev|build|lint|test` are standard (`lint` = `tsc --noEmit`;
-Node ≥ 22.6). The one non-obvious command:
+Node `>=22.13.0 || >=24`). The one non-obvious command:
 
 ```
 node --experimental-strip-types tests/<area>/<file>.test.ts   # one file, fast
@@ -82,28 +82,33 @@ before every push. CI runs lint + test + build on every branch, plus a
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.
 
-## Current Priority — P0 User Validation (BLOCKS ALL NEW WORK)
+## Current Priority — P0 User Validation (recommended evidence lane; no longer blocks engine work)
 
-**Status**: Phase 0 (documentation reconciliation) complete, Phase 1 (fix broken) next, Phase 2 (P0 validation) starts this week
+**Status**: P0 fielding is authorized (GO, 2026-08-04), but 0 valid human
+sessions are documented and no outcome verdict exists. P0 human evidence is
+the highest-priority lane; it is not replaced by engineering work.
 
 See `ROADMAP.md` for full plan. Key points:
 
-**P0 Gate (Hard Blocker)**:
+**P0 outcome gate**:
 - Recruit 5+ real screenwriters
 - Show them the sample coverage report with Story Graph
 - Ask: "Would you run your own draft?"
 - Count pull signals: strong (4+) / weak (2-3) / none (<2)
-- Decision: GREEN → proceed to V5 activation + P1 corpus | YELLOW → iterate | RED → stop/pivot
+- Apply the pre-registered PASS / STOP / INCONCLUSIVE rule only after valid
+  sessions are documented; no result may be inferred from recruitment or code.
 
 **What's Working**:
 - Story Graph Phase 1-2 (697 LOC) — fully integrated, shows in P0 sessions
 - V5 systems (5,000+ LOC) — shadow mode OFF, activates if P0 GREEN
 - Deterministic core — production-ready
 
-**What's Gated**:
-- No new engine work until P0 clears (exception: security fixes)
-- No Phase 3-4 Story Graph until P0 GREEN + P1 validation
-- No Infinity Gate expansion until P0 GREEN
+**Standing constraints (the P0 hard-gate was RETIRED 2026-08-11 by the
+maintainer — engine work proceeds in parallel with P0; P0 is a recommended
+evidence lane, not a prerequisite)**:
+- Scoring-path changes proceed within their machine-checked evidence gates
+  (measurement receipts, AUC ratchet) — see the 2026-08-04 amendment in
+  `ROADMAP.md` §3 and `docs/user-validation/PHASE_TRACKER.md`.
 - No new rules (frozen at 3,216 pass-scoped constants — machine-counted by
   `scripts/generate-rulebook.ts`; the "8,917" figure this line used to carry
   was DISPROVEN by the 2026-07-14 audit, see
@@ -111,7 +116,9 @@ See `ROADMAP.md` for full plan. Key points:
   R2-C01), no new waves (program RETIRED)
 
 **Constitutional Laws** (NORTH_STAR.md):
-- *Demand before rigor* — validated user need gates engine work
+- *Demand before rigor* — validated user need is the highest-priority signal;
+  pursued in parallel with engine work (amended 2026-08-11: no longer a hard
+  gate — see `docs/DECISION_LOG.md` Decision #2)
 - *Correct before reproducible* — score validity before determinism claims
 - *Measure on runnable real writing* — synthetic tests necessary but insufficient
 

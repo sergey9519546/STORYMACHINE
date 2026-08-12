@@ -45,7 +45,7 @@ It does not:
 
 ## 2. Prerequisites
 
-- Node >= 22.6 (this repo's standing requirement; type-stripped `.ts`
+- Node matching `>=22.13.0 || >=24` (this repo's standing requirement; type-stripped `.ts`
   imports used by `lib/blind-id.mjs` and `lib/manifest.mjs` need it).
 - A local corpus directory with the actual screenplay text (never
   committed — see `docs/p1-benchmark/MEASUREMENT_RUNBOOK.md` §1 for the

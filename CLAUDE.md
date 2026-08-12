@@ -18,7 +18,7 @@ quality reference, not an instruction to author another wave.
 ## Commands
 
 `npm run dev|build|lint|test` are standard (`lint` = `tsc --noEmit`;
-Node ≥ 22.6). The one non-obvious command:
+Node >=22.13.0 || >=24). The one non-obvious command:
 
 ```
 node --experimental-strip-types tests/<area>/<file>.test.ts   # one file, fast
@@ -94,8 +94,9 @@ author a new wave.
 
 The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
 
-1. **P0 — Validate with real writers.** No new engine work ships without a
-   validated user need. Blocks everything below.
+1. **P0 — Validate with real writers.** Recommended evidence lane. *(The P0
+   hard-gate was retired 2026-08-11 by maintainer decision — engine work now
+   proceeds in parallel with P0; see `docs/DECISION_LOG.md` Decision #2.)*
 2. **P1 — Make the score provably discriminate on REAL writing** (the One
    Bet). A legally distributable benchmark of real drafts running in CI,
    independently blind-labeled by >=3 experienced readers, with a
@@ -109,8 +110,10 @@ The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
 4. **P3 — Ship a shareable, third-party-verifiable coverage report.**
 5. **P4 — Retention & defensibility.** Last, not first.
 
-**Two laws now outrank the old rigor discipline** (full text in NORTH_STAR
-§1): *demand before rigor* — a validated user need gates engine work; and
+**Two laws guide the old rigor discipline** (full text in NORTH_STAR
+§1): *demand before rigor* — validated user need is the highest-priority
+signal (amended 2026-08-11: no longer a hard gate; engine work proceeds in
+parallel with P0); and
 *correct before reproducible* — determinism is worthless if the verdict is
 wrong, so reproducibility is earned AFTER the score is shown valid on real
 writing, never as a substitute for it. `measure-before-threshold on the

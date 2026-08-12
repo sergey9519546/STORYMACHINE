@@ -1,5 +1,6 @@
 // What-If Lab — Writer Cockpit feature: pick a story decision, flip it via the
-// SCM do()-calculus, see provably-coherent alternate futures ranked best-first,
+// SCM do()-calculus, see alternate futures through an experimental composite
+// ranking with Tier-1 checks included,
 // and adopt one straight into canon. Underneath, the original "Roads not
 // taken" ghost-commit browser lives on unchanged: every candidate the
 // Convergence Loop rejected, ready to be branched into.
@@ -747,7 +748,7 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
           <div className="flex items-center gap-2">
             <FlaskConical className="w-5 h-5 text-purple-400" />
             <h2 id="whatif-panel-title" className="text-white font-semibold text-lg">What-If Lab</h2>
-            <span className="text-xs text-gray-500 ml-2">flip a decision, see consistency-checked alternate futures ranked best-first</span>
+            <span className="text-xs text-gray-500 ml-2">flip a decision, see an experimental composite ranking with Tier-1 checks included</span>
           </div>
           <button onClick={onClose} aria-label="Close What-If Lab" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
@@ -879,7 +880,7 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
                   {labResult.branches.length > 0 && (
                     <div>
                       <div className="text-white font-medium text-xs mb-1.5">
-                        Branches <span className="text-gray-500 font-normal">ranked best-first</span>
+                        Branches <span className="text-gray-500 font-normal">experimental composite ranking with Tier-1 checks included</span>
                       </div>
                       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
                         {labResult.branches.map((b, i) => (

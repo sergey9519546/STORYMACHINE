@@ -142,9 +142,21 @@ export function analyzeStructure(
   const midpointPressure = n > 0 ? (suspenseValues[midIdx] ?? 0) : 0;
 
   // ── Tightest scene ────────────────────────────────────────────────────────
+  // Tie-break fix (pilot session 2026-08-07, PILOT_SESSION_REPORT.md §6.2):
+  // was `>`, which on an exact suspenseDelta tie keeps whichever scene the
+  // reduce visits FIRST — i.e. always the earliest scene in document order,
+  // regardless of how many later scenes match the same peak. On the pilot
+  // draft, Scene 1 (calm banter, suspense 5.0 off tension-lexicon words like
+  // "debt"/"forfeit") tied exactly with Scene 9 (the actual climax, also
+  // 5.0), and the earliest-wins tie-break silently pinned "tightest scene" to
+  // Scene 1 — which downstream fed a false CLIMAX_TOO_EARLY. `>=` makes a
+  // later scene overwrite an earlier tie, so among several scenes sharing the
+  // true peak, the one closest to the climax zone wins — the reading a
+  // reader would actually make of "which scene is the tightest" when two
+  // scenes score identically on the engine's suspense lexicon.
   const tightestScene = n > 0
     ? records.reduce((best, r) =>
-        r.suspenseDelta > (best?.suspenseDelta ?? -Infinity) ? r : best, null as ScreenplaySceneRecord | null
+        r.suspenseDelta >= (best?.suspenseDelta ?? -Infinity) ? r : best, null as ScreenplaySceneRecord | null
       )?.sceneIdx ?? null
     : null;
 

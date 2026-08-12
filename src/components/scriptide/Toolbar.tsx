@@ -16,7 +16,6 @@ import {
   Sparkles,
   SpellCheck,
   Stethoscope,
-  Wand2,
   Zap,
 } from "lucide-react";
 import { getLabsEnabled } from "../../lib/feature-flags";
@@ -33,8 +32,6 @@ interface ToolbarProps {
   isAnalyzing: boolean;
   directorsLayer: boolean;
   liveDiagnostics: boolean;
-  /** G0-03: inline AI ghost-text completion toggle state. */
-  inlineCompletion: boolean;
   /** G0-04: idle/background AI analysis (POST /api/analyze-script) toggle state. */
   autoAnalysis: boolean;
   wordCount: number;
@@ -49,7 +46,6 @@ interface ToolbarProps {
   onOpenSlate: () => void;
   onOpenStudio: () => void;
   onToggleLiveDiagnostics: () => void;
-  onToggleInlineCompletion: () => void;
   onToggleAutoAnalysis: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
@@ -61,7 +57,6 @@ interface ToolbarProps {
   onNewStory?: () => void;
   onGoHome?: () => void;
   onOpenCollab?: () => void;
-  onOpenCopilot?: () => void;
   onOpenSettings?: () => void;
   onToggleSidebar?: () => void;
 }
@@ -84,7 +79,6 @@ export default function Toolbar({
   isAnalyzing,
   directorsLayer,
   liveDiagnostics,
-  inlineCompletion,
   autoAnalysis,
   wordCount,
   pageCount,
@@ -98,7 +92,6 @@ export default function Toolbar({
   onOpenSlate,
   onOpenStudio,
   onToggleLiveDiagnostics,
-  onToggleInlineCompletion,
   onToggleAutoAnalysis,
   onToggleTypewriterSound,
   onExportFountain,
@@ -110,7 +103,6 @@ export default function Toolbar({
   onNewStory,
   onGoHome,
   onOpenCollab,
-  onOpenCopilot,
   onOpenSettings,
   onToggleSidebar,
 }: ToolbarProps) {
@@ -439,15 +431,6 @@ export default function Toolbar({
                 }}
               />
               <OverflowItem
-                icon={<Wand2 className="h-3.5 w-3.5" />}
-                label={inlineCompletion ? "Inline copilot on" : "Inline copilot off"}
-                pressed={inlineCompletion}
-                onClick={() => {
-                  onToggleInlineCompletion();
-                  setOverflowOpen(false);
-                }}
-              />
-              <OverflowItem
                 icon={<Zap className="h-3.5 w-3.5" />}
                 label={autoAnalysis ? "Auto-analysis on" : "Auto-analysis off"}
                 pressed={autoAnalysis}
@@ -464,15 +447,6 @@ export default function Toolbar({
                   setOverflowOpen(false);
                 }}
               />
-              {onOpenCopilot && (
-                <OverflowItem
-                  label="Copilot voice"
-                  onClick={() => {
-                    onOpenCopilot();
-                    setOverflowOpen(false);
-                  }}
-                />
-              )}
               {onOpenCollab && (
                 <OverflowItem
                   label="Collaborate"

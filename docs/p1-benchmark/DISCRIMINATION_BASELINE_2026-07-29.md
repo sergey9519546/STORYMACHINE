@@ -34,10 +34,14 @@ scripts, doesn't separate, or goes the wrong direction. Structural
 discrimination requires analyzer-layer work (new inter-scene relationship
 fields), not formula-layer tuning.
 
-No channel clears the 0.80 gate on the expanded corpus. The pooled AUC is
-~0.62 — above chance (0.50) but well below the gate. This is a **more honest
-and more defensible** baseline than the previous one because it tests on a
-representative live-action corpus, not an animation-only subset.
+## Pre-deduction historical results
+
+The remainder of this dated baseline through the reproducibility notes records
+the measurement state before the dialogue-diversity deduction and final test
+evaluation. Pre-deduction pooled AUC was ~0.62 and pre-deduction dialogue AUC
+was ~0.54. Those values are historical diagnostics, distinct from the current
+header's final test pooled AUC 0.754 and dialogue test AUC 0.990; they must not
+be read as the final results.
 
 ---
 

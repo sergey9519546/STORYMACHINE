@@ -20,6 +20,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8');
 
 const panel = read('../../src/components/scriptide/ScriptDoctorPanel.tsx');
+const startScreen = read('../../src/components/StartScreen.tsx');
+const whatIfPanel = read('../../src/components/WhatIfPanel.tsx');
 
 describe('G0-09 — report honesty copy contract', () => {
   it('verdict explainers are engine tiers, not human-reader endorsements', () => {
@@ -50,5 +52,16 @@ describe('G0-09 — report honesty copy contract', () => {
       /synthetic reference set/i,
       'percentile must disclose that the reference set is synthetic',
     );
+  });
+
+  it('describes the default sample as built-in rather than professional', () => {
+    assert.match(startScreen, /built-in sample screenplay/i);
+    assert.doesNotMatch(startScreen, /professional screenplay/i);
+  });
+
+  it('describes Labs branches as an experimental composite ranking with Tier-1 checks included', () => {
+    assert.match(whatIfPanel, /experimental composite ranking with Tier-1 checks included/i);
+    assert.doesNotMatch(whatIfPanel, /\bconsistency-checked\b/i);
+    assert.doesNotMatch(whatIfPanel, /\bbest-first\b/i);
   });
 });

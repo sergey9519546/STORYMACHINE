@@ -1,118 +1,89 @@
-// GET /api/scriptide/complete (P1 inline AI copilot FIM completion stream).
+// GET /api/scriptide/complete — compatibility tombstone.
 //
-// Bug covered here: the route's own genre/directorStyle validity checks
-// (`isValidGenre`/`isValidStyle`) were a stale, pre-genre-completion-wave
-// allowlist — only the original 8 StoryGenre members and 6 DirectorStyle
-// members — even though engine/types.ts's StoryGenre union now has 47
-// members and DirectorStyle has 27 (see genre-router.ts's own "Genre-
-// completion wave" header comment). Any caller who picked a genre/style
-// added after that original set (e.g. "heist", "kubrick") had it silently
-// dropped from the composed prompt block — the completion silently ignored
-// the writer's chosen genre/style for the large majority of the roster,
-// while every OTHER genre/style-consuming route (world-build, refine-
-// dialogue, analyze-tension, /api/story-genre, /api/director-style) honors
-// the full current roster via `k in GENRE_NAMES` / `k in STYLE_MODIFIERS`.
-//
-// Provider seam: setLLMProvider with a `generate`-only stub (no
-// generateStream) so engine/ai.ts's generateContentStream() falls back to a
-// single generateContent() call — the fallback path documented at
-// generateContentStream's own definition — letting this test capture the
-// exact prompt string sent to the model without needing a real streaming
-// mock.
+// The former keystroke-triggered EventSource route put draft text and a bearer
+// session id in a GET URL. The URL stays registered so old clients receive an
+// explicit retirement response, but it must be deterministic zero-work even
+// when a normal provider is ready. A separate positive control proves that
+// provider readiness and an explicit ScriptIDE AI workflow remain intact.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, type TestServer } from './helpers.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
+import { sessions } from '../../server/lib/session-store.ts';
 import type { GenerateContentParameters } from '@google/genai';
 
-// Neutral prefix — long enough to clear the route's `rawPrefix.length < 10`
-// short-circuit, and deliberately free of the words "heist"/"kubrick" so a
-// match against those words in the captured prompt can only come from the
-// genre/style modifier block, never an echo of the prefix itself.
-const PREFIX = 'INT. QUIET HOUSE - NIGHT\nA woman studies a photograph in silence.';
+const DRAFT_SENTINEL = 'INT. PRIVATE DRAFT - NIGHT\nThis text must never reach a provider.';
+const SESSION_SENTINEL = 'retired-inline-session-sentinel';
 
-describe('routes/scriptide — GET /api/scriptide/complete genre/directorStyle composition', async () => {
+describe('routes/scriptide — GET /api/scriptide/complete retirement tombstone', async () => {
   let server: TestServer;
-  let capturedContents: string | undefined;
-  // G0-03: the route now guards on llmReady() (server/routes/scriptide.ts)
-  // before ever reaching the provider — setLLMProvider's mock alone (below)
-  // no longer makes the route "ready", since llmReady() checks the key
-  // sources (env GEMINI_API_KEY / ai-config.ts's multi-provider config), not
-  // whether ai.ts's provider seam has been swapped. This suite's actual
-  // subject is genre/directorStyle prompt composition, which only runs once
-  // the guard is satisfied, so set a dummy key for its duration (restored in
-  // `after`) the same way the mocked provider below is installed/reset.
-  const prevGeminiKey = process.env.GEMINI_API_KEY;
+  const providerCalls: GenerateContentParameters[] = [];
+  let sessionLookups = 0;
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const originalSessionsGet = sessions.get;
 
   before(async () => {
-    process.env.GEMINI_API_KEY = 'test-key-for-genre-style-composition';
+    process.env.GEMINI_API_KEY = 'test-key-proves-provider-is-ready';
+    sessions.get = function (key: string) {
+      sessionLookups++;
+      return originalSessionsGet.call(sessions, key);
+    };
     server = await startTestServer();
     setLLMProvider({
       generate: async (params: GenerateContentParameters) => {
-        capturedContents = typeof params.contents === 'string' ? params.contents : JSON.stringify(params.contents);
-        return { text: 'continuation text' } as unknown as import('@google/genai').GenerateContentResponse;
+        providerCalls.push(params);
+        return { text: 'explicit-ai-provider-control' } as unknown as import('@google/genai').GenerateContentResponse;
       },
     });
   });
+
   after(async () => {
+    sessions.get = originalSessionsGet;
     resetLLMProvider();
-    if (prevGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
-    else process.env.GEMINI_API_KEY = prevGeminiKey;
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
     await server.close();
   });
 
-  it('honors a post-expansion genre ("heist") in the composed prompt block, not just the original 8', async () => {
-    capturedContents = undefined;
-    const res = await fetch(
-      `${server.baseUrl}/api/scriptide/complete?prefix=${encodeURIComponent(PREFIX)}&genre=heist`,
-    );
-    assert.equal(res.status, 200);
-    await res.text(); // drain the SSE stream so the handler runs to completion
-    assert.ok(capturedContents, 'expected the stub provider to have been called');
-    const contents = capturedContents as string;
-    assert.ok(
-      contents.includes('GENRE — HEIST'),
-      `expected the composed prompt to include the heist genre modifier block; got:\n${contents}`,
-    );
+  it('returns exact 410 no-store JSON without SSE, provider calls, or session lookup/work', async () => {
+    providerCalls.length = 0;
+    sessionLookups = 0;
+    const query = new URLSearchParams({
+      prefix: DRAFT_SENTINEL,
+      suffix: 'PRIVATE SUFFIX',
+      persona: 'private-persona',
+      directorStyle: 'kubrick',
+      genre: 'heist',
+      characters: 'ALICE,BOB',
+      sessionId: SESSION_SENTINEL,
+    });
+
+    const res = await fetch(`${server.baseUrl}/api/scriptide/complete?${query}`);
+    const bodyText = await res.text();
+
+    assert.equal(res.status, 410);
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    assert.notEqual(res.headers.get('content-type'), 'text/event-stream');
+    assert.deepEqual(JSON.parse(bodyText), { error: 'inline_completion_retired' });
+    assert.deepEqual(providerCalls, [], 'retired route must never reach the configured provider');
+    assert.equal(sessionLookups, 0, 'retired route must not resolve or inspect session data');
   });
 
-  it('honors a post-expansion director style ("kubrick") in the composed prompt block, not just the original 6', async () => {
-    capturedContents = undefined;
-    const res = await fetch(
-      `${server.baseUrl}/api/scriptide/complete?prefix=${encodeURIComponent(PREFIX)}&directorStyle=kubrick`,
-    );
-    assert.equal(res.status, 200);
-    await res.text();
-    assert.ok(capturedContents, 'expected the stub provider to have been called');
-    const contents = capturedContents as string;
-    assert.ok(
-      contents.includes('CINEMATIC STYLE — KUBRICK'),
-      `expected the composed prompt to include the kubrick style modifier block; got:\n${contents}`,
-    );
-  });
+  it('preserves normal readiness and an explicit ScriptIDE AI route', async () => {
+    providerCalls.length = 0;
 
-  it('still honors an original-roster genre+style pair ("thriller"/"hitchcock") — no regression on the previously-supported subset', async () => {
-    capturedContents = undefined;
-    const res = await fetch(
-      `${server.baseUrl}/api/scriptide/complete?prefix=${encodeURIComponent(PREFIX)}&genre=thriller&directorStyle=hitchcock`,
-    );
-    assert.equal(res.status, 200);
-    await res.text();
-    assert.ok(capturedContents, 'expected the stub provider to have been called');
-    const contents = capturedContents as string;
-    assert.ok(
-      /THRILLER/.test(contents) || /HITCHCOCK/.test(contents),
-      `expected the composed prompt to reference the thriller genre or hitchcock style; got:\n${contents}`,
-    );
-  });
+    const configRes = await fetch(`${server.baseUrl}/api/ai-config`);
+    assert.equal(configRes.status, 200);
+    const config = await configRes.json();
+    assert.equal(config.llmReady, true, 'normal Gemini readiness must remain available');
 
-  it('ignores an unknown genre/style value entirely (no crash, no bogus block)', async () => {
-    capturedContents = undefined;
-    const res = await fetch(
-      `${server.baseUrl}/api/scriptide/complete?prefix=${encodeURIComponent(PREFIX)}&genre=not-a-real-genre&directorStyle=not-a-real-style`,
-    );
-    assert.equal(res.status, 200);
-    await res.text();
-    assert.ok(capturedContents, 'expected the stub provider to have been called');
+    const explicitRes = await fetch(`${server.baseUrl}/api/scriptide/world-build`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ beat: 'A lighthouse keeper answers a deliberate distress call.' }),
+    });
+    assert.equal(explicitRes.status, 200);
+    assert.deepEqual(await explicitRes.json(), { result: 'explicit-ai-provider-control' });
+    assert.equal(providerCalls.length, 1, 'explicit AI workflow must remain wired to the provider');
   });
 });

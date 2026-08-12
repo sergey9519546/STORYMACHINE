@@ -1,5 +1,10 @@
 # APDL Implementation Summary
 
+> **ARCHIVED STATUS — historical experimental implementation report.** The
+> completeness and current-status claims below describe the APDL subsystem at
+> the time of writing, not current product readiness or direction. See
+> `ROADMAP.md` for current truth.
+
 ## Overview
 
 Complete implementation of **Affective Planning Domain Language (APDL)** for StoryMachine's narrative planner. APDL extends classical PDDL planning with emotional and dramatic reasoning, ensuring stories are both causally valid AND emotionally coherent.

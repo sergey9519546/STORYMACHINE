@@ -27,12 +27,17 @@ import { pdfToFountain } from '../../server/lib/pdf-import.ts';
 interface Run { x: number; text: string }
 interface Line { y: number; runs: Run[] }
 type Page = Line[];
+interface PdfOptions {
+  width?: number;
+  height?: number;
+  openActionJavaScript?: string;
+}
 
 function escapePdfString(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
-function buildScreenplayPdf(pages: Page[], opts: { width?: number; height?: number } = {}): Buffer {
+function buildScreenplayPdf(pages: Page[], opts: PdfOptions = {}): Buffer {
   const width = opts.width ?? 612;
   const height = opts.height ?? 792;
 
@@ -47,7 +52,9 @@ function buildScreenplayPdf(pages: Page[], opts: { width?: number; height?: numb
     contentObjNums.push(nextObj++);
   }
 
-  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  const openActionObjNum = opts.openActionJavaScript === undefined ? undefined : nextObj++;
+
+  objects[1] = `<< /Type /Catalog /Pages 2 0 R${openActionObjNum === undefined ? '' : ` /OpenAction ${openActionObjNum} 0 R`} >>`;
   objects[2] = `<< /Type /Pages /Kids [${pageObjNums.map(n => `${n} 0 R`).join(' ')}] /Count ${pages.length} >>`;
   // WinAnsiEncoding explicitly, so apostrophes/quotes in test fixtures decode
   // as plain ASCII rather than a bare Type1 font's built-in StandardEncoding
@@ -71,6 +78,10 @@ function buildScreenplayPdf(pages: Page[], opts: { width?: number; height?: numb
     ops.push('ET');
     const content = ops.join('\n');
     objects[contentObjNum] = `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`;
+  }
+
+  if (openActionObjNum !== undefined) {
+    objects[openActionObjNum] = `<< /S /JavaScript /JS (${escapePdfString(opts.openActionJavaScript!)}) >>`;
   }
 
   return assemblePdf(objects, nextObj - 1);
@@ -188,6 +199,31 @@ describe('pdfToFountain — classification by position', () => {
     const { fountain } = await pdfToFountain(new Uint8Array(pdf));
     assert.match(fountain, /^She waits\.$/m);
     assert.doesNotMatch(fountain, /^\.She waits\.$/m);
+  });
+});
+
+describe('pdfToFountain — document actions', () => {
+  it('extracts screenplay text without executing a JavaScript OpenAction', async () => {
+    const sentinelKey = '__storymachinePdfOpenActionSecuritySentinel';
+    const scope = globalThis as unknown as Record<string, unknown>;
+    scope[sentinelKey] = 'untouched';
+
+    try {
+      const pdf = buildScreenplayPdf([[
+        { y: 700, runs: [{ x: X_ACTION, text: 'INT. SAFE ROOM - DAY' }] },
+        { y: 680, runs: [{ x: X_ACTION, text: 'A sealed envelope rests on the table.' }] },
+      ]], {
+        openActionJavaScript: `globalThis.${sentinelKey} = 'executed'`,
+      });
+
+      const { fountain } = await pdfToFountain(new Uint8Array(pdf));
+
+      assert.match(fountain, /^INT\. SAFE ROOM - DAY$/m);
+      assert.match(fountain, /^A sealed envelope rests on the table\.$/m);
+      assert.equal(scope[sentinelKey], 'untouched');
+    } finally {
+      delete scope[sentinelKey];
+    }
   });
 });
 
@@ -315,6 +351,76 @@ describe('pdfToFountain — invalid input', () => {
     assert.ok(
       warnings.some(w => /Page 2:.*no text layer/.test(w)),
       `expected a page-2 no-text-layer warning, got ${JSON.stringify(warnings)}`,
+    );
+  });
+});
+
+describe('pdfToFountain — bounded extraction', () => {
+  it('accepts exactly 300 pages but rejects 301 before extracting them', async () => {
+    const firstPage: Page = [
+      { y: 700, runs: [{ x: X_ACTION, text: 'INT. ARCHIVE - DAY' }] },
+    ];
+    const acceptedPdf = buildScreenplayPdf([firstPage, ...Array.from({ length: 299 }, () => [])]);
+    const accepted = await pdfToFountain(new Uint8Array(acceptedPdf));
+    assert.match(accepted.fountain, /^INT\. ARCHIVE - DAY$/m);
+
+    const rejectedPdf = buildScreenplayPdf([firstPage, ...Array.from({ length: 300 }, () => [])]);
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(rejectedPdf)),
+      {
+        message: 'This PDF exceeds the 300-page limit. Split it into smaller files and try again.',
+      },
+    );
+  });
+
+  it('rejects 900,001 extractable characters and still converts a valid PDF afterward', async () => {
+    const oversizedLines = Array.from(
+      { length: 100_001 },
+      (_, index): Line => ({
+        y: 350_000 - index * 3,
+        runs: [{ x: X_ACTION, text: index === 100_000 ? 'A' : 'A'.repeat(9) }],
+      }),
+    );
+    const oversizedPdf = buildScreenplayPdf([oversizedLines], { height: 400_000 });
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(oversizedPdf)),
+      {
+        message: 'This PDF contains more than 900,000 extractable text characters. Split it into smaller files and try again.',
+      },
+    );
+
+    const validPdf = buildScreenplayPdf([[
+      { y: 700, runs: [{ x: X_ACTION, text: 'INT. CLEAN ROOM - DAY' }] },
+    ]]);
+    const converted = await pdfToFountain(new Uint8Array(validPdf));
+    assert.match(converted.fountain, /^INT\. CLEAN ROOM - DAY$/m);
+  });
+
+  it('rejects more than 200,000 streamed text items', async () => {
+    const lines = Array.from(
+      { length: 200_001 },
+      (_, index): Line => ({ y: 650_000 - index * 3, runs: [{ x: X_ACTION, text: 'a' }] }),
+    );
+    const oversizedPdf = buildScreenplayPdf([lines], { height: 700_000 });
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(oversizedPdf)),
+      {
+        message: 'This PDF contains more than 200,000 text items. Export a simplified PDF or split it into smaller files and try again.',
+      },
+    );
+  });
+
+  it('rejects Fountain output that grows beyond the canonical character limit', async () => {
+    const lines = Array.from(
+      { length: 100_001 },
+      (_, index): Line => ({ y: 350_000 - index * 3, runs: [{ x: X_ACTION, text: 'abcdefgh' }] }),
+    );
+    const oversizedPdf = buildScreenplayPdf([lines], { height: 400_000 });
+    await assert.rejects(
+      () => pdfToFountain(new Uint8Array(oversizedPdf)),
+      {
+        message: 'This PDF converts to more than 900,000 Fountain characters. Split it into smaller files and try again.',
+      },
     );
   });
 });

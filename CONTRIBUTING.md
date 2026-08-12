@@ -7,7 +7,7 @@ setup walkthrough see **README.md**; for working constraints see
 
 ## Dev setup
 
-Requires Node.js 22.6+ (CI pins Node 22).
+Requires Node.js >=22.13.0 || >=24 (CI pins Node 22).
 
 ```bash
 npm ci          # install pinned deps
@@ -61,25 +61,25 @@ constitution — see AGENTS.md "Security constraints" for the authoritative list
 - **All AI calls go through server-side Express routes**, never from the
   frontend bundle.
 
-## P0 freeze
+## P0 evidence gates
 
-Product code is **frozen for P0 user validation**. No new engine, scoring, or
-UI work without clearance. **Security fixes are the documented exception.**
+P0 fielding is authorized (GO, 2026-08-04), but there are 0 valid documented
+sessions and no P0 outcome verdict. P0 human evidence remains the highest
+priority and cannot be replaced by implementation work. The P0 hard-gate
+was retired 2026-08-11 (`docs/DECISION_LOG.md` Decision #2): engine work
+proceeds in parallel with P0; P4 retention/lock-in is last in sequence, no
+longer hard-blocked on a P0 PASS.
 
-P0 has not formally cleared (0/5 documented writer sessions as of this
-writing), yet `ROADMAP.md` §3 records P1 as partial and P2/P3 as DONE. That
-is not a contradiction to resolve here — the authorization is recorded in
-`docs/p1-benchmark/P1_STATUS_2026-07-29.md`'s "Phase-gate status" section:
-"P0 (demand): not formally cleared (0/5 writer sessions). User directed P1
-to begin; record shows this." This file does not relitigate that decision,
-only points to where it's on the record so the freeze language above isn't
-read in isolation from it.
+P0 has not passed (0/5 documented writer sessions as of this writing), while
+`ROADMAP.md` §3 records P1 as partial and P2/P3 as DONE. That does not change
+the P0 evidence requirement or permit P4 retention work; it records the
+current evidence-gated sequencing rather than an outcome verdict.
 
 See **ROADMAP.md** (and the archived `docs/filed-backlog/2026-07-15-session/
 MASTER_ROADMAP.md`) for the full plan and the current phase. If your change
-touches the engine, scoring, or UI and you have not gotten explicit
-clearance, it will not merge — open an issue first and triage via the
-feature-request freeze-check.
+touches scoring, measurement, or the user-facing surface, follow the
+applicable machine-checked evidence gate; do not treat engineering progress
+as P0 evidence or begin P4 retention/lock-in work before P0 PASS.
 
 ## ADRs
 

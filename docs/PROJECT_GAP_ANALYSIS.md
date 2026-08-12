@@ -1,5 +1,9 @@
 # STORYMACHINE — Complete Gap Analysis
 
+> **ARCHIVED STATUS — historical gap report.** The blockers, priorities, and
+> current-status claims below describe the 2026-07-15 snapshot and are not
+> current direction. See `ROADMAP.md` for current truth.
+
 **Date:** 2026-07-15  
 **Context:** After implementing Story Graph V2 Phase 1-2, analyzing entire project
 

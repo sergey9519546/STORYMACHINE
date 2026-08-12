@@ -221,9 +221,7 @@ const HISTORICAL_LABEL_RE = /\b(disprove[nd]?|disproving|disprov(?:ed|es)|retrac
 // point-in-time document from the same 2026-07-14/07-15 investigation that
 // this repo's own docs describe repeatedly — not living guidance a
 // contributor would read as current (CLAUDE.md's own orientation list names
-// ROADMAP/NORTH_STAR/ULTRAPLAN/ARCHITECTURE/README; none of these are on
-// it, and docs/user-validation/P1_BASELINE_INVENTORY.md's own header still
-// says "P1 HAS NOT STARTED" — itself superseded, same as this fix's item 1).
+// ROADMAP/NORTH_STAR/ULTRAPLAN/ARCHITECTURE/README; none of these are on it).
 // This repo's established convention for a disproven figure in a document
 // people still read (CHANGELOG.md's 1.0.0 entry) is to leave the record in
 // place with a correction attached NEARBY, not to silently rewrite it —
@@ -238,7 +236,6 @@ const DOC_STALE_NUMBER_EXEMPT_PREFIXES = [
   'docs/VISION_REBUILD.md', // "written 2026-07-14 against the DEEP_AUDIT" (its own header) — a dated sketch, not current direction
   'docs/PROJECT_GAP_ANALYSIS.md', // dated 2026-07-15 in its own header, same genre as DEEP_AUDIT
   'docs/user-validation/SESSION_LOG_2026-07-15.md', // dated session log
-  'docs/user-validation/P1_BASELINE_INVENTORY.md', // dated pre-P1 inventory, superseded in full (see item 1 of this fix)
 ];
 
 function isDocStaleNumberExempt(relPosixPath) {

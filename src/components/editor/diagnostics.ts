@@ -3,12 +3,10 @@
 // to the deterministic, keyless POST /api/scriptide/diagnose endpoint and the
 // returned issues are rendered as wavy-underline squiggles with hover cards.
 //
-// Structure deliberately mirrors inline-complete.ts (the closest analog in
-// this codebase):
+// Structure follows CodeMirror's field/effect/plugin/decorations pattern:
 //   • A single StateField holds the current diagnosis; a StateEffect updates it.
 //   • A ViewPlugin debounces after the last doc change, fetches, and dispatches
-//     the effect — with the same AbortController + request-counter staleness
-//     discipline used by inline-complete's completion trigger.
+//     the effect with AbortController + request-counter staleness guards.
 //   • Decorations are derived purely from state (ViewPlugin.decorations),
 //     same as fountain-highlight.ts.
 //
@@ -149,9 +147,8 @@ export const diagnosticsField = StateField.define<LocatedIssue[]>({
     // Line-anchored issues are only valid against the doc snapshot they were
     // computed from. Once the user types, lines above the issue may shift
     // (insert/delete a line), so a stale squiggle would misattribute an issue
-    // to the wrong line. Clear immediately on any edit — same "any edit
-    // invalidates the stale result" rule inline-complete applies to ghost text
-    // — and let the debounced re-fetch below repopulate once the writer pauses.
+    // to the wrong line. Clear immediately on any edit and let the debounced
+    // re-fetch below repopulate once the writer pauses.
     if (tr.docChanged) return [];
     return value;
   },
@@ -436,8 +433,7 @@ const diagnosticsTrigger = ViewPlugin.fromClass(
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
     private abortCtrl: AbortController | null = null;
     // Bumped on every scheduled request; a resolving/rejecting fetch checks
-    // its own snapshot against the latest value and no-ops if superseded —
-    // same staleness guard inline-complete applies via cursor-position equality.
+    // its own snapshot against the latest value and no-ops if superseded.
     private requestSeq = 0;
     private lastFingerprint: string | null = null;
     private consecutiveFailures = 0;
@@ -608,7 +604,7 @@ export interface ScriptDiagnosticsOptions {
   /** When false, returns a fully inert extension: no field, no plugin, no
    *  decorations, no network activity whatsoever. FountainEditor's primary
    *  on/off mechanism is a Compartment that swaps this whole extension in and
-   *  out (mirroring completionCompartment/themeCompartment) — this flag is a
+   *  out (mirroring the theme compartment) — this flag is a
    *  secondary belt-and-suspenders guard for any caller that constructs the
    *  extension directly without going through a Compartment. Default: true. */
   enabled?: boolean;

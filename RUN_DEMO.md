@@ -7,7 +7,7 @@ AI provider is contacted at any point (CI proves this on every commit:
 
 ## Prerequisites (one-time)
 
-1. Install **Node.js 22.6 or newer** (https://nodejs.org — the LTS installer
+1. Install **Node.js matching `>=22.13.0 || >=24`** (https://nodejs.org — the LTS installer
    is fine; confirm with `node --version` in a fresh terminal).
 2. Get the code onto the machine (either):
    - `git clone https://github.com/sergey9519546/STORYMACHINE.git`, or
@@ -45,9 +45,10 @@ design; the AI-dependent surfaces stay dark and say so honestly.
 4. Optional honesty checks to show a skeptical audience:
    - The sample never overwrites an existing draft (guarded; try it with
      text in the editor — it refuses with a notice).
-   - AI features are **off by default**: no inline copilot, no background
-     analysis, zero network calls to any provider (the smoke test asserts
-     zero at the provider seam *and* zero non-loopback requests).
+   - The legacy inline copilot is **retired**, background analysis is off by
+     default, and this path makes zero network calls to any provider (the
+     smoke test asserts zero at the provider seam *and* zero non-loopback
+     requests). Explicit AI tools remain available when configured and chosen.
    - An interrupted analysis shows "incomplete" — never a fake score.
 
 ## Verifying the zero-AI claim yourself

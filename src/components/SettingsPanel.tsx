@@ -552,7 +552,10 @@ function SessionTab() {
     setError(null);
     try {
       const res = await fetch("/api/session/rotate", { method: "POST" });
-      if (!res.ok) throw new Error(`Rotation failed: ${res.statusText}`);
+      if (!res.ok) {
+        const failure = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(failure?.error ?? `Rotation failed: ${res.statusText}`);
+      }
       const data = await res.json() as { status: string; newSessionId: string };
       if (data.status === "ok" && data.newSessionId) {
         setSessionId(data.newSessionId);
@@ -585,7 +588,7 @@ function SessionTab() {
           Rotate Session Security Key
         </div>
         <p className="text-xs text-gray-600 font-mono leading-relaxed">
-          If you shared a URL containing your session parameter or suspect your session bearer ID was exposed, click below to mint a new unguessable session ID and migrate your local state. The old ID will be invalidated immediately.
+          If you shared a URL containing your session parameter or suspect your session bearer ID was exposed, click below to mint a new unguessable session ID. Success is shown only after persistent server state is verified under the new ID; if rotation fails, your current ID and draft remain active so you can retry.
         </p>
         <div className="mt-2 flex items-center justify-between">
           <button
@@ -597,7 +600,7 @@ function SessionTab() {
           </button>
           {rotated && (
             <span className="text-xs font-mono font-bold text-green-700 uppercase">
-              Session Rotated Successfully ✓
+              Session Rotated and Verified ✓
             </span>
           )}
           {error && (

@@ -10,9 +10,12 @@ the kit.
 
 > **does this make you want to run your own draft — why or why not?**
 
-P0 is demand validation. It does **not** test whether the score is correct
-(that is P1, and P1 is frozen until P0 clears). Never relabel a P0 reaction as
-a P1/benchmark/quality/ground-truth label.
+P0 is demand validation. It does **not** test whether the score is correct;
+P1 has its own machine-checked evidence gates and may proceed without turning a
+P0 reaction into benchmark evidence. Never relabel a P0 reaction as a
+P1/benchmark/quality/ground-truth label. Fielding is GO, but P0 remains
+unvalidated: 0 valid documented human sessions and no verdict. P4 retention or
+lock-in work remains barred until P0 passes.
 
 ## Exit gate
 
@@ -63,7 +66,8 @@ render path, so for **live-flow** sessions the operating kit's pre-session
 > Newly measured provenance (HEAD `0cf12c9` at swap time): **health 78.3,
 > verdict CONSIDER, sceneCount 12**, contentHash
 > `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`,
-> regenerated `sample-coverage-report.html` is **193,132 bytes**. The old
+> regenerated `sample-coverage-report.html` was **193,132 bytes at the
+> 2026-08-04 swap**. The old
 > stimulus's fountain text is preserved verbatim at
 > `docs/user-validation/ARCHIVED_SAMPLE_THE_SECOND_KEY.md`. Zero P0 sessions
 > had been run against the retired stimulus, so no session comparability is
@@ -71,6 +75,14 @@ render path, so for **live-flow** sessions the operating kit's pre-session
 > figures above byte-identical apart from the runtime datestamp;
 > `scripts/smoke-p0-live-flow.mjs` PASS (zero genuine console errors,
 > keyless); `npm run honesty-audit` clean.
+
+> **Current artifact provenance (2026-08-08):** regenerated with
+> `npm run generate-p0-sample` after the live tie-break/report fixes:
+> health **78.3**, verdict **CONSIDER**, sceneCount **12**, contentHash
+> `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca`,
+> and `sample-coverage-report.html` **207,740 bytes**. This updates only the
+> generated report artifact; P0 remains fielding-authorized with **zero valid
+> human sessions** and **no outcome verdict**.
 
 **Exposure caveat:** the static HTML is the *report artifact only*. If your
 session shows only this file (not the live StartScreen → Doctor → export flow),
@@ -84,13 +96,13 @@ session. See the stimulus note in `P0_EVIDENCE_SUMMARY.md`.
 1. **Read the protocol.** `P0_OPERATING_KIT.md` — authority, consent, privacy,
    session script, stop rules, evidence classification. This is the real
    playbook; the steps below are just its table of contents.
-2. **Recruit (when the decision to field is made).** Recruitment is **deferred**
-   until a decision owner decides whether, when, and on what signal rule to run
-   P0 — building fielding machinery ahead of that decision is premature. The
-   earlier ready-to-send outreach/screening kit has been filed to
+2. **Recruit under the authorized protocol.** P0 fielding has been **GO /
+   authorized since 2026-08-04**. There are still **0 valid documented human
+   sessions** and no gate verdict. The earlier ready-to-send outreach/screening
+   kit has been filed to
    `docs/filed-backlog/premature-p0-machinery/` (recoverable if/when P0 is
-   re-opened, but re-check each template against the kit). When you do recruit,
-   the operating kit's eligibility and neutral-invitation rules govern directly
+   fielded, but re-check each template against the kit). When recruiting, the
+   operating kit's eligibility and neutral-invitation rules govern directly
    (do not pitch "objective/accurate/trusted"; do not lead the answer).
 3. **Per session, before you start.** Copy `P0_SESSION_TEMPLATE.md` to
    `sessions/P0-S##.md` (kept anonymous). Run the operating kit's pre-session
@@ -111,12 +123,15 @@ session. See the stimulus note in `P0_EVIDENCE_SUMMARY.md`.
 - Don't commit PII, contacts, recordings, transcripts, or screenplay content.
 - Don't pitch, teach the "right" answer, or defend the report against objections.
 - Don't treat P0 evidence as P1 labels.
-- Don't start engine/product work to "improve" the report mid-P0 — the freeze
-  holds until the gate clears (critical security fixes are the only exception).
+- Don't change the fielded stimulus mid-cohort to manufacture a better result.
+  The old blanket engine/product freeze is retired; `ROADMAP.md` now uses
+  machine-checked evidence gates. That does not make P0 passed or authorize
+  unsupported scoring, P4 retention, or other work whose gate has not cleared.
 
 ## Current status
 
-See `PHASE_TRACKER.md` and `P0_EVIDENCE_SUMMARY.md`. As of this writing: 0
-completed sessions; the live-flow stimulus had a pre-session smoke blocker
-(server port binding), which the static report above works around for the
-report-reaction portion.
+See `PHASE_TRACKER.md` and `P0_EVIDENCE_SUMMARY.md`. P0 fielding is authorized
+(GO, 2026-08-04), with **0 valid documented human sessions** and **no verdict**.
+Both static-report and live-flow sessions are unblocked. The former live-flow
+boot/port symptom was diagnosed as an import-time boot crash and is resolved;
+it is retained only as historical evidence in `P0_EVIDENCE_SUMMARY.md`.

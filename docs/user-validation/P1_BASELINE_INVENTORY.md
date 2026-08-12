@@ -1,12 +1,20 @@
-# P1 baseline inventory — inventory only
+# P1 baseline inventory — pre-P1 historical snapshot
 
-> **STOP: P1 HAS NOT STARTED.** P0 is active and blocks P1 until at least five documented writer sessions clear the P0 exit gate. This document authorizes **no experiment, implementation, benchmark construction, labeling run, corpus acquisition, scoring change, or metric rerun**. It is a repository inventory only. (`ULTRAPLAN.md:29-32`, `ULTRAPLAN.md:57-69`; `ROADMAP.md:97-119`)
+> **ARCHIVED — pre-P1 historical snapshot.** This inventory records the
+> repository before P1 execution began; its prohibitions and unchecked entry
+> checklist are historical task constraints, not current instructions. See
+> `ROADMAP.md` §3 for current truth and `ULTRAPLAN.md` for the current status:
+> P0 fielding is GO with 0 valid documented human sessions and no P0 outcome
+> verdict; P1 is active/partial, may run in parallel under evidence gates,
+> never substitutes for P0 human evidence, and its exit gate is not met; P2 and
+> P3 are complete. The P0 hard-gate was retired 2026-08-11 (Decision #2); P4
+> is sequenced last, not blocked on a P0 PASS.
 
 ## Scope and evidence rule
 
 This inventory records what already exists in the repository and what prior documents report. Numeric results below are citations, **not fresh measurements**; no test, scorer, corpus runner, or analysis script was run to produce or verify them. Conflicts and stale statements are preserved as discrepancies, not resolved experimentally.
 
-P1's eventual goal is a runnable test showing separation on strong versus weak **real** writing (`ROADMAP.md:119-128`). That goal is not satisfied by any asset inventoried below.
+P1's then-future goal was a runnable test showing separation on strong versus weak **real** writing. This snapshot did not satisfy that goal; current P1 evidence and status live in `ROADMAP.md` §3 and `docs/p1-benchmark/`.
 
 ## Existing evidence classes
 
@@ -81,9 +89,10 @@ These are algorithmically degraded versions of the private produced corpus, not 
 6. **Composite todo text:** surrounding comments report +2.2, but the todo reason still says approximately 0.0 (`tests/core/discrimination.test.ts:266-289`). The assertion remains todo; wording is stale.
 7. **Historical program language:** discrimination comments invite a future Program v2 wave (`tests/core/discrimination.test.ts:102-110`, `:243-246`), while the current plan retires/freeze-files Program v2 and rule growth (`ULTRAPLAN.md:153-164`). Current roadmap sequencing governs; historical comments are evidence, not authorization.
 
-## Missing prerequisites before P1 may begin
+## Historical pre-P1 entry gaps (snapshot)
 
-These are blockers/gaps, not an instruction to execute them now.
+These were the blockers/gaps recorded by this pre-P1 inventory, not current
+instructions or a current phase verdict.
 
 - P0 exit gate cleared and linked evidence from at least five documented writer sessions (`ULTRAPLAN.md:40-65`).
 - P0-derived objections and trust requirements available as P1 inputs (`ULTRAPLAN.md:62-63`).
@@ -94,21 +103,26 @@ These are blockers/gaps, not an instruction to execute them now.
 - Human label files and candidate-ID mapping with rights-safe storage; no such artifacts are currently present (`evals/scoring/human/HUMAN_LABELING_TASK.md:23-32`).
 - Runners for real-writing discrimination, confidence intervals, inter-rater agreement, and label-based ranking/calibration. Existing runners do not provide these (`evals/scoring/README.md:36-39`).
 
-## Frozen prohibitions while P0 is active and in this inventory task
+## Historical task-scoped prohibitions (not current instructions)
 
-- **No P1 execution.** No experiment, metric rerun, scorer invocation for measurement, implementation, test, script, fixture, label collection, or corpus acquisition.
+The inventory task that produced this snapshot operated under the following
+restrictions. They are preserved as historical process evidence; current work
+follows the evidence gates in `ROADMAP.md`.
+
+- **No P1 execution during this inventory task.** No experiment, metric rerun, scorer invocation for measurement, implementation, test, script, fixture, label collection, or corpus acquisition.
 - No score tuning, formula/constant change, proposed formula, proposed weights, component selection, or emotional-arc integration. P1 requires pre-registration first and held-out proof (`ROADMAP.md:132-135`).
 - No benchmark construction and no synthetic “bad” material (`ROADMAP.md:130-132`).
-- No new rules or catalog growth; the 8,917-entry catalog is frozen, while removal requires separate approval and dependency mapping (`ULTRAPLAN.md:105-108`).
+- No new rules or catalog growth; the 3,216-entry generated catalog was frozen, while removal required separate approval and dependency mapping.
 - No attempt to close the composite fixture via a global curve tweak (`ULTRAPLAN.md:103-104`).
 - No resolution of stale metrics by rerunning private or synthetic harnesses.
 - No use of the env-gated private corpus as if it were CI-runnable, legally distributable, or a discrimination benchmark.
 - No claim that deterministic engineering, calibration monotonicity, produced-floor checks, or metamorphic directions prove score correctness (`ULTRAPLAN.md:172-185`).
 - No other file modification under this task.
 
-## P1 entry checklist — all unchecked
+## Historical pre-P1 entry checklist — snapshot state
 
-Unchecked means **not established by repository evidence reviewed for this inventory**, not permission to begin work.
+Unchecked means **not established by repository evidence reviewed for this
+historical inventory**. It does not describe current completion or permission.
 
 - [ ] P0 has cleared with at least five documented sessions and a clear positive/qualified signal.
 - [ ] P0 objections and trust requirements have been incorporated into an approved P1 pre-registration.
@@ -134,4 +148,6 @@ Unchecked means **not established by repository evidence reviewed for this inven
 - [ ] Baseline discrepancies above have an approved, non-leaky resolution protocol.
 - [ ] Rule growth remains frozen and no score/formula tuning has occurred before pre-registration.
 
-Until every required entry condition is independently satisfied and P0 has cleared, P1 remains **not started**.
+At the time of this snapshot, the inventory recorded no authorization to begin
+P1. That statement is historical; current phase status is governed by
+`ROADMAP.md` §3.

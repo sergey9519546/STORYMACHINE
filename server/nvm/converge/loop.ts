@@ -249,7 +249,7 @@ export async function convergeScene(
     }
     // Wave 69: prepend the live Story Bible to the system preamble so the LLM
     // candidate generator knows the full story context — characters, arcs, clocks.
-    const basePreamble = buildSystemPreamble(specConstraints, state);
+    const basePreamble = buildSystemPreamble(specConstraints, state, target);
     const systemPreamble = budget.bibleSummary
       ? `${budget.bibleSummary}\n\n${basePreamble}`
       : basePreamble;

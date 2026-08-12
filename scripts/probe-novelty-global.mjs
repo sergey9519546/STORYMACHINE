@@ -1,8 +1,9 @@
 // GLOBAL novelty-against-prior discrimination probe.
 //
-// The per-scene probe showed the relocated CLIMAX scene's proper-noun novelty
-// spikes (mean delta +0.45, 10/11 scripts). This probe tests the GLOBAL
-// statistic — does summing "novelty-against-prior" across ALL scenes separate
+// A historical inline per-scene probe reported that the relocated CLIMAX
+// scene's proper-noun novelty spiked (mean delta +0.45, 10/11 scripts), but
+// its source and per-script receipt were not committed. This script tests the
+// GLOBAL statistic — does summing "novelty-against-prior" across ALL scenes separate
 // intact from degraded consistently enough to drive an AUC?
 //
 // GLOBAL METRIC: "forward-novelty burden" = sum over all scenes i of

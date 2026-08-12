@@ -109,9 +109,11 @@ describe('G0-09 — keyless deterministic session emits zero provider calls', as
     assert.equal(load.status, 200);
   });
 
-  it('gated AI routes refuse honestly (503), not silently attempt', async () => {
+  it('retired inline completion is an inert 410 tombstone, not a provider attempt', async () => {
     const res = await realFetch(`${server.baseUrl}/api/scriptide/complete?prefix=${encodeURIComponent(sampleFountain.slice(0, 200))}`);
-    assert.equal(res.status, 503, 'keyless completion must 503, not attempt a call');
+    assert.equal(res.status, 410, 'retired inline completion must return its compatibility tombstone');
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await res.json(), { error: 'inline_completion_retired' });
   });
 
   it('ZERO provider calls and ZERO external network requests occurred', () => {

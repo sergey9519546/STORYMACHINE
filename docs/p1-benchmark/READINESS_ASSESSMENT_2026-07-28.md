@@ -1,11 +1,12 @@
 # P1 Readiness Assessment — what's blocked vs. pre-buildable
 
-> **Status: P1 is BLOCKED.** Per ROADMAP §3, P1 cannot start until P0 (user
-> validation) clears with ≥5 documented sessions and a clear signal. This
-> document does **not** authorize starting P1. It separates what is genuinely
-> blocked on P0 + human inputs from what is pre-buildable infrastructure
-> that touches no experiment, no score, and no held-out data — so that when
-> P0 clears, the P1 launch is days, not weeks.
+> **Status: P1 is NOT HARD-BLOCKED on P0.** The P0 hard-gate was retired
+> 2026-08-11 (`docs/DECISION_LOG.md` Decision #2); engine work proceeds in
+> parallel with P0. The remaining P1 blocker is the real corpus + human
+> labels (not in this environment). This document separates what is genuinely
+> blocked on those inputs from what is pre-buildable infrastructure that
+> touches no experiment, no score, and no held-out data — so that when the
+> corpus arrives, the P1 launch is days, not weeks.
 >
 > This is an assessment, not an execution plan. Nothing here starts a P1
 > experiment, builds a benchmark, collects labels, or changes scoring.
@@ -88,6 +89,7 @@ credible." They are explicitly allowed pre-P1 work *in the same sense* the
 Do not start P1 now. But if you want launch-day readiness, the four
 pre-buildable tools above are a legitimate, freeze-safe workstream — they
 touch no experiment and no score. They can be built speculatively and will
-sit idle until P0 clears and the corpus/labels arrive. Say the word and I
+sit idle until the corpus/labels arrive (the P0 hard-gate was retired
+2026-08-11; the corpus blocker remains). Say the word and I
 will plan and build them as a separate, scoped workstream (not as "starting
 P1").

@@ -41,10 +41,11 @@ through ROADMAP.md's numbering, not MASTER_ROADMAP's.
 - Story Graph Phase 1-2 ready to show users — validate before building Phase 3-4
 - Risk mitigation: Learn cheaply (2-3 weeks) before investing heavily (2-3 months)
 
-**Implications**:
-- P0 is a **hard gate** — no new engine work until it clears
-- V5 systems remain in **shadow mode** (OFF by default) until P0 GREEN
-- Story Graph Phase 3-4 blocked on P0 GREEN + P1 validation
+**Implications** *(as originally recorded 2026-07-15; the hard-gate items
+below were SUPERSEDED by Decision #2 on 2026-08-11 — see that entry)*:
+- ~~P0 is a **hard gate** — no new engine work until it clears~~ *(SUPERSEDED)*
+- ~~V5 systems remain in **shadow mode** (OFF by default) until P0 GREEN~~ *(SUPERSEDED)*
+- ~~Story Graph Phase 3-4 blocked on P0 GREEN + P1 validation~~ *(SUPERSEDED)*
 - Infinity Gate Layer 4-7 moved to filed backlog
 - Wave program stays RETIRED, rule count frozen at 3,216
 
@@ -65,13 +66,64 @@ through ROADMAP.md's numbering, not MASTER_ROADMAP's.
   - STORY_GRAPH_*.md (11 files)
   - V5.0_RELEASE.md
 
-**Status**: Active — this is a phase-defining decision. P0 (user validation) is the active phase per ROADMAP.md and blocks all new engine work until its exit gate clears.
+**Status**: **SUPERSEDED by Decision #2 (2026-08-11).** Decision #1's
+hard-gate framing ("P0 blocks all new engine work until its exit gate
+clears") is retired. P0 remains a recommended evidence lane per its
+original rationale, but engine work no longer waits on it.
 
 **Cross-reference**: The phase-defining nature of this decision belongs in the
 ADR system at `docs/adr/` (see `ADR-001`, `ADR-002`, and `docs/adr/README.md`),
 which is the authoritative record for *why* phase-defining decisions hold.
 
 **Revision History**: This decision can be revisited if P0 GREEN validates demand for V5 capabilities
+
+---
+
+## Decision #2: Retire the P0 Hard-Gate (2026-08-11)
+
+**Context**: Decision #1 (2026-07-15) established P0 (user validation) as a
+hard gate: "no new engine work until P0 clears." As of 2026-08-11, P0 has
+zero documented valid sessions (the "GREEN" state that briefly appeared on
+the `codex/quarantine-2026-08-08-prototypes` branch was a fabrication,
+reverted by the maintainer in commit `a28436c`). The hard-gate therefore
+left the project in a state where no engine work could proceed, indefinitely,
+pending human recruitment that had not occurred.
+
+**The Question**: Should the P0 hard-gate remain in force, blocking all
+engine work, or should engine work proceed in parallel with P0
+evidence-gathering?
+
+**Decision**: **Retire the P0 hard-gate.** Engine work proceeds in parallel
+with P0. P0 remains a recommended, actively-pursued evidence lane — it is
+no longer a prerequisite for engine work.
+
+**Rationale**:
+- Maintainer decision (the project owner has the authority to amend
+  self-imposed governance constraints).
+- The hard-gate created an indefinite, human-recruitment-dependent freeze
+  with no defined path to clearing from within the codebase.
+- The 2026-08-04 amendment had already partially relaxed this (replacing the
+  blanket code freeze with machine-checked evidence gates); this decision
+  completes that relaxation for the demand-gate specifically.
+- P0's original rationale (validate demand before over-investing) still
+  holds as guidance; it no longer holds as a blocking constraint.
+
+**What changed**:
+- `NORTH_STAR.md` §1 law "Demand before rigor" amended: gate → principle.
+- `AGENTS.md` "What's Gated" → "Standing constraints"; P0-dependent gates
+  removed.
+- `CLAUDE.md` P0 item and law reference reframed.
+- `ROADMAP.md` P0 section header and §-law restatement amended.
+- Decision #1 implications struck through where superseded.
+
+**What did NOT change**:
+- P0 is still recommended and worth pursuing — the demand signal matters.
+- The rule-count freeze (3,216 constants) and wave-program retirement are
+  unrelated to P0 and remain in force.
+- The 2026-08-04 machine-checked evidence gates (measurement receipts, AUC
+  ratchet) for scoring-path changes remain in force.
+
+**Status**: Active.
 
 ---
 

@@ -40,6 +40,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
+import { assertKeylessAiConfig, keylessBrowserServerEnv } from './lib/keyless-browser-certification.mjs';
 
 const REPO = process.cwd();
 
@@ -75,7 +76,7 @@ async function bootServer() {
   console.log(`[verify] booting keyless server on port ${ISOLATED_PORT}...`);
   serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd: REPO,
-    env: { ...process.env, PORT: String(ISOLATED_PORT), GEMINI_API_KEY: '' },
+    env: keylessBrowserServerEnv(process.env, ISOLATED_PORT),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;
@@ -91,6 +92,7 @@ async function bootServer() {
     throw new Error(`server did not report server_started: ${e.message}`);
   }
   if (!booted) throw new Error('server started without emitting server_started');
+  await assertKeylessAiConfig(BASE);
   console.log('[verify] server booted (keyless).');
 }
 
@@ -377,9 +379,21 @@ async function main() {
   //       the decision was conditioned on exactly that being absent.
   const shipTaskBtn = pageA.getByRole('button', { name: 'Ship', exact: true }).first();
   await shipTaskBtn.click();
-  await pageA.waitForTimeout(300);
-  const studioTabLabels = await pageA.locator('div.flex.sm-btn--ink.overflow-x-auto button').allTextContents();
-  const studioReachableViaShip = studioTabLabels.length > 0;
+  const versionsTab = pageA.getByRole('button', { name: 'Versions', exact: true });
+  const versionsTabVisible = await versionsTab
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  const versionsTabCount = await versionsTab.count();
+  const versionsTabPressed = versionsTabVisible
+    ? (await versionsTab.getAttribute('aria-pressed')) === 'true'
+    : false;
+  const studioReachableViaShip = versionsTabCount === 1 && versionsTabVisible && versionsTabPressed;
+  const studioTabLabels = studioReachableViaShip
+    ? await versionsTab.evaluate((button) =>
+        Array.from(button.parentElement?.querySelectorAll('button') ?? [], (tab) => tab.textContent?.trim() ?? ''),
+      )
+    : [];
   const studioBodyText = studioReachableViaShip ? await pageA.locator('body').innerText() : '';
   const OASIS_JARGON_RE = /\bOASIS\b|\bNVM\b|causal twin|epistemic map|converge panel|fixed[- ]points|self-?play|agent roster/i;
   const leaksOasisJargon = OASIS_JARGON_RE.test(studioBodyText);
@@ -389,7 +403,7 @@ async function main() {
     studioReachableViaShip,
     studioReachableViaShip
       ? `REACHABLE with Labs OFF via Ship task tab, as decided — tabs found: ${JSON.stringify(studioTabLabels)}. Labs-gated Toolbar "Open Studio" overflow item remains a shortcut, not the sole door, per the accepted decision.`
-      : 'NOT reachable via Ship tab — this reverses the 2026-08-04 accepted decision; reconcile with docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md before treating this as a fix',
+      : `NOT reachable via Ship tab with one visible, active Versions button (count=${versionsTabCount}, visible=${versionsTabVisible}, aria-pressed=${versionsTabPressed}) — this reverses the 2026-08-04 accepted decision; reconcile with docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md before treating this as a fix`,
   );
   record(
     'P2-decision',

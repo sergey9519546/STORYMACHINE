@@ -1,13 +1,16 @@
 # P0 Fielding Decision Brief — for the decision owner
 
-> **This is the actual first step of Track 1.** Per the active-work prompt and
-> the freeze, recruitment, session-running, and the field-the-study decision
-> are *reserved to a human owner* — an agent cannot perform them. What an
-> agent *can* do is hand the owner a verified, decision-ready package so the
-> one thing that actually moves the gate (the go/no-go) can be made against
-> current reality, not stale SHAs. That is what this file is.
+> **Current status — read this first.** Fielding was authorized **GO** on
+> 2026-08-04, but P0 has 0 valid documented human sessions and no outcome
+> verdict. The opening decision request and freeze language below are preserved
+> as a **historical pre-GO record**. They are superseded by ROADMAP's 2026-08-04
+> amendment: P1 measurement/validity work may proceed within its
+> machine-checked evidence gates, in parallel with P0, and never substitutes
+> for human P0 evidence. P4 retention/lock-in remains prohibited until P0
+> PASS. The human-only, consent, privacy, and no-fabrication constraints remain
+> controlling.
 
-## What I need from you (the decision)
+## Historical pre-GO decision request (superseded)
 
 One decision, and it's yours, not mine:
 
@@ -117,25 +120,38 @@ a real script."
 
 ## The state of the gate, honestly
 
+Two different decisions live in this file, and conflating them is exactly
+the trap that misled a fast reader — keep them separate.
+
+| Decision | State | Dated | Where recorded |
+|---|---|---|---|
+| **Fielding authorization** (may recruiting/sessions begin?) | **GO** | 2026-08-04 | `PHASE_TRACKER.md` decision log; see "DECIDED — 2026-08-04: GO" below |
+| **Outcome gate** (PASS / STOP / INCONCLUSIVE on the core question, per the pre-registered signal rule) | **Not yet evaluable — 0 of >=5 valid sessions documented** | — | `P0_EVIDENCE_SUMMARY.md` |
+
 | Counter | Current | Required |
 |---|---:|---|
 | Valid, fully-documented sessions | **0** | **≥5** |
 | Recruited / scheduled | 0 / 0 | progress only |
-| Gate decision | INCONCLUSIVE (placeholder) | PASS / STOP |
 
 `P0_EVIDENCE_SUMMARY.md` records the constitutional guard correctly: *"Absence
 of contrary evidence with zero sessions is not favorable evidence."* Zero
-sessions means the gate is genuinely unmet. Nothing an agent does changes this
-counter — only human recruitment + human sessions do.
+sessions at this point is expected, not a blocker — fielding was only just
+authorized (above) and no session has been run yet. Nothing an agent does
+changes the outcome-gate counter — only human recruitment + human sessions
+do; the outcome gate cannot be evaluated before then, and no session has
+been fabricated to make it appear otherwise.
 
-## If you say GO — exactly what happens next (and who does it)
+## Now that GO is decided — exactly what happens next (and who does it)
 
 This is the path the operating kit governs. I am listing it so the decision is
 concrete, not so I can execute it — every step after the decision is human
 work.
 
 1. **You** record the GO + signal rule + decision-owner role in
-   `PHASE_TRACKER.md`'s decision log (it currently has zero entries).
+   `PHASE_TRACKER.md`'s decision log. **Done** — recorded 2026-08-04; the
+   log now carries two entries (the GO decision and the subsequent
+   stimulus-swap decision). This step is complete; steps 2-7 below remain
+   open (0 of >=5 sessions run as of this writing).
 2. **Recruiter** screens for eligibility per the kit: real screenwriters with a
    real draft in hand, can view the sample, can consent. No career-tier quota.
    Exclude anyone who can't consent, is pressured, helped design the report,
@@ -161,29 +177,38 @@ work.
    `P0_EVIDENCE_SUMMARY.md`, applies the signal rule, records PASS/STOP/
    INCONCLUSIVE, links from ROADMAP §3.
 
-## If you say NO or NOT YET — what's still useful
+## Historical pre-GO contingency — if the owner said NO or NOT YET
 
-The freeze stays. The highest-leverage agent work that *doesn't* touch the gate
-or the frozen score is **Track 2, Lever 2**: stand up a real-script
+The blanket-freeze premise in this section applied before the 2026-08-04 GO and
+ROADMAP amendment; it does not control current P1 policy. The described
+real-script measurement work remains useful when it follows the current
+machine-checked evidence gates: **Track 2, Lever 2** stands up a real-script
 discrimination harness (`REAL_SCRIPT_CORPUS_DIR`, 261+ `.fountain` on this
 machine) that runs the *current* Doctor over real writing and reports — without
 changing the score — whether it orders strong-above-weak, by what margin, and
 where it ties or inverts. That evidence sharpens whatever you show writers in
 P0 and pre-arms the P1 decision. It's the active-work prompt's named
-highest-value lever and is fully freeze-permitted. Say the word and I'll plan
-and build it.
+highest-value lever. Its results remain P1 evidence only and do not alter the
+P0 outcome gate.
 
-## What I will not do (and why these aren't mine to do)
+## Human-only and no-fabrication constraints that remain controlling
+
+These constraints protect P0 evidence integrity. They do **not** revive the
+former blanket P1 freeze: P1 work is governed by ROADMAP's machine-checked
+evidence gates. The P0 hard-gate was retired 2026-08-11 (`docs/DECISION_LOG.md`
+Decision #2); P4 retention/lock-in is sequenced last, not blocked on a P0 PASS.
 
 - **Fabricate sessions or participants.** Zero sessions is the truth. Inventing
   any would be the exact fabrication the operating kit and evidence summary
   exist to prevent, and would poison the gate.
-- **Recruit, outreach, or run sessions.** No human contacts, no outreach
-  channel, and these are explicitly human work per the freeze.
+- **Recruit, outreach, or run sessions.** No human contacts or outreach
+  channel may be fabricated or conducted by an agent; these are human work.
 - **Make the field-the-study decision or pick the signal rule.** Reserved to
   the owner. I will not auto-field to "make progress."
-- **Touch the scoring formula, constants, rules, detectors, calibration, or
-  report math.** Frozen under P0; the only exception is critical security.
+- **Bypass scoring evidence gates.** Formula, constants, rules, detectors,
+  calibration, and report-math changes must follow ROADMAP's machine-checked
+  evidence gates; the retired blanket P0 freeze and its security-only exception
+  do not govern current P1 work.
 
 ---
 
@@ -198,9 +223,9 @@ Summary: **GO** — field P0, static-report sessions first, live-flow
 permitted per the certifications above. Decision owner of record: Project
 Maintainer (role). The recording was performed under the maintainer's
 explicit 2026-08-04 blanket delegation of open decisions to the agent
-session; what CANNOT be delegated remains exactly what §"What I will not
-do" says — recruiting, running, and documenting sessions are human work,
-and zero sessions have been fabricated. The gate's counters still read
+session; the human-only constraints above remain controlling for recruiting,
+running, and documenting sessions, and zero sessions have been fabricated.
+The gate's counters still read
 0 of >= 5 valid sessions; GO changes what is *authorized*, not what is
 *evidenced*.
 
@@ -264,10 +289,11 @@ suspiciously perfect, not a wall of red.
 | Health | 68.9 | **78.3** |
 | Verdict | CONSIDER | CONSIDER (unchanged) |
 | contentHash | `33dcf21462118381ae1941b79240ffd441b0469f5f12dc997110c9bf9186004f` | `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` |
-| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes** |
+| `sample-coverage-report.html` size | 212,708 bytes | **193,132 bytes at the 2026-08-04 swap** |
 
-The new figures are the current, live provenance — see the 2026-08-04
-addendum in `P0_EVIDENCE_SUMMARY.md` for the fuller re-verification record
-(smoke test, verify-p2-p3-surfaces, honesty-audit, lint, full test suite).
+The score/content figures remain current; the generated HTML was most recently
+regenerated on 2026-08-08 through `npm run generate-p0-sample` at **207,740
+bytes** (contentHash unchanged). See the 2026-08-08 provenance repair in
+`P0_EVIDENCE_SUMMARY.md` for the current artifact record.
 **Zero P0 sessions had been run against the retired stimulus** (the gate
 counter is still 0 of >=5), so this swap loses no session comparability.

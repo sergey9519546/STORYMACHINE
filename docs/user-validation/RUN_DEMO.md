@@ -23,7 +23,7 @@ choose, but you must **record which exposure mode** each session used
 
 ## Prerequisites
 
-- Node ≥ 22.6 (the repo's only runtime requirement).
+- Node matching `>=22.13.0 || >=24` (the repo's only runtime requirement).
 - This repo cloned locally, with `npm install` run once (restores
   `node_modules/.bin/` so `vite`/`tsx` resolve to the project's versions,
   not a stray home-dir install — see commit `0d27c47`'s build-fix note).

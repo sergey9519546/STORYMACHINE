@@ -263,22 +263,6 @@ describe('validation-completeness — server/routes/scriptide.ts', async () => {
     assert.equal((await res.json()).status, 'saved');
   });
 
-  it('POST /api/scriptide/personas rejects a non-object body with 400', async () => {
-    const res = await fetch(`${server.baseUrl}/api/scriptide/personas`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify('not-an-object'),
-    });
-    assert.equal(res.status, 400);
-  });
-  it('POST /api/scriptide/personas accepts a well-formed persona with 200', async () => {
-    const res = await fetch(`${server.baseUrl}/api/scriptide/personas`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: 'w4-test-persona', name: 'W4 Test', systemPreamble: 'Write like a careful editor.' }),
-    });
-    assert.equal(res.status, 200);
-    assert.equal((await res.json()).persona.id, 'w4-test-persona');
-  });
-
   it('POST /api/scriptide/world-build rejects a missing beat with 400', async () => {
     const res = await fetch(`${server.baseUrl}/api/scriptide/world-build`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

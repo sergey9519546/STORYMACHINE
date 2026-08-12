@@ -163,7 +163,6 @@ const llmRoutes: ReadonlySet<string> = new Set([
   // server/routes/scriptide.ts
   'POST /api/scriptide/doctor/deep',     // runScriptDoctor(..., {deepRead:true}) — up to ~10 LLM calls
   'POST /api/scriptide/fix',             // fixAndVerify's one generation call
-  'GET /api/scriptide/complete',         // generateContentStream (SSE inline-completion)
   'POST /api/scriptide/world-build',     // direct generateContent call
   'POST /api/scriptide/refine-dialogue', // direct generateContent call
   'POST /api/scriptide/analyze-tension', // direct generateContent call
@@ -233,10 +232,10 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'POST /api/qbn/filter-choices', 'POST /api/ncp-storyform',
   // server/routes/scriptide.ts
   'POST /api/scriptide/save', 'GET /api/scriptide/load',
+  'GET /api/scriptide/complete',         // retired compatibility tombstone: 410 JSON, zero work
   'POST /api/scriptide/doctor',          // runDiagnoseOnly-gated, pure CPU (route's own comment)
   'POST /api/scriptide/doctor/pdf',      // pdfToFountain + runScriptDoctor with NO deepRead — heavyBodyLimiter, not aiLimiter
   'POST /api/scriptide/diagnose',        // runDiagnoseOnly-gated, pure CPU (route's own comment)
-  'GET /api/scriptide/personas', 'POST /api/scriptide/personas',
   'POST /api/characters/export', 'POST /api/characters/import',
   // server/routes/nvm/analysis.ts
   'GET /api/nvm/tension', 'GET /api/nvm/metrics', 'GET /api/nvm/two-reader', 'GET /api/nvm/topology',
