@@ -2,9 +2,9 @@
 
 **PRIMARY REFERENCE**: `ROADMAP.md` — single source of truth for project direction, phases, and sequencing
 
-**SUPPORTING DOCS**: `NORTH_STAR.md` (constitution) · `ARCHITECTURE.md` (system map) · `docs/DECISION_LOG.md` (audit trail) · `README.md` (setup)
+**SUPPORTING DOCS**: `NORTH_STAR.md` (constitution) · `ARCHITECTURE.md` (system map) · `docs/DECISION_LOG.md` (audit trail) · `README.md` (setup) · `docs/GODMODE_SCREENPLAY_UNDERSTANDING_STANDARD.md` (45-level craft framework) · `docs/GODMODE_COVERAGE_MAP.md` (which levels are built/wired/gapped)
 
-**ACTIVE WORK**: `docs/user-validation/` (P0 protocol, recruitment, sessions)
+**ACTIVE WORK**: `docs/user-validation/` (P0 protocol, recruitment, sessions) · Narrative Stress Ledger (7 accounts + fatigue/hysteresis + sequence architecture — see `server/nvm/quality/arc-tracker.ts`) · GODMODE integration (L4/L5/L8/L12/L13/L19 modules wired into doctor.ts)
 
 **HISTORICAL**: `docs/filed-backlog/` (V5 vision, session docs) — NOT active direction
 
