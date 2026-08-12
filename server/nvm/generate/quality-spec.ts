@@ -175,11 +175,45 @@ export function buildQualityAwareConstraints(
   qualityWarnings: QualityWarning[],
   openPromises: OpenPromise[],
   proppAnalysis: ProppAnalysis,
+  temporalDynamics?: import('../quality/arc-tracker.ts').TemporalDynamics,
 ): GenerationConstraint[] {
   return [
     ...proofConstraints,
     ...qualityConstraintsFromWarnings(qualityWarnings),
     ...arcConstraintsFromTracker(openPromises, 2),
     ...proppConstraintsFromAnalysis(proppAnalysis),
+    ...temporalDynamicsConstraints(temporalDynamics),
   ];
+}
+
+/** GODMODE §16–17: translate fatigue/hysteresis state into generation
+ *  constraints. When the system is in burnout or aftermath lock, the
+ *  LLM is instructed to shift pacing — this is the temporal-dynamics
+ *  feedback loop that prevents constant escalation. */
+function temporalDynamicsConstraints(
+  td?: import('../quality/arc-tracker.ts').TemporalDynamics,
+): GenerationConstraint[] {
+  if (!td) return [];
+  const constraints: GenerationConstraint[] = [];
+
+  if (td.lockMode === 'burnout_lock') {
+    constraints.push({
+      kind: 'free_form' as const,
+      description: `BURNOUT LOCK (fatigue ${td.fatigue.toFixed(2)}): characters have been in sustained distress for too long — the audience is going numb. Shift to aftermath, quiet dread, sensory breather, dark comedy, memory beat, or relationship repair. Do NOT escalate further.`,
+    });
+  } else if (td.lockMode === 'aftermath_lock') {
+    constraints.push({
+      kind: 'free_form' as const,
+      description: `AFTERMATH LOCK: catharsis just happened (${td.beatsSinceCatharsis} scene(s) ago). Let the emotional dust settle — show consequences, reactions, changed behavior. Do NOT immediately re-escalate unless a genuinely new cause enters.`,
+    });
+  }
+
+  if (td.fatigue > 0.4 && td.lockMode !== 'burnout_lock') {
+    constraints.push({
+      kind: 'free_form' as const,
+      description: `Fatigue is rising (${td.fatigue.toFixed(2)}). Consider a breather scene or a shift in dramatic register before the next escalation. Sensitivity to new tension is ${(td.sensitivityMultiplier * 100).toFixed(0)}% of normal.`,
+    });
+  }
+
+  return constraints;
 }
