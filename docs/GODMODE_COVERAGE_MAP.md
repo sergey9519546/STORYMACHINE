@@ -80,16 +80,26 @@
 
 ## Summary
 
+**Updated 2026-08-12** after GODMODE integration session (24 commits).
+
 | Status | Count | Levels |
 |---|---|---|
-| STRONG | 7 | L6, L10, L21, L24, L27, L33, L35 |
-| PARTIAL | 20 | L1, L2, L3, L5, L7, L9, L11, L14, L15, L16, L17, L18, L20, L22, L23, L25, L26, L28, L29, L30, L34, L36 |
-| UNWIRED | 2 | L4 (disclosure/truth ledger), L19 (reveal engine) |
-| GAP | 4 | L8, L12, L13, L37, L38 |
+| STRONG | 8 | L6, L10, L21, L24, L27, L33, L35 + **L5** (graph-health now scored in formula) |
+| PARTIAL | 24 | L1, L2, L3, L4/L19 (wired), L7, L8 (built), L9, L11, L12 (built), L13 (built), L14, L15, L16, L17, L18, L20, L22, L23, L25, L26, L28, L29, L30, L34, L36 |
+| UNWIRED | 0 | ~~L4, L19~~ — both wired into doctor.ts via disclosure-analysis.ts |
+| GAP | 2 | L37 (Deliberate Rule-Breaking), L38 (Cross-Script Comparison) |
 
-## Highest-value actions
+## Completed actions (previously listed as highest-value)
 
-1. **Wire L4/L19** — disclosure-ledger + truth-ledger + epistemic-ledger are built but uncalled. Wiring them covers 3 levels at once.
-2. **Build L12 Sequence Architecture** — the biggest structural gap. Sequences are "the most useful unit between whole script and scene" (GODMODE §14). No model exists.
-3. **Promote L5** — story-graph is wired to the report but not to health. Adding graph metrics to the health formula would make causal architecture a scored dimension.
-4. **Build L8 Supporting Character Function** — 14 function types that determine how each character should be analyzed. Currently all characters are treated uniformly.
+1. ~~Wire L4/L19~~ — ✅ DONE. disclosure-analysis.ts wires all three ledgers.
+2. ~~Build L12 Sequence Architecture~~ — ✅ DONE. SequenceGroup on ArcCompletionReport.
+3. ~~Promote L5~~ — ✅ DONE. graphHealth deduction (capped 15pts) in health formula.
+4. ~~Build L8 Supporting Character Function~~ — ✅ DONE. character-function.ts classifies 14 types.
+5. ~~Build L13 Subplot Architecture~~ — ✅ DONE. subplot-tracker.ts identifies threads + intersections.
+
+## Remaining highest-value actions
+
+1. **Build L37 (Deliberate Rule-Breaking)** — detect intentional convention violations with compensation analysis ("this passive protagonist works because...").
+2. **Build L38 (Cross-Script Comparison)** — comparative records across the corpus ("shared function, different implementation").
+3. **Calibrate graph-health deduction** — the new deduction shifted 3 test thresholds; needs AUC measurement on real corpus to validate discrimination.
+4. **Write tests for the 4 new GODMODE modules** — disclosure-analysis, character-function, subplot-tracker, graph-health currently have zero dedicated tests (they pass via the full suite but have no positive/negative fixtures).
