@@ -17,7 +17,6 @@ import {
 import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
 import { logger } from '../../lib/logger.ts';
 import { analyzeSubplots } from '../../nvm/quality/subplot-tracker.ts';
-import { classifyCharacterFunctions } from '../../nvm/quality/character-function.ts';
 
 const router = express.Router();
 export default router;
@@ -462,10 +461,6 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
     },
     // GODMODE structural analysis (from the live op stream)
     subplots: analyzeSubplots(allCommits.map((c: import('../../nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops }))),
-    characterFunctions: classifyCharacterFunctions(
-      Object.keys(state.characterBeliefs),
-      [],
-    ),
   });
 }));
 
