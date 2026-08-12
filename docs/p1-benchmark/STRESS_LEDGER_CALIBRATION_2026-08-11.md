@@ -1,9 +1,9 @@
 # Narrative Stress Ledger — Calibration Evidence
 
-**Date**: 2026-08-11
-**Corpus**: 49 professional screenplays (Jaws, Casablanca, Chinatown, Parasite, Godfather, Pulp Fiction, etc.)
-**Source**: `screenplay_training` corpus — 50+ films with 7-stage annotation pipeline
-**Quality scores**: composite_quality per film, range 5.02 (Mad Max) to 8.30 (Jaws)
+**Date**: 2026-08-11 (updated 2026-08-12 with 125-film expanded corpus)
+**Corpus**: 125 professional screenplays with dramatic annotations + quality scores
+**Source**: `screenplay_training` corpus — 7-stage annotation pipeline
+**Quality scores**: composite_quality per film, range ~5.0 to ~8.3
 
 ## Method
 
@@ -24,38 +24,47 @@ The converter maps annotation vocabulary to StoryOps:
 
 ## Cross-script correlation (Pearson r with composite quality)
 
-| Signal | r | Direction | Interpretation |
+**Updated 2026-08-12: expanded from 49 to 125 films.** The larger sample
+strengthens the systemic signal (r = −0.37, up from −0.32) while the
+overall debt discrimination remains stable (r = −0.28). Character and
+audience signals weakened — they discriminate at the extremes but
+dilute across a broader quality band.
+
+| Signal | r (125 films) | r (49 films) | Direction |
 |---|---|---|---|
-| systemic.openCount | **−0.32** | better ↓ | Better scripts resolve more open threads |
-| relational.subtotal | **−0.30** | better ↓ | Better scripts resolve relationship conflicts |
-| debtScore (overall) | **−0.29** | better ↓ | Better scripts have lower overall dramatic debt |
-| systemic.subtotal | **−0.28** | better ↓ | Better scripts have lower systemic debt |
-| audience.subtotal | **+0.27** | better ↑ | Better scripts raise more audience questions |
-| thematic.subtotal | **−0.21** | better ↓ | Better scripts resolve their themes |
-| fatigue | **+0.21** | better ↑ | Better scripts sustain pressure longer |
-| character.subtotal | **−0.17** | better ↓ | Better scripts resolve character distress |
-| epistemic.subtotal | 0.00 | — | Ceiling effect: pros pay off all clues |
-| scene.subtotal | 0.00 | — | Ceiling effect: pros have no dead air |
+| systemic.openCount | **−0.37** | −0.32 | better ↓ |
+| systemic.subtotal | **−0.30** | −0.28 | better ↓ |
+| debtScore (overall) | **−0.28** | −0.29 | better ↓ |
+| relational.subtotal | **−0.22** | −0.30 | better ↓ |
+| thematic.subtotal | **−0.20** | −0.21 | better ↓ |
+| character.subtotal | −0.09 | −0.17 | better ↓ (weakens with larger sample) |
+| audience.subtotal | +0.07 | +0.27 | better ↑ (weakens with larger sample) |
+| fatigue | +0.03 | +0.21 | better ↑ (weakens with larger sample) |
+| epistemic.subtotal | 0.00 | 0.00 | ceiling effect |
+| scene.subtotal | 0.00 | 0.00 | ceiling effect |
 
-**6 of 7 accounts discriminate quality in the right direction.**
+**5 of 7 accounts discriminate quality in the right direction** at the
+125-film scale. The systemic and debt signals are the strongest and
+most stable across sample sizes.
 
-## Top vs bottom quintile (9 best vs 9 weakest scripts)
+## Top vs bottom quintile (25 best vs 25 weakest scripts)
 
 | Metric | Top quintile | Bottom quintile | Δ |
 |---|---|---|---|
-| quality | 8.06 | 6.00 | +2.05 |
-| debtScore | 69.89 | 75.56 | **−5.67** |
-| relational.subtotal | 67.44 | 77.44 | **−10.00** |
-| character.subtotal | 64.11 | 70.11 | −6.00 |
-| thematic.subtotal | 74.44 | 80.00 | −5.56 |
+| quality | 8.17 | 6.19 | +1.98 |
+| debtScore | 70.36 | 75.40 | **−5.04** |
+| relational.subtotal | 68.96 | 74.72 | **−5.76** |
+| systemic.subtotal | 73.72 | 77.04 | −3.32 |
+| thematic.subtotal | 76.08 | 80.00 | −3.92 |
+| character.subtotal | 66.36 | 69.84 | −3.48 |
 
 ## Lock mode distribution (fatigue mechanism)
 
 | Lock mode | Count | % |
 |---|---|---|
-| burnout_lock (fatigue ≥ 0.70) | 26 | 53% |
-| aftermath_lock (catharsis ≤ 1 scene ago) | 2 | 4% |
-| none | 21 | 43% |
+| burnout_lock (fatigue ≥ 0.70) | 71 | 57% |
+| aftermath_lock (catharsis ≤ 1 scene ago) | 3 | 2% |
+| none | 51 | 41% |
 
 ## Ceiling effects (why epistemic and scene show zero variance)
 
