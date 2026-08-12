@@ -14,6 +14,7 @@ import type { ProppStage } from '../quality/index.ts';
 import { runQualityEngine, proppMorphology, burrowsDelta } from '../quality/index.ts';
 import { deriveTensionLedger, momentumScore } from '../valuation/futures.ts';
 import { emptyState } from '../state/NarrativeState.ts';
+import { analyzeSubplots } from '../quality/subplot-tracker.ts';
 import { randomUUID } from 'node:crypto';
 
 // ── Sidecar schema ────────────────────────────────────────────────────────────
@@ -51,6 +52,8 @@ export interface NVMSidecar {
   emotionSnapshot: Record<string, { dominant: string; intensity: number }>;
   /** Per-character quality warnings from dialogue validators. */
   perCharacterWarnings: Record<string, string[]>;
+  /** GODMODE L13: Subplot architecture snapshot. */
+  subplots?: import('../quality/subplot-tracker.ts').SubplotAnalysisReport;
 }
 
 // ── Regression snapshot ───────────────────────────────────────────────────────
@@ -207,5 +210,7 @@ export function buildSidecar(canon: Canon): NVMSidecar {
     beliefCounts,
     emotionSnapshot,
     perCharacterWarnings: perCharWarnings,
+    // GODMODE: subplot + character function snapshots from the op stream
+    subplots: analyzeSubplots(activeCommits.map(c => ({ sceneIdx: c.sceneIdx, ops: c.ops }))),
   };
 }
