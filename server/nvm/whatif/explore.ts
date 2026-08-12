@@ -35,6 +35,7 @@ import type { Intervention, CounterfactualReport } from '../twin/counterfactual.
 import { doIntervention } from '../twin/counterfactual.ts';
 import { applyStoryOps } from '../ops/dispatcher.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
+import { analyzeArcCompletion } from '../quality/arc-tracker.ts';
 import { runQualityEngine } from '../quality/index.ts';
 import { generateBranchField, type BranchPacket } from '../branch/field.ts';
 
@@ -50,6 +51,13 @@ export interface CompactSnapshot {
   openSetups: string[];
   /** Aggregate dramatic tension (Contradiction Futures Market total). */
   tension: number;
+  /** GODMODE: stress-ledger debt score 0–100 (0 = no debt, 100 = all overdue). */
+  debtScore?: number;
+  /** GODMODE: per-account subtotals. */
+  accountSubtotals?: Record<string, number>;
+  /** GODMODE: fatigue scalar 0–1 + lock mode from temporal dynamics. */
+  fatigue?: number;
+  lockMode?: string;
 }
 
 export type ConsequenceKind =
@@ -232,11 +240,22 @@ function buildCompactSnapshot(state: NarrativeState, sceneIdx: number): CompactS
 
   const ledger = deriveTensionLedger(state, sceneIdx);
 
+  // GODMODE: stress-ledger account breakdown + temporal dynamics
+  const arcReport = analyzeArcCompletion([{ sceneIdx, ops: [] }]); // baseline shape
+  const accountSubtotals: Record<string, number> = {};
+  for (const [account, breakdown] of Object.entries(arcReport.accounts)) {
+    accountSubtotals[account] = breakdown.subtotal;
+  }
+
   return {
     clocks: { ...state.clocks },
     relationships,
     openSetups,
     tension: Math.round(ledger.totalTension * 100) / 100,
+    debtScore: arcReport.debtScore,
+    accountSubtotals,
+    fatigue: arcReport.temporalDynamics.fatigue,
+    lockMode: arcReport.temporalDynamics.lockMode,
   };
 }
 
