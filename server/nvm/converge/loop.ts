@@ -173,6 +173,12 @@ export interface ConvergeBudget {
    */
   openPromises?: import('../quality/arc-tracker.ts').OpenPromise[];
   /**
+   * GODMODE §16–17: Temporal dynamics from analyzeArcCompletion. When the
+   * system is in burnout_lock or aftermath_lock, buildQualityAwareConstraints
+   * translates the lock state into a pacing-shift generation constraint.
+   */
+  temporalDynamics?: import('../quality/arc-tracker.ts').TemporalDynamics;
+  /**
    * Wave 85 (H8): Per-step streaming callback. Called synchronously after each
    * candidate is evaluated so callers (e.g. the SSE endpoint) can stream
    * progress to the client without waiting for the full loop to finish.
@@ -238,6 +244,7 @@ export async function convergeScene(
         currentQualityWarnings,
         budget.openPromises ?? [],
         proppGaps,
+        budget.temporalDynamics,
       );
     }
     // Wave 69: prepend the live Story Bible to the system preamble so the LLM

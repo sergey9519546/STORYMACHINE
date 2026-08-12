@@ -92,6 +92,7 @@ router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), withSe
     directorPolicy,
     bibleSummary: bibleSummary || undefined,
     openPromises: arcReport.openPromises.length > 0 ? arcReport.openPromises : undefined,
+    temporalDynamics: arcReport.temporalDynamics,
   };
 
   // TASK 1 (ai-budget): `generate` is wrapped so every candidate generation
@@ -222,6 +223,7 @@ router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req,
       directorPolicy,
       bibleSummary: bibleSummary || undefined,
       openPromises: arcReport.openPromises.length > 0 ? arcReport.openPromises : undefined,
+      temporalDynamics: arcReport.temporalDynamics,
       onStep: (step: import('../../nvm/converge/loop.ts').ConvergeStep) => {
         // Deliverable 2: per-step events already carried candidateId + the three
         // scores; `step.candidateId` is now the SAME deterministic `c<iter>-<idx>`
@@ -354,6 +356,7 @@ router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema),
     candidatesPerIteration: Math.min(Number(rawBudgetArc.candidatesPerIteration ?? 2), 5),
     bibleSummary: bibleSummaryArc || undefined,
     openPromises: arcReportForBudget.openPromises.length > 0 ? arcReportForBudget.openPromises : undefined,
+    temporalDynamics: arcReportForBudget.temporalDynamics,
   };
   const budget = { ...baseBudget, directorPolicy };
   const baseSeed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
