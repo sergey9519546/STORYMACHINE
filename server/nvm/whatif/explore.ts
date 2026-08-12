@@ -111,7 +111,8 @@ export function exploreWhatIf(input: ExploreInput): ExploreResult {
   // sceneIdx anchors the tension ledger's time-decay math to "now" — the scene
   // after the most recent commit, same convention branch/field.ts's route uses.
   const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : state.turn;
-  const baseline = buildCompactSnapshot(state, sceneIdx);
+  const baselineOps = commits.map(c => ({ sceneIdx: c.sceneIdx, ops: c.ops }));
+  const baseline = buildCompactSnapshot(state, sceneIdx, baselineOps);
 
   const report = doIntervention(scm, intervention);
   const targetNode = scm.nodes.get(intervention.opId);
@@ -137,7 +138,9 @@ export function exploreWhatIf(input: ExploreInput): ExploreResult {
   const interveneOps = buildInterveneOps(commits, intervention, report);
   const foldedIntervened = applyStoryOps(emptyState(), interveneOps);
   const intervenedState = mergeLiveFields(foldedIntervened, state);
-  const intervened = buildCompactSnapshot(intervenedState, sceneIdx);
+  // Build the intervened op stream (intervention applied to the commit history)
+  const intervenedSceneOps = buildInterveneSceneOps(commits, intervention, report);
+  const intervened = buildCompactSnapshot(intervenedState, sceneIdx, intervenedSceneOps);
 
   const consequences = diffConsequences(targetNode.op, intervention, report, baseline, intervened);
 
@@ -197,6 +200,32 @@ function buildInterveneOps(
   return out;
 }
 
+/** Same as buildInterveneOps but preserves scene grouping for arc-tracker. */
+function buildInterveneSceneOps(
+  commits: StoryCommit[],
+  intervention: Intervention,
+  report: CounterfactualReport,
+): { sceneIdx: number; ops: StoryOp[] }[] {
+  const excluded = new Set(report.affectedOps.map(a => a.opId));
+  const out: { sceneIdx: number; ops: StoryOp[] }[] = [];
+  for (const commit of commits) {
+    const surviving: StoryOp[] = [];
+    commit.ops.forEach((op, idx) => {
+      const id = opNodeId(commit.commitId, idx);
+      if (id === intervention.opId) {
+        if (intervention.replacement) surviving.push(intervention.replacement);
+        return;
+      }
+      if (excluded.has(id)) return;
+      surviving.push(op);
+    });
+    if (surviving.length > 0) {
+      out.push({ sceneIdx: commit.sceneIdx, ops: surviving });
+    }
+  }
+  return out;
+}
+
 /**
  * Merges a from-scratch op replay with the session's live-derived fields —
  * mirrors server/nvm/state/enrichedState.ts's merge policy exactly: op replay
@@ -220,7 +249,7 @@ function mergeLiveFields(folded: NarrativeState, liveState: NarrativeState): Nar
 
 // ── Compact snapshot ─────────────────────────────────────────────────────────
 
-function buildCompactSnapshot(state: NarrativeState, sceneIdx: number): CompactSnapshot {
+function buildCompactSnapshot(state: NarrativeState, sceneIdx: number, sceneOps?: { sceneIdx: number; ops: StoryOp[] }[]): CompactSnapshot {
   const paidOff = new Set(state.payoffs.map(p => p.setupId));
   const openSetups = state.clues.map(c => c.clueId).filter(id => !paidOff.has(id));
 
@@ -240,11 +269,22 @@ function buildCompactSnapshot(state: NarrativeState, sceneIdx: number): CompactS
 
   const ledger = deriveTensionLedger(state, sceneIdx);
 
-  // GODMODE: stress-ledger account breakdown + temporal dynamics
-  const arcReport = analyzeArcCompletion([{ sceneIdx, ops: [] }]); // baseline shape
-  const accountSubtotals: Record<string, number> = {};
-  for (const [account, breakdown] of Object.entries(arcReport.accounts)) {
-    accountSubtotals[account] = breakdown.subtotal;
+  // GODMODE: stress-ledger account breakdown + temporal dynamics from the
+  // ACTUAL op stream (not an empty array). Falls back to no stress data
+  // when sceneOps is not provided (backward-compatible).
+  let debtScore: number | undefined;
+  let accountSubtotals: Record<string, number> | undefined;
+  let fatigue: number | undefined;
+  let lockMode: string | undefined;
+  if (sceneOps && sceneOps.length > 0) {
+    const arcReport = analyzeArcCompletion(sceneOps);
+    debtScore = arcReport.debtScore;
+    accountSubtotals = {};
+    for (const [account, breakdown] of Object.entries(arcReport.accounts)) {
+      accountSubtotals[account] = breakdown.subtotal;
+    }
+    fatigue = arcReport.temporalDynamics.fatigue;
+    lockMode = arcReport.temporalDynamics.lockMode;
   }
 
   return {
@@ -252,10 +292,10 @@ function buildCompactSnapshot(state: NarrativeState, sceneIdx: number): CompactS
     relationships,
     openSetups,
     tension: Math.round(ledger.totalTension * 100) / 100,
-    debtScore: arcReport.debtScore,
+    debtScore,
     accountSubtotals,
-    fatigue: arcReport.temporalDynamics.fatigue,
-    lockMode: arcReport.temporalDynamics.lockMode,
+    fatigue,
+    lockMode,
   };
 }
 
