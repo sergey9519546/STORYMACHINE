@@ -20,7 +20,7 @@ export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 /**
  * Stress accounts — decomposes dramatic pressure into typed categories
  * aligned with the GODMODE Screenplay Understanding Standard
- * (docs/GODMODE_SCREENPLAY_UNDERSTANDING_STANDARD.md).
+ * (docs/screenplay-understanding/GODMODE_STANDARD.md).
  *
  * GODMODE level mapping:
  *   systemic    ← L21 (Setup/Payoff Architecture), L3 (World/Rules)

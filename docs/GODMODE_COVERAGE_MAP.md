@@ -1,6 +1,6 @@
 # GODMODE Coverage Map — StoryMachine vs the Screenplay Understanding Standard
 
-**Reference**: `docs/GODMODE_SCREENPLAY_UNDERSTANDING_STANDARD.md` (45 levels, 32 artifacts)
+**Reference**: `docs/screenplay-understanding/GODMODE_STANDARD.md` (45 levels, 32 artifacts)
 **Audited**: 2026-08-11 against `codex/quarantine-2026-08-08-prototypes` branch
 
 ## Status legend
