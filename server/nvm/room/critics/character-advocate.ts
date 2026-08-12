@@ -1,13 +1,41 @@
 // Character-Advocate critic — protects psychological consistency.
 // Objects to emotion states that contradict established character psychology,
 // or belief updates that don't flow from the character's known epistemics.
+//
+// GODMODE §27 integration: when temporalDynamics shows high fatigue, the
+// advocate pushes for catharsis — characters can't stay in peak distress
+// indefinitely without the audience going numb.
 
 import type { NarrativeTransitionIR } from '../../ir/NarrativeTransitionIR.ts';
 import type { NarrativeState } from '../../state/NarrativeState.ts';
 import type { Critique } from '../room.ts';
+import type { TemporalDynamics } from '../../quality/arc-tracker.ts';
 
-export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: NarrativeState): Critique[] {
+export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: NarrativeState, temporalDynamics?: TemporalDynamics): Critique[] {
   const critiques: Critique[] = [];
+
+  // Gate 0 (GODMODE §27): sustained distress without catharsis — if fatigue
+  // is above 0.5, characters have been in distress too long and the audience
+  // is going numb. The advocate demands emotional relief.
+  if (temporalDynamics && temporalDynamics.fatigue > 0.5) {
+    const hasCatharsisInScene = ir.ops.some(op =>
+      op.op === 'APPRAISE_EMOTION' &&
+      ['joy', 'pride', 'neutral'].includes(op.emotion.dominant),
+    );
+    const hasDistressInScene = ir.ops.some(op =>
+      op.op === 'APPRAISE_EMOTION' &&
+      ['fear', 'distress', 'anger', 'shame'].includes(op.emotion.dominant) &&
+      op.emotion.intensity >= 75,
+    );
+    if (hasDistressInScene && !hasCatharsisInScene && temporalDynamics.beatsSinceCatharsis > 3) {
+      critiques.push({
+        criticId: 'character_advocate', severity: 45, targetOpIdx: null,
+        objection: `Sustained distress without catharsis (fatigue ${temporalDynamics.fatigue.toFixed(2)}, ${temporalDynamics.beatsSinceCatharsis} scenes since last catharsis). Characters cannot stay in peak distress indefinitely — the audience is going numb. Provide emotional relief: joy, pride, or a quiet moment of acceptance.`,
+        suggestedOperator: 'defuse_clock',
+        attentionBid: 50,
+      });
+    }
+  }
 
   ir.ops.forEach((op, i) => {
     if (op.op === 'APPRAISE_EMOTION') {
