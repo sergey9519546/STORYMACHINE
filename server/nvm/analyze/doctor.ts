@@ -2129,7 +2129,15 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
       ? classifyCharacterFunctions(analysis.characters, analysis.records)
       : undefined,
     subplots: analysisComplete && analysis.sceneCount > 0
-      ? analyzeSubplots([])
+      ? analyzeSubplots(analysis.records.map((r, i) => ({
+          sceneIdx: i,
+          ops: [
+            ...(r.seededClueIds.map(id => ({ op: 'SEED_CLUE' as const, clueId: id, carrier: 'object' as const }))),
+            ...(r.payoffSetupIds.map(id => ({ op: 'PAYOFF_SETUP' as const, setupId: id, payoffEventId: `${id}-payoff` }))),
+            ...(r.clockRaised ? [{ op: 'RAISE_CLOCK' as const, clockId: `clock-${i}`, amount: 5 }] : []),
+            ...(r.relationshipShifts ?? []).map(s => ({ op: 'SHIFT_RELATIONSHIP' as const, pair: s.pairKey.split('|') as [string, string], delta: { dimension: 'trust' as const, amount: s.amount, reason: 'shift' } })),
+          ],
+        })))
       : undefined,
     // TRACE §13 temporal-consistency audit (2026-08-03 wiring). Diagnostic
     // only, same gating as storyGraph/metrics above: a prefix-only or

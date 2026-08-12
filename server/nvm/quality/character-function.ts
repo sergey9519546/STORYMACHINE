@@ -57,8 +57,6 @@ export function classifyCharacterFunctions(
   }
 
   for (const [idx, record] of records.entries()) {
-    // Dialogue lines from dialogueHighlights
-    const highlights = record.dialogueHighlights ?? [];
     // Scene presence from characters in the scene
     const present = new Set<string>();
     for (const shift of record.relationshipShifts ?? []) {
