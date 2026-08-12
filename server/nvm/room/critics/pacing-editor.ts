@@ -3,10 +3,15 @@
 // with zero modulation inside one scene, and to a mechanism:rule signature
 // that keeps recurring across the whole story so far — the engine cutting
 // the same shape of scene over and over with new names painted on it.
+//
+// GODMODE §16–17 integration: when temporalDynamics is provided, the
+// pacing-editor also objects to scenes that escalate during burnout or
+// aftermath lock states.
 
 import type { NarrativeTransitionIR } from '../../ir/NarrativeTransitionIR.ts';
 import type { NarrativeState } from '../../state/NarrativeState.ts';
 import type { Critique } from '../room.ts';
+import type { TemporalDynamics } from '../../quality/arc-tracker.ts';
 
 // Scene functions where the audience expects rising or turning material —
 // a scene claiming one of these needs enough ops to actually earn it.
@@ -14,8 +19,34 @@ const URGENCY_FUNCTIONS: NarrativeTransitionIR['sceneFunction'][] = [
   'advance_plot', 'build_tension', 'set_up_payoff',
 ];
 
-export function pacingEditorCritic(ir: NarrativeTransitionIR, state: NarrativeState): Critique[] {
+export function pacingEditorCritic(ir: NarrativeTransitionIR, state: NarrativeState, temporalDynamics?: TemporalDynamics): Critique[] {
   const critiques: Critique[] = [];
+
+  // Gate 0 (GODMODE §16–17): burnout / aftermath lock — the pacing editor
+  // objects to escalation when the system should be cooling.
+  if (temporalDynamics?.lockMode === 'burnout_lock') {
+    const hasDistress = ir.ops.some(op => op.op === 'APPRAISE_EMOTION' &&
+      ['fear', 'distress', 'anger', 'shame'].includes(op.emotion.dominant) &&
+      op.emotion.intensity >= 75);
+    if (hasDistress) {
+      critiques.push({
+        criticId: 'pacing_editor', severity: 55, targetOpIdx: null,
+        objection: `BURNOUT LOCK (fatigue ${temporalDynamics.fatigue.toFixed(2)}) — escalating distress when the audience is already numb from sustained pressure. Shift to breather/aftermath/dark comedy.`,
+        suggestedOperator: 'defuse_clock',
+        attentionBid: 60,
+      });
+    }
+  } else if (temporalDynamics?.lockMode === 'aftermath_lock') {
+    const hasEscalation = ir.ops.some(op => op.op === 'APPRAISE_EMOTION' && op.emotion.intensity >= 75);
+    if (hasEscalation) {
+      critiques.push({
+        criticId: 'pacing_editor', severity: 40, targetOpIdx: null,
+        objection: `AFTERMATH LOCK — catharsis was ${temporalDynamics.beatsSinceCatharsis} scene(s) ago. Let the emotional dust settle before re-escalating.`,
+        suggestedOperator: 'pacing_compress',
+        attentionBid: 45,
+      });
+    }
+  }
 
   // Gate 1: dead stretch — a plot/tension/payoff scene with ≤1 op has almost
   // no material. A picture editor can't build rhythm out of a single shot.
