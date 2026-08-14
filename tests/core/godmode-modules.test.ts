@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { analyzeDisclosureAndEpistemics } from '../../server/nvm/quality/disclosure-analysis.ts';
 import { classifyCharacterFunctions } from '../../server/nvm/quality/character-function.ts';
 import { analyzeSubplots } from '../../server/nvm/quality/subplot-tracker.ts';
-import { computeGraphHealth } from '../../server/nvm/quality/graph-health.ts';
+import { computeGraphHealth, graphHealthFromReport } from '../../server/nvm/quality/graph-health.ts';
 import type { StoryGraph } from '../../server/nvm/analyze/story-graph.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
@@ -84,6 +84,35 @@ describe('Disclosure Analysis (L4/L19)', () => {
     assert.equal(report.scored, false);
     assert.equal(report.violationCount, 0);
   });
+
+  // NEGATIVE fixtures — verify detectors do NOT over-fire (quality bar)
+
+  test('NEGATIVE: no epistemic gap when character present at both seed and payoff', () => {
+    const records = [
+      makeRecord({
+        sceneIdx: 0, seededClueIds: ['clue'],
+        relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }],
+      }),
+      makeRecord({
+        sceneIdx: 5, payoffSetupIds: ['clue'],
+        relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }],
+      }),
+    ];
+    const report = analyzeDisclosureAndEpistemics(records);
+    assert.equal(report.epistemicGaps.filter(g => g.character === 'alice').length, 0,
+      'alice present at both — no gap');
+    assert.equal(report.epistemicGaps.filter(g => g.character === 'bob').length, 0,
+      'bob present at both — no gap');
+  });
+
+  test('NEGATIVE: no violations when no clues or payoffs exist at all', () => {
+    const report = analyzeDisclosureAndEpistemics([
+      makeRecord({ sceneIdx: 0 }),
+      makeRecord({ sceneIdx: 1 }),
+    ]);
+    assert.equal(report.violationCount, 0);
+    assert.equal(report.epistemicGaps.length, 0);
+  });
 });
 
 // ── L8: Character Function Classification ────────────────────────────────────
@@ -125,6 +154,27 @@ describe('Character Function Classification (L8)', () => {
   test('returns empty array for no characters', () => {
     const profiles = classifyCharacterFunctions([], []);
     assert.equal(profiles.length, 0);
+  });
+
+  test('NEGATIVE: character with no data defaults to low-confidence ally', () => {
+    const profiles = classifyCharacterFunctions(['ghost'], [makeRecord()]);
+    assert.equal(profiles[0].function, 'ally');
+    assert.ok(profiles[0].confidence <= 0.4, 'unearned classification must be low-confidence');
+    assert.equal(profiles[0].independentGoal, false);
+  });
+
+  test('NEGATIVE: positive-net relationship does not classify as rival', () => {
+    const records = [
+      makeRecord({ sceneIdx: 0, relationshipShifts: [
+        { pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 },
+        { pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 },
+        { pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 },
+      ]}),
+    ];
+    const profiles = classifyCharacterFunctions(['alice', 'bob'], records);
+    const bob = profiles.find(p => p.characterId === 'bob');
+    assert.ok(bob);
+    assert.notEqual(bob!.function, 'rival', 'net-positive pair must not be a rival');
   });
 });
 
@@ -194,6 +244,60 @@ describe('Subplot Tracker (L13)', () => {
     const report = analyzeSubplots([]);
     assert.equal(report.totalSubplots, 0);
   });
+
+  // NEGATIVE fixtures — threshold boundaries (verify no over-firing)
+
+  test('NEGATIVE: 2 shifts on the same pair do NOT form a relationship arc', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [shiftRel('a', 'b', -0.5, 0)] },
+      { sceneIdx: 1, ops: [shiftRel('a', 'b', -0.3, 1)] },
+    ];
+    const report = analyzeSubplots(scenes);
+    assert.equal(report.subplots.filter(s => s.type === 'relationship_arc').length, 0,
+      'below the 3-shift threshold — must not fire');
+  });
+
+  test('NEGATIVE: promptly-paid clue does NOT form a mystery thread', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [seedClue('quick')] },
+      { sceneIdx: 2, ops: [payoffClue('quick')] },
+    ];
+    const report = analyzeSubplots(scenes);
+    assert.equal(report.subplots.filter(s => s.type === 'mystery_thread').length, 0,
+      'paid off within 5 scenes — not a mystery thread');
+  });
+
+  test('NEGATIVE: resolved theme claim does NOT form a counterargument', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [themeMove('claim-1', 'support')] },
+      { sceneIdx: 1, ops: [themeMove('claim-1', 'attack')] },
+      { sceneIdx: 2, ops: [themeMove('claim-1', 'resolve')] },
+    ];
+    const report = analyzeSubplots(scenes);
+    assert.equal(report.subplots.filter(s => s.type === 'theme_counterargument').length, 0,
+      'resolved claims must not appear as unresolved subplots');
+  });
+
+  test('NEGATIVE: single object advancement does NOT form an object arc subplot', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [objectArc('ring', 'found')] },
+    ];
+    const report = analyzeSubplots(scenes);
+    assert.equal(report.subplots.filter(s => s.type === 'object_arc').length, 0,
+      'below the 2-advancement threshold — must not fire');
+  });
+
+  test('POSITIVE: terminal object state marks the subplot resolved', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [objectArc('gun', 'found')] },
+      { sceneIdx: 1, ops: [objectArc('gun', 'loaded')] },
+      { sceneIdx: 2, ops: [objectArc('gun', 'destroyed')] },
+    ];
+    const report = analyzeSubplots(scenes);
+    const obj = report.subplots.find(s => s.type === 'object_arc');
+    assert.ok(obj);
+    assert.equal(obj!.resolvedAtScene, 2, 'destroyed is terminal — subplot resolved');
+  });
 });
 
 // ── L5: Graph Health ─────────────────────────────────────────────────────────
@@ -257,5 +361,58 @@ describe('Graph Health (L5)', () => {
     const graph = makeGraph({ isolatedScenes: [5, 10] });
     const result = computeGraphHealth(graph, 15);
     assert.ok(result.findings.some(f => f.includes('isolated')));
+  });
+
+  // Guard + math verification (scoring change — highest rigor required)
+
+  test('GUARD: graphHealthFromReport returns null for undefined report', () => {
+    assert.equal(graphHealthFromReport(undefined, 10), null);
+  });
+
+  test('GUARD: graphHealthFromReport returns null for zero scenes', () => {
+    const report = { graph: makeGraph() } as unknown as import('../../server/nvm/analyze/story-graph.ts').StoryGraphReport;
+    assert.equal(graphHealthFromReport(report, 0), null);
+  });
+
+  test('MATH: perfect graph scores exactly 100 with zero deduction', () => {
+    const result = computeGraphHealth(makeGraph({
+      promisePaymentRatio: 1, forwardEdgeRatio: 1,
+      escalationMonotonicity: 1, arcCoherence: 1,
+      causalDensity: 2,
+    }), 20);
+    assert.equal(result.graphHealthScore, 100);
+    assert.equal(result.graphDeduction, 0);
+  });
+
+  test('MATH: worst-possible graph scores exactly 0 with max deduction', () => {
+    const result = computeGraphHealth(makeGraph({
+      promisePaymentRatio: 0, forwardEdgeRatio: 0,
+      escalationMonotonicity: 0, arcCoherence: -1,
+      causalDensity: 0, isolatedScenes: [1, 2, 3],
+    }), 20);
+    assert.equal(result.graphHealthScore, 0);
+    assert.equal(result.graphDeduction, 15, 'cap must bind at exactly 15');
+  });
+
+  test('MATH: arcCoherence full swing -1→1 moves the score by exactly its weight (15pts)', () => {
+    const neg = computeGraphHealth(makeGraph({ arcCoherence: -1 }), 10);
+    const pos = computeGraphHealth(makeGraph({ arcCoherence: 1 }), 10);
+    assert.equal(pos.graphHealthScore - neg.graphHealthScore, 15,
+      'arc coherence weight is 0.15 → 15 points on a 0-100 scale');
+  });
+
+  test('MATH: metrics object echoes the input graph verbatim', () => {
+    const graph = makeGraph({
+      promisePaymentRatio: 0.77, forwardEdgeRatio: 0.88,
+      escalationMonotonicity: 0.5, arcCoherence: 0.33,
+      causalDensity: 1.2, isolatedScenes: [4, 9],
+    });
+    const result = computeGraphHealth(graph, 25);
+    assert.equal(result.metrics.promisePaymentRatio, 0.77);
+    assert.equal(result.metrics.forwardEdgeRatio, 0.88);
+    assert.equal(result.metrics.escalationMonotonicity, 0.5);
+    assert.equal(result.metrics.arcCoherence, 0.33);
+    assert.equal(result.metrics.causalDensity, 1.2);
+    assert.equal(result.metrics.isolatedSceneCount, 2);
   });
 });
