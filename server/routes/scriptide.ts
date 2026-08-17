@@ -28,6 +28,27 @@ import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/ana
 import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
 import { sanitizeExternalError } from '../lib/safe-error.ts';
 
+/**
+ * An AbortSignal that fires when the CLIENT gives up on this request — used
+ * to cancel off-thread Script Doctor work that nobody is waiting for any more
+ * (lane W1; see server/nvm/analyze/doctor-pool.ts).
+ *
+ * Listens on the RESPONSE, not the request. Since Node 16, `req` emits
+ * 'close' as soon as the request stream completes — which, for a POST whose
+ * body express already parsed, is immediately — so a req-based signal would
+ * abort every analysis the instant it started. `res` emits 'close' exactly
+ * once, either after a completed response (writableEnded true, nothing to
+ * cancel) or on a genuine disconnect (writableEnded false, cancel), which is
+ * the distinction that actually matters.
+ */
+function requestAbortSignal(res: express.Response): AbortSignal {
+  const controller = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  return controller.signal;
+}
+
 // ── AI provider fan-out budgets (2026-08-03 audit, Task 1) ─────────────────
 // See server/lib/ai-budget.ts's header for the full design. Every route
 // below calling withAiBudget holds no SessionCommandCoordinator command
@@ -354,8 +375,22 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // passes, matching this file's convention of lazily loading heavy modules
   // (see the engine/ai.ts and engine/character-memory.ts imports below) so
   // routes that never call the doctor don't pay for it at startup.
-  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-  const report = await runScriptDoctor(fountain);
+  //
+  // Lane W1 (2026-08-21): this goes through the worker-thread pool rather
+  // than calling runScriptDoctor on the main thread. The doctor is pure CPU
+  // with no await points, so an in-process call held the event loop — and
+  // therefore every other user's request — for the whole analysis; the
+  // 2026-08-14 audit measured 22+ minutes of total server unavailability on
+  // one ~350-scene submission. runScriptDoctorOffThread is contract-identical
+  // (same report, same LRU cache, same errors) and falls back to in-process
+  // execution if workers can't run in this environment — see doctor-pool.ts.
+  // The request's own abort signal is threaded through so a client that
+  // navigates away actually stops the work instead of merely stopping the
+  // wait for it.
+  const { runScriptDoctorOffThread } = await import('../nvm/analyze/doctor-pool.ts');
+  const report = await runScriptDoctorOffThread(fountain, undefined, {
+    signal: requestAbortSignal(res),
+  });
 
   // Root-cause clustering is attached HERE, at the route, rather than inside
   // runScriptDoctor/aggregateReport (doctor.ts) for two reasons: (1) doctor.ts

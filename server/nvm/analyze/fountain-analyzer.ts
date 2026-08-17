@@ -2239,19 +2239,42 @@ function emptyAnalysis(): FountainAnalysis {
 // out at roughly 150-250 scenes (industry rule of thumb: ~1 scene/page, a
 // two-hour feature runs ~110-180 pages), and the calibration corpus's
 // richest sample — deliberately built to be richer than any of the other 19,
-// see calibration/reference.ts's header — analyzes only 10 scenes. 1000 sits
-// 4-6x above the real-world ceiling (so no legitimate screenplay, however
-// long, is ever truncated) while remaining orders of magnitude below the
-// pathological regime (tens of thousands of scenes) that makes the quadratic
-// passes below actually hang. Scripts at or under the ceiling get exactly
-// the pre-guard analysis (byte-identical FountainAnalysis — the extra fields
-// below are only ever added when truncation actually happens, never present
-// otherwise). Scripts over the ceiling are analyzed on their first
-// ANALYZER_SCENE_CEILING scenes only (option (a): degrade honestly with a
-// flagged, complete-for-its-scope report, rather than (b) hard-rejecting a
-// legitimately huge script outright) — see FountainAnalysis.truncatedForAnalysis
-// / totalSceneCount, surfaced as a report notice by doctor.ts.
-const ANALYZER_SCENE_CEILING = 1000;
+// see calibration/reference.ts's header — analyzes only 10 scenes. Scripts at
+// or under the ceiling get exactly the pre-guard analysis (byte-identical
+// FountainAnalysis — the extra fields below are only ever added when
+// truncation actually happens, never present otherwise). Scripts over the
+// ceiling are analyzed on their first ANALYZER_SCENE_CEILING scenes only
+// (option (a): degrade honestly with a flagged, complete-for-its-scope
+// report, rather than (b) hard-rejecting a legitimately huge script outright)
+// — see FountainAnalysis.truncatedForAnalysis / totalSceneCount, surfaced as
+// a report notice by doctor.ts.
+//
+// ── 1000 -> 400 (lane W1/W2, 2026-08-21) ────────────────────────────────────
+// 1000 was chosen as "4-6x above the real-world ceiling, orders of magnitude
+// below the regime where the quadratic passes hang". The 2026-08-14 audit
+// showed that reasoning had a hole in the middle: the doctor's real cliff was
+// not in the tens of thousands of scenes, it was at ~120 (42s) and ~350
+// (never returned), so a script anywhere between 350 and 1000 scenes was
+// nominally "allowed" and in practice hung the server. The ceiling sat far
+// above the failure point it was supposed to protect.
+//
+// Lane W2 removed that cliff at the root (auditTemporalConsistency's path
+// consistency was 99.7% of the runtime and is now bit-packed with a
+// universal-relation fast path; measured end-to-end doctor runtime at 351
+// scenes went 22min+/never-returned -> 1.9s). So this number no longer has to
+// hold back a hang. What it should do instead is sit at honest headroom above
+// the longest real screenplay anyone will submit: the longest feature in the
+// project's own corpus is WALL-E at 292 scenes, and 400 clears that by ~37%
+// while keeping the worst legitimate case comfortably inside the CI perf
+// budget (tests/core/doctor-perf-budget.test.ts). Anything past 400 scenes is
+// either an anthology/series bible or an attack, and both are better served
+// by the honest truncation notice than by a multi-second analysis of a
+// document this tool was not built to score as one story.
+/** Exported so tests assert the honest-truncation contract against the ONE
+ *  definition of the ceiling rather than re-hardcoding a number that then
+ *  silently disagrees with the code (which is how the 1000-vs-real-cliff gap
+ *  above survived as long as it did). */
+export const ANALYZER_SCENE_CEILING = 400;
 
 export function analyzeFountainText(fountain: string): FountainAnalysis {
   if (!fountain || !fountain.trim()) return emptyAnalysis();

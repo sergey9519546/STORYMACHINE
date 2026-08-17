@@ -49,17 +49,25 @@ recorded (`MEASUREMENT_RECEIPTS.md`, 2026-08-14); these discharge it:
 Five defects an ordinary first-time user hits in their first five minutes,
 all reproduced and screenshotted in the 2026-08-14 UX audit:
 
-- **W1 (M).** Move `runScriptDoctor` off Node's main thread (worker thread
-  or job queue). Measured: a ~350-scene script froze the **entire server
-  for every user for 22+ minutes**. Until W2 lands, set the honesty
-  ceiling near the measured cliff (~150–200 scenes, down from 1000) so the
-  product truncates honestly instead of dying silently.
-- **W2 (L).** Fix the super-quadratic scoring passes. Measured curve: 26
-  scenes 208ms → 62 scenes 9.3s → 120 scenes 42s → 240 scenes 4.5min →
-  351 scenes never returned. Candidates are already named in
-  `analyzer-dos.test.ts`'s header (question-latency, relationship-shifts,
-  cluster overlap, content-word clusters). Target: ≤10s at 300 scenes,
-  budget-tested in CI on a synthetic 300-scene fixture.
+- **W1 (M) — DONE 2026-08-21.** `runScriptDoctor` now runs on a
+  `node:worker_threads` pool (`server/nvm/analyze/doctor-pool.ts`, size 1–2,
+  FIFO queue) with the LRU cache held on the coordinator, AbortSignal
+  cancellation that terminates the worker outright, and a permanent
+  in-process fallback if workers cannot run in the environment.
+  `ANALYZER_SCENE_CEILING` lowered 1000 → 400 (honest headroom above the
+  292-scene longest real feature; the existing truncation messaging already
+  covers it).
+- **W2 (L) — DONE 2026-08-21.** The super-quadratic cost was **not** in the
+  named suspects. Profiling put 99.7% of it in one place none of them named:
+  `auditTemporalConsistency`'s Allen-algebra path-consistency propagation
+  (158ms / 7.5s / 43.4s at 26 / 62 / 120 scenes), where each of the O(n³)
+  triples allocated three `Array.from` snapshots and a fresh `Set`. Re-expressed
+  over bit-packed typed arrays with a universal-relation fast path; measured
+  end-to-end doctor runtime 26→119ms, 62→206ms, 120→386ms, 244→1.2s,
+  306→1.7s, 351→1.9s (was: never returned). Proven pure by
+  `scripts/check-doctor-output-identity.mjs` — 45/45 fixtures byte-identical
+  pre/post — plus a verbatim-oracle equivalence test over 200 seeded graphs.
+  Budget-tested in CI by `tests/core/doctor-perf-budget.test.ts`.
 - **W3 (M).** Fix the false "Save Conflict" dialog — deterministic 3/3 on
   paste → save → reload, single tab, blaming a tab that doesn't exist. A
   save system that cries wolf teaches writers to distrust it.

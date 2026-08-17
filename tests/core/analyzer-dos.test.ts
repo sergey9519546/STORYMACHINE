@@ -9,8 +9,11 @@
 //
 // This file proves the guards added to fix it:
 //   1. ANALYZER_SCENE_CEILING (fountain-analyzer.ts) — the primary guard: a
-//      script over 1000 scenes is analyzed on its first 1000 only, flagged
-//      honestly via truncatedForAnalysis/totalSceneCount.
+//      script over the ceiling is analyzed on its first ANALYZER_SCENE_CEILING
+//      scenes only, flagged honestly via truncatedForAnalysis/totalSceneCount.
+//      The assertions below read the constant rather than hardcoding it, so
+//      moving the ceiling (1000 -> 400, lane W1 2026-08-21) re-locks the
+//      contract instead of quietly failing on a stale literal.
 //   2. Defense-in-depth bounds on the specific quadratic loops themselves —
 //      overlapClusters/matchOverlapTemplate (cluster.ts), detectQuestionLatency
 //      and detectRelationshipShifts (fountain-analyzer.ts), and
@@ -22,7 +25,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
+import { analyzeFountainText, ANALYZER_SCENE_CEILING } from '../../server/nvm/analyze/fountain-analyzer.ts';
 import { runScriptDoctor, clearDoctorCache } from '../../server/nvm/analyze/doctor.ts';
 import { clusterIssues } from '../../server/nvm/analyze/cluster.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
@@ -64,13 +67,14 @@ describe('analyzer DoS guard — primary scene-count ceiling', () => {
 
     // Pre-fix, the O(n^2) cross-scene loops over 5000 scenes would take this
     // well past any reasonable request budget; post-fix the ceiling caps the
-    // expensive work to 1000 scenes regardless of how large the input is.
+    // expensive work to ANALYZER_SCENE_CEILING scenes regardless of how large
+    // the input is.
     assert.ok(elapsed < 5000, `expected bounded analysis time, took ${elapsed}ms`);
     assert.equal(analysis.truncatedForAnalysis, true);
     assert.equal(analysis.totalSceneCount, 5000);
-    assert.equal(analysis.sceneCount, 1000);
-    assert.equal(analysis.records.length, 1000);
-    assert.equal(analysis.annotations.length, 1000);
+    assert.equal(analysis.sceneCount, ANALYZER_SCENE_CEILING);
+    assert.equal(analysis.records.length, ANALYZER_SCENE_CEILING);
+    assert.equal(analysis.annotations.length, ANALYZER_SCENE_CEILING);
   });
 
   it('fire: runScriptDoctor withholds whole-draft scores for a truncated script', async () => {
@@ -83,7 +87,7 @@ describe('analyzer DoS guard — primary scene-count ceiling', () => {
     assert.ok(elapsed < 15000, `expected bounded doctor runtime, took ${elapsed}ms`);
     assert.equal(report.truncatedForAnalysis, true);
     assert.equal(report.totalSceneCount, 5000);
-    assert.equal(report.sceneCount, 1000);
+    assert.equal(report.sceneCount, ANALYZER_SCENE_CEILING);
     assert.equal(report.analysisComplete, false);
     assert.equal(report.health, 0);
     assert.equal(report.grade, 'troubled');
@@ -92,26 +96,37 @@ describe('analyzer DoS guard — primary scene-count ceiling', () => {
     assert.equal(report.metrics, undefined, 'prefix-only narrative metrics must not look like whole-draft readings');
     assert.equal(report.storyGraph, undefined, 'prefix-only graph health must not look like a whole-draft assessment');
     assert.ok(report.plainSummary?.includes('5000 scenes'));
-    assert.ok(report.plainSummary?.includes('1000-scene limit'));
+    assert.ok(report.plainSummary?.includes(`${ANALYZER_SCENE_CEILING}-scene limit`));
     assert.match(report.plainSummary ?? '', /score and verdict are withheld/i);
   });
 
-  it('no-fire: a script at exactly the ceiling (1000 scenes) is analyzed in full, with no truncation flag', () => {
-    const fountain = buildTrivialScenes(1000);
+  it('no-fire: a script at exactly the ceiling is analyzed in full, with no truncation flag', () => {
+    const fountain = buildTrivialScenes(ANALYZER_SCENE_CEILING);
     const analysis = analyzeFountainText(fountain);
-    assert.equal(analysis.sceneCount, 1000);
-    assert.equal(analysis.records.length, 1000);
+    assert.equal(analysis.sceneCount, ANALYZER_SCENE_CEILING);
+    assert.equal(analysis.records.length, ANALYZER_SCENE_CEILING);
     assert.equal(analysis.truncatedForAnalysis, undefined);
     assert.equal(analysis.totalSceneCount, undefined);
   });
 
-  it('no-fire: a script just under the ceiling (999 scenes) analyzes fully and unflagged', () => {
-    const fountain = buildTrivialScenes(999);
+  it('no-fire: a script just under the ceiling analyzes fully and unflagged', () => {
+    const fountain = buildTrivialScenes(ANALYZER_SCENE_CEILING - 1);
     const analysis = analyzeFountainText(fountain);
-    assert.equal(analysis.sceneCount, 999);
-    assert.equal(analysis.records.length, 999);
+    assert.equal(analysis.sceneCount, ANALYZER_SCENE_CEILING - 1);
+    assert.equal(analysis.records.length, ANALYZER_SCENE_CEILING - 1);
     assert.equal(analysis.truncatedForAnalysis, undefined);
     assert.equal(analysis.totalSceneCount, undefined);
+  });
+
+  it('the ceiling clears the longest real feature in the corpus (WALL-E, 292 scenes) with headroom', () => {
+    // The point of lowering 1000 -> 400 was honesty, not restriction: the
+    // number must still sit above anything a screenwriter legitimately
+    // submits as ONE story, or the truncation notice starts firing on real
+    // work. Locked here so a future tightening has to confront that.
+    assert.ok(
+      ANALYZER_SCENE_CEILING >= 350,
+      `ceiling ${ANALYZER_SCENE_CEILING} leaves too little headroom above the longest real feature (292 scenes)`,
+    );
   });
 
   it('no-fire: normal-sized calibration corpus scripts are completely unaffected (no new fields, same shape)', () => {
@@ -119,7 +134,7 @@ describe('analyzer DoS guard — primary scene-count ceiling', () => {
       const analysis = analyzeFountainText(sample.fountain);
       assert.equal(analysis.truncatedForAnalysis, undefined);
       assert.equal(analysis.totalSceneCount, undefined);
-      assert.ok(analysis.sceneCount < 1000);
+      assert.ok(analysis.sceneCount < ANALYZER_SCENE_CEILING);
       assert.equal('truncatedForAnalysis' in analysis, false);
       assert.equal('totalSceneCount' in analysis, false);
     }

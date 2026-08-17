@@ -402,20 +402,6 @@ function composeRelations(ab: AllenRelation, bc: AllenRelation): AllenRelation[]
   return COMPOSITION_TABLE[ab]?.[bc] || [];
 }
 
-/**
- * Check if two relation sets are compatible (have non-empty intersection)
- */
-function relationsCompatible(setA: AllenRelation[], setB: AllenRelation[]): boolean {
-  return setA.some(r => setB.includes(r));
-}
-
-/**
- * Find the intersection of two relation sets
- */
-function intersectRelations(setA: AllenRelation[], setB: AllenRelation[]): AllenRelation[] {
-  return setA.filter(r => setB.includes(r));
-}
-
 /** Each Allen relation's inverse (file-header comment's "[7 inverses]"), so a
  *  relation asserted A→B can be checked against what B→A implies about A→B. */
 const INVERSE_RELATION: Record<AllenRelation, AllenRelation> = {
@@ -428,8 +414,92 @@ const INVERSE_RELATION: Record<AllenRelation, AllenRelation> = {
   'equals': 'equals',
 };
 
-function invertRelationSet(relations: Iterable<AllenRelation>): AllenRelation[] {
-  return Array.from(relations, r => INVERSE_RELATION[r]);
+// ────────────────────────────────────────────────────────────────────────────────
+// Bit-packed relation sets (perf substrate for detectTemporalContradictions)
+//
+// PURE REPRESENTATION CHANGE, 2026-08-21 (lane W2). The path-consistency
+// propagation below used to hold every matrix cell as a `Set<AllenRelation>`
+// inside a `Map<string, Map<string, Set<...>>>`, and re-derive `Array.from()`
+// snapshots of three of them on every one of the O(n³) triples it visits.
+// MEASURED (profile over synthetic concatenations of data/screenplays/*.
+// fountain): auditTemporalConsistencyReport was 99.7% of the entire Script
+// Doctor runtime — 158ms at 26 scenes, 7.5s at 62, 43.4s at 120, i.e. the
+// whole reported super-quadratic doctor curve was this one function. The
+// per-triple allocation (two Array.from snapshots, a fresh Set, a filter
+// closure) dominated; the algorithm itself is fine.
+//
+// So the sets became 13-bit integers and the matrix became flat typed arrays,
+// with the ORDERED relation list kept alongside the mask because the original
+// Set's INSERTION ORDER is observable: it is spliced verbatim into
+// `explanation` strings (`Array.from(rIK).join('|')`) on every reported
+// contradiction. `cellRel`/`cellLen` reproduce that order element-for-element;
+// `cellMask` exists only so the hot comparisons (empty? subset? disjoint?)
+// become single integer ops instead of array scans. Nothing about WHICH
+// contradictions are found, in WHAT order, or with WHAT text changed — see
+// tests/core/temporal-consistency-perf.test.ts, which runs the original
+// Set-based reference implementation and this one over the same randomized
+// constraint graphs and deep-equals the results.
+// ────────────────────────────────────────────────────────────────────────────────
+
+/** Canonical relation order — MUST match the literal order the original
+ *  implementation inserted into each freshly-initialized "all 13 possible"
+ *  cell, because that order is what `Array.from(cell).join('|')` renders. */
+const RELATION_ORDER: readonly AllenRelation[] = [
+  'before', 'meets', 'overlaps', 'starts', 'during', 'finishes', 'equals',
+  'after', 'met-by', 'overlapped-by', 'started-by', 'contains', 'finished-by',
+];
+const RELATION_COUNT = RELATION_ORDER.length; // 13
+const FULL_MASK = (1 << RELATION_COUNT) - 1;  // 0b1111111111111 = 8191
+const EQUALS_INDEX = RELATION_ORDER.indexOf('equals');
+
+const RELATION_INDEX: Record<AllenRelation, number> = Object.fromEntries(
+  RELATION_ORDER.map((r, i) => [r, i]),
+) as Record<AllenRelation, number>;
+
+/** COMPOSE_ORDERED[ab * 13 + bc] — the composition table's own entry order,
+ *  as relation INDICES. Order matters: it is the order the original code
+ *  inserted composed relations into its `composed` Set. */
+const COMPOSE_ORDERED: Uint8Array[] = new Array(RELATION_COUNT * RELATION_COUNT);
+/** COMPOSE_MASK[ab * 13 + bc] — the same entry as a bitmask. */
+const COMPOSE_MASK = new Uint16Array(RELATION_COUNT * RELATION_COUNT);
+for (let ab = 0; ab < RELATION_COUNT; ab++) {
+  for (let bc = 0; bc < RELATION_COUNT; bc++) {
+    const entry = composeRelations(RELATION_ORDER[ab], RELATION_ORDER[bc]);
+    const indices = new Uint8Array(entry.length);
+    let mask = 0;
+    for (let e = 0; e < entry.length; e++) {
+      const idx = RELATION_INDEX[entry[e]];
+      indices[e] = idx;
+      mask |= 1 << idx;
+    }
+    COMPOSE_ORDERED[ab * RELATION_COUNT + bc] = indices;
+    COMPOSE_MASK[ab * RELATION_COUNT + bc] = mask;
+  }
+}
+
+/** INVERSE_INDEX[i] — relation i's inverse, as an index. */
+const INVERSE_INDEX = new Uint8Array(RELATION_COUNT);
+for (let i = 0; i < RELATION_COUNT; i++) {
+  INVERSE_INDEX[i] = RELATION_INDEX[INVERSE_RELATION[RELATION_ORDER[i]]];
+}
+
+/** Bitmask of the inverses of every relation in `mask`. */
+function invertMask(mask: number): number {
+  let out = 0;
+  let rest = mask;
+  while (rest !== 0) {
+    const bit = rest & -rest;
+    out |= 1 << INVERSE_INDEX[31 - Math.clz32(bit)];
+    rest ^= bit;
+  }
+  return out;
+}
+
+function popcount(mask: number): number {
+  let m = mask - ((mask >> 1) & 0x55555555);
+  m = (m & 0x33333333) + ((m >> 2) & 0x33333333);
+  m = (m + (m >> 4)) & 0x0f0f0f0f;
+  return (m * 0x01010101) >> 24;
 }
 
 /**
@@ -470,37 +540,102 @@ function invertRelationSet(relations: Iterable<AllenRelation>): AllenRelation[] 
  *
  * Returns true iff either cell actually changed, so callers can fold this
  * into their existing propagation `changed` flag.
+ *
+ * (2026-08-21, lane W2) Same setter, same semantics, expressed against the
+ * bit-packed matrix described above instead of Map-of-Map-of-Set:
+ *   - the FORWARD cell is REPLACED by `relations`, keeping its order, and
+ *     only when it differs as a SET from what's already there (a same-set,
+ *     different-order narrowing was a no-op before and stays one, so no
+ *     explanation string can shift under this change);
+ *   - the BACKWARD cell is FILTERED in place against inverse(relations),
+ *     which preserves its own existing order exactly as `Array.from(...)
+ *     .filter(...)` did.
  */
-function narrowPairRelations(
-  matrix: Map<string, Map<string, Set<AllenRelation>>>,
-  aId: string,
-  bId: string,
-  relations: AllenRelation[]
-): boolean {
-  let changed = false;
-  const rowA = matrix.get(aId);
-  const rowB = matrix.get(bId);
+class RelationMatrix {
+  readonly size: number;
+  /** Ordered relation indices per cell, 13 slots each (row-major i*size+j). */
+  private readonly rel: Uint8Array;
+  /** How many of those 13 slots are live. */
+  private readonly len: Uint8Array;
+  /** Same content as a bitmask — lets the hot loop test empty/subset/disjoint
+   *  with one integer op instead of an array scan. Always in sync with rel/len. */
+  readonly mask: Uint16Array;
 
-  const newForward = new Set(relations);
-  const currentForward = rowA?.get(bId);
-  if (rowA) {
-    if (!currentForward || currentForward.size !== newForward.size || !Array.from(currentForward).every(r => newForward.has(r))) {
-      rowA.set(bId, newForward);
-      changed = true;
+  constructor(size: number) {
+    this.size = size;
+    this.rel = new Uint8Array(size * size * RELATION_COUNT);
+    this.len = new Uint8Array(size * size);
+    this.mask = new Uint16Array(size * size);
+    // Initialize: self-cell = {equals}; every other cell = all 13 relations in
+    // canonical order (the literal order the original initializer used).
+    for (let i = 0; i < size; i++) {
+      for (let j = 0; j < size; j++) {
+        const cell = i * size + j;
+        if (i === j) {
+          this.rel[cell * RELATION_COUNT] = EQUALS_INDEX;
+          this.len[cell] = 1;
+          this.mask[cell] = 1 << EQUALS_INDEX;
+        } else {
+          const base = cell * RELATION_COUNT;
+          for (let r = 0; r < RELATION_COUNT; r++) this.rel[base + r] = r;
+          this.len[cell] = RELATION_COUNT;
+          this.mask[cell] = FULL_MASK;
+        }
+      }
     }
   }
 
-  const invertedForward = invertRelationSet(relations);
-  const currentBackward = rowB?.get(aId);
-  if (rowB && currentBackward) {
-    const newBackward = new Set(Array.from(currentBackward).filter(r => invertedForward.includes(r)));
-    if (newBackward.size !== currentBackward.size) {
-      rowB.set(aId, newBackward);
-      changed = true;
-    }
+  cellIndex(i: number, j: number): number { return i * this.size + j; }
+  lengthAt(cell: number): number { return this.len[cell]; }
+  /** Relation index at a flat slot (`cell * RELATION_COUNT + ordinal`). */
+  relAt(slot: number): number { return this.rel[slot]; }
+
+  /** The cell's relations, in order, as an array — used only for rendering
+   *  explanation strings and for the (rare) narrowing path. */
+  toArray(cell: number): AllenRelation[] {
+    const n = this.len[cell];
+    const base = cell * RELATION_COUNT;
+    const out: AllenRelation[] = new Array(n);
+    for (let r = 0; r < n; r++) out[r] = RELATION_ORDER[this.rel[base + r]];
+    return out;
   }
 
-  return changed;
+  /** Overwrite a cell with `indices` (already deduped, order significant). */
+  private write(cell: number, indices: ArrayLike<number>, count: number, mask: number): void {
+    const base = cell * RELATION_COUNT;
+    for (let r = 0; r < count; r++) this.rel[base + r] = indices[r];
+    this.len[cell] = count;
+    this.mask[cell] = mask;
+  }
+
+  /** See the doc comment above — the symmetric setter, bit-packed. */
+  narrowPair(a: number, b: number, indices: ArrayLike<number>, count: number, newMask: number): boolean {
+    let changed = false;
+
+    const forward = this.cellIndex(a, b);
+    if (this.mask[forward] !== newMask || this.len[forward] !== count) {
+      this.write(forward, indices, count, newMask);
+      changed = true;
+    }
+
+    const backward = this.cellIndex(b, a);
+    const currentBackward = this.mask[backward];
+    const keep = currentBackward & invertMask(newMask);
+    if (keep !== currentBackward) {
+      // Filter in place, preserving the backward cell's own existing order.
+      const base = backward * RELATION_COUNT;
+      let out = 0;
+      for (let r = 0, n = this.len[backward]; r < n; r++) {
+        const idx = this.rel[base + r];
+        if ((keep >> idx) & 1) this.rel[base + out++] = idx;
+      }
+      this.len[backward] = out;
+      this.mask[backward] = keep;
+      changed = true;
+    }
+
+    return changed;
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -701,98 +836,127 @@ export function detectTemporalContradictions(
 ): TemporalContradiction[] {
   const contradictions: TemporalContradiction[] = [];
   const n = intervals.length;
-  
+
   if (n === 0) return [];
-  
-  // Build constraint matrix: constraintMatrix[i][j] = possible relations between interval i and j
-  const constraintMatrix: Map<string, Map<string, Set<AllenRelation>>> = new Map();
-  
-  // Initialize with all possible relations
-  intervals.forEach(intA => {
-    const rowMap = new Map<string, Set<AllenRelation>>();
-    intervals.forEach(intB => {
-      if (intA.id === intB.id) {
-        rowMap.set(intB.id, new Set<AllenRelation>(['equals']));
-      } else {
-        // Start with all 13 relations possible
-        rowMap.set(intB.id, new Set<AllenRelation>([
-          'before', 'meets', 'overlaps', 'starts', 'during', 'finishes', 'equals',
-          'after', 'met-by', 'overlapped-by', 'started-by', 'contains', 'finished-by'
-        ]));
-      }
-    });
-    constraintMatrix.set(intA.id, rowMap);
-  });
-  
+
+  // Build constraint matrix: constraintMatrix[i][j] = possible relations
+  // between interval i and j. Keyed by DISTINCT interval id, exactly as the
+  // original Map-of-Maps was: `intervals` can legitimately contain repeated
+  // ids (extractTemporalConstraints mints `${char}_age_${age}` intervals that
+  // collide whenever two scenes mention the same character at the same age),
+  // and a repeated id addressed the same single row before. The loops below
+  // still walk the `intervals` ARRAY — so a repeated id is visited as many
+  // times as it appears, preserving duplicate self-cycle/mirror reports.
+  const idIndex = new Map<string, number>();
+  for (const interval of intervals) {
+    if (!idIndex.has(interval.id)) idIndex.set(interval.id, idIndex.size);
+  }
+  const distinctCount = idIndex.size;
+  const matrix = new RelationMatrix(distinctCount);
+  /** Array-position -> distinct-id row, so the O(n³) loops below can work in
+   *  integers while still iterating `intervals` in its own order. */
+  const rowOf = new Int32Array(n);
+  for (let p = 0; p < n; p++) rowOf[p] = idIndex.get(intervals[p].id)!;
+
+  // Scratch buffers reused across every triple — the whole point of the
+  // bit-packed representation is that the hot loop allocates nothing.
+  const composedScratch = new Uint8Array(RELATION_COUNT);
+  const intersectScratch = new Uint8Array(RELATION_COUNT);
+  const singleScratch = new Uint8Array(1);
+
   // Apply explicit constraints and check for immediate conflicts
   constraints.forEach(c => {
-    const rowA = constraintMatrix.get(c.intervalA);
-    if (rowA) {
-      const current = rowA.get(c.intervalB);
-      if (current) {
-        const currentArray = Array.from(current);
-        // Intersect with existing constraint
-        const intersection = intersectRelations([c.relation], currentArray);
-        if (intersection.length === 0) {
-          // Explicit contradiction - same pair has incompatible constraints
-          contradictions.push({
-            type: 'explicit_conflict',
-            severity: 'blocker',
-            intervals: [c.intervalA, c.intervalB],
-            constraints: [c],
-            explanation: `Conflicting explicit constraints on ${c.intervalA} and ${c.intervalB}: existing=${currentArray.join('|')}, new=${c.relation}`,
-            affectedScenes: [c.sourceSceneId],
-          });
-        } else {
-          // Narrow BOTH directions together (see narrowPairRelations) so the
-          // backward cell never drifts away from being the true inverse of
-          // this forward assertion.
-          narrowPairRelations(constraintMatrix, c.intervalA, c.intervalB, intersection);
-        }
-      }
+    const a = idIndex.get(c.intervalA);
+    if (a === undefined) return;
+    const b = idIndex.get(c.intervalB);
+    if (b === undefined) return;
+    const cell = matrix.cellIndex(a, b);
+    const relIdx = RELATION_INDEX[c.relation];
+    if (relIdx === undefined) return;
+    if (((matrix.mask[cell] >> relIdx) & 1) === 0) {
+      // Explicit contradiction - same pair has incompatible constraints
+      contradictions.push({
+        type: 'explicit_conflict',
+        severity: 'blocker',
+        intervals: [c.intervalA, c.intervalB],
+        constraints: [c],
+        explanation: `Conflicting explicit constraints on ${c.intervalA} and ${c.intervalB}: existing=${matrix.toArray(cell).join('|')}, new=${c.relation}`,
+        affectedScenes: [c.sourceSceneId],
+      });
+    } else {
+      // Narrow BOTH directions together (see narrowPairRelations) so the
+      // backward cell never drifts away from being the true inverse of
+      // this forward assertion.
+      singleScratch[0] = relIdx;
+      matrix.narrowPair(a, b, singleScratch, 1, 1 << relIdx);
     }
   });
-  
+
   // Path consistency propagation (Floyd-Warshall style)
   let changed = true;
   let iterations = 0;
   const MAX_ITERATIONS = n * n * n; // Safety limit
-  
+
   while (changed && iterations < MAX_ITERATIONS) {
     changed = false;
     iterations++;
-    
-    for (const intI of intervals) {
-      for (const intJ of intervals) {
-        if (intI.id === intJ.id) continue;
-        
-        const rIJ = constraintMatrix.get(intI.id)?.get(intJ.id);
-        if (!rIJ || rIJ.size === 0) continue;
-        
-        for (const intK of intervals) {
-          if (intK.id === intI.id || intK.id === intJ.id) continue;
-          
-          const rJK = constraintMatrix.get(intJ.id)?.get(intK.id);
-          const rIK = constraintMatrix.get(intI.id)?.get(intK.id);
-          
-          if (!rJK || !rIK || rJK.size === 0 || rIK.size === 0) continue;
-          
-          // Compose all pairs of relations
-          const composed = new Set<AllenRelation>();
-          for (const ij of Array.from(rIJ)) {
-            for (const jk of Array.from(rJK)) {
-              const compositions = composeRelations(ij, jk);
-              compositions.forEach(r => composed.add(r));
+
+    for (let pi = 0; pi < n; pi++) {
+      const i = rowOf[pi];
+      for (let pj = 0; pj < n; pj++) {
+        const j = rowOf[pj];
+        if (i === j) continue;
+
+        const cellIJ = matrix.cellIndex(i, j);
+        const maskIJ = matrix.mask[cellIJ];
+        if (maskIJ === 0) continue;
+        // FAST PATH (pure, verified): composing the UNIVERSAL relation set
+        // with any non-empty set yields the universal set again — the union
+        // of COMPOSITION_TABLE[*][bc] is all 13 relations for every bc (an
+        // exhaustive check of the table, locked by
+        // tests/core/temporal-consistency-perf.test.ts). A universal
+        // `composed` can never be empty and always contains rIK, so the
+        // original code's every branch below was a no-op for this whole
+        // (i, j) row: no contradiction pushed, no cell narrowed, `changed`
+        // untouched. Skipping it is therefore output-identical, and it is
+        // what keeps intervals that carry no constraints at all (every
+        // `${char}_age_${n}` interval) from costing an inner O(n) scan each.
+        if (maskIJ === FULL_MASK) continue;
+        const lenIJ = matrix.lengthAt(cellIJ);
+        const baseIJ = cellIJ * RELATION_COUNT;
+
+        for (let pk = 0; pk < n; pk++) {
+          const k = rowOf[pk];
+          if (k === i || k === j) continue;
+
+          const cellJK = matrix.cellIndex(j, k);
+          const cellIK = matrix.cellIndex(i, k);
+          const maskJK = matrix.mask[cellJK];
+          const maskIK = matrix.mask[cellIK];
+
+          if (maskJK === 0 || maskIK === 0) continue;
+
+          // Compose all pairs of relations — bitmask only. The ORDERED
+          // composition is rebuilt below, and only on the rare paths that
+          // actually observe its order (a narrowing or a contradiction).
+          let composedMask = 0;
+          const baseJK = cellJK * RELATION_COUNT;
+          const lenJK = matrix.lengthAt(cellJK);
+          for (let x = 0; x < lenIJ; x++) {
+            const ij = matrix.relAt(baseIJ + x) * RELATION_COUNT;
+            for (let y = 0; y < lenJK; y++) {
+              composedMask |= COMPOSE_MASK[ij + matrix.relAt(baseJK + y)];
             }
           }
-          
+
           // If composition is empty, that's impossible
-          if (composed.size === 0) {
+          if (composedMask === 0) {
+            const intI = intervals[pi], intJ = intervals[pj], intK = intervals[pk];
             const relevantConstraints = constraints.filter(
               c => (c.intervalA === intI.id && c.intervalB === intJ.id) ||
                    (c.intervalA === intJ.id && c.intervalB === intK.id)
             );
-            
+
             contradictions.push({
               type: 'transitive_violation',
               severity: 'blocker',
@@ -801,55 +965,86 @@ export function detectTemporalContradictions(
               explanation: `Transitive temporal constraint violated: No valid composition of ${intI.label} → ${intJ.label} → ${intK.label}`,
               affectedScenes: [...new Set(relevantConstraints.map(c => c.sourceSceneId))],
             });
-            
+
             return contradictions;
           }
-          
-          // Intersect with existing constraint on i→k
-          const intersection = intersectRelations(Array.from(composed), Array.from(rIK));
-          
-          if (intersection.length === 0) {
+
+          // Intersect with existing constraint on i→k. `intersection` is
+          // always a subset of rIK (it is `composed` filtered by membership
+          // in rIK), so `intersection.length < rIK.size` is exactly
+          // "composed does not contain all of rIK" — one integer test.
+          if ((composedMask & maskIK) === maskIK) continue; // no narrowing, no report
+
+          // From here on the composition's ORDER is observable, so rebuild it
+          // exactly as the original Set did: iterate rIJ in order, rJK in
+          // order, and append each table entry's relations on first sight.
+          let composedCount = 0;
+          let seen = 0;
+          for (let x = 0; x < lenIJ; x++) {
+            const ij = matrix.relAt(baseIJ + x) * RELATION_COUNT;
+            for (let y = 0; y < lenJK; y++) {
+              const entry = COMPOSE_ORDERED[ij + matrix.relAt(baseJK + y)];
+              for (let e = 0; e < entry.length; e++) {
+                const r = entry[e];
+                if (((seen >> r) & 1) === 0) {
+                  seen |= 1 << r;
+                  composedScratch[composedCount++] = r;
+                }
+              }
+            }
+          }
+          const intersectMask = composedMask & maskIK;
+          let intersectCount = 0;
+          for (let x = 0; x < composedCount; x++) {
+            const r = composedScratch[x];
+            if ((intersectMask >> r) & 1) intersectScratch[intersectCount++] = r;
+          }
+
+          if (intersectCount === 0) {
             // Transitive contradiction detected
+            const intI = intervals[pi], intJ = intervals[pj], intK = intervals[pk];
             const relevantConstraints = constraints.filter(
               c => (c.intervalA === intI.id && c.intervalB === intJ.id) ||
                    (c.intervalA === intJ.id && c.intervalB === intK.id) ||
                    (c.intervalA === intI.id && c.intervalB === intK.id)
             );
-            
+            const composedRendered: AllenRelation[] = new Array(composedCount);
+            for (let x = 0; x < composedCount; x++) composedRendered[x] = RELATION_ORDER[composedScratch[x]];
+
             contradictions.push({
               type: 'transitive_violation',
               severity: 'blocker',
               intervals: [intI.id, intJ.id, intK.id],
               constraints: relevantConstraints,
-              explanation: `Transitive temporal constraint violated: ${intI.label} → ${intJ.label} → ${intK.label} creates impossible ordering (composed=${Array.from(composed).join('|')}, existing=${Array.from(rIK).join('|')})`,
+              explanation: `Transitive temporal constraint violated: ${intI.label} → ${intJ.label} → ${intK.label} creates impossible ordering (composed=${composedRendered.join('|')}, existing=${matrix.toArray(cellIK).join('|')})`,
               affectedScenes: [...new Set(relevantConstraints.map(c => c.sourceSceneId))],
             });
-            
+
             // Don't return immediately - collect all contradictions
             // But mark this relation as impossible (both directions, via
             // narrowPairRelations, so the backward cell doesn't keep
             // reporting a now-invalidated relation set).
-            narrowPairRelations(constraintMatrix, intI.id, intK.id, []);
+            matrix.narrowPair(i, k, intersectScratch, 0, 0);
             changed = true;
-          } else if (intersection.length < rIK.size) {
+          } else {
             // Narrow BOTH directions together (see narrowPairRelations) so
             // the backward cell (K→I) stays the true inverse of this
             // forward cell instead of drifting via unrelated composition
             // paths — the root cause of the CONTINUOUS/MOMENTS LATER/SAME
             // TIME false positives fixed 2026-08-03 (see that function's
             // doc comment).
-            narrowPairRelations(constraintMatrix, intI.id, intK.id, intersection);
+            matrix.narrowPair(i, k, intersectScratch, intersectCount, intersectMask);
             changed = true;
           }
         }
       }
     }
   }
-  
+
   // Check for cycles (interval before itself)
   intervals.forEach(int => {
-    const selfRelations = constraintMatrix.get(int.id)?.get(int.id);
-    if (selfRelations && !selfRelations.has('equals')) {
+    const self = idIndex.get(int.id);
+    if (self !== undefined && ((matrix.mask[matrix.cellIndex(self, self)] >> EQUALS_INDEX) & 1) === 0) {
       contradictions.push({
         type: 'cyclic_dependency',
         severity: 'blocker',
@@ -871,17 +1066,27 @@ export function detectTemporalContradictions(
   const reportedPairs = new Set(
     contradictions.flatMap(c => c.intervals.length === 2 ? [`${c.intervals[0]}|${c.intervals[1]}`, `${c.intervals[1]}|${c.intervals[0]}`] : [])
   );
-  for (const intA of intervals) {
-    for (const intB of intervals) {
-      if (intA.id === intB.id) continue;
-      if (reportedPairs.has(`${intA.id}|${intB.id}`)) continue;
+  for (let pa = 0; pa < n; pa++) {
+    const intA = intervals[pa];
+    const a = rowOf[pa];
+    for (let pb = 0; pb < n; pb++) {
+      const intB = intervals[pb];
+      const b = rowOf[pb];
+      if (a === b) continue;
+      // (`reportedPairs.size > 0` short-circuit only skips building the key
+      // string for the overwhelmingly common empty-set case; the membership
+      // semantics are unchanged.)
+      if (reportedPairs.size > 0 && reportedPairs.has(`${intA.id}|${intB.id}`)) continue;
 
-      const forward = constraintMatrix.get(intA.id)?.get(intB.id);
-      const backward = constraintMatrix.get(intB.id)?.get(intA.id);
-      if (!forward || !backward || forward.size === 0 || backward.size === 0) continue;
+      const forwardCell = matrix.cellIndex(a, b);
+      const backwardCell = matrix.cellIndex(b, a);
+      const forwardMask = matrix.mask[forwardCell];
+      const backwardMask = matrix.mask[backwardCell];
+      if (forwardMask === 0 || backwardMask === 0) continue;
 
-      const impliedFromBackward = new Set(Array.from(backward).map(r => INVERSE_RELATION[r]));
-      if (!relationsCompatible(Array.from(forward), Array.from(impliedFromBackward))) {
+      if ((forwardMask & invertMask(backwardMask)) === 0) {
+        const forward = matrix.toArray(forwardCell);
+        const backward = matrix.toArray(backwardCell);
         const relevantConstraints = constraints.filter(
           c => (c.intervalA === intA.id && c.intervalB === intB.id) ||
                (c.intervalA === intB.id && c.intervalB === intA.id)
@@ -901,8 +1106,8 @@ export function detectTemporalContradictions(
           intervals: [intA.id, intB.id],
           constraints: relevantConstraints,
           explanation: isDirectCycle
-            ? `Cyclic temporal dependency detected: ${intA.label} and ${intB.label} directly constrain each other to incompatible orderings (${Array.from(forward).join('|')} vs. inverse of ${Array.from(backward).join('|')})`
-            : `Transitive temporal constraint violated: inferred ordering between ${intA.label} and ${intB.label} (${Array.from(forward).join('|')}) conflicts with the inverse of the explicit ordering back from ${intB.label} (${Array.from(backward).join('|')})`,
+            ? `Cyclic temporal dependency detected: ${intA.label} and ${intB.label} directly constrain each other to incompatible orderings (${forward.join('|')} vs. inverse of ${backward.join('|')})`
+            : `Transitive temporal constraint violated: inferred ordering between ${intA.label} and ${intB.label} (${forward.join('|')}) conflicts with the inverse of the explicit ordering back from ${intB.label} (${backward.join('|')})`,
           affectedScenes: [...new Set(relevantConstraints.map(c => c.sourceSceneId))],
         });
         reportedPairs.add(`${intA.id}|${intB.id}`);

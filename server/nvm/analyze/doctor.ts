@@ -178,6 +178,53 @@ export function clearDoctorCache(): void {
   doctorCache.clear();
 }
 
+// ── Coordinator-side cache access (lane W1, 2026-08-21) ─────────────────────
+// doctor-pool.ts runs runScriptDoctor on a worker thread so a feature-length
+// script can no longer block the event loop for every other user. A worker is
+// a separate JS realm with its OWN module instance, so the LRU above would
+// otherwise become a per-worker cache — which silently breaks the property
+// the cache exists for (the SAME submission, resubmitted, is free) as soon as
+// the pool has more than one worker or recycles one.
+//
+// The fix is that the coordinator owns the cache: it peeks BEFORE dispatching
+// and adopts the worker's report AFTER, using these two functions, so there
+// is exactly one cache and it lives on the main thread. They deliberately
+// take the same (fountain, storyContext, deepRead) triple runScriptDoctor
+// does and derive the key through the identical doctorCacheKey/
+// computeContentHash path rather than accepting a pre-built key — a
+// coordinator that re-derived the key itself could drift from this module's
+// keying rules without anything failing loudly.
+//
+// The worker's own in-worker cache still fills as a harmless side effect; it
+// is bounded by the same DOCTOR_CACHE_CAPACITY and is never consulted for
+// correctness by anything here.
+
+/** Coordinator-side cache read. Returns a report ready to hand back to a
+ *  caller (fresh `analyzedAt`, shallow-copied), or undefined on a miss —
+ *  exactly what runScriptDoctor's own cache-check block would have returned. */
+export function doctorCachePeek(
+  fountain: string,
+  storyContext?: StoryContext,
+  deepRead = false,
+): ScriptDoctorReport | undefined {
+  const cached = doctorCacheGet(doctorCacheKey(computeContentHash(fountain), storyContext, deepRead));
+  return cached ? { ...cached, analyzedAt: Date.now() } : undefined;
+}
+
+/** Coordinator-side cache write — stores a report computed elsewhere (a
+ *  worker thread) under the key runScriptDoctor would have used, dropping
+ *  `analyzedAt` for the same reason runScriptDoctor does (every read stamps
+ *  its own). */
+export function doctorCacheAdopt(
+  fountain: string,
+  report: ScriptDoctorReport,
+  storyContext?: StoryContext,
+  deepRead = false,
+): void {
+  const { analyzedAt: _analyzedAt, ...cacheable } = report;
+  doctorCacheSet(doctorCacheKey(computeContentHash(fountain), storyContext, deepRead), cacheable);
+}
+
 // ── Opportunity-based craft penalty (saturation fix) ────────────────────────
 // PRIOR DESIGN (superseded — kept here as the historical record the rest of
 // this comment block refers to): craftPenalty = weightedIssues * (30 /

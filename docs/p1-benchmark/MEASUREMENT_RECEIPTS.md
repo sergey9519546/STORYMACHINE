@@ -741,3 +741,87 @@ holds (full suite green at the commit carrying this note).
   2026-08-14) verified the nonexistent SHA, the self-admitted simulated
   command, and the guard's pass/fail behavior on both ranges directly in
   this checkout. No measurement was run; none is claimed."
+
+### 2026-08-21 — LANE W1/W2 PERFORMANCE: no scoring measurement, because no score moved (output-identity receipt instead)
+
+- **What changed on the scoring path:** three files the receipt guard
+  classifies as scoring-path were touched, and this entry exists because the
+  guard correctly refuses to let that ship unexamined:
+  - `server/nvm/analyze/temporal-consistency.ts` — the path-consistency
+    constraint propagation was re-expressed over bit-packed typed arrays
+    instead of `Map<string, Map<string, Set<AllenRelation>>>`. Same algorithm,
+    same iteration order, same fixpoint; only the data structure changed.
+  - `server/nvm/analyze/doctor.ts` — two new exported cache accessors
+    (`doctorCachePeek` / `doctorCacheAdopt`) so the worker-thread pool can keep
+    the LRU on the coordinator. No formula, threshold, deduction, or verdict
+    rule was touched.
+  - `server/nvm/analyze/fountain-analyzer.ts` — `ANALYZER_SCENE_CEILING`
+    lowered 1000 -> 400. This is the one genuine behavior change; it is scoped
+    precisely below.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` (new in this
+  change) — NOT `npm run measure-real`.
+- **Baseline used:** `git archive origin/main` at `b67946a` — i.e. the SAME
+  main this change lands on, not the main it was branched from. This matters
+  and was re-done deliberately: main moved under this branch (`b67946a`
+  unwired `graphDeduction` from the health formula, added GODMODE L37/L38
+  `ruleBreaking`/cross-script, and merged the `INVERSE_CHEKHOV_GUN` rule into
+  `revision/passes/causality.ts`), all of which change reports on their own.
+  An identity comparison against the OLD base would have shown differences
+  that belong to main and proved nothing about this change; comparing
+  new-main-without-these-commits against new-main-with-them isolates exactly
+  this change's effect.
+- **Measured AUC-24:** none, and none is claimed. **This is deliberate, and it
+  is the honest instrument for this change, not an evasion of the guard.** An
+  AUC statistic is the right receipt for a change that moves scores; it is the
+  WRONG receipt for a change that claims to move nothing, because AUC is an
+  aggregate — it can stay identical while individual reports drift, so
+  "AUC unchanged" would be weaker evidence here than what was actually run.
+- **What was run instead — output identity, the stronger claim:** the doctor
+  was run over every deterministic fixture the repository owns, in a pristine
+  `git archive HEAD` checkout of the pre-change tree and in the post-change
+  tree, and the two sets of `ScriptDoctorReport`s were compared field by field
+  (canonical JSON, keys sorted, `analyzedAt` excluded as the one deliberately
+  non-deterministic field):
+  - 20 `data/screenplays/*.fountain` live-action fixtures
+  - 20 calibration `REFERENCE_CORPUS` samples
+  - the P0 sample script (`src/lib/sample-script.ts`)
+  - 4 synthetic concatenations at 62 / 120 / 244 / 306 scenes, included
+    because every real fixture is under 15 scenes and the optimized code paths
+    only engage at feature scale
+  Result: **45/45 byte-identical.** Health, grade, verdict, dimensions,
+  percentiles, strengths, plainSummary, every issue in every pass, and every
+  diagnostic passenger field match exactly.
+- **Second, independent identity proof (unit level):**
+  `tests/core/temporal-consistency-perf.test.ts` runs the verbatim pre-change
+  implementation as an oracle against the shipped one over 200 seeded random
+  constraint graphs plus five hand-built screenplay shapes, and deep-equals
+  every contradiction — including the `explanation` strings, whose relation
+  ORDER is path-dependent and was the delicate part of the rewrite. It also
+  asserts the algebraic fact the new fast path rests on (composing the
+  universal relation set with any non-empty set yields the universal set), so
+  a future composition-table edit cannot silently make the shortcut unsound.
+- **The one real behavior change, scoped:** the ceiling move (1000 -> 400)
+  changes output for exactly one class of input — a submission with more than
+  400 scenes, which now returns the honest truncation report instead of being
+  analyzed on its first 1000. It cannot change any score at or below 400
+  scenes, and the longest feature in the project's own corpus is 292 scenes,
+  so no corpus script's health/verdict/sceneCount can move. The real-corpus
+  manifest therefore needs no re-lock on this account. The motivation is
+  documented at the constant: 1000 was chosen as headroom above a hang that
+  the measurement showed actually began around 120-350 scenes, so the ceiling
+  sat far above the failure it was meant to guard.
+- **Why the AUC floor is untouched:** the AUC-24 ratchet is a function of the
+  health scores the doctor produces on the real corpus. Those scores are
+  proven identical above for every script the corpus can contain (all under
+  400 scenes), so the statistic is arithmetically unchanged. If any reviewer
+  disagrees with that reasoning, the falsifier is cheap and specific: run
+  `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` and confirm 0.731.
+- **Corpus fingerprint:** not applicable — the real corpus was not read. The
+  fixture set measured is the 45 in-repo deterministic fixtures listed above,
+  reproducible by anyone with a checkout and no corpus access at all.
+- **Runner attestation:** "Agent session (remote sandbox, 2026-08-21) ran the
+  output-identity harness against a `git archive origin/main` (`b67946a`)
+  baseline and the rebased working tree in this checkout, plus the
+  equivalence and perf-budget suites under `npm test`. No real-corpus
+  measurement was run, and none is claimed — see the reasoning above for why
+  identity, not AUC, is the receipt this change owes."
