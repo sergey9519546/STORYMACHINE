@@ -352,64 +352,57 @@ async function main() {
   record('P2', 'Toolbar overflow: "Open Simulate" ABSENT with Labs OFF', !hasSimulateOff, `items=${JSON.stringify(overflowLabelsOff)}`);
   record('P2', 'Toolbar overflow: "Labs & Settings" reachable (so a writer can turn Labs on)', overflowLabelsOff.some((l) => /labs/i.test(l)), `items=${JSON.stringify(overflowLabelsOff)}`);
 
-  // DECISION-ENCODED CHECK (accepted 2026-08-04, see the dated addendum in
-  // docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md — "Ship/Studio
-  // Labs-gate bypass"): the always-visible "Ship" task tab (not Labs-gated)
-  // reaches the same toolSlot="studio" panel as the Labs-gated Toolbar
-  // overflow item, via ScriptIDE.tsx's handleTaskChange (`next === "ship" ->
-  // setToolSlot("studio")`). The maintainer reviewed this as a real gating
-  // inconsistency (Toolbar's "Open Studio" is a shortcut, not the sole
-  // door) and ACCEPTED it: removing a default-surface tab risked removing
-  // load-bearing functionality (Title/Versions editing has no other
-  // default-surface path — confirmed by source read, not asserted on
-  // faith), and the panel's live content is Production/Analysis/Codex/
-  // Research-notes/Title/Versions, none of which are the ~38 Labs-gated
-  // research panels — so P2's exit-gate wording ("zero exposure to NVM/
-  // converge/twin/simulation jargon") holds regardless of which door
-  // reaches it.
-  //
-  // This assertion therefore encodes the decision as a PASS while staying a
-  // genuine tripwire in both directions:
-  //   (a) Ship must stay reachable with Labs OFF — if a future change guards
-  //       it, THIS FAILS, because that silently reverses the accepted
-  //       decision without anyone updating the addendum that records it.
-  //   (b) the panel it opens must still carry zero OASIS/NVM jargon — if a
-  //       future change ever routes a real gated research panel through
-  //       this door, THAT FAILS, because the "not a P2 violation" half of
-  //       the decision was conditioned on exactly that being absent.
+  // W6 (docs/PATH_TO_EXCELLENCE.md Phase W): the always-visible "Ship" task
+  // tab used to bypass the Labs gate by mounting toolSlot="studio" (the
+  // PRODUCTION/ANALYSIS/ENGINE/CODEX research shell) just to show a
+  // snapshots list — exactly the "Ship/Studio Labs-gate bypass" the
+  // 2026-08-04 addendum above ACCEPTED as a known-open item pending a real
+  // fix. This block asserts that leak is now CLOSED (not merely
+  // re-decided): Ship opens its own writer-facing ShipPanel
+  // (toolSlot="ship" — exports, snapshots/versions, verify-report pointer,
+  // paper·ink·stamp chrome, zero research tab bar); the research shell moved
+  // exclusively behind toolSlot="studio", reachable only through the still
+  // Labs-gated Toolbar overflow "Open Studio" item exercised in CONTEXT B
+  // below. See docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md's
+  // 2026-08-16 addendum for the closure record.
   const shipTaskBtn = pageA.getByRole('button', { name: 'Ship', exact: true }).first();
   await shipTaskBtn.click();
-  const versionsTab = pageA.getByRole('button', { name: 'Versions', exact: true });
-  const versionsTabVisible = await versionsTab
-    .waitFor({ state: 'visible', timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-  const versionsTabCount = await versionsTab.count();
-  const versionsTabPressed = versionsTabVisible
-    ? (await versionsTab.getAttribute('aria-pressed')) === 'true'
-    : false;
-  const studioReachableViaShip = versionsTabCount === 1 && versionsTabVisible && versionsTabPressed;
-  const studioTabLabels = studioReachableViaShip
-    ? await versionsTab.evaluate((button) =>
-        Array.from(button.parentElement?.querySelectorAll('button') ?? [], (tab) => tab.textContent?.trim() ?? ''),
-      )
-    : [];
-  const studioBodyText = studioReachableViaShip ? await pageA.locator('body').innerText() : '';
-  const OASIS_JARGON_RE = /\bOASIS\b|\bNVM\b|causal twin|epistemic map|converge panel|fixed[- ]points|self-?play|agent roster/i;
-  const leaksOasisJargon = OASIS_JARGON_RE.test(studioBodyText);
+  await pageA.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: 10000 });
+  await pageA.waitForTimeout(200);
+  const shipBodyTextOff = (await pageA.locator('body').innerText()).toUpperCase();
+  const RESEARCH_CHROME_RE = /\bPRODUCTION\b|\bANALYSIS\b|\bENGINE\b|\bCODEX\b/;
+  const shipHasResearchChromeOff = RESEARCH_CHROME_RE.test(shipBodyTextOff);
   record(
-    'P2-decision',
-    'Studio tool-slot (toolSlot="studio") reachable via the always-visible "Ship" task tab, bypassing the Labs-gated Toolbar overflow entry — ACCEPTED 2026-08-04 (docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md, "Ship/Studio Labs-gate bypass"); this must stay true, if it flips to unreachable someone gated Ship without reconciling that decision',
-    studioReachableViaShip,
-    studioReachableViaShip
-      ? `REACHABLE with Labs OFF via Ship task tab, as decided — tabs found: ${JSON.stringify(studioTabLabels)}. Labs-gated Toolbar "Open Studio" overflow item remains a shortcut, not the sole door, per the accepted decision.`
-      : `NOT reachable via Ship tab with one visible, active Versions button (count=${versionsTabCount}, visible=${versionsTabVisible}, aria-pressed=${versionsTabPressed}) — this reverses the 2026-08-04 accepted decision; reconcile with docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md before treating this as a fix`,
+    'P2-W6',
+    'Ship tab (Labs OFF) shows NO research-chrome tab bar — PRODUCTION/ANALYSIS/ENGINE/CODEX absent (the leak this component closes)',
+    !shipHasResearchChromeOff,
+    shipHasResearchChromeOff
+      ? 'PRODUCTION/ANALYSIS/ENGINE/CODEX text found on the Ship tab — the old studio-shell leak has returned'
+      : 'no research-chrome tab-bar text found on the Ship tab',
+  );
+  const shipExportLabels = ['PDF', 'Fountain', 'Final Draft', 'Word'];
+  const shipExportCounts = await Promise.all(
+    shipExportLabels.map((label) => pageA.getByRole('button', { name: new RegExp(`^${label}`, 'i') }).count()),
   );
   record(
-    'P2-decision',
-    'Studio panel content (reached via Ship, Labs OFF) contains no OASIS/NVM research jargon — the condition the 2026-08-04 accept decision (SURFACE_REVALIDATION_2026-08-04.md) rests on; a jargon leak here means a gated research panel became reachable through this door and the decision must be revisited',
-    !leaksOasisJargon,
-    leaksOasisJargon ? 'jargon regex matched — genuine P2 leak, invalidates the 2026-08-04 accept decision' : 'no NVM/OASIS/causal-twin/epistemic-map/converge/fixed-points/self-play jargon found; Ship-tab content is Production/Analysis/Codex/Research-notes/Title/Versions, not a gated research panel',
+    'P2-W6',
+    'Ship tab (Labs OFF): all four export actions (PDF/Fountain/Final Draft/Word) reachable from ShipPanel',
+    shipExportCounts.every((n) => n >= 1),
+    `counts=${JSON.stringify(Object.fromEntries(shipExportLabels.map((l, i) => [l, shipExportCounts[i]])))}`,
+  );
+  const shipSnapshotsHeadingOff = await pageA.getByText('Script Snapshots', { exact: true }).count();
+  record(
+    'P2-W6',
+    'Ship tab (Labs OFF): snapshots/versions list reachable ("Script Snapshots")',
+    shipSnapshotsHeadingOff >= 1,
+    `count=${shipSnapshotsHeadingOff}`,
+  );
+  const shipVerifyLinkOff = await pageA.getByRole('link', { name: /verify a report/i }).count();
+  record(
+    'P2-W6',
+    'Ship tab (Labs OFF): independent-verification pointer reachable ("Verify a report" -> #verify, same route as StartScreen\'s own link)',
+    shipVerifyLinkOff >= 1,
+    `count=${shipVerifyLinkOff}`,
   );
   // Closes the flagged item from docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md
   // ("Ship-tab toolbar row also has a 'Simulate' button ... Labs-agnostic path to

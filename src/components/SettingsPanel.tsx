@@ -766,7 +766,17 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white sm-btn shadow-[var(--sm-shadow)] w-full max-w-xl max-h-[90vh] flex flex-col mx-4">
+      {/* W5 fix: this container previously carried `sm-btn` (the BUTTON
+          primitive — inline-flex + centered content + hover-inverts to
+          near-black background) instead of `sm-panel` (the PANEL frame —
+          opaque token background, no display/alignment side effects). That
+          one wrong class fought the `flex flex-col` layout below (children
+          stopped stretching to the panel's own width) AND flipped the whole
+          modal to a near-black background on any hover — together producing
+          "provider cards below the first render with the app behind bleeding
+          through" once cards overflowed the panel's real edges. Confirmed
+          live via computed-style inspection before this fix. */}
+      <div className="sm-panel shadow-[var(--sm-shadow)] w-full max-w-xl max-h-[90vh] flex flex-col mx-4">
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b-4 border-black">
           <h2 className="text-lg font-bold uppercase tracking-widest">Settings</h2>

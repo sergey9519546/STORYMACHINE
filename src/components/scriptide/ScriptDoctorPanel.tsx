@@ -41,7 +41,7 @@ import type {
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
 import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
 import { diffLines } from "../../lib/diff.ts";
-import { decideWriteBack } from "../../lib/coverage-staleness.ts";
+import { decideWriteBack, isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
 import { trackDoctorRun, trackEvent } from "../../lib/analytics";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 
@@ -67,6 +67,18 @@ interface ScriptDoctorPanelProps {
    *  runs and compared before a fix or converted-Fountain write-back, so a
    *  result built against an older draft can't clobber edits made since. */
   getDraftGeneration?: () => number;
+  /** W4: a report CoverageSummary already computed, handed in so "Full
+   *  report" can hydrate straight into the success state instead of cold-
+   *  starting into "Run Diagnosis" and repaying the whole analysis. Only
+   *  consumed once, at mount (see initialReportHydratedRef) — a later prop
+   *  change (e.g. the writer re-opens the summary and runs coverage again
+   *  while this panel happens to still be mounted) is deliberately ignored,
+   *  the same "consumed once at mount" contract autoLoadSample already has
+   *  below, so it can never stomp on a fix or re-run the writer did inside
+   *  this panel since. If the live draft has moved past the generation this
+   *  report was measured against, it is treated as stale (see
+   *  handoffOutdated) rather than shown as a fresh-looking report. */
+  initialReport?: ThreadedCoverageReport | null;
   onClose: () => void;
 }
 
@@ -1571,10 +1583,16 @@ export default function ScriptDoctorPanel({
   onLoadFountain,
   autoLoadSample,
   getDraftGeneration,
+  initialReport,
   onClose,
 }: ScriptDoctorPanelProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [report, setReport] = useState<ScriptDoctorReport | null>(null);
+  // W4: an initialReport was handed in, but the draft moved on since it was
+  // measured — the existing "Coverage outdated" signal (ScriptIDE.tsx's
+  // toolbar) applied to this handoff path, so a stale report never gets
+  // shown here as if it were current.
+  const [handoffOutdated, setHandoffOutdated] = useState(false);
   const reportIsComplete = report !== null && isWholeDraftAnalysisComplete(report);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Per-pass collapse overrides; a pass with no override defaults to
@@ -2041,7 +2059,7 @@ export default function ScriptDoctorPanel({
   // the aborted first run's request as the only one ever made.
   const autoSampleFiredRef = useRef(false);
   useEffect(() => {
-    if (autoLoadSample && !autoSampleFiredRef.current) {
+    if (autoLoadSample && !autoSampleFiredRef.current && !initialReport) {
       autoSampleFiredRef.current = true;
       loadSample();
     }
@@ -2050,6 +2068,56 @@ export default function ScriptDoctorPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLoadSample]);
+
+  // W4 — "Full report" handoff: hydrate straight into the success state from
+  // a report CoverageSummary already computed, instead of cold-starting into
+  // "Run Diagnosis" and repaying an analysis the writer just watched run.
+  // Ref-gated (not dep-gated), same "consumed exactly once at mount" contract
+  // as autoSampleFiredRef above — a parent re-render passing the same (or a
+  // new) initialReport must never re-hydrate over whatever the writer has
+  // since done inside this panel (a Re-run, an applied fix, an upload).
+  const initialReportHydratedRef = useRef(false);
+  useEffect(() => {
+    if (initialReportHydratedRef.current) return;
+    initialReportHydratedRef.current = true;
+    if (!initialReport) return;
+
+    const currentGen = getDraftGeneration?.();
+    const isFresh = currentGen !== undefined && !isDraftStale(initialReport.generation, currentGen);
+    if (!isFresh) {
+      // G0-02: the draft advanced between CoverageSummary computing this
+      // report and the writer clicking through — presenting it here would be
+      // a stale report with a fresh coat of paint. Leave `status` at "idle"
+      // (no report, no numbers) and show the outdated banner instead; the
+      // writer re-runs from the same "Run Diagnosis" button this state
+      // already renders.
+      setHandoffOutdated(true);
+      return;
+    }
+
+    setReport(initialReport.report);
+    setAnalyzedSnapshot({ fountain: initialReport.fountain });
+    reportDraftGenRef.current = initialReport.generation; // G0-02: same write-back guard a fresh run would set
+    setActiveReportTitle(initialReport.title);
+    setAnalyzedIsSample(initialReport.isSample);
+    setLastRunMode("quick"); // CoverageSummary only ever calls the quick /doctor route
+    setStatus("success");
+
+    // Same draft-history bookkeeping a fresh runDiagnosis() call performs —
+    // Coverage is this product's primary entry point (see CoverageSummary.tsx's
+    // header comment), so skipping this here would mean a writer who always
+    // goes Coverage -> Full report never accumulates draft-over-draft history.
+    if (!initialReport.isSample && isWholeDraftAnalysisComplete(initialReport.report)) {
+      const { history: nextHistory, previous } = recordDoctorHistory(
+        initialReport.report,
+        initialReport.title,
+        "quick",
+      );
+      setHistory(nextHistory);
+      setPreviousEntry(previous);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleExportReport = () => {
     if (!report || !reportIsComplete) return;
@@ -2701,6 +2769,31 @@ export default function ScriptDoctorPanel({
           className="px-6 py-2 bg-green-50 dark:bg-green-950/40 border-b-2 border-green-300 dark:border-green-800 text-[10px] font-mono text-green-700 dark:text-green-300 shrink-0 flex items-center gap-2"
         >
           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {fixToast}
+        </div>
+      )}
+
+      {/* W4: the report threaded in from Coverage's summary no longer matches
+          the live draft — the same "Coverage outdated" signal ScriptIDE's
+          toolbar already shows, applied to this handoff path instead of
+          silently presenting numbers that no longer describe the draft on
+          screen. */}
+      {handoffOutdated && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b-2 border-amber-400 dark:border-amber-700 text-[10px] font-mono text-amber-800 dark:text-amber-200 shrink-0 flex items-center gap-2"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span className="min-w-0">
+            Coverage outdated — your draft changed since that report ran. Run a fresh diagnosis for current results.
+          </span>
+          <button
+            type="button"
+            onClick={() => setHandoffOutdated(false)}
+            aria-label="Dismiss"
+            className="ml-auto shrink-0 leading-none hover:opacity-70"
+          >
+            ✕
+          </button>
         </div>
       )}
 

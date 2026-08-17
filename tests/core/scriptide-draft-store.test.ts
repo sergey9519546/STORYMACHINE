@@ -307,6 +307,76 @@ describe('decideScriptIDERestore', () => {
     );
   });
 
+  // ── W3: false "Save Conflict" on a same-session reload ──────────────────
+  // Repro: paste → autosave fires a keepalive POST to /api/scriptide/save as
+  // the tab is torn down by reload → the server persists it (that's what
+  // keepalive is for) but the response's `.then()` never runs in the old
+  // page, so localStorage still says dirty/no-server-revision. The reload
+  // then fetches back EXACTLY what it just saved. There was never a second
+  // writer — the content on both sides is identical — so this must reconcile
+  // silently, never show the conflict banner.
+  describe('W3 — reconciles a lost-ack save instead of a false conflict', () => {
+    it('reconciles when a dirty local draft with no server base matches the server byte-for-byte', () => {
+      const matchingServer = {
+        scriptText: envelope.scriptText,
+        snapshots: envelope.snapshots,
+        characters: envelope.characters,
+        researchNotes: envelope.researchNotes,
+        isDarkMode: envelope.isDarkMode,
+        updatedAt: 999,
+      };
+      const local = { ...envelope, dirty: true, serverRevision: null };
+      assert.deepEqual(
+        decideScriptIDERestore(local, matchingServer, { hadVersionedDraft: true }),
+        { action: 'reconciled', server: matchingServer },
+      );
+    });
+
+    it('reconciles when a dirty local draft has an older server base but identical content', () => {
+      const matchingServer = {
+        scriptText: envelope.scriptText,
+        snapshots: envelope.snapshots,
+        characters: envelope.characters,
+        researchNotes: envelope.researchNotes,
+        isDarkMode: envelope.isDarkMode,
+        updatedAt: 555, // != local.serverRevision (100), simulating the lost ack
+      };
+      const local = { ...envelope, dirty: true, serverRevision: 100 };
+      assert.deepEqual(
+        decideScriptIDERestore(local, matchingServer, { hadVersionedDraft: true }),
+        { action: 'reconciled', server: matchingServer },
+      );
+    });
+
+    it('still conflicts when content genuinely differs, even with no server base (real two-writer case)', () => {
+      // Same shape as the reconciliation tests above, but the server's
+      // scriptText is NOT what local has — a genuine second writer, or a
+      // save that never actually reached the server. Must still show the
+      // conflict UI.
+      const local = { ...envelope, dirty: true, serverRevision: null };
+      assert.deepEqual(
+        decideScriptIDERestore(local, server, { hadVersionedDraft: true }),
+        { action: 'conflict', server },
+      );
+    });
+
+    it('still conflicts on a snapshots/characters/researchNotes/isDarkMode mismatch, not just scriptText', () => {
+      const local = { ...envelope, dirty: true, serverRevision: 100 };
+      const almostMatching = {
+        scriptText: envelope.scriptText,
+        snapshots: envelope.snapshots,
+        characters: envelope.characters,
+        researchNotes: envelope.researchNotes,
+        isDarkMode: !envelope.isDarkMode, // the one field that differs
+        updatedAt: 200,
+      };
+      assert.deepEqual(
+        decideScriptIDERestore(local, almostMatching, { hadVersionedDraft: true }),
+        { action: 'conflict', server: almostMatching },
+      );
+    });
+  });
+
   it('uses the legacy source once for multi-key migration', () => {
     const local = { ...envelope, dirty: true, serverRevision: null };
     assert.deepEqual(

@@ -22,7 +22,14 @@ import { getLabsEnabled } from "../../lib/feature-flags";
 
 /** Three user-facing desk modes. Scenes/cast stay in the rail (not a peer mode). */
 export type IdeTask = "write" | "coverage" | "ship";
-export type IdeToolSlot = "none" | "coverage" | "studio" | "director" | "slate";
+// W6: "ship" is the plain writer-facing container (exports, snapshots/
+// versions, verify-report pointer — ShipPanel.tsx) that the always-visible
+// Ship task tab opens by default. "studio" is the PRODUCTION/ANALYSIS/
+// ENGINE/CODEX research shell — Labs-gated, reachable only via this
+// Toolbar's own "Open Studio" overflow item (see the labsEnabled check
+// below). They used to be the same slot, which is exactly the P2 leak W6
+// closed: the Ship tab was mounting the research shell for every writer.
+export type IdeToolSlot = "none" | "coverage" | "ship" | "studio" | "director" | "slate";
 
 interface ToolbarProps {
   title?: string;

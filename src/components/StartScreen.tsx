@@ -264,7 +264,27 @@ export default function StartScreen({
                       isGenerating ? "cursor-wait opacity-50" : ""
                     }`}
                   >
-                    <span className="sm-stamp absolute -right-3 -top-3 rotate-[6deg] text-[11px] font-bold">
+                    {/* W5 fix: this badge previously reused the shared `.sm-stamp`
+                        class, which sets `color: var(--sm-stamp)` — the exact red
+                        this button's own background (`sm-btn--stamp`) already
+                        paints, so the label rendered invisible (red-on-red),
+                        leaving only its border box visible. That empty box was
+                        ALSO positioned to dip down into the "One click · instant
+                        feedback" caption row (the button's real padding is
+                        `.sm-btn`'s own 8px 16px — the shorthand in
+                        design-system.css, which loads after Tailwind's utilities
+                        and wins the cascade over this button's intended
+                        `px-8 py-10 sm:px-10 sm:py-12` — so the caption starts far
+                        closer to the top edge than the unmodified spacing implies,
+                        at every viewport width, not only 375px). Fixed narrowly,
+                        without touching the shared classes other buttons rely on:
+                        a small self-contained ribbon (cream-on-stamp, not
+                        sm-stamp's red-on-transparent) sized and lifted clear of
+                        that caption row instead. */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -right-1 -top-3 rotate-[5deg] whitespace-nowrap border-[1.5px] border-[var(--sm-cream)] bg-[var(--sm-stamp-dk)] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[var(--sm-cream)] sm:-right-2 sm:px-2 sm:text-[9px]"
+                    >
                       Recommended
                     </span>
                     <span className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.3em] text-[var(--sm-cream)]/70">

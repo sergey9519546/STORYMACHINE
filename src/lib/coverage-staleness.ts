@@ -1,3 +1,5 @@
+import type { ScriptDoctorReport } from "../../server/nvm/analyze/types.ts";
+
 /**
  * G0-02 — coverage / fix-result staleness guard.
  *
@@ -23,6 +25,25 @@
  */
 export function isDraftStale(capturedGeneration: number, currentGeneration: number): boolean {
   return capturedGeneration !== currentGeneration;
+}
+
+// ── W4: CoverageSummary → ScriptDoctorPanel "Full report" handoff ──────────
+// CoverageSummary already computes a full ScriptDoctorReport before "Full
+// report" is ever clicked; this is the payload ScriptIDE.tsx lifts out of
+// CoverageSummary (onReportComputed) and threads into ScriptDoctorPanel
+// (initialReport) so the panel can hydrate straight into its success state
+// instead of cold-starting into an idle "Run Diagnosis" prompt and repaying
+// the whole analysis. `generation` is the draft generation the report was
+// measured against (captured at request start, same convention every other
+// G0-02 caller in this module uses) — it's what lets the panel tell a
+// same-draft handoff apart from one that went stale between the summary
+// computing it and the writer clicking through, via isDraftStale below.
+export interface ThreadedCoverageReport {
+  report: ScriptDoctorReport;
+  generation: number;
+  title: string;
+  fountain: string;
+  isSample: boolean;
 }
 
 export type WriteBackReason = "current" | "draft-changed";

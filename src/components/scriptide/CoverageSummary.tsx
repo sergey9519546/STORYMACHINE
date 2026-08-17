@@ -7,7 +7,7 @@ import { AlertTriangle, Loader2, RefreshCw, Stethoscope, X, ArrowRight } from "l
 import type { ScriptDoctorReport } from "../../../server/nvm/analyze/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
 import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
-import { isDraftStale } from "../../lib/coverage-staleness.ts";
+import { isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
 
 interface CoverageSummaryProps {
   fountain: string;
@@ -22,6 +22,14 @@ interface CoverageSummaryProps {
   onLoadSampleIntoEditor?: (text: string) => void;
   onClose: () => void;
   onFreshReport?: () => void;
+  /** W4: hands the just-computed report (plus the draft generation it
+   *  measured and its exact source/title) up to ScriptIDE so a later "Full
+   *  report" click can thread it straight into ScriptDoctorPanel instead of
+   *  that panel re-running the whole diagnosis cold. Fired under the exact
+   *  same freshness gate as onFreshReport (see the `stale` check below) — a
+   *  response this component itself treats as stale must never be handed up
+   *  as if it were current. */
+  onReportComputed?: (payload: ThreadedCoverageReport) => void;
 }
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -41,6 +49,7 @@ export default function CoverageSummary({
   onLoadSampleIntoEditor,
   onClose,
   onFreshReport,
+  onReportComputed,
 }: CoverageSummaryProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +134,28 @@ export default function CoverageSummary({
         if (override?.sample && onLoadSampleIntoEditor) {
           onLoadSampleIntoEditor(override.fountain);
         }
+        // W4: hand the computed report up so "Full report" can thread it into
+        // ScriptDoctorPanel instead of that panel re-running cold. Generation
+        // is read FRESH here, after the sample-install branch above rather
+        // than reusing startDraftGen — installDraft's mutateDraft() bumps the
+        // shared draft generation by design (every real content mutation
+        // must, so a later report/fix can detect it), and for a sample run
+        // that bump happens on the very same content this report just
+        // measured. Reusing the pre-install startDraftGen would make a
+        // report that is byte-identical to what's now on screen look stale
+        // the instant it lands — a false "Coverage outdated" on the P0
+        // golden path this fix exists to protect. For a non-sample run,
+        // getDraftGeneration() here is guaranteed to equal startDraftGen —
+        // the `stale` check above already returned before this point if the
+        // writer edited during flight — so this is a safe substitution
+        // either way, not a behavior change for the common case.
+        onReportComputed?.({
+          report: data,
+          generation: getDraftGeneration?.() ?? startDraftGen,
+          title: override?.title ?? title ?? "Untitled",
+          fountain: override?.fountain ?? fountain,
+          isSample: !!override?.sample,
+        });
       } catch (e) {
         if (gen !== genRef.current) return;
         // A non-timeout abort means this run was superseded or the panel was
@@ -140,7 +171,7 @@ export default function CoverageSummary({
         clearTimeout(timeoutId);
       }
     },
-    [fountain, title, onFreshReport, onLoadSampleIntoEditor, getDraftGeneration],
+    [fountain, title, onFreshReport, onReportComputed, onLoadSampleIntoEditor, getDraftGeneration],
   );
 
   useEffect(() => {
