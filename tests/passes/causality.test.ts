@@ -30,7 +30,7 @@ import {
 } from '../../server/engine/agent/psychology.ts';
 import { renderTemplate, getPrompt, hasPrompt } from '../../server/lib/prompts.ts';
 import { parseRoomId, collabRoomCount } from '../../server/collab/yjs-server.ts';
-import {
+import { STORY_OP_KINDS } from '../../server/nvm/ops/StoryOp.ts';
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
 import { PROOF_TIERS, passResult, failResult } from '../../server/nvm/proof/contract.ts';
 import type { ProofName } from '../../server/nvm/proof/contract.ts';
@@ -6753,7 +6753,6 @@ ${sceneSixBody}
       assert.ok(!result.issues.some(i => i.rule === 'PROTAGONIST_UNTESTED'), 'no negativity anywhere means the absence is not meaningful');
     });
   });
-
   // ── INVERSE_CHEKHOV_GUN ───────────────────────────────────────────────────────
   describe('INVERSE_CHEKHOV_GUN', () => {
     const invChekSlugs = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY`);
