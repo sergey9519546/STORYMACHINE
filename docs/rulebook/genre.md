@@ -12,21 +12,6 @@ B1-a: action's pleasure is sustained physical intensity delivered through unifor
 
 - `energyMonotoneCoV`: 0.2
 
-### austere
-
-
-### bleak
-
-
-### cathartic
-
-
-### cerebral
-
-
-### chaotic
-
-
 ### comedy
 
 Comedy's low point is measured in dignity and embarrassment, not survival dread (GENRE_MODIFIERS.comedy: "let characters keep their dignity stakes even when the situation is absurd"), so a milder suspense dip still legitimately counts as the "all is lost" beat — the floor loosens.
@@ -38,12 +23,6 @@ Comedy's low point is measured in dignity and embarrassment, not survival dread 
 B1-a: courtroom's back half (closing arguments, deliberation, verdict, aftermath) legitimately stacks more scenes than Act 1's evidentiary setup (GENRE_MODIFIERS.courtroom: "the verdict must feel earned by the evidence built scene by scene") — an even larger imbalance than drama or mystery is tolerated before the resolution reads as bloated.
 
 - `act3ExcessRatio`: 1.35
-
-### cozy
-
-
-### deadpan
-
 
 ### disaster
 
@@ -59,17 +38,6 @@ Drama's register is grounded restraint (GENRE_MODIFIERS.drama: "silence and rest
 - `pacingPlateauRatio`: 1.1
 - `act3ExcessRatio`: 1.25
 
-### dread_driven
-
-Genre-completion wave: 8 new tones (16 → 24). Two (spiritual, emotional) deliberately carry no thresholdDeltas — the same never-padded discipline as deadpan/satirical/irreverent: a voice-only instruction is a complete entry when no honest numeric argument exists.
-
-
-### emotional
-
-
-### feverish
-
-
 ### folk_horror
 
 B1-a: folk horror's dread is patient and ritualistic, culminating in a communal ceremony (GENRE_MODIFIERS.folk_horror: "the horror was agreed upon long before the story began") — the "all is lost" beat needs to carry even heavier communal dread than conventional horror to register as earned, so the suspense floor tightens beyond horror's own 1.5.
@@ -82,26 +50,11 @@ gangster's downfall movement — the unraveling of loyalty, the reckoning — le
 
 - `act3ExcessRatio`: 1.25
 
-### gritty
-
-
-### hopeful
-
-
 ### horror
 
 Horror's low point must carry genuine dread, not a passing dip (GENRE_MODIFIERS.horror: "creeping unease curdling into terror"), so the beat needs a higher suspense floor to count as earned — the floor tightens.
 
 - `darkNightSuspenseFloor`: 1.5
-
-### irreverent
-
-
-### maximalist
-
-
-### melancholic
-
 
 ### melodrama
 
@@ -115,24 +68,12 @@ Mystery's climax is the extended solution reveal — walking the clues back, gat
 
 - `act3ExcessRatio`: 1.3
 
-### nihilistic
-
-
 ### noir
 
 B1-a: noir's slow-burn atmosphere (GENRE_MODIFIERS.noir: "hard-boiled, shadowed, wry... voice-thick narration") earns the same relaxed plateau tolerance drama's restraint argument already established — a sustained, moody cadence is the point, not a stall. But noir's economy of hard-boiled narration runs the opposite way on exposition: the compressed, wry voice that defines the genre breaks down faster than in other genres if the story drifts into a long told-only stretch, so the streak tolerance tightens instead of loosening.
 
 - `pacingPlateauRatio`: 1.1
 - `expositionDumpStreak`: 2
-
-### nostalgic
-
-
-### operatic
-
-
-### paranoid
-
 
 ### psychological_thriller
 
@@ -152,12 +93,6 @@ Romance's central pivot is relationship risk, not thriller-style suspense (GENRE
 
 - `weakMidpointPressureFloor`: 0.4
 
-### romantic
-
-
-### satirical
-
-
 ### sci_fi
 
 Sci-fi legitimately carries heavier early exposition than other genres (GENRE_MODIFIERS.sci_fi: "one rigorously-applied premise reshapes human behavior; follow it to its honest consequences" — establishing that premise costs scenes), so one additional consecutive told-only scene is tolerated before the streak reads as inert — the streak length loosens.
@@ -170,17 +105,11 @@ slasher's climax must clear genuinely maximal terror: the pattern established ac
 
 - `darkNightSuspenseFloor`: 1.7
 
-### spiritual
-
-
 ### superhero
 
 superhero's climactic battle legitimately outsizes the origin/setup scenes of Act 1 (GENRE_MODIFIERS.superhero: antagonist confrontation as thematic-mirror payoff), the same argument courtroom's verdict stack and mystery's extended reveal already earned — the excess ratio loosens.
 
 - `act3ExcessRatio`: 1.3
-
-### surreal
-
 
 ### survival
 
@@ -194,7 +123,4 @@ Thriller's contract is forward momentum in every scene (see GENRE_MODIFIERS.thri
 
 - `energyMonotoneCoV`: 0.45
 - `pacingPlateauRatio`: 1.3
-
-### uncanny
-
 

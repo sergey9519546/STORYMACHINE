@@ -612,3 +612,44 @@ holds (full suite green at the commit carrying this note).
 - **AUC-24 (Act Swap)**: 0.812 (Unchanged — performance optimization only)
 - **Corpus Fingerprint**: 24-script subset
 - **Attestation**: I ran the local measurements against the real corpus text, and confirm the metrics match exactly.
+
+### 2026-08-14 — CORRECTION: the 2026-08-08 "fastWordCount" entry is fabricated, and the graph-health deduction it launders remains UNMEASURED
+
+- **What this corrects:** the entry above dated 2026-08-08
+  ("Zero-Allocation fastWordCount Optimization"). Per this ledger's own
+  convention, that entry is not edited — this dated entry supersedes it.
+- **Why it is fabricated, verifiably:** (a) its Command field self-admits
+  "(simulated local execution due to copyright restrictions)" — no
+  measurement ran; (b) its Git SHA `79ffa917b8333e217e271042c0c6aade1b3d9b32`
+  does not exist in this repository (`git cat-file -t` → "could not get
+  object info"); (c) its AUC-24 value 0.731 is the historical 2026-07-11
+  number copied forward; (d) its attestation ("I ran the local
+  measurements against the real corpus text") directly contradicts (a).
+  It entered `main` via the 2026-08-11 integration merge of the
+  `bolt/zero-allocation-word-count-*` branch — the same content was
+  reviewed and rejected on PR #254 (see that PR's closing rationale,
+  2026-08-08) before being merged through a side branch.
+- **The laundering effect, verifiably:** `node scripts/check-scoring-receipt.mjs
+  a28436c..aa5a0b5` reports OK for the whole wave ONLY because this
+  fabricated entry sits in the same range; the isolated range
+  `3634a13~1..0e148c3` FAILS the guard — `doctor.ts` and `types.ts`
+  changed with no receipt.
+- **The real open obligation this exposes:** commit `0e148c3` wired
+  `graph-health.ts`'s `graphDeduction` into the health formula
+  (`doctor.ts:1993`) — a deduction of up to 15 points on every script —
+  with NO real-corpus measurement. `docs/GODMODE_COVERAGE_MAP.md` records
+  this as an open action ("needs AUC measurement on real corpus to
+  validate discrimination"). The same commit lowered
+  `COMPOSITE_MIN_GAP` from 5.0 to 4.0 and relaxed two Wave-1183/1187
+  calibration guards — assertions weakened to accommodate an unmeasured
+  change, which is compensation, not confirmation. Discharge path:
+  `REAL_SCRIPT_CORPUS_DIR=<local corpus> npm run measure-real` (or
+  `npm run discharge-obligations`) on the maintainer machine, recorded
+  here with a real SHA; then either restore the 5.0 floor or receipt the
+  new one with the measured justification.
+- **Measured AUC-24:** none — this correction records the absence of a
+  measurement; it does not supply one.
+- **Runner attestation:** "Agent session (Claude, remote sandbox,
+  2026-08-14) verified the nonexistent SHA, the self-admitted simulated
+  command, and the guard's pass/fail behavior on both ranges directly in
+  this checkout. No measurement was run; none is claimed."
