@@ -28,7 +28,6 @@ import {
   selectPersuasionStrategy,
   getReadyGoals,
 } from '../../server/engine/agent/psychology.ts';
-import { validatePersona, PERSONA_LIMITS } from '../../server/personas/types.ts';
 import { renderTemplate, getPrompt, hasPrompt } from '../../server/lib/prompts.ts';
 import { parseRoomId, collabRoomCount } from '../../server/collab/yjs-server.ts';
 import {
