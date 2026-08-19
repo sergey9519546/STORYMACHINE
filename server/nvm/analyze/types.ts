@@ -364,8 +364,9 @@ export interface ScriptDoctorReport {
    *  threads (relationship arcs, mystery threads, theme arguments) and
    *  their intersection points with the main plot. */
   subplots?: import('../quality/subplot-tracker.ts').SubplotAnalysisReport;
-  /** GODMODE L5: Story-graph health contribution — a scored deduction
-   *  (0-15 points) from graph metrics, suitable for the health formula. */
+  /** GODMODE L5: Story-graph health diagnostic. `graphDeduction` is a
+   *  potential 0–15 point value, NOT part of health/verdict until repaired
+   *  graph extraction passes real-writing calibration. */
   graphHealth?: import('../quality/graph-health.ts').GraphHealthContribution;
   /** GODMODE L37: Deliberate rule-breaking — convention violations that ARE
    *  compensated (passive protagonist with late-agency climax, minimal

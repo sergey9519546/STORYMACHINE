@@ -1,8 +1,10 @@
-// Graph Health — GODMODE L5 (Causal Architecture) scored contribution.
+// Graph Health — GODMODE L5 (Causal Architecture) diagnostic contribution.
 //
-// Promotes story-graph.ts from diagnostic-only to a scored deduction
-// suitable for adding to doctor.ts's health formula. Follows the same
-// capped-deduction pattern as arcIncoherenceDeduction (max 15 points).
+// Produces a graph-native structural diagnostic. It deliberately does NOT
+// change health or verdict: controlled-corpus calibration measured wrong-sign
+// discrimination (scripts/calibrate-graph-health.ts, r=-0.290 vs band rank).
+// The potential deduction is retained as an explicitly untrusted counterfactual
+// value for future re-calibration, not a live scoring channel.
 //
 // Metrics weighted: promise-payment (35%), forward-edges (25%),
 // escalation (20%), arc-coherence (15%), causal-density (5%).
@@ -12,7 +14,8 @@ import type { StoryGraph, StoryGraphReport } from '../analyze/story-graph.ts';
 export interface GraphHealthContribution {
   /** 0–100 health contribution from graph metrics (100 = excellent). */
   graphHealthScore: number;
-  /** Deduction amount to subtract from overall health (0–15, capped). */
+  /** Potential deduction (0–15, capped). Diagnostic-only until a future
+   *  calibration establishes correct real-writing discrimination. */
   graphDeduction: number;
   /** Individual metrics that drove the score. */
   metrics: {

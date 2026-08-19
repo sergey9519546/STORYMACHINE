@@ -19,7 +19,7 @@
 | L1 Script Intent Profile | PARTIAL | `NarrativeState.authorIntent` | Genre, theme, target structure (3 fields) | Full intent profile: tone, audience promise, ambiguity target, authorial risk |
 | L2 Premise & Story Engine | PARTIAL | `StoryGenome` (selfplay/genome.ts), DirectorNode | Terminal want, stakes, dominant wound | Story-engine lifecycle (seeded→activated→costly→crisis→resolved) |
 | L3 World/Rules/Institutions | PARTIAL | `objectiveReality` (AtomicFact[]), `TRIGGER_RULE` op | Facts + fired rules | Rule enforcement system (who enforces, who benefits, loopholes) |
-| L4 Fabula/Syuzhet | UNWIRED | `disclosure-ledger.ts` (discourse order), `truth-ledger.ts` (interval facts) | Both built, **neither wired**. `truth-extraction.ts` chains to truth-ledger but is itself uncalled | Wire disclosure-ledger into the analysis route; wire truth-extraction into doctor.ts |
+| L4 Fabula/Syuzhet | PARTIAL | `disclosure-analysis.ts`, disclosure-ledger.ts | Disclosure ordering and setup/payoff fairness wired into Doctor | Full fabula chronology, flashback/parallel-action model, truth-extraction integration |
 
 ### Architecture levels
 
@@ -28,7 +28,7 @@
 | L5 Causal Architecture | PARTIAL | `story-graph.ts` (696 LOC), `graph-health.ts`, proof/tier1/causal.ts | Causal/temporal/promise graph; graph health surfaced diagnostically | Repair graph extraction and re-calibrate before any score/verdict promotion |
 | L6 Protagonist Architecture | STRONG | `psychology.ts` (659 LOC), AppraisalEngine, decision.ts | Wound, fear, need, false belief, defense cascade, Trinity, Big Five | — |
 | L7 Opposition Architecture | PARTIAL | `conflict-orchestrator.ts`, intention-registry.ts | Goal collisions, threatened plans, leverage reversals | Thematic opposition (antagonist as counterclaim, not just obstacle) |
-| L8 Supporting Character Function | GAP | — | All characters treated uniformly | 14 supporting function types (ally, foil, mirror, gatekeeper, etc.) |
+| L8 Supporting Character Function | PARTIAL | `character-function.ts` | 14-type classifier (protagonist, ally, foil, rival, witness, gatekeeper, etc.) surfaced in Doctor | Richer evidence for mirror/temptation/betrayer/institutional roles; independent goal model |
 | L9 Character Intentionality Chains | PARTIAL | intention-registry.ts, decision.ts, BeatTrace | Want/fear/tactic per character; beat traces | Full intention chains (perceived situation → belief → goal → tactic → outcome → belief update) |
 | L10 Relationship Architecture | STRONG | RelationshipDelta (14 dims), TheoryOfMind, stress-ledger relational account | Trust/affinity/power/debt per pair; rupture/repair tracking | — |
 
