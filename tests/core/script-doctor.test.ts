@@ -738,13 +738,10 @@ describe('Wave 1183 — calibration-drift guard (strengths must never leak into 
       if ((report.strengths ?? []).some(s => WAVE_1183_MARKERS.some(m => s.includes(m)))) sawAWave1183Strength = true;
 
       const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
-      // GODMODE L5: graph-health deduction is now part of the health formula,
-      // so health may be lower than the raw computeHealthScore by up to 15 points.
-      // The test verifies that strengths alone don't move health — the graph
-      // deduction is a separate, legitimate, graph-native signal.
-      assert.ok(
-        report.health <= expectedHealth && report.health >= expectedHealth - 15,
-        `${sample.label}: health ${report.health} should be within [expected-15, expected] of computeHealthScore(${expectedHealth}) — graph deduction may lower it but strengths must never raise it`,
+      assert.equal(
+        report.health, expectedHealth,
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+          `strengths and uncalibrated graph diagnostics must never move it`,
       );
     }
     assert.ok(
@@ -995,10 +992,10 @@ describe('Wave 1187 — calibration-drift guard (strengths must never leak into 
       if ((report.strengths ?? []).some(s => WAVE_1187_MARKERS.some(m => s.includes(m)))) sawAWave1187Strength = true;
 
       const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
-      // GODMODE L5: graph-health deduction may lower health by up to 15 points.
-      assert.ok(
-        report.health <= expectedHealth && report.health >= expectedHealth - 15,
-        `${sample.label}: health ${report.health} should be within [expected-15, expected] of computeHealthScore(${expectedHealth}) — strengths must never raise it`,
+      assert.equal(
+        report.health, expectedHealth,
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+          `strengths and uncalibrated graph diagnostics must never move it`,
       );
     }
     assert.ok(

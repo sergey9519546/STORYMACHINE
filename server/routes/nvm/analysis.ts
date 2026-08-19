@@ -12,7 +12,7 @@ import {
 } from '../../lib/session-store.ts';
 import {
   validate, validateParams, QualityBodySchema, CommitIdParamSchema,
-  StoryVectorCompareBodySchema,
+  StoryVectorCompareBodySchema, CraftCompareBodySchema,
 } from '../../lib/validation.ts';
 import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
 import { logger } from '../../lib/logger.ts';
@@ -272,6 +272,29 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
       grade: queryReport.grade,
     },
   });
+}));
+
+// POST /api/nvm/analyze/craft-compare — GODMODE L38 craft comparison.
+// Pure structural comparison over 2–5 labeled fountain scripts: shared scene
+// functions, per-script implementation fingerprints, invariants/variables, and
+// pairwise structural similarity. Deterministic and keyless — no vector corpus.
+router.post('/api/nvm/analyze/craft-compare', gameLimiter, validate(CraftCompareBodySchema), asyncHandler(async (req, res) => {
+  const { scripts } = req.body as {
+    scripts: Array<{ label: string; fountain: string }>;
+  };
+  const { analyzeFountainText } = await import('../../nvm/analyze/fountain-analyzer.ts');
+  const { compareScripts } = await import('../../nvm/quality/cross-script.ts');
+
+  const inputs = scripts.map(({ label, fountain }) => ({
+    label,
+    analysis: analyzeFountainText(fountain),
+  }));
+
+  // The analyzer deliberately produces a fallback scene for any non-empty
+  // Fountain input. Empty text is rejected at the Zod boundary, so every
+  // validated input participates in comparison rather than silently vanishing.
+  const report = compareScripts(inputs);
+  res.json(report);
 }));
 
 // GET /api/nvm/analyze/corpus-stats — Get statistics about the vectorized corpus

@@ -897,6 +897,16 @@ export const StoryVectorCompareBodySchema = z.object({
   scriptText: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
 });
 
+// GODMODE L38 craft-comparison body: 2–5 labeled fountain scripts. Bound each
+// script by MAX_FOUNTAIN_CHARS so a single oversized draft 400s with a clean
+// field path instead of the express body-parser's generic 413.
+export const CraftCompareBodySchema = z.object({
+  scripts: z.array(z.object({
+    label: z.string().min(1).max(128),
+    fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
+  })).min(2).max(5),
+});
+
 // Path-param schema shared by GET /api/dramatic-pressure/:charId,
 // /api/goal-mutations/:charId, /api/persuasion/:charId — these previously
 // only did `req.params.charId?.substring(0, 128)` plus an empty-string

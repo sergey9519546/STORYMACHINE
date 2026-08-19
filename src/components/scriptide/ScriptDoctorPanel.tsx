@@ -3278,7 +3278,7 @@ export default function ScriptDoctorPanel({
 
             {/* GODMODE structural analysis — disclosure violations, character
                 functions, subplots, graph health. Each renders only when present. */}
-            {reportIsComplete && (report.graphHealth || report.disclosureAnalysis?.scored || (report.characterFunctions?.length ?? 0) > 0 || (report.subplots?.totalSubplots ?? 0) > 0) && (
+            {reportIsComplete && (report.graphHealth || report.disclosureAnalysis?.scored || (report.characterFunctions?.length ?? 0) > 0 || (report.subplots?.totalSubplots ?? 0) > 0 || (report.ruleBreaking?.findings?.length ?? 0) > 0) && (
               <div>
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
                   Structural Analysis
@@ -3330,6 +3330,24 @@ export default function ScriptDoctorPanel({
                       </div>
                       <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
                         {report.subplots.subplots.slice(0, 5).map((sp, i) => <li key={i}>• {sp.description}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {report.ruleBreaking?.scored && report.ruleBreaking.findings.length > 0 && (
+                    <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold">Deliberate Rule-Breaking</span>
+                        <span className="text-xs font-mono">
+                          {report.ruleBreaking.findings.filter(f => f.readsAsDeliberate).length}/{report.ruleBreaking.findings.length} deliberate
+                        </span>
+                      </div>
+                      <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-1 mt-1">
+                        {report.ruleBreaking.findings.slice(0, 4).map((f, i) => (
+                          <li key={i}>
+                            <span className="font-mono">{f.readsAsDeliberate ? 'PRESERVE' : 'CHECK'}</span>
+                            {' '}{f.convention} — {f.preserveNotice}
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   )}

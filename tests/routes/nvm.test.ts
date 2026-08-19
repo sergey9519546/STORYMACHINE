@@ -248,4 +248,74 @@ describe('routes/nvm — HTTP behavior', async () => {
     assert.equal(body.error, 'analysis_incomplete');
     assert.equal(body.healthMetrics, undefined);
   });
+
+  describe('POST /api/nvm/analyze/craft-compare (GODMODE L38)', () => {
+    const SCRIPT_A = `INT. OFFICE - DAY
+
+NORA studies a receipt.
+
+LEO
+You found it.
+
+Nora burns the receipt.`;
+    const SCRIPT_B = `EXT. STREET - NIGHT
+
+A car waits in the rain.
+
+MARA gets in. The engine starts.`;
+
+    it('rejects fewer than two scripts with 400', async () => {
+      const res = await fetch(`${server.baseUrl}/api/nvm/analyze/craft-compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scripts: [{ label: 'only', fountain: SCRIPT_A }] }),
+      });
+      assert.equal(res.status, 400);
+    });
+
+    it('rejects blank labels with 400', async () => {
+      const res = await fetch(`${server.baseUrl}/api/nvm/analyze/craft-compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scripts: [
+          { label: '', fountain: SCRIPT_A },
+          { label: 'B', fountain: SCRIPT_B },
+        ] }),
+      });
+      assert.equal(res.status, 400);
+    });
+
+    it('returns deterministic cross-script comparison for two parseable scripts', async () => {
+      const res = await fetch(`${server.baseUrl}/api/nvm/analyze/craft-compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scripts: [
+          { label: 'Receipt scene', fountain: SCRIPT_A },
+          { label: 'Rain scene', fountain: SCRIPT_B },
+        ] }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.scored, true);
+      assert.equal(body.summaries.length, 2);
+      assert.equal(body.similarityPairs.length, 1);
+      assert.equal(body.similarityPairs[0].a, 'Receipt scene');
+      assert.equal(body.similarityPairs[0].b, 'Rain scene');
+    });
+
+    it('accepts non-empty plain text via the analyzer fallback scene', async () => {
+      const res = await fetch(`${server.baseUrl}/api/nvm/analyze/craft-compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scripts: [
+          { label: 'Plain A', fountain: 'not a screenplay' },
+          { label: 'Plain B', fountain: 'also not a screenplay' },
+        ] }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.scored, true);
+      assert.equal(body.summaries.length, 2);
+    });
+  });
 });

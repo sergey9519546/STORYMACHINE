@@ -25,7 +25,7 @@
 
 | Level | Status | StoryMachine system | What exists | What's needed |
 |---|---|---|---|---|
-| L5 Causal Architecture | PARTIAL | `story-graph.ts` (696 LOC), proof/tier1/causal.ts | Causal/temporal/promise graph; on report but **not in health formula** | Promote to scored; add causal-density to health deduction |
+| L5 Causal Architecture | PARTIAL | `story-graph.ts` (696 LOC), `graph-health.ts`, proof/tier1/causal.ts | Causal/temporal/promise graph; graph health surfaced diagnostically | Repair graph extraction and re-calibrate before any score/verdict promotion |
 | L6 Protagonist Architecture | STRONG | `psychology.ts` (659 LOC), AppraisalEngine, decision.ts | Wound, fear, need, false belief, defense cascade, Trinity, Big Five | — |
 | L7 Opposition Architecture | PARTIAL | `conflict-orchestrator.ts`, intention-registry.ts | Goal collisions, threatened plans, leverage reversals | Thematic opposition (antagonist as counterclaim, not just obstacle) |
 | L8 Supporting Character Function | GAP | — | All characters treated uniformly | 14 supporting function types (ally, foil, mirror, gatekeeper, etc.) |
@@ -37,8 +37,8 @@
 | Level | Status | StoryMachine system | What exists | What's needed |
 |---|---|---|---|---|
 | L11 Structural Architecture | PARTIAL | pacing.ts, structure.ts revision passes | Rule-based act/turning-point detection | Structural map as data (not just rule violations) |
-| L12 Sequence Architecture | GAP | — | No sequence-as-group-of-scenes model | Sequence grouping, per-sequence objectives, escalation tracking |
-| L13 Subplot Architecture | GAP | — | No subplot model | Subplot identification + intersection tracking |
+| L12 Sequence Architecture | PARTIAL | `arc-tracker.ts` SequenceGroup | Adaptive scene grouping (target 8), distress/catharsis/reveal/dead-air flags | Sequence objective/POV/question/active opposition model |
+| L13 Subplot Architecture | PARTIAL | `subplot-tracker.ts` | Relationship arcs, mystery threads, theme counterarguments, object arcs + intersections | Main-plot relationship, character goals, escalation semantics |
 | L14 Scene Function Intelligence | PARTIAL | ScreenplaySceneRecord.purpose, stress-ledger SCENE_DEAD_AIR | Scene purpose detection + dead-air | Full scene function ledger (17 function types) |
 
 ### Craft levels
@@ -49,7 +49,7 @@
 | L16 Dialogue Intelligence | PARTIAL | dialogue.ts revision pass, DialogueAtom schema | Rule-based dialogue quality checks | 6-layer dialogue model (surface, hidden, tactical, relationship, knowledge, voice) |
 | L17 Action as Dialogue | PARTIAL | action-to-ops.ts (ActionLogEntry → StoryOp) | 15 action types → ops compiler | Action semantics (what does each action beat replace/answer/infer?) |
 | L18 Voice Distinction | PARTIAL | voice.ts pass, voiceAnalysis on FountainAnalysis | Lexical diversity, speech pattern derivation | Per-character Voice Grammar (12 properties) |
-| L19 Reveal & Clue Architecture | UNWIRED | reveal/RevealPlan.ts (11-line stub), disclosure-ledger.ts, EarnedRevealProof | Type exists, **zero producers**. Stage methods exist with no callers | Wire disclosure-ledger; populate ir.revealPlans from the engine |
+| L19 Reveal & Clue Architecture | PARTIAL | `disclosure-analysis.ts`, disclosure-ledger.ts, EarnedRevealProof | Fair-reveal ordering and epistemic gaps wired into Doctor; `RevealPlan` still has zero producers | Populate `ir.revealPlans` from the engine |
 | L20 Audience-State Architecture | PARTIAL | audienceState (4 scalars), stress-ledger AUDIENCE_QUESTION | Suspense/curiosity/investment + question tracking | Full audience curve (known facts, suspected, false beliefs, expected/feared outcomes) |
 
 ### Integration levels
@@ -75,31 +75,31 @@
 | L34 Evidence-Backed Annotations | PARTIAL | Provenance on StoryCommit, proof results with findings | Op-level provenance + proof findings | Scene-level evidence-backed annotations (the AnnotationAtom schema) |
 | L35 Counterfactual Proof | STRONG | twin/counterfactual.ts (Pearl do()-calculus), whatif/explore.ts | Full counterfactual: "what breaks if scene/op is removed" via causal DAG | — |
 | L36 Controlled Weak Versions | PARTIAL | DIR 2 shadow_mutations.py, preference pairs (11,580) | External training pipeline with corruption types | Integrated into StoryMachine's own analysis path |
-| L37 Deliberate Rule-Breaking | GAP | — | No system identifies intentional convention violations | Rule-violation detection with compensation analysis |
-| L38 Cross-Script Comparison | GAP | — | No cross-script comparative records | Comparative analysis across the corpus |
+| L37 Deliberate Rule-Breaking | PARTIAL | `rule-breaking.ts` | Detects compensated passive protagonists, minimal dialogue, abrupt endings, escalating repetition; preserve notices surfaced in Doctor | Broaden convention set; feed preserve notices into revision-advice suppression |
+| L38 Cross-Script Comparison | PARTIAL | `cross-script.ts`, `POST /api/nvm/analyze/craft-compare` | Shared functions, invariants, variable implementation details, structural similarity pairs | Corpus-wide persistent comparative records, genre conditioning |
 
 ## Summary
 
-**Updated 2026-08-12** after GODMODE integration session (24 commits).
+**Updated 2026-08-12** after GODMODE completion session.
 
 | Status | Count | Levels |
 |---|---|---|
-| STRONG | 8 | L6, L10, L21, L24, L27, L33, L35 + **L5** (graph-health now scored in formula) |
-| PARTIAL | 24 | L1, L2, L3, L4/L19 (wired), L7, L8 (built), L9, L11, L12 (built), L13 (built), L14, L15, L16, L17, L18, L20, L22, L23, L25, L26, L28, L29, L30, L34, L36 |
-| UNWIRED | 0 | ~~L4, L19~~ — both wired into doctor.ts via disclosure-analysis.ts |
-| GAP | 2 | L37 (Deliberate Rule-Breaking), L38 (Cross-Script Comparison) |
+| STRONG | 7 | L6, L10, L21, L24, L27, L33, L35 |
+| PARTIAL | 28 | L1, L2, L3, L4, L5 (diagnostic; calibration failed for scoring), L7, L8, L9, L11, L12, L13, L14, L15, L16, L17, L18, L19, L20, L22, L23, L25, L26, L28, L29, L30, L34, L36, L37, L38 |
+| UNWIRED | 0 | Every built GODMODE module has a live consumer |
+| GAP | 0 | No unbuilt priority levels remain; all remaining work is depth/calibration |
 
 ## Completed actions (previously listed as highest-value)
 
 1. ~~Wire L4/L19~~ — ✅ DONE. disclosure-analysis.ts wires all three ledgers.
 2. ~~Build L12 Sequence Architecture~~ — ✅ DONE. SequenceGroup on ArcCompletionReport.
-3. ~~Promote L5~~ — ✅ DONE. graphHealth deduction (capped 15pts) in health formula.
+3. ~~Promote L5~~ — ⚠️ CALIBRATION REJECTED scoring promotion. `scripts/calibrate-graph-health.ts` measured wrong-sign discrimination on the controlled corpus (`r=-0.290` for graph health vs band rank; deduction `r=+0.282`). Graph health remains surfaced as a diagnostic, not a health/verdict deduction, until the graph extractor is repaired and re-calibrated.
 4. ~~Build L8 Supporting Character Function~~ — ✅ DONE. character-function.ts classifies 14 types.
 5. ~~Build L13 Subplot Architecture~~ — ✅ DONE. subplot-tracker.ts identifies threads + intersections.
 
 ## Remaining highest-value actions
 
-1. **Build L37 (Deliberate Rule-Breaking)** — detect intentional convention violations with compensation analysis ("this passive protagonist works because...").
-2. **Build L38 (Cross-Script Comparison)** — comparative records across the corpus ("shared function, different implementation").
-3. **Calibrate graph-health deduction** — the new deduction shifted 3 test thresholds; needs AUC measurement on real corpus to validate discrimination.
-4. **Write tests for the 4 new GODMODE modules** — disclosure-analysis, character-function, subplot-tracker, graph-health currently have zero dedicated tests (they pass via the full suite but have no positive/negative fixtures).
+1. **Repair L5 graph extraction, then re-calibrate** — the current graph metric treats the calibration corpus's controlled-richness layout as isolated/underlinked. Do not restore its health deduction until repaired extraction shows the correct sign on both controlled bands and real scripts.
+2. **Deepen L37** — add compensated nonlinear chronology, tonal collision, late-protagonist-clarity, and genre-conditioned convention handling; then apply verified preserve notices to revision-advice suppression.
+3. **Deepen L38** — persist comparative records across the corpus, add genre/intent conditioning, and expose comparison in the writer-facing product UI.
+4. **Expand partial GODMODE levels** — L1 intent profile, L9 full intention chains, L14 scene-function ledger, L16 six-layer dialogue, L20 audience curve, L22 object meaning arcs, L23 theme argument graph, L30 ending proof, and L34 AnnotationAtom evidence envelopes.

@@ -364,13 +364,11 @@ describe('composite reviewer scenario — minimum-gap regression guard', () => {
   // +6.5 (good 72.2 → 76.5, bad 70.0 → 70.0), clearing the 5.0 floor with 1.5
   // points of headroom — 30% above the floor, not a 5.1 squeak.
   //
-  // GODMODE L5 (2026-08-11): graph-health deduction lowered the good half by
-  // ~2 points (it has richer causal structure, so more graph metrics to score).
-  // The floor is adjusted from 5.0 to 4.0 — the discrimination is still real
-  // (good > bad), the gap just narrowed because the deduction is graph-native
-  // rather than density-based. This is a known, accepted trade-off of adding
-  // graph-health to the formula.
-  const COMPOSITE_MIN_GAP = 4.0;
+  // Graph-health remains diagnostic-only after the controlled-corpus
+  // calibration found wrong-sign discrimination. The scoring formula is back
+  // to the density/structural/arc/dialogue channels; restore the verified
+  // 5.0-point floor from Lane H.
+  const COMPOSITE_MIN_GAP = 5.0;
 
   // CLOSED 2026-08-04 (Lane H — rhythm-minor density-bias guard). This was the
   // suite's last `todo`; it is now a hard assertion. Measured gap moved +2.2 →

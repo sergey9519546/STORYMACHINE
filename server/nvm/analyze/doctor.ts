@@ -53,6 +53,7 @@ import { auditTemporalConsistencyReport } from './temporal-consistency.ts';
 import { analyzeDisclosureAndEpistemics } from '../quality/disclosure-analysis.ts';
 import { classifyCharacterFunctions } from '../quality/character-function.ts';
 import { analyzeSubplots } from '../quality/subplot-tracker.ts';
+import { analyzeRuleBreaking } from '../quality/rule-breaking.ts';
 import { graphHealthFromReport } from '../quality/graph-health.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
@@ -1983,14 +1984,16 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   const dialogueSignals = computeDialogueDiversity(analysis.records);
   const dialogueDeduction = dialogueDegradationDeduction(dialogueSignals);
 
-  // GODMODE L5: graph-health deduction (capped 0-15, same pattern as the
-  // deductions above). Computed from story-graph metrics, NOT from issue
-  // density — this is the first graph-native signal in the health formula.
+  // GODMODE L5: graph-health remains a diagnostic-only signal. The
+  // controlled-corpus calibration (scripts/calibrate-graph-health.ts) found
+  // wrong-sign discrimination (r=-0.290): the graph extractor scores the
+  // corpus's deliberate controlled-richness design as isolated/underlinked.
+  // Do NOT feed it into health until a repaired extractor demonstrates
+  // positive real-writing discrimination. See P1 evidence discipline.
   const storyGraphResult = analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined;
   const graphHealthContribution = graphHealthFromReport(storyGraphResult, analysis.sceneCount) ?? undefined;
-  const graphDeduction = graphHealthContribution?.graphDeduction ?? 0;
 
-  const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction - dialogueDeduction - graphDeduction) * 10) / 10);
+  const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction - dialogueDeduction) * 10) / 10);
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────
@@ -2184,6 +2187,12 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
             ...(r.relationshipShifts ?? []).map(s => ({ op: 'SHIFT_RELATIONSHIP' as const, pair: s.pairKey.split('|') as [string, string], delta: { dimension: 'trust' as const, amount: s.amount, reason: 'shift' } })),
           ],
         })))
+      : undefined,
+    // GODMODE L37: deliberate rule-breaking (diagnostic only — never changes health).
+    // Compensated convention violations get preserveNotice so "fix this" advice
+    // can be softened where the violation is the design.
+    ruleBreaking: analysisComplete && analysis.sceneCount > 0
+      ? analyzeRuleBreaking(analysis)
       : undefined,
     // TRACE §13 temporal-consistency audit (2026-08-03 wiring). Diagnostic
     // only, same gating as storyGraph/metrics above: a prefix-only or

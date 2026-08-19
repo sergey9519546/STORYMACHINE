@@ -242,6 +242,7 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'POST /api/nvm/quality', 'GET /api/nvm/momentum', 'GET /api/nvm/sidecar',
   'GET /api/nvm/quality/scene/:commitId',
   'POST /api/nvm/analyze/compare',       // vectorizeScript/clusterCorpus are feature extraction, not LLM calls
+  'POST /api/nvm/analyze/craft-compare', // analyzeFountainText + compareScripts are pure deterministic craft analysis
   'GET /api/nvm/analyze/corpus-stats',
   'GET /api/nvm/epistemic', 'GET /api/nvm/health', 'GET /api/nvm/character-arc',
   'GET /api/nvm/arc-timeline', 'GET /api/nvm/arc-completion', 'GET /api/nvm/regression',

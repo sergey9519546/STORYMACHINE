@@ -827,6 +827,22 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
     }
   }
 
+  // Deliberate Rule-Breaking (L37)
+  if (report.ruleBreaking?.scored && report.ruleBreaking.findings.length > 0) {
+    const rb = report.ruleBreaking;
+    const deliberate = rb.findings.filter(f => f.readsAsDeliberate).length;
+    parts.push(`<div class="metric-row"><span class="metric-label">Rule-Breaking</span><span class="metric-value">${rb.findings.length} findings (${deliberate} deliberate)</span></div>`);
+    for (const finding of rb.findings.slice(0, 4)) {
+      const tag = finding.readsAsDeliberate ? 'PRESERVE' : 'CHECK';
+      parts.push(
+        `<li class="issue-minor"><strong>${escapeHtml(tag)}</strong> ${escapeHtml(finding.convention)} — ${escapeHtml(finding.preserveNotice)}</li>`,
+      );
+      for (const c of finding.compensations.slice(0, 2)) {
+        parts.push(`<li class="issue-minor sub">${escapeHtml(c)}</li>`);
+      }
+    }
+  }
+
   if (parts.length === 0) return '';
 
   return `<section class="section"><h2>Structural Analysis</h2><div class="metrics-grid">${parts.join('\n')}</div></section>`;

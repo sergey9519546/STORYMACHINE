@@ -367,6 +367,12 @@ export interface ScriptDoctorReport {
   /** GODMODE L5: Story-graph health contribution — a scored deduction
    *  (0-15 points) from graph metrics, suitable for the health formula. */
   graphHealth?: import('../quality/graph-health.ts').GraphHealthContribution;
+  /** GODMODE L37: Deliberate rule-breaking — convention violations that ARE
+   *  compensated (passive protagonist with late-agency climax, minimal
+   *  dialogue carried by visual density, escalating repetition). Diagnostic
+   *  only; each finding carries a preserveNotice so downstream "fix this"
+   *  advice can be suppressed where the violation reads as deliberate. */
+  ruleBreaking?: import('../quality/rule-breaking.ts').RuleBreakingReport;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
   /** Present ONLY on deep-read reports (POST /api/scriptide/doctor/deep).
