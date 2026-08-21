@@ -1,11 +1,11 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-08-21 (evening), main @ 3f2b1a3: Phases W and E are
-landed** — all six W lanes and all five E lanes shipped and gate-verified
-per their entries; Phase E's judged design-quality exit gate is the one
-item still open in E (in progress, see the gate note). Next: that
-judgment, then Phase S, with Phase P's measurement lanes in parallel and
-Phase T's owner-machine items still open. Successor to `PATH_TO_DONE.md`'s
+**State as of 2026-08-21, main @ 0c0a80c: Phases W and E are COMPLETE** —
+all six W lanes, all five E lanes, and Phase E's judged design-quality
+exit gate (met after one honest NOT-MET round and a three-item punch-list
+fix; see the gate note). Next: Phase S, with Phase P's measurement lanes
+in parallel and Phase T's owner-machine items still open. Successor to
+`PATH_TO_DONE.md`'s
 task framing: that file tracks ROADMAP phases; this one sequences everything
 measured by the three 2026-08-14 audits (UX-in-browser, engine-truth,
 ship-vehicle) into the shortest honest path to a product that is *truly
@@ -191,12 +191,26 @@ machine.
   10,727 with 42 new tests: 14 pure filter/scoring + 28 source-wiring
   assertions); `verify-p2-p3-surfaces.mjs` 115/115 unaffected.
 
-**Exit gate:** a design-quality pass judged against the named competitors —
-every journey "excellent," none merely "adequate." Not separately re-run
-here — E5 was the last item landed into this phase, and that holistic
-comparison against Final Draft / Highland / Arc Studio / WriterDuet across
-all five E-items belongs to whoever merges and reviews the full phase, not
-to this single item's own verification.
+**Exit gate — MET 2026-08-21, after one honest failure.** The judged pass
+(eight journeys browser-walked at 1440px + 375px, ~225 screenshots,
+adversarial brief) first returned **NOT MET**: five journeys excellent —
+with Verify-a-Report, the privacy page's specificity, the coverage delta
+banner, and the command palette judged *beyond* what Final Draft /
+Highland / Arc Studio / WriterDuet ship — but three below the bar. All
+three gaps were then root-caused and fixed (`0c0a80c`), each with a
+browser re-proof: (1) the coverage mini-panel was a fixed overlay with no
+layout participation, clipping the header's save-status chip at 1440px —
+the toolbar now reserves real panel width, and an independent bug found in
+the same code (save-status compared display strings against enum values,
+so the status chip could never match its state) was fixed with it; (2) the
+first-contact journey rode through `CoverageSummary`'s static spinner —
+the E1 SSE client is now a shared module (`src/lib/doctor-stream.ts`) and
+the summary card shows the live pass counter with a real Cancel; (3)
+Typewriter Focus was verified genuinely broken (no `scrollPastEnd()`, so
+the cursor stalled ~375px off-center near document end) and fixed to
+~0.2px of center, sustained while typing past the fold. The drawer-clip
+the judge also flagged was re-driven and found to be a transient
+entrance-animation frame, not a static defect — recorded, not "fixed."
 
 ## Phase P — Provably better (parallel track; includes the human-only work)
 
