@@ -1,6 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, type TestServer } from './helpers.ts';
+import { ANALYZER_SCENE_CEILING } from '../../server/nvm/analyze/fountain-analyzer.ts';
 
 // Multi-scene Fountain fixture — 4 sluglines, 3 speaking characters, dialogue
 // in every scene, and enough lexicon density (deadline/danger/mystery terms)
@@ -58,9 +59,12 @@ I'm sorry. I should have told you everything.
 
 const VALID_ANCHORS = new Set(['scene', 'character', 'lines', 'document']);
 
+// One scene past the analyzer's truncation ceiling — imported rather than
+// hardcoded so this fixture tracks the ceiling wherever it moves (it already
+// moved once, 1000 → 400, and the stale literal broke this test).
 function buildSceneTruncatedFountain(): string {
   return Array.from(
-    { length: 1_001 },
+    { length: ANALYZER_SCENE_CEILING + 1 },
     (_, index) => `INT. ROOM ${index} - DAY\n\nA person waits.`,
   ).join('\n\n');
 }
@@ -145,8 +149,8 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
     const body = await res.json();
     assert.equal(body.analysisComplete, false);
     assert.equal(body.truncatedForAnalysis, true);
-    assert.equal(body.totalSceneCount, 1_001);
-    assert.equal(body.sceneCount, 1_000);
+    assert.equal(body.totalSceneCount, ANALYZER_SCENE_CEILING + 1);
+    assert.equal(body.sceneCount, ANALYZER_SCENE_CEILING);
     assert.equal(body.health, undefined);
     assert.equal(body.grade, undefined);
     assert.equal(body.verdict, undefined);
