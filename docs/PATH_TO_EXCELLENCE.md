@@ -1,6 +1,9 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-08-14, main @ 4488218.** Successor to `PATH_TO_DONE.md`'s
+**State as of 2026-08-21, main @ f416336: Phase W is complete** (all six
+lanes landed and gate-verified; details in each entry). Next up: Phase E,
+with Phase P's measurement lanes in parallel and Phase T's owner-machine
+items still open. Successor to `PATH_TO_DONE.md`'s
 task framing: that file tracks ROADMAP phases; this one sequences everything
 measured by the three 2026-08-14 audits (UX-in-browser, engine-truth,
 ship-vehicle) into the shortest honest path to a product that is *truly
@@ -68,25 +71,45 @@ all reproduced and screenshotted in the 2026-08-14 UX audit:
   `scripts/check-doctor-output-identity.mjs` — 45/45 fixtures byte-identical
   pre/post — plus a verbatim-oracle equivalence test over 200 seeded graphs.
   Budget-tested in CI by `tests/core/doctor-perf-budget.test.ts`.
-- **W3 (M).** Fix the false "Save Conflict" dialog — deterministic 3/3 on
-  paste → save → reload, single tab, blaming a tab that doesn't exist. A
-  save system that cries wolf teaches writers to distrust it.
-- **W4 (M).** "Full report" must receive the already-computed report —
-  today it cold-remounts `ScriptDoctorPanel` and throws away the analysis
-  the user just watched run (which compounds with W1/W2 on big scripts).
-- **W5 (S).** Settings modal rendering: provider cards below the first
-  bleed editor text through; labels collide. This is the screen where a
-  user decides whether to trust you with an API key. Plus the mobile
-  375px CTA badge overlap.
-- **W6 (M).** The Ship tab — a primary non-Labs tab — opens the research
-  console (PRODUCTION/ANALYSIS/ENGINE/CODEX chrome, truncated off-screen)
-  to show a snapshots list. Give Ship a writer-facing container; research
-  chrome becomes Labs-only. This is the last P2 surface leak, and it's on
-  the most load-bearing tab.
+- **W3 (M) — DONE 2026-08-21.** The false "Save Conflict" traced to the
+  `visibilitychange` keepalive save: the POST persists server-side but its
+  ack dies with the reloading page, so the next load sees dirty +
+  revision-mismatch and blames a phantom tab. `decideScriptIDERestore` now
+  compares draft content against the server copy and returns a new
+  `reconciled` outcome when they match; the dialog only fires on a real
+  divergence, and its copy no longer invents a second tab. Browser-repro
+  suite: 3/3 pre-fix reproductions, 0 post-fix.
+- **W4 (M) — DONE 2026-08-21.** `CoverageSummary` hands its computed report
+  up via `onReportComputed`; "Full report" hydrates `ScriptDoctorPanel`
+  through `initialReport` (instrumentation preserved) instead of
+  cold-remounting. Staleness still tracks the draft generation, so a
+  hydrated report that's out of date says so.
+- **W5 (S) — DONE 2026-08-21.** Settings dialog wore `sm-btn` (a button
+  primitive) instead of `sm-panel` — one-class fix ends the bleed-through
+  and label collisions. The 375px CTA badge became a self-contained
+  cream-on-stamp ribbon clear of the caption row (it had been stamp-red on
+  stamp-red: invisible at every viewport).
+- **W6 (M) — DONE 2026-08-21.** Ship got its own writer-facing container
+  (`ShipPanel.tsx`: exports, snapshots/versions, independent-verification
+  pointer) on a new `ship` tool slot; the research shell survives untouched
+  but is reachable only through the Labs-gated "Open Studio" overflow entry.
+  `verify-p2-p3-surfaces.mjs` grew 7 assertions pinning this (108/108), and
+  the four deliberately orphaned oasis prototypes moved to an explicit
+  allowlist so the dead-file tripwire stays armed for new leaks. Known
+  tradeoff, recorded in `SURFACE_REVALIDATION_2026-08-04.md`'s 08-21
+  addendum: the Title Page form is now Labs-only; the keyless route is
+  Fountain title-page syntax at the top of the draft.
 
-**Exit gate:** re-run the audit's journey table in a real browser; zero
-"failing" rows; a feature-length script analyzes with the server responsive
-throughout.
+**Exit gate — MET 2026-08-21:** journey table re-run in a real browser
+(W3/W4 repro suite 11/11 including pre-fix reproduction of all six original
+failures; surface verification 108/108; smoke flow PASS with captured exit
+codes); the 306-scene synthetic analyzes in ~1.4s end-to-end with the
+server responsive throughout (worker pool + 470× curve fix, output proven
+byte-identical across 45 fixtures). Landed as `a86756f` + `40ce647`
+(W3–W6) and `9c0c992` + `f416336` (W1/W2 + a ceiling-tracking test
+fixture). Remaining Phase W-adjacent debt is listed under Phase T, not
+here: the GODMODE `graphDeduction` measurement is still owed on the owner's
+machine.
 
 ## Phase E — Easily controllable and interactive (2–3 weeks)
 
