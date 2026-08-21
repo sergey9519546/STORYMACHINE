@@ -127,11 +127,47 @@ machine.
   server, a visible "delete everything" control, and the honest privacy
   page. Server persistence (per-session SQLite) already survives restarts;
   the browser side deserves the same durability.
-- **E5.** Keyboard map + command palette; a11y sweep building on the
-  already-good focus rings.
+- **E5 — DONE 2026-08-21.** Command palette (Cmd/Ctrl+K, `CommandPalette.tsx`
+  + `src/lib/command-palette.ts`): an ARIA combobox/listbox over a ~25-entry
+  action registry, every `run:` a direct call to the SAME named callback the
+  visible button already calls (`handleTaskChange`, `openToolSlot`,
+  `exportPDF`, …) — verified by source assertion, not just code review. The
+  keyboard-map audit (`ShortcutModal.tsx`) found three previously-documented
+  bindings with zero matching keydown handler anywhere in the tree (Ctrl+S
+  as "save draft," Ctrl+Shift+F "Typewriter Focus," Alt+Shift+D "Dark / CRT
+  Vintage / Print Theme") — grepped, confirmed false, and per the "remove
+  nothing; correct anything stale" rule, wired for real rather than deleted:
+  Ctrl+S force-saves, Ctrl+Shift+F really centers the cursor's line (a
+  narrower, honestly-scoped "Typewriter Focus" than the old claim — no line
+  dimming), Alt+Shift+D really toggles dark/light (the CRT/print claim was
+  dropped — no such themes exist in this codebase). A11y sweep added real
+  `role="dialog" aria-modal="true"` + `useModalFocusTrap` to two panels that
+  had neither (SettingsPanel, StartScreen's file-preview modal — the latter
+  needed its own extracted component for the trap's mount-effect to line up
+  correctly, same reason ScriptIDE.tsx's inline modals already work that
+  way), ARIA tablist/tab/tabpanel roles on Settings' tab strip, `<label
+  htmlFor>`/`useId()` association on every Settings form field (previously
+  bare sibling `<label>`s with no programmatic link to their input), and
+  closed a real gap the browser-proof script caught live (not from source
+  review): the shortcuts panel had no Escape handling at all before this
+  pass. `prefers-reduced-motion` is inherited for free from the
+  `MotionConfig reducedMotion="user"` already wired at `App.tsx`'s root — the
+  palette and every touched dialog use `motion.div`, so no separate
+  reduced-motion path was needed. Browser-proofed end to end
+  (`scripts/verify-e5-command-palette.mjs`, 17/17): Cmd+K open → type "ship"
+  → Enter → the real Ship panel opens; Escape closes the palette AND
+  restores focus to the editor; a 25-press Tab-cycle inside Settings never
+  escapes its trap; an entrance Tab-order walk reaches 6+ visible controls
+  with none stranded off-screen. `npm test` 10,769/10,769 (0 fail, up from
+  10,727 with 42 new tests: 14 pure filter/scoring + 28 source-wiring
+  assertions); `verify-p2-p3-surfaces.mjs` 115/115 unaffected.
 
 **Exit gate:** a design-quality pass judged against the named competitors —
-every journey "excellent," none merely "adequate."
+every journey "excellent," none merely "adequate." Not separately re-run
+here — E5 was the last item landed into this phase, and that holistic
+comparison against Final Draft / Highland / Arc Studio / WriterDuet across
+all five E-items belongs to whoever merges and reviews the full phase, not
+to this single item's own verification.
 
 ## Phase P — Provably better (parallel track; includes the human-only work)
 

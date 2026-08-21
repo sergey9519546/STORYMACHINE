@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useId } from "react";
+import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import {
   GENRE_OPTIONS,
   TONE_OPTIONS,
@@ -97,12 +98,20 @@ function Field({
   placeholder?: string;
   type?: "text" | "password" | "url";
 }) {
+  // E5: `id` generated per mount via useId() rather than slugified from
+  // `label` — several Field instances across tabs render simultaneously
+  // (e.g. Story's several AxisSelects) and a couple share near-identical
+  // labels ("Model" appears in more than one MediaTab instance), so a
+  // label-derived id risks a silent duplicate-id collision; useId()
+  // guarantees uniqueness regardless of what any two labels happen to say.
+  const id = useId();
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+      <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
         {label}
       </label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -128,11 +137,18 @@ function ProviderRadio<T extends string>({
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</span>
-      <div className="flex gap-2 flex-wrap">
+      {/* role="radiogroup" + aria-pressed-as-checked on each button:
+          these are plain <button>s (not native radio inputs) so a screen
+          reader has no other way to know they're a mutually-exclusive set
+          or which one is current. */}
+      <div className="flex gap-2 flex-wrap" role="radiogroup" aria-label={label}>
         {options.map((opt) => (
           <button
             key={opt.value}
+            type="button"
             onClick={() => onChange(opt.value)}
+            role="radio"
+            aria-checked={value === opt.value}
             className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-2 transition-colors ${
               value === opt.value
                 ? "sm-btn--ink border-black"
@@ -326,19 +342,21 @@ function AxisSelect({
   status?: { ok: boolean; msg: string } | null;
   hint?: string;
 }) {
+  const id = useId();
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+        <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
           {label} <span className="text-gray-400 normal-case tracking-normal">({options.length})</span>
         </label>
         {status && (
-          <span className={`text-[10px] font-bold ${status.ok ? "text-green-700" : "text-red-600"}`}>
+          <span className={`text-[10px] font-bold ${status.ok ? "text-green-700" : "text-red-600"}`} role="status">
             {status.msg}
           </span>
         )}
       </div>
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="border-2 border-black px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-black w-full bg-white"
@@ -523,10 +541,11 @@ function StoryTab() {
         />
         <div className="flex items-end gap-2">
           <div className="flex flex-col gap-1 flex-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            <label htmlFor="story-expected-turns" className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               Expected Total Turns
             </label>
             <input
+              id="story-expected-turns"
               type="number"
               min={4}
               max={200}
@@ -793,6 +812,14 @@ function LabsTab() {
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPanelProps) {
+  // E5: this panel renders as a modal overlay (ScriptIDE.tsx wraps it in a
+  // full-viewport backdrop) but previously carried no role="dialog"/
+  // aria-modal and no real focus management — a keyboard user could Tab
+  // straight out of it into the app behind. dialogRef sits on the visible
+  // panel surface (not the backdrop div), matching ScriptDoctorPanel.tsx's
+  // convention.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useModalFocusTrap(dialogRef);
   const [activeTab, setActiveTab] = useState<Tab>("providers");
   const [cfg, setCfg]             = useState<AiConfig | null>(null);
   const [loading, setLoading]     = useState(true);
@@ -889,14 +916,21 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
           "provider cards below the first render with the app behind bleeding
           through" once cards overflowed the panel's real edges. Confirmed
           live via computed-style inspection before this fix. */}
-      <div className="sm-panel shadow-[var(--sm-shadow)] w-full max-w-xl max-h-[90vh] flex flex-col mx-4">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-panel-title"
+        className="sm-panel shadow-[var(--sm-shadow)] w-full max-w-xl max-h-[90vh] flex flex-col mx-4"
+      >
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b-4 border-black">
-          <h2 className="text-lg font-bold uppercase tracking-widest">Settings</h2>
+          <h2 id="settings-panel-title" className="text-lg font-bold uppercase tracking-widest">Settings</h2>
           <button
             onClick={onClose}
             className="text-xl font-bold leading-none hover:opacity-60"
-            aria-label="Close"
+            aria-label="Close settings"
           >
             ✕
           </button>
@@ -913,10 +947,14 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
         ) : (
           <>
             {/* Tabs */}
-            <div className="flex border-b-4 border-black">
+            <div className="flex border-b-4 border-black" role="tablist" aria-label="Settings sections">
               {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
                 <button
                   key={tab}
+                  id={`settings-tab-${tab}`}
+                  role="tab"
+                  aria-selected={activeTab === tab}
+                  aria-controls={`settings-panel-${tab}`}
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === tab
@@ -930,7 +968,13 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
             </div>
 
             {/* Tab body */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div
+              className="flex-1 overflow-y-auto p-6"
+              role="tabpanel"
+              id={`settings-panel-${activeTab}`}
+              aria-labelledby={`settings-tab-${activeTab}`}
+              tabIndex={0}
+            >
               {activeTab === "providers" && <AIProviderSettings />}
               {activeTab === "llm" && (
                 <LLMTab

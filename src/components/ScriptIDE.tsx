@@ -36,6 +36,8 @@ import { decideSampleInstall } from "../lib/sample-install-guard";
 import { isDraftStale, type ThreadedCoverageReport } from "../lib/coverage-staleness";
 import { fountain as sampleScriptFountain } from "../lib/sample-script";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
+import { getLabsEnabled } from "../lib/feature-flags";
+import type { PaletteAction } from "../lib/command-palette";
 import {
   AlertCircle,
   Loader2,
@@ -60,6 +62,7 @@ import Toolbar, { type IdeTask, type IdeToolSlot } from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
 import { StateDeltaCard, StateDeltaCardType } from "./StateDeltaCard";
 import ShortcutModal from "./scriptide/ShortcutModal";
+import CommandPalette from "./scriptide/CommandPalette";
 
 // Lazy-loaded — each is a conditionally-rendered tab/overlay, never needed on
 // first paint. AIPanel/AnalysisPanel render only behind their respective
@@ -387,6 +390,11 @@ export default function ScriptIDE({
   // confirms block the thread, are unstyleable, and can't be dismissed by Esc).
   const [newStoryConfirm, setNewStoryConfirm] = useState(false);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
+  // E5: Cmd/Ctrl+K command palette — see the consolidated global-shortcuts
+  // effect below (it needs isDarkMode/isTypewriterFocus/requestServerSaveRef,
+  // all declared later in this component, so it lives after them instead of
+  // here alongside this state).
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // Global Keyboard Shortcuts (Ctrl+/ or Cmd+/)
   useEffect(() => {
@@ -435,6 +443,12 @@ export default function ScriptIDE({
   // Theme preference: atomic local draft + server ScriptIDE_State.is_dark_mode.
   const [isDarkMode, setIsDarkMode] = useState(initialDraft.isDarkMode);
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
+  // E5: Typewriter Focus — keeps the cursor's line vertically centered as
+  // you type (FountainEditor.tsx's typewriterFocusCompartment). Off by
+  // default like Live Notes/auto-analysis (an opt-in reading mode, not a
+  // silent behavior change to the editor everyone gets). Persisted the same
+  // plain on/off-string way as typewriter_sound above.
+  const [isTypewriterFocus, setIsTypewriterFocus] = useState(() => lsGet("typewriter_focus") === "on");
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
   >(initialDraft.snapshots as { id: string; name: string; text: string; date: string }[]);
@@ -1313,12 +1327,33 @@ export default function ScriptIDE({
     }
   }, []);
 
-  // Escape ladder: prefs → tool slot → mobile sidebar
+  // Escape ladder: command palette → prefs → shortcuts → tool slot → mobile
+  // sidebar — ordered by each layer's actual stacking (paletteOpen z-[300]
+  // over prefsOpen's settings modal z-[200] over showShortcutModal z-[120]
+  // over every toolSlot drawer's z-50), so one Escape press closes exactly
+  // the topmost thing on screen, never two at once.
+  //
+  // E5 found (via scripts/verify-e5-command-palette.mjs's browser proof,
+  // not from source review) that showShortcutModal had NO Escape handling
+  // anywhere before this change — Ctrl+/ could open it but only a mouse
+  // click (the X or Close button) could dismiss it, a real violation of
+  // "Escape closes the topmost layer" on a panel that itself now declares
+  // role="dialog" aria-modal="true". Folded into this same ladder rather
+  // than a separate local listener in ShortcutModal.tsx so it participates
+  // in the same "exactly one layer" ordering as everything else here.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (paletteOpen) {
+        setPaletteOpen(false);
+        return;
+      }
       if (prefsOpen !== "none") {
         setPrefsOpen("none");
+        return;
+      }
+      if (showShortcutModal) {
+        setShowShortcutModal(false);
         return;
       }
       if (toolSlot === "coverage" && coverageFull) {
@@ -1335,7 +1370,77 @@ export default function ScriptIDE({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [prefsOpen, toolSlot, task, sidebarOpen, coverageFull]);
+  }, [paletteOpen, prefsOpen, showShortcutModal, toolSlot, task, sidebarOpen, coverageFull]);
+
+  // E5: consolidated global keyboard-shortcut bindings that don't belong to
+  // any one panel — Cmd/Ctrl+K (palette), Cmd/Ctrl+S (force an immediate
+  // save), Alt+Shift+D (toggle dark mode), Ctrl+Shift+F (toggle Typewriter
+  // Focus). Kept as ONE effect (rather than one per shortcut, like the
+  // pre-existing Ctrl+/ effect above) since every handler here needs state
+  // declared later in this component (isDarkMode, isTypewriterFocus,
+  // requestServerSaveRef) — see ShortcutModal.tsx for the full, true
+  // inventory this effect (plus Ctrl+/ above and each panel's own local
+  // bindings) is required to match exactly.
+  //
+  // Named so the palette's action registry below can call the EXACT same
+  // functions these bindings call — one implementation, two entry points —
+  // rather than a keyboard-only copy that could drift from a palette-only
+  // copy.
+  const toggleDarkMode = useCallback(() => setIsDarkMode((v) => !v), []);
+  const toggleTypewriterFocus = useCallback(() => {
+    setIsTypewriterFocus((prev) => {
+      lsSet("typewriter_focus", prev ? "off" : "on");
+      return !prev;
+    });
+  }, []);
+  const toggleLiveDiagnostics = useCallback(() => setLiveDiagnostics((prev) => !prev), []);
+  const toggleAutoAnalysis = useCallback(() => setAutoAnalysis((prev) => !prev), []);
+  const toggleTypewriterSound = useCallback(() => {
+    setIsTypewriterSound((prev) => {
+      lsSet("typewriter_sound", prev ? "off" : "on");
+      return !prev;
+    });
+  }, []);
+  const openSettingsPanel = useCallback(() => setPrefsOpen("settings"), []);
+  const openCollabPrompt = useCallback(() => {
+    setCollabNameInput(collabUserName);
+    setPrefsOpen("collab");
+  }, [collabUserName]);
+  const forceSaveNow = useCallback(() => {
+    requestServerSaveRef.current({ updateStatus: true });
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+        return;
+      }
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s") {
+        // preventDefault BEFORE anything else — the browser's native
+        // "Save Page As…" dialog must never appear, whether or not a save
+        // is actually in flight yet (persistence starts only after
+        // persistenceReady; forceSaveNow's own guard no-ops silently until
+        // then, same as any other autosave trigger this early).
+        e.preventDefault();
+        forceSaveNow();
+        return;
+      }
+      if (e.altKey && e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        toggleDarkMode();
+        return;
+      }
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        toggleTypewriterFocus();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalShortcuts);
+    return () => window.removeEventListener("keydown", handleGlobalShortcuts);
+  }, [forceSaveNow, toggleDarkMode, toggleTypewriterFocus]);
 
   // Poll the editor cursor at ~250ms to highlight the active scene in the sidebar.
   // Uses requestAnimationFrame-gated interval to avoid re-render storm.
@@ -1784,6 +1889,149 @@ export default function ScriptIDE({
 
   const isEmptyDraft = scriptText.trim().length === 0;
 
+  // ── E5: command palette action registry ─────────────────────────────────
+  // Every `run` below calls the SAME named function a visible button
+  // already calls (handleTaskChange, openToolSlot, exportFountain, the
+  // toggle* callbacks defined above, …) — the palette is a second entry
+  // point onto real dispatch, never a parallel implementation. Rebuilt each
+  // render (cheap — a few dozen small object literals, and only actually
+  // consumed while paletteOpen is true) rather than memoized, so it can
+  // never show a stale on/off label or a stale scene list.
+  const labsEnabled = getLabsEnabled();
+  const sceneActions: PaletteAction[] = parsedBlocks
+    .map((b, i) => ({ block: b, index: i }))
+    .filter(({ block }) => block.type === "scene_heading")
+    .map(({ block, index }, ordinal) => ({
+      id: `scene-${index}`,
+      label: `Scene ${ordinal + 1}: ${block.text.trim()}`,
+      group: "Scenes",
+      keywords: [block.text],
+      run: () => handleNavigate(index),
+    }));
+
+  const paletteActions: PaletteAction[] = [
+    // Go to
+    { id: "go-write", label: "Go to Write", group: "Go to", run: () => handleTaskChange("write") },
+    {
+      id: "go-coverage",
+      label: "Diagnose this draft (Script Doctor)",
+      group: "Go to",
+      keywords: ["doctor", "coverage", "run", "rerun", "re-run", "diagnose"],
+      run: () => handleTaskChange("coverage"),
+    },
+    { id: "go-ship", label: "Open Ship (export & versions)", group: "Go to", run: () => handleTaskChange("ship") },
+    ...sceneActions,
+
+    // Export & versions
+    {
+      id: "export-pdf",
+      label: "Export as PDF",
+      group: "Export & versions",
+      disabled: isEmptyDraft,
+      run: exportPDF,
+    },
+    {
+      id: "export-fountain",
+      label: "Export as Fountain",
+      group: "Export & versions",
+      disabled: isEmptyDraft,
+      run: exportFountain,
+    },
+    {
+      id: "export-fdx",
+      label: "Export as Final Draft (.fdx)",
+      group: "Export & versions",
+      keywords: ["fdx", "final draft"],
+      disabled: isEmptyDraft,
+      run: exportFDX,
+    },
+    {
+      id: "export-docx",
+      label: "Export as Word (.docx)",
+      group: "Export & versions",
+      keywords: ["docx", "word"],
+      disabled: isEmptyDraft,
+      run: exportDOCX,
+    },
+    {
+      id: "take-snapshot",
+      label: "Take a snapshot",
+      group: "Export & versions",
+      keywords: ["version", "save version"],
+      disabled: isEmptyDraft,
+      run: takeSnapshot,
+    },
+
+    // View
+    { id: "open-shortcuts", label: "Keyboard shortcuts", group: "View", shortcut: "^/", run: () => setShowShortcutModal(true) },
+    { id: "open-settings", label: "Settings", group: "View", run: openSettingsPanel },
+    {
+      id: "toggle-dark-mode",
+      label: isDarkMode ? "Switch to light mode" : "Switch to dark mode",
+      group: "View",
+      keywords: ["dark mode", "light mode", "theme"],
+      shortcut: "⌥⇧D",
+      run: toggleDarkMode,
+    },
+    {
+      id: "toggle-typewriter-focus",
+      label: isTypewriterFocus ? "Turn off Typewriter Focus" : "Turn on Typewriter Focus",
+      group: "View",
+      hint: "Keeps the cursor's line centered as you type",
+      shortcut: "^⇧F",
+      run: toggleTypewriterFocus,
+    },
+    {
+      id: "toggle-live-notes",
+      label: liveDiagnostics ? "Turn off Live Notes" : "Turn on Live Notes",
+      group: "View",
+      run: toggleLiveDiagnostics,
+    },
+    {
+      id: "toggle-auto-analysis",
+      label: autoAnalysis ? "Turn off auto-analysis" : "Turn on auto-analysis",
+      group: "View",
+      run: toggleAutoAnalysis,
+    },
+    {
+      id: "toggle-typewriter-sound",
+      label: isTypewriterSound ? "Turn off typewriter sound" : "Turn on typewriter sound",
+      group: "View",
+      run: toggleTypewriterSound,
+    },
+    { id: "save-now", label: "Save now", group: "View", shortcut: "^S", run: forceSaveNow },
+    { id: "collaborate", label: "Collaborate", group: "View", keywords: ["room", "share"], run: openCollabPrompt },
+
+    // Labs — only listed when the writer has actually turned Labs on
+    // (P2's surface-collapse rule: the default surface stays Doctor +
+    // Editor, and that includes the palette's own contents).
+    ...(labsEnabled
+      ? ([
+          { id: "open-studio", label: "Open Studio", group: "Labs", run: () => openToolSlot("studio") },
+          { id: "open-director", label: "Director HUD", group: "Labs", run: () => openToolSlot("director") },
+          { id: "open-slate", label: "Slate compare", group: "Labs", run: () => openToolSlot("slate") },
+          ...(onOpenStoryMachine
+            ? [
+                {
+                  id: "simulate-script",
+                  label: "Simulate in Story Machine",
+                  group: "Labs",
+                  disabled: isSimulating,
+                  run: handleSimulateScript,
+                } as PaletteAction,
+              ]
+            : []),
+        ] as PaletteAction[])
+      : []),
+
+    // Session
+    ...(onNewStory
+      ? ([
+          { id: "change-setup", label: "Change setup…", group: "Session", run: () => setNewStoryConfirm(true) },
+        ] as PaletteAction[])
+      : []),
+  ];
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div
@@ -1887,14 +2135,9 @@ export default function ScriptIDE({
           onOpenDirector={() => openToolSlot("director")}
           onOpenSlate={() => openToolSlot("slate")}
           onOpenStudio={() => openToolSlot("studio")}
-          onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
-          onToggleAutoAnalysis={() => setAutoAnalysis((prev) => !prev)}
-          onToggleTypewriterSound={() => {
-            setIsTypewriterSound((prev) => {
-              lsSet("typewriter_sound", prev ? "off" : "on");
-              return !prev;
-            });
-          }}
+          onToggleLiveDiagnostics={toggleLiveDiagnostics}
+          onToggleAutoAnalysis={toggleAutoAnalysis}
+          onToggleTypewriterSound={toggleTypewriterSound}
           onExportFountain={exportFountain}
           onExportFDX={exportFDX}
           onExportPDF={exportPDF}
@@ -1908,11 +2151,8 @@ export default function ScriptIDE({
           onNewStory={onNewStory ? () => setNewStoryConfirm(true) : undefined}
           onGoHome={onNewStory ? () => setNewStoryConfirm(true) : undefined}
           onToggleSidebar={() => setSidebarOpen(true)}
-          onOpenCollab={() => {
-            setCollabNameInput(collabUserName);
-            setPrefsOpen("collab");
-          }}
-          onOpenSettings={() => setPrefsOpen("settings")}
+          onOpenCollab={openCollabPrompt}
+          onOpenSettings={openSettingsPanel}
         />
 
         {/* Action strip — director's slate: one context, one dominant CTA, right-aligned */}
@@ -2124,6 +2364,7 @@ export default function ScriptIDE({
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
+            isTypewriterFocus={isTypewriterFocus}
           />
 
           {/* Page furniture — quiet manuscript metadata in the right gutter */}
@@ -2214,6 +2455,15 @@ export default function ScriptIDE({
       <AnimatePresence>
         {showShortcutModal && (
           <ShortcutModal onClose={() => setShowShortcutModal(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* E5: Command palette (Cmd/Ctrl+K). Escape is handled by the
+          top-of-component "escape ladder" effect, not locally — see
+          CommandPalette.tsx's header comment. */}
+      <AnimatePresence>
+        {paletteOpen && (
+          <CommandPalette actions={paletteActions} onClose={() => setPaletteOpen(false)} />
         )}
       </AnimatePresence>
 

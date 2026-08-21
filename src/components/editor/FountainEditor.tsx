@@ -69,7 +69,17 @@ export interface FountainEditorProps {
    * feature, off by default (see Toolbar/ScriptIDE "Live Notes" toggle).
    */
   liveDiagnostics?: boolean;
-  /** Typewriter Focus Mode: centers active line vertically & dims inactive lines */
+  /**
+   * E5: Typewriter Focus — keeps the cursor's line vertically centered in
+   * the viewport as the writer types or moves the cursor, mirroring
+   * dedicated screenwriting apps' "typewriter mode." Deliberately narrower
+   * than this prop's original (pre-E5) doc comment claimed: it does not dim
+   * inactive lines — that would need a second visual system (a fading
+   * decoration layer) this pass didn't build, and shipping the centering
+   * half only, honestly described, beat leaving the whole feature
+   * unimplemented behind a prop nothing ever read. See ShortcutModal.tsx
+   * for the keyboard binding (Ctrl/Cmd+Shift+F) this prop answers to.
+   */
   isTypewriterFocus?: boolean;
   /** Theme selection: "paper" | "dark" | "crt" | "print" */
   themeName?: "paper" | "dark" | "crt" | "print";
@@ -190,6 +200,20 @@ const findingHighlightField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
+// ── E5: Typewriter Focus — keep the cursor's line centered ─────────────────
+// A plain updateListener, not a ViewPlugin: it only ever dispatches a
+// scroll-only effect (EditorView.scrollIntoView never touches doc/selection),
+// so re-entering this listener from the transaction it itself causes is
+// impossible — the follow-up update has both docChanged and selectionSet
+// false, so the `if` below simply doesn't fire again. Module-scope (not
+// created per-render) since it closes over nothing — `update` carries
+// everything it needs.
+const typewriterFocusListener = EditorView.updateListener.of((update) => {
+  if (!update.docChanged && !update.selectionSet) return;
+  const pos = update.state.selection.main.head;
+  update.view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+});
+
 const findingHighlightTheme = EditorView.baseTheme({
   '.cm-sm-finding-flash': {
     animation: 'sm-finding-fade 2.2s ease-out forwards',
@@ -216,6 +240,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       collabRoom,
       collabUserName,
       liveDiagnostics = false,
+      isTypewriterFocus = false,
     },
     ref,
   ) {
@@ -234,6 +259,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     // Live Notes: holds scriptDiagnostics() when enabled, [] when disabled —
     // hot-swapped below the same way as the theme compartment.
     const diagnosticsCompartment = useRef(new Compartment());
+    // E5: Typewriter Focus — holds typewriterFocusListener (below) when
+    // enabled, [] when disabled. Same hot-swap idiom as diagnosticsCompartment.
+    const typewriterFocusCompartment = useRef(new Compartment());
     // P4: joining a collab room now requires fetching an auth token first
     // (see collab.ts), so the extension can't be included synchronously at
     // EditorState.create() time — this compartment starts empty and is
@@ -351,6 +379,8 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           screenplayCompletion,
           // ── Live Notes: in-editor narrative diagnostics (squiggles + hover) ──
           diagnosticsCompartment.current.of(liveDiagnostics ? scriptDiagnostics() : []),
+          // ── E5: Typewriter Focus (see typewriterFocusListener above) ────────
+          typewriterFocusCompartment.current.of(isTypewriterFocus ? [typewriterFocusListener] : []),
           // ── Fountain highlighting ───────────────────────────────────────────
           fountainHighlight,
           fountainTheme,
@@ -458,6 +488,23 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         ),
       });
     }, [liveDiagnostics]);
+
+    // ── Hot-swap Typewriter Focus on/off (E5) ──────────────────────────────────
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: typewriterFocusCompartment.current.reconfigure(
+          isTypewriterFocus ? [typewriterFocusListener] : [],
+        ),
+      });
+      // Turning it ON should center the current line immediately, not wait
+      // for the next keystroke/cursor move.
+      if (isTypewriterFocus) {
+        const pos = view.state.selection.main.head;
+        view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+      }
+    }, [isTypewriterFocus]);
 
     return (
       <div

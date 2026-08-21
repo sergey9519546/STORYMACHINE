@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, Settings, FileText, X, ChevronRight, ChevronLeft, Cpu, Upload, FilePlus2, ShieldCheck } from "lucide-react";
 import { StoryConfig } from "../types";
@@ -6,6 +6,7 @@ import { EXPLAINERS } from "./startscreen/explainers.config";
 import { ExplainerCard } from "./startscreen/ExplainerCard";
 import { StoryConfigForm, UploadedFile } from "./startscreen/StoryConfigForm";
 import { SlugLineIntro, usePrefersReducedMotion } from "./startscreen/SlugLineIntro";
+import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import {
   appendUploadedFiles,
   filterUploadableFiles,
@@ -58,6 +59,76 @@ const DUR_REVEAL = 0.7; // var(--dur-reveal), seconds
 const MICRO_TRANSITION = "duration-[var(--dur-micro)] ease-[var(--ease-out-expo)]";
 const FOCUS_RING =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-stamp focus-visible:outline-offset-4";
+
+/** E5: the file-preview overlay's own component so useModalFocusTrap's
+ *  mount-based effect actually lines up with the dialog opening/closing —
+ *  StartScreen itself never unmounts while previewFile toggles, so calling
+ *  the hook there (as an earlier version of this fix did) would arm it once
+ *  against a still-null ref and never again. Same rationale as
+ *  ScriptIDE.tsx's ActionRequiredModal/ChangeSetupConfirmModal — see the
+ *  comment above those for the full explanation. Escape is also handled
+ *  locally here (StartScreen has no equivalent to ScriptIDE's shared
+ *  escape-ladder effect), scoped to exactly this dialog's lifetime. */
+function FilePreviewDialog({ file, onClose }: { file: UploadedFile; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useModalFocusTrap(dialogRef);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 p-6"
+      onClick={onClose}
+    >
+      <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="file-preview-title"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 16 }}
+        transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[80vh] w-full max-w-3xl flex-col border border-ink bg-paper"
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-ink/15 bg-paper-edge px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <FileText className="h-4 w-4 shrink-0 text-stamp" aria-hidden="true" />
+            <h3 id="file-preview-title" className="max-w-[300px] truncate font-mono text-sm uppercase tracking-[0.15em] text-ink">
+              {file.name}
+            </h3>
+            <span className="shrink-0 border border-ink/30 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-ink/70">
+              {file.category}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close preview"
+            className={`flex min-h-[44px] min-w-[44px] items-center justify-center text-ink transition-colors ${MICRO_TRANSITION} hover:text-stamp ${FOCUS_RING}`}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto whitespace-pre-wrap p-6 font-mono text-sm text-ink/80">
+          {file.content}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function StartScreen({
   onStart,
@@ -841,48 +912,7 @@ export default function StartScreen({
 
       {/* File Preview Modal */}
       <AnimatePresence>
-        {previewFile && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 p-6"
-            onClick={() => setPreviewFile(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 16 }}
-              transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
-              onClick={(e) => e.stopPropagation()}
-              className="flex max-h-[80vh] w-full max-w-3xl flex-col border border-ink bg-paper"
-            >
-              <div className="flex items-center justify-between gap-4 border-b border-ink/15 bg-paper-edge px-5 py-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  <FileText className="h-4 w-4 shrink-0 text-stamp" aria-hidden="true" />
-                  <h3 className="max-w-[300px] truncate font-mono text-sm uppercase tracking-[0.15em] text-ink">
-                    {previewFile.name}
-                  </h3>
-                  <span className="shrink-0 border border-ink/30 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-ink/70">
-                    {previewFile.category}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPreviewFile(null)}
-                  aria-label="Close preview"
-                  className={`flex min-h-[44px] min-w-[44px] items-center justify-center text-ink transition-colors ${MICRO_TRANSITION} hover:text-stamp ${FOCUS_RING}`}
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto whitespace-pre-wrap p-6 font-mono text-sm text-ink/80">
-                {previewFile.content}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
+        {previewFile && <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />}
       </AnimatePresence>
     </div>
   );
