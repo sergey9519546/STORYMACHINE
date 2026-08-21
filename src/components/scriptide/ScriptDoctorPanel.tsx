@@ -2103,6 +2103,18 @@ export default function ScriptDoctorPanel({
     setLastRunMode("quick"); // CoverageSummary only ever calls the quick /doctor route
     setStatus("success");
 
+    // Same P3/P4 instrumentation a fresh runDiagnosis() success performs
+    // (doctor_run, and — once per session — first_report / time-to-first-
+    // report). This report reflects a real diagnosis the writer is now
+    // looking at; skipping this here would silently undercount every writer
+    // who reaches Script Doctor via Coverage's "Full report" (this product's
+    // primary entry point) out of the P3/P4 exit-gate metrics, even though
+    // CoverageSummary's own /api/scriptide/doctor call already did the real
+    // work this event is meant to count. A threaded report is never sourced
+    // from an upload, so only 'sample' or 'draft' apply here — matches
+    // runDiagnosis's own runSource classification below.
+    trackDoctorRun(initialReport.isSample ? "sample" : "draft");
+
     // Same draft-history bookkeeping a fresh runDiagnosis() call performs —
     // Coverage is this product's primary entry point (see CoverageSummary.tsx's
     // header comment), so skipping this here would mean a writer who always

@@ -289,6 +289,17 @@ async function getOverflowMenuItemLabels(page) {
   return items.map((s) => s.trim());
 }
 
+// W6: detects the PRODUCTION/ANALYSIS/ENGINE/CODEX research-shell tab bar.
+// Requires ALL FOUR words present, not any single one — "Analysis" alone is
+// ambiguous with the persistent Toolbar's own unrelated "No AI key ·
+// analysis ok" banner (ScriptIDE.tsx), which a naive any-of match (and an
+// earlier version of this check) false-positived on. Only the actual tab
+// bar renders all four together as siblings, so requiring the full set is
+// both a false-positive fix and a MORE specific regression tripwire.
+function hasResearchShellChrome(bodyText) {
+  return ['Production', 'Analysis', 'Engine', 'Codex'].every((w) => new RegExp(`\\b${w}\\b`, 'i').test(bodyText));
+}
+
 async function main() {
   const { fountain: sampleFountain, title: sampleTitle } = loadSampleScript();
   console.log(`[verify] loaded sample script "${sampleTitle}" (${sampleFountain.length} chars) for the verify loop.`);
@@ -364,21 +375,20 @@ async function main() {
   // exclusively behind toolSlot="studio", reachable only through the still
   // Labs-gated Toolbar overflow "Open Studio" item exercised in CONTEXT B
   // below. See docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md's
-  // 2026-08-16 addendum for the closure record.
+  // 2026-08-21 addendum for the closure record.
   const shipTaskBtn = pageA.getByRole('button', { name: 'Ship', exact: true }).first();
   await shipTaskBtn.click();
   await pageA.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: 10000 });
   await pageA.waitForTimeout(200);
-  const shipBodyTextOff = (await pageA.locator('body').innerText()).toUpperCase();
-  const RESEARCH_CHROME_RE = /\bPRODUCTION\b|\bANALYSIS\b|\bENGINE\b|\bCODEX\b/;
-  const shipHasResearchChromeOff = RESEARCH_CHROME_RE.test(shipBodyTextOff);
+  const shipBodyTextOff = await pageA.locator('body').innerText();
+  const shipHasResearchChromeOff = hasResearchShellChrome(shipBodyTextOff);
   record(
     'P2-W6',
-    'Ship tab (Labs OFF) shows NO research-chrome tab bar — PRODUCTION/ANALYSIS/ENGINE/CODEX absent (the leak this component closes)',
+    'Ship tab (Labs OFF) shows NO research-chrome tab bar — Production/Analysis/Engine/Codex not ALL present together (the leak this component closes)',
     !shipHasResearchChromeOff,
     shipHasResearchChromeOff
-      ? 'PRODUCTION/ANALYSIS/ENGINE/CODEX text found on the Ship tab — the old studio-shell leak has returned'
-      : 'no research-chrome tab-bar text found on the Ship tab',
+      ? 'Production/Analysis/Engine/Codex all found together on the Ship tab — the old studio-shell leak has returned'
+      : 'research-shell tab-bar text not found (as a full set) on the Ship tab',
   );
   const shipExportLabels = ['PDF', 'Fountain', 'Final Draft', 'Word'];
   const shipExportCounts = await Promise.all(
@@ -472,32 +482,43 @@ async function main() {
   record('P3', 'Sample coverage produces a rendered verdict (Doctor reachable end to end)', verdictRendered, 'checked CoverageSummary body for a verdict word');
 
   const fullReportBtn = pageA.getByRole('button', { name: 'Full report', exact: true }).first();
+  // W4 (docs/PATH_TO_EXCELLENCE.md Phase W): "Full report" used to unmount
+  // CoverageSummary and cold-mount ScriptDoctorPanel with autoLoadSample=
+  // false — landing on an idle "Run Diagnosis" prompt even though
+  // CoverageSummary had ALREADY computed a full report against this exact
+  // sample text, forcing the writer to re-pay the whole 14-pass diagnosis.
+  // The fix threads that report through ScriptIDE.tsx (ThreadedCoverageReport,
+  // src/lib/coverage-staleness.ts) as ScriptDoctorPanel's `initialReport`
+  // prop, so the panel hydrates straight into its success state at mount —
+  // no second /api/scriptide/doctor call, no "Run Diagnosis" click needed.
+  // Assert BOTH directions: the redundant call/click must be gone, and the
+  // Export button (which only ever renders once a real report is on screen)
+  // must already be there without it.
+  let secondDoctorCallSeen = false;
+  const onSecondDoctorCall = (req) => {
+    if (/\/api\/scriptide\/doctor(?!\/)/.test(req.url())) secondDoctorCallSeen = true;
+  };
+  pageA.on('request', onSecondDoctorCall);
   await fullReportBtn.click();
   await pageA.waitForSelector('[role="dialog"]', { timeout: 10000 });
-  await pageA.waitForTimeout(500);
-
-  // ScriptDoctorPanel opens with autoLoadSample=false — it lands in its own
-  // "idle" state (a fresh, unrun diagnosis) even though the editor draft
-  // already holds the sample text from CoverageSummary. It only renders the
-  // Export button once ITS OWN diagnosis has run (`status === "success" &&
-  // report`), so "Run Diagnosis" has to be clicked here before Export
-  // becomes available — this is the same run the focus-trap harness's
-  // "Full report" step exercises, just carried one step further.
-  const runDiagnosisBtn = pageA.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
-  // Click and wait must race-free (Promise.all, not click-then-await): the
-  // doctor route/LRU cache (doctor.ts) can resolve THE SAME sample text
-  // near-instantly on this second analysis, so a sequential
-  // click()-then-waitForResponse() can miss the response entirely if it
-  // lands before the listener is attached — same pattern as the download
-  // capture below.
-  await Promise.all([
-    pageA.waitForResponse((r) => /\/api\/scriptide\/doctor/.test(r.url()) && r.status() === 200, { timeout: 30000 }),
-    runDiagnosisBtn.click(),
-  ]);
-  await pageA.waitForTimeout(400);
 
   const exportBtn = pageA.getByRole('button', { name: 'Export coverage report as an HTML document', exact: true }).first();
-  await exportBtn.waitFor({ timeout: 10000 });
+  const runDiagnosisBtnW4 = pageA.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
+  const exportVisibleImmediately = await exportBtn
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  const idleRunDiagnosisVisible = await runDiagnosisBtnW4.isVisible().catch(() => false);
+  pageA.off('request', onSecondDoctorCall);
+  record(
+    'P3-W4',
+    'Full report hydrates the already-computed report immediately — no idle "Run Diagnosis" cold-mount',
+    exportVisibleImmediately && !idleRunDiagnosisVisible && !secondDoctorCallSeen,
+    `exportVisibleImmediately=${exportVisibleImmediately} idleRunDiagnosisVisible=${idleRunDiagnosisVisible} secondDoctorCallSeen=${secondDoctorCallSeen}`,
+  );
+  await pageA.waitForTimeout(400);
+
+
   const [download] = await Promise.all([
     pageA.waitForEvent('download', { timeout: 20000 }),
     exportBtn.click(),
@@ -678,6 +699,48 @@ async function main() {
     persistentSimVisibleOn,
     persistentSimVisibleOn ? '' : 'control not found/visible in persistent Toolbar with Labs ON',
   );
+
+  // W6, mirrored for Labs ON: Ship must show the SAME writer-facing
+  // ShipPanel — zero research-chrome tab bar — regardless of the Labs flag.
+  // Ship is not a Labs surface; only Studio (below) is.
+  await pageB.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: 10000 });
+  const shipBodyTextOn = await pageB.locator('body').innerText();
+  const shipHasResearchChromeOn = hasResearchShellChrome(shipBodyTextOn);
+  record(
+    'P2-W6',
+    'Ship tab (Labs ON) ALSO shows NO research-chrome tab bar — Ship stays the plain writer container regardless of the Labs flag',
+    !shipHasResearchChromeOn,
+    shipHasResearchChromeOn
+      ? 'Production/Analysis/Engine/Codex all found together on the Ship tab with Labs ON — Ship must never mount the research shell, Labs flag or not'
+      : 'research-shell tab-bar text not found (as a full set) on the Ship tab with Labs ON',
+  );
+
+  // W6: the research shell (toolSlot="studio") must still be genuinely
+  // reachable with Labs ON — proving it was gated, not deleted (deletion
+  // moratorium). Close the Ship drawer first: like Coverage/Director/Slate,
+  // it's a z-50 fixed overlay that sits above the z-20 header while open,
+  // so the toolbar's own overflow button is behind it until closed.
+  await pageB.getByRole('button', { name: 'Close ship panel' }).click();
+  await pageB.waitForTimeout(200);
+  const moreBtnOn = pageB.getByRole('button', { name: 'More tools' }).first();
+  await moreBtnOn.click();
+  const openStudioItem = pageB.getByRole('menuitem', { name: /open studio/i });
+  const openStudioCountOn = await openStudioItem.count();
+  record('P2-W6', 'Toolbar overflow "Open Studio" (Labs ON) is present and clickable', openStudioCountOn === 1, `count=${openStudioCountOn}`);
+  if (openStudioCountOn === 1) {
+    await openStudioItem.click();
+    await pageB.waitForTimeout(400);
+    const studioBodyTextOn = await pageB.locator('body').innerText();
+    const studioShellReachable = hasResearchShellChrome(studioBodyTextOn);
+    record(
+      'P2-W6',
+      'Research shell (toolSlot="studio") genuinely reachable with Labs ON via Toolbar overflow "Open Studio" — gated, not deleted (deletion moratorium)',
+      studioShellReachable,
+      studioShellReachable
+        ? 'Production/Analysis/Codex tab-bar text found after clicking "Open Studio"'
+        : 'research-shell tab-bar text NOT found after clicking "Open Studio" — the shell may have been deleted rather than gated',
+    );
+  }
 
   await contextB.close();
 

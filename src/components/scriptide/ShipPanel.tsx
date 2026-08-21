@@ -24,7 +24,7 @@
  * Fountain title-page syntax directly at the top of the draft — the
  * standard way most Fountain tooling expects it — without ever needing
  * Labs. Recorded in docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md's
- * 2026-08-16 addendum for anyone who later wants a default-surface form for
+ * 2026-08-21 addendum for anyone who later wants a default-surface form for
  * it too.
  */
 import React from "react";

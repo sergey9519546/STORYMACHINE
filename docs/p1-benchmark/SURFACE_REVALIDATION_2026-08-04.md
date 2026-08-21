@@ -493,3 +493,162 @@ Verified in a real browser: `verify-p2-p3-surfaces.mjs` grew 91 → 93
 (persistent control ABSENT with Labs OFF, APPEARS with Labs ON), all 93
 passing, exit 0, zero genuine console errors. With this, no known
 Labs-agnostic research affordance remains on the default surface.
+
+---
+
+## Addendum (2026-08-21) — Finding 1 / the Ship-Studio bypass is now CLOSED, reversing the 2026-08-04 accept decision
+
+docs/PATH_TO_EXCELLENCE.md's W6 ("the Ship tab — a primary non-Labs tab —
+opens the research console... to show a snapshots list") named this
+document's own accepted item as "its known remaining item family" and asked
+for a real fix, not another accept. This addendum records that fix and,
+per this document's own established practice, checks its reasoning against
+source rather than restating the brief on faith — including the one place
+the 2026-08-04 decision's rationale predicted a real regression if Ship
+were ever gated without a replacement door.
+
+**What changed.** `ScriptIDE.tsx`'s `handleTaskChange("ship")` no longer
+calls `setToolSlot("studio")`; it calls `setToolSlot("ship")`, a new,
+separate `IdeToolSlot` value (`scriptide/Toolbar.tsx`) that mounts a new
+component, `scriptide/ShipPanel.tsx` — a plain writer-facing drawer in the
+same paper·ink·stamp language CoverageSummary already uses (`sm-pagetop`
+header, `sm-panel-body`/`sm-card`/`sm-btn` tokens), containing exactly three
+things:
+
+1. **Export** — all four working actions (PDF, Fountain, Final Draft/.fdx,
+   Word/.docx), each calling the same `exportPDF`/`exportFountain`/
+   `exportFDX`/`exportDOCX` handlers the old Ship-tab toolbar row already
+   used, disabled together on an empty draft.
+2. **Snapshots/versions** — the full `SnapshotManager` (not the
+   `hideList`-only mode used elsewhere), so save/restore/delete of every
+   version is on the DEFAULT surface now, not Ship→Studio-only as the
+   2026-08-04 addendum's point 1 found for the read/restore/delete half of
+   version management. This is a strict improvement over the accepted
+   state, not just a leak fix.
+3. **Independent verification** — a "Verify a report" link to the same
+   `#verify` hash route (`App.tsx`, `VerifyReport.tsx`) StartScreen's own
+   link already uses, deliberately outside the Labs gate per that
+   component's own header comment.
+
+The research shell itself (`toolSlot="studio"`, the PRODUCTION/ANALYSIS/
+ENGINE/CODEX/RESEARCH/TITLE/VERSIONS tab bar) is **not deleted** — the
+deletion moratorium holds. It is now reachable **exclusively** through
+`Toolbar.tsx`'s existing Labs-gated "Open Studio" overflow item;
+`openToolSlot`'s `next === "studio"` branch no longer special-cases `task`
+to stay `"ship"`, so Studio now behaves like Director/Slate (an
+independent overlay, opened without regard to whichever task tab is
+active) instead of secretly doubling as Ship's own content.
+
+**The Title Page regression this document's own 2026-08-04 rationale
+warned about — addressed, not silently absorbed.** Point 1 of that
+addendum's rationale found, by source read, that Title editing
+(`renderTitlePage()`, the title/author/contact form) had exactly one
+default-surface path: Ship→Studio's "Title" tab. Gating Ship without a
+replacement, it warned, "would make title/author/contact editing
+Labs-only... exactly the kind of core Editor affordance the task's
+rationale describes as load-bearing." This fix does not add a
+default-surface form for Title editing — W6's brief scoped ShipPanel to
+exports, snapshots, and the verify pointer, not Title — so that warning is
+not fully answered, and it would be dishonest to claim otherwise. What
+holds it short of a functional regression, verified by source read rather
+than assumed:
+
+- `exportFountain` (`ScriptIDE.tsx`) only injects the `titlePage` state's
+  title/author/contact fields when the draft does not already start with
+  `Title:` — so a writer can set all three by typing standard Fountain
+  title-page syntax (`Title: ...`, `Author: ...`, etc.) directly at the top
+  of the draft, which is how most Fountain tooling expects title metadata
+  to travel in the first place, and requires no Labs flag.
+- `exportFDX`/`exportPDF`/`exportDOCX` were already found (this session,
+  not assumed) to pass `scriptText` straight through without ever reading
+  `titlePage` at all — a pre-existing inconsistency across the four
+  exporters, out of scope for this change (would touch `src/lib/fdx.ts`
+  `pdf.ts` `docx.ts`, none of which are in this lane) and not introduced or
+  worsened by it.
+- The dedicated visual form (three labeled fields vs. raw Fountain syntax)
+  is a real convenience loss for a writer who does not already know
+  Fountain's title-page syntax, and it is now Labs-gated along with the
+  rest of Studio's tab bar. Flagged here, honestly, as an open item for
+  whoever next touches Ship or Title — not claimed resolved.
+
+**The adjacent Ship-toolbar-row "Simulate" button** the 2026-08-04
+addendum flagged as "out of scope for this decision" was independently
+closed the same day (see the addendum immediately above this one) and
+remains closed — reconfirmed live below, unaffected by this change.
+
+**The OASIS-jargon condition the 2026-08-04 accept rested on** is now moot
+rather than re-checked: since Ship no longer reaches the research shell at
+all, there is no panel content left to jargon-scan on that path. The
+`OASIS_JARGON_RE` check itself still applies (unmodified) to the Studio
+path in the live-browser P2/P3 test suite's other assertions.
+
+### New verify-script assertions
+
+`scripts/verify-p2-p3-surfaces.mjs`: the old `P2-decision` block encoding
+the 2026-08-04 accept (`studioReachableViaShip` and its OASIS-jargon check)
+is removed — asserting a bypass "must stay reachable" no longer makes sense
+once the bypass is fixed — replaced with a `P2-W6` block, in both the
+Labs-OFF (CONTEXT A) and Labs-ON (CONTEXT B) passes:
+
+- Ship tab shows NO research-chrome tab bar — a shared
+  `hasResearchShellChrome(bodyText)` helper requires **all four** of
+  Production/Analysis/Engine/Codex present together (not any single one):
+  an early version of this check matched "Analysis" alone and false-positived
+  on the Toolbar's unrelated, pre-existing "No AI key · analysis ok" banner
+  text, caught and fixed by requiring the full set actually only the tab bar
+  renders together.
+- All four export actions (PDF/Fountain/Final Draft/Word) reachable from
+  ShipPanel.
+- The snapshots/versions list ("Script Snapshots") reachable.
+- The verify-report pointer ("Verify a report" → `#verify`) reachable.
+- (Labs ON only) the research shell is still genuinely reachable via
+  Toolbar's "Open Studio" overflow item — proving Studio was gated, not
+  deleted.
+
+### Verify / build gates (this addendum)
+
+- `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node
+  scripts/verify-p2-p3-surfaces.mjs` — **104/108**, exit 1. All new P2-W6
+  assertions PASS. The 4 remaining failures are not part of this change —
+  `oasis/{BeliefDriftGraph,ReplayInspector,SecretsMatrix,SimulationSandbox}.tsx`
+  reported dead/unreachable by the static cross-check, pre-existing from
+  the 2026-08-08 "preserve unreviewed prototype work" quarantine commit,
+  unrelated to any Ship/Studio/Settings surface. (An earlier run this same
+  session also showed 4 P4-instrumentation counter failures tied to
+  `tests/core/coverage-handoff.test.ts` / `ScriptDoctorPanel.tsx`'s
+  in-flight W3/W4 report-threading work on this same branch, a different
+  lane — those resolved between runs as that lane's own concurrent fix
+  landed, confirmed by `npm test` below now passing clean.) Zero genuine
+  browser console errors.
+- `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node
+  scripts/smoke-p0-live-flow.mjs` — PASS, exit 0 (`verdict=CONSIDER,
+  health~78`, zero genuine console errors).
+- `npm run lint` — 0 errors (`tsc --noEmit` clean).
+- `npm test` — **0 failures** out of 10662 (10576 pass, 85 skipped, 1 todo).
+  This session's own lane is `SettingsPanel.tsx`, `StartScreen.tsx` (mobile
+  CTA), `scriptide/**` excluding the save/persistence and CoverageSummary→
+  ScriptDoctorPanel handoff paths, `scripts/verify-p2-p3-surfaces.mjs`, and
+  this document — the coverage-handoff fix above landed from a different,
+  concurrent lane on this same branch.
+- Also fixed this same session, W5 (Phase W, docs/PATH_TO_EXCELLENCE.md):
+  `SettingsPanel.tsx`'s modal shell carried `sm-btn` (the interactive-button
+  primitive — `display:inline-flex`, centered content, hover-inverts to a
+  near-black background) instead of `sm-panel` (the inert panel frame),
+  fighting the `flex flex-col` layout so provider cards below the first
+  overflowed the panel's real edges into the dimmed backdrop, and the whole
+  modal flipped near-black on hover — root-caused via live computed-style
+  inspection, fixed by the one-class swap, re-verified with screenshots at
+  900px (scrolled + full-page) and on the Labs tab. `StartScreen.tsx`'s
+  "Recommended" ribbon on the primary CTA reused `sm-stamp`, whose
+  `color: var(--sm-stamp)` is the exact red the CTA's own `sm-btn--stamp`
+  background already paints — invisible text, at every viewport width, not
+  only 375px — and the button's real padding is `.sm-btn`'s 8px/16px
+  shorthand (also loading after Tailwind's utilities), not the intended
+  `px-8 py-10`, so the badge's border box dipped into the caption row at
+  375px. Fixed with a small self-contained cream-on-stamp ribbon lifted
+  clear of that row, verified with screenshots at 375px and 1440px.
+- Files changed: `src/components/SettingsPanel.tsx`,
+  `src/components/StartScreen.tsx`, `src/components/scriptide/Toolbar.tsx`,
+  `src/components/scriptide/ShipPanel.tsx` (new),
+  `src/components/ScriptIDE.tsx`, `scripts/verify-p2-p3-surfaces.mjs`, this
+  document.

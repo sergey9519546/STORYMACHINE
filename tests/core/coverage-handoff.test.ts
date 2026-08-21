@@ -134,7 +134,7 @@ describe("W4 — CoverageSummary -> ScriptDoctorPanel 'Full report' handoff", ()
     it("a fresh handoff hydrates report/status/history WITHOUT any network call", () => {
       const idx = scriptDoctorPanel.indexOf("const isFresh = currentGen");
       assert.ok(idx > -1, "expected the freshness check in the initialReport hydration effect");
-      const block = scriptDoctorPanel.slice(idx, idx + 1700);
+      const block = scriptDoctorPanel.slice(idx, idx + 2600);
       assert.match(block, /setReport\(initialReport\.report\);/);
       assert.match(block, /reportDraftGenRef\.current = initialReport\.generation;/, "must set the G0-02 write-back guard exactly as a fresh run would");
       assert.match(block, /setActiveReportTitle\(initialReport\.title\);/);
@@ -142,6 +142,25 @@ describe("W4 — CoverageSummary -> ScriptDoctorPanel 'Full report' handoff", ()
       assert.match(block, /setStatus\("success"\);/);
       assert.match(block, /recordDoctorHistory\(/, "must record draft-over-draft history the same as a fresh runDiagnosis()");
       assert.doesNotMatch(block, /fetch\(/, "the fresh-hydration branch must never call the network");
+    });
+
+    it("a fresh handoff fires the same P3/P4 instrumentation a real runDiagnosis() success would", () => {
+      // P4-instrumentation regression guard: doctor_run / first_report (once
+      // per session) are the ONLY signal behind the P3/P4 exit-gate metrics
+      // ("% of Doctor runs that export is measured", time-to-first-report).
+      // They live entirely inside trackDoctorRun() (src/lib/analytics.ts),
+      // called only from a real runDiagnosis() success before this fix —
+      // skipping it here would silently undercount every writer who reaches
+      // Script Doctor via Coverage's "Full report", this product's primary
+      // entry point, even though a real diagnosis (CoverageSummary's own
+      // /api/scriptide/doctor call) is exactly what produced this report.
+      const idx = scriptDoctorPanel.indexOf("const isFresh = currentGen");
+      const block = scriptDoctorPanel.slice(idx, idx + 2600);
+      assert.match(
+        block,
+        /trackDoctorRun\(initialReport\.isSample \? "sample" : "draft"\);/,
+        'must call trackDoctorRun with the report\'s own provenance (never "upload" — a threaded report is never sourced from one)',
+      );
     });
 
     it("a stale handoff (draft moved since the report was measured) does NOT show it as a fresh report", () => {
