@@ -4,6 +4,7 @@ import {
   DEFAULT_TITLE_PAGE,
   SCRIPTIDE_DRAFT_KEY,
   applyServerScriptIDEDraft,
+  decideScriptIDELocalRestore,
   decideScriptIDERestore,
   importScriptText,
   loadScriptIDEDraft,
@@ -410,5 +411,53 @@ describe('decideScriptIDERestore', () => {
   it('applies a clean server envelope even when the caller has no local titlePage yet (falls back to defaults)', () => {
     const applied = applyServerScriptIDEDraft(server, DEFAULT_TITLE_PAGE);
     assert.deepEqual(applied.titlePage, DEFAULT_TITLE_PAGE);
+  });
+});
+
+// ── E4: decideScriptIDELocalRestore (localStorage vs. IndexedDB mirror) ────
+// IndexedDB exists purely as capacity backup for drafts that outgrow
+// localStorage's ~5MB quota — it must only ever win the reconciliation when
+// it demonstrably holds content localStorage's own last successful write
+// does not (see the function's own doc comment in scriptide-draft-store.ts).
+describe('decideScriptIDELocalRestore', () => {
+  it('keeps local when there is no IndexedDB copy at all', () => {
+    assert.deepEqual(decideScriptIDELocalRestore(envelope, null), { action: 'keep-local' });
+  });
+
+  it('keeps local when the IndexedDB copy is identical content (even a different object)', () => {
+    const idbClone: ScriptIDEDraftEnvelope = { ...envelope, snapshots: [{ id: 's1' }] };
+    assert.deepEqual(decideScriptIDELocalRestore(envelope, idbClone), { action: 'keep-local' });
+  });
+
+  it('keeps local when IndexedDB differs but is NOT strictly newer (equal contentUpdatedAt)', () => {
+    const idb: ScriptIDEDraftEnvelope = { ...envelope, scriptText: 'IDB DIFFERS BUT SAME TIMESTAMP' };
+    assert.deepEqual(decideScriptIDELocalRestore(envelope, idb), { action: 'keep-local' });
+  });
+
+  it('keeps local when IndexedDB differs but is OLDER than local', () => {
+    const idb: ScriptIDEDraftEnvelope = {
+      ...envelope,
+      scriptText: 'STALE IDB COPY',
+      contentUpdatedAt: envelope.contentUpdatedAt - 1,
+    };
+    assert.deepEqual(decideScriptIDELocalRestore(envelope, idb), { action: 'keep-local' });
+  });
+
+  it('uses IndexedDB when it is strictly newer than local — the quota-failure recovery case', () => {
+    const idb: ScriptIDEDraftEnvelope = {
+      ...envelope,
+      scriptText: 'THE REAL DRAFT — LOCALSTORAGE.SETITEM SILENTLY FAILED ON THIS ONE',
+      contentUpdatedAt: envelope.contentUpdatedAt + 1,
+    };
+    assert.deepEqual(decideScriptIDELocalRestore(envelope, idb), { action: 'use-indexeddb', envelope: idb });
+  });
+
+  it('uses IndexedDB when only titlePage differs and IndexedDB is newer', () => {
+    const idb: ScriptIDEDraftEnvelope = {
+      ...envelope,
+      titlePage: { ...envelope.titlePage, title: 'NEWER TITLE FROM IDB' },
+      contentUpdatedAt: envelope.contentUpdatedAt + 1,
+    };
+    assert.deepEqual(decideScriptIDELocalRestore(envelope, idb), { action: 'use-indexeddb', envelope: idb });
   });
 });

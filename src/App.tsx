@@ -20,6 +20,7 @@ const ScriptIDE    = lazy(() => import('./components/ScriptIDE'));
 const StoryMachine = lazy(() => import('./components/StoryMachine'));
 const DesignPreview = lazy(() => import('./components/DesignPreview'));
 const VerifyReport = lazy(() => import('./components/VerifyReport'));
+const PrivacyPage  = lazy(() => import('./components/PrivacyPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen bg-white flex items-center justify-center font-mono">
@@ -177,7 +178,9 @@ export default function App() {
   // full reload, and the verify page's "Back to start" (href="#") returns.
   //   #design-preview — dev-only paper·ink·stamp primitive gallery.
   //   #verify         — P3 independent-verification surface (VerifyReport).
-  // Both bypass the persisted view state above entirely.
+  //   #privacy        — E4 honest privacy page (PrivacyPage.tsx), linked
+  //                      from StartScreen's one-sentence privacy claim.
+  // All three bypass the persisted view state above entirely.
   const [hashView, setHashView] = useState(() =>
     typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '');
   useEffect(() => {
@@ -186,12 +189,14 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  if (hashView === 'design-preview' || hashView === 'verify') {
+  if (hashView === 'design-preview' || hashView === 'verify' || hashView === 'privacy') {
     return (
       <MotionConfig reducedMotion="user">
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
-            {hashView === 'design-preview' ? <DesignPreview /> : <VerifyReport />}
+            {hashView === 'design-preview' ? <DesignPreview />
+              : hashView === 'verify' ? <VerifyReport />
+              : <PrivacyPage />}
           </Suspense>
         </ErrorBoundary>
       </MotionConfig>

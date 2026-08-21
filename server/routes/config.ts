@@ -11,13 +11,13 @@ import {
   validate as validateOutline, OutlineBodySchema, ImportBodySchema,
   PacingTargetBodySchema, EmotionalArcBodySchema, DirectorStyleBodySchema,
   StoryGenreBodySchema, CharacterArcModeBodySchema, StoryThemeBodySchema,
-  ApplyPresetBodySchema, RotateSessionBodySchema,
+  ApplyPresetBodySchema, RotateSessionBodySchema, DeleteSessionBodySchema,
 } from '../lib/validation.ts';
 import { z } from 'zod';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
   asyncHandler, gameLimiter, aiLimiter, sessions, sessionId, getOrCreateSession,
-  withSessionCommand, metrics, rotateSession,
+  withSessionCommand, metrics, rotateSession, destroySession,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
 import { withAiBudget, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
@@ -100,6 +100,24 @@ router.post('/api/session/rotate', gameLimiter, validate(RotateSessionBodySchema
   const body = req.body as z.infer<typeof RotateSessionBodySchema>;
   const result = await rotateSession(oldId, body?.newSessionId);
   res.json({ status: 'ok', ...result });
+}));
+
+// E4 "delete everything" — the server half of the local-first safety net's
+// destructive control (src/components/SettingsPanel.tsx's Session tab). Uses
+// the SAME destroySession() every other lifecycle primitive in this codebase
+// calls (server/lib/session-store.ts): closes the in-memory Stage and, in
+// PERSIST_SESSIONS mode, unlinks the session's .db/-wal/-shm/-journal files
+// from disk — a true wipe, not a soft reset. Always operates on the
+// CALLER's own session (sessionId(req) — explicit body/query, then
+// X-Session-Id header, then 'default'), exactly like every read/write route
+// in this file; there is no sessionId body field to target another session
+// with. A SessionBusyError (an in-flight command on this session) surfaces
+// as its own 409 via app.ts's global error handler rather than deleting out
+// from under an active mutation — the caller can retry once idle.
+router.post('/api/session/delete', gameLimiter, validate(DeleteSessionBodySchema), asyncHandler(async (req, res) => {
+  const id = sessionId(req);
+  destroySession(id);
+  res.json({ status: 'deleted', sessionId: id });
 }));
 
 // Metrics — Gemini call volume, latency, retries and failures per category

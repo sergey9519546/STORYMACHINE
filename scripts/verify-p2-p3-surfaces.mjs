@@ -644,6 +644,31 @@ async function main() {
     `event names observed on the wire: ${JSON.stringify([...namesSeen])}`,
   );
 
+  // ══════════════════════════════════════════════════════════════════════
+  // E4-PREP — the #privacy hash route (PrivacyPage.tsx) renders and states
+  // all four claims. Read-only: this deliberately does NOT exercise the
+  // Delete Everything control itself (that would reload the page mid-script
+  // and is a destructive action against a session other later assertions in
+  // this same context don't need) — the destructive flow gets its own
+  // dedicated browser-proof run, not this shared surface-completeness walk.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== E4-prep — #privacy page reachable and states all four claims ===');
+  await pageA.goto(`${BASE}#privacy`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  const privacyHeadingOk = await pageA.getByRole('heading', { name: /^privacy$/i })
+    .waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+  record('E4', '#privacy route renders the Privacy page', privacyHeadingOk, privacyHeadingOk ? '' : '"Privacy" heading not found');
+
+  for (const sectionName of [
+    'What stays in this browser',
+    'What the server stores',
+    'What leaves this deployment',
+    'Deleting it',
+  ]) {
+    const sectionOk = await pageA.getByRole('heading', { name: sectionName }).first()
+      .isVisible().catch(() => false);
+    record('E4', `#privacy states "${sectionName}"`, sectionOk, sectionOk ? '' : `heading not found: ${sectionName}`);
+  }
+
   await contextA.close();
 
   // ══════════════════════════════════════════════════════════════════════

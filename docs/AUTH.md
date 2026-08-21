@@ -86,8 +86,15 @@ no account record, no way to prove "this session belongs to user X" beyond
     Rotation is not a deletion endpoint, does not establish a user identity,
     and cannot protect a capability that has already leaked: another holder of
     the old id can use or rotate it before the legitimate holder does.
-    `POST /api/reset` still only clears simulation state; `destroySession()`
-    remains an internal lifecycle helper.
+    `POST /api/reset` still only clears simulation state. `destroySession()`
+    (evict the in-memory Stage and, in PERSIST mode, unlink the session's
+    `.db`/`-wal`/`-shm`/`-journal` files) was an internal-only lifecycle
+    helper until E4 (2026-08-21) exposed it as `POST /api/session/delete` —
+    the "delete everything" control in `src/components/SettingsPanel.tsx`'s
+    Session tab. Same bearer-capability model as rotation above: whoever
+    holds the id can delete the session it names, and the deletion is
+    unrecoverable (no server-side backup by default — see README.md's
+    "Session data" section).
 - **No user-level accountability.** Nothing distinguishes "this session's
   legitimate owner" from "whoever currently holds the id" — no audit trail
   of which human performed an action, no per-account rate limits or

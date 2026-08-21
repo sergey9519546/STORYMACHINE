@@ -253,6 +253,38 @@ export function decideScriptIDERestore(
   return { action: 'keep-local', serverRevision: server.updatedAt };
 }
 
+export type ScriptIDELocalRestoreDecision =
+  | { action: 'keep-local' }
+  | { action: 'use-indexeddb'; envelope: ScriptIDEDraftEnvelope };
+
+/**
+ * E4: reconciles the synchronous localStorage-sourced envelope against an
+ * asynchronously-read IndexedDB mirror, BEFORE that local envelope is ever
+ * compared against the server (decideScriptIDERestore above). IndexedDB
+ * exists solely as capacity backup for drafts that outgrow localStorage's
+ * ~5MB quota (see src/lib/scriptide-idb-store.ts and ScriptIDE.tsx's
+ * writeDraftBoth, which mirrors every authoritative write into both stores
+ * on the same debounce cadence) — so it must only ever WIN when it
+ * demonstrably holds content localStorage's own last successful write does
+ * not, never merely because it exists or because the two happen to differ
+ * by object identity. Equal content is not a reason to swap stores (see
+ * scriptIDEDraftStatesEqual's use below, which compares the full state, not
+ * just scriptText); a strictly newer contentUpdatedAt is the only signal
+ * that localStorage's own write actually failed — most likely quota-
+ * exceeded on a large draft — while the IndexedDB mirror succeeded.
+ */
+export function decideScriptIDELocalRestore(
+  local: ScriptIDEDraftEnvelope,
+  idb: ScriptIDEDraftEnvelope | null,
+): ScriptIDELocalRestoreDecision {
+  if (!idb) return { action: 'keep-local' };
+  if (scriptIDEDraftStatesEqual(local, idb)) return { action: 'keep-local' };
+  if (idb.contentUpdatedAt > local.contentUpdatedAt) {
+    return { action: 'use-indexeddb', envelope: idb };
+  }
+  return { action: 'keep-local' };
+}
+
 /**
  * Builds a full local envelope from a server snapshot. `titlePage` must be
  * supplied by the caller (typically the writer's current local titlePage) —

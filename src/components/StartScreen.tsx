@@ -326,11 +326,19 @@ export default function StartScreen({
                       opt-in per-session via SettingsPanel's own API-key
                       fields (POST /api/ai-config), not just an env var only
                       an operator can set. Never claim more than that: the
-                      generative shell still runs server-side when enabled. */}
-                  <p className="flex items-center gap-2 text-[11px] leading-snug text-ink/60 sm:text-xs">
+                      generative shell still runs server-side when enabled.
+                      E4: now an unobtrusive link to the #privacy page
+                      (PrivacyPage.tsx) that spells this claim out in full —
+                      what stays in the browser, what the server stores, and
+                      the delete-everything control — rather than leaving the
+                      one sentence as an unverifiable assertion. */}
+                  <a
+                    href="#privacy"
+                    className={`flex items-center gap-2 text-[11px] leading-snug text-ink/60 underline decoration-dotted underline-offset-4 transition-colors hover:text-ink sm:text-xs ${FOCUS_RING}`}
+                  >
                     <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-ink/40" aria-hidden="true" />
                     Keyless by default — your script stays in this deployment unless you turn on AI features yourself.
-                  </p>
+                  </a>
 
                   {/* Secondary actions: Open existing work or start fresh */}
                   <div className="flex flex-col gap-2 sm:flex-row">

@@ -1103,6 +1103,15 @@ export const RotateSessionBodySchema = z.object({
   newSessionId: z.string().regex(/^[a-zA-Z0-9_-]{8,64}$/, 'newSessionId must match [a-zA-Z0-9_-]{8,64}').optional(),
 }).strict().or(z.undefined());
 
+// E4 "delete everything": takes no body fields — the route always deletes
+// the CALLER's own session, identified the same way every other route
+// identifies it (sessionId(req): explicit body/query, then X-Session-Id
+// header, then 'default'). A strict empty-object schema (tolerating the
+// undefined body Express leaves on a bodyless POST) matches
+// AiConfigTestBodySchema's contract in server/routes/config.ts: no route may
+// skip zod validation, even one with nothing to validate.
+export const DeleteSessionBodySchema = z.object({}).strict().or(z.undefined());
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.

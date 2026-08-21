@@ -20,6 +20,7 @@ import {
 import { scheduleAutoAnalysis } from "../lib/auto-analysis-gate";
 import {
   applyServerScriptIDEDraft,
+  decideScriptIDELocalRestore,
   decideScriptIDERestore,
   loadScriptIDEDraft,
   readScriptIDEDraft,
@@ -30,6 +31,7 @@ import {
   type ScriptIDEDraftState,
   type ScriptIDEServerSnapshot,
 } from "../lib/scriptide-draft-store";
+import { readScriptIDEDraftIDB, writeScriptIDEDraftIDB } from "../lib/scriptide-idb-store";
 import { decideSampleInstall } from "../lib/sample-install-guard";
 import { isDraftStale, type ThreadedCoverageReport } from "../lib/coverage-staleness";
 import { fountain as sampleScriptFountain } from "../lib/sample-script";
@@ -325,6 +327,22 @@ const lsSet = (key: string, val: string): boolean => {
   }
 };
 
+// E4: mirrors every authoritative draft write into IndexedDB alongside
+// localStorage (IndexedDB survives drafts that outgrow localStorage's ~5MB
+// quota — see src/lib/scriptide-idb-store.ts's header). Fire-and-forget and
+// best-effort: the IndexedDB write's own success/failure never affects the
+// return value or the writer-facing save status, which stays governed by
+// localStorage alone exactly as before this change. Every call site that
+// used to call writeScriptIDEDraft(lsSet, ...) directly now calls this
+// instead, so the mirror stays byte-for-byte in step with every place the
+// envelope is persisted (debounced edits, server-ack writebacks, conflict
+// resolution, and the visibilitychange/unmount flush).
+const writeDraftBoth = (envelope: ScriptIDEDraftEnvelope): boolean => {
+  const ok = writeScriptIDEDraft(lsSet, envelope);
+  void writeScriptIDEDraftIDB(envelope);
+  return ok;
+};
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ScriptIDE({
@@ -545,6 +563,20 @@ export default function ScriptIDE({
   const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
   const requestServerSaveRef = useRef<(opts?: { updateStatus: boolean; keepalive?: boolean }) => void>(() => {});
   const skipNextLocalWriteRef = useRef(true);
+  // E4: set the instant "delete everything" begins (SettingsPanel's
+  // onBeginDataWipe, called synchronously before the wipe's own async work
+  // starts). Every autosave write path below — the debounced local-save
+  // effect, saveToServer, and syncLocalEnvelope — checks this and becomes a
+  // no-op once it's true. Without this, the delete control's own
+  // window.location.reload() fires a visibilitychange('hidden') event first
+  // (browsers do this just before unload), which this component's EXISTING
+  // onVis handler treats exactly like a tab-hide: it calls
+  // syncLocalEnvelope() + saveToServer(..., keepalive:true) and silently
+  // resurrects the just-deleted draft in localStorage (a synchronous write,
+  // so it wins the race against navigation) AND re-POSTs it to the server
+  // session that was just told to delete itself — found by this change's own
+  // scripts/verify-e4-local-safety-net.mjs browser proof, not assumed.
+  const suppressPersistenceRef = useRef(false);
   // Prevent setState-after-unmount from the flush-on-cleanup save path.
   const mountedRef = useRef(true);
   draftRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode, titlePage };
@@ -565,6 +597,7 @@ export default function ScriptIDE({
   // Update the in-memory envelope immediately on a real edit, then debounce its
   // single atomic storage write. Mounting and server restore are not edits.
   useEffect(() => {
+    if (suppressPersistenceRef.current) return;
     const state = draftRef.current;
     if (skipNextLocalWriteRef.current) {
       skipNextLocalWriteRef.current = false;
@@ -580,13 +613,13 @@ export default function ScriptIDE({
     // that edit immediately so the restore decision sees it and navigation
     // cannot lose it. Server-applied state sets skipNextLocalWriteRef above.
     if (!persistenceReady) {
-      const ok = writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+      const ok = writeDraftBoth(draftEnvelopeRef.current);
       setSaveStatus(ok ? "saved-local" : "save-failed");
       return;
     }
 
     const debounceTimer = setTimeout(() => {
-      const ok = writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+      const ok = writeDraftBoth(draftEnvelopeRef.current);
       if (!mountedRef.current) return;
       if (ok) {
         if (draftGenerationRef.current === generation && !saveConflictRef.current) {
@@ -604,12 +637,23 @@ export default function ScriptIDE({
   // timestamp/length rule once, then migrate into the envelope.
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/scriptide/load')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: ({ status: string } & Partial<ScriptIDEServerDraft>) | null) => {
+
+    // E4: reconcile localStorage's envelope against the IndexedDB mirror
+    // FIRST, before the server-load fetch below ever reads
+    // draftEnvelopeRef.current as "local". IndexedDB exists to survive
+    // drafts that outgrew localStorage's ~5MB quota (writeDraftBoth above
+    // mirrors every write into both), so a writer whose last localStorage
+    // write silently failed must not have that truncated/stale copy treated
+    // as their real draft once the server comparison runs. Awaited before
+    // the fetch starts (not raced against it) so this component never has to
+    // guess which of the two async reads would settle first.
+    const runServerReconcile = () => {
+      fetch('/api/scriptide/load')
+        .then(r => r.ok ? r.json() : null)
+        .then((data: ({ status: string } & Partial<ScriptIDEServerDraft>) | null) => {
         if (cancelled || !data) return;
         if (data.status === 'empty') {
-          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+          writeDraftBoth(draftEnvelopeRef.current);
           return;
         }
         if (
@@ -654,7 +698,7 @@ export default function ScriptIDE({
           // banner over a tab that never existed.
           draftEnvelopeRef.current = { ...local, serverRevision: decision.server.updatedAt, dirty: false };
           persistedGenerationRef.current = draftGenerationRef.current;
-          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+          writeDraftBoth(draftEnvelopeRef.current);
           return;
         }
         if (decision.action === 'use-server') {
@@ -672,7 +716,7 @@ export default function ScriptIDE({
           setCharacters(decision.server.characters as typeof characters);
           setResearchNotes(decision.server.researchNotes as typeof researchNotes);
           setIsDarkMode(decision.server.isDarkMode);
-          writeScriptIDEDraft(lsSet, cleanEnvelope);
+          writeDraftBoth(cleanEnvelope);
           return;
         }
 
@@ -683,15 +727,43 @@ export default function ScriptIDE({
             // Legacy multi-key imports must still server-save after migration.
             dirty: local.dirty || hadVersionedDraftRef.current === false,
           };
-          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+          writeDraftBoth(draftEnvelopeRef.current);
         }
       })
-      .catch(() => { /* non-critical — continue with local envelope */ })
-      .finally(() => {
+        .catch(() => { /* non-critical — continue with local envelope */ })
+        .finally(() => {
+          if (cancelled) return;
+          persistenceReadyRef.current = true;
+          setPersistenceReady(true);
+        });
+    };
+
+    readScriptIDEDraftIDB()
+      .catch(() => null) // belt-and-suspenders: readScriptIDEDraftIDB already never rejects
+      .then((idbEnvelope) => {
         if (cancelled) return;
-        persistenceReadyRef.current = true;
-        setPersistenceReady(true);
+        const localDecision = decideScriptIDELocalRestore(draftEnvelopeRef.current, idbEnvelope);
+        if (localDecision.action === 'use-indexeddb') {
+          const envelope = localDecision.envelope;
+          draftEnvelopeRef.current = envelope;
+          skipNextLocalWriteRef.current = true;
+          mutateDraft(envelope.scriptText);
+          setSnapshots(envelope.snapshots as { id: string; name: string; text: string; date: string }[]);
+          setCharacters(envelope.characters as typeof characters);
+          setResearchNotes(envelope.researchNotes as typeof researchNotes);
+          setIsDarkMode(envelope.isDarkMode);
+          setTitlePage(envelope.titlePage);
+          // Bring localStorage up to date with the envelope IndexedDB just
+          // supplied — the next reload should not have to repeat this
+          // reconciliation from the same stale localStorage copy.
+          writeDraftBoth(envelope);
+        }
+      })
+      .catch(() => { /* best-effort — continue with the localStorage envelope */ })
+      .finally(() => {
+        if (!cancelled) runServerReconcile();
       });
+
     return () => { cancelled = true; };
   }, []); // mount only
 
@@ -706,6 +778,11 @@ export default function ScriptIDE({
 
     const saveToServer = (opts: { updateStatus: boolean; keepalive?: boolean } = { updateStatus: true }) => {
       if (!persistenceReadyRef.current) return;
+      // E4: never re-save to the server once "delete everything" has begun —
+      // see suppressPersistenceRef's declaration for why the reload's own
+      // visibilitychange('hidden') would otherwise resurrect the just-deleted
+      // session server-side.
+      if (suppressPersistenceRef.current) return;
       if (inFlight) {
         trailingRequested = true;
         return;
@@ -749,7 +826,7 @@ export default function ScriptIDE({
           );
           draftEnvelopeRef.current = transition.envelope;
           persistedGenerationRef.current = Math.max(persistedGenerationRef.current, generation);
-          const localWriteOk = writeScriptIDEDraft(lsSet, transition.envelope);
+          const localWriteOk = writeDraftBoth(transition.envelope);
           if (transition.needsTrailingSave) trailingRequested = true;
           if (opts.updateStatus && mountedRef.current && transition.acknowledgedCurrentDraft) {
             setSaveStatus(localWriteOk ? "saved-server" : "save-failed");
@@ -768,11 +845,15 @@ export default function ScriptIDE({
     };
     requestServerSaveRef.current = saveToServer;
     const syncLocalEnvelope = () => {
+      // E4: same suppression as saveToServer above — once "delete
+      // everything" has begun, this must not write the pre-deletion draft
+      // back into localStorage/IndexedDB.
+      if (suppressPersistenceRef.current) return false;
       if (!scriptIDEDraftStatesEqual(draftEnvelopeRef.current, draftRef.current)) {
         draftEnvelopeRef.current = updateScriptIDEDraft(draftEnvelopeRef.current, draftRef.current);
         draftGenerationRef.current += 1;
       }
-      return writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+      return writeDraftBoth(draftEnvelopeRef.current);
     };
     const interval = setInterval(() => saveToServer({ updateStatus: true }), 30_000);
     const onVis = () => {
@@ -1626,7 +1707,7 @@ export default function ScriptIDE({
     setResearchNotes(server.researchNotes as typeof researchNotes);
     setIsDarkMode(server.isDarkMode);
     setSaveStatus("saved-server");
-    writeScriptIDEDraft(lsSet, cleanEnvelope);
+    writeDraftBoth(cleanEnvelope);
   };
 
   const keepLocalConflictDraft = () => {
@@ -1640,7 +1721,7 @@ export default function ScriptIDE({
     saveConflictRef.current = null;
     setSaveConflict(null);
     setSaveStatus("saving-server");
-    writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+    writeDraftBoth(draftEnvelopeRef.current);
     requestServerSaveRef.current({ updateStatus: true });
   };
 
@@ -2015,7 +2096,10 @@ export default function ScriptIDE({
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
             <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto bg-[var(--sm-paper)] shadow-2xl">
               <Suspense fallback={<div className="p-8 font-mono text-xs">Loading settings…</div>}>
-                <SettingsPanel onClose={() => setPrefsOpen("none")} />
+                <SettingsPanel
+                  onClose={() => setPrefsOpen("none")}
+                  onBeginDataWipe={() => { suppressPersistenceRef.current = true; }}
+                />
               </Suspense>
             </div>
           </div>

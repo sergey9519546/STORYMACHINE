@@ -11,6 +11,8 @@ import {
 import { AIProviderSettings } from "./AIProviderSettings";
 import { getLabsEnabled, setLabsEnabled } from "../lib/feature-flags";
 import { getSessionId, setSessionId } from "../lib/session";
+import { wipeAllScriptIDEData, type ScriptIDEWipeResult } from "../lib/scriptide-wipe";
+import { wipeScriptIDEIDB } from "../lib/scriptide-idb-store";
 
 type AiProviderName  = "gemini" | "openai-compat";
 type AiMediaProvider = "gemini" | "openai-compat" | "none";
@@ -42,6 +44,14 @@ interface AiConfig {
 
 interface SettingsPanelProps {
   onClose: () => void;
+  /** E4: called synchronously the instant "Delete Everything" is confirmed,
+   *  BEFORE any async wipe work starts. ScriptIDE.tsx wires this to flip its
+   *  suppressPersistenceRef — without it, the delete control's own
+   *  window.location.reload() fires a visibilitychange('hidden') event that
+   *  ScriptIDE's EXISTING autosave-on-hide handler would otherwise treat as
+   *  an ordinary tab-hide, silently re-saving the pre-deletion draft to
+   *  localStorage/IndexedDB/server right as the "clean" reload happens. */
+  onBeginDataWipe?: () => void;
 }
 
 type Tab = "llm" | "image" | "tts" | "embeddings" | "story" | "providers" | "session" | "labs";
@@ -541,11 +551,57 @@ function StoryTab() {
 // ── Session tab ───────────────────────────────────────────────────────────────
 // Writer-facing session bearer capability key management & rotation (Docs/AUTH.md).
 
-function SessionTab() {
+// E4 "delete everything" — real dependencies for wipeAllScriptIDEData
+// (src/lib/scriptide-wipe.ts). Kept as a plain object literal, not inline at
+// the call site, so the pure orchestration function stays testable with a
+// mock version of this same shape and this file never has to import
+// anything DOM-specific beyond what it already touches.
+const REAL_WIPE_DEPS = {
+  deleteServerSession: async () => {
+    try {
+      const res = await fetch("/api/session/delete", { method: "POST" });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+  clearLocalStorage: () => { localStorage.clear(); return true; },
+  clearSessionStorage: () => { sessionStorage.clear(); return true; },
+  wipeIndexedDB: wipeScriptIDEIDB,
+};
+
+function SessionTab({ onBeginDataWipe }: { onBeginDataWipe?: () => void }) {
   const [currentId, setCurrentId] = useState(getSessionId());
   const [rotating, setRotating]   = useState(false);
   const [rotated, setRotated]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
+
+  // Delete-everything: two-step (reveal confirm, then confirm) rather than a
+  // native window.confirm — same rationale as ScriptIDE.tsx's
+  // ChangeSetupConfirmModal (QA P1-5: native confirms block the thread, are
+  // unstyleable, and can't be dismissed by Esc).
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<ScriptIDEWipeResult | null>(null);
+
+  const handleDeleteEverything = async () => {
+    // Synchronous, before any await: stop ScriptIDE's own autosave/
+    // visibilitychange handlers from writing the still-in-memory
+    // (pre-deletion) draft back anywhere once the wipe below starts — see
+    // this prop's doc comment on SettingsPanelProps.
+    onBeginDataWipe?.();
+    setDeleting(true);
+    const result = await wipeAllScriptIDEData(REAL_WIPE_DEPS);
+    setDeleteResult(result);
+    setDeleting(false);
+    // Reload regardless of individual step outcomes: whatever DID clear
+    // (almost always everything — these are independent, low-failure-rate
+    // browser primitives) must be reflected in a fresh mount rather than
+    // left sitting in component state the writer can no longer act on. A
+    // brief pause lets the result line below actually be read before the
+    // page goes away.
+    setTimeout(() => window.location.reload(), 1200);
+  };
 
   const handleRotate = async () => {
     setRotating(true);
@@ -609,6 +665,63 @@ function SessionTab() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* E4: "delete everything" — a visible, honest, confirm-gated wipe of
+          every store this app writes to: the local draft mirror (localStorage
+          + IndexedDB), every other local preference/flag, and this session's
+          server-side saved data (server/routes/config.ts's
+          POST /api/session/delete -> destroySession, the same true wipe used
+          by session rotation's rollback paths). See #privacy for the fuller
+          claim this control backs. */}
+      <div className="flex flex-col gap-2 border-2 border-red-700 p-4 bg-red-50">
+        <div className="font-bold text-sm uppercase tracking-wider text-red-800">
+          Delete Everything
+        </div>
+        <p className="text-xs text-gray-700 font-mono leading-relaxed">
+          Permanently deletes your draft, snapshots, characters, and research notes — both the copy saved in this browser (localStorage and IndexedDB) and this session&apos;s saved copy on this server. It also clears every other local preference (theme, Labs, dismissed banners) and mints a fresh session ID on reload. This cannot be undone, and it does not touch files you already exported to your computer.
+        </p>
+        {!deleteConfirmOpen && !deleting && !deleteResult && (
+          <button
+            onClick={() => setDeleteConfirmOpen(true)}
+            className="mt-2 self-start px-4 py-2 font-bold uppercase tracking-wider text-xs border-2 border-red-700 text-red-800 hover:bg-red-700 hover:text-white transition-colors"
+          >
+            Delete Everything
+          </button>
+        )}
+        {deleteConfirmOpen && !deleting && !deleteResult && (
+          <div className="mt-2 flex flex-col gap-2 border-2 border-red-700 bg-white p-3">
+            <p className="text-xs font-mono font-bold text-red-800 uppercase">
+              Are you sure? This is permanent.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteEverything}
+                className="px-4 py-2 border-2 border-red-700 bg-red-700 text-white font-bold uppercase text-xs hover:bg-red-800 transition-colors"
+              >
+                Yes, delete everything
+              </button>
+            </div>
+          </div>
+        )}
+        {deleting && (
+          <span className="text-xs font-mono font-bold text-red-800 uppercase">
+            Deleting…
+          </span>
+        )}
+        {deleteResult && (
+          <span className="text-xs font-mono font-bold text-red-800 uppercase">
+            {deleteResult.serverDeleted && deleteResult.localStorageCleared && deleteResult.indexedDBWiped
+              ? "Deleted. Reloading…"
+              : "Deleted what this browser could reach. Reloading…"}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -679,7 +792,7 @@ function LabsTab() {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function SettingsPanel({ onClose }: SettingsPanelProps) {
+export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("providers");
   const [cfg, setCfg]             = useState<AiConfig | null>(null);
   const [loading, setLoading]     = useState(true);
@@ -881,7 +994,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               )}
               {activeTab === "story" && <StoryTab />}
-              {activeTab === "session" && <SessionTab />}
+              {activeTab === "session" && <SessionTab onBeginDataWipe={onBeginDataWipe} />}
               {activeTab === "labs" && <LabsTab />}
             </div>
 
