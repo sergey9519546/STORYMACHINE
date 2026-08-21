@@ -1,11 +1,12 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-08-21, main @ 0c0a80c: Phases W and E are COMPLETE** —
-all six W lanes, all five E lanes, and Phase E's judged design-quality
-exit gate (met after one honest NOT-MET round and a three-item punch-list
-fix; see the gate note). Next: Phase S, with Phase P's measurement lanes
-in parallel and Phase T's owner-machine items still open. Successor to
-`PATH_TO_DONE.md`'s
+**State as of 2026-08-21, main @ a541460: Phases W and E are COMPLETE and
+Phase S's code lanes are DONE** — all six W lanes, all five E lanes, the
+judged E exit gate (met after one honest NOT-MET round), S1–S3 landed, and
+the first release (`1.0.0-rc.1`, Docker image published via the Release
+workflow). What remains is genuinely human-side: Phase S's owner
+deployment items and stranger-week pilot, Phase P's measurement lanes, and
+Phase T's owner-machine items. Successor to `PATH_TO_DONE.md`'s
 task framing: that file tracks ROADMAP phases; this one sequences everything
 measured by the three 2026-08-14 audits (UX-in-browser, engine-truth,
 ship-vehicle) into the shortest honest path to a product that is *truly
@@ -239,17 +240,42 @@ No silent drift.
 
 ## Phase S — Ship it and keep it alive (1 week)
 
-From the ops audit — the Docker vehicle is already well-built; finish it:
-scheduled backups wired into the deployment (tooling exists, cadence
-doesn't); re-verify `RELIABILITY.md`'s open concurrency defects against
-current main; add the missing global room cap; set
-`ADMIN_TOKEN`/`TRUST_PROXY`/`METRICS_TOKEN` in the real environment;
-exercise the backup → restore loop once end-to-end; one load test of N
-concurrent feature-length analyses (meaningful only after W1/W2); cut the
-first real tagged release through `release.yml`.
+From the ops audit — the Docker vehicle is already well-built; finish it.
+**Code lanes DONE 2026-08-21 (`5abbfef` + `a541460`):**
+
+- **S1 ✓** Backup cadence: opt-in `BACKUP_INTERVAL_HOURS` timer in
+  `server.ts` running the existing `backupSessions()`; and the restore path
+  now EXISTS as code (`restoreSession()` + `npm run restore-session`),
+  proven by a drill test that backs up a real session, destroys it,
+  restores, and asserts the `.db` byte-identical with every field
+  round-tripped — a backup that has never been restored is not a backup.
+- **S2 ✓** `RELIABILITY.md` §IV-C re-verified with dated verdicts: CON-001/
+  002/004 VERIFIED-FIXED; **CON-003 was still present** (Director's Cut,
+  Converge-commit, and the Move Bus appended/reverted commits directly on
+  Stage while the Orchestrator's cached head went stale) — fixed via
+  `Orchestrator.syncFromStage()` at all three sites, regression-tested.
+  Global `MAX_ROOMS` cap (env, default 50, 429 at the boundary) added.
+- **S3 ✓** `scripts/load-test-doctor.mjs`: 10 concurrent feature-length
+  (250-scene) doctor runs × 3 rounds on a 4-CPU container — 30/30
+  succeeded, p50 4.4s / p95 7.9s, with `/health` probed every 200ms
+  answering p50 2ms / max 384ms throughout. The W1/W2 work holds under
+  concurrency.
+- **S4 (partial) ✓** Version bumped to `1.0.0-rc.1` — deliberately a
+  release candidate, not 1.0.0: the 1.0 definition below requires the
+  receipt trail's open `graphDeduction` obligation and human validation
+  that remain owner-side. The Release workflow ran via `workflow_dispatch`
+  on `a541460` and **published the first versioned Docker image to GHCR**
+  (Release run: success, 2026-08-21). The annotated `v1.0.0-rc.1` git tag
+  exists locally but the session's git proxy blocks tag pushes — pushing
+  it is an owner click. (A stale `v1.0.0` tag from an old commit sits on
+  the remote with no release behind it; owner may want to delete it.)
+
+**Still owner-only:** set `ADMIN_TOKEN`/`TRUST_PROXY`/`METRICS_TOKEN` in
+the real environment; enable `BACKUP_INTERVAL_HOURS` (and retention) in
+production; push the `v1.0.0-rc.1` tag.
 
 **Exit gate:** the stranger-week test — one pilot writer uses a hosted
-instance for a week and loses nothing.
+instance for a week and loses nothing. Human-only; not started.
 
 ## Definition of 1.0
 
