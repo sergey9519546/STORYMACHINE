@@ -19,7 +19,7 @@ import { generateContent, modelForTask, getTemperature } from '../engine/ai.ts';
 import { createVerifiedBackup, pruneSessionResetBackups } from '../lib/backup.ts';
 import {
   asyncHandler, requireString, sessionId, getOrCreateSession,
-  withSessionCommand, gameLimiter, aiLimiter, sessions, runningRooms,
+  withSessionCommand, gameLimiter, aiLimiter, sessions, runningRooms, MAX_ROOMS,
   PERSIST_SESSIONS, SESSION_BACKUP_DIR, SESSION_RESET_BACKUP_KEEP, SESSION_RESET_BACKUP_TTL_HOURS,
 } from '../lib/session-store.ts';
 import type { RoomProgressEvent } from '../engine/Orchestrator.ts';
@@ -145,6 +145,18 @@ function reserveSimulationRooms(
       const lockKeys = roomIdsFor(req).map(roomId => `${sid}:${roomId}`);
       if (lockKeys.some(lockKey => runningRooms.has(lockKey))) {
         res.status(409).json({ error: 'Simulation is already running or queued for one or more of these rooms. Please wait.' });
+        return;
+      }
+      // S2 (RELIABILITY.md, global room cap): a duplicate-key check alone
+      // never bounded the process-wide TOTAL of concurrently reserved rooms
+      // across every session. New (non-duplicate) keys are rejected outright
+      // once admitting them would push the process over MAX_ROOMS — a clear
+      // 429 rather than an unbounded queue or letting the server fall over
+      // under real concurrent load.
+      if (runningRooms.size + lockKeys.length > MAX_ROOMS) {
+        res.status(429).json({
+          error: `Server is at capacity for concurrent room simulations (max ${MAX_ROOMS}). Please retry shortly.`,
+        });
         return;
       }
       lockKeys.forEach(lockKey => runningRooms.add(lockKey));

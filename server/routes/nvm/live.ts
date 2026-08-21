@@ -98,7 +98,7 @@ router.post('/api/nvm/room/critique', gameLimiter, validate(RoomCritiqueBodySche
 
 // POST /api/nvm/live/move — Author-Presence Move Bus.
 router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), withSessionCommand(async (req, res, session) => {
-  const { stage } = session;
+  const { stage, orchestrator } = session;
   const { text, sceneIdx: bodySceneIdx } = req.body as { text: string; sceneIdx?: number };
   if (text.trim().length === 0) {
     res.status(400).json({ error: 'text is required' });
@@ -143,6 +143,10 @@ router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), wit
     const last = allCommits[allCommits.length - 1];
     if (last) {
       stage.revertCommit(last.commitId);
+      // CON-003 (RELIABILITY.md): the Orchestrator's cached head/state must
+      // drop the reverted commit too, or the next turn parents right back on
+      // top of a commit canon no longer recognizes.
+      orchestrator.syncFromStage();
       res.json({ verb: 'OVERRULE', summary: move.summary, commitId: null, reverted: last.commitId, tier1Pass: true, ambiguous: false });
     } else {
       res.json({ verb: 'OVERRULE', summary: 'No commit to revert', commitId: null, reverted: null, tier1Pass: true, ambiguous: true });
@@ -155,6 +159,9 @@ router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), wit
 
   if (commit) {
     stage.appendCommit(commit);
+    // CON-003 (RELIABILITY.md) — see the identical comment on the OVERRULE
+    // branch above and on /api/nvm/inject-ops.
+    orchestrator.syncFromStage();
     res.json({
       verb: move.intent.verb,
       summary: move.summary,

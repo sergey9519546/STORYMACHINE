@@ -1,10 +1,12 @@
 import 'dotenv/config';
 import fs from 'fs';
+import path from 'path';
 import { fileURLToPath } from 'url';
 import type { Server } from 'http';
 import { initFromEnv } from './server/lib/ai-config.ts';
 import { logger } from './server/lib/logger.ts';
 import { sessions, PERSIST_SESSIONS, SESSION_DB_DIR } from './server/lib/session-store.ts';
+import { backupSessions } from './server/lib/backup.ts';
 import { createApp } from './server/app.ts';
 import { attachCollabServer } from './server/collab/yjs-server.ts';
 
@@ -92,6 +94,54 @@ export function installCrashHandlers(shutdown: (signal: string, exitCode?: numbe
   });
 }
 
+/**
+ * S1 (docs/PATH_TO_EXCELLENCE.md Phase S): give `npm run backup`'s existing
+ * logic (server/lib/backup.ts) a real cadence instead of leaving scheduling
+ * entirely to an operator's own cron entry (README's documented fallback,
+ * still valid and still the only option before this). Opt-in and OFF by
+ * default — keyless-first minimalism: a deployment that never sets
+ * `BACKUP_INTERVAL_HOURS` behaves exactly as it always has, no background
+ * timer, no `backup/` directory created, no surprise disk writes. No new
+ * dependency and no assumed cron binary: a plain in-process `setInterval`,
+ * `unref()`'d exactly like every session-store sweep interval
+ * (server/lib/session-store.ts) so it can never by itself keep the process
+ * alive past a graceful shutdown.
+ *
+ * Reads the SAME env vars `scripts/backup-sessions.ts` (the manual/cron
+ * entrypoint) reads — `BACKUP_DIR`, `BACKUP_RETENTION_DAYS`,
+ * `BACKUP_RETENTION_KEEP` — so operators do not need a second, divergent
+ * config surface for the two ways of running the identical backup logic.
+ * Exported (not just called inline) so it's unit-testable without booting a
+ * real HTTP listener — see tests/core/backup-schedule.test.ts.
+ */
+export function startBackupSchedule(): NodeJS.Timeout | undefined {
+  const hours = Number(process.env.BACKUP_INTERVAL_HOURS ?? 0);
+  if (!Number.isFinite(hours) || hours <= 0) return undefined;
+  if (!PERSIST_SESSIONS) {
+    logger.warn('backup_schedule_skipped', { reason: 'SESSION_DB_DIR is :memory: — nothing to back up' });
+    return undefined;
+  }
+
+  const backupRootDir = process.env.BACKUP_DIR ?? path.join(process.cwd(), 'backup');
+  const retentionDays = process.env.BACKUP_RETENTION_DAYS ? Number(process.env.BACKUP_RETENTION_DAYS) : undefined;
+  const retentionKeep = process.env.BACKUP_RETENTION_KEEP ? Number(process.env.BACKUP_RETENTION_KEEP) : undefined;
+
+  const run = (): void => {
+    backupSessions({
+      sessionDbDir: SESSION_DB_DIR, backupRootDir, now: Date.now(), retentionDays, retentionKeep,
+    }).then((summary) => {
+      if (!summary.noop) logger.info('backup_schedule_run', { ...summary });
+    }).catch((err) => {
+      logger.error('backup_schedule_failed', { error: err instanceof Error ? err.message : String(err) });
+    });
+  };
+
+  const timer = setInterval(run, hours * 60 * 60 * 1000);
+  timer.unref();
+  logger.info('backup_schedule_started', { intervalHours: hours, backupRootDir });
+  return timer;
+}
+
 async function startServer() {
   if (PERSIST_SESSIONS) {
     fs.mkdirSync(SESSION_DB_DIR, { recursive: true });
@@ -99,6 +149,7 @@ async function startServer() {
   }
 
   const app = await createApp();
+  startBackupSchedule();
 
   const PORT = Number(process.env.PORT ?? 3000);
   if (isNaN(PORT) || PORT < 1 || PORT > 65535) {

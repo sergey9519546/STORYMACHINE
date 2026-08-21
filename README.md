@@ -191,6 +191,15 @@ Growth is bounded automatically, in two independent ways:
   (`SESSION_IDLE_TTL_MINUTES`, default 1440 = 24h) close a session's open
   file handle, but never delete the file — the session resumes on its next
   request.
+- **`MAX_ROOMS`** (default 50): the process-wide cap on concurrently reserved
+  room simulations across every session (`/api/run-room`,
+  `/api/run-room-stream`, `/api/run-scene` — each up to 8 locations,
+  `RunSceneBodySchema`). Independent of the existing per-session,
+  per-location duplicate-reservation lock (still a `409`); once admitting a
+  *new*, non-duplicate reservation would push the process over `MAX_ROOMS`,
+  the request gets a clear `429` instead of an unbounded queue or letting the
+  server fall over under real concurrent load. Raise it for a deployment
+  expecting heavier concurrent usage.
 - **Disk cleanup** (`SESSION_FILE_TTL_HOURS`, default 168 = 7 days) actually
   *deletes* `.db` files (and their `-wal`/`-shm`/`-journal` siblings) once
   they've sat orphaned (not currently loaded in memory) longer than that —
@@ -235,13 +244,49 @@ Example cron entry (hourly, keep 14 days):
 0 * * * * cd /path/to/storymachine && BACKUP_RETENTION_DAYS=14 npm run backup >> /var/log/storymachine-backup.log 2>&1
 ```
 
-**Restoring a snapshot:** stop the server (so no handle has the target
-session db open), copy the desired file out of a snapshot directory back
-into `SESSION_DB_DIR` under its original name — e.g.
-`cp backup/2026-07-10T12-34-56-789Z/<sessionId>.db data/sessions/<sessionId>.db`
-— then restart the server. To restore every session, copy the whole
-snapshot directory's `*.db` files over `SESSION_DB_DIR` the same way before
-restarting.
+**Scheduling it without cron:** set `BACKUP_INTERVAL_HOURS` and the running
+server itself runs the identical backup logic on an in-process timer — no
+new dependency, no assumed cron binary, useful for a deployment (e.g. a
+container) that has no host-level cron available. **Off by default** (unset
+= no background timer, no `backup/` directory created — keyless-first
+minimalism: a deployment that never sets it behaves exactly as it always
+did) and only meaningful in `PERSIST_SESSIONS` mode. Reads the same
+`BACKUP_DIR` / `BACKUP_RETENTION_DAYS` / `BACKUP_RETENTION_KEEP` vars as the
+CLI/cron path above, so there's one config surface for both ways of running
+the same backup. Example:
+```
+BACKUP_INTERVAL_HOURS=6
+BACKUP_RETENTION_DAYS=14
+```
+The two scheduling methods are not mutually exclusive but are redundant with
+each other — pick whichever fits the deployment (cron for a host with cron
+available and log rotation already set up; `BACKUP_INTERVAL_HOURS` for a
+container/PaaS deployment without one).
+
+**Restoring a snapshot — two ways:**
+
+1. **Manual (server stopped):** copy the desired file out of a snapshot
+   directory back into `SESSION_DB_DIR` under its original name — e.g.
+   `cp backup/2026-07-10T12-34-56-789Z/<sessionId>.db data/sessions/<sessionId>.db`
+   — then restart the server. To restore every session, copy the whole
+   snapshot directory's `*.db` files over `SESSION_DB_DIR` the same way
+   before restarting.
+2. **`npm run restore-session <sessionId> <snapshotFile>`** (server can stay
+   running): runs `server/lib/backup.ts`'s `restoreSession()` — verifies the
+   snapshot's SQLite integrity before publishing, then copies it into
+   `SESSION_DB_DIR/<sessionId>.db`. It refuses to overwrite a session
+   database that's still present on disk (call `POST /api/session/delete`,
+   or otherwise remove it, first) — restoring under a **new** session id
+   needs no such precondition and is always safe. Example:
+   ```
+   npm run backup                                                     # take a snapshot
+   curl -X POST http://localhost:3000/api/session/delete -H 'Content-Type: application/json' -d '{"sessionId":"abc123"}'
+   npm run restore-session abc123 backup/2026-08-21T12-00-00-000Z/abc123.db
+   ```
+   `tests/core/backup-restore-drill.test.ts` proves this exact sequence
+   round-trips a session's content byte-exact — a real backup, a real
+   `destroySession()`, a real restore, then reopened and diffed against what
+   was written before the drill.
 
 **Simulation reset:** `POST /api/reset` is not project deletion. It clears
 only simulation state and preserves the writer/editor state, author outline,

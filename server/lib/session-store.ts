@@ -192,6 +192,19 @@ export const SESSION_BACKUP_DIR = process.env.SESSION_BACKUP_DIR
 export const SESSION_RESET_BACKUP_KEEP = boundedIntegerEnv('SESSION_RESET_BACKUP_KEEP', 5, 1, 100);
 export const SESSION_RESET_BACKUP_TTL_HOURS = boundedIntegerEnv('SESSION_RESET_BACKUP_TTL_HOURS', 168, 1, 24 * 365);
 export const MAX_SESSIONS    = boundedIntegerEnv('MAX_SESSIONS', 100, 1, 100_000);
+// S2 (RELIABILITY.md concurrency re-verification, Phase S): `runningRooms`
+// (below) already prevented a duplicate room reservation for the SAME
+// session+location, but nothing bounded the TOTAL count of concurrently
+// reserved rooms across every session on the process — an unbounded set of
+// simultaneous /api/run-room /api/run-room-stream /api/run-scene requests
+// (each up to 8 locations, RunSceneBodySchema) could fan out an unbounded
+// number of parallel LLM-driven room simulations. 50 is deliberately
+// generous for a small pilot deployment (aiLimiter already caps a single
+// client to 20 req/min) while still giving the server's own capacity signal
+// (a clear 429, not an unbounded queue or an OOM) once a deployment is under
+// real concurrent load. Env-tunable via MAX_ROOMS; see
+// reserveSimulationRooms() in server/routes/game.ts for the enforcement site.
+export const MAX_ROOMS        = boundedIntegerEnv('MAX_ROOMS', 50, 1, 100_000);
 // Idle eviction TTL: how long a session may sit untouched in memory before the
 // sweep below closes it. Deliberately generous (24h default) — a writer
 // pausing over lunch, or a tab left open overnight, must not lose in-memory

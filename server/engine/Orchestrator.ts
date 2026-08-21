@@ -211,6 +211,38 @@ export class Orchestrator {
     }
   }
 
+  /**
+   * Re-derive the cached parent-chain head and folded NarrativeState from
+   * Stage's own live commits. CON-003 (RELIABILITY.md): Director's Cut
+   * (`/api/nvm/inject-ops`), Converge-commit (`/api/nvm/converge/commit`),
+   * and the Author-Presence Move Bus (`/api/nvm/live/move`, including its
+   * OVERRULE revert) all append/revert StoryCommits directly on Stage rather
+   * than through this Orchestrator's own runTurn()/runRoomSimulation() paths
+   * — those routes MUST call this immediately after their Stage write so the
+   * next turn's parentId and proof-gate state reflect what canon actually
+   * holds instead of the head this Orchestrator instance last saw itself.
+   * Uses getLiveCommits() (excludes reverted) rather than the constructor's
+   * getCommits(), so an OVERRULE'd commit correctly drops out of both the
+   * parent chain and the folded state instead of remaining chained on top of.
+   */
+  public syncFromStage(): void {
+    const liveCommits = this.stage.getLiveCommits();
+    this._lastCommitId = liveCommits.length > 0
+      ? liveCommits[liveCommits.length - 1].commitId
+      : null;
+    let folded = emptyState();
+    for (const c of liveCommits) folded = applyStoryOps(folded, c.ops);
+    this._narrativeState = folded;
+  }
+
+  /** Read-only accessor for the cached parent-chain head — supports
+   *  CON-003's regression test (tests/core/con-003-orchestrator-sync.test.ts)
+   *  without needing a full AI-driven runTurn() to prove syncFromStage()'s
+   *  effect. Not used by any production route. */
+  public getCachedHeadId(): string | null {
+    return this._lastCommitId;
+  }
+
   public registerAgent(sheet: CharacterSheet) {
     this.stage.addAgent(sheet);
     this.agents.set(sheet.char_id, new Agent(sheet, this.stage));

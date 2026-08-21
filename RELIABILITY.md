@@ -11,6 +11,17 @@
 > superseded: public JSON import is retired and non-mutating; JSON export is a
 > self-describing partial observation that cannot restore a project. The old
 > material remains below only as evidence for why that boundary was retired.
+>
+> **2026-08-21 addendum (docs/PATH_TO_EXCELLENCE.md Phase S, S2):** the four
+> §IV-C Concurrency findings (CON-001 through CON-004) were re-verified
+> against current `main` rather than left as unconfirmed 2026-07-15 prose —
+> each now carries a dated "Re-verification" subsection with a
+> VERIFIED-FIXED / STILL-PRESENT verdict and file:line evidence. Verdicts:
+> CON-001 VERIFIED-FIXED, CON-002 VERIFIED-FIXED, CON-003 STILL PRESENT (fixed
+> in this pass — see its subsection), CON-004 VERIFIED-FIXED. No other
+> section of this document (Correctness, Recovery, Resource, Degradation,
+> Product Behavior, Architecture Debt, Testing Gaps) was in this pass's scope
+> and none of it should be read as re-confirmed by this addendum.
 
 *Companion to `SECURITY.md`. Produced 2026-07-15 (v2). This document is a
 complete rewrite of the original reliability audit, upgraded from a prose-based
@@ -2181,6 +2192,26 @@ implement lock ordering: always acquire turn lock before room lock.
 - **Metric:** `concurrent_mutation_attempt_count` — should be 0 after fix.
 - **Alert:** If > 0, lock exclusion failed.
 
+### Re-verification (2026-08-21, Phase S / S2)
+
+**VERIFIED-FIXED.** `server/lib/session-store.ts`'s `SessionCommandCoordinator`
+(a rejection-safe promise-chain FIFO) replaced both the old `_turnQueue` and
+`runningRooms`-as-a-mutation-lock — every Stage-mutating route (`/api/turn`,
+`/api/run-room`, `/api/run-room-stream`, `/api/run-scene`, `/api/init`,
+`/api/reset`, and every `server/routes/nvm/*` mutation route) is wrapped in
+`withSessionCommand()`, which admits the handler through the SAME
+`session.commands` FIFO regardless of which route it came in on
+(`server/routes/game.ts:254` `/api/turn`, `:413` `/api/run-room` — same
+`session.commands` instance, `getOrCreateSession()` returns the one live
+`Session` per id). `runningRooms` (still present) is now purely an
+early-rejection duplicate-click guard (409) claimed BEFORE the FIFO —
+documented as such at its definition (`reserveSimulationRooms()`'s doc
+comment: "This retains duplicate-click protection while the command waits
+behind an earlier mutation; the FIFO itself remains the source of truth for
+Stage safety"), not a second, independent lock a Turn and a Room could each
+separately hold. Two mutation paths for one session can no longer interleave
+their writes.
+
 ---
 
 ## CON-002: Import/Reset do not join the turn queue
@@ -2247,6 +2278,37 @@ drain: wait for `_turnQueue` to resolve before proceeding with import.
 - **Metric:** `lifecycle_race_count` — lifecycle operations that
   detected an active turn. Should be 0 after fix.
 
+### Re-verification (2026-08-21, Phase S / S2)
+
+**VERIFIED-FIXED**, by two independent mechanisms depending on the route:
+
+- **Reset** (`POST /api/reset`, `server/routes/game.ts:752`) is now wrapped
+  in `withSessionCommand()` — it joins the exact same `session.commands`
+  FIFO a concurrent `/api/turn` uses, so it can no longer destroy/replace a
+  Stage a turn is mid-write on. (It additionally still checks
+  `runningRooms` for this session's keys before proceeding — belt-and-braces
+  on top of the FIFO, not instead of it.)
+- **Import** is moot: `POST /api/session/import` (`server/routes/config.ts:408`)
+  is retired — a non-mutating `410 Gone` tombstone for every request
+  regardless of body — so it cannot race a turn because it never touches
+  Stage at all. (Historical note: this closes CON-002's import half by
+  elimination, not by adding it to the coordinator — worth flagging in case
+  JSON import is ever un-retired, since that would need the same
+  `withSessionCommand()` treatment reset now has.)
+- **`POST /api/session/delete`** (the E4 "delete everything" route, added
+  after this finding was written — `destroySession()`, same primitive) is
+  NOT wrapped in `withSessionCommand()`, but is independently race-safe:
+  `destroySession()` synchronously checks `session.commands.isIdle` and
+  throws `SessionBusyError` (409) if a command is in flight, with no `await`
+  between that check and the close+delete — since Node is single-threaded
+  and the whole function body is synchronous, nothing can admit a new
+  command into the FIFO between the check and the delete. A concurrent
+  `/api/turn` either already incremented `pending` before delete's check
+  (delete sees busy, 409s) or delete already ran first (turn's next
+  `getOrCreateSession()` call constructs a fresh Stage under the same id,
+  same as any other post-eviction reopen). Documented in-code at the route
+  (`server/routes/config.ts`'s comment on `/api/session/delete`).
+
 ---
 
 ## CON-003: Director's Cut and Converge bypass the Orchestrator cache
@@ -2308,6 +2370,39 @@ If unified commit path is too invasive, add a notification mechanism:
 
 - **Metric:** `orchestrator_cache_staleness_duration` — time between
   external commit and Orchestrator cache update. Should be 0.
+
+### Re-verification (2026-08-21, Phase S / S2)
+
+**STILL PRESENT — fixed in this pass.** CON-001/CON-002's unified FIFO
+(`SessionCommandCoordinator`) closed the *concurrent-write-collision* half of
+this finding's original framing, but the *stale-cache* half survived
+unchanged and independent of concurrency: even with every mutation now
+strictly serialized through one FIFO per session, three routes still wrote
+directly to `Stage` via `stage.appendCommit()` / `stage.revertCommit()`
+without ever touching `session.orchestrator`'s private `_lastCommitId` /
+`_narrativeState` cache —
+`server/routes/nvm/commits.ts:78` (`POST /api/nvm/inject-ops`, Director's
+Cut), `server/routes/nvm/commits.ts:172` (`POST /api/nvm/converge/commit`),
+and `server/routes/nvm/live.ts:145`+`:157` (`POST /api/nvm/live/move`, both
+its OVERRULE-revert branch and its normal-commit branch). A same-session
+`/api/turn` (or `/api/run-room`, or `/api/nvm/live/advance`) issued
+afterward would still parent its new commit on the Orchestrator's stale
+cached head — sequentially now, not concurrently, but still wrong, still
+INV-I3.
+
+**Fix landed this pass:** `Orchestrator.syncFromStage()` (new public method,
+`server/engine/Orchestrator.ts`) re-derives both `_lastCommitId` and the
+folded `_narrativeState` from `stage.getLiveCommits()` (correctly excluding
+reverted commits, unlike the constructor's own `getCommits()`-based seed —
+see that method's doc comment for the OVERRULE-vs-restart-rehydration
+distinction). All three bypass sites now call it immediately after their
+Stage write. Regression-tested directly against the Orchestrator (no AI
+mock needed — WAIT-action turns don't produce a commit at all, so exercising
+this through a full `runTurn()` would be unreliable):
+`tests/core/con-003-orchestrator-sync.test.ts` (5/5 passing) reproduces the
+staleness mechanism, proves `syncFromStage()` corrects it across a chain of
+bypass writes, proves it correctly drops a reverted commit from the head,
+and cross-checks it against the constructor's own live-commit semantics.
 
 ---
 
@@ -2374,6 +2469,31 @@ current agent's turn, skip remaining agents, return partial results.
 - **Metric:** `room_simulation_duration_p99` — should be bounded
   after fix.
 - **Alert:** If p99 > 6 minutes, abort mechanism broken.
+
+### Re-verification (2026-08-21, Phase S / S2)
+
+**VERIFIED-FIXED**, dated 2026-08-04 per the in-code history (predates this
+Phase S pass but is re-confirmed against current `main`, not taken on faith):
+`server/routes/game.ts` wires a real `AbortController` through
+`Orchestrator.runRoomSimulation(nodeId, maxTurns, emit?, signal)` for both
+`POST /api/run-room` (`:448`) and its SSE sibling `GET /api/run-room-stream`
+(`:486`). The wall-clock deadline (`RUN_ROOM_BUDGET.timeoutMs`,
+env-tunable via `AI_BUDGET_RUN_ROOM_TIMEOUT_MS`) calls `controller.abort()`
+on fire; the Orchestrator checks the signal at its between-turn boundary
+(never mid-turn — a turn already in flight finishes on its own bounded
+per-call timeout) and winds the simulation down instead of running to
+natural completion. Critically, `await operation` (or `await
+orchestrator.runRoomSimulation(...)` in the SSE route) is still always fully
+awaited even after the deadline fires — `releaseSimulationRooms()` and
+`res.end()` only run once that promise has genuinely settled — so the room
+lock frees up promptly instead of staying stranded for the operation's
+original unbounded duration, and `run-room-stream`'s wall timer additionally
+labels a deadline-caused truncation distinctly
+(`stoppedBy: 'AI_BUDGET_DEADLINE_EXCEEDED'`) from a client disconnect. Both
+route bodies carry extensive in-line history explaining exactly what the
+pre-fix stranded-lock behavior was and why the current design (never abandon
+the promise, only ask it to wind down) was chosen over a cruder
+abandon-and-race approach.
 
 ---
 

@@ -112,6 +112,69 @@ export async function createVerifiedBackup(stage: Stage, destination: string): P
   }
 }
 
+export interface RestoreOptions {
+  /** Full path to the specific `<sessionId>.db` file inside a backup snapshot directory. */
+  snapshotFile: string;
+  /** Destination `SESSION_DB_DIR` — same var the server itself reads. */
+  sessionDbDir: string;
+  /** Session id to restore into (destination filename base). */
+  sessionId: string;
+}
+
+export interface RestoreResult {
+  destination: string;
+}
+
+/**
+ * Restore one session's SQLite file from a `backupSessions()` snapshot. This
+ * is the "prove restore" half of S1 (docs/PATH_TO_EXCELLENCE.md Phase S): a
+ * backup nobody has ever restored from is not a backup.
+ *
+ * The caller is responsible for the session being CLOSED and REMOVED from
+ * the addressable namespace first (`destroySession(sessionId)` — the same
+ * primitive every other lifecycle path in this codebase uses) before
+ * restoring: this function will not overwrite a live/existing session
+ * database, exactly like `createVerifiedBackup()`'s no-clobber posture above
+ * and for the same reason — an accidental double-restore, or restoring over
+ * a session that is still live, must never silently discard newer data.
+ * Restoring into a fresh/different `sessionId` (rather than the original
+ * one) is always safe and needs no such precondition.
+ */
+export function restoreSession(opts: RestoreOptions): RestoreResult {
+  const { snapshotFile, sessionDbDir, sessionId } = opts;
+  if (!fs.existsSync(snapshotFile)) {
+    throw new Error(`Backup snapshot not found: ${snapshotFile}`);
+  }
+
+  // Verify integrity before publishing — never restore a corrupt/partial
+  // file over a session id, live or not.
+  const verificationDb = new Database(snapshotFile, { readonly: true, fileMustExist: true });
+  try {
+    const integrity = verificationDb.pragma('quick_check', { simple: true });
+    if (integrity !== 'ok') {
+      throw new Error(`Backup snapshot failed integrity check: ${String(integrity)}`);
+    }
+  } finally {
+    verificationDb.close();
+  }
+
+  fs.mkdirSync(sessionDbDir, { recursive: true });
+  const destination = path.join(sessionDbDir, `${sessionId}.db`);
+  const sqliteSuffixes = ['', '-wal', '-shm', '-journal'] as const;
+  if (sqliteSuffixes.some(suffix => fs.existsSync(destination + suffix))) {
+    throw new Error(
+      `Refusing to restore over an existing session database: ${destination}. `
+      + 'Call destroySession() (or otherwise remove it) first.',
+    );
+  }
+
+  // Copy, never move — the snapshot file remains intact in the backup
+  // directory for a future restore or a different destination sessionId.
+  fs.copyFileSync(snapshotFile, destination);
+  logger.info('restore: complete', { sessionId, snapshotFile, destination });
+  return { destination };
+}
+
 const RESET_BACKUP_FILENAME = /^\d+-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.db$/i;
 const RESET_BACKUP_SESSION_DIRECTORY = /^[A-Za-z0-9_-]{1,64}$/;
 const SQLITE_SIDECARS = ['', '-wal', '-shm', '-journal'] as const;

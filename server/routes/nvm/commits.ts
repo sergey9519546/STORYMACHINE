@@ -59,7 +59,7 @@ router.get('/api/nvm/manifest', gameLimiter, asyncHandler(async (req, res) => {
 
 // POST /api/nvm/inject-ops — Director's Cut: inject custom StoryOps into the canon.
 router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), withSessionCommand(async (req, res, session) => {
-  const { stage } = session;
+  const { stage, orchestrator } = session;
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   const { stateHash } = await import('../../nvm/state/NarrativeState.ts');
   const { summarizeOps } = await import('../../nvm/state/StoryCommit.ts');
@@ -84,6 +84,10 @@ router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), w
     reverted: false,
     createdAt: Date.now(),
   });
+  // CON-003 (RELIABILITY.md): this write bypasses runTurn()/runRoomSimulation(),
+  // so the Orchestrator's cached head/state would otherwise go stale and the
+  // NEXT turn on this session would parent off the wrong commit.
+  orchestrator.syncFromStage();
 
   res.json({
     commitId,
@@ -107,7 +111,7 @@ router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), w
 // call — it only re-proves and commits already-generated ops, same cost profile
 // as /api/nvm/inject-ops.
 router.post('/api/nvm/converge/commit', gameLimiter, validate(ConvergeCommitBodySchema), withSessionCommand(async (req, res, session) => {
-  const { stage } = session;
+  const { stage, orchestrator } = session;
   const { runTier1, tier1Passes, failedProofs } = await import('../../nvm/proof/kernel.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   const { stateHash } = await import('../../nvm/state/NarrativeState.ts');
@@ -178,6 +182,8 @@ router.post('/api/nvm/converge/commit', gameLimiter, validate(ConvergeCommitBody
     reverted: false,
     createdAt: Date.now(),
   });
+  // CON-003 (RELIABILITY.md) — see the identical comment on /api/nvm/inject-ops.
+  orchestrator.syncFromStage();
 
   res.json({
     commitId,
