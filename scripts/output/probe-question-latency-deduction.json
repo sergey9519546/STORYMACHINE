@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-08-03T20:12:33.590Z",
-  "scriptCount": 30,
-  "scriptsAnalyzed": 30,
+  "generatedAt": "2026-08-21T07:51:11.968Z",
+  "scriptCount": 44,
+  "scriptsAnalyzed": 44,
   "candidate5Coverage": {
-    "scriptsWithQuestionsOnClean": 12,
-    "scriptsAnalyzed": 30
+    "scriptsWithQuestionsOnClean": 23,
+    "scriptsAnalyzed": 44
   },
   "degradations": {
     "SCENE_SHUFFLE": {
       "gated": {
-        "totalPairs": 30,
+        "totalPairs": 44,
         "bothGatedPairs": 0,
         "winTieLoss": {
           "win": 0,
@@ -24,23 +24,23 @@
         "verdict": "NO VALID PAIRS (n=0)"
       },
       "ungatedRate": {
-        "totalPairs": 30,
+        "totalPairs": 44,
         "winTieLoss": {
-          "win": 2,
-          "tie": 10,
-          "loss": 0,
-          "n": 12
+          "win": 5,
+          "tie": 16,
+          "loss": 2,
+          "n": 23
         },
         "auc": {
-          "auc": 0.5833333333333334,
-          "n": 12
+          "auc": 0.5652173913043478,
+          "n": 23
         },
-        "verdict": "NEAR CHANCE (AUC 0.583, n=12)"
+        "verdict": "NEAR CHANCE (AUC 0.565, n=23)"
       }
     },
     "MIDPOINT_DROP": {
       "gated": {
-        "totalPairs": 30,
+        "totalPairs": 44,
         "bothGatedPairs": 0,
         "winTieLoss": {
           "win": 0,
@@ -55,23 +55,23 @@
         "verdict": "NO VALID PAIRS (n=0)"
       },
       "ungatedRate": {
-        "totalPairs": 30,
+        "totalPairs": 44,
         "winTieLoss": {
-          "win": 0,
-          "tie": 9,
-          "loss": 1,
-          "n": 10
+          "win": 3,
+          "tie": 14,
+          "loss": 2,
+          "n": 19
         },
         "auc": {
-          "auc": 0.45,
-          "n": 10
+          "auc": 0.5263157894736842,
+          "n": 19
         },
-        "verdict": "BARELY MOVES (moved 1/10)"
+        "verdict": "NEAR CHANCE (AUC 0.526, n=19)"
       }
     },
     "CLIMAX_RELOCATE": {
       "gated": {
-        "totalPairs": 30,
+        "totalPairs": 44,
         "bothGatedPairs": 0,
         "winTieLoss": {
           "win": 0,
@@ -86,18 +86,18 @@
         "verdict": "NO VALID PAIRS (n=0)"
       },
       "ungatedRate": {
-        "totalPairs": 30,
+        "totalPairs": 44,
         "winTieLoss": {
           "win": 2,
-          "tie": 10,
+          "tie": 21,
           "loss": 0,
-          "n": 12
+          "n": 23
         },
         "auc": {
-          "auc": 0.5833333333333334,
-          "n": 12
+          "auc": 0.5434782608695652,
+          "n": 23
         },
-        "verdict": "NEAR CHANCE (AUC 0.583, n=12)"
+        "verdict": "BARELY MOVES (moved 2/23)"
       }
     }
   },
@@ -364,6 +364,45 @@
         "degGated": false
       },
       {
+        "script": "fountain:chain-of-custody.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 1,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:close-quarters.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:code-blue.fountain",
+        "cleanScenes": 14,
+        "degScenes": 14,
+        "cleanRaised": 2,
+        "degRaised": 2,
+        "cleanUnresolvedRate": 0.5,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:counter-offer.fountain",
         "cleanScenes": 10,
         "degScenes": 10,
@@ -390,6 +429,32 @@
         "degGated": false
       },
       {
+        "script": "fountain:high-voltage.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:mise.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:off-season.fountain",
         "cleanScenes": 9,
         "degScenes": 9,
@@ -397,6 +462,32 @@
         "degRaised": 0,
         "cleanUnresolvedRate": null,
         "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:quiet-season.fountain",
+        "cleanScenes": 10,
+        "degScenes": 10,
+        "cleanRaised": 7,
+        "degRaised": 7,
+        "cleanUnresolvedRate": 0.42857142857142855,
+        "degUnresolvedRate": 0.7142857142857143,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:red-line.fountain",
+        "cleanScenes": 14,
+        "degScenes": 14,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
         "cleanDeduction": 0,
         "degDeduction": 0,
         "cleanGated": false,
@@ -429,9 +520,100 @@
         "degGated": false
       },
       {
+        "script": "fountain:same-page.fountain",
+        "cleanScenes": 11,
+        "degScenes": 11,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:soft-launch.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-defense-rests.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
+        "cleanRaised": 4,
+        "degRaised": 4,
+        "cleanUnresolvedRate": 0.5,
+        "degUnresolvedRate": 0.5,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-detour.fountain",
+        "cleanScenes": 11,
+        "degScenes": 11,
+        "cleanRaised": 3,
+        "degRaised": 3,
+        "cleanUnresolvedRate": 0.3333333333333333,
+        "degUnresolvedRate": 0.3333333333333333,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-key-under-the-mat.fountain",
+        "cleanScenes": 11,
+        "degScenes": 11,
+        "cleanRaised": 6,
+        "degRaised": 6,
+        "cleanUnresolvedRate": 0.3333333333333333,
+        "degUnresolvedRate": 0.16666666666666666,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:transfer-window.fountain",
         "cleanScenes": 10,
         "degScenes": 10,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:two-lane.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 4,
+        "degRaised": 4,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0.5,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:undertow.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
         "cleanRaised": 0,
         "degRaised": 0,
         "cleanUnresolvedRate": null,
@@ -756,6 +938,45 @@
         "degGated": false
       },
       {
+        "script": "fountain:chain-of-custody.fountain",
+        "cleanScenes": 13,
+        "degScenes": 11,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:close-quarters.fountain",
+        "cleanScenes": 13,
+        "degScenes": 11,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:code-blue.fountain",
+        "cleanScenes": 14,
+        "degScenes": 11,
+        "cleanRaised": 2,
+        "degRaised": 2,
+        "cleanUnresolvedRate": 0.5,
+        "degUnresolvedRate": 0.5,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:counter-offer.fountain",
         "cleanScenes": 10,
         "degScenes": 8,
@@ -782,6 +1003,32 @@
         "degGated": false
       },
       {
+        "script": "fountain:high-voltage.fountain",
+        "cleanScenes": 13,
+        "degScenes": 11,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:mise.fountain",
+        "cleanScenes": 12,
+        "degScenes": 9,
+        "cleanRaised": 1,
+        "degRaised": 0,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:off-season.fountain",
         "cleanScenes": 9,
         "degScenes": 7,
@@ -789,6 +1036,32 @@
         "degRaised": 0,
         "cleanUnresolvedRate": null,
         "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:quiet-season.fountain",
+        "cleanScenes": 10,
+        "degScenes": 8,
+        "cleanRaised": 7,
+        "degRaised": 5,
+        "cleanUnresolvedRate": 0.42857142857142855,
+        "degUnresolvedRate": 0.4,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:red-line.fountain",
+        "cleanScenes": 14,
+        "degScenes": 11,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
         "cleanDeduction": 0,
         "degDeduction": 0,
         "cleanGated": false,
@@ -821,9 +1094,100 @@
         "degGated": false
       },
       {
+        "script": "fountain:same-page.fountain",
+        "cleanScenes": 11,
+        "degScenes": 9,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:soft-launch.fountain",
+        "cleanScenes": 12,
+        "degScenes": 9,
+        "cleanRaised": 1,
+        "degRaised": 0,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-defense-rests.fountain",
+        "cleanScenes": 12,
+        "degScenes": 9,
+        "cleanRaised": 4,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0.5,
+        "degUnresolvedRate": 1,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-detour.fountain",
+        "cleanScenes": 11,
+        "degScenes": 9,
+        "cleanRaised": 3,
+        "degRaised": 2,
+        "cleanUnresolvedRate": 0.3333333333333333,
+        "degUnresolvedRate": 0.5,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-key-under-the-mat.fountain",
+        "cleanScenes": 11,
+        "degScenes": 9,
+        "cleanRaised": 6,
+        "degRaised": 4,
+        "cleanUnresolvedRate": 0.3333333333333333,
+        "degUnresolvedRate": 0.5,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:transfer-window.fountain",
         "cleanScenes": 10,
         "degScenes": 8,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:two-lane.fountain",
+        "cleanScenes": 13,
+        "degScenes": 11,
+        "cleanRaised": 4,
+        "degRaised": 4,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:undertow.fountain",
+        "cleanScenes": 12,
+        "degScenes": 9,
         "cleanRaised": 0,
         "degRaised": 0,
         "cleanUnresolvedRate": null,
@@ -1148,6 +1512,45 @@
         "degGated": false
       },
       {
+        "script": "fountain:chain-of-custody.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:close-quarters.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:code-blue.fountain",
+        "cleanScenes": 14,
+        "degScenes": 14,
+        "cleanRaised": 2,
+        "degRaised": 2,
+        "cleanUnresolvedRate": 0.5,
+        "degUnresolvedRate": 0.5,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:counter-offer.fountain",
         "cleanScenes": 10,
         "degScenes": 10,
@@ -1174,6 +1577,32 @@
         "degGated": false
       },
       {
+        "script": "fountain:high-voltage.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:mise.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:off-season.fountain",
         "cleanScenes": 9,
         "degScenes": 9,
@@ -1181,6 +1610,32 @@
         "degRaised": 0,
         "cleanUnresolvedRate": null,
         "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:quiet-season.fountain",
+        "cleanScenes": 10,
+        "degScenes": 10,
+        "cleanRaised": 7,
+        "degRaised": 7,
+        "cleanUnresolvedRate": 0.42857142857142855,
+        "degUnresolvedRate": 0.42857142857142855,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:red-line.fountain",
+        "cleanScenes": 14,
+        "degScenes": 14,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
         "cleanDeduction": 0,
         "degDeduction": 0,
         "cleanGated": false,
@@ -1213,9 +1668,100 @@
         "degGated": false
       },
       {
+        "script": "fountain:same-page.fountain",
+        "cleanScenes": 11,
+        "degScenes": 11,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:soft-launch.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
+        "cleanRaised": 1,
+        "degRaised": 1,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-defense-rests.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
+        "cleanRaised": 4,
+        "degRaised": 4,
+        "cleanUnresolvedRate": 0.5,
+        "degUnresolvedRate": 0.5,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-detour.fountain",
+        "cleanScenes": 11,
+        "degScenes": 11,
+        "cleanRaised": 3,
+        "degRaised": 3,
+        "cleanUnresolvedRate": 0.3333333333333333,
+        "degUnresolvedRate": 0.3333333333333333,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:the-key-under-the-mat.fountain",
+        "cleanScenes": 11,
+        "degScenes": 11,
+        "cleanRaised": 6,
+        "degRaised": 6,
+        "cleanUnresolvedRate": 0.3333333333333333,
+        "degUnresolvedRate": 0.3333333333333333,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
         "script": "fountain:transfer-window.fountain",
         "cleanScenes": 10,
         "degScenes": 10,
+        "cleanRaised": 0,
+        "degRaised": 0,
+        "cleanUnresolvedRate": null,
+        "degUnresolvedRate": null,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:two-lane.fountain",
+        "cleanScenes": 13,
+        "degScenes": 13,
+        "cleanRaised": 4,
+        "degRaised": 4,
+        "cleanUnresolvedRate": 0,
+        "degUnresolvedRate": 0,
+        "cleanDeduction": 0,
+        "degDeduction": 0,
+        "cleanGated": false,
+        "degGated": false
+      },
+      {
+        "script": "fountain:undertow.fountain",
+        "cleanScenes": 12,
+        "degScenes": 12,
         "cleanRaised": 0,
         "degRaised": 0,
         "cleanUnresolvedRate": null,

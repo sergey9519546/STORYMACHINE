@@ -1,0 +1,1019 @@
+{
+  "generatedAt": "2026-08-21T07:56:27.325Z",
+  "agencySignalPartB": {
+    "d1": {
+      "total": 44,
+      "disagree": 2
+    },
+    "d2": {
+      "total": 44,
+      "disagree": 4
+    },
+    "rows": [
+      {
+        "script": "calibration:Low Tide (strong)",
+        "protagonist": "REYES",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Nine Minutes (strong)",
+        "protagonist": "PRIYA",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:The Long Game (strong)",
+        "protagonist": "ODELL",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Second Wind (strong)",
+        "protagonist": "RUTH",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": true,
+          "disagreement": true
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Sunlight Clause (strong)",
+        "protagonist": "DANA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Reasonable Doubt (competent)",
+        "protagonist": "ALICIA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Thanksgiving, Maybe (competent)",
+        "protagonist": "NORA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:The Dead Drop (competent)",
+        "protagonist": "FARROW",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Encore (competent)",
+        "protagonist": "PRIYA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Zero Day (competent)",
+        "protagonist": "NADIA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 3,
+          "disagreement": true
+        }
+      },
+      {
+        "script": "calibration:Yard Signs (weak)",
+        "protagonist": "CANDIDATE",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Merge (weak)",
+        "protagonist": "PRIYA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Splitting the House (weak)",
+        "protagonist": "DEREK",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:The Visit (weak)",
+        "protagonist": "ELENA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:The Corner Booth (weak)",
+        "protagonist": "MAREN",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:The Grift (troubled)",
+        "protagonist": "RAY",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Adrift (troubled)",
+        "protagonist": "BRYCE",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Lockdown (troubled)",
+        "protagonist": "DUKE",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Whiteout (troubled)",
+        "protagonist": "KOVAC",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "calibration:Firebreak (troubled)",
+        "protagonist": "REESE",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:chain-of-custody.fountain",
+        "protagonist": "NELL",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:close-quarters.fountain",
+        "protagonist": "ROSALIND",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:code-blue.fountain",
+        "protagonist": "RIVA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:counter-offer.fountain",
+        "protagonist": "WREN",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:dead-frequency.fountain",
+        "protagonist": "MAYA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 3,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:high-voltage.fountain",
+        "protagonist": "JUNE",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:mise.fountain",
+        "protagonist": "LUCIA",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": true,
+          "disagreement": true
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:off-season.fountain",
+        "protagonist": "GRETA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:quiet-season.fountain",
+        "protagonist": "MARJORIE",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 3,
+          "disagreement": true
+        }
+      },
+      {
+        "script": "fountain:red-line.fountain",
+        "protagonist": "MARCUS",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:room-12.fountain",
+        "protagonist": "NORA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:runoff.fountain",
+        "protagonist": "SARA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:same-page.fountain",
+        "protagonist": "ALEX",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:soft-launch.fountain",
+        "protagonist": "NADIA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:the-defense-rests.fountain",
+        "protagonist": "DESI",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:the-detour.fountain",
+        "protagonist": "MAYA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 3,
+          "disagreement": true
+        }
+      },
+      {
+        "script": "fountain:the-key-under-the-mat.fountain",
+        "protagonist": "NORA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:transfer-window.fountain",
+        "protagonist": "DEV",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:two-lane.fountain",
+        "protagonist": "CORA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "fountain:undertow.fountain",
+        "protagonist": "KAT",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": true,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 3,
+          "disagreement": true
+        }
+      },
+      {
+        "script": "structural-form-experiment:pair1-kishotenketsu.fountain",
+        "protagonist": "MIRA",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 2,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "structural-form-experiment:pair1-three-act-control.fountain",
+        "protagonist": "MIRA",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 3,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "structural-form-experiment:pair2-kishotenketsu.fountain",
+        "protagonist": "YUKI",
+        "d1": {
+          "legacyPassiveAtPeak": true,
+          "detectedAgencyAtPeak": false,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 1,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      },
+      {
+        "script": "structural-form-experiment:pair2-three-act-control.fountain",
+        "protagonist": "YUKI",
+        "d1": {
+          "legacyPassiveAtPeak": false,
+          "detectedAgencyAtPeak": true,
+          "disagreement": false
+        },
+        "d2": {
+          "legacyAllPassiveAct3": false,
+          "detectedInitiativeCount": 0,
+          "act3SceneCount": 4,
+          "disagreement": false
+        }
+      }
+    ]
+  },
+  "reversalDetectionPartB": {
+    "total": 44,
+    "disagreeMoreFound": 0,
+    "disagreeLegacyOnly": 0,
+    "rows": [
+      {
+        "script": "calibration:Low Tide (strong)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Nine Minutes (strong)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:The Long Game (strong)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Second Wind (strong)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Sunlight Clause (strong)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Reasonable Doubt (competent)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Thanksgiving, Maybe (competent)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:The Dead Drop (competent)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Encore (competent)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Zero Day (competent)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Yard Signs (weak)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Merge (weak)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Splitting the House (weak)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:The Visit (weak)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:The Corner Booth (weak)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:The Grift (troubled)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Adrift (troubled)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Lockdown (troubled)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Whiteout (troubled)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "calibration:Firebreak (troubled)",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:chain-of-custody.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:close-quarters.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:code-blue.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:counter-offer.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:dead-frequency.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:high-voltage.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:mise.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:off-season.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:quiet-season.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:red-line.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:room-12.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:runoff.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:same-page.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:soft-launch.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:the-defense-rests.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:the-detour.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:the-key-under-the-mat.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:transfer-window.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:two-lane.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "fountain:undertow.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "structural-form-experiment:pair1-kishotenketsu.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "structural-form-experiment:pair1-three-act-control.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "structural-form-experiment:pair2-kishotenketsu.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      },
+      {
+        "script": "structural-form-experiment:pair2-three-act-control.fountain",
+        "legacyCount": 0,
+        "detectedCount": 0,
+        "delta": 0
+      }
+    ],
+    "degradations": {
+      "SCENE_SHUFFLE": {
+        "n": 44,
+        "moved": 0
+      },
+      "MIDPOINT_DROP": {
+        "n": 44,
+        "moved": 0
+      },
+      "CLIMAX_RELOCATE": {
+        "n": 44,
+        "moved": 0
+      }
+    }
+  },
+  "questionLatencyPartB": {
+    "withQuestions": 23,
+    "analyzed": 44,
+    "gated": {
+      "SCENE_SHUFFLE": {
+        "n": 0,
+        "auc": null,
+        "ci": null
+      },
+      "MIDPOINT_DROP": {
+        "n": 0,
+        "auc": null,
+        "ci": null
+      },
+      "CLIMAX_RELOCATE": {
+        "n": 0,
+        "auc": null,
+        "ci": null
+      }
+    },
+    "ungated": {
+      "SCENE_SHUFFLE": {
+        "n": 23,
+        "auc": 0.5652173913043478,
+        "ci": {
+          "lo": 0.45652173913043476,
+          "hi": 0.6739130434782609
+        }
+      },
+      "MIDPOINT_DROP": {
+        "n": 19,
+        "auc": 0.5263157894736842,
+        "ci": {
+          "lo": 0.42105263157894735,
+          "hi": 0.631578947368421
+        }
+      },
+      "CLIMAX_RELOCATE": {
+        "n": 23,
+        "auc": 0.5434782608695652,
+        "ci": {
+          "lo": 0.5,
+          "hi": 0.6086956521739131
+        }
+      }
+    }
+  },
+  "truthExtractionPartB": {
+    "falsePositiveScripts": 0,
+    "falsePositiveCount": 0,
+    "noDeathFactScripts": 38,
+    "analyzed": 44
+  },
+  "partA": {
+    "measured": false,
+    "reason": "ANNOT_DIR/QUAL_DIR not present in this environment",
+    "annotDir": "C:\\Users\\serge\\.minimax-agent\\projects\\screenplay_training\\corpus\\05_dramatic_annotations",
+    "qualDir": "C:\\Users\\serge\\.minimax-agent\\projects\\screenplay_training\\corpus\\07_quality_scores"
+  }
+}
