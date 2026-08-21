@@ -225,8 +225,8 @@ export default function StartScreen({
             className="relative z-10 w-full"
           >
             {/* ── Hero: wordmark + bring a script (primary task) ── */}
-            <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-14 px-6 py-14 sm:gap-16 sm:px-10 sm:py-20">
-              <header className="flex flex-col gap-6 sm:gap-8">
+            <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-8 px-6 py-8 sm:gap-16 sm:px-10 sm:py-20">
+              <header className="flex flex-col gap-4 sm:gap-8">
                 <p className="hidden font-mono text-[11px] uppercase tracking-[0.4em] text-ink/50 sm:block">
                   Coverage Report — Reader&rsquo;s Copy
                 </p>
@@ -236,6 +236,15 @@ export default function StartScreen({
                 >
                   Story Machine
                 </h1>
+                {/* E3: the plain-language promise. A stranger needs to know
+                    what this does in one line, in the first glance, before
+                    the atmospheric slug-line intro or the CTA — separate
+                    from SlugLineIntro's "signature move" (untouched below),
+                    which is voice, not the promise itself. Static (not
+                    gated on isIntroResolved) so it reads immediately. */}
+                <p className="max-w-[46ch] text-sm leading-snug text-ink/80 sm:text-base">
+                  Reads your screenplay like a studio coverage reader and hands back a verdict, a craft score, and your next fix.
+                </p>
                 <SlugLineIntro onComplete={() => setIsIntroResolved(true)} />
               </header>
 
@@ -243,7 +252,7 @@ export default function StartScreen({
                 initial={{ opacity: 0, y: 12 }}
                 animate={isIntroResolved ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
                 transition={{ duration: DUR_REVEAL, ease: EASE_OUT_EXPO }}
-                className="flex flex-col gap-10 sm:gap-12"
+                className="flex flex-col gap-6 sm:gap-12"
                 inert={!isIntroResolved || undefined}
               >
                 <section aria-labelledby="entrance-actions-heading" className="flex flex-col gap-4 sm:gap-5">
@@ -260,7 +269,7 @@ export default function StartScreen({
                     onClick={handleSample}
                     disabled={isGenerating}
                     aria-busy={isGenerating}
-                    className={`sm-btn sm-btn--stamp group relative flex min-h-[80px] w-full flex-col items-start gap-2 px-8 py-10 text-left sm:px-10 sm:py-12 ${FOCUS_RING} ${
+                    className={`sm-btn sm-btn--stamp group relative flex min-h-[80px] w-full flex-col items-start gap-2 px-6 py-6 text-left sm:px-10 sm:py-12 ${FOCUS_RING} ${
                       isGenerating ? "cursor-wait opacity-50" : ""
                     }`}
                   >
@@ -294,10 +303,34 @@ export default function StartScreen({
                       <Sparkles className="h-7 w-7 shrink-0" aria-hidden="true" />
                       Try sample coverage
                     </span>
-                    <span className="max-w-[46ch] text-[15px] leading-relaxed text-[var(--sm-cream)]/80">
-                      See Script Doctor in action. Load the built-in sample screenplay, get instant analysis with verdict, craft dimensions, and top issues. No setup required.
+                    {/* whitespace-normal overrides .sm-btn's `white-space:
+                        nowrap` (design-system.css), which — being an
+                        inherited CSS property — otherwise cascades onto this
+                        span and forces the whole description onto one line,
+                        spilling past the button's right edge instead of
+                        wrapping. Same family of bug as the W5 ribbon fix
+                        above; fixed the same way, narrowly, without touching
+                        the shared .sm-btn rule other buttons rely on. */}
+                    <span className="max-w-[46ch] whitespace-normal text-[13px] leading-snug text-[var(--sm-cream)]/80 sm:text-[15px] sm:leading-relaxed">
+                      Loads the built-in sample screenplay for a full verdict, craft score, and top issues. No setup.
                     </span>
                   </button>
+
+                  {/* E3: the one-sentence privacy claim, right where it
+                      needs to land — after the primary CTA, before any
+                      commitment. Wording is load-bearing, not decorative:
+                      "keyless by default" mirrors server.ts's actual boot
+                      behavior (GEMINI_API_KEY unset -> analysis-only mode,
+                      see startup_keyless log + README.md), and "unless you
+                      turn it on yourself" is true because AI features are
+                      opt-in per-session via SettingsPanel's own API-key
+                      fields (POST /api/ai-config), not just an env var only
+                      an operator can set. Never claim more than that: the
+                      generative shell still runs server-side when enabled. */}
+                  <p className="flex items-center gap-2 text-[11px] leading-snug text-ink/60 sm:text-xs">
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-ink/40" aria-hidden="true" />
+                    Keyless by default — your script stays in this deployment unless you turn on AI features yourself.
+                  </p>
 
                   {/* Secondary actions: Open existing work or start fresh */}
                   <div className="flex flex-col gap-2 sm:flex-row">
