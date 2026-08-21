@@ -32,6 +32,7 @@ import type {
   DimensionKey,
   RootCauseFinding,
   FixVerifyResult,
+  DoctorProgressEvent,
 } from "../../../server/nvm/analyze/types.ts";
 import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type {
@@ -111,6 +112,137 @@ const MAX_UPLOAD_CHARS = 900_000;
 // Matches POST /api/scriptide/doctor/pdf's 15MB request-body cap — same
 // "fail fast client-side" rationale as MAX_UPLOAD_CHARS above.
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
+
+// ─── Live progress (E1, 2026-08-21) ─────────────────────────────────────────
+// A quick (non-deep, non-pdf) diagnosis streams its progress from POST
+// /api/scriptide/doctor/stream (server/routes/scriptide.ts) instead of
+// waiting on one JSON response the way /doctor does. Deep-read and pdf runs
+// still use their existing non-streaming routes unchanged — see
+// runDiagnosis's route selection below for why.
+
+/** Compact progress state the loading UI renders. null while no streamed run
+ *  is in flight. */
+interface DoctorStreamProgress {
+  stage: "parsing" | "deep_read" | "passes" | "aggregating";
+  passesDone: number;
+  totalPasses: number;
+}
+
+const DOCTOR_STREAM_TOTAL_PASSES = 14; // server/nvm/revision/pipeline.ts's fixed pass count
+
+/** Folds one DoctorProgressEvent (server/nvm/analyze/types.ts) into the next
+ *  progress state. `pass_complete` events can arrive out of submission order
+ *  — the 14 passes run concurrently in diagnose-only mode (pipeline.ts) — so
+ *  this counts events RECEIVED, not the highest passIndex seen; that stays
+ *  correct regardless of completion order. */
+function applyDoctorProgressEvent(prev: DoctorStreamProgress, event: DoctorProgressEvent): DoctorStreamProgress {
+  if (event.type === "stage") {
+    if (event.stage === "passes_start") {
+      return { stage: "passes", passesDone: 0, totalPasses: event.totalPasses };
+    }
+    return { ...prev, stage: event.stage };
+  }
+  // pass_complete
+  return { ...prev, stage: "passes", passesDone: Math.min(prev.totalPasses, prev.passesDone + 1) };
+}
+
+/** Parses one SSE frame ("\n\n"-terminated, "data: <json>" line) into its
+ *  JSON payload. Returns null for a frame with no `data:` line (a keep-alive
+ *  or stray blank) rather than throwing, so the reader loop can never crash
+ *  on a frame it doesn't recognize. */
+function parseSSEFrame(frame: string): unknown | null {
+  const line = frame.split("\n").find((l) => l.startsWith("data: "));
+  if (!line) return null;
+  try {
+    return JSON.parse(line.slice(6));
+  } catch {
+    return null;
+  }
+}
+
+type DoctorStreamPayload =
+  | { type: "doctor_progress"; event: DoctorProgressEvent }
+  | { type: "doctor_result"; report: ScriptDoctorReport }
+  | { type: "doctor_error"; error: string };
+
+/**
+ * POST /api/scriptide/doctor/stream and resolve with the final
+ * ScriptDoctorReport, calling `onProgress` for every event the server
+ * reports along the way. Throws the same shapes runDiagnosis's existing
+ * .catch block already handles: a DOMException named "AbortError" when
+ * `signal` fires (cancel or the 120s watchdog — both abort the same
+ * controller), or a plain Error with a user-facing message for anything
+ * else — so no new error-handling branch is needed at the call site.
+ */
+async function streamDoctorProgress(
+  body: { fountain: string; title?: string } | { fdx: string; title?: string },
+  signal: AbortSignal,
+  onProgress: (event: DoctorProgressEvent) => void,
+): Promise<ScriptDoctorReport> {
+  const res = await fetch("/api/scriptide/doctor/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(
+      errBody?.error ??
+        (res.status === 404
+          ? "Script Doctor isn't live yet — the /api/scriptide/doctor/stream route hasn't been deployed."
+          : `Diagnosis failed (${res.status})`)
+    );
+  }
+  if (!res.body) {
+    // No streaming body reader in this environment — never reached in a real
+    // browser; guarded so a future non-streaming fetch shim fails loudly
+    // instead of hanging forever waiting for frames that never arrive.
+    throw new Error("Streaming response body unavailable in this environment.");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalReport: ScriptDoctorReport | null = null;
+  let serverError: string | null = null;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary: number;
+    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const payload = parseSSEFrame(frame) as DoctorStreamPayload | null;
+      if (!payload) continue;
+      if (payload.type === "doctor_progress") onProgress(payload.event);
+      else if (payload.type === "doctor_result") finalReport = payload.report;
+      else if (payload.type === "doctor_error") serverError = payload.error;
+    }
+  }
+
+  if (serverError) throw new Error(serverError);
+  if (!finalReport) throw new Error("Diagnosis stream ended without a result — try again.");
+  return finalReport;
+}
+
+/** Loading-state copy for the current streamed stage — the live counterpart
+ *  to the old static "Running 14 passes…" line. */
+function doctorProgressLabel(progress: DoctorStreamProgress): string {
+  switch (progress.stage) {
+    case "parsing":
+      return "Reading the script…";
+    case "deep_read":
+      return "Reading each scene's meaning with AI…";
+    case "aggregating":
+      return "Compiling the report…";
+    case "passes":
+    default:
+      return `Running pass ${Math.min(progress.passesDone + 1, progress.totalPasses)} of ${progress.totalPasses}…`;
+  }
+}
 
 type Status = "idle" | "loading" | "success" | "error";
 // Export is a fully independent, secondary in-flight action (a report is
@@ -1702,12 +1834,23 @@ export default function ScriptDoctorPanel({
   // real deep-read request, not just because the toggle happens to be checked
   // right now (the toggle can change after a run started).
   const [lastRunMode, setLastRunMode] = useState<"quick" | "deep">("quick");
+  // Live progress for the in-flight streamed run (E1, 2026-08-21) — null
+  // while idle, while a deep-read/pdf run is in flight (those don't stream),
+  // or once the run has settled. See streamDoctorProgress/
+  // applyDoctorProgressEvent above.
+  const [streamProgress, setStreamProgress] = useState<DoctorStreamProgress | null>(null);
 
   // Dialog root — see the tabIndex={-1} on the outer motion.div below and the
   // useModalFocusTrap call near the Escape-handling effect further down.
   const panelRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Set true only by the Cancel button's own handler (cancelDiagnosis, E1,
+  // 2026-08-21) — distinguishes a real user cancel from the 120s watchdog
+  // and from an incidental teardown abort (StrictMode's synchronous
+  // unmount/remount), which share the same DOMException shape but must not
+  // share the same user-facing outcome. Reset at the start of every run.
+  const userCancelledRef = useRef(false);
   const loadedNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped on every run so a stale (aborted/superseded) response can never
   // clobber the state of a newer run — same guard pattern as
@@ -1863,6 +2006,7 @@ export default function ScriptDoctorPanel({
 
     // Cancel any in-flight diagnosis so its response can't land after a newer one.
     abortRef.current?.abort();
+    userCancelledRef.current = false;
     const controller = new AbortController();
     abortRef.current = controller;
     const myGeneration = ++generationRef.current;
@@ -1886,6 +2030,7 @@ export default function ScriptDoctorPanel({
 
     setStatus("loading");
     setErrorMessage(null);
+    setStreamProgress(null);
 
     // Request contract: exactly one of fountain|fdx as JSON, OR raw PDF bytes
     // with no JSON wrapper. A .fdx upload sends its raw text as `fdx`; a .pdf
@@ -1919,38 +2064,67 @@ export default function ScriptDoctorPanel({
     const effectiveMode: "quick" | "deep" = useDeepRead ? "deep" : "quick";
     setLastRunMode(effectiveMode);
 
-    const request = isPdf
+    // Route selection: pdf and deep-read stay on their existing one-shot JSON
+    // routes (a pdf run composes conversion+doctor server-side in one
+    // handler; deep read fans out LLM calls with its own budget — see the
+    // comment above `useDeepRead`). Only the quick fountain/fdx path — the
+    // common case, and the one an ordinary "Run Diagnosis" click takes —
+    // streams its progress from /api/scriptide/doctor/stream
+    // (streamDoctorProgress above), which is what turns the spinner below
+    // into a live per-pass progress readout and gives Cancel something real
+    // to stop server-side (server/nvm/analyze/doctor-pool.ts's AbortSignal →
+    // worker-terminate path).
+    const reportPromise: Promise<ScriptDoctorReport> = isPdf
       ? fetch("/api/scriptide/doctor/pdf", {
           method: "POST",
           headers: { "Content-Type": "application/pdf" },
           body: uploadedFile!.pdfBytes,
           signal: controller.signal,
+        }).then(async (res) => {
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            const fallback =
+              res.status === 404
+                ? "PDF diagnosis isn't live yet — the /api/scriptide/doctor/pdf route hasn't been deployed."
+                : `Diagnosis failed (${res.status})`;
+            throw new Error(body?.error ?? fallback);
+          }
+          return (await res.json()) as ScriptDoctorReport;
         })
-      : fetch(useDeepRead ? "/api/scriptide/doctor/deep" : "/api/scriptide/doctor", {
+      : useDeepRead
+      ? fetch("/api/scriptide/doctor/deep", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             isFdx ? { fdx: uploadedFile!.content, title: effectiveTitle } : { fountain: effectiveText, title: effectiveTitle }
           ),
           signal: controller.signal,
-        });
-
-    request
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as { error?: string } | null;
-          const fallback =
-            res.status === 404
-              ? isPdf
-                ? "PDF diagnosis isn't live yet — the /api/scriptide/doctor/pdf route hasn't been deployed."
-                : useDeepRead
+        }).then(async (res) => {
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            const fallback =
+              res.status === 404
                 ? "Deep read isn't live yet — the /api/scriptide/doctor/deep route hasn't been deployed."
-                : "Script Doctor isn't live yet — the /api/scriptide/doctor route hasn't been deployed."
-              : `Diagnosis failed (${res.status})`;
-          throw new Error(body?.error ?? fallback);
-        }
-        return (await res.json()) as ScriptDoctorReport;
-      })
+                : `Diagnosis failed (${res.status})`;
+            throw new Error(body?.error ?? fallback);
+          }
+          return (await res.json()) as ScriptDoctorReport;
+        })
+      : streamDoctorProgress(
+          isFdx ? { fdx: uploadedFile!.content, title: effectiveTitle } : { fountain: effectiveText, title: effectiveTitle },
+          controller.signal,
+          (event) => {
+            if (myGeneration !== generationRef.current) return; // superseded — ignore
+            setStreamProgress((prev) =>
+              applyDoctorProgressEvent(
+                prev ?? { stage: "parsing", passesDone: 0, totalPasses: DOCTOR_STREAM_TOTAL_PASSES },
+                event
+              )
+            );
+          }
+        );
+
+    reportPromise
       .then((data) => {
         if (myGeneration !== generationRef.current) return; // superseded by a newer run
         setReport(data);
@@ -2009,21 +2183,41 @@ export default function ScriptDoctorPanel({
       .catch((err: unknown) => {
         if (myGeneration !== generationRef.current) return; // superseded — ignore
         if (err instanceof DOMException && err.name === "AbortError") {
-          // A non-timeout abort (teardown, or a newer call already handled
-          // above via the generation guard) is not a diagnosis failure — it's
-          // this run being cancelled out from under itself, most commonly by
-          // StrictMode's synchronous unmount/remount of effects in dev. Only
-          // the 120s watchdog firing counts as a real, user-facing timeout.
+          // Three things share this exact DOMException shape, and only two
+          // are user-facing: the 120s watchdog (a real timeout), and a real
+          // Cancel click (E1, 2026-08-21 — userCancelledRef, set only by
+          // cancelDiagnosis below). A bare teardown abort (StrictMode's
+          // synchronous unmount/remount of effects in dev, or a newer run
+          // already handled above via the generation guard) is neither, and
+          // paints nothing.
           if (timedOut) {
             setStatus("error");
-            setErrorMessage("Diagnosis timed out (120s) or was cancelled — try again.");
+            setErrorMessage("Diagnosis timed out (120s) — try again.");
+          } else if (userCancelledRef.current) {
+            setStatus("idle"); // stopped, not failed — the writer can retry any time
           }
           return;
         }
         setStatus("error");
         setErrorMessage(err instanceof Error ? err.message : "Diagnosis failed");
       })
-      .finally(() => clearTimeout(timeoutId));
+      .finally(() => {
+        clearTimeout(timeoutId);
+        setStreamProgress(null);
+      });
+  };
+
+  /** The Cancel button in the loading state (E1, 2026-08-21): stops the
+   *  in-flight diagnosis for real, not just the client's wait for it. The
+   *  aborted fetch closes the connection, which fires the server's res
+   *  'close' handler (server/routes/scriptide.ts's requestAbortSignal),
+   *  which resolves the AbortSignal doctor-pool.ts's runScriptDoctorOffThread
+   *  was given — the pool terminates the busy worker outright and frees the
+   *  slot immediately, so the very next request is served with a clean
+   *  server, not queued behind abandoned work. */
+  const cancelDiagnosis = () => {
+    userCancelledRef.current = true;
+    abortRef.current?.abort();
   };
 
   /** "Try a sample script": loads the built-in sample (src/lib/sample-script.ts)
@@ -2911,21 +3105,56 @@ export default function ScriptDoctorPanel({
             </div>
           ))}
 
-        {/* ── Loading state ── */}
+        {/* ── Loading state (E1, 2026-08-21: live progress + a real Cancel) ── */}
         {status === "loading" && (
           <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-500" aria-hidden="true" />
             <p className="text-xs uppercase tracking-widest text-gray-500" role="status" aria-live="polite">
-              {lastRunMode === "deep"
+              {streamProgress
+                ? doctorProgressLabel(streamProgress)
+                : lastRunMode === "deep"
                 ? "Reading each scene's meaning with AI, then running 14 passes…"
                 : "Running 14 passes…"}
             </p>
-            <button
-              disabled
-              className="mt-4 w-full bg-gray-300 text-gray-600 px-4 py-3 text-xs font-bold uppercase tracking-widest sm-btn cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Diagnosing&hellip;
-            </button>
+            {/* Only the streamed (quick, non-deep, non-pdf) path has a real
+                per-pass count to show — deep-read/pdf runs still show the
+                indeterminate spinner above with no bar. */}
+            {streamProgress && streamProgress.stage === "passes" && (
+              <div className="mt-4 max-w-xs mx-auto">
+                <div
+                  className="h-1.5 w-full bg-gray-200 dark:bg-zinc-700 border border-black/10 dark:border-white/10 overflow-hidden"
+                  role="progressbar"
+                  aria-valuenow={streamProgress.passesDone}
+                  aria-valuemin={0}
+                  aria-valuemax={streamProgress.totalPasses}
+                  aria-label="Revision passes completed"
+                >
+                  <div
+                    className="h-full bg-zinc-500 dark:bg-zinc-400 transition-[width] duration-300"
+                    style={{ width: `${Math.round((streamProgress.passesDone / streamProgress.totalPasses) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 mt-1">
+                  {streamProgress.passesDone} / {streamProgress.totalPasses} passes
+                </p>
+              </div>
+            )}
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                disabled
+                className="flex-1 bg-gray-300 text-gray-600 px-4 py-3 text-xs font-bold uppercase tracking-widest sm-btn cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Diagnosing&hellip;
+              </button>
+              <button
+                onClick={cancelDiagnosis}
+                aria-label="Cancel this diagnosis"
+                title="Stop the analysis running on the server right now and free it up for the next request"
+                className="px-4 py-3 text-xs font-bold uppercase tracking-widest sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center justify-center gap-2 shrink-0"
+              >
+                <X className="w-4 h-4" aria-hidden="true" /> Cancel
+              </button>
+            </div>
           </div>
         )}
 

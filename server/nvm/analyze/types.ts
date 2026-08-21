@@ -15,6 +15,24 @@ import type { StructureState } from '../screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { NarrativeMetricsReport } from './metrics.ts';
 import type { StoryGraphReport } from './story-graph.ts';
+import type { RevisionProgressEvent } from '../revision/pipeline.ts';
+
+/**
+ * E1 (2026-08-21): observational progress events runScriptDoctor can
+ * optionally emit while it works, for a live-progress UI. Purely a side
+ * channel — an onProgress callback never changes what any of these stages
+ * COMPUTE, only when a caller is told a stage started or a pass finished.
+ * `pass_complete` is RevisionProgressEvent (server/nvm/revision/pipeline.ts),
+ * unmodified — that event already existed for the /api/nvm/revise-stream SSE
+ * route; this type just gives doctor.ts's own quick/parsing/aggregating
+ * bookends a matching shape so one callback can carry the whole run.
+ */
+export type DoctorProgressEvent =
+  | { type: 'stage'; stage: 'parsing' }
+  | { type: 'stage'; stage: 'deep_read' }
+  | { type: 'stage'; stage: 'passes_start'; totalPasses: number }
+  | { type: 'stage'; stage: 'aggregating' }
+  | RevisionProgressEvent;
 
 /** One recurring content-word object that did NOT earn clue status: it
  *  recurs across scenes, but nothing in the text ever marks it as unknown.

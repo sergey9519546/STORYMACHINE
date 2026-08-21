@@ -59,7 +59,7 @@
 import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import type { StoryContext } from '../revision/passes/types.ts';
-import type { ScriptDoctorReport } from './types.ts';
+import type { ScriptDoctorReport, DoctorProgressEvent } from './types.ts';
 import type { DoctorWorkerRequest, DoctorWorkerResponse } from './doctor-worker.ts';
 
 const WORKER_URL = new URL('./doctor-worker.ts', import.meta.url);
@@ -87,6 +87,11 @@ function poolEnabled(): boolean {
 interface PendingJob {
   request: Omit<DoctorWorkerRequest, 'id'>;
   signal?: AbortSignal;
+  /** E1 (2026-08-21): fired for each progress event the worker reports for
+   *  THIS job while it runs — see DoctorWorkerResponse's 'progress' variant.
+   *  Optional and purely observational, same contract as runScriptDoctor's
+   *  own onProgress (types.ts's DoctorProgressEvent doc comment). */
+  onProgress?: (event: DoctorProgressEvent) => void;
   resolve: (report: ScriptDoctorReport) => void;
   reject: (err: unknown) => void;
 }
@@ -142,13 +147,19 @@ function dropSlot(slot: WorkerSlot): void {
   if (at >= 0) slots.splice(at, 1);
 }
 
-/** Run the doctor on this thread. The fallback path, and the deep-read path. */
-async function runInProcess(request: Omit<DoctorWorkerRequest, 'id'>): Promise<ScriptDoctorReport> {
+/** Run the doctor on this thread. The fallback path, and the deep-read path.
+ *  `onProgress` is forwarded straight through — same thread, no serialization
+ *  boundary to cross, so this is a plain pass-through rather than the
+ *  postMessage relay the worker path needs (doctor-worker.ts). */
+async function runInProcess(
+  request: Omit<DoctorWorkerRequest, 'id'>,
+  onProgress?: (event: DoctorProgressEvent) => void,
+): Promise<ScriptDoctorReport> {
   const { runScriptDoctor } = await import('./doctor.ts');
   return runScriptDoctor(
     request.fountain,
     request.storyContext,
-    request.deepRead ? { deepRead: true } : undefined,
+    { ...(request.deepRead ? { deepRead: true } : {}), onProgress },
   );
 }
 
@@ -203,7 +214,11 @@ function spawnSlot(): WorkerSlot | undefined {
       return;
     }
     const active = slot.active;
-    if (!active || active.id !== message.id) return; // stale (cancelled) reply
+    if (!active || active.id !== message.id) return; // stale (cancelled/superseded) reply
+    if (message.type === 'progress') {
+      active.job.onProgress?.(message.event);
+      return; // does not settle the job — more messages (progress or result) still to come
+    }
     if (message.type === 'result') {
       finishJob(slot, () => active.job.resolve(message.report));
     } else {
@@ -226,7 +241,7 @@ function spawnSlot(): WorkerSlot | undefined {
       if (active) {
         slot.active = undefined;
         setBusy(slot, false);
-        runInProcess(active.job.request).then(active.job.resolve, active.job.reject);
+        runInProcess(active.job.request, active.job.onProgress).then(active.job.resolve, active.job.reject);
       }
     } else if (active) {
       slot.active = undefined;
@@ -289,7 +304,7 @@ function pump(): void {
   while (queue.length > 0) {
     if (poolDisabled) {
       const job = queue.shift()!;
-      runInProcess(job.request).then(job.resolve, job.reject);
+      runInProcess(job.request, job.onProgress).then(job.resolve, job.reject);
       continue;
     }
     let slot = slots.find(s => !s.active);
@@ -313,15 +328,20 @@ function pump(): void {
  * Contract-identical to calling runScriptDoctor directly: same arguments,
  * same report, same cache behavior, same errors. The only observable
  * differences are that the caller's `await` no longer blocks every other
- * request, and that an optional AbortSignal now genuinely stops the work.
+ * request, that an optional AbortSignal now genuinely stops the work, and
+ * (E1, 2026-08-21) that an optional onProgress callback fires the same
+ * DoctorProgressEvent stream runScriptDoctor would have emitted in-process,
+ * relayed across the worker boundary by doctor-worker.ts's 'progress'
+ * message. A cache hit fires none — there is nothing to report progress on.
  */
 export async function runScriptDoctorOffThread(
   fountain: string,
   storyContext?: StoryContext,
-  opts?: { deepRead?: boolean; signal?: AbortSignal },
+  opts?: { deepRead?: boolean; signal?: AbortSignal; onProgress?: (event: DoctorProgressEvent) => void },
 ): Promise<ScriptDoctorReport> {
   const deepRead = opts?.deepRead === true;
   const signal = opts?.signal;
+  const onProgress = opts?.onProgress;
 
   if (signal?.aborted) throw abortReasonToError(signal);
 
@@ -335,13 +355,13 @@ export async function runScriptDoctorOffThread(
 
   // Deep read stays in-process — see this file's header for why.
   if (deepRead || poolDisabled || !poolEnabled()) {
-    const report = await runInProcess(request);
+    const report = await runInProcess(request, onProgress);
     doctorCacheAdopt(fountain, report, storyContext, deepRead);
     return report;
   }
 
   const report = await new Promise<ScriptDoctorReport>((resolve, reject) => {
-    queue.push({ request, signal, resolve, reject });
+    queue.push({ request, signal, onProgress, resolve, reject });
     pump();
   });
 

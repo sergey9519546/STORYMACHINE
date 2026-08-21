@@ -825,3 +825,80 @@ holds (full suite green at the commit carrying this note).
   equivalence and perf-budget suites under `npm test`. No real-corpus
   measurement was run, and none is claimed — see the reasoning above for why
   identity, not AUC, is the receipt this change owes."
+
+### 2026-08-21 — LANE E1 LIVE PROGRESS: onProgress observational hook on `runScriptDoctor` — no scoring measurement, because no score moved (output-identity receipt instead)
+
+- **What changed on the scoring path:** `server/nvm/analyze/doctor.ts` and
+  `server/nvm/analyze/types.ts` (both ALWAYS-SCORING/reachable per the receipt
+  guard) gained one new capability: `runScriptDoctor`'s third argument grew an
+  optional `onProgress` callback (`DoctorProgressEvent`, defined in
+  `types.ts`), fired at four points — `{stage:'parsing'}` before the analyzer
+  runs, `{stage:'deep_read'}` before deep read's scene-sensing fan-out (deep
+  read mode only), `{stage:'passes_start'}` before the 14-pass pipeline, one
+  `pass_complete` event per pass (the pre-existing `RevisionProgressEvent`
+  from `server/nvm/revision/pipeline.ts`, unmodified, threaded straight
+  through where the call site used to pass `undefined`), and
+  `{stage:'aggregating'}` before `aggregateReport`. No formula, threshold,
+  deduction, cache key, or verdict rule was touched; the callback reads
+  nothing the computation doesn't already have in scope and writes nothing
+  back into it.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` — NOT `npm run
+  measure-real`, for the same reason the 2026-08-21 W1/W2 entry above gives:
+  this change claims to move zero reports, and an output-identity proof is a
+  strictly stronger, more falsifiable claim than "AUC unchanged" for that
+  shape of change.
+- **Baseline used:** `git archive origin/main` at `67e012e` (Phase W's
+  completion commit — the current tip of `origin/main` at measurement time).
+- **What was run — output identity over all 45 in-repo fixtures**, same set
+  the W1/W2 entry defines (20 `data/screenplays/*.fountain`, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, 4 synthetic
+  concatenations at 62/120/244/306 scenes): `node
+  scripts/check-doctor-output-identity.mjs --tree <baseline> --out /tmp/before`
+  then `--tree . --out /tmp/after` then `--compare /tmp/before /tmp/after`.
+  Result: **`OUTPUT IDENTITY: PASS — all 45 reports are byte-identical
+  (analyzedAt excluded).`** Every call site in this change is either called
+  with `onProgress` absent (every existing production caller except the new
+  streaming route) — in which case `opts?.onProgress?.(...)` is a no-op by
+  construction — or with a callback attached, which the harness's baseline
+  tree cannot exercise at all (the parameter doesn't exist there), so the
+  45-fixture run above is the in-repo callers' exact behavior, unchanged.
+- **Second, independent identity proof (unit level):**
+  `tests/core/doctor-progress.test.ts` calls `runScriptDoctor` twice on the
+  same input — once with no `onProgress`, once with one attached that
+  collects every event — and deep-equals the two reports (`analyzedAt`
+  excluded) for a corpus sample and across 6 calibration samples; a third
+  test asserts a *throwing* `onProgress` still surfaces as a rejection
+  rather than silently corrupting a report.
+  `tests/core/doctor-pool-progress.test.ts` extends the same proof across the
+  worker-thread boundary: `doctor-worker.ts` now relays each event over
+  `postMessage` (`{type:'progress', id, event}`, structured-clone, same
+  boundary the existing result/error messages already cross) and
+  `doctor-pool.ts` routes it to the job's own `onProgress` without settling
+  the promise; the test compares the off-thread event multiset against the
+  in-process one for the same input and asserts recovery/no-stale-delivery
+  after a mid-run cancellation.
+- **Sequence proof:** the same unit test file asserts `parsing` fires first,
+  `aggregating` fires last, exactly 14 `pass_complete` events fire (indices
+  0–13, each exactly once — the passes run concurrently in diagnose-only mode
+  per `pipeline.ts`'s existing `Promise.all` fast path, so completion ORDER is
+  not asserted, only the completed SET), the degenerate zero-scene report
+  fires only `parsing` (no pipeline ever runs), and a cache hit fires nothing
+  at all (the hit returns before the callback's first call site).
+- **Why the AUC floor is untouched:** identical reasoning to the W1/W2 entry
+  above — the AUC-24 ratchet is a function of the health scores the doctor
+  produces on the real corpus, proven identical here for every in-repo
+  fixture regardless of whether a caller attaches a progress callback. No
+  code path that computes health, verdict, dimensions, or any issue was
+  touched; only observation points were added around it.
+- **Corpus fingerprint:** not applicable — the real corpus was not read.
+- **Runner attestation:** "Agent session (remote sandbox, 2026-08-21) ran the
+  output-identity harness against a `git archive origin/main` (`67e012e`)
+  baseline and this branch's working tree, plus
+  `tests/core/doctor-progress.test.ts`,
+  `tests/core/doctor-pool-progress.test.ts`, the full existing
+  `tests/core/doctor-worker-pool.test.ts` suite (unchanged, still green), and
+  the new streaming-route test
+  `tests/routes/scriptide-doctor-stream.test.ts` under `npm test`. No
+  real-corpus measurement was run, and none is claimed — this change adds an
+  observational hook, not a scoring change, so identity is the receipt it
+  owes."

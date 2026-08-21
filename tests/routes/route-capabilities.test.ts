@@ -234,6 +234,7 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'POST /api/scriptide/save', 'GET /api/scriptide/load',
   'GET /api/scriptide/complete',         // retired compatibility tombstone: 410 JSON, zero work
   'POST /api/scriptide/doctor',          // runDiagnoseOnly-gated, pure CPU (route's own comment)
+  'POST /api/scriptide/doctor/stream',   // E1: SSE progress sibling of /doctor — same runScriptDoctorOffThread, same runDiagnoseOnly gate, pure CPU
   'POST /api/scriptide/doctor/pdf',      // pdfToFountain + runScriptDoctor with NO deepRead — heavyBodyLimiter, not aiLimiter
   'POST /api/scriptide/diagnose',        // runDiagnoseOnly-gated, pure CPU (route's own comment)
   'POST /api/characters/export', 'POST /api/characters/import',

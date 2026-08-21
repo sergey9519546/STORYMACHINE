@@ -407,6 +407,109 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   res.json({ ...publicDoctorReport(report), rootCauses, source });
 }));
 
+// POST /api/scriptide/doctor/stream — E1 (2026-08-21): live-progress sibling
+// of /doctor above. Same body contract (DoctorBodySchema: exactly one of
+// fountain/fdx, optional title) and the exact same computation
+// (runScriptDoctorOffThread, same LRU, same worker pool, same publicly
+// visible report shape) — the ONLY difference is that the response is a
+// Server-Sent-Events stream instead of one JSON payload, so the writer sees
+// each of the 14 passes land as it settles instead of staring at a spinner
+// for the whole run.
+//
+// Transport: SSE (`data: <json>\n\n` frames) over the SAME POST verb /doctor
+// uses — deliberately not a GET+EventSource pair, because EventSource cannot
+// carry a POST body and a feature-length script does not fit in a query
+// string (DoctorBodySchema allows up to 900_000 chars). The client instead
+// reads the fetch() response body as a stream and parses SSE frames itself
+// (src/components/scriptide/ScriptDoctorPanel.tsx's streamDoctorProgress) —
+// exactly the shape GET /api/nvm/revise-stream already established for the
+// revision pipeline's own progress events (server/routes/nvm/revision.ts),
+// reused here rather than inventing a second framing.
+//
+// Cancel: the SAME requestAbortSignal(res) helper /doctor already uses. A
+// writer's "Cancel" click aborts the client's fetch, which closes the
+// socket, which fires this res's 'close' event, which resolves the
+// AbortSignal doctor-pool.ts's runScriptDoctorOffThread was given — the pool
+// terminates the busy worker outright and frees the slot for the next
+// request (see doctor-pool.ts's header, property 2). No new cancellation
+// mechanism; this route just gives the writer a button that reaches the one
+// that already existed.
+//
+// gameLimiter, not aiLimiter — identical reasoning to /doctor: pure CPU
+// work, no LLM ever reachable from runDiagnoseOnly(). Stateless, like
+// /doctor: no sessionId, no getOrCreateSession/Stage.
+router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  let ended = false;
+  const ensureEnded = () => {
+    if (!ended) { ended = true; res.end(); }
+  };
+  // requestAbortSignal already listens on res 'close' — reuse its signal both
+  // to cancel the analysis AND to know when writing to `res` would throw.
+  const signal = requestAbortSignal(res);
+  const emitSSE = (data: unknown) => {
+    if (!signal.aborted && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string; title?: string };
+  let fountain: string;
+  let source: DoctorSource;
+
+  if (fdx !== undefined) {
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = fdxToFountain(fdx);
+    } catch (err) {
+      emitSSE({ type: 'doctor_error', error: sanitizeExternalError(err).message });
+      ensureEnded();
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      emitSSE({ type: 'doctor_error', error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
+      ensureEnded();
+      return;
+    }
+    fountain = converted.fountain;
+    source = {
+      format: 'fdx',
+      convertedFountain: converted.fountain,
+      ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
+    };
+  } else {
+    fountain = fountainBody as string;
+    source = { format: 'fountain' };
+  }
+
+  try {
+    const { runScriptDoctorOffThread } = await import('../nvm/analyze/doctor-pool.ts');
+    const report = await runScriptDoctorOffThread(fountain, undefined, {
+      signal,
+      onProgress: event => emitSSE({ type: 'doctor_progress', event }),
+    });
+
+    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+    const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, source } });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      // The client already disconnected (that's what fired the abort in the
+      // first place) — nothing left to tell it. emitSSE's own `signal.aborted`
+      // guard already makes this a no-op, but skip the logger.error call too:
+      // a cancelled analysis is expected traffic, not a fault to log as one.
+    } else {
+      logger.error('sse-error', { route: 'scriptide-doctor-stream', detail: (err as Error).message });
+      emitSSE({ type: 'doctor_error', error: 'internal_error' });
+    }
+  } finally {
+    ensureEnded();
+  }
+}));
+
 // POST /api/scriptide/doctor/deep — opt-in "deep read" sibling of /doctor
 // above. Same two-format body contract (DeepDoctorBodySchema is presently a
 // plain alias of DoctorBodySchema — see validation.ts) and the same fdx→

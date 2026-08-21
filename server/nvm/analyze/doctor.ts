@@ -67,7 +67,7 @@ import { computeNarrativeMetrics } from './metrics.ts';
 import { layoutScreenplay } from '../../../src/lib/screenplay-layout.ts';
 import type {
   FountainAnalysis, ScriptDoctorReport, DoctorPassSummary, SceneDiagnostics, DoctorGrade,
-  CoverageVerdict, DimensionKey, DimensionScore,
+  CoverageVerdict, DimensionKey, DimensionScore, DoctorProgressEvent,
 } from './types.ts';
 
 /** sha256 hex of the trimmed Fountain text — the determinism receipt on
@@ -2293,13 +2293,24 @@ function buildAnnotationsFromRecords(records: FountainAnalysis['records']): Scen
  * header for the full non-determinism/injection/cache story. Keyless or
  * total-failure degrades to the quick signals with report.deepRead.usedLLM
  * === false; it never throws for lack of a key (see deep-read.ts).
+ *
+ * opts.onProgress (E1, 2026-08-21, additive/observational — see
+ * DoctorProgressEvent's doc comment in types.ts): an optional callback fired
+ * at each stage boundary and after each of the 14 passes settles. Default is
+ * no-op (undefined), and every call site is a plain, unconditional
+ * `opts?.onProgress?.(...)` that reads no state the computation below also
+ * reads — it cannot change contentHash, the cache key, or any field on the
+ * returned report. Proven byte-identical against a pristine checkout by
+ * scripts/check-doctor-output-identity.mjs (see MEASUREMENT_RECEIPTS.md's
+ * 2026-08-21 E1 entry).
  */
 export async function runScriptDoctor(
   fountain: string,
   storyContext?: StoryContext,
-  opts?: { deepRead?: boolean },
+  opts?: { deepRead?: boolean; onProgress?: (event: DoctorProgressEvent) => void },
 ): Promise<ScriptDoctorReport> {
   const deepReadMode = opts?.deepRead === true;
+  const onProgress = opts?.onProgress;
 
   // ── Cache check ────────────────────────────────────────────────────────
   // contentHash is cheap (one sha256 over the trimmed text) relative to the
@@ -2319,6 +2330,7 @@ export async function runScriptDoctor(
     return { ...cached, analyzedAt: Date.now() };
   }
 
+  onProgress?.({ type: 'stage', stage: 'parsing' });
   const analysis = analyzeFountainText(fountain);
 
   // Nothing to diagnose — return a well-formed incomplete report rather than
@@ -2369,6 +2381,7 @@ export async function runScriptDoctor(
   let deepReadField: ScriptDoctorReport['deepRead'] | undefined;
 
   if (deepReadMode) {
+    onProgress?.({ type: 'stage', stage: 'deep_read' });
     const { records, deepRead } = await deepReadRecords(fountain, analysis.records);
     // Rebuild, don't reuse: structure.ts's analyzeStructure and this file's
     // buildAnnotationsFromRecords both derive purely from record signals
@@ -2391,10 +2404,12 @@ export async function runScriptDoctor(
     compiledAt: Date.now(),
   };
 
+  onProgress?.({ type: 'stage', stage: 'passes_start', totalPasses: 14 });
   const result = await runDiagnoseOnly(() =>
-    runRevisionPipeline(compiled, mergedAnalysis.records, mergedAnalysis.structure, [], undefined, storyContext),
+    runRevisionPipeline(compiled, mergedAnalysis.records, mergedAnalysis.structure, [], onProgress, storyContext),
   );
 
+  onProgress?.({ type: 'stage', stage: 'aggregating' });
   const report = aggregateReport(result, mergedAnalysis, fountain);
   if (deepReadField) report.deepRead = deepReadField;
 

@@ -27,7 +27,7 @@
 
 import { parentPort } from 'node:worker_threads';
 import type { StoryContext } from '../revision/passes/types.ts';
-import type { ScriptDoctorReport } from './types.ts';
+import type { ScriptDoctorReport, DoctorProgressEvent } from './types.ts';
 
 /** Coordinator -> worker. */
 export interface DoctorWorkerRequest {
@@ -40,9 +40,17 @@ export interface DoctorWorkerRequest {
 /** Worker -> coordinator. `ready` is posted once, after the first successful
  *  module load, so the pool can distinguish "this environment cannot load the
  *  doctor at all" (fall back in-process, permanently) from "this one script
- *  threw" (propagate the error, keep the pool). */
+ *  threw" (propagate the error, keep the pool).
+ *
+ *  `progress` (E1, 2026-08-21): zero or more of these precede a `result` (or
+ *  `error`) for the same id — one per DoctorProgressEvent runScriptDoctor's
+ *  optional onProgress callback fires (types.ts). Purely a side channel: it
+ *  carries the SAME event object the in-process caller would have received,
+ *  across the structured-clone boundary, and does not affect what `result`
+ *  ends up containing. */
 export type DoctorWorkerResponse =
   | { type: 'ready' }
+  | { type: 'progress'; id: number; event: DoctorProgressEvent }
   | { type: 'result'; id: number; report: ScriptDoctorReport }
   | { type: 'error'; id: number; name: string; message: string; stack?: string };
 
@@ -62,7 +70,10 @@ if (parentPort) {
         const report = await doctorModule.runScriptDoctor(
           request.fountain,
           request.storyContext,
-          request.deepRead ? { deepRead: true } : undefined,
+          {
+            ...(request.deepRead ? { deepRead: true } : {}),
+            onProgress: event => port.postMessage({ type: 'progress', id: request.id, event } satisfies DoctorWorkerResponse),
+          },
         );
         port.postMessage({ type: 'result', id: request.id, report } satisfies DoctorWorkerResponse);
       } catch (err) {
