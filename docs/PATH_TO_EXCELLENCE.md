@@ -215,11 +215,25 @@ entrance-animation frame, not a static defect — recorded, not "fixed."
 
 ## Phase P — Provably better (parallel track; includes the human-only work)
 
-- **P-1.** Wire-or-retire the four unwired signals (agency-signal,
-  question-latency, reversal-detection, truth-extraction) by measuring each
-  against the 125-film annotated corpus — the corpus growth makes this
-  newly possible; the stress-ledger calibration already proved the method.
-  Each ends in a receipt: wired with evidence, or honestly retired.
+- **P-1 — EVIDENCE PHASE DONE 2026-08-21** (`109318df`; full findings in
+  `docs/p1-benchmark/UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md`; wiring
+  remains owner-gated). Two structural facts first: neither named corpus
+  is reachable from a remote session (both owner-local), and three of the
+  four signals (agency-signal, question-latency, truth-extraction) are
+  CANNOT-MEASURE against the 125-film corpus's annotation schema even in
+  principle — they read raw screenplay prose the JSON annotations never
+  carry. Measured on the 44-script in-repo real-prose sample
+  (`scripts/measure-unwired-signals.ts`): **reversal-detection** — 0/44
+  disagreement with the legacy channel; recommend WIRE Channel 2, with one
+  owner-machine 125-film run still owed (command in the doc, amplitude
+  caveat flagged). **agency-signal** — the annotation-bridge measurement
+  path is structurally impossible; stays unwired pending the 761-script
+  corpus. **question-latency** — ungated AUC 0.53–0.57 with all 95% CIs
+  straddling 0.5; retire this measurement path (consistent with the prior
+  "underpowered, not refuted" verdict). **truth-extraction** — 0/44 false
+  positives on real prose + synthetic mechanism AUC 1.000; the
+  false-positive evidence supports a low-risk WIRE, recall unmeasurable
+  in-repo. No scoring file changed; receipt guard clean by construction.
 - **P-2.** The rule-catalog decision: run retirement evidence bar B1–B7
   (channel-zero AUC on the real corpus). The project's own rebuild
   experiment measured the weighted-rule channel as inverted; two weeks
