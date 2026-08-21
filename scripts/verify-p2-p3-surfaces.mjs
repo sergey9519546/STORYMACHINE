@@ -264,8 +264,23 @@ function staticCrossCheck() {
   // the live-browser Ship-task check for the one exception found.
   const runtimeGatedInDefaultReachable = new Set(['scriptide/Toolbar.tsx' /* the gate mechanism itself, not a panel */]);
 
+  // Known-quarantined dead components (2026-08-08 prototype quarantine, commit
+  // 1664d08 era): their entry points were deliberately retired but the files
+  // were preserved per the keep-as-reference moratorium. Listed BY NAME so the
+  // dead-UI tripwire stays armed for anything new — an unlisted unreachable
+  // component still FAILS this script. Owner decision (delete vs. revive) is
+  // pending; remove entries here only alongside that decision.
+  const knownQuarantinedDead = new Set([
+    'oasis/BeliefDriftGraph.tsx',
+    'oasis/ReplayInspector.tsx',
+    'oasis/SecretsMatrix.tsx',
+    'oasis/SimulationSandbox.tsx',
+  ]);
+
   for (const f of allFiles.sort()) {
-    if (deadFiles.has(f)) {
+    if (deadFiles.has(f) && knownQuarantinedDead.has(f)) {
+      record('P2-static', `${f} unreachable — known-quarantined (2026-08-08), owner decision pending`, true, 'deliberately orphaned prototype, preserved per moratorium; not a new leak');
+    } else if (deadFiles.has(f)) {
       record('P2-static', `${f} reachable from App.tsx`, false, 'UNREACHABLE — not imported (directly or transitively) from App.tsx at all; dead UI worth reporting');
     } else if (labsOnlyViaStoryMachine.has(f)) {
       record('P2-static', `${f} reachable only via Labs-gated StoryMachine.tsx`, true, 'imported exclusively through StoryMachine.tsx, itself gated by App.tsx\'s effectiveShowStoryMachine');
