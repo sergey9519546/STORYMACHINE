@@ -60,7 +60,7 @@ interface ShipPanelProps {
 
 const EXPORT_ACTIONS = (props: ShipPanelProps) =>
   [
-    { label: "PDF", hint: "Industry-standard, print-ready", icon: FileText, fn: props.onExportPDF },
+    { label: "PDF", hint: "Print-ready pages", icon: FileText, fn: props.onExportPDF },
     { label: "Fountain", hint: "Plain-text .fountain source", icon: FileText, fn: props.onExportFountain },
     { label: "Final Draft", hint: ".fdx for FDX-native tools", icon: FileText, fn: props.onExportFDX },
     { label: "Word", hint: ".docx for notes and redlines", icon: FileText, fn: props.onExportDOCX },
