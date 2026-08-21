@@ -10,7 +10,6 @@ import { buildScenarioFromScript } from "../lib/scenario-from-script";
 import { safeJsonParse } from "../lib/json";
 import {
   resolveDraftConflict,
-  saveStatusLabel as formatSaveStatus,
   type SaveStatus,
 } from "../lib/draft-persistence";
 import {
@@ -2119,7 +2118,15 @@ export default function ScriptIDE({
           title={titlePage.title || initialConfig.theme || "Untitled Script"}
           task={task}
           toolSlot={toolSlot}
-          saveStatusLabel={formatSaveStatus(saveStatus)}
+          // Phase E exit-gate punch list, P1: which right-side coverage
+          // panel (if any) sits on top of this header right now, so it can
+          // reserve real space instead of letting that panel's fixed
+          // overlay silently cover live header content (the clipped
+          // "SAVING LOCA…" bug). Mirrors the toolSlot/coverageFull gates
+          // that pick which of CoverageSummary/ScriptDoctorPanel renders
+          // below (see the "coverage" toolSlot branches further down).
+          panelReserve={toolSlot === "coverage" ? (coverageFull ? "full" : "mini") : "none"}
+          saveStatus={saveStatus}
           isAnalyzing={engineState.isAnalyzing}
           directorsLayer={directorsLayer}
           liveDiagnostics={liveDiagnostics}

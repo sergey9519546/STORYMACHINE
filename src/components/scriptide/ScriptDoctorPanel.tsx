@@ -33,8 +33,6 @@ import type {
   DimensionKey,
   RootCauseFinding,
   FixVerifyResult,
-  DoctorProgressEvent,
-  LocatedIssue,
 } from "../../../server/nvm/analyze/types.ts";
 import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type {
@@ -47,6 +45,14 @@ import { diffLines } from "../../lib/diff.ts";
 import { decideWriteBack, isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
 import { trackDoctorRun, trackEvent } from "../../lib/analytics";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
+import {
+  DOCTOR_STREAM_TOTAL_PASSES,
+  applyDoctorProgressEvent,
+  streamDoctorProgress,
+  doctorProgressLabel,
+  type DoctorStreamProgress,
+  type DoctorReportWithAnchors,
+} from "../../lib/doctor-stream.ts";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -128,140 +134,20 @@ const MAX_PDF_BYTES = 15 * 1024 * 1024;
 // /api/scriptide/doctor/stream (server/routes/scriptide.ts) instead of
 // waiting on one JSON response the way /doctor does. Deep-read and pdf runs
 // still use their existing non-streaming routes unchanged — see
-// runDiagnosis's route selection below for why.
-
-/** Compact progress state the loading UI renders. null while no streamed run
- *  is in flight. */
-interface DoctorStreamProgress {
-  stage: "parsing" | "deep_read" | "passes" | "aggregating";
-  passesDone: number;
-  totalPasses: number;
-}
-
-const DOCTOR_STREAM_TOTAL_PASSES = 14; // server/nvm/revision/pipeline.ts's fixed pass count
-
-/** Folds one DoctorProgressEvent (server/nvm/analyze/types.ts) into the next
- *  progress state. `pass_complete` events can arrive out of submission order
- *  — the 14 passes run concurrently in diagnose-only mode (pipeline.ts) — so
- *  this counts events RECEIVED, not the highest passIndex seen; that stays
- *  correct regardless of completion order. */
-function applyDoctorProgressEvent(prev: DoctorStreamProgress, event: DoctorProgressEvent): DoctorStreamProgress {
-  if (event.type === "stage") {
-    if (event.stage === "passes_start") {
-      return { stage: "passes", passesDone: 0, totalPasses: event.totalPasses };
-    }
-    return { ...prev, stage: event.stage };
-  }
-  // pass_complete
-  return { ...prev, stage: "passes", passesDone: Math.min(prev.totalPasses, prev.passesDone + 1) };
-}
-
-/** Parses one SSE frame ("\n\n"-terminated, "data: <json>" line) into its
- *  JSON payload. Returns null for a frame with no `data:` line (a keep-alive
- *  or stray blank) rather than throwing, so the reader loop can never crash
- *  on a frame it doesn't recognize. */
-function parseSSEFrame(frame: string): unknown | null {
-  const line = frame.split("\n").find((l) => l.startsWith("data: "));
-  if (!line) return null;
-  try {
-    return JSON.parse(line.slice(6));
-  } catch {
-    return null;
-  }
-}
+// runDiagnosis's route selection below for why. DoctorStreamProgress,
+// DOCTOR_STREAM_TOTAL_PASSES, applyDoctorProgressEvent, streamDoctorProgress,
+// and doctorProgressLabel now live in ../../lib/doctor-stream.ts (P2, Phase E
+// punch list) — CoverageSummary.tsx shares this exact client rather than
+// duplicating it.
 
 // ─── E2: finding → editor anchors ────────────────────────────────────────────
 // server/routes/scriptide.ts attaches `locatedIssues` to /doctor, /doctor/
 // stream, /doctor/deep, and /doctor/pdf's responses the same way it already
 // attaches `rootCauses` — a route-level enrichment, not part of the
 // ScriptDoctorReport contract in server/nvm/analyze/types.ts (that interface
-// is a fixed contract this task does not touch). Layered on here with an
-// intersection type rather than widening ScriptDoctorReport itself.
-type DoctorReportWithAnchors = ScriptDoctorReport & { locatedIssues?: LocatedIssue[] };
-
-type DoctorStreamPayload =
-  | { type: "doctor_progress"; event: DoctorProgressEvent }
-  | { type: "doctor_result"; report: DoctorReportWithAnchors }
-  | { type: "doctor_error"; error: string };
-
-/**
- * POST /api/scriptide/doctor/stream and resolve with the final
- * ScriptDoctorReport, calling `onProgress` for every event the server
- * reports along the way. Throws the same shapes runDiagnosis's existing
- * .catch block already handles: a DOMException named "AbortError" when
- * `signal` fires (cancel or the 120s watchdog — both abort the same
- * controller), or a plain Error with a user-facing message for anything
- * else — so no new error-handling branch is needed at the call site.
- */
-async function streamDoctorProgress(
-  body: { fountain: string; title?: string } | { fdx: string; title?: string },
-  signal: AbortSignal,
-  onProgress: (event: DoctorProgressEvent) => void,
-): Promise<DoctorReportWithAnchors> {
-  const res = await fetch("/api/scriptide/doctor/stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!res.ok) {
-    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(
-      errBody?.error ??
-        (res.status === 404
-          ? "Script Doctor isn't live yet — the /api/scriptide/doctor/stream route hasn't been deployed."
-          : `Diagnosis failed (${res.status})`)
-    );
-  }
-  if (!res.body) {
-    // No streaming body reader in this environment — never reached in a real
-    // browser; guarded so a future non-streaming fetch shim fails loudly
-    // instead of hanging forever waiting for frames that never arrive.
-    throw new Error("Streaming response body unavailable in this environment.");
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let finalReport: DoctorReportWithAnchors | null = null;
-  let serverError: string | null = null;
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let boundary: number;
-    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
-      const frame = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      const payload = parseSSEFrame(frame) as DoctorStreamPayload | null;
-      if (!payload) continue;
-      if (payload.type === "doctor_progress") onProgress(payload.event);
-      else if (payload.type === "doctor_result") finalReport = payload.report;
-      else if (payload.type === "doctor_error") serverError = payload.error;
-    }
-  }
-
-  if (serverError) throw new Error(serverError);
-  if (!finalReport) throw new Error("Diagnosis stream ended without a result — try again.");
-  return finalReport;
-}
-
-/** Loading-state copy for the current streamed stage — the live counterpart
- *  to the old static "Running 14 passes…" line. */
-function doctorProgressLabel(progress: DoctorStreamProgress): string {
-  switch (progress.stage) {
-    case "parsing":
-      return "Reading the script…";
-    case "deep_read":
-      return "Reading each scene's meaning with AI…";
-    case "aggregating":
-      return "Compiling the report…";
-    case "passes":
-    default:
-      return `Running pass ${Math.min(progress.passesDone + 1, progress.totalPasses)} of ${progress.totalPasses}…`;
-  }
-}
+// is a fixed contract this task does not touch). DoctorReportWithAnchors
+// (the intersection type for this) now lives in ../../lib/doctor-stream.ts
+// alongside streamDoctorProgress, which returns it.
 
 type Status = "idle" | "loading" | "success" | "error";
 // Export is a fully independent, secondary in-flight action (a report is

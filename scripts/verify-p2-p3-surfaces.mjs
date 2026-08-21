@@ -486,14 +486,22 @@ async function main() {
   });
 
   const sampleCta2 = pageA.getByRole('button', { name: /try sample coverage/i }).first();
-  await Promise.all([
-    pageA.waitForResponse((r) => /\/api\/scriptide\/doctor/.test(r.url()) && r.status() === 200, { timeout: 30000 }),
-    sampleCta2.click({ timeout: 15000 }),
-  ]);
-  await pageA.waitForTimeout(400);
-
-  const bodyTextAfterSample = await pageA.textContent('body');
-  const verdictRendered = /RECOMMEND|CONSIDER|PASS/.test(bodyTextAfterSample);
+  await sampleCta2.click({ timeout: 15000 });
+  // Phase E exit-gate punch list, P2: CoverageSummary now streams its
+  // progress from POST /api/scriptide/doctor/stream (src/lib/doctor-
+  // stream.ts) instead of awaiting one JSON response from the plain
+  // /doctor route. An SSE response's HTTP headers (and 200 status) arrive
+  // as soon as the connection opens — long before the 14-pass analysis
+  // actually finishes streaming its result — so waiting on that response
+  // event (the old strategy here) raced ahead of the render and always
+  // caught the still-loading state. Poll for the rendered verdict itself,
+  // which is the thing this assertion actually cares about, with a
+  // timeout budget generous enough for a real run (matches the old
+  // waitForResponse's 30s allowance).
+  const verdictRendered = await pageA
+    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: 30000 })
+    .then(() => true)
+    .catch(() => false);
   record('P3', 'Sample coverage produces a rendered verdict (Doctor reachable end to end)', verdictRendered, 'checked CoverageSummary body for a verdict word');
 
   const fullReportBtn = pageA.getByRole('button', { name: 'Full report', exact: true }).first();

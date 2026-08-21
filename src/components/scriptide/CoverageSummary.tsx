@@ -8,6 +8,13 @@ import type { ScriptDoctorReport } from "../../../server/nvm/analyze/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
 import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
 import { isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
+import {
+  streamDoctorProgress,
+  applyDoctorProgressEvent,
+  doctorProgressLabel,
+  DOCTOR_STREAM_TOTAL_PASSES,
+  type DoctorStreamProgress,
+} from "../../lib/doctor-stream.ts";
 
 interface CoverageSummaryProps {
   fountain: string;
@@ -55,6 +62,10 @@ export default function CoverageSummary({
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ScriptDoctorReport | null>(null);
   const [usingSample, setUsingSample] = useState(false);
+  // P2 (Phase E punch list): live per-pass progress for the streamed run —
+  // null while no streamed run is in flight, matching ScriptDoctorPanel's
+  // own streamProgress contract (../../lib/doctor-stream.ts).
+  const [streamProgress, setStreamProgress] = useState<DoctorStreamProgress | null>(null);
   const genRef = useRef(0);
   const sampleFired = useRef(false);
   // G0-02: false once the panel unmounts (Coverage closed mid-flight), so a
@@ -66,6 +77,16 @@ export default function CoverageSummary({
       aliveRef.current = false;
     };
   }, []);
+  // Live AbortController for the in-flight streamed run, so Cancel can stop
+  // it server-side the same way ScriptDoctorPanel's cancelDiagnosis does —
+  // aborting the fetch closes the connection, which frees the doctor-pool
+  // worker immediately (server/nvm/analyze/doctor-pool.ts) rather than
+  // leaving it to run to completion for a result nobody will see.
+  const abortRef = useRef<AbortController | null>(null);
+  // Set only by the Cancel button's own handler, so the catch block can tell
+  // a real Cancel apart from the 120s watchdog or a teardown/superseded
+  // abort — all three share the same DOMException("AbortError") shape.
+  const userCancelledRef = useRef(false);
 
   const run = useCallback(
     async (override?: { fountain: string; title: string; sample?: boolean }) => {
@@ -91,34 +112,36 @@ export default function CoverageSummary({
       // `timedOut` distinguishing a real deadline from a teardown/superseded
       // abort so only the former paints an error.
       const controller = new AbortController();
+      abortRef.current = controller;
+      userCancelledRef.current = false;
+      setStreamProgress(null);
       let timedOut = false;
       const timeoutId = setTimeout(() => {
         timedOut = true;
         controller.abort();
       }, 120_000);
       try {
-        const res = await fetch("/api/scriptide/doctor", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
+        // P2 (Phase E punch list): same streamed client ScriptDoctorPanel
+        // uses (../../lib/doctor-stream.ts) — turns this panel's loading
+        // state into a live "Running pass N of 14…" readout instead of a
+        // static "Reading the draft…" spinner for the whole run, and gives
+        // Cancel (below) something real to stop server-side.
+        const data = await streamDoctorProgress(
+          {
             fountain: override?.fountain ?? fountain,
             title: override?.title ?? title ?? "Untitled",
-          }),
-        });
-        if (gen !== genRef.current) return;
-        if (res.status === 404) {
-          setStatus("error");
-          setError("Coverage route not available.");
-          return;
-        }
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
-          setStatus("error");
-          setError(body.error ?? `Coverage failed (${res.status})`);
-          return;
-        }
-        const data = (await res.json()) as ScriptDoctorReport;
+          },
+          controller.signal,
+          (event) => {
+            if (gen !== genRef.current) return; // superseded — ignore
+            setStreamProgress((prev) =>
+              applyDoctorProgressEvent(
+                prev ?? { stage: "parsing", passesDone: 0, totalPasses: DOCTOR_STREAM_TOTAL_PASSES },
+                event,
+              ),
+            );
+          },
+        );
         if (gen !== genRef.current) return;
         // G0-02: Coverage closed mid-flight, or the writer typed during the
         // request. Show the numbers we computed, but never write back over the
@@ -158,9 +181,14 @@ export default function CoverageSummary({
         });
       } catch (e) {
         if (gen !== genRef.current) return;
-        // A non-timeout abort means this run was superseded or the panel was
-        // torn down — that is not an error the writer should see.
-        if ((e as Error).name === "AbortError" && !timedOut) return;
+        // A non-timeout, non-user-cancel abort means this run was superseded
+        // or the panel was torn down — that is not an error the writer
+        // should see. A real Cancel click goes back to idle (stopped, not
+        // failed), matching ScriptDoctorPanel's cancelDiagnosis.
+        if ((e as Error).name === "AbortError" && !timedOut) {
+          if (userCancelledRef.current) setStatus("idle");
+          return;
+        }
         setStatus("error");
         setError(
           timedOut
@@ -169,10 +197,20 @@ export default function CoverageSummary({
         );
       } finally {
         clearTimeout(timeoutId);
+        setStreamProgress(null);
       }
     },
     [fountain, title, onFreshReport, onReportComputed, onLoadSampleIntoEditor, getDraftGeneration],
   );
+
+  /** Cancel the in-flight streamed run (loading state only) — stops it for
+   *  real, not just the client's wait for it. Mirrors ScriptDoctorPanel's
+   *  cancelDiagnosis exactly: aborting the fetch closes the connection,
+   *  which frees the doctor-pool worker server-side immediately. */
+  const cancelRun = useCallback(() => {
+    userCancelledRef.current = true;
+    abortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (autoLoadSample && !sampleFired.current) {
@@ -265,9 +303,41 @@ export default function CoverageSummary({
 
       <div className="sm-panel-body flex-1 overflow-y-auto">
         {status === "loading" && (
-          <div className="flex items-center gap-3">
-            <Loader2 className="h-4 w-4 animate-spin text-[var(--sm-ink-mute)]" aria-hidden="true" />
-            <span className="sm-slug">Reading the draft…</span>
+          <div className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)]">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--sm-ink-mute)]" aria-hidden="true" />
+              <span className="sm-slug" role="status" aria-live="polite">
+                {streamProgress ? doctorProgressLabel(streamProgress) : "Reading the draft…"}
+              </span>
+            </div>
+            {/* P2 (Phase E punch list): live per-pass counter — the same
+                signal ScriptDoctorPanel's loading state shows, now visible
+                on the first-contact sample/Coverage-summary path too. */}
+            {streamProgress && streamProgress.stage === "passes" && (
+              <div className="mt-3">
+                <div
+                  className="h-1.5 w-full bg-[var(--sm-ink)]/10 border border-[var(--sm-ink)]/20 overflow-hidden"
+                  role="progressbar"
+                  aria-valuenow={streamProgress.passesDone}
+                  aria-valuemin={0}
+                  aria-valuemax={streamProgress.totalPasses}
+                  aria-label="Revision passes completed"
+                >
+                  <div
+                    className="h-full bg-[var(--sm-ink)]/60 transition-[width] duration-300"
+                    style={{ width: `${Math.round((streamProgress.passesDone / streamProgress.totalPasses) * 100)}%` }}
+                  />
+                </div>
+                <p className="sm-slug mt-1">
+                  {streamProgress.passesDone} / {streamProgress.totalPasses} passes
+                </p>
+              </div>
+            )}
+            <div className="mt-3">
+              <button type="button" onClick={cancelRun} className="sm-btn" aria-label="Cancel this coverage run">
+                <X className="h-3.5 w-3.5" aria-hidden="true" /> Cancel
+              </button>
+            </div>
           </div>
         )}
 

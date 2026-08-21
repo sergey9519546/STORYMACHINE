@@ -11,7 +11,7 @@ import React, {
   forwardRef,
 } from 'react';
 
-import { EditorView, keymap, Decoration, type DecorationSet } from '@codemirror/view';
+import { EditorView, keymap, Decoration, scrollPastEnd, type DecorationSet } from '@codemirror/view';
 import { EditorState, Compartment, StateEffect, StateField } from '@codemirror/state';
 import { history, defaultKeymap, historyKeymap, standardKeymap } from '@codemirror/commands';
 import { highlightActiveLine, lineNumbers, drawSelection } from '@codemirror/view';
@@ -214,6 +214,21 @@ const typewriterFocusListener = EditorView.updateListener.of((update) => {
   update.view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
 });
 
+// Phase E exit-gate punch list, P3: scrollPastEnd() pads the scroller with
+// extra blank space below the last line, equal to (viewport height − one
+// line). Without it, CodeMirror's scroller physically cannot scroll past
+// "last line flush with the bottom of the viewport" — so once the cursor
+// gets within roughly half a viewport of the document's end,
+// scrollIntoView(pos, {y:'center'}) above hits that hard floor and the
+// cursor line stalls above center (visibly "stuck near the top" once you
+// keep typing past the fold on a short-to-medium draft), never reaching
+// true center the way it does earlier in a longer document. Bundled into
+// the SAME compartment content as typewriterFocusListener (both toggled
+// together below) so normal editing without Typewriter Focus keeps its
+// ordinary scroll bounds — this extra bottom padding is part of the
+// centering behavior, not a general editor change.
+const typewriterFocusExtensions = [typewriterFocusListener, scrollPastEnd()];
+
 const findingHighlightTheme = EditorView.baseTheme({
   '.cm-sm-finding-flash': {
     animation: 'sm-finding-fade 2.2s ease-out forwards',
@@ -379,8 +394,8 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           screenplayCompletion,
           // ── Live Notes: in-editor narrative diagnostics (squiggles + hover) ──
           diagnosticsCompartment.current.of(liveDiagnostics ? scriptDiagnostics() : []),
-          // ── E5: Typewriter Focus (see typewriterFocusListener above) ────────
-          typewriterFocusCompartment.current.of(isTypewriterFocus ? [typewriterFocusListener] : []),
+          // ── E5: Typewriter Focus (see typewriterFocusExtensions above) ──────
+          typewriterFocusCompartment.current.of(isTypewriterFocus ? typewriterFocusExtensions : []),
           // ── Fountain highlighting ───────────────────────────────────────────
           fountainHighlight,
           fountainTheme,
@@ -495,7 +510,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       if (!view) return;
       view.dispatch({
         effects: typewriterFocusCompartment.current.reconfigure(
-          isTypewriterFocus ? [typewriterFocusListener] : [],
+          isTypewriterFocus ? typewriterFocusExtensions : [],
         ),
       });
       // Turning it ON should center the current line immediately, not wait

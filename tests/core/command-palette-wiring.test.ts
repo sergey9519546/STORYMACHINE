@@ -216,8 +216,19 @@ describe("FountainEditor.tsx — Typewriter Focus is really wired (not a dead pr
   });
 
   it("includes the compartment in the initial extensions AND hot-swaps it on prop change", () => {
-    assert.match(source, /typewriterFocusCompartment\.current\.of\(isTypewriterFocus \? \[typewriterFocusListener\] : \[\]\)/);
-    assert.match(source, /typewriterFocusCompartment\.current\.reconfigure\(\s*isTypewriterFocus \? \[typewriterFocusListener\] : \[\],?\s*\)/);
+    // Phase E exit-gate punch list, P3: typewriterFocusListener alone
+    // couldn't center the cursor's line near the END of a document —
+    // CodeMirror's scroller can't scroll past "last line flush with the
+    // viewport bottom" without scrollPastEnd() padding the scroll range, so
+    // the active line stalled above center once typing passed the fold on a
+    // short-to-medium draft. Both are now bundled as typewriterFocusExtensions
+    // and toggled together at both wiring sites below.
+    assert.match(
+      source,
+      /const typewriterFocusExtensions = \[typewriterFocusListener, scrollPastEnd\(\)\];/,
+    );
+    assert.match(source, /typewriterFocusCompartment\.current\.of\(isTypewriterFocus \? typewriterFocusExtensions : \[\]\)/);
+    assert.match(source, /typewriterFocusCompartment\.current\.reconfigure\(\s*isTypewriterFocus \? typewriterFocusExtensions : \[\],?\s*\)/);
   });
 });
 

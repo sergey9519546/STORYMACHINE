@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { getLabsEnabled } from "../../lib/feature-flags";
+import type { SaveStatus } from "../../lib/draft-persistence";
 
 /** Three user-facing desk modes. Scenes/cast stay in the rail (not a peer mode). */
 export type IdeTask = "write" | "coverage" | "ship";
@@ -31,11 +32,33 @@ export type IdeTask = "write" | "coverage" | "ship";
 // closed: the Ship tab was mounting the research shell for every writer.
 export type IdeToolSlot = "none" | "coverage" | "ship" | "studio" | "director" | "slate";
 
+/** Phase E exit-gate punch list, P1: which right-side coverage panel (if
+ *  any) is currently drawn on top of this header — "mini" for
+ *  CoverageSummary.tsx's fixed 380px aside, "full" for ScriptDoctorPanel.tsx's
+ *  fixed 640px (max 94vw) drawer, "none" otherwise. Drives reservedRightCss
+ *  below so the header's own live content (identity, save-status chip, etc.)
+ *  never renders UNDER that panel's left edge — the root cause of the
+ *  clipped "SAVING LOCA…" bug: the panel is a `position:fixed` overlay with
+ *  no participation in this header's layout, so without a reservation the
+ *  header simply draws content that the panel then draws over. */
+export type IdePanelReserve = "none" | "mini" | "full";
+
 interface ToolbarProps {
   title?: string;
   task: IdeTask;
   toolSlot: IdeToolSlot;
-  saveStatusLabel?: string;
+  panelReserve?: IdePanelReserve;
+  /** Phase E exit-gate punch list, P1: the RAW SaveStatus enum, not a
+   *  pre-formatted display string. Renamed from the old `saveStatusLabel`
+   *  prop, which was passed draft-persistence.ts's saveStatusLabel(status)
+   *  OUTPUT ("Saving locally…") while this component's own render logic
+   *  compared it against the enum's raw values ("saving-local") — a
+   *  mismatch that never matched, so the chip always fell through to its
+   *  bland "else" branch (no icon, no color, and the FULL long-form string
+   *  instead of the intended short "Saving"/"Saved" label) — one of the
+   *  contributors to how much of this chip extended under the coverage
+   *  panel's left edge before panelReserve above. */
+  saveStatus?: SaveStatus;
   isAnalyzing: boolean;
   directorsLayer: boolean;
   liveDiagnostics: boolean;
@@ -82,7 +105,8 @@ export default function Toolbar({
   title = "Untitled Script",
   task,
   toolSlot,
-  saveStatusLabel = "",
+  panelReserve = "none",
+  saveStatus,
   isAnalyzing,
   directorsLayer,
   liveDiagnostics,
@@ -146,6 +170,53 @@ export default function Toolbar({
     };
   }, [overflowOpen, exportOpen]);
 
+  // Phase E exit-gate punch list, P1: one entry per real SaveStatus value
+  // (idle intentionally excluded — the chip doesn't render for it, see
+  // `saveStatus && saveStatus !== "idle"` below). Short `label` is what
+  // shows in the chip (sm: and up); `title` is the full tooltip.
+  const SAVE_STATUS_META: Record<
+    Exclude<SaveStatus, "idle">,
+    { border: string; icon: React.ReactNode; label: string; title: string }
+  > = {
+    "saving-local": {
+      border: "border-[var(--sm-warn)] text-[var(--sm-warn)]",
+      icon: <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />,
+      label: "Saving",
+      title: "Saving changes…",
+    },
+    "saved-local": {
+      border: "border-[var(--sm-ok)] text-[var(--sm-ok)]",
+      icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />,
+      label: "Saved",
+      title: "Saved on this device",
+    },
+    "saving-server": {
+      border: "border-[var(--sm-warn)] text-[var(--sm-warn)]",
+      icon: <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />,
+      label: "Syncing",
+      title: "Saving to server…",
+    },
+    "saved-server": {
+      border: "border-[var(--sm-ok)] text-[var(--sm-ok)]",
+      icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />,
+      label: "Saved",
+      title: "All changes saved to server",
+    },
+    "save-conflict": {
+      border: "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]",
+      icon: <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />,
+      label: "Conflict",
+      title: "Conflict detected - resolve below",
+    },
+    "save-failed": {
+      border: "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]",
+      icon: <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />,
+      label: "Not Saved",
+      title: "Failed to save - your work may be at risk",
+    },
+  };
+  const saveMeta = saveStatus && saveStatus !== "idle" ? SAVE_STATUS_META[saveStatus] : null;
+
   const statusLabel = isAnalyzing ? "Running" : coverageStale ? "Outdated" : "Ready";
   const statusClass = isAnalyzing
     ? "text-[var(--sm-warn)]"
@@ -153,13 +224,59 @@ export default function Toolbar({
       ? "text-[var(--sm-stamp)]"
       : "text-[var(--sm-ok)]";
 
+  // Phase E exit-gate punch list, P1: mirrors CoverageSummary.tsx's own
+  // `sm:` breakpoint (Tailwind's default 640px) for when its 380px aside
+  // actually sits beside the header rather than covering the whole screen
+  // edge-to-edge (its mobile layout is a full-screen slide-over, so nothing
+  // needs reserving there — the header is meant to be fully hidden behind it,
+  // same as any other full-screen sheet). Below 640px, isDesktop stays false
+  // and reservedRightCss stays undefined.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(min-width: 640px)").matches
+      : true,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(min-width: 640px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // CoverageSummary.tsx: `sm:w-[380px]`. ScriptDoctorPanel.tsx: `w-[640px]
+  // max-w-[94vw]` — min() mirrors that same cap so the reservation never
+  // exceeds the drawer's own real width on a narrower desktop viewport.
+  const reservedRightCss =
+    !isDesktop || panelReserve === "none"
+      ? undefined
+      : panelReserve === "mini"
+        ? "380px"
+        : "min(640px, 94vw)";
+
   return (
     <header
       className="sm-pagetop z-20 flex-wrap gap-y-2 border-b-[1.5px] border-[var(--sm-ink)]"
-      style={{ padding: '10px 16px' }}
+      style={{
+        paddingTop: 10,
+        paddingBottom: 10,
+        paddingLeft: 16,
+        // Reserves real layout space for whichever coverage panel is open
+        // instead of letting its fixed-position overlay silently cover live
+        // header content — see IdePanelReserve's doc comment above.
+        paddingRight: reservedRightCss ? `calc(${reservedRightCss} + 16px)` : 16,
+      }}
     >
-      {/* Identity */}
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      {/* Identity. min-w-[160px] (not min-w-0): a bare min-w-0 let this block
+          get squeezed toward 0 width whenever panelReserve's paddingRight
+          (above) leaves the header tight — the title/subtitle's own
+          `truncate` still engaged, but at ~24px wide it wrapped into an
+          unreadable one-word-per-line stack instead of legibly truncating.
+          A concrete floor keeps this block readable and lets nav/the status
+          cluster wrap to their own row instead — flex-wrap on the header
+          already handles that gracefully. */}
+      <div className="flex min-w-[160px] flex-1 items-center gap-3">
         {onToggleSidebar && (
           <button
             type="button"
@@ -179,7 +296,7 @@ export default function Toolbar({
               {title}
             </h1>
           </div>
-          <p className="hidden font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--sm-cream)]/45 sm:block">
+          <p className="hidden truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--sm-cream)]/45 sm:block">
             {provenance !== "user" ? provenance : "desk"}
             <span className="text-[var(--sm-cream)]/30">
               {" "}
@@ -234,51 +351,22 @@ export default function Toolbar({
           {statusLabel}
         </span>
         
-        {/* Save status chip - now prominent with icons and colors */}
-        {saveStatusLabel && (
+        {/* Save status chip - now prominent with icons and colors.
+            min-w-0 + truncate (below) are defensive: with panelReserve
+            keeping this cluster clear of the coverage panel's left edge
+            (see reservedRightCss above), this chip should never need to
+            shrink — but if the header ever gets tighter than expected, it
+            now degrades to an ellipsis instead of being silently overdrawn. */}
+        {saveMeta && (
           <span
-            className={`inline-flex min-h-[28px] items-center gap-1.5 border px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.1em] transition-colors ${
-              saveStatusLabel === "saved-server"
-                ? "border-[var(--sm-ok)] text-[var(--sm-ok)]"
-                : saveStatusLabel === "saving-local"
-                  ? "border-[var(--sm-warn)] text-[var(--sm-warn)]"
-                  : saveStatusLabel === "save-conflict"
-                    ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]"
-                    : saveStatusLabel === "save-failed"
-                      ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]"
-                      : "border-[var(--sm-cream)]/30 text-[var(--sm-cream)]/60"
-            }`}
+            className={`inline-flex min-w-0 min-h-[28px] items-center gap-1.5 border px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.1em] transition-colors ${saveMeta.border}`}
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            title={
-              saveStatusLabel === "saved-server"
-                ? "All changes saved to server"
-                : saveStatusLabel === "saving-local"
-                  ? "Saving changes..."
-                  : saveStatusLabel === "save-conflict"
-                    ? "Conflict detected - resolve below"
-                    : saveStatusLabel === "save-failed"
-                      ? "Failed to save - your work may be at risk"
-                      : saveStatusLabel
-            }
+            title={saveMeta.title}
           >
-            {saveStatusLabel === "saved-server" && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
-            {saveStatusLabel === "saving-local" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-            {(saveStatusLabel === "save-conflict" || saveStatusLabel === "save-failed") && (
-              <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
-            )}
-            <span className="hidden sm:inline">
-              {saveStatusLabel === "saved-server"
-                ? "Saved"
-                : saveStatusLabel === "saving-local"
-                  ? "Saving"
-                  : saveStatusLabel === "save-conflict"
-                    ? "Conflict"
-                    : saveStatusLabel === "save-failed"
-                      ? "Not Saved"
-                      : saveStatusLabel}
-            </span>
+            {saveMeta.icon}
+            <span className="hidden truncate sm:inline">{saveMeta.label}</span>
           </span>
         )}
 
