@@ -403,8 +403,15 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // parallel agent adds to `dimensions`), so this can never regress an
   // existing consumer of the report shape.
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-  const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
-  res.json({ ...publicDoctorReport(report), rootCauses, source });
+  // E2 (2026-08-21): `locatedIssues` rides along for the exact reason
+  // `rootCauses` does two lines up — computed for free from the same
+  // locateIssues() call clusterIssues() already needs, so the client can
+  // resolve a topPriorities/per-pass issue to a concrete editor line span
+  // (click-a-finding → jump-to-line) without re-deriving scene/character
+  // spans itself. Same shape /api/scriptide/diagnose already sends.
+  const locatedIssues = locateIssues(issuesWithPass, fountain);
+  const rootCauses = clusterIssues(locatedIssues);
+  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
 }));
 
 // POST /api/scriptide/doctor/stream — E1 (2026-08-21): live-progress sibling
@@ -493,8 +500,10 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
     });
 
     const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-    const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
-    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, source } });
+    // E2: same locatedIssues attachment as /doctor above.
+    const locatedIssues = locateIssues(issuesWithPass, fountain);
+    const rootCauses = clusterIssues(locatedIssues);
+    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, locatedIssues, source } });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       // The client already disconnected (that's what fired the abort in the
@@ -603,8 +612,10 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
   // comment above. Deep read changes how SIGNALS were sensed, not the shape
   // of the resulting issues, so this step is identical either way.
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-  const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
-  res.json({ ...publicDoctorReport(report), rootCauses, source });
+  // E2: same locatedIssues attachment as /doctor above.
+  const locatedIssues = locateIssues(issuesWithPass, fountain);
+  const rootCauses = clusterIssues(locatedIssues);
+  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
 }));
 
 // POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
@@ -709,8 +720,10 @@ router.post(
     // out of doctor.ts (fixed contract, parallel agent's), and only needs the
     // report's own `passes` plus the converted Fountain text already in scope.
     const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-    const rootCauses = clusterIssues(locateIssues(issuesWithPass, converted.fountain));
-    res.json({ ...publicDoctorReport(report), rootCauses, source });
+    // E2: same locatedIssues attachment as /doctor above.
+    const locatedIssues = locateIssues(issuesWithPass, converted.fountain);
+    const rootCauses = clusterIssues(locatedIssues);
+    res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
   }),
 );
 

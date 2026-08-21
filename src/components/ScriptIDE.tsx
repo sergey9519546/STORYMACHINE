@@ -2654,6 +2654,15 @@ export default function ScriptIDE({
               if (autoAnalysis) triggerAnalysis(text);
             }}
             autoLoadSample={false}
+            onNavigateToFinding={(startLine, endLine) => {
+              // E2: click a finding in the full doctor panel -> scroll to and
+              // flash-highlight its exact lines. Same FountainEditorHandle
+              // the sidebar's scene navigation and CoverageSummary's
+              // "Jump to line" already reach through — this just calls its
+              // E2 sibling (highlightRange) instead of the plain navigateTo,
+              // so a finding gets a visible highlight, not just a cursor jump.
+              editorRef.current?.highlightRange(startLine, endLine);
+            }}
             onClose={() => {
               // Back one depth to summary, not all the way to write
               setCoverageFull(false);

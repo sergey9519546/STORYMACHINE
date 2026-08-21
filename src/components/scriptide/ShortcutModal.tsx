@@ -14,6 +14,7 @@ export default function ShortcutModal({ onClose }: Props) {
     { key: "Ctrl + Shift + F", action: "Toggle Typewriter Focus Mode (Center Active Line)" },
     { key: "Alt + Shift + D", action: "Toggle Dark / CRT Vintage / Print Theme" },
     { key: "Cmd/Ctrl + Shift + C", action: "Open Script Doctor Coverage Panel" },
+    { key: "Cmd/Ctrl + Enter", action: "Re-run Script Doctor (while its panel is open)" },
   ];
 
   return (

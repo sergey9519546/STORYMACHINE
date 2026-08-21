@@ -11,8 +11,8 @@ import React, {
   forwardRef,
 } from 'react';
 
-import { EditorView, keymap } from '@codemirror/view';
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorView, keymap, Decoration, type DecorationSet } from '@codemirror/view';
+import { EditorState, Compartment, StateEffect, StateField } from '@codemirror/state';
 import { history, defaultKeymap, historyKeymap, standardKeymap } from '@codemirror/commands';
 import { highlightActiveLine, lineNumbers, drawSelection } from '@codemirror/view';
 import { closeBrackets, autocompletion } from '@codemirror/autocomplete';
@@ -31,6 +31,18 @@ export interface FountainEditorHandle {
   getCurrentLine(): number;
   /** Returns the EditorView for advanced integrations */
   getView(): EditorView | null;
+  /**
+   * E2: scroll the 1-based inclusive [startLine, endLine] span into view
+   * (centered) and paint a brief, non-jarring highlight over it — the
+   * click-a-finding → land-on-the-lines half of the doctor↔editor round
+   * trip. Both endpoints are clamped to the document's actual line count so
+   * a finding computed against stale text (or a scene-anchored issue on a
+   * document shorter than expected) can't throw. The highlight is a fading
+   * decoration (see findingHighlightField/findingHighlightTheme below), not
+   * a persistent selection change beyond the initial cursor placement, so it
+   * reads as "look here" rather than "your selection is now this".
+   */
+  highlightRange(startLine: number, endLine: number): void;
 }
 
 export interface FountainEditorProps {
@@ -150,6 +162,46 @@ const lightTheme = EditorView.theme({
   '.cm-activeLine': { background: 'rgba(33,29,21,0.045)' },
 });
 
+// ── E2: finding → editor navigation highlight ───────────────────────────────
+// A CodeMirror decoration flashed over a finding's line span when the writer
+// clicks it in Script Doctor (FountainEditorHandle.highlightRange). The
+// stamp-red wash holds at full strength briefly, then fades over ~1.5s via a
+// pure-CSS keyframe animation rather than a JS-driven color tween — the
+// decoration is cleared by JS a moment after the animation completes
+// (highlightRange's own setTimeout below), purely as DOM housekeeping; the
+// fade itself never depends on that timing being exact.
+const setFindingHighlight = StateEffect.define<{ from: number; to: number } | null>();
+
+const findingHighlightField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(deco, tr) {
+    deco = deco.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (effect.is(setFindingHighlight)) {
+        deco = effect.value
+          ? Decoration.set([Decoration.mark({ class: 'cm-sm-finding-flash' }).range(effect.value.from, effect.value.to)])
+          : Decoration.none;
+      }
+    }
+    return deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+const findingHighlightTheme = EditorView.baseTheme({
+  '.cm-sm-finding-flash': {
+    animation: 'sm-finding-fade 2.2s ease-out forwards',
+    borderRadius: '2px',
+  },
+  '@keyframes sm-finding-fade': {
+    '0%': { backgroundColor: 'rgba(193,48,28,0.32)' },
+    '65%': { backgroundColor: 'rgba(193,48,28,0.32)' },
+    '100%': { backgroundColor: 'rgba(193,48,28,0)' },
+  },
+});
+
 // ── Component ─────────────────────────────────────────────────────────────────
 const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
   function FountainEditor(
@@ -193,6 +245,11 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     // session join is async, so the mount-time `value` closure is stale by sync
     // time — seeding from this ref avoids clobbering newer content.
     const valueRef = useRef(value);
+    // E2: the pending "clear the highlight decoration" timer from the most
+    // recent highlightRange() call — cleared and replaced on every new call
+    // (so rapid-fire finding clicks each get their own full flash instead of
+    // the first one's timer cutting a later one short) and on unmount.
+    const highlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Expose imperative handle ──────────────────────────────────────────────
     useImperativeHandle(ref, () => ({
@@ -217,6 +274,30 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         return view.state.doc.lineAt(pos).number;
       },
       getView: () => viewRef.current,
+      highlightRange(startLine: number, endLine: number) {
+        const view = viewRef.current;
+        if (!view) return;
+        const totalLines = view.state.doc.lines;
+        if (totalLines === 0) return;
+        const start = Math.max(1, Math.min(startLine, totalLines));
+        const end = Math.max(start, Math.min(endLine, totalLines));
+        const from = view.state.doc.line(start).from;
+        const to = view.state.doc.line(end).to;
+
+        if (highlightClearTimerRef.current) clearTimeout(highlightClearTimerRef.current);
+        view.dispatch({
+          selection: { anchor: from },
+          scrollIntoView: true,
+          effects: [EditorView.scrollIntoView(from, { y: 'center' }), setFindingHighlight.of({ from, to })],
+        });
+        view.focus();
+        // Matches sm-finding-fade's 2.2s CSS animation (findingHighlightTheme
+        // above) plus a small margin — pure housekeeping, removing the now-
+        // invisible decoration node rather than leaving it mounted forever.
+        highlightClearTimerRef.current = setTimeout(() => {
+          viewRef.current?.dispatch({ effects: setFindingHighlight.of(null) });
+        }, 2400);
+      },
     }));
 
     // ── Create EditorView once on mount ──────────────────────────────────────
@@ -288,6 +369,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           closeBrackets(),
           baseTheme,
           themeCompartment.current.of(isDarkMode ? darkTheme : lightTheme),
+          // ── E2: finding → editor navigation highlight (see above) ───────────
+          findingHighlightField,
+          findingHighlightTheme,
           // ── Change listener ─────────────────────────────────────────────────
           updateListener,
           // ── Placeholder ────────────────────────────────────────────────────
@@ -330,6 +414,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         // Release the collaboration socket + shared doc on unmount.
         collabRef.current?.destroy();
         collabRef.current = null;
+        if (highlightClearTimerRef.current) clearTimeout(highlightClearTimerRef.current);
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // run once — value/extensions are hot-patched below

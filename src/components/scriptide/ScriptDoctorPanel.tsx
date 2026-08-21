@@ -15,6 +15,7 @@ import {
   FileText,
   CheckCircle2,
   ArrowRightLeft,
+  ArrowRight,
   Download,
   History as HistoryIcon,
   Trash2,
@@ -33,6 +34,7 @@ import type {
   RootCauseFinding,
   FixVerifyResult,
   DoctorProgressEvent,
+  LocatedIssue,
 } from "../../../server/nvm/analyze/types.ts";
 import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type {
@@ -80,6 +82,14 @@ interface ScriptDoctorPanelProps {
    *  report was measured against, it is treated as stale (see
    *  handoffOutdated) rather than shown as a fresh-looking report. */
   initialReport?: ThreadedCoverageReport | null;
+  /** E2: click a finding (a root-cause card, a top-priority issue, or an
+   *  issue in the per-pass breakdown) and land on its exact lines in the
+   *  editor. Called with the finding's 1-based inclusive [startLine, endLine]
+   *  span whenever one is available — see RootCauseFinding.startLine/endLine
+   *  and the locatedIssues-derived anchor lookup below for which findings
+   *  qualify. Optional so the panel still renders (minus the jump buttons)
+   *  when a host doesn't wire an editor up to it. */
+  onNavigateToFinding?: (startLine: number, endLine: number) => void;
   onClose: () => void;
 }
 
@@ -160,9 +170,18 @@ function parseSSEFrame(frame: string): unknown | null {
   }
 }
 
+// ─── E2: finding → editor anchors ────────────────────────────────────────────
+// server/routes/scriptide.ts attaches `locatedIssues` to /doctor, /doctor/
+// stream, /doctor/deep, and /doctor/pdf's responses the same way it already
+// attaches `rootCauses` — a route-level enrichment, not part of the
+// ScriptDoctorReport contract in server/nvm/analyze/types.ts (that interface
+// is a fixed contract this task does not touch). Layered on here with an
+// intersection type rather than widening ScriptDoctorReport itself.
+type DoctorReportWithAnchors = ScriptDoctorReport & { locatedIssues?: LocatedIssue[] };
+
 type DoctorStreamPayload =
   | { type: "doctor_progress"; event: DoctorProgressEvent }
-  | { type: "doctor_result"; report: ScriptDoctorReport }
+  | { type: "doctor_result"; report: DoctorReportWithAnchors }
   | { type: "doctor_error"; error: string };
 
 /**
@@ -178,7 +197,7 @@ async function streamDoctorProgress(
   body: { fountain: string; title?: string } | { fdx: string; title?: string },
   signal: AbortSignal,
   onProgress: (event: DoctorProgressEvent) => void,
-): Promise<ScriptDoctorReport> {
+): Promise<DoctorReportWithAnchors> {
   const res = await fetch("/api/scriptide/doctor/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -204,7 +223,7 @@ async function streamDoctorProgress(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let finalReport: ScriptDoctorReport | null = null;
+  let finalReport: DoctorReportWithAnchors | null = null;
   let serverError: string | null = null;
 
   for (;;) {
@@ -325,6 +344,18 @@ function formatPassName(pass: PassName): string {
  *  problem, not leak an internal rule constant verbatim. */
 function humanizeRule(rule: string): string {
   return rule.replace(/_/g, " ").toLowerCase();
+}
+
+/** E2: a stable-ish identity for one reported issue — the pass that raised
+ *  it, its rule, and the pass's own free-form `location` string (e.g.
+ *  "Scene 3 (INT. BAR)"), NOT the resolved line numbers (those can drift
+ *  when unrelated text elsewhere in the draft shifts line counts, which
+ *  would make a genuinely unchanged finding look "cleared" and "new" at
+ *  once). Used only for the session-only findings-cleared/new delta below —
+ *  a plain set-membership diff over these strings, deliberately simple
+ *  rather than a fuzzy match. */
+function issueIdentity(pass: PassName, issue: RevisionIssue): string {
+  return `${pass}::${issue.rule}::${issue.location}`;
 }
 
 /** Severity → chip classes for the root-cause card's severity badge — reuses
@@ -1282,7 +1313,19 @@ function SeverityChip({
   );
 }
 
-function IssueCard({ issue, pass }: { issue: RevisionIssue; pass?: PassName }) {
+function IssueCard({
+  issue,
+  pass,
+  onNavigate,
+}: {
+  issue: RevisionIssue;
+  pass?: PassName;
+  /** E2: present only when this issue's `location` resolved to a genuine
+   *  line anchor (see ScriptDoctorPanel's locationAnchorMap) AND a host is
+   *  listening for navigation — undefined for a 'document'-tier issue (act-
+   *  level/whole-script, no honest span) or when no editor is wired up. */
+  onNavigate?: () => void;
+}) {
   const meta = SEVERITY_META[issue.severity];
   return (
     <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
@@ -1300,6 +1343,17 @@ function IssueCard({ issue, pass }: { issue: RevisionIssue; pass?: PassName }) {
         <span className="text-[10px] font-mono text-gray-600 dark:text-gray-300 ml-auto">
           {issue.location}
         </span>
+        {onNavigate && (
+          <button
+            type="button"
+            onClick={onNavigate}
+            aria-label={`Jump to "${issue.location}" in the script`}
+            title="Jump to this line in the editor"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
+          >
+            Jump <ArrowRight className="w-2.5 h-2.5" aria-hidden="true" />
+          </button>
+        )}
       </div>
       <p className="text-[10px] font-bold uppercase text-black dark:text-white mb-1">
         {issue.rule}
@@ -1325,12 +1379,19 @@ function IssueCard({ issue, pass }: { issue: RevisionIssue; pass?: PassName }) {
 function RootCauseCard({
   finding,
   fixState,
+  onNavigate,
 }: {
   finding: RootCauseFinding;
   /** Null when the finding has no line anchor (startLine/endLine both
    *  undefined) — there's no honest span to send POST /api/scriptide/fix,
    *  so no fix affordance renders at all for those findings. */
   fixState: RootCauseFixState | null;
+  /** E2: present only when the finding carries a genuine line anchor AND a
+   *  host is listening for navigation — mirrors IssueCard.onNavigate's
+   *  contract exactly (see the render-side hasAnchor check in the Root
+   *  Causes section for why the two never disagree with the fix affordance
+   *  about which findings have an honest span). */
+  onNavigate?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const meta = SEVERITY_META[finding.severity];
@@ -1356,6 +1417,17 @@ function RootCauseCard({
         <span className="text-xs font-bold uppercase tracking-wide text-black dark:text-white">
           {finding.title}
         </span>
+        {onNavigate && (
+          <button
+            type="button"
+            onClick={onNavigate}
+            aria-label={`Jump to "${finding.title}" in the script`}
+            title="Jump to these lines in the editor"
+            className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
+          >
+            Jump <ArrowRight className="w-2.5 h-2.5" aria-hidden="true" />
+          </button>
+        )}
       </div>
       <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
         {finding.explanation}
@@ -1716,10 +1788,11 @@ export default function ScriptDoctorPanel({
   autoLoadSample,
   getDraftGeneration,
   initialReport,
+  onNavigateToFinding,
   onClose,
 }: ScriptDoctorPanelProps) {
   const [status, setStatus] = useState<Status>("idle");
-  const [report, setReport] = useState<ScriptDoctorReport | null>(null);
+  const [report, setReport] = useState<DoctorReportWithAnchors | null>(null);
   // W4: an initialReport was handed in, but the draft moved on since it was
   // measured — the existing "Coverage outdated" signal (ScriptIDE.tsx's
   // toolbar) applied to this handoff path, so a stale report never gets
@@ -1864,13 +1937,60 @@ export default function ScriptDoctorPanel({
   // Shown when a write-back is refused because the draft changed under it.
   const [staleWriteBackNotice, setStaleWriteBackNotice] = useState<string | null>(null);
 
+  // ── E2: click-a-finding → editor navigation ────────────────────────────
+  // Root-cause findings already carry a genuine line anchor on this report
+  // shape (RootCauseFinding.startLine/endLine). topPriorities and per-pass
+  // issues carry only a prose `location` string on the issue itself — this
+  // map resolves that string to the SAME anchor the server already computed
+  // for it (report.locatedIssues, attached at the route — see
+  // DoctorReportWithAnchors above) without re-deriving scene/character spans
+  // client-side. Keyed by the raw `location` string rather than by
+  // (pass, rule): resolution depends only on `location`, so two issues that
+  // happen to share one (e.g. two notes about the same scene) resolve to the
+  // identical span either way — a Map naturally collapses that redundancy.
+  const locationAnchorMap = useMemo(() => {
+    const map = new Map<string, { startLine: number; endLine: number }>();
+    for (const located of report?.locatedIssues ?? []) {
+      if (located.startLine === undefined || located.endLine === undefined) continue; // 'document' tier — no honest span
+      if (!map.has(located.issue.location)) {
+        map.set(located.issue.location, { startLine: located.startLine, endLine: located.endLine });
+      }
+    }
+    return map;
+  }, [report]);
+
+  // G0-02: whether the DISPLAYED report predates the live editor draft —
+  // the exact same decideWriteBack(reportDraftGenRef, getDraftGeneration())
+  // check isWriteBackStale (below) uses before a fix write-back, recomputed
+  // here whenever the editor's text changes so the stale banner and the
+  // Cmd/Ctrl+Enter shortcut both reflect the SAME "is this still current"
+  // answer a write-back would. Only meaningful while analyzing the live
+  // editor draft (not an upload/sample) — same scope isWriteBackStale
+  // already has, since getDraftGeneration tracks the editor's text, not
+  // whatever alternate source is active.
+  const [reportStale, setReportStale] = useState(false);
+  useEffect(() => {
+    if (!getDraftGeneration || reportDraftGenRef.current === null) {
+      setReportStale(false);
+      return;
+    }
+    setReportStale(!decideWriteBack(reportDraftGenRef.current, getDraftGeneration()).allow);
+    // Re-checks on every fountain-prop change (i.e. every editor edit) —
+    // reportDraftGenRef.current itself is a ref (not reactive), so `fountain`
+    // is the reactive proxy that makes this effect re-run as the writer types.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fountain, getDraftGeneration, report]);
+
+  // Session-only finding continuity: "N cleared, M new" since the report
+  // that was on screen immediately before THIS one. Deliberately not
+  // persisted (unlike DoctorHistoryEntry) and deliberately not per-finding
+  // animation — see runDiagnosis's success handler for how it's computed and
+  // ShipPanel's/RootCauseCard's honesty conventions elsewhere in this file
+  // for why a plain count, not a claim about causation, is what's shown.
+  const [findingsDelta, setFindingsDelta] = useState<{ cleared: number; added: number } | null>(null);
+
   // ── Fix & verify (Run 11) ──────────────────────────────────────────────
-  // Keyed by RootCauseFinding.id. Only root-cause findings carry a genuine
-  // line anchor on this report shape (RootCauseFinding.startLine/endLine);
-  // topPriorities issues carry only a prose `location` string with no line
-  // numbers anywhere on ScriptDoctorReport, so there is no honest span to
-  // hang a fix button on them here — see the fix affordance's render guard
-  // in the root-causes section below.
+  // Keyed by RootCauseFinding.id.
   const [fixPendingId, setFixPendingId] = useState<string | null>(null);
   const [fixResults, setFixResults] = useState<Record<string, FixRunState>>({});
   const [fixErrors, setFixErrors] = useState<Record<string, string>>({});
@@ -2074,7 +2194,7 @@ export default function ScriptDoctorPanel({
     // into a live per-pass progress readout and gives Cancel something real
     // to stop server-side (server/nvm/analyze/doctor-pool.ts's AbortSignal →
     // worker-terminate path).
-    const reportPromise: Promise<ScriptDoctorReport> = isPdf
+    const reportPromise: Promise<DoctorReportWithAnchors> = isPdf
       ? fetch("/api/scriptide/doctor/pdf", {
           method: "POST",
           headers: { "Content-Type": "application/pdf" },
@@ -2089,7 +2209,7 @@ export default function ScriptDoctorPanel({
                 : `Diagnosis failed (${res.status})`;
             throw new Error(body?.error ?? fallback);
           }
-          return (await res.json()) as ScriptDoctorReport;
+          return (await res.json()) as DoctorReportWithAnchors;
         })
       : useDeepRead
       ? fetch("/api/scriptide/doctor/deep", {
@@ -2108,7 +2228,7 @@ export default function ScriptDoctorPanel({
                 : `Diagnosis failed (${res.status})`;
             throw new Error(body?.error ?? fallback);
           }
-          return (await res.json()) as ScriptDoctorReport;
+          return (await res.json()) as DoctorReportWithAnchors;
         })
       : streamDoctorProgress(
           isFdx ? { fdx: uploadedFile!.content, title: effectiveTitle } : { fountain: effectiveText, title: effectiveTitle },
@@ -2127,6 +2247,25 @@ export default function ScriptDoctorPanel({
     reportPromise
       .then((data) => {
         if (myGeneration !== generationRef.current) return; // superseded by a newer run
+        // E2: findings-cleared/new delta — compares the report that was on
+        // screen an instant ago (`report`, this render's closure — see
+        // issueIdentity's doc comment for why NOT persisted history) against
+        // the one that just landed. Skipped (not zeroed — left null, so the
+        // banner doesn't render at all) on the very first run in this panel
+        // (no previous report to compare) or across a quick/deep mode switch
+        // (the two lineages aren't comparable — same rule DraftDeltaStrip's
+        // CrossVersionNotice already applies to the health/verdict numbers).
+        if (report && lastRunMode === effectiveMode) {
+          const prevIds = new Set(report.passes.flatMap((p) => p.issues.map((iss) => issueIdentity(p.pass, iss))));
+          const currIds = new Set(data.passes.flatMap((p) => p.issues.map((iss) => issueIdentity(p.pass, iss))));
+          let cleared = 0;
+          for (const id of prevIds) if (!currIds.has(id)) cleared++;
+          let added = 0;
+          for (const id of currIds) if (!prevIds.has(id)) added++;
+          setFindingsDelta({ cleared, added });
+        } else {
+          setFindingsDelta(null);
+        }
         setReport(data);
         setAnalyzedSnapshot(snapshotForThisRun);
         reportDraftGenRef.current = draftGenForThisRun; // G0-02: draft version this report reflects
@@ -2709,6 +2848,37 @@ export default function ScriptDoctorPanel({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // E2: Cmd/Ctrl+Enter re-runs diagnosis via the same streaming path the
+  // "Re-run" button already calls (runDiagnosis) — one keystroke instead of
+  // reaching for the mouse, most useful exactly when `reportStale` is true
+  // (the stale banner below documents the same shortcut). Bound on `document`
+  // like the Escape handler above, so it fires whether focus is in the
+  // editor or the panel — this panel is a non-modal drawer meant to stay open
+  // alongside the editor (see ScriptDoctorPanelProps), not a blocking dialog.
+  // No modifier combo this codebase already binds: fountain-keymap.ts only
+  // claims bare "Enter"; CodeMirror's default keymaps don't bind Mod-Enter.
+  // Latest-closure ref (rerunActionRef) so the listener itself is registered
+  // once at mount instead of being torn down/rebuilt on every keystroke —
+  // `fountain` changes on every edit, and runDiagnosis is a fresh closure
+  // every render, so a plain effect dependency here would churn constantly.
+  const rerunActionRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    rerunActionRef.current = () => {
+      if (status === "loading" || isEmpty) return;
+      runDiagnosis();
+    };
+  });
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        rerunActionRef.current();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   // Real focus management for this panel's role="dialog" aria-modal="true"
   // contract (see the outer motion.div below): moves focus in on mount
   // (including the auto-fired sample run above — this fires on mount
@@ -2852,7 +3022,10 @@ export default function ScriptDoctorPanel({
             onClick={() => runDiagnosis()}
             disabled={isEmpty}
             aria-label="Re-run diagnosis"
-            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
+            title="Re-run diagnosis (Cmd/Ctrl+Enter)"
+            className={`sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5 ${
+              reportStale ? "animate-pulse ring-2 ring-amber-400" : ""
+            }`}
           >
             <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Re-run
           </button>
@@ -3000,6 +3173,26 @@ export default function ScriptDoctorPanel({
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* E2: the report on screen predates the live draft — quiet, auto-
+          clearing (recomputed by the reportStale effect on every edit and
+          every fresh report, not a one-shot dismiss flag), so it never nags
+          past the moment it stops being true. No dismiss button: unlike
+          handoffOutdated/staleWriteBackNotice above, there's nothing to
+          dismiss into — it reappears the instant it's true again anyway. */}
+      {status === "success" && reportStale && (
+        <div
+          role="status"
+          className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b-2 border-amber-400 dark:border-amber-700 text-[10px] font-mono text-amber-800 dark:text-amber-200 shrink-0 flex items-center gap-2"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span className="min-w-0">
+            Draft changed since this report ran — press{" "}
+            <kbd className="px-1 py-0.5 border border-amber-400 dark:border-amber-700 font-bold">Cmd/Ctrl+Enter</kbd>{" "}
+            or Re-run to refresh.
+          </span>
         </div>
       )}
 
@@ -3338,6 +3531,31 @@ export default function ScriptDoctorPanel({
               </div>
             )}
 
+            {/* E2: finding continuity across runs — a plain count, computed by
+                runDiagnosis's success handler against whatever report was on
+                screen immediately before this one (session-only; see
+                issueIdentity's doc comment). Null (not zeroed) on the first
+                run this panel has made, or across a quick/deep mode switch,
+                so it never claims a comparison that wasn't actually made. */}
+            {findingsDelta && (
+              <p className="text-[11px] font-mono uppercase tracking-widest text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 px-3 py-2">
+                {findingsDelta.cleared === 0 && findingsDelta.added === 0 ? (
+                  "No change in findings since your last run."
+                ) : (
+                  <>
+                    <span className="text-green-600 dark:text-green-400 font-bold">
+                      {findingsDelta.cleared} finding{findingsDelta.cleared === 1 ? "" : "s"} cleared
+                    </span>
+                    {" · "}
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">
+                      {findingsDelta.added} new
+                    </span>
+                    {" since your last run"}
+                  </>
+                )}
+              </p>
+            )}
+
             {/* Plain-language summary — a readable paragraph a writer with no
                 film-school vocabulary can act on immediately. */}
             {report.plainSummary && (
@@ -3386,7 +3604,18 @@ export default function ScriptDoctorPanel({
                           onDiscard: () => discardFix(finding.id),
                         }
                       : null;
-                    return <RootCauseCard key={finding.id} finding={finding} fixState={fixState} />;
+                    return (
+                      <RootCauseCard
+                        key={finding.id}
+                        finding={finding}
+                        fixState={fixState}
+                        onNavigate={
+                          hasAnchor && onNavigateToFinding
+                            ? () => onNavigateToFinding(finding.startLine!, finding.endLine!)
+                            : undefined
+                        }
+                      />
+                    );
                   })}
                 </div>
               </div>
@@ -3696,9 +3925,21 @@ export default function ScriptDoctorPanel({
                   Top Priorities
                 </h3>
                 <div className="space-y-2">
-                  {report.topPriorities.map((issue, i) => (
-                    <IssueCard key={i} issue={issue} pass={issue.pass} />
-                  ))}
+                  {report.topPriorities.map((issue, i) => {
+                    const anchor = locationAnchorMap.get(issue.location);
+                    return (
+                      <IssueCard
+                        key={i}
+                        issue={issue}
+                        pass={issue.pass}
+                        onNavigate={
+                          anchor && onNavigateToFinding
+                            ? () => onNavigateToFinding(anchor.startLine, anchor.endLine)
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -3750,7 +3991,20 @@ export default function ScriptDoctorPanel({
                               No issues found by this pass.
                             </p>
                           ) : (
-                            p.issues.map((issue, i) => <IssueCard key={i} issue={issue} />)
+                            p.issues.map((issue, i) => {
+                              const anchor = locationAnchorMap.get(issue.location);
+                              return (
+                                <IssueCard
+                                  key={i}
+                                  issue={issue}
+                                  onNavigate={
+                                    anchor && onNavigateToFinding
+                                      ? () => onNavigateToFinding(anchor.startLine, anchor.endLine)
+                                      : undefined
+                                  }
+                                />
+                              );
+                            })
                           )}
                         </div>
                       )}
