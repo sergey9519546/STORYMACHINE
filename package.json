@@ -1,7 +1,7 @@
 {
   "name": "storymachine",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
@@ -27,7 +27,7 @@
     "restore-session": "node --experimental-strip-types scripts/restore-session.ts",
     "check-docs": "node --experimental-strip-types scripts/check-docs-quality.ts --all",
     "check-docs:strict": "node --experimental-strip-types scripts/check-docs-quality.ts --all --strict",
-    "setup-hooks": "cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo '\u2713 Git hooks installed'",
+    "setup-hooks": "cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo '✓ Git hooks installed'",
     "validate": "npm run lint && npm run check-docs && npm test",
     "gates": "node scripts/report-unverified-gates.mjs"
   },
