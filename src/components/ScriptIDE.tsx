@@ -31,7 +31,7 @@ import {
   type ScriptIDEServerSnapshot,
 } from "../lib/scriptide-draft-store";
 import { decideSampleInstall } from "../lib/sample-install-guard";
-import { isDraftStale } from "../lib/coverage-staleness";
+import { isDraftStale, type ThreadedCoverageReport } from "../lib/coverage-staleness";
 import { fountain as sampleScriptFountain } from "../lib/sample-script";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import {
@@ -76,6 +76,10 @@ const ScriptDoctorPanel = lazy(() => import("./scriptide/ScriptDoctorPanel"));
 const SettingsPanel = lazy(() => import("./SettingsPanel"));
 const CoverageSummary = lazy(() => import("./scriptide/CoverageSummary"));
 const SlatePanel = lazy(() => import("./SlatePanel"));
+// W6: writer-facing Ship container (exports/snapshots/verify pointer) —
+// see ShipPanel.tsx's header comment for why this replaced the "studio"
+// research-shell mount on the always-visible Ship task tab.
+const ShipPanel = lazy(() => import("./scriptide/ShipPanel"));
 
 // Matches the DirectorPanel/ScriptDoctorPanel shell (fixed right-side drawer,
 // same sm-btn/white-bg idiom) so first-open doesn't flash blank space
@@ -385,6 +389,10 @@ export default function ScriptIDE({
   // Coverage freshness: after user edits, diagnosis is considered stale until
   // they re-open Coverage / re-run doctor (quiet intelligence, not a nag stack).
   const [coverageStale, setCoverageStale] = useState(false);
+  // W4: the last full report CoverageSummary computed, threaded into
+  // ScriptDoctorPanel as initial state when "Full report" is clicked — see
+  // that panel's initialReport prop doc comment for the freshness contract.
+  const [coverageReport, setCoverageReport] = useState<ThreadedCoverageReport | null>(null);
   /** Progressive depth: summary first; full Script Doctor is opt-in. */
   const [coverageFull, setCoverageFull] = useState(false);
   /** Current cursor line (1-based) for sidebar scene highlighting. */
@@ -635,6 +643,18 @@ export default function ScriptIDE({
           saveConflictRef.current = decision.server;
           setSaveConflict(decision.server);
           setSaveStatus('save-conflict');
+          return;
+        }
+        if (decision.action === 'reconciled') {
+          // W3: this draft's content already matches the server (see
+          // scriptIDEDraftMatchesServer's doc comment in scriptide-draft-store.ts)
+          // — the earlier save succeeded, only its client-side ack was lost to
+          // the reload that raced it. Nothing on screen needs to change; just
+          // catch the bookkeeping up so this reload never shows the conflict
+          // banner over a tab that never existed.
+          draftEnvelopeRef.current = { ...local, serverRevision: decision.server.updatedAt, dirty: false };
+          persistedGenerationRef.current = draftGenerationRef.current;
+          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
           return;
         }
         if (decision.action === 'use-server') {
@@ -1181,11 +1201,15 @@ export default function ScriptIDE({
       if (next === "coverage") {
         setTask("coverage");
         setCoverageStale(false);
-      } else if (next === "studio") {
-        setTask((t) => (t === "ship" ? "ship" : "write"));
       } else if (next === "none") {
         setTask((t) => (t === "coverage" || t === "ship" ? "write" : t));
       }
+      // W6: "studio" (the Labs-gated research shell) intentionally does NOT
+      // mutate task, same as "director"/"slate" — it's an independent
+      // overlay now, not Ship's content. Before this change it special-cased
+      // task to stay "ship" (the one leak this component closes); now Ship
+      // has its own toolSlot ("ship", opened only via handleTaskChange
+      // below), so Studio never needs to know what task is active.
       return next;
     });
   }, []);
@@ -1200,8 +1224,10 @@ export default function ScriptIDE({
       setCoverageFull(false);
       setCoverageStale(false);
     } else if (next === "ship") {
-      setToolSlot("studio");
-      setActiveTab("versions");
+      // W6: the writer-facing ShipPanel (exports/snapshots/verify), NOT the
+      // Labs-gated research shell (toolSlot="studio") this used to mount —
+      // see ShipPanel.tsx's header comment for the full history.
+      setToolSlot("ship");
       setCoverageFull(false);
     }
   }, []);
@@ -1727,8 +1753,19 @@ export default function ScriptIDE({
               <span className="font-bold uppercase tracking-wider text-[var(--sm-stamp)]">
                 Save Conflict Detected
               </span>
+              {/* W3: this fires only when the server's saved content genuinely
+                  differs from what's on screen (scriptIDEDraftMatchesServer in
+                  scriptide-draft-store.ts already clears the identical-content
+                  case silently) — but a real content difference can also mean
+                  this device's own last save never reached the server (e.g. a
+                  dropped connection), not that another tab touched it. Naming
+                  a specific cause we can't actually confirm would be its own
+                  false accusation, so this describes what's true either way:
+                  the two copies disagree, and the writer picks which wins. */}
               <span className="text-[10px] text-[var(--sm-ink)]/70">
-                This draft was modified in another tab or window. Choose which version to keep.
+                This draft on this device doesn&rsquo;t match what&rsquo;s saved on the server —
+                from another tab or window editing it, or a save that didn&rsquo;t finish.
+                Choose which version to keep.
               </span>
             </div>
             <button
@@ -2559,6 +2596,7 @@ export default function ScriptIDE({
               autoLoadSample={doctorAutoSample}
               getDraftGeneration={getDraftGeneration}
               onFreshReport={() => setCoverageStale(false)}
+              onReportComputed={setCoverageReport}
               onLoadSampleIntoEditor={(text) => {
                 // G0-01 defense in depth: refuse to overwrite a non-empty draft
                 // that differs from the sample. The draft stays byte-identical.
@@ -2605,6 +2643,7 @@ export default function ScriptIDE({
             fountain={scriptText}
             title={titlePage.title}
             getDraftGeneration={getDraftGeneration}
+            initialReport={coverageReport}
             onLoadFountain={(text) => {
               installDraft(text);
               setCoverageStale(false);
@@ -2632,8 +2671,41 @@ export default function ScriptIDE({
         )}
       </AnimatePresence>
 
-      {/* Snapshot modals when Versions tab is not mounting the full manager */}
-      {!(toolSlot === "studio" && activeTab === "versions") && (
+      {/* ── SHIP — writer-facing container, the default (non-Labs) surface
+          for the always-visible Ship task tab (W6). Exports, snapshots/
+          versions, and the verify-report pointer — see ShipPanel.tsx. ── */}
+      <AnimatePresence>
+        {toolSlot === "ship" && (
+          <Suspense fallback={<DrawerPanelFallback />}>
+            <ShipPanel
+              title={titlePage.title || initialConfig.theme}
+              isEmptyDraft={isEmptyDraft}
+              onExportFountain={exportFountain}
+              onExportFDX={exportFDX}
+              onExportPDF={exportPDF}
+              onExportDOCX={exportDOCX}
+              snapshots={snapshots}
+              snapshotModal={snapshotModal}
+              restoreModal={restoreModal}
+              onTakeSnapshot={takeSnapshot}
+              onConfirmSnapshot={confirmSnapshot}
+              onRestoreSnapshot={restoreSnapshot}
+              onConfirmRestore={confirmRestore}
+              onDeleteSnapshot={deleteSnapshot}
+              onSetSnapshotModal={setSnapshotModal}
+              onSetRestoreModal={setRestoreModal}
+              onClose={() => {
+                setToolSlot("none");
+                if (task === "ship") setTask("write");
+              }}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* Snapshot modals when neither Ship nor the (Labs-only) Studio's own
+          Versions tab is already mounting the full manager. */}
+      {!(toolSlot === "ship" || (toolSlot === "studio" && activeTab === "versions")) && (
         <SnapshotManager
           snapshots={snapshots}
           snapshotModal={snapshotModal}

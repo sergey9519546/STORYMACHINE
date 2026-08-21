@@ -184,7 +184,33 @@ export type ScriptIDERestoreDecision =
   | { action: 'empty' }
   | { action: 'use-server'; server: ScriptIDEServerSnapshot }
   | { action: 'keep-local'; serverRevision: number | null }
-  | { action: 'conflict'; server: ScriptIDEServerSnapshot };
+  | { action: 'conflict'; server: ScriptIDEServerSnapshot }
+  | { action: 'reconciled'; server: ScriptIDEServerSnapshot };
+
+/**
+ * W3 root cause: true when a local draft's actual content already matches
+ * what the server holds, even though their revision numbers disagree. This
+ * is exactly what a same-session reload sees after ScriptIDE.tsx's
+ * visibilitychange/unmount save path fires a `keepalive` POST to
+ * /api/scriptide/save right as the page is torn down — the request reaches
+ * the server and IS persisted (keepalive's whole purpose), but the response's
+ * `.then()` (the one place that clears `dirty` and adopts the new
+ * serverRevision in localStorage) never gets to run in the old page's JS
+ * context. The next load reads a local envelope that still says "dirty,
+ * unacknowledged" pointing at a server draft that is, in fact, this exact
+ * content. Content equality is what tells that apart from a genuine second
+ * writer, whose server draft would carry DIFFERENT content.
+ */
+function scriptIDEDraftMatchesServer(
+  local: ScriptIDEDraftEnvelope,
+  server: ScriptIDEServerSnapshot,
+): boolean {
+  return local.scriptText === server.scriptText &&
+    local.isDarkMode === server.isDarkMode &&
+    JSON.stringify(local.snapshots) === JSON.stringify(server.snapshots) &&
+    JSON.stringify(local.characters) === JSON.stringify(server.characters) &&
+    JSON.stringify(local.researchNotes) === JSON.stringify(server.researchNotes);
+}
 
 /**
  * Pure restore policy for mount-time local vs server drafts.
@@ -204,6 +230,13 @@ export function decideScriptIDERestore(
   if (opts.hadVersionedDraft) {
     const serverChanged = local.serverRevision !== server.updatedAt;
     if (local.dirty && serverChanged) {
+      // W3: an unacknowledged save whose content already landed on the
+      // server is not a conflict — there was never a second writer, just a
+      // lost ack (see scriptIDEDraftMatchesServer above). Reconcile the
+      // bookkeeping silently instead of accusing a tab that never existed.
+      if (scriptIDEDraftMatchesServer(local, server)) {
+        return { action: 'reconciled', server };
+      }
       return { action: 'conflict', server };
     }
     if (!local.dirty && serverChanged) {

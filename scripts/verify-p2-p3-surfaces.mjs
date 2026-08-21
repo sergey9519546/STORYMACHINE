@@ -264,8 +264,23 @@ function staticCrossCheck() {
   // the live-browser Ship-task check for the one exception found.
   const runtimeGatedInDefaultReachable = new Set(['scriptide/Toolbar.tsx' /* the gate mechanism itself, not a panel */]);
 
+  // Known-quarantined dead components (2026-08-08 prototype quarantine, commit
+  // 1664d08 era): their entry points were deliberately retired but the files
+  // were preserved per the keep-as-reference moratorium. Listed BY NAME so the
+  // dead-UI tripwire stays armed for anything new — an unlisted unreachable
+  // component still FAILS this script. Owner decision (delete vs. revive) is
+  // pending; remove entries here only alongside that decision.
+  const knownQuarantinedDead = new Set([
+    'oasis/BeliefDriftGraph.tsx',
+    'oasis/ReplayInspector.tsx',
+    'oasis/SecretsMatrix.tsx',
+    'oasis/SimulationSandbox.tsx',
+  ]);
+
   for (const f of allFiles.sort()) {
-    if (deadFiles.has(f)) {
+    if (deadFiles.has(f) && knownQuarantinedDead.has(f)) {
+      record('P2-static', `${f} unreachable — known-quarantined (2026-08-08), owner decision pending`, true, 'deliberately orphaned prototype, preserved per moratorium; not a new leak');
+    } else if (deadFiles.has(f)) {
       record('P2-static', `${f} reachable from App.tsx`, false, 'UNREACHABLE — not imported (directly or transitively) from App.tsx at all; dead UI worth reporting');
     } else if (labsOnlyViaStoryMachine.has(f)) {
       record('P2-static', `${f} reachable only via Labs-gated StoryMachine.tsx`, true, 'imported exclusively through StoryMachine.tsx, itself gated by App.tsx\'s effectiveShowStoryMachine');
@@ -287,6 +302,17 @@ async function getOverflowMenuItemLabels(page) {
   const items = await menu.getByRole('menuitem').allTextContents();
   await page.keyboard.press('Escape'); // close it back up
   return items.map((s) => s.trim());
+}
+
+// W6: detects the PRODUCTION/ANALYSIS/ENGINE/CODEX research-shell tab bar.
+// Requires ALL FOUR words present, not any single one — "Analysis" alone is
+// ambiguous with the persistent Toolbar's own unrelated "No AI key ·
+// analysis ok" banner (ScriptIDE.tsx), which a naive any-of match (and an
+// earlier version of this check) false-positived on. Only the actual tab
+// bar renders all four together as siblings, so requiring the full set is
+// both a false-positive fix and a MORE specific regression tripwire.
+function hasResearchShellChrome(bodyText) {
+  return ['Production', 'Analysis', 'Engine', 'Codex'].every((w) => new RegExp(`\\b${w}\\b`, 'i').test(bodyText));
 }
 
 async function main() {
@@ -352,64 +378,56 @@ async function main() {
   record('P2', 'Toolbar overflow: "Open Simulate" ABSENT with Labs OFF', !hasSimulateOff, `items=${JSON.stringify(overflowLabelsOff)}`);
   record('P2', 'Toolbar overflow: "Labs & Settings" reachable (so a writer can turn Labs on)', overflowLabelsOff.some((l) => /labs/i.test(l)), `items=${JSON.stringify(overflowLabelsOff)}`);
 
-  // DECISION-ENCODED CHECK (accepted 2026-08-04, see the dated addendum in
-  // docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md — "Ship/Studio
-  // Labs-gate bypass"): the always-visible "Ship" task tab (not Labs-gated)
-  // reaches the same toolSlot="studio" panel as the Labs-gated Toolbar
-  // overflow item, via ScriptIDE.tsx's handleTaskChange (`next === "ship" ->
-  // setToolSlot("studio")`). The maintainer reviewed this as a real gating
-  // inconsistency (Toolbar's "Open Studio" is a shortcut, not the sole
-  // door) and ACCEPTED it: removing a default-surface tab risked removing
-  // load-bearing functionality (Title/Versions editing has no other
-  // default-surface path — confirmed by source read, not asserted on
-  // faith), and the panel's live content is Production/Analysis/Codex/
-  // Research-notes/Title/Versions, none of which are the ~38 Labs-gated
-  // research panels — so P2's exit-gate wording ("zero exposure to NVM/
-  // converge/twin/simulation jargon") holds regardless of which door
-  // reaches it.
-  //
-  // This assertion therefore encodes the decision as a PASS while staying a
-  // genuine tripwire in both directions:
-  //   (a) Ship must stay reachable with Labs OFF — if a future change guards
-  //       it, THIS FAILS, because that silently reverses the accepted
-  //       decision without anyone updating the addendum that records it.
-  //   (b) the panel it opens must still carry zero OASIS/NVM jargon — if a
-  //       future change ever routes a real gated research panel through
-  //       this door, THAT FAILS, because the "not a P2 violation" half of
-  //       the decision was conditioned on exactly that being absent.
+  // W6 (docs/PATH_TO_EXCELLENCE.md Phase W): the always-visible "Ship" task
+  // tab used to bypass the Labs gate by mounting toolSlot="studio" (the
+  // PRODUCTION/ANALYSIS/ENGINE/CODEX research shell) just to show a
+  // snapshots list — exactly the "Ship/Studio Labs-gate bypass" the
+  // 2026-08-04 addendum above ACCEPTED as a known-open item pending a real
+  // fix. This block asserts that leak is now CLOSED (not merely
+  // re-decided): Ship opens its own writer-facing ShipPanel
+  // (toolSlot="ship" — exports, snapshots/versions, verify-report pointer,
+  // paper·ink·stamp chrome, zero research tab bar); the research shell moved
+  // exclusively behind toolSlot="studio", reachable only through the still
+  // Labs-gated Toolbar overflow "Open Studio" item exercised in CONTEXT B
+  // below. See docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md's
+  // 2026-08-21 addendum for the closure record.
   const shipTaskBtn = pageA.getByRole('button', { name: 'Ship', exact: true }).first();
   await shipTaskBtn.click();
-  const versionsTab = pageA.getByRole('button', { name: 'Versions', exact: true });
-  const versionsTabVisible = await versionsTab
-    .waitFor({ state: 'visible', timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-  const versionsTabCount = await versionsTab.count();
-  const versionsTabPressed = versionsTabVisible
-    ? (await versionsTab.getAttribute('aria-pressed')) === 'true'
-    : false;
-  const studioReachableViaShip = versionsTabCount === 1 && versionsTabVisible && versionsTabPressed;
-  const studioTabLabels = studioReachableViaShip
-    ? await versionsTab.evaluate((button) =>
-        Array.from(button.parentElement?.querySelectorAll('button') ?? [], (tab) => tab.textContent?.trim() ?? ''),
-      )
-    : [];
-  const studioBodyText = studioReachableViaShip ? await pageA.locator('body').innerText() : '';
-  const OASIS_JARGON_RE = /\bOASIS\b|\bNVM\b|causal twin|epistemic map|converge panel|fixed[- ]points|self-?play|agent roster/i;
-  const leaksOasisJargon = OASIS_JARGON_RE.test(studioBodyText);
+  await pageA.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: 10000 });
+  await pageA.waitForTimeout(200);
+  const shipBodyTextOff = await pageA.locator('body').innerText();
+  const shipHasResearchChromeOff = hasResearchShellChrome(shipBodyTextOff);
   record(
-    'P2-decision',
-    'Studio tool-slot (toolSlot="studio") reachable via the always-visible "Ship" task tab, bypassing the Labs-gated Toolbar overflow entry — ACCEPTED 2026-08-04 (docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md, "Ship/Studio Labs-gate bypass"); this must stay true, if it flips to unreachable someone gated Ship without reconciling that decision',
-    studioReachableViaShip,
-    studioReachableViaShip
-      ? `REACHABLE with Labs OFF via Ship task tab, as decided — tabs found: ${JSON.stringify(studioTabLabels)}. Labs-gated Toolbar "Open Studio" overflow item remains a shortcut, not the sole door, per the accepted decision.`
-      : `NOT reachable via Ship tab with one visible, active Versions button (count=${versionsTabCount}, visible=${versionsTabVisible}, aria-pressed=${versionsTabPressed}) — this reverses the 2026-08-04 accepted decision; reconcile with docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md before treating this as a fix`,
+    'P2-W6',
+    'Ship tab (Labs OFF) shows NO research-chrome tab bar — Production/Analysis/Engine/Codex not ALL present together (the leak this component closes)',
+    !shipHasResearchChromeOff,
+    shipHasResearchChromeOff
+      ? 'Production/Analysis/Engine/Codex all found together on the Ship tab — the old studio-shell leak has returned'
+      : 'research-shell tab-bar text not found (as a full set) on the Ship tab',
+  );
+  const shipExportLabels = ['PDF', 'Fountain', 'Final Draft', 'Word'];
+  const shipExportCounts = await Promise.all(
+    shipExportLabels.map((label) => pageA.getByRole('button', { name: new RegExp(`^${label}`, 'i') }).count()),
   );
   record(
-    'P2-decision',
-    'Studio panel content (reached via Ship, Labs OFF) contains no OASIS/NVM research jargon — the condition the 2026-08-04 accept decision (SURFACE_REVALIDATION_2026-08-04.md) rests on; a jargon leak here means a gated research panel became reachable through this door and the decision must be revisited',
-    !leaksOasisJargon,
-    leaksOasisJargon ? 'jargon regex matched — genuine P2 leak, invalidates the 2026-08-04 accept decision' : 'no NVM/OASIS/causal-twin/epistemic-map/converge/fixed-points/self-play jargon found; Ship-tab content is Production/Analysis/Codex/Research-notes/Title/Versions, not a gated research panel',
+    'P2-W6',
+    'Ship tab (Labs OFF): all four export actions (PDF/Fountain/Final Draft/Word) reachable from ShipPanel',
+    shipExportCounts.every((n) => n >= 1),
+    `counts=${JSON.stringify(Object.fromEntries(shipExportLabels.map((l, i) => [l, shipExportCounts[i]])))}`,
+  );
+  const shipSnapshotsHeadingOff = await pageA.getByText('Script Snapshots', { exact: true }).count();
+  record(
+    'P2-W6',
+    'Ship tab (Labs OFF): snapshots/versions list reachable ("Script Snapshots")',
+    shipSnapshotsHeadingOff >= 1,
+    `count=${shipSnapshotsHeadingOff}`,
+  );
+  const shipVerifyLinkOff = await pageA.getByRole('link', { name: /verify a report/i }).count();
+  record(
+    'P2-W6',
+    'Ship tab (Labs OFF): independent-verification pointer reachable ("Verify a report" -> #verify, same route as StartScreen\'s own link)',
+    shipVerifyLinkOff >= 1,
+    `count=${shipVerifyLinkOff}`,
   );
   // Closes the flagged item from docs/p1-benchmark/SURFACE_REVALIDATION_2026-08-04.md
   // ("Ship-tab toolbar row also has a 'Simulate' button ... Labs-agnostic path to
@@ -479,32 +497,43 @@ async function main() {
   record('P3', 'Sample coverage produces a rendered verdict (Doctor reachable end to end)', verdictRendered, 'checked CoverageSummary body for a verdict word');
 
   const fullReportBtn = pageA.getByRole('button', { name: 'Full report', exact: true }).first();
+  // W4 (docs/PATH_TO_EXCELLENCE.md Phase W): "Full report" used to unmount
+  // CoverageSummary and cold-mount ScriptDoctorPanel with autoLoadSample=
+  // false — landing on an idle "Run Diagnosis" prompt even though
+  // CoverageSummary had ALREADY computed a full report against this exact
+  // sample text, forcing the writer to re-pay the whole 14-pass diagnosis.
+  // The fix threads that report through ScriptIDE.tsx (ThreadedCoverageReport,
+  // src/lib/coverage-staleness.ts) as ScriptDoctorPanel's `initialReport`
+  // prop, so the panel hydrates straight into its success state at mount —
+  // no second /api/scriptide/doctor call, no "Run Diagnosis" click needed.
+  // Assert BOTH directions: the redundant call/click must be gone, and the
+  // Export button (which only ever renders once a real report is on screen)
+  // must already be there without it.
+  let secondDoctorCallSeen = false;
+  const onSecondDoctorCall = (req) => {
+    if (/\/api\/scriptide\/doctor(?!\/)/.test(req.url())) secondDoctorCallSeen = true;
+  };
+  pageA.on('request', onSecondDoctorCall);
   await fullReportBtn.click();
   await pageA.waitForSelector('[role="dialog"]', { timeout: 10000 });
-  await pageA.waitForTimeout(500);
-
-  // ScriptDoctorPanel opens with autoLoadSample=false — it lands in its own
-  // "idle" state (a fresh, unrun diagnosis) even though the editor draft
-  // already holds the sample text from CoverageSummary. It only renders the
-  // Export button once ITS OWN diagnosis has run (`status === "success" &&
-  // report`), so "Run Diagnosis" has to be clicked here before Export
-  // becomes available — this is the same run the focus-trap harness's
-  // "Full report" step exercises, just carried one step further.
-  const runDiagnosisBtn = pageA.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
-  // Click and wait must race-free (Promise.all, not click-then-await): the
-  // doctor route/LRU cache (doctor.ts) can resolve THE SAME sample text
-  // near-instantly on this second analysis, so a sequential
-  // click()-then-waitForResponse() can miss the response entirely if it
-  // lands before the listener is attached — same pattern as the download
-  // capture below.
-  await Promise.all([
-    pageA.waitForResponse((r) => /\/api\/scriptide\/doctor/.test(r.url()) && r.status() === 200, { timeout: 30000 }),
-    runDiagnosisBtn.click(),
-  ]);
-  await pageA.waitForTimeout(400);
 
   const exportBtn = pageA.getByRole('button', { name: 'Export coverage report as an HTML document', exact: true }).first();
-  await exportBtn.waitFor({ timeout: 10000 });
+  const runDiagnosisBtnW4 = pageA.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
+  const exportVisibleImmediately = await exportBtn
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  const idleRunDiagnosisVisible = await runDiagnosisBtnW4.isVisible().catch(() => false);
+  pageA.off('request', onSecondDoctorCall);
+  record(
+    'P3-W4',
+    'Full report hydrates the already-computed report immediately — no idle "Run Diagnosis" cold-mount',
+    exportVisibleImmediately && !idleRunDiagnosisVisible && !secondDoctorCallSeen,
+    `exportVisibleImmediately=${exportVisibleImmediately} idleRunDiagnosisVisible=${idleRunDiagnosisVisible} secondDoctorCallSeen=${secondDoctorCallSeen}`,
+  );
+  await pageA.waitForTimeout(400);
+
+
   const [download] = await Promise.all([
     pageA.waitForEvent('download', { timeout: 20000 }),
     exportBtn.click(),
@@ -685,6 +714,48 @@ async function main() {
     persistentSimVisibleOn,
     persistentSimVisibleOn ? '' : 'control not found/visible in persistent Toolbar with Labs ON',
   );
+
+  // W6, mirrored for Labs ON: Ship must show the SAME writer-facing
+  // ShipPanel — zero research-chrome tab bar — regardless of the Labs flag.
+  // Ship is not a Labs surface; only Studio (below) is.
+  await pageB.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: 10000 });
+  const shipBodyTextOn = await pageB.locator('body').innerText();
+  const shipHasResearchChromeOn = hasResearchShellChrome(shipBodyTextOn);
+  record(
+    'P2-W6',
+    'Ship tab (Labs ON) ALSO shows NO research-chrome tab bar — Ship stays the plain writer container regardless of the Labs flag',
+    !shipHasResearchChromeOn,
+    shipHasResearchChromeOn
+      ? 'Production/Analysis/Engine/Codex all found together on the Ship tab with Labs ON — Ship must never mount the research shell, Labs flag or not'
+      : 'research-shell tab-bar text not found (as a full set) on the Ship tab with Labs ON',
+  );
+
+  // W6: the research shell (toolSlot="studio") must still be genuinely
+  // reachable with Labs ON — proving it was gated, not deleted (deletion
+  // moratorium). Close the Ship drawer first: like Coverage/Director/Slate,
+  // it's a z-50 fixed overlay that sits above the z-20 header while open,
+  // so the toolbar's own overflow button is behind it until closed.
+  await pageB.getByRole('button', { name: 'Close ship panel' }).click();
+  await pageB.waitForTimeout(200);
+  const moreBtnOn = pageB.getByRole('button', { name: 'More tools' }).first();
+  await moreBtnOn.click();
+  const openStudioItem = pageB.getByRole('menuitem', { name: /open studio/i });
+  const openStudioCountOn = await openStudioItem.count();
+  record('P2-W6', 'Toolbar overflow "Open Studio" (Labs ON) is present and clickable', openStudioCountOn === 1, `count=${openStudioCountOn}`);
+  if (openStudioCountOn === 1) {
+    await openStudioItem.click();
+    await pageB.waitForTimeout(400);
+    const studioBodyTextOn = await pageB.locator('body').innerText();
+    const studioShellReachable = hasResearchShellChrome(studioBodyTextOn);
+    record(
+      'P2-W6',
+      'Research shell (toolSlot="studio") genuinely reachable with Labs ON via Toolbar overflow "Open Studio" — gated, not deleted (deletion moratorium)',
+      studioShellReachable,
+      studioShellReachable
+        ? 'Production/Analysis/Codex tab-bar text found after clicking "Open Studio"'
+        : 'research-shell tab-bar text NOT found after clicking "Open Studio" — the shell may have been deleted rather than gated',
+    );
+  }
 
   await contextB.close();
 
