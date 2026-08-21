@@ -1,9 +1,11 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-08-21, main @ f416336: Phase W is complete** (all six
-lanes landed and gate-verified; details in each entry). Next up: Phase E,
-with Phase P's measurement lanes in parallel and Phase T's owner-machine
-items still open. Successor to `PATH_TO_DONE.md`'s
+**State as of 2026-08-21 (evening), main @ 3f2b1a3: Phases W and E are
+landed** — all six W lanes and all five E lanes shipped and gate-verified
+per their entries; Phase E's judged design-quality exit gate is the one
+item still open in E (in progress, see the gate note). Next: that
+judgment, then Phase S, with Phase P's measurement lanes in parallel and
+Phase T's owner-machine items still open. Successor to `PATH_TO_DONE.md`'s
 task framing: that file tracks ROADMAP phases; this one sequences everything
 measured by the three 2026-08-14 audits (UX-in-browser, engine-truth,
 ship-vehicle) into the shortest honest path to a product that is *truly
@@ -113,20 +115,47 @@ machine.
 
 ## Phase E — Easily controllable and interactive (2–3 weeks)
 
-- **E1.** Live analysis progress: stream per-pass progress with a real
-  cancel (the between-turn cancellation pattern already proven in the
-  engine applies here), so even long runs feel owned by the writer.
-- **E2.** Finding ↔ editor round-trip as the core loop: click a finding →
-  land on the exact lines → fix → one-keystroke re-run → watch the finding
-  clear. The staleness banner already works; make the loop feel like a
-  conversation.
-- **E3.** First-run: a stranger must understand the promise in 10 seconds —
-  one line of what it does, the sample CTA, and the one-sentence privacy
-  claim (drafted in the ops audit) visible before any commitment.
-- **E4.** Local-first safety net: IndexedDB autosave independent of the
-  server, a visible "delete everything" control, and the honest privacy
-  page. Server persistence (per-session SQLite) already survives restarts;
-  the browser side deserves the same durability.
+- **E1 — DONE 2026-08-21.** `POST /api/scriptide/doctor/stream`: SSE
+  sibling of `/doctor` (same schema, limiter, worker pool, report shape)
+  emitting per-stage and per-pass progress frames; `ScriptDoctorPanel`
+  shows "Running pass N of 14…" with a real Cancel that reaches the
+  existing res-close → AbortSignal → worker-terminate path — no new
+  cancellation mechanism. Progress hooks are purely observational: proven
+  byte-identical across all 45 fixtures (receipt recorded in
+  `MEASUREMENT_RECEIPTS.md`, independently re-verified before merge).
+  Browser-proofed: cancel cleared in 118ms with the server immediately
+  serving the next run. Deep-read/PDF routes deliberately kept one-shot.
+- **E2 — DONE 2026-08-21.** `locatedIssues` now rides every doctor
+  response (reusing the `locateIssues()` call the routes already made —
+  zero new computation); finding cards get a Jump button →
+  `FountainEditor.highlightRange` scrolls and paints a fading stamp-red
+  wash on the exact lines; Cmd/Ctrl+Enter re-runs via the E1 streaming
+  path; a session-only "N findings cleared · M new" delta line
+  (identity = pass::rule::location, its line-number-drift noisiness
+  documented in-code as an accepted limitation). Browser-proofed
+  end-to-end on a real finding: jump → edit → re-run → cleared.
+- **E3 — DONE 2026-08-21.** Entrance promise line ("Reads your screenplay
+  like a studio coverage reader…"), privacy sentence ("Keyless by default —
+  your script stays in this deployment unless you turn on AI features
+  yourself" — worded to be true for visitors, since keys are opt-in via
+  Settings, not operator-only), CTA hierarchy preserved; all three visible
+  without scrolling at 1440px and 375px. Fixed a real pre-existing bug en
+  route: the CTA description inherited `.sm-btn`'s `white-space: nowrap`
+  and spilled past the button edge at every viewport.
+- **E4 — DONE 2026-08-21.** IndexedDB draft mirror
+  (`scriptide-idb-store.ts`, never-rejecting, wins on restore only when
+  strictly newer than localStorage — the quota-failure recovery case,
+  routed through a new `decideScriptIDELocalRestore` sibling rather than a
+  change to the W3 logic); Delete Everything in Settings → Session,
+  confirm-gated, wiping IndexedDB + localStorage and calling the new
+  `POST /api/session/delete` (the existing `destroySession()` primitive:
+  Stage eviction + SQLite file unlink, caller's own session only); the
+  `#privacy` page stating what stays in the browser, what the server
+  stores, what leaves (nothing by default, live-checked), and how to
+  delete — every sentence code-verified. The lane's own browser proof
+  caught and fixed a real bug: the wipe's reload raced the
+  `visibilitychange` autosave, which silently resurrected the deleted
+  draft; a synchronous suppression flag now guards every write path.
 - **E5 — DONE 2026-08-21.** Command palette (Cmd/Ctrl+K, `CommandPalette.tsx`
   + `src/lib/command-palette.ts`): an ARIA combobox/listbox over a ~25-entry
   action registry, every `run:` a direct call to the SAME named callback the
