@@ -31,9 +31,10 @@ OASIS and the research surfaces remain available only as filed Labs work.
 
 The project has strong deterministic engineering but no documented evidence
 in this repo that a real writer wants the output. Its former headline metric
-is also non-load-bearing: the live generated rulebook is 3,216 pass-scoped
-constants (the earlier "8,917" figure was shown to be inaccurate by the
-2026-07-14 audit), while the doctor's own diagnostics report rule-channel AUC
+is also non-load-bearing: the live generated rulebook is 3,217 pass-scoped
+constants (corrected 2026-08-24 — 3,216 until PR #257 added
+`INVERSE_CHEKHOV_GUN` in `33a2ee48`; the earlier "8,917" figure was shown to
+be inaccurate by the 2026-07-14 audit), while the doctor's own diagnostics report rule-channel AUC
 ~0.076 versus scene-count scarcity AUC ~0.938. Reproducibility is real; score
 validity on real writing is not yet proven.
 
@@ -102,8 +103,14 @@ rulebook — and the P1 exit gate is not met.
 - The dialogue-diversity deduction reached test AUC 0.990.
 - Final pooled test AUC is 0.754, below the 0.80 gate; SHUFFLE/DROP/RELOCATE
   remain the structural gap at 0.73/0.77/0.52.
-- The composite synthetic minimum-gap guard remains below its 5.0 threshold.
-- The generated rule inventory remains frozen at 3,216 pass-scoped constants.
+- The composite synthetic minimum-gap guard **PASSES** — corrected
+  2026-08-24. It has been a hard assertion (not a `todo`) since 2026-08-04,
+  and the measured gap today is **+8.5** (good 78.5, bad 70.0) against the
+  5.0 threshold; `tests/core/discrimination.test.ts` runs 14 pass / 0 fail /
+  0 todo. This line previously said the guard "remains below its 5.0
+  threshold," which had been false for twenty days.
+- The generated rule inventory remains frozen at 3,217 pass-scoped constants
+  (corrected 2026-08-24 from 3,216; `33a2ee48` added `INVERSE_CHEKHOV_GUN`).
 
 ### P1 work
 
@@ -123,9 +130,16 @@ rulebook — and the P1 exit gate is not met.
 5. Integrate the landed emotional-arc channel only if it improves held-out
    doctor-level discrimination without calibration or produced-floor
    regressions.
-6. Close the composite minimum-gap guard through measured false-positive
-   reduction — never by a global curve tweak that merely moves the fixture.
-7. Freeze rule growth: add no entries to the current 3,216-entry generated
+6. ~~Close the composite minimum-gap guard through measured false-positive
+   reduction — never by a global curve tweak that merely moves the fixture.~~
+   **DONE 2026-08-04 (Lane H), recorded here 2026-08-24.** Closed exactly as
+   specified: six over-firing rhythm/dialogue-shape MINOR rules were guarded
+   against two independent ground truths, the BAD half of the pair did not
+   move at all (70.0 before and after), and the gap went +2.2 → +6.5 → +8.5
+   (today, after `de21e5f2` unwired `graphDeduction`). Receipts:
+   `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` (Lane H) and
+   `tests/core/density-bias-guards.test.ts`.
+7. Freeze rule growth: add no entries to the current 3,217-entry generated
    catalog; treat the distinct rule concepts as the maintained conceptual
    set. Author no new wave. Removal is a separately approved migration after
    dependency mapping, never implied by "freeze."
@@ -137,7 +151,10 @@ rulebook — and the P1 exit gate is not met.
   bootstrap interval whose lower bound is **> 0.65**.
 - Shuffle-drop AUC **>= 0.80**.
 - Act-swap AUC **>= 0.70**.
-- Composite minimum-gap guard passes at **>= 5.0**.
+- Composite minimum-gap guard passes at **>= 5.0**. — **MET 2026-08-04,
+  re-measured +8.5 on 2026-08-24.** This is the one exit-gate condition of
+  the five that is satisfied; the other four are open (see "Known baseline"
+  above). A conjunction does not exit on one clause.
 - No benchmark leakage or material regression in deterministic, keyless,
   calibration, produced-floor, security, type-check, or build gates.
 

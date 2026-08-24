@@ -109,9 +109,11 @@ evidence lane, not a prerequisite)**:
 - Scoring-path changes proceed within their machine-checked evidence gates
   (measurement receipts, AUC ratchet) — see the 2026-08-04 amendment in
   `ROADMAP.md` §3 and `docs/user-validation/PHASE_TRACKER.md`.
-- No new rules (frozen at 3,216 pass-scoped constants — machine-counted by
-  `scripts/generate-rulebook.ts`; the "8,917" figure this line used to carry
-  was DISPROVEN by the 2026-07-14 audit, see
+- No new rules (frozen at 3,217 pass-scoped constants — machine-counted by
+  `scripts/generate-rulebook.ts`, published in `docs/rulebook/README.md`;
+  this line said 3,216 until 2026-08-24, correct until PR #257 added
+  `INVERSE_CHEKHOV_GUN` in `33a2ee48`; the "8,917" figure this line used to
+  carry was DISPROVEN by the 2026-07-14 audit, see
   `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
   R2-C01), no new waves (program RETIRED)
 

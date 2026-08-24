@@ -24,9 +24,13 @@ file led with "3,216 hand-specified rules" and later asserted the rulebook
 had grown to "8,917 by generated count." An independent audit
 (`docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
 R2-C01) showed the "8,917" figure and the "~5,701 from a bulk Wave 1191"
-story to be inaccurate: the live generated rulebook is **3,216 distinct
+story to be inaccurate: the generated rulebook was **3,216 distinct
 pass-scoped rule constants** (machine-counted from the live pass files by
 `scripts/generate-rulebook.ts`, enforced by `tests/core/rulebook.test.ts`).
+*(That 3,216 was the correct live figure through 2026-08-23 and is left
+here as the audit's finding. **The live count today is 3,217** — PR #257
+added `INVERSE_CHEKHOV_GUN` in `33a2ee48`. `docs/rulebook/README.md` is the
+machine-counted authority; noted 2026-08-24.)*
 The rule channel is **inverted** in degradation experiments, not merely weak: by
 the doctor's own measurements (`server/nvm/analyze/doctor.ts:1892-1898`) the
 entire weighted-rule channel has AUC ~0.076 (where 0.50 is random and 1.0 is
@@ -42,26 +46,44 @@ with the rule count. The rule count is neither the wedge nor load-bearing.
 
 Measured proof points (honest, as of 2026-07-14):
 - **Discrimination is thin and synthetic.** 6 hand-authored paired
-  good/bad scenarios; 5 are hard CI assertions but two pass by only +1.4,
-  and the 6th (composite-reviewer-scenario) still fails its 5.0-point
-  minimum-gap floor. No runnable discrimination test on *real* writing
-  exists yet — this is the P1 gap the roadmap now treats as the One Bet.
+  good/bad scenarios; **all 6 are now hard CI assertions** (0 `todo` in the
+  file) but two pass by only +1.4. No runnable discrimination test on *real*
+  writing exists yet — this is the P1 gap the roadmap now treats as the One
+  Bet, and it is untouched by any of the below.
+  *(Corrected 2026-08-24. This bullet said the composite-reviewer-scenario
+  pair "still fails its 5.0-point minimum-gap floor." That stopped being
+  true on 2026-08-04, when Lane H closed the last `todo`; re-measured today
+  the gap is **+8.5** — good 78.5, bad 70.0 — against the 5.0 floor at
+  `tests/core/discrimination.test.ts:371-377`, with the whole file at
+  14 pass / 0 fail / 0 todo. The thinness criticism is unaffected: a wider
+  gap on 6 synthetic pairs is still not evidence about real writing.)*
 - **Ground truth is a floor-check, not a discrimination test, and it does
   not run locally.** 72 produced scripts are manifest-locked (71 RECOMMEND
   + 1 CONSIDER), but the text lives outside the repo and
   `tests/core/real-script-corpus.test.ts` SKIPS every assertion without
   `REAL_SCRIPT_CORPUS_DIR` (0 files present here). The check asserts
   health ≥ 80 by fiat, not that the score separates strong from weak.
-- **Degradation AUC is near coin-flip.** Shuffle-drop AUC-24 measured 0.672
-  against a 0.622 ratchet floor; AUC-71 ~0.652; act-swap 0.48→0.62. A ~0.65
-  AUC is barely above chance — treat these as work-in-progress baselines,
-  not proof the score discriminates.
-- **Rulebook**: 3,216 generated pass-scoped rule constants (the live
-  `docs/rulebook/README.md` count; the earlier "8,917" figure was shown to
-  be inaccurate by the 2026-07-14 audit). Freeze means **add
-  no entries to the current catalog** and maintain the distinct conceptual
-  set — not delete generated permutations by implication. Any removal is a separately
-  approved migration with dependency review.
+- **Degradation AUC is weak.** Shuffle-drop **AUC-24 last measured 0.731**
+  against its 0.622 ratchet floor (`tests/core/real-script-corpus.test.ts:186`;
+  the 0.672 this bullet used to quote was the *pre*-arc-incoherence-deduction
+  figure the 0.622 floor was originally derived from, corrected 2026-08-24);
+  AUC-71 ~0.652; act-swap 0.48→0.62. Still well short of the 0.80 the P1 exit
+  gate asks for — treat these as work-in-progress baselines, not proof the
+  score discriminates.
+  **Do not merge these with the P1 baseline numbers.** AUC-24 is ONE combined
+  degradation (shuffle scenes AND drop every third) over a 24-script subset of
+  the local-only corpus. The 761-script P1 baseline
+  (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`) reports
+  SCENE_SHUFFLE 0.734 and MIDPOINT_DROP 0.766 as SEPARATE degradations on a
+  153-script hash-locked test partition. Different corpus, different
+  degradation, different denominator; they have been confused before.
+- **Rulebook**: **3,217** generated pass-scoped rule constants (the live
+  `docs/rulebook/README.md` count, corrected 2026-08-24 — it was 3,216 until
+  PR #257 added `INVERSE_CHEKHOV_GUN` in `33a2ee48`; the earlier "8,917"
+  figure was shown to be inaccurate by the 2026-07-14 audit). Freeze means
+  **add no entries to the current catalog** and maintain the distinct
+  conceptual set — not delete generated permutations by implication. Any
+  removal is a separately approved migration with dependency review.
 
 ## 1. Non-negotiables (the constitution proper)
 
@@ -164,7 +186,7 @@ historical quality reference; its wave cadence is retired.
   (`passes/lib/checks.ts`), and by the doctor's own measurement the whole
   weighted-rule channel contributes AUC ~0.076 to discrimination while the
   scene-count scarcity term carries AUC ~0.938 (on artificial scene-drop, not natural strong-vs-weak human writing — suspected confound/proxy). Add no entries to the
-  current 3,216-entry catalog; maintain the distinct rule concepts unless
+  current 3,217-entry catalog; maintain the distinct rule concepts unless
   a separately approved migration removes generated permutations. The claim
   is now a score that demonstrably separates strong from weak real writing,
   not a big number. (See ROADMAP.md — the wave cadence that manufactured the

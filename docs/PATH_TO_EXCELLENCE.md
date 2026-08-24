@@ -72,19 +72,69 @@ main via the 2026-08-11 integration merge and laundered the GODMODE
 health-formula change past the receipt guard. The correction entry is
 recorded (`MEASUREMENT_RECEIPTS.md`, 2026-08-14); these discharge it:
 
-- **T1 (owner machine).** Run `npm run discharge-obligations` (or
-  `measure-real`) against the local corpus and record a REAL receipt for
-  `0e148c3`'s `graphDeduction` — up to 15 points off every script's health,
-  currently unvalidated. Then either restore `COMPOSITE_MIN_GAP` to 5.0 or
-  receipt the 4.0 with the measured justification. If the measurement says
-  the deduction hurts discrimination, unwire it — the unwired-first pattern
-  exists for exactly this.
+- **T1 (owner machine) — HALF DONE. The code half landed; only the receipt
+  is left.** Narrowed 2026-08-24 after verifying against the code, because
+  this item read as fully open and two of its three clauses were already
+  closed by `de21e5f2` (2026-08-19, "quarantine failed L5 score channel"):
+  - ~~If the measurement says the deduction hurts discrimination, unwire
+    it.~~ **DONE.** `scripts/calibrate-graph-health.ts` ran the real Doctor
+    path over all 20 controlled calibration scripts and measured WRONG-SIGN
+    discrimination (graph health r = −0.290 against band rank; it fires on
+    20/20 samples because the extractor reads the controlled-richness design
+    as isolated/underlinked). `graphDeduction` is now out of the health
+    formula — `doctor.ts:2034-2043` computes
+    `baseHealth − structuralDeduction − arcIncoherenceDeduction −
+    dialogueDeduction`, with graph health kept as a surfaced diagnostic only.
+    The unwired-first pattern worked exactly as intended.
+  - ~~Either restore `COMPOSITE_MIN_GAP` to 5.0 or receipt the 4.0.~~
+    **DONE — restored to 5.0**, and it is a hard assertion:
+    `tests/core/discrimination.test.ts:371-377`, file green at 14 pass /
+    0 fail / 0 todo, measured gap **+8.5** on 2026-08-24.
+  - **STILL OPEN (owner machine, and only the owner's):** run
+    `npm run discharge-obligations` (or `npm run measure-real`) against the
+    local corpus and record a REAL receipt covering the `0e148c3` →
+    `de21e5f2` `graphDeduction` episode. The deduction is unwired, so nothing
+    unvalidated is scoring anyone today — but the fabricated 2026-08-08
+    receipt that laundered it is still the reason this phase exists, and the
+    correction entry in `MEASUREMENT_RECEIPTS.md` (2026-08-14) is a
+    *statement* that no real measurement was made, not a measurement. This
+    cannot be discharged in CI or by an agent: the corpus is local-only for
+    copyright reasons and deliberately cannot reach CI.
 - **T2 (owner clicks).** Repository is **public** (`"private": false`,
-  verified live) despite the 2026-08-03 decision to make it private — for a
-  product inviting unpublished scripts, flip it. Enable branch protection on
-  `main` (currently none — the fabricated receipt arrived via an unreviewed
-  integration merge; protection is the structural fix). Confirm the
-  Dependency-graph toggle (CI evidence says on since 08-10).
+  re-verified live 2026-08-24) despite the 2026-08-03 decision to make it
+  private — for a product inviting unpublished scripts, flip it. Enable
+  branch protection on `main` (currently none — the fabricated receipt
+  arrived via an unreviewed integration merge; protection is the structural
+  fix). Confirm the Dependency-graph toggle (CI evidence says on since
+  08-10).
+
+  **Also T2, added 2026-08-24 — fix the repo description.** ROADMAP.md
+  claimed on 2026-08-21 that "no rule-count claim survives on the shipped
+  surface (grep-verified)". The grep was over files and was right about
+  files; the repository's own About blurb is also a shipped surface, and it
+  still reads:
+
+  > Deterministic screenplay analysis engine — 3,216 corpus-measured rules, a 14-pass Script Doctor, and a Fountain authoring IDE. Keyless-first; no LLM-as-judge.
+
+  That trips `stale-count-3216` and `corpus-measured` in
+  `scripts/honesty-audit.mjs`, and the number is stale besides (the live
+  catalog is 3,217). Only a repo admin can edit it. **Set it to exactly
+  this** — pre-validated 2026-08-24 by running the audit's own live
+  `PATTERNS` array against it (0 violations across all 24 entries that apply
+  to repo metadata; 160 chars, under GitHub's 350 limit):
+
+  > Deterministic screenplay analysis engine — a 14-pass Script Doctor, re-derivable coverage reports, and a Fountain authoring IDE. Keyless-first; no LLM-as-judge.
+
+  Every claim in it is machine-checked: the 14-pass pipeline is live
+  (`ROADMAP`/`CLAUDE.md`), "re-derivable coverage reports" is asserted
+  end-to-end by `node scripts/verify-p2-p3-surfaces.mjs` (the P3 round-trip
+  re-derives contentHash/health/verdict/totalIssues from the pasted script
+  and matches the export exactly, and a one-character edit correctly
+  mismatches), and keyless-first is the CI posture. It names no rule count,
+  so it cannot go stale the way the current one did. Homepage and topics
+  are already clean. Once it is set, consider flipping
+  `REPO_METADATA_BLOCKING` to `true` in `scripts/honesty-audit.mjs` so the
+  description can only regress loudly.
 - **T3 (decision).** PR #257 (`INVERSE_CHEKHOV_GUN`, 3,216 → 3,217): merge
   with a one-line recorded freeze amendment, or close. Its receipt is the
   good pattern — the conflict is only with the freeze language. Delete the

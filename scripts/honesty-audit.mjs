@@ -332,6 +332,154 @@ function scanDocStaleNumbers(files) {
 }
 
 // ---------------------------------------------------------------------------
+// Repo-metadata lane (2026-08-24)
+// ---------------------------------------------------------------------------
+// WHY THIS EXISTS: on 2026-08-21 ROADMAP.md recorded "no rule-count claim
+// survives on the shipped surface (grep-verified)". The grep was over FILES,
+// and it was correct about files. It was wrong about the product, because the
+// repository's own GitHub description — the first line of prose anyone sees,
+// on the repo page, in search results, and in every social embed — still read
+// "3,216 corpus-measured rules". One string, two PATTERNS violations
+// (stale-count-3216 at :74 and corpus-measured at :79 — measured 2026-08-24,
+// not assumed), invisible to a file scanner by construction, and stale in its
+// number besides. Note that n-rules-claim (:83) does NOT fire on it: its regex
+// wants the digits adjacent to "rules" (`\d{3,}[\d,]*\s+(deterministic\s+)?
+// rules`), and "corpus-measured" sits between them. That near-miss is the
+// argument for this lane rather than against it — the string is a rule-count
+// marketing claim that the tree's own strictest pattern happens to slip past,
+// so nothing but a metadata scan would ever have caught it. Repo metadata is
+// a shipped surface; this lane audits it with the SAME PATTERNS as the tree so
+// the two cannot drift again.
+//
+// Fields audited: description, homepage, topics. These are the three pieces of
+// repo metadata that render as user-facing prose.
+//
+// SCOPE RULE: repo metadata is treated as equivalent to the `public/` surface
+// — a marketing surface, not internal commentary. So a PATTERNS entry applies
+// here when it has no scopeDirs (repo-wide) or when its scopeDirs includes
+// 'public'. That admits the AUC ban and the retired report-copy phrases, and
+// excludes the docs-only P0-sample entry. Nothing about the file passes above
+// changes.
+//
+// ENV-GATED, AND THE GATE IS ACTUALLY SET. The lane runs only when
+// HONESTY_AUDIT_REPO is set to an `owner/repo` string, so a local or offline
+// `npm run honesty-audit` stays deterministic and network-free. That gating is
+// only honest if something sets it: `.github/workflows/ci.yml` and
+// `.github/workflows/release.yml` BOTH set HONESTY_AUDIT_REPO (and
+// GITHUB_TOKEN) on their "Honesty string audit" step, asserted by
+// tests/core/ci-gates-intact.test.ts. This is deliberate: the repo already has
+// one env-gated check (REAL_SCRIPT_CORPUS_DIR) whose variable is set nowhere
+// in .github/, so its assertion has silently skipped on every CI run since it
+// was written. An env-gated check nobody enables is not a check. Do not add
+// another one.
+//
+// WARN-ONLY, ON PURPOSE. A hit here prints and does NOT fail the build,
+// because the remedy is a repo-admin click that no contributor's PR can make —
+// blocking would wedge every unrelated PR on someone else's settings page.
+// TO MAKE IT BLOCKING: flip REPO_METADATA_BLOCKING to true (one line, below).
+// Do that once the description is corrected, so it can only regress loudly.
+const REPO_METADATA_BLOCKING = false;
+
+const REPO_METADATA_TIMEOUT_MS = 10_000;
+
+function repoMetadataPatterns() {
+  return PATTERNS.filter((p) => !p.scopeDirs || p.scopeDirs.includes('public'));
+}
+
+/** Scan the three prose-bearing metadata fields with the tree's own PATTERNS. */
+function scanRepoMetadata(meta) {
+  const fields = [
+    ['description', meta.description ?? ''],
+    ['homepage', meta.homepage ?? ''],
+    ['topics', Array.isArray(meta.topics) ? meta.topics.join(', ') : ''],
+  ];
+  const hits = [];
+  for (const pattern of repoMetadataPatterns()) {
+    for (const [field, value] of fields) {
+      if (!value) continue;
+      pattern.re.lastIndex = 0;
+      let m;
+      while ((m = pattern.re.exec(value)) !== null) {
+        hits.push({ field, match: m[0], pattern: pattern.name });
+        if (m[0].length === 0) pattern.re.lastIndex += 1; // guard zero-width
+      }
+    }
+  }
+  return hits;
+}
+
+/** Fetch repo metadata. Returns null (with a printed reason) on any failure —
+ *  a network problem must never be reported as "metadata is clean", and must
+ *  never fail the build either. */
+async function fetchRepoMetadata(slug) {
+  if (!/^[\w.-]+\/[\w.-]+$/.test(slug)) {
+    console.error(
+      `honesty-audit: repo-metadata lane SKIPPED — HONESTY_AUDIT_REPO="${slug}" is not an owner/repo slug.`
+    );
+    return null;
+  }
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'storymachine-honesty-audit',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${slug}`, {
+      headers,
+      signal: AbortSignal.timeout(REPO_METADATA_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      console.error(
+        `honesty-audit: repo-metadata lane could not read ${slug} (HTTP ${res.status}) — not treated as clean, and not failing the build.`
+      );
+      return null;
+    }
+    return await res.json();
+  } catch (err) {
+    console.error(
+      `honesty-audit: repo-metadata lane could not reach the GitHub API (${err?.message ?? err}) — not treated as clean, and not failing the build.`
+    );
+    return null;
+  }
+}
+
+/** Returns true when the lane found violations AND is configured to block. */
+async function runRepoMetadataLane() {
+  const slug = process.env.HONESTY_AUDIT_REPO;
+  if (!slug) {
+    console.log(
+      'honesty-audit: repo-metadata lane skipped (HONESTY_AUDIT_REPO unset — set it to "owner/repo" to audit the repo description/homepage/topics).'
+    );
+    return false;
+  }
+  const meta = await fetchRepoMetadata(slug);
+  if (!meta) return false;
+
+  const hits = scanRepoMetadata(meta);
+  if (hits.length === 0) {
+    console.log(`honesty-audit: repo metadata for ${slug} (description/homepage/topics) — clean.`);
+    return false;
+  }
+  const severity = REPO_METADATA_BLOCKING ? 'FAIL' : 'WARNING';
+  console.error(
+    `\nhonesty-audit: ${severity} — ${hits.length} overclaim violation(s) in ${slug}'s repo metadata:`
+  );
+  for (const h of hits) {
+    console.error(`  repo:${h.field}: [${h.pattern}] "${h.match}"`);
+  }
+  console.error(
+    `  Current description: ${JSON.stringify(meta.description ?? '')}\n` +
+      `  Fix: a repo admin edits the repository's About panel (Settings -> General, or the gear on the repo page).\n` +
+      (REPO_METADATA_BLOCKING
+        ? ''
+        : `  This lane is warn-only; flip REPO_METADATA_BLOCKING in scripts/honesty-audit.mjs to make it block.\n`)
+  );
+  return REPO_METADATA_BLOCKING;
+}
+
+// ---------------------------------------------------------------------------
 // Comment stripping
 // ---------------------------------------------------------------------------
 // Regex-based stripper for // and /* */ comments in JS/TS-family source.
@@ -510,7 +658,7 @@ function scanFile(filePath) {
   return hits;
 }
 
-function main() {
+async function main() {
   const files = collectFiles().filter(shouldScan);
   const allHits = [];
   for (const f of files) {
@@ -526,6 +674,10 @@ function main() {
       console.error(`${h.file}:${h.line}: [${h.pattern}] "${h.match}"`);
     }
     console.error(`\nhonesty-audit: FAIL — remove or rewrite the strings above.`);
+    // The repo-metadata lane still runs on a dirty tree: a contributor fixing
+    // file-level strings should see the metadata drift in the same output,
+    // not discover it on a second run after the first one is green.
+    await runRepoMetadataLane();
     process.exit(1);
   }
 
@@ -533,7 +685,9 @@ function main() {
     `honesty-audit: scanned ${files.length} files, plus ${mdFiles.length} tracked ` +
       `markdown files for stale rule-count numbers — clean.`
   );
-  process.exit(0);
+
+  const metadataBlocks = await runRepoMetadataLane();
+  process.exit(metadataBlocks ? 1 : 0);
 }
 
-main();
+await main();

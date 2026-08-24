@@ -58,8 +58,8 @@ quality judgment on a real, non-synthetic screenplay.
 ### What's broken or overstated
 - **The rule count is a weak pitch, not a wedge.** The live generated rulebook is **3,217 distinct pass-scoped rule constants** (per `docs/rulebook/README.md`, machine-counted from the live pass files by `scripts/generate-rulebook.ts`; enforced by `tests/core/rulebook.test.ts`; it was 3,216 until PR #257 added INVERSE_CHEKHOV_GUN in `33a2ee48`, which is why older entries below say 3,216). Earlier prose in these docs claimed 8,917 rules — ~5,701 from a bulk "Wave 1191," ~47,500 pass lines, ~1,326 `as any` casts. An independent audit (`docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md` R2-C01) showed that bulk-wave history to be inaccurate: the catalog was always 3,216, "Wave 1191" (commit a68a425) added 6 named detectors across 2 passes, and the live totals are ~97,775 pass lines and ~1,421 `as any` occurrences. The rule-count freeze below stands — but on validity grounds (the rule channel's measured discrimination AUC is ~0.076), not on the earlier "bulk wave" history.
 - **The score doesn't discriminate — by its own numbers.** Comments in `doctor.ts:1892-1898` record: scene-count scarcity term AUC 0.938 (on artificial scene-drop degradation, not natural human-labeled writing — suspected confound/proxy), the entire weighted-rule channel AUC 0.076 (inverted — worse than random's 0.50), and with scene count held constant "the doctor cannot detect reordering at all (AUC ~0.48)." Scene count + raw issue density dominate; the rule channel's ~0.076 AUC is independently re-measurable (see `docs/audits/2026-07-14-high-end-audit/`).
-- **Evidence base is synthetic and largely unrunnable.** Only 6 synthetic discrimination pairs (`tests/core/discrimination.test.ts`) — 2 pass by only +1.4, the composite pair FAILS the 5.0 min-gap guard (still a todo), 3 were tied until a curve was retuned. Calibration corpus = 20 synthetic samples. The "72 produced scripts" real corpus is not in the repo; `tests/core/real-script-corpus.test.ts` SKIPS every assertion without `REAL_SCRIPT_CORPUS_DIR` (0 files locally, never runs), the manifest is actually 71 RECOMMEND + 1 CONSIDER, and the check is a floor-check (health>=80), not discrimination. Degradation AUCs are near coin-flip: shuffle-drop ~0.652, act-swap 0.48→0.62.
-- **Marketing number is internally inconsistent.** Landing footer says "3,216 deterministic rules," docs say 8,917, a stale plan file says 10,523. — **Closed 2026-08-21:** no rule-count claim survives on the shipped surface (grep-verified), and `npm run honesty-audit` is a blocking CI step that fails on any `<N> rules` claim or a reappearance of the stale figures. The count is no longer part of the pitch.
+- **Evidence base is synthetic and largely unrunnable.** Only 6 synthetic discrimination pairs (`tests/core/discrimination.test.ts`) — 2 pass by only +1.4, 3 were tied until a curve was retuned. (The "composite pair FAILS the 5.0 min-gap guard (still a todo)" clause that stood here was true when written and is **no longer true**: corrected 2026-08-24 — the guard has been a hard assertion since 2026-08-04, measured +8.5 today. See §P1 "What remains" for the evidence. The *synthetic-and-small* criticism above stands regardless; 6 hand-authored pairs is not real-writing evidence no matter how wide their gaps are.) Calibration corpus = 20 synthetic samples. The "72 produced scripts" real corpus is not in the repo; `tests/core/real-script-corpus.test.ts` SKIPS every assertion without `REAL_SCRIPT_CORPUS_DIR` (0 files locally, never runs), the manifest is actually 71 RECOMMEND + 1 CONSIDER, and the check is a floor-check (health>=80), not discrimination. Degradation AUCs are near coin-flip: shuffle-drop ~0.652, act-swap 0.48→0.62.
+- **Marketing number is internally inconsistent.** Landing footer said "3,216 deterministic rules," docs said 8,917, a stale plan file said 10,523. — **Closed in the tree, OPEN in repo metadata (re-audited 2026-08-24).** The 2026-08-21 entry here claimed "no rule-count claim survives on the shipped surface (grep-verified)". That was true of the *files* and false of the *repository*, which is also a shipped surface: the live GitHub repo description (fetched 2026-08-24) still reads `Deterministic screenplay analysis engine — 3,216 corpus-measured rules, a 14-pass Script Doctor, and a Fountain authoring IDE. Keyless-first; no LLM-as-judge.` That single string trips two `scripts/honesty-audit.mjs` PATTERNS — `stale-count-3216` (:74) and `corpus-measured` (:79), measured, not assumed — and its number is now wrong besides (the live catalog is 3,217). It does NOT trip `n-rules-claim` (:83), whose regex needs the digits adjacent to "rules"; "corpus-measured" sits in between. A rule-count marketing claim that slips past the tree's strictest rule-count pattern is the argument FOR auditing metadata, not against it. **Repo description/homepage/topics are the one remaining non-compliant surface, and the fix is the owner's: only a repo admin can edit it.** In the tree the closure holds — `npm run honesty-audit` is a blocking CI step over src/**, public/**, server/**, `index.html`, `README.md`, `metadata.json`, `package.json` and the tracked P0 sample report, and it fails on any `<N> rules` claim or a reappearance of the stale figures. As of 2026-08-24 that audit also runs a **repo-metadata lane** (warn-only, `HONESTY_AUDIT_REPO` set in `ci.yml` and `release.yml`) so this exact drift is reported on every CI run instead of being discovered by a human a month later. The proposed replacement string is in `docs/PATH_TO_EXCELLENCE.md` under T2.
 - **UI sprawl:** ~40 React panels (DirectorPanel 70KB, StoryMachine 82KB, WhatIfPanel 53KB, plus SelfPlay, EpistemicMap, Converge, Twin, Room, etc.).
 - **Two products, one repo.** OASIS (the multi-agent simulation engine) is ~half the codebase with no defined user persona.
 
@@ -198,15 +198,31 @@ exit gate below is unaffected and still unmet.
   capture inter-scene relationships (not just intra-scene content). The
   formula cannot detect reordering because every field is content-derived
   and preserved under scene reordering.
-- Composite min-gap guard (tests/core/discrimination.test.ts) still at +2.9
-  gap (needs ≥5.0) — a craft-quality gap at short-script scale, separate
-  from the corpus AUC.
+- ~~Composite min-gap guard (tests/core/discrimination.test.ts) still at +2.9
+  gap (needs ≥5.0)~~ — **MET since 2026-08-04 (Lane H); re-measured
+  2026-08-24.** The guard is a hard assertion, not a `todo`:
+  `COMPOSITE_MIN_GAP = 5.0` at `tests/core/discrimination.test.ts:371-377`,
+  and the whole file runs 14 pass / 0 fail / 0 todo. Measured gap today is
+  **+8.5** (good 78.5, bad 70.0) — it was +2.2 before Lane H, +6.5 at Lane H
+  close, and moved again when `de21e5f2` unwired `graphDeduction` from the
+  health formula. This was a craft-quality gap at short-script scale and is
+  separate from the corpus AUC, which is still open (see the SHUFFLE/DROP/
+  RELOCATE line above).
 
 **Exit gate:** On a pre-registered held-out set large enough to report uncertainty:
 point-estimate discrimination **AUC >= 0.80**, with the 95% bootstrap lower
 bound reported and above **0.65**; shuffle-drop **>= 0.80**; act-swap
 **>= 0.70**; composite min-gap guard passes; no benchmark leakage or material
 regression on calibration, produced-floor, determinism, or keyless behavior.
+
+**Exit-gate status (2026-08-24): one of the five conditions is MET.** The
+composite min-gap guard passes (+8.5 vs its 5.0 floor, above). The other four
+remain open, on the 153-script hash-locked test partition of
+`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`: pooled test AUC
+**0.754** against the 0.80 point estimate; SCENE_SHUFFLE **0.734** and
+MIDPOINT_DROP **0.766** against the 0.80 shuffle-drop gate; act-swap still
+0.48→0.62 against its 0.70 gate; and CLIMAX_RELOCATE **0.523** is at chance.
+A met sub-condition does not exit P1 — the gate is a conjunction.
 
 **Decision: proceed to P2 while structural work continues.** The dialogue
 channel is solved — that's real discrimination on real writing. The
@@ -418,15 +434,22 @@ as permanently open:
   a multi-tenant configuration model. Any hosted multi-tenant release needs
   authenticated, tenant-scoped provider ownership and credentials, not merely
   this SSRF control.
-- **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` / `detectQuestionLatency` / `computeContentWordClueClusters` unbounded; `DoctorBodySchema` caps bytes, not scene count. (`cluster.ts:591`, `fountain-analyzer.ts:1118`/`1314`) — mitigated via `ANALYZER_SCENE_CEILING` in S-wave; confirm coverage.
-- **OPS-1 / OPS-2**: crash handlers + `/metrics` gate — closed in S-wave; confirm still present.
+- **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` / `detectQuestionLatency` / `computeContentWordClueClusters` unbounded; `DoctorBodySchema` caps bytes, not scene count. — **CLOSED / re-verified 2026-08-24.** `ANALYZER_SCENE_CEILING` is live at `fountain-analyzer.ts:2277` (`= 400`, lowered from 1000 by Lane W1 — honest headroom over the 292-scene longest real feature), enforced at the analyzer entry and referenced as a defense-in-depth bound at `fountain-analyzer.ts:683`/`1446`/`1863`/`2238`. Coverage: `tests/core/analyzer-dos.test.ts`.
+- **OPS-1 / OPS-2**: crash handlers + `/metrics` gate — **CLOSED / re-verified 2026-08-24.** `installCrashHandlers()` is defined at `server.ts:85-93` and actually wired at `server.ts:177` (definition without the call would be the silent failure here, so both are cited). `/metrics` is loopback-only by default and requires a constant-time `Authorization: Bearer` match when `METRICS_TOKEN` is set (`server/routes/config.ts:128-143,153`).
 
-SHOULD items (verify): CSV formula injection (`breakdown.ts:644`), collab
-token no room-ownership (`collab.ts:12`), run-room limiter tier mismatch
-(`game.ts:245`), no prod CSP (`app.ts:97`), container runs root. NICE: 4
-transitive dev-dep CVEs (`npm audit fix`). Clean at last audit: session
-capability model, HTML export escaping, prompt-injection boundary, secrets
-never in bundle/logs, body/rate limits.
+**SHOULD items — all five CLOSED, verified against source 2026-08-24** (this
+block asked to "verify"/"confirm" them; that verification is now done, so
+they read as closed with a pointer rather than as open work):
+- **CSV formula injection** — closed. `escapeCsvField()` at `server/lib/breakdown.ts:652-667` prefixes a `'` to any field whose first non-TAB/CR character is `= + - @`, *inside* the RFC 4180 quoting, and is exported so its edge cases are unit-testable.
+- **Collab token has no room-ownership check** — closed as *documented intent*, not as a code change: `server/routes/collab.ts:12-23` records finding S1-a-3 and states why this is a deliberate bearer-capability design, and the route does enforce the one thing it can — a 503 rather than a random per-process secret when `NODE_ENV=production` and `COLLAB_SECRET` is unset.
+- **run-room limiter tier mismatch** — closed. Both endpoints take the stricter `aiLimiter`, not `gameLimiter`: `POST /api/run-room` at `server/routes/game.ts:425` and the SSE sibling `GET /api/run-room-stream` at `:484` (the fan-out rationale is recorded at `:481` and `:618`).
+- **No prod CSP** — closed. A hand-set `Content-Security-Policy` is applied to every response under `NODE_ENV==='production'` (`server/app.ts:105` for the derivation comment, policy assembled and set at `:148-157`), deliberately not in dev, where Vite's HMR needs inline script and `eval`.
+- **Container runs root** — closed. `Dockerfile:74` is `USER node`, after a `chown -R node:node /app` at `:72`.
+
+NICE: 4 transitive dev-dep CVEs — **CLOSED. `npm audit` reports `found 0
+vulnerabilities` (run 2026-08-24).** Clean at last audit: session capability
+model, HTML export escaping, prompt-injection boundary, secrets never in
+bundle/logs, body/rate limits.
 
 Security work is **not** gated behind the §3 phases — a live deployment
 blocker is fixed when found, regardless of the active product phase.

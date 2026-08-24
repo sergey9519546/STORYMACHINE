@@ -65,8 +65,22 @@ jobs:
       # overclaim language ("Hollywood gold standard", "provably", stale
       # hardcoded rule/corpus counts, unverified superlatives, etc.) in the
       # shipped surface. See scripts/honesty-audit.mjs for scope and rules.
+      #
+      # HONESTY_AUDIT_REPO enables the repo-metadata lane, which runs the same
+      # PATTERNS against the repository's description/homepage/topics. It is
+      # env-gated so a local, offline run stays deterministic — and it is set
+      # HERE precisely so the gate is not decorative. (The repo already has one
+      # env-gated check, REAL_SCRIPT_CORPUS_DIR, that is set nowhere in
+      # .github/ and has therefore silently skipped on every CI run since it
+      # was written; that is the failure mode this line exists to avoid.)
+      # The lane is warn-only today because the fix is a repo-admin edit to the
+      # About panel, not something a PR can change — see REPO_METADATA_BLOCKING
+      # in scripts/honesty-audit.mjs for the one-line flip to blocking.
       - name: Honesty string audit
         run: npm run honesty-audit
+        env:
+          HONESTY_AUDIT_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
 
       # Documentation quality check: scan markdown files for AI writing patterns
       # Uses avoid-ai-writing Tier 1 patterns (25 high-confidence markers)

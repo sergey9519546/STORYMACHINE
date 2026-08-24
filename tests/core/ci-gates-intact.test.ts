@@ -156,6 +156,33 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     }
   });
 
+  // The honesty audit's repo-metadata lane is env-gated on HONESTY_AUDIT_REPO
+  // so that a local, offline run stays deterministic and network-free. That
+  // design is only honest if something actually sets the variable — otherwise
+  // it is a check that silently never runs.
+  //
+  // This repo has already been bitten by exactly that: REAL_SCRIPT_CORPUS_DIR
+  // gates the AUC-24 ratchet assertion in tests/core/real-script-corpus.test.ts
+  // and appears nowhere in .github/, so that assertion has SKIPPED on every CI
+  // run since it was written. (That one is unfixable here — the corpus is
+  // local-only for copyright reasons and deliberately cannot reach CI. This
+  // one is fixable, so it is fixed.)
+  //
+  // Deleting the env line below would not fail any other test, would not fail
+  // the build, and would turn the lane back into decoration — which is the
+  // whole failure mode. So it is asserted.
+  it('both workflows actually SET HONESTY_AUDIT_REPO on the honesty-audit step (an env-gated check nothing enables is not a check)', () => {
+    for (const [label, source] of [['ci.yml', ci], ['release.yml', release]] as const) {
+      const block = stepBlock(source, 'Honesty string audit');
+      assert.ok(block, `${label} must keep a step named "Honesty string audit"`);
+      assert.match(
+        block!,
+        /HONESTY_AUDIT_REPO\s*:\s*\$\{\{\s*github\.repository\s*\}\}/,
+        `${label}'s honesty-audit step must set HONESTY_AUDIT_REPO — without it the repo-metadata lane skips silently on every run, reproducing the REAL_SCRIPT_CORPUS_DIR failure mode`,
+      );
+    }
+  });
+
   it("release.yml's publish job still hard-depends on the test job", () => {
     // Unlike ci.yml/security.yml (which have no downstream job to gate),
     // release.yml's four duplicated steps only actually block anything
