@@ -15,12 +15,25 @@ new spine is §3: validate with writers → make the score provably discriminate
 → collapse scope → ship a shareable artifact → then defensibility.
 
 Ground yourself before touching code: `NORTH_STAR.md` (constitution),
-`ULTRAPLAN.md` (short execution brief), `ARCHITECTURE.md` (system map),
-`CLAUDE.md` (working constraints), and `git log --oneline -40` for the
-session's commit trail. These documents were reconciled to this roadmap on
-2026-07-14: the roadmap sets sequence, NORTH_STAR sets product laws,
-ULTRAPLAN summarizes the active phase, and CLAUDE sets implementation
-constraints.
+`docs/PATH_TO_EXCELLENCE.md` (the current execution sequence),
+`ARCHITECTURE.md` (system map), `CLAUDE.md` (working constraints), and
+`git log --oneline -40` for the session's commit trail. These documents were
+reconciled to this roadmap on 2026-07-14: the roadmap sets sequence,
+NORTH_STAR sets product laws, and CLAUDE sets implementation constraints.
+`ULTRAPLAN.md` is superseded by `docs/PATH_TO_EXCELLENCE.md` and kept as a
+pointer.
+
+> **Where execution actually stands — 2026-08-21.** This file remains
+> canonical on *phase semantics and sequence*. The day-to-day lane sequencing
+> now lives in `docs/PATH_TO_EXCELLENCE.md`, which tracks the T/W/E/P/S lanes
+> measured by the three 2026-08-14 audits. As of that document: **Phase W
+> (make it truly work) and Phase E (easily controllable and interactive) are
+> COMPLETE with judged exit gates; Phase S's code lanes S1–S3 are DONE; the
+> first release, `1.0.0-rc.1`, is cut and its Docker image published; Phase
+> P's P-1 evidence lane is done.** What remains there is owner-side: the
+> stranger-week pilot, the P0 sessions, ≥3 blind readers, and the outstanding
+> `graphDeduction` measurement. Nothing in that program re-sequences the P0–P4
+> phases below; it is how P0–P4's remaining work is being executed.
 
 ---
 
@@ -46,7 +59,7 @@ quality judgment on a real, non-synthetic screenplay.
 - **The rule count is a weak pitch, not a wedge.** The live generated rulebook is **3,216 distinct pass-scoped rule constants** (per `docs/rulebook/README.md`, machine-counted from the live pass files by `scripts/generate-rulebook.ts`; enforced by `tests/core/rulebook.test.ts`). Earlier prose in these docs claimed 8,917 rules — ~5,701 from a bulk "Wave 1191," ~47,500 pass lines, ~1,326 `as any` casts. An independent audit (`docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md` R2-C01) showed that bulk-wave history to be inaccurate: the catalog was always 3,216, "Wave 1191" (commit a68a425) added 6 named detectors across 2 passes, and the live totals are ~97,775 pass lines and ~1,421 `as any` occurrences. The rule-count freeze below stands — but on validity grounds (the rule channel's measured discrimination AUC is ~0.076), not on the earlier "bulk wave" history.
 - **The score doesn't discriminate — by its own numbers.** Comments in `doctor.ts:1892-1898` record: scene-count scarcity term AUC 0.938 (on artificial scene-drop degradation, not natural human-labeled writing — suspected confound/proxy), the entire weighted-rule channel AUC 0.076 (inverted — worse than random's 0.50), and with scene count held constant "the doctor cannot detect reordering at all (AUC ~0.48)." Scene count + raw issue density dominate; the rule channel's ~0.076 AUC is independently re-measurable (see `docs/audits/2026-07-14-high-end-audit/`).
 - **Evidence base is synthetic and largely unrunnable.** Only 6 synthetic discrimination pairs (`tests/core/discrimination.test.ts`) — 2 pass by only +1.4, the composite pair FAILS the 5.0 min-gap guard (still a todo), 3 were tied until a curve was retuned. Calibration corpus = 20 synthetic samples. The "72 produced scripts" real corpus is not in the repo; `tests/core/real-script-corpus.test.ts` SKIPS every assertion without `REAL_SCRIPT_CORPUS_DIR` (0 files locally, never runs), the manifest is actually 71 RECOMMEND + 1 CONSIDER, and the check is a floor-check (health>=80), not discrimination. Degradation AUCs are near coin-flip: shuffle-drop ~0.652, act-swap 0.48→0.62.
-- **Marketing number is internally inconsistent.** Landing footer says "3,216 deterministic rules," docs say 8,917, a stale plan file says 10,523.
+- **Marketing number is internally inconsistent.** Landing footer says "3,216 deterministic rules," docs say 8,917, a stale plan file says 10,523. — **Closed 2026-08-21:** no rule-count claim survives on the shipped surface (grep-verified), and `npm run honesty-audit` is a blocking CI step that fails on any `<N> rules` claim or a reappearance of the stale figures. The count is no longer part of the pitch.
 - **UI sprawl:** ~40 React panels (DirectorPanel 70KB, StoryMachine 82KB, WhatIfPanel 53KB, plus SelfPlay, EpistemicMap, Converge, Twin, Room, etc.).
 - **Two products, one repo.** OASIS (the multi-agent simulation engine) is ~half the codebase with no defined user persona.
 
@@ -70,7 +83,8 @@ quality judgment on a real, non-synthetic screenplay.
   Shared-file collisions are the project's main recurring hazard — enforce
   one owner per file per run. Parallel sessions are real (two sessions have
   independently built the same detector and merged concurrently before) —
-  pull `main` and check `git log` for overlapping work before starting.
+  pull the session's own integration branch (never a hardcoded `main`) and
+  check `git log` for overlapping work before starting.
 - Per landing: independently re-run that workstream's own tests, review the
   diff, commit that workstream alone, push. Do not batch unrelated
   workstreams into one commit.
@@ -88,11 +102,18 @@ quality judgment on a real, non-synthetic screenplay.
 
 ## 3. The plan — demand-driven phases
 
-These phases are **strictly ordered**. Do not parallelize them — the ordering
-*is* the strategy. Each phase ends with a hard exit gate that must be met
-before the next begins, because every downstream promise (private, instant,
-deterministic, reproducible coverage) rests on the score being provably real,
-and by our own numbers it isn't yet. We build demand-out, not rigor-first.
+These phases are a **dependency order**, and the ordering *is* the strategy:
+every downstream promise (private, instant, deterministic, reproducible
+coverage) rests on the score being provably real, and by our own numbers it
+isn't yet. We build demand-out, not rigor-first.
+
+**Amended 2026-08-11** (`docs/DECISION_LOG.md` Decision #2): this is no longer
+a blanket serial-work freeze. The P0 hard-gate was retired, and engine work now
+proceeds in parallel with the P0 human lane under machine-checked evidence
+gates (see P0's amendment below). Parallel execution does not move a phase's
+exit gate: an unmet gate stays unmet, and engineering output never substitutes
+for the human evidence P0 asks for. The one prohibition that survives is that
+P4-class retention/lock-in work still waits.
 
 ### P0 — Validate with real writers (recommended evidence lane; P0 hard-gate RETIRED 2026-08-11 — engine work proceeds in parallel)
 
@@ -147,6 +168,18 @@ P0** — do not proceed to build on a report nobody wants to run.
 RELOCATE 0.52). Pooled test AUC 0.754 — below the 0.80 gate. See
 `docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md` for full results.
 
+**Update (2026-08-21) — the four unwired signals were measured** (`109318df`;
+findings in `docs/p1-benchmark/UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md`). Two
+structural facts came out of it: neither named corpus is reachable from a
+remote session, and three of the four signals cannot be measured against the
+125-film corpus's annotation schema even in principle, because they read raw
+screenplay prose the annotations never carry. On the 44-script in-repo
+real-prose sample: **reversal-detection** recommends WIRE, **truth-extraction**
+recommends a low-risk WIRE, **question-latency**'s measurement path is retired
+(all 95% CIs straddle 0.5), and **agency-signal** stays unwired pending the
+761-script corpus. Wiring remains owner-gated; no scoring file changed. The P1
+exit gate below is unaffected and still unmet.
+
 **What's done:**
 - Corpus expanded 48 → 761 scripts (89 original + 684 crawl, ~92% live-action).
   See `docs/p1-benchmark/CORPUS_EXPANSION_2026-07-29.md`.
@@ -195,6 +228,18 @@ can proceed in parallel.
   from the default surface (not just from inside OASIS).
 - `src/components/ScriptIDE.tsx`: SettingsPanel lazy-loaded as modal overlay,
   reachable from Toolbar overflow.
+
+**Extended 2026-08-21 (W6 + E5):** the collapse went past gating. Ship got its
+own writer-facing container (`src/components/scriptide/ShipPanel.tsx` —
+exports, snapshots/versions, independent-verification pointer) on a `ship`
+tool slot, so the research shell is reachable only through the Labs-gated
+"Open Studio" overflow entry rather than sitting in the default path; and E5
+added a Cmd/Ctrl+K command palette whose every action calls the same named
+callback the visible button already calls. The surface claim is now
+machine-checked: `scripts/verify-p2-p3-surfaces.mjs` asserts default-path vs.
+Labs-only vs. dead-file reachability for every component, with the four
+deliberately orphaned oasis prototypes on an explicit allowlist so the
+dead-UI tripwire stays armed for anything new.
 
 **Exit gate:** A new user reaches their first coverage report with **zero
 exposure** to NVM/converge/twin/simulation jargon; time-to-first-report is
@@ -249,6 +294,13 @@ that HTML file is all a recipient ever has) and verifying them through the
 real route, plus the two forgeries the mechanism exists to catch: an inflated
 health figure on untouched text, and a genuine report paired with a different
 script.
+
+**Still true 2026-08-21.** The verify loop is re-checked end to end by
+`scripts/verify-p2-p3-surfaces.mjs`, which scrapes the claims out of a real
+exported artifact and drives `#verify` in a browser rather than trusting the
+in-process report object. The privacy page E4 added (`#privacy`) is the other
+half of the same trust story: what stays local, what the server holds, what
+leaves, and how to delete it.
 
 **Known limit:** counters are unauthenticated and client-reported, in-memory
 and process-local, and reset on restart. They are not durable, not
@@ -341,6 +393,10 @@ isolation" to "prove value to a real writer, then harden it."
 | Engine + substrate wave (2026-07-12, commit 700fb5d) | Arc-incoherence deduction (act-swap AUC 0.48→0.62); emotional-arc + 8 diagnostic signals (anti-slop, theme, interiority, mirror-scenes, silence, bonding, cold-open, pattern-establishment); substrate spine (NarrativeState, Truth Ledger); detector modules (value-shift, story-spine, scene-economy); fountain import normalizer; paper-ink-stamp design system |
 | Wave 1191 (bulk expansion) | Earlier prose claimed "5,701 template-generated rules (rule count 3,216 → 8,917)" here. **The 2026-07-14 audit (`PHASE_2_REPOSITORY_RECONSTRUCTION.md` R2-C01) showed this never happened as described**: the live catalog was always 3,216; commit a68a425 ("Wave 1191") added 6 named detectors across 2 passes, not 5,701. The wave cadence itself is retired — see §1, §4. |
 | Change-impact surface (commit 9f538e5) | Deterministic scene-dependency analysis surface |
+| Phase W — make it truly work (2026-08-21) | Doctor moved onto a `node:worker_threads` pool with coordinator-side LRU, abort-terminate cancellation, and an in-process fallback; `auditTemporalConsistency`'s O(n³) path-consistency re-expressed over bit-packed typed arrays (351 scenes: never-returned → ~1.9s), proven output-identical across 45 fixtures; `ANALYZER_SCENE_CEILING` 1000 → 400; false "Save Conflict" root-caused to the visibilitychange keepalive save; coverage → full-report hydration instead of cold remount; Ship given its own writer-facing panel |
+| Phase E — controllable and interactive (2026-08-21) | SSE doctor stream with per-pass progress and a real Cancel; `locatedIssues` + jump-to-line + re-run + session findings delta; entrance promise/privacy/CTA hierarchy; IndexedDB draft mirror, `POST /api/session/delete`, and the `#privacy` page; Cmd/Ctrl+K command palette plus an a11y sweep (focus traps, ARIA roles, label association) |
+| Phase S — ship and keep alive, code lanes (2026-08-21) | `BACKUP_INTERVAL_HOURS` in-process backup timer and a real restore path (`restoreSession()` / `npm run restore-session`) proven by a backup→destroy→restore drill; RELIABILITY §IV-C re-verified (CON-003 found still-present and fixed via `Orchestrator.syncFromStage()`); global `MAX_ROOMS` cap; concurrent doctor load test; version cut to `1.0.0-rc.1` with the first published GHCR image |
+| P-1 evidence (2026-08-21) | The four unwired signals measured on the 44-script in-repo real-prose sample: reversal-detection and truth-extraction recommend WIRE, question-latency's measurement path retired, agency-signal blocked on the 761-script corpus. No scoring file changed; wiring stays owner-gated |
 
 ---
 

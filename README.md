@@ -35,8 +35,22 @@ The server deliberately boots **without any key** into analysis-only mode (the d
 | `COLLAB_SECRET` | Optional | Shared secret for the collaborative-editing WebSocket. Required in production. |
 | `TRUST_PROXY` | Optional | Set to `1` / `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored. |
 | `APP_URL` | Optional | Hosting URL (not in `.env.example`; injected automatically by some deployment environments like AI Studio). |
+| `MAX_SESSIONS`, `SESSION_DB_DIR`, `SESSION_IDLE_TTL_MINUTES`, `SESSION_FILE_TTL_HOURS` | Optional | Session persistence and growth bounds — see "Session data" under Deployment. |
+| `MAX_ROOMS` | Optional | Process-wide cap on concurrently reserved room simulations (default `50`); `429` at the boundary. See "Session data". |
+| `BACKUP_INTERVAL_HOURS`, `BACKUP_DIR`, `BACKUP_RETENTION_DAYS`, `BACKUP_RETENTION_KEEP` | Optional | In-process backup timer (off by default) and the shared backup destination/retention config — see "Backing it up safely". |
+| `SESSION_BACKUP_DIR`, `SESSION_RESET_BACKUP_KEEP`, `SESSION_RESET_BACKUP_TTL_HOURS` | Optional | Where `POST /api/reset`'s pre-reset recovery artifacts land, and how many/how long they are retained. |
+| `DOCTOR_WORKER_POOL`, `DOCTOR_WORKER_POOL_SIZE` | Optional | Script Doctor worker pool: set `DOCTOR_WORKER_POOL=off` to force the in-process fallback; `DOCTOR_WORKER_POOL_SIZE` overrides the auto-sized 1–2 threads (capped at 4). Defaults are correct for normal deployments. |
+| `COLLAB_MAX_ROOMS` | Optional | Max concurrent Yjs collab rooms (default `200`). |
+| `PORT` | Optional | HTTP port (default `3000`). |
 
 > **Security note:** `.env` is gitignored via `.env*` in `.gitignore`. Only `.env.example` is tracked. Never commit real keys. API keys live only in `.env` and are never serialized to clients — `getPublicConfig()` exposes boolean flags only.
+
+**What a visitor is told:** the running app serves a `#privacy` page
+(`src/components/PrivacyPage.tsx`) stating what stays in the browser, what the
+server stores, what leaves the deployment (nothing by default — AI features are
+opt-in via Settings), and how to delete it all. Settings → Session has a
+confirm-gated "delete everything" that wipes localStorage, sessionStorage, and
+the IndexedDB draft mirror, and calls `POST /api/session/delete`.
 
 ## Key Endpoints
 
@@ -45,8 +59,12 @@ The server deliberately boots **without any key** into analysis-only mode (the d
 | `GET /health` | Liveness probe — returns `{ status, uptime, sessions, version, commit }`. `version`/`commit` identify what's actually running (see "Releases" below); no auth, no rate limit. |
 | `POST /api/init` | Initialize simulation with agents and locations |
 | `POST /api/run-room` | Run a 5-turn dialogue lock in a location |
+| `POST /api/scriptide/doctor` | Run the deterministic Script Doctor and return the full report |
+| `POST /api/scriptide/doctor/stream` | Same analysis over SSE, emitting per-pass progress frames; closing the response cancels the run |
 | `GET /api/session/export` | Download a self-describing partial simulation observation; it is not a project backup and cannot restore a project |
 | `POST /api/session/import` | Retired; returns non-mutating `410 Gone` because the legacy JSON projection is not recoverable |
+| `POST /api/session/rotate` | Issue a new session id and move the session's data to it; the old id stops being authoritative only after the move verifies |
+| `POST /api/session/delete` | Destroy the caller's own session — evict its `Stage` and unlink its SQLite files. Unrecoverable; backs the "delete everything" control in Settings → Session |
 | `GET /api/ledger/fountain` | Export action log as annotated Fountain screenplay |
 
 ## Running Tests
@@ -59,6 +77,7 @@ npm test
 
 **Development & Build:**
 - `npm run dev` - Start development server with hot reload
+- `npm start` - Byte-identical to `npm run dev` (both are `tsx server.ts`); present for hosts that expect a `start` script
 - `npm run build` - Build production bundle
 - `npm run preview` - Preview production build locally
 
@@ -76,7 +95,12 @@ npm test
 - `npm run rulebook` - Generate rulebook from current rule set
 - `npm run generate-p0-sample` - Generate P0 validation sample coverage report
 - `npm run backup` - Backup session data
+- `npm run restore-session <sessionId> <snapshotFile>` - Restore one session from a snapshot (see "Restoring a snapshot" below)
 - `npm run honesty-audit` - Scan shipped surface for overclaim language (CI-enforced)
+- `npm run check-scoring-receipt` - Fail if a scoring-path file changed without a matching measurement receipt (CI-enforced)
+- `npm run measure-real` - Measure discrimination on the local real-script corpus (needs `REAL_SCRIPT_CORPUS_DIR`; not runnable in CI)
+- `npm run discharge-obligations` - Run the measurements the receipt trail currently owes
+- `npm run gates` - Report which gates are asserted but not machine-verified
 - `npm run test:metamorphic` - Run the metamorphic scoring invariants (the `empty_verbosity` case is a documented known-failing witness)
 - `npm run measure-slop` - Measure anti-slop marker discrimination
 - `npm run clean` - Remove the `dist/` build output
@@ -103,6 +127,16 @@ from the placeholder `0.0.0`) for the first release this pipeline covers —
 plain semver from here on, bump it per release. It's also the version
 `/health` and the image tag report for untagged/dev builds (`npm run dev`,
 a plain `docker build` with no `--build-arg`s).
+
+**Current version: `1.0.0-rc.1`** — deliberately a release candidate rather
+than `1.0.0`. The code is complete against the 1.0 definition
+(`docs/PATH_TO_EXCELLENCE.md`); what remains is owner-side validation, not
+code. The first versioned GHCR image was published from this version via
+`workflow_dispatch` (recorded in `docs/PATH_TO_EXCELLENCE.md` Phase S); the
+annotated `v1.0.0-rc.1` tag exists locally and pushing it is an owner step.
+Note that a `workflow_dispatch` run derives `VERSION` from `package.json` and
+still tags the image `latest`, so re-publishing from a prerelease version
+moves `latest` onto it.
 
 **Cutting a release** (`.github/workflows/release.yml`):
 
@@ -280,9 +314,14 @@ container/PaaS deployment without one).
    needs no such precondition and is always safe. Example:
    ```
    npm run backup                                                     # take a snapshot
-   curl -X POST http://localhost:3000/api/session/delete -H 'Content-Type: application/json' -d '{"sessionId":"abc123"}'
-   npm run restore-session abc123 backup/2026-08-21T12-00-00-000Z/abc123.db
+   curl -X POST http://localhost:3000/api/session/delete -H 'X-Session-Id: abc12345'
+   npm run restore-session abc12345 backup/2026-08-21T12-00-00-000Z/abc12345.db
    ```
+   `/api/session/delete` takes **no body fields** (`DeleteSessionBodySchema`
+   is a strict empty object — a `{"sessionId": ...}` body is a `400`); it
+   always acts on the caller's own session, named by `X-Session-Id`, which
+   must match `[A-Za-z0-9_-]{8,64}` or the request silently falls back to the
+   `default` session.
    `tests/core/backup-restore-drill.test.ts` proves this exact sequence
    round-trips a session's content byte-exact — a real backup, a real
    `destroySession()`, a real restore, then reopened and diffed against what

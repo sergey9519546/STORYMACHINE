@@ -92,9 +92,16 @@ no account record, no way to prove "this session belongs to user X" beyond
     helper until E4 (2026-08-21) exposed it as `POST /api/session/delete` —
     the "delete everything" control in `src/components/SettingsPanel.tsx`'s
     Session tab. Same bearer-capability model as rotation above: whoever
-    holds the id can delete the session it names, and the deletion is
-    unrecoverable (no server-side backup by default — see README.md's
-    "Session data" section).
+    holds the id can delete that session, and the deletion is unrecoverable
+    (no server-side backup by default — see README.md's "Session data"
+    section). The route takes **no body fields** (`DeleteSessionBodySchema`
+    is a strict empty object) and so cannot be pointed at a session other
+    than the caller's own — the id comes from `sessionId(req)` exactly as it
+    does for every read/write route. A `SessionBusyError` (an in-flight
+    command on that session) surfaces as `409` rather than deleting out from
+    under an active mutation; the caller retries once idle. This narrows what
+    a leaked id can be *aimed* at, not what it grants: the holder of a leaked
+    id is the caller, and can delete with it.
 - **No user-level accountability.** Nothing distinguishes "this session's
   legitimate owner" from "whoever currently holds the id" — no audit trail
   of which human performed an action, no per-account rate limits or

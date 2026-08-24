@@ -112,7 +112,8 @@ export function installCrashHandlers(shutdown: (signal: string, exitCode?: numbe
  * `BACKUP_RETENTION_KEEP` — so operators do not need a second, divergent
  * config surface for the two ways of running the identical backup logic.
  * Exported (not just called inline) so it's unit-testable without booting a
- * real HTTP listener — see tests/core/backup-schedule.test.ts.
+ * real HTTP listener — see tests/core/backup-schedule-persist.test.ts and
+ * tests/core/backup-schedule-memory.test.ts.
  */
 export function startBackupSchedule(): NodeJS.Timeout | undefined {
   const hours = Number(process.env.BACKUP_INTERVAL_HOURS ?? 0);

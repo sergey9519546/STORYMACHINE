@@ -1,18 +1,26 @@
 # STORYMACHINE — ULTRAPLAN (short execution brief)
 
-*Re-spined 2026-07-14 after the product teardown. `ROADMAP.md` is the
-canonical plan and `NORTH_STAR.md` is the constitution. This file is the
-short cold-start answer to: **what do I do next?** If any detail here drifts
-from the roadmap, the roadmap wins.*
+> **SUPERSEDED for sequencing — 2026-08-21. For "what do I do next?", read
+> `docs/PATH_TO_EXCELLENCE.md`,** which now carries this file's job: it
+> sequences the live T/W/E/P/S lanes and records Phases W and E COMPLETE with
+> judged exit gates, Phase S's code lanes S1–S3 DONE, the first release cut
+> (`1.0.0-rc.1`, image published), and Phase P's P-1 evidence lane done — none
+> of which this file knew about. `ROADMAP.md` stays canonical on phase
+> semantics and sequence. This file is kept, not deleted: the P0–P4 briefs and
+> gates below are still accurate and still the shortest statement of them.
+>
+> **Current status — 2026-08-21.** P0 fielding is GO, with **0 valid
+> documented human sessions** and no P0 outcome verdict. **P1 is
+> active/partial**: evidence-gated P1 work may run in parallel, never
+> substitutes for P0 human evidence, and its exit gate is not met. **P2 and P3
+> are complete**, both extended by the W/E lanes (Ship panel, command palette,
+> `#privacy`, machine-checked surface verification). The P0 hard-gate was
+> retired 2026-08-11 (`docs/DECISION_LOG.md` Decision #2): engine work
+> proceeds in parallel with P0, and P4 retention/lock-in is sequenced last,
+> not blocked on a P0 PASS.
 
-> **Current status — 2026-08-08.** `ROADMAP.md` §3 is the authority. P0
-> fielding is GO, but there are **0 valid documented human sessions** and no
-> P0 outcome verdict. **P1 is active/partial**: evidence-gated work may run in
-> parallel, never substitutes for P0 human evidence, and the P1 exit gate is
-> not met. **P2 and P3 are complete.** The P0 hard-gate was retired
-> 2026-08-11 (`docs/DECISION_LOG.md` Decision #2): engine work proceeds in
-> parallel with P0; P4 retention/lock-in is sequenced last, not blocked on a
-> P0 PASS. The sections below summarize those lanes and their gates.
+*Re-spined 2026-07-14 after the product teardown. `NORTH_STAR.md` is the
+constitution.*
 
 ## 0. The decision
 
@@ -137,7 +145,7 @@ If the thresholds cannot be met without unstable proxies or benchmark
 leakage, report that result and revisit the product claim. Do not hide it
 behind another rule expansion.
 
-## 3. CURRENT STATE — P2/P3 complete; P4 blocked
+## 3. CURRENT STATE — P2/P3 complete; P4 last in sequence
 
 ### P2 — Collapse to Doctor + Editor ✅ COMPLETE
 
@@ -236,3 +244,6 @@ evidence-gated P1 work. P0 remains at 0 valid documented human sessions with
 no outcome verdict; P1 remains partial with its exit gate unmet; P2 and P3 are
 complete. The P0 hard-gate was retired 2026-08-11 (Decision #2); P4 is
 sequenced last, not blocked on a P0 PASS.
+
+For which lane is actually in flight today, and the evidence behind each
+completed one, read `docs/PATH_TO_EXCELLENCE.md` rather than this paragraph.

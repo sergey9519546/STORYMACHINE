@@ -17,7 +17,9 @@ Job:
 > choose a repair, and re-verify the draft with a reproducible receipt.
 
 **Secondary / experimental surface:** OASIS Story Machine (multi-agent simulation,
-NVM research panels). Reachable, not the default activation path.
+NVM research panels). Reachable only behind the Labs flag
+(`src/lib/feature-flags.ts`, `sm_labs_enabled`, default OFF) — not the default
+activation path.
 
 **Organizing principle:** a **deterministic core** inside a **generative shell**.
 
@@ -54,12 +56,14 @@ Browser (React SPA — same-origin fetch / SSE / WebSocket)
   │                middleware: JSON, request log (pathname only),
   │                security headers, CSP (prod), rate limits
   │                │
-  │                ├─ routes/config.ts     health, AI config, simulation observation export, retired JSON import
-  │                ├─ routes/scriptide.ts  doctor, diagnose, copilot, fix-and-verify
+  │                ├─ routes/config.ts     health, AI config, session delete/rotate, simulation observation export, retired JSON import
+  │                ├─ routes/scriptide.ts  doctor, doctor/stream (SSE), diagnose, copilot, fix-and-verify
   │                ├─ routes/export.ts     coverage HTML, FDX/DOCX/print
   │                ├─ routes/game.ts       OASIS simulation (init/turn/room/interview)
+  │                ├─ routes/events.ts     closed-vocabulary instrumentation sink + /api/events/summary
   │                ├─ routes/nvm.ts        NVM research engine (~50 routes)
   │                └─ routes/collab.ts     short-lived Yjs room tokens
+  │                (also mounted: ai-providers.ts, live.ts, critics.ts)
   │
   └─ /collab/:room ──► server/collab/yjs-server.ts (token-gated Yjs sync)
 ```
@@ -88,6 +92,12 @@ See `docs/AUTH.md` for guarantees and non-guarantees.
 
 Behind a reverse proxy, set `TRUST_PROXY` or all clients collapse onto one IP.
 
+Rate limits are per-IP and per-minute; one cap is instead process-wide and
+concurrent: `MAX_ROOMS` (`server/lib/session-store.ts`, default 50) bounds
+simultaneously reserved room simulations across every session, answering `429`
+at the boundary rather than queueing without limit. It is independent of the
+per-session, per-location duplicate-reservation lock, which still returns `409`.
+
 ---
 
 ## 4. Script Doctor pipeline
@@ -108,6 +118,30 @@ structure → causality → intention → belief → conflict → character-arc 
 dialogue → rhythm → pacing → originality → payoff → voice → theme →
 relationship-arc
 ```
+
+### Execution off the main thread
+
+`runScriptDoctor` is pure, deterministic CPU work with no I/O to yield on, so
+running it inline blocks every other request for the duration. It runs instead
+on a small `node:worker_threads` pool (`server/nvm/analyze/doctor-pool.ts` +
+`doctor-worker.ts`): 1–2 threads, FIFO dispatch, the LRU cache held on the
+coordinator (never per-worker), `AbortSignal` cancellation that terminates the
+worker outright, and a permanent in-process fallback if workers cannot run in
+the environment. `DOCTOR_WORKER_POOL=off` exercises that fallback by hand;
+`DOCTOR_WORKER_POOL_SIZE` overrides the size (capped at 4). Deep read stays
+in-process on purpose — it is I/O-bound and its budget/abort machinery is
+main-thread state.
+
+### Streaming progress
+
+`POST /api/scriptide/doctor/stream` is the SSE sibling of `/api/scriptide/doctor`
+— same schema, same limiter, same worker pool, same report shape — emitting
+per-stage and per-pass progress frames so the client can show which pass is
+running and offer a real Cancel. Cancellation rides the existing
+res-close → `AbortSignal` → worker-terminate path; no second mechanism. The
+progress hooks are observational only: the report is byte-identical with and
+without them. `src/lib/doctor-stream.ts` is the shared browser client. The
+deep-read and PDF routes are deliberately one-shot.
 
 ### Scoring trust contract
 
@@ -132,9 +166,11 @@ A failed detector must never present as “zero issues found.”
 
 ### Truncation (P0.2)
 
-Analyzer scene ceiling = 1000. Scripts above the ceiling:
+`ANALYZER_SCENE_CEILING` = 400 (`fountain-analyzer.ts`; lowered from 1000 in
+W1, 2026-08-21 — honest headroom above the 292-scene longest real feature in
+the corpus). Scripts above the ceiling:
 
-- analyze only the first 1000 scenes
+- analyze only the first 400 scenes
 - score density uses **analyzed** word count only
 - report surfaces a truncation notice
 
@@ -162,12 +198,29 @@ Tier-1 invariants against current session state.
 ```
 App
  ├─ StartScreen          sample / open file / editor / wizard / OASIS entry
- ├─ ScriptIDE            primary product (doctor, diagnose, exports, fix)
- └─ StoryMachine         experimental simulation + NVM panels
+ ├─ ScriptIDE            primary product (write / coverage / ship task slots)
+ ├─ StoryMachine         experimental simulation + NVM panels (Labs-gated)
+ └─ hash routes          #verify (VerifyReport) · #privacy (PrivacyPage) ·
+                         #design-preview — reachable without creating a script
 ```
 
 View state persists in `localStorage` (`sm_app_view_v1`) so refresh resumes the
 editor rather than dumping users back into the wizard.
+
+**Draft persistence** is localStorage-first with an IndexedDB mirror
+(`src/lib/scriptide-idb-store.ts`): every export is promise-based and never
+rejects, so a browser with IndexedDB blocked or unavailable degrades to "no
+mirror" rather than losing draft persistence. The mirror wins on restore only
+when strictly newer than localStorage — the localStorage-quota-failure
+recovery case. Settings → Session offers a confirm-gated "delete everything"
+that wipes both stores and calls `POST /api/session/delete`; `#privacy` states
+what stays in the browser, what the server holds, and what leaves.
+
+**Command palette** (Cmd/Ctrl+K): `src/components/scriptide/CommandPalette.tsx`
+over the DOM-free registry and filter logic in `src/lib/command-palette.ts`.
+Every action's `run` is the same named callback the visible button already
+calls — the palette is a second entry point onto real dispatch, never a
+parallel implementation.
 
 Build note: ScriptIDE is the largest client chunk; advanced panels should stay
 lazy-loaded. Avoid growing the critical first-value path.
@@ -183,7 +236,24 @@ Docker (non-root) → Express on :3000 → /health
 ```
 
 Release artifacts are versioned images (`/health` reports `version` + `commit`).
-Backups use SQLite online backup (`npm run backup`), not raw file copy of live WAL.
+The current version is `1.0.0-rc.1` (`package.json`) — a release candidate,
+not `1.0.0`, because the remaining 1.0 items are owner-side validation, not
+code. See README's "Releases" section.
+
+Backups use SQLite online backup (`server/lib/backup.ts`), not a raw file copy
+of a live WAL. Two ways to schedule the identical logic, reading the identical
+`BACKUP_DIR` / `BACKUP_RETENTION_DAYS` / `BACKUP_RETENTION_KEEP` config: an
+operator's own cron running `npm run backup`, or `BACKUP_INTERVAL_HOURS` (S1,
+2026-08-21), an opt-in `unref()`'d in-process timer in `server.ts` for
+deployments with no host cron. Off by default, and skipped with a logged
+warning in `:memory:` mode.
+
+The restore path exists as code, not just as a documented `cp`:
+`restoreSession()` / `npm run restore-session <sessionId> <snapshotFile>`
+verifies the snapshot's SQLite integrity before publishing it and refuses to
+overwrite a session database still present on disk. A backup that has never
+been restored is not a backup — `tests/core/backup-restore-drill.test.ts`
+backs up a real session, destroys it, restores it, and asserts the round trip.
 
 **Fit today**
 
@@ -215,6 +285,13 @@ Backups use SQLite online backup (`npm run backup`), not raw file copy of live W
 | E2E journeys (API-level) | Keyless product paths without a browser |
 | Real-corpus harness | Env-gated structural regression on real scripts |
 
+Browser-level proof exists but runs **on demand, not in CI** (Playwright is not
+a CI dependency): `scripts/smoke-p0-live-flow.mjs`,
+`verify-p2-p3-surfaces.mjs` (surface/Labs gating + a static dead-UI tripwire),
+`verify-focus-traps.mjs`, `verify-e4-local-safety-net.mjs`,
+`verify-e5-command-palette.mjs`, plus `scripts/load-test-doctor.mjs` for
+concurrent doctor load.
+
 **Not yet proven by default CI:** browser journeys, human agreement with scores,
 public multi-tenant security.
 
@@ -241,10 +318,14 @@ Before expanding scope:
 | `server/app.ts` | Express app, security headers, routers |
 | `server/nvm/analyze/fountain-analyzer.ts` | Text → records |
 | `server/nvm/analyze/doctor.ts` | Aggregate Script Doctor report |
+| `server/nvm/analyze/doctor-pool.ts` | Worker-thread pool + coordinator cache + in-process fallback |
 | `server/nvm/revision/pipeline.ts` | 14-pass diagnose/rewrite |
-| `src/App.tsx` | Top-level view router |
+| `server/lib/backup.ts` | SQLite online backup, retention pruning, `restoreSession()` |
+| `src/App.tsx` | Top-level view router + `#verify` / `#privacy` hash routes |
 | `src/components/ScriptIDE.tsx` | Primary product surface |
 | `src/components/scriptide/ScriptDoctorPanel.tsx` | Doctor UI + incomplete-analysis banner |
+| `src/components/scriptide/CommandPalette.tsx` | Cmd/Ctrl+K palette shell (logic in `src/lib/command-palette.ts`) |
+| `src/components/PrivacyPage.tsx` | `#privacy` — what stays local, what the server holds, how to delete |
 | `docs/AUTH.md` | Session capability model |
 
 Depth lives in file headers. Prefer reading those over duplicating behavior here.
