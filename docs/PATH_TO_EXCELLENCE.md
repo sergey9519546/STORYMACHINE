@@ -46,6 +46,61 @@ here because three of them changed what the project believes about itself:
   that measured nothing must fail loudly rather than report silence as a
   result.
 
+**2026-08-24, later — the completion sweep and its six lanes.** An
+eight-area adversarial audit (21 agents) enumerated everything left and
+re-tested every item previously filed as owner-only. Its Section A is now
+**exhausted**; what it found was worse than a punch list:
+
+- `a2448714` — **ten CI gates that advertised protection they did not have.**
+  The worst: `check-scoring-receipt.mjs` resolved its range as
+  `origin/main...HEAD` under CI, so on a **push to main those refs are the
+  same SHA and the range is empty** — the gate printed "OK" and exited 0
+  regardless of what the push contained, across ~182 main-push runs. That is
+  the exact mechanism by which the 2026-08-08 fabricated-receipt incident
+  recurs undetected. Now resolved from the pushed range and proven against
+  the real historical case (`3634a13..0e148c3` → exit 1, naming doctor.ts
+  and types.ts). Entry validation is no longer a line count: the fabricated
+  2026-08-08 entry fails on four independent tells while the honest
+  2026-08-21 entries pass. The no-console gate's `--exclude=index.ts`
+  matched by **basename**, silently exempting the live route barrel
+  (`server/routes/nvm/index.ts`) — a planted `console.log` there passed CI;
+  exemptions are now derived from tsconfig and each is *proven unreachable*
+  from `server.ts`. Plus: `tests/critics` and the live kernel test never ran;
+  four tripwire bypass shapes closed; ci.yml had no `permissions` block and
+  release.yml leaked `packages: write` into the `npm ci` job; `:latest`
+  published unconditionally from a prerelease.
+- `274d71f4` — **the suite could not detect deletion of the product's own
+  thesis.** Ablating BOTH feature-scale deductions left all 10,863 tests and
+  the metamorphic gate green, because `ARC_DED_MIN_SCENES = 15` and every
+  committed fixture was ≤14 scenes. New CC0 21-scene fixtures make intact and
+  act-swapped **word-count identical**, holding scarcity and the whole rule
+  channel constant so only structure varies. Ablation now fails 2 tests
+  (independently re-verified). Also fixed two story-graph tests whose names
+  promised discrimination while asserting only types.
+- `1b410f33` — **Story Vector 500'd on every request** (a manifest no
+  checkout can have), and under that a dimension mismatch that could compare
+  unrelated rules across a warm cache. Its `genome` field was five hardcoded
+  literals while the docs advertised measured numbers; now `null` with a
+  stated reason. Ships the **server dead-code tripwire** (`src/` had one,
+  `server/` did not — which is why 78 files / 24,722 lines accumulated
+  unnoticed).
+- `20f90b47` — **a prompt-injection vulnerability.** A caller-supplied
+  `title` reached `compileScreenplay()` effectively raw; `Title:` is a
+  single-line key, so a newline forged extra title-page keys and then
+  arbitrary screenplay body — which is interpolated into the LLM rewrite
+  prompt fenced by a literal `--- END DRAFT ---` the forged body could
+  impersonate on each of the 14 passes. Fixed via `sanitizeSingleLine()` on
+  all three compile call sites, with regression tests.
+- `6584e3bc` / `f2e4d09f` — docs truth-sync round 2 (a **met** P1 exit
+  condition that four documents still called failing; AUC-24 stale at 0.672
+  vs 0.731) plus an honesty-audit lane over the repo's own description; and a
+  cross-lane fix caught by the new step-for-step mirror assertion firing on
+  its first real opportunity.
+
+Suite 10,576 → **10,994**, 0 failures. Nothing was deleted: the dead-weight
+inventory is written up as three separate decisions in
+`docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md`.
+
 Successor to `PATH_TO_DONE.md`'s
 task framing: that file tracks ROADMAP phases; this one sequences everything
 measured by the three 2026-08-14 audits (UX-in-browser, engine-truth,
