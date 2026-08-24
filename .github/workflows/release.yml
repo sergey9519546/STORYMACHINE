@@ -7,23 +7,38 @@ name: Release
 #   - workflow_dispatch (manual re-run, e.g. to republish an image after a
 #     registry outage, without cutting a new tag)
 #
-# The `test` job mirrors ci.yml's gate (type check, no-console lint, keyless
-# test suite, build) so a broken tag/dispatch can never publish a broken
-# image — `publish` has a hard `needs: test` dependency and will not run if
-# it fails. This intentionally duplicates ci.yml's steps rather than
-# depending on a ci.yml run for this ref/SHA (workflow_dispatch has no
-# associated PR/push CI run to depend on, and tag-push CI runs are a
-# separate, not-guaranteed-synchronous workflow run) — see CLAUDE.md file
-# ownership: this file must not edit ci.yml.
+# The `test` job mirrors ci.yml's gate so a broken tag/dispatch can never
+# publish a broken image — `publish` has a hard `needs: test` dependency and
+# will not run if it fails. This intentionally duplicates ci.yml's steps rather
+# than depending on a ci.yml run for this ref/SHA (workflow_dispatch has no
+# associated PR/push CI run to depend on, and tag-push CI runs are a separate,
+# not-guaranteed-synchronous workflow run).
+#
+# "MIRRORS" IS A CLAIM THIS FILE HAS TO KEEP EARNING. It previously said it
+# mirrored ci.yml while running 7 steps to ci.yml's 10: no receipt check, no
+# RUN_E2E, no doc-quality check, no unverified-gates report, and a shallow
+# checkout. A tag push could therefore publish an image built from an
+# unreceipted scoring change. Every ci.yml gate now has a counterpart here, and
+# tests/core/ci-gates-intact.test.ts asserts the correspondence step by step so
+# the two files cannot silently diverge again.
+#
+# The ONE deliberate difference, stated rather than hidden: the receipt check
+# runs in --structural-only mode over the whole release window (previous v*
+# tag → this ref) instead of a single change's range. See the step's own
+# comment and the flag's documentation in scripts/check-scoring-receipt.mjs.
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch: {}
 
+# Workflow-level permissions are the FLOOR every job inherits, so the registry
+# write token must not live here: `packages: write` at this level meant the
+# `test` job held a GHCR push credential while running `npm ci` — a malicious
+# postinstall in any transitive dependency would have had it. The publish job
+# declares `packages: write` for itself; the test job gets read-only.
 permissions:
   contents: read
-  packages: write
 
 env:
   REGISTRY: ghcr.io
@@ -34,6 +49,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Same reason as ci.yml: the scoring-receipt guard needs real history
+          # (and a resolvable previous release tag) to diff against. A depth-1
+          # checkout silently degrades it to "no base ref — nothing to check".
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -46,23 +66,14 @@ jobs:
       - name: Type check
         run: npm run lint
 
-      # --exclude-dir/--exclude mirror ci.yml's quarantine of the never-
-      # compiled v5.0 experimental "narrative OS" subsystem. Note this
-      # excludes the dead kernel files BY FILE, not --exclude-dir=kernel:
-      # server/nvm/kernel/ is partially live (Stage.ts imports event-store.ts
-      # + adapters/commit-to-events.ts), so the live event-store.ts stays
-      # covered. See ci.yml's comment for the full rationale.
+      # Same gate as ci.yml, same script. The exemption set comes from
+      # tsconfig.json's quarantine declaration and every exemption is proven
+      # unreachable from server.ts/server/app.ts before the scan runs — see
+      # ci.yml's comment and scripts/check-no-console.mjs's header for why the
+      # old inline grep (which matched --exclude patterns against BASE NAMES
+      # and so exempted the live route barrel) is gone from both files.
       - name: Enforce no console.* under server/
-        run: >-
-          ! grep -rn 'console\.' server --include='*.ts'
-          --exclude-dir=quantum --exclude-dir=research
-          --exclude-dir=infinity-gate --exclude-dir=planning --exclude-dir=benchmarks
-          --exclude-dir=__tests__ --exclude-dir=verifiers
-          --exclude=type-enrichment.ts --exclude=type-enrichment.test.ts
-          --exclude=v5-examples.ts --exclude=adapters.ts
-          --exclude=event-store.test.ts --exclude=index.ts --exclude=integration.ts
-          --exclude=trinity-gate.ts --exclude=trinity-gate-example.ts
-          --exclude=trinity-gate-demo.ts
+        run: npm run check-no-console
 
       # G0-08: mirrors ci.yml's honesty string audit — see that file's
       # comment and scripts/honesty-audit.mjs for scope and rules.
@@ -76,8 +87,51 @@ jobs:
           HONESTY_AUDIT_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ github.token }}
 
+      # Mirrors ci.yml. Non-blocking there, non-blocking here — the ONLY step
+      # in this job that is allowed to be.
+      - name: Check documentation quality
+        run: npm run check-docs
+        continue-on-error: true
+
       - name: Run tests (keyless — analysis-only posture)
+        # Mirrors ci.yml: RUN_E2E gates tests/e2e/journeys.test.ts, the only
+        # full-stack test. A release is the last place to skip it.
+        env:
+          RUN_E2E: "1"
         run: npm test
+
+      # Mirrors ci.yml's receipt gate, scoped to a release instead of a change.
+      # A tag does not "introduce" commits, so there is no push range to diff:
+      # the meaningful question at release time is whether every scoring-path
+      # change since the PREVIOUS release shipped with a receipt entry. That is
+      # what this diffs.
+      #
+      # --structural-only is deliberate and is NOT a weakening of ci.yml's
+      # gate: entry CONTENT (SHA resolvability, no simulation language,
+      # required fields) is validated by ci.yml on the narrow range that adds
+      # the entry, which is the only moment it can be validated — an honest
+      # entry cites the branch SHA it was measured at, and that object stops
+      # resolving once the branch is squash-merged. Re-checking it here would
+      # fail releases on the most carefully written receipts in the ledger.
+      # (Verified: the honest 2026-08-04 and 2026-08-07 entries both cite SHAs
+      # that no longer resolve.)
+      - name: Scoring-path change requires a measurement receipt
+        run: |
+          set -euo pipefail
+          PREV_TAG="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_SHA}^" 2>/dev/null || true)"
+          if [ -n "${PREV_TAG}" ]; then
+            echo "Release window: ${PREV_TAG}..${GITHUB_SHA}"
+            node scripts/check-scoring-receipt.mjs --structural-only "${PREV_TAG}..${GITHUB_SHA}"
+          else
+            echo "No previous v* tag reachable from ${GITHUB_SHA} — falling back to the default range."
+            node scripts/check-scoring-receipt.mjs --structural-only
+          fi
+
+      # Mirrors ci.yml: names the env-gated suites that did NOT run, so a green
+      # release job is not mistaken for "everything was verified".
+      - name: Report unverified gates
+        if: always()
+        run: node scripts/report-unverified-gates.mjs
 
       - name: Metamorphic scoring gate
         run: npm run test:metamorphic
@@ -90,6 +144,11 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
+    # The registry write scope lives HERE, not at workflow level, so it is not
+    # inherited by the test job's `npm ci`.
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -98,6 +157,13 @@ jobs:
       # the package.json version so a manual re-publish still gets a
       # meaningful, non-"unknown" tag rather than failing or defaulting to
       # something misleading.
+      #
+      # IS_PRERELEASE drives the `:latest` tag below. A SemVer version with a
+      # prerelease identifier (1.0.0-rc.1, 2.0.0-beta.3) is by definition not
+      # what a user typing `docker pull …:latest` is asking for. This was not
+      # gated before, and the consequence is live: ghcr.io/…/storymachine:latest
+      # currently resolves to 1.0.0-rc.1 — the release candidate overwrote the
+      # stable tag simply by being tagged after it.
       - name: Compute release version and commit SHA
         id: meta
         run: |
@@ -106,8 +172,15 @@ jobs:
           else
             VERSION="$(node -p "require('./package.json').version")"
           fi
+          if [[ "${VERSION}" == *-* ]]; then
+            IS_PRERELEASE=true
+          else
+            IS_PRERELEASE=false
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=${IS_PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "Version ${VERSION} (prerelease: ${IS_PRERELEASE})"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -126,6 +199,27 @@ jobs:
         id: image
         run: echo "name=${REGISTRY}/${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
 
+      # `:latest` is appended only for a non-prerelease version — see the
+      # meta step's comment. The version tag is always pushed, so a
+      # prerelease is still fully published and pullable by its exact tag.
+      - name: Compute image tags
+        id: tags
+        run: |
+          {
+            echo "list<<EOF"
+            echo "${IMAGE_NAME}:${VERSION}"
+            if [[ "${IS_PRERELEASE}" == "false" ]]; then
+              echo "${IMAGE_NAME}:latest"
+            else
+              echo "Skipping :latest — ${VERSION} is a prerelease." >&2
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          IS_PRERELEASE: ${{ steps.meta.outputs.is_prerelease }}
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -134,9 +228,7 @@ jobs:
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
             GIT_SHA=${{ steps.meta.outputs.sha }}
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
-            ${{ steps.image.outputs.name }}:latest
+          tags: ${{ steps.tags.outputs.list }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.meta.outputs.sha }}

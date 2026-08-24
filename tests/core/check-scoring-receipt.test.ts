@@ -138,16 +138,49 @@ describe('check-scoring-receipt.mjs — fixture ranges', () => {
         '}',
         '',
       ].join('\n'));
+      // The entry must be shaped like §3's template: a dated `###` heading and
+      // the required fields. This fixture used to append `### fixture
+      // measurement` with two ad-hoc bullets, which passed only because the
+      // guard's receipt check was `git diff --numstat` insertions > 0 — the
+      // same check that waved through the fabricated 2026-08-08 entry. See
+      // tests/core/scoring-receipt-guard.test.ts for the validator's fixtures.
       appendFileSync(path.join(dir, RECEIPT_REL), [
         '',
-        '### fixture measurement',
-        '- Date: fixture',
-        '- Measured AUC-24: 0.999 (synthetic fixture value, not a real measurement)',
+        '### 2026-08-24 — fixture measurement',
+        '',
+        '- **Date:** 2026-08-24',
+        `- **Git SHA:** \`${baseSha}\``,
+        '- **Command:** `REAL_SCRIPT_CORPUS_DIR=/corpus npm run measure-real`',
+        '- **Measured AUC-24:** 0.999 (synthetic fixture value, not a real measurement)',
+        '- **Corpus fingerprint:** fixture corpus, 0 scripts',
+        '- **Runner attestation:** "fixture harness, not a human measurement."',
         '',
       ].join('\n'));
       commitAll(dir, 'change doctor formula + record receipt');
       const result = runCheck(dir, `${baseSha}...HEAD`);
       assert.equal(result.status, 0, `expected exit 0, got ${result.status}\n${result.stdout}\n${result.stderr}`);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  it('scoring-change-with-a-shapeless-receipt: appending lines that are not an entry FAILS', () => {
+    // The regression this pins: "the receipt gained insertions" was the whole
+    // check, so any added line satisfied it.
+    const { dir, baseSha } = makeBaseRepo('shapeless-receipt');
+    try {
+      writeFile(dir, 'server/nvm/analyze/doctor.ts', [
+        "import { helper } from './fountain-analyzer.ts';",
+        'export function score(): number {',
+        '  return helper() + 2;',
+        '}',
+        '',
+      ].join('\n'));
+      appendFileSync(path.join(dir, RECEIPT_REL), '\nmeasured it, looks fine\n');
+      commitAll(dir, 'change doctor formula + wave at the ledger');
+      const result = runCheck(dir, `${baseSha}...HEAD`);
+      assert.equal(result.status, 1, `expected exit 1, got ${result.status}\n${result.stdout}\n${result.stderr}`);
+      assert.match(result.stderr, /gained no new entry/);
     } finally {
       cleanup(dir);
     }
@@ -231,6 +264,7 @@ describe('check-scoring-receipt.mjs — falsifiability of the scoring-path defin
   it('a broken (emptied) path definition lets the no-receipt fixture pass; the real script still catches it', () => {
     const { dir, baseSha } = makeBaseRepo('falsifiability');
     let brokenScriptPath: string | null = null;
+    let brokenScriptDir: string | null = null;
     try {
       writeFile(dir, 'server/nvm/analyze/doctor.ts', [
         "import { helper } from './fountain-analyzer.ts';",
@@ -261,7 +295,19 @@ describe('check-scoring-receipt.mjs — falsifiability of the scoring-path defin
         assert.ok(brokenSource.includes(marker), `break pattern for "${marker}" did not match — falsifiability harness is stale against the script`);
       }
 
-      brokenScriptPath = path.join(dir, '__broken-check-scoring-receipt.mjs');
+      // The broken copy lives in its own temp dir, NOT in the fixture repo:
+      // the script imports ./lib/import-graph.mjs (shared with
+      // check-no-console.mjs), so a bare copy would die on module resolution
+      // and "fail" for a reason that has nothing to do with the path
+      // definitions this test is falsifying.
+      brokenScriptDir = mkdtempSync(path.join(os.tmpdir(), 'storymachine-broken-guard-'));
+      mkdirSync(path.join(brokenScriptDir, 'lib'), { recursive: true });
+      writeFileSync(
+        path.join(brokenScriptDir, 'lib/import-graph.mjs'),
+        readFileSync(path.join(REPO_ROOT, 'scripts/lib/import-graph.mjs'), 'utf8'),
+        'utf8',
+      );
+      brokenScriptPath = path.join(brokenScriptDir, '__broken-check-scoring-receipt.mjs');
       writeFileSync(brokenScriptPath, brokenSource, 'utf8');
 
       const broken = runCheck(dir, range, brokenScriptPath);
@@ -274,6 +320,7 @@ describe('check-scoring-receipt.mjs — falsifiability of the scoring-path defin
     } finally {
       cleanup(dir);
       if (brokenScriptPath) rmSync(brokenScriptPath, { force: true });
+      if (brokenScriptDir) rmSync(brokenScriptDir, { recursive: true, force: true });
     }
   });
 });

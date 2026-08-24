@@ -36,6 +36,15 @@ const securityYml = path.join(root, '.github/workflows/security.yml');
 const ciYml = path.join(root, '.github/workflows/ci.yml');
 const releaseYml = path.join(root, '.github/workflows/release.yml');
 
+/** Every `- name: …` step in a workflow, in file order. */
+function stepNames(source: string): string[] {
+  return source
+    .split('\n')
+    .map((l) => /^\s*-\s+name:\s+(.+?)\s*$/.exec(l))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map((m) => m[1]);
+}
+
 /**
  * Extract the YAML block for a named step: everything from `- name: <name>`
  * up to (not including) the next sibling `- name:` or a dedent to a new job.
@@ -90,10 +99,10 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
   });
 
   it('the ci.yml gates that must block are not continue-on-error', () => {
-    // These four are the hard gates. `Check documentation quality` is
+    // These are the named hard gates. `Check documentation quality` is
     // deliberately non-blocking and is intentionally NOT listed here.
     //
-    // 'Scoring-path change requires a measurement receipt' extends this list
+    // 'Scoring-path change requires a measurement receipt' is on this list
     // for the same #236-241 reason as the rest: it is CI's only mechanical
     // enforcement of the AUC-floor human-measurement step (CLAUDE.md — the
     // corpus itself can never reach CI, so the VALUE stays unverifiable, but
@@ -101,11 +110,20 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     // ever grows a `continue-on-error: true`, the gap it closes reopens
     // invisibly, exactly like the dependency-review bypass this file exists
     // to catch.
+    //
+    // The list below names steps that must EXIST. Whether a step BLOCKS is no
+    // longer checked from a hardcoded list at all — see the derived test
+    // further down, which was added after an audit found this list silently
+    // omitting "Run tests", "Metamorphic scoring gate", and "Build". A list of
+    // gates to protect is itself a thing that can be quietly shortened.
     for (const name of [
       'Type check',
       'Enforce no console.* under server/',
       'Honesty string audit',
+      'Run tests (keyless — analysis-only posture)',
       'Scoring-path change requires a measurement receipt',
+      'Metamorphic scoring gate',
+      'Build',
     ]) {
       const block = stepBlock(ci, name);
       assert.ok(block, `ci.yml must keep a step named "${name}"`);
@@ -115,6 +133,167 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
         `"${name}" is a hard gate and must not be continue-on-error`,
       );
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Derived checks: four bypass shapes the hardcoded lists above cannot see.
+  //
+  // Every check below reasons over ALL steps/jobs found in the file rather
+  // than over a list someone has to remember to extend. The audit that
+  // prompted them found: (a) job-level `continue-on-error` unguarded,
+  // (b) expression-valued `continue-on-error: ${{ true }}` unguarded,
+  // (c) `if: <cond> && false` unguarded (only a bare `if: false` was checked),
+  // and (d) three ci.yml steps absent from the hardcoded list entirely, so
+  // neutering any of them was free.
+  // -------------------------------------------------------------------------
+
+  /**
+   * The ONLY steps allowed to be non-blocking, each with the reason. Anything
+   * else carrying `continue-on-error` fails — including a brand-new step
+   * nobody thought to add to a list.
+   */
+  const ALLOWED_NON_BLOCKING: Record<string, string> = {
+    'Check documentation quality':
+      'AI-writing-pattern scan over markdown; warnings only, deliberately advisory to avoid false positives on legitimate usage.',
+  };
+
+  for (const [file, src] of [['ci.yml', ci], ['release.yml', release], ['security.yml', security]] as const) {
+    it(`${file}: only explicitly-allowed steps are continue-on-error`, () => {
+      const offenders: string[] = [];
+      for (const name of stepNames(src)) {
+        const block = stepBlock(src, name);
+        if (!block) continue;
+        if (!/continue-on-error\s*:/.test(block)) continue;
+        if (name in ALLOWED_NON_BLOCKING) continue;
+        offenders.push(name);
+      }
+      assert.deepEqual(
+        offenders,
+        [],
+        `${file}: these steps carry \`continue-on-error\` without being on the allowlist in this test. `
+        + 'A gate that cannot fail is not a gate. If a step genuinely must be advisory, add it to '
+        + 'ALLOWED_NON_BLOCKING with the reason — in a diff a reviewer will see.',
+      );
+    });
+
+    it(`${file}: no job-level continue-on-error`, () => {
+      // `continue-on-error` at JOB level (4-space indent, a sibling of
+      // `runs-on:`) makes every step in the job advisory at once without any
+      // step being touched. None of the step-level checks above would see it.
+      assert.doesNotMatch(
+        src,
+        /^ {4}continue-on-error\s*:/m,
+        `${file} must not set continue-on-error at job level — it neuters every step in the job at once`,
+      );
+    });
+
+    it(`${file}: continue-on-error is never expression-valued`, () => {
+      // `continue-on-error: ${{ true }}` (or any expression) reads as
+      // configuration and defeats every literal `: true` check, including the
+      // one this file has had since #236-241.
+      assert.doesNotMatch(
+        src,
+        /continue-on-error\s*:\s*\$\{\{/,
+        `${file}: continue-on-error must be a literal true/false. An expression hides whether the gate blocks.`,
+      );
+    });
+
+    it(`${file}: no \`if:\` condition can evaluate to a hardcoded false`, () => {
+      // The original check looked only for a bare `if: false` on its own line.
+      // `if: github.event_name == 'push' && false` skips the step just as
+      // completely while looking like a real condition.
+      const badIfs = src
+        .split('\n')
+        .filter((l) => /^\s*if\s*:/.test(l) && /\bfalse\b/.test(l));
+      assert.deepEqual(
+        badIfs.map((l) => l.trim()),
+        [],
+        `${file}: an \`if:\` containing a literal \`false\` disables a job or step while looking conditional`,
+      );
+    });
+  }
+
+  it('release.yml really does mirror ci.yml, step for step', () => {
+    // release.yml's header claims it mirrors ci.yml's gate. It did not: it ran
+    // 7 steps to ci.yml's 10 — no receipt check, no RUN_E2E, no doc-quality
+    // check, no unverified-gates report — so a tag push could publish an image
+    // built from an unreceipted scoring change. The claim is now mechanical:
+    // if a gate is added to ci.yml and not to release.yml, this fails.
+    const ciSteps = stepNames(ci);
+    const releaseSteps = new Set(stepNames(release));
+    const missing = ciSteps.filter((s) => !releaseSteps.has(s));
+    assert.deepEqual(
+      missing,
+      [],
+      'release.yml claims (in its header) to mirror ci.yml, but these ci.yml steps have no counterpart '
+      + 'there. Either add them or rewrite the claim — a false claim of coverage is worse than an '
+      + 'acknowledged gap.',
+    );
+  });
+
+  it('release.yml runs the keyless suite with RUN_E2E enabled, like ci.yml', () => {
+    const block = stepBlock(release, 'Run tests (keyless — analysis-only posture)');
+    assert.ok(block, 'release.yml must keep the test step');
+    assert.match(
+      block,
+      /RUN_E2E\s*:\s*"?1"?/,
+      'release.yml must set RUN_E2E=1 like ci.yml — a release is the last place to skip the only full-stack test',
+    );
+  });
+
+  it('both workflows checkout with full history (the receipt guard needs it)', () => {
+    for (const [file, src] of [['ci.yml', ci], ['release.yml', release]] as const) {
+      assert.match(
+        src,
+        /fetch-depth:\s*0/,
+        `${file} must checkout with fetch-depth: 0 — the scoring-receipt guard degrades to "no base ref, `
+        + 'nothing to check" on a shallow clone, which looks exactly like a pass',
+      );
+    }
+  });
+
+  it('ci.yml declares least-privilege permissions', () => {
+    assert.match(
+      ci,
+      /^permissions:\n\s+contents:\s*read\s*$/m,
+      'ci.yml must declare `permissions: contents: read`. With no permissions block the job inherits the '
+      + 'repository default, which can be a read/write GITHUB_TOKEN held by every step including `npm ci`.',
+    );
+  });
+
+  it('release.yml keeps the registry write token out of the test job', () => {
+    // Workflow-level `packages: write` is inherited by EVERY job, so the test
+    // job held a GHCR push credential while running `npm ci` — one malicious
+    // postinstall away from an image push.
+    const workflowLevel = release.match(/^permissions:\n((?:[ \t]+\S.*\n)+)/m);
+    assert.ok(workflowLevel, 'release.yml must declare workflow-level permissions');
+    assert.doesNotMatch(
+      workflowLevel![1],
+      /packages\s*:\s*write/,
+      'release.yml must not grant `packages: write` at workflow level — scope it to the publish job',
+    );
+    const publishJob = release.match(/\n {2}publish:\n([\s\S]*?)(?=\n {2}\S|\n*$)/);
+    assert.ok(publishJob, 'release.yml must keep a "publish" job');
+    assert.match(
+      publishJob![1],
+      /packages\s*:\s*write/,
+      'the publish job must declare its own `packages: write`',
+    );
+  });
+
+  it('release.yml does not push :latest for a prerelease version', () => {
+    // ghcr.io/…/storymachine:latest currently resolves to 1.0.0-rc.1 because
+    // the tag list was unconditional. `latest` must mean the newest stable.
+    assert.doesNotMatch(
+      release,
+      /^\s+\$\{\{ steps\.image\.outputs\.name \}\}:latest\s*$/m,
+      'release.yml must not list `:latest` unconditionally in the build-push tag list',
+    );
+    assert.match(
+      release,
+      /is_prerelease/,
+      'release.yml must compute a prerelease flag and gate the `:latest` tag on it',
+    );
   });
 
   it('no workflow disables a gate by neutering the whole job', () => {

@@ -4,10 +4,10 @@ name: Security
 # Three independent jobs:
 #   - dependency-review: blocks PRs that introduce known-vulnerable
 #     dependency versions in their diff (GitHub Advisory Database).
-#   - npm-audit: surfaces high/critical CVEs in the resolved dependency
-#     tree. NON-BLOCKING for now (continue-on-error) so it reports without
-#     failing existing PRs; the lead can flip it to blocking once the
-#     baseline is clean.
+#   - npm-audit: fails on high/critical CVEs in the resolved production
+#     dependency tree. BLOCKING since 2026-08-24 — the baseline was verified
+#     clean (0 vulnerabilities with and without dev deps) before the escape
+#     hatch was removed.
 #   - codeql: semantic code scanning for the JavaScript/TypeScript surface.
 #
 # Matches ci.yml conventions (Node 22, checkout@v4, setup-node@v4 with
@@ -67,14 +67,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # NON-BLOCKING (continue-on-error: true): npm audit reports
-      # high/critical CVEs in the resolved tree so they are visible on
-      # every run, but it does NOT fail existing PRs while the baseline
-      # contains pre-existing advisories. Flip `continue-on-error` to
-      # `false` (and drop this comment) once the baseline is clean and
-      # the lead has signed off — this is the intended steady state.
+      # BLOCKING as of 2026-08-24. This step carried `continue-on-error: true`
+      # with a comment saying to flip it "once the baseline is clean". The
+      # baseline is clean and was verified before flipping: on the committed
+      # package-lock.json, both `npm audit --omit=dev --audit-level=high` and
+      # `npm audit --audit-level=high` report "found 0 vulnerabilities" (exit
+      # 0). There is no pre-existing advisory left for the escape hatch to
+      # accommodate, and a security step that cannot fail reports nothing a
+      # reader can act on — it is indistinguishable from a clean run.
+      #
+      # If this goes red, a high/critical advisory landed in the resolved
+      # production tree. Fix the dependency; do not restore continue-on-error.
+      # (tests/core/ci-gates-intact.test.ts enforces that.)
       - name: npm audit (production, high+)
-        continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
 
   codeql:

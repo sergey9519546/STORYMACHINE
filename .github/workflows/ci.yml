@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: ["**"]
 
+# Least privilege, declared explicitly. Without a `permissions:` block a
+# workflow inherits the repository/organization default, which on many repos is
+# still the legacy read/write GITHUB_TOKEN — every step in this job, including
+# `npm ci` and any postinstall script it runs, would hold a token able to push
+# commits, move tags, and edit issues. This job only ever needs to read the
+# checkout. (release.yml scopes its `packages: write` to the publish job for the
+# same reason.)
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -31,35 +41,26 @@ jobs:
 
       # Mechanical enforcement of CLAUDE.md's "no console.* under server/**"
       # rule — a written convention only reliably holds when CI holds it.
-      # grep exits 1 on no-match, so `!` inverts: any hit fails the build
-      # and prints the offending lines.
       #
-      # --exclude-dir/--exclude mirror the tsconfig.json quarantine of the
-      # never-compiled v5.0 experimental "narrative OS" subsystem, EXCLUDING
-      # BY FILE rather than by the whole kernel/ dir. server/nvm/kernel/ is
-      # NOT fully dead: server/engine/Stage.ts imports live runtime values
-      # from server/nvm/kernel/event-store.ts and adapters/commit-to-events.ts
-      # (a small live closure fixed in place per the tsconfig comment). The
-      # earlier `--exclude-dir=kernel` hid that whole closure — including
-      # event-store.ts's console.* calls — from this gate on shipped code.
-      # Now only the genuinely-dead kernel files (the v5-examples, trinity-gate,
-      # integration, and adapters/type-enrichment experiments, plus their
-      # __tests__ and verifiers subdirs) are excluded, so the live event-store
-      # path stays covered. The fully-dead top-level dirs
-      # (quantum/research/infinity-gate/planning/benchmarks) stay dir-excluded.
-      # None of the excluded code is wired into the running server, so it isn't
-      # held to the logger convention either; genuinely-live code stays covered.
+      # This used to be an inline `grep -rn 'console\.' server ...` with a long
+      # list of `--exclude=` flags. It did not work. When grep searches
+      # RECURSIVELY, `--exclude=GLOB` matches each file's BASE NAME, not its
+      # path — so `--exclude=index.ts` exempted every index.ts in the tree,
+      # including server/routes/nvm/index.ts, the live route barrel mounted by
+      # server/app.ts (plus the live quality/, project/, and bible/ barrels).
+      # Reproduced: `console.log("GATE PROBE")` appended to the live route
+      # barrel passed the old step with exit 0.
+      #
+      # That was the SECOND round of this same bug here (the previous one was
+      # `--exclude-dir=kernel` hiding the live event-store closure), so the fix
+      # is not another flag list. scripts/check-no-console.mjs derives its
+      # exemptions from tsconfig.json's `exclude` array — the repo's existing,
+      # path-anchored quarantine declaration — and then PROVES each exemption
+      # is dead by walking the import graph out from server.ts/server/app.ts.
+      # An exemption covering code the server can reach fails the build, so a
+      # third occurrence cannot be introduced by editing a list.
       - name: Enforce no console.* under server/
-        run: >-
-          ! grep -rn 'console\.' server --include='*.ts'
-          --exclude-dir=quantum --exclude-dir=research
-          --exclude-dir=infinity-gate --exclude-dir=planning --exclude-dir=benchmarks
-          --exclude-dir=__tests__ --exclude-dir=verifiers
-          --exclude=type-enrichment.ts --exclude=type-enrichment.test.ts
-          --exclude=v5-examples.ts --exclude=adapters.ts
-          --exclude=event-store.test.ts --exclude=index.ts --exclude=integration.ts
-          --exclude=trinity-gate.ts --exclude=trinity-gate-example.ts
-          --exclude=trinity-gate-demo.ts
+        run: npm run check-no-console
 
       # G0-08: user-facing honesty string audit — fails the build on
       # overclaim language ("Hollywood gold standard", "provably", stale
@@ -119,7 +120,21 @@ jobs:
       # that can be silently disabled by the thing it gates is not a gate
       # (see tests/core/ci-gates-intact.test.ts's header for why that matters
       # here specifically).
+      #
+      # PUSH_BEFORE_SHA is what makes this step real on push events. The guard
+      # used to hardcode `origin/main...HEAD` whenever CI was set; on a
+      # push-to-main run those refs are the SAME commit, the range is empty,
+      # and the step printed "no scoring-path files changed. OK." regardless of
+      # what the push contained — ~182 main-push runs gated by nothing, which
+      # is exactly how the 2026-08-08 fabricated receipt reached main. On a
+      # `push` the guard now diffs the PUSHED range; on a `pull_request` it
+      # keeps the three-dot branch range. The script also reads
+      # $GITHUB_EVENT_PATH directly, so dropping this env block does not
+      # silently reopen the hole — but wire it anyway, it is the explicit
+      # contract. (Pinned by tests/core/scoring-receipt-guard.test.ts.)
       - name: Scoring-path change requires a measurement receipt
+        env:
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: npm run check-scoring-receipt
 
       # Reports which env-gated suites did NOT run. Non-blocking by design:

@@ -12,12 +12,45 @@
 // local measurement and recorded it — this script is that trip-wire.
 //
 // MECHANISM: given a git range, detect whether any file on the "scoring path"
-// changed. If one did, the SAME range must also touch
-// docs/p1-benchmark/MEASUREMENT_RECEIPTS.md with real added content (not a
-// no-op touch) — the human step is CHECKED FOR, not hoped for. The AUC number
-// itself is never re-verified; a fabricated receipt still gets past this
-// script. That is a known, accepted boundary — see MEASUREMENT_RECEIPTS.md's
-// own header.
+// changed. If one did, the SAME range must also add a well-formed new entry to
+// docs/p1-benchmark/MEASUREMENT_RECEIPTS.md — the human step is CHECKED FOR,
+// not hoped for. The AUC NUMBER is still never re-verified (CI has no corpus);
+// what IS now verified is that the entry is not self-evidently fake.
+//
+// ---------------------------------------------------------------------------
+// TWO HOLES THIS SCRIPT USED TO HAVE (both reproduced before being fixed)
+// ---------------------------------------------------------------------------
+// 1. THE RANGE WAS EMPTY ON EVERY PUSH-TO-MAIN RUN. `resolveDefaultRange()`
+//    returned `origin/main...HEAD` whenever process.env.CI was set. On a
+//    push-to-main workflow run those two refs are the SAME COMMIT, so the
+//    three-dot range is empty and the script printed "no scoring-path files
+//    changed. OK." and exited 0 no matter what the push contained. ~182
+//    main-push CI runs were gated by nothing. That is the exact mechanism by
+//    which the 2026-08-08 fabricated-receipt incident could recur undetected:
+//    the guard is loudest on PRs and was silent on the branch that actually
+//    ships. FIXED: on a `push` event the range is the PUSHED range
+//    (`<before>..<sha>`), taken from PUSH_BEFORE_SHA (wired in ci.yml) or read
+//    straight out of $GITHUB_EVENT_PATH so forgetting to wire the env var
+//    cannot silently reopen the hole. Three-dot `origin/main...HEAD` is kept
+//    for `pull_request`, where it is the correct shape.
+//
+// 2. "CONTENT-BEARING UPDATE" WAS A LINE COUNT. The old
+//    `receiptWasMeaningfullyUpdated()` returned true when `git diff --numstat`
+//    reported insertions > 0. Nothing checked that the added lines were an
+//    entry, let alone a plausible one. The known-fabricated 2026-08-08 entry
+//    (see MEASUREMENT_RECEIPTS.md's own 2026-08-14 CORRECTION) sails through
+//    that test while citing a git SHA that does not exist in this repository
+//    and a Command field that literally says "(simulated local execution due
+//    to copyright restrictions)". FIXED: entries ADDED IN THE RANGE are now
+//    validated — see validateEntry() below. Entries already in history are
+//    never re-validated; this guard reports on what a change is adding, and
+//    retroactively failing the ledger's own honest correction entries would
+//    make the ledger unmaintainable.
+//
+// The boundary that REMAINS: a careful liar can still write a well-formed
+// entry citing a real SHA and an invented AUC. CI has no corpus and cannot
+// recompute it. What changed is that the cheap forgeries — no measurement at
+// all, a made-up SHA, an entry that admits it was simulated — now fail.
 //
 // ---------------------------------------------------------------------------
 // THE SCORING PATH — defined conservatively, reasoning documented inline.
@@ -101,8 +134,10 @@
 // ---------------------------------------------------------------------------
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { computeReachableSet } from './lib/import-graph.mjs';
 
 const ROOT = process.cwd();
 const RECEIPT_PATH = 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md';
@@ -147,15 +182,58 @@ function isSingleRefRange(range) {
   return !range.includes('..');
 }
 
-/** CI default: origin/main...HEAD (PR-shaped: only what HEAD added since it
- *  diverged from origin/main). Local default: diff against the merge-base
- *  with whichever of origin/main / main exists, so uncommitted work is
- *  included (a dev wants to know before committing, not after). Last resort:
- *  the previous commit. Returns null only when none of these resolve (e.g. a
- *  brand-new single-commit repo with no remote) — callers treat that as "no
- *  base to compare against, nothing to check" rather than an error. */
+const ZERO_SHA_RE = /^0{7,40}$/;
+
+/** The `before` SHA of a GitHub `push` event: the commit the branch pointed at
+ *  before this push. Preferred source is PUSH_BEFORE_SHA (wired explicitly in
+ *  ci.yml from `${{ github.event.before }}`); the $GITHUB_EVENT_PATH payload is
+ *  read as a fallback so that forgetting to wire the env var in a workflow does
+ *  NOT silently restore the empty-range hole this function exists to close. */
+function pushEventBeforeSha() {
+  const explicit = (process.env.PUSH_BEFORE_SHA ?? '').trim();
+  if (explicit) return explicit;
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (eventPath && existsSync(eventPath)) {
+    try {
+      const payload = JSON.parse(readFileSync(eventPath, 'utf8'));
+      if (typeof payload?.before === 'string' && payload.before.trim()) return payload.before.trim();
+    } catch {
+      // Unparseable payload is not worth crashing the job over; fall through.
+    }
+  }
+  return null;
+}
+
+/** CI, `push` event: the PUSHED range, `<before>..<sha>`. This is the fix for
+ *  the hole described at the top of this file — on a push to main,
+ *  `origin/main...HEAD` names the same commit twice and diffs nothing, so the
+ *  guard passed unconditionally on the branch that actually ships.
+ *
+ *  CI, `pull_request` event: `origin/main...HEAD` (three-dot, PR-shaped: only
+ *  what HEAD added since it diverged from origin/main).
+ *
+ *  Local: diff against whichever of origin/main / main exists, so uncommitted
+ *  work is included (a dev wants to know before committing, not after). Last
+ *  resort: the previous commit. Returns null only when nothing resolves — a
+ *  brand-new repo, or a first push that creates a branch with the all-zeros
+ *  `before` sentinel AND no origin/main to fall back on. Callers treat null as
+ *  "no base to compare against"; it is announced loudly rather than passed off
+ *  as a clean result. */
 function resolveDefaultRange() {
   if (process.env.CI) {
+    if (process.env.GITHUB_EVENT_NAME === 'push') {
+      const before = pushEventBeforeSha();
+      if (before && !ZERO_SHA_RE.test(before) && refExists(before)) {
+        const head = process.env.GITHUB_SHA && refExists(process.env.GITHUB_SHA)
+          ? process.env.GITHUB_SHA
+          : 'HEAD';
+        return `${before}..${head}`;
+      }
+      // All-zeros `before` = this push CREATED the ref, so there is no prior
+      // state on it. Everything the new branch adds relative to main is the
+      // honest range; fall through to it. (A first push that creates `main`
+      // itself has no base at all and lands on the null return below.)
+    }
     if (refExists('origin/main')) return 'origin/main...HEAD';
     // CI without a resolvable origin/main is a checkout misconfiguration
     // (shallow fetch, wrong ref) — fall through to the same local-style
@@ -185,76 +263,257 @@ function getChangedFiles(range) {
   return [...new Set(files)];
 }
 
-/** The receipt must gain content in this range, not merely appear in the
- *  diff — a whitespace-only or deletion-only touch doesn't count. Handles
- *  both a tracked modification (numstat insertions > 0) and a brand-new
- *  untracked receipt file in single-ref/local mode. */
-function receiptWasMeaningfullyUpdated(range) {
+/** Lines this range ADDS to the receipt file, '+' stripped. Handles a tracked
+ *  modification (unified=0 diff) and a brand-new untracked receipt in
+ *  single-ref/local mode (the whole file counts as added). */
+export function addedReceiptLines(range) {
+  const lines = [];
   try {
-    const out = git(['diff', '--numstat', range, '--', RECEIPT_PATH]).trim();
-    if (out) {
-      const added = Number(out.split('\n')[0].split('\t')[0]);
-      if (Number.isFinite(added) && added > 0) return true;
+    const out = git(['diff', '--unified=0', range, '--', RECEIPT_PATH]);
+    for (const line of out.split('\n')) {
+      if (line.startsWith('+++')) continue;
+      if (line.startsWith('+')) lines.push(line.slice(1));
     }
   } catch {
     // fall through to the untracked check below
   }
-  if (isSingleRefRange(range)) {
+  if (lines.length === 0 && isSingleRefRange(range)) {
     const status = git(['status', '--porcelain=v1', '--untracked-files=all']);
     for (const line of status.split('\n')) {
-      if (line.startsWith('??') && line.slice(3).trim() === RECEIPT_PATH) return true;
+      if (line.startsWith('??') && line.slice(3).trim() === RECEIPT_PATH) {
+        const abs = path.join(ROOT, RECEIPT_PATH);
+        if (existsSync(abs)) lines.push(...readFileSync(abs, 'utf8').split('\n'));
+      }
     }
   }
-  return false;
+  return lines;
 }
 
 // ---------------------------------------------------------------------------
-// Reachability: static import graph rooted at doctor.ts
+// Receipt entry validation
 // ---------------------------------------------------------------------------
+//
+// SCOPE, DELIBERATELY: only entries whose `### <date> …` heading appears among
+// the lines ADDED in this range are validated. History is never re-validated.
+// The ledger's own convention is that a bad entry is superseded by a dated
+// correction entry rather than edited away, so the file permanently contains
+// the 2026-08-08 fabrication AND the 2026-08-14 correction that dissects it —
+// quoting its simulated Command field and its nonexistent SHA. A validator
+// that re-scanned history would fail the build on the honesty work.
 
-// Matches: `import ... from '...'`, `import type ... from '...'`,
-// `export ... from '...'`, `import '...'`, and `import('...')`. Deliberately
-// simple (regex, not a real parser) — this repo consistently writes relative
-// imports with explicit extensions, and a missed edge only ever makes the
-// reachable set SMALLER (erring away from inclusion would be the dangerous
-// direction; see the resolveImport fallback below for how ambiguity is
-// handled instead).
-const IMPORT_RE = /(?:import|export)(?:\s+type)?\s+(?:[^'";]*?\bfrom\s+)?['"](\.[^'"]+)['"]|import\s*\(\s*['"](\.[^'"]+)['"]\s*\)/g;
+/** `### 2026-08-21 — …`, `### 2026-08-08 Receipt: …` — an entry heading is a
+ *  level-3 heading that starts with an ISO date. The §3 template placeholder
+ *  (`### <YYYY-MM-DD> — …`) deliberately does not match. */
+const ENTRY_HEADING_RE = /^###\s+(\d{4}-\d{2}-\d{2})\b(.*)$/;
 
-function resolveImport(fromRelFile, spec) {
-  const base = path.normalize(path.join(path.dirname(fromRelFile), spec)).replace(/\\/g, '/');
-  const candidates = [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`];
-  for (const c of candidates) {
-    const abs = path.join(ROOT, c);
-    if (existsSync(abs) && statSync(abs).isFile()) return c;
+/** Fields required by §3's template. Matched on the bolded label, tolerating
+ *  both `**Command:**` and `**Command**:` (the ledger contains both). */
+const REQUIRED_FIELDS = [
+  { label: 'Command', patterns: [/\*\*\s*Command\s*:?\s*\*\*/i] },
+  { label: 'Corpus fingerprint', patterns: [/\*\*\s*Corpus\s+fingerprint\s*:?\s*\*\*/i] },
+  { label: 'Runner attestation', patterns: [/\*\*\s*Runner\s+attestation\s*:?\s*\*\*/i] },
+  {
+    // A commit anchor: what tree was this measured against. `Git SHA` per the
+    // template, or `Baseline used` as the two 2026-08-21 output-identity
+    // entries write it (they compare against a `git archive origin/main` tree
+    // rather than measuring at HEAD).
+    label: 'Git SHA (or Baseline used)',
+    patterns: [/\*\*\s*Git\s+SHA\s*:?\s*\*\*/i, /\*\*\s*Baseline\s+used\s*:?\s*\*\*/i],
+  },
+];
+
+/** Fields that assert what was actually EXECUTED. Simulation language here is
+ *  not prose, it is the claim itself contradicting itself — the 2026-08-08
+ *  fabrication's Command field reads "(simulated local execution due to
+ *  copyright restrictions)". Prose fields elsewhere in an entry are NOT
+ *  scanned with this list, because honest entries legitimately reason about
+ *  what a weaker instrument "would be" (the 2026-08-21 W1/W2 entry argues
+ *  exactly that about AUC) — those get the narrower whole-entry list below. */
+const CLAIM_FIELD_LABELS = ['Command', 'Git SHA', 'Baseline used', 'Runner attestation', 'Attestation'];
+const CLAIM_FIELD_SIMULATION_RE = /\b(?:simulated|simulation|hypothetical(?:ly)?|estimated|approximated|extrapolated|would\s+be|not\s+actually\s+run|mocked)\b/i;
+
+/** Phrasings that cannot occur in an honest receipt anywhere in the entry.
+ *  Each is deliberately specific: `would be` alone is ordinary English, but
+ *  "would be 0.73" is a number nobody measured. */
+const ENTRY_SIMULATION_PATTERNS = [
+  { re: /simulated\s+(?:local\s+)?(?:execution|run|measurement)/i, why: 'the entry says the run was simulated' },
+  { re: /\bnot\s+actually\s+run\b/i, why: 'the entry says the measurement was not actually run' },
+  { re: /\bhypothetical(?:ly)?\s+(?:run|measurement|result|value|number|AUC)/i, why: 'the entry describes a hypothetical measurement' },
+  { re: /\bwould\s+(?:be|have\s+been)\s+(?:roughly\s+|approximately\s+|about\s+|~)?[0-9]/i, why: 'the entry states a number that was projected, not measured' },
+  { re: /\bestimated\s+(?:AUC|value|number|result)/i, why: 'the entry reports an estimate in place of a measurement' },
+];
+
+/** A whole-backtick span that is nothing but a git object id. Whole-span
+ *  matching (rather than scanning for hex substrings) is what keeps this from
+ *  firing on `--partition=test`, `1.0.0-rc.1`, or a hex-looking fragment of a
+ *  longer command. Requiring at least one digit drops English words that
+ *  happen to be spellable in a–f. */
+const BACKTICKED_SHA_RE = /`([0-9a-f]{7,40})`/g;
+const BARE_SHA_RE = /(?<![\w`])([0-9a-f]{7,40})(?![\w`])/g;
+const HAS_DIGIT_RE = /[0-9]/;
+
+/** A correction entry documents a bad SHA on purpose — the ledger's 2026-08-14
+ *  entry exists precisely to say "this SHA does not exist". Honor that within
+ *  a two-line window (the disclaimer routinely wraps onto the next line). */
+const SHA_DISCLAIMED_RE = /does\s+not\s+exist|nonexistent|non-existent|no\s+longer\s+exists|not\s+resolvable|unresolvable|could\s+not\s+get\s+object/i;
+
+function fieldValue(entryLines, label) {
+  const start = entryLines.findIndex((l) => new RegExp(`\\*\\*\\s*${label.replace(/\s+/g, '\\s+')}\\s*:?\\s*\\*\\*`, 'i').test(l));
+  if (start === -1) return null;
+  const out = [entryLines[start]];
+  for (let i = start + 1; i < entryLines.length; i++) {
+    // A new bolded bullet at any indent ends the field.
+    if (/^\s*[-*]\s+\*\*/.test(entryLines[i])) break;
+    out.push(entryLines[i]);
   }
-  return null;
+  return out.join('\n');
 }
 
-function computeReachableSet(rootRelFiles) {
+function collectCitedShas(entryLines) {
+  const found = [];
+  for (let i = 0; i < entryLines.length; i++) {
+    const line = entryLines[i];
+    const window = `${line}\n${entryLines[i + 1] ?? ''}`;
+    const disclaimed = SHA_DISCLAIMED_RE.test(window);
+    for (const m of line.matchAll(BACKTICKED_SHA_RE)) {
+      if (HAS_DIGIT_RE.test(m[1])) found.push({ sha: m[1], line: i, disclaimed });
+    }
+    // A Git SHA field may write the id unquoted; scan that field's lines too.
+    if (/\*\*\s*Git\s+SHA\s*:?\s*\*\*/i.test(line)) {
+      for (const m of line.matchAll(BARE_SHA_RE)) {
+        if (HAS_DIGIT_RE.test(m[1])) found.push({ sha: m[1], line: i, disclaimed });
+      }
+    }
+  }
   const seen = new Set();
-  const queue = [...rootRelFiles];
-  while (queue.length) {
-    const rel = queue.shift();
-    if (seen.has(rel)) continue;
-    seen.add(rel);
-    const abs = path.join(ROOT, rel);
-    if (!existsSync(abs) || !statSync(abs).isFile()) continue;
-    let src;
-    try {
-      src = readFileSync(abs, 'utf8');
-    } catch {
+  return found.filter((f) => (seen.has(f.sha) ? false : (seen.add(f.sha), true)));
+}
+
+function shaResolves(sha) {
+  try {
+    // stdio pinned to pipe: git writes "Not a valid object name" to stderr,
+    // which execFileSync would otherwise inherit straight into the CI log and
+    // make a passing run look broken.
+    execFileSync('git', ['cat-file', '-e', `${sha}^{object}`], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate one receipt entry. Returns a list of human-readable problems;
+ * empty means the entry is well-formed. `objectExists` is injectable so tests
+ * can exercise the SHA rule without depending on repository history.
+ */
+export function validateEntry(entry, { objectExists = shaResolves } = {}) {
+  const problems = [];
+  const body = entry.lines.join('\n');
+
+  for (const field of REQUIRED_FIELDS) {
+    if (!field.patterns.some((re) => re.test(body))) {
+      problems.push(`missing required field **${field.label}** (see §3's entry template)`);
+    }
+  }
+
+  for (const label of CLAIM_FIELD_LABELS) {
+    const value = fieldValue(entry.lines, label);
+    if (!value) continue;
+    const hit = CLAIM_FIELD_SIMULATION_RE.exec(value);
+    if (hit) {
+      problems.push(
+        `the **${label}** field contains "${hit[0]}" — a receipt records what was RUN. `
+        + 'If no measurement was run, say so plainly and explain what evidence stands in its place; '
+        + 'do not describe a simulated run as a measurement.',
+      );
+    }
+  }
+
+  for (const { re, why } of ENTRY_SIMULATION_PATTERNS) {
+    const hit = re.exec(body);
+    if (hit) problems.push(`${why} ("${hit[0].trim()}")`);
+  }
+
+  for (const { sha, disclaimed } of collectCitedShas([entry.heading, ...entry.lines])) {
+    if (disclaimed) continue;
+    if (!objectExists(sha)) {
+      problems.push(
+        `cites git object \`${sha}\`, which does not exist in this repository. `
+        + 'A receipt must name a commit a reviewer can check out. (This is the tell that '
+        + 'exposed the 2026-08-08 fabrication.)',
+      );
+    }
+  }
+
+  return problems;
+}
+
+/** Group added lines into entries. Only a `### <ISO date>` line starts one;
+ *  anything added before the first such line belongs to no entry and is
+ *  ignored (it is prose, a §-header, or a template edit). */
+export function extractEntries(lines) {
+  const entries = [];
+  let current = null;
+  for (const line of lines) {
+    const m = ENTRY_HEADING_RE.exec(line.trim());
+    if (m) {
+      current = { date: m[1], heading: line.trim(), lines: [] };
+      entries.push(current);
       continue;
     }
-    for (const m of src.matchAll(IMPORT_RE)) {
-      const spec = m[1] ?? m[2];
-      if (!spec) continue;
-      const resolved = resolveImport(rel, spec);
-      if (resolved && !seen.has(resolved)) queue.push(resolved);
-    }
+    if (current) current.lines.push(line);
   }
-  return seen;
+  return entries;
 }
+
+/**
+ * The receipt requirement for a range: at least one new, well-formed entry.
+ * Returns { ok, problems }.
+ *
+ * `structuralOnly: true` keeps the "a new dated entry must exist" requirement
+ * but skips per-entry content validation. That mode exists for ONE caller:
+ * release.yml, which checks a whole release window (previous v* tag → this
+ * tag) rather than a single change. Content validation is a property of the
+ * moment an entry is written — an honest entry cites the branch SHA it was
+ * measured at, and after that branch is squash-merged the SHA is no longer in
+ * the repository at all (verified: the 2026-08-04 craft-spec and 2026-08-07
+ * pilot entries both cite SHAs that no longer resolve, and both are honest).
+ * Re-validating them months later manufactures failures on exactly the
+ * carefully-written receipts this guard is meant to encourage. Entry content
+ * is validated where it can be validated: in CI, on the range that adds it.
+ */
+export function checkReceiptForRange(range, opts = {}) {
+  const { structuralOnly = false, ...entryOpts } = opts;
+  const added = addedReceiptLines(range).filter((l) => l.trim() !== '');
+  if (added.length === 0) {
+    return { ok: false, problems: [`${RECEIPT_PATH} gained no content in this range.`] };
+  }
+  const entries = extractEntries(addedReceiptLines(range));
+  if (entries.length === 0) {
+    return {
+      ok: false,
+      problems: [
+        `${RECEIPT_PATH} changed in this range but gained no new entry. An entry starts with `
+        + 'a level-3 heading naming its date, e.g. `### 2026-08-21 — <reason>`. Appending lines '
+        + 'to an existing entry is not a receipt for a new scoring change.',
+      ],
+    };
+  }
+  if (structuralOnly) return { ok: true, problems: [] };
+  const problems = [];
+  for (const entry of entries) {
+    for (const p of validateEntry(entry, entryOpts)) problems.push(`${entry.heading}\n      ${p}`);
+  }
+  return { ok: problems.length === 0, problems };
+}
+
+// Reachability (the static import walk rooted at doctor.ts) lives in
+// scripts/lib/import-graph.mjs — shared with scripts/check-no-console.mjs so
+// the two gates cannot drift into disagreeing about what "wired in" means.
 
 // ---------------------------------------------------------------------------
 // Classification
@@ -287,16 +546,26 @@ function classify(relPathRaw, reachable) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const explicitRange = process.argv[2];
+  const args = process.argv.slice(2);
+  const structuralOnly = args.includes('--structural-only');
+  const explicitRange = args.find((a) => !a.startsWith('--'));
   const range = explicitRange || resolveDefaultRange();
 
   if (!range) {
-    console.log('check-scoring-receipt: no base ref to diff against (no origin/main, main, or prior commit) — nothing to check.');
+    // Loud, not casual: "nothing to check" is what the old empty-range bug
+    // printed on every push to main. If this line appears in a CI log on a
+    // normal run, the checkout is misconfigured, not clean.
+    console.log(
+      'check-scoring-receipt: NO BASE REF to diff against (no push range, no origin/main, no main, '
+      + 'no prior commit) — nothing could be checked. This is not a pass; it is an absent check. '
+      + 'On CI this means the checkout lacks history (needs fetch-depth: 0) or the event payload '
+      + 'was unavailable.',
+    );
     process.exit(0);
   }
 
   const changed = getChangedFiles(range);
-  const reachable = computeReachableSet(REACHABILITY_ROOTS);
+  const reachable = computeReachableSet(ROOT, REACHABILITY_ROOTS);
 
   const scoringHits = [];
   for (const f of changed) {
@@ -309,13 +578,20 @@ function main() {
     process.exit(0);
   }
 
-  const receiptOk = receiptWasMeaningfullyUpdated(range);
+  const receipt = checkReceiptForRange(range, { structuralOnly });
 
-  console.log(`check-scoring-receipt: range "${range}" — ${scoringHits.length} scoring-path file(s) changed:`);
+  console.log(
+    `check-scoring-receipt: range "${range}"${structuralOnly ? ' [--structural-only: entry content not re-validated]' : ''}`
+    + ` — ${scoringHits.length} scoring-path file(s) changed:`,
+  );
   for (const h of scoringHits) console.log(`  - ${h.file}  (${h.reason})`);
 
-  if (receiptOk) {
-    console.log(`\n${RECEIPT_PATH} was updated with added content in the same range. OK.`);
+  if (receipt.ok) {
+    console.log(
+      structuralOnly
+        ? `\n${RECEIPT_PATH} gained a new entry in the same range. OK (content was validated by CI on the range that added it).`
+        : `\n${RECEIPT_PATH} gained a well-formed new entry in the same range. OK.`,
+    );
     process.exit(0);
   }
 
@@ -323,11 +599,14 @@ function main() {
     [
       '',
       '='.repeat(72),
-      'SCORING-PATH CHANGE WITHOUT A MEASUREMENT RECEIPT',
+      'SCORING-PATH CHANGE WITHOUT A VALID MEASUREMENT RECEIPT',
       '='.repeat(72),
       '',
       'A file on the scoring path changed in this range, but',
-      `${RECEIPT_PATH} did not gain a new entry in the same range.`,
+      `${RECEIPT_PATH} did not gain a valid new entry in the same range.`,
+      '',
+      'What is wrong with the receipt:',
+      ...receipt.problems.map((p) => `  - ${p}`),
       '',
       'The CI corpus cannot verify the AUC value — it never has the corpus text',
       '(local-only, copyright-restricted). What it CAN verify is that a human ran',
@@ -339,9 +618,17 @@ function main() {
       '     (or, for the full P1 partition sweep:',
       '       CORPUS_DIR=/path/to/corpus node scripts/measure-auc-split.mjs --partition=test)',
       `  2. Append a new entry to ${RECEIPT_PATH} using its §3 template —`,
-      '     date, git SHA, exact command, measured AUC-24 (and any flag-run',
-      '     AUCs), corpus fingerprint, and a runner attestation line.',
+      '     a `### <YYYY-MM-DD> — <reason>` heading, then date, git SHA (or the',
+      '     baseline tree compared against), exact command, measured AUC-24 (and',
+      '     any flag-run AUCs), corpus fingerprint, and a Runner attestation line.',
       '  3. Commit the receipt alongside the scoring change (same range).',
+      '',
+      'The entry must describe a run that HAPPENED: the SHA it cites has to exist',
+      'in this repository, and its Command/attestation fields must not describe a',
+      'simulated, hypothetical, or estimated measurement. If your change genuinely',
+      'moves no score, say that plainly and cite the evidence that shows it (the',
+      'two 2026-08-21 output-identity entries are the worked example) — an honest',
+      '"no measurement, here is why" entry passes; a fabricated measurement does not.',
       '',
       'If this change does not actually affect scoring (a comment, a type-only',
       'refactor, a doc string), consider whether the touched file truly belongs',
@@ -354,4 +641,10 @@ function main() {
   process.exit(1);
 }
 
-main();
+// Run only when invoked as a script — tests/core/scoring-receipt-guard.test.ts
+// imports validateEntry/extractEntries/resolveDefaultRange from this file.
+const invokedDirectly = Boolean(process.argv[1])
+  && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+if (invokedDirectly) main();
+
+export { resolveDefaultRange, classify, getChangedFiles, RECEIPT_PATH };
