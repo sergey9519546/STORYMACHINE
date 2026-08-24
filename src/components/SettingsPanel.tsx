@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useId } from "react";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
+import { nextRovingIndex } from "../lib/roving-tabindex";
 import {
   GENRE_OPTIONS,
   TONE_OPTIONS,
@@ -57,6 +58,10 @@ interface SettingsPanelProps {
 
 type Tab = "llm" | "image" | "tts" | "embeddings" | "story" | "providers" | "session" | "labs";
 
+// The tab strip's order, in one place: the rendering map's key order IS the
+// visual order, and the keyboard pattern below needs the same order as an
+// array to move by index. Deriving it (rather than writing the list twice)
+// means a tab added to TAB_LABELS is automatically reachable by arrow key.
 const TAB_LABELS: Record<Tab, string> = {
   providers:  "Providers",
   llm:        "Text LLM",
@@ -67,6 +72,8 @@ const TAB_LABELS: Record<Tab, string> = {
   session:    "Session",
   labs:       "Labs",
 };
+
+const TAB_ORDER = Object.keys(TAB_LABELS) as Tab[];
 
 // ── Story-axis config (server-persisted, saves immediately per control) ──────
 // Mirrors GET /api/story-config's response shape (server/routes/config.ts).
@@ -821,6 +828,25 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
   const dialogRef = useRef<HTMLDivElement | null>(null);
   useModalFocusTrap(dialogRef);
   const [activeTab, setActiveTab] = useState<Tab>("providers");
+  // One DOM node per tab, so an arrow key can move real focus and not just
+  // the selected state — a roving tabindex that never calls .focus() looks
+  // right in the markup and does nothing for the person pressing the key.
+  const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+
+  /** Arrow/Home/End on a tab: select the target tab and move focus onto it.
+   *  Keys this pattern does not own (Tab, Enter, Space, typing) fall through
+   *  untouched — nextRovingIndex returns null for them, and nothing is
+   *  preventDefault-ed, so Tab still leaves the strip and the browser's own
+   *  button activation still works. preventDefault matters for Home/End,
+   *  which would otherwise scroll the dialog while "moving" the tab. */
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = nextRovingIndex(e.key, index, TAB_ORDER.length);
+    if (next === null) return;
+    e.preventDefault();
+    const target = TAB_ORDER[next];
+    setActiveTab(target);
+    tabRefs.current[target]?.focus();
+  };
   const [cfg, setCfg]             = useState<AiConfig | null>(null);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -946,16 +972,26 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
           </div>
         ) : (
           <>
-            {/* Tabs */}
+            {/* Tabs — WAI-ARIA tabs pattern, keyboard included (E5 shipped
+                the roles and shelved the key handling; this is that half).
+                The strip is ONE Tab stop: only the selected tab carries
+                tabIndex 0, the rest are -1, so Tab moves past the whole strip
+                into the panel instead of making a keyboard user press it
+                eight times to get anywhere. Left/Right move (and select, per
+                APG's automatic-activation guidance — every panel here is
+                local state, nothing to fetch), Home/End jump to the ends. */}
             <div className="flex border-b-4 border-black" role="tablist" aria-label="Settings sections">
-              {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
+              {TAB_ORDER.map((tab, index) => (
                 <button
                   key={tab}
                   id={`settings-tab-${tab}`}
+                  ref={(el) => { tabRefs.current[tab] = el; }}
                   role="tab"
                   aria-selected={activeTab === tab}
                   aria-controls={`settings-panel-${tab}`}
+                  tabIndex={activeTab === tab ? 0 : -1}
                   onClick={() => setActiveTab(tab)}
+                  onKeyDown={(e) => handleTabKeyDown(e, index)}
                   className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === tab
                       ? "sm-btn--ink"

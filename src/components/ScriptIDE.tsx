@@ -2967,6 +2967,15 @@ export default function ScriptIDE({
                 editorRef.current?.navigateTo(line1);
                 // Keep coverage open; user is deciding/acting on the page
               }}
+              onNavigateToFinding={(startLine, endLine) => {
+                // Same handle, same behavior as the full doctor panel's
+                // finding clicks below: scroll to the span AND flash it, so
+                // "jump to line" from Coverage lands the writer's eye on the
+                // lines rather than only their cursor. Coverage stays open —
+                // unchanged from the plain-navigate wiring above, which this
+                // supersedes wherever both are wired.
+                editorRef.current?.highlightRange(startLine, endLine);
+              }}
               onOpenFullReport={() => setCoverageFull(true)}
               onClose={() => {
                 setDoctorAutoSample(false);

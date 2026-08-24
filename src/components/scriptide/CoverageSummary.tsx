@@ -14,6 +14,7 @@ import {
   doctorProgressLabel,
   DOCTOR_STREAM_TOTAL_PASSES,
   type DoctorStreamProgress,
+  type DoctorReportWithAnchors,
 } from "../../lib/doctor-stream.ts";
 
 interface CoverageSummaryProps {
@@ -25,7 +26,18 @@ interface CoverageSummaryProps {
    *  clear the stale flag or install a sample over edits made during flight. */
   getDraftGeneration?: () => number;
   onOpenFullReport: () => void;
+  /** Plain cursor move, no highlight — the original "Jump to line" wiring.
+   *  Kept as the fallback for a host that has not wired
+   *  {@link CoverageSummaryProps.onNavigateToFinding}; when both are present
+   *  the highlighting one wins. */
   onJumpToLine?: (line1Based: number) => void;
+  /** Scroll to a finding's 1-based inclusive line span AND flash-highlight it
+   *  — FountainEditorHandle.highlightRange, the same path E2 gave the full
+   *  doctor panel's findings. Coverage's own "Jump to line" button predates
+   *  that work and was still calling the plain cursor-move above, so the same
+   *  click landed differently depending on which of the two panels the writer
+   *  clicked it in. Now it doesn't. */
+  onNavigateToFinding?: (startLine: number, endLine: number) => void;
   onLoadSampleIntoEditor?: (text: string) => void;
   onClose: () => void;
   onFreshReport?: () => void;
@@ -53,6 +65,7 @@ export default function CoverageSummary({
   getDraftGeneration,
   onOpenFullReport,
   onJumpToLine,
+  onNavigateToFinding,
   onLoadSampleIntoEditor,
   onClose,
   onFreshReport,
@@ -60,7 +73,11 @@ export default function CoverageSummary({
 }: CoverageSummaryProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [report, setReport] = useState<ScriptDoctorReport | null>(null);
+  // DoctorReportWithAnchors, not the bare ScriptDoctorReport: the route
+  // attaches `locatedIssues` to every doctor response (server/routes/
+  // scriptide.ts), and the jump button below reads them to resolve the top
+  // priority's prose location to the span the server already computed for it.
+  const [report, setReport] = useState<DoctorReportWithAnchors | null>(null);
   const [usingSample, setUsingSample] = useState(false);
   // P2 (Phase E punch list): live per-pass progress for the streamed run —
   // null while no streamed run is in flight, matching ScriptDoctorPanel's
@@ -246,14 +263,44 @@ export default function CoverageSummary({
   const top = report?.topPriorities?.[0];
   const root = report?.rootCauses?.[0];
   const reportIsComplete = report ? isWholeDraftAnalysisComplete(report) : false;
-  const jumpLine =
-    root?.startLine ??
-    (typeof top?.location === "string"
-      ? (() => {
-          const m = top.location.match(/Lines?\s+(\d+)/i) || top.location.match(/Line\s+(\d+)/i);
-          return m ? Number(m[1]) : undefined;
-        })()
-      : undefined);
+  // The span the "Jump to line" button targets. A root cause already carries
+  // one (its member issues' combined scene span); a topPriority carries only
+  // the free-form location string a revision pass wrote, so parse the
+  // "Lines N-M" / "Line N" shape out of it — both endpoints now, not just the
+  // first, so a multi-line finding highlights the lines it actually covers
+  // instead of one arbitrary line of them. A location with no line numbers
+  // (scene-, act- or document-level) yields no span and no button, exactly as
+  // before. Both endpoints are clamped editor-side by highlightRange, so a
+  // span computed against text the writer has since edited cannot throw.
+  //
+  // Three sources, in the order that matches what the card actually says.
+  // The card leads with the TOP PRIORITY's description, so its own anchor
+  // comes first: the server already resolved every issue's prose location to
+  // a span (report.locatedIssues, attached at the route) using the honest
+  // four-tier anchoring in server/nvm/analyze/locate.ts — scene, lines,
+  // character, or document (no span). Reading that map is what makes the
+  // button appear for the ordinary case of a scene-level top priority
+  // ("Scene 9 (climax peak)"), which the old line-number regex could never
+  // resolve and which therefore showed no jump button at all. The root
+  // cause's own span is the fallback, and the regex parse is the last resort
+  // for a report shape that predates locatedIssues.
+  const jumpSpan: { startLine: number; endLine: number } | undefined = (() => {
+    if (typeof top?.location === "string") {
+      const located = report?.locatedIssues?.find(
+        (l) => l.issue.location === top.location && l.startLine !== undefined && l.endLine !== undefined,
+      );
+      if (located) return { startLine: located.startLine!, endLine: located.endLine! };
+    }
+    if (root?.startLine != null) {
+      return { startLine: root.startLine, endLine: root.endLine ?? root.startLine };
+    }
+    if (typeof top?.location !== "string") return undefined;
+    const m = top.location.match(/Lines?\s+~?(\d+)(?:\s*[-–—]\s*~?(\d+))?/i);
+    if (!m) return undefined;
+    const start = Number(m[1]);
+    const end = m[2] ? Number(m[2]) : start;
+    return { startLine: Math.min(start, end), endLine: Math.max(start, end) };
+  })();
 
   const nextLabel =
     top?.description?.slice(0, 140) ||
@@ -479,13 +526,17 @@ export default function CoverageSummary({
                 </p>
               )}
               <div className="mt-4 flex flex-wrap gap-2">
-                {jumpLine != null && onJumpToLine && (
+                {jumpSpan && (onNavigateToFinding || onJumpToLine) && (
                   <button
                     type="button"
-                    onClick={() => onJumpToLine(jumpLine)}
+                    onClick={() =>
+                      onNavigateToFinding
+                        ? onNavigateToFinding(jumpSpan.startLine, jumpSpan.endLine)
+                        : onJumpToLine?.(jumpSpan.startLine)
+                    }
                     className="sm-btn sm-btn--stamp"
                   >
-                    Jump to line {jumpLine}
+                    Jump to line {jumpSpan.startLine}
                     <ArrowRight className="h-3 w-3" aria-hidden="true" />
                   </button>
                 )}

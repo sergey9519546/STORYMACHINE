@@ -53,6 +53,11 @@ import {
   type DoctorStreamProgress,
   type DoctorReportWithAnchors,
 } from "../../lib/doctor-stream.ts";
+import {
+  pairFindingSceneIndexes,
+  collectFindingIdentities,
+  diffFindingIdentities,
+} from "../../lib/finding-identity.ts";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -232,16 +237,35 @@ function humanizeRule(rule: string): string {
   return rule.replace(/_/g, " ").toLowerCase();
 }
 
-/** E2: a stable-ish identity for one reported issue — the pass that raised
- *  it, its rule, and the pass's own free-form `location` string (e.g.
- *  "Scene 3 (INT. BAR)"), NOT the resolved line numbers (those can drift
- *  when unrelated text elsewhere in the draft shifts line counts, which
- *  would make a genuinely unchanged finding look "cleared" and "new" at
- *  once). Used only for the session-only findings-cleared/new delta below —
- *  a plain set-membership diff over these strings, deliberately simple
- *  rather than a fuzzy match. */
-function issueIdentity(pass: PassName, issue: RevisionIssue): string {
-  return `${pass}::${issue.rule}::${issue.location}`;
+// ─── E2: finding identity for the cleared/new delta ──────────────────────────
+// The identity function this file used to define inline (`pass::rule::
+// location`, with `location` taken verbatim) now lives in
+// ../../lib/finding-identity.ts — same move, and the same reason, as E1's
+// streamDoctorProgress above. It was NOT just relocated: the raw location is
+// often an absolute line number ("Lines 40-42"), so one inserted line in an
+// early scene renamed every later finding and the delta reported a draft
+// nobody had touched as "10 cleared · 9 new". The shared module resolves
+// scene and line references to the scene HEADING they fall in before
+// comparing, and keeps the raw string wherever it cannot. See that file's
+// header for the full behavior, including what it deliberately does not
+// attempt (no fuzzy matching) and the resolution the delta copy below must
+// keep describing honestly.
+
+/** The exact Fountain text a displayed report analyzed, or null when the
+ *  client never received it. fdx/pdf reports carry the server's own
+ *  conversion (`source.convertedFountain`); a plain fountain/sample run is
+ *  whatever snapshot was taken when the request went out. Same precedence as
+ *  `fixSourceText` further down, which answers the same question for the fix
+ *  route — kept as a standalone function because the delta needs it for the
+ *  PREVIOUS report too, not only the displayed one. */
+function analyzedFountainOf(
+  report: DoctorReportWithAnchors | null,
+  snapshot: { fountain?: string; fdx?: string } | null,
+): string | null {
+  if (!report) return null;
+  const format = report.source?.format;
+  if (format === "fdx" || format === "pdf") return report.source?.convertedFountain ?? null;
+  return snapshot?.fountain ?? null;
 }
 
 /** Severity → chip classes for the root-cause card's severity badge — reuses
@@ -1793,6 +1817,14 @@ export default function ScriptDoctorPanel({
   // real deep-read request, not just because the toggle happens to be checked
   // right now (the toggle can change after a run started).
   const [lastRunMode, setLastRunMode] = useState<"quick" | "deep">("quick");
+  // Which of the three doctor routes the IN-FLIGHT or MOST RECENT run went
+  // to. `lastRunMode` above answers "was this a deep read"; this answers
+  // "what can the writer actually be told about it", and the two are not the
+  // same question — a pdf run is quick-mode but has no per-pass stream, and a
+  // deep run has neither a stream nor a server-side cancel. The loading copy
+  // and the Cancel affordance below both key off this so neither can describe
+  // a capability the route in flight does not have.
+  const [lastRunRoute, setLastRunRoute] = useState<"stream" | "deep" | "pdf">("stream");
   // Live progress for the in-flight streamed run (E1, 2026-08-21) — null
   // while idle, while a deep-read/pdf run is in flight (those don't stream),
   // or once the run has settled. See streamDoctorProgress/
@@ -2069,6 +2101,7 @@ export default function ScriptDoctorPanel({
     const useDeepRead = deepReadEnabled && !isPdf;
     const effectiveMode: "quick" | "deep" = useDeepRead ? "deep" : "quick";
     setLastRunMode(effectiveMode);
+    setLastRunRoute(isPdf ? "pdf" : useDeepRead ? "deep" : "stream");
 
     // Route selection: pdf and deep-read stay on their existing one-shot JSON
     // routes (a pdf run composes conversion+doctor server-side in one
@@ -2142,13 +2175,22 @@ export default function ScriptDoctorPanel({
         // (the two lineages aren't comparable — same rule DraftDeltaStrip's
         // CrossVersionNotice already applies to the health/verdict numbers).
         if (report && lastRunMode === effectiveMode) {
-          const prevIds = new Set(report.passes.flatMap((p) => p.issues.map((iss) => issueIdentity(p.pass, iss))));
-          const currIds = new Set(data.passes.flatMap((p) => p.issues.map((iss) => issueIdentity(p.pass, iss))));
-          let cleared = 0;
-          for (const id of prevIds) if (!currIds.has(id)) cleared++;
-          let added = 0;
-          for (const id of currIds) if (!prevIds.has(id)) added++;
-          setFindingsDelta({ cleared, added });
+          // Each side is anchored against the text IT analyzed — the previous
+          // report against the snapshot taken when that run went out, this
+          // one against the text just submitted. Using one document's scene
+          // index for both would defeat the point: the whole reason the
+          // previous run's line numbers no longer line up is that the draft
+          // moved underneath them.
+          const [prevIndex, currIndex] = pairFindingSceneIndexes(
+            analyzedFountainOf(report, analyzedSnapshot),
+            analyzedFountainOf(data, snapshotForThisRun),
+          );
+          setFindingsDelta(
+            diffFindingIdentities(
+              collectFindingIdentities(report.passes, prevIndex),
+              collectFindingIdentities(data.passes, currIndex),
+            ),
+          );
         } else {
           setFindingsDelta(null);
         }
@@ -2232,14 +2274,22 @@ export default function ScriptDoctorPanel({
       });
   };
 
-  /** The Cancel button in the loading state (E1, 2026-08-21): stops the
-   *  in-flight diagnosis for real, not just the client's wait for it. The
-   *  aborted fetch closes the connection, which fires the server's res
-   *  'close' handler (server/routes/scriptide.ts's requestAbortSignal),
-   *  which resolves the AbortSignal doctor-pool.ts's runScriptDoctorOffThread
-   *  was given — the pool terminates the busy worker outright and frees the
-   *  slot immediately, so the very next request is served with a clean
-   *  server, not queued behind abandoned work. */
+  /** The Cancel button in the loading state (E1, 2026-08-21). On the streamed
+   *  and pdf routes it stops the in-flight diagnosis for real, not just the
+   *  client's wait for it: the aborted fetch closes the connection, which
+   *  fires the server's res 'close' handler (server/routes/scriptide.ts's
+   *  requestAbortSignal), which resolves the AbortSignal doctor-pool.ts's
+   *  runScriptDoctorOffThread was given — the pool terminates the busy worker
+   *  outright and frees the slot immediately, so the very next request is
+   *  served with a clean server, not queued behind abandoned work.
+   *
+   *  On the DEEP-READ route it does not, and the button says so (see the
+   *  loading state's label/title, keyed off lastRunRoute). /doctor/deep runs
+   *  runScriptDoctor in-process with an LLM fan-out that has no cancellation
+   *  seam reachable from the route, so an abort here ends this page's wait
+   *  and leaves the provider calls to finish. Building real deep-read
+   *  cancellation is a server change, not a copy change; until someone makes
+   *  it, the copy is what keeps this honest. */
   const cancelDiagnosis = () => {
     userCancelledRef.current = true;
     abortRef.current?.abort();
@@ -3191,10 +3241,23 @@ export default function ScriptDoctorPanel({
             <p className="text-xs uppercase tracking-widest text-gray-500" role="status" aria-live="polite">
               {streamProgress
                 ? doctorProgressLabel(streamProgress)
-                : lastRunMode === "deep"
-                ? "Reading each scene's meaning with AI, then running 14 passes…"
+                : lastRunRoute === "deep"
+                ? "Deep read — contacting your AI provider…"
+                : lastRunRoute === "pdf"
+                ? "Reading the PDF, then running 14 passes…"
                 : "Running 14 passes…"}
             </p>
+            {/* Deep read has no progress stream to report: it fans out one
+                LLM call per scene inside the request and answers once, so
+                there is nothing between "sent" and "done" to show. Saying
+                that plainly beats an animated bar that would be inventing
+                its own numbers. */}
+            {lastRunRoute === "deep" && (
+              <p className="mt-2 text-[10px] font-mono text-gray-500 dark:text-gray-400 leading-snug max-w-xs mx-auto">
+                One request per scene, then the 14 passes. This route answers once, at the
+                end — there are no progress updates to show along the way.
+              </p>
+            )}
             {/* Only the streamed (quick, non-deep, non-pdf) path has a real
                 per-pass count to show — deep-read/pdf runs still show the
                 indeterminate spinner above with no bar. */}
@@ -3225,13 +3288,34 @@ export default function ScriptDoctorPanel({
               >
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Diagnosing&hellip;
               </button>
+              {/* Two different buttons wearing one icon, and the difference
+                  is not cosmetic. On the streamed and pdf routes the abort
+                  reaches the server: closing the connection fires the route's
+                  res 'close' handler, which aborts the signal the doctor pool
+                  was given, which terminates the worker mid-analysis. The
+                  deep-read route has no such path — it fans LLM calls out
+                  inside one request with no cancellation seam — so aborting
+                  there stops this browser waiting and nothing else. The label
+                  and the tooltip both change to say which one the writer is
+                  actually getting. */}
               <button
                 onClick={cancelDiagnosis}
-                aria-label="Cancel this diagnosis"
-                title="Stop the analysis running on the server right now and free it up for the next request"
+                aria-label={
+                  lastRunRoute === "deep"
+                    ? "Stop waiting for this deep read"
+                    : "Cancel this diagnosis"
+                }
+                title={
+                  lastRunRoute === "deep"
+                    ? "Stops this page waiting for the deep read. The scene reads already sent to your AI provider run to completion on the server — this does not call them back."
+                    : lastRunRoute === "pdf"
+                    ? "Stops the analysis on the server and frees it for the next request. The PDF-to-text conversion, if it is still running, finishes first."
+                    : "Stop the analysis running on the server right now and free it up for the next request"
+                }
                 className="px-4 py-3 text-xs font-bold uppercase tracking-widest sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center justify-center gap-2 shrink-0"
               >
-                <X className="w-4 h-4" aria-hidden="true" /> Cancel
+                <X className="w-4 h-4" aria-hidden="true" />{" "}
+                {lastRunRoute === "deep" ? "Stop waiting" : "Cancel"}
               </button>
             </div>
           </div>
@@ -3420,26 +3504,38 @@ export default function ScriptDoctorPanel({
             {/* E2: finding continuity across runs — a plain count, computed by
                 runDiagnosis's success handler against whatever report was on
                 screen immediately before this one (session-only; see
-                issueIdentity's doc comment). Null (not zeroed) on the first
+                ../../lib/finding-identity.ts). Null (not zeroed) on the first
                 run this panel has made, or across a quick/deep mode switch,
-                so it never claims a comparison that wasn't actually made. */}
+                so it never claims a comparison that wasn't actually made.
+                The second line names the matching resolution out loud: notes
+                are matched by rule and by the scene they land in, so this
+                count stays still when an edit merely shifts line numbers —
+                and so a reader is never left to assume a finer comparison
+                than the one that was made. */}
             {findingsDelta && (
-              <p className="text-[11px] font-mono uppercase tracking-widest text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 px-3 py-2">
-                {findingsDelta.cleared === 0 && findingsDelta.added === 0 ? (
-                  "No change in findings since your last run."
-                ) : (
-                  <>
-                    <span className="text-green-600 dark:text-green-400 font-bold">
-                      {findingsDelta.cleared} finding{findingsDelta.cleared === 1 ? "" : "s"} cleared
-                    </span>
-                    {" · "}
-                    <span className="text-amber-600 dark:text-amber-400 font-bold">
-                      {findingsDelta.added} new
-                    </span>
-                    {" since your last run"}
-                  </>
-                )}
-              </p>
+              <div className="text-[11px] font-mono text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 px-3 py-2">
+                <p className="uppercase tracking-widest">
+                  {findingsDelta.cleared === 0 && findingsDelta.added === 0 ? (
+                    "No change in findings since your last run."
+                  ) : (
+                    <>
+                      <span className="text-green-600 dark:text-green-400 font-bold">
+                        {findingsDelta.cleared} finding{findingsDelta.cleared === 1 ? "" : "s"} cleared
+                      </span>
+                      {" · "}
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">
+                        {findingsDelta.added} new
+                      </span>
+                      {" since your last run"}
+                    </>
+                  )}
+                </p>
+                <p className="mt-1 text-[10px] normal-case tracking-normal text-gray-500 dark:text-gray-400 leading-snug">
+                  Notes are matched by rule and by the scene they fall in, not by line
+                  number — so editing one scene doesn&rsquo;t churn the count for the rest
+                  of the draft.
+                </p>
+              </div>
             )}
 
             {/* Plain-language summary — a readable paragraph a writer with no

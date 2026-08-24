@@ -708,8 +708,43 @@ router.post(
       return;
     }
 
-    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-    const report = await runScriptDoctor(converted.fountain);
+    // Off-thread, exactly like /doctor and /doctor/stream (lane W1; see
+    // server/nvm/analyze/doctor-pool.ts). This route was the last quick-read
+    // entry point still calling runScriptDoctor on the main thread — and the
+    // worst one to leave there: a PDF is how a feature-length screenplay
+    // actually arrives (a 120-page import is the common case, not the
+    // pathological one), so the in-process call held the event loop, and
+    // therefore every other user's request, for the entire analysis. The
+    // conversion above (pdfToFountain) is genuinely I/O-ish and yields, so it
+    // was never the stall; the doctor is the pure-CPU half, and that is the
+    // half this moves. runScriptDoctorOffThread is contract-identical (same
+    // report, same LRU cache, same errors) and falls back to in-process
+    // execution where workers can't run. The request's own abort signal is
+    // threaded through for the same reason /doctor threads it: a client that
+    // navigates away (or a fetch the panel aborts on Cancel) terminates the
+    // busy worker instead of leaving abandoned work to finish at the next
+    // user's expense.
+    //
+    // Deep read is the one path that deliberately stays in-process — see
+    // doctor-pool.ts's header. This route never asks for it (no deepRead
+    // option below), so nothing here is affected by that carve-out.
+    const { runScriptDoctorOffThread } = await import('../nvm/analyze/doctor-pool.ts');
+    let report: ScriptDoctorReport;
+    try {
+      report = await runScriptDoctorOffThread(converted.fountain, undefined, {
+        signal: requestAbortSignal(res),
+      });
+    } catch (err) {
+      // The only thing that aborts this signal is the client disconnecting
+      // (requestAbortSignal fires on res 'close' with the response unsent),
+      // so there is no longer anyone to answer and nothing to report as a
+      // fault — same reasoning /doctor/stream's catch documents. Falling
+      // through to asyncHandler's 500 path instead would log an error-level
+      // event for an ordinary Cancel click and then try to write a response
+      // onto a socket that is already gone. Any other failure still throws.
+      if (err instanceof Error && err.name === 'AbortError') return;
+      throw err;
+    }
     const source: DoctorSource = {
       format: 'pdf',
       convertedFountain: converted.fountain,
