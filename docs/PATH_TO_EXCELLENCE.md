@@ -1,12 +1,52 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-08-21, main @ a541460: Phases W and E are COMPLETE and
-Phase S's code lanes are DONE** — all six W lanes, all five E lanes, the
-judged E exit gate (met after one honest NOT-MET round), S1–S3 landed, and
-the first release (`1.0.0-rc.1`, Docker image published via the Release
-workflow). What remains is genuinely human-side: Phase S's owner
-deployment items and stranger-week pilot, Phase P's measurement lanes, and
-Phase T's owner-machine items. Successor to `PATH_TO_DONE.md`'s
+**State as of 2026-08-24, main @ 9a5783cb: Phases W and E are COMPLETE,
+Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
+— all six W lanes, all five E lanes, the judged E exit gate (met after one
+honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
+published via the Release workflow), and P-1/P-2/P-3 evidence. What remains
+is genuinely human-side: Phase S's owner deployment items and stranger-week
+pilot, the owner-corpus measurement runs the P lanes specify, and Phase T's
+owner-machine items.
+
+**2026-08-24 session — five landings after the phase close-out.** Recorded
+here because three of them changed what the project believes about itself:
+
+- `6e04740` — the five recorded UX/perf leftovers, closed. The PDF doctor
+  route was the last path still computing on the main thread (now pooled);
+  deep-read's UI stops implying a cancel it cannot deliver; the coverage
+  jump button turned out not to *render at all* for the sample (its top
+  finding is scene-anchored and the old code only parsed line numbers);
+  Settings gained a real roving tabindex; and finding-identity is now
+  scene-anchored — browser-proven to turn a spurious "8 cleared · 8 new"
+  after a one-line edit into an honest "no change."
+- `7d398a7` — docs truth-sync. `ARCHITECTURE.md` still claimed a 1000-scene
+  analyzer ceiling (400 since W1), README's env table was missing seven live
+  variables, and its documented restore `curl` would have returned 400
+  (verified live against a running server).
+- `4b03c80` — **P-2/P-3 evidence, and it contradicts the retirement design.**
+  The design calls a "Tier B" of rules removable "at zero measurable score
+  cost, by construction." Measured: 246 rules fire only on degraded scripts,
+  and removing exactly that tier drops pooled AUC 0.572 → 0.530
+  (SCENE_SHUFFLE 0.487 → 0.342). Retirement bar item **B5 breaks** — full
+  channel-zero collapses the calibration bands until *weak ties strong*, and
+  monotonicity is not even monotone in K. Five rules outscore all 906 that
+  ever fire (0.753 vs 0.572, the only non-overlapping CI pair in the run).
+  **Nothing was retired; the in-repo evidence does not justify it.** Same
+  commit fixes reversal-detection Channel 2, whose absolute thresholds made
+  it structurally inert on the float-scale producer the owner's 125-film run
+  would have used — that run would have measured the scale, not the detector.
+- `5fa7282` — the live catalog is **3,217**, not 3,216 (`33a2ee48` added
+  INVERSE_CHEKHOV_GUN). Live-state claims corrected in `CLAUDE.md` and
+  `ROADMAP.md`; dated historical records left intact.
+- `9a5783cb` — four committed probe scripts globbed `*.fountain.txt` against
+  a `*.fountain` corpus: they selected zero files, printed empty tables, and
+  **exited 0**. Two are the commands the 2026-08-05 novelty result cites as
+  its own reproduction. Fixed, and an empty selection now exits 1 — a probe
+  that measured nothing must fail loudly rather than report silence as a
+  result.
+
+Successor to `PATH_TO_DONE.md`'s
 task framing: that file tracks ROADMAP phases; this one sequences everything
 measured by the three 2026-08-14 audits (UX-in-browser, engine-truth,
 ship-vehicle) into the shortest honest path to a product that is *truly
