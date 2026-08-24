@@ -26,7 +26,14 @@
 // passes, ~2s. No doctor run. Pure text-signal feasibility check.
 import { readFileSync, readdirSync } from 'node:fs';
 
-const files = readdirSync('data/screenplays').filter(f => f.endsWith('.fountain.txt')).slice(0, 12);
+// See probe-climax-locators.mjs's note: this glob said `*.fountain.txt` while
+// the corpus is `*.fountain`, so the probe selected zero files and still
+// exited 0. Accept both, and fail loudly on an empty selection.
+const files = readdirSync('data/screenplays').filter(f => f.endsWith('.fountain') || f.endsWith('.fountain.txt')).slice(0, 12);
+if (files.length === 0) {
+  console.error('[FATAL] no screenplays selected from data/screenplays (looked for *.fountain and *.fountain.txt) — refusing to report an empty run as success');
+  process.exit(1);
+}
 
 function segment(text) {
   const lines = text.split('\n');

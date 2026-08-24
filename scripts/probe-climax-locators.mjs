@@ -23,7 +23,17 @@
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
 import { readdirSync, readFileSync } from 'node:fs';
 
-const files = readdirSync('data/screenplays').filter(f => f.endsWith('.fountain.txt'));
+// The corpus is `*.fountain`; this glob said `*.fountain.txt` and therefore
+// selected ZERO files while still exiting 0 — the probe printed its header
+// and an empty table, which reads as "ran, found nothing" rather than "never
+// ran" (found 2026-08-24 by the P-3 re-derivation). Accept both spellings,
+// and refuse to exit 0 on an empty selection: a probe that measures nothing
+// must fail loudly, not report silence as a result.
+const files = readdirSync('data/screenplays').filter(f => f.endsWith('.fountain') || f.endsWith('.fountain.txt'));
+if (files.length === 0) {
+  console.error('[FATAL] no screenplays selected from data/screenplays (looked for *.fountain and *.fountain.txt) — refusing to report an empty run as success');
+  process.exit(1);
+}
 console.log('=== CLIMAX-LOCATOR CANDIDATE PROBE — where does each signal sit? ===');
 console.log(`(27 produced features, suspenseDelta baseline = degenerate per prior measurement)\n`);
 console.log('script'.padEnd(34) + '| suspPeak%  | lastRevel% | lastTurn%  | purpose=climax at');
