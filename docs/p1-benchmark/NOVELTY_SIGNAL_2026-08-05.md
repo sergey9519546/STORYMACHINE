@@ -1,5 +1,19 @@
 # Novelty-against-prior signal — historical targeted note, not reproduced
 
+> **RE-DERIVED 2026-08-24 — see
+> `docs/p1-benchmark/CLIMAX_RELOCATE_REDERIVATION_2026-08-24.md`.** The status
+> below is UNCHANGED: this document stays historical and its numbers must
+> still not be cited. What the re-derivation adds: the targeted statistic was
+> rebuilt from the committed pieces that survived and its *direction* holds
+> (18/18 CC0 scripts rise, mean delta +0.28 against the +0.45 reported here),
+> its magnitudes do not, and the noun-type hypothesis in "What this opens"
+> below was measured — raw proper-noun novelty is **anti-specific** (it fires
+> more when an ordinary scene is moved to the front than when the climax is),
+> while the relational-reference contrast is specific but not yet sensitive.
+> One caveat that belongs here: the two commands in the "Reproduction" section
+> at the bottom select `*.fountain.txt`, and the in-repo corpus uses
+> `*.fountain` — on this checkout they measure zero scripts.
+
 **Status:** **HISTORICAL / UNREPRODUCIBLE AS CURRENT EVIDENCE (2026-08-08).**
 The 2026-08-05 commit recorded targeted 10/11 measurements but did not commit
 the inline source or a receipt containing per-script results. The sanitized

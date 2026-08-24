@@ -1,0 +1,627 @@
+{
+  "generatedAt": "2026-08-24T05:30:57.075Z",
+  "script": "scripts/rederive-climax-relocate.ts",
+  "priorResult": "docs/p1-benchmark/NOVELTY_SIGNAL_2026-08-05.md (HISTORICAL / UNREPRODUCIBLE)",
+  "part1Reachability": {
+    "corpusDir": "/home/user/STORYMACHINE/.claude/worktrees/agent-ae0a51b2b93f97c71/data/screenplays",
+    "dotFountainTxt": 0,
+    "dotFountain": 20,
+    "committedProbesInert": true
+  },
+  "part2Targeted": {
+    "cc0": {
+      "n": 18,
+      "intactMean": 0.2539454372787706,
+      "intactMin": 0,
+      "intactMax": 0.5,
+      "relocatedMean": 0.533573525240192,
+      "relocatedMin": 0.25,
+      "relocatedMax": 1,
+      "deltaMean": 0.2796280879614213,
+      "deltaMin": 0.11111111111111116,
+      "deltaMax": 0.6,
+      "roseOver0_1": 18
+    },
+    "all": {
+      "n": 38,
+      "intactMean": 0.2510334694545221,
+      "intactMin": 0,
+      "intactMax": 0.5,
+      "relocatedMean": 0.5123004919057552,
+      "relocatedMin": 0.16666666666666666,
+      "relocatedMax": 1,
+      "deltaMean": 0.26126702245123296,
+      "deltaMin": 0,
+      "deltaMax": 0.6666666666666666,
+      "roseOver0_1": 35
+    },
+    "rows": [
+      {
+        "label": "chain-of-custody.fountain",
+        "origin": "cc0",
+        "scenes": 13,
+        "intact": 0,
+        "relocated": 0.25,
+        "delta": 0.25
+      },
+      {
+        "label": "close-quarters.fountain",
+        "origin": "cc0",
+        "scenes": 13,
+        "intact": 0.4,
+        "relocated": 1,
+        "delta": 0.6
+      },
+      {
+        "label": "code-blue.fountain",
+        "origin": "cc0",
+        "scenes": 14,
+        "intact": 0.1429,
+        "relocated": 0.4286,
+        "delta": 0.2857
+      },
+      {
+        "label": "counter-offer.fountain",
+        "origin": "cc0",
+        "scenes": 10,
+        "intact": 0.1538,
+        "relocated": 0.4615,
+        "delta": 0.3077
+      },
+      {
+        "label": "dead-frequency.fountain",
+        "origin": "cc0",
+        "scenes": 12,
+        "intact": 0.2727,
+        "relocated": 0.8182,
+        "delta": 0.5455
+      },
+      {
+        "label": "high-voltage.fountain",
+        "origin": "cc0",
+        "scenes": 13,
+        "intact": 0.3333,
+        "relocated": 0.5,
+        "delta": 0.1667
+      },
+      {
+        "label": "mise.fountain",
+        "origin": "cc0",
+        "scenes": 12,
+        "intact": 0.375,
+        "relocated": 0.625,
+        "delta": 0.25
+      },
+      {
+        "label": "off-season.fountain",
+        "origin": "cc0",
+        "scenes": 9,
+        "intact": 0.4444,
+        "relocated": 0.5556,
+        "delta": 0.1111
+      },
+      {
+        "label": "quiet-season.fountain",
+        "origin": "cc0",
+        "scenes": 10,
+        "intact": 0.125,
+        "relocated": 0.25,
+        "delta": 0.125
+      },
+      {
+        "label": "red-line.fountain",
+        "origin": "cc0",
+        "scenes": 14,
+        "intact": 0,
+        "relocated": 0.4,
+        "delta": 0.4
+      },
+      {
+        "label": "room-12.fountain",
+        "origin": "cc0",
+        "scenes": 10,
+        "intact": 0.4,
+        "relocated": 0.7,
+        "delta": 0.3
+      },
+      {
+        "label": "same-page.fountain",
+        "origin": "cc0",
+        "scenes": 11,
+        "intact": 0.1667,
+        "relocated": 0.3333,
+        "delta": 0.1667
+      },
+      {
+        "label": "soft-launch.fountain",
+        "origin": "cc0",
+        "scenes": 12,
+        "intact": 0.2857,
+        "relocated": 0.4286,
+        "delta": 0.1429
+      },
+      {
+        "label": "the-defense-rests.fountain",
+        "origin": "cc0",
+        "scenes": 12,
+        "intact": 0.5,
+        "relocated": 0.625,
+        "delta": 0.125
+      },
+      {
+        "label": "the-detour.fountain",
+        "origin": "cc0",
+        "scenes": 11,
+        "intact": 0.2857,
+        "relocated": 0.4286,
+        "delta": 0.1429
+      },
+      {
+        "label": "the-key-under-the-mat.fountain",
+        "origin": "cc0",
+        "scenes": 11,
+        "intact": 0.1429,
+        "relocated": 0.4286,
+        "delta": 0.2857
+      },
+      {
+        "label": "two-lane.fountain",
+        "origin": "cc0",
+        "scenes": 13,
+        "intact": 0.4,
+        "relocated": 0.8,
+        "delta": 0.4
+      },
+      {
+        "label": "undertow.fountain",
+        "origin": "cc0",
+        "scenes": 12,
+        "intact": 0.1429,
+        "relocated": 0.5714,
+        "delta": 0.4286
+      },
+      {
+        "label": "calibration/Low Tide",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.5,
+        "relocated": 0.8333,
+        "delta": 0.3333
+      },
+      {
+        "label": "calibration/Nine Minutes",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.5,
+        "relocated": 0.5,
+        "delta": 0
+      },
+      {
+        "label": "calibration/The Long Game",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.3333,
+        "relocated": 0.8333,
+        "delta": 0.5
+      },
+      {
+        "label": "calibration/Second Wind",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.1667,
+        "relocated": 0.6667,
+        "delta": 0.5
+      },
+      {
+        "label": "calibration/Sunlight Clause",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0,
+        "relocated": 0.6667,
+        "delta": 0.6667
+      },
+      {
+        "label": "calibration/Reasonable Doubt",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.2857,
+        "relocated": 0.5714,
+        "delta": 0.2857
+      },
+      {
+        "label": "calibration/Thanksgiving, Maybe",
+        "origin": "calibration",
+        "scenes": 9,
+        "intact": 0.4286,
+        "relocated": 0.5714,
+        "delta": 0.1429
+      },
+      {
+        "label": "calibration/The Dead Drop",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.375,
+        "relocated": 0.625,
+        "delta": 0.25
+      },
+      {
+        "label": "calibration/Encore",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.25,
+        "relocated": 0.625,
+        "delta": 0.375
+      },
+      {
+        "label": "calibration/Zero Day",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.4286,
+        "relocated": 0.7143,
+        "delta": 0.2857
+      },
+      {
+        "label": "calibration/Yard Signs",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0,
+        "relocated": 0.1667,
+        "delta": 0.1667
+      },
+      {
+        "label": "calibration/Merge",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.2857,
+        "relocated": 0.5714,
+        "delta": 0.2857
+      },
+      {
+        "label": "calibration/Splitting the House",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.4444,
+        "relocated": 0.6667,
+        "delta": 0.2222
+      },
+      {
+        "label": "calibration/The Visit",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.375,
+        "relocated": 0.375,
+        "delta": 0
+      },
+      {
+        "label": "calibration/The Corner Booth",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0.1667,
+        "relocated": 0.1667,
+        "delta": 0
+      },
+      {
+        "label": "calibration/The Grift",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0,
+        "relocated": 0.2857,
+        "delta": 0.2857
+      },
+      {
+        "label": "calibration/Adrift",
+        "origin": "calibration",
+        "scenes": 10,
+        "intact": 0,
+        "relocated": 0.1667,
+        "delta": 0.1667
+      },
+      {
+        "label": "calibration/Lockdown",
+        "origin": "calibration",
+        "scenes": 9,
+        "intact": 0.1429,
+        "relocated": 0.2857,
+        "delta": 0.1429
+      },
+      {
+        "label": "calibration/Whiteout",
+        "origin": "calibration",
+        "scenes": 9,
+        "intact": 0.1429,
+        "relocated": 0.2857,
+        "delta": 0.1429
+      },
+      {
+        "label": "calibration/Firebreak",
+        "origin": "calibration",
+        "scenes": 9,
+        "intact": 0.1429,
+        "relocated": 0.2857,
+        "delta": 0.1429
+      }
+    ]
+  },
+  "part3Formulations": {
+    "F1_properNoveltyAtScene1": {
+      "CLIMAX_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.5263157894736842,
+        "ci": {
+          "lo": 0.3684210526315789,
+          "hi": 0.6842105263157895
+        },
+        "rose": 19,
+        "n": 38,
+        "nonTied": 36
+      },
+      "SCENE_SHUFFLE": {
+        "pairs": 38,
+        "auc": 0.5,
+        "ci": {
+          "lo": 0.34210526315789475,
+          "hi": 0.6578947368421053
+        },
+        "rose": 17,
+        "n": 38,
+        "nonTied": 34
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 38,
+        "auc": 0.5,
+        "ci": {
+          "lo": 0.5,
+          "hi": 0.5
+        },
+        "rose": 0,
+        "n": 38,
+        "nonTied": 0
+      },
+      "MID_SCENE_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.631578947368421,
+        "ci": {
+          "lo": 0.4868421052631579,
+          "hi": 0.7631578947368421
+        },
+        "rose": 21,
+        "n": 38,
+        "nonTied": 32
+      }
+    },
+    "F2_relationalUnanchoredAtScene1": {
+      "CLIMAX_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.6052631578947368,
+        "ci": {
+          "lo": 0.47368421052631576,
+          "hi": 0.7368421052631579
+        },
+        "rose": 18,
+        "n": 38,
+        "nonTied": 28
+      },
+      "SCENE_SHUFFLE": {
+        "pairs": 38,
+        "auc": 0.6842105263157895,
+        "ci": {
+          "lo": 0.5657894736842105,
+          "hi": 0.8026315789473685
+        },
+        "rose": 20,
+        "n": 38,
+        "nonTied": 26
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 38,
+        "auc": 0.5,
+        "ci": {
+          "lo": 0.5,
+          "hi": 0.5
+        },
+        "rose": 0,
+        "n": 38,
+        "nonTied": 0
+      },
+      "MID_SCENE_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.6578947368421053,
+        "ci": {
+          "lo": 0.5263157894736842,
+          "hi": 0.7894736842105263
+        },
+        "rose": 20,
+        "n": 38,
+        "nonTied": 28
+      }
+    },
+    "F3_relationalExcessAtScene1": {
+      "CLIMAX_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.631578947368421,
+        "ci": {
+          "lo": 0.47368421052631576,
+          "hi": 0.7631578947368421
+        },
+        "rose": 23,
+        "n": 38,
+        "nonTied": 38
+      },
+      "SCENE_SHUFFLE": {
+        "pairs": 38,
+        "auc": 0.6842105263157895,
+        "ci": {
+          "lo": 0.5394736842105263,
+          "hi": 0.8157894736842105
+        },
+        "rose": 24,
+        "n": 38,
+        "nonTied": 36
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 38,
+        "auc": 0.5,
+        "ci": {
+          "lo": 0.5,
+          "hi": 0.5
+        },
+        "rose": 0,
+        "n": 38,
+        "nonTied": 0
+      },
+      "MID_SCENE_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.5131578947368421,
+        "ci": {
+          "lo": 0.35526315789473684,
+          "hi": 0.6710526315789473
+        },
+        "rose": 19,
+        "n": 38,
+        "nonTied": 37
+      }
+    },
+    "F4_maxRelationalExcess": {
+      "CLIMAX_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.5263157894736842,
+        "ci": {
+          "lo": 0.4473684210526316,
+          "hi": 0.6052631578947368
+        },
+        "rose": 5,
+        "n": 38,
+        "nonTied": 10
+      },
+      "SCENE_SHUFFLE": {
+        "pairs": 38,
+        "auc": 0.5921052631578947,
+        "ci": {
+          "lo": 0.4605263157894737,
+          "hi": 0.7105263157894737
+        },
+        "rose": 17,
+        "n": 38,
+        "nonTied": 27
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 38,
+        "auc": 0.34210526315789475,
+        "ci": {
+          "lo": 0.25,
+          "hi": 0.4342105263157895
+        },
+        "rose": 2,
+        "n": 38,
+        "nonTied": 18
+      },
+      "MID_SCENE_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.5,
+        "ci": {
+          "lo": 0.40789473684210525,
+          "hi": 0.5921052631578947
+        },
+        "rose": 6,
+        "n": 38,
+        "nonTied": 14
+      }
+    },
+    "F5_anaphoricDensityAtScene1": {
+      "CLIMAX_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.6447368421052632,
+        "ci": {
+          "lo": 0.5394736842105263,
+          "hi": 0.75
+        },
+        "rose": 16,
+        "n": 38,
+        "nonTied": 21
+      },
+      "SCENE_SHUFFLE": {
+        "pairs": 38,
+        "auc": 0.5789473684210527,
+        "ci": {
+          "lo": 0.4868421052631579,
+          "hi": 0.6710526315789473
+        },
+        "rose": 10,
+        "n": 38,
+        "nonTied": 14
+      },
+      "MIDPOINT_DROP": {
+        "pairs": 38,
+        "auc": 0.5,
+        "ci": {
+          "lo": 0.5,
+          "hi": 0.5
+        },
+        "rose": 0,
+        "n": 38,
+        "nonTied": 0
+      },
+      "MID_SCENE_RELOCATE": {
+        "pairs": 38,
+        "auc": 0.5394736842105263,
+        "ci": {
+          "lo": 0.4342105263157895,
+          "hi": 0.631578947368421
+        },
+        "rose": 8,
+        "n": 38,
+        "nonTied": 13
+      }
+    }
+  },
+  "part4Verdict": {
+    "verdicts": [
+      {
+        "id": "F1_properNoveltyAtScene1",
+        "relocateAuc": 0.5263157894736842,
+        "relocateLo": 0.3684210526315789,
+        "nonTied": 36,
+        "midRelocateAuc": 0.631578947368421,
+        "specificityGap": -0.10526315789473684,
+        "viable": false
+      },
+      {
+        "id": "F2_relationalUnanchoredAtScene1",
+        "relocateAuc": 0.6052631578947368,
+        "relocateLo": 0.47368421052631576,
+        "nonTied": 28,
+        "midRelocateAuc": 0.6578947368421053,
+        "specificityGap": -0.052631578947368474,
+        "viable": false
+      },
+      {
+        "id": "F3_relationalExcessAtScene1",
+        "relocateAuc": 0.631578947368421,
+        "relocateLo": 0.47368421052631576,
+        "nonTied": 38,
+        "midRelocateAuc": 0.5131578947368421,
+        "specificityGap": 0.11842105263157887,
+        "viable": false
+      },
+      {
+        "id": "F4_maxRelationalExcess",
+        "relocateAuc": 0.5263157894736842,
+        "relocateLo": 0.4473684210526316,
+        "nonTied": 10,
+        "midRelocateAuc": 0.5,
+        "specificityGap": 0.02631578947368418,
+        "viable": false
+      },
+      {
+        "id": "F5_anaphoricDensityAtScene1",
+        "relocateAuc": 0.6447368421052632,
+        "relocateLo": 0.5394736842105263,
+        "nonTied": 21,
+        "midRelocateAuc": 0.5394736842105263,
+        "specificityGap": 0.10526315789473684,
+        "viable": true
+      }
+    ],
+    "anyViable": true
+  }
+}

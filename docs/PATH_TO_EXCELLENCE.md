@@ -234,15 +234,47 @@ entrance-animation frame, not a static defect — recorded, not "fixed."
   positives on real prose + synthetic mechanism AUC 1.000; the
   false-positive evidence supports a low-risk WIRE, recall unmeasurable
   in-repo. No scoring file changed; receipt guard clean by construction.
-- **P-2.** The rule-catalog decision: run retirement evidence bar B1–B7
-  (channel-zero AUC on the real corpus). The project's own rebuild
-  experiment measured the weighted-rule channel as inverted; two weeks
-  later the question is still open. Settle it.
-- **P-3.** The CLIMAX_RELOCATE wall: the one sanctioned next experiment is
-  noun-type-aware novelty (proper vs. relational/anaphoric reference),
-  reproduced from committed source against the real corpus — the prior
-  result is marked unreproducible-historical and must not be cited until
-  re-derived.
+- **P-2 — EVIDENCE PHASE DONE 2026-08-24** (findings in
+  `docs/p1-benchmark/RULE_CHANNEL_EVIDENCE_2026-08-24.md`; harness
+  `scripts/measure-rule-channel-evidence.ts`). The bar was run on everything
+  reachable and the conclusion is **the in-repo evidence does NOT justify a
+  retirement recommendation** — not for sample-size reasons. Three findings
+  govern it. (1) **The migration's own safety guarantee is wrong.** The design
+  calls Tier B removable "at zero measurable score cost, by construction";
+  246 rule names fire only on a degraded variant and never on an intact
+  script, so removing exactly Tier B costs pooled AUC 0.572 → 0.530 and
+  SCENE_SHUFFLE 0.487 → 0.342. (2) **B5 is settleable in-repo and it BREAKS**
+  — full channel-zero collapses the four calibration bands to an 0.93-point
+  spread with weak tying strong, and monotonicity is not monotone in K, so it
+  must be re-measured for the exact removal set. (3) **B1's dialogue clause
+  flips on a health-floor artifact** (raw CI-lo 0.711 FAIL,
+  saturation-corrected 1.000 PASS), so the owner run must report both.
+  Directionally the inversion reproduces and sharpens: five rules outscore all
+  906 firing ones on pooled AUC (0.753 vs 0.572, the one non-overlapping CI
+  pair). B2/B3/B4 CANNOT-MEASURE (owner-local corpus); B6 satisfied; B7
+  half-unsatisfied (rollback plan written, no individual named). Also
+  recorded: the live catalog is **3,217**, not the 3,216 this file, CLAUDE.md
+  and ROADMAP still say (`33a2ee48` added INVERSE_CHEKHOV_GUN). Nothing was
+  retired.
+- **P-3 — EVIDENCE PHASE DONE 2026-08-24** (findings in
+  `docs/p1-benchmark/CLIMAX_RELOCATE_REDERIVATION_2026-08-24.md`; harness
+  `scripts/rederive-climax-relocate.ts`). First, a reachability defect: all
+  four committed probes in the 2026-08-05 family glob `*.fountain.txt` while
+  the corpus is `*.fountain`, so they select zero files and exit 0 having
+  measured nothing — including the two commands `NOVELTY_SIGNAL` offers as its
+  own reproduction. Rebuilt from the committed pieces that survived, the
+  targeted claim's **direction holds** (18/18 CC0 scripts rise) and its
+  **magnitude does not** (delta +0.28 vs the reported +0.45). The sanctioned
+  noun-type layer was then measured against a specificity control this harness
+  adds (move a *middle* scene to the front instead of the climax): raw
+  proper-noun novelty is **anti-specific** (gap −0.105 — it fires more on the
+  benign move), while the relational-reference contrast is **specific**
+  (+0.118) but not yet sensitive (CI-lo 0.474). One of five formulations
+  clears both conditions (anaphoric density at scene 1, AUC 0.645
+  [0.539, 0.750]) and is recorded as a lead, not a finding — one positive out
+  of five unregistered tests on 38 short scripts. `NOVELTY_SIGNAL_2026-08-05.md`
+  stays marked unreproducible-historical; its numbers still must not be cited.
+  Nothing wired.
 - **P-4 (human-only).** Five real P0 sessions via the fielding kit and
   async portal — recruitment and moderation cannot be delegated. Record
   the outcome PASS/STOP honestly, whatever it is.
