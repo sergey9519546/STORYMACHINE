@@ -25,3 +25,37 @@ export function sanitizeForPrompt(value: string, maxLen = 2000): string {
     .substring(0, maxLen)
     .trim();
 }
+
+/**
+ * Sanitize a value destined for a strictly SINGLE-LINE field — a Fountain
+ * title-page key (`Title:`, `Credit:`), a slug line, a header — as opposed to
+ * a prose block.
+ *
+ * WHY THIS IS SEPARATE FROM sanitizeForPrompt(). That function deliberately
+ * PRESERVES LF, because Fountain body text and prose legitimately contain line
+ * breaks (see CONTROL_CHAR_RE's comment above). That makes it the wrong tool
+ * for a one-line field: a caller-supplied newline survives it and forges
+ * ADDITIONAL lines into the document. On a Fountain title page — a sequence of
+ * single-line `Key: value` records terminated by a blank line — that lets a
+ * `title` of "A\nCredit: forged" write a second, attacker-chosen title-page
+ * key, and a `title` containing a blank line plus arbitrary text write
+ * arbitrary screenplay BODY. Both then travel into the LLM prompt that
+ * server/nvm/revision/rewrite.ts builds around the compiled draft, where the
+ * forged text can impersonate that prompt's own `--- END DRAFT ---` fence.
+ * (Found by tests/routes/nvm-revision.test.ts against the three
+ * compileScreenplay() call sites in server/routes/nvm/revision.ts.)
+ *
+ * Collapses every whitespace RUN — line breaks and tabs included — to a single
+ * space, so the result is guaranteed to be exactly one line, then applies the
+ * same control-character strip and length cap sanitizeForPrompt() uses.
+ * Returns '' for a value that is empty or whitespace-only after collapsing;
+ * callers wanting a placeholder should supply their own.
+ */
+export function sanitizeSingleLine(value: string, maxLen = 256): string {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(CONTROL_CHAR_RE, ' ')   // NUL/CR/etc → space (TAB and LF survive this, by design)
+    .replace(/\s+/g, ' ')            // …so collapse every whitespace run, LF included, to one space
+    .substring(0, maxLen)
+    .trim();
+}

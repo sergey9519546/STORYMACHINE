@@ -3,7 +3,7 @@
 // SSE streaming variants). Split out of the former server/routes/nvm.ts — see
 // server/routes/nvm/index.ts for the full module map.
 import express from 'express';
-import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
+import { sanitizeForPrompt, sanitizeSingleLine } from '../../lib/prompt-utils.ts';
 import {
   asyncHandler, sessionId, getOrCreateSession,
   gameLimiter, aiLimiter,
@@ -13,6 +13,20 @@ import { logger } from '../../lib/logger.ts';
 
 const router = express.Router();
 export default router;
+
+/** The title every route below hands to compileScreenplay(), which writes it
+ *  verbatim as the compiled Fountain's `Title:` title-page key — a
+ *  SINGLE-LINE record. Callers supply it (`title` in the body, `?title=` on the
+ *  SSE route), so it is untrusted: before this existed, a newline in it forged
+ *  extra title-page keys and whole body lines into the compiled screenplay,
+ *  which then travels into the LLM rewrite prompt. sanitizeSingleLine() (not
+ *  sanitizeForPrompt(), which deliberately preserves LF for prose) is the
+ *  guard; 'UNTITLED' matches compileScreenplay()'s own default for a title
+ *  that sanitizes down to nothing. */
+function compiledTitle(raw: unknown): string {
+  if (typeof raw !== 'string') return 'UNTITLED';
+  return sanitizeSingleLine(raw, 256) || 'UNTITLED';
+}
 
 // GET /api/nvm/screenplay/memory — Live Screenplay Memory.
 router.get('/api/nvm/screenplay/memory', gameLimiter, asyncHandler(async (req, res) => {
@@ -31,7 +45,7 @@ router.get('/api/nvm/screenplay/memory', gameLimiter, asyncHandler(async (req, r
 // POST /api/nvm/compile — End-Condition Detector + Screenplay Compiler.
 router.post('/api/nvm/compile', gameLimiter, validate(CompileBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const { title = 'UNTITLED' } = req.body as { title?: string };
+  const title = compiledTitle((req.body as { title?: unknown }).title);
 
   const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');
   const { analyzeStructure } = await import('../../nvm/screenplay/structure.ts');
@@ -60,7 +74,8 @@ router.post('/api/nvm/compile', gameLimiter, validate(CompileBodySchema), asyncH
 // aiLimiter: one revise call runs the 14-pass pipeline — up to 14 sequential LLM rewrites.
 router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const { approvedSpans = [], title = 'UNTITLED' } = req.body as { approvedSpans?: unknown[]; title?: string };
+  const { approvedSpans = [] } = req.body as { approvedSpans?: unknown[] };
+  const title = compiledTitle((req.body as { title?: unknown }).title);
 
   const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');
   const { analyzeStructure } = await import('../../nvm/screenplay/structure.ts');
@@ -124,8 +139,7 @@ router.get('/api/nvm/revise-stream', aiLimiter, async (req, res) => {
     if (!ended) { ended = true; res.end(); }
   };
 
-  const rawTitle = req.query?.title;
-  const title = typeof rawTitle === 'string' ? sanitizeForPrompt(rawTitle, 256) : 'UNTITLED';
+  const title = compiledTitle(req.query?.title);
   try {
     const { stage } = getOrCreateSession(sessionId(req));
     const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');

@@ -38,15 +38,26 @@
 // (server/nvm/analyze/types.ts) — duplicated below rather than imported, same
 // client/server boundary rule diagnostics.ts's header documents.
 
+// `import type` on DecorationSet/Extension is load-bearing, not style: both are
+// type-only exports of their packages, so a plain named import of either makes
+// this module unloadable under `node --experimental-strip-types` (the repo's
+// test runner), which does no cross-usage elision — it fails with "does not
+// provide an export named 'DecorationSet'". tests/core/editor-decorations.test.ts
+// documents hitting exactly that wall and working around it by reimplementing
+// the logic in test code; splitting the type imports here is the direct fix, and
+// it lets tests/core/fix-action.test.ts import THIS module rather than a copy of
+// it. Vite/tsc erase the two forms identically, so nothing about the shipped
+// bundle changes. ViewUpdate stays a value import — it is a real runtime class.
 import {
   EditorView,
   Decoration,
-  DecorationSet,
   WidgetType,
   ViewPlugin,
   ViewUpdate,
 } from '@codemirror/view';
-import { StateField, StateEffect, Extension } from '@codemirror/state';
+import type { DecorationSet } from '@codemirror/view';
+import { StateField, StateEffect } from '@codemirror/state';
+import type { Extension } from '@codemirror/state';
 
 // ── Contract types — kept in sync with server/nvm/analyze/types.ts's
 // FixVerifyResult and server/nvm/revision/passes/types.ts's RevisionIssue ──
@@ -348,8 +359,20 @@ function healthArrow(before: number, after: number): string {
 }
 
 class FixReceiptWidget extends WidgetType {
-  constructor(readonly key: string, readonly phase: FixPhase) {
+  // Written out longhand rather than as TypeScript parameter properties
+  // (`constructor(readonly key: string, ...)`) for the same reason the type
+  // imports above are split: Node's strip-only type stripping rejects
+  // parameter properties outright ("TypeScript parameter property is not
+  // supported in strip-only mode"), which would make this whole module
+  // unloadable in tests. Identical runtime behavior; the fields are still
+  // readonly to the type checker.
+  readonly key: string;
+  readonly phase: FixPhase;
+
+  constructor(key: string, phase: FixPhase) {
     super();
+    this.key = key;
+    this.phase = phase;
   }
 
   eq(other: FixReceiptWidget): boolean {
