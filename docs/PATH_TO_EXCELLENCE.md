@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-08-24, main @ 9a5783cb: Phases W and E are COMPLETE,
+**State as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -8,6 +8,32 @@ published via the Release workflow), and P-1/P-2/P-3 evidence. What remains
 is genuinely human-side: Phase S's owner deployment items and stranger-week
 pilot, the owner-corpus measurement runs the P lanes specify, and Phase T's
 owner-machine items.
+
+**Independent verification sweep — 2026-08-24, six re-verifiers.** After the
+completion sweep, six agents re-derived every claim from scratch on the tip,
+each instructed to assume its assigned claims false until reproduced (probing
+agents planted probes and reverted them; final trees clean). Outcome:
+**every claim TRUE/HOLDS.** Release/ops: 8/8 (Release run success and the
+prerelease `:latest` gate confirmed against the live workflow-run record;
+restore drill 4/4; load test re-run end-to-end). Security-live: 8/8 (the
+title-injection payload fired at all three routes comes back single-line; a
+real 429 proved the shared limiter; delete-everything round-tripped
+save→load→delete→empty; `npm audit` 0/0). Docs-vs-reality: all 23 cited SHAs
+resolve and match their diffs, every number re-derived live (+8.5 gap
+re-measured, P-2 JSON byte-identical bar its timestamp). Scoring-thesis: the
+ablation guard fails exactly 2 tests when both deductions are zeroed, fixture
+invariants re-derived independently (10861 bytes / 1964 tokens each), story-
+graph stub now fails 5 tests (was 13/14-passing). Gate-integrity: all ten
+reproduced — AND the verifier found two holes in the protection *added this
+session*, both now closed in `092a601d`: the "mirror" assertion compared step
+NAMES only (a release gate's body could be hollowed to `echo` with all checks
+green), and `continue-on-error` on an unnamed step was invisible to every
+scan. Two new tests compare run bodies and walk every `continue-on-error`
+back to a named, allowlisted step; both proven against the exact exploits.
+Product-surface verification was covered by the orchestrator's own full
+browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
+ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
+agent hit its session limit. The written record is trustworthy as-is.
 
 **2026-08-24 session — five landings after the phase close-out.** Recorded
 here because three of them changed what the project believes about itself:
