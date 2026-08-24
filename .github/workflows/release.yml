@@ -75,6 +75,14 @@ jobs:
       - name: Enforce no console.* under server/
         run: npm run check-no-console
 
+      # Mirrors ci.yml's server dead-code tripwire. Added here when the
+      # step-for-step mirror assertion in tests/core/ci-gates-intact.test.ts
+      # caught this file lagging ci.yml by one step — which is precisely the
+      # drift that assertion exists to prevent, working as intended on its
+      # first real opportunity.
+      - name: Server dead-code tripwire (reachability from server.ts)
+        run: npm run check-server-reachability
+
       # G0-08: mirrors ci.yml's honesty string audit — see that file's
       # comment and scripts/honesty-audit.mjs for scope and rules.
       # HONESTY_AUDIT_REPO is set here for the same reason ci.yml sets it: the
