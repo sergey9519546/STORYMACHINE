@@ -37,6 +37,21 @@
 //
 // PERF_BUDGET_SKIP=1 opts out entirely, for the rare environment where even
 // that is not enough.
+//
+// ── A LIMIT OF THE SYNTHETIC SCRIPT, MEASURED ───────────────────────────────
+// buildSyntheticScript concatenates 20 unrelated short screenplays, so the
+// result has no global emotional arc to destroy. Measured 2026-08-24: at 150
+// scenes the concatenation scores health 86.4 (arcHealth 0.868), and
+// act-swapping its three thirds scores 89.1 (arcHealth 1.455) — the scramble
+// scores HIGHER, because the "intact" reference was never coherent. So this
+// file's script is the right material for a perf budget and the WRONG material
+// for a discrimination assertion. Feature-scale discrimination is pinned on
+// purpose-built committed fixtures instead, in
+// tests/core/feature-scale-discrimination.test.ts. (Also measured: appending
+// 130 filler scenes to those 21-scene fixtures collapses the act-swap health
+// delta from 9.7 to 0.1 — the arc term does not survive dilution, which is
+// worth knowing before anyone tries to scale a discrimination fixture by
+// padding it.)
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -106,6 +121,37 @@ describe('Script Doctor perf budget (lane W2 regression guard)', () => {
     const elapsed = performance.now() - started;
 
     assert.equal(report.sceneCount, sceneCount);
+
+    // ── SCORE behaviour, not just wall-clock ────────────────────────────────
+    // Until 2026-08-24 this file's eight assertions were ALL about time: a
+    // 150-scene doctor run could return health: NaN, verdict: undefined or a
+    // saturated 100 and every one of them still passed. These four cost no
+    // extra work — the report is already in hand — and they are the only place
+    // in the suite where a report produced at feature scale is inspected at
+    // all. Direction of the feature-scale deductions is pinned separately, on
+    // committed fixtures, in tests/core/feature-scale-discrimination.test.ts.
+    assert.ok(
+      Number.isFinite(report.health) && report.health > 0 && report.health <= 100,
+      `feature-scale health must be a real score, got ${report.health}`,
+    );
+    assert.ok(
+      report.verdict !== undefined && (['RECOMMEND', 'CONSIDER', 'PASS'] as const).includes(report.verdict),
+      `feature-scale verdict must be a real tier, got ${String(report.verdict)}`,
+    );
+    // The arc signal must actually be COMPUTED at this scale. doctor.ts gates
+    // arcIncoherenceDeduction on sceneCount >= 15 and on this arc being
+    // `scored`; a 150-scene script that returns an unscored arc means the term
+    // is silently inert on exactly the inputs it was built for.
+    assert.ok(
+      report.emotionalArc?.scored === true,
+      'the emotional arc must be scored on a 150-scene script — arcIncoherenceDeduction ' +
+      'reads it, and an unscored arc means that deduction is dead at feature scale',
+    );
+    assert.ok(
+      Number.isFinite(report.emotionalArc.arcHealth),
+      `arcHealth must be finite at feature scale, got ${report.emotionalArc.arcHealth}`,
+    );
+
     assert.ok(
       elapsed < 15_000,
       `${sceneCount}-scene analysis took ${Math.round(elapsed)}ms, budget 15000ms. ` +
@@ -127,6 +173,38 @@ describe('Script Doctor perf budget (lane W2 regression guard)', () => {
     const elapsed = performance.now() - started;
 
     assert.ok(report.sceneCount >= ANALYZER_SCENE_CEILING - 20);
+
+    // ── SCORE behaviour at the ceiling ──────────────────────────────────────
+    // buildSyntheticScript adds whole screenplays until it REACHES the target,
+    // so it overshoots: measured 2026-08-24 it lands at 405 scenes against a
+    // 400-scene ceiling, analyzeFountainText sets truncatedForAnalysis, and
+    // doctor.ts's analysisComplete gate then WITHHOLDS the score (health 0,
+    // verdict undefined) rather than reporting a number derived from a
+    // truncated document. That withholding is the correct behaviour and worth
+    // pinning — a regression that silently scored the first 400 scenes as if
+    // they were the whole script would be a trust bug, not a perf bug.
+    // Both branches are asserted so this stays true whichever side of the
+    // ceiling the fixture corpus happens to put us on.
+    if (report.analysisComplete) {
+      assert.ok(
+        Number.isFinite(report.health) && report.health > 0 && report.health <= 100,
+        `ceiling-scale health must be a real score when the analysis completed, got ${report.health}`,
+      );
+      assert.ok(
+        report.verdict !== undefined && (['RECOMMEND', 'CONSIDER', 'PASS'] as const).includes(report.verdict),
+        `ceiling-scale verdict must be a real tier when the analysis completed, got ${String(report.verdict)}`,
+      );
+    } else {
+      assert.equal(
+        report.health, 0,
+        'a truncated analysis must withhold the score, not publish a partial one',
+      );
+      assert.equal(
+        report.verdict, undefined,
+        'a truncated analysis must withhold the verdict, not publish a partial one',
+      );
+    }
+
     assert.ok(
       elapsed < 30_000,
       `${report.sceneCount}-scene (ceiling) analysis took ${Math.round(elapsed)}ms, budget 30000ms.`,

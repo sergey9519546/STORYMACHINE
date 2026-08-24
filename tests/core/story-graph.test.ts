@@ -5,15 +5,31 @@
 // scripts from structurally degraded versions (act-swapped).
 //
 // Key discriminators:
-// - forwardEdgeRatio: intact scripts have causal edges pointing forward (setup
-//   → payoff in narrative order); act-swapped scripts have backward edges
+// - forwardEdgeRatio: 1.0 while paid promises exist; falls to computeGraphMetrics'
+//   0.5 no-data sentinel when a degradation strands the payoff before its setup.
+//   It does NOT count reversed edges — see the act-swap block for why it cannot.
 // - arcCoherence: intact scripts show tension rising with position; act-swapped
-//   scripts lose position correlation
-// - promisePaymentRatio: measures setup/payoff closure independent of order
+//   scripts ANTI-correlate with it. This is the metric that truly reads order.
+// - promisePaymentRatio: setup/payoff closure — falls when a payoff is stranded
+//
+// The act-swap discrimination block below runs against the committed 21-scene
+// fixture pair in tests/fixtures/feature-scale-discrimination/, not against
+// 3-scene sketches. It previously ran on a 3-scene fixture and asserted only
+// types and ranges; see that block's header for the full account.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
+
+const FIXTURE_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../fixtures/feature-scale-discrimination',
+);
+const INTACT_FIXTURE = readFileSync(path.join(FIXTURE_DIR, 'intact.fountain'), 'utf8');
+const ACT_SWAPPED_FIXTURE = readFileSync(path.join(FIXTURE_DIR, 'act-swapped.fountain'), 'utf8');
 
 describe('Story Graph — core construction', () => {
   it('builds graph from scene records with promises', async () => {
@@ -87,84 +103,151 @@ Nothing happens.
   });
 });
 
+// ── Act-swap discrimination ────────────────────────────────────────────────
+//
+// WHAT THIS BLOCK USED TO BE, AND WHY IT CHANGED (2026-08-24):
+//
+// The test below was named 'intact scripts show higher forwardEdgeRatio than
+// act-swapped versions'. It analysed a THREE-scene fixture and then asserted
+// only `typeof === 'number'`, `>= 0` and `<= 1`. Replacing all three core
+// story-graph metrics with the constant 0.5 left 13 of this file's 14 tests
+// passing — the one test whose NAME made a discrimination claim could not
+// detect the metrics being deleted, because it never compared the two scripts
+// to each other. A sibling test, 'detects backward arcs in degraded scripts',
+// had the same shape: it analysed a scrambled 3-scene fixture on its own and
+// asserted a range.
+//
+// Both are now real comparisons, run on the committed 21-scene fixture pair in
+// tests/fixtures/feature-scale-discrimination/. That pair is a pure
+// permutation — identical scenes, identical word count, only the act order
+// differs — so any metric difference is order-attributable. Measured:
+//
+//                          intact      act-swapped
+//   forwardEdgeRatio         1.00         0.50
+//   arcCoherence            +0.679       -0.646
+//   promisePaymentRatio      0.167        0.00
+//   graphHealth             64           25
+//
+// Each assertion below is a DIRECTION between those two columns, so stubbing
+// any of the three metrics to a constant collapses the comparison and fails
+// the test by name.
+//
+// ── AN HONEST NOTE ABOUT forwardEdgeRatio ──────────────────────────────────
+// Its name suggests it counts causal edges that point backwards. It does not,
+// and cannot. buildStoryGraph walks scenes in order and registers a payoff
+// only when its setup is ALREADY in promiseMap, so a paid cross-scene promise
+// always has seedIdx < payoffIdx and always counts as forward. The ratio can
+// therefore only be 1.0 (paid promises exist, all necessarily forward) or the
+// 0.5 SENTINEL that computeGraphMetrics returns when there are no paid
+// promises at all. Act-swapping this fixture moves it 1.0 -> 0.5 not because
+// edges reversed but because the payoff is lost: the fixture's ledger clue is
+// introduced in Act I and resolved in Act III, so under the order III-I-II the
+// resolution precedes the introduction, applyClueLifecycle represents that as
+// payoffScene < seedScene, and buildStoryGraph drops the payoff on the floor.
+// That is a genuine order signal and the direction is genuinely right — but it
+// is a "the promise stopped being paid" signal, not a "the arrow flipped"
+// signal, and the assertion below says so rather than pretending otherwise.
 describe('Story Graph — act-swap discrimination', () => {
   it('intact scripts show higher forwardEdgeRatio than act-swapped versions', async () => {
-    // This is a simple fixture to test the basic mechanism
-    // Real discrimination will be tested on the calibration corpus
-    const fountain = `
-= ACT 1
+    const intact = await runScriptDoctor(INTACT_FIXTURE);
+    const swapped = await runScriptDoctor(ACT_SWAPPED_FIXTURE);
 
-INT. START - DAY
+    assert.ok(intact.storyGraph && swapped.storyGraph, 'both reports should have story graphs');
+    assert.equal(
+      swapped.sceneCount, intact.sceneCount,
+      'the pair must be a permutation, not a different script',
+    );
 
-Opening scene.
+    const intactRatio = intact.storyGraph.graph.forwardEdgeRatio;
+    const swappedRatio = swapped.storyGraph.graph.forwardEdgeRatio;
 
-= ACT 2
-
-INT. MIDDLE - DAY
-
-Middle scene builds on opening.
-
-= ACT 3
-
-INT. END - DAY
-
-Ending resolves the story.
-    `.trim();
-    
-    const intact = await runScriptDoctor(fountain);
-    
-    // Act-swap: reorder to Act 3 → Act 1 → Act 2
-    const lines = fountain.split('\n');
-    const act1Start = lines.findIndex(l => l.includes('ACT 1'));
-    const act2Start = lines.findIndex(l => l.includes('ACT 2'));
-    const act3Start = lines.findIndex(l => l.includes('ACT 3'));
-    
-    const act1Lines = lines.slice(act1Start, act2Start);
-    const act2Lines = lines.slice(act2Start, act3Start);
-    const act3Lines = lines.slice(act3Start);
-    
-    // Reorder: 3-1-2
-    const swappedFountain = [...act3Lines, ...act1Lines, ...act2Lines].join('\n');
-    const swapped = await runScriptDoctor(swappedFountain);
-    
-    assert.ok(intact.storyGraph && swapped.storyGraph, 'Both reports should have story graphs');
-    
-    // The forwardEdgeRatio should be affected by act-swap
-    // Intact scripts generally have forward temporal flow
-    // This assertion may be weak without actual promise edges, but tests the mechanism
-    assert.ok(typeof intact.storyGraph.graph.forwardEdgeRatio === 'number');
-    assert.ok(typeof swapped.storyGraph.graph.forwardEdgeRatio === 'number');
+    assert.ok(
+      intactRatio > swappedRatio,
+      `forwardEdgeRatio must be strictly higher on the intact cut ` +
+      `(intact ${intactRatio}, act-swapped ${swappedRatio}). Measured 1.0 vs 0.5. ` +
+      'Equal values mean the metric has stopped responding to scene order — which is ' +
+      'what a constant stub looks like, and what this test failed to notice for its ' +
+      'entire previous life.',
+    );
+    assert.equal(
+      intactRatio, 1,
+      'the intact cut pays its ledger promise forward, so every paid promise is forward',
+    );
+    assert.equal(
+      swappedRatio, 0.5,
+      'the act-swapped cut has NO paid promise left, so computeGraphMetrics returns its ' +
+      '0.5 no-data sentinel — see the block comment: this is a lost payoff, not a ' +
+      'reversed edge',
+    );
   });
-  
+
+  it('act-swapping inverts arcCoherence — the metric that actually reads scene order', async () => {
+    const intact = await runScriptDoctor(INTACT_FIXTURE);
+    const swapped = await runScriptDoctor(ACT_SWAPPED_FIXTURE);
+    assert.ok(intact.storyGraph && swapped.storyGraph);
+
+    const intactArc = intact.storyGraph.graph.arcCoherence;
+    const swappedArc = swapped.storyGraph.graph.arcCoherence;
+
+    // arcCoherence is a Pearson correlation of tension against position, so it
+    // is the one graph metric that is *defined* on order. Direction, not type.
+    assert.ok(
+      intactArc > 0,
+      `a draft that builds should correlate tension with position (got ${intactArc.toFixed(3)}, measured +0.679)`,
+    );
+    assert.ok(
+      swappedArc < 0,
+      `the same scenes in the order III-I-II should ANTI-correlate (got ${swappedArc.toFixed(3)}, measured -0.646)`,
+    );
+    assert.ok(
+      intactArc - swappedArc > 1.0,
+      `the act-swap should open a wide gap in arcCoherence (intact ${intactArc.toFixed(3)}, ` +
+      `swapped ${swappedArc.toFixed(3)}, gap ${(intactArc - swappedArc).toFixed(3)}, measured 1.325)`,
+    );
+  });
+
+  it('act-swapping strands the promise it used to pay — promisePaymentRatio and graphHealth both fall', async () => {
+    const intact = await runScriptDoctor(INTACT_FIXTURE);
+    const swapped = await runScriptDoctor(ACT_SWAPPED_FIXTURE);
+    assert.ok(intact.storyGraph && swapped.storyGraph);
+
+    assert.ok(
+      intact.storyGraph.graph.promisePaymentRatio > swapped.storyGraph.graph.promisePaymentRatio,
+      `promisePaymentRatio must fall when the payoff is cut adrift from its setup ` +
+      `(intact ${intact.storyGraph.graph.promisePaymentRatio}, ` +
+      `swapped ${swapped.storyGraph.graph.promisePaymentRatio}; measured 0.167 vs 0)`,
+    );
+    assert.ok(
+      swapped.storyGraph.graph.unpaidPromises.length > intact.storyGraph.graph.unpaidPromises.length,
+      'the stranded promise must show up as unpaid, not vanish from the accounting',
+    );
+    assert.ok(
+      intact.storyGraph.graphHealth > swapped.storyGraph.graphHealth + 20,
+      `graphHealth composites the three metrics above, so it must drop hard on the swap ` +
+      `(intact ${intact.storyGraph.graphHealth}, swapped ${swapped.storyGraph.graphHealth}; ` +
+      'measured 64 vs 25)',
+    );
+  });
+
   it('detects backward arcs in degraded scripts', async () => {
-    const fountain = `
-= ACT 3
-
-INT. END - DAY
-
-This should be the ending but appears first.
-
-= ACT 1
-
-INT. START - DAY
-
-This should be the start but appears in the middle.
-
-= ACT 2
-
-INT. MIDDLE - DAY
-
-This should be the middle but appears last.
-    `.trim();
-    
-    const report = await runScriptDoctor(fountain);
+    // The degraded script here is the committed act-swapped fixture, not a
+    // 3-scene sketch: a backward arc needs enough scenes to HAVE an arc.
+    const report = await runScriptDoctor(ACT_SWAPPED_FIXTURE);
     assert.ok(report.storyGraph);
-    
-    // With scenes explicitly out of order, forwardEdgeRatio should be lower
-    // The actual value depends on whether promises exist, but the metric should exist
-    assert.ok(typeof report.storyGraph.graph.forwardEdgeRatio === 'number');
-    assert.ok(report.storyGraph.graph.forwardEdgeRatio >= 0);
-    assert.ok(report.storyGraph.graph.forwardEdgeRatio <= 1);
+
+    // A backward arc means tension falls as position rises. Assert the sign,
+    // which is the claim the test's name makes — not the range, which every
+    // possible value satisfies.
+    assert.ok(
+      report.storyGraph.graph.arcCoherence < 0,
+      `a script whose acts run III-I-II should register a NEGATIVE arcCoherence, ` +
+      `got ${report.storyGraph.graph.arcCoherence.toFixed(3)}`,
+    );
+    assert.ok(
+      report.storyGraph.graph.escalationMonotonicity < 1,
+      `escalation must not read as perfectly monotonic on a scrambled cut ` +
+      `(got ${report.storyGraph.graph.escalationMonotonicity})`,
+    );
   });
 });
 
