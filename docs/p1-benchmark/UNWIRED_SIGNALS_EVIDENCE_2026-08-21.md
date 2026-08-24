@@ -94,14 +94,24 @@ revelation *prose* to match against a lexicon; the ops-derived path's
 `revelation` field is populated only from `UPDATE_BELIEF` ops, which the
 stress-ledger converter never emits, so Channel 1 is unreachable via this
 bridge for the same reason as agency-signal/truth-extraction below — only
-Channel 2 is testable. (b) The converter's `SHIFT_RELATIONSHIP` amplitudes
-(0.15–0.5) are roughly 10x smaller than `reversal-detection.ts`'s own
-established/swing thresholds (3/4), which were tuned against real
-fountain-text amplitudes (`RELATIONSHIP_SHIFT_THRESHOLD=2`, per-scene cap
-5). Run as shipped, Channel 2 will structurally under-fire on this bridge
-regardless of the real reversal rate — an owner run needs a corpus-
-appropriate rescale (a threshold-tuning decision that needs the actual data
-distribution, out of scope for this evidence lane).
+Channel 2 is testable. (b) **FIXED 2026-08-24 in `434be38c` — this caveat is
+discharged; the owner run below is now safe to take at face value.** The
+converter's `SHIFT_RELATIONSHIP` amplitudes (0.15–0.5) are roughly 10x
+smaller than `reversal-detection.ts`'s own established/swing thresholds
+(3/4), which were tuned against real fountain-text amplitudes
+(`RELATIONSHIP_SHIFT_THRESHOLD=2`, per-scene cap 5). Run as shipped in
+August 2026, Channel 2 structurally under-fired on this bridge regardless of
+the real reversal rate, so the owner run would have measured the scale
+rather than the detector. The fix does not retune the thresholds — it
+expresses them in the producer's own unit (`inferAmplitudeScale` /
+`ReversalDetectionOptions.amplitudeScale`), returning exactly 1 (a
+byte-for-byte no-op) for the text path's integer convention and
+`max(|amount|)/5` otherwise, which maps this bridge's 0.5 ceiling to 0.1 and
+turns (3, 4) into (0.3, 0.4). `scripts/measure-unwired-signals.ts` now
+prints the inferred scale per film, so a run reporting `1.0` across the
+board is a signal that the bridge changed and the numbers need a second
+look. Still not a scoring change: the module remains unwired and outside
+`doctor.ts`'s import graph, and `check-scoring-receipt` exits 0 over the fix.
 
 **Measured (Part B, 44 in-repo real scripts, this session):**
 
@@ -141,10 +151,12 @@ QUAL_DIR=<path>/screenplay_training/corpus/07_quality_scores \
 node --experimental-strip-types scripts/measure-unwired-signals.ts
 ```
 
+The amplitude mismatch that used to make this run uninterpretable is fixed
+(`434be38c`, 2026-08-24); the rescale is applied automatically and reported
+per film, so no manual threshold edit is needed for this run.
+
 If Channel 2 clears a meaningful precision/recall bar against the labeled
-`reversal` field (after correcting the amplitude mismatch — rescale the
-bridge's `SHIFT_RELATIONSHIP` amounts to the real-text scale, or lower
-`establishedThreshold`/`swingThreshold` for this corpus run only), it is a
+`reversal` field, it is a
 wiring candidate; a subsequent AUC-24 real-corpus run per the P1 protocol
 (CLAUDE.md's "Which floor, exactly") would then decide whether to route it
 into a bounded deduction. Channel 1 stays unwired regardless — it needs raw
@@ -355,7 +367,7 @@ itself.
 
 | Signal | 125-film corpus (this session) | In-repo real-prose (measured) | Recommendation |
 |---|---|---|---|
-| reversal-detection (Ch. 2) | CANNOT-MEASURE (corpus absent); structurally reachable in principle, with an amplitude-mismatch caveat | 0/44 disagreement, 0/44 moved under degradation | WIRE — evidence incomplete, discharge = owner-machine run above |
+| reversal-detection (Ch. 2) | CANNOT-MEASURE (corpus absent); structurally reachable in principle — the amplitude-mismatch caveat is FIXED (`434be38c`, 2026-08-24) | 0/44 disagreement, 0/44 moved under degradation | WIRE — evidence incomplete, discharge = owner-machine run above |
 | reversal-detection (Ch. 1) | CANNOT-MEASURE (no prose in corpus) | n/a (not order-sensitive; disagreement-rate design shared with Ch. 2's count) | stays unwired — needs 761-script prose corpus |
 | agency-signal | CANNOT-MEASURE-MEANINGFULLY (bridge produces no matchable text even if corpus were present) | D1: 2/44 disagree, D2: 4/44 disagree | RETIRE this measurement path; unwired pending 761-script corpus |
 | question-latency-deduction | CANNOT-MEASURE (ops path never populates raised/resolved/unresolved) | GATED n=0 (below 15-scene floor); UNGATED AUC 0.53–0.57, all 3 CIs straddle 0.5 | RETIRE this measurement path; near-chance on best available sample |
