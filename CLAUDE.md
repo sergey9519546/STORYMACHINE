@@ -1,9 +1,12 @@
 # STORYMACHINE — Project Memory
 
-Orientation: `ROADMAP.md` (canonical demand-driven sequence and active phase) ·
-`NORTH_STAR.md` (product constitution) · `ULTRAPLAN.md` (short execution brief) ·
-`ARCHITECTURE.md` (system map) · `README.md` (setup, env vars). Research and
-retired wave material is filed backlog, not active direction; see ROADMAP §8.
+Orientation: `docs/PATH_TO_EXCELLENCE.md` (current lane sequence and live
+status — start here for "what do I do next?") · `ROADMAP.md` (canonical
+demand-driven phase semantics) · `NORTH_STAR.md` (product constitution) ·
+`ARCHITECTURE.md` (system map) · `README.md` (setup, env vars) ·
+`ULTRAPLAN.md` (superseded 2026-08-24; still the shortest statement of the
+P0–P4 briefs and gates). Research and retired wave material is filed
+backlog, not active direction; see ROADMAP §8.
 
 ## Quality bar
 
@@ -83,7 +86,9 @@ before every push. CI runs lint + test + build on every branch, plus a
 
 **The "3 checks + 6 tests per wave, forever" cadence is dead.** It was the
 machine that manufactured the project's biggest liability: the live generated
-rulebook is 3,216 pass-scoped constants (the earlier "~8,917 rules, ~5,701
+rulebook is 3,217 pass-scoped constants (3,216 until PR #257 added
+INVERSE_CHEKHOV_GUN in `33a2ee48`; `docs/rulebook/README.md` is the
+machine-counted authority — the earlier "~8,917 rules, ~5,701
 from a bulk Wave 1191" story was shown to be inaccurate by the 2026-07-14
 audit — `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
 R2-C01), and by the doctor's own measurement (`doctor.ts:1892-1898`) the
@@ -102,7 +107,7 @@ The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
    independently blind-labeled by >=3 experienced readers, with a
    pre-registered split, held-out evaluation, and uncertainty reporting.
    Rebuild around the smallest signal set that actually separates. Add no
-   entries to the current 3,216 generated catalog; treat the distinct rule
+   entries to the current 3,217 generated catalog; treat the distinct rule
    concepts as the maintained conceptual set. Removal is a separate approved
    migration, never implied by "freeze."
 3. **P2 — Collapse the surface to Doctor + Editor.** Everything else
