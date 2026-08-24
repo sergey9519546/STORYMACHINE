@@ -1,21 +1,26 @@
 // server/nvm/analyze/story-vector.ts — Story Vector Embedding primitive for
-// comparative screenplay analysis. Converts Script Doctor's 3,216-dimensional
-// rule-firing pattern into a normalized vector representation for similarity
-// search, clustering, and structural pattern extraction.
+// comparative screenplay analysis. Converts Script Doctor's rule-firing
+// pattern into a normalized vector representation for similarity search,
+// clustering, and structural pattern extraction.
 //
 // ARCHITECTURE: Script Doctor already produces a rule-firing vector (how many
-// times each of ~1,300 rules across 14 passes triggered). This module treats
-// that as a raw structural fingerprint and provides:
+// times each rule across the 14 passes triggered). This module treats that as
+// a raw structural fingerprint and provides:
 //   1. Vectorization — normalize the raw counts to unit L2-norm
-//   2. Similarity — cosine similarity between any two vectors (range [0,1])
-//   3. Nearest neighbors — find k most similar scripts from a corpus
-//   4. Clustering — group scripts by structural similarity
+//   2. Alignment — project vectors onto one shared dimension space
+//   3. Similarity — cosine similarity between any two vectors (range [0,1])
+//   4. Nearest neighbors — find k most similar scripts from a corpus
+//   5. Clustering — group scripts by structural similarity
 //
-// The 3,216 dimensions come from: 14 passes × ~230 rules per pass (average),
-// with each dimension representing how many times that specific rule fired.
-// Scripts with similar structural patterns (pacing issues in the same places,
-// similar character-arc shapes, parallel plot construction) cluster together
-// in this space regardless of genre or surface content.
+// DIMENSION COUNT IS NOT FIXED. RULE_INDEX (bottom of this file) is built
+// lazily from the (pass, rule) keys actually encountered, so a vector's length
+// is "how many distinct rules this process has seen so far", not a constant.
+// This header used to state a fixed 3,2xx-dimensional space; it never was one.
+// Every vector therefore carries `ruleKeys` — its own dimension-to-rule
+// mapping — and alignVectors() reconciles vectors by rule NAME before any
+// distance math. Scripts with similar structural patterns (pacing issues in
+// the same places, similar character-arc shapes, parallel plot construction)
+// cluster together in this space regardless of genre or surface content.
 
 import crypto from 'node:crypto';
 import type { RevisionIssue, PassName } from '../revision/passes/types.ts';
@@ -31,12 +36,34 @@ type TaggedIssue = RevisionIssue & { pass: PassName };
 // ── Core Types ─────────────────────────────────────────────────────────────
 
 export interface StoryVector {
-  /** 3,216-dimensional vector, L2-normalized to unit length. Each dimension
-   *  corresponds to a specific diagnostic rule's firing count. Dimensions are
-   *  ordered by pass (structure, pacing, rhythm, ...) then alphabetically by
-   *  rule name within each pass for deterministic indexing. */
+  /** L2-normalized (unit length) vector. Each dimension corresponds to one
+   *  specific diagnostic rule's firing count. The dimension count is NOT
+   *  fixed: RULE_INDEX is built lazily from the rules actually encountered
+   *  (see its comment below), so two vectors built in different processes —
+   *  or in the same process from different scripts — routinely have different
+   *  lengths. `ruleKeys` is what makes them comparable anyway. */
   dimensions: number[];
-  
+
+  /** The exact dimension-to-rule mapping this vector was built against:
+   *  ruleKeys[i] is the "pass::rule" key that dimensions[i] counts.
+   *
+   *  WHY THIS EXISTS (2026-08-24 fix). RULE_INDEX is a per-process, lazily
+   *  grown, encounter-ordered list. Two consequences made every multi-vector
+   *  comparison unsafe before this field existed: (1) a vector built earlier
+   *  in a process is SHORTER than one built later, so cosineSimilarity threw
+   *  "Dimension mismatch"; (2) across processes the same index position can
+   *  denote a DIFFERENT rule, because the append order depends on which
+   *  scripts were vectorized first — which is silently wrong rather than
+   *  loud. Carrying the axis labels on the vector lets alignVectors() project
+   *  everything into one shared, sorted key space by NAME instead of by
+   *  position, which is correct in both cases.
+   *
+   *  Optional only for backward compatibility with vectors deserialized from
+   *  a pre-2026-08-24 cache file. Anything this module builds always sets it,
+   *  and server/lib/corpus-loader.ts treats its absence as a stale cache row. */
+  ruleKeys?: readonly string[];
+
+
   metadata: {
     /** Human-readable title (from screenplay filename or user input) */
     title: string;
@@ -75,7 +102,8 @@ export interface Cluster {
   /** Vectors assigned to this cluster */
   members: StoryVector[];
   
-  /** Centroid position in 3,216-d space (the cluster's "average" vector) */
+  /** Centroid position in the cluster run's aligned dimension space (the
+   *  cluster's "average" vector) */
   centroid: number[];
   
   /** Within-cluster sum of squared distances (compactness measure) */
@@ -91,9 +119,10 @@ export interface Neighbor {
 
 // ── Vectorization ──────────────────────────────────────────────────────────
 
-/** Convert Script Doctor's raw issue list into a 3,216-dimensional vector.
- *  Each dimension = count of how many times that specific rule fired, then
- *  L2-normalize to unit length for cosine similarity.
+/** Convert Script Doctor's raw issue list into a story vector. Each dimension
+ *  = count of how many times that specific rule fired, then L2-normalize to
+ *  unit length for cosine similarity. The number of dimensions is however many
+ *  distinct (pass, rule) keys RULE_INDEX holds at call time — see the header.
  * 
  *  RULE ORDERING: Dimensions are sorted first by pass name (alphabetically),
  *  then by rule name (alphabetically) within each pass. This is FIXED at
@@ -131,6 +160,9 @@ function vectorizeFromIssuesCore(
 
   return {
     dimensions,
+    // Snapshot, not a live reference: RULE_INDEX keeps growing after this
+    // call, and this vector's axes are frozen at the length it had here.
+    ruleKeys: [...RULE_INDEX],
     metadata: {
       ...metadata,
       timestamp: new Date().toISOString(),
@@ -185,6 +217,82 @@ export async function vectorizeScript(
     ...vector,
     metadata: { ...vector.metadata, wholeDraftAnalysisComplete: true },
   };
+}
+
+// ── Dimension Alignment ────────────────────────────────────────────────────
+
+/** Project a set of vectors into one shared, deterministic dimension space so
+ *  they can actually be compared.
+ *
+ *  THE PROBLEM THIS SOLVES. RULE_INDEX (below) is per-process, append-only and
+ *  ENCOUNTER-ORDERED. Vectorize a user's draft, then the corpus, and the draft
+ *  ends up with fewer dimensions than every corpus entry — which is exactly
+ *  what POST /api/nvm/analyze/compare did on every single request, producing
+ *  "Dimension mismatch: 2 vs 185" out of cosineSimilarity and a 500. Worse,
+ *  the same position can mean a different rule in a different process (the
+ *  append order follows whichever script was vectorized first), so a warm
+ *  corpus cache could line up positionally and still be comparing unrelated
+ *  rules — wrong numbers with no error at all. clusterCorpus has no length
+ *  guard whatsoever, so there the failure is a silent NaN centroid.
+ *
+ *  THE FIX. Every vector carries `ruleKeys` (its own axis labels). Take the
+ *  union of all keys, SORT it (so the result depends only on the set of keys
+ *  present, never on call order or on which process built which vector), and
+ *  rewrite each vector's dimensions into that order, filling 0 for a rule a
+ *  given vector never saw. Zero is the honest value: an absent key means that
+ *  rule fired zero times.
+ *
+ *  This is loss-free and geometry-preserving. Re-projection is a permutation
+ *  plus zero-extension, and neither changes an L2 norm or a dot product, so
+ *  aligned vectors stay unit-length and every similarity/distance computed
+ *  from them is the value the un-aligned math was reaching for.
+ *
+ *  Legacy inputs: a vector with no `ruleKeys` (deserialized from a cache file
+ *  written before the field existed) cannot be projected, because nothing
+ *  records what its positions meant. If every input already has the same
+ *  length, they are returned untouched — the pre-existing positional
+ *  assumption, unchanged. If lengths differ, this throws rather than guessing,
+ *  because guessing is how silently-wrong similarity gets shipped.
+ *
+ *  @param vectors - Vectors to bring into a common space
+ *  @returns Vectors with identical, sorted dimension ordering (input order
+ *           preserved; metadata carried through untouched) */
+export function alignVectors(vectors: StoryVector[]): StoryVector[] {
+  if (vectors.length <= 1) return vectors;
+
+  const allKeyed = vectors.every(v => v.ruleKeys !== undefined);
+  if (!allKeyed) {
+    const lengths = new Set(vectors.map(v => v.dimensions.length));
+    if (lengths.size === 1) return vectors;
+    throw new Error(
+      `Cannot align vectors of differing length (${[...lengths].join(', ')}) without ruleKeys — `
+      + 're-vectorize the inputs so each carries its dimension-to-rule mapping.',
+    );
+  }
+
+  // Fast path: identical axis labels already (the common case once every
+  // vector in a request came from the same primed index).
+  const first = vectors[0].ruleKeys as readonly string[];
+  const alreadyAligned = vectors.every(v => {
+    const keys = v.ruleKeys as readonly string[];
+    return keys.length === first.length && keys.every((k, i) => k === first[i]);
+  });
+  if (alreadyAligned) return vectors;
+
+  const union = new Set<string>();
+  for (const v of vectors) for (const key of v.ruleKeys as readonly string[]) union.add(key);
+  const sharedKeys = [...union].sort();
+
+  return vectors.map(v => {
+    const keys = v.ruleKeys as readonly string[];
+    const byKey = new Map<string, number>();
+    for (let i = 0; i < keys.length; i++) byKey.set(keys[i], v.dimensions[i] ?? 0);
+    return {
+      ...v,
+      dimensions: sharedKeys.map(key => byKey.get(key) ?? 0),
+      ruleKeys: sharedKeys,
+    };
+  });
 }
 
 // ── Similarity & Distance ──────────────────────────────────────────────────
@@ -242,7 +350,14 @@ export function euclideanDistance(v1: StoryVector, v2: StoryVector): number {
 
 /** Find k most similar vectors from a corpus. Returns results sorted by
  *  descending similarity (most similar first).
- * 
+ *
+ *  The query and the corpus are aligned onto a shared dimension space first
+ *  (see alignVectors) — a draft vectorized before the corpus has a shorter,
+ *  differently-ordered index, and comparing it raw either throws or silently
+ *  compares the wrong rules. The returned `vector` is the caller's ORIGINAL
+ *  corpus object, not the aligned copy, so object identity and any cached
+ *  dimensions the caller holds are left alone.
+ *
  *  @param query - The screenplay to compare
  *  @param corpus - Reference library of vectors to search
  *  @param k - How many neighbors to return (default 5)
@@ -252,13 +367,15 @@ export function findNearestNeighbors(
   corpus: StoryVector[],
   k: number = 5
 ): Neighbor[] {
+  const [alignedQuery, ...alignedCorpus] = alignVectors([query, ...corpus]);
+
   // Compute similarity to every corpus vector
-  const neighbors: Neighbor[] = corpus.map(corpusVec => ({
-    vector: corpusVec,
-    similarity: cosineSimilarity(query, corpusVec),
-    distance: euclideanDistance(query, corpusVec),
+  const neighbors: Neighbor[] = alignedCorpus.map((alignedVec, i) => ({
+    vector: corpus[i],
+    similarity: cosineSimilarity(alignedQuery, alignedVec),
+    distance: euclideanDistance(alignedQuery, alignedVec),
   }));
-  
+
   // Sort by similarity (descending) and take top k
   neighbors.sort((a, b) => b.similarity - a.similarity);
   return neighbors.slice(0, k);
@@ -268,28 +385,37 @@ export function findNearestNeighbors(
 
 /** K-means clustering: group vectors by structural similarity. Uses Lloyd's
  *  algorithm with k-means++ initialization for stable cluster assignment.
- * 
- *  @param vectors - Vectors to cluster
+ *
+ *  Inputs are aligned onto a shared dimension space first (see alignVectors).
+ *  This matters more here than anywhere else in the module: every distance
+ *  loop below indexes `dimensions[i]` with NO length guard, so a vector
+ *  shorter than the first one reads `undefined` past its end and propagates
+ *  NaN through every centroid, every assignment and every inertia — a wrong
+ *  clustering with nothing thrown to catch it. Members and centroids in the
+ *  returned clusters are therefore expressed in the aligned space.
+ *
+ *  @param inputVectors - Vectors to cluster
  *  @param numClusters - How many clusters to create (k)
  *  @param maxIterations - Maximum Lloyd iterations (default 100)
  *  @param seed - Random seed for deterministic k-means++ init (default 42)
  *  @returns Array of clusters with centroids and inertia */
 export function clusterCorpus(
-  vectors: StoryVector[],
+  inputVectors: StoryVector[],
   numClusters: number,
   maxIterations: number = 100,
   seed: number = 42
 ): Cluster[] {
-  if (vectors.length === 0) {
+  if (inputVectors.length === 0) {
     return [];
   }
-  
-  if (numClusters <= 0 || numClusters > vectors.length) {
-    throw new Error(`Invalid numClusters: ${numClusters} (corpus has ${vectors.length} vectors)`);
+
+  if (numClusters <= 0 || numClusters > inputVectors.length) {
+    throw new Error(`Invalid numClusters: ${numClusters} (corpus has ${inputVectors.length} vectors)`);
   }
-  
+
+  const vectors = alignVectors(inputVectors);
   const dimensions = vectors[0].dimensions.length;
-  
+
   // Seeded RNG for deterministic k-means++
   let rngState = seed;
   const seededRandom = (): number => {
@@ -409,31 +535,29 @@ export function clusterCorpus(
 
 // ── Rule Index (Dimension Ordering) ────────────────────────────────────────
 
-/** Fixed mapping from dimension index → rule key. Built once at module load
- *  time by enumerating all possible (pass, rule) pairs in deterministic order.
- *  Every StoryVector built by this module uses this EXACT ordering, so
- *  dimension 0 always means the same rule across all vectors.
- * 
- *  CONSTRUCTION: We can't actually enumerate the real rules at module load
- *  time (the 14 pass files are not imported here, and they define rules
- *  dynamically via function bodies), so this is a PLACEHOLDER that assumes
- *  3,216 synthetic rules. The real implementation would need to either:
+/** Per-process, append-only mapping from dimension index → "pass::rule" key.
+ *
+ *  WHAT IT ACTUALLY IS (corrected 2026-08-24 — the previous version of this
+ *  comment opened by calling it a fixed module-load-time enumeration in which
+ *  "dimension 0 always means the same rule across all vectors", then two
+ *  paragraphs later admitted the opposite): it starts EMPTY and grows on every
+ *  vectorizeFromIssues call, appending whichever keys that call introduced,
+ *  sorted among themselves. So the index is a function of which scripts this
+ *  process has vectorized and in what order — dimension 0 means the same rule
+ *  only within one uninterrupted sequence in one process.
+ *
+ *  Enumerating the real rule set up front is still the better design, and
+ *  would need one of:
  *    (a) Import all 14 pass files and extract their rule sets, OR
  *    (b) Define rules in a central registry that both passes and this module
  *        read from, OR
- *    (c) Build the index lazily on first vectorization by inspecting a real
- *        Script Doctor report's issue list.
- * 
- *  For now, we use a synthetic index that treats each unique (pass, rule)
- *  pair encountered in an issue list as a new dimension. The order is:
- *    1. Sort by pass name (alphabetically)
- *    2. Within each pass, sort by rule name (alphabetically)
- * 
- *  This is deterministic AS LONG AS the same set of rules appears across all
- *  vectors being compared. If a new rule is added to a pass, old vectors
- *  remain valid (they just have 0 for that dimension), but new vectors will
- *  have one extra dimension. For production use, the index should be frozen
- *  to a fixed rule set and versioned. */
+ *    (c) Freeze a versioned snapshot of the generated rulebook and index
+ *        against that.
+ *  None of those is done here. What IS done, so that the lazy index cannot
+ *  produce wrong comparisons in the meantime: every vector records its own
+ *  `ruleKeys`, and alignVectors() reconciles by key before any distance math.
+ *  A new rule appearing in a later pass simply becomes a new shared dimension
+ *  that older vectors carry as 0 — which is the truth about them. */
 const RULE_INDEX: string[] = (() => {
   // For now, return an empty array — it will be populated dynamically on
   // first vectorization. See buildRuleIndex() below.

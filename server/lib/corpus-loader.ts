@@ -2,9 +2,10 @@
 // corpus for Story Vector comparative analysis. Handles caching to avoid
 // re-running Script Doctor (expensive) on every server restart.
 //
-// ARCHITECTURE: The corpus lives in data/screenplays/ as Fountain files with
-// a manifest.json describing metadata. This loader:
-//   1. Reads manifest.json to enumerate available screenplays
+// ARCHITECTURE: The corpus lives in data/screenplays/ as Fountain files, with
+// an OPTIONAL manifest.json describing metadata. This loader:
+//   1. Enumerates available screenplays (manifest.json if present, otherwise a
+//      direct scan of data/screenplays/*.fountain — see resolveCorpusEntries)
 //   2. Vectorizes each via Script Doctor → story-vector.ts
 //   3. Caches computed vectors to data/screenplays/.vectors/ as JSON
 //   4. Returns StoryVector[] ready for nearest-neighbor / clustering
@@ -50,6 +51,104 @@ interface ManifestEntry {
 
 type Manifest = ManifestEntry[];
 
+// ── Corpus Entry Resolution ────────────────────────────────────────────────
+
+/** One resolvable corpus screenplay: a slug plus the Fountain file to read.
+ *  sceneCount/wordCount are OPTIONAL because they are manifest-only metadata
+ *  — the directory-scan path has no manifest to read them from, and
+ *  vectorizeScript already fills both from the real Script Doctor report. */
+interface CorpusEntry {
+  slug: string;
+  fountainPath: string;
+  sceneCount?: number;
+  wordCount?: number;
+}
+
+const FOUNTAIN_EXT = '.fountain';
+
+/** Enumerate the corpus: manifest first, directory scan as the floor.
+ *
+ *  WHY THE FALLBACK EXISTS (2026-08-24 fix). manifest.json is written by
+ *  exactly one thing — scripts/convert-screenplays.ts, which converts PDFs
+ *  from a private local source directory — and `data/` is gitignored, so the
+ *  manifest can never be committed. Every fresh checkout therefore had NO
+ *  manifest, while data/screenplays/ DOES ship tracked CC0 Fountain scripts
+ *  (force-added, see data/screenplays/LICENSE-live-action.md). The result was
+ *  an unconditional ENOENT out of fs.readFile that reached the Express error
+ *  handler: POST /api/nvm/analyze/compare and GET /api/nvm/analyze/corpus-stats
+ *  both returned 500 "Internal Server Error" on every install, with the real
+ *  cause visible only in an unhandled_error log line. Reading the directory
+ *  when the manifest is absent makes the shipped corpus BE the corpus.
+ *
+ *  Precedence is deliberate: when a manifest exists it wins, because it is the
+ *  richer and more selective source — it records conversion errors and
+ *  zero-scene extractions that must be skipped, which a bare directory listing
+ *  cannot know about. The scan is a floor, never an override.
+ *
+ *  Failure modes stay distinguishable: a MISSING manifest or a missing corpus
+ *  directory is a normal not-yet-populated state and degrades to fewer (or
+ *  zero) entries; a manifest that exists but is unreadable or malformed still
+ *  throws, because that is a real misconfiguration a caller must see. */
+async function resolveCorpusEntries(): Promise<CorpusEntry[]> {
+  let manifestRaw: string | null = null;
+  try {
+    manifestRaw = await fs.readFile(MANIFEST_PATH, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    manifestRaw = null;
+  }
+
+  if (manifestRaw !== null) {
+    let manifest: Manifest;
+    try {
+      manifest = JSON.parse(manifestRaw);
+    } catch (err) {
+      logger.error('corpus_loader_manifest_parse_failed', { manifestPath: MANIFEST_PATH, error: (err as Error).message });
+      throw new Error('corpus manifest is not valid JSON: ' + (err as Error).message);
+    }
+    if (!Array.isArray(manifest)) {
+      logger.error('corpus_loader_manifest_not_an_array', { manifestPath: MANIFEST_PATH });
+      throw new Error('corpus manifest is not an array of entries');
+    }
+    // Manifest filter (unchanged): skip failed conversions and zero-scene
+    // extractions, which are recorded but not usable as reference vectors.
+    const entries = manifest
+      .filter(entry => !entry.error && !!entry.sceneCount && entry.sceneCount > 0)
+      .map(entry => ({
+        slug: entry.slug,
+        fountainPath: entry.outputFile,
+        sceneCount: entry.sceneCount,
+        wordCount: entry.wordCount,
+      }));
+    logger.info('corpus_loader_manifest_loaded', { validScreenplays: entries.length });
+    return entries;
+  }
+
+  let names: string[];
+  try {
+    names = await fs.readdir(SCREENPLAY_DIR);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    logger.warn('corpus_loader_corpus_dir_missing', { screenplayDir: SCREENPLAY_DIR });
+    return [];
+  }
+
+  const entries = names
+    .filter(name => name.endsWith(FOUNTAIN_EXT))
+    .sort()  // stable enumeration order, so vector ordering is deterministic
+    .map(name => ({
+      slug: name.slice(0, -FOUNTAIN_EXT.length),
+      fountainPath: path.join(SCREENPLAY_DIR, name),
+    }));
+
+  if (entries.length === 0) {
+    logger.warn('corpus_loader_corpus_empty', { screenplayDir: SCREENPLAY_DIR });
+  } else {
+    logger.info('corpus_loader_directory_scan', { screenplays: entries.length, reason: 'no manifest.json' });
+  }
+  return entries;
+}
+
 // ── Cache Management ───────────────────────────────────────────────────────
 
 /** Ensure cache directory exists */
@@ -76,15 +175,21 @@ async function loadCachedVector(
     const json = await fs.readFile(cachePath, 'utf-8');
     const cached = JSON.parse(json) as StoryVector;
     
-    // Validate cache: hash and whole-draft receipt must match. The receipt
-    // intentionally invalidates legacy cache rows, which predate the
-    // truncation guard and could contain a prefix vector labeled with a full
-    // script hash.
+    // Validate cache: hash, whole-draft receipt, and axis labels must all be
+    // present. The receipt intentionally invalidates legacy cache rows, which
+    // predate the truncation guard and could contain a prefix vector labeled
+    // with a full script hash. ruleKeys does the same job for a second class
+    // of legacy row: a vector cached before ruleKeys existed carries no record
+    // of what its dimension positions meant, and the index order is
+    // per-process (see story-vector.ts's RULE_INDEX), so reusing one would
+    // compare rule N of this process against rule N of some earlier one.
+    // Re-vectorizing is cheap; a silently mis-aligned similarity is not.
     if (
       cached.metadata.contentHash !== contentHash ||
-      cached.metadata.wholeDraftAnalysisComplete !== true
+      cached.metadata.wholeDraftAnalysisComplete !== true ||
+      !Array.isArray(cached.ruleKeys)
     ) {
-      return null; // Cache stale (Fountain text changed)
+      return null; // Cache stale (Fountain text changed, or pre-ruleKeys row)
     }
     
     return cached;
@@ -116,26 +221,8 @@ export async function loadCorpusVectors(
   cacheDir?: string,
   progressCallback?: (current: number, total: number, slug: string) => void
 ): Promise<StoryVector[]> {
-  // Read manifest
-  const manifestRaw = await fs.readFile(MANIFEST_PATH, 'utf-8');
-  let manifest: Manifest;
-  try {
-    manifest = JSON.parse(manifestRaw);
-  } catch (err) {
-    logger.error('corpus_loader_manifest_parse_failed', { manifestPath: MANIFEST_PATH, error: (err as Error).message });
-    throw new Error('corpus manifest is not valid JSON: ' + (err as Error).message);
-  }
+  const validEntries = await resolveCorpusEntries();
 
-  // Filter to valid screenplays only (skip errors and zero-scene files)
-  const validEntries = manifest.filter(entry => {
-    if (entry.error) return false;
-    if (entry.sceneCount === 0) return false;
-    if (!entry.sceneCount) return false; // undefined/null
-    return true;
-  });
-  
-  logger.info('corpus_loader_manifest_loaded', { validScreenplays: validEntries.length });
-  
   const vectors: StoryVector[] = [];
   const { vectorizeScript } = await import('../nvm/analyze/story-vector.ts');
   const { computeContentHash } = await import('../nvm/analyze/doctor.ts');
@@ -149,7 +236,7 @@ export async function loadCorpusVectors(
     }
     
     // Read Fountain file
-    const fountainPath = entry.outputFile;
+    const fountainPath = entry.fountainPath;
     let fountainText: string;
     try {
       fountainText = await fs.readFile(fountainPath, 'utf-8');
@@ -173,11 +260,15 @@ export async function loadCorpusVectors(
     logger.info('corpus_loader_cache_miss', { slug, note: 'vectorizing (this may take 30-60s)' });
     try {
       const vector = await vectorizeScript(fountainText, entry.slug, 'corpus');
-      
-      // Enhance metadata with manifest info
-      vector.metadata.sceneCount = entry.sceneCount;
-      vector.metadata.wordCount = entry.wordCount;
-      
+
+      // Enhance metadata with manifest info WHEN THERE IS ANY. Guarded because
+      // directory-scan entries carry no counts: an unconditional assignment
+      // would overwrite the real Script Doctor-derived sceneCount/wordCount
+      // vectorizeScript just set with `undefined`, and the response would then
+      // report a missing count for a script that was fully measured.
+      if (entry.sceneCount !== undefined) vector.metadata.sceneCount = entry.sceneCount;
+      if (entry.wordCount !== undefined) vector.metadata.wordCount = entry.wordCount;
+
       // Save to cache
       await saveCachedVector(slug, vector);
       
@@ -199,29 +290,15 @@ export async function loadCorpusVectors(
  *  @param slug - Screenplay slug from manifest
  *  @returns StoryVector or null if not found */
 export async function loadSingleVector(slug: string): Promise<StoryVector | null> {
-  // Read manifest
-  const manifestRaw = await fs.readFile(MANIFEST_PATH, 'utf-8');
-  let manifest: Manifest;
-  try {
-    manifest = JSON.parse(manifestRaw);
-  } catch (err) {
-    logger.error('corpus_loader_manifest_parse_failed', { manifestPath: MANIFEST_PATH, slug, error: (err as Error).message });
-    throw new Error('corpus manifest is not valid JSON: ' + (err as Error).message);
-  }
-
-  // Find entry
-  const entry = manifest.find(e => e.slug === slug);
+  // resolveCorpusEntries has already applied the manifest's error/zero-scene
+  // filter, so an entry that comes back here is by construction usable.
+  const entry = (await resolveCorpusEntries()).find(e => e.slug === slug);
   if (!entry) {
     return null;
   }
-  
-  // Validate entry
-  if (entry.error || entry.sceneCount === 0) {
-    return null;
-  }
-  
+
   // Read Fountain
-  const fountainText = await fs.readFile(entry.outputFile, 'utf-8');
+  const fountainText = await fs.readFile(entry.fountainPath, 'utf-8');
   const { computeContentHash } = await import('../nvm/analyze/doctor.ts');
   const contentHash = computeContentHash(fountainText);
   
@@ -234,31 +311,24 @@ export async function loadSingleVector(slug: string): Promise<StoryVector | null
   // Vectorize
   const { vectorizeScript } = await import('../nvm/analyze/story-vector.ts');
   const vector = await vectorizeScript(fountainText, entry.slug, 'corpus');
-  vector.metadata.sceneCount = entry.sceneCount;
-  vector.metadata.wordCount = entry.wordCount;
-  
+  // Guarded for the same reason as loadCorpusVectors above: a directory-scan
+  // entry has no manifest counts, and must not blank out the measured ones.
+  if (entry.sceneCount !== undefined) vector.metadata.sceneCount = entry.sceneCount;
+  if (entry.wordCount !== undefined) vector.metadata.wordCount = entry.wordCount;
+
   // Cache and return
   await saveCachedVector(slug, vector);
   return vector;
 }
 
-/** Get list of available screenplay slugs from manifest (for enumeration).
- *  Only returns valid screenplays (no errors, sceneCount > 0).
- * 
- *  @returns Array of slugs */
+/** Get list of available screenplay slugs (for enumeration). Reads the
+ *  manifest when there is one, otherwise the shipped Fountain files; only
+ *  returns usable screenplays (no conversion errors, sceneCount > 0 where a
+ *  manifest recorded one).
+ *
+ *  @returns Array of slugs (empty when no corpus is installed) */
 export async function getAvailableSlugs(): Promise<string[]> {
-  const manifestRaw = await fs.readFile(MANIFEST_PATH, 'utf-8');
-  let manifest: Manifest;
-  try {
-    manifest = JSON.parse(manifestRaw);
-  } catch (err) {
-    logger.error('corpus_loader_manifest_parse_failed', { manifestPath: MANIFEST_PATH, error: (err as Error).message });
-    throw new Error('corpus manifest is not valid JSON: ' + (err as Error).message);
-  }
-
-  return manifest
-    .filter(e => !e.error && e.sceneCount && e.sceneCount > 0)
-    .map(e => e.slug);
+  return (await resolveCorpusEntries()).map(e => e.slug);
 }
 
 /** Clear all cached vectors (force re-vectorization on next load). Useful for

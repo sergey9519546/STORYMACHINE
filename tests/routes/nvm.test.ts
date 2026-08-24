@@ -237,6 +237,99 @@ describe('routes/nvm — HTTP behavior', async () => {
     assert.equal(res.status, 400);
   });
 
+  // Regression, 2026-08-24. This route was 500ing on EVERY well-formed
+  // request, for two independent reasons, and nothing covered its success
+  // path — the three cases above only ever exercise 400/422 rejections, so
+  // the endpoint could be (and was) completely non-functional with a green
+  // suite. Reproduced against a booted keyless server before the fix:
+  //
+  //   1. corpus-loader.ts read data/screenplays/manifest.json unconditionally.
+  //      That file is written only by scripts/convert-screenplays.ts from a
+  //      private PDF source dir, and `data/` is gitignored, so no checkout has
+  //      one: "ENOENT: no such file or directory, open '.../manifest.json'".
+  //   2. With the corpus loading, findNearestNeighbors then threw
+  //      "Dimension mismatch: 2 vs 185" — the draft is vectorized BEFORE the
+  //      corpus, so it carries fewer of story-vector.ts's lazily-appended
+  //      RULE_INDEX dimensions than every corpus vector built after it.
+  //
+  // This test asserts the success path end-to-end, so a regression in either
+  // mechanism fails here rather than in production.
+  it('POST /api/nvm/analyze/compare returns a 200 comparison for a complete draft', async () => {
+    const script = [
+      'INT. KITCHEN - DAY',
+      '',
+      'ANNA stares at the kettle. It will not boil.',
+      '',
+      'ANNA',
+      'I have been waiting eleven minutes.',
+      '',
+      'EXT. STREET - NIGHT',
+      '',
+      'Rain. BEN waits under an awning, watching a lit window.',
+      '',
+      'BEN',
+      'She is not coming down.',
+      '',
+      'INT. CAR - NIGHT',
+      '',
+      'Anna drives. Ben rides shotgun, silent.',
+      '',
+      'ANNA',
+      'Say it.',
+      '',
+      'BEN',
+      'I already did.',
+    ].join('\n');
+
+    const res = await fetch(`${server.baseUrl}/api/nvm/analyze/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptText: script }),
+    });
+
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    assert.equal(typeof body.vector.dimensions, 'number');
+    assert.ok(Array.isArray(body.nearestNeighbors));
+    assert.equal(typeof body.corpus.size, 'number');
+    assert.equal(typeof body.healthMetrics.health, 'number');
+
+    // Corpus size and neighbor count must agree: an empty neighbor list is
+    // only honest when there is genuinely no corpus installed.
+    if (body.corpus.size > 0) {
+      assert.ok(
+        body.nearestNeighbors.length > 0,
+        `corpus.size ${body.corpus.size} but zero neighbors returned`,
+      );
+      for (const n of body.nearestNeighbors) {
+        assert.equal(typeof n.similarity, 'number');
+        assert.ok(Number.isFinite(n.similarity), `non-finite similarity for ${n.title}`);
+        assert.ok(n.similarity >= 0 && n.similarity <= 1, `similarity out of range: ${n.similarity}`);
+      }
+    }
+
+    // Honesty: the response must not carry an invented structural genome.
+    // Before 2026-08-24 this field was five hardcoded literals
+    // (actBreakPositions: [], reversalCount: 0, 'linear', 'linear', 0.5)
+    // while docs/story-vector.md advertised measured-looking values for it.
+    if (body.structuralTemplate !== null) {
+      assert.equal(body.structuralTemplate.genome, null);
+      assert.equal(typeof body.structuralTemplate.genomeUnavailableReason, 'string');
+    }
+  });
+
+  it('GET /api/nvm/analyze/corpus-stats returns 200 corpus statistics', async () => {
+    // Same manifest-ENOENT 500 as the compare route above; same fix.
+    const res = await fetch(`${server.baseUrl}/api/nvm/analyze/corpus-stats`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(typeof body.available, 'number');
+    assert.equal(typeof body.cached, 'number');
+    assert.ok(Array.isArray(body.slugs));
+    assert.ok(body.slugs.length <= 10, 'corpus-stats previews at most 10 slugs');
+  });
+
   it('POST /api/nvm/analyze/compare refuses a scene-truncated prefix before making comparative claims', async () => {
     const res = await fetch(`${server.baseUrl}/api/nvm/analyze/compare`, {
       method: 'POST',

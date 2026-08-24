@@ -56,6 +56,7 @@ import type { RevisionIssue, PassName } from '../../server/nvm/revision/passes/t
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import {
   vectorizeFromIssues,
+  alignVectors,
   cosineSimilarity,
   euclideanDistance,
   findNearestNeighbors,
@@ -281,6 +282,164 @@ describe('Story Vector - Similarity', () => {
 
     assert.throws(() => cosineSimilarity(v1, v2), /Dimension mismatch/);
     assert.throws(() => euclideanDistance(v1, v2), /Dimension mismatch/);
+  });
+});
+
+// ── Dimension Alignment Tests ──────────────────────────────────────────────
+//
+// Added 2026-08-24 with alignVectors(). File header note (3) called
+// un-primed sequential vectorization "a live footgun" and worked around it in
+// the fixtures with primeRuleIndex(); POST /api/nvm/analyze/compare could not
+// work around it, because it vectorizes the user's draft first and only then
+// loads the corpus. Reproduced against a booted server, that produced
+// "Dimension mismatch: 2 vs 185" and a 500 on every well-formed request.
+// These tests pin the alignment that makes the un-primed order work.
+
+describe('Story Vector - Dimension Alignment', () => {
+  beforeEach(() => {
+    resetRuleIndex();
+  });
+
+  it('records the dimension-to-rule mapping on every vector it builds', () => {
+    const vector = vectorizeFromIssues(
+      mockIssues([
+        { pass: 'structure', rule: 'RULE_A', count: 1 },
+        { pass: 'pacing', rule: 'RULE_B', count: 1 },
+      ]),
+      { title: 'V', source: 'synthetic', contentHash: 'h' },
+    );
+
+    assert.ok(vector.ruleKeys, 'vector must carry its own axis labels');
+    assert.equal(vector.ruleKeys!.length, vector.dimensions.length);
+    assert.deepEqual([...vector.ruleKeys!].sort(), ['pacing::RULE_B', 'structure::RULE_A']);
+  });
+
+  it('projects differently-indexed vectors onto one sorted key space, zero-filling absent rules', () => {
+    const early = vectorizeFromIssues(
+      mockIssues([{ pass: 'structure', rule: 'RULE_A', count: 4 }]),
+      { title: 'early', source: 'synthetic', contentHash: 'h1' },
+    );
+    const late = vectorizeFromIssues(
+      mockIssues([
+        { pass: 'structure', rule: 'RULE_A', count: 4 },
+        { pass: 'pacing', rule: 'RULE_B', count: 3 },
+      ]),
+      { title: 'late', source: 'synthetic', contentHash: 'h2' },
+    );
+    assert.notEqual(early.dimensions.length, late.dimensions.length);
+
+    const [a, b] = alignVectors([early, late]);
+
+    assert.deepEqual(a.ruleKeys, b.ruleKeys);
+    assert.deepEqual([...a.ruleKeys!], ['pacing::RULE_B', 'structure::RULE_A']);
+    // `early` never saw RULE_B: zero is the honest value for that axis.
+    assert.equal(a.dimensions[0], 0);
+    // Re-projection is a permutation plus zero-extension, so unit length
+    // survives it exactly — that is what keeps cosine similarity valid.
+    const norm = (v: StoryVector) => Math.sqrt(v.dimensions.reduce((s, x) => s + x * x, 0));
+    assertClose(norm(a), 1, 1e-12);
+    assertClose(norm(b), 1, 1e-12);
+  });
+
+  it('leaves already-matching vectors untouched (identity, not a rebuild)', () => {
+    const issues = mockIssues([{ pass: 'structure', rule: 'RULE_A', count: 2 }]);
+    primeRuleIndex(issues);
+    const v1 = vectorizeFromIssues(issues, { title: 'A', source: 'synthetic', contentHash: 'h1' });
+    const v2 = vectorizeFromIssues(issues, { title: 'B', source: 'synthetic', contentHash: 'h2' });
+
+    const aligned = alignVectors([v1, v2]);
+    assert.equal(aligned[0], v1);
+    assert.equal(aligned[1], v2);
+  });
+
+  it('refuses to guess when un-labeled vectors disagree on length', () => {
+    // A vector deserialized from a pre-ruleKeys cache file carries no record
+    // of what its positions meant. Guessing is how silently-wrong similarity
+    // ships, so this throws instead.
+    const legacyShort: StoryVector = {
+      dimensions: [1, 0],
+      metadata: { title: 'legacy', source: 'corpus', contentHash: 'h1', timestamp: new Date().toISOString() },
+    };
+    const legacyLong: StoryVector = {
+      dimensions: [1, 0, 0],
+      metadata: { title: 'legacy2', source: 'corpus', contentHash: 'h2', timestamp: new Date().toISOString() },
+    };
+    assert.throws(() => alignVectors([legacyShort, legacyLong]), /without ruleKeys/);
+
+    // Equal-length un-labeled vectors keep the old positional assumption.
+    const sameLength: StoryVector = { ...legacyLong, metadata: { ...legacyLong.metadata, contentHash: 'h3' } };
+    assert.doesNotThrow(() => alignVectors([legacyLong, sameLength]));
+  });
+
+  it('compares a draft vectorized BEFORE the corpus (the live route order)', () => {
+    // Exactly what POST /api/nvm/analyze/compare does: vectorize the user's
+    // draft, THEN load/vectorize the corpus. Before alignVectors() this threw
+    // "Dimension mismatch" out of cosineSimilarity and 500ed the request.
+    const query = vectorizeFromIssues(
+      mockIssues([{ pass: 'structure', rule: 'RULE_A', count: 8 }]),
+      { title: 'User Draft', source: 'generated', contentHash: 'query' },
+    );
+    const corpus = [
+      vectorizeFromIssues(
+        mockIssues([
+          { pass: 'structure', rule: 'RULE_A', count: 9 },
+          { pass: 'pacing', rule: 'RULE_B', count: 1 },
+        ]),
+        { title: 'near', source: 'corpus', contentHash: 'c1' },
+      ),
+      vectorizeFromIssues(
+        mockIssues([
+          { pass: 'dialogue', rule: 'RULE_C', count: 7 },
+          { pass: 'rhythm', rule: 'RULE_D', count: 7 },
+        ]),
+        { title: 'far', source: 'corpus', contentHash: 'c2' },
+      ),
+    ];
+    assert.notEqual(query.dimensions.length, corpus[1].dimensions.length);
+
+    const neighbors = findNearestNeighbors(query, corpus, 2);
+
+    assert.equal(neighbors.length, 2);
+    for (const n of neighbors) {
+      assert.ok(Number.isFinite(n.similarity), `non-finite similarity for ${n.vector.metadata.title}`);
+      assert.ok(Number.isFinite(n.distance), `non-finite distance for ${n.vector.metadata.title}`);
+    }
+    // The near-identical corpus entry must win; the disjoint one scores 0.
+    assert.equal(neighbors[0].vector.metadata.title, 'near');
+    assertClose(neighbors[1].similarity, 0, 1e-12);
+    // Callers get their own objects back, not aligned copies.
+    assert.equal(neighbors[0].vector, corpus[0]);
+  });
+
+  it('clusters vectors of differing length without propagating NaN', () => {
+    // clusterCorpus has no length guard of its own: a short vector reads
+    // `undefined` past its end and NaN spreads through every centroid and
+    // inertia with nothing thrown. Alignment is what prevents that.
+    const vectors = [
+      vectorizeFromIssues(mockIssues([{ pass: 'structure', rule: 'RULE_A', count: 10 }]),
+        { title: 'S0', source: 'corpus', contentHash: 'h0' }),
+      vectorizeFromIssues(mockIssues([{ pass: 'structure', rule: 'RULE_A', count: 9 }, { pass: 'pacing', rule: 'RULE_B', count: 1 }]),
+        { title: 'S1', source: 'corpus', contentHash: 'h1' }),
+      vectorizeFromIssues(mockIssues([{ pass: 'dialogue', rule: 'RULE_C', count: 10 }]),
+        { title: 'S2', source: 'corpus', contentHash: 'h2' }),
+      vectorizeFromIssues(mockIssues([{ pass: 'dialogue', rule: 'RULE_C', count: 9 }, { pass: 'rhythm', rule: 'RULE_D', count: 1 }]),
+        { title: 'S3', source: 'corpus', contentHash: 'h3' }),
+    ];
+    assert.ok(new Set(vectors.map(v => v.dimensions.length)).size > 1, 'fixture must have mixed lengths');
+
+    const clusters = clusterCorpus(vectors, 2);
+
+    assert.equal(clusters.length, 2);
+    for (const cluster of clusters) {
+      assert.ok(Number.isFinite(cluster.inertia), `NaN inertia in cluster ${cluster.id}`);
+      for (const value of cluster.centroid) {
+        assert.ok(Number.isFinite(value), `NaN centroid component in cluster ${cluster.id}`);
+      }
+    }
+    const clusterOf = (title: string) => clusters.findIndex(c => c.members.some(m => m.metadata.title === title));
+    assert.equal(clusterOf('S0'), clusterOf('S1'));
+    assert.equal(clusterOf('S2'), clusterOf('S3'));
+    assert.notEqual(clusterOf('S0'), clusterOf('S2'));
   });
 });
 

@@ -62,6 +62,17 @@ jobs:
       - name: Enforce no console.* under server/
         run: npm run check-no-console
 
+      # Dead-code tripwire for server/**: static BFS from server.ts, failing on
+      # any unreachable non-test file that is not on the script's explicit,
+      # justified allowlist. src/ has had an equivalent check since the P2
+      # surface work (verify-p2-p3-surfaces.mjs's staticCrossCheck); server/ had
+      # none, which is how 78 files / 24,722 LOC accumulated there unnoticed.
+      # Blocking, and it passes today by construction: everything currently
+      # unreachable is allowlisted BY NAME with a reason. It removes nothing —
+      # it only stops the pile growing while the owner decides what to keep.
+      - name: Server dead-code tripwire (reachability from server.ts)
+        run: npm run check-server-reachability
+
       # G0-08: user-facing honesty string audit — fails the build on
       # overclaim language ("Hollywood gold standard", "provably", stale
       # hardcoded rule/corpus counts, unverified superlatives, etc.) in the

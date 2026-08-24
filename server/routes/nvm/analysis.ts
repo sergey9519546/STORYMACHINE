@@ -164,8 +164,6 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
   // Vectorize the input script
   const { vectorizeScript, findNearestNeighbors, clusterCorpus } = await import('../../nvm/analyze/story-vector.ts');
   const { loadCorpusVectors } = await import('../../lib/corpus-loader.ts');
-  const { extractGenome, findStructuralTemplate } = await import('../../nvm/analyze/structural-genome.ts');
-  const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');
   const { runScriptDoctor } = await import('../../nvm/analyze/doctor.ts');
 
   // A similarity/health comparison over a scene-truncated prefix would look
@@ -210,40 +208,51 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
     c.members.some(m => m.metadata.contentHash === queryVector.metadata.contentHash)
   );
   
-  // Build scene records for genome extraction (query + top match)
-  logger.info('story_vector_extracting_genome', {});
-  type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
-  
-  // Convert Script Doctor report to scene records (simplified)
-  // In production, this would need the full screenplay memory build
-  const queryRecords: import('../../nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [];
-  
-  const queryGenome = extractGenome(queryVector, queryRecords);
-  
-  // Get the top match's genome
-  let topMatchGenome = null;
-  let structuralTemplate = null;
+  // The top match's identity and similarity ARE measured. Its structural
+  // genome is NOT available on this path and must not be invented.
+  //
+  // 2026-08-24 honesty fix. This block previously emitted a `genome` object
+  // whose every field was a hardcoded literal — actBreakPositions: [],
+  // reversalCount: 0, conflictEscalationPattern: 'linear', characterArcShape:
+  // 'linear', emotionalCurvature: 0.5 — labeled "a placeholder" in a code
+  // comment the caller never sees, while docs/story-vector.md advertised the
+  // same field with plausible measured-looking values ([28, 73], 4 reversals,
+  // 'exponential', 'u-shape', 0.68). Constant output presented as measurement
+  // is the failure mode this project keeps a blocking honesty gate for, so the
+  // constants are gone rather than dressed up.
+  //
+  // Why it cannot simply be computed here: extractGenome (server/nvm/analyze/
+  // structural-genome.ts) reads per-scene ScreenplaySceneRecords, and those
+  // are built by buildScreenplayMemory() from a StoryCommit op ledger. The
+  // corpus cache stores vectors only, and a pasted Fountain draft has no
+  // commit ledger at all — so neither side of the comparison can produce
+  // records without a design change (cache records alongside vectors, or
+  // derive records from a Fountain parse). Until then this reports null and
+  // says why, instead of reporting a constant.
+  let structuralTemplate: {
+    title: string;
+    similarity: number;
+    sceneCount?: number;
+    wordCount?: number;
+    source: 'generated' | 'corpus' | 'synthetic';
+    genome: null;
+    genomeUnavailableReason: string;
+  } | null = null;
   if (neighbors.length > 0) {
     const topMatch = neighbors[0];
-    logger.info('story_vector_extracting_top_match_genome', { title: topMatch.vector.metadata.title });
-    
-    // For now, we can't build full scene records without re-running Script Doctor
-    // on the corpus screenplay. In production, these would be cached alongside vectors.
-    // For this implementation, we'll return a placeholder.
     structuralTemplate = {
       title: topMatch.vector.metadata.title,
-      similarity: topMatch.similarity,
-      genome: {
-        sourceTitle: topMatch.vector.metadata.title,
-        actBreakPositions: [],
-        reversalCount: 0,
-        conflictEscalationPattern: 'linear' as const,
-        characterArcShape: 'linear' as const,
-        emotionalCurvature: 0.5,
-      },
+      similarity: Math.round(topMatch.similarity * 100) / 100,
+      sceneCount: topMatch.vector.metadata.sceneCount,
+      wordCount: topMatch.vector.metadata.wordCount,
+      source: topMatch.vector.metadata.source,
+      genome: null,
+      genomeUnavailableReason:
+        'Structural genome extraction needs per-scene records built from a StoryCommit ledger. '
+        + 'The corpus cache stores vectors only, so no genome is measured for this match.',
     };
   }
-  
+
   res.json({
     vector: {
       dimensions: queryVector.dimensions.length,
@@ -265,6 +274,14 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
         .map(m => m.metadata.title),
     } : null,
     structuralTemplate,
+    // How many reference vectors the comparison actually ran against. Without
+    // this a caller cannot tell "no corpus is installed" from "the draft
+    // matched nothing" — both render as an empty nearestNeighbors and a null
+    // cluster. size 0 means the former.
+    corpus: {
+      size: corpus.length,
+      clustered: queryCluster !== undefined,
+    },
     healthMetrics: {
       sceneCount: queryReport.sceneCount,
       wordCount: queryReport.wordCount,
