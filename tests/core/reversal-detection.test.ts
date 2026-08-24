@@ -35,7 +35,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { detectReversals, computeReversalDelta } from '../../server/nvm/analyze/reversal-detection.ts';
+import { detectReversals, computeReversalDelta, inferAmplitudeScale } from '../../server/nvm/analyze/reversal-detection.ts';
 import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
 import { makeSceneRecord } from '../passes/helpers.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
@@ -261,5 +261,199 @@ describe('detectReversals — sceneIdx contract (0-based, per record.sceneIdx, n
     const result = detectReversals(records);
     assert.equal(result.reversals.length, 1);
     assert.equal(result.reversals[0].sceneIdx, 7);
+  });
+});
+
+// ── Channel 2 amplitude-scale normalisation (2026-08-24) ──────────────────
+//
+// The defect: channel 2's establishedThreshold()/swingThreshold() are ABSOLUTE
+// magnitudes (3 / 4) tuned against fountain-analyzer.ts's text path, which
+// emits integers of magnitude 2..5. A producer on the StoryOps -1..1-per-shift
+// float convention (memory.ts's ops path; scripts/calibrate-stress-ledger.ts's
+// annotation bridge emits 0.15 / 0.3 / 0.5) can never reach either threshold,
+// so channel 2 was STRUCTURALLY INERT there — reporting 0 reversals for
+// reasons unrelated to the material. Flagged as the "amplitude-mismatch caveat
+// to fix first" in docs/p1-benchmark/UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md §1
+// caveat (b), before the owner's 125-film wire-decision run.
+//
+// These tests prove three things, in this order: (1) the fix is a no-op on the
+// text path's native scale — the property every pre-existing test above relies
+// on; (2) the SAME reversal shape now fires on a 10x-smaller float producer;
+// (3) rescaling does not weaken the discriminations channel 2 exists to make
+// (no established prior, same-sign continuation, undersized swing all still
+// correctly do NOT fire, in the rescaled units).
+
+describe('detectReversals — channel 2 amplitude scale: inference', () => {
+  it('infers scale 1 (exact no-op) for the text path\'s integer 2..5 convention', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 3 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -5 }] }),
+    ];
+    assert.equal(inferAmplitudeScale(records), 1);
+  });
+
+  it('infers scale 1 on a REAL text-path parse — the path every shipped caller uses', () => {
+    const text = fs.readFileSync(path.join(fixtureDir, 'the-second-key.fountain'), 'utf8');
+    const { records } = analyzeFountainText(text);
+    assert.equal(
+      inferAmplitudeScale(records), 1,
+      'fountain-analyzer.ts output must always be recognised as the native scale',
+    );
+  });
+
+  it('infers 0.1 for the annotation bridge\'s 0.15 / 0.3 / 0.5 float amounts (max 0.5 over the text path\'s cap of 5)', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.15 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.3 }] }),
+      makeSceneRecord(2, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.5 }] }),
+    ];
+    assert.equal(inferAmplitudeScale(records), 0.1);
+  });
+
+  it('returns 1 when there are no shifts at all — with nothing to calibrate against, leave the shipped thresholds alone', () => {
+    assert.equal(inferAmplitudeScale([makeSceneRecord(0), makeSceneRecord(1)]), 1);
+    assert.equal(inferAmplitudeScale([]), 1);
+  });
+
+  it('returns 1 when every shift amount is zero or non-finite (degenerate, not a scale)', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: Number.NaN }] }),
+    ];
+    assert.equal(inferAmplitudeScale(records), 1);
+  });
+
+  it('rescales an all-integer producer that never clears the text path\'s minimum of 2 (max 1 -> 0.2)', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 1 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -1 }] }),
+    ];
+    assert.equal(inferAmplitudeScale(records), 0.2);
+  });
+});
+
+describe('detectReversals — channel 2 amplitude scale: the fix fires on a float producer', () => {
+  /** The bridge shape scripts/calibrate-stress-ledger.ts actually emits:
+   *  `confrontation` -0.3, `test` -0.15, `reversal` -0.5 — an established
+   *  NEGATIVE reading (rolling sum -0.45) then a +0.5 swing back. Under the
+   *  pre-fix absolute thresholds this needed a rolling sum of 3 and a swing of
+   *  4: unreachable by an order of magnitude. */
+  const bridgeRecords = (): ScreenplaySceneRecord[] => [
+    makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.3 }] }),
+    makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.15 }] }),
+    makeSceneRecord(2, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.5 }] }),
+  ];
+
+  it('fires a relationship_swing on the bridge\'s own amplitudes, at the right scene', () => {
+    const result = detectReversals(bridgeRecords());
+    const hit = result.reversals.find(r => r.kind === 'relationship_swing');
+    assert.ok(hit, 'expected a relationship_swing candidate on the 0.15/0.3/0.5 scale');
+    assert.equal(hit!.sceneIdx, 2);
+    assert.equal(result.reversalCount, 1);
+  });
+
+  it('reports the rescale in the candidate\'s evidence so a diagnostic run can see it happened', () => {
+    const hit = detectReversals(bridgeRecords()).reversals.find(r => r.kind === 'relationship_swing');
+    assert.match(hit!.evidence, /amplitude scale 0\.1/);
+    assert.match(hit!.evidence, /thresholds 0\.3\/0\.4/);
+  });
+
+  it('leaves native-scale evidence strings unchanged (no scale annotation at scale 1)', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 3 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -4 }] }),
+    ];
+    const hit = detectReversals(records).reversals.find(r => r.kind === 'relationship_swing');
+    assert.doesNotMatch(hit!.evidence, /amplitude scale/);
+  });
+
+  it('an explicit amplitudeScale overrides inference', () => {
+    // Native integers, but the caller declares a 10x scale: the thresholds
+    // become 30/40 and the same records no longer clear them.
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 3 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -4 }] }),
+    ];
+    assert.equal(detectReversals(records).reversalCount, 1, 'inferred (scale 1) fires');
+    assert.equal(detectReversals(records, { amplitudeScale: 10 }).reversalCount, 0, 'declared scale 10 does not');
+  });
+
+  it('an invalid explicit amplitudeScale (0, negative, NaN) falls back to inference rather than firing on everything', () => {
+    const records = bridgeRecords();
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.equal(
+        detectReversals(records, { amplitudeScale: bad }).reversalCount, 1,
+        `amplitudeScale=${bad} must fall back to inference (0.1), not disable the thresholds`,
+      );
+    }
+  });
+
+  it('computeReversalDelta forwards the option to the detector', () => {
+    const records = bridgeRecords();
+    assert.equal(computeReversalDelta(records).detectedCount, 1, 'inference reaches computeReversalDelta');
+    assert.equal(
+      computeReversalDelta(records, { amplitudeScale: 1 }).detectedCount, 0,
+      'forcing the native scale reproduces the pre-fix inert behaviour exactly',
+    );
+  });
+});
+
+describe('detectReversals — channel 2 amplitude scale: rescaling does not weaken the discriminations', () => {
+  it('a float swing BELOW the rescaled swing threshold still does not fire', () => {
+    // max magnitude 0.5 -> scale 0.1 -> SWING 0.4. A -0.3 swing is under it.
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.5 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.3 }] }),
+    ];
+    assert.equal(detectReversals(records).reversalCount, 0);
+  });
+
+  it('a float swing with NO established prior still does not fire', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.5 }] }),
+    ];
+    assert.equal(detectReversals(records).reversalCount, 0);
+  });
+
+  it('a same-sign float continuation on an established pair still does not fire', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.3 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.5 }] }),
+    ];
+    assert.equal(detectReversals(records).reversalCount, 0);
+  });
+
+  it('the float epsilon covers binary accumulation error: a rolling sum one ulp low still clears its bar', () => {
+    // 0.1 + 0.2 === 0.30000000000000004 is ABOVE 0.3; 0.15 + 0.15 === 0.3
+    // exactly. The genuinely-low case is 0.35 + 0.15, which lands just under
+    // 0.5. Scale here is 0.1 (max magnitude 0.5), so ESTABLISHED is 0.3 and
+    // the -0.4 swing clears SWING 0.4 only with the relative epsilon.
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.1 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.2 }] }),
+      makeSceneRecord(2, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.5 }] }),
+    ];
+    assert.equal(
+      detectReversals(records).reversalCount, 1,
+      'an established 0.3 reading followed by a -0.5 swing must fire at scale 0.1',
+    );
+  });
+
+  it('is deterministic on a rescaled float producer too', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.3 }] }),
+      makeSceneRecord(1, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: -0.15 }] }),
+      makeSceneRecord(2, { relationshipShifts: [{ pairKey: 'ally|hero', dimension: 'trust', amount: 0.5 }] }),
+    ];
+    assert.deepEqual(detectReversals(records), detectReversals(records));
+  });
+
+  it('channel 1 is untouched by any amplitude scale (it reads text, not amounts)', () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord(0, { revelation: 'It was you all along. You were the mole the entire time.' }),
+    ];
+    assert.equal(detectReversals(records).reversalCount, 1);
+    assert.equal(detectReversals(records, { amplitudeScale: 0.001 }).reversalCount, 1);
+    assert.equal(detectReversals(records, { amplitudeScale: 1000 }).reversalCount, 1);
   });
 });

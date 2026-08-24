@@ -58,7 +58,7 @@ import {
   detectPeakAgency,
   detectAct3Agency,
 } from '../server/nvm/analyze/agency-signal.ts';
-import { computeReversalDelta, detectReversals } from '../server/nvm/analyze/reversal-detection.ts';
+import { computeReversalDelta, detectReversals, inferAmplitudeScale } from '../server/nvm/analyze/reversal-detection.ts';
 import { computeQuestionLatencyDeduction } from '../server/nvm/analyze/question-latency-deduction.ts';
 import { detectTruthContradictions } from '../server/nvm/analyze/truth-extraction.ts';
 import { buildScreenplayMemory } from '../server/nvm/screenplay/memory.ts';
@@ -396,13 +396,15 @@ if (!fs.existsSync(ANNOT_DIR) || !fs.existsSync(QUAL_DIR)) {
   console.log('    precision/recall opportunity this script computes below IF the corpus is present. Two');
   console.log('    caveats an owner run must account for: (1) channel 1 (revelation-text allegiance) is');
   console.log('    unreachable for the same no-prose reason as truth-extraction/agency-signal above, so');
-  console.log('    only channel 2 is testable; (2) the converter\'s SHIFT_RELATIONSHIP amplitudes (0.15-0.5)');
-  console.log('    are roughly 10x smaller than reversal-detection.ts\'s own established/swing thresholds');
-  console.log('    (3/4), which were tuned against real fountain-text amplitudes (RELATIONSHIP_SHIFT_');
-  console.log('    THRESHOLD=2, per-scene cap 5) — an owner run may need a corpus-appropriate rescale, not');
-  console.log('    the thresholds as shipped, or channel 2 will structurally under-fire regardless of the');
-  console.log('    real reversal rate. This script does NOT rescale on the owner\'s behalf (that is a');
-  console.log('    threshold-tuning decision requiring the actual data distribution, out of scope here).');
+  console.log('    only channel 2 is testable; (2) AMPLITUDE MISMATCH — FIXED 2026-08-24. The converter\'s');
+  console.log('    SHIFT_RELATIONSHIP amplitudes (0.15-0.5) are roughly 10x smaller than reversal-');
+  console.log('    detection.ts\'s established/swing thresholds (3/4), which were tuned against real');
+  console.log('    fountain-text amplitudes (RELATIONSHIP_SHIFT_THRESHOLD=2, per-scene cap 5). Channel 2');
+  console.log('    was therefore STRUCTURALLY INERT on this bridge regardless of the real reversal rate.');
+  console.log('    reversal-detection.ts now expresses those thresholds in the PRODUCER\'S own unit');
+  console.log('    (inferAmplitudeScale / ReversalDetectionOptions.amplitudeScale) — a provable no-op on');
+  console.log('    the integer text path, and a 10x rescale on this bridge. The owner run below reports');
+  console.log('    the inferred scale per film so the correction is visible, not assumed.');
   report.partA = { measured: false, reason: 'ANNOT_DIR/QUAL_DIR not present in this environment', annotDir: ANNOT_DIR, qualDir: QUAL_DIR };
 } else {
   // ── Reused verbatim from scripts/calibrate-stress-ledger.ts ──────────────
@@ -515,6 +517,10 @@ if (!fs.existsSync(ANNOT_DIR) || !fs.existsSync(QUAL_DIR)) {
 
   interface FilmResult {
     film: string; quality: number; sceneCount: number;
+    /** Channel 2's inferred producer amplitude unit (reversal-detection.ts
+     *  inferAmplitudeScale). 1 = text-path scale; ~0.1 = this bridge's float
+     *  scale. Recorded so the 2026-08-24 amplitude fix is visible in the run. */
+    amplitudeScale: number;
     legacyReversalCount: number; detectedReversalCount: number;
     tp: number; fp: number; fn: number; tn: number;
     agencyD1Runs: number; agencyD1Disagree: number;
@@ -543,6 +549,12 @@ if (!fs.existsSync(ANNOT_DIR) || !fs.existsSync(QUAL_DIR)) {
     // Reversal-detection: legacy vs detected vs the corpus's OWN ground-truth
     // `reversal` label (per-scene confusion matrix — the direct-validation
     // opportunity this corpus uniquely offers among the four signals).
+    // Amplitude scale is INFERRED, not assumed: the bridge emits floats
+    // (0.15/0.3/0.5) while channel 2's thresholds were tuned to the integer
+    // text path. Recorded per film so an owner reading the run can see the
+    // correction actually applied — 1.0 here would mean the bridge somehow
+    // produced text-path-scale amounts and the run needs a second look.
+    const amplitudeScale = inferAmplitudeScale(records);
     const revResult = detectReversals(records);
     const revDelta = computeReversalDelta(records);
     const detectedScenes = new Set(revResult.reversals.map(r => r.sceneIdx));
@@ -570,7 +582,7 @@ if (!fs.existsSync(ANNOT_DIR) || !fs.existsSync(QUAL_DIR)) {
     const ql = computeQuestionLatencyDeduction(records);
 
     results.push({
-      film, quality, sceneCount: scenes.length,
+      film, quality, sceneCount: scenes.length, amplitudeScale,
       legacyReversalCount: revDelta.legacyCount, detectedReversalCount: revDelta.detectedCount,
       tp, fp, fn, tn,
       agencyD1Runs: protagonist ? 1 : 0, agencyD1Disagree: d1Disagree,
@@ -589,6 +601,11 @@ if (!fs.existsSync(ANNOT_DIR) || !fs.existsSync(QUAL_DIR)) {
   const recall = totalTp + totalFn > 0 ? totalTp / (totalTp + totalFn) : NaN;
   const f1 = (precision + recall) > 0 ? 2 * precision * recall / (precision + recall) : NaN;
   console.log('\n── A2. REVERSAL-DETECTION vs. corpus\'s own `reversal` annotation label (channel 2 only) ──');
+  const scales = [...new Set(results.map(r => Number(r.amplitudeScale.toPrecision(6))))].sort((a, b) => a - b);
+  console.log(`  Inferred amplitude scale(s) across films: ${scales.join(', ')}`
+    + (scales.every(s => s === 1)
+      ? '  <- ALL 1.0: no rescale applied. Expect ~0 detections; re-check the bridge.'
+      : '  <- rescale applied (amplitude-mismatch fix, 2026-08-24)'));
   console.log(`  Confusion (scene-level): TP=${totalTp} FP=${totalFp} FN=${totalFn} TN=${totalTn}`);
   console.log(`  Precision=${precision.toFixed(3)}  Recall=${recall.toFixed(3)}  F1=${f1.toFixed(3)}`);
   const rQuality = pearson(results.map(r => r.quality), results.map(r => r.detectedReversalCount));
