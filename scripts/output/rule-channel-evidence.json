@@ -1,0 +1,675 @@
+{
+  "generatedAt": "2026-08-24T04:48:48.948Z",
+  "script": "scripts/measure-rule-channel-evidence.ts",
+  "bar": "docs/p1-benchmark/RULE_CATALOG_RETIREMENT_DESIGN.md §3 (B1-B7)",
+  "part1Census": {
+    "passFiles": 15,
+    "passScopedConstants": 3217,
+    "distinctNames": 3186,
+    "dualOwned": 31,
+    "passFileLines": 98239,
+    "publishedTotal": 3217,
+    "liveFreezeHolds": true,
+    "designRecords": {
+      "passScopedConstants": 3216,
+      "distinctNames": 3185,
+      "dualOwned": 31,
+      "lines": 97953
+    },
+    "designDocCurrent": false
+  },
+  "part2Firing": {
+    "distinctNames": 3186,
+    "everFired": 906,
+    "silentNames": 2280,
+    "silentFraction": 0.7156308851224106,
+    "dualOwnedUpperBound": 31,
+    "totalWeight": 4633,
+    "top15": [
+      {
+        "rule": "ZERO_ENTROPY_SCENE",
+        "scripts": 36,
+        "weight": 274.5
+      },
+      {
+        "rule": "NO_REVERSALS_LONG_STORY",
+        "scripts": 38,
+        "weight": 152
+      },
+      {
+        "rule": "EXPOSITION_DUMP",
+        "scripts": 37,
+        "weight": 139.5
+      },
+      {
+        "rule": "PASSIVE_ACT3_INTENTION",
+        "scripts": 26,
+        "weight": 104
+      },
+      {
+        "rule": "INTENTION_INVISIBLE",
+        "scripts": 38,
+        "weight": 68.5
+      },
+      {
+        "rule": "ENTROPY_CLUSTER",
+        "scripts": 30,
+        "weight": 63
+      },
+      {
+        "rule": "DARK_NIGHT_ABSENT",
+        "scripts": 38,
+        "weight": 57
+      },
+      {
+        "rule": "NO_REVERSALS",
+        "scripts": 38,
+        "weight": 57
+      },
+      {
+        "rule": "SCENE_SHAPE_TEMPLATING",
+        "scripts": 38,
+        "weight": 57
+      },
+      {
+        "rule": "MISSING_INCITING_INCIDENT",
+        "scripts": 14,
+        "weight": 56
+      },
+      {
+        "rule": "WEAK_MIDPOINT",
+        "scripts": 37,
+        "weight": 55.5
+      },
+      {
+        "rule": "REVELATION_DROUGHT",
+        "scripts": 33,
+        "weight": 55
+      },
+      {
+        "rule": "ACT2_BOUNDARY_WEAK",
+        "scripts": 36,
+        "weight": 54
+      },
+      {
+        "rule": "TOLD_BELIEF_DOMINATION",
+        "scripts": 36,
+        "weight": 54
+      },
+      {
+        "rule": "ARC_EMOTIONAL_FLATLINE",
+        "scripts": 35,
+        "weight": 52.5
+      }
+    ]
+  },
+  "part3B1Proxy": {
+    "all": {
+      "baseline": {
+        "SCENE_SHUFFLE": {
+          "pairs": 38,
+          "auc": 0.4868421052631579,
+          "ci": {
+            "lo": 0.34210526315789475,
+            "hi": 0.631578947368421
+          },
+          "satPairs": 0,
+          "aucExSat": 0.4868421052631579,
+          "ciExSat": {
+            "lo": 0.34210526315789475,
+            "hi": 0.631578947368421
+          }
+        },
+        "MIDPOINT_DROP": {
+          "pairs": 38,
+          "auc": 0.3026315789473684,
+          "ci": {
+            "lo": 0.15789473684210525,
+            "hi": 0.4605263157894737
+          },
+          "satPairs": 0,
+          "aucExSat": 0.3026315789473684,
+          "ciExSat": {
+            "lo": 0.15789473684210525,
+            "hi": 0.4605263157894737
+          }
+        },
+        "CLIMAX_RELOCATE": {
+          "pairs": 38,
+          "auc": 0.5,
+          "ci": {
+            "lo": 0.32894736842105265,
+            "hi": 0.6578947368421053
+          },
+          "satPairs": 0,
+          "aucExSat": 0.5,
+          "ciExSat": {
+            "lo": 0.32894736842105265,
+            "hi": 0.6578947368421053
+          }
+        },
+        "DIALOGUE_FLATTEN": {
+          "pairs": 38,
+          "auc": 1,
+          "ci": {
+            "lo": 1,
+            "hi": 1
+          },
+          "satPairs": 20,
+          "aucExSat": 1,
+          "ciExSat": {
+            "lo": 1,
+            "hi": 1
+          }
+        },
+        "POOLED": {
+          "pairs": 152,
+          "auc": 0.5723684210526315,
+          "ci": {
+            "lo": 0.4934210526315789,
+            "hi": 0.6480263157894737
+          },
+          "satPairs": 20,
+          "aucExSat": 0.5075757575757576,
+          "ciExSat": {
+            "lo": 0.42424242424242425,
+            "hi": 0.5946969696969697
+          }
+        }
+      },
+      "ruleZero": {
+        "SCENE_SHUFFLE": {
+          "pairs": 38,
+          "auc": 0.5,
+          "ci": {
+            "lo": 0.5,
+            "hi": 0.5
+          },
+          "satPairs": 0,
+          "aucExSat": 0.5,
+          "ciExSat": {
+            "lo": 0.5,
+            "hi": 0.5
+          }
+        },
+        "MIDPOINT_DROP": {
+          "pairs": 38,
+          "auc": 1,
+          "ci": {
+            "lo": 1,
+            "hi": 1
+          },
+          "satPairs": 0,
+          "aucExSat": 1,
+          "ciExSat": {
+            "lo": 1,
+            "hi": 1
+          }
+        },
+        "CLIMAX_RELOCATE": {
+          "pairs": 38,
+          "auc": 0.5,
+          "ci": {
+            "lo": 0.5,
+            "hi": 0.5
+          },
+          "satPairs": 0,
+          "aucExSat": 0.5,
+          "ciExSat": {
+            "lo": 0.5,
+            "hi": 0.5
+          }
+        },
+        "DIALOGUE_FLATTEN": {
+          "pairs": 38,
+          "auc": 0.7894736842105263,
+          "ci": {
+            "lo": 0.7105263157894737,
+            "hi": 0.868421052631579
+          },
+          "satPairs": 20,
+          "aucExSat": 1,
+          "ciExSat": {
+            "lo": 1,
+            "hi": 1
+          }
+        },
+        "POOLED": {
+          "pairs": 152,
+          "auc": 0.6973684210526315,
+          "ci": {
+            "lo": 0.6578947368421053,
+            "hi": 0.7335526315789473
+          },
+          "satPairs": 20,
+          "aucExSat": 0.7121212121212122,
+          "ciExSat": {
+            "lo": 0.6704545454545454,
+            "hi": 0.7537878787878788
+          }
+        }
+      }
+    },
+    "cc0": {
+      "baseline": {
+        "SCENE_SHUFFLE": {
+          "pairs": 18,
+          "auc": 0.4166666666666667,
+          "ci": {
+            "lo": 0.2222222222222222,
+            "hi": 0.6388888888888888
+          },
+          "satPairs": 0,
+          "aucExSat": 0.4166666666666667,
+          "ciExSat": {
+            "lo": 0.2222222222222222,
+            "hi": 0.6388888888888888
+          }
+        },
+        "MIDPOINT_DROP": {
+          "pairs": 18,
+          "auc": 0.5277777777777778,
+          "ci": {
+            "lo": 0.3055555555555556,
+            "hi": 0.75
+          },
+          "satPairs": 0,
+          "aucExSat": 0.5277777777777778,
+          "ciExSat": {
+            "lo": 0.3055555555555556,
+            "hi": 0.75
+          }
+        },
+        "CLIMAX_RELOCATE": {
+          "pairs": 18,
+          "auc": 0.3888888888888889,
+          "ci": {
+            "lo": 0.19444444444444445,
+            "hi": 0.6111111111111112
+          },
+          "satPairs": 0,
+          "aucExSat": 0.3888888888888889,
+          "ciExSat": {
+            "lo": 0.19444444444444445,
+            "hi": 0.6111111111111112
+          }
+        },
+        "DIALOGUE_FLATTEN": {
+          "pairs": 18,
+          "auc": 1,
+          "ci": {
+            "lo": 1,
+            "hi": 1
+          },
+          "satPairs": 1,
+          "aucExSat": 1,
+          "ciExSat": {
+            "lo": 1,
+            "hi": 1
+          }
+        },
+        "POOLED": {
+          "pairs": 72,
+          "auc": 0.5833333333333334,
+          "ci": {
+            "lo": 0.4722222222222222,
+            "hi": 0.6875
+          },
+          "satPairs": 1,
+          "aucExSat": 0.5774647887323944,
+          "ciExSat": {
+            "lo": 0.4647887323943662,
+            "hi": 0.6830985915492958
+          }
+        }
+      },
+      "ruleZero": {
+        "SCENE_SHUFFLE": {
+          "pairs": 18,
+          "auc": 0.5,
+          "ci": {
+            "lo": 0.5,
+            "hi": 0.5
+          },
+          "satPairs": 0,
+          "aucExSat": 0.5,
+          "ciExSat": {
+            "lo": 0.5,
+            "hi": 0.5
+          }
+        },
+        "MIDPOINT_DROP": {
+          "pairs": 18,
+          "auc": 1,
+          "ci": {
+            "lo": 1,
+            "hi": 1
+          },
+          "satPairs": 0,
+          "aucExSat": 1,
+          "ciExSat": {
+            "lo": 1,
+            "hi": 1
+          }
+        },
+        "CLIMAX_RELOCATE": {
+          "pairs": 18,
+          "auc": 0.5,
+          "ci": {
+            "lo": 0.5,
+            "hi": 0.5
+          },
+          "satPairs": 0,
+          "aucExSat": 0.5,
+          "ciExSat": {
+            "lo": 0.5,
+            "hi": 0.5
+          }
+        },
+        "DIALOGUE_FLATTEN": {
+          "pairs": 18,
+          "auc": 0.9722222222222222,
+          "ci": {
+            "lo": 0.9166666666666666,
+            "hi": 1
+          },
+          "satPairs": 1,
+          "aucExSat": 1,
+          "ciExSat": {
+            "lo": 1,
+            "hi": 1
+          }
+        },
+        "POOLED": {
+          "pairs": 72,
+          "auc": 0.7430555555555556,
+          "ci": {
+            "lo": 0.6875,
+            "hi": 0.7986111111111112
+          },
+          "satPairs": 1,
+          "aucExSat": 0.7464788732394366,
+          "ciExSat": {
+            "lo": 0.6901408450704225,
+            "hi": 0.8028169014084507
+          }
+        }
+      }
+    }
+  },
+  "part4TopK": [
+    {
+      "k": 0,
+      "kept": 0,
+      "pooled": 0.6973684210526315,
+      "pooledCi": {
+        "lo": 0.6578947368421053,
+        "hi": 0.7335526315789473
+      },
+      "dialogue": 0.7894736842105263,
+      "shuffle": 0.5,
+      "drop": 1,
+      "relocate": 0.5
+    },
+    {
+      "k": 1,
+      "kept": 1,
+      "pooled": 0.6973684210526315,
+      "pooledCi": {
+        "lo": 0.6578947368421053,
+        "hi": 0.7335526315789473
+      },
+      "dialogue": 0.7894736842105263,
+      "shuffle": 0.5,
+      "drop": 1,
+      "relocate": 0.5
+    },
+    {
+      "k": 5,
+      "kept": 5,
+      "pooled": 0.7532894736842105,
+      "pooledCi": {
+        "lo": 0.7138157894736842,
+        "hi": 0.7927631578947368
+      },
+      "dialogue": 0.9868421052631579,
+      "shuffle": 0.5131578947368421,
+      "drop": 1,
+      "relocate": 0.5131578947368421
+    },
+    {
+      "k": 10,
+      "kept": 10,
+      "pooled": 0.7302631578947368,
+      "pooledCi": {
+        "lo": 0.680921052631579,
+        "hi": 0.7796052631578947
+      },
+      "dialogue": 0.9473684210526315,
+      "shuffle": 0.5131578947368421,
+      "drop": 0.8421052631578947,
+      "relocate": 0.618421052631579
+    },
+    {
+      "k": 25,
+      "kept": 25,
+      "pooled": 0.7039473684210527,
+      "pooledCi": {
+        "lo": 0.6480263157894737,
+        "hi": 0.756578947368421
+      },
+      "dialogue": 0.9868421052631579,
+      "shuffle": 0.4605263157894737,
+      "drop": 0.868421052631579,
+      "relocate": 0.5
+    },
+    {
+      "k": 50,
+      "kept": 50,
+      "pooled": 0.6907894736842105,
+      "pooledCi": {
+        "lo": 0.6217105263157895,
+        "hi": 0.756578947368421
+      },
+      "dialogue": 1,
+      "shuffle": 0.32894736842105265,
+      "drop": 0.868421052631579,
+      "relocate": 0.5657894736842105
+    },
+    {
+      "k": 100,
+      "kept": 100,
+      "pooled": 0.625,
+      "pooledCi": {
+        "lo": 0.5592105263157895,
+        "hi": 0.6907894736842105
+      },
+      "dialogue": 1,
+      "shuffle": 0.42105263157894735,
+      "drop": 0.5526315789473685,
+      "relocate": 0.5263157894736842
+    },
+    {
+      "k": 250,
+      "kept": 250,
+      "pooled": 0.6381578947368421,
+      "pooledCi": {
+        "lo": 0.5625,
+        "hi": 0.7072368421052632
+      },
+      "dialogue": 1,
+      "shuffle": 0.5,
+      "drop": 0.5,
+      "relocate": 0.5526315789473685
+    },
+    {
+      "k": 500,
+      "kept": 500,
+      "pooled": 0.5789473684210527,
+      "pooledCi": {
+        "lo": 0.5032894736842105,
+        "hi": 0.6546052631578947
+      },
+      "dialogue": 1,
+      "shuffle": 0.34210526315789475,
+      "drop": 0.4473684210526316,
+      "relocate": 0.5263157894736842
+    },
+    {
+      "k": "all",
+      "kept": 906,
+      "pooled": 0.5723684210526315,
+      "pooledCi": {
+        "lo": 0.4934210526315789,
+        "hi": 0.6480263157894737
+      },
+      "dialogue": 1,
+      "shuffle": 0.4868421052631579,
+      "drop": 0.3026315789473684,
+      "relocate": 0.5
+    }
+  ],
+  "part4Arithmetic": {
+    "arithmeticSound": true,
+    "tierBIdentical": false,
+    "degradationOnlyRules": 246
+  },
+  "part5B5": [
+    {
+      "label": "RULE_ZERO (channel fully removed)",
+      "kept": 0,
+      "averages": {
+        "strong": 85.99999999994891,
+        "competent": 85.6888888888378,
+        "weak": 85.99999999994891,
+        "troubled": 85.06666666661559
+      },
+      "monotonic": false
+    },
+    {
+      "label": "top-1 rules kept",
+      "kept": 1,
+      "averages": {
+        "strong": 85.99999999230586,
+        "competent": 85.68888868295555,
+        "weak": 85.99999977888191,
+        "troubled": 85.06666649220215
+      },
+      "monotonic": false
+    },
+    {
+      "label": "top-5 rules kept",
+      "kept": 5,
+      "averages": {
+        "strong": 85.99908678304338,
+        "competent": 85.55915620053872,
+        "weak": 85.93060380169214,
+        "troubled": 84.92705156502959
+      },
+      "monotonic": false
+    },
+    {
+      "label": "top-10 rules kept",
+      "kept": 10,
+      "averages": {
+        "strong": 84.3402533768032,
+        "competent": 78.02317106697554,
+        "weak": 80.83426210225205,
+        "troubled": 77.51018547627602
+      },
+      "monotonic": false
+    },
+    {
+      "label": "top-25 rules kept",
+      "kept": 25,
+      "averages": {
+        "strong": 76.05469663049051,
+        "competent": 75.55481584510983,
+        "weak": 75.70157699586909,
+        "troubled": 74.71434271013757
+      },
+      "monotonic": false
+    },
+    {
+      "label": "top-50 rules kept",
+      "kept": 50,
+      "averages": {
+        "strong": 75.22837002353133,
+        "competent": 72.62496734414935,
+        "weak": 72.64933591614074,
+        "troubled": 69.91309235860754
+      },
+      "monotonic": false
+    },
+    {
+      "label": "top-100 rules kept",
+      "kept": 100,
+      "averages": {
+        "strong": 72.8215469413021,
+        "competent": 66.12252633957104,
+        "weak": 61.63599097912741,
+        "troubled": 59.73453632474491
+      },
+      "monotonic": true
+    },
+    {
+      "label": "top-250 rules kept",
+      "kept": 250,
+      "averages": {
+        "strong": 67.80138446876761,
+        "competent": 59.51930056142551,
+        "weak": 51.266988649830466,
+        "troubled": 49.24648702724507
+      },
+      "monotonic": true
+    },
+    {
+      "label": "top-500 rules kept",
+      "kept": 500,
+      "averages": {
+        "strong": 65.13309410978614,
+        "competent": 55.52607339449986,
+        "weak": 42.77831218884503,
+        "troubled": 44.94902279662009
+      },
+      "monotonic": false
+    },
+    {
+      "label": "Tier B removed (only never-firing rules dropped)",
+      "kept": 906,
+      "averages": {
+        "strong": 62.39227098245999,
+        "competent": 52.52241357398911,
+        "weak": 42.11669166861899,
+        "troubled": 37.077568593962035
+      },
+      "monotonic": true
+    },
+    {
+      "label": "today (full catalog)",
+      "kept": "all",
+      "averages": {
+        "strong": 62.39227098245999,
+        "competent": 52.52241357398911,
+        "weak": 42.11669166861899,
+        "troubled": 37.077568593962035
+      },
+      "monotonic": true
+    }
+  ],
+  "part6Reachability": {
+    "realPresent": false,
+    "corpusPresent": false,
+    "crawlPresent": false,
+    "manifestPresent": true,
+    "manifestEntries": 0
+  },
+  "part7Process": {
+    "receiptGuardExists": true,
+    "receiptGuardInCi": true,
+    "receiptsDocExists": true,
+    "splitHashLock": true,
+    "hasRollbackSection": true,
+    "namesAnOwner": false
+  }
+}
