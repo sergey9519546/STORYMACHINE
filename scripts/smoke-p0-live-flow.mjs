@@ -135,12 +135,25 @@ async function main() {
   await sampleCta.click({ timeout: 15000 });
   console.log('[smoke] clicked "Try sample coverage"; waiting for report...');
 
-  // Wait for the deterministic coverage route to populate the report.
-  await page.waitForResponse((r) => /\/api\/scriptide\/doctor/.test(r.url()) && r.status() === 200, { timeout: 30000 });
-  await page.waitForSelector(/CONSIDER|RECOMMEND|PASS/, { timeout: 15000 }).catch(() => {});
+  // Wait for the report to RENDER, not for the route to answer. The coverage
+  // card now streams over SSE (/api/scriptide/doctor/stream), whose 200
+  // arrives at connection-open — long before the report exists — so the old
+  // waitForResponse gate here passed while "Running pass 1 of 14…" was still
+  // on screen and the body assertion below raced the stream and lost.
+  // (The old second line also passed a REGEX to waitForSelector, which takes
+  // a selector string — it threw immediately and the .catch swallowed it, so
+  // it never waited at all.) Same fix verify-p2-p3-surfaces.mjs already got:
+  // poll the rendered text for the verdict with a real deadline.
+  const renderDeadline = Date.now() + 45000;
+  let body = '';
+  for (;;) {
+    body = (await page.textContent('body')) ?? '';
+    if (body.includes(EXPECT.verdict)) break;
+    if (Date.now() > renderDeadline) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
 
   // 3. Assert the report rendered with expected verdict + health.
-  const body = await page.textContent('body');
   const okVerdict = body.includes(EXPECT.verdict);
   const okHealth = body.includes(String(EXPECT.health));
   if (!okVerdict) throw new Error(`report did not render verdict "${EXPECT.verdict}"`);

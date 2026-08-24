@@ -168,7 +168,11 @@ async function main() {
   console.log('\n=== 2) delete-everything -> reload -> clean slate ===');
   const settingsItem = await getOverflowMenuItem(page, /labs & settings|labs is on/i);
   await settingsItem.click();
-  await page.getByRole('button', { name: 'Session', exact: true }).click();
+  // E5's a11y pass gave the Settings tab strip real ARIA tablist semantics,
+  // so the tabs are role="tab" now, not buttons — this selector went stale
+  // between E4 landing and E5 landing the same day, and nobody re-ran this
+  // proof on the merged tree until 2026-08-24.
+  await page.getByRole('tab', { name: 'Session', exact: true }).click();
   await page.getByRole('button', { name: 'Delete Everything', exact: true }).first().click();
   await page.getByRole('button', { name: /yes, delete everything/i }).click();
 

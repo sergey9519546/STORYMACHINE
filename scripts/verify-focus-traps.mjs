@@ -245,11 +245,21 @@ async function main() {
 
     const sampleCta = page.getByRole('button', { name: /try sample coverage/i }).first();
     await sampleCta.click({ timeout: 15000 });
-    await page.waitForResponse((r) => /\/api\/scriptide\/doctor/.test(r.url()) && r.status() === 200, { timeout: 30000 });
-    await page.waitForTimeout(400);
+    // The coverage card streams over SSE now (/api/scriptide/doctor/stream),
+    // whose 200 arrives at connection-open — before the report exists — so
+    // waiting on the response + 400ms raced the stream and lost. Poll the
+    // rendered text instead (same fix as smoke-p0-live-flow.mjs and
+    // verify-p2-p3-surfaces.mjs — third copy of this wait, third fix).
+    const renderDeadline = Date.now() + 45000;
+    let bodyText = '';
+    for (;;) {
+      bodyText = (await page.textContent('body')) ?? '';
+      if (bodyText.includes('CONSIDER')) break;
+      if (Date.now() > renderDeadline) break;
+      await page.waitForTimeout(250);
+    }
 
     // Smoke basics (assertion 5): the deterministic report actually rendered.
-    const bodyText = await page.textContent('body');
     record('ScriptDoctorPanel', 'SMOKE: coverage summary renders CONSIDER', bodyText.includes('CONSIDER'), 'checked page body for "CONSIDER"');
 
     const fullReportBtn = page.getByRole('button', { name: 'Full report', exact: true }).first();
