@@ -378,4 +378,99 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
       "release.yml's publish job must declare `needs: test` — without it, a failing test job cannot block image publication",
     );
   });
+
+  it('mirrored gate steps run the SAME commands, not just the same names', () => {
+    // 2026-08-24 adversarial verification found the step-for-step mirror
+    // assertion above is name-only: replacing a release.yml gate's `run:`
+    // body with `echo "..."` while keeping the step name left all checks
+    // green — a tag push could publish an image whose gates are hollow.
+    // This closes that: every step name shared by both files must carry an
+    // identical run body, except the one documented deliberate difference.
+    const runBody = (source: string, name: string): string | null => {
+      const block = stepBlock(source, name);
+      if (!block) return null;
+      const m = /^\s*run:\s*(.*)$/m.exec(block);
+      if (!m) return null;
+      const inline = m[1].trim();
+      if (inline !== '' && !/^[|>]-?$/.test(inline)) return inline;
+      // Block scalar: collect the indented lines that follow.
+      const lines = block.split('\n');
+      const idx = lines.findIndex((l) => /^\s*run:\s*[|>]-?\s*$/.test(l));
+      if (idx === -1) return m[1].trim();
+      const body: string[] = [];
+      let base = -1;
+      for (let i = idx + 1; i < lines.length; i++) {
+        const l = lines[i];
+        if (l.trim() === '') { body.push(''); continue; }
+        const li = l.search(/\S/);
+        if (base === -1) base = li;
+        if (li < base) break;
+        body.push(l.slice(base));
+      }
+      return body.join('\n').trim();
+    };
+    // The receipt check is the one step whose bodies legitimately differ:
+    // ci.yml checks the single change's range, release.yml checks the whole
+    // release window with --structural-only (its own comment explains why
+    // re-validating historical entry CONTENT over a wide window would fail
+    // the honest squash-merged receipts). The exception still requires the
+    // release body to actually invoke the guard — an `echo` fails here too.
+    const ALLOWED_BODY_DIVERGENCE: Record<string, RegExp> = {
+      'Scoring-path change requires a measurement receipt': /check-scoring-receipt(\.mjs|\b)/,
+    };
+    const ciSteps = stepNames(ci);
+    for (const name of ciSteps) {
+      const ciBody = runBody(ci, name);
+      const relBody = runBody(release, name);
+      if (ciBody === null || relBody === null) continue;
+      if (name in ALLOWED_BODY_DIVERGENCE) {
+        assert.match(
+          relBody,
+          ALLOWED_BODY_DIVERGENCE[name],
+          `release.yml's "${name}" diverges from ci.yml by documented design, but its body no longer `
+          + 'invokes the gate it is named for — a hollow step wearing an honest name.',
+        );
+        continue;
+      }
+      assert.equal(
+        relBody,
+        ciBody,
+        `release.yml's "${name}" runs a different command than ci.yml's step of the same name. `
+        + 'The mirror claim is about what executes, not what the step is called — if the divergence '
+        + 'is deliberate, add it to ALLOWED_BODY_DIVERGENCE with the reason and a containment regex.',
+      );
+    }
+  });
+
+  it('continue-on-error appears nowhere except the one allowlisted named step', () => {
+    // Same verification found continue-on-error on an UNNAMED step (e.g. a
+    // bare `- uses: actions/setup-node@v4`) is invisible to every scan above
+    // — stepNames() only enumerates `- name:` lines. This is the blunt
+    // backstop: every continue-on-error occurrence in every workflow must
+    // sit inside the step block of an explicitly allowlisted step name;
+    // an occurrence in an unnamed step has no name to allowlist and fails.
+    const ALLOWED_STEPS = new Set(['Check documentation quality']);
+    for (const [file, source] of [['ci.yml', ci], ['release.yml', release], ['security.yml', security]] as const) {
+      const lines = source.split('\n');
+      lines.forEach((line, i) => {
+        if (!/^\s*continue-on-error\s*:/.test(line)) return;
+        // Walk back to the enclosing step's `- name:` (a `- uses:`/- run:`
+        // opener without a name yields none — which is the point).
+        let owner: string | null = null;
+        for (let j = i; j >= 0; j--) {
+          const dash = /^(\s*)-\s+(name:\s*(.+?)\s*)?/.exec(lines[j]);
+          if (dash && /^\s*-\s/.test(lines[j])) {
+            owner = /^\s*-\s+name:\s*(.+?)\s*$/.exec(lines[j])?.[1] ?? null;
+            break;
+          }
+        }
+        assert.ok(
+          owner !== null && ALLOWED_STEPS.has(owner),
+          `${file}:${i + 1} has continue-on-error ${owner === null
+            ? 'on an UNNAMED step — unnamed steps are invisible to the named-step scans, which is exactly why this backstop exists'
+            : `on step "${owner}", which is not allowlisted`}. Remove it, or name the step and allowlist it with a reason.`,
+        );
+      });
+    }
+  });
 });
