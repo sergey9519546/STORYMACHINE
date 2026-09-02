@@ -389,12 +389,98 @@ Exclude scripts with ANY of:
 
 ---
 
+## Section 12: Power and agreement floors (added 2026-09-02, unsigned)
+
+**Status: PROPOSAL. None of this section is adopted.** It is added in
+response to `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` §10,
+which found that this protocol's original methodology (Sections 1-11 above,
+left intact) specifies a >=0.60 kappa target and a >=0.80 AUC gate with no
+stated confidence-interval requirement, no overlap budget for computing
+kappa, and no minimum detectable effect — so nobody could tell, before
+running the study, whether it was large enough to answer the question it
+asks. The full derivation, formulas, and reproducible arithmetic are in
+`docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md`; this section states the
+proposed numbers only. **Every value below requires the owner's signature
+before it governs anything** — until signed, Sections 1-11's original,
+unmodified targets remain what this protocol commits to.
+
+### 12.1 AUC gate (Section 6/10/11 above)
+
+- **Proposal:** report the 95% confidence interval (Hanley-McNeil
+  approximation) alongside every AUC point estimate, and treat the P1 gate
+  as "point estimate >= 0.80 **and** the CI lower bound clearly separated
+  from 0.75" rather than a bare point comparison.
+- **Why:** at n=153 (the held-out test partition size), the 95% CI half-width
+  around an AUC of 0.80 is approximately 0.07-0.09 depending on the
+  positive/negative split assumed (POWER_ANALYSIS_2026-09-02.md §1.2) — wide
+  enough that 0.80 and 0.75 are statistically indistinguishable from a single
+  measurement (§1.4: 0.75 falls inside the 95% CI around 0.80 under every
+  split scenario tested).
+- **Minimum detectable difference:** two independent AUC measurements on this
+  partition (e.g. before/after a scoring change) cannot be told apart at 80%
+  power unless they differ by roughly **0.145-0.19** (POWER_ANALYSIS_2026-09-02.md
+  §1.3) — larger than the entire observed spread across the four measured
+  degradation channels (0.523-0.990).
+
+### 12.2 Reader agreement (Section 3 above)
+
+- **Proposal:** keep the existing Fleiss' kappa point-estimate floor of
+  **>= 0.60**, unchanged, and add a new requirement — the measured kappa's
+  95% confidence interval half-width must be **<= 0.10**, so the point
+  estimate cannot float between the "moderate" (0.41-0.60) and "substantial"
+  (0.61-0.80) Landis & Koch bands.
+- **Overlap budget (new):** at least **49 scripts must be labeled by ALL
+  THREE readers** before the kappa computed on them meets the CI requirement
+  above (POWER_ANALYSIS_2026-09-02.md §2.2, using the SPLIT_STRATEGY target
+  category distribution; 43 under a simpler uniform-tier planning
+  assumption). Below this count the CI is wider than the "substantial"
+  agreement band itself.
+- **Total labeling volume:** at the corpus target of 100-200 scripts with
+  the full-overlap design this protocol's own §3 already specifies (every
+  reader labels every script), each reader produces 100-200 labels and needs
+  an estimated **175-395 reader-hours** depending on reading pace
+  (POWER_ANALYSIS_2026-09-02.md §2.3) — materially longer than the 2-week
+  Phase 2 window in Section 8 above. The owner must resolve this gap: shrink
+  the labeled corpus, adopt a partial-overlap design (fixed >=49-script
+  overlap core plus a split remainder — not currently specified anywhere in
+  this protocol), or extend the timeline.
+
+### 12.3 The five P0 moderated sessions
+
+- **What n=5 can and cannot show:** the exact (Clopper-Pearson) 95%
+  confidence interval on "4 of 5 writers would use this again" is
+  **[0.284, 0.995]** — consistent with a true adoption rate anywhere from
+  about 28% to about 99% (POWER_ANALYSIS_2026-09-02.md §3.1). n=5 supports
+  qualitative discovery (objections, moments of trust or disbelief, the
+  core "does this make you want to run your own draft?" question) but not a
+  quantitative go/no-go claim about writer demand at large.
+- **Proposal:** state explicitly, wherever a P0 result is reported, that it
+  is qualitative discovery evidence, not a statistically powered adoption
+  estimate.
+- **Sample size for a +/-20-point interval:** approximately **17 sessions**
+  (holding near the observed ~80% rate) are needed before the exact 95% CI
+  half-width narrows to <= 0.20 (POWER_ANALYSIS_2026-09-02.md §3.2) — a
+  looser target than most product-adoption studies would accept, and still
+  more than 3x the current plan.
+
+### 12.4 Signature
+
+**None of Sections 12.1-12.3 governs the P0 or P1 gate until signed here.**
+
+**Owner:** ___________________________
+**Date:** ___________________________
+**Decision:** [ ] Adopt as written  [ ] Adopt with changes (log in Section 9)  [ ] Reject — Sections 1-11's original targets stand
+
+---
+
 ## Related Documents
 
 - **SPLIT_STRATEGY.md:** Technical split implementation
 - **ADR-002:** Design decisions rationale
 - **ROADMAP.md P1:** High-level P1 requirements
 - **Manifest (after split):** `corpus-manifest.json`
+- **POWER_ANALYSIS_2026-09-02.md:** Full derivation and reproducible
+  arithmetic behind Section 12's proposed floors.
 
 ---
 

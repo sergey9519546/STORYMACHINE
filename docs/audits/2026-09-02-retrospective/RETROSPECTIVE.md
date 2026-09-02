@@ -129,7 +129,7 @@ the deliverable. Fix: every reported gap gets an expiry after which the step
 blocks.
 
 ## 10. The validation design was never power-analyzed
-**OPEN QUESTION · pre-registration drafted (lane R6); owner signs**
+**OPEN QUESTION · power analysis delivered — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` and `PRE_REGISTRATION_PROTOCOL.md` §12 (proposal, unsigned); owner signs**
 
 The One Bet is 5 moderated sessions and ≥3 blind readers against a ≥0.80
 pooled-AUC gate on 153 held-out scripts. Nowhere is there a κ floor, an
@@ -218,7 +218,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | 7 | Ratchet never re-ratcheted | WEAK ROUTE | R1 |
 | 8 | Audit checks numbers, not claims | WEAK ROUTE | R4 |
 | 9 | Non-blocking-by-design reporter | WEAK ROUTE | R1 |
-| 10 | No power analysis | OPEN | R6 drafts; owner signs |
+| 10 | No power analysis | OPEN | Delivered — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` + protocol §12; owner signs |
 | 11 | Generative half unevaluated | OPEN | owner decides |
 | 12 | Title page unpersisted | WEAK ROUTE | R6 |
 
