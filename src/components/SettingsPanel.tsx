@@ -980,7 +980,21 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
                 eight times to get anywhere. Left/Right move (and select, per
                 APG's automatic-activation guidance — every panel here is
                 local state, nothing to fetch), Home/End jump to the ends. */}
-            <div className="flex border-b-4 border-black" role="tablist" aria-label="Settings sections">
+            {/* Phone-width fix (375/390px): all 8 tabs carry `flex-1`, which
+                only grows/shrinks evenly when the row's items CAN shrink
+                below their own content width — flex items default to
+                `min-width: auto`, so once the dialog narrows to `w-full
+                mx-4` on phones (well under the 8 tabs' combined intrinsic
+                width), the row stops shrinking and instead spills past the
+                dialog's right edge with no scrollbar (the dialog itself is
+                default `overflow: visible`), silently clipping "Session"
+                and "Labs" off-screen — Session is the only route to
+                Settings → Session → "Delete Everything". `overflow-x-auto`
+                below `sm` turns that silent clip into a reachable
+                horizontal scroll; `sm:overflow-x-visible` restores the
+                exact desktop rendering (all 8 tabs already fit the
+                `max-w-xl` dialog there, so this is a no-op above `sm`). */}
+            <div className="flex overflow-x-auto border-b-4 border-black sm:overflow-x-visible" role="tablist" aria-label="Settings sections">
               {TAB_ORDER.map((tab, index) => (
                 <button
                   key={tab}

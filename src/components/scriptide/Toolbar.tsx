@@ -334,8 +334,24 @@ export default function Toolbar({
         </div>
       </nav>
 
-      {/* Status + utilities cluster */}
-      <div className="flex shrink-0 items-center gap-2.5">
+      {/* Status + utilities cluster.
+
+          Phone-width fix (375/390px): this cluster used to be a single
+          `shrink-0` nowrap row. Its own max-content width is ~415px — wider
+          than a 375px viewport — and because ScriptIDE's root shell is
+          `overflow-hidden`, the tail of the row (the Export menu AND the
+          "More tools" overflow button) was clipped off the right edge with
+          NO scroll affordance to reach it. The overflow menu is the only
+          route to Labs & Settings, so on a phone that also made Settings →
+          Session → "Delete Everything" — the exact flow #privacy tells the
+          reader to use — physically unreachable.
+
+          Below `sm` the cluster now takes its own full-width row and wraps
+          internally, so every chip and control stays inside the viewport.
+          From `sm` up every one of those utilities is restored verbatim
+          (w-auto / basis-auto / flex-nowrap / shrink-0), so the desktop
+          header is byte-identical in layout to before. */}
+      <div className="flex w-full basis-full flex-wrap items-center justify-end gap-2.5 sm:w-auto sm:basis-auto sm:flex-nowrap sm:shrink-0">
         {/* Status chip */}
         <span
           className={`inline-flex min-h-[28px] items-center border px-2 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.12em] ${
