@@ -372,10 +372,78 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     // an image anyway, with no single step needing to be touched.
     const publishJob = release.match(/\n {2}publish:\n([\s\S]*?)(?=\n {2}\S|\n*$)/);
     assert.ok(publishJob, 'release.yml must keep a "publish" job');
+    const needs = /^\s*needs\s*:\s*(.+?)\s*$/m.exec(publishJob![1]);
+    assert.ok(needs, "release.yml's publish job must declare `needs:`");
+    const needed = needs![1].replace(/[[\]]/g, '').split(',').map((n) => n.trim()).filter(Boolean);
+    assert.ok(
+      needed.includes('test'),
+      "release.yml's publish job must need the `test` job — without it, a failing test job cannot block image publication",
+    );
+    // Added 2026-09-02 with the browser battery. A release that publishes
+    // while the live-surface certifications are red (or were never run) is
+    // exactly the failure this whole file exists to prevent, one job over.
+    assert.ok(
+      needed.includes('browser'),
+      "release.yml's publish job must need the `browser` job — a release must not ship with rotted browser proofs",
+    );
+  });
+
+  it('both workflows run the browser battery, with a real browser install (2026-09-02)', () => {
+    // The six live-Chromium suites ran on exactly ONE machine before this.
+    // Three of their headers asserted they "must not be wired into CI"; that
+    // was a self-imposed limitation, and while it held, the SSE migration
+    // silently broke two of them and an ARIA change broke a third. The gate is
+    // only real if BOTH steps stay: installing the browser, and running the
+    // suites. Either one alone is decoration.
+    for (const [label, source] of [['ci.yml', ci], ['release.yml', release]] as const) {
+      const install = stepBlock(source, 'Install Playwright Chromium');
+      assert.ok(install, `${label} must keep a step named "Install Playwright Chromium"`);
+      assert.match(
+        install!,
+        /playwright install .*chromium/,
+        `${label}'s browser-install step must actually install Chromium`,
+      );
+      const run = stepBlock(source, 'Browser verification battery');
+      assert.ok(run, `${label} must keep a step named "Browser verification battery"`);
+      assert.match(
+        run!,
+        /npm run verify:browser\b/,
+        `${label}'s browser battery step must invoke npm run verify:browser`,
+      );
+    }
+  });
+
+  it('verify:browser really runs all six browser suites (a shortened battery is a quiet bypass)', () => {
+    // `npm run verify:browser` is what CI executes. Shortening that one line
+    // in package.json would silently stop gating three of the six suites
+    // while every workflow check above stayed green — the same shape as a
+    // hardcoded gate list someone quietly trims.
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    const battery = pkg.scripts['verify:browser'];
+    assert.ok(battery, 'package.json must keep a verify:browser script');
+    for (const suite of [
+      'verify:p0-flow',
+      'verify:focus-traps',
+      'verify:surfaces',
+      'verify:ui-polish',
+      'verify:local-safety-net',
+      'verify:command-palette',
+    ]) {
+      assert.ok(
+        battery.includes(suite),
+        `verify:browser must run ${suite} — CI runs this one script, so a suite missing from it runs nowhere`,
+      );
+      assert.ok(pkg.scripts[suite], `package.json must keep the ${suite} script`);
+    }
+    // Pinned exactly: the browser build Playwright downloads must match the
+    // client driving it, and a floating range silently changes that pairing.
     assert.match(
-      publishJob![1],
-      /^\s*needs\s*:\s*test\s*$/m,
-      "release.yml's publish job must declare `needs: test` — without it, a failing test job cannot block image publication",
+      pkg.devDependencies.playwright ?? '',
+      /^\d+\.\d+\.\d+$/,
+      'playwright must be an exact pinned devDependency — the suites are useless if CI cannot install a browser',
     );
   });
 

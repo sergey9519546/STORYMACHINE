@@ -14,84 +14,41 @@
 //      have reported is computed from them here, and it is compared against
 //      what the panel actually shows on screen.
 //
-// Runs the real server (keyless) and drives real Chromium via Playwright,
-// following scripts/verify-p2-p3-surfaces.mjs's boot/launch/console-capture
-// structure. Screenshots land in output/playwright/ui-polish/ (gitignored).
+// Runs the real server (keyless) and drives real Chromium via Playwright. The
+// shared boot/launch/console-capture machinery and the PASS/FAIL summary live
+// in scripts/lib/browser-verify.mjs — change them there, not here. Screenshots
+// land in output/playwright/ui-polish/ (gitignored).
+//
+// THIS RUNS IN CI (2026-09-02), like the rest of the browser battery:
+// `playwright` is a pinned devDependency and the `browser` job in
+// .github/workflows/ci.yml provisions Chromium before running the suites.
+// PW_CHROMIUM_PATH stays an override for a browser provisioned outside
+// Playwright's cache (this container):
 //
 //   PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node scripts/verify-ui-polish-affordances.mjs
 //
 // Exit code 0 only when every assertion passed.
 
-import { spawn, execSync } from 'node:child_process';
-import { createServer } from 'node:net';
-import { existsSync, mkdirSync } from 'node:fs';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertKeylessAiConfig, keylessBrowserServerEnv } from './lib/keyless-browser-certification.mjs';
+import {
+  bootKeylessServer,
+  createRecorder,
+  launchChromium,
+  pickFreePort,
+  shutdown,
+} from './lib/browser-verify.mjs';
 
 const REPO = process.cwd();
 const SHOTS = join(REPO, 'output', 'playwright', 'ui-polish');
 mkdirSync(SHOTS, { recursive: true });
 
-function pickFreePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.unref();
-    s.on('error', reject);
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-  });
-}
-
 const PORT = await pickFreePort();
 const BASE = `http://127.0.0.1:${PORT}`;
 let serverProc = null;
 let browser = null;
-const results = [];
 
-function record(phase, assertion, pass, detail) {
-  results.push({ phase, assertion, pass, detail });
-  console.log(`[${pass ? 'PASS' : 'FAIL'}] ${phase} :: ${assertion}${detail ? ' — ' + detail : ''}`);
-}
-
-async function bootServer() {
-  console.log(`[verify] booting keyless server on port ${PORT}...`);
-  serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
-    cwd: REPO,
-    env: keylessBrowserServerEnv(process.env, PORT),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let booted = false;
-  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('server boot timeout (30s)')), 30000));
-  const ready = new Promise((resolve) => {
-    let buf = '';
-    const sniff = (d) => { buf += d; if (buf.includes('server_started')) { booted = true; resolve(); } };
-    serverProc.stdout.on('data', sniff);
-    serverProc.stderr.on('data', sniff);
-  });
-  await Promise.race([ready, timeout]);
-  if (!booted) throw new Error('server started without emitting server_started');
-  await assertKeylessAiConfig(BASE);
-  console.log('[verify] server booted (keyless).');
-}
-
-async function launchBrowser() {
-  const candidates = [
-    fileURLToPath(new URL('../node_modules/playwright/index.mjs', import.meta.url)),
-    fileURLToPath(new URL('../node_modules/playwright/index.js', import.meta.url)),
-  ];
-  try {
-    const globalRoot = execSync('npm root -g', { encoding: 'utf8' }).trim();
-    candidates.push(`${globalRoot}/playwright/index.mjs`, `${globalRoot}/playwright/index.js`);
-  } catch {}
-  const pwPath = candidates.find((p) => p && existsSync(p));
-  if (!pwPath) throw new Error('Playwright not found.');
-  const pw = await import(pathToFileURL(pwPath).href);
-  const chromium = pw.chromium ?? pw.default?.chromium;
-  return chromium.launch({ headless: true, executablePath: process.env.PW_CHROMIUM_PATH || undefined });
-}
+const { record, printSummary } = createRecorder({ grouped: true, groupKey: 'phase' });
 
 /** Pull the final `doctor_result` report out of a captured SSE body. */
 function reportFromSse(body) {
@@ -123,8 +80,8 @@ function rawIdentities(report) {
 }
 
 try {
-  await bootServer();
-  browser = await launchBrowser();
+  serverProc = await bootKeylessServer({ repo: REPO, port: PORT, baseUrl: BASE });
+  browser = await launchChromium();
   const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
   const page = await context.newPage();
 
@@ -318,13 +275,8 @@ try {
 } catch (err) {
   record('harness', 'the proof run completed without throwing', false, String(err && err.stack ? err.stack : err));
 } finally {
-  if (browser) await browser.close().catch(() => {});
-  if (serverProc) serverProc.kill('SIGTERM');
+  await shutdown({ browser, serverProc });
 }
 
-const failed = results.filter((r) => !r.pass);
-console.log('\n' + '='.repeat(72));
-console.log(`[verify] ${results.length - failed.length}/${results.length} assertions passed.`);
-console.log(`[verify] screenshots: ${SHOTS}`);
-console.log('='.repeat(72));
-process.exit(failed.length === 0 ? 0 : 1);
+const allPassed = printSummary({ extraLines: [`[verify] screenshots: ${SHOTS}`] });
+process.exit(allPassed ? 0 : 1);

@@ -146,9 +146,17 @@ that got us here.
      (the established pattern: question-latency, reversal-detection,
      truth-extraction).
   3. **Surface changes must keep the browser verification suites green**
-     (`smoke-p0-live-flow`, `verify-focus-traps`, `verify-p2-p3-surfaces`)
-     plus the honesty gates (honesty-audit, check-docs, scene-label
-     tripwire).
+     (`smoke-p0-live-flow`, `verify-focus-traps`, `verify-p2-p3-surfaces`,
+     `verify-ui-polish-affordances`, `verify-e4-local-safety-net`,
+     `verify-e5-command-palette`) plus the honesty gates (honesty-audit,
+     check-docs, scene-label tripwire). Calling the browser suites a
+     "tripwire" was aspirational until **2026-09-02**: they ran on one
+     developer's machine and nowhere else, and three of them had rotted for
+     days against the code they certify before anyone noticed. They are now
+     literally gates — `npm run verify:browser` runs all six in the
+     `browser` job of `.github/workflows/ci.yml` (which installs Chromium
+     via Playwright) on every push, and `publish` in `release.yml` blocks on
+     that job.
   4. **Demand evidence remains the highest-priority HUMAN lane, run in
      parallel** — P0 sessions are GO (see decision log) and nothing
      engineering does substitutes for them. The one prohibition that

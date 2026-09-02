@@ -7,12 +7,12 @@ name: Release
 #   - workflow_dispatch (manual re-run, e.g. to republish an image after a
 #     registry outage, without cutting a new tag)
 #
-# The `test` job mirrors ci.yml's gate so a broken tag/dispatch can never
-# publish a broken image — `publish` has a hard `needs: test` dependency and
-# will not run if it fails. This intentionally duplicates ci.yml's steps rather
-# than depending on a ci.yml run for this ref/SHA (workflow_dispatch has no
-# associated PR/push CI run to depend on, and tag-push CI runs are a separate,
-# not-guaranteed-synchronous workflow run).
+# The `test` and `browser` jobs mirror ci.yml's gates so a broken tag/dispatch
+# can never publish a broken image — `publish` has a hard `needs: [test,
+# browser]` dependency and will not run if either fails. This intentionally
+# duplicates ci.yml's steps rather than depending on a ci.yml run for this
+# ref/SHA (workflow_dispatch has no associated PR/push CI run to depend on, and
+# tag-push CI runs are a separate, not-guaranteed-synchronous workflow run).
 #
 # "MIRRORS" IS A CLAIM THIS FILE HAS TO KEEP EARNING. It previously said it
 # mirrored ci.yml while running 7 steps to ci.yml's 10: no receipt check, no
@@ -20,7 +20,10 @@ name: Release
 # checkout. A tag push could therefore publish an image built from an
 # unreceipted scoring change. Every ci.yml gate now has a counterpart here, and
 # tests/core/ci-gates-intact.test.ts asserts the correspondence step by step so
-# the two files cannot silently diverge again.
+# the two files cannot silently diverge again. (2026-09-02: the browser battery
+# — six live-Chromium suites that ran on one developer's machine and nowhere
+# else — became a gate here too. A release is the last place to ship
+# certifications nobody has executed.)
 #
 # The ONE deliberate difference, stated rather than hidden: the receipt check
 # runs in --structural-only mode over the whole release window (previous v*
@@ -149,8 +152,59 @@ jobs:
         env:
           GEMINI_API_KEY: "test-key-ci"
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # The browser battery. Six live-Chromium suites (smoke-p0-live-flow,
+  # verify-focus-traps, verify-p2-p3-surfaces, verify-ui-polish-affordances,
+  # verify-e4-local-safety-net, verify-e5-command-palette) that boot the real
+  # keyless server and drive the real UI.
+  #
+  # These used to run on exactly ONE machine. Three of their own headers
+  # asserted they "must not be wired into CI" because "CI has no browser
+  # provisioned" — a self-imposed limitation, not a fact: an ubuntu runner
+  # provisions Chromium in the one step below. The consequence of the old
+  # claim was measured, not hypothetical: the SSE migration broke the
+  # report-render wait in two suites and an ARIA role change broke a selector
+  # in a third, and all three rotted for days because nothing ran them.
+  #
+  # A SEPARATE JOB on purpose: it runs in parallel with `test`, so provisioning
+  # a browser (~1 browser download) never lengthens the lint/test path, and a
+  # browser-infrastructure flake is legible as such instead of being mixed into
+  # the unit-test signal. `playwright` is a pinned devDependency, so the
+  # installed browser build always matches the client driving it.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm ci` installs the Playwright CLIENT only — modern playwright
+      # packages ship no browser-downloading install script, which is why this
+      # step is explicit rather than implied. --with-deps adds the shared
+      # libraries headless Chromium needs on a bare ubuntu image.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # PW_CHROMIUM_PATH is deliberately NOT set: unset means "let Playwright
+      # resolve the build it pins", which is the path the step above
+      # provisions. The env override exists for machines that pre-provision a
+      # browser outside Playwright's cache (the development container), and
+      # keeping it unset here is what proves the CI path really works.
+      - name: Browser verification battery
+        run: npm run verify:browser
+
   publish:
-    needs: test
+    # A release must not ship with rotted proofs: `publish` blocks on the
+    # browser battery exactly as it blocks on `test`. Before 2026-09-02 the
+    # battery ran nowhere, so a tag could publish an image whose live-surface
+    # certifications had not been executed against that code in days.
+    needs: [test, browser]
     runs-on: ubuntu-latest
     # The registry write scope lives HERE, not at workflow level, so it is not
     # inherited by the test job's `npm ci`.

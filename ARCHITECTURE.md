@@ -285,15 +285,25 @@ backs up a real session, destroys it, restores it, and asserts the round trip.
 | E2E journeys (API-level) | Keyless product paths without a browser |
 | Real-corpus harness | Env-gated structural regression on real scripts |
 
-Browser-level proof exists but runs **on demand, not in CI** (Playwright is not
-a CI dependency): `scripts/smoke-p0-live-flow.mjs`,
+Browser-level proof runs **in CI** as of 2026-09-02 (`playwright` is a pinned
+devDependency; the `browser` job in `.github/workflows/ci.yml` installs
+Chromium and runs `npm run verify:browser`, and `publish` in `release.yml`
+blocks on the same job). The six suites are `scripts/smoke-p0-live-flow.mjs`,
 `verify-p2-p3-surfaces.mjs` (surface/Labs gating + a static dead-UI tripwire),
-`verify-focus-traps.mjs`, `verify-e4-local-safety-net.mjs`,
-`verify-e5-command-palette.mjs`, plus `scripts/load-test-doctor.mjs` for
-concurrent doctor load.
+`verify-focus-traps.mjs`, `verify-ui-polish-affordances.mjs`,
+`verify-e4-local-safety-net.mjs`, and `verify-e5-command-palette.mjs`; their
+shared boot/launch/console-capture/report-wait machinery lives once in
+`scripts/lib/browser-verify.mjs`. `scripts/load-test-doctor.mjs` (concurrent
+doctor load) stays on demand — it is a measurement, not a pass/fail gate.
 
-**Not yet proven by default CI:** browser journeys, human agreement with scores,
-public multi-tenant security.
+Until 2026-09-02 those suites ran on exactly one developer's machine, and this
+section said so. That was a self-imposed limitation, not a fact about CI, and
+it had a measured cost: the SSE migration broke the report-render wait in
+three of them and an ARIA role change broke a selector in a fourth, all
+unnoticed for days because nothing ran them.
+
+**Not yet proven by default CI:** human agreement with scores, public
+multi-tenant security.
 
 ---
 

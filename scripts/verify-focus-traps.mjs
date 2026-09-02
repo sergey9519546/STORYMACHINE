@@ -11,123 +11,57 @@
 // two real, live bugs that every prior source-read review missed (see the
 // commit history / doc comments in use-modal-focus-trap.ts and App.tsx).
 //
-// THIS IS A MANUALLY-RUN VERIFICATION SCRIPT, NOT A CI TEST. CI has no
-// browser provisioned (no Chromium, no PW_CHROMIUM_PATH), so this is not
-// wired into `npm test` and must not be. Run it by hand after touching
-// use-modal-focus-trap.ts or any dialog that calls it.
+// THIS RUNS IN CI (2026-09-02). It used to say the opposite — "not a CI test,
+// CI has no browser provisioned" — and that was a self-imposed limitation, not
+// a fact: an ubuntu-latest runner installs Chromium in one step. The cost of
+// the old claim was real rot (an ARIA role change broke a selector here and
+// nobody noticed for days, because nothing ran it). `playwright` is now a
+// pinned devDependency and the `browser` job in .github/workflows/ci.yml runs
+// `npx playwright install --with-deps chromium` before `npm run verify:browser`,
+// so this suite gates every push and blocks `publish` in release.yml. Run it
+// by hand too, after touching use-modal-focus-trap.ts or any dialog that
+// calls it.
 //
-// Prereqs: Node >= 22.6; the `playwright` package in node_modules (installed
-// --no-save, matches scripts/smoke-p0-live-flow.mjs's proven pattern); a
-// working Chromium binary. In THIS container that binary lives at
-// /opt/pw-browsers/chromium, so run:
+// Prereqs: Node >= 22.6; `npm ci` (brings Playwright) and a Chromium binary —
+// `npx playwright install chromium`, which is what CI does. In THIS container
+// a browser is already provisioned outside Playwright's cache, so run:
 //
 //   PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node scripts/verify-focus-traps.mjs
 //
-// (PW_CHROMIUM_PATH is optional elsewhere — omit it to let Playwright resolve
-// its own pinned browser build.)
+// (PW_CHROMIUM_PATH is optional — omit it to let Playwright resolve its own
+// pinned browser build, which is the CI path.)
 //
-// Boot/teardown pattern (keyless server on an isolated free port, resolve
-// Playwright from node_modules or the npm global root) is lifted directly
-// from scripts/smoke-p0-live-flow.mjs — read that file first if this one
-// needs changing.
+// Boot/launch/console-capture/report-wait and the PASS/FAIL summary all live
+// in scripts/lib/browser-verify.mjs — change them there, not here.
 //
 // Exit codes: 0 = every assertion passed. 1 = at least one failed (see the
 // per-assertion PASS/FAIL log above the summary for which, and why).
 
-import { spawn } from 'node:child_process';
-import { createServer } from 'node:net';
-import { setTimeout as sleep } from 'node:timers/promises';
-import { existsSync } from 'node:fs';
-import { execSync } from 'node:child_process';
-import { pathToFileURL, fileURLToPath } from 'node:url';
-import { assertKeylessAiConfig, keylessBrowserServerEnv } from './lib/keyless-browser-certification.mjs';
+import {
+  bootKeylessServer,
+  createRecorder,
+  launchChromium,
+  pickFreePort,
+  shutdown,
+  waitForRenderedText,
+  wireConsoleCapture,
+} from './lib/browser-verify.mjs';
 
 const REPO = process.cwd();
-
-function pickFreePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.unref();
-    s.on('error', reject);
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-  });
-}
 
 const ISOLATED_PORT = await pickFreePort();
 const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 
 let serverProc = null;
 let browser = null;
-const results = []; // { dialog, assertion, pass, detail }
 const genuineConsoleErrors = [];
 
-function record(dialog, assertion, pass, detail) {
-  results.push({ dialog, assertion, pass, detail });
-  const tag = pass ? 'PASS' : 'FAIL';
-  console.log(`[${tag}] ${dialog} :: ${assertion}${detail ? ' — ' + detail : ''}`);
-}
-
-async function bootServer() {
-  console.log(`[verify] booting keyless server on port ${ISOLATED_PORT}...`);
-  serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
-    cwd: REPO,
-    env: keylessBrowserServerEnv(process.env, ISOLATED_PORT),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let booted = false;
-  const bootTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('server boot timeout (30s)')), 30000));
-  const bootReady = new Promise((resolve) => {
-    let buf = '';
-    serverProc.stdout.on('data', (d) => { buf += d; if (buf.includes('server_started')) { booted = true; resolve(); } });
-    serverProc.stderr.on('data', (d) => { buf += d; if (buf.includes('server_started')) { booted = true; resolve(); } });
-  });
-  try {
-    await Promise.race([bootReady, bootTimeout]);
-  } catch (e) {
-    throw new Error(`server did not report server_started: ${e.message}`);
-  }
-  if (!booted) throw new Error('server started without emitting server_started');
-  await assertKeylessAiConfig(BASE);
-  console.log('[verify] server booted (keyless).');
-}
-
-async function launchBrowser() {
-  const candidatePaths = [
-    fileURLToPath(new URL('../node_modules/playwright/index.mjs', import.meta.url)),
-    fileURLToPath(new URL('../node_modules/playwright/index.js', import.meta.url)),
-  ];
-  try {
-    const globalRoot = execSync('npm root -g', { encoding: 'utf8' }).trim();
-    candidatePaths.push(`${globalRoot}/playwright/index.mjs`, `${globalRoot}/playwright/index.js`);
-  } catch {}
-  const pwPath = candidatePaths.find((p) => p && existsSync(p));
-  if (!pwPath) throw new Error('Playwright not found — install it (`npm i -g playwright` + `npx playwright install chromium`).');
-  const pw = await import(pathToFileURL(pwPath).href);
-  const chromium = pw.chromium ?? pw.default?.chromium;
-  if (!chromium) throw new Error('Playwright imported but `chromium` export not found.');
-  return chromium.launch({
-    headless: true,
-    executablePath: process.env.PW_CHROMIUM_PATH || undefined,
-  });
-}
-
-function wireConsoleCapture(page) {
-  page.on('console', (msg) => {
-    const t = msg.type();
-    const txt = msg.text();
-    // Same dev-only/keyless-503 noise filter as smoke-p0-live-flow.mjs.
-    const isHmr = /vite|hmr|websocket|24678/i.test(txt) || t === 'warning';
-    const isKeyless503 = /503|analyze-script|model key|Failed to fetch/i.test(txt) && /analyze-script|503|key/i.test(txt);
-    if (t === 'error' && !isHmr && !isKeyless503) genuineConsoleErrors.push(txt);
-  });
-  page.on('pageerror', (err) => {
-    if (/websocket|ws:\/\//i.test(err.message)) return;
-    genuineConsoleErrors.push(`pageerror: ${err.message}`);
-  });
-}
+// { dialog, assertion, pass, detail }
+const { record, printSummary } = createRecorder({
+  grouped: true,
+  groupKey: 'dialog',
+  listFailures: true,
+});
 
 // ── Shared DOM probes (mirror the hook's own logic so we're testing the
 // hook's CONTRACT, not re-deriving our own notion of "focusable"). ──────────
@@ -230,34 +164,27 @@ async function verifyDialog(page, { name, restoreTriggerHandle, closeDialog }) {
 }
 
 async function main() {
-  await bootServer();
-  browser = await launchBrowser();
+  serverProc = await bootKeylessServer({ repo: REPO, port: ISOLATED_PORT, baseUrl: BASE });
+  browser = await launchChromium();
 
   // ── Context 1: ScriptDoctorPanel — the P0-critical dialog. ───────────────
   // StartScreen -> "Try sample coverage" -> CoverageSummary -> "Full report".
   {
     const context = await browser.newContext();
     const page = await context.newPage();
-    wireConsoleCapture(page);
+    wireConsoleCapture(page, genuineConsoleErrors);
 
     console.log('\n=== ScriptDoctorPanel (StartScreen -> Try sample coverage -> Full report) ===');
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
     const sampleCta = page.getByRole('button', { name: /try sample coverage/i }).first();
     await sampleCta.click({ timeout: 15000 });
-    // The coverage card streams over SSE now (/api/scriptide/doctor/stream),
-    // whose 200 arrives at connection-open — before the report exists — so
-    // waiting on the response + 400ms raced the stream and lost. Poll the
-    // rendered text instead (same fix as smoke-p0-live-flow.mjs and
-    // verify-p2-p3-surfaces.mjs — third copy of this wait, third fix).
-    const renderDeadline = Date.now() + 45000;
-    let bodyText = '';
-    for (;;) {
-      bodyText = (await page.textContent('body')) ?? '';
-      if (bodyText.includes('CONSIDER')) break;
-      if (Date.now() > renderDeadline) break;
-      await page.waitForTimeout(250);
-    }
+    // The coverage card streams over SSE (/api/scriptide/doctor/stream), whose
+    // 200 arrives at connection-open — before the report exists. The shared
+    // helper polls the rendered text against a real deadline; it was the third
+    // copy of this wait and the third fix of the same race, which is why it
+    // now lives in scripts/lib/browser-verify.mjs exactly once.
+    const bodyText = await waitForRenderedText(page, 'CONSIDER');
 
     // Smoke basics (assertion 5): the deterministic report actually rendered.
     record('ScriptDoctorPanel', 'SMOKE: coverage summary renders CONSIDER', bodyText.includes('CONSIDER'), 'checked page body for "CONSIDER"');
@@ -283,7 +210,7 @@ async function main() {
     const context = await browser.newContext();
     await context.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch {} });
     const page = await context.newPage();
-    wireConsoleCapture(page);
+    wireConsoleCapture(page, genuineConsoleErrors);
 
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
     const advancedBtn = page.getByRole('button', { name: /advanced: simulation/i }).first();
@@ -326,28 +253,7 @@ async function main() {
   }
 }
 
-async function teardown() {
-  try { if (browser) await browser.close(); } catch {}
-  try {
-    if (serverProc) {
-      serverProc.kill('SIGTERM');
-      await sleep(800);
-      if (!serverProc.killed) serverProc.kill('SIGKILL');
-    }
-  } catch {}
-}
-
-function printSummary() {
-  const failed = results.filter((r) => !r.pass);
-  console.log('\n' + '='.repeat(72));
-  console.log(`[verify] ${results.length - failed.length}/${results.length} assertions passed.`);
-  if (failed.length > 0) {
-    console.log('[verify] FAILED assertions:');
-    for (const f of failed) console.log(`  - ${f.dialog} :: ${f.assertion}${f.detail ? ' — ' + f.detail : ''}`);
-  }
-  console.log('='.repeat(72));
-  return failed.length === 0;
-}
+const teardown = () => shutdown({ browser, serverProc, graceMs: 800 });
 
 try {
   await main();

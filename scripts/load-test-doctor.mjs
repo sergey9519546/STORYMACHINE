@@ -6,8 +6,13 @@
 // the concurrency validation W1 (doctor-pool.ts's worker-thread pool) and W2
 // (the O(n^3)->near-linear temporal-consistency fix) exist to make possible.
 //
-// THIS IS A MANUALLY-RUN VERIFICATION SCRIPT, NOT A CI TEST — like the other
-// scripts/verify-*.mjs tools, it is deliberately not wired into `npm test`.
+// THIS IS A MANUALLY-RUN MEASUREMENT, NOT A CI TEST — and unlike the
+// scripts/verify-*.mjs browser battery (which became a real CI gate on
+// 2026-09-02: see the `browser` job in .github/workflows/ci.yml), it stays out
+// of CI for a reason that is about this script, not about CI's capabilities:
+// it reports latency percentiles, and a percentile measured on a shared,
+// variably-loaded hosted runner is noise dressed as a threshold. It is
+// deliberately not wired into `npm test`.
 // The synthetic-script generator is the SAME pattern
 // tests/core/doctor-perf-budget.test.ts uses (concatenate real
 // data/screenplays/*.fountain fixtures, uniquifying sluglines per repeat) —

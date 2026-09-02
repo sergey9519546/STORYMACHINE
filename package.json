@@ -40,7 +40,7 @@
     "verify:command-palette": "node scripts/verify-e5-command-palette.mjs",
     "verify:corpus-layout": "node scripts/verify-corpus-layout.mjs",
     "verify:llm-providers": "node scripts/smoke-llm-providers.mjs",
-    "verify:browser": "npm run verify:p0-flow && npm run verify:focus-traps && npm run verify:surfaces"
+    "verify:browser": "npm run verify:p0-flow && npm run verify:focus-traps && npm run verify:surfaces && npm run verify:ui-polish && npm run verify:local-safety-net && npm run verify:command-palette"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -82,6 +82,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.21",
+    "playwright": "1.56.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.23.11",
     "typescript": "~5.8.2",
