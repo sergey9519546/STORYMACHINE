@@ -260,6 +260,25 @@ function makePushRepo(secondCommit: {
   return { dir, before, after };
 }
 
+/**
+ * A repository with NOTHING to diff against: one commit (so no HEAD~1), on a
+ * branch that is not `main`, with no `origin/main` remote-tracking ref. Every
+ * candidate base in resolveDefaultRange() misses, so `range` is null — the
+ * shape a shallow or misconfigured CI checkout produces.
+ */
+function makeOrphanRepo() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'receipt-guard-orphan-'));
+  run('git', ['init', '--quiet', '--initial-branch=detached-work'], dir);
+  run('git', ['config', 'user.email', 'test@example.com'], dir);
+  run('git', ['config', 'user.name', 'Receipt Guard Test'], dir);
+  run('git', ['config', 'commit.gpgsign', 'false'], dir);
+  writeFile(dir, DOCTOR_REL, 'export const health = 1;\n');
+  writeFile(dir, RECEIPT_REL, '# Measurement Receipts Ledger\n');
+  run('git', ['add', '-A'], dir);
+  run('git', ['commit', '--quiet', '-m', 'only commit'], dir);
+  return dir;
+}
+
 function runGuard(dir: string, env: Record<string, string>) {
   return spawnSync(process.execPath, [guardScript], {
     cwd: dir,
@@ -399,6 +418,44 @@ describe('measurement-receipt guard — push-event range', () => {
       assert.equal(r.status, 0, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
       assert.match(r.stdout, /origin\/main\.\.\.HEAD/);
       assert.doesNotMatch(r.stdout, /0000000/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // 2026-09-02: the guard used to print "This is not a pass; it is an absent
+  // check" and then exit 0 — including under CI. A shallow or misconfigured
+  // checkout therefore rendered as a green build, which is the exact shape of
+  // the ~182-run blind spot above, one layer down. Under CI it now fails;
+  // locally it stays lenient, because a developer in a base-ref-less repo is
+  // not shipping anything and failing there only teaches people to route
+  // around the guard.
+  it('FAILS under CI when there is no base ref at all (an absent check must not be green)', () => {
+    const dir = makeOrphanRepo();
+    try {
+      const r = spawnSync(process.execPath, [guardScript], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: { ...process.env, CI: '1', GITHUB_EVENT_NAME: 'push' },
+      });
+      assert.equal(r.status, 1, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+      assert.match(r.stderr, /NO BASE REF/);
+      assert.match(r.stderr, /FAILING because CI is set/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('stays lenient (exit 0) with no base ref when CI is not set', () => {
+    const dir = makeOrphanRepo();
+    try {
+      const env = { ...process.env };
+      delete env.CI;
+      delete env.GITHUB_EVENT_NAME;
+      delete env.GITHUB_ACTIONS;
+      const r = spawnSync(process.execPath, [guardScript], { cwd: dir, encoding: 'utf8', env });
+      assert.equal(r.status, 0, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+      assert.match(r.stdout, /NO BASE REF/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

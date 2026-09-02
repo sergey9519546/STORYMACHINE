@@ -555,12 +555,31 @@ function main() {
     // Loud, not casual: "nothing to check" is what the old empty-range bug
     // printed on every push to main. If this line appears in a CI log on a
     // normal run, the checkout is misconfigured, not clean.
-    console.log(
+    const message =
       'check-scoring-receipt: NO BASE REF to diff against (no push range, no origin/main, no main, '
       + 'no prior commit) — nothing could be checked. This is not a pass; it is an absent check. '
       + 'On CI this means the checkout lacks history (needs fetch-depth: 0) or the event payload '
-      + 'was unavailable.',
-    );
+      + 'was unavailable.';
+    if (process.env.CI) {
+      // 2026-09-02: on CI this used to print the sentence above and exit 0 —
+      // an absent check that renders as a green build, which is precisely the
+      // shape of every failure this guard exists to prevent. Both workflows
+      // check out with fetch-depth: 0 for exactly this reason, and
+      // tests/core/ci-gates-intact.test.ts asserts they keep doing so; if the
+      // range still cannot be resolved, the checkout is broken and the build
+      // must say so rather than certifying a range it never read.
+      //
+      // Local runs stay lenient (below): a developer in a fresh repo with no
+      // base ref is not shipping anything, and failing there teaches people to
+      // route around the guard.
+      console.error(message);
+      console.error(
+        'check-scoring-receipt: FAILING because CI is set. A misconfigured or shallow checkout must '
+        + 'not produce a green build — fix the checkout (fetch-depth: 0) or pass an explicit range.',
+      );
+      process.exit(1);
+    }
+    console.log(message);
     process.exit(0);
   }
 
