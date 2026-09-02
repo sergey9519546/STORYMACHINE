@@ -22,7 +22,7 @@ labeled by all readers) that nothing in the current protocol requires. The
 plan is under-powered on all three legs as written. That is the finding.
 
 All arithmetic below is produced by
-`/tmp/claude-0/-home-user-STORYMACHINE/057a350f-7a69-54f4-ba49-41ec690a2ffe/scratchpad/power-analysis.mjs`,
+`docs/p1-benchmark/power-analysis.mjs` (run with `node docs/p1-benchmark/power-analysis.mjs`),
 reproduced in full in the Appendix. No statistic in this document was typed
 in by hand — every number is copied from that script's stdout.
 
@@ -298,7 +298,7 @@ new section added to `PRE_REGISTRATION_PROTOCOL.md`.
 
 ## Appendix: full computation output
 
-Script: `/tmp/claude-0/-home-user-STORYMACHINE/057a350f-7a69-54f4-ba49-41ec690a2ffe/scratchpad/power-analysis.mjs`
+Script: `docs/p1-benchmark/power-analysis.mjs` (run with `node docs/p1-benchmark/power-analysis.mjs`)
 (zero dependencies, plain Node; every number above is copied from this
 output, nothing was hand-typed).
 
