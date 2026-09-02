@@ -25,6 +25,7 @@ describe('routes/scriptide — HTTP behavior', async () => {
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.status, 'empty');
+    assert.equal(body.titlePage, null);
   });
 
   it('POST /api/scriptide/save then GET /api/scriptide/load roundtrips text + updatedAt', async () => {
@@ -58,6 +59,95 @@ describe('routes/scriptide — HTTP behavior', async () => {
     assert.deepEqual(loadBody.characters, []);
     assert.deepEqual(loadBody.researchNotes, []);
     assert.equal(loadBody.isDarkMode, true);
+    assert.equal(loadBody.titlePage, null, 'a save with no titlePage field leaves it null, not a default object');
+  });
+
+  // Retrospective finding #12 — the byte-identical restore drill (S1) could
+  // not carry title/author/contact because ScriptIDE_State had no column for
+  // it at all. Covers the same route layer as the test above, isolating the
+  // titlePage-specific behavior: it round-trips byte-exact, and a save that
+  // never mentions it does not disturb an already-saved one.
+  describe('title page persistence (retrospective #12)', () => {
+    it('a save with a title page round-trips it byte-exact through load', async () => {
+      const sid = freshSessionId();
+      const titlePage = { title: 'THE LAST DRAFT', author: 'A. Writer', contact: 'writer@example.com\n(555) 555-0100' };
+      const saveRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sid, scriptText: 'INT. TITLE CARD - DAY', snapshots: [], characters: [],
+          researchNotes: [], isDarkMode: false, titlePage,
+        }),
+      });
+      assert.equal(saveRes.status, 200);
+
+      const loadRes = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+      assert.equal(loadRes.status, 200);
+      const loadBody = await loadRes.json();
+      assert.deepEqual(loadBody.titlePage, titlePage);
+    });
+
+    it('an explicit null titlePage clears a previously-saved one (full-state save, not a patch)', async () => {
+      const sid = freshSessionId();
+      await fetch(`${server.baseUrl}/api/scriptide/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sid, scriptText: 'x',
+          titlePage: { title: 'WILL BE CLEARED', author: '', contact: '' },
+        }),
+      });
+      const clearRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid, scriptText: 'x', titlePage: null }),
+      });
+      assert.equal(clearRes.status, 200);
+
+      const loadRes = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+      const loadBody = await loadRes.json();
+      assert.equal(loadBody.titlePage, null);
+    });
+
+    it('rejects an oversized title page field with 400, without persisting it', async () => {
+      const sid = freshSessionId();
+      const res = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sid,
+          scriptText: 'x',
+          titlePage: { title: 'A'.repeat(301), author: 'Author', contact: '' },
+        }),
+      });
+      assert.equal(res.status, 400);
+
+      const loadRes = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+      const loadBody = await loadRes.json();
+      assert.equal(loadBody.status, 'empty', 'the rejected save must not have created a row at all');
+    });
+
+    it('rejects a title page with a wrong-typed field with 400', async () => {
+      const res = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: freshSessionId(),
+          scriptText: 'x',
+          titlePage: { title: 'Fine', author: 42, contact: '' },
+        }),
+      });
+      assert.equal(res.status, 400);
+    });
+
+    it('rejects a titlePage that is not an object (e.g. a bare string) with 400', async () => {
+      const res = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: freshSessionId(), scriptText: 'x', titlePage: 'not an object' }),
+      });
+      assert.equal(res.status, 400);
+    });
   });
 
   it('persists an intentionally blank draft and metadata-only state', async () => {

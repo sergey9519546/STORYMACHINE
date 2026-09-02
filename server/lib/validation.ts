@@ -965,6 +965,18 @@ export const ProjectTargetParamSchema = z.object({
 
 // ── server/routes/scriptide.ts schemas (W4 validation-completeness audit) ───
 
+// Title Page (retrospective finding #12): title/author are short single-line
+// fields in the Labs "Title" tab's actual inputs (ScriptIDE.tsx renderTitlePage),
+// contact is a free-text textarea that can reasonably hold a multi-line
+// address/phone/agent block — capped generously wider than the other two but
+// still bounded, matching the "cap the JSON size sensibly" instruction rather
+// than leaving it unbounded like the passthrough envelope fields around it.
+export const TitlePageBodySchema = z.object({
+  title: z.string().max(300),
+  author: z.string().max(300),
+  contact: z.string().max(2_000),
+});
+
 // POST /api/scriptide/save — persists the ScriptIDE editor's full working
 // state. Every cap below matches the route's own pre-existing inline
 // truncation exactly (`.substring(0, 500_000)`, `.slice(0, 20/100/200)`) —
@@ -978,6 +990,11 @@ export const ScriptideSaveBodySchema = z.object({
   characters: z.array(z.unknown()).max(100).optional(),
   researchNotes: z.array(z.unknown()).max(200).optional(),
   isDarkMode: z.boolean().optional(),
+  // null clears a previously-saved title page; omitted means "unchanged" is
+  // NOT implied — the route treats a missing titlePage the same as every
+  // other envelope field (a full-state save, not a partial patch), matching
+  // scriptText/snapshots/characters/researchNotes above.
+  titlePage: TitlePageBodySchema.nullable().optional(),
   expectedUpdatedAt: z.number().int().nonnegative().nullable().optional(),
 }).passthrough();
 

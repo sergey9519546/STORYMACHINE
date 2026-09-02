@@ -55,7 +55,10 @@ function finiteTimestamp(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function isTitlePageState(value: unknown): value is TitlePageState {
+// Exported so callers validating a raw server JSON response (ScriptIDE.tsx's
+// mount-time /api/scriptide/load handling) can use the exact same shape
+// check as the envelope reader below, rather than re-deriving it.
+export function isTitlePageState(value: unknown): value is TitlePageState {
   if (!value || typeof value !== 'object') return false;
   const t = value as Partial<TitlePageState>;
   return typeof t.title === 'string' && typeof t.author === 'string' && typeof t.contact === 'string';
@@ -171,14 +174,18 @@ export function writeScriptIDEDraft(
   return true;
 }
 
-// The server-side ScriptIDE persistence route (server/routes/scriptide.ts)
-// only ever reads/writes scriptText, snapshots, characters, researchNotes,
-// and isDarkMode — titlePage has no server-side counterpart. A server
-// snapshot therefore never carries titlePage; callers that build a full
-// envelope FROM a server snapshot (applyServerScriptIDEDraft below) must
-// supply the writer's current titlePage separately rather than have it
-// reset by whatever the server returns.
-export type ScriptIDEServerSnapshot = Omit<ScriptIDEDraftState, 'titlePage'> & { updatedAt: number };
+// Retrospective finding #12: the server-side ScriptIDE persistence route
+// (server/routes/scriptide.ts) now reads/writes titlePage too, via
+// ScriptIDE_State.title_page_json. A server snapshot's titlePage is `null`
+// for a row saved before this column existed, or for a session that was
+// never given a title page at all — callers that build a full envelope FROM
+// a server snapshot (applyServerScriptIDEDraft below) must fall back to the
+// writer's current local titlePage in exactly that case, never treat a null
+// server titlePage as "clear it", so an editor open against an old cached
+// client build (whose save payload omits titlePage) can't wipe a title page
+// the writer already set from a different tab/device.
+export type ScriptIDEServerSnapshot =
+  Omit<ScriptIDEDraftState, 'titlePage'> & { titlePage: TitlePageState | null; updatedAt: number };
 
 export type ScriptIDERestoreDecision =
   | { action: 'empty' }
@@ -286,14 +293,18 @@ export function decideScriptIDELocalRestore(
 }
 
 /**
- * Builds a full local envelope from a server snapshot. `titlePage` must be
- * supplied by the caller (typically the writer's current local titlePage) —
- * the server has no titlePage of its own to contribute, so "the server draft
- * wins" must never be read as "reset the title page too."
+ * Builds a full local envelope from a server snapshot. `fallbackTitlePage`
+ * (typically the writer's current local titlePage) is used only when the
+ * server snapshot's own titlePage is null — a row saved before this column
+ * existed, or a session that genuinely never had one — so "the server draft
+ * wins" is never read as "reset the title page too" for a writer whose title
+ * page never made it to THIS server row. Once the server does carry a
+ * titlePage, it wins like every other field, matching how a second tab/
+ * device's edit is supposed to propagate.
  */
 export function applyServerScriptIDEDraft(
   server: ScriptIDEServerSnapshot,
-  titlePage: TitlePageState,
+  fallbackTitlePage: TitlePageState,
 ): ScriptIDEDraftEnvelope {
   return {
     schemaVersion: SCRIPTIDE_DRAFT_SCHEMA_VERSION,
@@ -302,7 +313,7 @@ export function applyServerScriptIDEDraft(
     characters: server.characters,
     researchNotes: server.researchNotes,
     isDarkMode: server.isDarkMode,
-    titlePage,
+    titlePage: server.titlePage ?? fallbackTitlePage,
     contentUpdatedAt: server.updatedAt,
     serverRevision: server.updatedAt,
     dirty: false,

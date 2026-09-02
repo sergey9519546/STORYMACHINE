@@ -59,8 +59,14 @@ describe('S1 restore drill — real backup, real destroy, real restore, byte-exa
       'hero', { action_type: 'WAIT', content: 'The moment before the restore drill', target: null }, 'room',
     );
     const draftScript = 'INT. ROOM - NIGHT\n\nA draft that must survive the round trip byte-exact.\n';
+    // Retrospective finding #12: the title page (Labs-only form) previously
+    // had no server-side column at all, so this exact drill restored a
+    // session that structurally could not hold it. Included here so the
+    // drill actually covers the finding, not just scriptText.
+    const draftTitlePage = { title: 'THE RESTORE DRILL', author: 'A. Writer', contact: 'writer@example.com' };
     session.stage.saveScriptIDEState(sessionId, {
       scriptText: draftScript, snapshots: [], characters: [], researchNotes: [], isDarkMode: false,
+      titlePage: draftTitlePage,
     });
 
     // ── Real backup — the exact logic `npm run backup` runs ────────────────
@@ -109,6 +115,11 @@ describe('S1 restore drill — real backup, real destroy, real restore, byte-exa
 
     const scriptIDE = restored.stage.loadScriptIDEState(sessionId);
     assert.equal(scriptIDE?.scriptText, draftScript, 'the editor draft must round-trip byte-exact, not just approximately');
+    assert.deepEqual(
+      scriptIDE?.titlePage,
+      draftTitlePage,
+      'the title page (title/author/contact) must round-trip byte-exact, not be structurally unable to persist (finding #12)',
+    );
   });
 
   it('restoreSession() refuses to restore over a session that is still live (no-clobber)', async () => {

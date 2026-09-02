@@ -21,6 +21,7 @@ import {
   applyServerScriptIDEDraft,
   decideScriptIDELocalRestore,
   decideScriptIDERestore,
+  isTitlePageState,
   loadScriptIDEDraft,
   readScriptIDEDraft,
   scriptIDEDraftStatesEqual,
@@ -684,6 +685,11 @@ export default function ScriptIDE({
           characters: data.characters,
           researchNotes: data.researchNotes,
           isDarkMode: data.isDarkMode,
+          // Retrospective finding #12: null for a pre-migration row or a
+          // session that never had a title page — applyServerScriptIDEDraft
+          // below falls back to the writer's current local titlePage in
+          // that case rather than treating null as "clear it".
+          titlePage: isTitlePageState(data.titlePage) ? data.titlePage : null,
           updatedAt: data.updatedAt,
         };
         const local = draftEnvelopeRef.current;
@@ -715,11 +721,13 @@ export default function ScriptIDE({
           return;
         }
         if (decision.action === 'use-server') {
-          // titlePage has no server-side counterpart (server/routes/scriptide.ts
-          // never reads or returns it) — read the ref rather than the `titlePage`
-          // React state closed over by this mount-only ([]) effect, which would
-          // be stale by the time this async response lands if the writer edited
-          // the title page while the fetch was in flight.
+          // Retrospective finding #12: the server now has its own titlePage
+          // (falls back to the writer's current local one only when the
+          // server's is null — see applyServerScriptIDEDraft's doc comment).
+          // Read the ref rather than the `titlePage` React state closed over
+          // by this mount-only ([]) effect, which would be stale by the time
+          // this async response lands if the writer edited the title page
+          // while the fetch was in flight.
           const cleanEnvelope = applyServerScriptIDEDraft(decision.server, draftEnvelopeRef.current.titlePage);
           draftEnvelopeRef.current = cleanEnvelope;
           skipNextLocalWriteRef.current = true;
@@ -729,6 +737,7 @@ export default function ScriptIDE({
           setCharacters(decision.server.characters as typeof characters);
           setResearchNotes(decision.server.researchNotes as typeof researchNotes);
           setIsDarkMode(decision.server.isDarkMode);
+          setTitlePage(cleanEnvelope.titlePage);
           writeDraftBoth(cleanEnvelope);
           return;
         }
@@ -1797,8 +1806,10 @@ export default function ScriptIDE({
   const useServerConflictDraft = () => {
     const server = saveConflictRef.current;
     if (!server) return;
-    // titlePage has no server-side counterpart — keep the writer's current
-    // title page rather than let "use server" reset it to nothing.
+    // Retrospective finding #12: the server now has its own titlePage — use
+    // it, falling back to the writer's current title page only when the
+    // server's is null (see applyServerScriptIDEDraft's doc comment), rather
+    // than letting "use server" reset it to nothing.
     const cleanEnvelope = applyServerScriptIDEDraft(server, titlePage);
     draftEnvelopeRef.current = cleanEnvelope;
     skipNextLocalWriteRef.current = true;
@@ -1810,6 +1821,7 @@ export default function ScriptIDE({
     setCharacters(server.characters as typeof characters);
     setResearchNotes(server.researchNotes as typeof researchNotes);
     setIsDarkMode(server.isDarkMode);
+    setTitlePage(cleanEnvelope.titlePage);
     setSaveStatus("saved-server");
     writeDraftBoth(cleanEnvelope);
   };

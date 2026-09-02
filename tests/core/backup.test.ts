@@ -178,7 +178,7 @@ describe('verified Stage backup and simulation-only reset', () => {
       stage.recordAction('hero', { action_type: 'WAIT', content: 'Latest committed event', target: null }, 'room');
       stage.saveScriptIDEState('wal-session', {
         scriptText: 'INT. ROOM - NIGHT\n\nLatest editor draft.', snapshots: [], characters: [],
-        researchNotes: [], isDarkMode: false,
+        researchNotes: [], isDarkMode: false, titlePage: null,
       });
       assert.ok(fs.existsSync(`${dbPath}-wal`) && fs.statSync(`${dbPath}-wal`).size > 0,
         'fixture must retain an active WAL');
@@ -248,7 +248,7 @@ describe('verified Stage backup and simulation-only reset', () => {
       INSERT INTO Ghost_Commits VALUES ('ghost',NULL,1,'{}','failed_proof',1);
       INSERT INTO Reveal_Plans VALUES ('reveal','setup','reveal','[]',1,1);
       INSERT INTO Drama_Positions VALUES ('position','option','hero','position',1,50,0.9,45,0,1,1);
-      INSERT INTO ScriptIDE_State VALUES ('project','DRAFT','[]','[]','[]',1,123);
+      INSERT INTO ScriptIDE_State VALUES ('project','DRAFT','[]','[]','[]',1,'{"title":"Reset Must Not Touch This","author":"Author","contact":""}',123);
       INSERT INTO Llm_Cache VALUES ('cache','model','hash','response',123);
       INSERT INTO Self_Play_Corpus VALUES ('run','scenario',1,1,1,1,'{}',123);
     `);

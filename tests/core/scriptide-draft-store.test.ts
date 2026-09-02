@@ -46,6 +46,7 @@ const server = {
   characters: [],
   researchNotes: [],
   isDarkMode: false,
+  titlePage: null,
   updatedAt: 200,
 };
 
@@ -324,6 +325,7 @@ describe('decideScriptIDERestore', () => {
         characters: envelope.characters,
         researchNotes: envelope.researchNotes,
         isDarkMode: envelope.isDarkMode,
+        titlePage: null,
         updatedAt: 999,
       };
       const local = { ...envelope, dirty: true, serverRevision: null };
@@ -340,6 +342,7 @@ describe('decideScriptIDERestore', () => {
         characters: envelope.characters,
         researchNotes: envelope.researchNotes,
         isDarkMode: envelope.isDarkMode,
+        titlePage: null,
         updatedAt: 555, // != local.serverRevision (100), simulating the lost ack
       };
       const local = { ...envelope, dirty: true, serverRevision: 100 };
@@ -369,6 +372,7 @@ describe('decideScriptIDERestore', () => {
         characters: envelope.characters,
         researchNotes: envelope.researchNotes,
         isDarkMode: !envelope.isDarkMode, // the one field that differs
+        titlePage: null,
         updatedAt: 200,
       };
       assert.deepEqual(
@@ -411,6 +415,17 @@ describe('decideScriptIDERestore', () => {
   it('applies a clean server envelope even when the caller has no local titlePage yet (falls back to defaults)', () => {
     const applied = applyServerScriptIDEDraft(server, DEFAULT_TITLE_PAGE);
     assert.deepEqual(applied.titlePage, DEFAULT_TITLE_PAGE);
+  });
+
+  // Retrospective finding #12: ScriptIDE_State grew a title_page_json column,
+  // so a server snapshot CAN now carry a real titlePage (not just null for
+  // pre-migration rows). Once it does, it wins like every other field — the
+  // fallback above exists only for the null case, not as a permanent
+  // "server never has an opinion on this" rule.
+  it('prefers the server\'s own titlePage over the caller-supplied fallback once the server has one', () => {
+    const serverWithTitlePage = { ...server, titlePage: { title: 'FROM SERVER', author: 'Server Author', contact: '' } };
+    const applied = applyServerScriptIDEDraft(serverWithTitlePage, { title: 'STALE LOCAL', author: '', contact: '' });
+    assert.deepEqual(applied.titlePage, { title: 'FROM SERVER', author: 'Server Author', contact: '' });
   });
 });
 

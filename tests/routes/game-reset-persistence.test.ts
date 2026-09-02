@@ -209,6 +209,7 @@ describe('routes/game — persistent simulation reset', () => {
         characters: [{ name: 'Writer character' }],
         researchNotes: [{ id: 'note', content: 'POST-RESET NOTE' }],
         isDarkMode: true,
+        titlePage: null,
         updatedAt: session.stage.loadScriptIDEState(sid)?.updatedAt,
       });
     } finally {

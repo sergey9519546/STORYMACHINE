@@ -163,6 +163,12 @@ restore drill faithfully restores a session that structurally cannot hold the
 writer's title, author, or contact. Masked only because W6 made that form
 Labs-only.
 
+**Landed:** `ScriptIDE_State` gained a nullable `title_page_json` column (a
+new v13→v14 rung on the existing migration ladder, `server/engine/Stage.ts`),
+wired through the save/load routes, `ScriptideSaveBodySchema`, and the
+client's local/IndexedDB envelope and server-reconcile paths; the S1 restore
+drill now asserts the title page round-trips too.
+
 ---
 
 ## Well-built — no action
@@ -220,7 +226,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | 9 | Non-blocking-by-design reporter | WEAK ROUTE | R1 |
 | 10 | No power analysis | OPEN | Delivered — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` + protocol §12; owner signs |
 | 11 | Generative half unevaluated | OPEN | owner decides |
-| 12 | Title page unpersisted | WEAK ROUTE | R6 |
+| 12 | Title page unpersisted | WEAK ROUTE | R6 — landed: `title_page_json` column + full round trip |
 
 Lanes R1–R6 are Opus agents in isolated worktrees, launched 2026-09-02; their
 outcomes are recorded in `docs/PATH_TO_EXCELLENCE.md` as they land.

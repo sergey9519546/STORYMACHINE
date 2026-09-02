@@ -285,6 +285,7 @@ router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema
     characters?: unknown;
     researchNotes?: unknown;
     isDarkMode?: unknown;
+    titlePage?: unknown;
     expectedUpdatedAt?: number | null;
   };
   const scriptText     = typeof body.scriptText     === 'string' ? body.scriptText.substring(0, 500_000) : '';
@@ -292,9 +293,28 @@ router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema
   const characters     = Array.isArray(body.characters)    ? body.characters.slice(0, 100) : [];
   const researchNotes  = Array.isArray(body.researchNotes) ? body.researchNotes.slice(0, 200) : [];
   const isDarkMode     = body.isDarkMode === true;
+  // Retrospective finding #12: title/author/contact now round-trip through
+  // ScriptIDE_State's title_page_json column. ScriptideSaveBodySchema (the
+  // `validate` middleware above) already rejected an out-of-shape titlePage
+  // with a 400 before this handler runs; this re-derivation is the same
+  // defense-in-depth as scriptText/snapshots/etc. above — clamp to the exact
+  // shape and bounds rather than trust `body.titlePage`'s type at the call
+  // site. `null` (explicit clear) and "field omitted" both land here as null,
+  // matching every other field's full-state-save semantics.
+  const rawTitlePage = body.titlePage as { title?: unknown; author?: unknown; contact?: unknown } | null | undefined;
+  const titlePage = rawTitlePage && typeof rawTitlePage === 'object'
+    && typeof rawTitlePage.title === 'string'
+    && typeof rawTitlePage.author === 'string'
+    && typeof rawTitlePage.contact === 'string'
+    ? {
+        title: rawTitlePage.title.substring(0, 300),
+        author: rawTitlePage.author.substring(0, 300),
+        contact: rawTitlePage.contact.substring(0, 2_000),
+      }
+    : null;
   const result = stage.saveScriptIDEState(
     sessionId(req),
-    { scriptText, snapshots, characters, researchNotes, isDarkMode },
+    { scriptText, snapshots, characters, researchNotes, isDarkMode, titlePage },
     body.expectedUpdatedAt,
   );
   if (result.status === 'conflict') {
@@ -308,7 +328,10 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
   const { stage } = getOrCreateSession(sessionId(req));
   const saved = stage.loadScriptIDEState(sessionId(req));
   if (!saved) {
-    res.json({ status: 'empty', scriptText: '', snapshots: [], characters: [], researchNotes: [], isDarkMode: false, updatedAt: null });
+    res.json({
+      status: 'empty', scriptText: '', snapshots: [], characters: [], researchNotes: [],
+      isDarkMode: false, titlePage: null, updatedAt: null,
+    });
     return;
   }
   res.json({ status: 'ok', ...saved });

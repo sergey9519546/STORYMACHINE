@@ -68,12 +68,29 @@ export const SIMULATION_RESET_TABLES = [
   'Self_Play_Corpus',
 ] as const;
 
+// The writer-facing Title Page form (Labs-only — src/components/ScriptIDE.tsx's
+// "Title" tab, ShipPanel.tsx's doc comment explains why it stays there) — the
+// same shape as src/lib/scriptide-draft-store.ts's client-side TitlePageState,
+// duplicated here rather than imported since server/** must not depend on
+// src/**. Kept deliberately small: three free-text fields, nothing structured.
+export interface TitlePageState {
+  title: string;
+  author: string;
+  contact: string;
+}
+
 export interface ScriptIDEState {
   scriptText: string;
   snapshots: unknown[];
   characters: unknown[];
   researchNotes: unknown[];
   isDarkMode: boolean;
+  // null means "no title page saved" (never written, or explicitly cleared).
+  // Retrospective finding #12: this had no server-side column at all, so a
+  // save→restore round trip (the byte-identical S1 restore drill included)
+  // structurally could not carry title/author/contact — the Labs gate on the
+  // form itself masked the loss since almost nobody hit the save path.
+  titlePage: TitlePageState | null;
 }
 
 export interface SavedScriptIDEState extends ScriptIDEState {
@@ -346,6 +363,15 @@ export class Stage {
             updated_at    INTEGER NOT NULL
           );
         `);
+      },
+      // v13 → v14: retrospective finding #12 — ScriptIDE_State had no column
+      //   for the writer's Title Page (title/author/contact), so it could
+      //   never survive a save→restore round trip no matter how the client
+      //   behaved. Nullable: NULL means "no title page saved" and is the
+      //   correct value for every row that predates this column (existing
+      //   sessions upgrade with title_page_json = NULL, not an empty object).
+      () => {
+        this.db.exec('ALTER TABLE ScriptIDE_State ADD COLUMN title_page_json TEXT');
       },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
@@ -1831,6 +1857,7 @@ export class Stage {
             characters: [],
             researchNotes: [],
             isDarkMode: false,
+            titlePage: null,
             updatedAt: 0,
           },
         };
@@ -1839,8 +1866,8 @@ export class Stage {
       const updatedAt = Math.max(Date.now(), (current?.updatedAt ?? 0) + 1);
       this.db.prepare(`
         INSERT OR REPLACE INTO ScriptIDE_State
-          (session_id, script_text, snapshots_json, characters_json, research_notes_json, is_dark_mode, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+          (session_id, script_text, snapshots_json, characters_json, research_notes_json, is_dark_mode, title_page_json, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         sessionId,
         state.scriptText,
@@ -1848,6 +1875,7 @@ export class Stage {
         JSON.stringify(state.characters),
         JSON.stringify(state.researchNotes),
         state.isDarkMode ? 1 : 0,
+        state.titlePage ? JSON.stringify(state.titlePage) : null,
         updatedAt,
       );
       return { status: 'saved', updatedAt };
@@ -1863,6 +1891,7 @@ export class Stage {
       characters_json: string;
       research_notes_json: string;
       is_dark_mode: number;
+      title_page_json: string | null;
       updated_at: number;
     } | undefined;
 
@@ -1873,6 +1902,9 @@ export class Stage {
       characters: safeJsonParse<unknown[]>(row.characters_json, []),
       researchNotes: safeJsonParse<unknown[]>(row.research_notes_json, []),
       isDarkMode: row.is_dark_mode === 1,
+      titlePage: row.title_page_json != null
+        ? safeJsonParse<TitlePageState | null>(row.title_page_json, null)
+        : null,
       updatedAt: row.updated_at,
     };
   }
