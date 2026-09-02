@@ -1,6 +1,8 @@
 # STORYMACHINE — Project Memory
 
-Orientation: `docs/PATH_TO_EXCELLENCE.md` (current lane sequence and live
+Orientation: `docs/UNIFIED_STATE_2026-09-02.md` (one reconciliation of every
+branch/PR/stash/orphan — start here for "where is everything?") ·
+`docs/PATH_TO_EXCELLENCE.md` (current lane sequence and live
 status — start here for "what do I do next?") · `ROADMAP.md` (canonical
 demand-driven phase semantics) · `NORTH_STAR.md` (product constitution) ·
 `ARCHITECTURE.md` (system map) · `README.md` (setup, env vars) ·
