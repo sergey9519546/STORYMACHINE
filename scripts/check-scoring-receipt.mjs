@@ -85,13 +85,13 @@
 //                                              pass here can move health via
 //                                              runRevisionPipeline)
 //
-// 2. REACHABILITY-GATED (everything else under server/nvm/analyze/** and
-//    server/nvm/revision/**) — a file here counts as scoring-path ONLY if it
-//    is statically reachable by following import/export/dynamic-import edges
-//    outward from doctor.ts (server/nvm/analyze/doctor.ts), computed fresh
-//    against the CURRENT on-disk tree every run (not against git history —
-//    a file's wiring is a property of the checkout being tested, not of any
-//    one commit). This is what keeps NEW unwired candidate files — the
+// 2. REACHABLE-FROM-DOCTOR (everything else, NO DIRECTORY RESTRICTION) — a
+//    file here counts as scoring-path if and only if it is statically
+//    reachable by following import/export/dynamic-import edges outward from
+//    doctor.ts (server/nvm/analyze/doctor.ts), computed fresh against the
+//    CURRENT on-disk tree every run (not against git history — a file's
+//    wiring is a property of the checkout being tested, not of any one
+//    commit). This is what keeps NEW unwired candidate files — the
 //    QL-deduction (question-latency-deduction.ts), reversal-detection.ts,
 //    truth-extraction.ts pattern CLAUDE.md and the maintainer named
 //    explicitly — from tripping the guard: nothing in the scoring path
@@ -116,21 +116,84 @@
 //    rewrite.ts, and the pipeline's own imports of screenplay/compile.ts,
 //    screenplay/structure.ts, screenplay/memory.ts, etc.).
 //
-//    Only files under server/nvm/analyze/** or server/nvm/revision/** are
-//    reachability-gated at all — the walk itself does follow edges outside
-//    those directories (e.g. into server/nvm/screenplay/**, server/lib/**,
-//    src/lib/screenplay-layout.ts) to stay correct across re-export chains,
-//    but files outside the two gated directories are never classified as
-//    scoring-path even if visited, because editing e.g. src/lib/
-//    screenplay-layout.ts's rendering code is not a scoring-formula change
-//    (see the "outside the scoring-path directories" branch in classify()).
+//    UNTIL 2026-09-02 this tier was itself restricted to files under
+//    server/nvm/analyze/** or server/nvm/revision/** — the walk followed
+//    edges outside those directories to stay correct across re-export
+//    chains, but a file outside the two prefixes was never classified as
+//    scoring-path even when the walk visited it, on the theory that e.g.
+//    src/lib/screenplay-layout.ts is "rendering code, not a scoring-formula
+//    change." THAT THEORY WAS FALSE FOR THE ACTUAL FILES INVOLVED (2026-09-02
+//    retrospective, finding #3) and the restriction is now removed:
+//      - doctor.ts imports `layoutScreenplay` from src/lib/screenplay-layout.ts
+//        DIRECTLY (doctor.ts:67) and uses its return value to compute `pages`
+//        (doctor.ts:864) — not rendering, an input to a number the report
+//        emits.
+//      - fountain-analyzer.ts (tier 1, always-scoring) imports
+//        src/lib/fountain.ts, which decides what counts as a scene heading —
+//        i.e. it produces `sceneCount`, the single highest-AUC term the
+//        doctor emits (~0.938, doctor.ts:1892-1898). The old prefix filter
+//        discarded it unconditionally.
+//      - Proven on commit c9023b8f ("multi-language scene headings"): the old
+//        gate named only screenplay-normalizer.ts in that range while the
+//        commit also changed fountain.ts, and fountain.ts was invisible to
+//        the guard. `node scripts/check-scoring-receipt.mjs c9023b8f^..c9023b8f`
+//        now names both files.
+//    "Which directory is this file in" was never actually evidence that a
+//    file could not move a number; "is this file in doctor.ts's reachable
+//    set" is the only evidence the walk was ever computing, and it is now the
+//    only thing classification consults for this tier.
 //
-// A file this script does NOT catch: anything computing health/verdict from
-// OUTSIDE server/nvm/analyze/** and server/nvm/revision/** entirely (there is
-// no such file today — doctor.ts is the sole entrypoint). If one is ever
-// added elsewhere, add its directory to REACHABILITY_GATED_PREFIXES (or its
-// exact path to ALWAYS_SCORING_FILES) — erring toward inclusion, per the
-// brief this script was built against.
+//    A reachable file CAN still be marked scoring:false — via
+//    REACHABLE_BUT_NOT_SCORING below — but only by a per-file entry that
+//    documents a specific proof (see that constant's comment), never by
+//    directory membership. The set starts EMPTY and stays empty until such a
+//    proof exists; err toward inclusion, per the brief this script was built
+//    against.
+//
+// A file this script does NOT catch: anything computing health/verdict
+// without being statically reachable from doctor.ts by a plain
+// import/export/dynamic-import edge — a dynamically-built import path
+// (`import(someVariable)`), a file read directly off disk by path string
+// rather than imported, or a second entrypoint that duplicates doctor.ts's
+// logic without doctor.ts itself importing it. There is no such file known
+// today — doctor.ts is the sole entrypoint and the walk in
+// scripts/lib/import-graph.mjs follows both static and dynamic `import(...)`
+// forms. If a new scoring computation is ever added that the walk cannot see,
+// add its exact path to ALWAYS_SCORING_FILES (or its directory to
+// ALWAYS_SCORING_DIR_PREFIXES) — erring toward inclusion, per the brief this
+// script was built against.
+// ---------------------------------------------------------------------------
+//
+// REACHABLE_BUT_NOT_SCORING — the one, documented exit from tier 2.
+//
+// A file reachable from doctor.ts belongs here ONLY after a specific proof
+// that NONE of the exported functions doctor.ts's import graph actually
+// reaches from that file feed a number in ScriptDoctorReport (health,
+// verdict, sceneCount, or any field a caller reads off the report). "It looks
+// like rendering/logging/plumbing code" is not that proof — it is exactly the
+// argument this script's header used to make about
+// src/lib/screenplay-layout.ts, and it was wrong (see above). The repo's
+// instrument for a real proof is the output-identity harness:
+//
+//   node scripts/check-doctor-output-identity.mjs --tree <baseline> --out /tmp/before
+//   node scripts/check-doctor-output-identity.mjs --tree <working-tree-with-file-neutered> --out /tmp/after
+//   node scripts/check-doctor-output-identity.mjs --compare /tmp/before /tmp/after
+//
+// i.e.: stub out (or delete) the candidate file's contribution, confirm the
+// project still builds/types, and show every fixture's report snapshot is
+// byte-identical. A file that survives that comparison unchanged has proven
+// it isn't wired to a number, not merely that it "sounds like" plumbing.
+//
+// As of 2026-09-02 this set is EMPTY. No file has such a proof on record —
+// src/lib/screenplay-layout.ts was investigated and DISQUALIFIED (see above:
+// it feeds `pages` directly). Every other file the walk currently reaches
+// outside server/nvm/analyze/**+server/nvm/revision/** (server/engine/**,
+// server/lib/**, server/nvm/screenplay/**, server/nvm/quality/**, etc. — see
+// the 2026-09-02 retrospective's finding #5 on the deterministic/generative
+// boundary) is included as scoring-path by the same default, for the same
+// reason: nobody has produced the identity proof for any of them yet, and
+// "err toward inclusion" is not a suggestion. (The Set itself is declared
+// below, alongside the other classification constants.)
 // ---------------------------------------------------------------------------
 
 import { execFileSync } from 'node:child_process';
@@ -151,10 +214,13 @@ const ALWAYS_SCORING_DIR_PREFIXES = [
   'server/nvm/analyze/calibration/',
   'server/nvm/revision/passes/',
 ];
-const REACHABILITY_GATED_PREFIXES = [
-  'server/nvm/analyze/',
-  'server/nvm/revision/',
-];
+// Files reachable from doctor.ts's import graph that are PROVEN not to feed
+// any ScriptDoctorReport field. Empty by design — see the header comment's
+// "REACHABLE_BUT_NOT_SCORING" section for what a proof has to show and the
+// harness that produces one. Do not add an entry here on the strength of a
+// file's directory or its apparent purpose; that reasoning is exactly what
+// let src/lib/screenplay-layout.ts slip through before 2026-09-02.
+const REACHABLE_BUT_NOT_SCORING = new Set([]);
 const REACHABILITY_ROOTS = ['server/nvm/analyze/doctor.ts'];
 
 // ---------------------------------------------------------------------------
@@ -528,17 +594,23 @@ function classify(relPathRaw, reachable) {
   if (alwaysDir) {
     return { scoring: true, reason: `under ${alwaysDir} (always in scope, conservative)` };
   }
-  const gatedDir = REACHABILITY_GATED_PREFIXES.find((pre) => p.startsWith(pre));
-  if (gatedDir) {
-    if (reachable.has(p)) {
-      return { scoring: true, reason: "reachable from doctor.ts's import graph" };
-    }
+  // Tier 2: reachability decides membership for EVERY remaining file, with no
+  // directory restriction (2026-09-02 fix — see the header's "REACHABLE-FROM-
+  // DOCTOR" section for why the old server/nvm/analyze|revision restriction
+  // was itself the bug this rewrite closes).
+  if (!reachable.has(p)) {
     return {
       scoring: false,
-      reason: `under ${gatedDir} but not reachable from doctor.ts — unwired candidate, excluded`,
+      reason: "not reachable from doctor.ts's import graph — unwired candidate, excluded",
     };
   }
-  return { scoring: false, reason: 'outside the scoring-path directories' };
+  if (REACHABLE_BUT_NOT_SCORING.has(p)) {
+    return {
+      scoring: false,
+      reason: 'reachable from doctor.ts, but excluded by a documented proof — see REACHABLE_BUT_NOT_SCORING in this script',
+    };
+  }
+  return { scoring: true, reason: "reachable from doctor.ts's import graph" };
 }
 
 // ---------------------------------------------------------------------------

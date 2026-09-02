@@ -49,7 +49,7 @@ required forging 48 individually plausible values whose Mann–Whitney
 statistic lands on a claimed number, instead of typing one figure into prose.
 
 ## 3. The receipt gate did not cover the parser the score is computed from
-**MISTAKE · dispatched (lane R2)**
+**MISTAKE · fixed 2026-09-02**
 
 `check-scoring-receipt.mjs:531-541` gated only `server/nvm/analyze/**` and
 `server/nvm/revision/**`; the reachability walk from `doctor.ts` also finds
@@ -57,7 +57,18 @@ statistic lands on a claimed number, instead of typing one figure into prose.
 `sceneCount`, the AUC ~0.938 term) and `src/lib/screenplay-layout.ts`, and
 the prefix filter discarded both. Proven on `c9023b8f` ("multi-language scene
 headings"): the gate named only `screenplay-normalizer.ts` while the commit
-also changed `fountain.ts`.
+also changed `fountain.ts`. **Fix:** classification no longer consults
+directory at all for tier 2 — every file `doctor.ts`'s import graph reaches
+is scoring-path by default, gated only by a `REACHABLE_BUT_NOT_SCORING`
+exclusion set that starts (and, as of this fix, remains) empty because no
+file has an output-identity proof (`scripts/check-doctor-output-identity.mjs`)
+that it can't move a number; `src/lib/screenplay-layout.ts` was investigated
+as the leading exclusion candidate and disqualified — `doctor.ts:67` imports
+`layoutScreenplay` directly and `doctor.ts:864` uses its output to compute
+`pages`. Re-running the old range now names `src/lib/fountain.ts` (plus
+`server/lib/validation.ts`, also newly reachable-gated); see
+`scripts/check-scoring-receipt.mjs`'s header and
+`tests/core/scoring-receipt-guard.test.ts`'s cross-boundary fixture.
 
 ## 4. Collab hands any anonymous caller a live copy of an unpublished draft
 **MISTAKE · dispatched (lane R3)**
@@ -217,7 +228,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 |---|---|---|---|
 | 1 | Verbosity bias | MISTAKE | R5 — ready branch, owner run to merge |
 | 2 | AUC verifiable from committed numbers | MISTAKE | R1 |
-| 3 | Receipt gate misses `src/lib/fountain.ts` | MISTAKE | R2 |
+| 3 | Receipt gate misses `src/lib/fountain.ts` | MISTAKE | Fixed 2026-09-02 — reachability now ungated by directory, `REACHABLE_BUT_NOT_SCORING` starts empty |
 | 4 | Collab rooms unowned | MISTAKE | R3 |
 | 5 | Core imports AI + SQLite | WEAK ROUTE | R2 |
 | 6 | 21 untested rules; false coverage claim | MISTAKE | R4 |

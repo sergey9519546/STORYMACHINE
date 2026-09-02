@@ -287,13 +287,17 @@ describe('check-scoring-receipt.mjs — falsifiability of the scoring-path defin
       const brokenSource = originalSource
         .replace(/const ALWAYS_SCORING_FILES = new Set\(\[[\s\S]*?\]\);/, 'const ALWAYS_SCORING_FILES = new Set([]); // BROKEN FOR TEST')
         .replace(/const ALWAYS_SCORING_DIR_PREFIXES = \[[\s\S]*?\];/, 'const ALWAYS_SCORING_DIR_PREFIXES = []; // BROKEN FOR TEST')
-        .replace(/const REACHABILITY_GATED_PREFIXES = \[[\s\S]*?\];/, 'const REACHABILITY_GATED_PREFIXES = []; // BROKEN FOR TEST')
         .replace(/const REACHABILITY_ROOTS = \[[\s\S]*?\];/, 'const REACHABILITY_ROOTS = []; // BROKEN FOR TEST');
 
       assert.notEqual(brokenSource, originalSource, 'the break patterns must actually match the script source (falsifiability harness itself must not silently no-op)');
-      for (const marker of ['ALWAYS_SCORING_FILES = new Set([]);', 'ALWAYS_SCORING_DIR_PREFIXES = [];', 'REACHABILITY_GATED_PREFIXES = [];', 'REACHABILITY_ROOTS = [];']) {
+      for (const marker of ['ALWAYS_SCORING_FILES = new Set([]);', 'ALWAYS_SCORING_DIR_PREFIXES = [];', 'REACHABILITY_ROOTS = [];']) {
         assert.ok(brokenSource.includes(marker), `break pattern for "${marker}" did not match — falsifiability harness is stale against the script`);
       }
+      // REACHABILITY_ROOTS = [] alone empties the whole reachable set (nothing
+      // to walk from), which is sufficient to drop tier-2 classification to
+      // nothing — no separate "gated prefixes" constant exists to break since
+      // the 2026-09-02 rewrite (finding #3): reachability now applies to every
+      // file, not just server/nvm/analyze/** and server/nvm/revision/**.
 
       // The broken copy lives in its own temp dir, NOT in the fixture repo:
       // the script imports ./lib/import-graph.mjs (shared with

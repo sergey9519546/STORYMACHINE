@@ -386,6 +386,73 @@ describe('measurement-receipt guard — push-event range', () => {
     }
   });
 
+  // 2026-09-02 retrospective, finding #3: the classifier used to restrict
+  // reachability-gating to server/nvm/analyze/** and server/nvm/revision/**,
+  // so a file doctor.ts imports OUTSIDE those two directories — the real
+  // repo's src/lib/fountain.ts and src/lib/screenplay-layout.ts, both
+  // imported across that exact boundary — was silently excluded no matter
+  // how the walk classified it. This fixture reproduces the shape with a
+  // throwaway src/lib/ file to prove the fix generalizes past the two real
+  // files named in the finding.
+  it('CATCHES an unreceipted change to a cross-boundary file doctor.ts imports outside server/nvm/', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'receipt-guard-crossboundary-'));
+    try {
+      run('git', ['init', '--quiet', '--initial-branch=main'], dir);
+      run('git', ['config', 'user.email', 'test@example.com'], dir);
+      run('git', ['config', 'user.name', 'Receipt Guard Test'], dir);
+      run('git', ['config', 'commit.gpgsign', 'false'], dir);
+
+      // doctor.ts reaches straight out of server/nvm/ into src/lib/ — the
+      // same relative-import shape as the real doctor.ts:67 import of
+      // src/lib/screenplay-layout.ts.
+      writeFile(
+        dir,
+        DOCTOR_REL,
+        [
+          "import { isSceneHeading } from '../../../src/lib/scene-heading.ts';",
+          "export const health = isSceneHeading('INT. HOUSE - DAY') ? 1 : 0;",
+          '',
+        ].join('\n'),
+      );
+      writeFile(
+        dir,
+        'src/lib/scene-heading.ts',
+        "export function isSceneHeading(line) { return line.startsWith('INT.'); }\n",
+      );
+      writeFile(dir, RECEIPT_REL, '# Measurement Receipts Ledger\n');
+      run('git', ['add', '-A'], dir);
+      run('git', ['commit', '--quiet', '-m', 'base'], dir);
+      const before = run('git', ['rev-parse', 'HEAD'], dir);
+
+      // Second commit touches ONLY the cross-boundary file — doctor.ts itself
+      // does not change — and adds no receipt.
+      writeFile(
+        dir,
+        'src/lib/scene-heading.ts',
+        "export function isSceneHeading(line) { return /^(INT|EXT)\\./.test(line); }\n",
+      );
+      run('git', ['add', '-A'], dir);
+      run('git', ['commit', '--quiet', '-m', 'widen scene-heading detection'], dir);
+      const after = run('git', ['rev-parse', 'HEAD'], dir);
+      run('git', ['update-ref', 'refs/remotes/origin/main', after], dir);
+
+      const r = runGuard(dir, {
+        GITHUB_EVENT_NAME: 'push',
+        PUSH_BEFORE_SHA: before,
+        GITHUB_SHA: after,
+      });
+      assert.equal(
+        r.status,
+        1,
+        `guard must fail on an unreceipted change to a cross-boundary file doctor.ts imports.\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stdout, /src\/lib\/scene-heading\.ts/);
+      assert.match(r.stdout, /reachable from doctor\.ts/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('FAILS when the receipt gains lines but no new dated entry', () => {
     const { dir, before, after } = makePushRepo({
       doctorBody: 'export const health = 6;\n',
