@@ -24,8 +24,13 @@ export interface CollabSession {
 }
 
 export interface CollabOptions {
-  /** Room id — collaborators sharing this id edit the same document. */
-  room: string;
+  /**
+   * Server-minted room id (POST /api/collab/rooms). This is the CAPABILITY:
+   * anyone holding it can read and write the shared document, so it is never
+   * writer-typed and never derived from the draft's title — see
+   * createCollabRoom() below.
+   */
+  roomId: string;
   /** Display name shown on this user's remote cursor. */
   userName?: string;
   /** Cursor color (CSS color). A stable per-user color is recommended. */
@@ -59,16 +64,75 @@ export function collabWsBase(): string {
   return `${proto}://${window.location.host}/collab`;
 }
 
+/** Query parameter carrying a room id in a share link. */
+export const COLLAB_QUERY_PARAM = 'collab';
+
+/**
+ * Ask the server to mint a new room. The id comes back from the server and is
+ * never chosen here: a client-chosen (writer-typed) room name was the hole
+ * that let any anonymous caller pull down an unpublished draft — see
+ * server/routes/collab.ts and docs/AUTH.md's "Collaboration rooms".
+ */
+export async function createCollabRoom(): Promise<string> {
+  const res = await fetch('/api/collab/rooms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) throw new Error(`Failed to create collaboration room: ${res.status}`);
+  const { roomId } = await res.json() as { roomId: string };
+  if (!roomId) throw new Error('Server did not return a room id.');
+  return roomId;
+}
+
+/** The link to hand a collaborator. Anyone holding it can read and write. */
+export function collabShareUrl(roomId: string): string {
+  if (typeof window === 'undefined') return roomId;
+  const url = new URL(window.location.href);
+  url.searchParams.set(COLLAB_QUERY_PARAM, roomId);
+  url.hash = '';
+  return url.toString();
+}
+
+/**
+ * Pull a room id out of a pasted share link (or accept a bare id). Returns
+ * null when the input contains nothing that could be a room id, so the caller
+ * can refuse rather than opening a socket for a typo.
+ */
+export function parseShareInput(raw: string): string | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const bare = /^[A-Za-z0-9_-]{1,64}$/;
+  if (bare.test(text)) return text;
+  try {
+    const parsed = new URL(text, typeof window === 'undefined' ? 'http://localhost' : window.location.href);
+    const id = parsed.searchParams.get(COLLAB_QUERY_PARAM);
+    return id && bare.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Read the room id a share link put in the current URL, if any. */
+export function roomIdFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const id = new URLSearchParams(window.location.search).get(COLLAB_QUERY_PARAM);
+  return id && /^[A-Za-z0-9_-]{1,64}$/.test(id) ? id : null;
+}
+
 /**
  * Fetch a short-lived token authorizing a join to this room (server/collab/
  * yjs-server.ts rejects any /collab/<room> WebSocket upgrade without one —
- * see server/lib/collab-auth.ts). Throws if the server rejects the request.
+ * see server/lib/collab-auth.ts). Throws if the server rejects the request,
+ * which now includes "that room does not exist" — an id the server never
+ * minted, or one whose room has since expired, is refused rather than
+ * conjured into existence on demand.
  */
-async function fetchCollabToken(room: string): Promise<string> {
+async function fetchCollabToken(roomId: string): Promise<string> {
   const res = await fetch('/api/collab/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ room }),
+    body: JSON.stringify({ roomId }),
   });
   if (!res.ok) throw new Error(`Failed to fetch collab token: ${res.status}`);
   const { token } = await res.json() as { token: string };
@@ -90,7 +154,7 @@ export async function createCollabSession(opts: CollabOptions): Promise<CollabSe
 
   let token: string;
   try {
-    token = await fetchCollabToken(opts.room);
+    token = await fetchCollabToken(opts.roomId);
   } catch (err) {
     // Nothing downstream has a reference to `doc` yet (the promise rejects
     // here), so it must be torn down before rethrowing or it leaks.
@@ -101,7 +165,7 @@ export async function createCollabSession(opts: CollabOptions): Promise<CollabSe
   // `params` is serialized as a query string by y-websocket, landing after the
   // room segment (…/collab/<room>?token=…), which the server parses separately
   // from the room path — see parseRoomId/parseToken in yjs-server.ts.
-  const provider = new WebsocketProvider(collabWsBase(), opts.room, doc, { params: { token } });
+  const provider = new WebsocketProvider(collabWsBase(), opts.roomId, doc, { params: { token } });
 
   const name = opts.userName ?? 'Writer';
   provider.awareness.setLocalStateField('user', {

@@ -21,6 +21,7 @@ import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { logger } from '../lib/logger.ts';
 import { verifyCollabToken } from '../lib/collab-auth.ts';
+import { collabRoomExists, touchCollabRoom } from '../lib/collab-rooms.ts';
 import { boundedIntegerEnv } from '../lib/runtime-limits.ts';
 
 // y-protocols message type tags (wire constants).
@@ -258,15 +259,36 @@ export function attachCollabServer(server: HttpServer): WebSocketServer {
       // deal with it. We must not destroy the socket here.
       return;
     }
-    // Require a token minted by POST /api/collab/token for this exact room.
-    // Without this, any client that can reach the port could join and read/
-    // write any room's shared document — see server/lib/collab-auth.ts.
-    if (!verifyCollabToken(roomId, parseToken(req.url))) {
-      logger.warn('collab_auth_rejected', { room: roomId });
+    // Two independent gates, both required.
+    //
+    // 1. A token minted by POST /api/collab/token for this exact room. Without
+    //    it, any client that can reach the port could join and read/write any
+    //    room's shared document — see server/lib/collab-auth.ts.
+    // 2. The room id is still in the registry (server/lib/collab-rooms.ts).
+    //    The token is stateless by design: it is an HMAC over (room, expiry)
+    //    with a 30-minute TTL and no server-side record, so a token that was
+    //    legitimately minted before a room expired — or one replayed from a
+    //    log, a shared URL, or browser history — would otherwise still open a
+    //    doc for the id's whole 30-minute window after the capability was
+    //    meant to be gone. Requiring the registry entry makes room expiry and
+    //    the registry ceiling actually terminate access instead of merely
+    //    stopping NEW tokens from being issued.
+    //
+    // Both failures answer identically (401, same log event, no room id) so
+    // the upgrade handler is not an existence oracle either.
+    if (!verifyCollabToken(roomId, parseToken(req.url)) || !collabRoomExists(roomId)) {
+      // The room id is a live capability, exactly like the session id that
+      // docs/AUTH.md keeps out of `req.url` logging — so it is NOT logged.
+      // The event alone is what an operator needs; the id would turn every
+      // log sink into a set of working join credentials.
+      logger.warn('collab_auth_rejected', {});
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
     }
+    // Someone is actively joining: extend the room's TTL so a live session is
+    // never dropped out from under its collaborators.
+    touchCollabRoom(roomId);
     const room = getRoom(roomId);
     if (!room) {
       socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');

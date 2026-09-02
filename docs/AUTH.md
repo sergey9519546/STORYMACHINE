@@ -116,6 +116,83 @@ no account record, no way to prove "this session belongs to user X" beyond
   authenticated ownership, and server-side revocation are separate systems
   and explicitly **out of scope** for this audit.
 
+## Collaboration rooms
+
+Real-time collaboration (`server/collab/yjs-server.ts`) uses the **same
+bearer-capability shape as the session id above**, with one difference that
+matters: the capability is minted by the SERVER, not typed by the writer.
+
+**What it was, and why it was broken.** Until 2026-09-02, `POST
+/api/collab/token` minted an HMAC join token for any syntactically valid room
+*name* to any caller, and the name was writer-typed free text generated
+client-side (`draft`, a film's title). The stated model was "knowledge of the
+room name is the authorization to join it" — but a guessable secret is not a
+capability. An attacker asked for a token for the room they wanted, opened the
+WebSocket, and the entire unpublished Y.Doc synced to them. The HMAC, the TTL,
+the room-binding and both test files were all correct and none of it helped.
+See `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` §4.
+
+**The model now.**
+
+- `POST /api/collab/rooms` mints a room id: 16 CSPRNG bytes, base64url (128
+  bits, 22 chars) — `server/lib/collab-rooms.ts`. The route accepts **no room
+  input at all**, so a client-chosen id is not expressible.
+- `POST /api/collab/token` mints a WebSocket join token **only for an id that
+  was actually minted**. An id the server never issued is refused, so guessing
+  a name buys nothing.
+- The WebSocket upgrade requires BOTH a valid token and a live registry entry
+  for the id. The token is stateless (an HMAC over room+expiry, 30-minute
+  TTL), so without the registry check a token minted before a room expired —
+  or replayed out of a log or a shared URL — would keep opening the doc for
+  the rest of its window.
+- The writer's typed name is a **local label** held in `localStorage`
+  (`src/components/ScriptIDE.tsx`). It never reaches the server, and the
+  status bar shows the label rather than the id so a screenshot does not hand
+  out access.
+- Sharing is explicit: a share link (`?collab=<id>`) copied by the writer. The
+  UI states in words that anyone with the link can read and edit the draft.
+
+**Budgets and lifetime** (all `boundedIntegerEnv`, so deployable overrides are
+range-checked):
+
+| Control | Default | Env |
+| --- | --- | --- |
+| Room TTL from last create/join | 24 h | `COLLAB_ROOM_TTL_MS` |
+| Registry ceiling (joinable ids) | 2000 | `COLLAB_MAX_TRACKED_ROOMS` |
+| Room creations per session | 10/min | `COLLAB_ROOMS_PER_SESSION_PER_MIN` |
+| Token mints per session | 30/min | `COLLAB_TOKENS_PER_SESSION_PER_MIN` |
+| Live Y.Docs | 200 | `COLLAB_MAX_ROOMS` |
+
+Both routes refuse a caller presenting no session id rather than lumping every
+anonymous caller into the shared `'default'` budget bucket — a partitioning
+measure, not an access check, since session ids are self-minted by the client.
+The token route answers "unknown room" and "token budget exhausted" with the
+**same 404 and the same work**, and spends the budget *before* consulting the
+registry, so a caller who has burned their budget cannot keep using the
+difference between two status codes as a free room-existence oracle. The room
+id is never written to a log line, for the same reason `req.path` (not
+`req.url`) is logged above: a log sink full of room ids is a log sink full of
+working join credentials.
+
+**What this does NOT protect.**
+
+- **The link is the key.** Anyone who obtains a share link — forwarded email,
+  a pasted Slack message, browser history, a referrer header — has full read
+  and write access to that draft. There is no per-collaborator identity, no
+  invitation, no revocation of one participant.
+- **No revocation at all, in fact.** A room ends by expiring (TTL), by being
+  evicted at the registry ceiling, or by the process restarting. There is no
+  "remove this collaborator" or "rotate this room's id" control.
+- **In-memory and process-local.** The registry, like the Y.Docs themselves,
+  lives in one process's memory. A restart drops every room, and a
+  multi-process deployment behind a load balancer does not share rooms even
+  with `COLLAB_SECRET` set — the token would verify but the registry entry
+  would not exist on the other instance. Collaboration is single-process today;
+  that is a real limit, not a configuration mistake.
+- **No content-level authorization.** A room grants the whole document. There
+  is no read-only mode, no per-scene scoping, and no audit trail of which
+  human made which edit beyond the awareness cursor's self-declared name.
+
 The rotation route reduces the lifetime of a capability only for a caller who
 can update their local storage and coordinate their own clients. It does not
 change the central ceiling of this model: without accounts, authenticated

@@ -902,3 +902,42 @@ holds (full suite green at the commit carrying this note).
   real-corpus measurement was run, and none is claimed — this change adds an
   observational hook, not a scoring change, so identity is the receipt it
   owes."
+
+### 2026-09-02 — LANE R3 COLLAB ROOM CAPABILITY: `server/lib/validation.ts` gained `CollabRoomCreateBodySchema`/`CollabTokenBodySchema` changes — no scoring measurement, because no score moved (output-identity receipt instead)
+
+- **What changed on the scoring path:** `server/lib/validation.ts` is
+  reachable from `doctor.ts`'s import graph (the receipt guard has classified
+  every reachable file as scoring-path since `305bb4ab`, regardless of
+  directory). The change here is confined to the collab request schemas:
+  `CollabTokenBodySchema` now validates `{ roomId }` instead of `{ room }`,
+  and a room-creation body schema was added. No schema, constant, or function
+  that the doctor imports from this module was touched; no formula,
+  threshold, deduction, cache key, or verdict rule changed anywhere.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` — NOT
+  `npm run measure-real`, for the reason the two 2026-08-21 entries give:
+  this change claims to move zero reports, and an output-identity proof is
+  the stronger, more falsifiable receipt for that shape of change.
+- **Baseline used:** `git archive main` at `305bb4ab` — the tip of the
+  branch being merged into at measurement time, not the fork point. The
+  comparison tree was this branch's working tree (the collab commit rebased
+  onto that same `305bb4ab`); the commit's own hash is not cited because the
+  receipt is amended into that commit and would name a hash that no longer
+  resolves — the baseline is the checkable anchor.
+- **What was run — output identity over all 45 in-repo fixtures** (20
+  `data/screenplays/*.fountain`, 20 calibration `REFERENCE_CORPUS` samples,
+  the P0 sample script, 4 synthetic concatenations):
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then `--compare <before> <after>`.
+  Result: **`OUTPUT IDENTITY: PASS — all 45 reports are byte-identical
+  (analyzedAt excluded).`** Exit codes 0 / 0 / 0, captured by redirecting
+  each run to a log file and reading `$?`.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the
+  45 in-repo fixtures are the whole input. `tests/fixtures/real-corpus-manifest.json`
+  (72 rows) is unchanged by this range.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), ran the three
+  harness commands above myself against the rebased collab branch on
+  2026-09-02 and read the PASS line from the compare run's log. No
+  real-corpus measurement was run, and none is claimed — this change alters
+  request validation for collaboration routes, not scoring, so identity is
+  the receipt it owes."

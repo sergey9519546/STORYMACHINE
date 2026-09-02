@@ -55,9 +55,11 @@ export interface FountainEditorProps {
   /** Fires when the user types (after every doc change, before debounce) */
   onUserEdit?: () => void;
   /**
-   * P4: when set, the editor joins a real-time collaboration room of this id.
-   * Yjs becomes the source of truth for the document; the `value` prop is used
-   * only to seed an empty shared doc, and external value-sync is disabled.
+   * P4: when set, the editor joins the real-time collaboration room with this
+   * SERVER-MINTED id (POST /api/collab/rooms — never a writer-typed name; see
+   * server/routes/collab.ts). Yjs becomes the source of truth for the
+   * document; the `value` prop is used only to seed an empty shared doc, and
+   * external value-sync is disabled.
    */
   collabRoom?: string;
   /** Display name for this user's remote cursor in collaboration mode. */
@@ -439,7 +441,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       let torndown = false;
       if (collabRoom) {
         createCollabSession({
-          room: collabRoom,
+          roomId: collabRoom,
           userName: collabUserName,
           initialText: () => valueRef.current,
         }).then((session) => {

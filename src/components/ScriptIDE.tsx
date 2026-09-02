@@ -37,6 +37,12 @@ import { isDraftStale, type ThreadedCoverageReport } from "../lib/coverage-stale
 import { fountain as sampleScriptFountain } from "../lib/sample-script";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import { getLabsEnabled } from "../lib/feature-flags";
+import {
+  createCollabRoom,
+  collabShareUrl,
+  parseShareInput,
+  roomIdFromLocation,
+} from "./editor/collab";
 import type { PaletteAction } from "../lib/command-palette";
 import {
   AlertCircle,
@@ -494,11 +500,24 @@ export default function ScriptIDE({
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulateStatus, setSimulateStatus] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
   const simulateStatusTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // P4: real-time collaboration room.
-  const [collabRoom, setCollabRoom] = useState<string | undefined>(undefined);
+  // P4: real-time collaboration.
+  //
+  // `collabRoom` is the SERVER-MINTED room id (server/routes/collab.ts) and is
+  // the capability: anyone holding it can read and write this draft. It is
+  // never typed by the writer — the writer-typed name is `collabLabel`, which
+  // stays on this machine and never reaches the server. Before the 2026-09-02
+  // retrospective (§4) the typed name WAS the room id, so anyone who guessed
+  // it ("draft", the film's title) could ask for a token and sync the whole
+  // unpublished script.
+  const [collabRoom, setCollabRoom] = useState<string | undefined>(() => roomIdFromLocation() ?? undefined);
   const [collabUserName, setCollabUserName] = useState<string>(() => lsGet("collab_username") || "Writer");
+  const [collabLabel, setCollabLabel] = useState<string>(() => lsGet("collab_label") || "");
   const [collabInput, setCollabInput] = useState("");
   const [collabNameInput, setCollabNameInput] = useState("");
+  const [collabLabelInput, setCollabLabelInput] = useState("");
+  const [collabBusy, setCollabBusy] = useState(false);
+  const [collabError, setCollabError] = useState<string | null>(null);
+  const [collabCopied, setCollabCopied] = useState(false);
   // Keyless-honesty banner (finding E): whether explicit generation features
   // (world-building, simulation turns, rewriting) have an AI key behind them.
   // null = not yet fetched; the banner only ever renders once we know for
@@ -1412,8 +1431,58 @@ export default function ScriptIDE({
   const openSettingsPanel = useCallback(() => setPrefsOpen("settings"), []);
   const openCollabPrompt = useCallback(() => {
     setCollabNameInput(collabUserName);
+    setCollabLabelInput(collabLabel);
+    setCollabError(null);
     setPrefsOpen("collab");
-  }, [collabUserName]);
+  }, [collabUserName, collabLabel]);
+
+  // Persist the writer's chosen display name + local label, then enter the
+  // room. Splitting this out keeps the two entry points (create a new room,
+  // join a pasted share link) from duplicating it.
+  const enterCollabRoom = useCallback((roomId: string) => {
+    const name = collabNameInput.trim() || collabUserName;
+    lsSet("collab_username", name);
+    setCollabUserName(name);
+    const label = collabLabelInput.trim();
+    lsSet("collab_label", label);
+    setCollabLabel(label);
+    setCollabRoom(roomId);
+    setPrefsOpen("none");
+    setCollabInput("");
+    setCollabError(null);
+  }, [collabNameInput, collabUserName, collabLabelInput]);
+
+  const startCollabRoom = useCallback(async () => {
+    setCollabBusy(true);
+    setCollabError(null);
+    try {
+      enterCollabRoom(await createCollabRoom());
+    } catch {
+      setCollabError("Could not start a shared room. Try again in a moment.");
+    } finally {
+      setCollabBusy(false);
+    }
+  }, [enterCollabRoom]);
+
+  const joinCollabRoom = useCallback(() => {
+    const roomId = parseShareInput(collabInput);
+    if (!roomId) {
+      setCollabError("That does not look like a share link. Paste the whole link a collaborator sent you.");
+      return;
+    }
+    enterCollabRoom(roomId);
+  }, [collabInput, enterCollabRoom]);
+
+  // The share link carries the room id, so it IS the access grant — copying it
+  // is the act of sharing, which is why the UI says so next to the button.
+  const copyCollabLink = useCallback(() => {
+    if (!collabRoom) return;
+    const link = collabShareUrl(collabRoom);
+    void navigator.clipboard?.writeText(link).then(
+      () => { setCollabCopied(true); window.setTimeout(() => setCollabCopied(false), 2000); },
+      () => { setCollabError("Could not copy the link."); },
+    );
+  }, [collabRoom]);
   const forceSaveNow = useCallback(() => {
     requestServerSaveRef.current({ updateStatus: true });
   }, []);
@@ -2195,9 +2264,16 @@ export default function ScriptIDE({
             </>
           ) : collabRoom ? (
             <>
-              <span className="sm-live"><i /> Live · {collabRoom}</span>
+              {/* The room id is a live capability — never printed in the
+                  status bar, where a screenshot or a shoulder would hand it
+                  out. The writer sees their own local label instead, and the
+                  id only ever leaves via the deliberate Copy-link action. */}
+              <span className="sm-live"><i /> Live · {collabLabel || "Shared draft"}</span>
               <span className="text-[var(--sm-ink-mute)]">{collabUserName}</span>
-              <button type="button" onClick={() => setCollabRoom(undefined)} className="sm-btn ml-auto py-1.5">
+              <button type="button" onClick={copyCollabLink} className="sm-btn ml-auto py-1.5" title="Anyone with this link can read and edit this draft">
+                {collabCopied ? "Link copied" : "Copy share link"}
+              </button>
+              <button type="button" onClick={() => setCollabRoom(undefined)} className="sm-btn py-1.5">
                 Leave
               </button>
             </>
@@ -2301,53 +2377,65 @@ export default function ScriptIDE({
 
         {/* Progressive depth: collaboration and settings only when requested from overflow. */}
         {prefsOpen === "collab" && !collabRoom && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
-            <input
-              value={collabNameInput}
-              onChange={(e) => setCollabNameInput(e.target.value)}
-              placeholder="Your name"
-              aria-label="Collaborator name"
-              className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
-            />
-            <input
-              value={collabInput}
-              onChange={(e) => setCollabInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && collabInput.trim()) {
-                  const name = collabNameInput.trim() || collabUserName;
-                  lsSet("collab_username", name);
-                  setCollabUserName(name);
-                  setCollabRoom(collabInput.trim());
-                  setPrefsOpen("none");
-                  setCollabInput("");
-                }
-              }}
-              placeholder="Room ID"
-              aria-label="Collaboration room id"
-              className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (!collabInput.trim()) return;
-                const name = collabNameInput.trim() || collabUserName;
-                lsSet("collab_username", name);
-                setCollabUserName(name);
-                setCollabRoom(collabInput.trim());
-                setPrefsOpen("none");
-                setCollabInput("");
-              }}
-              className="border border-black bg-black px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white"
-            >
-              Join
-            </button>
-            <button
-              type="button"
-              onClick={() => setPrefsOpen("none")}
-              className="font-mono text-[10px] uppercase tracking-wider underline"
-            >
-              Cancel
-            </button>
+          <div className="flex flex-col gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={collabNameInput}
+                onChange={(e) => setCollabNameInput(e.target.value)}
+                placeholder="Your name"
+                aria-label="Collaborator name"
+                className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+              />
+              <input
+                value={collabLabelInput}
+                onChange={(e) => setCollabLabelInput(e.target.value)}
+                placeholder="Label (only on this computer)"
+                aria-label="Collaboration label"
+                className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => { void startCollabRoom(); }}
+                disabled={collabBusy}
+                className="border border-black bg-black px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white disabled:opacity-50"
+              >
+                {collabBusy ? "Starting…" : "Start shared room"}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={collabInput}
+                onChange={(e) => { setCollabInput(e.target.value); setCollabError(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") joinCollabRoom(); }}
+                placeholder="…or paste a share link"
+                aria-label="Collaboration share link"
+                className="min-w-[16rem] flex-1 border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={joinCollabRoom}
+                className="border border-black px-2 py-1 font-mono text-[10px] uppercase tracking-wider"
+              >
+                Join
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrefsOpen("none")}
+                className="font-mono text-[10px] uppercase tracking-wider underline"
+              >
+                Cancel
+              </button>
+            </div>
+            {/* Said plainly, because it is the whole security model: the link
+                is the key. There are no accounts and no invitations — see
+                docs/AUTH.md's "Collaboration rooms". */}
+            <p className="font-mono text-[10px] leading-snug text-[var(--sm-ink-mute)]">
+              Anyone with the share link can read and edit this draft. Only send it to people you
+              want in the script. The label stays on this computer; it is never sent to the server.
+            </p>
+            {collabError && (
+              <p role="alert" className="font-mono text-[10px] text-[var(--sm-stamp)]">{collabError}</p>
+            )}
           </div>
         )}
         {/* P2: Settings panel (incl. Labs toggle) as a modal overlay. */}

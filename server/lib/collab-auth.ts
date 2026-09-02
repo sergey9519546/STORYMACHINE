@@ -1,11 +1,18 @@
 // ── Collaboration room tokens ─────────────────────────────────────────────────
 // Stateless, short-lived HMAC tokens gating access to a Yjs collab room
 // (server/collab/yjs-server.ts). A client must fetch a token via
-// POST /api/collab/token (an authenticated-by-session-membership REST call,
-// itself behind gameLimiter) before it can open the /collab/<room> WebSocket.
+// POST /api/collab/token — which mints one only for a room id the server
+// itself minted (server/lib/collab-rooms.ts), and only for a caller
+// presenting a session id — before it can open the /collab/<room> WebSocket.
 // No token store is needed: verification recomputes the HMAC from the room
-// name and embedded expiry, so any process holding COLLAB_SECRET can verify
+// id and embedded expiry, so any process holding COLLAB_SECRET can verify
 // a token issued by any other (or the same, restarted) process.
+//
+// A VALID TOKEN IS NECESSARY, NOT SUFFICIENT. Precisely because this layer is
+// stateless, it cannot know that a room has since expired or been evicted, so
+// the upgrade handler also requires a live registry entry — see the two-gate
+// comment in server/collab/yjs-server.ts. Nothing here should grow a notion
+// of room lifetime; that belongs to the registry.
 import crypto from 'crypto';
 import { logger } from './logger.ts';
 

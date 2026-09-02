@@ -71,7 +71,12 @@ as the leading exclusion candidate and disqualified — `doctor.ts:67` imports
 `tests/core/scoring-receipt-guard.test.ts`'s cross-boundary fixture.
 
 ## 4. Collab hands any anonymous caller a live copy of an unpublished draft
-**MISTAKE · dispatched (lane R3)**
+**MISTAKE · FIXED (lane R3)** — room ids are now server-minted 128-bit
+capabilities (`server/lib/collab-rooms.ts`), `POST /api/collab/rooms` accepts
+no client-chosen id, `POST /api/collab/token` refuses any id the server never
+minted, the WebSocket upgrade additionally requires a live registry entry, the
+typed name is a local label, and `docs/AUTH.md` has a "Collaboration rooms"
+section.
 
 `server/routes/collab.ts:24-31` mints an HMAC room token for any room name to
 any caller — no session check, no ownership, no invite. The room name is free
@@ -229,7 +234,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | 1 | Verbosity bias | MISTAKE | R5 — ready branch, owner run to merge |
 | 2 | AUC verifiable from committed numbers | MISTAKE | R1 |
 | 3 | Receipt gate misses `src/lib/fountain.ts` | MISTAKE | Fixed 2026-09-02 — reachability now ungated by directory, `REACHABLE_BUT_NOT_SCORING` starts empty |
-| 4 | Collab rooms unowned | MISTAKE | R3 |
+| 4 | Collab rooms unowned | MISTAKE | R3 — delivered: server-minted room ids, share-link model, `docs/AUTH.md` §Collaboration rooms |
 | 5 | Core imports AI + SQLite | WEAK ROUTE | R2 |
 | 6 | 21 untested rules; false coverage claim | MISTAKE | R4 |
 | 7 | Ratchet never re-ratcheted | WEAK ROUTE | R1 |

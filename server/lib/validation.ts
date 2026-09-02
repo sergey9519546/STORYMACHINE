@@ -376,29 +376,41 @@ export const OutlineBodySchema = z.object({
   beats: z.array(OutlineBeatSchema).max(50),
 });
 
-// POST /api/collab/token (audit finding S1-a-3, SHOULD) — mints a token for
-// ANY syntactically-valid room name, with no server-side notion of who
-// "owns" a room. This is intentional, not an oversight: real-time
-// collaboration (server/collab/yjs-server.ts) is explicitly designed so two
-// different browser sessions/users can join the SAME room to co-edit one
-// document — that is the feature, so a token-mint check that only allowed a
-// session to mint tokens for "its own" rooms would break the product's core
-// use case (there is no first-class concept of a room's creator/owner
-// anywhere in Stage/session-store — rooms are ephemeral Yjs docs created
-// lazily by yjs-server.ts's getRoom(), keyed only by name).
+// ── Collaboration rooms (share-link capability model) ───────────────────────
+// SUPERSEDED DESIGN, kept here because the old comment was load-bearing and
+// wrong: this schema used to accept `{ room }` — ANY syntactically-valid room
+// NAME — and server/routes/collab.ts minted an HMAC join token for it to any
+// caller. The stated justification was a bearer-capability model ("knowledge
+// of the room name is the authorization to join it"), but the room name was
+// writer-typed free text (`draft`, a film title) generated client-side, so
+// the "secret" was guessable and an attacker could simply ask for a token for
+// the room they wanted and sync the whole unpublished Y.Doc. See
+// docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §4.
 //
-// The security model here is deliberately a BEARER-CAPABILITY one, the same
-// shape as a Google Docs "anyone with the link" share or a video-call room
-// code: knowledge of the room name is the authorization to join it. The
-// room name is the caller-chosen secret, generated client-side (see
-// src/components/ScriptIDE.tsx) — this schema only bounds its shape/length
-// (matches server/collab/yjs-server.ts's ROOM_RE exactly, so this validator
-// and the WebSocket-upgrade check can never accept/reject different sets of
-// room names). The route itself (server/routes/collab.ts) additionally
-// gates on COLLAB_SECRET being genuinely configured before minting in any
-// deployment that looks production-like — see that file's comment.
+// The capability is now a SERVER-minted, unguessable room id
+// (server/lib/collab-rooms.ts — 128 bits of CSPRNG entropy). The writer's
+// typed name never reaches the server; it stays a local label in the UI. A
+// room must be created before a token can be minted for it, so guessing a
+// name buys nothing. The regex still matches server/collab/yjs-server.ts's
+// ROOM_RE exactly, so this validator and the WebSocket-upgrade check can
+// never accept/reject different sets of ids.
+//
+// `sessionId` is accepted (optional) purely because server/lib/session-store.ts's
+// sessionId(req) reads req.body.sessionId for non-GET requests — the routes
+// need the caller's session for their per-session budgets. Both routes reject
+// a caller with no session id at all rather than lumping every anonymous
+// caller into the shared 'default' budget bucket.
+const collabSessionIdField = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/).optional();
+
+/** POST /api/collab/rooms — takes no room input at all; the id is minted. */
+export const CollabRoomCreateBodySchema = z
+  .object({ sessionId: collabSessionIdField })
+  .or(z.undefined());
+
+/** POST /api/collab/token — mints a join token for an EXISTING minted id. */
 export const CollabTokenBodySchema = z.object({
-  room: roomIdField,
+  roomId: roomIdField,
+  sessionId: collabSessionIdField,
 });
 
 // POST /api/story-tone (B1-a — Genre Engine Expansion). Mirrors the shape of

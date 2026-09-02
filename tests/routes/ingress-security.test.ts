@@ -256,11 +256,34 @@ describe('routes/collab — token minting (HTTP behavior)', async () => {
   before(async () => { server = await startTestServer(); });
   after(async () => { await server.close(); });
 
-  it('POST /api/collab/token mints a token for any syntactically-valid room name (bearer-capability model)', async () => {
+  // This describe used to assert the OPPOSITE of the line below: that a token
+  // was minted for "any syntactically-valid room name", which it called a
+  // bearer-capability model. The name was writer-typed free text, so the
+  // "capability" was guessable and any caller could pull down an unpublished
+  // draft (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §4). The
+  // capability is now a server-minted id; see tests/collab/token.test.ts for
+  // the full route coverage.
+  it('POST /api/collab/token refuses a room id the server never minted', async () => {
     const res = await fetch(`${server.baseUrl}/api/collab/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: `room-${freshSessionId()}` }),
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': freshSessionId() },
+      body: JSON.stringify({ roomId: 'AAAAAAAAAAAAAAAAAAAAAA' }),
+    });
+    assert.equal(res.status, 404);
+  });
+
+  it('POST /api/collab/rooms mints an id, which POST /api/collab/token then honors', async () => {
+    const sessionId = freshSessionId();
+    const headers = { 'Content-Type': 'application/json', 'X-Session-Id': sessionId };
+    const created = await fetch(`${server.baseUrl}/api/collab/rooms`, {
+      method: 'POST', headers, body: '{}',
+    });
+    assert.equal(created.status, 200);
+    const { roomId } = await created.json();
+    assert.match(roomId, /^[A-Za-z0-9_-]{22}$/);
+
+    const res = await fetch(`${server.baseUrl}/api/collab/token`, {
+      method: 'POST', headers, body: JSON.stringify({ roomId }),
     });
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -268,11 +291,11 @@ describe('routes/collab — token minting (HTTP behavior)', async () => {
     assert.equal(typeof body.expiresAt, 'number');
   });
 
-  it('POST /api/collab/token rejects a malformed room name with 400', async () => {
+  it('POST /api/collab/token rejects a malformed room id with 400', async () => {
     const res = await fetch(`${server.baseUrl}/api/collab/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: 'has spaces! and $ymbols' }),
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': freshSessionId() },
+      body: JSON.stringify({ roomId: 'has spaces! and $ymbols' }),
     });
     assert.equal(res.status, 400);
   });
@@ -294,8 +317,19 @@ describe('routes/collab — COLLAB_SECRET production gate', async () => {
   it('refuses to mint a token with 503 when NODE_ENV=production and COLLAB_SECRET is unset', async () => {
     const res = await fetch(`${server.baseUrl}/api/collab/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: 'prod-room-1' }),
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': freshSessionId() },
+      body: JSON.stringify({ roomId: 'AAAAAAAAAAAAAAAAAAAAAA' }),
+    });
+    assert.equal(res.status, 503);
+  });
+
+  it('refuses to CREATE a room with 503 under the same misconfiguration', async () => {
+    // A room that can never be joined is worse than a refusal at the moment
+    // the writer asks for one, so the gate covers creation too.
+    const res = await fetch(`${server.baseUrl}/api/collab/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': freshSessionId() },
+      body: '{}',
     });
     assert.equal(res.status, 503);
   });
