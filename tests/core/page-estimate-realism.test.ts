@@ -86,6 +86,36 @@ describe('estimatePages — realistic, and consistent with the editor', () => {
       pooled >= 120 && pooled <= 280,
       `pooled ${pooled.toFixed(0)} words/page should sit near the corpus median of ~215`,
     );
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a density band alone is
+    // satisfied by an estimator that returns a constant page count proportional
+    // to nothing — pooling hides per-script behaviour. Require the estimate to
+    // actually respond to script length: different scripts get different page
+    // counts, and doubling a script roughly doubles its pages. That is the
+    // property the old source-line formula violated.
+    const perFile = files.map((file) => {
+      const text = fs.readFileSync(path.join(corpusDir, file), 'utf8');
+      return { file, words: wordCount(text), pages: estimatePages(text)!.pages, text };
+    });
+    assert.ok(new Set(perFile.map((f) => f.pages)).size > 1,
+      `every script estimates the same page count (${perFile[0].pages}) — the estimator ignores its input`);
+    for (const { file, pages } of perFile) {
+      assert.ok(pages > 0 && Number.isFinite(pages), `${file} estimated ${pages} pages`);
+    }
+
+    const longest = perFile.reduce((a, b) => (a.words > b.words ? a : b));
+    const shortest = perFile.reduce((a, b) => (a.words < b.words ? a : b));
+    assert.ok(longest.pages > shortest.pages,
+      `the longest script (${longest.file}, ${longest.words} words) must estimate more pages than the `
+      + `shortest (${shortest.file}, ${shortest.words} words): ${longest.pages} vs ${shortest.pages}`);
+
+    // Doubling the text must roughly double the pages (±25%) — a formula that
+    // saturated or counted source lines would not.
+    const doubled = estimatePages(`${shortest.text}\n\n${shortest.text}`)!.pages;
+    const ratio = doubled / shortest.pages;
+    assert.ok(ratio > 1.5 && ratio < 2.5,
+      `doubling ${shortest.file} changed pages by ${ratio.toFixed(2)}x (${shortest.pages} → ${doubled}); `
+      + 'expected roughly 2x');
   });
 
   it('a 14-scene sample can never be reported as one page', () => {

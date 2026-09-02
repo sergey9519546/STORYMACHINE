@@ -1337,6 +1337,7 @@ describe('runScriptDoctor report shape — dimension-collapse fix, end to end (W
     // bound: whatever the dimension curve does as issue volume scales up, it
     // must never leave the documented [0, 100] contract.
     const analysis = buildAnalysisFixture(9, 608);
+    const byMultiplier = new Map<number, Map<string, number>>();
     for (const multiplier of [1, 2, 3]) {
       const result = buildDimensionSkewedResult([
         { minor: 70 * multiplier }, { minor: 80 * multiplier }, { minor: 28 * multiplier },
@@ -1346,7 +1347,25 @@ describe('runScriptDoctor report shape — dimension-collapse fix, end to end (W
       for (const dim of report.dimensions!) {
         assert.ok(dim.score >= 0 && dim.score <= 100, `dimension ${dim.key} out of range at x${multiplier}: ${dim.score}`);
       }
+      byMultiplier.set(multiplier, new Map(report.dimensions!.map(d => [d.key, d.score])));
     }
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the [0,100] bound above is
+    // true of a formula that returns a frozen constant — which is the one
+    // failure mode a "sweep" test exists to catch. The sweep is only meaningful
+    // if tripling the issue volume MOVES the score, and moves it downward.
+    const keys = [...byMultiplier.get(1)!.keys()];
+    assert.ok(keys.length >= 5, 'the fixture skews five dimensions');
+    for (const key of keys) {
+      const [x1, x2, x3] = [1, 2, 3].map(m => byMultiplier.get(m)!.get(key)!);
+      assert.ok(x2 <= x1 && x3 <= x2,
+        `dimension ${key} must not IMPROVE as issue volume grows: x1=${x1} x2=${x2} x3=${x3}`);
+    }
+    assert.ok(
+      keys.some(key => byMultiplier.get(3)!.get(key)! < byMultiplier.get(1)!.get(key)!),
+      'at least one dimension must score strictly worse at 3x issue volume — otherwise the '
+      + 'formula is insensitive to issue count and the range bound proves nothing',
+    );
   });
 });
 
@@ -1454,6 +1473,33 @@ describe('runScriptDoctor — narrative metrics (report.metrics)', () => {
         assert.ok(Number.isFinite(v) && v >= 0 && v <= 100, `scene ${scene.sceneIdx} ${key} out of [0,100]: ${v}`);
       }
     }
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): every assertion in this test
+    // was a [0,100] range check, all of which a frozen 0 satisfies. Keep the
+    // documented contract, and add the non-degeneracy the contract implies: the
+    // per-scene series must not be a single repeated value.
+    for (const key of ['pivotStrength', 'cliffhangerStrength', 'surpriseProxy', 'informationAsymmetryStrength'] as const) {
+      const series = metrics.perScene.map(scene => scene[key]);
+      assert.ok(new Set(series).size > 1,
+        `${key} is identical across all ${series.length} scenes (${series[0]}) — a constant passes the `
+        + 'range check but measures nothing');
+    }
+
+    // KNOWN WEAKNESS: twistImpact is 0 for EVERY scene of this fixture, even
+    // though scene 5 is literally "A hidden note reveals the truth. It was you
+    // all along." twistImpact is gated on the scene record's `revelation` field
+    // (metrics.ts:360 returns 0 when it is absent), and the fountain analyzer
+    // does not populate `revelation` for that line — so the metric is inert on
+    // ordinary prose and only ever scores when some other pass has already
+    // labelled a revelation. A correct implementation would either recognise
+    // reveal-shaped action lines itself or be documented as depending on an
+    // upstream label. metrics.ts is reachable from doctor.ts (scoring path), so
+    // changing it needs a measure-real receipt; the assertion below records the
+    // measured behaviour instead of hiding it.
+    assert.deepEqual(
+      new Set(metrics.perScene.map(scene => scene.twistImpact)), new Set([0]),
+      'measured, not desired: twistImpact is uniformly 0 on this fixture — see KNOWN WEAKNESS above',
+    );
 
     const s = metrics.script;
     for (const key of ['suspenseEntropy', 'momentumConsistency', 'finalCliffhangerStrength', 'narrativeCohesion'] as const) {

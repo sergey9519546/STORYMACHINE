@@ -191,10 +191,26 @@ test('estimateTransportation: band boundary at exactly mean = 5.0', () => {
   };
   const result = estimateTransportation(signals);
 
-  // With mean near 5, should be 'moderate' (not 'low')
-  if (result.mean >= 5) {
-    assert.strictEqual(result.band, 'moderate', 'Band should be moderate when mean >= 5');
-  }
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the band assertion was guarded
+  // by `if (result.mean >= 5)`, so a scorer that drifted BELOW the boundary —
+  // which is exactly what a boundary test is for — skipped the check instead of
+  // failing it. Assert the mean lands on the intended side, then the band, then
+  // the other side of the same boundary.
+  assert.ok(result.mean >= 5, `these signals must land at or above the 5.0 boundary, got ${result.mean}`);
+  assert.ok(result.mean < 5.01, `and only just above it, got ${result.mean}`);
+  assert.strictEqual(result.band, 'moderate', 'Band should be moderate when mean >= 5');
+  assert.strictEqual(result.abstained, false, 'five of five signals present — no abstention');
+
+  const justBelow = estimateTransportation({
+    tensionArcCoherence: 0.6,
+    characterInteriority: 0.6,
+    curiosityOpen: 0.6,
+    emotionalRange: 0.6,
+    resolutionClarity: 0.6,
+  });
+  assert.ok(justBelow.mean < 5, `the contrast case must sit below the boundary, got ${justBelow.mean}`);
+  assert.strictEqual(justBelow.band, 'low',
+    'below 5.0 the band must drop to low — otherwise the boundary is not a boundary');
 });
 
 test('estimateTransportation: band boundary at exactly mean = 6.0', () => {

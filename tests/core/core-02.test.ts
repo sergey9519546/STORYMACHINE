@@ -803,6 +803,23 @@ describe('NVM — Quality Engines (Wave 11)', () => {
     assert.ok(typeof report.specificity === 'number');
     assert.ok(Array.isArray(report.arcDebt));
     assert.ok(typeof report.revealReady === 'boolean');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a range check plus three
+    // typeofs is satisfied by a constant report. The engine has to SEPARATE:
+    // named, specific ops must outscore ops built from placeholder nouns
+    // ("thing does event"), which is the generic-writing case the engine exists
+    // to punish.
+    const genericReport = runQualityEngine(makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'g1', subject: 'thing', predicate: 'does', object: 'event', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]), emptyState());
+    assert.ok(
+      report.score > genericReport.score,
+      `specific, named ops must outscore placeholder nouns: ${report.score} vs ${genericReport.score}`,
+    );
+    assert.ok(
+      genericReport.warnings.length > report.warnings.length,
+      `the generic IR must collect more warnings: ${genericReport.warnings.length} vs ${report.warnings.length}`,
+    );
   });
 
   it('runQualityEngine flags DV1_ON_THE_NOSE for full-confidence told belief', () => {
@@ -822,6 +839,29 @@ describe('NVM — Quality Engines (Wave 11)', () => {
     assert.ok(typeof report.causalGraph === 'object', 'causalGraph should exist');
     assert.ok(Array.isArray(report.proppAnalysis.present), 'proppAnalysis.present should be array');
     assert.ok(Array.isArray(report.repairGaps), 'repairGaps should be array');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "the field exists and has the
+    // right JS type" is true of a frozen report. The Propp analysis in
+    // particular must READ the ops: a lone ADD_FACT registers only the
+    // preparation function, an IR with no ops registers none, and a richer IR
+    // registers strictly more.
+    assert.deepEqual(report.proppAnalysis.present, ['preparation'],
+      `a single ADD_FACT is preparation only, got ${JSON.stringify(report.proppAnalysis.present)}`);
+    const emptyReport = runQualityEngine(makeMinimalIR([]), emptyState());
+    assert.deepEqual(emptyReport.proppAnalysis.present, [], 'no ops → no Propp functions detected');
+    const richerReport = runQualityEngine(makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'krogstad', predicate: 'threatens', object: 'nora', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 70, anger: 0, fear: 90, pride: 0, shame: 10, dominant: 'fear', intensity: 90, last_updated_at: 1 } },
+    ]), emptyState());
+    assert.ok(
+      richerReport.proppAnalysis.present.length > report.proppAnalysis.present.length,
+      `a threat plus an emotional response covers more Propp functions: `
+      + `${JSON.stringify(richerReport.proppAnalysis.present)} vs ${JSON.stringify(report.proppAnalysis.present)}`,
+    );
+    assert.ok(
+      Array.isArray(report.causalGraph.nodes) && Array.isArray(report.causalGraph.edges),
+      'causalGraph carries nodes and edges, not just an object',
+    );
   });
 });
 
@@ -1067,9 +1107,20 @@ describe('NVM — LLM Candidate Generator (Wave 15)', () => {
     qualityTarget: 40,
   };
 
-  it('makeLLMCandidateGenerator returns a function', () => {
+  it('makeLLMCandidateGenerator returns a generator whose output count follows its n argument', async () => {
     const gen = makeLLMCandidateGenerator();
     assert.equal(typeof gen, 'function');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `typeof gen === 'function'`
+    // is true of `() => {}`. A generator has to actually generate, and how many
+    // it generates has to follow the count it was asked for.
+    const spec = buildGenerationSpec(emptyState(), stubTarget, []);
+    const two = await gen(spec, 2);
+    const five = await gen(spec, 5);
+    assert.equal(two.length, 2, 'asked for 2 candidates');
+    assert.equal(five.length, 5, 'asked for 5 candidates');
+    assert.ok(five.length > two.length, 'the count must follow the argument, not a constant');
+    assert.ok(two.every(c => Array.isArray(c.ops)), 'every candidate carries an ops list');
   });
 
   it('stub path produces N candidates when LLM is unavailable', async () => {
@@ -1144,7 +1195,7 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
     assert.ok(results.some(r => r.proof === 'CharacterAgencyProof'));
   });
 
-  it('tier2Score is 100 when all Tier 2 proofs pass', () => {
+  it('tier2Score tracks the Tier 2 pass fraction exactly (100 only when all pass)', () => {
     // Rich, specific ops tend to pass
     const ir = minimalIR([
       { op: 'ADD_FACT', fact: { factId: 'fact-nora-loan', subject: 'nora', predicate: 'borrowed_from', object: 'krogstad', addedAtTurn: 1, validFrom: 1, validTo: null } },
@@ -1155,6 +1206,26 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
     const results = runTier2(ir, emptyState());
     const s = tier2Score(results);
     assert.ok(s >= 0 && s <= 100, `tier2Score out of range: ${s}`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the test's NAME promised 100
+    // while its only assertion was a range check that any constant satisfies —
+    // and the fixture does not in fact pass every proof. The real contract is
+    // that the score is the pass fraction of whatever came back, so assert that
+    // closed form against the live results, plus the all-pass endpoint the name
+    // was reaching for.
+    const failures = results.filter(r => !r.pass).length;
+    assert.equal(
+      s, Math.max(0, Math.round(100 - failures * (100 / results.length))),
+      `tier2Score must be the pass fraction of ${results.length} proofs (${failures} failing), got ${s}`,
+    );
+    const allPass = results.map(r => ({ ...r, pass: true }));
+    assert.equal(tier2Score(allPass), 100, 'all Tier 2 proofs passing scores 100');
+    const allFail = results.map(r => ({ ...r, pass: false }));
+    assert.equal(tier2Score(allFail), 0, 'all Tier 2 proofs failing scores 0');
+    assert.ok(
+      tier2Score(allPass) > tier2Score(allFail),
+      'the score must separate an all-pass run from an all-fail run',
+    );
   });
 
   it('tier2Score is 0 when all Tier 2 proofs fail', () => {
@@ -1173,7 +1244,19 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
       { proof: 'DialogueProof' as const, tier: 2 as const, pass: true, reason: 'ok', findings: [] },
     ];
     const s = tier2Score(results);
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `0 < s < 100` is satisfied by
+    // any frozen middle constant. Two of three proofs pass, so the score is a
+    // known fraction, and it must sit strictly between the all-fail and all-pass
+    // endpoints the sibling tests pin.
     assert.ok(s > 0 && s < 100, `expected partial score, got ${s}`);
+    const allPass = results.map(r => ({ ...r, pass: true }));
+    const allFail = results.map(r => ({ ...r, pass: false }));
+    assert.equal(tier2Score(allFail), 0);
+    assert.equal(tier2Score(allPass), 100);
+    assert.ok(s < tier2Score(allPass) && s > tier2Score(allFail),
+      `one failing proof must land strictly between 0 and 100, got ${s}`);
+    assert.equal(s, Math.round((2 / 3) * 100),
+      `two of three proofs passing must score 2/3 of the range, got ${s}`);
   });
 
   it('Tier 2 results all have recognized proof names', () => {
@@ -1429,6 +1512,20 @@ describe('NVM — G3 Projection Gallery (Wave 19)', () => {
     assert.ok(panels.length > 0, 'at least one panel');
     assert.ok(typeof (panels[0] as Record<string, unknown>)['panel'] === 'number', 'panel has number');
     assert.ok(typeof art.metadata['panels'] === 'number', 'panels metadata present');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): parseability plus two typeofs
+    // is satisfied by a constant '[{"panel":1,"caption":""}]'. The projection
+    // must be OF the canon: the panels metadata has to agree with the panels
+    // actually emitted, panel numbers must be a 1-based run, and the canon's
+    // characters must reach the page.
+    assert.equal(art.metadata['panels'], panels.length, 'metadata panel count must match the panels emitted');
+    assert.deepEqual(
+      panels.map(p => (p as Record<string, unknown>)['panel']),
+      panels.map((_, i) => i + 1),
+      'panels are numbered as a 1-based run, not stamped with a constant',
+    );
+    assert.ok(art.content.includes('nora'), 'the canon\'s character must appear in the comic projection');
+    assert.strictEqual(art.target, 'comic', 'artifact reports the target it was asked for');
   });
 
   it('interactive projection produces replayable JSON with commits', () => {
@@ -1471,6 +1568,17 @@ describe('NVM — G3 Projection Gallery (Wave 19)', () => {
     assert.ok('totalTension' in data, 'totalTension present');
     assert.ok('momentum' in data, 'momentum present');
     assert.ok(typeof art.metadata['qualityScore'] === 'number', 'metadata qualityScore is number');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): key-presence checks pass for
+    // a frozen JSON blob. The sidecar's job is to REPORT the canon it was given,
+    // so the metadata must agree with the body, and an emptier canon must not
+    // produce the identical sidecar.
+    assert.equal(art.metadata['qualityScore'], data['qualityScore'],
+      'metadata qualityScore must be the same measurement as the body');
+    assert.ok(typeof data['totalTension'] === 'number' && Number.isFinite(data['totalTension'] as number),
+      `totalTension must be a finite measurement, got ${String(data['totalTension'])}`);
+    const bare = project({ commits: [], state: emptyState(), title: 'EMPTY' }, 'sidecar');
+    assert.notEqual(bare.content, art.content, 'an empty canon must not project the same sidecar as a populated one');
   });
 
   it('project() dispatch covers all 10 targets without throwing', () => {
@@ -1827,13 +1935,28 @@ describe('NVM — Genre Arc Templates (Wave 23)', () => {
     }
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [0,100] bound holds for a
+  // preset whose every scene targets the same tension — a flat structure preset
+  // is exactly the bug worth catching. Keep the bound, then require each preset
+  // to describe an actual SHAPE.
   it('all preset tensionTargets are in [0, 100]', () => {
     for (const p of PRESETS) {
       for (const sc of p.scenes) {
         assert.ok(sc.tensionTarget >= 0 && sc.tensionTarget <= 100,
           `${p.label} tension ${sc.tensionTarget} in range`);
+        assert.ok(Number.isFinite(sc.tensionTarget), `${p.label} has a non-finite tension target`);
       }
+      const targets = p.scenes.map(sc => sc.tensionTarget);
+      assert.ok(new Set(targets).size > 1,
+        `${p.label} targets one flat tension (${targets[0]}) across all ${targets.length} scenes — `
+        + 'a structure preset with no shape');
+      assert.ok(Math.max(...targets) - Math.min(...targets) >= 20,
+        `${p.label} spans only ${Math.max(...targets) - Math.min(...targets)} tension points — too flat to guide structure`);
     }
+    assert.ok(
+      new Set(PRESETS.map(p => p.scenes.map(sc => sc.tensionTarget).join(','))).size === PRESETS.length,
+      'two presets share an identical tension curve — they are not distinct structures',
+    );
   });
 
   it('Tragedy preset peaks tension in middle-to-late then drops', () => {
@@ -2213,12 +2336,26 @@ describe('NVM — Arc Completion Tracker (Wave 25)', () => {
       { sceneIdx: 15, ops: [{ op: 'SEED_CLUE' as const, clueId: 'fresh', carrier: 'camera' as const }] },
     ];
     const report = analyzeArcCompletion(scenes);
-    if (report.openPromises.length >= 2) {
-      assert.ok(
-        report.openPromises[0].urgency === 'overdue' || report.openPromises[0].pacingScore <= report.openPromises[1].pacingScore,
-        'overdue/lower-pacing should come first',
-      );
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the assertion was guarded by
+    // `if (openPromises.length >= 2)`, so an analyzer that returned one promise
+    // (or none) skipped the ordering check entirely — and the check itself was a
+    // disjunction satisfied by the first branch alone. Assert the precondition,
+    // then the ordering over the WHOLE list.
+    assert.ok(report.openPromises.length >= 2,
+      `both the stale and the fresh clue must be open, got ${report.openPromises.length}`);
+    const rank = { overdue: 0, due_soon: 1, on_track: 2, not_yet: 3 } as const;
+    for (let i = 1; i < report.openPromises.length; i++) {
+      const prev = report.openPromises[i - 1];
+      const curr = report.openPromises[i];
+      assert.ok(rank[prev.urgency] <= rank[curr.urgency],
+        `promise ${i - 1} (${prev.urgency}) must not sort after promise ${i} (${curr.urgency})`);
+      if (prev.urgency === curr.urgency) {
+        assert.ok(prev.pacingScore <= curr.pacingScore,
+          `within ${prev.urgency}, lower pacingScore comes first: ${prev.pacingScore} then ${curr.pacingScore}`);
+      }
     }
+    assert.equal(report.openPromises[0].promiseId, 'clue:old',
+      'the 15-scene-old clue is the overdue one and must be listed first');
   });
 });
 
@@ -2685,7 +2822,7 @@ describe('NVM — Narrative Momentum Dashboard (Wave 30)', () => {
     assert.ok(r2.score >= r1.score - 5, `regression should not drop sharply: ${r1.score} → ${r2.score}`);
   });
 
-  it('momentum: proofPassRate is 100 when tier1 passes for simple ops', () => {
+  it('momentum: proofPassRate is a measurement — a clean commit outscores an unearned payoff', () => {
     const fact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 0, validFrom: 0, validTo: null } };
     const commit = makeMomentumCommit(0, [fact]);
     const ir = buildIR(commit);
@@ -2694,6 +2831,31 @@ describe('NVM — Narrative Momentum Dashboard (Wave 30)', () => {
     const passCount = results.filter(r => r.pass).length;
     const rate = results.length === 0 ? 100 : Math.round((passCount / results.length) * 100);
     assert.ok(rate >= 0 && rate <= 100, `proofPassRate is 0-100: ${rate}`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `rate` is arithmetic the TEST
+    // performs, so the range check above asserted a property of the test itself
+    // and nothing about runTier1. The old test NAME also claimed 100, which was
+    // never true: a bare ADD_FACT carries no active mechanism, so MechanismProof
+    // fails and the rate is 88. Pin the real failing set, then prove the rate is
+    // a measurement by making it drop further on a genuinely broken IR.
+    assert.ok(results.length > 0, 'Tier 1 must actually run some proofs');
+    assert.deepEqual(
+      results.filter(r => !r.pass).map(r => r.proof), ['MechanismProof'],
+      'a self-consistent ADD_FACT fails only the mechanism-coverage proof',
+    );
+    assert.ok(rate < 100 && rate > 50, `a single clean fact mostly passes Tier 1, got ${rate}`);
+
+    // PAYOFF_SETUP with no matching SEED_CLUE anywhere in state is an unearned
+    // payoff — Tier 1 must catch it, dropping the rate below 100.
+    const unearned = buildIR(makeMomentumCommit(1, [
+      { op: 'PAYOFF_SETUP', setupId: 'never-planted', payoffEventId: 'evt-x' },
+    ]));
+    const badResults = runTier1(unearned, state);
+    const badRate = Math.round((badResults.filter(r => r.pass).length / badResults.length) * 100);
+    assert.ok(
+      badRate < rate,
+      `an unearned payoff must score below a clean commit: ${badRate} vs ${rate}`,
+    );
   });
 
   it('momentum: deriveTensionLedger returns totalTension as a number', () => {
@@ -2701,6 +2863,33 @@ describe('NVM — Narrative Momentum Dashboard (Wave 30)', () => {
     const ledger = deriveTensionLedger(state, 0);
     assert.ok(typeof ledger.totalTension === 'number', 'totalTension is a number');
     assert.ok(ledger.totalTension >= 0, 'totalTension is non-negative');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "is a non-negative number"
+    // passes for a hardcoded 0 — which is, in fact, the right answer for an
+    // empty state. Pin that, then prove the ledger MOVES: a character holding a
+    // confident told-belief is an open dramatic position, so it must open one
+    // and carry non-zero tension.
+    assert.equal(ledger.totalTension, 0, 'nothing is at stake in an empty state');
+    assert.deepEqual(ledger.positions, [], 'an empty state opens no dramatic positions');
+
+    const withToldBelief = deriveTensionLedger({
+      ...emptyState(),
+      audienceState: { knownFacts: [], suspense: 40, curiosity: 30, investment: 60 },
+      characterBeliefs: {
+        alice: [{
+          id: 'b-told', proposition: 'the ledger is safe', confidence: 0.9,
+          source: 'told', source_agent_id: 'bob', acquired_at: 1, contradicts: [],
+        }],
+      },
+    }, 0);
+    assert.ok(
+      withToldBelief.positions.length > 0,
+      'a confident told-belief is an open belief-conflict position',
+    );
+    assert.ok(
+      withToldBelief.totalTension > ledger.totalTension,
+      `an open position must carry tension: ${withToldBelief.totalTension} vs ${ledger.totalTension}`,
+    );
   });
 
   it('momentum: points accumulate rolling state across commits', () => {
@@ -2714,9 +2903,23 @@ describe('NVM — Narrative Momentum Dashboard (Wave 30)', () => {
       rollingState = applyStoryOps(rollingState, commit.ops);
       stateSnapshots.push({ ...rollingState });
     }
-    // After commit 1, alice should have beliefs
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "the beliefs object has at
+    // least one key" is true even if the fact from commit 0 were dropped and
+    // only commit 1 landed. "Rolling state" means EVERY commit's effect
+    // survives, so assert both, and assert the intermediate snapshot too.
+    const [afterCommit0, afterCommit1] = stateSnapshots;
+    assert.equal(stateSnapshots.length, 2);
+    assert.ok(afterCommit0.objectiveReality.some(f => f.factId === 'f1'),
+      'commit 0 adds fact f1 — it must be present after the first apply');
+    assert.deepEqual(Object.keys(afterCommit0.characterBeliefs), [],
+      'no belief has been applied yet after commit 0');
+
     const finalState = stateSnapshots[stateSnapshots.length - 1];
     assert.ok(Object.keys(finalState.characterBeliefs).length > 0, 'character beliefs accumulate');
+    assert.ok(finalState.objectiveReality.some(f => f.factId === 'f1'),
+      "commit 0's fact must SURVIVE commit 1 — that is what 'rolling' means");
+    assert.ok(finalState.characterBeliefs['alice']?.some(b => b.id === 'b1'),
+      "commit 1's belief must be attributed to alice");
   });
 
   it('momentum: regression and quality are independent signals', () => {
@@ -2730,8 +2933,24 @@ describe('NVM — Narrative Momentum Dashboard (Wave 30)', () => {
     // Verify both produce valid score ranges
     assert.ok(qReport.score >= 0 && qReport.score <= 100, `quality score in range: ${qReport.score}`);
     assert.ok(rReport.score >= 0 && rReport.score <= 100, `regression score in range: ${rReport.score}`);
-    // They can differ
-    assert.ok(true, 'quality and regression are independent');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the independence claim was
+    // asserted as `assert.ok(true, 'quality and regression are independent')` —
+    // a comment wearing an assertion's clothes. Independence is testable: change
+    // the input so one engine's verdict moves and the other's does not.
+    const beliefOnly = makeMomentumCommit(0, [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b9', proposition: 'x is y', confidence: 0.8, source: 'told', acquired_at: 0 } },
+    ]);
+    const beliefRegression = runNarrativeRegression([beliefOnly]);
+    assert.notEqual(beliefRegression.score, rReport.score,
+      'a commit with no world fact must score differently under the regression engine — '
+      + `both scored ${rReport.score}, so the engine is not reading its input`);
+    assert.ok(beliefRegression.score >= 0 && beliefRegression.score <= 100);
+
+    // The two engines must be reading different things: their verdicts on the
+    // same commit are computed from separate reports, not one shared number.
+    assert.notStrictEqual(qReport, rReport);
+    assert.ok('score' in qReport && 'score' in rReport);
   });
 });
 
@@ -2767,7 +2986,25 @@ describe('NVM — Voice DNA Analyzer (Wave 31)', () => {
       makeBeliefOp('bob', 'truth justice darkness shadow'),
     ];
     const delta = burrowsDelta(ops);
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `0 < delta < 1` is satisfied
+    // by a frozen 0.5. Two of four words overlap out of a six-word union, so the
+    // value is determined; and it must sit strictly between the disjoint (0) and
+    // identical (1) cases the sibling tests pin.
     assert.ok(delta > 0 && delta < 1, `expected 0 < delta < 1, got ${delta}`);
+    const disjoint = burrowsDelta([
+      makeBeliefOp('alice', 'moonbeam silver glow twilight'),
+      makeBeliefOp('bob', 'engine diesel grease carburetor'),
+    ]);
+    const identical = burrowsDelta([
+      makeBeliefOp('alice', 'truth justice freedom honor'),
+      makeBeliefOp('bob', 'truth justice freedom honor'),
+    ]);
+    assert.equal(disjoint, 0);
+    assert.equal(identical, 1);
+    assert.ok(delta > disjoint && delta < identical,
+      `partial overlap must order strictly between disjoint (${disjoint}) and identical (${identical}), got ${delta}`);
+    assert.ok(Math.abs(delta - 2 / 6) < 1e-9,
+      `two shared words over a six-word union is 1/3, got ${delta}`);
   });
 
   it('voiceDNA: Jaccard similarity — shared / union', () => {
@@ -3219,6 +3456,24 @@ describe('NVM — Reactive Turn Cycle (Wave 34)', () => {
     assert.ok('commits' in result, 'result has commits field');
     assert.ok('turnsRun' in result, 'result has turnsRun field');
     assert.ok('stoppedBecause' in result, 'result has stoppedBecause field');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): three `'x' in result` checks
+    // pass against a frozen object literal. The loop has agents but no AI key in
+    // the test environment, so the documented outcome is a clean, empty stop —
+    // and the reason must be one the caller can branch on, not a placeholder.
+    assert.ok(
+      ['maxBeats', 'noAgents', 'climax', 'error'].includes(result.stoppedBecause),
+      `stoppedBecause must be a known reason, got ${String(result.stoppedBecause)}`,
+    );
+    assert.equal(result.commits.length, result.commits.filter(c => typeof c === 'object').length,
+      'every returned commit is an object');
+    assert.ok(result.turnsRun >= 0 && result.turnsRun <= 1, `turnsRun must respect maxBeats=1, got ${result.turnsRun}`);
+
+    // A zero-beat budget must stop before running a turn at all — proof the
+    // budget argument reaches the loop rather than being ignored.
+    const zeroBeat = await advanceWorld(stage, orch, 0);
+    assert.equal(zeroBeat.turnsRun, 0, 'a zero-beat budget runs no turns');
+    assert.equal(zeroBeat.commits.length, 0, 'a zero-beat budget produces no commits');
   });
 });
 
@@ -3252,6 +3507,31 @@ describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
     assert.ok(typeof score.total === 'number', 'total is number');
     assert.ok(score.total >= 0 && score.total <= 100, `total in [0,100]: ${score.total}`);
     assert.ok(score.arcAlignment >= 0 && score.arcAlignment <= 100, `arcAlignment in [0,100]: ${score.arcAlignment}`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the shape checks above pass
+    // against any constant-returning stub. The numbers must be DERIVED from the
+    // ops. consequence is a documented closed form — UPDATE_READER_STATE
+    // contributes |delta| * 3 (2 -> 6) and RAISE_CLOCK contributes amount * 4
+    // (2 -> 8) — so this input has exactly one correct answer.
+    assert.equal(
+      score.consequence, 14,
+      `consequence must be derived from the ops (READER_STATE 2*3 + RAISE_CLOCK 2*4 = 14), got ${score.consequence}`,
+    );
+    // ...and a structurally heavier branch must outrank a lighter one on both
+    // the dimension that measures weight and the weighted total.
+    const heavyOps: StoryOp[] = [
+      { op: 'PAYOFF_SETUP', setupId: 'setup-001', payoffEventId: 'evt-002' },
+      { op: 'SEED_CLUE', clueId: 'clue-heavy', carrier: 'object' },
+    ];
+    const heavy = scoreBranch(heavyOps, { ...ir, ops: heavyOps }, emptyState(), []);
+    assert.ok(
+      heavy.consequence > score.consequence,
+      `payoff+clue must score higher consequence than reader-state+clock: ${heavy.consequence} vs ${score.consequence}`,
+    );
+    assert.ok(
+      heavy.total > score.total,
+      `payoff+clue must score a higher weighted total: ${heavy.total} vs ${score.total}`,
+    );
   });
 
   it('branchField: SEED_CLUE op boosts screenplayUsefulness', () => {
@@ -3326,26 +3606,82 @@ describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
 
   // ── generateBranchField ────────────────────────────────────────────────────
 
-  it('branchField: generates branches from emptyState', () => {
-    const field = generateBranchField(emptyState(), [], 42);
-    assert.ok(Array.isArray(field.branches), 'branches is an array');
-    assert.ok(field.branches.length >= 0, 'at least 0 branches (may be pruned)');
-    assert.ok(typeof field.currentSceneIdx === 'number', 'currentSceneIdx present');
-    assert.ok(typeof field.generatedAt === 'number', 'generatedAt present');
+  // A state with real dramatic material in it — clocks, audience pressure and a
+  // fact in objective reality — so buildSeedIR() has something for the mutation
+  // operators to work on. emptyState() deliberately does NOT: every operator's
+  // output prunes out below MIN_CONSEQUENCE. That contrast is the behaviour the
+  // two tests below assert.
+  const richBranchState = (): NarrativeState => ({
+    ...emptyState(),
+    clocks: { revelation_clock: 6, tension: 3 },
+    audienceState: { knownFacts: [], suspense: 4, curiosity: 3, investment: 2 },
+    objectiveReality: [{
+      factId: 'fact-ledger',
+      subject: 'ledger',
+      predicate: 'is_hidden',
+      object: 'in the study',
+      addedAtTurn: 0,
+      validFrom: 0,
+      validTo: null,
+    }],
+  });
+
+  it('branchField: prunes an empty state to nothing but branches a state with material', () => {
+    const empty = generateBranchField(emptyState(), [], 42);
+    assert.ok(Array.isArray(empty.branches), 'branches is an array');
+    assert.ok(typeof empty.currentSceneIdx === 'number', 'currentSceneIdx present');
+    assert.ok(typeof empty.generatedAt === 'number', 'generatedAt present');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the previous version of this
+    // test asserted `branches.length >= 0`, which is true of every array ever
+    // constructed. The real contract is that the field DISCRIMINATES: a state
+    // with no facts, no clocks and a flat audience yields a seed IR whose every
+    // mutation falls under MIN_CONSEQUENCE and is pruned, while a state carrying
+    // dramatic material yields a full field.
+    assert.equal(
+      empty.branches.length, 0,
+      `an empty state has no material to branch from; every candidate must prune out, got ${empty.branches.length}`,
+    );
+    const rich = generateBranchField(richBranchState(), [], 42);
+    assert.ok(
+      rich.branches.length > 0,
+      'a state with clocks, audience pressure and a fact must produce branches',
+    );
   });
 
   it('branchField: each branch has branchId, operator, scores, ops', () => {
-    const field = generateBranchField(emptyState(), [], 99);
+    // NOTE (2026-09-02 vacuous-test sweep): this test used to call
+    // generateBranchField(emptyState(), ...), whose branch list is empty — the
+    // loop below ran ZERO times and the test asserted nothing at all. It now
+    // branches a state with material, and asserts the loop actually executed.
+    const field = generateBranchField(richBranchState(), [], 99);
+    assert.ok(field.branches.length > 0, 'fixture must actually produce branches to inspect');
+    const seenIds = new Set<string>();
+    const seenOperators = new Set<string>();
     for (const branch of field.branches) {
       assert.ok(typeof branch.branchId === 'string' && branch.branchId.length > 0, 'branchId present');
       assert.ok(typeof branch.operator === 'string', 'operator present');
       assert.ok(Array.isArray(branch.ops), 'ops is array');
       assert.ok(typeof branch.scores.total === 'number', 'scores.total is number');
+      // Behavioural: identity and content must be per-branch, not a shared constant.
+      assert.ok(!seenIds.has(branch.branchId), `branchId ${branch.branchId} is duplicated across branches`);
+      seenIds.add(branch.branchId);
+      assert.ok(!seenOperators.has(branch.operator), `operator ${branch.operator} applied twice in one field`);
+      seenOperators.add(branch.operator);
+      assert.ok(branch.ops.length > 0, `branch ${branch.operator} carries no ops — nothing would be committed`);
+      assert.ok(ALL_OPERATORS.includes(branch.operator), `${branch.operator} is not a known mutation operator`);
+      assert.ok(
+        branch.scores.consequence >= 15,
+        `pruning contract: branch ${branch.operator} survived with consequence ${branch.scores.consequence}`,
+      );
     }
   });
 
   it('branchField: branches are sorted by total score descending', () => {
-    const field = generateBranchField(emptyState(), [], 123);
+    // NOTE (2026-09-02 vacuous-test sweep): this used emptyState(), which yields
+    // zero branches — the loop never ran and the ordering was never checked.
+    const field = generateBranchField(richBranchState(), [], 123);
+    assert.ok(field.branches.length > 1, 'need at least two branches to check an ordering');
     for (let i = 1; i < field.branches.length; i++) {
       assert.ok(
         field.branches[i - 1].scores.total >= field.branches[i].scores.total,
@@ -3391,6 +3727,27 @@ describe('NVM — Conflict Orchestrator + Intention Registry (Wave 36)', () => {
       assert.ok(typeof intention.whatTheyLose === 'string', 'whatTheyLose present');
       assert.ok(typeof intention.urgency === 'number' && intention.urgency >= 0 && intention.urgency <= 100, 'urgency in [0,100]');
     }
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "the field is a non-empty
+    // string" passes against a stub that hardcodes "x". Every one of these
+    // fields is derived from the fixture's CharacterSheet, so each has exactly
+    // one correct value: wantNow is the first unachieved instrumental goal,
+    // terminalWant is the terminal goal's description, and whatTheyLose falls
+    // back to "fails to achieve: <terminal>" when the sheet carries no stakes.
+    const alice = registry.intentions.find(i => i.charId === 'alice');
+    const bob = registry.intentions.find(i => i.charId === 'bob');
+    assert.ok(alice && bob, 'both fixture characters are registered');
+    assert.equal(alice!.name, 'Alice');
+    assert.equal(alice!.wantNow, 'Keep Bob distracted', 'wantNow = first unachieved instrumental goal');
+    assert.equal(alice!.terminalWant, 'Get the ledger', 'terminalWant = terminal goal description');
+    assert.equal(alice!.currentSubgoal, 'Keep Bob distracted');
+    assert.equal(alice!.whatTheyLose, 'fails to achieve: Get the ledger', 'no stakes on the sheet → derived from the terminal goal');
+    assert.equal(alice!.urgency, 100, 'urgency = terminal value (100), unboosted because suspicion 10 is not threatening');
+    assert.equal(alice!.threatened, false);
+    // Bob's differ — proof the values track the character, not a constant.
+    assert.equal(bob!.wantNow, 'Gather evidence');
+    assert.equal(bob!.terminalWant, 'Identify the thief');
+    assert.notEqual(bob!.wantNow, alice!.wantNow, 'per-character intentions must differ');
   });
 
   it('conflictOrch: registry sorted by urgency descending', () => {
@@ -3422,6 +3779,27 @@ describe('NVM — Conflict Orchestrator + Intention Registry (Wave 36)', () => {
     assert.ok(Array.isArray(conflicts.tickingClocks), 'tickingClocks is array');
     assert.ok(Array.isArray(conflicts.leverageReversals), 'leverageReversals is array');
     assert.ok(typeof conflicts.totalDramaticPressure === 'number', 'totalDramaticPressure is number');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "is an array" / "is a number"
+    // is satisfied by a stub returning four frozen [] and 0. Assert the CONTENTS
+    // instead: an empty NarrativeState carries no clocks and no relationship
+    // debt, so every list must be empty and pressure exactly 0 — and adding two
+    // critical clocks to the same registry must populate tickingClocks and move
+    // the pressure off that floor.
+    assert.deepEqual(conflicts.tickingClocks, [], 'no clocks in state → no ticking clocks');
+    assert.deepEqual(conflicts.leverageReversals, [], 'no relationship debt and urgency 100 → no reversals');
+    assert.equal(conflicts.totalDramaticPressure, 0, 'nothing in the state is dramatic → zero pressure');
+
+    const clocked = computeConflicts(registry, { ...emptyState(), clocks: { doom: 9, exposure: 8 } });
+    assert.equal(clocked.tickingClocks.length, 2, 'both clocks surface as ticking clocks');
+    assert.ok(
+      clocked.tickingClocks.every(c => c.urgency === 'critical'),
+      'levels 9 and 8 are both at or above the critical threshold',
+    );
+    assert.ok(
+      clocked.totalDramaticPressure > conflicts.totalDramaticPressure,
+      `critical clocks must raise pressure: ${clocked.totalDramaticPressure} vs ${conflicts.totalDramaticPressure}`,
+    );
   });
 
   it('conflictOrch: ticking clocks detected from state clocks', () => {
@@ -3448,6 +3826,26 @@ describe('NVM — Conflict Orchestrator + Intention Registry (Wave 36)', () => {
       conflicts.totalDramaticPressure >= 0 && conflicts.totalDramaticPressure <= 100,
       `pressure in [0,100]: ${conflicts.totalDramaticPressure}`
     );
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a range check alone passes
+    // for any frozen constant in [0,100]. Pressure must also be MONOTONE in the
+    // number of critical clocks, and must still clamp at the top of the range
+    // rather than running away — that clamp is what makes the range meaningful.
+    const oneClock = computeConflicts(registry, { ...emptyState(), clocks: { doom: 9 } });
+    const twoClocks = computeConflicts(registry, { ...emptyState(), clocks: { doom: 9, exposure: 9 } });
+    assert.ok(
+      twoClocks.totalDramaticPressure > oneClock.totalDramaticPressure,
+      `two critical clocks must out-pressure one: ${twoClocks.totalDramaticPressure} vs ${oneClock.totalDramaticPressure}`,
+    );
+    assert.ok(
+      oneClock.totalDramaticPressure > conflicts.totalDramaticPressure,
+      `one critical clock must out-pressure none: ${oneClock.totalDramaticPressure} vs ${conflicts.totalDramaticPressure}`,
+    );
+    const manyClocks = computeConflicts(registry, {
+      ...emptyState(),
+      clocks: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`clock_${i}`, 9])),
+    });
+    assert.equal(manyClocks.totalDramaticPressure, 100, '20 critical clocks clamp at the documented ceiling');
   });
 
   it('conflictOrch: collisions sorted by severity descending', () => {
@@ -3554,6 +3952,32 @@ describe('NVM — Live Screenplay Memory + Structure (Wave 37)', () => {
     assert.ok(typeof structure.escalating === 'boolean', 'escalating present');
     assert.ok(typeof structure.reversalCount === 'number', 'reversalCount present');
     assert.ok(typeof structure.approachingClimax === 'boolean', 'approachingClimax present');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): every assertion above is a
+    // typeof, so a stub returning a frozen StructureState passes. Assert the
+    // values MOVE with the ledger: act position and completion are driven by
+    // blended clock+dramatic pressure, and reversalCount counts scenes whose
+    // suspense dropped by more than 1.
+    assert.equal(structure.actPosition, 'act1', 'one flat scene, no clocks → act1');
+    assert.equal(structure.completionPercent, 0, 'no pressure → 0% complete');
+    assert.equal(structure.reversalCount, 0, 'a single rising scene contains no reversal');
+
+    const pressured = [
+      makeScreenplayCommit(0, [{ op: 'RAISE_CLOCK', clockId: 'doom', amount: 9 }]),
+      makeScreenplayCommit(1, [{ op: 'RAISE_CLOCK', clockId: 'doom', amount: 9 }]),
+      makeScreenplayCommit(2, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 4 } }]),
+      makeScreenplayCommit(3, [{ op: 'UPDATE_READER_STATE', delta: { suspense: -5 } }]),
+    ];
+    const pressuredStructure = analyzeStructure(buildScreenplayMemory(pressured), pressured);
+    assert.equal(pressuredStructure.actPosition, 'act3', '18 units of clock pressure clears the act3 threshold');
+    assert.ok(
+      pressuredStructure.completionPercent > structure.completionPercent,
+      `pressure must raise completion: ${pressuredStructure.completionPercent} vs ${structure.completionPercent}`,
+    );
+    assert.ok(
+      pressuredStructure.reversalCount > 0,
+      'the scene whose suspense fell by 5 must be counted as a reversal',
+    );
   });
 
   it('screenmem: analyzeStructure returns act1 when no clock pressure', () => {
@@ -3628,6 +4052,43 @@ describe('NVM — End-Condition Detector + Screenplay Compiler (Wave 38)', () =>
     assert.ok(Array.isArray(result.gaps), 'gaps is array');
     assert.ok(typeof result.confidence === 'number' && result.confidence >= 0 && result.confidence <= 100,
       `confidence in [0,100]: ${result.confidence}`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "reasons is an array" holds
+    // for a stub returning two frozen []. The detector's contract is that each
+    // signal it credits appears as a REASON and each it misses appears as a GAP,
+    // both naming the thing it looked at. Five flat clock-less scenes hit the
+    // minimum-length and no-orphan-clue credits and miss everything else.
+    assert.equal(result.complete, false, 'act1 with no revelation is not screenplay-complete');
+    assert.ok(
+      result.reasons.some(r => r.includes('5 scenes')),
+      `minimum-length credit must name the scene count, got ${JSON.stringify(result.reasons)}`,
+    );
+    assert.ok(
+      result.gaps.some(g => g.includes('act1')),
+      `the act gap must name the act the story is stuck in, got ${JSON.stringify(result.gaps)}`,
+    );
+    assert.ok(
+      result.gaps.some(g => g.toLowerCase().includes('revelation')),
+      `zero revelations must be reported as a gap, got ${JSON.stringify(result.gaps)}`,
+    );
+    assert.ok(
+      !result.reasons.some(g => g.includes('Act 3')),
+      'a story in act1 must not be credited with reaching Act 3',
+    );
+
+    // Every credited signal moves confidence up and moves that gap out of the
+    // gap list — the direction is the point, not the magnitude.
+    const finished = detectEndCondition(
+      records,
+      { ...structure, actPosition: 'act3', revelationCount: 2, escalating: true, approachingClimax: true, reversalCount: 1 },
+      commits,
+    );
+    assert.ok(
+      finished.confidence > result.confidence,
+      `act3 + revelations + escalation must beat act1: ${finished.confidence} vs ${result.confidence}`,
+    );
+    assert.ok(finished.gaps.length < result.gaps.length, 'satisfied signals must leave the gap list');
+    assert.ok(finished.reasons.length > result.reasons.length, 'satisfied signals must enter the reason list');
   });
 
   // ── compileScreenplay ──────────────────────────────────────────────────────
@@ -3642,6 +4103,37 @@ describe('NVM — End-Condition Detector + Screenplay Compiler (Wave 38)', () =>
     assert.ok(typeof compiled.structureSummary === 'string', 'structureSummary is string');
     assert.ok(typeof compiled.wordCount === 'number', 'wordCount is number');
     assert.ok(typeof compiled.compiledAt === 'number', 'compiledAt is number');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): typeof-only assertions pass
+    // against a stub returning { fountain: '', annotations: [], ... }. The
+    // compiler's contract is that the title reaches the Fountain, that scenes
+    // become annotations, and that wordCount tracks the text it produced.
+    assert.ok(compiled.fountain.includes('TEST STORY'), `the title must reach the Fountain: ${compiled.fountain.slice(0, 200)}`);
+    assert.equal(compiled.annotations.length, 0, 'no commits → no scene annotations');
+
+    const scened = Array.from({ length: 3 }, (_, i) =>
+      makeScreenplayCommit(i, [
+        { op: 'UPDATE_READER_STATE', delta: { suspense: 2 } },
+        { op: 'RAISE_CLOCK', clockId: 'doom', amount: 2 },
+      ]));
+    const scenedRecords = buildScreenplayMemory(scened);
+    const scenedCompiled = compileScreenplay(
+      scened, emptyState(), scenedRecords, analyzeStructure(scenedRecords, scened), 'SECOND STORY',
+    );
+    assert.equal(scenedCompiled.annotations.length, 3, 'one annotation per committed scene');
+    assert.deepEqual(
+      scenedCompiled.annotations.map(a => a.sceneIdx), [0, 1, 2],
+      'annotations carry the scene indices they were built from',
+    );
+    assert.ok(
+      scenedCompiled.annotations.every(a => a.clockRaised),
+      'every fixture scene raised a clock, so every annotation must say so',
+    );
+    assert.ok(
+      scenedCompiled.wordCount > compiled.wordCount,
+      `three scenes must compile to more words than none: ${scenedCompiled.wordCount} vs ${compiled.wordCount}`,
+    );
+    assert.ok(scenedCompiled.fountain.includes('SECOND STORY'), 'the second title must not be the first title');
   });
 
   it('compile: structureSummary includes actPosition', () => {
@@ -4443,6 +4935,20 @@ describe('Wave 68 — NaN hardening + arc alignment + enhanced bible', () => {
     assert.ok(isFinite(conflicts.totalDramaticPressure), `totalDramaticPressure must be finite: ${conflicts.totalDramaticPressure}`);
     assert.ok(conflicts.totalDramaticPressure >= 0 && conflicts.totalDramaticPressure <= 100,
       `totalDramaticPressure in [0,100]: ${conflicts.totalDramaticPressure}`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): finite-and-in-range is
+    // satisfied by a guard that swallows the poisoned input and returns a
+    // constant for EVERY input — which would hide a real NaN bug behind a
+    // permanently-flat pressure reading. Compare against the un-poisoned
+    // registry: the guard must degrade the NaN case, not freeze both.
+    const cleanRegistry = buildIntentionRegistryW68(makeStage());
+    const clean = computeConflictsW68(cleanRegistry, emptyState());
+    assert.ok(isFinite(clean.totalDramaticPressure));
+    assert.equal(conflicts.totalDramaticPressure, clean.totalDramaticPressure,
+      'the NaN guard must fall back to the same pressure the clean registry yields: '
+      + `poisoned=${conflicts.totalDramaticPressure} clean=${clean.totalDramaticPressure}`);
+    assert.equal(conflicts.collisions.length, clean.collisions.length,
+      'poisoning urgency must not change how many collisions are detected');
   });
 
   // ── Arc alignment: PAYOFF_SETUP boosts arcAlignment ───────────────────────
@@ -4583,6 +5089,20 @@ describe('Wave 69 — personality NaN guards, bible injection, BELIEF_REVERSAL i
     for (const [k, v] of Object.entries(weights)) {
       assert.ok(isFinite(v), `actionBiasWeights[${k}] should be finite for NaN traits, got ${v}`);
       assert.ok(v >= 0.5 && v <= 1.6, `actionBiasWeights[${k}] should be in [0.5, 1.6], got ${v}`);
+    }
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the test's NAME says "near
+    // 1.0", which finite-and-in-[0.5,1.6] does not check — 0.5 satisfies both.
+    // The NaN guard's contract is that an unreadable trait falls back to the
+    // NEUTRAL midpoint, so assert the weights equal the neutral ones exactly.
+    const neutral = actionBiasWeights(
+      { machiavellianism: 50, narcissism: 50, psychopathy: 50 },
+      { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 },
+    );
+    assert.deepEqual(weights, neutral,
+      'NaN traits must fall back to the neutral profile, not to an arbitrary in-range constant');
+    for (const [k, v] of Object.entries(weights)) {
+      assert.ok(Math.abs(v - 1) <= 0.1, `actionBiasWeights[${k}] should be near 1.0 for NaN traits, got ${v}`);
     }
   });
 
@@ -5201,7 +5721,15 @@ describe('Wave 78 — character-advocate false-positive fix, studio-note scene e
     ]);
     const critiques = characterAdvocateCritic(ir, state);
     const reversal = critiques.filter(c => c.objection.includes('bridging beat'));
-    assert.ok(reversal.length > 0, 'should fire when no bridging event precedes the emotional reversal');
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `length > 0` fires for a
+    // critique about ANY character. Pin that the objection names bob (whose
+    // emotion reversed), and that it points at the offending op.
+    assert.equal(reversal.length, 1, 'exactly one unbridged reversal in this IR');
+    assert.ok(reversal[0].objection.toLowerCase().includes('bob'),
+      `the critique must name the character whose emotion reversed, got: ${reversal[0].objection}`);
+    assert.equal(reversal[0].criticId, 'character_advocate');
+    assert.ok(reversal[0].targetOpIdx === 0 || reversal[0].targetOpIdx === null,
+      `if a target op is given it must be the APPRAISE_EMOTION at index 0, got ${reversal[0].targetOpIdx}`);
   });
 
   // ── studio-note ────────────────────────────────────────────────────────────
@@ -5223,7 +5751,23 @@ describe('Wave 78 — character-advocate false-positive fix, studio-note scene e
     ]);
     const critiques = studioNoteCritic(ir, emptyState());
     const noReaderUpdate = critiques.filter(c => c.objection.includes('UPDATE_READER_STATE'));
-    assert.ok(noReaderUpdate.length > 0, 'advance_plot should still require UPDATE_READER_STATE');
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `length > 0` cannot tell this
+    // critique from a duplicate storm or from one attributed to another critic.
+    // Pin the count, the critic, and the fact that adding the missing op
+    // SILENCES it — the negative half the "does NOT fire" sibling only covers
+    // for reveal_character.
+    assert.equal(noReaderUpdate.length, 1, 'one missing-UPDATE_READER_STATE objection, not a storm');
+    assert.equal(noReaderUpdate[0].criticId, 'studio_note');
+
+    const withReaderUpdate = makeIR78('advance_plot', [
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'plot', predicate: 'advanced', object: 'yes', addedAtTurn: 2, validFrom: 2, validTo: null } },
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 10, curiosity: 5, investment: 5 } },
+    ]);
+    assert.equal(
+      studioNoteCritic(withReaderUpdate, emptyState()).filter(c => c.objection.includes('UPDATE_READER_STATE')).length,
+      0,
+      'supplying the required op must silence the objection — otherwise the critique is unactionable',
+    );
   });
 
   // ── cliché expansion ───────────────────────────────────────────────────────
@@ -5609,16 +6153,64 @@ describe('Wave 83 — quality-spec lost_permanently, topology resample guard, no
     const report = computeTopology([{ positions: [], totalTension: 50, sceneIdx: 0 }]);
     assert.ok(report.coherence >= 0 && report.coherence <= 100, 'Coherence should be 0–100');
     assert.ok(report.dominantArc !== undefined, 'Should have a dominant arc');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a range check plus "is
+    // defined" passes for a frozen report. A single ledger is one trajectory
+    // point carrying the tension it was handed, and a DIFFERENT single ledger
+    // must produce a different trajectory — otherwise the input is being ignored.
+    assert.equal(report.trajectory.length, 1, 'one ledger in → one trajectory point out');
+    // The trajectory is min-max normalized, so a single point is degenerate: it
+    // is 0.5 whatever its raw tension. That is the documented contract, and
+    // pinning it here is what stops it drifting silently.
+    assert.deepEqual(report.trajectory, [0.5], 'a lone scene has no shape — it normalizes to the midpoint');
+    const quieter = computeTopology([{ positions: [], totalTension: 5, sceneIdx: 0 }]);
+    assert.deepEqual(quieter.trajectory, report.trajectory, 'a single point normalizes identically at any tension');
+    // ...and because that degenerate case cannot discriminate, prove the shape
+    // reader actually reads shape once it has one: a rising arc and a falling
+    // arc over the same tension values must not produce the same trajectory.
+    const rising = computeTopology([0, 25, 50, 75, 100].map((t, i) => ({ positions: [], totalTension: t, sceneIdx: i })));
+    const falling = computeTopology([100, 75, 50, 25, 0].map((t, i) => ({ positions: [], totalTension: t, sceneIdx: i })));
+    assert.notDeepEqual(rising.trajectory, falling.trajectory,
+      `a rising arc must not read the same as a falling one: `
+      + `${JSON.stringify(rising.trajectory)} vs ${JSON.stringify(falling.trajectory)}`);
+    assert.deepEqual(rising.trajectory, [...falling.trajectory].reverse(),
+      'the two fixtures are exact mirrors, so their normalized trajectories must mirror too');
   });
 
   // ── normalizeTension guards ────────────────────────────────────────────────
 
-  it('normalizeTension returns 0 for NaN tension', async () => {
+  it('normalizeTension contributes 0 to the composite for a non-finite tension target', async () => {
     const { convergeScene } = await import('../../server/nvm/converge/loop.ts');
-    // Test normalizeTension indirectly by checking that composite score is finite
-    // when tension values are non-finite — this guards the NaN propagation path.
-    // We just verify the function exists and the module loads cleanly.
     assert.equal(typeof convergeScene, 'function');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): this test's only assertion
+    // used to be `typeof convergeScene === 'function'` — it would have passed
+    // with normalizeTension deleted, and its own comment admitted as much.
+    // normalizeTension is module-private, so exercise it through its one call
+    // site: the composite is 0.6 * tensionNorm + 0.4 * qualityScore, so a
+    // non-finite (or non-positive) tension target must zero the tension term and
+    // leave a FINITE composite equal to 0.4 * quality — never NaN.
+    const generator: CandidateGenerator = async (_spec, n) => Array.from({ length: n }, (_, i) => ({
+      ...buildNoraWarehouseIR(),
+      transitionId: `nan_guard_${i}`,
+    }));
+    const budget = { maxIterations: 1, candidatesPerIteration: 1 };
+    const base = {
+      sceneIdx: 1, sceneFunction: 'build_tension' as const,
+      activeMechanisms: [], qualityTarget: 0,
+    };
+
+    for (const [label, tensionTarget] of [['NaN', NaN], ['Infinity', Infinity], ['zero', 0]] as const) {
+      const result = await convergeScene(emptyState(), { ...base, tensionTarget }, generator, budget, 1);
+      const step = result.history[0];
+      assert.ok(step, `${label}: convergence produced a step`);
+      assert.ok(Number.isFinite(step.compositeScore), `${label} target must not poison compositeScore: ${step.compositeScore}`);
+      assert.ok(
+        Math.abs(step.compositeScore - 0.4 * step.qualityScore) < 1e-9,
+        `${label} target must zero the tension term: composite ${step.compositeScore} vs 0.4*quality ${0.4 * step.qualityScore}`,
+      );
+      assert.ok(Number.isFinite(result.finalComposite), `${label}: finalComposite stays finite`);
+    }
   });
 
   // ── arc-tracker computeUrgency clamp ─────────────────────────────────────

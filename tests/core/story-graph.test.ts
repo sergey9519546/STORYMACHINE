@@ -356,10 +356,25 @@ Third scene.
     
     const report = await runScriptDoctor(fountain);
     assert.ok(report.storyGraph);
-    
-    // causalDensity = edges / nodes
-    assert.ok(typeof report.storyGraph.graph.causalDensity === 'number');
-    assert.ok(report.storyGraph.graph.causalDensity >= 0);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `typeof === 'number'` and
+    // `>= 0` are satisfied by a hard-coded 0. causalDensity is DEFINED as
+    // edges/nodes, so check it against the graph it was computed from, pin the
+    // literal value for this fixture, and show it MOVES when the edge/node
+    // ratio moves.
+    const graph = report.storyGraph.graph;
+    assert.strictEqual(graph.nodes.length, 3, 'three sluglines, three scene nodes, no promise nodes');
+    assert.strictEqual(graph.edges.length, 2, 'two temporal edges chain the three scenes');
+    assert.strictEqual(graph.causalDensity, graph.edges.length / graph.nodes.length);
+    assert.ok(Math.abs(graph.causalDensity - 2 / 3) < 1e-12,
+      `expected 2/3 for a 3-scene temporal chain, got ${graph.causalDensity}`);
+
+    // Discrimination: a two-scene script is a 1/2 chain, so the metric must
+    // report a different number rather than a constant.
+    const shorter = await runScriptDoctor('INT. A - DAY\nFirst scene.\n\nINT. B - DAY\nSecond scene.');
+    assert.ok(shorter.storyGraph);
+    assert.strictEqual(shorter.storyGraph.graph.causalDensity, 0.5);
+    assert.notStrictEqual(shorter.storyGraph.graph.causalDensity, graph.causalDensity);
   });
   
   it('identifies isolated scenes', async () => {
@@ -373,10 +388,35 @@ Second scene.
     
     const report = await runScriptDoctor(fountain);
     assert.ok(report.storyGraph);
-    assert.ok(Array.isArray(report.storyGraph.graph.isolatedScenes));
-    
-    // Very short scripts won't flag isolated scenes
-    // This just tests the structure exists
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `Array.isArray(...)` is true
+    // of the empty array the metric always returned here, so the old test
+    // proved only that a field exists. Assert the two sides of the documented
+    // rule instead: sceneCount > 2 is required before anything is flagged.
+    assert.deepStrictEqual(report.storyGraph.graph.isolatedScenes, [],
+      'a two-scene script must flag nothing — the analyzer deliberately abstains below three scenes');
+
+    const threeScenes = await runScriptDoctor(
+      'INT. A - DAY\nFirst scene.\n\nINT. B - DAY\nSecond scene.\n\nINT. C - DAY\nThird scene.',
+    );
+    assert.ok(threeScenes.storyGraph);
+    assert.deepStrictEqual(threeScenes.storyGraph.graph.isolatedScenes, [0, 1, 2],
+      'once the three-scene floor is crossed, scenes with no causal/character-arc edge are named by index');
+
+    // KNOWN WEAKNESS: isolatedScenes counts only `causal` and `character-arc`
+    // edges (story-graph.ts:280-282). `causal` edges are ONLY ever emitted
+    // between promise nodes (promise-setup-X → promise-payoff-X,
+    // story-graph.ts:176-182), never between scene nodes, and `character-arc`
+    // edges require two scenes to share a relationshipShift pairKey, which does
+    // not fire on ordinary two-hander dialogue. The practical result is that
+    // every scene of nearly every script over two scenes is reported as
+    // "isolated", including the linked three-act fixtures in this file — the
+    // metric does not discriminate connected scripts from disconnected ones. A
+    // correct implementation would either count promise-link paths that pass
+    // THROUGH a promise node as connecting the two scenes at its ends, or emit
+    // scene→scene causal edges directly. story-graph.ts is reachable from
+    // doctor.ts (scoring path), so fixing it needs a measure-real receipt and is
+    // out of scope for this sweep; the assertions above record what it does.
   });
 });
 
@@ -411,9 +451,18 @@ Scene 2.
     
     const report = await runScriptDoctor(fountain);
     assert.ok(report.storyGraph);
-    
-    // Should not throw and should compute metrics safely
-    assert.ok(typeof report.storyGraph.graphHealth === 'number');
-    assert.ok(typeof report.storyGraph.graph.promisePaymentRatio === 'number');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): two `typeof === 'number'`
+    // checks pass for NaN, for -1, and for a frozen constant. "Safely" means
+    // specific finite values, so pin them.
+    const { graphHealth, graph } = report.storyGraph;
+    assert.ok(Number.isFinite(graphHealth), `graphHealth must be finite, got ${graphHealth}`);
+    assert.ok(graphHealth > 0 && graphHealth <= 100, `graphHealth out of range: ${graphHealth}`);
+    assert.strictEqual(graphHealth, 70, 'a two-scene script with no unpaid promises scores 70');
+    assert.strictEqual(graph.promisePaymentRatio, 1,
+      'no promises seeded means none unpaid — the ratio is 1, not 0 or NaN');
+    assert.deepStrictEqual(graph.unpaidPromises, [], 'nothing was promised, so nothing is outstanding');
+    assert.strictEqual(graph.nodes.length, 2);
+    assert.strictEqual(graph.scored, true);
   });
 });

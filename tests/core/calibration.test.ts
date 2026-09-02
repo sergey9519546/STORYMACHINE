@@ -100,9 +100,23 @@ describe('percentileDescriptor', () => {
   const subject = 'Dialogue & Voice';
   const bands = [0, 5, 15, 30, 50, 70, 85, 95, 100];
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "non-empty" is satisfied by one
+  // frozen sentence returned for every percentile, which would make the
+  // descriptor useless while passing. Assert the descriptor actually VARIES by
+  // band and that the low and high ends do not read the same.
   it('returns a non-empty string across low, mid, and high bands', () => {
-    for (const pct of bands) {
-      assert.ok(percentileDescriptor(pct, subject).length > 0, `empty descriptor at pct=${pct}`);
+    const rendered = bands.map(pct => percentileDescriptor(pct, subject));
+    for (const [i, text] of rendered.entries()) {
+      assert.ok(text.length > 0, `empty descriptor at pct=${bands[i]}`);
+      assert.ok(text.trim().length > 0, `whitespace-only descriptor at pct=${bands[i]}`);
+    }
+    assert.ok(new Set(rendered).size > 1,
+      `every band returns the same descriptor ("${rendered[0]}") — the percentile is not being read`);
+    assert.notEqual(rendered[0], rendered[rendered.length - 1],
+      'the 0th and 100th percentile must not read identically');
+    for (const text of rendered) {
+      assert.ok(text.includes(subject),
+        `the descriptor must name the dimension it is describing, got: ${text}`);
     }
   });
 
@@ -476,5 +490,17 @@ describe('termination / no-recursion', () => {
     const report = await runScriptDoctor(buildSmallFountain());
     assert.equal(typeof report.healthPercentile, 'number');
     assert.ok(report.healthPercentile! >= 0 && report.healthPercentile! <= 100);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a typeof plus a [0,100] bound
+    // is satisfied by a hard-coded 0, which would ALSO be what a deadlocked
+    // distribution build fell back to — the exact failure this test guards. Pin
+    // that the analysis actually completed and that a second call through the
+    // same (now warm) path agrees, which is what "no recursion" has to mean.
+    assert.equal(report.analysisComplete, true,
+      'a plain call on a healthy fixture must complete — an incomplete report withholds the percentile');
+    assert.ok(Number.isFinite(report.health), `health must be a real number, got ${report.health}`);
+    const second = await runScriptDoctor(buildSmallFountain());
+    assert.equal(second.healthPercentile, report.healthPercentile,
+      'the warm path must agree with the cold one — a differing percentile means the distribution rebuilt');
   });
 });

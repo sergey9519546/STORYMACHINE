@@ -325,29 +325,53 @@ text text text text text text text text text text text text text text text text.
     }
   });
 
-  it('slopScore is always a non-negative number', () => {
-    const results = [
-      detectSlop(''),
-      detectSlop('Clean action text.'),
-      detectSlop('The weight settled.'),
-    ];
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `typeof === 'number'` plus
+  // `>= 0` is satisfied by a slopScore hard-coded to 0 — which would silently
+  // destroy the detector. The property under test is that the score ORDERS
+  // clean text below slop-laden text, so assert the ordering and the endpoints.
+  it('slopScore is a non-negative number that rises with marker density', () => {
+    const empty = detectSlop('');
+    const clean = detectSlop('INT. OFFICE - DAY\nSarah sits at her desk, reviewing documents.');
+    const oneMarker = detectSlop('The weight settled.');
+    const manyMarkers = detectSlop(
+      'Her heart raced wildly. The weight settled upon him.\n'
+      + 'Something shifted in the darkness. A chill ran through her.\n'
+      + 'His breath caught in his throat. Her stomach dropped suddenly.\n'
+      + 'Their eyes widened simultaneously. Time seemed to slow.',
+    );
 
-    for (const result of results) {
+    for (const result of [empty, clean, oneMarker, manyMarkers]) {
       assert(typeof result.slopScore === 'number');
       assert(result.slopScore >= 0);
+      assert(Number.isFinite(result.slopScore), `slopScore must be finite, got ${result.slopScore}`);
     }
+
+    assert.equal(empty.slopScore, 0, 'no text, no slop');
+    assert.equal(clean.slopScore, 0, 'clean screenplay prose scores zero');
+    assert(oneMarker.slopScore > clean.slopScore,
+      `a single generic-emotion line must out-score clean prose (${oneMarker.slopScore} vs ${clean.slopScore})`);
+    assert(manyMarkers.slopScore > oneMarker.slopScore,
+      `four marker lines must out-score one (${manyMarkers.slopScore} vs ${oneMarker.slopScore})`);
+    assert.equal(manyMarkers.genericEmotion.count, 4);
+    assert.deepEqual(manyMarkers.genericEmotion.lines, [0, 1, 2, 3],
+      'the score must be traceable to the specific lines it came from');
   });
 
-  it('scored is always a boolean', () => {
-    const results = [
-      detectSlop(''),
-      detectSlop('Test text.'),
-      detectSlop('   '),
-    ];
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `typeof === 'boolean'` is true
+  // of a constant `false`, which is what an abstain-always detector returns.
+  // `scored` means "there was enough text to measure", so assert both verdicts.
+  it('scored is a boolean that is false only when there is nothing to measure', () => {
+    const noText = detectSlop('');
+    const whitespaceOnly = detectSlop('   ');
+    const realText = detectSlop('Test text.');
 
-    for (const result of results) {
+    for (const result of [noText, whitespaceOnly, realText]) {
       assert(typeof result.scored === 'boolean');
     }
+
+    assert.equal(noText.scored, false, 'empty input is an abstain, not a verdict');
+    assert.equal(whitespaceOnly.scored, false, 'whitespace-only input is an abstain');
+    assert.equal(realText.scored, true, 'real prose must actually be scored');
   });
 });
 

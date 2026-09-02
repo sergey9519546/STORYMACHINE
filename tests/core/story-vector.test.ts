@@ -578,8 +578,38 @@ describe('Story Vector - Clustering', () => {
 
     const clusters = clusterCorpus(vectors, 2);
 
-    assert.ok(clusters[0].inertia >= 0);
-    assert.ok(clusters[1].inertia >= 0);
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `inertia >= 0` is satisfied by
+    // a hard-coded 0, which is what an unimplemented inertia returns. Inertia is
+    // within-cluster variance, so it must be finite, must be 0 exactly when a
+    // cluster holds a single member, and must SHRINK as k grows on the same
+    // vectors (more clusters, tighter clusters).
+    for (const cluster of clusters) {
+      assert.ok(Number.isFinite(cluster.inertia), `inertia must be finite, got ${cluster.inertia}`);
+      assert.ok(cluster.inertia >= 0, `inertia must be non-negative, got ${cluster.inertia}`);
+      if (cluster.members.length === 1) {
+        assert.equal(cluster.inertia, 0, 'a one-member cluster has zero within-cluster variance');
+      }
+    }
+    const total = (k: number) => clusterCorpus(vectors, k).reduce((sum, c) => sum + c.inertia, 0);
+    const atK2 = clusters.reduce((sum, c) => sum + c.inertia, 0);
+    assert.ok(total(3) <= atK2,
+      `inertia must not increase as k grows: k=3 total ${total(3)} vs k=2 total ${atK2}`);
+
+    // KNOWN WEAKNESS: these six fixtures differ only in ISSUE COUNT (1..6
+    // occurrences of the same rule), and vectorizeFromIssues L2-normalises, so a
+    // single-rule script always becomes the unit vector [1] no matter how many
+    // times the rule fired. All six vectors are therefore byte-identical:
+    // clusterCorpus puts every member in cluster 0, leaves cluster 1 EMPTY, and
+    // both inertias are 0. Severity/volume is invisible to the corpus vector.
+    // A correct implementation would keep a magnitude channel (or normalise per
+    // rule-count rather than per vector) so "one structural failure" and "six"
+    // are not the same script. story-vector.ts is reachable from doctor.ts
+    // (scoring path), so changing it needs a measure-real receipt; the
+    // assertions below record what it does today.
+    assert.deepEqual(clusters.map(c => c.members.length), [6, 0],
+      'measured, not desired: every vector collapses into one cluster — see KNOWN WEAKNESS above');
+    assert.equal(atK2, 0,
+      'measured, not desired: identical vectors leave zero within-cluster variance');
   });
 
   it('should throw on invalid k', () => {

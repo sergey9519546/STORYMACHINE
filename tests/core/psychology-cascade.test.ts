@@ -198,20 +198,40 @@ describe('computeDefenseCascadeState — determinism & bounds', () => {
     assert.deepEqual(a, b);
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [0,100] bound is satisfied by
+  // an implementation that returns a single frozen intensity for every input —
+  // exactly the failure this spread is supposed to catch. Keep the bound, and
+  // additionally pin the clamping behaviour at both ends and the state each
+  // extreme resolves to, so out-of-range inputs are proved to be CLAMPED rather
+  // than propagated or silently defaulted.
   it('keeps intensity within [0, 100] across a spread of inputs, including extreme/out-of-range values', () => {
-    const spread: DefenseCascadeInputs[] = [
-      cascadeInputs({ threatLevel: -50 }),
-      cascadeInputs({ threatLevel: 500, suddenness: 999, exposureTurns: 1000, escapeAvailable: false }),
-      cascadeInputs({ threatLevel: 95, exposureTurns: 50, escapeAvailable: false }),
-      cascadeInputs({ threatLevel: 65, escapeAvailable: true, socialThreat: true, powerDifferential: -1000 }),
-      cascadeInputs({ threatLevel: 0 }),
-      cascadeInputs({ threatLevel: 100, escapeAvailable: true, angerDominant: true }),
+    const spread: Array<{ label: string; inputs: DefenseCascadeInputs; state: CascadeState; intensity: number }> = [
+      { label: 'negative threat clamps to the sub-threshold baseline', inputs: cascadeInputs({ threatLevel: -50 }), state: 'arousal', intensity: 10 },
+      { label: 'every input over its ceiling', inputs: cascadeInputs({ threatLevel: 500, suddenness: 999, exposureTurns: 1000, escapeAvailable: false }), state: 'collapse', intensity: 100 },
+      { label: 'sustained inescapable threat', inputs: cascadeInputs({ threatLevel: 95, exposureTurns: 50, escapeAvailable: false }), state: 'collapse', intensity: 100 },
+      { label: 'power differential under its floor', inputs: cascadeInputs({ threatLevel: 65, escapeAvailable: true, socialThreat: true, powerDifferential: -1000 }), state: 'fawn', intensity: 76 },
+      { label: 'no threat at all', inputs: cascadeInputs({ threatLevel: 0 }), state: 'arousal', intensity: 10 },
+      { label: 'anger overrides an available exit', inputs: cascadeInputs({ threatLevel: 100, escapeAvailable: true, angerDominant: true }), state: 'fight', intensity: 100 },
     ];
-    for (const inputs of spread) {
+    for (const { label, inputs, state, intensity } of spread) {
       const r = computeDefenseCascadeState(inputs);
       assert.ok(r.intensity >= 0 && r.intensity <= 100, `intensity ${r.intensity} out of bounds for state ${r.state}`);
       assert.ok(Number.isFinite(r.intensity));
+      assert.equal(r.state, state, `${label}: expected state ${state}, got ${r.state}`);
+      assert.equal(r.intensity, intensity, `${label}: expected intensity ${intensity}, got ${r.intensity}`);
     }
+
+    // The spread must actually SPREAD — a constant-output implementation passes
+    // every bound check above but not this one.
+    const distinct = new Set(spread.map(({ inputs }) => computeDefenseCascadeState(inputs).intensity));
+    assert.ok(distinct.size >= 3, `intensity must vary across the spread, got ${[...distinct].join(', ')}`);
+    // Out-of-range inputs must be clamped to the same answer as their in-range
+    // equivalents, not propagated into the arithmetic.
+    assert.deepEqual(
+      computeDefenseCascadeState(cascadeInputs({ threatLevel: 500, suddenness: 999, exposureTurns: 1000, escapeAvailable: false })).intensity,
+      computeDefenseCascadeState(cascadeInputs({ threatLevel: 100, suddenness: 100, exposureTurns: 1000, escapeAvailable: false })).intensity,
+      'over-ceiling inputs must clamp to their in-range equivalents',
+    );
   });
 });
 
@@ -325,6 +345,12 @@ describe('arbitrateTrinity — winner selection', () => {
     assert.deepEqual(a, b);
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "returns bounded scores" plus
+  // "rationale is non-empty" is satisfied by a stub that returns zeros and the
+  // string "x". The interesting property of the minimal sheet is that the
+  // arbitration DEFAULTS somewhere specific — ego wins on a character with no
+  // dark triad, no goals and no stakes — and that the rationale names the
+  // numbers it arbitrated on, so a writer can audit the verdict.
   it('does not crash on an empty/minimal character sheet and returns bounded scores', () => {
     const sheet = baseSheet(); // no darkTriad/bigFive/emotionState/goalStack/stakes/theoryOfMind
     const r = arbitrateTrinity(sheet);
@@ -333,7 +359,29 @@ describe('arbitrateTrinity — winner selection', () => {
     for (const score of [r.idProposal, r.egoAssessment, r.superegoPressure]) {
       assert.ok(score >= 0 && score <= 100 && Number.isFinite(score));
     }
-    assert.ok(r.rationale.length > 0);
-    assert.ok(describeTrinityGuidance(r).length > 0);
+
+    // With no drives, no goals and no stakes, the deliberating agent must win —
+    // a character sheet carrying nothing is not an impulsive one.
+    assert.equal(r.winner, 'ego', 'a featureless sheet must default to ego, not to id or superego');
+    assert.ok(r.egoAssessment > r.idProposal,
+      `ego (${r.egoAssessment}) must out-score id (${r.idProposal}) on a sheet with no drives`);
+    assert.ok(r.egoAssessment > r.superegoPressure,
+      `ego (${r.egoAssessment}) must out-score superego (${r.superegoPressure}) on a sheet with no obligations`);
+    assert.notEqual(r.colorer, r.winner, 'the colorer is a second voice, never the winner again');
+
+    // The rationale must be auditable: it carries the three scores it decided
+    // on and names the winner.
+    assert.ok(r.rationale.includes(String(r.idProposal))
+      && r.rationale.includes(String(r.egoAssessment))
+      && r.rationale.includes(String(r.superegoPressure)),
+      `rationale must show the arbitrated scores, got: ${r.rationale}`);
+    assert.ok(r.rationale.toUpperCase().includes(r.winner.toUpperCase()),
+      `rationale must name the winning agent, got: ${r.rationale}`);
+
+    const guidance = describeTrinityGuidance(r);
+    assert.ok(guidance.toUpperCase().includes(r.winner.toUpperCase()),
+      `guidance must tell the writer which agent decides, got: ${guidance}`);
+    assert.ok(guidance.toUpperCase().includes(r.colorer.toUpperCase()),
+      `guidance must name the colouring agent, got: ${guidance}`);
   });
 });

@@ -359,26 +359,42 @@ describe('detectExcellence — excellence signal detection', () => {
       assert.strictEqual(antagonistSignal?.present, false);
     });
 
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the [0,1] range check was
+    // wrapped in `if (result.scored)` with no else, so an analyzer that
+    // abstained on every input skipped it entirely; and a range check alone is
+    // satisfied by a frozen 0. Assert that it was scored, that the signal set is
+    // non-degenerate, and that at least one confidence is strictly inside the
+    // range (a constant-0 or constant-1 implementation now fails).
     it('all signals have confidence in 0..1 range', () => {
       const result = detectExcellence(buildWantNeedOppositionScript());
-      if (result.scored) {
-        for (const signal of result.signals) {
-          assert(
-            signal.confidence >= 0 && signal.confidence <= 1,
-            `confidence out of range: ${signal.confidence}`
-          );
-        }
+      assert.strictEqual(result.scored, true, 'the want/need fixture must be scored, not abstained on');
+      assert(result.signals.length > 0, 'a scored result must carry signals');
+      for (const signal of result.signals) {
+        assert(
+          signal.confidence >= 0 && signal.confidence <= 1,
+          `confidence out of range: ${signal.confidence}`
+        );
+        assert(Number.isFinite(signal.confidence), `confidence must be finite for ${signal.id}`);
       }
+      assert(
+        result.signals.some(s => s.present && s.confidence > 0),
+        'at least one signal must fire with non-zero confidence on the positive fixture — '
+        + 'otherwise the range check above is true of an inert detector',
+      );
     });
 
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): both the outer `if
+    // (result.scored)` and the inner `if (!signal.present)` could be false for
+    // every signal, leaving the test with zero executed assertions. Prove the
+    // implication has a witness on this fixture, then check it holds.
     it('presence=false implies confidence=0', () => {
       const result = detectExcellence(buildOnlyWantScript());
-      if (result.scored) {
-        for (const signal of result.signals) {
-          if (!signal.present) {
-            assert.strictEqual(signal.confidence, 0);
-          }
-        }
+      assert.strictEqual(result.scored, true, 'the want-only fixture must be scored');
+      const absent = result.signals.filter(s => !s.present);
+      assert(absent.length > 0,
+        'the want-only fixture must leave at least one signal absent — with none, the implication is vacuous');
+      for (const signal of absent) {
+        assert.strictEqual(signal.confidence, 0, `${signal.id} is absent but carries confidence ${signal.confidence}`);
       }
     });
   });

@@ -492,6 +492,26 @@ describe('computeNarrativeMetrics — edge cases', () => {
       assert.ok(Number.isFinite(v) && v >= 0 && v <= 100, `${key}=${v} out of [0,100]`);
     }
     assert.ok(Number.isFinite(report.script.tensionMeasures.lexical));
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): every assertion above is a
+    // finiteness or [0,100] range check, all of which a report of hard-coded
+    // zeros satisfies — so a 15-scene DELIBERATELY VARIED fixture proved nothing
+    // more than the all-zero fixture in the test above it. Require the variation
+    // in the input to show up in the output.
+    assert.equal(report.perScene.length, 15, 'one entry per varied scene');
+    const varying = ['pivotStrength', 'cliffhangerStrength', 'surpriseProxy', 'informationAsymmetryStrength'] as const;
+    for (const key of varying) {
+      const series = report.perScene.map(scene => scene[key]);
+      assert.ok(new Set(series).size > 1,
+        `${key} is identical across all 15 deliberately-varied scenes (${series[0]}) — the fixture's `
+        + 'variation is not reaching the metric');
+    }
+    const scriptKeys = ['suspenseEntropy', 'momentumConsistency', 'narrativeCohesion'] as const;
+    const scriptLevel = scriptKeys.map(key => report.script[key]);
+    assert.ok(scriptLevel.some(v => v > 0),
+      `every script-level measure is 0 on a varied fixture: ${scriptLevel.join(', ')}`);
+    assert.ok(report.script.emotionalImpactRange.spread > 0,
+      'a fixture that alternates positive/negative/neutral emotional shifts must show a non-zero spread');
   });
 
   it('is stable under permutation of the input array order (same records, different insertion order)', () => {

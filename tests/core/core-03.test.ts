@@ -736,11 +736,20 @@ describe('Wave 85 — converge loop onStep callback + M7 continuity cleanup', ()
 
     const critiques = continuityCritic(ir, state);
     const causalCritique = critiques.find(c => c.objection.includes('CausalProof'));
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the only assertion was inside
+    // `if (causalCritique)`, so a critic that stopped emitting CausalProof
+    // critiques entirely — the regression this test guards against — passed
+    // silently. The find is now an assertion.
+    assert.ok(causalCritique,
+      'a scene-2 IR with no preconditions must draw a CausalProof critique; its absence is the bug');
     // CausalProof "missing preconditions" finding sets no opIdx → targetOpIdx should be null
-    if (causalCritique) {
-      assert.equal(causalCritique.targetOpIdx, null,
-        'CausalProof missing-preconditions finding should yield null targetOpIdx');
-    }
+    assert.equal(causalCritique.targetOpIdx, null,
+      'CausalProof missing-preconditions finding should yield null targetOpIdx');
+    assert.equal(causalCritique.criticId, 'continuity');
+
+    // Contrast: the sibling test proves a finding that DOES carry opIdx yields
+    // targetOpIdx 0, so null here is a real distinction rather than a constant.
+    assert.notEqual(critiques.length, 0);
   });
 });
 
@@ -2319,8 +2328,11 @@ describe('collab/yjs-server', () => {
     assert.equal(parseRoomId('/collab/' + 'x'.repeat(65)), null);
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the test's NAME says the count
+  // starts at zero; `typeof === 'number'` says nothing at all and is true of a
+  // leaked non-zero count from an earlier suite.
   it('collabRoomCount starts at zero with no active rooms', () => {
-    assert.equal(typeof collabRoomCount(), 'number');
+    assert.equal(collabRoomCount(), 0, 'no room has been opened, so the gauge must read zero');
   });
 });
 
@@ -4756,13 +4768,29 @@ describe('Wave 129 — P2: Export pipeline', () => {
     assert.ok(blocks.some(b => b.type === 'scene_heading'), 'scene heading still parsed');
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `blocks.length > 0` is true of
+  // a parser that returned one block of garbage. Assert the XML-hazardous
+  // characters SURVIVE the parse unescaped and un-dropped, in the right blocks —
+  // that is what a downstream escapeXml has to be handed.
   it('escapeXml: handles &, <, >, ", \'', () => {
-    // Test via fountain parse that special chars in scene headings don't break
     const fountain = `INT. ROOM & HALL - "DAY"
 
-Character speaks.`;
+He said <that> & she said it's over.`;
     const blocks = parseFountain(fountain);
-    assert.ok(blocks.length > 0, 'blocks parsed even with special chars');
+    assert.ok(blocks.length >= 2, `expected a heading and an action block, got ${blocks.length}`);
+
+    const heading = blocks.find(b => b.type === 'scene_heading');
+    assert.ok(heading, 'the special characters must not stop the slugline being recognised');
+    assert.ok(heading.text.includes('&'), `ampersand dropped from the slugline: ${heading.text}`);
+    assert.ok(heading.text.includes('"'), `double quote dropped from the slugline: ${heading.text}`);
+
+    const action = blocks.find(b => b.type === 'action');
+    assert.ok(action, 'the action line must survive angle brackets');
+    for (const ch of ['<', '>', '&', "'"]) {
+      assert.ok(action.text.includes(ch), `${ch} dropped from the action line: ${action.text}`);
+    }
+    assert.ok(!action.text.includes('&amp;'),
+      'the parser must NOT pre-escape — escaping is the exporter\'s job, and double-escaping is the bug');
   });
 
   it('DOCX: paragraph types for all block types', () => {
@@ -4789,10 +4817,24 @@ Character speaks.`;
       centered: 'centered',
       section: 'section',
     };
-    // All mapped types should have valid CSS class names
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the loop asserted that a
+    // literal defined three lines above is non-empty — it could not fail, and it
+    // never touched the parser. The real claim in the name is that the CSS map
+    // COVERS the block types the parser actually emits, so check that.
     for (const [blockType, cssClass] of Object.entries(cssMap)) {
       assert.ok(cssClass.length > 0, `${blockType} has CSS class`);
+      assert.ok(/^[a-z][a-z0-9-]*$/.test(cssClass), `${blockType} maps to an invalid CSS class: ${cssClass}`);
     }
+    assert.equal(new Set(Object.values(cssMap)).size, Object.keys(cssMap).length,
+      'two block types share a CSS class — they would be indistinguishable in print');
+
+    const emitted = new Set(parseFountain(SAMPLE_FOUNTAIN_P2).map(b => b.type));
+    // `empty`, `boneyard`, `synopsis` and `page_break` are structural blocks the
+    // print path drops rather than styles, so they need no class.
+    const notStyled = new Set(['empty', 'boneyard', 'synopsis', 'page_break']);
+    const unmapped = [...emitted].filter(t => !(t in cssMap) && !notStyled.has(t));
+    assert.deepEqual(unmapped, [],
+      `the parser emits block types with no print CSS class: ${unmapped.join(', ')}`);
   });
 
 });
@@ -4917,9 +4959,34 @@ describe('Wave 131 — Structure act-position blends dramatic events', () => {
     ];
     const records = buildScreenplayMemory(commits);
     const structure = analyzeStructure(records, commits);
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [25,35] window is satisfied
+    // by a constant 30 that ignores its input, and the test's name claims BOTH
+    // clocks and dramatic events contribute — which a single reading cannot
+    // show. Pin the documented arithmetic, then vary each contributor
+    // independently and require the completion to move.
     // blendedPressure = 6 → completion = round(6/20*100) = 30
-    assert.ok(structure.completionPercent >= 25 && structure.completionPercent <= 35,
-      `completion reflects clock pressure (got ${structure.completionPercent})`);
+    assert.equal(structure.completionPercent, 30,
+      `two clock raises of 3 blend to pressure 6 → 30% (got ${structure.completionPercent})`);
+
+    const moreClock = analyzeStructure(
+      buildScreenplayMemory([
+        makeScreenplayCommit(0, [{ op: 'RAISE_CLOCK', clockId: 'c1', amount: 6 }]),
+        makeScreenplayCommit(1, [{ op: 'RAISE_CLOCK', clockId: 'c2', amount: 6 }]),
+      ]),
+      [
+        makeScreenplayCommit(0, [{ op: 'RAISE_CLOCK', clockId: 'c1', amount: 6 }]),
+        makeScreenplayCommit(1, [{ op: 'RAISE_CLOCK', clockId: 'c2', amount: 6 }]),
+      ],
+    );
+    assert.ok(moreClock.completionPercent > structure.completionPercent,
+      `doubling clock pressure must raise completion: ${moreClock.completionPercent} vs ${structure.completionPercent}`);
+
+    const noClock = analyzeStructure(
+      buildScreenplayMemory([makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])]),
+      [makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])],
+    );
+    assert.ok(noClock.completionPercent < structure.completionPercent,
+      `no clock pressure must score below two raises: ${noClock.completionPercent} vs ${structure.completionPercent}`);
   });
 
 });

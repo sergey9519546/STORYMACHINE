@@ -480,9 +480,24 @@ describe('projection richness — a commit carrying all 14 StoryOp kinds compile
     const blocks = parseFountain(compiled.fountain);
     const cueIdxs = blocks.map((b, i) => ({ b, i })).filter(({ b }) => b.type === 'character').map(({ i }) => i);
     assert.ok(cueIdxs.length > 0, 'expected at least one character cue (UPDATE_BELIEF + ADVANCE_THEME_ARGUMENT both render one)');
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "some dialogue block exists
+    // ANYWHERE after this cue" is satisfied by a single dialogue line at the end
+    // of the script, no matter how many orphaned cues precede it — and the test's
+    // name promised "within the scene". Check the cue's IMMEDIATE successor
+    // instead, which is what makes a cue/dialogue pair in Fountain.
     for (const idx of cueIdxs) {
-      const hasDialogueAfter = blocks.slice(idx + 1).some(b => b.type === 'dialogue');
-      assert.ok(hasDialogueAfter, `character cue at block ${idx} ("${blocks[idx].text.trim()}") has no dialogue anywhere after it`);
+      const next = blocks[idx + 1];
+      assert.ok(next, `character cue at block ${idx} ("${blocks[idx].text.trim()}") is the last block — an orphan cue`);
+      assert.ok(
+        next.type === 'dialogue' || next.type === 'parenthetical',
+        `character cue at block ${idx} ("${blocks[idx].text.trim()}") is followed by a `
+        + `${next.type} block ("${next.text.trim()}") — a cue must be immediately followed by its speech`,
+      );
+      if (next.type === 'parenthetical') {
+        const afterParen = blocks[idx + 2];
+        assert.ok(afterParen && afterParen.type === 'dialogue',
+          `cue at block ${idx} has a parenthetical but no dialogue after it`);
+      }
     }
   });
 
@@ -511,9 +526,24 @@ describe('projection richness — a commit carrying all 14 StoryOp kinds compile
     }
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `doesNotThrow` is satisfied by
+  // an analyzer that returns an empty analysis for every input — a silent
+  // round-trip failure. "Round-trips" means the analyzer RECOVERS the scene the
+  // compiler emitted, so assert what comes back.
   it('re-parsing the compiled fountain through analyzeFountainText round-trips without throwing', async () => {
     const { analyzeFountainText } = await import('../../server/nvm/analyze/fountain-analyzer.ts');
     const compiled = compileAll14();
     assert.doesNotThrow(() => analyzeFountainText(compiled.fountain));
+
+    const analysis = analyzeFountainText(compiled.fountain);
+    const compiledHeadings = parseFountain(compiled.fountain).filter(b => b.type === 'scene_heading').length;
+    assert.ok(compiledHeadings > 0, 'the compiler must emit at least one slugline to round-trip');
+    assert.equal(analysis.sceneCount, compiledHeadings,
+      `the analyzer recovered ${analysis.sceneCount} scenes from ${compiledHeadings} compiled sluglines`);
+    assert.equal(analysis.records.length, analysis.sceneCount,
+      'one record per scene — a short records array means content was dropped in the round-trip');
+    for (const record of analysis.records) {
+      assert.ok(record.slug.trim().length > 0, 'every recovered record must carry its slug');
+    }
   });
 });

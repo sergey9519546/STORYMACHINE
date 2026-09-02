@@ -171,6 +171,15 @@ describe('ThemeMove — exhaustiveness (5 → 11, not 12: "subvert" dropped as a
     // 'undercut'; this line documents and enforces that it stays rejected.
     const notAMove: ThemeMove = 'subvert';
     void notAMove;
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the @ts-expect-error above is
+    // a COMPILE-time proof, so at runtime this test had zero assertions and
+    // could not fail under `npm test` at all — only under `npm run lint`. Add
+    // the runtime half: the rejected name must be absent from the live kind
+    // table, and its accepted synonym must be present.
+    assert.ok(!(('subvert') in THEME_MOVE_KINDS),
+      'subvert must not appear in the runtime kind table either');
+    assert.ok('undercut' in THEME_MOVE_KINDS,
+      'undercut is the surviving synonym and must be present');
   });
 
   it('every one of the 11 moves renders a non-empty two-voice VOICE A/VOICE B exchange via ADVANCE_THEME_ARGUMENT', () => {
@@ -241,6 +250,14 @@ describe('RelationshipDelta.dimension — exhaustiveness (10 → 14)', () => {
     // excluded, not an oversight.
     const notADimension: RelationshipDelta['dimension'] = 'shame';
     void notADimension;
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the @ts-expect-error is a
+    // compile-time proof only — at runtime this test asserted nothing, so a
+    // regression that ADDED 'shame' to the runtime table would not fail
+    // `npm test`. Assert the runtime table too.
+    assert.ok(!(('shame') in RELATIONSHIP_DIMENSION_KINDS),
+      'shame must not appear in the runtime relationship-dimension table');
+    assert.ok('trust' in RELATIONSHIP_DIMENSION_KINDS,
+      'a real relational axis must be present, or the negative check above proves nothing');
   });
 });
 

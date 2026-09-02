@@ -214,8 +214,31 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
       ];
       
       const contradictions = detectTemporalContradictions(intervals, constraints);
-      
-      assert.ok(contradictions.length > 0, 'Should detect impossible flashback ordering');
+
+      // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `length > 0` fires for a
+      // contradiction about ANY pair of intervals — including one the module
+      // invented. Pin what it points AT: the two intervals actually in
+      // conflict, the scene the losing constraint came from, and a blocking
+      // severity. A detector that reported a contradiction between the wrong
+      // pair would have passed the old assertion.
+      assert.equal(contradictions.length, 1, 'exactly one conflict: present↔flashback');
+      const flashbackConflict = contradictions[0]!;
+      assert.deepEqual(
+        [...flashbackConflict.intervals].sort(),
+        ['flashback', 'present'],
+        'the contradiction must name the two intervals that actually conflict',
+      );
+      assert.equal(flashbackConflict.type, 'explicit_conflict');
+      assert.equal(flashbackConflict.severity, 'blocker');
+      assert.deepEqual(flashbackConflict.affectedScenes, ['2'],
+        'the writer is pointed at scene 2 — the flashback marker that contradicts the established order');
+
+      // Negative half: drop the contradicting second constraint and the same
+      // intervals produce nothing. Without this, the assertions above could be
+      // satisfied by a detector that flags every pair it is given.
+      const consistentOnly = detectTemporalContradictions(intervals, [constraints[0]!]);
+      assert.equal(consistentOnly.length, 0,
+        'a single non-contradictory ordering constraint must produce no contradiction');
     });
   });
   
@@ -469,7 +492,27 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
 
       const contradictions = detectTemporalContradictions(intervals, constraints);
 
-      assert.ok(contradictions.length > 0, 'a genuine cyclic meets-chain must still be flagged, not silenced by the false-positive fix');
+      // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the point of this test is
+      // that the 2026-08-03 false-positive fix did not silence REAL cycles, and
+      // `length > 0` cannot tell a real cycle report from an unrelated one. Pin
+      // the cycle's membership and the scenes the writer is sent to.
+      assert.ok(contradictions.length > 0,
+        'a genuine cyclic meets-chain must still be flagged, not silenced by the false-positive fix');
+      const cycle = contradictions[0]!;
+      assert.deepEqual([...cycle.intervals].sort(), ['A', 'B', 'C'],
+        'the flagged contradiction must span all three intervals in the cycle');
+      assert.equal(cycle.severity, 'blocker');
+      assert.ok(cycle.affectedScenes.length > 0 && cycle.affectedScenes.every((id) => ['0', '1', '2'].includes(id)),
+        `affected scenes must come from the cycle, got ${JSON.stringify(cycle.affectedScenes)}`);
+      assert.ok(/impossible ordering/i.test(cycle.explanation),
+        `explanation should say why it is impossible, got: ${cycle.explanation}`);
+
+      // Negative half: break the cycle (C meets A → A meets C is dropped) and
+      // the same three intervals are consistent. A LINEAR meets-chain is the
+      // exact shape the 2026-08-03 fix stopped flagging.
+      const linear = detectTemporalContradictions(intervals, constraints.slice(0, 2));
+      assert.equal(linear.length, 0,
+        'a linear A-meets-B-meets-C chain is consistent — flagging it is the regression the fix removed');
     });
   });
 
@@ -569,8 +612,17 @@ describe('TRACE §13 Temporal-Consistency Detectors', () => {
       ];
       
       const contradictions = detectTemporalContradictions(intervals, constraints);
-      
-      assert.ok(contradictions.length > 0, 'Should detect 2-cycle');
+
+      // BEHAVIOURAL (2026-09-02 vacuous-test sweep): assert the 2-cycle is
+      // reported against A and B specifically, and that reversing only one of
+      // the two constraints removes it — so the test distinguishes "detects the
+      // cycle" from "reports something".
+      assert.equal(contradictions.length, 1, 'the minimum cycle produces exactly one contradiction');
+      assert.deepEqual([...contradictions[0]!.intervals].sort(), ['A', 'B']);
+      assert.equal(contradictions[0]!.severity, 'blocker');
+
+      const acyclic = detectTemporalContradictions(intervals, [constraints[0]!]);
+      assert.equal(acyclic.length, 0, 'A before B alone is not a cycle');
     });
   });
 });

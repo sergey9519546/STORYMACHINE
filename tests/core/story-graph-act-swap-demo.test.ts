@@ -237,7 +237,23 @@ Inside, she finds evidence of the crime.
     
     assert.ok(Array.isArray(graph.isolatedScenes));
     assert.ok(Array.isArray(graph.unpaidPromises));
-    
-    console.log(`  ✓ All 6 core metrics computed and within valid ranges`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): every assertion above is a
+    // typeof or a range check, all of which a graph of hard-coded zeros
+    // satisfies — so "all metrics are computed" was never actually tested.
+    // Require the graph to be non-degenerate: real nodes, real edges, and a
+    // composite health that is neither 0 nor 100.
+    assert.ok(graph.nodes.length > 0, 'a computed graph must have nodes');
+    assert.ok(graph.edges.length > 0, 'a computed graph must have edges');
+    assert.equal(graph.scored, true, 'the graph must report itself as scored');
+    assert.ok(Number.isFinite(report.storyGraph.graphHealth));
+    assert.ok(report.storyGraph.graphHealth > 0 && report.storyGraph.graphHealth < 100,
+      `graphHealth ${report.storyGraph.graphHealth} is pinned to a rail — that is not a computed composite`);
+    assert.equal(graph.causalDensity, graph.edges.length / graph.nodes.length,
+      'causalDensity must be derived from the graph it ships with, not stored independently');
+    assert.ok(
+      new Set([graph.promisePaymentRatio, graph.forwardEdgeRatio, graph.arcCoherence, graph.escalationMonotonicity]).size > 1,
+      'all four ratio metrics returned the same value — they are not independently computed',
+    );
   });
 });

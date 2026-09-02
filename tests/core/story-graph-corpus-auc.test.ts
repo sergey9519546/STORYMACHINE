@@ -198,7 +198,19 @@ describe('Story Graph Position-Sensitivity Regression', () => {
     console.log(`    Mean intact: ${result.meanGood.toFixed(3)}`);
     console.log(`    Mean swapped: ${result.meanBad.toFixed(3)}`);
     console.log(`    Separation:  ${result.separation.toFixed(3)}`);
-    
-    // Informational only, no hard assertion
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): this test had NO assertion at
+    // all, so a measurement harness that silently produced nothing — zero
+    // scripts, NaN AUC — reported clean. The AUC VALUE stays informational (no
+    // floor is claimed for escalationMonotonicity), but the MEASUREMENT must be
+    // valid or the printed numbers above are noise.
+    assert.ok(result.n > 0,
+      'the measurement must actually cover scripts; n=0 means the corpus filter excluded everything');
+    assert.ok(Number.isFinite(result.auc) && result.auc >= 0 && result.auc <= 1,
+      `AUC must be a real probability, got ${result.auc}`);
+    assert.ok(Number.isFinite(result.meanGood) && Number.isFinite(result.meanBad),
+      `both means must be finite, got intact=${result.meanGood} swapped=${result.meanBad}`);
+    assert.ok(Math.abs(result.separation - (result.meanGood - result.meanBad)) < 1e-9,
+      'separation must equal meanGood - meanBad, or the printed report is internally inconsistent');
   });
 });

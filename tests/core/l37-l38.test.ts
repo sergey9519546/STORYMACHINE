@@ -131,9 +131,21 @@ describe('L37 rule-breaking', () => {
       scene(8, { dramaticTurn: 'turn' }), scene(9, { dramaticTurn: 'turn' }), scene(10, { dramaticTurn: 'turn' }), scene(11),
     ];
     const report = analyzeRuleBreaking(analysis(records));
-    if (report.findings.some(f => f.convention === 'passive_protagonist')) {
-      assert.ok(!report.checked.includes('passive_protagonist'));
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the only assertion sat inside
+    // `if (findings.some(...))`, so an analyzer that stopped firing
+    // passive_protagonist skipped the test rather than failing it. Assert the
+    // trigger fires, then the exclusion it implies — and prove the invariant
+    // holds for EVERY fired convention, not just this one.
+    assert.ok(report.findings.some(f => f.convention === 'passive_protagonist'),
+      'eight turn-less scenes must fire passive_protagonist; without it the exclusion below is vacuous');
+    assert.ok(!report.checked.includes('passive_protagonist'),
+      'a convention that FIRED must not also be listed as merely CHECKED');
+    for (const finding of report.findings) {
+      assert.ok(!report.checked.includes(finding.convention),
+        `${finding.convention} appears in both findings and the CHECKED list`);
     }
+    assert.ok(report.checked.length > 0,
+      'some conventions must still be reported as checked-and-clean, or the exclusion is trivially true');
   });
 });
 

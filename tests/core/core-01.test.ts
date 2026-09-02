@@ -1278,16 +1278,62 @@ describe('Fountain export — X1 action vocabulary', () => {
     assert.doesNotThrow(() => parseFountain(output));
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "non-empty and does not throw"
+  // is satisfied by an exporter that emits only the title page and drops every
+  // action. Assert what each verb actually renders: the actor is named, the
+  // content survives, and the SILENT verbs land as action lines while the
+  // SPOKEN verbs land as a character cue plus dialogue — the distinction the
+  // X1 vocabulary exists to make.
   it('every new X1 verb produces non-empty output that round-trips through parseFountain without throwing', () => {
-    const allTypes: ActionLogEntry['action_type'][] = [
-      'HIDE', 'OBSERVE', 'LISTEN', 'SEARCH', 'REVEAL', 'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE', 'FLEE',
-    ];
+    const silentVerbs = ['HIDE', 'OBSERVE', 'LISTEN', 'SEARCH', 'FLEE'] as const;
+    const spokenVerbs = ['REVEAL', 'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE'] as const;
+    const allTypes: ActionLogEntry['action_type'][] = [...silentVerbs, ...spokenVerbs];
+
+    const rendered = new Map<string, string>();
     for (const type of allTypes) {
       const log = makeLog({ action_type: type, content: 'Some content.', target_char_id: 'bob', is_audible: true });
       const output = transcriptToFountain(log, agents, locations);
       assert.ok(output.trim().length > 0, `${type} should not render as nothing`);
       assert.doesNotThrow(() => parseFountain(output), `${type} output should parse without throwing`);
+
+      const blocks = parseFountain(output);
+      assert.ok(blocks.some(b => b.type === 'scene_heading' && b.text.includes('THE STUDY')),
+        `${type} must render inside its location's slugline`);
+      assert.ok(output.includes('Some content.'), `${type} must carry the action's content through to the page`);
+      rendered.set(type, output);
     }
+
+    for (const type of silentVerbs) {
+      const blocks = parseFountain(rendered.get(type)!);
+      assert.ok(blocks.some(b => b.type === 'action' && b.text.includes('Alice')),
+        `${type} is a silent verb and must render as an action line naming Alice`);
+      assert.ok(!blocks.some(b => b.type === 'character' && b.text.includes('ALICE')),
+        `${type} is a silent verb and must NOT produce a dialogue cue`);
+    }
+
+    for (const type of spokenVerbs) {
+      const blocks = parseFountain(rendered.get(type)!);
+      assert.ok(blocks.some(b => b.type === 'character' && b.text.includes('ALICE')),
+        `${type} is spoken and must render a character cue`);
+      assert.ok(blocks.some(b => b.type === 'dialogue' && b.text.includes('Some content.')),
+        `${type} is spoken and must render its content as dialogue`);
+    }
+
+    // KNOWN WEAKNESS: REVEAL, BETRAY, PROTECT and FORM_ALLIANCE render
+    // byte-identically — all four become `ALICE / (to Bob) / <content>`, with no
+    // parenthetical or action beat distinguishing a betrayal from an alliance.
+    // Only THREATEN carries its own parenthetical ("low and dangerous"). A
+    // reader of the exported fountain cannot recover which verb the simulation
+    // chose. A correct implementation would give each verb a distinguishing
+    // parenthetical or action beat. server/lib/fountain.ts is not on the scoring
+    // path, but changing the export format is a product decision rather than a
+    // test fix, so it is recorded here instead of changed.
+    const indistinguishable = ['REVEAL', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE'];
+    const distinctRenders = new Set(indistinguishable.map(t => rendered.get(t)!));
+    assert.equal(distinctRenders.size, 1,
+      'measured, not desired: these four verbs currently render identically — see KNOWN WEAKNESS above');
+    assert.notEqual(rendered.get('THREATEN'), rendered.get('REVEAL'),
+      'THREATEN does carry its own parenthetical, so at least one spoken verb is distinguishable');
   });
 });
 
@@ -2332,11 +2378,26 @@ describe('analyzeSubtext', () => {
     assert.ok(r.score < 50, `Pure subtext dialogue should score below 50, got ${r.score}`);
   });
 
-  it('worstLine is non-empty when score >= 20', () => {
+  it('worstLine names the on-the-nose line, not just any non-empty string', () => {
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): this test used to wrap its
+    // single `worstLine.length > 0` check in `if (r.score >= 20)`, so it
+    // asserted NOTHING whenever the meter scored low — including if the meter
+    // had been replaced with one that always returns 0. Assert the trigger
+    // fires, and that the line it points at is the naming-the-emotion one
+    // rather than the neutral observation next to it.
     const r = analyzeSubtext(["I am angry at you.", "The sky is blue."]);
-    if (r.score >= 20) {
-      assert.ok(r.worstLine.length > 0, 'worstLine should be set when score >= 20');
-    }
+    assert.ok(r.score >= 20, `a stated-emotion line must score at least 20, got ${r.score}`);
+    assert.ok(r.worstLine.length > 0, 'worstLine should be set when score >= 20');
+    assert.ok(
+      r.worstLine.includes('angry'),
+      `worstLine must be the on-the-nose line, got "${r.worstLine}"`,
+    );
+    // ...and a scene with nothing on the nose must not manufacture a worst line.
+    const clean = analyzeSubtext(["The window is open.", "Strange weather."]);
+    assert.ok(
+      clean.score < r.score,
+      `oblique dialogue must score below stated emotion: ${clean.score} vs ${r.score}`,
+    );
   });
 });
 
@@ -2462,6 +2523,25 @@ describe('memory — scoreBelief', () => {
     const b: Belief = { id: 'b', proposition: 'knife study evening', confidence: 1.0, source: 'witnessed', acquired_at: 5 };
     const s = scoreBelief(b, 5, ctx);
     assert.ok(s >= 0 && s <= 1, `score ${s} should be in [0,1]`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [0,1] range check is true
+    // of any frozen constant in that interval. Exercise BOTH ends of the bound
+    // with the same scorer: a maximal belief (full confidence, witnessed,
+    // current, every context term present) must land near the ceiling and a
+    // minimal one (no confidence, inferred, stale, nothing in common with the
+    // context) near the floor — and the ordering must hold.
+    const worst: Belief = {
+      id: 'w', proposition: 'unrelated lazy drifting clouds', confidence: 0,
+      source: 'inferred', acquired_at: 0,
+    };
+    const worstScore = scoreBelief(worst, 5, ctx);
+    assert.ok(worstScore >= 0 && worstScore <= 1, `worst score ${worstScore} should be in [0,1]`);
+    assert.ok(
+      s > worstScore,
+      `a confident, witnessed, on-context belief must outscore a stale irrelevant one: ${s} vs ${worstScore}`,
+    );
+    assert.ok(s > 0.5, `the maximal belief should sit in the upper half of the range, got ${s}`);
+    assert.ok(worstScore < 0.5, `the minimal belief should sit in the lower half of the range, got ${worstScore}`);
   });
 });
 
@@ -2785,18 +2865,20 @@ describe('Orchestrator — relationship graph fields populated via mock LLM', ()
       await orch.runRoomSimulation('room-1', 1);
       const alice = stage.getAgent('a-alice');
       const tomForBob = alice?.theoryOfMind?.['a-bob'];
-      if (tomForBob) {
-        assert.ok(typeof tomForBob.affinity === 'number', 'affinity should be stored');
-        assert.ok(Math.abs(tomForBob.affinity! - 0.6) < 0.01, `affinity should be ~0.6, got ${tomForBob.affinity}`);
-        assert.ok(typeof tomForBob.power_balance === 'number', 'power_balance should be stored');
-        assert.ok(typeof tomForBob.debt === 'number', 'debt should be stored');
-        assert.ok(Array.isArray(tomForBob.shared_history), 'shared_history should be an array');
-        assert.ok(tomForBob.shared_history!.length > 0, 'shared_history should contain the event');
-        assert.ok(tomForBob.shared_history![0].includes('ledger'), 'shared_history should contain the event text');
-      }
-      // If tomForBob is undefined the epistemic update returned no ToM entries —
-      // that is acceptable (mock may not have matched the agent name). Only assert
-      // when the data is present to avoid fragile name-matching failures.
+      // BEHAVIOURAL (2026-09-02 vacuous-test sweep): every assertion sat inside
+      // `if (tomForBob)`, so the ONE outcome this test exists to rule out — the
+      // relationship fields never reaching TheoryOfMind at all — made the test
+      // pass silently. The LLM is mocked here, so the name match is
+      // deterministic; the guard is now an assertion, and the values are pinned
+      // to the ones the mock returned rather than to their types.
+      assert.ok(tomForBob, 'the mocked epistemic update names Bob — a missing ToM entry is the bug this test exists to catch');
+      assert.ok(Math.abs(tomForBob.affinity! - 0.6) < 0.01, `affinity should be ~0.6, got ${tomForBob.affinity}`);
+      assert.ok(Math.abs(tomForBob.power_balance! - 0.4) < 0.01, `power_balance should be ~0.4, got ${tomForBob.power_balance}`);
+      assert.ok(Math.abs(tomForBob.debt! - 0.2) < 0.01, `debt should be ~0.2, got ${tomForBob.debt}`);
+      assert.ok(Math.abs(tomForBob.trust_level! - 0.3) < 0.01, `trust_level should be ~0.3, got ${tomForBob.trust_level}`);
+      assert.deepEqual(tomForBob.shared_history, ['We argued about the missing ledger.'],
+        'the shared-history event must be stored verbatim, not summarised or dropped');
+      assert.equal(tomForBob.believed_motive, 'Hide something');
     } finally {
       resetLLMProvider();
     }
@@ -2921,6 +3003,11 @@ describe('personality — actionBiasWeights', () => {
     assert.ok(lowE.RELOCATE > highE.RELOCATE, 'low extraversion should prefer RELOCATE');
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [0.5, 1.6] bound is satisfied
+  // by weights hard-coded to 1.0 — i.e. by a personality model that does
+  // nothing. Keep the clamp check, then prove the clamp is BINDING (an extreme
+  // trait profile actually pushes weights to the rails) and that the extreme
+  // profile differs from the neutral one.
   it('all weights are clamped between 0.5 and 1.6', () => {
     const extreme = actionBiasWeights(
       { machiavellianism: 100, narcissism: 100, psychopathy: 100 },
@@ -2929,6 +3016,38 @@ describe('personality — actionBiasWeights', () => {
     for (const [k, v] of Object.entries(extreme)) {
       assert.ok(v >= 0.5 && v <= 1.6, `${k} weight ${v} is outside [0.5, 1.6]`);
     }
+
+    // Neutral traits leave almost every action unbiased. RELOCATE and FLEE are
+    // the two measured exceptions (both 1.08 at neutral, from the flight-bias
+    // term); pinning them keeps the baseline honest rather than approximate.
+    const neutral = actionBiasWeights(NEUTRAL_DT, NEUTRAL_BF);
+    for (const [k, v] of Object.entries(neutral)) {
+      const expected = k === 'RELOCATE' || k === 'FLEE' ? 1.08 : 1.0;
+      assert.ok(Math.abs(v - expected) < 1e-9, `neutral ${k} weight should be ${expected}, got ${v}`);
+    }
+
+    // The clamp must be BINDING, not decorative: the dark extreme pushes
+    // BETRAY/LIE toward the 1.6 ceiling and REVEAL/PROTECT toward the floor,
+    // and the opposite extreme reverses both.
+    const moved = Object.keys(extreme).filter(k => extreme[k as keyof typeof extreme] !== neutral[k as keyof typeof neutral]);
+    assert.ok(moved.length >= 10,
+      `an all-extremes personality must move most action weights, only ${moved.length} moved`);
+    assert.ok(Object.values(extreme).some(v => v > 1) && Object.values(extreme).some(v => v < 1),
+      `an extreme profile must both raise and suppress actions, got ${JSON.stringify(extreme)}`);
+    assert.ok(extreme.BETRAY > 1.5 && extreme.LIE > 1.5,
+      `the dark triad at maximum must push BETRAY/LIE near the ceiling, got ${extreme.BETRAY}/${extreme.LIE}`);
+    assert.ok(extreme.REVEAL < 0.7 && extreme.PROTECT < 0.7,
+      `the dark triad at maximum must suppress REVEAL/PROTECT, got ${extreme.REVEAL}/${extreme.PROTECT}`);
+
+    const opposite = actionBiasWeights(
+      { machiavellianism: 0, narcissism: 0, psychopathy: 0 },
+      { openness: 100, conscientiousness: 100, extraversion: 100, agreeableness: 100, neuroticism: 0 },
+    );
+    for (const [k, v] of Object.entries(opposite)) {
+      assert.ok(v >= 0.5 && v <= 1.6, `${k} weight ${v} is outside [0.5, 1.6] at the opposite extreme`);
+    }
+    assert.ok(opposite.BETRAY < extreme.BETRAY && opposite.LIE < extreme.LIE,
+      'the two opposite personality poles must order BETRAY/LIE oppositely, not identically');
   });
 });
 
@@ -3144,11 +3263,34 @@ describe('WAIT action — personality bias', () => {
     assert.equal(w.WAIT, 1.0, 'neutral traits must produce exactly 1.0 for WAIT');
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the bound alone is satisfied by
+  // the neutral 1.0 the sibling test already pins, so this test could not tell
+  // "clamped" from "never moved". Assert that extreme traits actually MOVE WAIT
+  // off neutral, and that the two opposite extremes move it in opposite
+  // directions.
   it('WAIT weight is within [0.5, 1.6] for extreme traits', () => {
     const extremeDT = { machiavellianism: 100, narcissism: 100, psychopathy: 100 };
     const extremeBF5 = { openness: 0, conscientiousness: 0, extraversion: 0, agreeableness: 0, neuroticism: 100 };
     const w = actionBiasWeights(extremeDT, extremeBF5);
     assert.ok(w.WAIT >= 0.5 && w.WAIT <= 1.6, `WAIT ${w.WAIT} out of bounds [0.5, 1.6]`);
+
+    const neutral = actionBiasWeights(
+      { machiavellianism: 50, narcissism: 50, psychopathy: 50 },
+      { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 },
+    );
+    assert.equal(neutral.WAIT, 1.0);
+    assert.notEqual(w.WAIT, neutral.WAIT,
+      `extreme traits must move WAIT off its neutral 1.0, got ${w.WAIT} — a clamp check alone cannot see this`);
+
+    const opposite = actionBiasWeights(
+      { machiavellianism: 0, narcissism: 0, psychopathy: 0 },
+      { openness: 100, conscientiousness: 100, extraversion: 100, agreeableness: 100, neuroticism: 0 },
+    );
+    assert.ok(opposite.WAIT >= 0.5 && opposite.WAIT <= 1.6, `opposite-extreme WAIT ${opposite.WAIT} out of bounds`);
+    assert.ok(
+      (w.WAIT - 1) * (opposite.WAIT - 1) <= 0,
+      `opposite trait extremes must not push WAIT the same way: ${w.WAIT} vs ${opposite.WAIT}`,
+    );
   });
 });
 
@@ -3461,11 +3603,22 @@ describe('metrics — latency percentiles', () => {
     metrics.reset();
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the test's NAME promises the
+  // percentiles are 0, but its only assertion was `typeof total_calls ===
+  // 'number'` — true of a snapshot carrying stale counters from a previous
+  // test. Assert the reset actually zeroes the surface.
   it('percentiles are 0 before any calls', () => {
     metrics.reset();
     const snap = metrics.snapshot() as Record<string, Record<string, Record<string, unknown>>>;
-    // No categories yet — just verify snapshot doesn't crash.
-    assert.ok(typeof snap.ai.total_calls === 'number');
+    assert.equal(snap.ai.total_calls, 0, 'reset() must zero the call counter, not merely keep it numeric');
+    for (const [category, stats] of Object.entries(snap.ai)) {
+      if (typeof stats !== 'object' || stats === null) continue;
+      for (const key of ['p50_ms', 'p95_ms', 'p99_ms']) {
+        if (key in stats) {
+          assert.equal(stats[key], 0, `${category}.${key} must be 0 before any calls, got ${stats[key]}`);
+        }
+      }
+    }
     metrics.reset();
   });
 });
@@ -4136,12 +4289,35 @@ describe('NVM — mechanism schema loader', () => {
   it('auto-discovers mechanisms (MVP + Phase 2)', () => {
     assert.ok(loadMechanisms().size >= 3, 'should have at least 3 mechanisms');
   });
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): three `.length > 0` checks pass
+  // for arrays of empty strings, and for a loader that returns the SAME
+  // mechanism under every id. Assert the entries are real and that the
+  // mechanisms are distinguishable from one another.
   it('each mechanism validates: lifecycle, rules, invariants present', () => {
-    for (const m of loadMechanisms().values()) {
+    const mechanisms = [...loadMechanisms().values()];
+    assert.ok(mechanisms.length >= 3, 'the loader must find the MVP set at minimum');
+
+    for (const m of mechanisms) {
       assert.ok(m.lifecycleStates.length > 0, `${m.id} has lifecycle states`);
       assert.ok(m.invariants.length > 0, `${m.id} has invariants`);
       assert.ok(m.climaxProofPredicate.length > 0, `${m.id} has climax predicate`);
+      for (const state of m.lifecycleStates) {
+        assert.ok(typeof state === 'string' && state.trim().length > 0,
+          `${m.id} has a blank lifecycle state: ${JSON.stringify(state)}`);
+      }
+      assert.equal(new Set(m.lifecycleStates).size, m.lifecycleStates.length,
+        `${m.id} repeats a lifecycle state: ${m.lifecycleStates.join(', ')}`);
+      assert.ok(m.climaxProofPredicate.trim().length > 0,
+        `${m.id}'s climax predicate is whitespace, which passes a length check but proves nothing`);
     }
+
+    // Distinct mechanisms must be distinct — a loader returning one shared
+    // object under many ids satisfies every check above.
+    assert.equal(new Set(mechanisms.map(m => m.id)).size, mechanisms.length, 'mechanism ids must be unique');
+    assert.ok(new Set(mechanisms.map(m => m.climaxProofPredicate)).size > 1,
+      'every mechanism shares one climax predicate — they are not actually different mechanisms');
+    assert.ok(new Set(mechanisms.map(m => m.lifecycleStates.join('>'))).size > 1,
+      'every mechanism shares one lifecycle — they are not actually different mechanisms');
   });
   it('resolves the 3 MVP ids', () => {
     const m = loadMechanisms();
@@ -4345,12 +4521,24 @@ describe('NVM — Seed PRNG (A1)', () => {
     const p2 = makePrng(2);
     assert.notEqual(p1(), p2());
   });
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `v >= 0 && v < 10` is satisfied
+  // by `return 0` — the exact degenerate PRNG this test should catch. Keep the
+  // bound, then assert the draws are integers, actually spread across the
+  // range, and reproducible from the seed.
   it('randInt stays in bounds', () => {
-    const prng = makePrng(99);
-    for (let i = 0; i < 100; i++) {
-      const v = randInt(prng, 10);
+    const draw = (seed: number) => {
+      const prng = makePrng(seed);
+      return Array.from({ length: 100 }, () => randInt(prng, 10));
+    };
+    const values = draw(99);
+    for (const v of values) {
       assert.ok(v >= 0 && v < 10, `randInt out of bounds: ${v}`);
+      assert.ok(Number.isInteger(v), `randInt must return an integer, got ${v}`);
     }
+    assert.ok(new Set(values).size >= 5,
+      `100 draws over [0,10) must cover most of the range, saw only ${new Set(values).size} distinct values`);
+    assert.deepEqual(values, draw(99), 'the same seed must replay the same draws');
+    assert.notDeepEqual(values, draw(100), 'a different seed must produce a different sequence');
   });
   it('shuffle is deterministic for same seed', () => {
     const arr = [1, 2, 3, 4, 5];
@@ -4928,6 +5116,34 @@ describe('NVM — Adversarial Audience Red-Team (C2)', () => {
     };
     const verdict = redTeamVerdict(plan, emptyState());
     assert.ok(verdict.guessConfidence >= 0 && verdict.guessConfidence <= 1);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [0,1] range check passes
+    // for a hardcoded 0.5. guessConfidence measures how easily the audience can
+    // pre-empt the reveal, so a reveal whose own wording is already sitting in
+    // the audience's known facts must be strictly easier to guess than one the
+    // audience has never seen a word of.
+    const guessable: RevealPlan = {
+      revealId: 'r_guessable',
+      description: 'lied deceived false warehouse',
+      requiredClueIds: [],
+      payoffSetupId: 's',
+    };
+    const primedState = emptyState();
+    primedState.audienceState.suspense = 90;
+    primedState.audienceState.knownFacts = [
+      'Nora lied to Bob about the warehouse',
+      'The truth is in warehouse B not A',
+    ];
+    const guessableVerdict = redTeamVerdict(guessable, primedState);
+    assert.ok(
+      guessableVerdict.guessConfidence >= 0 && guessableVerdict.guessConfidence <= 1,
+      `guessable confidence ${guessableVerdict.guessConfidence} should be in [0,1]`,
+    );
+    assert.ok(
+      guessableVerdict.guessConfidence > verdict.guessConfidence,
+      `a reveal the audience already holds the facts for must be easier to guess: `
+      + `${guessableVerdict.guessConfidence} vs ${verdict.guessConfidence}`,
+    );
   });
 });
 
@@ -4946,7 +5162,10 @@ describe('NVM — Two-Reader Model (C3)', () => {
     assert.ok(typeof report.twistPremium === 'number');
   });
 
-  it('rewatchRecommended is true when rewatch score > 70', () => {
+  // Renamed 2026-09-02: the old name ("rewatchRecommended is true when rewatch
+  // score > 70") was FALSE of this fixture — it scores 51, so the flag is false.
+  // The name is now what the test actually proves.
+  it('rewatchRecommended tracks the rewatch score across the 70 threshold', () => {
     const state = emptyState();
     // Push irony: told belief + audience knows the deception
     state.characterBeliefs['bob'] = [{
@@ -4960,8 +5179,37 @@ describe('NVM — Two-Reader Model (C3)', () => {
     state.payoffs.push({ setupId: 's1', payoffEventId: 'e1' });
     const ledger = deriveTensionLedger(state, 2);
     const report = twoReaderReport(state, ledger);
-    // rewatchRecommended depends on computed score — just verify it's a boolean
-    assert.ok(typeof report.rewatchRecommended === 'boolean');
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the test's NAME states an
+    // implication ("true when rewatch score > 70") that `typeof === 'boolean'`
+    // does not check at all. Assert the implication itself, in both directions,
+    // so a flag wired to the wrong score — or to nothing — fails here.
+    assert.equal(report.rewatch.mode, 'rewatch');
+    assert.equal(
+      report.rewatchRecommended, report.rewatch.overallScore > 70,
+      `rewatchRecommended (${report.rewatchRecommended}) must track the rewatch score `
+      + `(${report.rewatch.overallScore}) across the 70 threshold`,
+    );
+
+    // The score must not be a constant: a bare state with no irony and no
+    // payoffs must score strictly lower than this one.
+    const bare = twoReaderReport(emptyState(), deriveTensionLedger(emptyState(), 2));
+    assert.equal(bare.rewatchRecommended, bare.rewatch.overallScore > 70);
+    assert.ok(report.rewatch.overallScore > bare.rewatch.overallScore,
+      `an ironic, paid-off state (${report.rewatch.overallScore}) must out-score a bare one `
+      + `(${bare.rewatch.overallScore})`);
+
+    // KNOWN WEAKNESS: this fixture is deliberately maximal — dramatic irony
+    // (a told belief the audience knows to be a lie), audience investment at
+    // 90, a planted clue and a paid-off setup — and still scores only 51, so
+    // rewatchRecommended is FALSE here and the 70 threshold is never crossed by
+    // any fixture in this suite. Either the threshold is set above what the
+    // scorer can reach on realistic input, or the rewatch score under-weights
+    // irony and payoff. A correct implementation would make the flag reachable.
+    // Asserted as measured.
+    assert.equal(report.rewatch.overallScore, 51,
+      'measured, not desired: the maximal-irony fixture scores 51 — see KNOWN WEAKNESS above');
+    assert.equal(report.rewatchRecommended, false,
+      'measured, not desired: no fixture in this suite crosses the 70 threshold');
   });
 });
 
@@ -5121,6 +5369,24 @@ describe('NVM — Convergence Loop (G1)', () => {
     assert.ok(result.converged || result.iterations > 0);
     assert.ok(Array.isArray(result.history));
     assert.ok(result.history.length > 0);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `converged || iterations > 0`
+    // is satisfied by a loop that never converges, which is the opposite of what
+    // the test name claims. With tensionTarget 0 the mock candidates clear the
+    // bar on the first pass, so assert convergence itself — and that it stopped
+    // early rather than burning the whole budget.
+    assert.equal(result.converged, true, 'a zero tension target must converge on the mock candidates');
+    assert.ok(result.ir, 'a converged run must hand back the winning IR');
+    assert.ok(
+      result.iterations <= 3,
+      `convergence must respect the 3-iteration budget, ran ${result.iterations}`,
+    );
+    // ...and the same generator against an unreachable target must NOT converge.
+    const unreachable = await convergeScene(
+      emptyState(), { ...target, tensionTarget: 9999 }, mockGenerator,
+      { maxIterations: 3, candidatesPerIteration: 2 }, 1234,
+    );
+    assert.equal(unreachable.converged, false, 'an unreachable tension target must not report convergence');
   });
 
   it('history records proof results for each candidate', async () => {
@@ -5142,6 +5408,25 @@ describe('NVM — Convergence Loop (G1)', () => {
     );
     // With an impossible tension target, candidates should be ghosted
     assert.ok(result.ghosts.length > 0 || !result.converged);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the `||` above lets the test
+    // pass on a loop that ghosts nothing, which is exactly the failure it is
+    // named for. Assert ghosting HAPPENED, that each ghost carries the reason
+    // the target was missed, and that the reachable target ghosts strictly less.
+    assert.ok(result.ghosts.length > 0, 'an unreachable tension target must ghost every candidate');
+    assert.equal(result.converged, false, 'and must not report convergence');
+    assert.ok(
+      result.ghosts.every(g => g.reason === 'valuation_too_low' || g.reason === 'proof_fail'),
+      `ghost reasons must name the miss, got ${JSON.stringify(result.ghosts.map(g => g.reason))}`,
+    );
+    const reachable = await convergeScene(
+      emptyState(), target, mockGenerator,
+      { maxIterations: 2, candidatesPerIteration: 1 }, 99,
+    );
+    assert.ok(
+      reachable.ghosts.length < result.ghosts.length,
+      `a reachable target must ghost fewer candidates: ${reachable.ghosts.length} vs ${result.ghosts.length}`,
+    );
   });
 
   it('different seeds produce different candidate ids', async () => {
@@ -5166,6 +5451,34 @@ describe('NVM — Writers\' Room (G2)', () => {
     assert.ok(typeof result.transcript === 'string');
     assert.ok(result.transcript.length > 0);
     assert.ok(Array.isArray(result.critiques));
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): two typeofs, a range check
+    // and "non-empty string" are all satisfied by a constant result. The room's
+    // job is to SEPARATE a sound IR from a broken one, so a deliberately broken
+    // IR must draw more critiques and lower consensus than the valid fixture.
+    const brokenIR = {
+      ...baseIR,
+      sceneIdx: 3,
+      preconditions: [],
+      ops: [],
+    };
+    const brokenResult = runWritersRoom(brokenIR, state);
+    assert.ok(
+      brokenResult.critiques.length > result.critiques.length,
+      `a broken IR must draw more critiques: ${brokenResult.critiques.length} vs ${result.critiques.length}`,
+    );
+    assert.ok(
+      brokenResult.consensus < result.consensus,
+      `a broken IR must reach lower consensus: ${brokenResult.consensus} vs ${result.consensus}`,
+    );
+    // The transcript must be a record of the session, not boilerplate: every
+    // critique that fired has to be traceable to a named critic in it.
+    for (const critique of brokenResult.critiques) {
+      assert.ok(
+        brokenResult.transcript.includes(critique.criticId.toUpperCase()),
+        `transcript must name the critic that fired (${critique.criticId})`,
+      );
+    }
   });
 
   it('a valid M1.5 IR draws 0 critiques from continuity (all proofs pass)', () => {
@@ -5232,12 +5545,24 @@ describe('NVM — Writers\' Room (G2)', () => {
     }
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the only assertion sat inside
+  // `if (result.suggestedOperator !== null)`, so an implementation that always
+  // returned null — never suggesting anything — passed. State the disjunction
+  // as one unconditional assertion, and pin what this fixture actually yields.
   it('suggestedOperator is a valid MutationOperator or null', () => {
     const result = runWritersRoom(baseIR, state);
-    if (result.suggestedOperator !== null) {
-      assert.ok(ALL_OPERATORS.includes(result.suggestedOperator),
-        `invalid operator: ${result.suggestedOperator}`);
-    }
+    assert.ok(
+      result.suggestedOperator === null || ALL_OPERATORS.includes(result.suggestedOperator),
+      `suggestedOperator must be null or a known operator, got: ${result.suggestedOperator}`,
+    );
+    // A suggestion is only made when a critique asked for one; with no
+    // critiques there is nothing to suggest.
+    assert.equal(
+      result.suggestedOperator === null, result.critiques.length === 0,
+      `a room with ${result.critiques.length} critiques returned suggestedOperator=${result.suggestedOperator}`,
+    );
+    assert.deepEqual(runWritersRoom(baseIR, state).suggestedOperator, result.suggestedOperator,
+      'the suggestion must be deterministic for the same IR and state');
   });
 });
 
@@ -5283,6 +5608,30 @@ describe('NVM — Structural Causal Model (G4)', () => {
     ]));
     const scm = buildSCM(stage);
     assert.ok(scm.order.length > 0);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "non-empty" passes for a
+    // stub returning ['x']. The order is a topological sort of the op graph, so
+    // it must contain exactly the op nodes of the commit — and when a second op
+    // depends on the first, the parent must precede the child.
+    assert.deepEqual(scm.order, ['c1:0'], 'one op in → exactly that op node out');
+
+    const twoOpStage = new Stage(':memory:');
+    twoOpStage.appendCommit(mkCommitWithOps('c2', null, [
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b2', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ]));
+    const twoOpScm = buildSCM(twoOpStage);
+    assert.equal(twoOpScm.order.length, 2, 'two ops in → two nodes in the order');
+    // scm.ts documents this order as "leaves first, roots last", so the belief
+    // that DEPENDS on the fact comes first and the fact it depends on comes last.
+    assert.ok(
+      twoOpScm.order.indexOf('c2:1') < twoOpScm.order.indexOf('c2:0'),
+      `leaves-first order must put the dependent belief before the fact it rests on: ${JSON.stringify(twoOpScm.order)}`,
+    );
+    assert.ok(
+      twoOpScm.nodes.get('c2:0')!.children.includes('c2:1'),
+      'and the edge itself must run fact -> belief',
+    );
   });
 
   it('buildSCM on empty stage returns empty model', () => {
@@ -5418,6 +5767,30 @@ describe('NVM — Holographic Projection (G3)', () => {
     assert.ok(panels.length > 0, 'no panels generated');
     assert.ok(typeof panels[0].panel === 'number', 'panel missing panel number');
     assert.ok(typeof panels[0].caption === 'string', 'panel missing caption');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): parseability plus two typeofs
+    // is satisfied by a constant '[{"panel":1,"caption":""}]'. The projection is
+    // OF a canon, so panel numbering must be a real 1-based run, the captions
+    // must carry content rather than empty strings, and an empty canon must not
+    // project the same comic as a populated one.
+    const panelNumbers = panels.map((p: { panel: number }) => p.panel);
+    assert.equal(new Set(panelNumbers).size, panelNumbers.length, 'panel numbers are unique, not a repeated constant');
+    for (let i = 1; i < panelNumbers.length; i++) {
+      assert.ok(
+        panelNumbers[i] > panelNumbers[i - 1],
+        `panel numbers must increase with the canon: ${JSON.stringify(panelNumbers)}`,
+      );
+    }
+    assert.ok(
+      panels.every((p: { caption: string }) => p.caption.length > 0),
+      'every panel carries a caption drawn from the canon',
+    );
+    assert.equal(artifact.metadata.panels, panels.length, 'metadata panel count matches the panels emitted');
+    const emptyArtifact = project({ commits: [], state: emptyState(), title: 'EMPTY' }, 'comic');
+    assert.notEqual(
+      emptyArtifact.content, artifact.content,
+      'an empty canon must not project the same comic as a populated one',
+    );
   });
 
   it('interactive output is valid JSON with commits and finalState', () => {
@@ -5574,10 +5947,15 @@ describe('NVM — Sidecar Schema + Regression (Wave 13)', () => {
     // Simulate a degraded sidecar
     const degraded = { ...sidecar, qualityScore: sidecar.qualityScore * 0.5 };
     const result = checkRegression(snap, degraded);
-    if (sidecar.qualityScore > 0) {
-      assert.ok(!result.passed, 'should fail when quality drops >10%');
-      assert.ok(result.regressions.some(r => r.metric === 'qualityScore'));
-    }
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): both assertions were guarded
+    // by `if (sidecar.qualityScore > 0)`, so a fixture that scored 0 turned the
+    // test into a no-op — and a detector that never fires would still pass.
+    // The guard is now the precondition it always was.
+    assert.ok(sidecar.qualityScore > 0,
+      `the fixture must have a positive quality score to halve, got ${sidecar.qualityScore}`);
+    assert.ok(!result.passed, 'should fail when quality drops >10%');
+    const qualityRegression = result.regressions.find(r => r.metric === 'qualityScore');
+    assert.ok(qualityRegression, `regressions must name qualityScore, got ${JSON.stringify(result.regressions)}`);
   });
 });
 
@@ -5601,6 +5979,18 @@ describe('NVM — Quality-Aware Convergence Loop (Wave 13)', () => {
     assert.ok(typeof step.qualityScore === 'number', 'qualityScore missing from step');
     assert.ok(typeof step.compositeScore === 'number', 'compositeScore missing from step');
     assert.ok(step.qualityScore >= 0 && step.qualityScore <= 100, `qualityScore out of range: ${step.qualityScore}`);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): two typeofs and a range check
+    // pass for a frozen step. The composite is a documented blend —
+    // 0.6 * normalizedTension + 0.4 * quality — and this target's tensionTarget
+    // is 0, which normalizes the tension term to 0. So the composite has exactly
+    // one correct value here, derived from the quality the step measured.
+    assert.ok(
+      Math.abs(step.compositeScore - 0.4 * step.qualityScore) < 1e-9,
+      `with tensionTarget 0 the composite must be 0.4 * quality: `
+      + `${step.compositeScore} vs ${0.4 * step.qualityScore}`,
+    );
+    assert.ok(step.qualityScore > 0, 'the mock candidate is a real IR and must score above zero');
   });
 
   it('ConvergeResult includes finalQuality and finalComposite', async () => {
@@ -5611,6 +6001,21 @@ describe('NVM — Quality-Aware Convergence Loop (Wave 13)', () => {
     const result = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 1);
     assert.ok(typeof result.finalQuality === 'number', 'finalQuality missing');
     assert.ok(typeof result.finalComposite === 'number', 'finalComposite missing');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): two typeofs are satisfied by
+    // a frozen result. The final figures must be the ones the run actually
+    // measured — the winning step's — and the same 0.6/0.4 blend, with the
+    // tension term zeroed by this target's tensionTarget of 0.
+    assert.ok(result.history.length > 0, 'the run produced at least one step to be final about');
+    assert.ok(
+      Math.abs(result.finalComposite - 0.4 * result.finalQuality) < 1e-9,
+      `with tensionTarget 0 finalComposite must be 0.4 * finalQuality: `
+      + `${result.finalComposite} vs ${0.4 * result.finalQuality}`,
+    );
+    assert.ok(
+      result.history.some(s => Math.abs(s.qualityScore - result.finalQuality) < 1e-9),
+      `finalQuality ${result.finalQuality} must be a quality score some step actually measured`,
+    );
   });
 
   it('quality_low ghost reason fires when qualityTarget is impossibly high', async () => {
@@ -5722,11 +6127,29 @@ describe('NVM — Temporal Authoring / Fixed Points (G9)', () => {
     assert.ok(tensionOp, 'UPDATE_READER_STATE expected for suspense gap');
   });
 
-  it('planToward transcript is non-empty', () => {
+  it('planToward transcript records the fixed point it planned toward', () => {
     const state = baseState();
     const fp: FixedPoint = { atScene: 5, required: { clueIds: ['x'] }, description: 'test' };
     const result = planToward(state, [fp], 0);
     assert.ok(result.transcript.length > 0, 'transcript should be non-empty');
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): "non-empty" passes for a
+    // constant banner string. The transcript is the planner's receipt, so it has
+    // to name the thing it planned for — and planning for a DIFFERENT fixed
+    // point must produce a different receipt.
+    assert.ok(
+      result.transcript.includes('x') || result.transcript.includes('test'),
+      `transcript must reference the fixed point it planned toward: ${result.transcript}`,
+    );
+    const other = planToward(
+      baseState(),
+      [{ atScene: 9, required: { clueIds: ['zebra_clue'] }, description: 'a different requirement' }],
+      0,
+    );
+    assert.notEqual(
+      other.transcript, result.transcript,
+      'a different fixed point must produce a different transcript, not a constant',
+    );
   });
 });
 
@@ -5868,9 +6291,26 @@ describe('NVM — Self-Play Corpus (G13)', () => {
 
   it('each SimResult has a score between 0 and 1', async () => {
     const report = await runSelfPlay(makeScenarios(2), mockGenerate);
+    assert.equal(report.runs.length, 2, 'both scenarios must actually run — an empty loop asserts nothing');
     for (const run of report.runs) {
       assert.ok(run.score >= 0 && run.score <= 1, `score out of range: ${run.score}`);
     }
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [0,1] range check over a
+    // loop that may not iterate is satisfied by a constant. The corpus report's
+    // aggregates have to be aggregates OF these runs, so cross-check them
+    // against the per-run scores the same call returned.
+    const scores = report.runs.map(r => r.score);
+    assert.ok(
+      Math.abs(report.meanScore - scores.reduce((a, b) => a + b, 0) / scores.length) < 1e-9,
+      `meanScore must be the mean of the run scores: ${report.meanScore} vs ${scores}`,
+    );
+    assert.equal(report.bestRun.score, Math.max(...scores), 'bestRun is the highest-scoring run');
+    assert.equal(report.worstRun.score, Math.min(...scores), 'worstRun is the lowest-scoring run');
+    assert.deepEqual(
+      report.runs.map(r => r.scenarioId), ['drama_scenario_0', 'drama_scenario_1'],
+      'each result is tied to the scenario that produced it',
+    );
   });
 
   it('CorpusReport identifies bestRun with highest score', async () => {
@@ -5942,10 +6382,25 @@ describe('NVM — Corpus Miner / Director Policy (G13)', () => {
     assert.ok(playbook.summary.includes('empty'));
   });
 
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): `ops.length > 0` is true of any
+  // non-empty list, including an arc-specific one — so the test could not tell
+  // "fell back to globalTopOperators" from "did not fall back at all". Assert
+  // the fallback identity, and contrast it with a KNOWN arc.
   it('queryPolicy falls back to globalTopOperators for unknown arc', () => {
     const playbook = mineCorpus(makeFakeReport());
     const ops = queryPolicy(playbook.policy, 'rags_to_riches');
     assert.ok(ops.length > 0);
+    assert.deepEqual(ops, playbook.policy.globalTopOperators,
+      'an arc with no mined policy must return the global list verbatim, not a subset or a rebuild');
+
+    // A mined arc with its own ranked combo must return THAT combo's operators,
+    // not the global fallback — otherwise "falls back" is not a distinction.
+    const minedCombo = playbook.policy.rankedCombos.find(c => c.topOperators.length > 0);
+    assert.ok(minedCombo, 'the fake report must mine at least one ranked combo for the contrast below');
+    assert.deepEqual(queryPolicy(playbook.policy, minedCombo.arcArchetype), minedCombo.topOperators,
+      'a mined arc must return ITS operators, not the global fallback');
+    assert.notEqual(minedCombo.arcArchetype, 'rags_to_riches',
+      'the fallback arc above must be one with no mined combo, or the two branches are the same');
   });
 });
 
@@ -6012,6 +6467,30 @@ describe('NVM — StoryGenome (G13)', () => {
     const g2 = extractGenome(makeTestCanon(), 'g2');
     const diff = diffGenomes(g1, g2);
     assert.ok(diff.similarity >= 0 && diff.similarity <= 1);
+
+    // BEHAVIOURAL (2026-09-02 vacuous-test sweep): a [0,1] range check passes
+    // for a hardcoded 0.5. Similarity must DISCRIMINATE: two extractions of the
+    // same canon are near-identical, and a genome whose theme, wound and tension
+    // profile have all been replaced must score strictly lower.
+    assert.ok(diff.similarity > 0.95, `two extractions of one canon are near-identical, got ${diff.similarity}`);
+    const divergent = {
+      ...g2,
+      genomeId: 'divergent',
+      themeClaims: ['obedience'],
+      dominantWound: 'krogstad',
+      ironyDensity: g2.ironyDensity > 0.5 ? 0 : 1,
+      tensionProfile: [...g2.tensionProfile].reverse().map(v => 1 - v) as [number, number, number, number, number],
+    };
+    const divergentDiff = diffGenomes(g1, divergent);
+    assert.ok(
+      divergentDiff.similarity >= 0 && divergentDiff.similarity <= 1,
+      `divergent similarity ${divergentDiff.similarity} should be in [0,1]`,
+    );
+    assert.ok(
+      divergentDiff.similarity < diff.similarity,
+      `a genome with a different theme, wound and tension shape must score lower: `
+      + `${divergentDiff.similarity} vs ${diff.similarity}`,
+    );
   });
 
   it('diffGenomes: identical genome has similarity > 0.95', () => {

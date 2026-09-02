@@ -63,10 +63,24 @@ test('parseLabels: truncates raw text to 80 characters plus ellipsis for long li
   const invalidJsonl = '{INVALID:JSON}:' + 'x'.repeat(100) + '\n{"evaluatorId":"eval2","pairId":"pair2","candidateA":"c","candidateB":"d","preference":"B","confidence":0.5,"rubricBreakdown":{},"evaluatorRole":"story_reader"}';
   const invalidResult = parseLabels(invalidJsonl);
 
-  if (invalidResult.errors.length > 0) {
-    assert.ok(invalidResult.errors[0].raw.length <= 83, 'Raw text should be truncated to ~80 chars + ...');
-    assert.ok(invalidResult.errors[0].raw.endsWith('...'), 'Long raw text should end with ...');
-  }
+  // BEHAVIOURAL (2026-09-02 vacuous-test sweep): both assertions were guarded by
+  // `if (errors.length > 0)`, so a parser that stopped reporting errors — the
+  // worst outcome — passed silently. The guard is now the assertion it always
+  // implied, and truncation is pinned to the documented 80 + '...' rather than
+  // an upper bound a NON-truncating parser could also satisfy on a short line.
+  assert.strictEqual(invalidResult.errors.length, 1, 'the malformed first line must be reported');
+  const raw = invalidResult.errors[0].raw;
+  assert.strictEqual(raw.length, 83, `truncated raw must be exactly 80 chars + '...', got ${raw.length}`);
+  assert.ok(raw.endsWith('...'), 'Long raw text should end with ...');
+  assert.strictEqual(raw.slice(0, 80), invalidJsonl.split('\n')[0].slice(0, 80),
+    'the retained prefix must be the START of the offending line, not an arbitrary slice');
+
+  // A line under the limit must come back whole, so the ellipsis is proof of
+  // truncation rather than an unconditional suffix.
+  const shortInvalid = parseLabels('{OOPS}\n' + jsonl.split('\n')[1]);
+  assert.strictEqual(shortInvalid.errors.length, 1);
+  assert.strictEqual(shortInvalid.errors[0].raw, '{OOPS}',
+    'a short malformed line must be reported verbatim, with no ellipsis');
 });
 
 test('parseLabels: validates required string fields are non-empty', () => {

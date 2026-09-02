@@ -266,9 +266,20 @@ describe('STYLE_MODIFIERS — completeness', () => {
           `${key} boost ${style.beliefEdgeIntensityBoost} outside observed range [${EXISTING_MIN}, ${EXISTING_MAX}]`);
       });
 
+      // BEHAVIOURAL (2026-09-02 vacuous-test sweep): the assertion was guarded by
+      // `if (... !== undefined)` with no else, so a style whose override was
+      // present-but-empty-string still had to pass the length check, while one
+      // that dropped the field entirely asserted nothing. State the disjunction
+      // unconditionally so both branches are covered by one falsifiable claim.
       it('confrontationHintOverride, if present, is a non-empty string', () => {
-        if (style.confrontationHintOverride !== undefined) {
-          assert.ok(style.confrontationHintOverride.trim().length > 10, `${key} confrontationHintOverride is trivial/empty`);
+        const override = style.confrontationHintOverride;
+        assert.ok(
+          override === undefined || (typeof override === 'string' && override.trim().length > 10),
+          `${key} confrontationHintOverride must be absent or substantive, got ${JSON.stringify(override)}`,
+        );
+        if (override !== undefined) {
+          assert.notEqual(override.trim(), style.pacingHintSuffix?.trim(),
+            `${key} confrontation override is identical to its pacing suffix — it overrides nothing`);
         }
       });
     });
