@@ -344,6 +344,77 @@ entry (the auc24-table gate blocking from 2026-10-01 is unchanged).
 
 ---
 
+## Decision #6: License the Repository (2026-09-03) — DECISION NEEDED
+
+**Context**: `LICENSE` grants no license, right, or permission to any person
+or entity to use, copy, modify, or distribute this software without the
+copyright holder's prior written permission, and `package.json` sets
+`"license": "UNLICENSED"`. Read literally, that makes the software
+proprietary and all-rights-reserved. Yet `README.md` gives complete
+self-hosting instructions (`docker pull` / `docker run`, a full local dev
+setup) and `CONTRIBUTING.md` opens with "Thanks for helping" and a PR
+workflow, and until this entry neither file said a word about licensing
+terms. A stranger deciding whether to self-host, and a contributor about to
+send a PR, had no statement anywhere in the onboarding docs of what they
+were actually agreeing to. README.md and CONTRIBUTING.md now both carry a
+short "Licensing" section stating the contradiction plainly and pointing
+here — that is documentation of the current state, not a resolution of it.
+
+**The Question**: Should the project's actual license change, and to what?
+This is the owner's decision — this entry states the options and what each
+one unblocks; it does not choose one.
+
+**Options** (not exhaustive, not ranked):
+
+1. **Keep it proprietary and say so everywhere.** Change nothing about the
+   grant of rights; instead make the "no rights without written permission"
+   posture visible and consistent — README/CONTRIBUTING stop reading as an
+   open invitation, the self-host instructions get a permission-required
+   notice, and (if contributions are still wanted) a contributor license
+   agreement or explicit written grant covers PRs before they're merged.
+   Unblocks: no change to the owner's control over the code or any future
+   commercial path. Costs: self-hosting and outside contribution stay
+   effectively closed to anyone the owner hasn't personally cleared, which
+   is in tension with the README/CONTRIBUTING tone as written today.
+
+2. **Adopt a permissive open-source license** (e.g. MIT, Apache-2.0). Grants
+   broad rights to use, modify, and redistribute, including commercially,
+   with minimal conditions (typically attribution). Unblocks: the
+   self-hosting instructions and contribution invitation become literally
+   true for anyone, external contributors can rely on a stable grant instead
+   of ad hoc permission, and the project can appear in package registries
+   / be forked / be bundled by others without a support ticket. Costs: gives
+   up the ability to restrict commercial reuse of the code itself (a
+   competing hosted offering built on this codebase would be permitted); no
+   revocation once released under such a license for a given version.
+
+3. **Adopt a source-available / "fair-source" license** (e.g. a
+   Business Source License, a non-compete-clause license, or similar).
+   Grants read/self-host/contribute rights (often with a time-delayed
+   conversion to a permissive license) while restricting specific uses —
+   most commonly, offering the software as a competing paid service.
+   Unblocks: honest self-hosting and contribution today, closer to what the
+   docs already describe, while preserving a commercial moat the owner may
+   want. Costs: more legal nuance to get right than picking an OSI-approved
+   license off the shelf (the restricted-use clause has to be drafted or
+   selected carefully), and it does not carry the same "open source"
+   branding/eligibility for some ecosystems (e.g. some Linux distro
+   repositories, some "open source only" review policies) that option 2
+   does.
+
+**Decision**: Not made. This entry exists to make the contradiction visible
+and enumerate the realistic paths, per the owner's request — no license
+change is implied or authorized by this entry, and `LICENSE` is unchanged.
+
+**What this does NOT decide**: Which option (if any) the project adopts,
+any timeline, or whether existing contributions/forks need to be
+retroactively addressed under a new license. `LICENSE` and `package.json`'s
+`"license"` field remain the actual terms in force until the owner acts.
+
+**Status**: **DECISION NEEDED** — open, addressed to the owner.
+
+---
+
 ## Decision Template (for future entries)
 
 **Context**: What situation prompted this decision?

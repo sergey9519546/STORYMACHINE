@@ -6,6 +6,18 @@
 
 Dual-engine creative writing tool: a multi-agent narrative simulation (Story Machine) paired with a Fountain screenplay authoring environment (Script IDE).
 
+## Licensing
+
+`LICENSE` currently grants no license, right, or permission to any person or
+entity to use, copy, modify, or distribute this software without the
+copyright holder's prior written permission, and `package.json` sets
+`"license": "UNLICENSED"`. That is the license actually governing this
+repository today — including the self-hosting instructions and the
+contribution guide below. Self-hosting an instance or sending a contribution
+right now requires the owner's written permission first; nothing in this
+README or in `CONTRIBUTING.md` grants it. See `docs/DECISION_LOG.md`
+("License the Repository") for the open decision on whether that changes.
+
 ## Run Locally
 
 **Prerequisites:** Node.js matching `>=22.13.0 || >=24` (the test suite runs via `node --experimental-strip-types`, and CI pins Node 22)

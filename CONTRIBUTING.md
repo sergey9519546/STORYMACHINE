@@ -5,6 +5,17 @@ scripts do, the non-obvious rules, and how to land a change. For the full
 setup walkthrough see **README.md**; for working constraints see
 **AGENTS.md**.
 
+## Licensing
+
+`LICENSE` currently grants no license, right, or permission to any person or
+entity to use, copy, modify, or distribute this software without the
+copyright holder's prior written permission, and `package.json` sets
+`"license": "UNLICENSED"`. Read literally, sending a pull request against a
+proprietary, all-rights-reserved codebase needs that written permission
+first — the setup and workflow below assume you already have it or are
+working directly with the owner. See `docs/DECISION_LOG.md` ("License the
+Repository") for the open decision on whether that changes.
+
 ## Dev setup
 
 Requires Node.js >=22.13.0 || >=24 (CI pins Node 22).
