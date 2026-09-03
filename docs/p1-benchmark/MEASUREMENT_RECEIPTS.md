@@ -1022,3 +1022,91 @@ holds (full suite green at the commit carrying this note).
   trees and read both module lists. No real-corpus measurement was run, and
   none is claimed: this change moves module boundaries, not numbers, and the
   byte-level identity of all 45 reports is the receipt it owes."
+
+### 2026-09-03 — LANE R6 ENGINE-VERSION SURFACE: provenance block + stable finding ids + reader-voice copy — identity-modulo-listed-keys receipt (no real-corpus measurement claimed)
+
+- **What changed on the scoring path:** three additive/copy-only changes, no
+  formula, threshold, deduction, weight, or verdict-band constant touched.
+  (1) Every `ScriptDoctorReport` gained a `provenance` block (`engineCommit`,
+  `rulebookCount`, `groundTruthSource`, `percentileBasis`, an optional
+  `structuralReliabilityNote`) populated by `doctor.ts`'s aggregation from
+  two new leaf modules with no import from `analyze/**`/`revision/**`
+  (`server/lib/build-info.ts`'s existing commit identity;
+  `server/lib/rulebook-count.ts`, reading `docs/rulebook/coverage.json`'s
+  `totalRuleRecords` once at module load). (2) Every `RevisionIssue` gained
+  an optional `id` — a short hash of `(pass, rule, a normalized "Scene N"
+  span)`, deliberately not the free-form display `location` string — set
+  once where `doctor.ts` builds `passes`, so it reaches `passes[].issues[]`
+  and `topPriorities[]` identically. (3) `VERDICT_DESCRIPTORS` and
+  `plainSummary`'s opening sentence were rewritten from an engine-status
+  register ("the engine's intermediate threshold-based verdict") into
+  reader-voice ("solid bones with fixable structural problems"), with the
+  methodology fact kept as its own sentence immediately after rather than
+  folded inline. `Math.round(health)` in that sentence is unchanged bit for
+  bit — only the surrounding words moved.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` with the
+  additive-schema flags added in this same range (item 1) — NOT
+  `npm run measure-real`. This range claims zero health/verdict/sceneCount
+  movement; an identity-modulo-listed-keys proof is the correct, stronger
+  receipt for that claim, same reasoning the 2026-08-21 and 2026-09-03
+  entries above give for their own output-identity receipts.
+- **Baseline used:** `git archive main` at `0ad2b065` — the tip of the
+  branch being merged into at measurement time. `node_modules` was symlinked
+  into the extracted tree so both trees resolved the same dependency
+  versions; the comparison tree was this branch's own working tree. This
+  branch's own commit hashes are deliberately not cited anywhere in this
+  entry — they change on every rebase, and a receipt has to name something a
+  reviewer can still resolve.
+- **What was run — output identity, modulo the keys this range adds, over
+  all 45 in-repo fixtures** (20 `data/screenplays/*.fountain`, 20
+  calibration `REFERENCE_CORPUS` samples, the P0 sample script, 4 synthetic
+  concatenations at 60/120/240/300 scenes):
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then
+  `node scripts/check-doctor-output-identity.mjs --compare <before> <after> --ignore-keys provenance,plainSummary,passes.*.issues.*.id,topPriorities.*.id --require-added provenance,passes.*.issues.*.id,topPriorities.*.id`.
+  Exit codes 0 / 0 / 0, captured by redirecting each run to a log file and
+  reading `$?`. Compare output, verbatim:
+  ```
+  Ignored keys (excluded from the identity check, over 45 compared reports):
+    "provenance": differs in 45/45 reports
+    "plainSummary": differs in 45/45 reports
+    "passes.*.issues.*.id": differs in 45/45 reports
+    "topPriorities.*.id": differs in 45/45 reports
+
+  Required-added keys confirmed present in every AFTER report and absent from every BEFORE report: provenance, passes.*.issues.*.id, topPriorities.*.id
+
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical modulo the ignored key(s) [provenance, plainSummary, passes.*.issues.*.id, topPriorities.*.id] (analyzedAt excluded).
+  ```
+  Every one of the four ignored keys genuinely differs in all 45 reports —
+  the ignore list isn't hiding a no-op key, and the require-added lines
+  confirm all three additive paths are clean additions (absent on the
+  baseline tree, present on every report on this one), not a removed or
+  reshaped field laundered through the ignore list. A run with NO flags on
+  the same two directories was also captured as a negative control: it
+  reports `OUTPUT IDENTITY: FAIL — 45 fixture(s) differ.`, exit 1 — proving
+  the flagged run above is doing real work, not trivially passing because
+  the comparison itself is a no-op.
+- **Second check — every OTHER field, spot-checked directly, not just
+  claimed by the compare's silence.** A small script read `health`,
+  `verdict`, `sceneCount`, `totalIssues`, `grade`, `wordCount`, and
+  `healthPercentile` back out of all 45 before/after snapshot pairs and
+  diffed them field by field, independent of the harness's own stripped-JSON
+  comparison: 0 mismatches across 45 fixtures × 7 fields (315 comparisons).
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the
+  45 in-repo fixtures are the whole input, same as the 2026-09-03
+  RETROSPECTIVE #5 entry above. `tests/fixtures/real-corpus-manifest.json`
+  is unchanged by this range and no manifest re-lock was needed, because no
+  produced script's health, verdict, or sceneCount moved — that is what the
+  identity PASS (and the independent field-by-field spot check) above says.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the
+  baseline tree myself, ran the harness commands above myself on 2026-09-03,
+  and read the PASS line and the per-key differ counts directly out of the
+  compare run's own log file, along with its exit code. I separately wrote
+  and ran the field-by-field spot check described above and read its
+  zero-mismatch result myself. This is an identity-modulo-listed-keys
+  receipt, not a discrimination-statistic measurement: no real-corpus AUC
+  measurement was run against this range, and none is claimed — the change
+  is copy and additive schema, not a formula, threshold, or weight edit, and
+  the byte-level identity of every non-listed field across all 45 reports is
+  the receipt it owes."
