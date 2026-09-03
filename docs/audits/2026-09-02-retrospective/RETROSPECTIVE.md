@@ -164,7 +164,16 @@ One Bet. The honest power analysis may say the plan is too small; that
 conclusion is the deliverable.
 
 ## 11. "Keyless-first" has become a way not to evaluate the generative half
-**OPEN QUESTION · owner decision**
+**DECIDED 2026-09-03 — demoted to Labs** (maintainer delegate; owner
+instruction: decide and move on). `docs/DECISION_LOG.md` Decision #3: option
+(a). Every generative control — "Fix with AI", Deep read, Fix & verify,
+auto-analysis, the live-intent copilot, and Settings' five AI-provider tabs —
+now sits behind the existing Labs flag, so the default surface makes no
+LLM-adjacent request at all. Nothing deleted, server untouched, and Labs ON
+restores the pre-decision behavior exactly; option (b) (the ~30-case graded
+set) is the condition for re-promotion, deferred rather than abandoned.
+Asserted both directions by `verify-p2-p3-surfaces.mjs`'s `P2-generative`
+phase and `tests/core/generative-surface-labs-gate.test.ts`.
 
 Every LLM-adjacent test is plumbing (`ai-budget`, `ai-config-live-path`,
 `llm-ready`). Not one assertion anywhere says whether a rewrite pass, a
@@ -249,7 +258,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | 8 | Audit checks numbers, not claims | WEAK ROUTE | R4b — fixed: `docs/CLAIMS_REGISTER.md` + honesty-audit claims lane, entrance copy reworded, catalog archived |
 | 9 | Non-blocking-by-design reporter | WEAK ROUTE | R1 — landed: per-gate `expires`, reporter exits 1 past a deadline, both workflow comments corrected |
 | 10 | No power analysis | OPEN | Delivered — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` + protocol §12; owner signs |
-| 11 | Generative half unevaluated | OPEN | owner decides |
+| 11 | Generative half unevaluated | OPEN | DECIDED 2026-09-03 — demoted to Labs (`DECISION_LOG.md` #3); nothing deleted, re-promotion waits on a graded set |
 | 12 | Title page unpersisted | WEAK ROUTE | R6 — landed: `title_page_json` column + full round trip |
 
 Lanes R1–R6 are Opus agents in isolated worktrees, launched 2026-09-02; their

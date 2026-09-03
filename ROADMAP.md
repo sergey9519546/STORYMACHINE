@@ -269,6 +269,8 @@ can proceed in parallel.
 
 **Status (2026-07-29):** DONE. Default experience = paste/open script → report
 → per-scene fixes → export. OASIS + research panels gated behind Labs flag.
+**Extended 2026-09-03 (Decision #3):** the GENERATIVE surface is gated by that
+same flag too — the collapse is now Doctor + Editor *and keyless*.
 
 **What shipped:**
 - `src/lib/feature-flags.ts`: `getLabsEnabled()` / `setLabsEnabled()` (localStorage
@@ -291,6 +293,24 @@ machine-checked: `scripts/verify-p2-p3-surfaces.mjs` asserts default-path vs.
 Labs-only vs. dead-file reachability for every component, with the four
 deliberately orphaned oasis prototypes on an explicit allowlist so the
 dead-UI tripwire stays armed for anything new.
+
+**Extended 2026-09-03 (`docs/DECISION_LOG.md` Decision #3; retrospective
+finding §11):** P2's "everything else behind a Labs flag" was only ever
+applied to OASIS and the research panels. The GENERATIVE half — "Fix with AI"
+in the editor, Script Doctor's "Deep read" and "Fix & verify", the
+auto-analysis toggle, the unannounced live-intent copilot, and Settings' five
+AI-provider tabs — sat on the default surface with no evaluation behind it:
+every LLM-adjacent test in the repo is plumbing, and nothing asserts a rewrite
+or an annotation is good. It is now behind the same single flag
+(`getLabsEnabled()`), by the same hide-don't-disable rule. Nothing is deleted
+and the server is untouched; with Labs ON every control behaves exactly as
+before. The default surface consequently makes **no LLM-adjacent request at
+all**, which is what the landing page's keyless claim has always implied.
+Machine-checked in both directions by `verify-p2-p3-surfaces.mjs`'s
+`P2-generative` phase (21 live-browser assertions) and
+`tests/core/generative-surface-labs-gate.test.ts` (31). Re-promotion is
+available once a graded generative benchmark exists — that is the condition
+the decision defers, not abandons.
 
 **Exit gate:** A new user reaches their first coverage report with **zero
 exposure** to NVM/converge/twin/simulation jargon; time-to-first-report is

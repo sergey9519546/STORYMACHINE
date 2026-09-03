@@ -12,7 +12,12 @@ reconstructs what the surrounding docs already assumed existed.*
 
 A deterministic core (audit / verdicts / percentiles / counterfactuals /
 critics / receipts — fully keyless) inside a generative shell (candidates /
-rewrites / voices — opt-in, labeled, degradable). The product's structural
+rewrites / voices — opt-in, labeled, degradable). *(Amended 2026-09-03,
+`docs/DECISION_LOG.md` Decision #3: "opt-in" now means Labs-gated. The
+generative shell is no longer reachable from the default surface at all —
+not because it was deleted, but because nothing in the repository asserts
+that what it produces is good, and the core it wraps is measured. It comes
+back, unchanged, the moment a writer turns Labs on.)* The product's structural
 claim is not "an AI that judges scripts" — it is **a private, instant,
 reproducible coverage read whose every verdict is an inspectable
 deterministic rule or formula, not a black-box LLM opinion.** The score
@@ -110,9 +115,16 @@ Measured proof points (honest, as of 2026-07-14):
 - **Keyless-first.** The deterministic surface (doctor, diagnose, coverage,
   what-if, room, interview receipts) is the product's front door, not a
   degraded fallback. The server must never refuse to boot without an AI key.
+  *(Strengthened 2026-09-03, Decision #3: the default surface is not merely
+  usable keyless — it is keyless. Every generative control moved behind the
+  Labs flag, so with Labs off the app makes no LLM-adjacent request of any
+  kind. Keyless-first was becoming a way NOT to evaluate the generative half;
+  gating it is what makes the claim load-bearing instead of rhetorical.)*
 - **Honest degradation.** Every LLM-gated feature degrades to a labeled,
   functional fallback when keyless — never a silent quality drop, never a
-  500.
+  500. *(2026-09-03: a Labs-gated feature degrades by not rendering at all —
+  hide, don't disable. A permanently-inert control, or an API-key form for a
+  feature the surface cannot reach, is a worse answer than its absence.)*
 - **Determinism receipts.** `contentHash`-keyed reproducibility is a
   load-bearing product claim *once the score is valid*: the same script text
   always produces the same report, and the verify endpoint lets anyone check

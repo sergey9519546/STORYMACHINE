@@ -127,6 +127,103 @@ no longer a prerequisite for engine work.
 
 ---
 
+## Decision #3: Demote the Generative Surface to Labs (2026-09-03)
+
+**Context**: The 2026-09-02 retrospective
+(`docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` §11) found that every
+LLM-adjacent test in the repository is plumbing — `ai-budget`,
+`ai-config-live-path`, `llm-ready`, the route contracts. Not one assertion
+anywhere says whether a rewrite pass, a copilot suggestion, or a deep-read
+annotation is *good*, or even not worse than its input. Meanwhile the
+deterministic half is measured hard (AUC ratchets, measurement receipts, a
+761-script benchmark, 135 browser surface assertions). "Keyless-first" is a
+genuinely strong privacy posture and worth keeping; it had also become
+load-bearing as an excuse for never evaluating the other half.
+
+**The Question**: The retrospective framed it as binary. Either (a) demote the
+generative surface to Labs alongside OASIS, or (b) fund a ~30-case golden set
+with a human-scored rubric and a pinned model so the generative half gets a
+real quality gate. Shipping unevaluated generation on the default surface
+indefinitely was not one of the options.
+
+**Options Considered**:
+1. **Demote to Labs** — one flag, no deletion, the default surface becomes
+   fully deterministic and fully measured.
+2. **Fund the golden set** — ~30 cases, >=2 scorers, a pinned model, and a
+   recurring cost every time the model changes.
+3. **Leave it as is** — keep unevaluated generation on the default surface and
+   keep describing keyless-first as a feature.
+
+**Decision**: **Demote to Labs** (Option 1).
+
+**Rationale**:
+- It is what ROADMAP P2 already says: collapse the surface to Doctor +
+  Editor, everything else behind a Labs flag. The generative half was simply
+  never counted as "everything else" when P2 shipped.
+- It makes keyless-first the product's front door rather than its excuse. With
+  Labs off, the default surface makes no LLM-adjacent call at all — which is
+  what the landing page's keyless claim has always implied.
+- A graded set has neither budget nor readers today. Option 2 is the right
+  thing to do *before re-promoting*, not a thing to block on now.
+- The alternative to gating is not "evaluate it soon"; it is shipping
+  unevaluated output next to a score that is measured. That contrast is the
+  liability.
+
+**What changed** (all in `src/`; the single existing flag,
+`src/lib/feature-flags.ts`'s `getLabsEnabled()`, gates all of it):
+- Editor: "Fix with AI" (and its `Mod-Shift-f` binding) — the whole
+  `fixAction()` extension is omitted from Live Notes when Labs is off, so the
+  editor makes no `/api/ai-config` probe either. The deterministic squiggles
+  and hover text are untouched.
+- Script Doctor: the "Deep read" toggle and every "Fix & verify" button. The
+  stored deep-read preference is AND'd with the flag, so a preference saved
+  under Labs cannot keep firing after Labs is turned off.
+- Toolbar + command palette: the auto-analysis toggle (POST
+  `/api/analyze-script`), which now sits in the palette's Labs group.
+  `scheduleAutoAnalysis` is AND'd with the flag for the same
+  stale-preference reason.
+- The live-intent copilot (POST `/api/live/intent`), which had no UI control
+  at all and fired on every typing pause.
+- Settings: the five AI-provider tabs (Providers, Text LLM, Image, TTS,
+  Embeddings) are hidden, not shown-and-inert — an API-key form on the
+  keyless front door invites a writer to paste a secret into a deployment
+  that will not use it. Session (Delete Everything) and Labs stay in the
+  strip; the default strip goes 8 tabs -> 3.
+- The "No AI key · analysis ok" banner, which with Labs off answers a
+  question the writer was never asked.
+
+**What this does NOT decide**:
+- **Nothing is deleted.** Every generative module, route, and plumbing test
+  stays and still runs. With Labs ON the whole surface behaves exactly as it
+  did before this decision — the browser suite asserts both directions.
+- The server is untouched: `/api/ai-config`'s `llmReady`, the routes, their
+  limiters and schemas are all unchanged. The flag decides whether a
+  *control* renders, never whether the readiness answer is honest.
+- It does not close Option 2. Re-promotion is explicitly available once a
+  graded set exists (~30 cases, a rubric, >=2 scorers, a pinned model, run in
+  CI) — that is the bar this decision defers, not abandons.
+- It does not touch the deterministic surface, the AUC ratchet, the rule-count
+  freeze, or P0/P1.
+
+**Expected Outcomes**: A first-time writer reaches a verdict, a craft score,
+and their next fix without ever meeting an unevaluated generative control; the
+keyless claim on the landing page becomes literally true on the default path
+rather than nearly true.
+
+**Evidence**: `tests/core/generative-surface-labs-gate.test.ts` (31
+assertions, both flag states) and the `P2-generative` phase of
+`scripts/verify-p2-p3-surfaces.mjs` (21 live-browser assertions, Labs OFF and
+Labs ON from the same starting points), both in CI.
+
+**Decided by**: maintainer delegate (owner instruction: decide and move on).
+
+**Status**: Active.
+
+**Revision History**: Revisit when a graded generative benchmark exists; that
+is the condition for re-promoting any of this to the default surface.
+
+---
+
 ## Decision #4: Adopt the Power-Analysis Proposals (2026-09-03)
 
 **Context**: `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` and
