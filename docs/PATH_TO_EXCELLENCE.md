@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-03, main @ e40f4cf5 (session record below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,99 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-03 session — the retrospective's twelve findings, worked.** The
+2026-09-02 retrospective (`docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md`)
+ranked twelve mistakes and weak routes. This session dispatched each to an
+isolated-worktree agent (one Opus lane at a time after the first nine
+parallel lanes died on a session rate limit, then two, then Sonnet for the
+mechanical halves), verified every landing on the merged tree (lint, full
+suite at 0 failures, no-console, reachability, receipt gate, docs, honesty,
+metamorphic, and the six-suite browser battery where UI moved), and pushed
+26 commits (`a4bec2fc..e40f4cf5`, 146 files). What landed, by finding:
+
+- **#3 + #5 — the score's import graph is now a gate, and it is smaller.**
+  `305bb4ab` makes the receipt guard classify EVERY file reachable from
+  `doctor.ts` as scoring-path (proven on `c9023b8f`, the historical commit
+  that changed `src/lib/fountain.ts` unreceipted). That pulled 43 non-core
+  files into scope, so `6601370f`–`31d7bb4c` cut the edges: the LLM
+  dependency inverted through `server/lib/llm-port.ts`, the SQLite `Stage`
+  and Express out of the doctor's graph via module splits (dynamic and
+  type-only imports are edges to the walker, so only splits count), reachable
+  set 85 → 63 files, outside-core 43 → 21 with a justified allowlist.
+  `tests/core/pure-core-boundary.test.ts` fails 5/6 on the pre-refactor
+  tree; `tests/core/llm-seam-wiring.test.ts` proves the seam is plugged in
+  (mutation-checked). Output identity: 45/45 byte-identical, receipted.
+- **#2 + #9 + #7 — the AUC-24 statistic is CI-recomputable from committed
+  numbers.** `316fcf66`–`c49e5542`: one definition of the statistic and the
+  degradation recipe (`scripts/lib/auc.ts`, oracle-tested byte-identical to
+  the old inline code), `npm run lock-auc24` (refuses without the corpus,
+  writes hashes + health values only), `tests/core/auc24-table.test.ts`
+  (skips loudly until the table exists), and `report-unverified-gates.mjs`
+  now blocks past a per-gate expiry — the table's is **2026-10-01**. The
+  floor stays 0.622: nobody has re-measured since 2026-07-11, and a raise
+  without a measurement is a guess wearing a gate's clothes.
+- **#4 — collab rooms are server-minted capabilities** (`1e02c23a`): 128-bit
+  ids, typed name is a local label, token minting requires a live room,
+  WebSocket upgrade re-checks the registry, per-session budgets, the id no
+  longer logged. Required an output-identity receipt because
+  `validation.ts` was still in the doctor's graph that morning.
+- **#6 + #8 — coverage is measured, claims are registered.** `dfc16c16`:
+  the 21 rules with zero test references now have fire/no-fire tests (none
+  was dead), `scripts/measure-rule-test-coverage.mjs` writes
+  `docs/rulebook/coverage.json` and the rulebook's sentence is derived from
+  it (3,186 of 3,186 distinct names referenced; tripwire test). `e8bc1dd7`:
+  `docs/CLAIMS_REGISTER.md` (22 rows, 20 supported, 2 retired, 0 live
+  unsupported), an honesty-audit claims lane with a planted-violation test,
+  the entrance's human-comparison line reworded to what is true (the audit
+  now refuses the retired phrase itself — it caught this very paragraph),
+  `MEGA_CATALOG_12700_SYSTEMS.md` archived to `docs/filed-backlog/`.
+- **#10 — power analysis** (`61fe5310`, `c17d90fc`): at n=153 the 95% CI on
+  an AUC of 0.80 is about ±0.07, so the gate cannot be told from 0.75; five
+  moderated sessions bound "would use again" to [28%, 99%]; κ needs 43–49
+  triple-rated scripts. The plan is under-powered on all three legs; the
+  numbers are in `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md`, computed
+  by a committed script, and proposed (unsigned) in the pre-registration.
+- **#12 — the title page persists** (`0467de9b`): migration rung v13→v14,
+  round-trip and restore-drill tests. Follow-on data-path audit found and
+  fixed a silent overwrite (`5f6e38a6`: a server backup restore OLDER than
+  the browser's last acknowledged save used to win without a word — now a
+  labelled `server-rolled-back` conflict), the oversized-save retry loop, and
+  the optional `scriptText` that could blank a row (`937ec7c9`).
+- **Browser proofs are a CI job** (`fd6da8dc`): six suites, shared
+  `scripts/lib/browser-verify.mjs`, `playwright` pinned, mirrored in
+  release.yml; three stale "CI has no browser" claims corrected. The receipt
+  guard now FAILS on CI when no base ref resolves (`7ca24907`).
+- **74 vacuous tests made behavioural** (`b0262020`, 23 files; method and
+  six KNOWN WEAKNESS findings in `VACUOUS_TESTS_SWEEP.md`).
+- **375/390px** (`e093f863`): the toolbar's utility cluster and the Settings
+  tab strip clipped off-screen — Settings → Session → Delete Everything was
+  unreachable on a phone. Two fixes, desktop byte-identical.
+- **Four false present-tense claims** (`8a742b6c`): "six critics" (twelve),
+  a stale 3,216, an incomplete `validate` description, and a security item
+  marked CLOSED while `npm audit` reports four advisories (three in the
+  production `express` chain) — now an honest OPEN line.
+- **#1 — verbosity bias:** ships as the unmerged branch
+  `claude/r5-verbosity-bias-pending-measurement` (4 commits). Density is
+  now normalised by scene opportunity — `weightedIssues / (sceneCount·30)^0.7`,
+  penalty `8·density²` — after measurement showed the proposed opportunity
+  count could not include action paragraphs (they are the filler) or speeches
+  (bad craft inflates them). The padding witness flips from +5.4 to −4.4;
+  metamorphic 8/8 with zero known-failing cases; 11,212 tests, 0 failing. The
+  honest costs are written down: calibration band separation halves (25.3 →
+  11.1), the composite discrimination pair sits 0.2 above its gate, all 45
+  in-repo reports move (28 change verdict), one feature-scale tier assertion
+  is SUSPENDED in-file pending verdict re-anchoring, and the 72-row real-corpus
+  manifest is stale until re-locked. The ledger entry is headed PENDING OWNER
+  MEASUREMENT — and the receipt gate accepted it, which is a gap being closed
+  now (a pending entry is a promise, not a receipt).
+
+**What only the owner can do now** (in addition to the list above):
+`REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24` and commit the table
+before 2026-10-01 (the gate blocks after that); `npm run measure-real` on
+the R5 branch, then re-lock the manifest and merge it; fix GitHub Actions
+(see the block above); sign or reject the power-analysis proposals; decide
+finding #11 (demote the generative half to Labs, or fund a graded set).
 
 **2026-08-24 session — five landings after the phase close-out.** Recorded
 here because three of them changed what the project believes about itself:
