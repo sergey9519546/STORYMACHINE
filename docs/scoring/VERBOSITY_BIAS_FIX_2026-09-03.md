@@ -11,6 +11,17 @@ measurement and the produced-anchor manifest re-lock — are the owner's, and
 headed `PENDING OWNER MEASUREMENT` and says in the first person that
 `npm run measure-real` has **not** been run.
 
+**Read that status literally: nothing mechanical is stopping this merge.**
+`node scripts/check-scoring-receipt.mjs main..HEAD` exits **0** on this
+branch — correctly, and by that validator's own documented design ("an honest
+'no measurement, here is why' entry passes; a fabricated measurement does
+not"). The gate proves a receipt exists, never that an AUC was measured. The
+env-gated `tests/core/real-script-corpus.test.ts` would catch the stale
+manifest, but it SKIPS in CI because `REAL_SCRIPT_CORPUS_DIR` is unset there.
+So the "do not merge yet" on this branch is a human constraint carried by this
+document, the receipt heading and the commit message — not something CI will
+enforce for you.
+
 ---
 
 ## 1. The defect
