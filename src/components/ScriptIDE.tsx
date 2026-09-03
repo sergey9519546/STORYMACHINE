@@ -14,6 +14,8 @@ import {
 } from "../lib/draft-persistence";
 import {
   acknowledgeScriptIDESave,
+  classifyScriptIDESaveFailure,
+  isScriptIDEScriptNearCap,
   shouldStartScriptIDESave,
 } from "../lib/scriptide-autosave";
 import { scheduleAutoAnalysis } from "../lib/auto-analysis-gate";
@@ -470,6 +472,22 @@ export default function ScriptIDE({
   >(initialDraft.researchNotes as { id: string; title: string; content: string }[]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveConflict, setSaveConflict] = useState<ScriptIDEServerDraft | null>(null);
+  // Finding 1: which of the two ways a conflict arose, so the banner can say
+  // what actually happened instead of always guessing "another tab" — see
+  // ScriptIDERestoreDecision's `reason` doc comment in scriptide-draft-store.ts.
+  // The live-save CAS path (POST /api/scriptide/save's 409) below always sets
+  // 'diverged' — it's a genuine two-writer race, never a server rollback.
+  const [saveConflictReason, setSaveConflictReason] = useState<'diverged' | 'server-rolled-back'>('diverged');
+  // Finding 2: the server's own validation message for a save the client
+  // discarded before this change (e.g. "scriptText: String must contain at
+  // most 500000 character(s)") — shown verbatim in the Toolbar's save-failed
+  // chip instead of the generic "may be at risk" wording for every failure.
+  const [saveFailureMessage, setSaveFailureMessage] = useState<string | null>(null);
+  // Finding 2: true only for a 4xx validation rejection (the payload itself
+  // is invalid — retrying the identical payload can never succeed), false
+  // for a network/5xx failure (worth retrying). Drives both the Toolbar's
+  // distinct label and the retry-loop stop below.
+  const [saveFailureIsValidation, setSaveFailureIsValidation] = useState(false);
   // Persistence starts only after the mount-time server/local conflict has been
   // resolved. This prevents StrictMode cleanup and slow loads from saving stale
   // local state over a newer server revision.
@@ -594,6 +612,14 @@ export default function ScriptIDE({
   const persistedGenerationRef = useRef(initialDraft.dirty ? -1 : 0);
   const persistenceReadyRef = useRef(false);
   const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
+  // Finding 2: the draftGenerationRef value that most recently failed with a
+  // 4xx validation rejection, or null when no such block is in effect. While
+  // it equals the CURRENT generation, shouldStartScriptIDESave refuses to
+  // start another attempt — the payload hasn't changed, so retrying would
+  // just fail the same way every 30s. It naturally clears itself the moment
+  // the writer edits again (a real edit always bumps draftGenerationRef), so
+  // no separate "retry now" plumbing is needed once the draft is small enough.
+  const validationBlockedGenerationRef = useRef<number | null>(null);
   const requestServerSaveRef = useRef<(opts?: { updateStatus: boolean; keepalive?: boolean }) => void>(() => {});
   const skipNextLocalWriteRef = useRef(true);
   // E4: set the instant "delete everything" begins (SettingsPanel's
@@ -724,6 +750,7 @@ export default function ScriptIDE({
         if (decision.action === 'conflict') {
           saveConflictRef.current = decision.server;
           setSaveConflict(decision.server);
+          setSaveConflictReason(decision.reason);
           setSaveStatus('save-conflict');
           return;
         }
@@ -828,7 +855,13 @@ export default function ScriptIDE({
         trailingRequested = true;
         return;
       }
-      if (!shouldStartScriptIDESave(draftEnvelopeRef.current, saveConflictRef.current !== null, inFlight)) return;
+      if (!shouldStartScriptIDESave(
+        draftEnvelopeRef.current,
+        saveConflictRef.current !== null,
+        inFlight,
+        validationBlockedGenerationRef.current,
+        draftGenerationRef.current,
+      )) return;
 
       const generation = draftGenerationRef.current;
       const payload = draftRef.current;
@@ -842,23 +875,47 @@ export default function ScriptIDE({
         keepalive: opts.keepalive === true,
       })
         .then(async (r) => {
-          const data = await r.json() as {
+          const data = await r.json().catch(() => null) as {
             status?: string;
             updatedAt?: number;
             server?: ScriptIDEServerDraft;
-          };
-          if (r.status === 409 && data.status === 'conflict' && data.server) {
+            error?: string;
+          } | null;
+          if (r.status === 409 && data?.status === 'conflict' && data.server) {
             saveConflictRef.current = data.server;
             if (mountedRef.current) {
               setSaveConflict(data.server);
+              // Live-save CAS 409s are always a genuine two-writer race, never
+              // a server rollback (rollback is caught only by the mount-time
+              // decideScriptIDERestore path above) — see the reason field's
+              // doc comment.
+              setSaveConflictReason('diverged');
               setSaveStatus('save-conflict');
             }
             return;
           }
-          if (!r.ok || data.status !== 'saved' || typeof data.updatedAt !== 'number') {
-            throw new Error(`save ${r.status}`);
+          if (!r.ok || data?.status !== 'saved' || typeof data?.updatedAt !== 'number') {
+            // Finding 2: surface the server's own validation message (e.g.
+            // an oversized scriptText/title-page field) instead of
+            // collapsing every failure into one generic string, and stop
+            // retrying a 4xx payload that cannot succeed unchanged — see
+            // classifyScriptIDESaveFailure's doc comment.
+            const failure = classifyScriptIDESaveFailure(r.status, data?.error);
+            if (failure.kind === 'validation') {
+              validationBlockedGenerationRef.current = generation;
+            }
+            if (opts.updateStatus && mountedRef.current) {
+              setSaveFailureIsValidation(failure.kind === 'validation');
+              setSaveFailureMessage(failure.message);
+              setSaveStatus("save-failed");
+            }
+            return;
           }
 
+          // A real save landed — any earlier validation block necessarily
+          // referred to a since-superseded (and now provably savable)
+          // generation.
+          validationBlockedGenerationRef.current = null;
           const transition = acknowledgeScriptIDESave(
             draftEnvelopeRef.current,
             generation,
@@ -870,11 +927,20 @@ export default function ScriptIDE({
           const localWriteOk = writeDraftBoth(transition.envelope);
           if (transition.needsTrailingSave) trailingRequested = true;
           if (opts.updateStatus && mountedRef.current && transition.acknowledgedCurrentDraft) {
+            setSaveFailureMessage(null);
+            setSaveFailureIsValidation(false);
             setSaveStatus(localWriteOk ? "saved-server" : "save-failed");
           }
         })
         .catch(() => {
-          if (opts.updateStatus && mountedRef.current) setSaveStatus("save-failed");
+          // A genuine network failure (fetch itself rejected — offline,
+          // dropped connection) never reaches the block above; always
+          // retryable, so this never sets the validation block.
+          if (opts.updateStatus && mountedRef.current) {
+            setSaveFailureIsValidation(false);
+            setSaveFailureMessage(null);
+            setSaveStatus("save-failed");
+          }
         })
         .finally(() => {
           inFlight = false;
@@ -1125,6 +1191,15 @@ export default function ScriptIDE({
       estimatedMinutes,
     };
   }, [scriptText, parsedBlocks]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Finding 2 (audit-client-data-paths.md): a soft, non-blocking warning once
+  // scriptText nears the server's hard 500,000-char save cap
+  // (server/lib/validation.ts's ScriptideSaveBodySchema — mirrored client-side
+  // as SCRIPTIDE_SCRIPT_TEXT_SERVER_CAP in scriptide-autosave.ts, kept in
+  // sync by a test that reads the server literal). The writer sees this
+  // coming instead of discovering it only once autosave starts silently
+  // failing forever.
+  const scriptNearSizeCap = useMemo(() => isScriptIDEScriptNearCap(scriptText.length), [scriptText]);
 
   // Live page count — same layoutScreenplay() the PDF exporter uses, so the
   // Toolbar number always matches what .PDF actually produces. Debounced
@@ -1885,6 +1960,7 @@ export default function ScriptIDE({
     persistedGenerationRef.current = draftGenerationRef.current;
     saveConflictRef.current = null;
     setSaveConflict(null);
+    setSaveConflictReason('diverged');
     mutateDraft(server.scriptText);
     setSnapshots(server.snapshots as typeof snapshots);
     setCharacters(server.characters as typeof characters);
@@ -1905,6 +1981,7 @@ export default function ScriptIDE({
     };
     saveConflictRef.current = null;
     setSaveConflict(null);
+    setSaveConflictReason('diverged');
     setSaveStatus("saving-server");
     writeDraftBoth(draftEnvelopeRef.current);
     requestServerSaveRef.current({ updateStatus: true });
@@ -2160,22 +2237,37 @@ export default function ScriptIDE({
             <AlertCircle className="h-5 w-5 shrink-0 text-[var(--sm-stamp)]" aria-hidden="true" />
             <div className="mr-auto flex flex-col gap-1">
               <span className="font-bold uppercase tracking-wider text-[var(--sm-stamp)]">
-                Save Conflict Detected
+                {saveConflictReason === 'server-rolled-back' ? 'Server Copy Is Older' : 'Save Conflict Detected'}
               </span>
-              {/* W3: this fires only when the server's saved content genuinely
-                  differs from what's on screen (scriptIDEDraftMatchesServer in
-                  scriptide-draft-store.ts already clears the identical-content
-                  case silently) — but a real content difference can also mean
-                  this device's own last save never reached the server (e.g. a
-                  dropped connection), not that another tab touched it. Naming
-                  a specific cause we can't actually confirm would be its own
-                  false accusation, so this describes what's true either way:
-                  the two copies disagree, and the writer picks which wins. */}
-              <span className="text-[10px] text-[var(--sm-ink)]/70">
-                This draft on this device doesn&rsquo;t match what&rsquo;s saved on the server —
-                from another tab or window editing it, or a save that didn&rsquo;t finish.
-                Choose which version to keep.
-              </span>
+              {saveConflictReason === 'server-rolled-back' ? (
+                // Finding 1: server.updatedAt came back OLDER than the
+                // revision this browser already had acknowledged — the only
+                // realistic cause is a server-side restore to a snapshot
+                // taken before the writer's last successful save (see
+                // decideScriptIDERestore's serverRegressed comment). Name
+                // this specifically rather than reusing the generic
+                // "another tab" copy below, which would be actively
+                // misleading here.
+                <span className="text-[10px] text-[var(--sm-ink)]/70">
+                  The server copy is older than what this browser last saved — keep this
+                  browser&rsquo;s version or take the server&rsquo;s?
+                </span>
+              ) : (
+                // W3: this fires only when the server's saved content genuinely
+                // differs from what's on screen (scriptIDEDraftMatchesServer in
+                // scriptide-draft-store.ts already clears the identical-content
+                // case silently) — but a real content difference can also mean
+                // this device's own last save never reached the server (e.g. a
+                // dropped connection), not that another tab touched it. Naming
+                // a specific cause we can't actually confirm would be its own
+                // false accusation, so this describes what's true either way:
+                // the two copies disagree, and the writer picks which wins.
+                <span className="text-[10px] text-[var(--sm-ink)]/70">
+                  This draft on this device doesn&rsquo;t match what&rsquo;s saved on the server —
+                  from another tab or window editing it, or a save that didn&rsquo;t finish.
+                  Choose which version to keep.
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -2208,6 +2300,9 @@ export default function ScriptIDE({
           // below (see the "coverage" toolSlot branches further down).
           panelReserve={toolSlot === "coverage" ? (coverageFull ? "full" : "mini") : "none"}
           saveStatus={saveStatus}
+          saveFailureMessage={saveFailureMessage}
+          saveFailureIsValidation={saveFailureIsValidation}
+          scriptNearSizeCap={scriptNearSizeCap}
           isAnalyzing={engineState.isAnalyzing}
           directorsLayer={directorsLayer}
           liveDiagnostics={liveDiagnostics}

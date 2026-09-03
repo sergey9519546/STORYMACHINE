@@ -191,7 +191,15 @@ export type ScriptIDERestoreDecision =
   | { action: 'empty' }
   | { action: 'use-server'; server: ScriptIDEServerSnapshot }
   | { action: 'keep-local'; serverRevision: number | null }
-  | { action: 'conflict'; server: ScriptIDEServerSnapshot }
+  // `reason` distinguishes the two ways a conflict can arise so the UI can
+  // tell the writer what actually happened instead of guessing:
+  //  - 'diverged': the ordinary case — local and server both moved forward
+  //    from a common base (a second tab/device, or a save that never landed).
+  //  - 'server-rolled-back': the server's updatedAt is OLDER than a revision
+  //    this browser already had acknowledged — see decideScriptIDERestore's
+  //    serverRegressed comment. Never a "second writer"; always a
+  //    server-side regression (e.g. an operator's backup restore).
+  | { action: 'conflict'; server: ScriptIDEServerSnapshot; reason: 'diverged' | 'server-rolled-back' }
   | { action: 'reconciled'; server: ScriptIDEServerSnapshot };
 
 /**
@@ -223,6 +231,18 @@ function scriptIDEDraftMatchesServer(
  * Pure restore policy for mount-time local vs server drafts.
  * Versioned envelopes use dirty + serverRevision; legacy one-shot migration
  * still uses timestamp/length via the provided legacySource when needed.
+ *
+ * Clock semantics: `server.updatedAt` is SERVER-assigned (Stage.ts's
+ * saveScriptIDEState sets it via `Math.max(Date.now(), (current?.updatedAt
+ * ?? 0) + 1)` on every write, never a client-supplied timestamp), so it is
+ * monotonically non-decreasing across ordinary forward saves and safe to
+ * compare as a real ordering — not merely an opaque revision id — WITHIN a
+ * single session's lineage. The only way this browser can observe a
+ * `server.updatedAt` LOWER than a revision it already saw acknowledged
+ * (`local.serverRevision`) is if the server's row was replaced wholesale out
+ * from under the client (e.g. an operator restoring server/lib/backup.ts's
+ * SQLite snapshot to a point before the writer's last successful save) — see
+ * `serverRegressed` below.
  */
 export function decideScriptIDERestore(
   local: ScriptIDEDraftEnvelope,
@@ -236,6 +256,17 @@ export function decideScriptIDERestore(
 
   if (opts.hadVersionedDraft) {
     const serverChanged = local.serverRevision !== server.updatedAt;
+    // Finding 1 (rollback silent-overwrite): a `!==` alone can't tell a
+    // genuine forward move (server is NEWER — the common case, another
+    // device already saved) from a regression (server is OLDER than what
+    // this browser already acknowledged). Only a known prior server
+    // revision can regress; `local.serverRevision === null` means this
+    // envelope never had one to regress FROM (a fresh/never-synced draft),
+    // so that case is intentionally excluded here and falls through to the
+    // pre-existing dirty/clean branches below, unchanged.
+    const serverRegressed =
+      typeof local.serverRevision === 'number' && server.updatedAt < local.serverRevision;
+
     if (local.dirty && serverChanged) {
       // W3: an unacknowledged save whose content already landed on the
       // server is not a conflict — there was never a second writer, just a
@@ -244,9 +275,24 @@ export function decideScriptIDERestore(
       if (scriptIDEDraftMatchesServer(local, server)) {
         return { action: 'reconciled', server };
       }
-      return { action: 'conflict', server };
+      return { action: 'conflict', server, reason: serverRegressed ? 'server-rolled-back' : 'diverged' };
     }
     if (!local.dirty && serverChanged) {
+      if (serverRegressed) {
+        // The forward "use-server" shortcut below is exactly the silent
+        // downgrade this branch exists to prevent: a clean local draft
+        // normally adopts the server's copy unconditionally, but here the
+        // server is OLDER than what this browser already had acknowledged,
+        // so "adopt it" would erase real, already-saved writer content with
+        // no trace. Content-equality still short-circuits to a silent
+        // reconcile (matching W3's own contract) when the rollback happens
+        // to land on a row whose content is identical to what's already on
+        // screen — nothing for the writer to actually choose there.
+        if (scriptIDEDraftMatchesServer(local, server)) {
+          return { action: 'reconciled', server };
+        }
+        return { action: 'conflict', server, reason: 'server-rolled-back' };
+      }
       return { action: 'use-server', server };
     }
     // Same base revision: keep local (dirty or clean). Adopt serverRevision when known.

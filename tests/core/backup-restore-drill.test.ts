@@ -26,6 +26,13 @@ const {
   getOrCreateSession, destroySession, dbPathFor, sessions, PERSIST_SESSIONS,
 } = await import('../../server/lib/session-store.ts');
 const { backupSessions, restoreSession } = await import('../../server/lib/backup.ts');
+// Finding 1 (audit-client-data-paths.md): the pure client-side reconciliation
+// decision that runs against whatever a restored session hands back on the
+// writer's next load. Imported here (not re-implemented) so this drill
+// exercises the REAL decision function against a REAL restored row, not a
+// hand-built fixture — see scriptide-draft-store.test.ts for the isolated
+// unit coverage of decideScriptIDERestore itself.
+const { decideScriptIDERestore } = await import('../../src/lib/scriptide-draft-store.ts');
 
 let backupRootDir: string;
 
@@ -147,5 +154,84 @@ describe('S1 restore drill — real backup, real destroy, real restore, byte-exa
       }),
       /Backup snapshot not found/,
     );
+  });
+
+  // ── Finding 1 client-side leg: a real server restore to an OLDER snapshot
+  // must not be silently adopted by a writer's browser that had already
+  // acknowledged a newer revision. This drives the REAL backup → destroy →
+  // restore pipeline (not a hand-built ScriptIDEServerSnapshot fixture) to
+  // reproduce the exact repro-restore-rollback.mjs scenario end to end: an
+  // operator restores a backup taken BEFORE the writer's last successful
+  // autosave. ─────────────────────────────────────────────────────────────
+  it('client decision: a real server restore to an older snapshot yields server-rolled-back, never use-server', async () => {
+    const sessionId = 'restore-drill-client-rollback';
+
+    // Save #1 ("old") — this is the state the backup below will snapshot.
+    const oldScript = 'INT. ROOM - DAY\n\nOld content, from before the writer\'s last save.\n';
+    const s1 = getOrCreateSession(sessionId);
+    s1.stage.saveScriptIDEState(sessionId, {
+      scriptText: oldScript, snapshots: [], characters: [], researchNotes: [], isDarkMode: false,
+      titlePage: { title: 'ROLLBACK DRILL', author: 'A. Writer', contact: 'writer@example.com' },
+    });
+    const oldUpdatedAt = s1.stage.loadScriptIDEState(sessionId)!.updatedAt;
+
+    const oldSnapshot = await backupSessions({ sessionDbDir: tmpDir, backupRootDir, now: Date.now() });
+    const oldSnapshotFile = path.join(oldSnapshot.destDir!, `${sessionId}.db`);
+    assert.ok(fs.existsSync(oldSnapshotFile));
+
+    // Save #2 ("new") — the writer's last successful, ACKNOWLEDGED autosave.
+    // Stage.saveScriptIDEState's own monotonic bump (Math.max(now, prev+1))
+    // guarantees this updatedAt is strictly greater than oldUpdatedAt even
+    // under a fast clock, so the ordering this test relies on is real, not
+    // timing-dependent.
+    const newScript = 'INT. ROOM - DAY\n\nThe WRITER\'S LATEST, ACKNOWLEDGED content.\n';
+    s1.stage.saveScriptIDEState(sessionId, {
+      scriptText: newScript, snapshots: [], characters: [], researchNotes: [], isDarkMode: false,
+      titlePage: { title: 'ROLLBACK DRILL', author: 'A. Writer', contact: 'writer@example.com' },
+    });
+    const newUpdatedAt = s1.stage.loadScriptIDEState(sessionId)!.updatedAt;
+    assert.ok(newUpdatedAt > oldUpdatedAt, 'sanity: the second save must be strictly newer');
+
+    // ── Operator restores the OLD backup (taken before save #2) ──────────
+    const dbPath = dbPathFor(sessionId);
+    destroySession(sessionId);
+    restoreSession({ snapshotFile: oldSnapshotFile, sessionDbDir: tmpDir, sessionId });
+    assert.ok(fs.existsSync(dbPath));
+
+    const restored = getOrCreateSession(sessionId);
+    const serverRow = restored.stage.loadScriptIDEState(sessionId);
+    assert.equal(serverRow?.scriptText, oldScript, 'sanity: the restored row really is the OLD content');
+    assert.equal(serverRow?.updatedAt, oldUpdatedAt);
+
+    // ── The writer's browser, which had acknowledged save #2, reloads ────
+    // (mirrors ScriptIDE.tsx's mount-time runServerReconcile: local is
+    // clean/dirty:false because save #2's response was already applied).
+    const localEnvelope = {
+      schemaVersion: 2 as const,
+      scriptText: newScript,
+      snapshots: [] as unknown[],
+      characters: [] as unknown[],
+      researchNotes: [] as unknown[],
+      isDarkMode: false,
+      titlePage: { title: 'ROLLBACK DRILL', author: 'A. Writer', contact: 'writer@example.com' },
+      contentUpdatedAt: newUpdatedAt,
+      serverRevision: newUpdatedAt, // last ack'd revision — strictly newer than the restored row
+      dirty: false,
+    };
+    const server = {
+      scriptText: serverRow!.scriptText,
+      snapshots: serverRow!.snapshots,
+      characters: serverRow!.characters,
+      researchNotes: serverRow!.researchNotes,
+      isDarkMode: serverRow!.isDarkMode,
+      titlePage: serverRow!.titlePage,
+      updatedAt: serverRow!.updatedAt,
+    };
+
+    const decision = decideScriptIDERestore(localEnvelope, server, { hadVersionedDraft: true });
+    assert.notEqual(decision.action, 'use-server', 'the older restored row must never be silently adopted over the newer acknowledged local draft');
+    assert.equal(decision.action, 'conflict');
+    assert.equal((decision as { reason?: string }).reason, 'server-rolled-back');
+    assert.equal((decision as { server?: { scriptText?: string } }).server?.scriptText, oldScript);
   });
 });

@@ -281,16 +281,80 @@ describe('decideScriptIDERestore', () => {
     const local = { ...envelope, dirty: true, serverRevision: 100 };
     assert.deepEqual(
       decideScriptIDERestore(local, server, { hadVersionedDraft: true }),
-      { action: 'conflict', server },
+      { action: 'conflict', server, reason: 'diverged' },
     );
   });
 
-  it('uses server when a clean versioned local draft is out of date', () => {
+  it('uses server when a clean versioned local draft is out of date (forward — server genuinely newer)', () => {
     const local = { ...envelope, dirty: false, serverRevision: 100 };
     assert.deepEqual(
       decideScriptIDERestore(local, server, { hadVersionedDraft: true }),
       { action: 'use-server', server },
     );
+  });
+
+  // ── Finding 1: server-side rollback must never silently overwrite a
+  // clean, newer local draft (was: `use-server` for ANY serverChanged, with
+  // no ordering check — see repro-restore-rollback.mjs and the audit). ──────
+  describe('server rollback (server.updatedAt older than local.serverRevision)', () => {
+    it('does NOT use-server when the server row is older than the last acknowledged local revision (clean local)', () => {
+      const local = { ...envelope, dirty: false, serverRevision: 2000 };
+      const rolledBackServer = { ...server, updatedAt: 1000 }; // older than 2000, content differs
+      const decision = decideScriptIDERestore(local, rolledBackServer, { hadVersionedDraft: true });
+      assert.notEqual(decision.action, 'use-server');
+      assert.deepEqual(decision, { action: 'conflict', server: rolledBackServer, reason: 'server-rolled-back' });
+    });
+
+    it('does NOT use-server when the server row is older than the last acknowledged local revision (dirty local, content differs)', () => {
+      const local = { ...envelope, dirty: true, serverRevision: 2000 };
+      const rolledBackServer = { ...server, updatedAt: 1000 };
+      const decision = decideScriptIDERestore(local, rolledBackServer, { hadVersionedDraft: true });
+      assert.notEqual(decision.action, 'use-server');
+      assert.deepEqual(decision, { action: 'conflict', server: rolledBackServer, reason: 'server-rolled-back' });
+    });
+
+    it('reconciles silently (not conflict, not use-server) when the rolled-back row happens to match local content exactly', () => {
+      const rolledBackMatching = {
+        scriptText: envelope.scriptText,
+        snapshots: envelope.snapshots,
+        characters: envelope.characters,
+        researchNotes: envelope.researchNotes,
+        isDarkMode: envelope.isDarkMode,
+        titlePage: null,
+        updatedAt: 1000, // older than local.serverRevision (2000)
+      };
+      const local = { ...envelope, dirty: false, serverRevision: 2000 };
+      assert.deepEqual(
+        decideScriptIDERestore(local, rolledBackMatching, { hadVersionedDraft: true }),
+        { action: 'reconciled', server: rolledBackMatching },
+      );
+    });
+
+    it('forward case still uses server unconditionally (server genuinely newer than local.serverRevision)', () => {
+      const local = { ...envelope, dirty: false, serverRevision: 100 };
+      const newerServer = { ...server, updatedAt: 200 };
+      assert.deepEqual(
+        decideScriptIDERestore(local, newerServer, { hadVersionedDraft: true }),
+        { action: 'use-server', server: newerServer },
+      );
+    });
+
+    it('equal revisions still no-op to keep-local (unaffected by the ordering check)', () => {
+      const local = { ...envelope, dirty: false, serverRevision: 200 };
+      assert.deepEqual(
+        decideScriptIDERestore(local, server, { hadVersionedDraft: true }),
+        { action: 'keep-local', serverRevision: 200 },
+      );
+    });
+
+    it('a never-synced local draft (serverRevision null) is not treated as a regression, even against an "old" server timestamp', () => {
+      const local = { ...envelope, dirty: false, serverRevision: null };
+      const oldServer = { ...server, updatedAt: 1 };
+      assert.deepEqual(
+        decideScriptIDERestore(local, oldServer, { hadVersionedDraft: true }),
+        { action: 'use-server', server: oldServer },
+      );
+    });
   });
 
   it('keeps a dirty versioned local draft with the same server base', () => {
@@ -305,7 +369,7 @@ describe('decideScriptIDERestore', () => {
     const local = { ...envelope, dirty: true, serverRevision: null };
     assert.deepEqual(
       decideScriptIDERestore(local, server, { hadVersionedDraft: true }),
-      { action: 'conflict', server },
+      { action: 'conflict', server, reason: 'diverged' },
     );
   });
 
@@ -360,7 +424,7 @@ describe('decideScriptIDERestore', () => {
       const local = { ...envelope, dirty: true, serverRevision: null };
       assert.deepEqual(
         decideScriptIDERestore(local, server, { hadVersionedDraft: true }),
-        { action: 'conflict', server },
+        { action: 'conflict', server, reason: 'diverged' },
       );
     });
 
@@ -377,7 +441,7 @@ describe('decideScriptIDERestore', () => {
       };
       assert.deepEqual(
         decideScriptIDERestore(local, almostMatching, { hadVersionedDraft: true }),
-        { action: 'conflict', server: almostMatching },
+        { action: 'conflict', server: almostMatching, reason: 'diverged' },
       );
     });
   });

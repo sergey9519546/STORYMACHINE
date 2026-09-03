@@ -59,6 +59,21 @@ interface ToolbarProps {
    *  contributors to how much of this chip extended under the coverage
    *  panel's left edge before panelReserve above. */
   saveStatus?: SaveStatus;
+  /** Finding 2 (audit-client-data-paths.md): the server's own validation
+   *  message for a save-failed status caused by a 4xx rejection (e.g. an
+   *  oversized scriptText/title-page field), verbatim from the response
+   *  body — replaces the generic "may be at risk" wording so the writer can
+   *  actually tell what's wrong. Undefined/null for a network/5xx failure,
+   *  where the generic wording is already accurate. */
+  saveFailureMessage?: string | null;
+  /** True only when the current save-failed status is a 4xx validation
+   *  rejection (retrying the identical payload cannot succeed) rather than a
+   *  network/5xx blip (worth retrying) — drives a distinct chip label. */
+  saveFailureIsValidation?: boolean;
+  /** Finding 2: scriptText is within 5% of the server's hard save cap. Shown
+   *  as a standalone soft warning (not tied to saveStatus) so it appears
+   *  BEFORE any save actually fails. */
+  scriptNearSizeCap?: boolean;
   isAnalyzing: boolean;
   directorsLayer: boolean;
   liveDiagnostics: boolean;
@@ -107,6 +122,9 @@ export default function Toolbar({
   toolSlot,
   panelReserve = "none",
   saveStatus,
+  saveFailureMessage,
+  saveFailureIsValidation = false,
+  scriptNearSizeCap = false,
   isAnalyzing,
   directorsLayer,
   liveDiagnostics,
@@ -211,8 +229,12 @@ export default function Toolbar({
     "save-failed": {
       border: "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]",
       icon: <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />,
-      label: "Not Saved",
-      title: "Failed to save - your work may be at risk",
+      // Finding 2: a 4xx validation rejection (the draft itself is too big —
+      // retrying the same bytes can never succeed) reads distinctly from a
+      // network/5xx blip (worth retrying), both in the short chip label and
+      // its full tooltip (the server's own message, when one came back).
+      label: saveFailureIsValidation ? "Too Large" : "Not Saved",
+      title: saveFailureMessage || "Failed to save - your work may be at risk",
     },
   };
   const saveMeta = saveStatus && saveStatus !== "idle" ? SAVE_STATUS_META[saveStatus] : null;
@@ -395,6 +417,21 @@ export default function Toolbar({
           <span className="text-[var(--sm-cream)]/40">·</span>
           <span>{wordCount.toLocaleString()} w</span>
         </span>
+
+        {/* Finding 2: soft warning as scriptText nears the server's hard
+            save cap — appears BEFORE any save actually fails, distinct from
+            the save-failed chip above (which only shows once one has). */}
+        {scriptNearSizeCap && (
+          <span
+            className="inline-flex min-h-[28px] items-center gap-1.5 border border-[var(--sm-warn)] px-2 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--sm-warn)]"
+            role="status"
+            aria-live="polite"
+            title="This draft is nearing the server's save size limit — trim it or export a copy so autosave keeps working"
+          >
+            <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Near Size Limit</span>
+          </span>
+        )}
 
         <div className="relative" ref={exportRef}>
           <button
