@@ -284,7 +284,7 @@ ${STYLES}
           <th>#</th>
           <th>Title</th>
           <th>Health</th>
-          <th>Percentile</th>
+          <th title="Rank against a fixed 20-sample reference set, not the other scripts in this slate">Percentile</th>
           <th>Verdict</th>
           <th>Scenes</th>
           <th>Words</th>
@@ -299,6 +299,8 @@ ${STYLES}
     </table>
     <footer>
       Deterministic analysis &mdash; no generative AI read or scored any of these scripts. Ranked by health, descending.
+      Percentile ranks each script's health against a fixed, 20-sample, hand-authored synthetic reference set
+      (server/nvm/analyze/calibration/corpus.ts) &mdash; not against the other scripts in this slate.
     </footer>
   </div>
 </body>
