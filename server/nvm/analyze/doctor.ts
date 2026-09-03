@@ -65,10 +65,41 @@ import { computeNarrativeMetrics } from './metrics.ts';
 // fountain.ts), so it adds no cycle and cannot re-enter the doctor↔reference
 // circular import this file's TDZ note warns about.
 import { layoutScreenplay } from '../../../src/lib/screenplay-layout.ts';
+// Provenance sourcing (#8): both leaf modules, no import from analyze/** or
+// revision/** — same "cannot re-enter the doctor↔reference circular import"
+// safety the screenplay-layout.ts import above already documents. engineCommit
+// is server/lib/build-info.ts's existing build/deploy-time commit identity
+// (the same value GET /health reports) — never computed by shelling out to
+// git at runtime, which a Docker-built image (no .git directory) and a
+// doctor worker thread both cannot do safely anyway.
+import { commit as engineCommit } from '../../lib/build-info.ts';
+import { rulebookCount } from '../../lib/rulebook-count.ts';
+import { computeStructuralReliabilityNote } from '../../lib/structural-reliability.ts';
 import type {
   FountainAnalysis, ScriptDoctorReport, DoctorPassSummary, SceneDiagnostics, DoctorGrade,
-  CoverageVerdict, DimensionKey, DimensionScore, DoctorProgressEvent,
+  CoverageVerdict, DimensionKey, DimensionScore, DoctorProgressEvent, ReportProvenance,
 } from './types.ts';
+
+// ── Report provenance (#8) ──────────────────────────────────────────────────
+// Engine identity, attached to EVERY report this module returns (including
+// the zero-scene degenerate path below) — unlike health/verdict/dimensions,
+// which are honestly withheld when analysisComplete is false, provenance
+// describes the ENGINE that ran, not the reliability of what it found, so it
+// is never conditional on analysis completeness. Deterministic across runs
+// for the same tree: engineCommit/rulebookCount are read once at their
+// leaf modules' load time (never per report), groundTruthSource/
+// percentileBasis are fixed literals, and structuralReliabilityNote is a
+// pure function of sceneCount.
+function buildProvenance(sceneCount: number): ReportProvenance {
+  const structuralReliabilityNote = computeStructuralReliabilityNote(sceneCount);
+  return {
+    engineCommit,
+    rulebookCount,
+    groundTruthSource: 'mechanical-degradation',
+    percentileBasis: 'internal-calibration-corpus-20-samples',
+    ...(structuralReliabilityNote !== undefined ? { structuralReliabilityNote } : {}),
+  };
+}
 
 /** sha256 hex of the trimmed Fountain text — the determinism receipt on
  *  ScriptDoctorReport.contentHash (types.ts). Trimmed (not raw) so that
@@ -2198,6 +2229,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     strengths: analysisComplete ? strengths : undefined,
     plainSummary: analysisComplete ? plainSummary : incompleteSummary,
     contentHash: computeContentHash(fountain),
+    provenance: buildProvenance(analysis.sceneCount),
     healthPercentile: analysisComplete ? healthPercentile : undefined,
     // These summarize the whole narrative. A prefix-only analysis must not
     // present them as if they described the unexamined remainder of a draft.
@@ -2363,6 +2395,7 @@ export async function runScriptDoctor(
         'Analysis incomplete — no screenplay scenes were found, so the score and verdict are withheld. ' +
         'Add at least one scene of screenplay content and resubmit for a real assessment.',
       contentHash,
+      provenance: buildProvenance(0),
     };
     // A deep-read request against an empty submission is still a "deep"
     // lineage report — types.ts's deepRead field is populated on every

@@ -490,4 +490,50 @@ export interface ScriptDoctorReport {
   /** The script's TRUE total scene count, present only alongside
    *  truncatedForAnalysis === true. */
   totalSceneCount?: number;
+  /** Which engine, and by what method, produced this report — the identity
+   *  half of the determinism story `contentHash` already tells for the
+   *  INPUT. Populated deterministically by doctor.ts's aggregation for every
+   *  non-degenerate run (same tree -> same provenance, always — no
+   *  Date.now(), no environment probing beyond the build-time commit
+   *  identity every other release-facing surface already reads through
+   *  server/lib/build-info.ts). Optional so reports serialized/cached before
+   *  this field existed stay valid. */
+  provenance?: ReportProvenance;
+}
+
+/** engineCommit/rulebookCount are also what POST /api/export/verify and the
+ *  exported coverage HTML's verify block re-publish (server/routes/
+ *  export.ts, server/lib/coverage-html.ts) so a recipient can tell an
+ *  `engine_mismatch` (the engine moved since this report was produced, but
+ *  the content and score still check out — a soft, re-run-to-confirm signal)
+ *  apart from a real content/score mismatch. */
+export interface ReportProvenance {
+  /** The build/deploy-time git SHA of the running instance — server/lib/
+   *  build-info.ts's `commit` verbatim (falls back to 'dev' locally/CI, same
+   *  as GET /health). Never computed by shelling out to git at request time:
+   *  a Docker-built image ships with no .git directory (build-info.ts's own
+   *  header explains why) and a doctor worker thread should never touch the
+   *  filesystem beyond what it already reads at module load. */
+  engineCommit: string;
+  /** The rulebook's `totalRuleRecords` (docs/rulebook/coverage.json) at the
+   *  moment this file was built — the machine-counted rule-concept count
+   *  behind the verdict, read once at module load (server/lib/
+   *  rulebook-count.ts), never per report. */
+  rulebookCount: number;
+  /** How the ground truth this report's percentile/health is normalized
+   *  against was established. Always this one literal today — there is no
+   *  other calibration source in the codebase — kept as a named field
+   *  (rather than baked into a comment) so an export/verify consumer can
+   *  display it without knowing the engine's internals. */
+  groundTruthSource: 'mechanical-degradation';
+  /** Which reference distribution `healthPercentile` is ranked against —
+   *  server/nvm/analyze/calibration/corpus.ts's 20-sample REFERENCE_CORPUS,
+   *  the only percentile basis this engine has. */
+  percentileBasis: 'internal-calibration-corpus-20-samples';
+  /** Present iff sceneCount > server/lib/structural-reliability.ts's
+   *  STRUCTURAL_ABSORPTION_THRESHOLD (40) — the SAME field the exported
+   *  coverage HTML's footer caveat renders (coverage-html.ts is now a
+   *  CONSUMER of this value, not an independent computation of it; see that
+   *  module's header). Absent below the threshold — never an empty string. */
+  structuralReliabilityNote?: string;
 }

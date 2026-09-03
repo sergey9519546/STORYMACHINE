@@ -14,6 +14,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
+import { computeStructuralReliabilityNote } from '../../server/lib/structural-reliability.ts';
 import type {
   ScriptDoctorReport, DimensionScore, CoverageVerdict, DoctorGrade, RootCauseFinding,
 } from '../../server/nvm/analyze/types.ts';
@@ -513,5 +514,70 @@ describe('renderCoverageHtml — Root Causes section', () => {
     assert.ok(html.includes('&lt;script&gt;alert(document.cookie)&lt;/script&gt;'), 'explanation must be HTML-escaped');
     assert.ok(html.includes('&lt;script&gt;alert(2)&lt;/script&gt;'), 'member rule names must be HTML-escaped');
     assert.ok(html.includes('&quot;hello&quot;'), 'quotes in the explanation must be escaped');
+  });
+});
+
+// ── Structural reliability note (#8 provenance) ─────────────────────────────
+// server/lib/structural-reliability.ts is now the SINGLE source of truth for
+// this caveat: doctor.ts's aggregation populates it onto
+// ScriptDoctorReport.provenance.structuralReliabilityNote, and this renderer
+// is a CONSUMER of that field rather than an independent computation. These
+// tests are the regression guard the header comments on both files promise:
+// if the two ever drift (someone edits the text in one place but not the
+// other, or the >40 threshold moves in only one file), a test here fails.
+describe('renderCoverageHtml — structural reliability note stays in sync with doctor.ts provenance', () => {
+  it('renders the exact note carried on report.provenance when present', () => {
+    const note = computeStructuralReliabilityNote(45);
+    assert.ok(note, 'sanity: 45 scenes must earn a note from the shared function');
+    const report = buildReport({
+      sceneCount: 45,
+      provenance: {
+        engineCommit: 'abc123',
+        rulebookCount: 3217,
+        groundTruthSource: 'mechanical-degradation',
+        percentileBasis: 'internal-calibration-corpus-20-samples',
+        structuralReliabilityNote: note,
+      },
+    });
+    const html = renderCoverageHtml(report, 'Feature Length Draft');
+    assert.ok(html.includes(`<div class="footer-caveat">${note}</div>`));
+  });
+
+  it('falls back to computing the SAME note when a report carries no provenance field', () => {
+    // Simulates a report shape older than the provenance field, or a
+    // hand-reconstructed one — the renderer must still be correct, and must
+    // still agree with the value doctor.ts would have attached.
+    const report = buildReport({ sceneCount: 45, provenance: undefined });
+    const html = renderCoverageHtml(report, 'Feature Length Draft');
+    const expected = computeStructuralReliabilityNote(45);
+    assert.ok(html.includes(`<div class="footer-caveat">${expected}</div>`));
+  });
+
+  it('a provenance note that DISAGREES with the shared function would be rendered verbatim — proving the renderer trusts the report, not a second computation', () => {
+    // Not a "should happen" case (doctor.ts always calls the same shared
+    // function), but it demonstrates the renderer is genuinely a CONSUMER:
+    // it prints whatever the report says, rather than silently recomputing
+    // and overriding it.
+    const report = buildReport({
+      sceneCount: 45,
+      provenance: {
+        engineCommit: 'abc123',
+        rulebookCount: 3217,
+        groundTruthSource: 'mechanical-degradation',
+        percentileBasis: 'internal-calibration-corpus-20-samples',
+        structuralReliabilityNote: 'a distinguishable sentinel string the test can find',
+      },
+    });
+    const html = renderCoverageHtml(report, 'Feature Length Draft');
+    assert.ok(html.includes('a distinguishable sentinel string the test can find'));
+  });
+
+  it('omits the caveat at/below the threshold, matching computeStructuralReliabilityNote returning undefined', () => {
+    assert.equal(computeStructuralReliabilityNote(40), undefined);
+    const report = buildReport({ sceneCount: 40, provenance: undefined });
+    const html = renderCoverageHtml(report, 'Short Draft');
+    // '.footer-caveat' the CSS rule is always present in the stylesheet;
+    // what must be absent is the actual rendered <div>.
+    assert.ok(!html.includes('<div class="footer-caveat">'));
   });
 });

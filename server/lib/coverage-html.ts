@@ -22,6 +22,7 @@ import type {
 } from '../nvm/analyze/types.ts';
 import type { RevisionIssue, PassName } from '../nvm/revision/passes/types.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
+import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the
@@ -407,19 +408,19 @@ function buildFooterSection(report: ScriptDoctorReport): string {
     </div>`
     : '';
 
-  // Category B honesty caveat (2026-07-28): the health formula's density
-  // normalization absorbs rule-family signal at feature scale — measured in
-  // scripts/probe-dimension-honesty.mjs, a midpoint-scene drop moves the
-  // Structure & Pacing dimension by ~10 points at 20 scenes but only ~2 at
-  // 80. Structural verdicts (act shape, climax placement, escalation) are
-  // most reliable under ~40 scenes; above that, focus on the dialogue and
-  // per-scene findings. NORTH_STAR section 2 law #2 documents the property;
-  // this caveat surfaces it to the writer.
-  const STRUCTURAL_ABSORPTION_THRESHOLD = 40;
-  const structuralCaveat =
-    typeof report.sceneCount === 'number' && report.sceneCount > STRUCTURAL_ABSORPTION_THRESHOLD
-      ? `<div class="footer-caveat">This draft has ${report.sceneCount} scenes. The engine's structural signals (act shape, climax placement, escalation) are most reliable under ~${STRUCTURAL_ABSORPTION_THRESHOLD} scenes; at feature length they're partially absorbed by length-normalization, so weight the dialogue and per-scene findings more heavily than the structural verdicts.</div>`
-      : '';
+  // Category B honesty caveat (2026-07-28), now a CONSUMER of the same field
+  // doctor.ts's aggregation populates on ScriptDoctorReport.provenance
+  // (server/lib/structural-reliability.ts is the single source of truth for
+  // both — see that file's header). Falls back to computing it locally only
+  // for a report that predates the provenance field (an older cached/
+  // reconstructed report shape reaching this pure function directly) so this
+  // stays correct for ANY ScriptDoctorReport, not just ones a live doctor run
+  // just produced.
+  const structuralNote = report.provenance?.structuralReliabilityNote
+    ?? computeStructuralReliabilityNote(report.sceneCount);
+  const structuralCaveat = structuralNote
+    ? `<div class="footer-caveat">${structuralNote}</div>`
+    : '';
 
   return `
   <footer class="report-footer">
