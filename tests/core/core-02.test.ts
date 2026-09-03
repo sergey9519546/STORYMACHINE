@@ -4888,6 +4888,35 @@ describe('fountainToFdx', () => {
     assert.ok(!fdx.includes('BOB ^'), 'caret should be stripped');
     assert.ok(fdx.includes('<Text>BOB</Text>'), 'clean BOB cue present');
   });
+
+  // ── Title page (retrospective: "title page in every export") ──────────────
+  it('emits a <TitlePage> with Type="Title"/"Credit"/"Author"/"Contact" paragraphs when given explicit title-page data', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nA man sits.`, {
+      title: 'The Long Wait', author: 'Jane Doe', contact: 'jane@example.com',
+    });
+    assert.ok(fdx.includes('<TitlePage>'), 'TitlePage element present');
+    assert.ok(fdx.includes('<Paragraph Type="Title"><Text>The Long Wait</Text></Paragraph>'), 'title paragraph present');
+    assert.ok(fdx.includes('<Paragraph Type="Credit"><Text>Written by</Text></Paragraph>'), 'credit paragraph present');
+    assert.ok(fdx.includes('<Paragraph Type="Author"><Text>Jane Doe</Text></Paragraph>'), 'author paragraph present');
+    assert.ok(fdx.includes('<Paragraph Type="Contact"><Text>jane@example.com</Text></Paragraph>'), 'contact paragraph present');
+  });
+
+  it('emits no <TitlePage> at all when there is no title typed and none parsed from the Fountain title block', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nA man sits.`);
+    assert.ok(!fdx.includes('<TitlePage>'), 'no TitlePage element when there is nothing to show');
+  });
+
+  it("falls back to the Fountain script's own leading title block when no explicit titlePage is given", () => {
+    const fdx = fountainToFdx(`Title: Parsed Title\nAuthor: Parsed Author\n\nINT. ROOM - DAY\n\nAction.`);
+    assert.ok(fdx.includes('<Paragraph Type="Title"><Text>Parsed Title</Text></Paragraph>'), 'title parsed from the script body');
+    assert.ok(fdx.includes('<Paragraph Type="Author"><Text>Parsed Author</Text></Paragraph>'), 'author parsed from the script body');
+  });
+
+  it('accepts a plain title string as shorthand (legacy call shape, still used by server routes)', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nA man sits.`, 'Just A Title');
+    assert.ok(fdx.includes('<Paragraph Type="Title"><Text>Just A Title</Text></Paragraph>'), 'string shorthand becomes the title');
+    assert.ok(!fdx.includes('Type="Credit"'), 'no author given, so no credit line');
+  });
 });
 
 

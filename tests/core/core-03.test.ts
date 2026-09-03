@@ -2069,6 +2069,51 @@ describe('Wave 91 — fountainToPdf', () => {
     assert.ok(text.includes('\\(parenthetical\\)'), 'parentheses escaped');
     assert.ok(text.includes('\\\\'), 'backslash escaped');
   });
+
+  // ── Title page (retrospective: "title page in every export") ──────────────
+  function pageCount(bytes: Uint8Array): number {
+    const text = toLatin1(bytes);
+    return parseInt(text.match(/\/Count (\d+)/)![1], 10);
+  }
+
+  it('emits a title page with title/written-by/author/contact text and no page number', () => {
+    const pdf = fountainToPdf('INT. ROOM - DAY\n\nA man sits.', {
+      title: 'The Long Wait', author: 'Jane Doe', contact: 'jane@example.com',
+    });
+    const text = toLatin1(pdf);
+    assert.ok(text.includes('(The Long Wait) Tj'), 'title text present in the PDF text stream');
+    assert.ok(text.includes('(Written by) Tj'), 'written-by credit present');
+    assert.ok(text.includes('(Jane Doe) Tj'), 'author present');
+    assert.ok(text.includes('(jane@example.com) Tj'), 'contact present');
+    assert.ok(!text.includes('(1.) Tj'), 'title page carries no page number');
+  });
+
+  it('adds exactly one page for an explicit title, over the same script with none', () => {
+    const withTitle = fountainToPdf('INT. ROOM - DAY\n\nA man sits.', { title: 'Has A Title' });
+    const withoutTitle = fountainToPdf('INT. ROOM - DAY\n\nA man sits.');
+    assert.equal(pageCount(withTitle), pageCount(withoutTitle) + 1, 'title page adds exactly one page');
+  });
+
+  it('skips the "Written by"/author lines when no author is given', () => {
+    const text = toLatin1(fountainToPdf('INT. ROOM - DAY\n\nA man sits.', { title: 'Solo Title' }));
+    assert.ok(text.includes('(Solo Title) Tj'), 'title present');
+    assert.ok(!text.includes('(Written by) Tj'), 'no credit line without an author');
+  });
+
+  it('emits no title page at all when there is no title typed and none parsed from the Fountain title block', () => {
+    const withNoTitle = fountainToPdf('INT. ROOM - DAY\n\nA man sits.');
+    const withEmptyExplicit = fountainToPdf('INT. ROOM - DAY\n\nA man sits.', { title: '', author: '', contact: '' });
+    assert.equal(pageCount(withNoTitle), pageCount(withEmptyExplicit), 'an all-blank explicit titlePage adds no page either');
+    // Still numbers pages from 2 onward — same shape as a plain script with no title page at all.
+    assert.ok(!toLatin1(withNoTitle).includes('(1.) Tj'), 'page 1 has no page number');
+  });
+
+  it("falls back to the Fountain script's own leading title block when no explicit titlePage is given", () => {
+    const pdf = fountainToPdf('Title: Parsed Title\nAuthor: Parsed Author\n\nINT. ROOM - DAY\n\nAction.');
+    const text = toLatin1(pdf);
+    assert.ok(text.includes('(Parsed Title) Tj'), 'title parsed from the script body');
+    assert.ok(text.includes('(Parsed Author) Tj'), 'author parsed from the script body');
+  });
 });
 
 
@@ -2158,10 +2203,39 @@ describe('Wave 92 — fountainToDocx', () => {
     assert.ok(text.includes('Tom &amp; Jerry &lt;fight&gt; &quot;loudly&quot;'), 'ampersand, angle brackets, quotes escaped');
   });
 
-  it('excludes Fountain title-page key:value lines from the body', () => {
-    const text = latin1(fountainToDocx('Title: My Script\nAuthor: Me\n\nINT. ROOM - DAY\n\nAction.'));
+  it('excludes Fountain title-page key:value lines from the body, and renders them as a real title page instead', () => {
+    const text = latin1(fountainToDocx('Title: My Script\nAuthor: Jane Q. Author\n\nINT. ROOM - DAY\n\nAction.'));
     assert.ok(!text.includes('Title: My Script'), 'title-page line not in body');
     assert.ok(text.includes('Action'), 'body content present');
+    // Retrospective ("title page in every export"): with no explicit titlePage
+    // argument, fountainToDocx falls back to the script's own leading title
+    // block instead of silently dropping it — the title/author actually show
+    // up somewhere in the document, not just get excluded from the body.
+    assert.ok(text.includes('My Script'), 'title text rendered as a title page');
+    assert.ok(text.includes('Jane Q. Author'), 'author text rendered as a title page');
+  });
+
+  // ── Title page (retrospective: "title page in every export") ──────────────
+  it('emits a title page with title/written-by/author/contact text and a page break before the body', () => {
+    const text = latin1(fountainToDocx('INT. ROOM - DAY\n\nA man sits.', {
+      title: 'The Long Wait', author: 'Jane Doe', contact: 'jane@example.com',
+    }));
+    assert.ok(text.includes('The Long Wait'), 'title present');
+    assert.ok(text.includes('Written by'), 'written-by credit present');
+    assert.ok(text.includes('Jane Doe'), 'author present');
+    assert.ok(text.includes('jane@example.com'), 'contact present');
+    assert.ok(text.includes('<w:br w:type="page"/>'), 'hard page break before the script body');
+  });
+
+  it('skips the "Written by"/author lines when no author is given', () => {
+    const text = latin1(fountainToDocx('INT. ROOM - DAY\n\nA man sits.', { title: 'Solo Title' }));
+    assert.ok(text.includes('Solo Title'), 'title present');
+    assert.ok(!text.includes('Written by'), 'no credit line without an author');
+  });
+
+  it('emits no title page (and no extra page break) when there is no title typed and none parsed from the script', () => {
+    const text = latin1(fountainToDocx('INT. ROOM - DAY\n\nA man sits.'));
+    assert.ok(!text.includes('<w:br w:type="page"/>'), 'no page break when there is no title page');
   });
 });
 

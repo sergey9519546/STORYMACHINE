@@ -5,6 +5,7 @@
 // paragraph element Type, the way Final Draft's own importer does.
 
 import { parseFountain, type FountainBlock, type FountainBlockType } from './fountain.ts';
+import { resolveExportTitlePage, type TitlePageInput, type ExportTitlePage } from './export-title-page.ts';
 
 // Fountain block type → FDX paragraph Type attribute.
 // FDX recognises: Scene Heading, Action, Character, Dialogue, Parenthetical,
@@ -52,12 +53,39 @@ function cleanBlockText(block: FountainBlock): string {
   return t;
 }
 
+function buildTitlePageXml(info: ExportTitlePage): string {
+  const parts: string[] = [];
+  if (info.title) parts.push(`      <Paragraph Type="Title"><Text>${escapeXml(info.title)}</Text></Paragraph>`);
+  if (info.author) {
+    parts.push('      <Paragraph Type="Credit"><Text>Written by</Text></Paragraph>');
+    parts.push(`      <Paragraph Type="Author"><Text>${escapeXml(info.author)}</Text></Paragraph>`);
+  }
+  if (info.contact) {
+    for (const line of info.contact.split(/\r\n|\r|\n/).map(l => l.trim()).filter(Boolean)) {
+      parts.push(`      <Paragraph Type="Contact"><Text>${escapeXml(line)}</Text></Paragraph>`);
+    }
+  }
+  return [
+    '  <TitlePage>',
+    '    <Content>',
+    ...parts,
+    '    </Content>',
+    '  </TitlePage>',
+  ].join('\n');
+}
+
 /**
  * Convert a Fountain script string to Final Draft (.fdx) XML.
  * Title-page lines (Title:, Credit:, Author:, etc.) and notes/boneyard blocks
  * are skipped from the body — FDX keeps those in separate structures.
+ *
+ * `titlePage` is either a plain title string or a {title, author, contact}
+ * object; when omitted (or empty), the Fountain text's own leading title
+ * block is used instead, and when NEITHER carries anything the document gets
+ * no <TitlePage> element at all rather than a page of blank placeholders —
+ * see resolveExportTitlePage.
  */
-export function fountainToFdx(fountain: string, title = 'Untitled Script'): string {
+export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): string {
   const blocks = parseFountain(fountain);
 
   const paragraphs: string[] = [];
@@ -83,17 +111,15 @@ export function fountainToFdx(fountain: string, title = 'Untitled Script'): stri
     );
   }
 
+  const info = resolveExportTitlePage(fountain, titlePage);
+
   return [
     '<?xml version="1.0" encoding="UTF-8" standalone="no"?>',
     '<FinalDraft DocumentType="Script" Template="No" Version="5">',
     '  <Content>',
     ...paragraphs,
     '  </Content>',
-    '  <TitlePage>',
-    '    <Content>',
-    `      <Paragraph Type="Action"><Text>${escapeXml(title)}</Text></Paragraph>`,
-    '    </Content>',
-    '  </TitlePage>',
+    ...(info ? [buildTitlePageXml(info)] : []),
     '</FinalDraft>',
   ].join('\n');
 }

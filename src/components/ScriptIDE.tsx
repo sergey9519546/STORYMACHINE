@@ -1806,9 +1806,22 @@ export default function ScriptIDE({
   // that specific format, so there's no reason to pay for fdx.ts/pdf.ts/
   // docx.ts (plus pdf.ts's screenplay-layout.ts and docx.ts's zip.ts) on
   // first paint.
+  //
+  // Sourced from the `titlePage` state the "Title" tab actually edits, same
+  // as exportFountain above — but only when the writer has actually set it:
+  // isDefaultTitlePage true means nothing was ever typed AND nothing was
+  // ever parsed from the script's own leading title block (that parse keeps
+  // titlePage in sync on every scriptText change — see the useEffect near
+  // deriveTitlePageFromScript above), so passing it through here would
+  // print the untouched "UNTITLED SCRIPT"/"AUTHOR NAME"/"CONTACT INFO"
+  // placeholders as if the writer had typed them. Passing `undefined`
+  // instead lets each exporter's own fallback (the Fountain text's leading
+  // title block, or nothing at all) decide.
+  const exportTitlePage = isDefaultTitlePage(titlePage) ? undefined : titlePage;
+
   const exportFDX = async () => {
     const { fountainToFdx } = await import("../lib/fdx");
-    const fdx = fountainToFdx(scriptText);
+    const fdx = fountainToFdx(scriptText, exportTitlePage);
     const blob = new Blob([fdx], { type: "application/xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1821,7 +1834,7 @@ export default function ScriptIDE({
   const exportPDF = async () => {
     // Industry-standard PDF: US Letter, Courier 12pt, standard margins/indents.
     const { fountainToPdf } = await import("../lib/pdf");
-    const bytes = fountainToPdf(scriptText);
+    const bytes = fountainToPdf(scriptText, exportTitlePage);
     // Copy into a fresh ArrayBuffer so the Blob owns a clean, correctly-typed buffer.
     const buf = bytes.slice().buffer;
     const blob = new Blob([buf], { type: "application/pdf" });
@@ -1836,7 +1849,7 @@ export default function ScriptIDE({
   const exportDOCX = async () => {
     // Word-compatible .docx: OOXML parts zipped (store method), Courier styles.
     const { fountainToDocx } = await import("../lib/docx");
-    const bytes = fountainToDocx(scriptText);
+    const bytes = fountainToDocx(scriptText, exportTitlePage);
     const buf = bytes.slice().buffer;
     const blob = new Blob([buf], {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

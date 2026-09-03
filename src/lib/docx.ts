@@ -7,6 +7,7 @@
 
 import { parseFountain, type FountainBlock, type FountainBlockType } from './fountain.ts';
 import { buildZip, type ZipEntry } from './zip.ts';
+import { resolveExportTitlePage, type TitlePageInput, type ExportTitlePage } from './export-title-page.ts';
 
 // Twips = 1/1440 inch. Word measures indents in twips.
 const TW = (inches: number) => Math.round(inches * 1440);
@@ -63,6 +64,45 @@ function cleanText(block: FountainBlock): string {
   return t;
 }
 
+// ── Title page ────────────────────────────────────────────────────────────────
+// Industry convention: title centered ~1/3 down the page, a "Written by"
+// credit and the author's name centered directly beneath it, and a contact
+// block bottom-left — then a hard page break so page 1 of the script proper
+// starts on the NEXT page (Word has no notion of "page numbering starts at
+// page 2" the way our PDF writer's footer does, since this exporter has
+// never emitted page numbers at all — only the page break is this format's
+// half of that convention).
+function titleParagraph(
+  text: string,
+  opts: { size?: number; bold?: boolean; italics?: boolean; align?: 'center' | 'left'; spaceBefore: number },
+): string {
+  const jc = opts.align === 'center' ? '<w:jc w:val="center"/>' : '';
+  const rPr = `<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>${opts.bold ? '<w:b/>' : ''}${opts.italics ? '<w:i/>' : ''}<w:sz w:val="${opts.size ?? 24}"/>`;
+  return `    <w:p><w:pPr><w:spacing w:before="${opts.spaceBefore}"/>${jc}</w:pPr><w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+}
+
+function buildTitlePageParagraphs(info: ExportTitlePage): string[] {
+  const paras: string[] = [];
+
+  if (info.title) {
+    paras.push(titleParagraph(info.title, { size: 32, bold: true, align: 'center', spaceBefore: TW(3.0) }));
+  }
+  if (info.author) {
+    paras.push(titleParagraph('Written by', { italics: true, align: 'center', spaceBefore: TW(0.5) }));
+    paras.push(titleParagraph(info.author, { align: 'center', spaceBefore: TW(0.15) }));
+  }
+  if (info.contact) {
+    const contactLines = info.contact.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
+    contactLines.forEach((line, i) => {
+      paras.push(titleParagraph(line, { align: 'left', spaceBefore: i === 0 ? TW(2.5) : 0 }));
+    });
+  }
+
+  // Hard page break: the script body (pushed below) always starts fresh.
+  paras.push('    <w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+  return paras;
+}
+
 // ── Static package parts ──────────────────────────────────────────────────────
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -107,7 +147,7 @@ ${styleDefs}
 </w:styles>`;
 }
 
-function buildDocumentXml(fountain: string): string {
+function buildDocumentXml(fountain: string, titlePage?: TitlePageInput): string {
   const blocks = parseFountain(fountain);
   const paras: string[] = [];
   let pastTitlePage = false;
@@ -130,13 +170,16 @@ function buildDocumentXml(fountain: string): string {
     );
   }
 
+  const info = resolveExportTitlePage(fountain, titlePage);
+  const titleParas = info ? buildTitlePageParagraphs(info) : [];
+
   // US Letter page with 1" margins (1440 twips).
   const sectPr = `    <w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>`;
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-${paras.join('\n')}
+${[...titleParas, ...paras].join('\n')}
 ${sectPr}
   </w:body>
 </w:document>`;
@@ -145,14 +188,20 @@ ${sectPr}
 /**
  * Convert a Fountain script to a .docx document.
  * Returns the raw archive bytes (wrap in a Blob to download).
+ *
+ * `titlePage` is either a plain title string or a {title, author, contact}
+ * object; when omitted (or empty), the Fountain text's own leading title
+ * block is used instead, and when NEITHER carries anything the document
+ * gets no title page (and no extra page break) at all — see
+ * resolveExportTitlePage.
  */
-export function fountainToDocx(fountain: string): Uint8Array {
+export function fountainToDocx(fountain: string, titlePage?: TitlePageInput): Uint8Array {
   const entries: ZipEntry[] = [
     { name: '[Content_Types].xml', data: CONTENT_TYPES },
     { name: '_rels/.rels', data: ROOT_RELS },
     { name: 'word/_rels/document.xml.rels', data: DOC_RELS },
     { name: 'word/styles.xml', data: buildStylesXml() },
-    { name: 'word/document.xml', data: buildDocumentXml(fountain) },
+    { name: 'word/document.xml', data: buildDocumentXml(fountain, titlePage) },
   ];
   return buildZip(entries);
 }
