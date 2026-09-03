@@ -310,12 +310,12 @@ machine.
   read to a human studio coverage reader — reworded 2026-09-03 per the
   2026-09-02 retrospective's finding #8: an unsupported human-comparison
   claim with zero human-agreement evidence; see `docs/CLAIMS_REGISTER.md`),
-  privacy sentence ("Keyless by
-  default — your script stays in this deployment unless you turn on AI
-  features yourself" — worded to be true for visitors, since keys are
-  opt-in via Settings, not operator-only), CTA hierarchy preserved; all
-  three visible without scrolling at 1440px and 375px. Fixed a real
-  pre-existing bug en route: the CTA description inherited `.sm-btn`'s
+  privacy sentence ("Keyless by default — your script stays in this
+  deployment unless you turn on AI features yourself" — worded to be true
+  for visitors, since keys are opt-in via Settings, not operator-only), CTA
+  hierarchy preserved; all three visible without scrolling at 1440px and
+  375px. Fixed a real pre-existing bug en route: the CTA description
+  inherited `.sm-btn`'s
   `white-space: nowrap` and spilled past the button edge at every viewport.
 - **E4 — DONE 2026-08-21.** IndexedDB draft mirror
   (`scriptide-idb-store.ts`, never-rejecting, wins on restore only when
