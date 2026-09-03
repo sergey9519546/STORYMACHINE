@@ -19,12 +19,13 @@ function result(id: string, passed: boolean): MetamorphicResult {
 }
 
 describe('metamorphic exit-code contract', () => {
-  it('exits 0 when only known-failing empty_verbosity fails', () => {
+  it('exits 0 when every case passes', () => {
     const code = exitCodeForResults([
       result('identity', true),
       result('whitespace_reflow', true),
       result('rename_character', true),
-      result('empty_verbosity', false),
+      result('empty_verbosity', true),
+      result('filler_scenes', true),
       result('scene_shuffle', true),
       result('scene_reverse', true),
       result('scene_dup_padding', true),
@@ -32,12 +33,28 @@ describe('metamorphic exit-code contract', () => {
     assert.equal(code, 0);
   });
 
+  it('exits 1 when empty_verbosity fails — it is a HARD case as of 2026-09-03', () => {
+    // It was `known-failing` (exit 0) for seven weeks while the verbosity bias
+    // stood; lane R5 fixed the formula and promoted it. This assertion is the
+    // guard against it quietly sliding back to a soft witness — see
+    // docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md.
+    const code = exitCodeForResults([
+      result('identity', true),
+      result('empty_verbosity', false),
+    ]);
+    assert.equal(code, 1);
+  });
+
   it('exits 1 when a hard case fails', () => {
     const code = exitCodeForResults([
       result('identity', true),
       result('scene_shuffle', false),
-      result('empty_verbosity', false),
     ]);
     assert.equal(code, 1);
+  });
+
+  it('exits 0 for an unrecognised-but-passing id, 1 for an unrecognised failing one', () => {
+    assert.equal(exitCodeForResults([result('some_future_case', true)]), 0);
+    assert.equal(exitCodeForResults([result('some_future_case', false)]), 1);
   });
 });

@@ -24,30 +24,36 @@ function result(id: string, passed: boolean): MetamorphicResult {
 }
 
 describe('metamorphic classifyResults', () => {
-  it('treats empty_verbosity failure as known-failing, not hard', () => {
+  it('treats a failed empty_verbosity as a HARD failure — it stopped being a known-failing witness on 2026-09-03', () => {
     const { hardFailures, knownFailures } = classifyResults([
       result('identity', true),
       result('empty_verbosity', false),
       result('scene_shuffle', true),
     ]);
-    assert.deepEqual(hardFailures.map(r => r.id), []);
-    assert.deepEqual(knownFailures.map(r => r.id), ['empty_verbosity']);
+    assert.deepEqual(hardFailures.map(r => r.id), ['empty_verbosity']);
+    assert.deepEqual(knownFailures.map(r => r.id), []);
   });
 
   it('treats a failed hard case as a hard failure', () => {
     const { hardFailures, knownFailures } = classifyResults([
       result('identity', false),
-      result('empty_verbosity', false),
+      result('scene_shuffle', true),
     ]);
     assert.deepEqual(hardFailures.map(r => r.id), ['identity']);
-    assert.deepEqual(knownFailures.map(r => r.id), ['empty_verbosity']);
+    assert.deepEqual(knownFailures.map(r => r.id), []);
   });
 
-  it('surfaces an unexpected pass of a known-failing case', () => {
-    const { unexpectedPasses } = classifyResults([
-      result('empty_verbosity', true),
-    ]);
-    assert.deepEqual(unexpectedPasses.map(r => r.id), ['empty_verbosity']);
+  it('still knows how to surface an unexpected pass, should a case ever be held known-failing again', () => {
+    // KNOWN_FAILING_CASE_IDS is empty today (see the policy assertion below),
+    // so this exercises the branch through a synthetic id set rather than a
+    // real case — the classifier's contract, not the current roster.
+    const { unexpectedPasses, knownFailures, hardFailures } = classifyResults(
+      [result('identity', true)],
+      new Set(['identity']),
+    );
+    assert.deepEqual(unexpectedPasses.map(r => r.id), ['identity']);
+    assert.deepEqual(knownFailures.map(r => r.id), []);
+    assert.deepEqual(hardFailures.map(r => r.id), []);
   });
 
   it('case definitions are the exact single source of policy truth', () => {
@@ -58,12 +64,15 @@ describe('metamorphic classifyResults', () => {
       'whitespace_reflow',
       'rename_character',
       'empty_verbosity',
+      'filler_scenes',
       'scene_shuffle',
       'scene_reverse',
       'scene_dup_padding',
     ]);
-    assert.deepEqual([...KNOWN_FAILING_CASE_IDS], ['empty_verbosity']);
-    assert.deepEqual([...HARD_CASE_IDS], ids.filter(id => id !== 'empty_verbosity'));
+    // No case is held known-failing any more: empty_verbosity, the only one
+    // there has ever been, was promoted to hard by lane R5 (2026-09-03).
+    assert.deepEqual([...KNOWN_FAILING_CASE_IDS], []);
+    assert.deepEqual([...HARD_CASE_IDS], ids);
   });
 });
 
