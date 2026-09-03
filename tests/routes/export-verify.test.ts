@@ -171,6 +171,7 @@ describe('routes/export/verify — HTTP behavior', async () => {
     const body = await res.json();
 
     assert.equal(body.verified, false);
+    assert.equal(body.mismatchKind, 'content_mismatch');
     assert.deepEqual(body.checked, ['contentHash']);
     assert.equal(body.mismatches.length, 1);
     assert.equal(body.mismatches[0].field, 'contentHash');
@@ -181,6 +182,63 @@ describe('routes/export/verify — HTTP behavior', async () => {
     // fields (health/verdict/totalIssues/healthPercentile) that would only
     // exist once runScriptDoctor had actually been called.
     assert.deepEqual(Object.keys(body.recomputed), ['contentHash']);
+  });
+
+  // #4: engine identity (provenance.engineCommit/rulebookCount) is checked
+  // separately from content/score fields — a mismatch confined to it is
+  // advisory ("the engine moved, re-run to confirm"), never a sign the
+  // report was tampered with.
+  it('engine identity differs while content and score match -> soft engine_mismatch, verified stays true', async () => {
+    assert.ok(report.provenance, 'sanity: a non-degenerate report must carry provenance');
+
+    const res = await post({
+      fountain: MULTI_SCENE_FOUNTAIN,
+      expected: {
+        contentHash,
+        health: report.health,
+        verdict: report.verdict,
+        totalIssues: report.totalIssues,
+        engineCommit: `${report.provenance!.engineCommit}-a-different-build`,
+        rulebookCount: report.provenance!.rulebookCount,
+      },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    assert.equal(body.verified, true, 'content and score both check out; an engine-only difference must not flip verified false');
+    assert.equal(body.mismatchKind, 'engine_mismatch');
+    assert.match(body.message, /re-run/i);
+    assert.equal(body.mismatches.length, 1);
+    assert.equal(body.mismatches[0].field, 'engineCommit');
+    assert.equal(body.mismatches[0].actual, report.provenance!.engineCommit);
+    assert.equal(body.recomputed.engineCommit, report.provenance!.engineCommit);
+    assert.equal(body.recomputed.rulebookCount, report.provenance!.rulebookCount);
+  });
+
+  it('rulebookCount alone differing is also classified as the soft engine_mismatch', async () => {
+    const res = await post({
+      fountain: MULTI_SCENE_FOUNTAIN,
+      expected: { contentHash, rulebookCount: (report.provenance?.rulebookCount ?? 0) + 1 },
+    });
+    const body = await res.json();
+    assert.equal(body.verified, true);
+    assert.equal(body.mismatchKind, 'engine_mismatch');
+  });
+
+  it('a real score mismatch alongside an engine difference is still the hard score_mismatch, not engine_mismatch', async () => {
+    const tamperedHealth = report.health > 50 ? 0 : 100;
+    const res = await post({
+      fountain: MULTI_SCENE_FOUNTAIN,
+      expected: {
+        contentHash,
+        health: tamperedHealth,
+        engineCommit: `${report.provenance?.engineCommit ?? ''}-a-different-build`,
+      },
+    });
+    const body = await res.json();
+    assert.equal(body.verified, false);
+    assert.equal(body.mismatchKind, 'score_mismatch');
+    assert.equal(body.message, undefined, 'the soft engine message must not appear alongside a hard mismatch');
   });
 
   it('fdx path: matching everything against the fdx-converted text -> verified true', async () => {

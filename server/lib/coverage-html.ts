@@ -404,6 +404,8 @@ function buildFooterSection(report: ScriptDoctorReport): string {
         <div><dt>Health</dt><dd><code>${escapeHtml(report.health.toFixed(1))}</code></dd></div>
         ${report.verdict ? `<div><dt>Verdict</dt><dd><code>${escapeHtml(report.verdict)}</code></dd></div>` : ''}
         <div><dt>Total issues</dt><dd><code>${report.totalIssues}</code></dd></div>
+        ${report.provenance ? `<div><dt>Engine commit</dt><dd><code>${escapeHtml(report.provenance.engineCommit)}</code></dd></div>
+        <div><dt>Rulebook count</dt><dd><code>${report.provenance.rulebookCount}</code></dd></div>` : ''}
       </dl>
     </div>`
     : '';

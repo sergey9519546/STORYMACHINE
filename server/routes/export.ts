@@ -752,6 +752,22 @@ const VERIFY_FLOAT_TOLERANCE = 0.05;
 
 interface VerifyMismatch { field: string; expected: unknown; actual: unknown }
 
+// #4: engineCommit/rulebookCount are the ONLY two `expected` fields that
+// describe the ENGINE rather than the script's content or score. A mismatch
+// confined to this set — the content hash matched, and every content/score
+// field that WAS checked also matched — means the report is authentic for
+// this script but was produced by a different build of the engine than is
+// running now: a soft, advisory outcome ("re-run to confirm under the
+// current engine"), never a sign of tampering. Any mismatch outside this set
+// is a hard failure regardless of what else does or doesn't match.
+const ENGINE_IDENTITY_FIELDS = new Set(['engineCommit', 'rulebookCount']);
+
+type MismatchKind = 'content_mismatch' | 'score_mismatch' | 'engine_mismatch' | null;
+
+const ENGINE_MISMATCH_MESSAGE =
+  'The engine has moved since this report was produced. The script content and score both still ' +
+  'check out — re-run this verification to confirm under the current engine.';
+
 router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), asyncHandler(async (req, res) => {
   const { expected } = req.body as {
     expected: {
@@ -760,6 +776,8 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
       verdict?: CoverageVerdict;
       totalIssues?: number;
       healthPercentile?: number;
+      engineCommit?: string;
+      rulebookCount?: number;
     };
   };
 
@@ -777,6 +795,7 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
     if (actualContentHash !== expected.contentHash) {
       res.json({
         verified: false,
+        mismatchKind: 'content_mismatch' as MismatchKind,
         checked: ['contentHash'],
         mismatches: [{ field: 'contentHash', expected: expected.contentHash, actual: actualContentHash }] as VerifyMismatch[],
         recomputed: { contentHash: actualContentHash },
@@ -834,9 +853,42 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
         mismatches.push({ field: 'healthPercentile', expected: expected.healthPercentile, actual: actualPercentile });
       }
     }
+    // #4: engineCommit/rulebookCount, checked the same way as every field
+    // above (exact string / exact int — no float tolerance needed), but kept
+    // out of `hardMismatches` below so a difference confined to these two
+    // fields reports as the soft engine_mismatch outcome, never as a content
+    // or score failure.
+    if (expected.engineCommit !== undefined) {
+      checked.push('engineCommit');
+      const actualEngineCommit = report.provenance?.engineCommit;
+      if (actualEngineCommit === undefined || expected.engineCommit !== actualEngineCommit) {
+        mismatches.push({ field: 'engineCommit', expected: expected.engineCommit, actual: actualEngineCommit });
+      }
+    }
+    if (expected.rulebookCount !== undefined) {
+      checked.push('rulebookCount');
+      const actualRulebookCount = report.provenance?.rulebookCount;
+      if (actualRulebookCount === undefined || expected.rulebookCount !== actualRulebookCount) {
+        mismatches.push({ field: 'rulebookCount', expected: expected.rulebookCount, actual: actualRulebookCount });
+      }
+    }
+
+    const hardMismatches = mismatches.filter((m) => !ENGINE_IDENTITY_FIELDS.has(m.field));
+    const engineMismatches = mismatches.filter((m) => ENGINE_IDENTITY_FIELDS.has(m.field));
+    const mismatchKind: MismatchKind = hardMismatches.length > 0
+      ? 'score_mismatch'
+      : engineMismatches.length > 0
+        ? 'engine_mismatch'
+        : null;
 
     res.json({
-      verified: mismatches.length === 0,
+      // `verified` reflects content/score correctness ONLY — an engine-only
+      // mismatch does not flip it false, because the report IS authentic for
+      // this script and this score; `mismatchKind`/`mismatches` still
+      // surface the engine difference for a caller that cares.
+      verified: hardMismatches.length === 0,
+      mismatchKind,
+      ...(mismatchKind === 'engine_mismatch' ? { message: ENGINE_MISMATCH_MESSAGE } : {}),
       checked,
       mismatches,
       recomputed: {
@@ -845,6 +897,8 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
         verdict: report.verdict,
         totalIssues: report.totalIssues,
         healthPercentile: report.healthPercentile,
+        engineCommit: report.provenance?.engineCommit,
+        rulebookCount: report.provenance?.rulebookCount,
       },
       verifiedAt,
     });

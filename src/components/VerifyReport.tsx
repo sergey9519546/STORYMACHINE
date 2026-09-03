@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { ShieldCheck, ShieldX, Upload, X, ChevronLeft } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldX, Upload, X, ChevronLeft } from "lucide-react";
 import { trackEvent } from "../lib/analytics";
 
 // P3 — "Verify this report" surface (ROADMAP §3 P3 exit gate: a third party
@@ -20,8 +20,16 @@ interface VerifyMismatch {
   actual: unknown;
 }
 
+// #4: distinguishes a real content/score problem from the engine simply
+// having moved since this report was produced (server/routes/export.ts's
+// /api/export/verify — see ENGINE_IDENTITY_FIELDS there). 'engine_mismatch'
+// is soft: `verified` is still true, because content and score both checked
+// out — only the engine identity claim differs.
+type MismatchKind = "content_mismatch" | "score_mismatch" | "engine_mismatch" | null;
+
 interface VerifyResponse {
   verified: boolean;
+  mismatchKind?: MismatchKind;
   checked?: string[];
   mismatches?: VerifyMismatch[];
   recomputed?: {
@@ -30,6 +38,8 @@ interface VerifyResponse {
     verdict?: string;
     totalIssues?: number;
     healthPercentile?: number;
+    engineCommit?: string;
+    rulebookCount?: number;
   };
   error?: string;
   message?: string;
@@ -48,6 +58,8 @@ export default function VerifyReport() {
   const [health, setHealth] = useState("");
   const [verdict, setVerdict] = useState("");
   const [totalIssues, setTotalIssues] = useState("");
+  const [engineCommit, setEngineCommit] = useState("");
+  const [rulebookCount, setRulebookCount] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,6 +123,15 @@ export default function VerifyReport() {
         return;
       }
       expected.totalIssues = parsed;
+    }
+    if (engineCommit.trim() !== "") expected.engineCommit = engineCommit.trim();
+    if (rulebookCount.trim() !== "") {
+      const parsed = Number(rulebookCount);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        setFormError("Rulebook count must be a whole number, exactly as printed in the report.");
+        return;
+      }
+      expected.rulebookCount = parsed;
     }
 
     setBusy(true);
@@ -272,6 +293,37 @@ export default function VerifyReport() {
                 />
               </label>
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="sm-slug">Engine commit (optional)</span>
+                <input
+                  type="text"
+                  value={engineCommit}
+                  onChange={(e) => setEngineCommit(e.target.value)}
+                  spellCheck={false}
+                  autoComplete="off"
+                  placeholder="e.g. a1b2c3d"
+                  className={`w-full border border-ink/25 bg-paper px-4 py-3 font-mono text-sm text-ink placeholder:text-ink/30 ${FOCUS_RING}`}
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="sm-slug">Rulebook count (optional)</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={rulebookCount}
+                  onChange={(e) => setRulebookCount(e.target.value)}
+                  autoComplete="off"
+                  placeholder="3217"
+                  className={`w-full border border-ink/25 bg-paper px-4 py-3 font-mono text-sm text-ink placeholder:text-ink/30 ${FOCUS_RING}`}
+                />
+              </label>
+            </div>
+            <p className="sm-slug">
+              Engine commit and rulebook count identify which build of the engine produced the report.
+              If either differs but the content and score still match, that&rsquo;s reported separately
+              below as an engine-version notice, not a failed verification.
+            </p>
           </div>
         </section>
 
@@ -292,14 +344,26 @@ export default function VerifyReport() {
           )}
         </div>
 
-        {result && (
+        {result && (() => {
+          // #4: a soft engine_mismatch keeps `verified === true` (content and
+          // score both checked out) but must not read exactly like a clean
+          // "Verified" — it's a distinct, amber, "the engine moved" outcome,
+          // never the harsh red "Does not match" a real content/score
+          // problem gets.
+          const isEngineMismatch = result.mismatchKind === "engine_mismatch";
+          return (
           <section
             aria-live="polite"
-            className={`sm-panel ${result.verified ? "" : "border-[var(--sm-stamp)]"}`}
+            className={`sm-panel ${result.verified && !isEngineMismatch ? "" : isEngineMismatch ? "border-amber-500" : "border-[var(--sm-stamp)]"}`}
           >
             <div className="sm-panel-body flex flex-col gap-4">
               <div className="flex items-center gap-3">
-                {result.verified ? (
+                {isEngineMismatch ? (
+                  <>
+                    <ShieldAlert className="h-6 w-6 text-amber-600" aria-hidden="true" />
+                    <p className="font-display text-2xl uppercase text-ink">Verified — engine has moved</p>
+                  </>
+                ) : result.verified ? (
                   <>
                     <ShieldCheck className="h-6 w-6 text-green-700" aria-hidden="true" />
                     <p className="font-display text-2xl uppercase text-ink">Verified</p>
@@ -312,7 +376,9 @@ export default function VerifyReport() {
                 )}
               </div>
               <p className="text-[15px] leading-relaxed text-ink/75">
-                {result.verified
+                {isEngineMismatch
+                  ? (result.message ?? "The engine has moved since this report was produced. The script content and score both still check out — re-run this verification to confirm under the current engine.")
+                  : result.verified
                   ? `The engine re-ran the analysis on the submitted text and every checked value matched (${(result.checked ?? []).join(", ")}). This report is authentic engine output for this script.`
                   : "At least one checked value does not match what the engine produces for the submitted text. Either the text isn't the text the report was generated from, or the report's numbers were altered."}
               </p>
@@ -341,11 +407,13 @@ export default function VerifyReport() {
                   Recomputed hash: {result.recomputed.contentHash.slice(0, 12)}…
                   {result.recomputed.health !== undefined && ` · health ${result.recomputed.health}`}
                   {result.recomputed.verdict && ` · ${result.recomputed.verdict}`}
+                  {result.recomputed.engineCommit && ` · engine ${result.recomputed.engineCommit}`}
                 </p>
               )}
             </div>
           </section>
-        )}
+          );
+        })()}
 
         <footer className="border-t border-[var(--sm-hair)] pt-6 text-center">
           <p className="sm-slug">Story Machine — deterministic analysis, independently verifiable</p>

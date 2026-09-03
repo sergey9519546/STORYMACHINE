@@ -819,6 +819,14 @@ const VerifyExpectedSchema = z.object({
   verdict: z.enum(['RECOMMEND', 'CONSIDER', 'PASS']).optional(),
   totalIssues: z.number().int().min(0).optional(),
   healthPercentile: z.number().min(0).max(100).optional(),
+  // #4: the engine-identity claims published in ScriptDoctorReport.provenance
+  // (types.ts) and the exported coverage HTML's verify block
+  // (coverage-html.ts). Checked separately from the four fields above — see
+  // server/routes/export.ts's /api/export/verify — so a mismatch here alone
+  // (content and score both still match) reports as the SOFT `engine_mismatch`
+  // outcome rather than a hard content/score failure.
+  engineCommit: z.string().min(1).max(200).optional(),
+  rulebookCount: z.number().int().min(0).optional(),
 });
 
 export const VerifyBodySchema = z.object({
