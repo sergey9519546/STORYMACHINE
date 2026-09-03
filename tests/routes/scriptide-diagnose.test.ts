@@ -246,4 +246,54 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
     const direct = await runScriptDoctor(MULTI_SCENE_FOUNTAIN);
     assert.deepEqual(body.topPriorities, direct.topPriorities);
   });
+
+  // A4 (2026-09-03): `characterSummaries` — per-character roll-up derived
+  // from `characters`, `characterFunctions`, `voiceAnalysis`, and this same
+  // route's `locatedIssues` (server/nvm/analyze/prioritize.ts).
+  it('/doctor attaches `characterSummaries` covering every character, with subjects and swap risk from the real report', async () => {
+    const res = await postDoctor({ fountain: MULTI_SCENE_FOUNTAIN });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body.characterSummaries), 'expected /doctor report to carry characterSummaries');
+
+    // One summary per report character, same names, same order.
+    assert.deepEqual(body.characterSummaries.map((c: { name: string }) => c.name), body.characters);
+
+    for (const summary of body.characterSummaries) {
+      assert.ok(typeof summary.issueCount === 'number' && summary.issueCount >= 0);
+      assert.ok(Array.isArray(summary.swapRiskWith));
+      if ('function' in summary) {
+        assert.ok(typeof summary.function === 'string' && summary.function.length > 0);
+      }
+    }
+
+    // Every character-anchored located issue's subject appears among the
+    // summaries with issueCount > 0 for that name — the roll-up must not
+    // silently drop a real character-anchored finding.
+    const characterAnchored = body.locatedIssues.filter((li: { anchor: string }) => li.anchor === 'character');
+    const summaryByName = new Map(body.characterSummaries.map((c: { name: string; issueCount: number }) => [c.name, c.issueCount]));
+    for (const li of characterAnchored) {
+      const location = li.issue.location as string;
+      const subject = location.replace(/^Character:\s*/i, '').trim();
+      assert.ok(summaryByName.has(subject), `character-anchored issue "${li.issue.rule}" names "${subject}", not in characterSummaries`);
+      assert.ok((summaryByName.get(subject) as number) > 0, `"${subject}" has a character-anchored issue but issueCount is 0`);
+    }
+
+    // swapRiskWith mirrors voiceAnalysis.pairs exactly: for every swapRisk
+    // pair, each side lists the other, and nothing else does.
+    const expectedSwapRisk = new Map<string, Set<string>>();
+    for (const name of body.characters) expectedSwapRisk.set(name, new Set());
+    for (const pair of body.voiceAnalysis?.pairs ?? []) {
+      if (!pair.swapRisk) continue;
+      expectedSwapRisk.get(pair.a)?.add(pair.b);
+      expectedSwapRisk.get(pair.b)?.add(pair.a);
+    }
+    for (const summary of body.characterSummaries) {
+      assert.deepEqual(
+        new Set(summary.swapRiskWith),
+        expectedSwapRisk.get(summary.name),
+        `swapRiskWith for "${summary.name}" doesn't match voiceAnalysis.pairs`,
+      );
+    }
+  });
 });

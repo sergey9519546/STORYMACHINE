@@ -48,6 +48,7 @@
 
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { IssueAnchor, LocatedIssue, RootCauseFinding } from './types.ts';
+import type { CharacterFunctionProfile, SupportingFunction } from '../quality/character-function.ts';
 
 /** How many entries `prioritized` carries. Matches buildTopPriorities' own
  *  slice(0, 10) so the two lists are the same size and directly comparable —
@@ -147,5 +148,118 @@ export function buildPrioritizedIssues(
     ...(li.startLine !== undefined ? { startLine: li.startLine } : {}),
     ...(li.endLine !== undefined ? { endLine: li.endLine } : {}),
     ...(finding ? { clusterId: finding.id, clusterSize: finding.memberCount } : {}),
+  }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// characterSummaries — item #10 of the 2026-09-03 discovery report.
+//
+// THE PROBLEM. A writer can see `characters` (a bare name list) and, deep in
+// `characterFunctions`, a GODMODE classification keyed by `characterId` — but
+// nothing on the report says "here is what the doctor actually found ABOUT
+// this person": how many character-anchored issues name them, or whether the
+// voice-delta pass thinks two characters are interchangeable. Three existing
+// report fields (`characters`, `characterFunctions`, `voiceAnalysis`, plus the
+// route's own `locatedIssues`) already carry everything needed to answer
+// that per-character, so this is a derivation, not new analysis.
+//
+// WHERE IT LIVES. Same reasoning as buildPrioritizedIssues above: attached at
+// the route, not inside doctor.ts/aggregateReport, so nothing on the scoring
+// path moves. Nothing here is imported by doctor.ts.
+//
+// RECOVERING THE SUBJECT NAME. A character-anchored LocatedIssue carries the
+// resolved line, not the character's name — locate.ts's resolveLocation
+// consults its own `characterFirstLines` map (built from cue blocks, keyed
+// upper-cased) and never returns the matched name, only the anchor + line.
+// The subject is recovered here the same way locate.ts derived it in the
+// first place — from the issue's own `location` string ("Character: NAME" or
+// a bare all-caps cue) — normalized and matched case-insensitively against
+// the report's own `characters` list. This duplicates locate.ts's small
+// CHARACTER_PREFIX_RE / BARE_CUE_RE / normalizeCueText, the same trade-off
+// locate.ts's own header already makes for normalizeCueText: not worth
+// exporting solely for this one caller.
+// ─────────────────────────────────────────────────────────────────────────
+
+const CHARACTER_PREFIX_RE = /^Character:\s*(.+)$/i;
+const BARE_CUE_RE = /^[A-Z][A-Z0-9 '.\-]*$/;
+
+function normalizeCueText(raw: string): string {
+  return raw
+    .replace(/\^\s*$/, '')
+    .replace(/\(\s*V\.O\.\s*\)/gi, '')
+    .replace(/\(\s*O\.S\.\s*\)/gi, '')
+    .replace(/\(\s*CONT'?D\s*\)/gi, '')
+    .trim();
+}
+
+/** The character a 'character'-anchored issue's `location` names, resolved
+ *  against the report's own character list (case-insensitively, decorations
+ *  stripped) — or undefined if it can't be matched back (defensive only; a
+ *  'character' anchor is set by locate.ts precisely when this same lookup
+ *  already succeeded once against the fountain's own cue blocks). */
+function characterSubject(location: string, byUpper: Map<string, string>): string | undefined {
+  const prefixMatch = CHARACTER_PREFIX_RE.exec(location);
+  const trimmed = location.trim();
+  const candidate = prefixMatch ? prefixMatch[1].trim() : (BARE_CUE_RE.test(trimmed) ? trimmed : null);
+  if (!candidate) return undefined;
+  return byUpper.get(normalizeCueText(candidate).toUpperCase());
+}
+
+/** One character's roll-up: what function the doctor thinks they serve, how
+ *  many character-anchored issues name them, and which other characters the
+ *  voice-delta pass flags as dangerously similar to them. */
+export interface CharacterSummary {
+  name: string;
+  /** Absent when characterFunctions wasn't computed for this report (e.g. a
+   *  scene-truncated or degenerate run) or didn't classify this character. */
+  function?: SupportingFunction;
+  /** Count of located issues anchored to this character specifically —
+   *  NOT every issue that merely mentions them in prose. */
+  issueCount: number;
+  /** Other characters voiceAnalysis.pairs flags swapRisk: true against this
+   *  one. Empty (never absent) when voiceAnalysis didn't score, or scored
+   *  and found no risk — both are honest zeros, not "no data". */
+  swapRiskWith: string[];
+}
+
+/**
+ * Per-character roll-up of what the doctor found about them, derived from
+ * three existing report fields plus the route's own locatedIssues. Pure and
+ * deterministic: same inputs, same output, in `characters`' own order (so
+ * the list order matches every other characters-ordered surface — the
+ * heatmap, the panel — with no extra sort to keep in sync).
+ */
+export function buildCharacterSummaries(
+  characters: string[],
+  locatedIssues: LocatedIssue[],
+  characterFunctions: CharacterFunctionProfile[] = [],
+  voiceAnalysis?: { pairs: Array<{ a: string; b: string; delta: number; swapRisk: boolean }>; scored: boolean },
+): CharacterSummary[] {
+  const functionByName = new Map(characterFunctions.map(cf => [cf.characterId, cf.function] as const));
+
+  const byUpper = new Map(characters.map(c => [normalizeCueText(c).toUpperCase(), c] as const));
+  const issueCounts = new Map<string, number>();
+  for (const li of locatedIssues) {
+    if (li.anchor !== 'character') continue;
+    const subject = characterSubject(li.issue.location, byUpper);
+    if (subject === undefined) continue;
+    issueCounts.set(subject, (issueCounts.get(subject) ?? 0) + 1);
+  }
+
+  const swapRiskByName = new Map<string, string[]>();
+  for (const pair of voiceAnalysis?.pairs ?? []) {
+    if (!pair.swapRisk) continue;
+    for (const [self, other] of [[pair.a, pair.b], [pair.b, pair.a]] as const) {
+      const list = swapRiskByName.get(self);
+      if (list) list.push(other);
+      else swapRiskByName.set(self, [other]);
+    }
+  }
+
+  return characters.map(name => ({
+    name,
+    ...(functionByName.has(name) ? { function: functionByName.get(name)! } : {}),
+    issueCount: issueCounts.get(name) ?? 0,
+    swapRiskWith: swapRiskByName.get(name) ?? [],
   }));
 }

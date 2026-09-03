@@ -23,7 +23,7 @@ import {
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues, sceneLineSpans } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
-import { buildPrioritizedIssues } from '../nvm/analyze/prioritize.ts';
+import { buildPrioritizedIssues, buildCharacterSummaries } from '../nvm/analyze/prioritize.ts';
 import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
@@ -519,7 +519,14 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // `topPriorities` instead of replacing it (topPriorities is a published
   // ScriptDoctorReport field on the scoring path and stays byte-identical).
   const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
-  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source });
+  // A4 (2026-09-03): `characterSummaries` — same attach-at-the-route
+  // reasoning as `prioritized` two lines up, derived from three existing
+  // report fields (characters, characterFunctions, voiceAnalysis) plus this
+  // route's own locatedIssues. See prioritize.ts's buildCharacterSummaries.
+  const characterSummaries = buildCharacterSummaries(
+    report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
+  );
+  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source });
 }));
 
 // POST /api/scriptide/doctor/stream — E1 (2026-08-21): live-progress sibling
@@ -625,7 +632,11 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
     const locatedIssues = locateIssues(issuesWithPass, fountain);
     const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
     const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
-    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source } });
+    // A4: same characterSummaries attachment as /doctor above.
+    const characterSummaries = buildCharacterSummaries(
+      report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
+    );
+    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source } });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       // The client already disconnected (that's what fired the abort in the
@@ -738,7 +749,11 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
   const locatedIssues = locateIssues(issuesWithPass, fountain);
   const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
   const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
-  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source });
+  // A4: same characterSummaries attachment as /doctor above.
+  const characterSummaries = buildCharacterSummaries(
+    report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
+  );
+  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source });
 }));
 
 // POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
@@ -882,7 +897,11 @@ router.post(
     const locatedIssues = locateIssues(issuesWithPass, converted.fountain);
     const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(converted.fountain));
     const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
-    res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source });
+    // A4: same characterSummaries attachment as /doctor above.
+    const characterSummaries = buildCharacterSummaries(
+      report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
+    );
+    res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source });
   }),
 );
 
