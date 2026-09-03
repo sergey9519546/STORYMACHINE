@@ -344,6 +344,51 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
   res.json({ status: 'ok', ...saved });
 }));
 
+// ── Unrecognized-format short-circuit (upgrade item #3) ─────────────────────
+// A raw paste with zero scene headings (no INT./EXT. slugline anywhere) still
+// parses as ONE degenerate "scene" — the 14 passes dutifully report a clean,
+// empty scene, and the aggregated report comes back self-contradicting:
+// health 0, verdict PASS ("decline" in coverage vocabulary), and five
+// "nothing to fix" dimension summaries, none of which says the actual
+// problem: this text was never recognized as a screenplay. Caught HERE, at
+// the route, before the doctor ever runs — not inside runScriptDoctor/
+// doctor.ts, which is scoring-path and out of scope for this change, and
+// which doesn't need to change: detecting "is this even Fountain" needs
+// nothing the doctor computes.
+//
+// SCENE_HEADING_RE mirrors src/lib/fountain.ts's parseFountain heading test
+// (identical to canonical-fountain.ts's own HEADING_RE) — duplicated rather
+// than imported because both of those modules sit on the scoring path
+// (src/lib/fountain.ts feeds fountain-analyzer.ts's sceneCount, the single
+// highest-AUC term the doctor emits — doctor.ts:1892-1898) and this route is
+// under a hard no-scoring-path-touch constraint for this change.
+// tests/routes/format-unrecognized.test.ts asserts this mirror agrees with
+// the real parser's scene_heading classification on all 20 calibration
+// corpus samples plus this file's own fixtures, so a future drift in either
+// original regex is caught rather than silently diverging.
+const SCENE_HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
+
+/** True when at least one line of `fountain` reads as a Fountain scene
+ *  heading — the standard INT./EXT./EST./... slugline vocabulary, or a
+ *  forced heading (a line starting with a single "."), matching
+ *  src/lib/fountain.ts's own scene_heading test closely enough to agree with
+ *  it on real screenplay text (see SCENE_HEADING_RE's comment above).
+ *  Exported (this file's only other export is the router itself) solely so
+ *  tests/routes/format-unrecognized.test.ts can assert agreement with the
+ *  real parser directly, rather than only indirectly through HTTP fixtures. */
+export function hasSceneHeading(fountain: string): boolean {
+  return fountain.split('\n').some(line => {
+    const trimmed = line.trim();
+    return trimmed !== '' && (SCENE_HEADING_RE.test(trimmed) || trimmed.startsWith('.'));
+  });
+}
+
+const FORMAT_UNRECOGNIZED_REASON =
+  "No scene headings such as INT. or EXT. were found — this doesn't read as a screenplay in Fountain format.";
+const FORMAT_UNRECOGNIZED_HINT =
+  'Script Doctor analyzes Fountain-formatted screenplay text. Scene headings (sluglines) start a new scene ' +
+  'and begin with INT., EXT., INT./EXT., or EST. — for example "INT. KITCHEN - DAY".';
+
 // ── Script Doctor (bridge half 3) ────────────────────────────────────────────
 // POST /api/scriptide/doctor — run the deterministic 14-pass revision-engine
 // checkup and return the aggregated ScriptDoctorReport. Two-format contract,
@@ -399,6 +444,22 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   } else {
     fountain = fountainBody as string;
     source = { format: 'fountain' };
+  }
+
+  // Upgrade item #3: short-circuit BEFORE the doctor ever runs on text with
+  // no recognizable scene heading — see hasSceneHeading's comment above for
+  // why this belongs here rather than in doctor.ts. 200, not 4xx: this isn't
+  // a malformed-request error (the body validated fine against
+  // DoctorBodySchema) or a server fault — it's a legitimate, complete answer
+  // ("this text isn't a screenplay") that the client renders as its own
+  // banner, exactly like `formatUnrecognized` is not `error`. A 4xx would
+  // also route it into every consumer's generic "!res.ok -> throw" catch
+  // block (see streamDoctorProgress and this panel's own pdf/deep branches),
+  // collapsing this distinct, actionable signal into the same bucket as a
+  // real failure.
+  if (!hasSceneHeading(fountain)) {
+    res.json({ formatUnrecognized: true, reason: FORMAT_UNRECOGNIZED_REASON, hint: FORMAT_UNRECOGNIZED_HINT });
+    return;
   }
 
   // Dynamic import: doctor.ts pulls in the full analyzer + all 14 revision
@@ -520,6 +581,17 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
   } else {
     fountain = fountainBody as string;
     source = { format: 'fountain' };
+  }
+
+  // Upgrade item #3: same short-circuit as /doctor above, in the one shape
+  // this route's SSE transport actually has — a distinct frame type, so the
+  // client (streamDoctorProgress, src/lib/doctor-stream.ts) can tell it apart
+  // from both `doctor_result` and `doctor_error` instead of the writer seeing
+  // either a self-contradicting report or a bare "Diagnosis failed".
+  if (!hasSceneHeading(fountain)) {
+    emitSSE({ type: 'doctor_format_unrecognized', reason: FORMAT_UNRECOGNIZED_REASON, hint: FORMAT_UNRECOGNIZED_HINT });
+    ensureEnded();
+    return;
   }
 
   try {

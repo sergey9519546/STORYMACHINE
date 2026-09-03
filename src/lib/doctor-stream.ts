@@ -36,7 +36,23 @@ export type DoctorReportWithAnchors = ScriptDoctorReport & { locatedIssues?: Loc
 type DoctorStreamPayload =
   | { type: "doctor_progress"; event: DoctorProgressEvent }
   | { type: "doctor_result"; report: DoctorReportWithAnchors }
-  | { type: "doctor_error"; error: string };
+  | { type: "doctor_error"; error: string }
+  | { type: "doctor_format_unrecognized"; reason: string; hint: string };
+
+/** Thrown by streamDoctorProgress when the server recognized the submitted
+ *  text as having no scene headings at all (upgrade item #3) rather than
+ *  running the doctor on it — distinct from a plain Error/doctor_error so a
+ *  caller can render its own "this isn't a screenplay" banner instead of the
+ *  generic "Diagnosis failed" one. `message` carries `reason`; `hint` is the
+ *  extra explanatory sentence. */
+export class FormatUnrecognizedError extends Error {
+  hint: string;
+  constructor(reason: string, hint: string) {
+    super(reason);
+    this.name = "FormatUnrecognizedError";
+    this.hint = hint;
+  }
+}
 
 /** Folds one DoctorProgressEvent into the next progress state. `pass_complete`
  *  events can arrive out of submission order — the 14 passes run
@@ -111,6 +127,7 @@ export async function streamDoctorProgress(
   let buffer = "";
   let finalReport: DoctorReportWithAnchors | null = null;
   let serverError: string | null = null;
+  let formatUnrecognized: { reason: string; hint: string } | null = null;
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -125,9 +142,11 @@ export async function streamDoctorProgress(
       if (payload.type === "doctor_progress") onProgress(payload.event);
       else if (payload.type === "doctor_result") finalReport = payload.report;
       else if (payload.type === "doctor_error") serverError = payload.error;
+      else if (payload.type === "doctor_format_unrecognized") formatUnrecognized = payload;
     }
   }
 
+  if (formatUnrecognized) throw new FormatUnrecognizedError(formatUnrecognized.reason, formatUnrecognized.hint);
   if (serverError) throw new Error(serverError);
   if (!finalReport) throw new Error("Diagnosis stream ended without a result — try again.");
   return finalReport;

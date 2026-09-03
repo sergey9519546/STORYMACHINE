@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Info,
   ShieldAlert,
+  FileQuestion,
   Upload,
   FileText,
   CheckCircle2,
@@ -52,6 +53,7 @@ import {
   doctorProgressLabel,
   type DoctorStreamProgress,
   type DoctorReportWithAnchors,
+  FormatUnrecognizedError,
 } from "../../lib/doctor-stream.ts";
 import {
   pairFindingSceneIndexes,
@@ -1710,6 +1712,12 @@ export default function ScriptDoctorPanel({
   const [handoffOutdated, setHandoffOutdated] = useState(false);
   const reportIsComplete = report !== null && isWholeDraftAnalysisComplete(report);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Upgrade item #3: set instead of (never alongside) errorMessage when the
+  // server recognized the submission as having no scene headings at all —
+  // status still goes to "error" (Retry reuses the same button/flow), but
+  // the error-state render branch below checks this first to show a
+  // dedicated "not a screenplay" banner rather than "Diagnosis failed".
+  const [formatUnrecognized, setFormatUnrecognized] = useState<{ reason: string; hint: string } | null>(null);
   // Per-pass collapse overrides; a pass with no override defaults to
   // "open iff it found issues" (collapsed-by-default when 0 issues).
   const [openPasses, setOpenPasses] = useState<Partial<Record<PassName, boolean>>>({});
@@ -1972,6 +1980,7 @@ export default function ScriptDoctorPanel({
       setStatus("idle");
       setReport(null);
       setErrorMessage(null);
+      setFormatUnrecognized(null);
       return;
     }
 
@@ -2014,6 +2023,7 @@ export default function ScriptDoctorPanel({
     setStatus("idle");
     setReport(null);
     setErrorMessage(null);
+    setFormatUnrecognized(null);
   };
 
   const clearUpload = () => {
@@ -2023,6 +2033,7 @@ export default function ScriptDoctorPanel({
     setStatus("idle");
     setReport(null);
     setErrorMessage(null);
+    setFormatUnrecognized(null);
   };
 
   /** `sampleOverride` is set only by loadSample's own immediate call, to hand
@@ -2068,6 +2079,7 @@ export default function ScriptDoctorPanel({
 
     setStatus("loading");
     setErrorMessage(null);
+    setFormatUnrecognized(null);
     setStreamProgress(null);
 
     // Request contract: exactly one of fountain|fdx as JSON, OR raw PDF bytes
@@ -2263,6 +2275,11 @@ export default function ScriptDoctorPanel({
           } else if (userCancelledRef.current) {
             setStatus("idle"); // stopped, not failed — the writer can retry any time
           }
+          return;
+        }
+        if (err instanceof FormatUnrecognizedError) {
+          setStatus("error");
+          setFormatUnrecognized({ reason: err.message, hint: err.hint });
           return;
         }
         setStatus("error");
@@ -3321,8 +3338,31 @@ export default function ScriptDoctorPanel({
           </div>
         )}
 
+        {/* ── Unrecognized-format state (upgrade item #3) ── distinct from
+            both the red "Diagnosis failed" banner below (this isn't a
+            failure — the request succeeded, the text just isn't a
+            screenplay) and the amber "Analysis incomplete" banner in the
+            success branch (that one means the doctor RAN but couldn't
+            finish; this one means the doctor never ran at all). */}
+        {status === "error" && formatUnrecognized && (
+          <div className="sm-panel border-2 border-stamp bg-paper p-4 space-y-3">
+            <p className="sm-sub text-stamp flex items-center gap-2">
+              <FileQuestion className="w-4 h-4" aria-hidden="true" /> Not a screenplay
+            </p>
+            <p className="text-xs font-mono leading-relaxed text-ink/80">{formatUnrecognized.reason}</p>
+            <p className="text-[10px] font-mono leading-relaxed text-ink/60">{formatUnrecognized.hint}</p>
+            <button
+              onClick={() => runDiagnosis()}
+              disabled={isEmpty}
+              className="sm-btn--ink px-3 py-2 text-[10px] font-bold uppercase tracking-widest sm-btn disabled:opacity-40 flex items-center gap-2"
+            >
+              <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Retry
+            </button>
+          </div>
+        )}
+
         {/* ── Error state ── */}
-        {status === "error" && (
+        {status === "error" && !formatUnrecognized && (
           <div className="bg-red-50 dark:bg-red-950/40 border-2 border-red-300 dark:border-red-800 p-4 space-y-3">
             <p className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-2">
               <ShieldAlert className="w-4 h-4" aria-hidden="true" /> Diagnosis failed
