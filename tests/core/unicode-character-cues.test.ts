@@ -239,13 +239,14 @@ describe('character cues: the accented script parses like its ASCII twin', () =>
   });
 
   it('Burrows\'s-delta voice analysis scores the accented cast', () => {
-    const a = analyzeFountainText(accented);
-    const b = analyzeFountainText(ascii);
-    assert.equal(a.voiceAnalysis.scored, true, 'voice analysis abstained on the accented script');
-    assert.equal(a.voiceAnalysis.pairs.length, 10, 'expected all 5-choose-2 pairs');
+    const va = analyzeFountainText(accented).voiceAnalysis;
+    const vb = analyzeFountainText(ascii).voiceAnalysis;
+    assert.ok(va && vb, 'voiceAnalysis missing from the analysis');
+    assert.equal(va.scored, true, 'voice analysis abstained on the accented script');
+    assert.equal(va.pairs.length, 10, 'expected all 5-choose-2 pairs');
     assert.deepEqual(
-      a.voiceAnalysis.pairs.map(p => ({ ...p, a: deaccent(p.a), b: deaccent(p.b) })),
-      b.voiceAnalysis.pairs,
+      va.pairs.map(p => ({ ...p, a: deaccent(p.a), b: deaccent(p.b) })),
+      vb.pairs,
       'voice deltas diverge between the accented script and its ASCII twin',
     );
   });

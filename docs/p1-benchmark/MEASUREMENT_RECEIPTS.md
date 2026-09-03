@@ -1121,3 +1121,131 @@ holds (full suite green at the commit carrying this note).
   and none is claimed — the change is copy and additive schema, not a
   formula, threshold, or weight edit, and the byte-level identity of every
   non-listed field across all 45 reports is the receipt it owes."
+
+### 2026-09-03 — UNICODE CHARACTER CUES: the cue alphabet widened from `[A-Z]` to `\p{Lu}\p{Lt}\p{M}` — output-identity receipt over the 45 in-repo fixtures, WITH an explicit statement of the scripts whose scores this DOES move
+
+- **What changed on the scoring path:** one rule, spelled out in many places,
+  each of which said "all caps" in ASCII. A character cue is an all-caps line
+  adjacent to its dialogue; every copy tested that with `[A-Z]`, so `MARÍA`
+  failed and `MARIA` passed. Fountain's grammar is context-dependent on the
+  preceding block, so a single unrecognised cue also demoted the parenthetical
+  and every dialogue line beneath it, and the doctor — which segments scenes
+  through `parseFountain` — read any script with an accented name as pure
+  action. Fixed in: `src/lib/fountain.ts` (the parser's cue regex and its
+  shot-line class, which now export the alphabet once as `CUE_INITIAL_CLASS` /
+  `CUE_LETTER_CLASS`); `server/nvm/analyze/fountain-analyzer.ts` (`CUE_LINE_RE`,
+  the clue channel's speaker-name guard, hoisted to module scope and composed
+  from those classes); `server/nvm/analyze/screenplay-normalizer.ts`
+  (`isCharacterCue`, the double-spaced-import detector); 122 inline copies
+  across `server/nvm/revision/passes/**` (voice, originality, dialogue,
+  structure, character-arc, intention, pacing, rhythm, causality — each gating
+  an `inDialogue` walk); and ten more cue predicates under
+  `server/nvm/analyze/**` (interiority, pattern-establishment, bonding-signal,
+  silence-signal, excellence-signals, dialogue-info-ratio, locate, prioritize,
+  epistemic-ledger, custody-ledger). No formula, threshold, weight, deduction,
+  verdict band, cache key or rule name was touched: the ONLY change is which
+  lines the parser is willing to call a cue.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` — NOT
+  `npm run measure-real`. The reasoning is the one the 2026-08-21 and
+  2026-09-03 entries above give: this range claims a specific, falsifiable
+  thing about the in-repo fixture set (that no report over it moves), and a
+  byte-level identity proof is the stronger receipt for that claim than a
+  discrimination statistic, which can stay put while individual reports drift.
+  Read the "what this receipt does NOT say" bullet below before treating that
+  PASS as a claim that nothing anywhere scores differently — it is not, and
+  this change is not a pure refactor.
+- **Baseline used:** `git archive main` at `e68435ca` — the tip of the branch
+  being merged into at measurement time, not the fork point; this work was
+  rebased onto that tip before measuring, and the harness was run against it
+  afterwards, not before. `node_modules` was symlinked into the extracted tree
+  so both trees resolved the same dependency versions. The comparison tree was
+  this branch's own working tree. This branch's commit hashes are deliberately
+  not cited: they change on every rebase, and a receipt has to name something a
+  reviewer can still resolve.
+- **What was run — output identity over all 45 in-repo fixtures** (20
+  `data/screenplays/*.fountain`, 20 calibration `REFERENCE_CORPUS` samples, the
+  P0 sample script, 4 synthetic concatenations at 60/120/240/300 scenes):
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then `--compare <before> <after>`, with no
+  `--ignore-keys` and no `--require-added` — this range adds no report key, so
+  a plain, unflagged comparison is the honest instrument. Result, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  Exit codes 0 / 0 / 0, captured by redirecting each run to a log file and
+  reading `$?`.
+- **WHY identity holds, stated so it cannot be mistaken for a stronger claim.**
+  It holds because the 45 fixtures contain no non-ASCII capital at all. Every
+  non-ASCII code point across the 20 live-action fixtures, the calibration
+  corpus and the P0 sample was enumerated: 213 box-drawing rules and 2 `≈`
+  (both inside `corpus.ts` comments), 69 em dashes, 1 en dash, and 3
+  lower-case `é`. Zero uppercase letters, zero titlecase letters, zero
+  combining marks. On ASCII input `\p{Lu}` is exactly `[A-Z]`, `\p{Lt}` and
+  `\p{M}` match nothing, so the widened classes are provably the same classes
+  over this input. Identity here is a statement about the fixtures, not about
+  the change.
+- **What this receipt does NOT say — the scores this change DOES move.** Any
+  script containing a character cue with a non-ASCII capital WILL score
+  differently on this branch than on the baseline, by design, because it was
+  previously parsed as action. This was measured directly rather than argued.
+  (1) On `tests/fixtures/unicode-cues/accented-cues.fountain`, a fixture added
+  by this range whose five cues are MARÍA / JOSÉ / ZOË / BJÖRN / RENÉE: on the
+  baseline tree the analyzer returns 0 characters, 0 dialogue lines, 75 action
+  lines and a subtext ratio of 1, and the doctor returns health 76.7 with 0
+  character functions; on this tree the same file returns 5 characters, 16
+  dialogue lines, 40 action lines, subtext ratio 0.63, scored Burrows's-delta
+  voice analysis, and health 74.7 with 5 character functions. (2) A negative
+  control on a REAL fixture: giving one cue name in
+  `data/screenplays/mise.fountain` a single diacritic (every `LUCIA` cue line
+  → `LÉCIA`, nothing else changed) moves that script on the baseline tree from
+  health 72.9 / 5 character functions to 72.7 / 4, while on this tree the
+  accented variant scores identically to the file as committed (72.9 / 5).
+  That is the whole change in one line: the parse became invariant to the
+  accent, which necessarily means it differs from the baseline wherever an
+  accent was present. Anyone holding the private real corpus should therefore
+  run `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` and re-lock
+  `tests/fixtures/real-corpus-manifest.json` if any corpus script carries a
+  non-ASCII character cue, since such a script's health, verdict or scene
+  count can move. The corpus is local-only and copyright-restricted, so that
+  step belongs to the owner; this entry records the in-repo evidence and names
+  the exact condition that triggers the re-lock rather than implying none is
+  needed.
+- **Second instrument — the guards that keep the copies from diverging again.**
+  `tests/core/unicode-character-cues.test.ts` holds three of the independent
+  predicates (`src/lib/fountain.ts`'s `CHARACTER_CUE_RE`,
+  `fountain-analyzer.ts`'s `CUE_LINE_RE`, `screenplay-normalizer.ts`'s
+  `isCharacterCue`) to one 29-row table of ASCII lines and their accented
+  twins, asserting each predicate agrees with itself across the diacritic and
+  that `parseFountain` assigns the twins the same block type; plus a source
+  scan over `server/nvm/analyze/**`, `server/nvm/revision/passes/**`,
+  `src/lib/fountain.ts` and `src/services/director.ts` that fails on any
+  ASCII-only cue class reintroduced there. 16 assertions, all passing. The
+  suite also pins the DELIBERATE non-behaviour: caseless scripts (CJK, Hebrew,
+  Arabic) stay `action`, because "all caps" is a signal that exists only in a
+  cased script and admitting `\p{Lo}` would make every short line of Japanese
+  action a character cue.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the 45
+  in-repo fixtures plus three new fixtures under
+  `tests/fixtures/unicode-cues/` are the whole input. The new fixtures sit in a
+  SUBDIRECTORY on purpose: the harness scans `tests/fixtures/*.fountain` flat
+  and its set must stay at 45, which the before/after snapshot counts confirm
+  (45 and 45). `tests/fixtures/real-corpus-manifest.json` is unchanged by this
+  range; whether it needs a re-lock depends on the corpus, per the bullet
+  above.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the baseline
+  tree myself, ran the three harness commands above myself on 2026-09-03 after
+  rebasing onto that tip, and read the PASS line out of the compare run's own
+  log file along with its exit code. I wrote and ran the two before/after
+  probes described above against both trees and read their numbers out of the
+  probe output myself; the health and character-function figures quoted for
+  the accented fixture and for the `mise.fountain` negative control are that
+  output, not an inference from it. I also enumerated every non-ASCII code
+  point in the 45-fixture input myself and read the result. No real-corpus AUC
+  measurement was run against this range and none is claimed: the corpus is
+  local-only and this container has no copy of it. I want the limit of this
+  receipt on the record in plain words — output identity over the in-repo
+  fixtures does NOT mean no score moves, only that these 45 ASCII inputs are
+  unaffected; a real-corpus script with a non-ASCII character cue scores
+  differently on this branch, deliberately, and the owner's `measure-real` run
+  plus a manifest re-lock is the step that closes that gap."
