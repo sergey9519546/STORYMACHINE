@@ -42,7 +42,12 @@ describe('G0-04 — programmatic draft installs respect the auto-analysis gate',
     // call is guarded.
     const idx = source.indexOf('onLoadSampleIntoEditor');
     assert.ok(idx > -1, 'expected ScriptIDE.tsx to wire onLoadSampleIntoEditor');
-    const body = source.slice(idx, idx + 1600);
+    // Window widened 1600 -> 3000 (retrospective #1/#2): this callback
+    // legitimately grew — the G0-01 cleared-by-writer guard and the sample
+    // title-page autofill both landed inside it — pushing the still-gated
+    // triggerAnalysis call further from the anchor. The regex requirement
+    // below is unchanged; only the scan window grew to still find it.
+    const body = source.slice(idx, idx + 3000);
     assert.ok(
       body.includes('triggerAnalysis'),
       'sanity: the sample-install callback should still reference triggerAnalysis',

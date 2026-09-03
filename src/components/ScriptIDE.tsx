@@ -3177,10 +3177,10 @@ export default function ScriptIDE({
               onFreshReport={() => setCoverageStale(false)}
               onReportComputed={setCoverageReport}
               onLoadSampleIntoEditor={(text) => {
-                // G0-01 defense in depth: refuse to overwrite a non-empty draft
-                // that differs from the sample. The draft stays byte-identical.
-                // Retrospective #2: also refuse an empty draft that was
-                // cleared AFTER holding the sample (see sampleEverInstalledRef).
+                // G0-01 defense in depth: refuse a non-empty, differing
+                // draft. Retrospective #2: also refuse an empty draft the
+                // writer cleared AFTER it held the sample (see
+                // sampleEverInstalledRef's doc comment above).
                 const decision = decideSampleInstall({
                   currentDraft: draftRef.current.scriptText,
                   incomingSample: text,
@@ -3195,26 +3195,15 @@ export default function ScriptIDE({
                   return;
                 }
                 installDraft(text);
-                // Retrospective #2 (root fix): reset the auto-load flag the
-                // MOMENT the sample is actually installed, not only on the
-                // Coverage panel's close handler. AnimatePresence unmounts
-                // CoverageSummary per tab switch, which resets its local
-                // `sampleFired` ref — without this, a lingering
-                // doctorAutoSample=true silently refires the auto-install
-                // effect on the next Coverage remount and can repopulate a
-                // draft the writer just emptied. Also record that this
-                // specific draft now HAS held the sample, so the guard above
-                // refuses a later silent reinstall into it once cleared.
+                // Retrospective #2 root fix: reset the moment it's actually
+                // installed, not only on close — see doctorAutoSample's doc
+                // comment for the remount loophole this closes.
                 setDoctorAutoSample(false);
                 sampleEverInstalledRef.current = true;
-                // Retrospective #1 ("Title survives"): the bundled sample's
-                // own Fountain text (src/lib/sample-script.ts) has no
-                // leading title block for the scriptText-watching effect
-                // above to find, so it never earned "Dead Frequency" from
-                // that generic parse. Its title is a known constant
-                // (sampleScriptTitle) instead — set it directly, but only
-                // when titlePage is still untouched, so this can never
-                // clobber a title the writer set on the Title tab.
+                // Retrospective #1: the sample's own Fountain has no title
+                // block for the parser above to find, so give it its known
+                // title directly (still guarded — never overwrites a
+                // writer-set titlePage).
                 if (isDefaultTitlePage(draftRef.current.titlePage)) {
                   setTitlePage({ ...draftRef.current.titlePage, title: sampleScriptTitle });
                 }

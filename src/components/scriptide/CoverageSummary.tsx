@@ -58,6 +58,99 @@ function verdictLabel(v?: string): string {
   return v.charAt(0) + v.slice(1).toLowerCase();
 }
 
+/**
+ * Retrospective #8: the six stat tiles below (Critical/Major/Minor, Subtext
+ * Ratio, Voice Separation, Resolved Qs) carried no explanation of what they
+ * measure or which direction is better — a first-time writer has to guess
+ * whether a high "Subtext Ratio" is good news. Each sentence below is
+ * written from the ACTUAL producing code, not a guess:
+ *   - bySeverity.critical/major/minor: server/nvm/analyze/doctor.ts's raw
+ *     per-severity finding counts (fewer is better, self-evidently).
+ *   - subtextRatio: server/nvm/analyze/fountain-analyzer.ts computes
+ *     totalActionWords / (totalActionWords + totalDialogueWords) — an
+ *     action-vs-dialogue WORD-COUNT split, not a literary subtext judgment.
+ *     Nothing in the scoring pipeline attaches an ideal target to it (grep
+ *     confirms doctor.ts only carries the number through), so the copy
+ *     below does not invent a "higher/lower is better" claim the code
+ *     doesn't make.
+ *   - voiceAnalysis.pairs/swapRisk: server/nvm/analyze/voice-delta.ts's
+ *     Burrows's-Delta pairwise comparison; swapRisk is true when two
+ *     characters' dialogue is statistically indistinguishable (delta below
+ *     0.15) — more non-swap-risk pairs (a higher fraction) is better.
+ *   - questionLatencyOverall: fountain-analyzer.ts's detectQuestionLatency
+ *     walks the document tracking every substantive dialogue question
+ *     against whether a LATER line's content words answer it — more
+ *     resolved (closer to the total) is better (fewer dangling threads).
+ * Each definition is BOTH the button's title= (desktop hover) and the
+ * always-present, aria-describedby-linked paragraph a screen reader
+ * announces regardless of interaction; tapping/clicking the "i" toggle also
+ * reveals it visually, which is what makes it reachable on touch (title=
+ * alone never fires there).
+ */
+const STAT_DEFINITIONS = {
+  critical: "Findings the doctor rates severity: critical — the issues most likely to break the read. Fewer is better.",
+  major: "Findings rated severity: major — real craft problems short of critical. Fewer is better.",
+  minor: "Findings rated severity: minor — smaller polish notes. Fewer is better.",
+  subtextRatio:
+    "Share of the script's words that are action/description rather than dialogue (action words ÷ action+dialogue words). A word-count split, not a judgment of literary subtlety — there's no single ideal ratio.",
+  voiceSeparation:
+    "Character pairs whose dialogue is statistically distinguishable (Burrows's Delta) out of every pair with enough dialogue to test. Higher is better — a low pair risks two characters sounding interchangeable.",
+  resolvedQs:
+    "Substantive questions raised in dialogue that a later line goes on to answer, out of every question raised. Higher (closer to the total) is better — the gap is open threads left dangling.",
+} as const;
+
+/** One stat tile: label + value, with an info toggle that's the hover title
+ *  AND an always-present aria-describedby target (for screen readers) AND a
+ *  tap-to-reveal visible caption (for touch, where title= never fires). */
+function StatTile({
+  id,
+  label,
+  description,
+  cardClassName = "sm-card py-3 text-center",
+  valueClassName = "mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-ink)]",
+  children,
+}: {
+  id: string;
+  label: string;
+  description: string;
+  cardClassName?: string;
+  valueClassName?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const descId = `${id}-desc`;
+  return (
+    <div className={cardClassName} aria-describedby={descId}>
+      <div className="flex items-center justify-center gap-1">
+        <p className="sm-h">{label}</p>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-label={`What does ${label} measure?`}
+          title={description}
+          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-current text-[8px] font-bold normal-case leading-none text-[var(--sm-ink-mute)] opacity-70 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        >
+          i
+        </button>
+      </div>
+      <p className={valueClassName}>
+        {children}
+      </p>
+      {/* Always in the DOM (so aria-describedby always has something for a
+          screen reader to announce); `sr-only` visually hides it until the
+          "i" toggle opens it — the only way a touch user, who never
+          triggers title=, can see it. */}
+      <p
+        id={descId}
+        className={`mt-1.5 text-left text-[9px] font-normal normal-case leading-snug text-[var(--sm-ink-mute)] ${open ? "" : "sr-only"}`}
+      >
+        {description}
+      </p>
+    </div>
+  );
+}
+
 export default function CoverageSummary({
   fountain,
   title,
@@ -474,46 +567,56 @@ export default function CoverageSummary({
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <div className="sm-card py-3 text-center">
-                <p className="sm-h">Critical</p>
-                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-stamp)]">
-                  {report.bySeverity.critical}
-                </p>
-              </div>
-              <div className="sm-card py-3 text-center">
-                <p className="sm-h">Major</p>
-                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-ink)]">
-                  {report.bySeverity.major}
-                </p>
-              </div>
-              <div className="sm-card py-3 text-center">
-                <p className="sm-h">Minor</p>
-                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-ink-mute)]">
-                  {report.bySeverity.minor}
-                </p>
-              </div>
+              <StatTile
+                id="tile-critical"
+                label="Critical"
+                description={STAT_DEFINITIONS.critical}
+                valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-stamp)]"
+              >
+                {report.bySeverity.critical}
+              </StatTile>
+              <StatTile id="tile-major" label="Major" description={STAT_DEFINITIONS.major}>
+                {report.bySeverity.major}
+              </StatTile>
+              <StatTile
+                id="tile-minor"
+                label="Minor"
+                description={STAT_DEFINITIONS.minor}
+                valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-ink-mute)]"
+              >
+                {report.bySeverity.minor}
+              </StatTile>
             </div>
 
             {/* Batch 2 Metrics: Subtext, Voice Separation & Question Latency */}
             <div className="grid grid-cols-3 gap-2">
-              <div className="sm-card py-2 text-center">
-                <p className="sm-h">Subtext Ratio</p>
-                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]">
-                  {typeof report.subtextRatio === 'number' ? `${Math.round(report.subtextRatio * 100)}%` : '—'}
-                </p>
-              </div>
-              <div className="sm-card py-2 text-center">
-                <p className="sm-h">Voice Separation</p>
-                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]">
-                  {report.voiceAnalysis?.scored ? `${report.voiceAnalysis.pairs.filter(p => !p.swapRisk).length}/${report.voiceAnalysis.pairs.length} Pairs` : 'N/A'}
-                </p>
-              </div>
-              <div className="sm-card py-2 text-center">
-                <p className="sm-h">Resolved Qs</p>
-                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]">
-                  {report.questionLatencyOverall ? `${report.questionLatencyOverall.totalResolved}/${report.questionLatencyOverall.totalQuestions}` : '—'}
-                </p>
-              </div>
+              <StatTile
+                id="tile-subtext-ratio"
+                label="Subtext Ratio"
+                description={STAT_DEFINITIONS.subtextRatio}
+                cardClassName="sm-card py-2 text-center"
+                valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]"
+              >
+                {typeof report.subtextRatio === 'number' ? `${Math.round(report.subtextRatio * 100)}%` : '—'}
+              </StatTile>
+              <StatTile
+                id="tile-voice-separation"
+                label="Voice Separation"
+                description={STAT_DEFINITIONS.voiceSeparation}
+                cardClassName="sm-card py-2 text-center"
+                valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]"
+              >
+                {report.voiceAnalysis?.scored ? `${report.voiceAnalysis.pairs.filter(p => !p.swapRisk).length}/${report.voiceAnalysis.pairs.length} Pairs` : 'N/A'}
+              </StatTile>
+              <StatTile
+                id="tile-resolved-qs"
+                label="Resolved Qs"
+                description={STAT_DEFINITIONS.resolvedQs}
+                cardClassName="sm-card py-2 text-center"
+                valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]"
+              >
+                {report.questionLatencyOverall ? `${report.questionLatencyOverall.totalResolved}/${report.questionLatencyOverall.totalQuestions}` : '—'}
+              </StatTile>
             </div>
 
             <div className="sm-card sm-card--sel">
