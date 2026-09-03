@@ -31,6 +31,36 @@ activation path.
 The server boots **without** an AI key on purpose (`server.ts` → analysis-only mode).
 Keyless analysis is the product’s front door, not a degraded afterthought.
 
+**The boundary between those two layers is a module boundary, and a test says so.**
+Until 2026-09-03 the paragraph above was only prose: the static import graph
+rooted at `server/nvm/analyze/doctor.ts` reached `server/engine/ai.ts` (and its
+provider/HTTP stack) and `server/engine/Stage.ts` (better-sqlite3), so every
+doctor worker thread loaded an AI transport and a native database binding in
+order to compute a deterministic score — the 2026-09-02 retrospective’s finding
+#5. `tests/core/pure-core-boundary.test.ts` now enforces the claim four ways:
+
+- nothing under `server/engine/ai.ts`, `server/engine/Stage.ts`,
+  `server/lib/ai-providers/**`, `server/monitoring/**` or `server/routes/**` may
+  be reachable from `doctor.ts`;
+- no reachable file may import `better-sqlite3`, `express`, `node:http(s)` or `ws`;
+- the set of reachable files outside `server/nvm/analyze/**` and
+  `server/nvm/revision/**` must equal `CORE_ALLOWLIST` in that test — 21 entries
+  today, each with a one-line justification naming the number it helps compute,
+  so a new arrival cannot slip in unexplained;
+- and a worker thread running the doctor is observed with a `node:module` load
+  hook and a patched `process.dlopen`, so a violation is caught even when it
+  arrives by a route the static walk cannot see.
+
+Two mechanics are load-bearing when cutting an edge. `scripts/lib/import-graph.mjs`
+follows **type-only** imports and **dynamic** `import()` deliberately (the receipt
+gate depends on seeing both), so neither `import type` nor `await import()` hides a
+dependency: split the module (`screenplay/compile-types.ts`, `state/from-stage.ts`,
+`lib/request-logger.ts`) or invert it behind a registry (`lib/llm-port.ts`,
+`revision/rewrite-llm.ts`), where the adapter lives outside the core and plugs
+itself in. The allowlist is also the receipt gate’s scoring-path list
+(`scripts/check-scoring-receipt.mjs`), so every entry costs a measurement receipt
+on every change — keeping it short is not tidiness, it is the cost model.
+
 ---
 
 ## 2. Stack

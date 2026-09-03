@@ -88,7 +88,7 @@ mentions collab. Fix: server-minted unguessable room ids; the typed name
 becomes a local label — a share-link model matching the rest of the product.
 
 ## 5. The deterministic/generative boundary is prose, not a module boundary
-**WEAK ROUTE · dispatched (lane R2)**
+**WEAK ROUTE · FIXED 2026-09-03 (lane R2)** — edges cut (LLM behind `server/lib/llm-port.ts`, `rewrite-llm.ts`, `compile-types.ts`, `from-stage.ts`, `request-logger.ts`); doctor's reachable set 85 → 63 files, 43 → 21 outside the two core directories; enforced by `tests/core/pure-core-boundary.test.ts` (fails 5 of 6 on the pre-fix tree) with all 45 doctor fixtures byte-identical.
 
 `ARCHITECTURE.md §1` promises the core is pure and keyless. Traced:
 `doctor.ts → deep-read.ts → engine/ai.ts` and
@@ -235,7 +235,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | 2 | AUC verifiable from committed numbers | MISTAKE | R1 |
 | 3 | Receipt gate misses `src/lib/fountain.ts` | MISTAKE | Fixed 2026-09-02 — reachability now ungated by directory, `REACHABLE_BUT_NOT_SCORING` starts empty |
 | 4 | Collab rooms unowned | MISTAKE | R3 — delivered: server-minted room ids, share-link model, `docs/AUTH.md` §Collaboration rooms |
-| 5 | Core imports AI + SQLite | WEAK ROUTE | R2 |
+| 5 | Core imports AI + SQLite | WEAK ROUTE | R2 — fixed 2026-09-03: edges cut, reachable set 43 → 21 files outside the core dirs, `tests/core/pure-core-boundary.test.ts` + its allowlist enforce it |
 | 6 | 21 untested rules; false coverage claim | MISTAKE | R4 |
 | 7 | Ratchet never re-ratcheted | WEAK ROUTE | R1 |
 | 8 | Audit checks numbers, not claims | WEAK ROUTE | R4 |

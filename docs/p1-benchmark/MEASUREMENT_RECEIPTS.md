@@ -941,3 +941,75 @@ holds (full suite green at the commit carrying this note).
   real-corpus measurement was run, and none is claimed — this change alters
   request validation for collaboration routes, not scoring, so identity is
   the receipt it owes."
+
+### 2026-09-03 — RETROSPECTIVE #5 PURE-CORE BOUNDARY: the deterministic core stopped importing the AI transport and the SQLite Stage — no scoring measurement, because no score moved (output-identity receipt instead)
+
+- **What changed on the scoring path:** structure only, in five places.
+  `server/nvm/analyze/deep-read.ts` now reaches a language model through
+  `server/lib/llm-port.ts` (an interface plus a registry, no dependencies)
+  instead of importing `server/engine/ai.ts` directly;
+  `server/nvm/revision/rewrite.ts`'s generative half moved to
+  `rewrite-llm.ts`, which the revision route wires in; `CompiledScreenplay` /
+  `SceneAnnotation` moved to `server/nvm/screenplay/compile-types.ts`;
+  `buildNarrativeState(stage)` moved to `server/nvm/state/from-stage.ts`; and
+  `requestLogger()` moved to `server/lib/request-logger.ts`. Not one formula,
+  threshold, deduction, constant, cache key, rule name or verdict rule was
+  touched. The reachable set rooted at `server/nvm/analyze/doctor.ts` shrank
+  from 85 files to 63 — 43 outside `server/nvm/analyze/**` and
+  `server/nvm/revision/**` down to 21 — and `server/engine/ai.ts`,
+  `server/engine/ai-provider.ts`, `server/lib/ai-providers/**`,
+  `server/lib/validation.ts`, `server/lib/runtime-limits.ts`,
+  `server/lib/metrics.ts`, `server/engine/Stage.ts`,
+  `server/monitoring/v5-metrics.ts` and the kernel/project/quality/valuation
+  subgraphs left it entirely.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` — NOT
+  `npm run measure-real`, for the reason the two 2026-08-21 entries and the
+  2026-09-02 entry give: this change claims to move zero reports, and an
+  output-identity proof is the stronger, more falsifiable receipt for that
+  shape of change. A discrimination statistic can stay put while individual
+  reports drift; byte identity cannot.
+- **Baseline used:** `git archive main` at `5f6e38a6` — the tip of the branch
+  being merged into at measurement time, not the fork point (this branch was
+  rebased onto that tip before measuring). `node_modules` was symlinked into
+  the extracted tree so both trees resolved the same dependency versions. The
+  comparison tree was this branch's working tree. This branch's own commit
+  hashes are deliberately not cited: they change on every rebase, and a
+  receipt has to name something a reviewer can still resolve.
+- **What was run — output identity over all 45 in-repo fixtures** (20
+  `data/screenplays/*.fountain`, 20 calibration `REFERENCE_CORPUS` samples,
+  the P0 sample script, 4 synthetic concatenations at 60/120/240/300 scenes):
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then `--compare <before> <after>`.
+  Result: **`OUTPUT IDENTITY: PASS — all 45 reports are byte-identical
+  (analyzedAt excluded).`** Exit codes 0 / 0 / 0, captured by redirecting each
+  run to a log file and reading `$?`.
+- **Second instrument — what the doctor's own thread loads.** A worker thread
+  performing exactly what `server/nvm/analyze/doctor-worker.ts` performs
+  (`await import('./doctor.ts')`, then `runScriptDoctor`) was instrumented
+  with a `node:module` load hook and a patched `process.dlopen`. On the
+  baseline tree it instantiated 60 repository modules and 92 `node_modules`
+  entries, among them `server/engine/ai.ts`, `server/engine/ai-provider.ts`,
+  `server/lib/ai-providers/openai-compat.ts`,
+  `server/lib/ai-providers/schema.ts`, `server/lib/metrics.ts` and
+  `server/lib/validation.ts`. On this tree it instantiates 53 repository
+  modules and 79 `node_modules` entries, and none of those six. Neither tree
+  loaded a native addon — `server/engine/Stage.ts` was reached only through
+  type-only edges, which runtime type-stripping erases, which is exactly why
+  the static import walk (not the runtime probe) is what caught that half.
+  This observation is now a permanent test:
+  `tests/core/pure-core-boundary.test.ts`, which fails 5 of its 6 assertions
+  when run against the baseline tree and passes on this one.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the
+  45 in-repo fixtures are the whole input.
+  `tests/fixtures/real-corpus-manifest.json` (72 rows) is unchanged by this
+  range, and no manifest re-lock was needed because no produced script's
+  health, verdict or sceneCount moved — that is what the identity PASS above
+  says.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the
+  baseline tree myself, ran the three harness commands above myself on
+  2026-09-03, and read the PASS line out of the compare run's log file along
+  with its exit code. I also ran the worker-thread load probe against both
+  trees and read both module lists. No real-corpus measurement was run, and
+  none is claimed: this change moves module boundaries, not numbers, and the
+  byte-level identity of all 45 reports is the receipt it owes."
