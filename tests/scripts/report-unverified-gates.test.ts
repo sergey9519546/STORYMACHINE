@@ -15,7 +15,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { evaluateGates, gateRan, isExpired, render } from '../../scripts/report-unverified-gates.mjs';
+import { evaluateGates, gateRan, isExpired, render, GATES } from '../../scripts/report-unverified-gates.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(REPO_ROOT, 'scripts/report-unverified-gates.mjs');
@@ -41,6 +41,13 @@ describe('isExpired', () => {
   it('a gate with no expiry never expires — reporting stays the default', () => {
     assert.equal(isExpired(envGate, '2099-01-01'), false);
     assert.equal(isExpired({ ...envGate, expires: '' }, '2099-01-01'), false);
+  });
+
+  it('expires: null never blocks, at any date — the explicit "will not close in CI" case (Decision #5)', () => {
+    const g = { ...envGate, expires: null, expiresReason: 'cannot reach CI by design' };
+    assert.equal(isExpired(g, '2026-09-03'), false);
+    assert.equal(isExpired(g, '2099-01-01'), false);
+    assert.equal(evaluateGates([g], { env: {}, root: REPO_ROOT, today: '2099-01-01' }).exitCode, 0);
   });
 
   it('expires ON the date, not the day after', () => {
@@ -113,6 +120,17 @@ describe('render', () => {
     assert.match(out, /expires:\s+2026-10-01/);
     assert.doesNotMatch(out, /BLOCKING/);
   });
+
+  it('marks a null-expiry gate SKIPPED, prints "never" with its reason, and never blocks', () => {
+    const out = render(evaluateGates(
+      [{ ...envGate, expires: null, expiresReason: 'cannot reach CI by design' }],
+      { env: {}, root: REPO_ROOT, today: '2099-01-01' },
+    ));
+    assert.match(out, /\[SKIPPED\]/);
+    assert.match(out, /expires:\s+never — cannot reach CI by design/);
+    assert.doesNotMatch(out, /\[EXPIRED\]/);
+    assert.doesNotMatch(out, /BLOCKING/);
+  });
 });
 
 describe('the real gate list', () => {
@@ -132,5 +150,42 @@ describe('the real gate list', () => {
     // the gate, or move the date in a diff a reviewer can refuse.
     const r = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
     assert.ok(r.length > 0);
+  });
+
+  it('every gate now has an explicit expires — a deadline or a stated null (Decision #5)', () => {
+    // The 2026-09-03 decision (docs/DECISION_LOG.md Decision #5) requires
+    // that no gate be silently undated. A gate with expires: null must carry
+    // an expiresReason so the absence of a deadline reads as a decision.
+    for (const g of GATES) {
+      assert.ok('expires' in g, `${g.suite} has no expires field at all`);
+      if (g.expires === null) {
+        assert.ok(g.expiresReason, `${g.suite} has expires: null with no expiresReason`);
+      } else {
+        assert.match(g.expires ?? '', /^\d{4}-\d{2}-\d{2}$/, `${g.suite} expires is not an ISO date`);
+      }
+    }
+  });
+
+  it('the E2E journeys gate expires 2026-10-15', () => {
+    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    assert.match(out, /tests\/e2e\/journeys\.test\.ts/);
+    assert.match(out, /unset:\s+RUN_E2E/);
+    assert.match(out, /expires:\s+2026-10-15/);
+  });
+
+  it('the craft-kb gate expires 2026-11-01 and names the commit-vs-hash decision it forces', () => {
+    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    assert.match(out, /tests\/nvm\/generate\/craft-kb\.test\.ts/);
+    assert.match(out, /expires:\s+2026-11-01/);
+  });
+
+  it('the two corpus-gated suites carry an explicit null expiry with a reason, not silence', () => {
+    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    assert.match(out, /tests\/core\/real-script-corpus\.test\.ts/);
+    assert.match(out, /tests\/core\/anti-slop-real-corpus\.test\.ts/);
+    // Both should render "expires: never — <reason>", never a bare SKIPPED
+    // with no expires line at all.
+    const skippedGateBlocks = out.split(/\[SKIPPED\]/).slice(1);
+    assert.ok(skippedGateBlocks.length >= 2);
   });
 });

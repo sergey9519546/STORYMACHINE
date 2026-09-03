@@ -35,9 +35,17 @@
 // sees and can refuse. All three are better than silence.
 //
 // A gate with no `expires` reports and does not block. That is deliberate:
-// the existing four gates' deadlines are the owner's call, not this script's,
-// and inventing dates for them would be the same overreach in the opposite
-// direction.
+// gate deadlines are the owner's call, not this script's, and inventing dates
+// for them would be the same overreach in the opposite direction.
+//
+// ── EVERY GATE NOW HAS AN EXPLICIT ANSWER (2026-09-03, Decision #5 —
+// docs/DECISION_LOG.md) ── "no expires" used to mean "nobody decided yet."
+// As of this entry every gate below carries either a real ISO date or an
+// explicit `expires: null`, so the absence of a deadline is a stated
+// decision (see each gate's `expiresReason` where present), never an
+// oversight. `expires: null` still means what "no expires" always meant —
+// report, never block — the only change is that it is now chosen, not
+// missing.
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -56,14 +64,24 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
  * @property {string} ifSkipped  what is unverified while it does not.
  * @property {string} [env]      env var whose presence means the gate ran.
  * @property {string} [file]     repo-relative input file whose presence means the gate ran.
- * @property {string} [expires]  ISO date on which an unclosed gate starts failing the build.
+ * @property {string | null} [expires]  ISO date on which an unclosed gate starts failing the
+ *   build, or explicit `null` for a gate that by design can never close in CI (see
+ *   `expiresReason`). Omitting the field entirely is no longer used in this file — every
+ *   gate below states one or the other on purpose.
+ * @property {string} [expiresReason]  required alongside `expires: null` — why this gate
+ *   is exempt from ever blocking, so the absence of a deadline reads as a decision.
  */
 
 /** @type {Gate[]} */
-const GATES = [
+export const GATES = [
   {
     env: 'REAL_SCRIPT_CORPUS_DIR',
     suite: 'tests/core/real-script-corpus.test.ts',
+    expires: null,
+    expiresReason:
+      'The corpus cannot reach CI by design (local-only, copyright; mounting it via '
+      + 'secrets was rejected — secrets are not a corpus transport). The closable half of '
+      + 'this gap is the committed table gate below, which does have a deadline.',
     protects:
       'AUC-24 structural-degradation ratchet measured live (shuffle + drop-every-third '
       + 'over a 24-script subset; last measured 0.731), plus 71 per-script '
@@ -78,8 +96,8 @@ const GATES = [
   {
     file: 'tests/fixtures/auc24-table.json',
     suite: 'tests/core/auc24-table.test.ts',
-    // The one gate that carries a deadline, because it is the one gate whose
-    // work is a single local command with no open design questions left.
+    // The gate with the nearest deadline: it is the one whose work is a
+    // single local command with no open design questions left.
     expires: '2026-10-01',
     protects:
       'The AUC-24 ratchet, recomputed in CI from committed NUMBERS (24 intact/degraded '
@@ -98,12 +116,17 @@ const GATES = [
   {
     env: 'REAL_SLOP_CORPUS_DIR',
     suite: 'tests/core/anti-slop-real-corpus.test.ts',
+    expires: null,
+    expiresReason:
+      'Same reason as the real-script-corpus gate above: this corpus cannot reach CI by '
+      + 'design (local-only, copyright), so it has no closable path a deadline could force.',
     protects: 'Anti-slop marker discrimination on real writing.',
     ifSkipped: 'Anti-slop markers are unverified against real prose.',
   },
   {
     env: 'RUN_E2E',
     suite: 'tests/e2e/journeys.test.ts',
+    expires: '2026-10-15',
     protects:
       'The only full-stack test: boots a real server and drives the writer '
       + 'journey over HTTP.',
@@ -113,6 +136,12 @@ const GATES = [
   {
     file: 'data/craft/craft-kb.json',
     suite: 'tests/nvm/generate/craft-kb.test.ts',
+    expires: '2026-11-01',
+    expiresReason:
+      'Closing this gate requires deciding whether to commit the generated KB itself '
+      + '(data/ is gitignored today) or a derived hash of it that a smaller, committable '
+      + 'fixture can check against — that choice, not the test code, is what the deadline '
+      + 'forces a decision on.',
     protects:
       'The 7 schema/integrity assertions over the craft knowledge base: 22 films x 7 '
       + 'canonical sections = 154 entries, every entry genre-attributed with a numeric '
@@ -192,6 +221,8 @@ export function render({ skipped, ran, expired }) {
     lines.push(`     ${gateInput(g)}`);
     if (g.expires) {
       lines.push(`     expires:   ${g.expires}${expiredNow ? '  — PASSED. This step now fails the build.' : '  (reports until then, blocks after)'}`);
+    } else if (g.expires === null) {
+      lines.push(`     expires:   never — ${g.expiresReason ?? 'no reason recorded'}`);
     }
     lines.push(`     protects:  ${g.protects}`);
     lines.push(`     therefore: ${g.ifSkipped}`);

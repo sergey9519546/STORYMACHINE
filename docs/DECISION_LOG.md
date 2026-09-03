@@ -127,6 +127,126 @@ no longer a prerequisite for engine work.
 
 ---
 
+## Decision #4: Adopt the Power-Analysis Proposals (2026-09-03)
+
+**Context**: `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` and
+`docs/p1-benchmark/PRE_REGISTRATION_PROTOCOL.md` §12 (added 2026-09-02,
+marked PROPOSAL/unsigned) computed, for the first time, whether the
+project's existing evidence-gathering sample sizes were actually large
+enough to answer the questions they're asked to answer: a kappa floor with a
+stated confidence-interval requirement, an overlap budget (43-49
+triple-rated scripts) for computing that kappa precisely, the minimum
+detectable AUC difference at the existing n=153 test partition, and the P0
+session count (n=17) needed to bound "would use again" to +/-20 points —
+against the 5 sessions and >=3 readers with no overlap budget that were
+previously written into the plan as unexamined defaults.
+
+**The Question**: Should the project adopt the power-analysis proposals as
+governing targets, or leave them as an unsigned proposal indefinitely?
+
+**Decision**: **Adopt the power-analysis proposals as written.** Maintainer
+delegate, acting on owner instruction ("decide for me and move on"):
+- `PRE_REGISTRATION_PROTOCOL.md` §12 status: PROPOSAL -> **ADOPTED
+  2026-09-03**. §12.1-12.3's numbers are unchanged from the proposal;
+  §12.4 is signed. Sections 1-11 (the locked pre-registration content) are
+  untouched.
+- P0 target: **17 moderated sessions**, with the existing 5 kept as the
+  first checkpoint, not the finish line.
+- P1 human-labeled benchmark (when it starts): keeps the existing >=0.60
+  Fleiss' kappa floor and adds a 95% CI half-width <= 0.10 requirement, plus
+  a >=49-script all-three-reader overlap budget to estimate that kappa
+  precisely.
+- `ROADMAP.md` P0 and P1 sections, `docs/user-validation/P0_QUICK_START.md`
+  (the P0 wayfinding index) updated to state both the checkpoint and the
+  target. `NORTH_STAR.md` was checked and does not state the old sizes as
+  the plan (no session-count or reader-count target appears there), so it
+  was left unchanged.
+
+**Rationale**:
+- The numbers are arithmetic (Hanley-McNeil AUC standard error, Fleiss'
+  kappa large-sample variance, Clopper-Pearson exact binomial CIs), not
+  opinion — see the derivation script `docs/p1-benchmark/power-analysis.mjs`
+  cited in full in the power-analysis doc's Appendix.
+- The old sizes (5 sessions, >=3 readers, no overlap budget) were never
+  chosen for statistical adequacy; they were defaults nobody power-analyzed
+  before writing them into the pre-registration protocol.
+- Adopting the new numbers changes what counts as sufficient evidence going
+  forward. It does not change what the engine does, and it does not
+  fabricate evidence that doesn't exist.
+
+**What this does NOT decide**:
+- It does not claim any P0 session or P1 label exists. Zero sessions and
+  zero labels means zero — this decision records a design target, not
+  results. `docs/user-validation/PHASE_TRACKER.md`'s counters (0 of N)
+  are unaffected by this entry.
+- It does not raise the P1 AUC gate above its existing 0.80 point-estimate
+  target. §12.1's proposal only asks that the CI be reported alongside the
+  point estimate; the gate's bright line is unchanged.
+- It does not shorten or lengthen the reader-labor timeline gap already
+  flagged in §12.2 (100-200 scripts at full overlap vs. a 2-week Phase 2
+  window) — that remains an open decision for whoever runs the labeling
+  round.
+
+**Links**: `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md`;
+`docs/p1-benchmark/PRE_REGISTRATION_PROTOCOL.md` §12;
+`docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` §10 (the finding
+that prompted the power analysis); `ROADMAP.md` P0 and P1 sections;
+`docs/user-validation/P0_QUICK_START.md`.
+
+**Status**: Active.
+
+---
+
+## Decision #5: Every Reported Unverified Gate Gets an Expiry (2026-09-03)
+
+**Context**: `scripts/report-unverified-gates.mjs` gained a per-gate
+`expires` field on 2026-09-02; as of this entry only the `auc24-table` gate
+had one set (2026-10-01). The other CI-skipped/env-gated gates — the E2E
+journeys suite, the craft-KB generation test, and the two local-corpus
+discrimination suites — had no stated deadline, so a reported gap could sit
+open indefinitely with no forcing function.
+
+**The Question**: Should every entry in the unverified-gates reporter carry
+an explicit expiry, and what should each one be?
+
+**Decision**: Set expiries for every gate the reporter tracks:
+- `tests/e2e/journeys.test.ts` (env `RUN_E2E`) -> **2026-10-15**.
+- `tests/nvm/generate/craft-kb.test.ts` (file `data/craft/craft-kb.json`) ->
+  **2026-11-01**, with a note that closing it requires deciding whether to
+  commit the generated KB itself or a derived hash of it — that decision is
+  what the expiry forces, not a specific answer to it.
+- `tests/core/real-script-corpus.test.ts` (env `REAL_SCRIPT_CORPUS_DIR`) and
+  `tests/core/anti-slop-real-corpus.test.ts` (env `REAL_SLOP_CORPUS_DIR`) ->
+  **`expires: null`** (no expiry), with a one-line reason recorded in the
+  config: the corpus cannot reach CI by design (local-only, copyright — see
+  `CLAUDE.md`'s AUC-24 gotcha), and the closable half of that gap is already
+  covered by the committed `auc24-table` gate, which does have a deadline.
+- The reporter's own test suite
+  (`tests/scripts/report-unverified-gates.test.ts`) now covers a
+  `null`-expiry gate as "never blocks" so that case has explicit coverage,
+  not just an absence of an assertion.
+
+**Rationale**: A reported gap with no deadline is easy to treat as
+permanently acceptable. An expiry forces a revisit — either the gate closes
+(the table gets committed, the corpus-adjacent test gets wired) or someone
+consciously extends the deadline with a reason. The two corpus-gated tests
+are the deliberate exception: they cannot close by design (see Decision #2's
+and CLAUDE.md's standing rationale for why the corpus itself can never reach
+CI), so giving them a false deadline would just manufacture a recurring,
+unfixable red flag; `expires: null` says that honestly instead.
+
+**What this does NOT decide**: It does not change any gate's pass/fail
+criteria, the AUC-24 floor, or which gates are blocking vs. advisory beyond
+what `scripts/report-unverified-gates.mjs` already encoded before this
+entry (the auc24-table gate blocking from 2026-10-01 is unchanged).
+
+**Links**: `scripts/report-unverified-gates.mjs`;
+`tests/scripts/report-unverified-gates.test.ts`.
+
+**Status**: Active.
+
+---
+
 ## Decision Template (for future entries)
 
 **Context**: What situation prompted this decision?

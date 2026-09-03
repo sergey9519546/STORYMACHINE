@@ -128,8 +128,19 @@ that got us here.
 
 **Operational artifacts:** [quick-start](docs/user-validation/P0_QUICK_START.md) · [P0 evidence summary](docs/user-validation/P0_EVIDENCE_SUMMARY.md) · [phase tracker](docs/user-validation/PHASE_TRACKER.md) · [static stimulus report](docs/user-validation/sample-coverage-report.html) (regen: `npm run generate-p0-sample`)
 
+**Sample size (adopted 2026-09-03, Decision #4 —
+`docs/DECISION_LOG.md`):** the power-relevant target is **17 moderated
+sessions**, not 5 — at a ~80% "would use again" rate, n=17 is the smallest
+sample whose exact 95% CI narrows to +/-20 points; n=5 cannot distinguish
+"most writers want this" from "a small, polite minority" (95% CI on 4/5 runs
+[0.284, 0.995]). **5 remains the first checkpoint, not the finish line**: run
+and log the first 5 as originally planned, then continue to 17 before
+treating the result as decision-grade. See
+`docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` §3 for the full derivation.
+
 **Work:**
-- Recruit >=5 real screenwriters (any career tier, real drafts in hand).
+- Recruit real screenwriters (any career tier, real drafts in hand) toward
+  the 17-session target above, with 5 as the first checkpoint.
 - Show them the existing sample coverage report; watch, don't pitch.
 - Capture the single core question: *does this make you want to run your own draft — why or why not?*
 - Log objections, moments of trust, and moments of disbelief verbatim.
@@ -166,8 +177,12 @@ that got us here.
      mechanically.
 
 **Exit gate:** >=5 documented sessions with a clear signal on the core
-question. If the signal is negative or ambiguous, **STOP, reframe, and repeat
-P0** — do not proceed to build on a report nobody wants to run.
+question is the first checkpoint; **17 documented sessions** is the
+power-adequate target for treating "would use again" as decision-grade
+(Decision #4, 2026-09-03 — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md`
+§3.2). If the signal is negative or ambiguous at either checkpoint, **STOP,
+reframe, and repeat P0** — do not proceed to build on a report nobody wants
+to run.
 
 ### P1 — Make the score provably discriminate on real writing (the One Bet)
 
@@ -216,6 +231,18 @@ exit gate below is unaffected and still unmet.
   health formula. This was a craft-quality gap at short-script scale and is
   separate from the corpus AUC, which is still open (see the SHUFFLE/DROP/
   RELOCATE line above).
+
+**Reader agreement, adopted 2026-09-03 (Decision #4 —
+`docs/DECISION_LOG.md`; `docs/p1-benchmark/PRE_REGISTRATION_PROTOCOL.md`
+§12.2):** any future human-labeled benchmark for this gate keeps the
+existing Fleiss' kappa floor of **>= 0.60**, and adds two requirements that
+were previously unstated — a **95% CI half-width <= 0.10** on the measured
+kappa (so the point estimate cannot float between the "moderate" and
+"substantial" Landis & Koch bands), and an **overlap budget of >= 49
+scripts labeled by all three readers** (the N required to hit that CI width
+at 3 raters, per `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` §2.2). No
+labeling has occurred yet — this governs the design of that work when it
+starts, not a result already collected.
 
 **Exit gate:** On a pre-registered held-out set large enough to report uncertainty:
 point-estimate discrimination **AUC >= 0.80**, with the 95% bootstrap lower

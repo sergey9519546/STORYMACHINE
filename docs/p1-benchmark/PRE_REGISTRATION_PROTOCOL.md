@@ -332,6 +332,7 @@ Exclude scripts with ANY of:
 | Date | Change | Justification | Approved By |
 |------|--------|---------------|-------------|
 | - | - | - | - |
+| 2026-09-03 | Section 12 status changed PROPOSAL -> ADOPTED (kappa CI/overlap-budget requirement, AUC-CI framing, MDE, and the 17-session P0 target all now govern; Sections 1-11 unchanged) | The numbers are arithmetic derived from `POWER_ANALYSIS_2026-09-02.md`, not opinion; the prior sizes were unchosen defaults. See `docs/DECISION_LOG.md` Decision #4. | maintainer delegate (owner instruction: decide and move on) |
 
 **Rule:** Any deviation MUST be documented here with timestamp and rationale BEFORE making the change.
 
@@ -389,20 +390,23 @@ Exclude scripts with ANY of:
 
 ---
 
-## Section 12: Power and agreement floors (added 2026-09-02, unsigned)
+## Section 12: Power and agreement floors (added 2026-09-02, ADOPTED 2026-09-03)
 
-**Status: PROPOSAL. None of this section is adopted.** It is added in
-response to `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` §10,
-which found that this protocol's original methodology (Sections 1-11 above,
-left intact) specifies a >=0.60 kappa target and a >=0.80 AUC gate with no
-stated confidence-interval requirement, no overlap budget for computing
-kappa, and no minimum detectable effect — so nobody could tell, before
-running the study, whether it was large enough to answer the question it
-asks. The full derivation, formulas, and reproducible arithmetic are in
+**Status: ADOPTED 2026-09-03 by maintainer delegate** (owner instruction:
+"decide for me and move on" — see `docs/DECISION_LOG.md` Decision #4). It
+was added in response to `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md`
+§10, which found that this protocol's original methodology (Sections 1-11
+above, left intact) specifies a >=0.60 kappa target and a >=0.80 AUC gate
+with no stated confidence-interval requirement, no overlap budget for
+computing kappa, and no minimum detectable effect — so nobody could tell,
+before running the study, whether it was large enough to answer the question
+it asks. The full derivation, formulas, and reproducible arithmetic are in
 `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md`; this section states the
-proposed numbers only. **Every value below requires the owner's signature
-before it governs anything** — until signed, Sections 1-11's original,
-unmodified targets remain what this protocol commits to.
+adopted numbers, unchanged from that proposal. **Sections 12.1-12.3 below now
+govern the P0 and P1 gates**, alongside — not in place of — Sections 1-11's
+original, unmodified targets (§12 adds CI requirements and an overlap
+budget on top of the existing >=0.60 kappa and >=0.80 AUC point-estimate
+targets; it does not relax either).
 
 ### 12.1 AUC gate (Section 6/10/11 above)
 
@@ -465,11 +469,17 @@ unmodified targets remain what this protocol commits to.
 
 ### 12.4 Signature
 
-**None of Sections 12.1-12.3 governs the P0 or P1 gate until signed here.**
+**Sections 12.1-12.3 govern the P0 and P1 gate as of the signature below.**
 
-**Owner:** ___________________________
-**Date:** ___________________________
-**Decision:** [ ] Adopt as written  [ ] Adopt with changes (log in Section 9)  [ ] Reject — Sections 1-11's original targets stand
+**Owner:** maintainer delegate (owner instruction: "decide for me and move on")
+**Date:** 2026-09-03
+**Decision:** [x] Adopt as written  [ ] Adopt with changes (log in Section 9)  [ ] Reject — Sections 1-11's original targets stand
+
+This adoption does not claim any P0 session or P1 label exists — zero
+sessions and zero labels means zero, and adoption records a design decision
+about what will count as evidence, not a claim that evidence has been
+collected. It does not raise the P1 gate above the existing 0.80 AUC point
+estimate. See `docs/DECISION_LOG.md` Decision #4 for the full record.
 
 ---
 

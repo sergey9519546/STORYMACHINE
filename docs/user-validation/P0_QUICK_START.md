@@ -19,9 +19,12 @@ lock-in work remains barred until P0 passes.
 
 ## Exit gate
 
-**>= 5 documented, valid sessions** with a clear signal on the core question.
-Negative or ambiguous → **STOP, reframe, repeat P0.** Do not add features or
-rules to compensate.
+**>= 5 documented, valid sessions** is the first checkpoint; **17 documented,
+valid sessions** is the power-adequate target for a decision-grade "would use
+again" read (Decision #4, 2026-09-03 — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md`
+§3.2; at n=5 the 95% CI on a 4/5 result runs [0.284, 0.995], too wide to
+support a demand claim). Negative or ambiguous at either checkpoint →
+**STOP, reframe, repeat P0.** Do not add features or rules to compensate.
 
 ## What you show them
 
@@ -113,9 +116,9 @@ session. See the stimulus note in `P0_EVIDENCE_SUMMARY.md`.
    separate, ask the exact core question verbatim, then the four follow-ups.
 5. **After the session.** Privacy-review, classify (Positive / Qualified /
    Negative / Ambiguous / Invalid), and commit only the anonymized record.
-6. **After >= 5 valid sessions.** Aggregate into `P0_EVIDENCE_SUMMARY.md`, apply
-   the exit gate, record the decision, and link the artifact from `ROADMAP.md`
-   §3.
+6. **After >= 5 valid sessions (checkpoint) / >= 17 valid sessions (target).**
+   Aggregate into `P0_EVIDENCE_SUMMARY.md`, apply the exit gate, record the
+   decision, and link the artifact from `ROADMAP.md` §3.
 
 ## Hard don'ts (from the kit — repeated because they're easy to trip)
 
