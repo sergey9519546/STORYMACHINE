@@ -32,9 +32,11 @@ Do not use `npm install` in CI-bound contexts — it can rewrite
 
 | Script | What it does |
 |---|---|
-| `npm run dev` | Start the dev server (`tsx server.ts`). |
+| `npm run dev` | Start the dev server (`tsx server.ts`). Set `SESSION_DB_DIR=:memory:` first for local UI/manual-testing iteration — otherwise every boot persists session state to `data/sessions/<sessionId>.db` and ad hoc poking accumulates real files there over time. |
 | `npm run lint` | **Type check only** (`tsc --noEmit`). Despite the name there is no ESLint/static-analysis pass. |
-| `npm test` | Full test suite. **0 failures required** before push. |
+| `npm test` | Full test suite. **0 failures required** before push. **Skips `tests/e2e/journeys.test.ts`** (the full-stack journey suite) unless `RUN_E2E=1` is set — CI sets it, a plain local run does not; you'll see `# SKIP RUN_E2E not set` instead of that file actually running. |
+| `RUN_E2E=1 npm test` | Same suite, but also runs the full-stack journey tests — spawns a real server and drives complete writer flows end to end. |
+| `npm run verify:browser` | Runs the six live-Chromium suites (`verify:p0-flow`, `verify:focus-traps`, `verify:surfaces`, `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`). Not part of `npm test`; measured at **~3 minutes** wall clock with Chromium pre-cached. CI runs it as its own blocking `browser` job. |
 | `npm run test:metamorphic` | Hard metamorphic scoring invariants. `empty_verbosity` is a known-failing witness (verbosity bias) and does not fail this step — see `docs/scoring/VERBOSITY_BIAS_2026-07-11.md`. |
 | `npm run build` | Production build (`vite build`). |
 | `npm run honesty-audit` | Fails on overclaim language / stale claims in the shipped surface. CI-enforced. |

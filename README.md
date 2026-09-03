@@ -85,6 +85,27 @@ the IndexedDB draft mirror, and calls `POST /api/session/delete`.
 npm test
 ```
 
+A plain `npm test` **skips two gates** you won't see fail unless you know to
+look:
+
+- **`RUN_E2E=1 npm test`** additionally runs `tests/e2e/journeys.test.ts`,
+  the full-stack journey suite that spawns a real server and drives complete
+  writer flows end to end. CI sets `RUN_E2E=1`; a local `npm test` does not,
+  so it silently reports `# SKIP RUN_E2E not set` for that file instead of
+  running it.
+- **`npm run verify:browser`** runs the six live-Chromium suites
+  (`verify:p0-flow`, `verify:focus-traps`, `verify:surfaces`,
+  `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`) —
+  it is a separate command, not part of `npm test` at all. Measured directly:
+  about **three minutes** wall clock with Chromium pre-cached, all six green.
+  CI runs it as its own blocking `browser` job.
+
+For local UI/manual-testing iteration, set `SESSION_DB_DIR=:memory:` before
+`npm run dev` (or export it for the session). Without it, every `npm run dev`
+boot persists session state to `data/sessions/<sessionId>.db` on disk (the
+default outside tests — see "Session data" under Deployment) and ad hoc
+local poking accumulates real `.db` files there over time.
+
 ## Available npm Scripts
 
 **Development & Build:**
@@ -94,7 +115,8 @@ npm test
 - `npm run preview` - Preview production build locally
 
 **Testing & Quality:**
-- `npm test` - Run full test suite
+- `npm test` - Run full test suite (skips `tests/e2e/journeys.test.ts` unless `RUN_E2E=1` — see "Running Tests" above)
+- `npm run verify:browser` - Run the six live-Chromium suites (~3 min); not part of `npm test`, but a blocking CI job
 - `npm run lint` - Type check with TypeScript (no emit)
 - `npm run check-docs` - Scan documentation for AI writing patterns
 - `npm run check-docs:strict` - Same as check-docs but fails on high-severity patterns
