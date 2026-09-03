@@ -11,10 +11,10 @@ export async function analyzeScriptBlock(
   const scriptBlocks: ScriptBlock[] = lines.map((line, index) => {
     let type: ScriptBlock["type"] = "action";
     if (line.match(/^(INT\.|EXT\.|INT\/EXT\.)/i)) type = "scene_heading";
-    else if (line.match(/^[A-Z\s]+(\(V\.O\.\)|\(O\.S\.\))?$/) && line.trim().length > 0) type = "character";
+    else if (line.match(/^[\p{Lu}\p{Lt}\p{M}\s]+(\(V\.O\.\)|\(O\.S\.\))?$/u) && line.trim().length > 0) type = "character";
     else if (line.match(/^\(.*\)$/)) type = "parenthetical";
     else if (line.match(/^(CUT TO:|FADE OUT\.|FADE IN:)/i)) type = "transition";
-    else if (index > 0 && lines[index - 1].match(/^[A-Z\s]+(\(V\.O\.\)|\(O\.S\.\))?$/)) type = "dialogue";
+    else if (index > 0 && lines[index - 1].match(/^[\p{Lu}\p{Lt}\p{M}\s]+(\(V\.O\.\)|\(O\.S\.\))?$/u)) type = "dialogue";
     return { id: `block-${Date.now()}-${index}`, type, text: line };
   }).filter(b => b.text.trim().length > 0);
 

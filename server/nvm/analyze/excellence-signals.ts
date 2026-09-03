@@ -31,7 +31,7 @@ export interface ExcellenceSignals {
 }
 
 // Character detection: ALL-CAPS cue lines (dialogue cues, not sluglines).
-const CHARACTER_CUE = /^([A-Z][A-Z0-9\s'-]*[A-Z0-9])(?:\s*\(|$)/m;
+const CHARACTER_CUE = /^([\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s'-]*[\p{Lu}\p{Lt}\p{M}0-9])(?:\s*\(|$)/mu;
 
 // External want/goal patterns: explicit goal statements.
 const WANT_PATTERNS = [
@@ -89,7 +89,7 @@ function extractCharacterName(cueLine: string): string | null {
 
 function isDialogueCue(line: string): boolean {
   // Dialogue cue is ALL-CAPS at line start, not a slugline or transition.
-  if (!/^[A-Z]/.test(line)) return false;
+  if (!/^[\p{Lu}\p{Lt}]/u.test(line)) return false;
   if (/^(?:INT|EXT|FADE|CUT|TRANSITION|V\.O\.|O\.S\.|CONT\'D)/.test(line)) return false;
   const match = line.match(CHARACTER_CUE);
   return !!match;

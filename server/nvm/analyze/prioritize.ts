@@ -181,7 +181,7 @@ export function buildPrioritizedIssues(
 // ─────────────────────────────────────────────────────────────────────────
 
 const CHARACTER_PREFIX_RE = /^Character:\s*(.+)$/i;
-const BARE_CUE_RE = /^[A-Z][A-Z0-9 '.\-]*$/;
+const BARE_CUE_RE = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9 '.\-]*$/u;
 
 function normalizeCueText(raw: string): string {
   return raw

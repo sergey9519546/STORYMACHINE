@@ -142,7 +142,7 @@ const CHARACTER_PREFIX_RE = /^Character:\s*(.+)$/i;
 // upper-case too; the deciding factor is always the character-cue lookup
 // below (a name that isn't a real speaking character falls through to
 // 'document' regardless of this regex matching).
-const BARE_CUE_RE = /^[A-Z][A-Z0-9 '.\-]*$/;
+const BARE_CUE_RE = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9 '.\-]*$/u;
 
 /** Strip Fountain character-cue decorations ((V.O.), (O.S.), (CONT'D), the
  *  trailing ^ dual-dialogue marker) down to the bare character name.

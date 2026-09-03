@@ -22,6 +22,8 @@
 // structural element until the next one. Wrapped fragments inside a block are
 // joined into flowing text.
 
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../../src/lib/fountain.ts';
+
 // Heading detection is kept BYTE-COMPATIBLE with src/lib/fountain.ts's
 // parseFountain (a scene_heading is `/^(INT|EXT|EST|I\/E)[. ]/i` OR any line
 // beginning with '.'), so every line the real parser counts as a scene is also
@@ -36,6 +38,11 @@ const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH 
 // punctuation marks, and carries at least one letter.
 const PAREN_TAIL_RE = /\s*\([^)]*\)\s*$/;
 const PURE_PAREN_RE = /^\([^)]*\)$/;
+// The cue alphabet, composed from src/lib/fountain.ts's single definition —
+// see the block comment there for why capitals of any cased script count and
+// caseless scripts (CJK, Hebrew, Arabic) deliberately do not.
+const CUE_INITIAL_LETTER_RE = new RegExp(`[${CUE_INITIAL_CLASS}]`, 'u');
+const CUE_BODY_RE = new RegExp(`^[${CUE_LETTER_CLASS}0-9 .,'&/#\\-]+$`, 'u');
 
 export function isHeading(t: string): boolean { return HEADING_RE.test(t) || t.startsWith('.'); }
 function isTransition(t: string): boolean {
@@ -54,8 +61,14 @@ export function isCharacterCue(rawLine: string): boolean {
   if (!bare) return false;
   // must be all-caps (letters that appear are uppercase; digits/&/./'/- allowed)
   if (bare !== bare.toUpperCase()) return false;
-  if (!/[A-Z]/.test(bare)) return false;
-  if (!/^[A-Z0-9 .,'&/#\-]+$/.test(bare)) return false;
+  // Unicode cue alphabet (2026-09-03): this file carried a THIRD independent
+  // ASCII-only copy of the cue class, so an import whose cues are accented
+  // ("MARÍA") was neither detected as double-spaced nor reflowed — the
+  // normalizer that exists to rescue messy imports was itself blind to them.
+  // Both tests now compose the single class definition in src/lib/fountain.ts.
+  // `bare !== bare.toUpperCase()` above was already Unicode-correct.
+  if (!CUE_INITIAL_LETTER_RE.test(bare)) return false;
+  if (!CUE_BODY_RE.test(bare)) return false;
   const words = bare.split(/\s+/).filter(Boolean);
   if (words.length === 0 || words.length > 4) return false;   // cues are short
   if (bare.length > 30) return false;

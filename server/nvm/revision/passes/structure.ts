@@ -6753,7 +6753,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const sceneTextLower1191 = sceneTextRaw1191.map(t => t.toLowerCase());
 
     // Character-cue speakers, mapped to scene index by nearest preceding heading line.
-    const cueRe1191 = /^[A-Z][A-Z0-9\s\-'.]{1,30}$/;
+    const cueRe1191 = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'.]{1,30}$/u;
     const cueExcludeRe1191 = /^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/;
     const speakerCounts1191 = new Map<string, number>();
     const speakersByScene1191: Array<Set<string>> = records.map(() => new Set<string>());
@@ -6897,7 +6897,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   // bearing slugs) keep every short fixture and the whole calibration
   // corpus structurally exempt: this is a feature-scale rule.
   {
-    const CUE_RE_SCC = /^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\([A-Za-z.\s']+\))?$/;
+    const CUE_RE_SCC = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\([\p{L}\p{M}.\s']+\))?$/u;
     const normLocSCC = (slug: string): string => {
       let s = slug.replace(/^(INT\.\/EXT\.|INT\/EXT\.|I\/E\.|INT\.|EXT\.)\s*/i, '');
       s = s.replace(/\s*-\s*(DAY|NIGHT|CONTINUOUS|LATER|MOMENTS LATER|DAWN|DUSK|MORNING|EVENING|AFTERNOON|NIGHTTIME|SAME TIME)\s*$/i, '');

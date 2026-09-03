@@ -49,7 +49,7 @@ function isCharacterCueLine(trimmed: string): boolean {
   if (!trimmed) return false;
   if (trimmed.startsWith('(')) return false;
   if (/^(?:INT|EXT|FADE|CUT|TRANSITION|V\.O\.|O\.S\.|CONT'D)/i.test(trimmed)) return false;
-  return /^[A-Z][A-Z\s.'-]*$/.test(trimmed) && trimmed.length < 80;
+  return /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}\s.'-]*$/u.test(trimmed) && trimmed.length < 80;
 }
 
 /**

@@ -743,7 +743,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = lines[i].trim();
       if (!t) { inDialogue = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDialogue = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t)) { inDialogue = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t)) { inDialogue = true; continue; }
       if (inDialogue) continue; // skip dialogue lines
       if (t.startsWith('(') && t.endsWith(')')) continue; // parenthetical
 
@@ -848,7 +848,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDialogue2 = false; continue; }
       if (/^(INT\.|EXT\.)/i.test(t)) { inDialogue2 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t)) { inDialogue2 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t)) { inDialogue2 = true; continue; }
       if (inDialogue2) continue;
       if (t.startsWith('(') && t.endsWith(')')) continue;
       actionLineCount++;
@@ -904,7 +904,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDialogue3 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDialogue3 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDialogue3 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDialogue3 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDialogue3) continue;
       totalActionLines2++;
@@ -953,7 +953,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg) continue;
       actionN++;
@@ -982,7 +982,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       contentN++;
       if (t.includes('...') || t.includes('…')) ellipsisN++;
@@ -1013,7 +1013,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg) continue;
       actionN++;
@@ -1046,7 +1046,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { pvInDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { pvInDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { pvInDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { pvInDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (pvInDlg) continue;
       pvActionN++;
@@ -1077,7 +1077,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { imInDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { imInDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { imInDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { imInDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (imInDlg) continue;
       imActionN++;
@@ -1139,7 +1139,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { slInDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { slInDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { slInDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { slInDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (slInDlg) continue;
       slActionN++;
@@ -1168,7 +1168,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { ddInDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { ddInDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { ddInDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { ddInDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (ddInDlg) { ddDialogueN++; } else { ddActionN++; }
     }
@@ -1197,7 +1197,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { aoInDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { aoInDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { aoInDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { aoInDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (aoInDlg) continue;
       aoActionN++;
@@ -1226,7 +1226,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg217 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg217 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg217 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg217 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg217) continue;
       actionLines217.push(t);
@@ -1379,7 +1379,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg231 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg231 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg231 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg231 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg231) {
         totalDlgLines231++;
@@ -1417,7 +1417,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = lines[li].trim();
       if (!t) { inDlg231b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg231b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg231b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg231b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg231b) continue;
       const si231 = lineToScene231[li] ?? -1;
@@ -1466,7 +1466,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlgOrig245 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgOrig245 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgOrig245 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlgOrig245 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlgOrig245) continue;
       actionLinesOrig245++;
@@ -1531,7 +1531,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlgCog245 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgCog245 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgCog245 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlgCog245 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlgCog245) continue;
       actionLinesCog245++;
@@ -1568,7 +1568,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg259 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg259 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg259 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg259 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg259) continue;
       actionLines259++;
@@ -1600,7 +1600,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlgFilt259 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgFilt259 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgFilt259 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlgFilt259 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlgFilt259) continue;
       actionLinesFilt259++;
@@ -1632,7 +1632,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = lines[i].trim();
       if (!t) { inDlgDir259 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgDir259 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgDir259 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlgDir259 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlgDir259) continue;
       if (directorialRe259.test(t)) {
@@ -1686,7 +1686,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg273 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg273 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg273 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg273 = true; continue; }
       if (!inDlg273) continue;
       if (/^\(/.test(t)) parentheticalCount273++;
       else dlgLineCount273++;
@@ -1781,7 +1781,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     let inDialogue287 = false;
     for (const line of lines) {
       const t = line.trim();
-      if (/^[A-Z][A-Z\s]{1,30}$/.test(t) && !/^(INT\.|EXT\.|FADE|CUT|DISSOLVE)/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}\s]{1,30}$/u.test(t) && !/^(INT\.|EXT\.|FADE|CUT|DISSOLVE)/.test(t)) {
         inDialogue287 = true;
       } else if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
         inDialogue287 = false;
@@ -1933,7 +1933,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg315b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg315b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg315b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg315b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg315b) continue;
       actionLines315b++;
@@ -2361,7 +2361,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg396b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg396b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg396b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg396b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg396b) {
         totalDlg396b++;
@@ -2396,7 +2396,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg396c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg396c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg396c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg396c = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg396c) {
         totalDlg396c++;
@@ -2529,7 +2529,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg424b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg424b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg424b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg424b = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg424b) continue;
       actionTotal424b++;
@@ -2568,7 +2568,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg424c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg424c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg424c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg424c = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg424c) continue;
       actionTotal424c++;
@@ -2611,7 +2611,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg438a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg438a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg438a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg438a = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg438a) continue;
       actionTotal438a++;
@@ -2681,7 +2681,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg438b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg438b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg438b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg438b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg438b) { actionTotal438b++; continue; }
       dlgTotal438b++;
@@ -2721,7 +2721,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg438c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg438c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg438c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg438c = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg438c) continue;
       if (/\?/.test(t)) questionCount438c++;
@@ -2759,7 +2759,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg452a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg452a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg452a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg452a = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg452a) continue;
       dlgTotal452a++;
@@ -2834,7 +2834,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg452c = false; isFirstDlgLine452c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg452c = false; isFirstDlgLine452c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg452c = true; isFirstDlgLine452c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg452c = true; isFirstDlgLine452c = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg452c) continue;
       if (isFirstDlgLine452c) {
@@ -2875,7 +2875,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { prevWasBlank466a = true; inDlg466a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { prevWasBlank466a = false; inDlg466a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg466a = true; prevWasBlank466a = false; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg466a = true; prevWasBlank466a = false; continue; }
       if (t.startsWith('(')) { prevWasBlank466a = false; continue; }
       if (inDlg466a) { prevWasBlank466a = false; continue; }
       // Action line
@@ -2917,7 +2917,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg466b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg466b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg466b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg466b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg466b) continue;
       dlgTotal466b++;
@@ -2957,7 +2957,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       // continues across inter-paragraph gaps (each action line is one potential run member).
       if (!t) { inDlg466c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg466c = false; curEllipsisRun466c = 0; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg466c = true; curEllipsisRun466c = 0; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg466c = true; curEllipsisRun466c = 0; continue; }
       if (t.startsWith('(')) { curEllipsisRun466c = 0; continue; }
       if (inDlg466c) { curEllipsisRun466c = 0; continue; }
       // Action line
@@ -3005,7 +3005,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg480a = false; isFirstDlgLine480a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg480a = false; isFirstDlgLine480a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
         inDlg480a = true; isFirstDlgLine480a = true; totalSpeeches480a++;
         continue;
       }
@@ -3054,7 +3054,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg480b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg480b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg480b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg480b = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg480b) continue;
       actionLineCount480b++;
@@ -3103,7 +3103,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         if (curParaWords480c > 0) { paragraphWords480c.push(curParaWords480c); curParaWords480c = 0; }
         prevWasBlank480c = false; inDlg480c = false; continue;
       }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
         if (curParaWords480c > 0) { paragraphWords480c.push(curParaWords480c); curParaWords480c = 0; }
         inDlg480c = true; prevWasBlank480c = false; continue;
       }
@@ -3165,7 +3165,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { flushSpeech494a(); inDlg494a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { flushSpeech494a(); inDlg494a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { flushSpeech494a(); inDlg494a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { flushSpeech494a(); inDlg494a = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg494a) continue;
       curSpeechText494a += ' ' + t;
@@ -3218,7 +3218,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { flushSpeech494b(); inDlg494b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { flushSpeech494b(); inDlg494b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { flushSpeech494b(); inDlg494b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { flushSpeech494b(); inDlg494b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg494b) continue;
       curSpeechWords494b += t.split(/\s+/).filter(Boolean).length;
@@ -3256,7 +3256,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { currentSpeaker494c = null; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { currentSpeaker494c = null; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
         currentSpeaker494c = t.replace(/\s*\(.*\)\s*$/, '').trim();
         continue;
       }
@@ -3300,7 +3300,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   // punctuation, not speaker identity), DIALOGUE_FILLER_RUN (Wave 480: opener word, not
   // speaker identity). First run-based check on speaker-identity continuity.
   {
-    const speakerCuePat508a = /^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/;
+    const speakerCuePat508a = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u;
     let currentSpeaker508a: string | null = null;
     let prevSpeaker508a: string | null = null;
     let curSpeakerRun508a = 0;
@@ -3370,7 +3370,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg508b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg508b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg508b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg508b = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg508b) continue;
       actionTotal508b++;
@@ -3409,7 +3409,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg508c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg508c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg508c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg508c = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg508c) continue;
       dlgTotal508c++;
@@ -3446,7 +3446,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg522a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg522a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg522a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg522a = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg522a) continue;
       dlgTotal522a++;
@@ -3481,7 +3481,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg522b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg522b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg522b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg522b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg522b) { curAgreeRun522b = 0; continue; }
       if (agreeRe522b.test(t)) {
@@ -3519,7 +3519,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg522c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg522c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg522c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg522c = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg522c) continue;
       dlgTotal522c++;
@@ -3557,7 +3557,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg536a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg536a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg536a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg536a = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg536a) continue;
       dlgTotal536a++;
@@ -3592,7 +3592,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg536b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg536b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg536b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg536b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg536b) continue;
       if (t.endsWith('!')) {
@@ -3631,7 +3631,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg536c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg536c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg536c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg536c = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg536c) continue;
       dlgTotal536c++;
@@ -3674,7 +3674,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { lastWasCharCue550a = false; lastWasParen550a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { lastWasCharCue550a = false; lastWasParen550a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
         speechCount550a++;
         lastWasCharCue550a = true;
         lastWasParen550a = false;
@@ -3720,7 +3720,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg550b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg550b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg550b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg550b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg550b) continue;
       dlgTotal550b++;
@@ -3760,7 +3760,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg550c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg550c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg550c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg550c = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg550c) continue;
       // This is an action line
@@ -3845,7 +3845,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg564b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg564b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg564b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg564b = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg564b) continue;
       dlgTotal564b++;
@@ -3887,7 +3887,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg564c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg564c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg564c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg564c = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg564c) continue;
       // This is an action line — count standalone "and" conjunctions (word-boundaried, so "band",
@@ -3978,7 +3978,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg578b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg578b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg578b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg578b = true; continue; }
       if (t.startsWith('(')) continue;
       if (inDlg578b) continue;
       actionTotal578b++;
@@ -4019,7 +4019,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg578c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg578c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg578c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg578c = true; continue; }
       if (t.startsWith('(')) continue;
       if (!inDlg578c) continue;
       dlgTotal578c++;

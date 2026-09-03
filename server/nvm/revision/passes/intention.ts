@@ -593,7 +593,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // Fountain character cues are ALL-CAPS lines that aren't sluglines/transitions
   const fountainChars = new Set<string>();
   for (const line of linesInFountain) {
-    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(line.trim()) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(line.trim())) {
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(line.trim()) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(line.trim())) {
       fountainChars.add(line.trim().split('(')[0].trim());
     }
   }
@@ -7023,7 +7023,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     // proxy dialogue in particular tends to arrive by phone (V.O.), and
     // dropping those cues silently blinds the proxy detector to exactly the
     // scenes it exists to read.
-    const CUE_RE_1193 = /^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\([A-Za-z.\s']+\))?$/;
+    const CUE_RE_1193 = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\([\p{L}\p{M}.\s']+\))?$/u;
     const NON_CUE_RE_1193 = /^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/;
     const dlg1193: DlgLine1193[] = [];
     {
@@ -7237,7 +7237,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { flush728(); curSpeaker728 = null; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { flush728(); curSpeaker728 = null; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
         flush728();
         curSpeaker728 = t.replace(/\s*\(.*\)\s*$/, '').trim();
         continue;

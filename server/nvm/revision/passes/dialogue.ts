@@ -590,7 +590,7 @@ function extractDialogue(fountain: string): Array<{ speaker: string; line: strin
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     // Character cue: ALL CAPS, not a slugline/transition
-    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(line) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/.test(line)) {
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(line) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/.test(line)) {
       currentSpeaker = line.split('(')[0].trim();
       isDialogue = true;
     } else if (isDialogue && line && !line.startsWith('(') && currentSpeaker) {
@@ -994,7 +994,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     for (let i = 0; i < fountainLines.length; i++) {
       const t = fountainLines[i].trim();
       const isSlug = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t);
-      const isCharCue = t && /^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) && !isSlug;
+      const isCharCue = t && /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t) && !isSlug;
       const isParenthetical = t.startsWith('(') && t.endsWith(')');
       const isBlank = !t;
       // Action: non-empty, not a slug, not a char cue, not parenth, not dialogue (i.e., inside dialogue block = false)
@@ -1064,7 +1064,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
       if (!t) { isInDialogue = false; continue; }
       const isSlugLine = /^(INT\.|EXT\.)/i.test(t);
       if (isSlugLine) { currentChar = ''; isInDialogue = false; continue; }
-      const isCharCueLine = /^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) && !isSlugLine;
+      const isCharCueLine = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t) && !isSlugLine;
       if (isCharCueLine) {
         currentChar = t.split('(')[0].trim();
         isInDialogue = true;

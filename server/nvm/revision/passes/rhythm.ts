@@ -558,7 +558,7 @@ function extractActionLines(fountain: string): Array<{ text: string; lineNum: nu
 
     // Sluglines, transitions, character cues, parentheticals
     if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.|CUT TO|FADE|SMASH|THE END)/i.test(line)) continue;
-    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(line)) { skipNext = true; continue; }
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(line)) { skipNext = true; continue; }
     if (skipNext) { skipNext = false; continue; } // dialogue line after character cue
     if (line.startsWith('(') && line.endsWith(')')) continue; // parenthetical
     if (line.startsWith('>') || line.startsWith('/*') || line.startsWith('//')) continue;

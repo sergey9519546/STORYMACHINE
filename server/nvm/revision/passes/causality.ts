@@ -7054,7 +7054,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     // Character-cue speakers (same ALL-CAPS cue heuristic as dialogue.ts's extractDialogue),
     // mapped to scene index by nearest preceding heading line. Used to identify the
     // protagonist (highest total cue count) and per-scene co-presence.
-    const cueRe1191 = /^[A-Z][A-Z0-9\s\-'.]{1,30}$/;
+    const cueRe1191 = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'.]{1,30}$/u;
     const cueExcludeRe1191 = /^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/;
     const speakerCounts1191 = new Map<string, number>();
     const speakersByScene1191: Array<Set<string>> = records.map(() => new Set<string>());

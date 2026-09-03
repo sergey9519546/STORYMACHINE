@@ -28,6 +28,68 @@ const CAMERA_TERMS = [
   'WIDE SHOT', 'PAN', 'ZOOM', 'ANGLE ON', 'CLOSE UP', 'POV', 'CRANE', 'TRACKING SHOT', 'DOLLY', '35MM', 'WE SEE', 'ESTABLISHING SHOT', 'WIDE ESTABLISHING SHOT', 'TIGHT ON', 'REVERSE ANGLE'
 ];
 
+// ── The character-cue alphabet (2026-09-03, Unicode cue fix) ────────────────
+// A character cue is an ALL-CAPS line adjacent to its dialogue. Until this
+// change every copy of that rule spelled "all caps" as the ASCII class
+// `[A-Z]`, so `MARÍA` failed the test and parsed as `action` while `MARIA`
+// parsed as `character`. Because Fountain's grammar is context-dependent on
+// the preceding block, the failure cascaded: the parenthetical and EVERY
+// dialogue line after an unrecognised cue also fell back to `action`, and the
+// Script Doctor — which segments scenes through parseFountain — lost the
+// speaker, the dialogue, and every metric derived from them (character count,
+// dialogue ratio, voice analysis) for any script with an accented name:
+// José, María, Zoë, Björn, Renée.
+//
+// WHAT IS AND IS NOT A CUE LETTER, and why:
+//   * `\p{Lu}` (uppercase) and `\p{Lt}` (titlecase, the ǅ-style digraphs) are
+//     the cue alphabet. On ASCII input `\p{Lu}` is exactly `[A-Z]`, so every
+//     existing English script parses byte-identically; what it adds is every
+//     OTHER cased script — Latin-with-diacritics, Greek, Cyrillic, Armenian,
+//     Georgian.
+//   * `\p{M}` (combining marks) is allowed only AFTER the first letter, so a
+//     decomposed NFD cue (`MARI` + U+0301 + `A`, which macOS and several PDF
+//     extractors emit) is the same cue as its NFC twin. A cue may not START
+//     with a mark.
+//   * CASELESS SCRIPTS (CJK, Hebrew, Arabic, Devanagari, Thai) are
+//     DELIBERATELY EXCLUDED — they are `\p{Lo}`, not `\p{Lu}`. This is a
+//     decision, not an oversight: "all caps" is a signal that only exists in
+//     a cased script, so admitting `\p{Lo}` would make every short line of
+//     Japanese or Hebrew action a character cue and destroy the parse of the
+//     very documents it was meant to help. Fountain's own escape hatch for
+//     those scripts is the forced-cue `@` prefix, which this parser does not
+//     implement today (verified by grep at the time of this change) and which
+//     this change does not add — teaching every renderer to strip the marker
+//     (src/lib/pdf.ts, fdx.ts, docx.ts, src/components/editor/**,
+//     src/lib/screenplay-layout.ts) is a separate change. A caseless cue is
+//     therefore still parsed as `action`, exactly as before.
+//
+// These two class BODIES are the single definition of that alphabet. Every
+// other cue test in the repository composes them (server/nvm/analyze/
+// fountain-analyzer.ts, server/nvm/analyze/screenplay-normalizer.ts) or is
+// held to them by tests/core/unicode-character-cues.test.ts, which fails on
+// any ASCII-only cue class reintroduced anywhere on the scoring path.
+
+/** Characters a cue may START with: any cased-script capital. */
+export const CUE_INITIAL_CLASS = '\\p{Lu}\\p{Lt}';
+/** Characters a cue may CONTINUE with: capitals plus combining marks. */
+export const CUE_LETTER_CLASS = `${CUE_INITIAL_CLASS}\\p{M}`;
+
+/** The parser's own cue test. Equivalent to the pre-2026-09-03 literal
+ *  `/^[A-Z][A-Z0-9 \t'.#\-]*\s*\^?\s*(\s*\(V\.O\.\)|\s*\(O\.S\.\)|\s*\(CONT'D\))?$/`
+ *  with the two ASCII classes widened; built with `new RegExp` so the class
+ *  bodies above stay the one place the alphabet is written down. */
+export const CHARACTER_CUE_RE = new RegExp(
+  `^[${CUE_INITIAL_CLASS}][${CUE_LETTER_CLASS}0-9 \\t'.#\\-]*\\s*\\^?\\s*`
+  + `(\\s*\\(V\\.O\\.\\)|\\s*\\(O\\.S\\.\\)|\\s*\\(CONT'D\\))?$`,
+  'u',
+);
+
+/** Camera-direction ("shot") lines are all-caps too, and were gated by the
+ *  same ASCII class; widened for the same reason. The CAMERA_TERMS gate is
+ *  unchanged, so this only decides whether an accented all-caps line is even
+ *  eligible to be tested against those terms. */
+const SHOT_LINE_RE = new RegExp(`^[${CUE_LETTER_CLASS}0-9 \\t\\-]+$`, 'u');
+
 export function parseFountain(text: string): FountainBlock[] {
   const lines = text.split('\n');
   const blocks: FountainBlock[] = [];
@@ -72,7 +134,7 @@ export function parseFountain(text: string): FountainBlock[] {
       type = 'lyrics';
     } else if (trimmed.startsWith('>') && trimmed.endsWith('<')) {
       type = 'centered';
-    } else if (trimmed.match(/^[A-Z][A-Z0-9 \t'.#\-]*\s*\^?\s*(\s*\(V\.O\.\)|\s*\(O\.S\.\)|\s*\(CONT'D\))?$/) && i < lines.length - 1 && lines[i+1].trim() !== '') {
+    } else if (CHARACTER_CUE_RE.test(trimmed) && i < lines.length - 1 && lines[i+1].trim() !== '') {
       // Character names are all caps, optionally ending with ^ for dual dialogue
       const prevBlock = blocks.length > 0 ? blocks[blocks.length - 1] : null;
       if (!prevBlock || prevBlock.type === 'empty') {
@@ -101,7 +163,7 @@ export function parseFountain(text: string): FountainBlock[] {
       }
     } else if (trimmed.match(/^(FADE IN:|FADE OUT\.|CUT TO:|DISSOLVE TO:)$/) || (trimmed.match(/^[A-Z ]+ TO:$/) && trimmed === trimmed.toUpperCase())) {
       type = 'transition';
-    } else if (trimmed.match(/^[A-Z0-9 \t\-]+$/) && CAMERA_TERMS.some(term => trimmed.includes(term))) {
+    } else if (SHOT_LINE_RE.test(trimmed) && CAMERA_TERMS.some(term => trimmed.includes(term))) {
       type = 'shot';
     } else if (i > 0 && blocks.length > 0 && (blocks[blocks.length - 1].type === 'character' || blocks[blocks.length - 1].type === 'dual_dialogue' || blocks[blocks.length - 1].type === 'parenthetical')) {
       type = 'dialogue';

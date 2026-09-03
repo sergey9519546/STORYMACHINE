@@ -542,7 +542,7 @@ function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>
       isDialogue = false;
       continue;
     }
-    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(trimmed)) { isDialogue = true; continue; }
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(trimmed)) { isDialogue = true; continue; }
     if (!trimmed) { isDialogue = false; continue; }
     if (isDialogue) continue; // skip dialogue
     if (sceneIdx < 0) continue;
@@ -598,7 +598,7 @@ function buildCharacterVoiceProfiles(fountain: string): Map<string, CharacterVoi
     if (t.startsWith('(') && t.endsWith(')')) continue;
 
     // Character cue: ALL-CAPS, 3+ chars (strips extensions like "(V.O.)")
-    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t)) {
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t)) {
       const charName = t.replace(/\s*\(.*?\)\s*$/, '').trim();
       if (NON_SPEAKING_CUES.has(charName)) {
         currentChar = null; inDialogue = false;
@@ -868,7 +868,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     const t = line.trim();
     if (!t) { inDialogueBlock = false; continue; }
     if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDialogueBlock = false; continue; }
-    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDialogueBlock = true; continue; }
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDialogueBlock = true; continue; }
     if (/^\(/.test(t)) continue; // parenthetical — stay in dialogue
     if (inDialogueBlock) continue; // dialogue line
     actionOnlyLines.push(t);
@@ -1007,7 +1007,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg = true; continue; }
       if (/^\(/.test(t)) continue; // parenthetical
       if (inDlg) dialogueLines.push(t);
     }
@@ -1083,7 +1083,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { awaitParenthetical = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { awaitParenthetical = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
         charCueCount++;
         awaitParenthetical = true;
         continue;
@@ -1119,7 +1119,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { qmInDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { qmInDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { qmInDlg = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { qmInDlg = true; continue; }
       if (/^\(/.test(t)) continue;
       if (qmInDlg) { qmDlgLines.push(t); } else { qmInDlg = false; }
     }
@@ -1169,7 +1169,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { msdInDlg = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { msdInDlg = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
         msdChar = t.replace(/\s*\(.*?\)\s*$/, '').trim();
         msdInDlg = true;
         continue;
@@ -1234,7 +1234,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t224)) { inSceneOpener224 = true; continue; }
       if (!t224) continue;
       if (inSceneOpener224) {
-        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t224)) { inSceneOpener224 = false; continue; }
+        if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t224)) { inSceneOpener224 = false; continue; }
         openerLines224.push(t224);
         inSceneOpener224 = false;
       }
@@ -1305,7 +1305,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { negInDlg238 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { negInDlg238 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { negInDlg238 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { negInDlg238 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (negInDlg238) negDlgLines238.push(t);
       else negInDlg238 = false;
@@ -1360,7 +1360,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { fpInDlg238 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { fpInDlg238 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { fpInDlg238 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { fpInDlg238 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (fpInDlg238) flatDlg238.push(t);
       else fpInDlg238 = false;
@@ -1440,7 +1440,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { monoInDlg252 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { monoInDlg252 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { monoInDlg252 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { monoInDlg252 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (monoInDlg252) {
         monoAllWords252.push(...t.split(/\s+/).filter(w => w.length > 0));
@@ -1454,7 +1454,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         const t = line.trim();
         if (!t) { inD = false; continue; }
         if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inD = false; continue; }
-        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inD = true; continue; }
+        if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inD = true; continue; }
         if (/^\(/.test(t)) continue;
         if (inD) count++;
         else inD = false;
@@ -1511,7 +1511,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { hedgeDlgIn266 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { hedgeDlgIn266 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { hedgeDlgIn266 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { hedgeDlgIn266 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (hedgeDlgIn266) hedgeDlgLines266.push(t);
       else hedgeDlgIn266 = false;
@@ -1567,7 +1567,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { intensInDlg280 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { intensInDlg280 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { intensInDlg280 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { intensInDlg280 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (intensInDlg280) intensDlgLines280.push(t);
       else intensInDlg280 = false;
@@ -1662,7 +1662,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { intInDlg294 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { intInDlg294 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { intInDlg294 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { intInDlg294 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (intInDlg294) intDlgLines294.push(t);
       else intInDlg294 = false;
@@ -1742,7 +1742,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg308 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg308 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg308 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg308 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg308) dlg308.push(t);
       else inDlg308 = false;
@@ -1819,7 +1819,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg322 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg322 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg322 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg322 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg322) dlg322.push(t);
       else inDlg322 = false;
@@ -1901,7 +1901,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg333 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg333 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg333 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg333 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg333) dlg333.push(t);
       else inDlg333 = false;
@@ -1995,7 +1995,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg347 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg347 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg347 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg347 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg347) dlg347.push(t);
       else inDlg347 = false;
@@ -2078,7 +2078,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg361 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg361 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg361 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg361 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg361) dlg361.push(t);
     }
@@ -2161,7 +2161,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg375 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg375 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg375 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg375 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg375) dlg375.push(t);
     }
@@ -2261,7 +2261,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg389 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg389 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg389 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg389 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg389) dlg389.push(t);
     }
@@ -2326,7 +2326,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg403a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg403a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg403a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg403a = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg403a) dlg403a.push(t);
     }
@@ -2361,7 +2361,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg403b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg403b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg403b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg403b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg403b) dlg403b.push(t);
     }
@@ -2467,7 +2467,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg417b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg417b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg417b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg417b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg417b) dlg417b.push(t);
     }
@@ -2503,7 +2503,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg417c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg417c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg417c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg417c = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg417c) dlg417c.push(t);
     }
@@ -2532,7 +2532,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg431 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg431 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg431 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg431 = true; continue; }
       if (/^\(/.test(t)) continue; // parenthetical
       if (inDlg431) dlg431.push(t);
     }
@@ -2640,7 +2640,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg445 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg445 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg445 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg445 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg445) dlg445.push(t);
     }
@@ -2704,7 +2704,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           continue;
         }
         if (!siInScene445) continue;
-        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
           siInDlg445 = true;
           if (!siFirstActSeen445) siDlgBeforeAct445 = true;
           continue;
@@ -2774,7 +2774,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg459 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg459 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg459 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg459 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg459) dlg459.push(t);
     }
@@ -2833,7 +2833,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         const t = line.trim();
         if (!t) { curChar459b = null; continue; }
         if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { curChar459b = null; continue; }
-        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) {
           curChar459b = t.replace(/\s*\(.*\)$/, '').trim();
           continue;
         }
@@ -2917,7 +2917,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg473a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg473a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg473a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg473a = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg473a) allDlg473a.push(t);
     }
@@ -2964,7 +2964,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg473b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg473b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg473b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg473b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg473b) allDlg473b.push(t);
     }
@@ -3041,7 +3041,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg487a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg487a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg487a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg487a = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg487a) allDlg487a.push(t);
     }
@@ -3083,7 +3083,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg487b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg487b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg487b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg487b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg487b) allDlg487b.push(t);
     }
@@ -3129,7 +3129,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg487c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg487c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg487c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg487c = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg487c) allDlg487c.push(t);
     }
@@ -3170,7 +3170,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg501a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg501a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg501a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg501a = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg501a) allDlg501a.push(t);
     }
@@ -3213,7 +3213,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg501b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg501b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg501b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg501b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg501b) allDlg501b.push(t);
     }
@@ -3256,7 +3256,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg501c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg501c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg501c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg501c = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg501c) allDlg501c.push(t);
     }
@@ -3287,7 +3287,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg515 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg515 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg515 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg515 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg515) dlg515.push(t);
     }
@@ -3408,7 +3408,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg529 = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg529 = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg529 = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg529 = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg529) dlg529.push(t);
     }
@@ -3581,7 +3581,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg543b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg543b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg543b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg543b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg543b) dlg543b.push(t);
     }
@@ -3662,7 +3662,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg557a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg557a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg557a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg557a = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg557a) dlg557a.push(t);
     }
@@ -3701,7 +3701,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg557b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg557b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg557b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg557b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg557b) dlg557b.push(t);
     }
@@ -3751,7 +3751,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg557c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg557c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg557c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg557c = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg557c) dlg557c.push(t);
     }
@@ -3799,7 +3799,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg571a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg571a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg571a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg571a = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg571a) dlg571a.push(t);
     }
@@ -3844,7 +3844,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg571b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg571b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg571b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg571b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg571b) dlg571b.push(t);
     }
@@ -3883,7 +3883,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg571c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg571c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg571c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg571c = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg571c) dlg571c.push(t);
     }
@@ -3930,7 +3930,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg585a = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg585a = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg585a = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg585a = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg585a) dlg585a.push(t);
     }
@@ -3977,7 +3977,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg585b = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg585b = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg585b = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg585b = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg585b) dlg585b.push(t);
     }
@@ -4024,7 +4024,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
       const t = line.trim();
       if (!t) { inDlg585c = false; continue; }
       if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg585c = false; continue; }
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg585c = true; continue; }
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}(\s*\(.*\))?$/u.test(t)) { inDlg585c = true; continue; }
       if (/^\(/.test(t)) continue;
       if (inDlg585c) dlg585c.push(t);
     }

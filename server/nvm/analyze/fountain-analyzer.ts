@@ -158,7 +158,12 @@
 // (see memory.ts's Wave 1192 field comments for what the StoryOp ledger can
 // and cannot honestly carry for each of the three).
 
-import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import {
+  parseFountain,
+  CUE_INITIAL_CLASS,
+  CUE_LETTER_CLASS,
+  type FountainBlock,
+} from '../../../src/lib/fountain.ts';
 import { normalizeScreenplay } from './screenplay-normalizer.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
@@ -781,6 +786,48 @@ function detectPurpose(ctx: PurposeContext): ScenePurpose {
 // ── Clue lifecycle (cross-scene) ─────────────────────────────────────────────
 
 const QUOTE_RE = /"([^"]{3,60})"/g;
+
+/** Whole-line character-cue shape, used by the clue channel's speaker-name
+ *  guard (detectClueLifecycle) to recognise "this caps token is a NAME, not a
+ *  planted prop".
+ *
+ *  Unicode cue alphabet (2026-09-03): this predicate used to carry an
+ *  INDEPENDENT ASCII-only copy of the parser's cue class — the same defect as
+ *  src/lib/fountain.ts's, in a second file, so the speaker guard was blind to
+ *  exactly the cues the parser was blind to: two bugs with one symptom, each
+ *  able to be "fixed" without the other. It now composes the single class
+ *  definition in src/lib/fountain.ts, and the parenthetical tail is widened
+ *  from [A-Za-z] to \p{L}\p{M} for the same reason ("(FUERA DE CAMPO)").
+ *
+ *  Exported so tests/core/unicode-character-cues.test.ts can hold this
+ *  predicate and the parser's to the same accent-invariance table — the two
+ *  cannot silently diverge again. Hoisted to module scope in the same change
+ *  (it was rebuilt on every detectClueLifecycle call); it closes over nothing
+ *  and src/lib/fountain.ts imports nothing, so there is no cycle here and no
+ *  temporal-dead-zone hazard of the kind doctor.ts↔reference has. */
+export const CUE_LINE_RE = new RegExp(
+  `^[${CUE_INITIAL_CLASS}][${CUE_LETTER_CLASS}0-9\\s\\-'\\.]{1,}`
+  + `(\\s*\\([\\p{L}\\p{M}.\\s']+\\))?$`,
+  'u',
+);
+
+// DELIBERATELY STILL ASCII (2026-09-03 Unicode cue fix, scope note). This is
+// the INLINE-CAPS PROP tokenizer, not the cue grammar — a different channel
+// with a different risk profile, and it is left alone on purpose:
+//   1. Widening it ADDS clue seeds. The clue channel has been actively
+//      DE-NOISED twice (the 2026-07-10 precision wave measured 300-700 fake
+//      seeds per feature; the ubiquity guard trimmed more), so adding seeds
+//      is a scoring change that owes its own measurement, not a free ride on
+//      a parser fix.
+//   2. `\b` is defined on ASCII word characters even under the `u` flag, so
+//      a naive widening MIS-SPLITS the very names it is meant to catch:
+//      `\b[\p{Lu}]{3,}\b` matches "CAF" inside "CAFÉ", because É is not a
+//      \w character and the trailing boundary therefore lands mid-word.
+//      Doing this correctly means replacing `\b` with lookarounds.
+// The accented names this channel misses are character names, and character
+// names are exactly what the speaker guard below DISCARDS — so for the cue
+// defect this class is a no-op either way. A future change that widens it
+// must bring a real-corpus measurement.
 const CAPS_TOKEN_RE = /\b[A-Z]{3,}(?:\s[A-Z]{3,}){0,2}\b/g;
 
 /** Recurring-token candidates for clue seed/payoff tracking: quoted phrases
@@ -1638,7 +1685,6 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   // introduction ("KRISTOFF (8), and his reindeer") — the intro convention —
   // so the guard must be by-name, not by-line.
   const speakerNames = new Set<string>();
-  const CUE_LINE_RE = /^[A-Z][A-Z0-9\s\-'\.]{1,}(\s*\([A-Za-z.\s']+\))?$/;
   for (const s of scenes) {
     for (const line of s.rawText.split(/\r?\n/)) {
       const t = line.trim();

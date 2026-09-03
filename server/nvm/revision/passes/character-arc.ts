@@ -720,7 +720,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const fountainCueCounts = new Map<string, number>();
     for (const line of fountain.split('\n')) {
       const t = line.trim();
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) &&
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t) &&
           !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
         const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
         if (charName !== 'narrator' && charName !== 'v.o.' && charName !== 'o.s.') {
@@ -831,7 +831,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const cueCounts = new Map<string, number>();
     for (let i = 0; i < lines.length; i++) {
       const t = lines[i].trim();
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) &&
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t) &&
           !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
         const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
         if (charName === 'narrator' || charName === 'v.o.' || charName === 'o.s.') continue;
@@ -948,7 +948,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const cueCounts2 = new Map<string, number>();
     for (const line of fountain.split('\n')) {
       const t = line.trim();
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) &&
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t) &&
           !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
         const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
         if (charName !== 'narrator' && charName !== 'v.o.' && charName !== 'o.s.') {
@@ -1015,7 +1015,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       const cueMap = new Map<string, number>();
       for (const line of fountain.split('\n')) {
         const t = line.trim();
-        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) &&
+        if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t) &&
             !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
           const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
           if (charName !== 'narrator' && charName !== 'v.o.' && charName !== 'o.s.') {
@@ -1223,7 +1223,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     const cueCounts228 = new Map<string, number>();
     for (const line228 of fountain.split('\n')) {
       const t228 = line228.trim();
-      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t228) &&
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t228) &&
           !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t228)) {
         const charName228 = t228.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
         if (charName228 !== 'narrator' && charName228 !== 'v.o.' && charName228 !== 'o.s.') {

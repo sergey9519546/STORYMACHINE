@@ -92,7 +92,7 @@ function parseDialogueLines(scene: string): Array<{ cue: string; dialogue: strin
     if (!trimmed || trimmed.startsWith('(')) continue;
 
     // Check if line is an all-caps character cue (word or short phrase)
-    if (/^[A-Z][A-Z\s]*$/.test(trimmed) && trimmed.length < 80) {
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}\s]*$/u.test(trimmed) && trimmed.length < 80) {
       // Save previous turn if we have accumulated dialogue
       if (currentCue && currentDialogue.length > 0) {
         turns.push({

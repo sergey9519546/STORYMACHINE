@@ -584,7 +584,7 @@ function sceneLineCount(fountain: string): Map<number, number> {
       nextLineIsDialogue = false;
     } else if (currentScene >= 0 && trimmed) {
       // Character cue: all-caps, optionally with parenthetical suffix
-      if (/^[A-Z][A-Z0-9 \-'\.]{1,}(\s*\(.*\))?$/.test(trimmed) && trimmed.length < 40) {
+      if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9 \-'\.]{1,}(\s*\(.*\))?$/u.test(trimmed) && trimmed.length < 40) {
         nextLineIsDialogue = true;
         // Character cue itself doesn't count toward pacing weight
       } else if (nextLineIsDialogue && !/^\(/.test(trimmed)) {

@@ -36,10 +36,10 @@ const MIN_SCENES = 6;
 // Character cue detection — ALL-CAPS line at start, not a slugline/transition,
 // mirrors excellence-signals.ts's isDialogueCue discipline so a recurring
 // NAME doesn't get credited as a motif.
-const CHARACTER_CUE = /^([A-Z][A-Z0-9\s'-]*[A-Z0-9])(?:\s*\(|$)/;
+const CHARACTER_CUE = /^([\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s'-]*[\p{Lu}\p{Lt}\p{M}0-9])(?:\s*\(|$)/u;
 
 function isDialogueCueLine(line: string): boolean {
-  if (!/^[A-Z]/.test(line)) return false;
+  if (!/^[\p{Lu}\p{Lt}]/u.test(line)) return false;
   if (/^(?:INT|EXT|FADE|CUT|TRANSITION|V\.O\.|O\.S\.|CONT'D)/.test(line)) return false;
   return CHARACTER_CUE.test(line);
 }

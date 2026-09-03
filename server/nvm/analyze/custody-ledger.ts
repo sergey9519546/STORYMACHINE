@@ -31,7 +31,7 @@ import type { SupportState } from '../proof/surfacing.ts';
 
 const SLUG = /^\s*(?:INT|EXT|INT\.?\/EXT|I\/E|EST)[.\s]/i;
 const TRANS = /^\s*(?:CUT TO:|FADE (?:IN|OUT)|DISSOLVE TO:|SMASH CUT|MATCH CUT|BACK TO)/i;
-const CUE = /^\s{0,}([A-Z][A-Z0-9 .'\-]{0,30})\s*(?:\(.*\))?\s*$/;
+const CUE = /^\s{0,}([\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9 .'\-]{0,30})\s*(?:\(.*\))?\s*$/u;
 
 // Custody verbs indicating transfer, holding, or action on a tracked object.
 // Whitelist: only direct possession actions count for entry into the ledger.

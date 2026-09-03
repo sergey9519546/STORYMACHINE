@@ -75,12 +75,12 @@ const CHANNEL_NAMES = Object.keys(CHANNELS);
 
 // Dialogue-cue convention shared with anti-slop / excellence-signals: ALL-CAPS
 // cue line at start, not a slugline or transition.
-const CHARACTER_CUE = /^([A-Z][A-Z0-9\s'-]*[A-Z0-9])(?:\s*\(|$)/;
+const CHARACTER_CUE = /^([\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s'-]*[\p{Lu}\p{Lt}\p{M}0-9])(?:\s*\(|$)/u;
 const NON_CUE_PREFIX = /^(?:INT|EXT|FADE|CUT|TRANSITION|V\.O\.|O\.S\.|CONT'D)/;
 
 function isDialogueCue(line: string): boolean {
   const trimmed = line.trim();
-  if (!/^[A-Z]/.test(trimmed)) return false;
+  if (!/^[\p{Lu}\p{Lt}]/u.test(trimmed)) return false;
   if (NON_CUE_PREFIX.test(trimmed)) return false;
   return CHARACTER_CUE.test(trimmed);
 }
