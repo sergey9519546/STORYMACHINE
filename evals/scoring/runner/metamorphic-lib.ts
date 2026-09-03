@@ -15,12 +15,20 @@ export function check(c: MetamorphicCase, base: number, variant: number): { pass
   }
 }
 
-/** Classify results into hard failures vs known-failing witnesses. Pure, testable. */
+/** Exit code for a run: nonzero iff any HARD invariant broke. */
 export function exitCodeForResults(results: MetamorphicResult[]): number {
   return classifyResults(results).hardFailures.length > 0 ? 1 : 0;
 }
 
-export function classifyResults(results: MetamorphicResult[]): {
+/** Classify results into hard failures vs known-failing witnesses. Pure, testable.
+ *
+ *  `knownFailing` defaults to the live roster, which is currently EMPTY: lane
+ *  R5 promoted empty_verbosity — the only case ever held there — to hard on
+ *  2026-09-03 (docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md). It is a
+ *  parameter so the known-failing branch stays directly testable while the
+ *  roster is empty, rather than going unexercised until the next time some
+ *  defect has to be held. */
+export function classifyResults(results: MetamorphicResult[], knownFailing: ReadonlySet<string> = KNOWN_FAILING_CASE_IDS): {
   hardFailures: MetamorphicResult[];
   knownFailures: MetamorphicResult[];
   unexpectedPasses: MetamorphicResult[];
@@ -31,7 +39,7 @@ export function classifyResults(results: MetamorphicResult[]): {
   const unexpectedPasses: MetamorphicResult[] = [];
   let hardPasses = 0;
   for (const r of results) {
-    if (KNOWN_FAILING_CASE_IDS.has(r.id)) {
+    if (knownFailing.has(r.id)) {
       if (r.passed) unexpectedPasses.push(r);
       else knownFailures.push(r);
     } else if (HARD_CASE_IDS.has(r.id)) {

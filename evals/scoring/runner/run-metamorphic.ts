@@ -1,12 +1,15 @@
 // Phase B metamorphic runner — asserts KNOWN score MOVEMENTS through the real
 // doctor. Run:  node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts
 //
-// CI contract (2026-07-14):
+// CI contract (2026-07-14, amended 2026-09-03):
 //   - HARD cases must pass — failure exits nonzero and fails CI.
-//   - KNOWN-FAILING cases (currently empty_verbosity only) are printed as a
-//     standing witness of the documented density verbosity bias; they do NOT
-//     fail CI until the health formula is re-calibrated.
-//   - See docs/scoring/VERBOSITY_BIAS_2026-07-11.md.
+//   - KNOWN-FAILING cases are printed as standing witnesses of a documented,
+//     accepted defect; they do NOT fail CI. There are none right now:
+//     empty_verbosity, the only one there has ever been, became HARD on
+//     2026-09-03 when lane R5 replaced the health formula's word-count
+//     denominator with a scene-opportunity one.
+//   - See docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md (and
+//     docs/scoring/VERBOSITY_BIAS_2026-07-11.md for the original hold).
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +50,11 @@ for (const r of results) {
 }
 console.log(`\n${pass}/${results.length} cases passed raw; hard passes ${hardPasses}; known-failing witnesses ${knownFailures.length}.`);
 
-console.log('KNOWN FAILING POLICY: empty_verbosity (documented verbosity bias — not a CI hard fail)');
+console.log(
+  KNOWN_FAILING_CASE_IDS.size === 0
+    ? 'KNOWN FAILING POLICY: no case is held known-failing — every invariant in this suite is a hard CI gate.'
+    : `KNOWN FAILING POLICY: ${[...KNOWN_FAILING_CASE_IDS].join(', ')} (documented defect — not a CI hard fail)`,
+);
 if (knownFailures.length > 0) {
   console.log(`CURRENT WITNESS: ${knownFailures.map(r => r.id).join(', ')} still fails as documented.`);
 }
