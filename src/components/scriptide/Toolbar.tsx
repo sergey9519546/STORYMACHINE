@@ -408,12 +408,17 @@ export default function Toolbar({
           </span>
         )}
 
-        {/* Page / Word Budget Indicator */}
+        {/* Page / Word Budget Indicator. Retrospective #4: "P.8/110" reads as
+            "page 8 of 110" (a progress fraction) when it's actually the
+            current page count against a feature-length TARGET, not a bound
+            — this draft can run past 110pp with no error. "8 pp · target
+            110" keeps the same information but can't be misread as
+            location-in-document. */}
         <span
           className="inline-flex min-h-[28px] items-center gap-1 border border-[var(--sm-cream)]/30 px-2 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--sm-cream)]/80"
           title="Feature screenplay budget target: ~110 pages"
         >
-          <span>P.{pageCount || 1}/110</span>
+          <span>{pageCount || 1} pp · target 110</span>
           <span className="text-[var(--sm-cream)]/40">·</span>
           <span>{wordCount.toLocaleString()} w</span>
         </span>
