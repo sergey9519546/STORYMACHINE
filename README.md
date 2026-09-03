@@ -75,6 +75,7 @@ the IndexedDB draft mirror, and calls `POST /api/session/delete`.
 | Path | Description |
 |---|---|
 | `GET /health` | Liveness probe — returns `{ status, uptime, sessions, version, commit }`. `version`/`commit` identify what's actually running (see "Releases" below); no auth, no rate limit. |
+| `GET /metrics` | Bespoke JSON (`{ sessions, uptime_s, ai: { ..., by_category }, ... }`) — **not Prometheus exposition format.** A Prometheus scraper pointed at this endpoint collects nothing. Gated by `METRICS_TOKEN` off loopback (see below). |
 | `POST /api/init` | Initialize simulation with agents and locations |
 | `POST /api/run-room` | Run a 5-turn dialogue lock in a location |
 | `POST /api/scriptide/doctor` | Run the deterministic Script Doctor and return the full report |
