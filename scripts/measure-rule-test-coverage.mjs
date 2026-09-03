@@ -1,0 +1,130 @@
+#!/usr/bin/env node
+// Measures, rather than asserts, how many of the rulebook's rule constants
+// are referenced by at least one test under tests/**.
+//
+// Retrospective finding #6 (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md
+// §6): docs/rulebook/README.md used to claim every rule is "fire-tested and
+// no-fire-tested" as a hardcoded string in scripts/generate-rulebook.ts — not
+// a measurement. This script IS the measurement: it reuses the generator's
+// own rule enumeration (extractAllPasses in scripts/generate-rulebook.ts, the
+// same source scripts/generate-rulebook.ts uses to build the rulebook) so
+// there is exactly one definition of "the set of rule constants," never a
+// second regex that could drift from the first.
+//
+// For each rule constant, "tested" means the constant name occurs at least
+// once, at a word boundary, in any file under tests/** (any extension —
+// fixtures and helpers count, not just *.test.ts). That is a coverage-proxy,
+// not a proof the test is behavioural or that it asserts on the finding; the
+// companion CI test (tests/core/rule-test-coverage.test.ts) only requires the
+// zero-occurrence list to be empty, and the 2026-09-03 work that emptied it
+// hand-wrote real fire/no-fire fixtures for each of the 21 previously-unseen
+// constants (docs/rulebook/COVERAGE_2026-09-03.md has the method and list).
+//
+// Usage: node scripts/measure-rule-test-coverage.mjs [--out <path>] [--quiet]
+// Writes docs/rulebook/coverage.json by default and prints a human summary
+// to stdout (suppressed with --quiet; the JSON is always written).
+
+import { writeFileSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { extractAllPasses } from './generate-rulebook.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, '..');
+const TESTS_DIR = path.join(REPO_ROOT, 'tests');
+const DEFAULT_OUT = path.join(REPO_ROOT, 'docs/rulebook/coverage.json');
+
+function parseArgs(argv) {
+  let out = DEFAULT_OUT;
+  let quiet = false;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--out' && argv[i + 1]) { out = path.resolve(argv[i + 1]); i++; }
+    else if (argv[i] === '--quiet') quiet = true;
+  }
+  return { out, quiet };
+}
+
+/** Every regular file under `dir`, recursively, skipping node_modules-style
+ *  junk (none expected under tests/, but defensive). */
+function walkFiles(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkFiles(full));
+    else if (entry.isFile()) out.push(full);
+  }
+  return out;
+}
+
+export function measureCoverage() {
+  const extractions = extractAllPasses();
+  const ruleNames = [];
+  for (const e of extractions) {
+    for (const r of e.rules) ruleNames.push({ rule: r.rule, pass: e.pass });
+  }
+  // Rule identity is (pass, rule-constant-name) per the generator's own
+  // methodology note (docs/rulebook/README.md) — the same constant name can
+  // recur, independently implemented, in two different passes. Coverage is
+  // measured per rule-name across ALL of tests/**, not per (pass, name):
+  // the retrospective's complaint is "does anything under tests/ ever
+  // exercise this rule name at all," not which pass's test file does it.
+  const distinctNames = [...new Set(ruleNames.map(r => r.rule))].sort();
+
+  const testFiles = walkFiles(TESTS_DIR).filter(f => statSync(f).isFile());
+  const fileContents = testFiles.map(f => ({ file: path.relative(REPO_ROOT, f), text: readFileSync(f, 'utf8') }));
+
+  const perRule = [];
+  const zeroOccurrence = [];
+  for (const name of distinctNames) {
+    let count = 0;
+    const files = [];
+    for (const { file, text } of fileContents) {
+      const re = new RegExp(`\\b${name}\\b`, 'g');
+      const matches = text.match(re);
+      if (matches) { count += matches.length; files.push(file); }
+    }
+    perRule.push({ rule: name, occurrences: count, files });
+    if (count === 0) zeroOccurrence.push(name);
+  }
+
+  const totalRuleRecords = ruleNames.length; // (pass, rule) records — matches the rulebook's published total
+  const totalDistinctNames = distinctNames.length;
+  const testedDistinctNames = totalDistinctNames - zeroOccurrence.length;
+
+  return {
+    measuredAt: new Date().toISOString(),
+    method: 'word-boundary regex match of each rule constant name against every file under tests/**',
+    totalRuleRecords,
+    totalDistinctRuleNames: totalDistinctNames,
+    testedDistinctRuleNames: testedDistinctNames,
+    zeroOccurrenceCount: zeroOccurrence.length,
+    zeroOccurrenceRules: zeroOccurrence,
+    perRule,
+  };
+}
+
+function main() {
+  const { out, quiet } = parseArgs(process.argv.slice(2));
+  const report = measureCoverage();
+
+  mkdirSync(path.dirname(out), { recursive: true });
+  writeFileSync(out, JSON.stringify(report, null, 2) + '\n');
+
+  if (!quiet) {
+    console.log(
+      `rule test coverage: ${report.testedDistinctRuleNames} of ${report.totalDistinctRuleNames} ` +
+      `distinct rule constants are referenced by at least one file under tests/** ` +
+      `(${report.zeroOccurrenceCount} have zero occurrence).`,
+    );
+    if (report.zeroOccurrenceCount > 0) {
+      console.log('Zero-occurrence rules:');
+      for (const r of report.zeroOccurrenceRules) console.log(`  - ${r}`);
+    }
+    console.log(`Report written to ${path.relative(REPO_ROOT, out)}`);
+  }
+}
+
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+if (isMain) main();

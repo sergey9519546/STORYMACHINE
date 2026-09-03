@@ -9395,3 +9395,73 @@ Alice grabs the edge of the counter, knuckles white.
     );
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — GENERIC_DESCRIPTOR had zero
+// occurrence anywhere under tests/ despite being a live rule
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — originalityPass: GENERIC_DESCRIPTOR', () => {
+  const makeRecR6 = (idx: number): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+  });
+  const inputForR6 = (fountain: string, n: number) => ({
+    fountain, original: fountain,
+    records: Array.from({ length: n }, (_, i) => makeRecR6(i)) as any,
+    structure: {} as any, annotations: [], approvedSpans: [],
+  });
+
+  it('originalityPass detects GENERIC_DESCRIPTOR on a generic scene-transition phrase ("suddenly")', async () => {
+    const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+    const fountain = `INT. WAREHOUSE - NIGHT
+
+Alice moves through the shadows. Suddenly, a door slams somewhere above.
+`;
+    const result = await originalityPass(inputForR6(fountain, 1));
+    const hits = result.issues.filter(i => i.rule === 'GENERIC_DESCRIPTOR');
+    assert.ok(hits.length >= 1, `Should detect GENERIC_DESCRIPTOR; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.match(hits[0].description, /Generic scene descriptor: "[Ss]uddenly"/);
+  });
+
+  it('originalityPass detects GENERIC_DESCRIPTOR on a generic beautiful-sunset descriptor', async () => {
+    const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+    const fountain = `EXT. CLIFFSIDE - DUSK
+
+A beautiful sunset stretches across the horizon as Mara watches in silence.
+`;
+    const result = await originalityPass(inputForR6(fountain, 1));
+    const hits = result.issues.filter(i => i.rule === 'GENERIC_DESCRIPTOR');
+    assert.ok(hits.length >= 1, `Should detect GENERIC_DESCRIPTOR; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.match(hits[0].description, /beautiful sunset/i);
+  });
+
+  it('originalityPass does NOT fire GENERIC_DESCRIPTOR on specific, concrete scene description', async () => {
+    const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+    const fountain = `INT. WAREHOUSE - NIGHT
+
+Alice moves through the shadows. A rusted forklift blocks the loading bay; rain drips through a hole in the corrugated roof.
+`;
+    const result = await originalityPass(inputForR6(fountain, 1));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'GENERIC_DESCRIPTOR'),
+      'Should NOT fire when scene description is specific and concrete',
+    );
+  });
+
+  it('originalityPass reports only one GENERIC_DESCRIPTOR per line even when multiple generic patterns match', async () => {
+    const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+    // "the next day" and "suddenly" both match GENERIC_PATTERNS on the same line.
+    const fountain = `INT. OFFICE - DAY
+
+The next day, suddenly, everything changes.
+`;
+    const result = await originalityPass(inputForR6(fountain, 1));
+    const hits = result.issues.filter(i => i.rule === 'GENERIC_DESCRIPTOR' && i.location === 'Line 3');
+    assert.equal(hits.length, 1, 'Should cap at one GENERIC_DESCRIPTOR issue per line');
+  });
+});

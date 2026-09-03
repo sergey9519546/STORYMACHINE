@@ -6813,3 +6813,71 @@ ${sceneSixBody}
     });
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — EMOTIONAL_MONOTONY had zero
+// occurrence anywhere under tests/ despite being a live rule
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — causalityPass: EMOTIONAL_MONOTONY', () => {
+  const makeRecR6 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const blankFountainR6 = (n: number) =>
+    Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+  const noAnnotationsR6 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+  const causeInputR6 = (records: any[]) => ({
+    fountain: blankFountainR6(records.length), original: blankFountainR6(records.length),
+    records: records as any, structure: {} as any,
+    annotations: noAnnotationsR6(records.length), approvedSpans: [],
+  });
+
+  it('causalityPass detects EMOTIONAL_MONOTONY when 3 consecutive scenes share a non-neutral emotional tone', async () => {
+    const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+    const shifts = ['positive', 'positive', 'positive', 'neutral', 'neutral'];
+    const records = shifts.map((s, i) => makeRecR6(i, { emotionalShift: s }));
+    const result = await causalityPass(causeInputR6(records));
+    const hits = result.issues.filter(i => i.rule === 'EMOTIONAL_MONOTONY');
+    assert.ok(hits.length >= 1, `Should detect EMOTIONAL_MONOTONY; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.match(hits[0].description, /Three consecutive scenes share the same emotional tone \(positive\)/);
+  });
+
+  it('causalityPass does NOT fire EMOTIONAL_MONOTONY when the run of 3 is emotionally neutral', async () => {
+    const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+    const shifts = ['neutral', 'neutral', 'neutral', 'positive', 'negative'];
+    const records = shifts.map((s, i) => makeRecR6(i, { emotionalShift: s }));
+    const result = await causalityPass(causeInputR6(records));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'EMOTIONAL_MONOTONY'),
+      'Should NOT fire when the repeated tone is neutral — the rule requires a non-neutral match',
+    );
+  });
+
+  it('causalityPass does NOT fire EMOTIONAL_MONOTONY when emotional tone varies scene to scene', async () => {
+    const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+    const shifts = ['positive', 'negative', 'positive', 'negative', 'positive'];
+    const records = shifts.map((s, i) => makeRecR6(i, { emotionalShift: s }));
+    const result = await causalityPass(causeInputR6(records));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'EMOTIONAL_MONOTONY'),
+      'Should NOT fire when no 3-scene run shares the same emotional tone',
+    );
+  });
+
+  it('causalityPass does NOT fire EMOTIONAL_MONOTONY on only 2 consecutive matching scenes', async () => {
+    const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+    const shifts = ['positive', 'positive', 'negative', 'negative', 'positive'];
+    const records = shifts.map((s, i) => makeRecR6(i, { emotionalShift: s }));
+    const result = await causalityPass(causeInputR6(records));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'EMOTIONAL_MONOTONY'),
+      'Should NOT fire when a matching pair never extends to a run of 3',
+    );
+  });
+});

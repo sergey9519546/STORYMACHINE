@@ -7418,3 +7418,120 @@ describe('conflictPass — NO_REVERSALS_LONG_STORY honesty hedge (pilot session 
     assert.ok(!result.issues.some(i => i.rule === 'NO_REVERSALS_LONG_STORY'), 'must not fire once reversalDensity is nonzero');
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — TOO_MANY_OPEN_CONFLICTS,
+// CLIMAX_APPROACH_FLAT had zero occurrence anywhere under tests/ despite
+// being live rules (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — conflictPass: TOO_MANY_OPEN_CONFLICTS, CLIMAX_APPROACH_FLAT', () => {
+  const makeRecR6 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const baseStructureR6 = (override: Partial<any> = {}) => ({
+    actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 5,
+    midpointPressure: 2, reversalCount: 1, tightestScene: 3,
+    avgSuspensePerScene: 1.5, escalating: true, reversalDensity: 0.2,
+    approachingClimax: false, openClues: 0, revelationCount: 0,
+    ...override,
+  });
+  const fountainR6 = (n: number) => Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+  // ── TOO_MANY_OPEN_CONFLICTS: structure.openClues > 3 ─────────────────────
+  it('conflictPass detects TOO_MANY_OPEN_CONFLICTS when more than 3 threads remain unresolved', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 5 }, (_, i) => makeRecR6(i));
+    const result = await conflictPass({
+      fountain: fountainR6(5), original: fountainR6(5), records: records as any,
+      structure: baseStructureR6({ openClues: 4 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'TOO_MANY_OPEN_CONFLICTS');
+    assert.ok(hits.length >= 1, `Should detect TOO_MANY_OPEN_CONFLICTS; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'major');
+    assert.match(hits[0].description, /4 planted conflicts\/clues remain unresolved/);
+  });
+
+  it('conflictPass does NOT fire TOO_MANY_OPEN_CONFLICTS when 3 or fewer threads are open', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 5 }, (_, i) => makeRecR6(i));
+    const result = await conflictPass({
+      fountain: fountainR6(5), original: fountainR6(5), records: records as any,
+      structure: baseStructureR6({ openClues: 3 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'TOO_MANY_OPEN_CONFLICTS'),
+      'Should NOT fire at exactly 3 open threads (guard is strictly > 3)',
+    );
+  });
+
+  // ── CLIMAX_APPROACH_FLAT: approachingClimax && avg(last 3 suspenseDelta) < avgSuspensePerScene ──
+  it('conflictPass detects CLIMAX_APPROACH_FLAT when the final 3 scenes read below-average suspense while approaching climax', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = [
+      makeRecR6(0, { suspenseDelta: 3 }),
+      makeRecR6(1, { suspenseDelta: 3 }),
+      makeRecR6(2, { suspenseDelta: 3 }),
+      makeRecR6(3, { suspenseDelta: 0.2 }), // last 3 scenes flat
+      makeRecR6(4, { suspenseDelta: 0.2 }),
+      makeRecR6(5, { suspenseDelta: 0.2 }),
+    ];
+    const result = await conflictPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: baseStructureR6({ approachingClimax: true, avgSuspensePerScene: 1.5 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'CLIMAX_APPROACH_FLAT');
+    assert.ok(hits.length >= 1, `Should detect CLIMAX_APPROACH_FLAT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'major');
+    assert.equal(hits[0].location, 'Pre-climax scenes (last 3)');
+  });
+
+  it('conflictPass does NOT fire CLIMAX_APPROACH_FLAT when the final 3 scenes intensify while approaching climax', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = [
+      makeRecR6(0, { suspenseDelta: 0.5 }),
+      makeRecR6(1, { suspenseDelta: 0.5 }),
+      makeRecR6(2, { suspenseDelta: 0.5 }),
+      makeRecR6(3, { suspenseDelta: 3 }), // last 3 scenes escalate
+      makeRecR6(4, { suspenseDelta: 3 }),
+      makeRecR6(5, { suspenseDelta: 3 }),
+    ];
+    const result = await conflictPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: baseStructureR6({ approachingClimax: true, avgSuspensePerScene: 1.5 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'CLIMAX_APPROACH_FLAT'),
+      'Should NOT fire when the pre-climax run intensifies above the story average',
+    );
+  });
+
+  it('conflictPass does NOT fire CLIMAX_APPROACH_FLAT when the story is not approaching climax, even with a flat ending run', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = [
+      makeRecR6(0, { suspenseDelta: 3 }),
+      makeRecR6(1, { suspenseDelta: 3 }),
+      makeRecR6(2, { suspenseDelta: 3 }),
+      makeRecR6(3, { suspenseDelta: 0.2 }),
+      makeRecR6(4, { suspenseDelta: 0.2 }),
+      makeRecR6(5, { suspenseDelta: 0.2 }),
+    ];
+    const result = await conflictPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: baseStructureR6({ approachingClimax: false, avgSuspensePerScene: 1.5 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'CLIMAX_APPROACH_FLAT'),
+      'Should NOT fire when structure.approachingClimax is false',
+    );
+  });
+});

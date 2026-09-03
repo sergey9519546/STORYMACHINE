@@ -6598,3 +6598,182 @@ describe('I1-a — pacingPass: ENERGY_MONOTONE tone-composed thresholds (compose
     assert.ok(monotone[0].description.endsWith('(threshold adjusted for thriller)'), 'genre-only note must not mention any tone');
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — ACT1_TOO_LONG, ACT3_TOO_SHORT,
+// COMPRESSED_TURNING_POINT had zero occurrence anywhere under tests/ despite
+// being live rules (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ──────────────────────────────────────
+
+describe('Retrospective §6 coverage — pacingPass: ACT1_TOO_LONG, ACT3_TOO_SHORT, COMPRESSED_TURNING_POINT', () => {
+  const makeRecR6 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const noAnnotationsR6 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+  function fountainWithLengthsR6(sceneLinesArray: number[]): string {
+    return sceneLinesArray.map((len, i) => {
+      const body = Array.from({ length: len }, (_, j) => `Scene ${i} action line ${j + 1}.`).join('\n');
+      return `INT. SC${i} - DAY\n\n${body}\n`;
+    }).join('\n');
+  }
+
+  // ── ACT1_TOO_LONG ──────────────────────────────────────────────────────────
+  // n=8, act1End = floor(8*0.25) = 2 (scenes 0-1). act1Pct > 0.4 fires.
+  it('pacingPass detects ACT1_TOO_LONG when Act 1 scenes use over 40% of total page count', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    // Act 1 (scenes 0-1): 30 + 30 = 60 lines. Act 2/3 (scenes 2-7): 6 each = 36.
+    // total = 96; act1Pct = 60/96 = 0.625 > 0.4 → fires.
+    const sceneLens = [30, 30, 6, 6, 6, 6, 6, 6];
+    const records = Array.from({ length: 8 }, (_, i) => makeRecR6(i));
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(8), approvedSpans: [],
+    });
+    const act1 = result.issues.filter(i => i.rule === 'ACT1_TOO_LONG');
+    assert.ok(act1.length >= 1, `Should detect ACT1_TOO_LONG; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(act1[0].severity, 'major');
+    assert.match(act1[0].description, /Act 1 uses \d+% of total page count/);
+  });
+
+  it('pacingPass does NOT fire ACT1_TOO_LONG when Act 1 is proportionate', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    // Act 1 (scenes 0-1): 8+8=16 of a 64-line total (25%) — well under the 40% cutoff.
+    const sceneLens = [8, 8, 8, 8, 8, 8, 8, 8];
+    const records = Array.from({ length: 8 }, (_, i) => makeRecR6(i));
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(8), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT1_TOO_LONG'),
+      'Should NOT fire when Act 1 uses a proportionate share of total page count',
+    );
+  });
+
+  // ── ACT3_TOO_SHORT ─────────────────────────────────────────────────────────
+  // n=8, act3Start = floor(8*0.75) = 6 (scenes 6-7). Requires act3Pct < 0.1
+  // AND structure.actPosition === 'act3' — both guards must be exercised.
+  it('pacingPass detects ACT3_TOO_SHORT when Act 3 is under 10% of total page count and structure says act3', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    // Act 3 (scenes 6-7): 1+1=2 of a total of 2+6*17=104 lines → act3Pct ≈ 0.019 < 0.1.
+    const sceneLens = [17, 17, 17, 17, 17, 17, 1, 1];
+    const records = Array.from({ length: 8 }, (_, i) => makeRecR6(i));
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any,
+      structure: { actPosition: 'act3' } as any,
+      annotations: noAnnotationsR6(8), approvedSpans: [],
+    });
+    const act3 = result.issues.filter(i => i.rule === 'ACT3_TOO_SHORT');
+    assert.ok(act3.length >= 1, `Should detect ACT3_TOO_SHORT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(act3[0].severity, 'major');
+    assert.match(act3[0].description, /Act 3 uses only \d+% of total page count/);
+  });
+
+  it('pacingPass does NOT fire ACT3_TOO_SHORT when Act 3 is short but structure.actPosition is not act3', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    // Same page-count shape as the fire case (act3Pct < 0.1), but the
+    // structure guard (actPosition !== 'act3') must suppress the rule —
+    // this scene-length ratio alone is not sufficient.
+    const sceneLens = [17, 17, 17, 17, 17, 17, 1, 1];
+    const records = Array.from({ length: 8 }, (_, i) => makeRecR6(i));
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any,
+      structure: { actPosition: 'act1' } as any,
+      annotations: noAnnotationsR6(8), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT3_TOO_SHORT'),
+      'Should NOT fire when structure.actPosition is not act3, even if Act 3 page share is thin',
+    );
+  });
+
+  it('pacingPass does NOT fire ACT3_TOO_SHORT when Act 3 carries a proportionate page share', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    const sceneLens = [8, 8, 8, 8, 8, 8, 8, 8];
+    const records = Array.from({ length: 8 }, (_, i) => makeRecR6(i));
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any,
+      structure: { actPosition: 'act3' } as any,
+      annotations: noAnnotationsR6(8), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT3_TOO_SHORT'),
+      'Should NOT fire when Act 3 uses a proportionate share of total page count',
+    );
+  });
+
+  // ── COMPRESSED_TURNING_POINT ───────────────────────────────────────────────
+  // Per-scene: lineCount < avgLength*0.3 AND (annotation.revelation || record.clockRaised).
+  it('pacingPass detects COMPRESSED_TURNING_POINT when a very short scene raises the clock', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    // avg = (20*5 + 2)/6 ≈ 17; scene 5 = 2 lines < avg*0.3 (~5.1) and clockRaised.
+    const sceneLens = [20, 20, 20, 20, 20, 2];
+    const records = Array.from({ length: 6 }, (_, i) =>
+      makeRecR6(i, { clockRaised: i === 5 }),
+    );
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(6), approvedSpans: [],
+    });
+    const compressed = result.issues.filter(i => i.rule === 'COMPRESSED_TURNING_POINT');
+    assert.ok(compressed.length >= 1, `Should detect COMPRESSED_TURNING_POINT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(compressed[0].severity, 'major');
+    assert.match(compressed[0].location, /Scene 6/);
+  });
+
+  it('pacingPass detects COMPRESSED_TURNING_POINT when a very short scene carries a revelation annotation', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    const sceneLens = [20, 20, 20, 20, 20, 2];
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i));
+    const annotations = noAnnotationsR6(6);
+    annotations[5] = { revelation: true } as any;
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any, structure: {} as any,
+      annotations, approvedSpans: [],
+    });
+    const compressed = result.issues.filter(i => i.rule === 'COMPRESSED_TURNING_POINT');
+    assert.ok(compressed.length >= 1, `Should detect COMPRESSED_TURNING_POINT via revelation annotation; got: ${result.issues.map(i => i.rule).join(', ')}`);
+  });
+
+  it('pacingPass does NOT fire COMPRESSED_TURNING_POINT when a short scene is neither a revelation nor a clock-raise', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    const sceneLens = [20, 20, 20, 20, 20, 2];
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i, { clockRaised: false }));
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(6), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'COMPRESSED_TURNING_POINT'),
+      'Should NOT fire on a short scene with no revelation and no clock-raise',
+    );
+  });
+
+  it('pacingPass does NOT fire COMPRESSED_TURNING_POINT when the turning-point scene has adequate length', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    // Same avg (~17), but the turning-point scene is 8 lines — above avg*0.3 (~5.1).
+    const sceneLens = [20, 20, 20, 20, 20, 8];
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i, { clockRaised: i === 5 }));
+    const result = await pacingPass({
+      fountain: fountainWithLengthsR6(sceneLens),
+      original: '', records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(6), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'COMPRESSED_TURNING_POINT'),
+      'Should NOT fire when the turning-point scene is not disproportionately short',
+    );
+  });
+});

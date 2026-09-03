@@ -7123,3 +7123,116 @@ function baseStructureFor152() {
     openClues: 0, revelationCount: 0,
   };
 }
+
+// ── Retrospective 2026-09-02 §6 coverage — ACT3_TOO_EARLY, ACT2_TOO_SHORT had
+// zero occurrence anywhere under tests/ despite being live rules
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — structurePass: ACT3_TOO_EARLY, ACT2_TOO_SHORT', () => {
+  const recsR6 = (n: number): any[] => Array.from({ length: n }, (_, i) => ({
+    commitId: `c${i}`, sceneIdx: i, slug: `INT. SC${i} - DAY`, purpose: 'dialogue',
+    dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+    emotionalShift: 'neutral', suspenseDelta: 1, dialogueHighlights: [], unresolvedClues: [],
+    seededClueIds: [], payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+  }));
+  const fountainR6 = (n: number) => Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA line.\n`).join('');
+
+  // ── ACT3_TOO_EARLY: structure.actPosition === 'act3' && completionPercent < 80 ──
+  it('structurePass detects ACT3_TOO_EARLY when Act 3 is reached before 80% completion', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const n = 6;
+    const result = await structurePass({
+      fountain: fountainR6(n), original: fountainR6(n), records: recsR6(n) as any,
+      structure: { ...baseStructureFor152(), actPosition: 'act3', completionPercent: 55 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'ACT3_TOO_EARLY');
+    assert.ok(hits.length >= 1, `Should detect ACT3_TOO_EARLY; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'major');
+    assert.match(hits[0].description, /Act 3 reached at only 55% completion/);
+  });
+
+  it('structurePass does NOT fire ACT3_TOO_EARLY when Act 3 arrives at or after 80% completion', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const n = 6;
+    const result = await structurePass({
+      fountain: fountainR6(n), original: fountainR6(n), records: recsR6(n) as any,
+      structure: { ...baseStructureFor152(), actPosition: 'act3', completionPercent: 85 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT3_TOO_EARLY'),
+      'Should NOT fire when Act 3 is reached at a healthy completion percentage',
+    );
+  });
+
+  it('structurePass does NOT fire ACT3_TOO_EARLY when completion is low but the story is not yet in Act 3', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const n = 6;
+    const result = await structurePass({
+      fountain: fountainR6(n), original: fountainR6(n), records: recsR6(n) as any,
+      structure: { ...baseStructureFor152(), actPosition: 'act2b', completionPercent: 55 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT3_TOO_EARLY'),
+      'Should NOT fire when actPosition has not yet reached act3, even at low completion',
+    );
+  });
+
+  // ── ACT2_TOO_SHORT: actPosition in {act1, act2a} && completionPercent > 60 ──
+  it('structurePass detects ACT2_TOO_SHORT when still in act1 past 60% completion', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const n = 6;
+    const result = await structurePass({
+      fountain: fountainR6(n), original: fountainR6(n), records: recsR6(n) as any,
+      structure: { ...baseStructureFor152(), actPosition: 'act1', completionPercent: 70 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'ACT2_TOO_SHORT');
+    assert.ok(hits.length >= 1, `Should detect ACT2_TOO_SHORT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'critical');
+    assert.match(hits[0].description, /70% complete but still in act1/);
+  });
+
+  it('structurePass detects ACT2_TOO_SHORT when still in act2a past 60% completion', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const n = 6;
+    const result = await structurePass({
+      fountain: fountainR6(n), original: fountainR6(n), records: recsR6(n) as any,
+      structure: { ...baseStructureFor152(), actPosition: 'act2a', completionPercent: 65 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'ACT2_TOO_SHORT');
+    assert.ok(hits.length >= 1, `Should detect ACT2_TOO_SHORT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+  });
+
+  it('structurePass does NOT fire ACT2_TOO_SHORT when act1/act2a completion is at or below 60%', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const n = 6;
+    const result = await structurePass({
+      fountain: fountainR6(n), original: fountainR6(n), records: recsR6(n) as any,
+      structure: { ...baseStructureFor152(), actPosition: 'act2a', completionPercent: 50 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT2_TOO_SHORT'),
+      'Should NOT fire when act1/act2a completion has not yet crossed 60%',
+    );
+  });
+
+  it('structurePass does NOT fire ACT2_TOO_SHORT past 60% completion once the story has reached act2b', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const n = 6;
+    const result = await structurePass({
+      fountain: fountainR6(n), original: fountainR6(n), records: recsR6(n) as any,
+      structure: { ...baseStructureFor152(), actPosition: 'act2b', completionPercent: 70 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT2_TOO_SHORT'),
+      'Should NOT fire once the story has progressed past act2a, even at high completion',
+    );
+  });
+});

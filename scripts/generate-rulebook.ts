@@ -55,6 +55,51 @@ export const DOCTOR_FILE = path.join(REPO_ROOT, 'server/nvm/analyze/doctor.ts');
 export const CLUSTER_FILE = path.join(REPO_ROOT, 'server/nvm/analyze/cluster.ts');
 export const GENRE_FILE = path.join(REPO_ROOT, 'server/lib/genre-router.ts');
 export const OUT_DIR = path.join(REPO_ROOT, 'docs/rulebook');
+const COVERAGE_REPORT_PATH = path.join(OUT_DIR, 'coverage.json');
+
+// ── Test-coverage measurement (retrospective #6, 2026-09-03) ────────────────
+// docs/rulebook/README.md used to assert every rule is "fire-tested and
+// no-fire-tested" as a hardcoded sentence, never actually measured — see
+// docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6. This reads the
+// report `scripts/measure-rule-test-coverage.mjs` produces (that script reuses
+// this file's own extractAllPasses as its rule enumeration, so there is one
+// source of truth for "the set of rule constants," never a second regex) and
+// renders the true count instead. `npm run rulebook` always regenerates the
+// coverage report first — see the "rulebook" script in package.json — so this
+// file only fails loudly if that step was skipped.
+export interface CoverageReport {
+  totalDistinctRuleNames: number;
+  testedDistinctRuleNames: number;
+  zeroOccurrenceCount: number;
+  zeroOccurrenceRules: string[];
+}
+
+export function readCoverageReport(reportPath: string = COVERAGE_REPORT_PATH): CoverageReport {
+  let raw: string;
+  try {
+    raw = readFileSync(reportPath, 'utf8');
+  } catch {
+    throw new Error(
+      `docs/rulebook/coverage.json not found at ${reportPath}. Run ` +
+      '`node scripts/measure-rule-test-coverage.mjs` first (or `npm run rulebook`, which does ' +
+      'this automatically) — the README\'s test-coverage sentence is a measurement, not a claim, ' +
+      'and refuses to render without a fresh measurement behind it.',
+    );
+  }
+  return JSON.parse(raw) as CoverageReport;
+}
+
+/** Renders the honest coverage sentence for the README — no blanket claim,
+ *  just what was actually measured, with the full miss list when non-empty. */
+export function renderCoverageSentence(coverage: CoverageReport): string {
+  const { totalDistinctRuleNames: M, testedDistinctRuleNames: N, zeroOccurrenceCount: K, zeroOccurrenceRules } = coverage;
+  const missClause = K === 0
+    ? '; 0 have no test reference.'
+    : `; ${K} have no test reference: ${zeroOccurrenceRules.join(', ')}.`;
+  return `${N} of ${M} rule constants are referenced by at least one test under \`tests/**\` ` +
+    '(word-boundary match of the constant name; see `scripts/measure-rule-test-coverage.mjs` and ' +
+    '`docs/rulebook/coverage.json` for the full per-rule measurement)' + missClause;
+}
 
 // ── Shared textual-extraction primitives ────────────────────────────────────
 
@@ -555,7 +600,7 @@ function renderPassDoc(extraction: PassExtraction): string {
   return lines.join('\n');
 }
 
-function renderReadme(extractions: PassExtraction[]): { markdown: string; totalRules: number } {
+export function renderReadme(extractions: PassExtraction[], coverage: CoverageReport): { markdown: string; totalRules: number } {
   const totalRules = extractions.reduce((s, e) => s + e.rules.length, 0);
 
   const eraCounts = { founding: 0, 'program-v1': 0, 'program-v2': 0, unattributed: 0 } as Record<string, number>;
@@ -572,11 +617,12 @@ function renderReadme(extractions: PassExtraction[]): { markdown: string; totalR
     'by pass and by the wave that added it, with the human context the source ' +
     'comments actually support. No LLM is involved in producing a single finding ' +
     'this catalog describes: every rule below is a pure function of the parsed ' +
-    'screenplay, fire-tested and no-fire-tested in `tests/passes/*.test.ts`, and ' +
-    'governed end-to-end by `server/nvm/revision/WAVE_QUALITY_GUARANTEE.md`\'s ' +
-    'binding per-wave acceptance checklist (exhaustive distinctness, complete ' +
-    'guard conditions, symmetric fire/no-fire test coverage, and craft-grade ' +
-    'authoring — never "good enough").',
+    'screenplay.',
+  );
+  lines.push('');
+  lines.push(
+    '**Test coverage (measured, not claimed — retrospective 2026-09-02 §6):** ' +
+    renderCoverageSentence(coverage),
   );
   lines.push('');
   lines.push(
@@ -816,7 +862,8 @@ function main(): void {
   mkdirSync(OUT_DIR, { recursive: true });
 
   const extractions = extractAllPasses();
-  const { markdown: readme, totalRules } = renderReadme(extractions);
+  const coverage = readCoverageReport();
+  const { markdown: readme, totalRules } = renderReadme(extractions, coverage);
   writeFileSync(path.join(OUT_DIR, 'README.md'), readme + '\n');
 
   for (const e of extractions) {

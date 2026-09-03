@@ -7014,3 +7014,156 @@ describe('Wave 138 — characterArcPass: relational arc tracking', () => {
     );
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — FLAT_CHARACTER_ARC, NO_REVELATIONS,
+// CLIMAX_EMOTIONALLY_FLAT had zero occurrence anywhere under tests/ despite
+// being live rules (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — characterArcPass: FLAT_CHARACTER_ARC, NO_REVELATIONS, CLIMAX_EMOTIONALLY_FLAT', () => {
+  const baseStructureR6 = {
+    actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 5,
+    midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
+    escalating: true, reversalDensity: 0.1, approachingClimax: false,
+    openClues: 1, revelationCount: 1,
+  };
+  const makeRecR6 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const fountainR6 = (n: number) => Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+  // ── FLAT_CHARACTER_ARC: dominant shift of first third === dominant shift of
+  // last third, and neither is 'neutral' ────────────────────────────────────
+  it('characterArcPass detects FLAT_CHARACTER_ARC when the opening and closing thirds share the same non-neutral tone', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    // 9 scenes: first third and last third both dominantly 'positive'; middle
+    // third is 'negative' so this is a real opens=closes shape, not just uniform.
+    const shifts = ['positive', 'positive', 'positive', 'negative', 'negative', 'negative', 'positive', 'positive', 'positive'];
+    const records = Array.from({ length: 9 }, (_, i) => makeRecR6(i, { emotionalShift: shifts[i] }));
+    const result = await characterArcPass({
+      fountain: fountainR6(9), original: fountainR6(9),
+      records: records as any, structure: baseStructureR6 as any, annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'FLAT_CHARACTER_ARC');
+    assert.ok(hits.length >= 1, `Should detect FLAT_CHARACTER_ARC; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'major');
+    assert.match(hits[0].description, /opens and closes with the same dominant emotional tone \(positive\)/);
+  });
+
+  it('characterArcPass does NOT fire FLAT_CHARACTER_ARC when the closing third has a different dominant tone', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const shifts = ['positive', 'positive', 'positive', 'neutral', 'neutral', 'neutral', 'negative', 'negative', 'negative'];
+    const records = Array.from({ length: 9 }, (_, i) => makeRecR6(i, { emotionalShift: shifts[i] }));
+    const result = await characterArcPass({
+      fountain: fountainR6(9), original: fountainR6(9),
+      records: records as any, structure: baseStructureR6 as any, annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'FLAT_CHARACTER_ARC'),
+      'Should NOT fire when opening and closing thirds have different dominant tones',
+    );
+  });
+
+  it('characterArcPass does NOT fire FLAT_CHARACTER_ARC when both thirds are dominantly neutral', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const records = Array.from({ length: 9 }, (_, i) => makeRecR6(i, { emotionalShift: 'neutral' }));
+    const result = await characterArcPass({
+      fountain: fountainR6(9), original: fountainR6(9),
+      records: records as any, structure: baseStructureR6 as any, annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'FLAT_CHARACTER_ARC'),
+      'Should NOT fire when the shared tone is neutral — the rule requires a non-neutral match',
+    );
+  });
+
+  // ── NO_REVELATIONS: structure.revelationCount === 0 && completionPercent >= 70 ──
+  it('characterArcPass detects NO_REVELATIONS when a near-complete story has zero revelation scenes', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i));
+    const result = await characterArcPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: { ...baseStructureR6, revelationCount: 0, completionPercent: 75 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'NO_REVELATIONS');
+    assert.ok(hits.length >= 1, `Should detect NO_REVELATIONS; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'critical');
+  });
+
+  it('characterArcPass does NOT fire NO_REVELATIONS when the story has at least one revelation', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i));
+    const result = await characterArcPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: { ...baseStructureR6, revelationCount: 1, completionPercent: 75 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(!result.issues.some(i => i.rule === 'NO_REVELATIONS'), 'Should NOT fire once revelationCount > 0');
+  });
+
+  it('characterArcPass does NOT fire NO_REVELATIONS when the story is still early (below 70% completion)', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i));
+    const result = await characterArcPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: { ...baseStructureR6, revelationCount: 0, completionPercent: 40 } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'NO_REVELATIONS'),
+      'Should NOT fire before the story is far enough along to expect a revelation yet',
+    );
+  });
+
+  // ── CLIMAX_EMOTIONALLY_FLAT: approachingClimax && records.length >= 4 &&
+  // none of the last 4 records carry a non-neutral emotionalShift ──────────
+  it('characterArcPass detects CLIMAX_EMOTIONALLY_FLAT when the last 4 pre-climax scenes are all emotionally neutral', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i, { emotionalShift: 'neutral' }));
+    const result = await characterArcPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: { ...baseStructureR6, approachingClimax: true } as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'CLIMAX_EMOTIONALLY_FLAT');
+    assert.ok(hits.length >= 1, `Should detect CLIMAX_EMOTIONALLY_FLAT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'major');
+    assert.equal(hits[0].location, 'Pre-climax character arc');
+  });
+
+  it('characterArcPass does NOT fire CLIMAX_EMOTIONALLY_FLAT when at least one of the last 4 scenes carries an emotional peak', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const records = Array.from({ length: 6 }, (_, i) =>
+      makeRecR6(i, { emotionalShift: i === 5 ? 'positive' : 'neutral' }),
+    );
+    const result = await characterArcPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: { ...baseStructureR6, approachingClimax: true } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'CLIMAX_EMOTIONALLY_FLAT'),
+      'Should NOT fire once at least one of the final 4 scenes has a non-neutral emotional shift',
+    );
+  });
+
+  it('characterArcPass does NOT fire CLIMAX_EMOTIONALLY_FLAT when the story is not approaching climax', async () => {
+    const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i, { emotionalShift: 'neutral' }));
+    const result = await characterArcPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: { ...baseStructureR6, approachingClimax: false } as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'CLIMAX_EMOTIONALLY_FLAT'),
+      'Should NOT fire when structure.approachingClimax is false',
+    );
+  });
+});

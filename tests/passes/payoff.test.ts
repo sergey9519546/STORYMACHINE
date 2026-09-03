@@ -6810,3 +6810,112 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       );
     });
   });
+
+// ── Retrospective 2026-09-02 §6 coverage — NO_SETUPS, OPEN_CLUES_AT_END had
+// zero occurrence anywhere under tests/ despite being live rules
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — payoffPass: NO_SETUPS, OPEN_CLUES_AT_END', () => {
+  const makeRecR6 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const baseStructureR6 = (override: Partial<any> = {}) => ({
+    actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 5,
+    midpointPressure: 2, reversalCount: 1, tightestScene: 3,
+    avgSuspensePerScene: 1.5, escalating: true, reversalDensity: 0.1,
+    approachingClimax: false, openClues: 0, revelationCount: 1,
+    ...override,
+  });
+  const fountainR6 = (n: number) => Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+  // ── NO_SETUPS: no seeded clues anywhere && records.length >= 5 ───────────
+  it('payoffPass detects NO_SETUPS when the story plants no clues at all', async () => {
+    const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+    const records = Array.from({ length: 5 }, (_, i) => makeRecR6(i));
+    const result = await payoffPass({
+      fountain: fountainR6(5), original: fountainR6(5), records: records as any,
+      structure: baseStructureR6() as any, annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'NO_SETUPS');
+    assert.ok(hits.length >= 1, `Should detect NO_SETUPS; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'major');
+    assert.equal(hits[0].location, 'Setup/payoff layer');
+  });
+
+  it('payoffPass does NOT fire NO_SETUPS once at least one clue is seeded', async () => {
+    const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+    const records = Array.from({ length: 5 }, (_, i) =>
+      i === 0 ? makeRecR6(i, { seededClueIds: ['clue-a'] }) : makeRecR6(i),
+    );
+    const result = await payoffPass({
+      fountain: fountainR6(5), original: fountainR6(5), records: records as any,
+      structure: baseStructureR6() as any, annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'NO_SETUPS'),
+      'Should NOT fire once the story has at least one seeded clue',
+    );
+  });
+
+  it('payoffPass does NOT fire NO_SETUPS on a story with fewer than 5 scenes, even with no clues', async () => {
+    const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+    const records = Array.from({ length: 4 }, (_, i) => makeRecR6(i));
+    const result = await payoffPass({
+      fountain: fountainR6(4), original: fountainR6(4), records: records as any,
+      structure: baseStructureR6() as any, annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'NO_SETUPS'),
+      'Should NOT fire below the 5-scene floor',
+    );
+  });
+
+  // ── OPEN_CLUES_AT_END: structure.openClues > 0 && actPosition === 'epilogue' ──
+  it('payoffPass detects OPEN_CLUES_AT_END when clues remain unresolved at the epilogue', async () => {
+    const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i));
+    const result = await payoffPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: baseStructureR6({ actPosition: 'epilogue', openClues: 2 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'OPEN_CLUES_AT_END');
+    assert.ok(hits.length >= 1, `Should detect OPEN_CLUES_AT_END; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'major');
+    assert.match(hits[0].description, /2 unresolved clue\(s\) remain at story end/);
+  });
+
+  it('payoffPass does NOT fire OPEN_CLUES_AT_END when openClues is 0 at the epilogue', async () => {
+    const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i));
+    const result = await payoffPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: baseStructureR6({ actPosition: 'epilogue', openClues: 0 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'OPEN_CLUES_AT_END'),
+      'Should NOT fire when no clues are left open',
+    );
+  });
+
+  it('payoffPass does NOT fire OPEN_CLUES_AT_END when clues are open but the story has not reached the epilogue', async () => {
+    const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+    const records = Array.from({ length: 6 }, (_, i) => makeRecR6(i));
+    const result = await payoffPass({
+      fountain: fountainR6(6), original: fountainR6(6), records: records as any,
+      structure: baseStructureR6({ actPosition: 'act3', openClues: 2 }) as any,
+      annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'OPEN_CLUES_AT_END'),
+      'Should NOT fire before the story reaches the epilogue position',
+    );
+  });
+});

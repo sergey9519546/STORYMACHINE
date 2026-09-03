@@ -16,7 +16,7 @@
     "lint": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
     "test:metamorphic": "node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts",
-    "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts",
+    "rulebook": "node --experimental-strip-types scripts/measure-rule-test-coverage.mjs --quiet && node --experimental-strip-types scripts/generate-rulebook.ts",
     "generate-p0-sample": "node --experimental-strip-types scripts/generate-p0-sample-report.ts",
     "measure-slop": "node --experimental-strip-types scripts/measure-slop-discrimination.ts",
     "measure-real": "node --experimental-strip-types scripts/measure-real-script-discrimination.ts",

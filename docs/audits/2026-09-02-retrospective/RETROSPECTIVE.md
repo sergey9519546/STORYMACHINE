@@ -101,7 +101,7 @@ on day one — that is the finding), then cut the edges with an
 output-identity receipt.
 
 ## 6. Test investment is anti-correlated with rule importance
-**MISTAKE · dispatched (lane R4)**
+**MISTAKE · dispatched (lane R4) — part (a), the untested-21 and the false coverage claim, delivered 2026-09-03: measured (0 of 3186 distinct rule constants now zero-occurrence), all 21 given real fire/no-fire tests, the generator's claim is now a live measurement with a CI tripwire (`tests/core/rule-test-coverage.test.ts`); see `docs/rulebook/COVERAGE_2026-09-03.md`. Part (b), the passes/tests line-count inversion itself, remains open.**
 
 `revision/passes/*.ts` is 98,321 lines; `tests/passes/*.test.ts` is 104,485 —
 half the repository guards the channel the doctor measures at AUC ~0.076,
@@ -236,7 +236,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | 3 | Receipt gate misses `src/lib/fountain.ts` | MISTAKE | Fixed 2026-09-02 — reachability now ungated by directory, `REACHABLE_BUT_NOT_SCORING` starts empty |
 | 4 | Collab rooms unowned | MISTAKE | R3 — delivered: server-minted room ids, share-link model, `docs/AUTH.md` §Collaboration rooms |
 | 5 | Core imports AI + SQLite | WEAK ROUTE | R2 — fixed 2026-09-03: edges cut, reachable set 43 → 21 files outside the core dirs, `tests/core/pure-core-boundary.test.ts` + its allowlist enforce it |
-| 6 | 21 untested rules; false coverage claim | MISTAKE | R4 |
+| 6 | 21 untested rules; false coverage claim | MISTAKE | R4 — part (a) delivered 2026-09-03 (0 untested, claim now measured, CI tripwire added); part (b) (line-count inversion) open |
 | 7 | Ratchet never re-ratcheted | WEAK ROUTE | R1 — floor moved to one place (`AUC24_FLOOR`) but NOT raised: the last real AUC-24 measurement is 2026-07-11, so the raise waits on the lock run |
 | 8 | Audit checks numbers, not claims | WEAK ROUTE | R4 |
 | 9 | Non-blocking-by-design reporter | WEAK ROUTE | R1 — landed: per-gate `expires`, reporter exits 1 past a deadline, both workflow comments corrected |

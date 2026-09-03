@@ -7458,3 +7458,101 @@ I saw everything.
     );
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — MONOTONOUS_RHYTHM,
+// STACCATO_FRAGMENTATION had zero occurrence anywhere under tests/ despite
+// being live rules (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — rhythmPass: MONOTONOUS_RHYTHM, STACCATO_FRAGMENTATION', () => {
+  const blankRecR6 = (idx: number): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+    visualBeats: [], relationshipShifts: [],
+  });
+  const makeInputR6 = (fountain: string) => ({
+    fountain, original: fountain,
+    records: [blankRecR6(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+  });
+  /** An 8-word action sentence, distinct per index so lines don't read as duplicates. */
+  const wordsLine = (n: number, seed: number) =>
+    Array.from({ length: n }, (_, j) => `word${seed}${j}`).join(' ') + '.';
+
+  // ── MONOTONOUS_RHYTHM: >=8 action lines, <20% deviate from avg by >30% ────
+  it('rhythmPass detects MONOTONOUS_RHYTHM when all action lines run the same length', async () => {
+    const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+    // 10 action lines, each exactly 8 words — zero variation.
+    const fountain = 'INT. HALLWAY - DAY\n' +
+      Array.from({ length: 10 }, (_, i) => wordsLine(8, i)).join('\n\n') + '\n';
+    const result = await rhythmPass(makeInputR6(fountain));
+    const hits = result.issues.filter(i => i.rule === 'MONOTONOUS_RHYTHM');
+    assert.ok(hits.length >= 1, `Should detect MONOTONOUS_RHYTHM; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.match(hits[0].description, /rhythmically uniform \(avg 8 words, <20% variation\)/);
+  });
+
+  it('rhythmPass does NOT fire MONOTONOUS_RHYTHM when action-line lengths vary widely', async () => {
+    const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+    // Alternate very short (2-word) and very long (20-word) lines — most lines
+    // deviate from the average by well over 30%.
+    const fountain = 'INT. HALLWAY - DAY\n' +
+      Array.from({ length: 10 }, (_, i) => wordsLine(i % 2 === 0 ? 2 : 20, i)).join('\n\n') + '\n';
+    const result = await rhythmPass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'MONOTONOUS_RHYTHM'),
+      'Should NOT fire when action-line lengths vary widely',
+    );
+  });
+
+  it('rhythmPass does NOT fire MONOTONOUS_RHYTHM with fewer than 8 action lines, even if uniform', async () => {
+    const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+    const fountain = 'INT. HALLWAY - DAY\n' +
+      Array.from({ length: 6 }, (_, i) => wordsLine(8, i)).join('\n\n') + '\n';
+    const result = await rhythmPass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'MONOTONOUS_RHYTHM'),
+      'Should NOT fire below the 8-action-line floor',
+    );
+  });
+
+  // ── STACCATO_FRAGMENTATION: 4+ consecutive action lines of <=4 words ─────
+  it('rhythmPass detects STACCATO_FRAGMENTATION on 4 consecutive very short action lines', async () => {
+    const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+    const fountain = `INT. VAULT - NIGHT
+She waits.
+
+Nothing moves.
+
+Only silence.
+
+He listens hard.
+`;
+    const result = await rhythmPass(makeInputR6(fountain));
+    const hits = result.issues.filter(i => i.rule === 'STACCATO_FRAGMENTATION');
+    assert.ok(hits.length >= 1, `Should detect STACCATO_FRAGMENTATION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.match(hits[0].location, /^Lines ~/);
+  });
+
+  it('rhythmPass does NOT fire STACCATO_FRAGMENTATION when a longer line breaks the short-line streak', async () => {
+    const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+    const fountain = `INT. VAULT - NIGHT
+She waits.
+
+Nothing moves.
+
+Only silence.
+
+He steps forward slowly into the dark, unsure of what waits ahead.
+
+Quiet now.
+`;
+    const result = await rhythmPass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'STACCATO_FRAGMENTATION'),
+      'Should NOT fire when the short-line run never reaches 4 in a row',
+    );
+  });
+});

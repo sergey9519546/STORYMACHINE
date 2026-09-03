@@ -7482,3 +7482,82 @@ describe('P6 — intentionPass: PROTAGONIST_DECISION_VACUUM', () => {
     );
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — INTENTION_INVISIBLE had zero
+// occurrence anywhere under tests/ despite being a live rule
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — intentionPass: INTENTION_INVISIBLE', () => {
+  const makeRecR6 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const noAnnotationsR6 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+  it('intentionPass detects INTENTION_INVISIBLE for a character cue with no tracked beliefs or goals', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    const fountain = `INT. OFFICE - DAY
+
+CARTER
+Nobody move.
+
+Carter steps into the doorway, gun raised.
+`;
+    // No dialogueHighlights reference "carter:" anywhere — the character is a
+    // speaking cue with zero tracked belief/goal trace.
+    const records = [makeRecR6(0)];
+    const result = await intentionPass({
+      fountain, original: fountain, records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(1), approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'INTENTION_INVISIBLE');
+    assert.ok(hits.length >= 1, `Should detect INTENTION_INVISIBLE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.equal(hits[0].location, 'Character: CARTER');
+  });
+
+  it('intentionPass does NOT fire INTENTION_INVISIBLE when the character has a tracked belief/goal trace', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    const fountain = `INT. OFFICE - DAY
+
+CARTER
+Nobody move.
+
+Carter steps into the doorway, gun raised.
+`;
+    const records = [makeRecR6(0, { dialogueHighlights: ['carter: believes the vault is empty'] })];
+    const result = await intentionPass({
+      fountain, original: fountain, records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(1), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'INTENTION_INVISIBLE'),
+      'Should NOT fire once dialogueHighlights track a belief for the character',
+    );
+  });
+
+  it('intentionPass does NOT fire INTENTION_INVISIBLE for a bare NARRATOR cue', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    const fountain = `INT. OFFICE - DAY
+
+NARRATOR
+Some things are better left unsaid.
+
+The room sits empty.
+`;
+    const records = [makeRecR6(0)];
+    const result = await intentionPass({
+      fountain, original: fountain, records: records as any, structure: {} as any,
+      annotations: noAnnotationsR6(1), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'INTENTION_INVISIBLE' && i.location.includes('NARRATOR')),
+      'Should NOT flag NARRATOR as intention-invisible',
+    );
+  });
+});

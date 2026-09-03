@@ -8741,3 +8741,109 @@ About everything that happened at the marina.
   });
 
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — NO_DIALOGUE, SYCOPHANTIC_AGREEMENT
+// had zero occurrence anywhere under tests/ despite being live rules
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — dialoguePass: NO_DIALOGUE, SYCOPHANTIC_AGREEMENT', () => {
+  const blankRecR6 = (idx: number): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+    visualBeats: [], relationshipShifts: [],
+  });
+  const makeInputR6 = (fountain: string) => ({
+    fountain, original: fountain,
+    records: [blankRecR6(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+  });
+
+  // ── NO_DIALOGUE: dialogue.length === 0 && fountain has more than 20 lines ──
+  it('dialoguePass detects NO_DIALOGUE on a 20+ line screenplay with no dialogue at all', async () => {
+    const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+    const fountain = `INT. WAREHOUSE - NIGHT\n\n` +
+      Array.from({ length: 22 }, (_, i) => `Alice moves through the darkness, beat ${i + 1}.`).join('\n\n') + '\n';
+    const result = await dialoguePass(makeInputR6(fountain));
+    const hits = result.issues.filter(i => i.rule === 'NO_DIALOGUE');
+    assert.ok(hits.length >= 1, `Should detect NO_DIALOGUE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.equal(hits[0].location, 'Entire screenplay');
+  });
+
+  it('dialoguePass does NOT fire NO_DIALOGUE once any dialogue exchange is present', async () => {
+    const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+    const fountain = `INT. WAREHOUSE - NIGHT\n\n` +
+      Array.from({ length: 20 }, (_, i) => `Alice moves through the darkness, beat ${i + 1}.`).join('\n\n') +
+      `\n\nALICE\nWe need to move.\n`;
+    const result = await dialoguePass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'NO_DIALOGUE'),
+      'Should NOT fire once the screenplay contains at least one dialogue line',
+    );
+  });
+
+  it('dialoguePass does NOT fire NO_DIALOGUE on a short (<=20 line) screenplay, even with no dialogue', async () => {
+    const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+    const fountain = `INT. WAREHOUSE - NIGHT\n\n` +
+      Array.from({ length: 5 }, (_, i) => `Alice moves through the darkness, beat ${i + 1}.`).join('\n\n') + '\n';
+    const result = await dialoguePass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'NO_DIALOGUE'),
+      'Should NOT fire when the screenplay is 20 lines or fewer',
+    );
+  });
+
+  // ── SYCOPHANTIC_AGREEMENT: a bare-agreement line from a DIFFERENT speaker ──
+  it('dialoguePass detects SYCOPHANTIC_AGREEMENT when the next speaker just agrees', async () => {
+    const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+    const fountain = `INT. ROOM - DAY
+
+ALICE
+We need to leave right now.
+
+BOB
+Absolutely.
+`;
+    const result = await dialoguePass(makeInputR6(fountain));
+    const hits = result.issues.filter(i => i.rule === 'SYCOPHANTIC_AGREEMENT');
+    assert.ok(hits.length >= 1, `Should detect SYCOPHANTIC_AGREEMENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.match(hits[0].description, /BOB simply agrees with ALICE/);
+  });
+
+  it('dialoguePass does NOT fire SYCOPHANTIC_AGREEMENT when the reply pushes back instead of agreeing', async () => {
+    const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+    const fountain = `INT. ROOM - DAY
+
+ALICE
+We need to leave right now.
+
+BOB
+I don't think that's a good idea at all.
+`;
+    const result = await dialoguePass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'SYCOPHANTIC_AGREEMENT'),
+      'Should NOT fire when the reply is not a bare agreement',
+    );
+  });
+
+  it('dialoguePass does NOT fire SYCOPHANTIC_AGREEMENT when the SAME speaker echoes their own line', async () => {
+    const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+    const fountain = `INT. ROOM - DAY
+
+ALICE
+We need to leave right now.
+
+ALICE
+Absolutely.
+`;
+    const result = await dialoguePass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'SYCOPHANTIC_AGREEMENT'),
+      'Should NOT fire when the agreement line and the prior line share the same speaker',
+    );
+  });
+});

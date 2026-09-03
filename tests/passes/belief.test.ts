@@ -6668,3 +6668,91 @@ describe('I1-a — beliefPass: EXPOSITION_DUMP tone-composed thresholds (compose
     );
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — BELIEF_WITHOUT_CONTEXT had zero
+// occurrence anywhere under tests/ despite being a live rule
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — beliefPass: BELIEF_WITHOUT_CONTEXT', () => {
+  const makeRecR6 = (idx: number, dialogueHighlights: string[], revelation: string | null): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+    dramaticTurn: 'nothing', clockRaised: false, clockDelta: 0,
+    emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights, revelation,
+    unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+    visualBeats: [], relationshipShifts: [],
+  });
+  const fountainR6 = (n: number) => Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+  it('beliefPass detects BELIEF_WITHOUT_CONTEXT when a told belief has no prior witnessed setup', async () => {
+    const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+    const records = [
+      makeRecR6(0, [], null),
+      makeRecR6(1, ['alice: Michael stole the diamonds last night'], null), // 6-word claim, no prior witness
+      makeRecR6(2, [], null),
+    ];
+    const result = await beliefPass({
+      fountain: fountainR6(3), original: fountainR6(3),
+      records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'BELIEF_WITHOUT_CONTEXT');
+    assert.ok(hits.length >= 1, `Should detect BELIEF_WITHOUT_CONTEXT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.match(hits[0].description, /no prior contextual setup/);
+  });
+
+  it('beliefPass does NOT fire BELIEF_WITHOUT_CONTEXT when a prior witnessed belief already establishes the claim', async () => {
+    const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+    const records = [
+      makeRecR6(0, [], 'Michael stole diamonds recently'), // witnessed belief planted first
+      makeRecR6(1, ['alice: Michael stole the diamonds last night'], null), // shares 3+ significant words
+      makeRecR6(2, [], null),
+    ];
+    const result = await beliefPass({
+      fountain: fountainR6(3), original: fountainR6(3),
+      records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'BELIEF_WITHOUT_CONTEXT'),
+      'Should NOT fire when an earlier witnessed belief already establishes overlapping context',
+    );
+  });
+
+  it('beliefPass does NOT fire BELIEF_WITHOUT_CONTEXT for a told belief in the very first scene', async () => {
+    const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+    const records = [
+      makeRecR6(0, ['alice: Michael stole the diamonds last night'], null), // sceneIdx 0 — guarded out
+      makeRecR6(1, [], null),
+    ];
+    const result = await beliefPass({
+      fountain: fountainR6(2), original: fountainR6(2),
+      records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'BELIEF_WITHOUT_CONTEXT'),
+      'Should NOT fire on scene 0 — there is no earlier scene to have set anything up',
+    );
+  });
+
+  it('beliefPass does NOT fire BELIEF_WITHOUT_CONTEXT for a trivial short claim (fewer than 4 words)', async () => {
+    const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+    const records = [
+      makeRecR6(0, [], null),
+      makeRecR6(1, ['alice: Michael stole it'], null), // 3 words — below the significance floor
+      makeRecR6(2, [], null),
+    ];
+    const result = await beliefPass({
+      fountain: fountainR6(3), original: fountainR6(3),
+      records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'BELIEF_WITHOUT_CONTEXT'),
+      'Should NOT fire for a trivial claim under 4 words',
+    );
+  });
+});

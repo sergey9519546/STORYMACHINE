@@ -1,6 +1,8 @@
 # STORYMACHINE Rulebook
 
-This is the full, generated rule catalog behind the Script Doctor's 14-pass revision engine — every deterministic craft check the pipeline runs, grouped by pass and by the wave that added it, with the human context the source comments actually support. No LLM is involved in producing a single finding this catalog describes: every rule below is a pure function of the parsed screenplay, fire-tested and no-fire-tested in `tests/passes/*.test.ts`, and governed end-to-end by `server/nvm/revision/WAVE_QUALITY_GUARANTEE.md`'s binding per-wave acceptance checklist (exhaustive distinctness, complete guard conditions, symmetric fire/no-fire test coverage, and craft-grade authoring — never "good enough").
+This is the full, generated rule catalog behind the Script Doctor's 14-pass revision engine — every deterministic craft check the pipeline runs, grouped by pass and by the wave that added it, with the human context the source comments actually support. No LLM is involved in producing a single finding this catalog describes: every rule below is a pure function of the parsed screenplay.
+
+**Test coverage (measured, not claimed — retrospective 2026-09-02 §6):** 3186 of 3186 rule constants are referenced by at least one test under `tests/**` (word-boundary match of the constant name; see `scripts/measure-rule-test-coverage.mjs` and `docs/rulebook/coverage.json` for the full per-rule measurement); 0 have no test reference.
 
 **Total distinct rules: 3217** across the 14 revision passes (rule identity here is `(pass, rule-constant-name)` — a small number of names recur across two different passes, each with its own independent implementation and guard, and are counted once per owning pass, matching how the codebase itself scopes a rule).
 

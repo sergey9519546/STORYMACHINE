@@ -8839,3 +8839,77 @@ describe('Wave 138 — voicePass: VOICE_MONOTONE_CHARACTER', () => {
     );
   });
 });
+
+// ── Retrospective 2026-09-02 §6 coverage — TONAL_WHIPLASH had zero occurrence
+// anywhere under tests/ despite being a live rule
+// (docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md §6,
+// docs/rulebook/COVERAGE_2026-09-03.md). ─────────────────────────────────────
+
+describe('Retrospective §6 coverage — voicePass: TONAL_WHIPLASH', () => {
+  const makeRecR6 = (idx: number): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`, purpose: 'dialogue',
+    dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+    emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+    visualBeats: [], relationshipShifts: [],
+  });
+  const inputForR6 = (fountain: string, n: number) => ({
+    fountain, original: fountain,
+    records: Array.from({ length: n }, (_, i) => makeRecR6(i)) as any,
+    structure: {} as any, annotations: [], approvedSpans: [],
+  });
+
+  it('voicePass detects TONAL_WHIPLASH when a scene\'s action vocabulary diverges sharply from a run of matching scenes', async () => {
+    const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+    // Scenes 0-2 share identical action vocabulary (distance ~0 between each
+    // adjacent pair); scene 3 uses completely disjoint vocabulary (distance ~1),
+    // which sits far above avgDist + 0.3 and above the 0.7 floor.
+    const quietBeat = 'Shadow crosses the hallway in silence, a whisper barely heard.';
+    const carnivalBeat = 'Carnival lights flicker as balloons drift past the ferris wheel amid laughter.';
+    const fountain = [
+      `INT. SC0 - DAY\n\n${quietBeat}`,
+      `INT. SC1 - DAY\n\n${quietBeat}`,
+      `INT. SC2 - DAY\n\n${quietBeat}`,
+      `INT. SC3 - DAY\n\n${carnivalBeat}`,
+    ].join('\n\n');
+    const result = await voicePass(inputForR6(fountain, 4));
+    const hits = result.issues.filter(i => i.rule === 'TONAL_WHIPLASH');
+    assert.ok(hits.length >= 1, `Should detect TONAL_WHIPLASH; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    assert.equal(hits[0].severity, 'minor');
+    assert.match(hits[0].description, /abrupt tonal shift/);
+    assert.equal(hits[0].location, 'Scene 4 (INT. SC3 - DAY)');
+  });
+
+  it('voicePass does NOT fire TONAL_WHIPLASH when action vocabulary is consistent scene to scene', async () => {
+    const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+    const quietBeat = 'Shadow crosses the hallway in silence, a whisper barely heard.';
+    const fountain = [
+      `INT. SC0 - DAY\n\n${quietBeat}`,
+      `INT. SC1 - DAY\n\n${quietBeat}`,
+      `INT. SC2 - DAY\n\n${quietBeat}`,
+      `INT. SC3 - DAY\n\n${quietBeat}`,
+    ].join('\n\n');
+    const result = await voicePass(inputForR6(fountain, 4));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'TONAL_WHIPLASH'),
+      'Should NOT fire when adjacent scenes share the same action vocabulary',
+    );
+  });
+
+  it('voicePass does NOT fire TONAL_WHIPLASH when every scene is equally distant from its neighbor (no outlier jump)', async () => {
+    const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+    // 4 scenes, each with completely disjoint vocabulary from its neighbor —
+    // every adjacent distance is ~1.0, so none exceeds avgDist + 0.3.
+    const fountain = [
+      `INT. SC0 - DAY\n\nMountain snow drifts silently across the frozen ridge.`,
+      `INT. SC1 - DAY\n\nCarnival lights flicker as balloons drift past the ferris wheel.`,
+      `INT. SC2 - DAY\n\nSubway trains rattle beneath crowded platform turnstiles nightly.`,
+      `INT. SC3 - DAY\n\nDesert canyons echo with distant thunder rolling eastward.`,
+    ].join('\n\n');
+    const result = await voicePass(inputForR6(fountain, 4));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'TONAL_WHIPLASH'),
+      'Should NOT fire when no single adjacent pair stands out as an outlier jump',
+    );
+  });
+});
