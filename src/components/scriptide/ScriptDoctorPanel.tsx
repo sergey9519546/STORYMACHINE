@@ -1416,34 +1416,51 @@ function RootCauseCard({
       )}
       {fixState && (
         <div className="pt-2 border-t border-black/10 dark:border-white/10 space-y-2">
-          {!fixState.run && (
-            <button
-              onClick={fixState.onRunFix}
-              disabled={
-                fixState.pending ||
-                fixState.blockedByOtherPending ||
-                fixState.llmReady === false ||
-                !fixState.hasSourceText
-              }
-              title={
-                fixState.llmReady === false
-                  ? "Fix & verify needs an AI key configured — set one in Settings."
-                  : fixState.blockedByOtherPending
-                  ? "Another fix is already running — wait for it to finish."
-                  : !fixState.hasSourceText
-                  ? "No analyzable script text is available for this report."
-                  : undefined
-              }
-              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5"
-            >
-              {fixState.pending ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
-              ) : (
-                <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
-              )}
-              {fixState.pending ? "Fixing & verifying…" : "Fix & verify"}
-            </button>
-          )}
+          {!fixState.run && (() => {
+            // Retrospective #5: this reason used to live ONLY in the
+            // button's `title` — invisible until a mouse hovers it, so a
+            // touch/keyboard writer saw a disabled button with no
+            // explanation at all. Compute it once and render it as a
+            // visible caption below the button (title kept too, for the
+            // hover-still-works case) — same "explain the disabled state
+            // in plain sight" pattern already used elsewhere in this panel
+            // (e.g. the isSample caption on the receipt's Accept button).
+            const disabledReason =
+              fixState.llmReady === false
+                ? "Fix & verify needs an AI key configured — set one in Settings."
+                : fixState.blockedByOtherPending
+                ? "Another fix is already running — wait for it to finish."
+                : !fixState.hasSourceText
+                ? "No analyzable script text is available for this report."
+                : null;
+            return (
+              <>
+                <button
+                  onClick={fixState.onRunFix}
+                  disabled={
+                    fixState.pending ||
+                    fixState.blockedByOtherPending ||
+                    fixState.llmReady === false ||
+                    !fixState.hasSourceText
+                  }
+                  title={disabledReason ?? undefined}
+                  className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5"
+                >
+                  {fixState.pending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
+                  )}
+                  {fixState.pending ? "Fixing & verifying…" : "Fix & verify"}
+                </button>
+                {disabledReason && !fixState.pending && (
+                  <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
+                    {disabledReason}
+                  </p>
+                )}
+              </>
+            );
+          })()}
           {fixState.error && (
             <p role="alert" className="text-[10px] font-mono text-red-600 dark:text-red-400">
               {fixState.error}
