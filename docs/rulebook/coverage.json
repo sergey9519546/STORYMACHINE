@@ -1,5 +1,5 @@
 {
-  "method": "word-boundary regex match of each rule constant name against every file under tests/**",
+  "method": "word-boundary regex match of each rule constant name against every code file under tests/** (data files — .json/.csv/.txt/.md — excluded)",
   "totalRuleRecords": 3217,
   "totalDistinctRuleNames": 3186,
   "testedDistinctRuleNames": 3186,

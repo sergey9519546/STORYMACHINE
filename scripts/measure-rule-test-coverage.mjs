@@ -53,7 +53,12 @@ function walkFiles(dir) {
     if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...walkFiles(full));
-    else if (entry.isFile()) out.push(full);
+    // Captured-output data files are not tests. A JSON fixture that is a
+    // recorded doctor report (tests/fixtures/rulebook-report-pairs.json lists
+    // 185 rule names because the doctor emitted them) would mark every rule
+    // it contains as "referenced by a test" without any assertion existing.
+    // Code fixtures (.ts/.js/.fountain) still count; data files do not.
+    else if (entry.isFile() && !/\.(json|csv|txt|md)$/i.test(entry.name)) out.push(full);
   }
   return out;
 }
@@ -98,7 +103,7 @@ export function measureCoverage() {
     // rulebook`, and a wall-clock field made every regeneration a diff even
     // when nothing was measured differently. The commit that lands it is the
     // date; the numbers are the content.
-    method: 'word-boundary regex match of each rule constant name against every file under tests/**',
+    method: 'word-boundary regex match of each rule constant name against every code file under tests/** (data files — .json/.csv/.txt/.md — excluded)',
     totalRuleRecords,
     totalDistinctRuleNames: totalDistinctNames,
     testedDistinctRuleNames: testedDistinctNames,
