@@ -6,11 +6,9 @@
 
 import express from 'express';
 import { createHash } from 'node:crypto';
-import {
-  Document, Paragraph, TextRun, AlignmentType, Packer,
-  convertInchesToTwip, PageOrientation,
-} from 'docx';
-import { parseFountain, type FountainBlockType } from '../../src/lib/fountain.ts';
+import { parseFountain } from '../../src/lib/fountain.ts';
+import { fountainToFdx } from '../../src/lib/fdx.ts';
+import { fountainToDocx } from '../../src/lib/docx.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { logger } from '../lib/logger.ts';
 import { isWholeDraftAnalysisComplete } from '../lib/analysis-completeness.ts';
@@ -68,55 +66,18 @@ function escapeXml(s: string): string {
 }
 
 // ── FDX (Final Draft XML) ─────────────────────────────────────────────────────
-
-const FDX_TYPE_MAP: Partial<Record<FountainBlockType, string>> = {
-  scene_heading:  'Scene Heading',
-  action:         'Action',
-  character:      'Character',
-  dual_dialogue:  'Character',
-  dialogue:       'Dialogue',
-  parenthetical:  'Parenthetical',
-  transition:     'Transition',
-  shot:           'Shot',
-  centered:       'Action',
-  lyrics:         'Action',
-  section:        'Scene Heading',
-};
-
-function fountainToFdx(fountain: string, title: string): string {
-  const blocks = parseFountain(fountain);
-  const paragraphs: string[] = [];
-
-  for (const block of blocks) {
-    if (block.type === 'boneyard' || block.type === 'synopsis' || block.type === 'note') continue;
-
-    if (block.type === 'empty') {
-      paragraphs.push('    <Paragraph Type="Action"><Text></Text></Paragraph>');
-      continue;
-    }
-
-    const fdxType = FDX_TYPE_MAP[block.type] ?? 'Action';
-    const text = escapeXml(block.text.trim());
-    const align = block.type === 'centered' ? ' Alignment="Center"' : '';
-    paragraphs.push(`    <Paragraph Type="${fdxType}"${align}><Text>${text}</Text></Paragraph>`);
-  }
-
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<FinalDraft DocumentType="Script" Template="No" Version="4">
-  <Content>
-    <Paragraph Type="Action"><Text>${escapeXml(title)}</Text></Paragraph>
-    <Paragraph Type="Action"><Text></Text></Paragraph>
-${paragraphs.join('\n')}
-  </Content>
-  <TitlePage>
-    <Content>
-      <Paragraph Type="Title"><Text>${escapeXml(title)}</Text></Paragraph>
-      <Paragraph Type="Credit"><Text>Written by</Text></Paragraph>
-      <Paragraph Type="Author"><Text>STORYMACHINE</Text></Paragraph>
-    </Content>
-  </TitlePage>
-</FinalDraft>`;
-}
+// P2 export-pipeline consolidation: this route used to hand-roll its own
+// Fountain→FDX writer here (a second, drifted-from copy of src/lib/fdx.ts —
+// notably missing the title page's Type="Title"/"Credit"/"Author" paragraphs
+// AND duplicating the title into the script body as a stray Action
+// paragraph, a bug the client-side writer never had). Import the ONE
+// canonical exporter instead. `title` here is always a non-empty string
+// (defaults to 'Untitled' below), so fountainToFdx's "no title page when
+// nothing is given" fallback never triggers for this route — it always gets
+// a title page, matching this route's prior behavior, just without the
+// hardcoded "STORYMACHINE" author placeholder this route used to force (no
+// real author is available here — ProjectionGalleryPanel.tsx, the only
+// caller, never collects one).
 
 router.post('/api/export/fdx', gameLimiter, validate(FountainTitleBodySchema), asyncHandler(async (req, res) => {
   const fountain = extractFountain(req.body);
@@ -137,110 +98,14 @@ router.post('/api/export/fdx', gameLimiter, validate(FountainTitleBodySchema), a
 }));
 
 // ── DOCX ──────────────────────────────────────────────────────────────────────
-// Standard screenplay margins (in twips — 1 twip = 1/1440 inch):
-//   Left: 1.5"  Right: 1"  Top/Bottom: 1"
-// Character cue: ~3.7" from left edge (2.2" from left margin)
-// Dialogue: 1.0" from left margin, 2.5" from right margin
-// Parenthetical: 1.5" indent from left margin
-
-const TWIP = convertInchesToTwip;
-
-const DOC_MARGINS = {
-  top:    TWIP(1),
-  bottom: TWIP(1),
-  left:   TWIP(1.5),
-  right:  TWIP(1),
-};
-
-function fountainToDocxParagraphs(fountain: string): Paragraph[] {
-  const blocks = parseFountain(fountain);
-  const paragraphs: Paragraph[] = [];
-
-  for (const block of blocks) {
-    if (block.type === 'boneyard' || block.type === 'synopsis' || block.type === 'note') continue;
-
-    const raw = block.text.trim();
-
-    switch (block.type) {
-      case 'empty':
-        paragraphs.push(new Paragraph({ children: [] }));
-        break;
-
-      case 'scene_heading':
-        paragraphs.push(new Paragraph({
-          spacing: { before: TWIP(0.5) },
-          children: [new TextRun({ text: raw, bold: true, allCaps: true, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'action':
-      case 'lyrics':
-        paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: raw, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'centered':
-        paragraphs.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: raw, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'character':
-      case 'dual_dialogue':
-        paragraphs.push(new Paragraph({
-          indent: { left: TWIP(2.2) },
-          spacing: { before: TWIP(0.17) },
-          children: [new TextRun({ text: raw, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'dialogue':
-        paragraphs.push(new Paragraph({
-          indent: { left: TWIP(1.0), right: TWIP(2.5) },
-          children: [new TextRun({ text: raw, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'parenthetical':
-        paragraphs.push(new Paragraph({
-          indent: { left: TWIP(1.5), right: TWIP(2.0) },
-          children: [new TextRun({ text: raw, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'transition':
-        paragraphs.push(new Paragraph({
-          alignment: AlignmentType.RIGHT,
-          spacing: { before: TWIP(0.17) },
-          children: [new TextRun({ text: raw, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'shot':
-        paragraphs.push(new Paragraph({
-          spacing: { before: TWIP(0.17) },
-          children: [new TextRun({ text: raw, bold: true, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      case 'section':
-        paragraphs.push(new Paragraph({
-          spacing: { before: TWIP(0.5) },
-          children: [new TextRun({ text: raw, bold: true, italics: true, font: 'Courier New', size: 24 })],
-        }));
-        break;
-
-      default:
-        paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: raw, font: 'Courier New', size: 24 })],
-        }));
-    }
-  }
-
-  return paragraphs;
-}
+// P2 export-pipeline consolidation: this route used to build its own DOCX
+// via the `docx` npm package (different margins — 1.5" left vs. the client
+// exporter's 1", no title page, different scene-heading spacing) instead of
+// src/lib/docx.ts's hand-rolled zip writer. Import the ONE canonical
+// exporter instead, same rationale as the FDX route above — `title` here is
+// always non-empty, so it always gets a title page (matching this route's
+// prior "always has SOME title" behavior, now with a real title page
+// instead of just a Word document-properties field nobody printed).
 
 router.post('/api/export/docx', gameLimiter, validate(FountainTitleBodySchema), asyncHandler(async (req, res) => {
   const fountain = extractFountain(req.body);
@@ -250,27 +115,10 @@ router.post('/api/export/docx', gameLimiter, validate(FountainTitleBodySchema), 
   const title = sanitizeForPrompt(rawTitle, 256) || 'Untitled';
 
   try {
-    const paragraphs = fountainToDocxParagraphs(fountain);
-
-    const doc = new Document({
-      title,
-      creator: 'STORYMACHINE',
-      description: 'Exported screenplay',
-      sections: [{
-        properties: {
-          page: {
-            size: { width: TWIP(8.5), height: TWIP(11), orientation: PageOrientation.PORTRAIT },
-            margin: DOC_MARGINS,
-          },
-        },
-        children: paragraphs,
-      }],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
+    const bytes = fountainToDocx(fountain, title);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(title)}.docx"`);
-    res.send(buffer);
+    res.send(Buffer.from(bytes));
   } catch (err) {
     logger.error('export_docx_error', { message: (err as Error).message });
     res.status(500).json({ error: 'DOCX conversion failed' });
