@@ -4889,6 +4889,27 @@ describe('fountainToFdx', () => {
     assert.ok(fdx.includes('<Text>BOB</Text>'), 'clean BOB cue present');
   });
 
+  // ── Dual dialogue (retrospective: "dual dialogue survives FDX") ────────────
+  it('wraps a dual-dialogue exchange in a <DualDialogue> element containing both Character/Dialogue pairs', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nBRICK\nScrew retirement.\n\nSTEEL ^\nScrew retirement!`);
+    const match = /<DualDialogue>([\s\S]*?)<\/DualDialogue>/.exec(fdx);
+    assert.ok(match, 'DualDialogue wrapper present');
+    const inner = match![1];
+    assert.ok(inner.includes('<Text>BRICK</Text>'), 'first speaker cue inside the wrapper');
+    assert.ok(inner.includes('<Text>STEEL</Text>'), 'second speaker cue inside the wrapper');
+    assert.ok(inner.includes('<Text>Screw retirement.</Text>'), 'first dialogue line inside the wrapper');
+    assert.ok(inner.includes('<Text>Screw retirement!</Text>'), 'second dialogue line inside the wrapper');
+    assert.equal((inner.match(/Type="Character"/g) || []).length, 2, 'both cues typed Character');
+    assert.equal((inner.match(/Type="Dialogue"/g) || []).length, 2, 'both dialogue lines typed Dialogue');
+    // Exactly one wrapper — the whole exchange is one dual-dialogue group, not two.
+    assert.equal((fdx.match(/<DualDialogue>/g) || []).length, 1, 'exactly one DualDialogue wrapper');
+  });
+
+  it('does not wrap ordinary (non-dual) sequential dialogue in a <DualDialogue> element', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nALICE\nHi.\n\nBOB\nHey.`);
+    assert.ok(!fdx.includes('<DualDialogue>'), 'plain back-and-forth dialogue is never wrapped');
+  });
+
   // ── Title page (retrospective: "title page in every export") ──────────────
   it('emits a <TitlePage> with Type="Title"/"Credit"/"Author"/"Contact" paragraphs when given explicit title-page data', () => {
     const fdx = fountainToFdx(`INT. ROOM - DAY\n\nA man sits.`, {

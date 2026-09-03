@@ -9,8 +9,11 @@ import { resolveExportTitlePage, type TitlePageInput, type ExportTitlePage } fro
 
 // Fountain block type → FDX paragraph Type attribute.
 // FDX recognises: Scene Heading, Action, Character, Dialogue, Parenthetical,
-// Transition, Shot, General. (Dual dialogue is exported as ordinary Character
-// + Dialogue pairs — Final Draft re-pairs adjacent cues on import.)
+// Transition, Shot, General. Dual dialogue (a `dual_dialogue`-typed Character
+// cue and its Parenthetical/Dialogue lines) is wrapped in a <DualDialogue>
+// element below — see buildParagraphs — which is what the FDX spec actually
+// requires for two columns to render side by side; Final Draft does NOT
+// re-pair adjacent Character/Dialogue paragraphs on import on its own.
 const FDX_TYPE: Partial<Record<FountainBlockType, string>> = {
   scene_heading: 'Scene Heading',
   action:        'Action',
@@ -25,6 +28,17 @@ const FDX_TYPE: Partial<Record<FountainBlockType, string>> = {
   section:       'Action',
   synopsis:      'Action',
 };
+
+// A meaningful (non-empty/boneyard/note, past-title-page) block reduced to
+// what the paragraph/wrapper builder needs: the ORIGINAL Fountain block type
+// (to detect dual-dialogue membership — 'dual_dialogue' cues are grouped with
+// the ordinary 'dialogue'/'parenthetical' lines that follow them) alongside
+// the already-resolved FDX paragraph Type and cleaned text.
+interface FdxEntry {
+  blockType: FountainBlockType;
+  fdxType: string;
+  text: string;
+}
 
 // XML-escape text content for safe embedding in an FDX <Text> node.
 function escapeXml(s: string): string {
@@ -51,6 +65,47 @@ function cleanBlockText(block: FountainBlock): string {
   if (block.type === 'section') t = t.replace(/^#+\s*/, '');
   if (block.type === 'synopsis') t = t.replace(/^=\s*/, '');
   return t;
+}
+
+/** A block is part of a dual-dialogue exchange's body once its speaker cue
+ *  has been retagged 'dual_dialogue' — its Parenthetical/Dialogue lines stay
+ *  typed 'parenthetical'/'dialogue' (see fountain.ts), so membership in the
+ *  wrapped run is "starts at a dual_dialogue cue, continues through any
+ *  parenthetical/dialogue/dual_dialogue block that immediately follows". */
+function isDualDialogueMember(t: FountainBlockType): boolean {
+  return t === 'dual_dialogue' || t === 'parenthetical' || t === 'dialogue';
+}
+
+function paragraphXml(e: FdxEntry, indent: string): string {
+  return `${indent}<Paragraph Type="${e.fdxType}">\n${indent}  <Text>${escapeXml(e.text)}</Text>\n${indent}</Paragraph>`;
+}
+
+// Walk the flat entry list, wrapping every contiguous dual-dialogue run
+// (one or more 'dual_dialogue' cues plus their parenthetical/dialogue lines)
+// in a <DualDialogue> element as the FDX spec requires for two-column
+// playback, and emitting every other paragraph as before.
+function buildParagraphs(entries: FdxEntry[]): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < entries.length) {
+    const entry = entries[i];
+    if (entry.blockType === 'dual_dialogue') {
+      let j = i;
+      const group: FdxEntry[] = [];
+      while (j < entries.length && isDualDialogueMember(entries[j].blockType)) {
+        group.push(entries[j]);
+        j++;
+      }
+      out.push('    <DualDialogue>');
+      for (const g of group) out.push(paragraphXml(g, '      '));
+      out.push('    </DualDialogue>');
+      i = j;
+    } else {
+      out.push(paragraphXml(entry, '    '));
+      i++;
+    }
+  }
+  return out;
 }
 
 function buildTitlePageXml(info: ExportTitlePage): string {
@@ -88,7 +143,7 @@ function buildTitlePageXml(info: ExportTitlePage): string {
 export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): string {
   const blocks = parseFountain(fountain);
 
-  const paragraphs: string[] = [];
+  const entries: FdxEntry[] = [];
   let pastTitlePage = false;
 
   for (const block of blocks) {
@@ -106,9 +161,7 @@ export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): str
 
     if (text === '') continue;
     const fdxType = FDX_TYPE[block.type] ?? 'Action';
-    paragraphs.push(
-      `    <Paragraph Type="${fdxType}">\n      <Text>${escapeXml(text)}</Text>\n    </Paragraph>`,
-    );
+    entries.push({ blockType: block.type, fdxType, text });
   }
 
   const info = resolveExportTitlePage(fountain, titlePage);
@@ -117,7 +170,7 @@ export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): str
     '<?xml version="1.0" encoding="UTF-8" standalone="no"?>',
     '<FinalDraft DocumentType="Script" Template="No" Version="5">',
     '  <Content>',
-    ...paragraphs,
+    ...buildParagraphs(entries),
     '  </Content>',
     ...(info ? [buildTitlePageXml(info)] : []),
     '</FinalDraft>',
