@@ -23,6 +23,7 @@ import {
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues, sceneLineSpans } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
+import { buildPrioritizedIssues } from '../nvm/analyze/prioritize.ts';
 import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
@@ -513,7 +514,12 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // spans itself. Same shape /api/scriptide/diagnose already sends.
   const locatedIssues = locateIssues(issuesWithPass, fountain);
   const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
-  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
+  // A3 (2026-09-03): `prioritized` is the "start here" ordering — see
+  // server/nvm/analyze/prioritize.ts for why it is attached beside
+  // `topPriorities` instead of replacing it (topPriorities is a published
+  // ScriptDoctorReport field on the scoring path and stays byte-identical).
+  const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source });
 }));
 
 // POST /api/scriptide/doctor/stream — E1 (2026-08-21): live-progress sibling
@@ -618,7 +624,8 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
     // E2: same locatedIssues attachment as /doctor above.
     const locatedIssues = locateIssues(issuesWithPass, fountain);
     const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
-    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, locatedIssues, source } });
+    const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source } });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       // The client already disconnected (that's what fired the abort in the
@@ -730,7 +737,8 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
   // E2: same locatedIssues attachment as /doctor above.
   const locatedIssues = locateIssues(issuesWithPass, fountain);
   const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
-  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
+  const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source });
 }));
 
 // POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
@@ -873,7 +881,8 @@ router.post(
     // E2: same locatedIssues attachment as /doctor above.
     const locatedIssues = locateIssues(issuesWithPass, converted.fountain);
     const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(converted.fountain));
-    res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
+    const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+    res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, source });
   }),
 );
 

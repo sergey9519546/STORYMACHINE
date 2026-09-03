@@ -201,4 +201,49 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
     assert.equal(body.sceneCount, 4);
     assert.equal(body.passes.length, 14);
   });
+
+  // A3 (2026-09-03): `prioritized` is the route-layer "start here" ordering
+  // (server/nvm/analyze/prioritize.ts) — attached beside, never in place of,
+  // the report's own severity-first `topPriorities`.
+  it('/doctor attaches `prioritized` leading with anchored issues, and leaves topPriorities untouched', async () => {
+    const res = await postDoctor({ fountain: MULTI_SCENE_FOUNTAIN });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body.prioritized), 'expected /doctor report to carry a prioritized array');
+    assert.ok(body.prioritized.length > 0);
+
+    // Every entry is shaped like the module's PrioritizedIssue contract.
+    for (const entry of body.prioritized) {
+      assert.ok(VALID_ANCHORS.has(entry.anchor), `unexpected anchor "${entry.anchor}"`);
+      assert.ok(typeof entry.issue === 'object' && entry.issue !== null);
+      assert.ok(typeof entry.pass === 'string' && entry.pass.length > 0);
+    }
+
+    // The anchored-lead guarantee (prioritize.ts's own contract, re-checked
+    // here through HTTP): whenever the draft produced at least three scene-
+    // or lines-anchored located issues, the first three prioritized entries
+    // are all anchored — this fixture measured 3 (belt-and-suspenders: if a
+    // future locate.ts/pass change ever drops it below 3, the guard below
+    // simply doesn't fire rather than failing on an unrelated regression).
+    const anchoredCount = body.locatedIssues.filter(
+      (li: { anchor: string }) => li.anchor === 'scene' || li.anchor === 'lines',
+    ).length;
+    if (anchoredCount >= 3) {
+      assert.ok(body.prioritized.length >= 3, 'expected at least three prioritized entries');
+      for (const entry of body.prioritized.slice(0, 3)) {
+        assert.ok(
+          entry.anchor === 'scene' || entry.anchor === 'lines',
+          `prioritized entry "${entry.issue.rule}" leads with anchor "${entry.anchor}"`,
+        );
+      }
+    }
+
+    // topPriorities is the SAME field the doctor itself computes — attaching
+    // `prioritized` beside it must not move it. Verified against a direct,
+    // route-free call to the doctor on the identical content (deterministic:
+    // same contentHash always produces the same report).
+    const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
+    const direct = await runScriptDoctor(MULTI_SCENE_FOUNTAIN);
+    assert.deepEqual(body.topPriorities, direct.topPriorities);
+  });
 });
