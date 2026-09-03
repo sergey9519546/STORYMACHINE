@@ -482,20 +482,38 @@ they read as closed with a pointer rather than as open work):
 - **Container runs root** — closed. `Dockerfile:74` is `USER node`, after a `chown -R node:node /app` at `:72`.
 
 NICE: transitive dependency CVEs — **OPEN / MONITORING (re-verified
-2026-09-03, supersedes the 2026-08-24 "0 vulnerabilities" CLOSED claim,
-which was false as of this re-check).** `npm audit` reports 4 vulnerabilities
-(3 moderate, 1 high): `browserslist` (high) is transitive via
+2026-09-03, non-breaking fix applied; supersedes the 2026-09-03 "4
+vulnerabilities, none applied" note above).** `npm audit fix` (no `--force`,
+no major bumps) was run: `browserslist` (high, transitive via
 `@babel/helper-compilation-targets` and `autoprefixer`, both
-**devDependencies** — build-time only, not shipped to the running server.
-The other 3 (moderate) are a `qs` -> `body-parser` -> `express` chain;
-`express` is a **direct production dependency** (`package.json`
-`dependencies`, `server/app.ts`), so — unlike the prior "dev-dep" framing —
-this chain is reachable from the deployed server's HTTP framework, not
-confined to dev/build tooling. All four report a fix available via `npm
-audit fix`; none has been applied by this pass (no dependency bump,
-`package-lock.json` unchanged) — that upgrade is separately scoped work, not
-done here. Re-run `npm audit` before the next security pass or dependency
-bump. Unrelated to this: session capability model, HTML export escaping,
+**devDependencies**) is **CLOSED** — `browserslist` 4.28.1 → 4.28.8, pulling
+matching bumps to `baseline-browser-mapping` (2.10.12 → 2.11.20),
+`caniuse-lite` (1.0.30001781 → 1.0.30001810), `electron-to-chromium`
+(1.5.328 → 1.5.420), `node-releases` (2.0.36 → 2.0.54), and
+`update-browserslist-db` (1.2.3 → 1.3.2). The remaining 3 (moderate) —
+`qs` -> `body-parser` -> `express` — are **still OPEN, and cannot be closed
+without a major bump**: `qs` moved 6.15.2 → 6.15.3 (a `side-channel` bump,
+1.1.0 → 1.1.1, rode along), but both advisories affecting `qs` cover every
+release up to and including 6.15.3 — the fix needs `qs` >= 6.16.0. That
+version exists on the registry, but `body-parser`'s newest 1.x release
+(1.20.6, already installed) pins `qs` to `~6.15.1`, and `express`'s newest
+4.x release (4.22.2, already installed) pins `body-parser` to `~1.20.5` —
+both are already at the ceiling of their non-breaking range. Reaching
+`qs` >= 6.16.0 requires `body-parser` 2.x, which requires `express` 5.x — a
+direct production-dependency major bump, out of scope for a non-breaking
+fix. `express` is a **direct production dependency** (`package.json`
+`dependencies`, `server/app.ts`), so this chain is reachable from the
+deployed server's HTTP framework, not confined to dev/build tooling; the
+qs-array-limit and qs-isBuffer-DoS advisories are both denial-of-service
+class (CVSS 3.7 and 5.3), not RCE or auth bypass. `package-lock.json`
+updated accordingly; `package.json` unchanged (no direct dependency range
+needed to move — `express` stayed at its already-satisfied `^4.21.2`, and
+`browserslist`/`qs` are transitive). Re-verified after the fix: `npm ci`,
+`npm run lint`, full `npm test` (11215 tests, 0 fail), `npm run build`,
+`npm run check-server-reachability`, and a real-server Playwright smoke
+(`verify:p0-flow`) all pass. Track the express 5.x migration as a separate,
+deliberately-scoped major-version upgrade before the next security pass.
+Unrelated to this: session capability model, HTML export escaping,
 prompt-injection boundary, secrets never in bundle/logs, and body/rate
 limits remain clean as of the last audit.
 
