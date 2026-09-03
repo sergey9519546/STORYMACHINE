@@ -40,6 +40,15 @@ docs/user-validation/sessions/*.pdf
 docs/user-validation/sessions/*.docx
 data/
 
+# Session backups. `npm run backup` and the BACKUP_INTERVAL_HOURS timer write
+# timestamped subdirectories of BACKUP_DIR (default `backup/`, see README
+# "Backups") full of per-visitor SQLite databases — the same writers' drafts
+# `data/` is ignored to protect. Without this rule a self-hoster who follows
+# the documented backup step inside a checkout is invited by `git status` to
+# commit their users' screenplays. Found 2026-09-03 when a local test run's
+# restore drill left 266 session DBs untracked in the repo root.
+backup/
+
 # The `data/` rule above is for the root runtime dir (per-visitor SQLite
 # session DBs, gitignored for good reason). But it also matches any nested
 # `data/` dir by name — including `server/nvm/analyze/data/`, which holds a
