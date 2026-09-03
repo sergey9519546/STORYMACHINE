@@ -893,7 +893,14 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
   const rootCauses = clusterIssues(locatedIssues);
   const analysisComplete = isWholeDraftAnalysisComplete(report);
 
-  const diagnosis: LiveDiagnosis = {
+  // Upgrade item #11: sceneHeatmap for the live editor's per-scene heatmap.
+  // LiveDiagnosis (./analyze/types.ts) is a fixed scoring-path contract this
+  // change is out of scope to touch, so the field is added here via a local
+  // intersection type instead — the value itself needs no new computation:
+  // runScriptDoctor's report already carries sceneHeatmap (aggregateReport,
+  // doctor.ts), exactly as /doctor's response does, so this just forwards
+  // the same array rather than re-deriving it.
+  const diagnosis: LiveDiagnosis & { sceneHeatmap: ScriptDoctorReport['sceneHeatmap'] } = {
     analysisComplete,
     ...(analysisComplete
       ? { health: report.health, grade: report.grade, verdict: report.verdict }
@@ -902,6 +909,7 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
       ? { truncatedForAnalysis: true, totalSceneCount: report.totalSceneCount }
       : {}),
     sceneCount: report.sceneCount,
+    sceneHeatmap: report.sceneHeatmap,
     locatedIssues,
     rootCauses,
     // runScriptDoctor always populates contentHash — both on the normal

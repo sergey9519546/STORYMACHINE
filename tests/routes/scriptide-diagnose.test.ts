@@ -172,6 +172,25 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
     assert.deepEqual(body1, body2);
   });
 
+  // Upgrade item #11: the live editor's per-scene heatmap. LiveDiagnosis
+  // (types.ts) has no sceneHeatmap field of its own — the route attaches it
+  // via a local intersection type, forwarding the value runScriptDoctor's
+  // report already computes rather than deriving anything new.
+  it('carries a sceneHeatmap with one entry per scene, matching /doctor on the same text', async () => {
+    const [diagRes, doctorRes] = await Promise.all([
+      postDiagnose({ fountain: MULTI_SCENE_FOUNTAIN }),
+      postDoctor({ fountain: MULTI_SCENE_FOUNTAIN }),
+    ]);
+    assert.equal(diagRes.status, 200);
+    assert.equal(doctorRes.status, 200);
+    const diag = await diagRes.json();
+    const doctor = await doctorRes.json();
+
+    assert.ok(Array.isArray(diag.sceneHeatmap));
+    assert.equal(diag.sceneHeatmap.length, diag.sceneCount);
+    assert.deepEqual(diag.sceneHeatmap, doctor.sceneHeatmap);
+  });
+
   it('/doctor now returns 200 with a rootCauses field attached', async () => {
     const res = await postDoctor({ fountain: MULTI_SCENE_FOUNTAIN });
     assert.equal(res.status, 200);
