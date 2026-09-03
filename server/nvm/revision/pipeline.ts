@@ -19,7 +19,7 @@
 // 13. theme            — theme resonance gaps, unresolved theme in Act 3
 // 14. relationship-arc — static/monotone relationships, idle emotional engine
 
-import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
+import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile-types.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import type { PassResult, ApprovedSpan, StoryContext, PassName, RevisionPass, PassInput } from './passes/types.ts';

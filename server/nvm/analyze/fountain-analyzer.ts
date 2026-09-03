@@ -162,7 +162,7 @@ import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts'
 import { normalizeScreenplay } from './screenplay-normalizer.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
-import type { SceneAnnotation } from '../screenplay/compile.ts';
+import type { SceneAnnotation } from '../screenplay/compile-types.ts';
 import type { FountainAnalysis, RecurringImage } from './types.ts';
 import { analyzeVoices } from './voice-delta.ts';
 import { fastWordCount } from '../../lib/string-utils.ts';

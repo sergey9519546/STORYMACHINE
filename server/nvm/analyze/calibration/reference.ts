@@ -142,7 +142,7 @@
 //      catch a slow drift in how WIDE the separation is, since the
 //      band-average targets are documented as soft, not asserted exactly.
 
-import type { CompiledScreenplay } from '../../screenplay/compile.ts';
+import type { CompiledScreenplay } from '../../screenplay/compile-types.ts';
 import type { PassName } from '../../revision/passes/types.ts';
 import { runRevisionPipeline } from '../../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../../revision/rewrite.ts';

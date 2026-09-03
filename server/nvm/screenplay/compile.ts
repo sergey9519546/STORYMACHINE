@@ -14,29 +14,15 @@ import type { ScreenplaySceneRecord } from './memory.ts';
 import type { StructureState } from './structure.ts';
 import { project, type Canon } from '../project/index.ts';
 import { fastWordCount } from '../../lib/string-utils.ts';
+import type { CompiledScreenplay, SceneAnnotation } from './compile-types.ts';
 
-export interface CompiledScreenplay {
-  /** Raw Fountain text */
-  fountain: string;
-  /** Per-scene structural annotations */
-  annotations: SceneAnnotation[];
-  /** Structure summary for the title page */
-  structureSummary: string;
-  /** Total word count (approximate) */
-  wordCount: number;
-  /** Compiled at timestamp */
-  compiledAt: number;
-}
-
-export interface SceneAnnotation {
-  sceneIdx: number;
-  purpose: string;
-  dramaticTurn: string;
-  revelation: string | null;
-  emotionalShift: string;
-  clockRaised: boolean;
-  openClues: number;
-}
+// The two shapes below live in ./compile-types.ts — a leaf with no imports —
+// so that the deterministic analysis core can name them without dragging this
+// file's projector/quality/valuation subgraph into doctor.ts's import graph
+// (retrospective #5; scripts/lib/import-graph.mjs follows type-only edges on
+// purpose, so `import type` alone would not have cut it). Re-exported here so
+// importers of the compiler itself are unaffected.
+export type { CompiledScreenplay, SceneAnnotation };
 
 /**
  * Compile the lived commit path into a structured Fountain screenplay.

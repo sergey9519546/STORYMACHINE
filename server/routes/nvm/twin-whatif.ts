@@ -167,7 +167,8 @@ router.get('/api/nvm/branch/field', gameLimiter, asyncHandler(async (req, res) =
   const seed = typeof req.query.seed === 'string' ? parseInt(req.query.seed, 10) : undefined;
 
   const { generateBranchField } = await import('../../nvm/branch/field.ts');
-  const { buildNarrativeState, emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { buildNarrativeState } = await import('../../nvm/state/from-stage.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;

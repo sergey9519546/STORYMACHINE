@@ -31,7 +31,7 @@
 
 import crypto from 'node:crypto';
 import type { StoryContext, PassName, RevisionIssue } from '../revision/passes/types.ts';
-import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
+import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile-types.ts';
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';

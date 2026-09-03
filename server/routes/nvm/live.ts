@@ -45,7 +45,8 @@ export default router;
 router.post('/api/nvm/room/critique', gameLimiter, validate(RoomCritiqueBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runWritersRoom } = await import('../../nvm/room/room.ts');
-  const { buildNarrativeState, emptyState, stateHash } = await import('../../nvm/state/NarrativeState.ts');
+  const { emptyState, stateHash } = await import('../../nvm/state/NarrativeState.ts');
+  const { buildNarrativeState } = await import('../../nvm/state/from-stage.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
   type NarrativeTransitionIRT = import('../../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
 
@@ -106,7 +107,8 @@ router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), wit
   }
 
   const { parseAuthorMove, buildAuthorCommit } = await import('../../nvm/live/move-bus.ts');
-  const { buildNarrativeState, emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { buildNarrativeState } = await import('../../nvm/state/from-stage.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;

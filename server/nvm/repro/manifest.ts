@@ -6,7 +6,8 @@
 
 import type { StoryCommit } from '../state/StoryCommit.ts';
 import { applyStoryOps } from '../ops/dispatcher.ts';
-import { emptyState, stateHash, buildNarrativeState } from '../state/NarrativeState.ts';
+import { emptyState, stateHash } from '../state/NarrativeState.ts';
+import { buildNarrativeState } from '../state/from-stage.ts';
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { Stage } from '../../engine/Stage.ts';
 import type { Seed } from './seed.ts';

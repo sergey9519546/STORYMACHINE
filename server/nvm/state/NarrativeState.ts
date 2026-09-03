@@ -8,7 +8,6 @@
 
 import { createHash } from 'node:crypto';
 import type { Belief, EmotionState, StoryStructure, StoryGenre } from '../../engine/types.ts';
-import type { Stage } from '../../engine/Stage.ts';
 import type { AtomicFact, RelationshipDelta, ClueCarrier, ThemeMove } from '../ops/StoryOp.ts';
 
 export interface NarrativeState {
@@ -64,16 +63,9 @@ function canonical(value: unknown): string {
     .map(k => JSON.stringify(k) + ':' + canonical(obj[k])).join(',') + '}';
 }
 
-// Projects a NarrativeState read-model from the live Stage. Objective facts
-// start empty — they accumulate through ADD_FACT StoryOps, not Stage rows.
-export function buildNarrativeState(stage: Stage): NarrativeState {
-  const state = emptyState();
-  state.turn = stage.getTurnCount();
-  const illusion = stage.getIllusionState();
-  state.authorIntent = { targetStructure: illusion.structure, theme: illusion.story_theme, genre: illusion.story_genre };
-  for (const agent of stage.getAllAgents()) {
-    if (agent.beliefs?.length) state.characterBeliefs[agent.char_id] = agent.beliefs;
-    if (agent.emotionState) state.characterEmotions[agent.char_id] = agent.emotionState;
-  }
-  return state;
-}
+// buildNarrativeState(stage) — the one Stage-bound projection in this module —
+// moved to ./from-stage.ts on 2026-09-03 (retrospective #5). server/engine/
+// Stage.ts is the better-sqlite3 surface, and scripts/lib/import-graph.mjs
+// follows type-only edges on purpose, so even `import type { Stage }` put a
+// native database binding inside the reachable set of the deterministic doctor.
+// This file is now free of engine imports beyond its plain type vocabulary.

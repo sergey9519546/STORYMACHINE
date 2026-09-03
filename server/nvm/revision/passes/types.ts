@@ -1,7 +1,7 @@
 // Wave 39 — Revision Pass Shared Types
 // Each of the 12 revision passes shares this interface contract.
 
-import type { SceneAnnotation } from '../../screenplay/compile.ts';
+import type { SceneAnnotation } from '../../screenplay/compile-types.ts';
 import type { StructureState } from '../../screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
 

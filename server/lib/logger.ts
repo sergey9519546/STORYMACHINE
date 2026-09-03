@@ -13,18 +13,9 @@ export const logger = {
   error: (msg: string, data?: Record<string, unknown>) => emit('error', msg, data),
 };
 
-// Express request logger middleware — logs method, path, status, duration in ms.
-export function requestLogger(): import('express').RequestHandler {
-  return (req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-      logger.info('request', {
-        method: req.method,
-        path: req.path,
-        status: res.statusCode,
-        ms: Date.now() - start,
-      });
-    });
-    next();
-  };
-}
+// requestLogger() moved to ./request-logger.ts on 2026-09-03 (retrospective
+// #5). This module is reachable from the deterministic doctor's import graph,
+// and it is allowed to stay there only because it is a leaf — a JSON sink with
+// no dependencies. Referencing Express's RequestHandler type here made the web
+// framework part of the analysis core's type graph for a function no analysis
+// code calls. Keep this file import-free.

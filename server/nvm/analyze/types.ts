@@ -10,7 +10,7 @@
 // Everything here is JSON-serializable: the report travels over HTTP verbatim.
 
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
-import type { SceneAnnotation } from '../screenplay/compile.ts';
+import type { SceneAnnotation } from '../screenplay/compile-types.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { NarrativeMetricsReport } from './metrics.ts';

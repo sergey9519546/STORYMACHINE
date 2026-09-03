@@ -832,7 +832,8 @@ router.get('/api/nvm/conflicts', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { buildIntentionRegistry } = await import('../../nvm/drama/intention-registry.ts');
   const { computeConflicts } = await import('../../nvm/drama/conflict-orchestrator.ts');
-  const { buildNarrativeState, emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { buildNarrativeState } = await import('../../nvm/state/from-stage.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;

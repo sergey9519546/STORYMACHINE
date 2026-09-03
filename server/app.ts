@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
-import { logger, requestLogger } from './lib/logger.ts';
+import { logger } from './lib/logger.ts';
+import { requestLogger } from './lib/request-logger.ts';
 import { ValidationError, SessionBusyError, SessionCapacityError, gameLimiter } from './lib/session-store.ts';
 import configRouter      from './routes/config.ts';
 import gameRouter        from './routes/game.ts';

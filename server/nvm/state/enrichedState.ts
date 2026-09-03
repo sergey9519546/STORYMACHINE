@@ -13,7 +13,8 @@
 
 import type { Stage } from '../../engine/Stage.ts';
 import type { NarrativeState } from './NarrativeState.ts';
-import { buildNarrativeState, emptyState } from './NarrativeState.ts';
+import { emptyState } from './NarrativeState.ts';
+import { buildNarrativeState } from './from-stage.ts';
 import { applyStoryOps } from '../ops/dispatcher.ts';
 import type { StoryCommit } from './StoryCommit.ts';
 

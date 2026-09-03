@@ -9,7 +9,8 @@ import { logger } from '../lib/logger.ts';
 // Wave 32 — Action↔StoryOp Bridge: unify the live sim with the canon ledger.
 import { buildTurnCommit } from '../nvm/bridge/action-to-ops.ts';
 import type { RelationshipDeltaInput, EmotionAppraisalInput } from '../nvm/bridge/action-to-ops.ts';
-import { buildNarrativeState, emptyState } from '../nvm/state/NarrativeState.ts';
+import { emptyState } from '../nvm/state/NarrativeState.ts';
+import { buildNarrativeState } from '../nvm/state/from-stage.ts';
 import type { NarrativeState } from '../nvm/state/NarrativeState.ts';
 import { applyStoryOps } from '../nvm/ops/dispatcher.ts';
 
