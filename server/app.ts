@@ -8,6 +8,7 @@ import gameRouter        from './routes/game.ts';
 import scriptideRouter   from './routes/scriptide.ts';
 import nvmRouter         from './routes/nvm.ts';
 import exportRouter      from './routes/export.ts';
+import coverageLetterRouter from './routes/coverage-letter.ts';
 import collabRouter      from './routes/collab.ts';
 import eventsRouter      from './routes/events.ts';
 import aiProvidersRouter from './routes/ai-providers.ts';
@@ -175,6 +176,7 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   app.use(scriptideRouter);
   app.use(nvmRouter);
   app.use(exportRouter);
+  app.use(coverageLetterRouter);
   app.use(collabRouter);
   app.use(eventsRouter);
   app.use(liveRouter);

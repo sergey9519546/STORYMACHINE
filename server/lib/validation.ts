@@ -685,6 +685,26 @@ export const DoctorBodySchema = z.object({
 // (e.g. a future per-scene budget field) without disturbing /doctor's schema.
 export const DeepDoctorBodySchema = DoctorBodySchema;
 
+// POST /api/export/coverage-letter (server/routes/coverage-letter.ts,
+// server/lib/coverage-letter.ts) — the one-to-two-page connected-prose
+// coverage LETTER, sibling to POST /api/export/coverage's dashboard-style
+// HTML. Same two-format body contract as DoctorBodySchema (exactly one of
+// fountain/fdx, optional title) plus an optional `author` byline — the only
+// field the coverage-letter renderer accepts that the HTML export's route
+// doesn't take directly (that route derives the byline itself from the
+// Fountain title page). Kept as its own schema rather than reusing
+// DoctorBodySchema so `author` doesn't leak into every other doctor-shaped
+// route's accepted body.
+export const CoverageLetterBodySchema = z.object({
+  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  title: z.string().max(300).optional(),
+  author: z.string().max(300).optional(),
+}).refine(
+  (body) => (body.fountain !== undefined) !== (body.fdx !== undefined),
+  'provide exactly one of fountain or fdx',
+);
+
 // POST /api/scriptide/diagnose — stateless (no sessionId), fountain-only. This
 // is the debounce-friendly "diagnostics as you type" sibling of /doctor: it
 // has no fdx/pdf variant because it runs on every keystroke-pause tick against

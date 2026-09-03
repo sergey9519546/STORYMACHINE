@@ -1,0 +1,1811 @@
+{
+  "health": 66.7,
+  "grade": "solid",
+  "totalIssues": 33,
+  "bySeverity": {
+    "critical": 0,
+    "major": 17,
+    "minor": 16
+  },
+  "passes": [
+    {
+      "pass": "structure",
+      "issues": [
+        {
+          "location": "Scene 4 (midpoint)",
+          "rule": "WEAK_MIDPOINT",
+          "description": "Midpoint suspense pressure is flat — the story lacks a dramatic pivot",
+          "severity": "major",
+          "suggestedFix": "Insert a surprise revelation or reversal at the midpoint scene"
+        },
+        {
+          "location": "Overall structure",
+          "rule": "NO_REVERSALS",
+          "description": "No suspense-dip reversals detected — this checks only for a scene where the engine's danger/tension language drops sharply (suspenseDelta < -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn't also read as a tension drop. Reread the draft for that kind of turn before treating this as \"no opposition anywhere.\"",
+          "severity": "major",
+          "suggestedFix": "If a reread confirms the story truly never turns, add a scene where a character's plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector's coverage, not necessarily a craft problem."
+        },
+        {
+          "location": "End of Act 2 (Scene ~5)",
+          "rule": "ACT2_BOUNDARY_WEAK",
+          "description": "Scene 5 (Act 2 ending) has low suspense delta (0.0) — Act 2 should end with a climactic turn that forces entry into Act 3",
+          "severity": "major",
+          "suggestedFix": "The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment"
+        },
+        {
+          "location": "Final scene (Scene 6)",
+          "rule": "FINAL_IMAGE_WEAK",
+          "severity": "minor",
+          "description": "The final scene (Scene 6) carries no charge on any channel — neutral emotion, no suspense, no relationship movement. The last image is what the audience carries out of the theatre; a closing beat that registers on nothing sends them off empty-handed, undercutting whatever the story built.",
+          "suggestedFix": "Give the final scene a deliberate charge: a last emotional turn (acceptance, grief, hard-won peace), a final relational note (a bond sealed or severed), or a resonant image that answers the opening. The ending does not need spectacle, but it must leave a mark."
+        },
+        {
+          "location": "Opening (Scenes 1–3) — emotional flatline",
+          "rule": "EMOTIONAL_OPENING_NEUTRAL",
+          "severity": "minor",
+          "description": "The first three scenes are all emotionally neutral — the opening establishes nothing on the emotional channel. The audience meets the story through flat affect and is given no feeling to attach to before the plot begins. An opening that engages the mind (plot, questions) but not the heart risks the audience watching from a distance rather than investing.",
+          "suggestedFix": "Charge at least one of the first three scenes emotionally: a moment of warmth, dread, grief, or longing that gives the audience a feeling to carry into the story. Emotional investment in the opening is what makes the later stakes matter — the audience must care before they can be made anxious."
+        }
+      ],
+      "critical": 0,
+      "major": 3,
+      "minor": 2
+    },
+    {
+      "pass": "causality",
+      "issues": [
+        {
+          "location": "Scene 1 (INT. KITCHEN - DAY)",
+          "rule": "ACTION_WITHOUT_CONSEQUENCE",
+          "description": "Scene 1 plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected",
+          "severity": "major",
+          "suggestedFix": "Add a reaction scene where a character responds to or is affected by the action in this scene"
+        },
+        {
+          "location": "Scenes 1–3 (setup zone)",
+          "rule": "CHEKHOV_GUN_UNFIRED",
+          "description": "2 clue(s) seeded in the first half (jane, mark) have no matching payoff anywhere in the story — Chekhov's gun shown but never fired",
+          "severity": "major",
+          "suggestedFix": "Either fire the gun: add a payoff scene that calls back each planted clue. Or remove the clue from Act 1 if you don't intend to resolve it."
+        },
+        {
+          "location": "Scene 2 (dramatic turn: )",
+          "rule": "DRAMATIC_TURN_AFTERMATH_VOID",
+          "severity": "minor",
+          "description": "Scene 2 delivers a dramatic turn (\"\") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.",
+          "suggestedFix": "Let the turn ripple: the scenes immediately after a reversal or revelation should show characters adjusting — an emotional shift, a relationship strained or realigned, suspense climbing as the new situation sinks in. The size of a turn is measured by its wake, not its announcement."
+        },
+        {
+          "location": "Scenes 1–3 — turn cluster",
+          "rule": "DRAMATIC_TURN_CLUSTER",
+          "severity": "minor",
+          "description": "Scenes 1–3 contain 3 dramatic turns in a row — reversals and revelations piled into a three-scene window. The audience gets no time to register one pivot before the next overwrites it, and the turns cannibalize each other's impact instead of compounding it.",
+          "suggestedFix": "Space the turns out. Let each reversal land and ripple — give the characters (and the audience) a scene to absorb and react before the next pivot. Bank some of the clustered turns for later acts where the story needs a fresh jolt."
+        }
+      ],
+      "critical": 0,
+      "major": 2,
+      "minor": 2
+    },
+    {
+      "pass": "intention",
+      "issues": [
+        {
+          "location": "Character: JANE",
+          "rule": "INTENTION_INVISIBLE",
+          "description": "JANE appears in the screenplay but has no tracked beliefs or goals — their intention is opaque",
+          "severity": "minor",
+          "suggestedFix": "Give JANE a clear want in their first scene (verbal or physical action)"
+        },
+        {
+          "location": "Character: MARK",
+          "rule": "INTENTION_INVISIBLE",
+          "description": "MARK appears in the screenplay but has no tracked beliefs or goals — their intention is opaque",
+          "severity": "minor",
+          "suggestedFix": "Give MARK a clear want in their first scene (verbal or physical action)"
+        },
+        {
+          "location": "Scene 2 (EXT. BACKYARD - CONTINUOUS)",
+          "rule": "ZERO_ENTROPY_SCENE",
+          "description": "Scene 2 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+          "severity": "major",
+          "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+        },
+        {
+          "location": "Scene 3 (INT. KITCHEN - LATER)",
+          "rule": "ZERO_ENTROPY_SCENE",
+          "description": "Scene 3 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+          "severity": "major",
+          "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+        },
+        {
+          "location": "Scene 4 (INT. GARAGE - NIGHT)",
+          "rule": "ZERO_ENTROPY_SCENE",
+          "description": "Scene 4 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+          "severity": "major",
+          "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+        },
+        {
+          "location": "Scene 5 (INT. HALLWAY - NIGHT)",
+          "rule": "ZERO_ENTROPY_SCENE",
+          "description": "Scene 5 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+          "severity": "major",
+          "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+        },
+        {
+          "location": "Scenes 3–5",
+          "rule": "ENTROPY_CLUSTER",
+          "description": "Three consecutive scenes (3–5) have low suspense and no relationship/clue advancement — the story stalls in a dead zone",
+          "severity": "major",
+          "suggestedFix": "Add a turning point, revelation, or relationship shift to one of these scenes; or consolidate them into a single tighter scene"
+        }
+      ],
+      "critical": 0,
+      "major": 5,
+      "minor": 2
+    },
+    {
+      "pass": "belief",
+      "issues": [
+        {
+          "location": "Scenes 1–3",
+          "rule": "EXPOSITION_DUMP",
+          "description": "Scenes 1–3: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert",
+          "severity": "major",
+          "suggestedFix": "Break the exposition streak with a scene that shows rather than tells the key information"
+        },
+        {
+          "location": "Scenes 4–6",
+          "rule": "EXPOSITION_DUMP",
+          "description": "Scenes 4–6: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert",
+          "severity": "major",
+          "suggestedFix": "Break the exposition streak with a scene that shows rather than tells the key information"
+        },
+        {
+          "location": "Belief/revelation layer",
+          "rule": "TOLD_BELIEF_DOMINATION",
+          "description": "6 of 6 belief scenes (100%) are told-only with no witnessed revelation — the story tells far more than it shows",
+          "severity": "major",
+          "suggestedFix": "Convert at least one told-belief scene to a witnessed event — let the audience discover the truth through action or direct observation rather than a character asserting it"
+        }
+      ],
+      "critical": 0,
+      "major": 3,
+      "minor": 0
+    },
+    {
+      "pass": "conflict",
+      "issues": [
+        {
+          "location": "Overall conflict arc",
+          "rule": "FLAT_SUSPENSE_ARC",
+          "description": "Average suspense in the second half (0) does not exceed the first half — conflict fails to escalate",
+          "severity": "major",
+          "suggestedFix": "Increase the stakes in the second half by having a character lose something they cannot recover easily"
+        }
+      ],
+      "critical": 0,
+      "major": 1,
+      "minor": 0
+    },
+    {
+      "pass": "character-arc",
+      "issues": [
+        {
+          "location": "Emotional landscape",
+          "rule": "ARC_EMOTIONAL_MONOTONE",
+          "description": "100% of scenes carry the same emotional register (neutral) — the story has no emotional dynamics; every beat lands at the same pitch",
+          "severity": "major",
+          "suggestedFix": "Vary the emotional register scene to scene: a moment of levity before tragedy, a flash of hope before despair. Contrast is what makes any single emotion land."
+        },
+        {
+          "location": "Scenes 1–2 (opening)",
+          "rule": "ARC_OPENING_VOID",
+          "description": "The opening two scenes are emotionally neutral with no revelation — the story begins without establishing the protagonist's emotional baseline. The arc has no departure point to measure transformation against.",
+          "severity": "minor",
+          "suggestedFix": "Give the protagonist a distinct emotional state in the opening scene — joy, fear, contentment, or dread — so the arc has a clearly felt starting point. The audience must know where the character is before they can feel where they end up."
+        }
+      ],
+      "critical": 0,
+      "major": 1,
+      "minor": 1
+    },
+    {
+      "pass": "dialogue",
+      "issues": [],
+      "critical": 0,
+      "major": 0,
+      "minor": 0
+    },
+    {
+      "pass": "rhythm",
+      "issues": [
+        {
+          "location": "Action lines throughout",
+          "rule": "SIMULTANEOUS_ACTION_ABSENT",
+          "severity": "minor",
+          "description": "13 action lines contain no simultaneous-action language (\"while\", \"even as\", \"at the same time\") — every action is strictly sequential. Film captures two things happening at once in the frame; a scene with no simultaneity misses the visual layering that distinguishes screenplay from a prose sequence of events.",
+          "suggestedFix": "Add at least one simultaneous layer: \"While he talks, she reads the room.\" or \"Even as he smiles, his hands are shaking.\" Simultaneous action creates visual depth and reveals character through contradiction."
+        },
+        {
+          "location": "Action lines throughout",
+          "rule": "VISUAL_TEXTURE_ABSENT",
+          "severity": "minor",
+          "description": "13 action lines contain no texture or material descriptor — the screenplay world has no tactile surface. Nothing is rough, worn, cracked, gleaming, or stained. Texture words are what make described objects feel real; their absence gives the visual world a blank, set-photograph quality.",
+          "suggestedFix": "Add at least 2-3 texture descriptors to the action: the worn armrest, the cracked plastic casing, the polished floor that reflects the overhead light. Texture is how the world tells the audience how old it is, how it has been used, and what it costs to be in it."
+        },
+        {
+          "location": "Action lines throughout",
+          "rule": "COLOR_ABSENCE",
+          "severity": "minor",
+          "description": "13 action lines contain no color reference — the visual world is rendered without color. Film is a visual medium; color is one of the cinematographer's primary expressive tools. A scene description with no color information presents a monochrome world and gives the director nothing to work from visually.",
+          "suggestedFix": "Introduce at least one color reference in the action: the red exit sign, the grey concrete walls, the yellow stain on the ceiling. Color is not decoration — it is the screenplay's instruction to the visual department about the emotional temperature of the scene."
+        },
+        {
+          "location": "Action lines throughout",
+          "rule": "SET_DRESSING_DOMINANCE",
+          "severity": "minor",
+          "description": "5 of 13 action lines (38%) reference static furniture or architectural elements (desk, chair, door, window, floor, etc.) — the prose is cataloguing the set rather than dramatizing the people in it. A screenplay's action lines should track what characters do; when furniture fills the page, the human drama is crowded out.",
+          "suggestedFix": "Anchor furniture and props to character behavior: instead of noting that a desk sits in the corner, show a character lean against it, avoid it, or slam a fist on its surface. Props earn their place by participating in action, not by being listed."
+        },
+        {
+          "location": "Middle action lines (4–9) — no short line ≤4 words",
+          "rule": "ACTION_MIDDLE_SHORT_ABSENT",
+          "severity": "minor",
+          "description": "The middle 50% of action lines (lines 4–9) contains no short line of 4 words or fewer, while 3 short lines exist in the outer zones — the script's longest sustained section is written without any compressed beat. Short lines serve a pacing function in the middle of prose: they signal a gear-change, register a reaction in isolation, or land a beat without commentary. When the middle zone is uniformly dense, it risks feeling metronomically even — each line demands similar reading time, and the absence of the staccato beat removes the contrast that makes the surrounding longer lines feel deliberate rather than routine.",
+          "suggestedFix": "Add at least one short action line (≤4 words) in the middle section (action lines 4–9) — a one-word reaction, a two-word observation, a three-word beat that interrupts the density. The short line doesn't need to be climactic; it needs to change the reader's rhythm and signal that something just happened in a single beat."
+        },
+        {
+          "location": "Finale action lines (10–13) — no long line ≥12 words",
+          "rule": "ACTION_FINALE_LONG_ABSENT",
+          "severity": "minor",
+          "description": "The final 25% of action lines (lines 10–13) contains no line of 12 words or more — the script's finale is written entirely in short and medium beats — while 3 long action lines appear in the first three-quarters. The finale is where the script delivers its most specific and physically-realized staging: the space where action lands, the texture of a confrontation, the exact geometry of a resolution. When the entire finale is telegraphic notation with no fully-constructed descriptive line, the climax is gestured at rather than rendered. A short line can deliver a beat with force, but without at least one long line anchoring the physical reality, the finale risks feeling like a summary of events rather than the events themselves.",
+          "suggestedFix": "Add at least one action line of 12+ words in the finale (action lines 10–13) — a line that renders the space, the physical action, or the specific detail that makes the climactic moment real rather than merely described. This does not need to be decorative; it needs to commit to the scene's specific reality in the way that only a fully-constructed sentence can."
+        },
+        {
+          "location": "opening 25% of action lines (first 3 of 13): no medium-length lines (5–11 words)",
+          "rule": "ACTION_MEDIUM_OPENING_ABSENT",
+          "severity": "minor",
+          "description": "The opening 25% of action lines contains no medium-length line (5–11 words), while 7 appear later in the script. The medium register — sentences neither clipped to a blunt beat nor expanded into a full descriptive block — is the workhorse prose that establishes scene mechanics, character action, and environment in measured strokes. An opening section that skips entirely to short staccato hits or long descriptive expansions starts the script at the rhythm extremes before the baseline is set. Its absence in the setup leaves the opening action either too punchy or too dense without the mid-range that grounds the dramatic world.",
+          "suggestedFix": "Look at the first 3 action lines. If they run to very short beats (≤4 words each) or to long descriptive passages (≥12 words), introduce at least one medium-length sentence (5–11 words) that establishes a concrete action, object, or spatial detail. The opening does not need to average medium length — just touch the register to calibrate the reader's ear for the prose that follows."
+        }
+      ],
+      "critical": 0,
+      "major": 0,
+      "minor": 7
+    },
+    {
+      "pass": "pacing",
+      "issues": [],
+      "critical": 0,
+      "major": 0,
+      "minor": 0
+    },
+    {
+      "pass": "originality",
+      "issues": [
+        {
+          "location": "Emotional arc throughout",
+          "rule": "EMOTIONAL_ARC_PLATEAU",
+          "description": "All 6 scenes have neutral emotional shifts — the story has no emotional peaks or valleys. Every scene leaves characters and audience in exactly the same affective state.",
+          "severity": "major",
+          "suggestedFix": "Give the story emotional shape: at least one scene should end on a positive note (relief, hope, connection) and one on a negative (loss, betrayal, setback). An emotionally flat story is not drama."
+        },
+        {
+          "location": "Scene sluglines",
+          "rule": "SLUG_GENERIC_LOCATION",
+          "severity": "minor",
+          "description": "5 of 6 scene sluglines (83%) use generic location labels (ROOM, OFFICE, BUILDING, STREET, etc.) — placeholders rather than places. A screenplay grounds the audience in specific geography: \"INT. MARA'S CLUTTERED REPAIR SHOP - NIGHT\" anchors the scene; \"INT. ROOM - NIGHT\" gives them a void.",
+          "suggestedFix": "Give every location a specific name that carries information: the name of an establishment, a character, or a defining feature. Even a modest space earns texture when named — \"INT. THE BROKEN COMPASS BAR - NIGHT\" is a setting; \"INT. BAR - NIGHT\" is an empty stage."
+        }
+      ],
+      "critical": 0,
+      "major": 1,
+      "minor": 1
+    },
+    {
+      "pass": "payoff",
+      "issues": [],
+      "critical": 0,
+      "major": 0,
+      "minor": 0
+    },
+    {
+      "pass": "voice",
+      "issues": [
+        {
+          "location": "Action lines throughout",
+          "rule": "ACTION_MOTION_VERB_MONOTONE",
+          "severity": "minor",
+          "description": "7 of 12 action lines (58%) use a generic motion or displacement verb (\"walks\", \"enters\", \"moves\", \"crosses\", \"turns\", \"heads\"). When displacement verbs dominate the action, the script describes choreography — who moved where — rather than what characters are doing in any dramatically meaningful sense. Action prose reduced to traffic management under-describes the physical world and the psychological stakes behind movement.",
+          "suggestedFix": "Replace generic motion verbs with specific verbs that carry attitude and intent: \"walks toward\" → \"advances\", \"strides\", \"creeps\"; \"enters\" → \"bursts in\", \"slips in\", \"crashes through.\" Movement is always motivated — the verb should carry that motivation. When a character walks, how and why they walk is the character."
+        }
+      ],
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+    },
+    {
+      "pass": "theme",
+      "issues": [],
+      "critical": 0,
+      "major": 0,
+      "minor": 0
+    },
+    {
+      "pass": "relationship-arc",
+      "issues": [
+        {
+          "location": "Entire screenplay",
+          "rule": "NO_RELATIONSHIP_MOVEMENT",
+          "description": "No relationship between any two characters shifts across the entire story. Relationships are static — the emotional engine is idle.",
+          "severity": "major",
+          "suggestedFix": "Identify the two characters whose bond matters most and give it at least one turn: a betrayal, a reconciliation, a shift in trust or power."
+        }
+      ],
+      "critical": 0,
+      "major": 1,
+      "minor": 0
+    }
+  ],
+  "sceneHeatmap": [
+    {
+      "sceneIdx": 0,
+      "slug": "INT. KITCHEN - DAY",
+      "issueCount": 1,
+      "critical": 0,
+      "major": 1,
+      "minor": 0
+    },
+    {
+      "sceneIdx": 1,
+      "slug": "EXT. BACKYARD - CONTINUOUS",
+      "issueCount": 2,
+      "critical": 0,
+      "major": 1,
+      "minor": 1
+    },
+    {
+      "sceneIdx": 2,
+      "slug": "INT. KITCHEN - LATER",
+      "issueCount": 1,
+      "critical": 0,
+      "major": 1,
+      "minor": 0
+    },
+    {
+      "sceneIdx": 3,
+      "slug": "INT. GARAGE - NIGHT",
+      "issueCount": 2,
+      "critical": 0,
+      "major": 2,
+      "minor": 0
+    },
+    {
+      "sceneIdx": 4,
+      "slug": "INT. HALLWAY - NIGHT",
+      "issueCount": 1,
+      "critical": 0,
+      "major": 1,
+      "minor": 0
+    },
+    {
+      "sceneIdx": 5,
+      "slug": "EXT. STREET - NIGHT",
+      "issueCount": 1,
+      "critical": 0,
+      "major": 0,
+      "minor": 1
+    }
+  ],
+  "topPriorities": [
+    {
+      "location": "Scene 4 (midpoint)",
+      "rule": "WEAK_MIDPOINT",
+      "description": "Midpoint suspense pressure is flat — the story lacks a dramatic pivot",
+      "severity": "major",
+      "suggestedFix": "Insert a surprise revelation or reversal at the midpoint scene",
+      "pass": "structure"
+    },
+    {
+      "location": "Overall structure",
+      "rule": "NO_REVERSALS",
+      "description": "No suspense-dip reversals detected — this checks only for a scene where the engine's danger/tension language drops sharply (suspenseDelta < -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn't also read as a tension drop. Reread the draft for that kind of turn before treating this as \"no opposition anywhere.\"",
+      "severity": "major",
+      "suggestedFix": "If a reread confirms the story truly never turns, add a scene where a character's plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector's coverage, not necessarily a craft problem.",
+      "pass": "structure"
+    },
+    {
+      "location": "End of Act 2 (Scene ~5)",
+      "rule": "ACT2_BOUNDARY_WEAK",
+      "description": "Scene 5 (Act 2 ending) has low suspense delta (0.0) — Act 2 should end with a climactic turn that forces entry into Act 3",
+      "severity": "major",
+      "suggestedFix": "The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment",
+      "pass": "structure"
+    },
+    {
+      "location": "Scene 1 (INT. KITCHEN - DAY)",
+      "rule": "ACTION_WITHOUT_CONSEQUENCE",
+      "description": "Scene 1 plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected",
+      "severity": "major",
+      "suggestedFix": "Add a reaction scene where a character responds to or is affected by the action in this scene",
+      "pass": "causality"
+    },
+    {
+      "location": "Scenes 1–3 (setup zone)",
+      "rule": "CHEKHOV_GUN_UNFIRED",
+      "description": "2 clue(s) seeded in the first half (jane, mark) have no matching payoff anywhere in the story — Chekhov's gun shown but never fired",
+      "severity": "major",
+      "suggestedFix": "Either fire the gun: add a payoff scene that calls back each planted clue. Or remove the clue from Act 1 if you don't intend to resolve it.",
+      "pass": "causality"
+    },
+    {
+      "location": "Scene 2 (EXT. BACKYARD - CONTINUOUS)",
+      "rule": "ZERO_ENTROPY_SCENE",
+      "description": "Scene 2 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+      "severity": "major",
+      "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely",
+      "pass": "intention"
+    },
+    {
+      "location": "Scene 3 (INT. KITCHEN - LATER)",
+      "rule": "ZERO_ENTROPY_SCENE",
+      "description": "Scene 3 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+      "severity": "major",
+      "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely",
+      "pass": "intention"
+    },
+    {
+      "location": "Scene 4 (INT. GARAGE - NIGHT)",
+      "rule": "ZERO_ENTROPY_SCENE",
+      "description": "Scene 4 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+      "severity": "major",
+      "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely",
+      "pass": "intention"
+    },
+    {
+      "location": "Scene 5 (INT. HALLWAY - NIGHT)",
+      "rule": "ZERO_ENTROPY_SCENE",
+      "description": "Scene 5 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+      "severity": "major",
+      "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely",
+      "pass": "intention"
+    },
+    {
+      "location": "Scenes 3–5",
+      "rule": "ENTROPY_CLUSTER",
+      "description": "Three consecutive scenes (3–5) have low suspense and no relationship/clue advancement — the story stalls in a dead zone",
+      "severity": "major",
+      "suggestedFix": "Add a turning point, revelation, or relationship shift to one of these scenes; or consolidate them into a single tighter scene",
+      "pass": "intention"
+    }
+  ],
+  "structure": {
+    "actPosition": "act1",
+    "completionPercent": 0,
+    "avgSuspensePerScene": 0,
+    "escalating": false,
+    "reversalCount": 0,
+    "reversalDensity": 0,
+    "approachingClimax": false,
+    "openClues": 2,
+    "revelationCount": 0,
+    "midpointPressure": 0,
+    "tightestScene": 1
+  },
+  "characters": [
+    "JANE",
+    "MARK"
+  ],
+  "sceneCount": 6,
+  "wordCount": 167,
+  "analyzedAt": 1787279939609,
+  "voiceAnalysis": {
+    "pairs": [],
+    "scored": false
+  },
+  "subtextRatio": 0.73,
+  "questionLatencyOverall": {
+    "totalQuestions": 1,
+    "totalResolved": 0,
+    "avgScenesToResolve": 0
+  },
+  "analysisComplete": true,
+  "verdict": "CONSIDER",
+  "dimensions": [
+    {
+      "key": "structure-pacing",
+      "label": "Structure & Pacing",
+      "passes": [
+        "structure",
+        "pacing",
+        "rhythm"
+      ],
+      "score": 87.5,
+      "issueCount": 12,
+      "summary": "Structure & Pacing is in good shape — a handful of minor notes, mostly around weak midpoint.",
+      "percentile": 70,
+      "percentileDescriptor": "Structure & Pacing is stronger than 70% of the reference set."
+    },
+    {
+      "key": "character",
+      "label": "Character",
+      "passes": [
+        "character-arc",
+        "intention",
+        "relationship-arc"
+      ],
+      "score": 80.7,
+      "issueCount": 10,
+      "summary": "Character is in good shape — a handful of major notes, mostly around zero entropy scene.",
+      "percentile": 40,
+      "percentileDescriptor": "Character is stronger than 40% of the reference set."
+    },
+    {
+      "key": "dialogue-voice",
+      "label": "Dialogue & Voice",
+      "passes": [
+        "dialogue",
+        "voice"
+      ],
+      "score": 99.8,
+      "issueCount": 1,
+      "summary": "Dialogue & Voice is in good shape — a handful of minor notes, mostly around action motion verb monotone.",
+      "percentile": 0,
+      "percentileDescriptor": "Dialogue & Voice is in the bottom 10% of the reference set."
+    },
+    {
+      "key": "plot-logic",
+      "label": "Plot Logic & Payoff",
+      "passes": [
+        "causality",
+        "belief",
+        "payoff",
+        "conflict"
+      ],
+      "score": 85.3,
+      "issueCount": 8,
+      "summary": "Plot Logic & Payoff is in good shape — a handful of major notes, mostly around exposition dump.",
+      "percentile": 5,
+      "percentileDescriptor": "Plot Logic & Payoff is in the bottom 10% of the reference set."
+    },
+    {
+      "key": "theme-originality",
+      "label": "Theme & Originality",
+      "passes": [
+        "theme",
+        "originality"
+      ],
+      "score": 98.7,
+      "issueCount": 2,
+      "summary": "Theme & Originality is in good shape — a handful of major notes, mostly around emotional arc plateau.",
+      "percentile": 0,
+      "percentileDescriptor": "Theme & Originality is in the bottom 10% of the reference set."
+    }
+  ],
+  "strengths": [
+    "No fatal flaws surfaced across 6 scenes — nothing here would sink the draft outright."
+  ],
+  "plainSummary": "CONSIDER — the engine's intermediate threshold-based verdict; overall engine score 67/100. Dialogue & Voice is the highest-scoring diagnostic dimension, at 100/100. Character is the lowest-scoring diagnostic dimension, at 81/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: Midpoint suspense pressure is flat — the story lacks a dramatic pivot.",
+  "contentHash": "42f08fc26ba8a760b26ff903ceaa934ad6fcc7b6caa89c95ce9fab7902ffee42",
+  "healthPercentile": 90,
+  "metrics": {
+    "perScene": [
+      {
+        "sceneIdx": 0,
+        "slug": "INT. KITCHEN - DAY",
+        "pivotStrength": 0,
+        "cliffhangerStrength": 29,
+        "twistImpact": 0,
+        "surpriseProxy": 0,
+        "informationAsymmetryStrength": 22,
+        "pacingFit": null
+      },
+      {
+        "sceneIdx": 1,
+        "slug": "EXT. BACKYARD - CONTINUOUS",
+        "pivotStrength": 6,
+        "cliffhangerStrength": 7,
+        "twistImpact": 0,
+        "surpriseProxy": 100,
+        "informationAsymmetryStrength": 11,
+        "pacingFit": null
+      },
+      {
+        "sceneIdx": 2,
+        "slug": "INT. KITCHEN - LATER",
+        "pivotStrength": 0,
+        "cliffhangerStrength": 0,
+        "twistImpact": 0,
+        "surpriseProxy": 100,
+        "informationAsymmetryStrength": 0,
+        "pacingFit": null
+      },
+      {
+        "sceneIdx": 3,
+        "slug": "INT. GARAGE - NIGHT",
+        "pivotStrength": 0,
+        "cliffhangerStrength": 0,
+        "twistImpact": 0,
+        "surpriseProxy": 67,
+        "informationAsymmetryStrength": 0,
+        "pacingFit": null
+      },
+      {
+        "sceneIdx": 4,
+        "slug": "INT. HALLWAY - NIGHT",
+        "pivotStrength": 0,
+        "cliffhangerStrength": 0,
+        "twistImpact": 0,
+        "surpriseProxy": 50,
+        "informationAsymmetryStrength": 0,
+        "pacingFit": null
+      },
+      {
+        "sceneIdx": 5,
+        "slug": "EXT. STREET - NIGHT",
+        "pivotStrength": 0,
+        "cliffhangerStrength": 0,
+        "twistImpact": 0,
+        "surpriseProxy": 40,
+        "informationAsymmetryStrength": 0,
+        "pacingFit": null
+      }
+    ],
+    "script": {
+      "sceneCount": 6,
+      "suspenseEntropy": 85,
+      "momentumConsistency": 50,
+      "finalCliffhangerStrength": 0,
+      "pacingFit": null,
+      "narrativeCohesion": 67,
+      "emotionalImpactRange": {
+        "peak": 33,
+        "spread": 25
+      },
+      "tensionMeasures": {
+        "lexical": 0.17,
+        "structural": 3,
+        "rhythmic": 80,
+        "asymmetric": 6
+      }
+    }
+  },
+  "pageEstimate": {
+    "pages": 2,
+    "runtimeMinutes": 2,
+    "basis": "lines"
+  },
+  "excerptNote": "This reads like an excerpt (6 scenes analyzed): scores and verdicts are computed the same way as for a full script, but with this little material they should be read as feedback on the pages, not coverage of a feature.",
+  "emotionalArc": {
+    "perScene": [
+      {
+        "valence": -0.09333333333333334,
+        "arousal": 0.4566666666666666,
+        "tension": 43.58333333333333,
+        "coverage": 0.12244897959183673
+      },
+      {
+        "valence": -0.03,
+        "arousal": 0.47000000000000003,
+        "tension": 38.77631578947369,
+        "coverage": 0.13157894736842105
+      },
+      {
+        "valence": -0.04999999999999999,
+        "arousal": 0.55,
+        "tension": 46.25,
+        "coverage": 0.125
+      },
+      {
+        "valence": 0.2,
+        "arousal": 0.2,
+        "tension": 15.000000000000002,
+        "coverage": 0.08333333333333333
+      },
+      {
+        "valence": 0.23,
+        "arousal": 0.23,
+        "tension": 17.25,
+        "coverage": 0.1
+      },
+      {
+        "valence": 0,
+        "arousal": 0.6,
+        "tension": 44.99999999999999,
+        "coverage": 0.14285714285714285
+      }
+    ],
+    "peakPosition": 0.5,
+    "rampCorrelation": -0.3310363280772895,
+    "resolutionDrop": 0.02702702702702718,
+    "valenceShift": 0.09333333333333334,
+    "tensionVolatility": 19.13243050141176,
+    "reaganArc": "rise",
+    "reaganFit": 0.5833637342482796,
+    "arcHealth": 0.5964744207329036,
+    "lexCoverage": 0.11753640052512233,
+    "scored": true
+  },
+  "antiSlop": {
+    "genericEmotion": {
+      "count": 0,
+      "lines": []
+    },
+    "negatedClicheRaw": {
+      "count": 0,
+      "lines": []
+    },
+    "negatedClicheGuarded": {
+      "count": 0,
+      "lines": []
+    },
+    "screenplayAIMarkers": {
+      "detection": {
+        "count": 0,
+        "lines": []
+      },
+      "byCategory": {
+        "copula-avoidance": 0,
+        "inflated-staging": 0,
+        "vague-complexity": 0,
+        "unnecessary-formality": 0,
+        "metaphorical-inflation": 0,
+        "generic-intensifiers": 0,
+        "buzzwords-jargon": 0,
+        "filler-cliches": 0
+      },
+      "validated": false
+    },
+    "freshness": 0.9620253164556962,
+    "slopScore": 0,
+    "scored": true
+  },
+  "theme": {
+    "themeKeywords": [
+      "int",
+      "jane",
+      "mark",
+      "night",
+      "kitchen",
+      "stands",
+      "vegetables",
+      "door"
+    ],
+    "motifWords": [
+      "int",
+      "kitchen",
+      "day",
+      "jane",
+      "stands",
+      "counter",
+      "chopping",
+      "vegetables",
+      "glances",
+      "clock",
+      "he's",
+      "late",
+      "again",
+      "door",
+      "opens",
+      "mark",
+      "enters",
+      "breathless",
+      "traffic",
+      "insane",
+      "i'm",
+      "sorry",
+      "you're",
+      "always",
+      "sets",
+      "bag",
+      "crosses",
+      "mean",
+      "time",
+      "ext",
+      "backyard",
+      "continuous",
+      "storms",
+      "through",
+      "follows",
+      "calling",
+      "after",
+      "wait",
+      "stops",
+      "fence",
+      "arms",
+      "crossed",
+      "staring",
+      "horizon",
+      "keep",
+      "waiting",
+      "change",
+      "later",
+      "quiet",
+      "sits",
+      "alone",
+      "table",
+      "abandoned",
+      "stares",
+      "photograph",
+      "hand",
+      "herself",
+      "maybe",
+      "already",
+      "know",
+      "answer",
+      "garage",
+      "night",
+      "over",
+      "workbench",
+      "tools",
+      "scattered",
+      "fine",
+      "hallway",
+      "walks",
+      "okay",
+      "street",
+      "car",
+      "passes"
+    ],
+    "confidence": 1,
+    "scored": true
+  },
+  "interiority": {
+    "perCharacter": [
+      {
+        "character": "JANE",
+        "wantCues": 0,
+        "fearCues": 0,
+        "woundCues": 0,
+        "dialogueBlocks": 5,
+        "interiorityScore": 0
+      },
+      {
+        "character": "MARK",
+        "wantCues": 0,
+        "fearCues": 0,
+        "woundCues": 0,
+        "dialogueBlocks": 5,
+        "interiorityScore": 0
+      }
+    ],
+    "charactersWithWant": 0,
+    "charactersOpaque": 2,
+    "wantNeedOppositionPresent": false,
+    "scored": true
+  },
+  "mirrorScenes": {
+    "echoes": [],
+    "hasBookend": false,
+    "strength": 0,
+    "scored": false
+  },
+  "silence": {
+    "silentBeats": [],
+    "craftedSilentBeatCount": 0,
+    "ratio": 0,
+    "strength": 0,
+    "scored": true
+  },
+  "bonding": {
+    "bondingBeats": [],
+    "bondingBeatCount": 0,
+    "ratio": 0,
+    "strength": 0,
+    "scored": true
+  },
+  "coldOpenPromise": {
+    "promiseTokens": [
+      "mark",
+      "jane",
+      "again",
+      "traffic",
+      "clock"
+    ],
+    "keptTokens": [
+      "jane"
+    ],
+    "plantedAtFront": true,
+    "strength": 0.2,
+    "scored": true
+  },
+  "patternEstablishment": {
+    "motifs": [],
+    "motifCount": 0,
+    "strength": 0,
+    "scored": true
+  },
+  "storyGraph": {
+    "graph": {
+      "nodes": [
+        {
+          "id": "scene-0",
+          "type": "scene",
+          "sceneIdx": 0,
+          "label": "INT. KITCHEN - DAY",
+          "metadata": {
+            "slug": "INT. KITCHEN - DAY",
+            "purpose": "establish_world"
+          }
+        },
+        {
+          "id": "scene-1",
+          "type": "scene",
+          "sceneIdx": 1,
+          "label": "EXT. BACKYARD - CONTINUOUS",
+          "metadata": {
+            "slug": "EXT. BACKYARD - CONTINUOUS",
+            "purpose": "complicate"
+          }
+        },
+        {
+          "id": "scene-2",
+          "type": "scene",
+          "sceneIdx": 2,
+          "label": "INT. KITCHEN - LATER",
+          "metadata": {
+            "slug": "INT. KITCHEN - LATER",
+            "purpose": "turning_point"
+          }
+        },
+        {
+          "id": "scene-3",
+          "type": "scene",
+          "sceneIdx": 3,
+          "label": "INT. GARAGE - NIGHT",
+          "metadata": {
+            "slug": "INT. GARAGE - NIGHT",
+            "purpose": "complicate"
+          }
+        },
+        {
+          "id": "scene-4",
+          "type": "scene",
+          "sceneIdx": 4,
+          "label": "INT. HALLWAY - NIGHT",
+          "metadata": {
+            "slug": "INT. HALLWAY - NIGHT",
+            "purpose": "complicate"
+          }
+        },
+        {
+          "id": "scene-5",
+          "type": "scene",
+          "sceneIdx": 5,
+          "label": "EXT. STREET - NIGHT",
+          "metadata": {
+            "slug": "EXT. STREET - NIGHT",
+            "purpose": "complicate"
+          }
+        },
+        {
+          "id": "promise-setup-jane",
+          "type": "promise",
+          "label": "Setup: jane",
+          "metadata": {
+            "promiseType": "setup",
+            "clueId": "jane"
+          }
+        },
+        {
+          "id": "promise-setup-mark",
+          "type": "promise",
+          "label": "Setup: mark",
+          "metadata": {
+            "promiseType": "setup",
+            "clueId": "mark"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "source": "scene-0",
+          "target": "promise-setup-jane",
+          "type": "promise-link",
+          "weight": 1
+        },
+        {
+          "source": "scene-0",
+          "target": "promise-setup-mark",
+          "type": "promise-link",
+          "weight": 1
+        },
+        {
+          "source": "scene-0",
+          "target": "scene-1",
+          "type": "temporal",
+          "weight": 0.5
+        },
+        {
+          "source": "scene-1",
+          "target": "scene-2",
+          "type": "temporal",
+          "weight": 0.5
+        },
+        {
+          "source": "scene-2",
+          "target": "scene-3",
+          "type": "temporal",
+          "weight": 0.5
+        },
+        {
+          "source": "scene-3",
+          "target": "scene-4",
+          "type": "temporal",
+          "weight": 0.5
+        },
+        {
+          "source": "scene-4",
+          "target": "scene-5",
+          "type": "temporal",
+          "weight": 0.5
+        }
+      ],
+      "promisePaymentRatio": 0,
+      "unpaidPromises": [
+        "jane",
+        "mark"
+      ],
+      "arcCoherence": -0.49705012174770846,
+      "escalationMonotonicity": 0,
+      "causalDensity": 0.875,
+      "isolatedScenes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "forwardEdgeRatio": 0.5,
+      "setupPayoffDistance": 0,
+      "scored": true
+    },
+    "diagnostics": {
+      "critical": [
+        {
+          "severity": "critical",
+          "type": "unpaid-promise",
+          "sceneIdx": 0,
+          "message": "Setup \"jane\" planted but never resolved",
+          "impact": "Audiences remember setups and expect payoffs. Unresolved promises can feel like plot holes or wasted screen time.",
+          "suggestions": [
+            "Add a payoff scene in Act 2 or 3 to resolve this setup",
+            "If this setup is no longer relevant to the main plot, consider removing it",
+            "Connect this promise to an existing climax or resolution scene"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "severity": "critical",
+          "type": "unpaid-promise",
+          "sceneIdx": 0,
+          "message": "Setup \"mark\" planted but never resolved",
+          "impact": "Audiences remember setups and expect payoffs. Unresolved promises can feel like plot holes or wasted screen time.",
+          "suggestions": [
+            "Add a payoff scene in Act 2 or 3 to resolve this setup",
+            "If this setup is no longer relevant to the main plot, consider removing it",
+            "Connect this promise to an existing climax or resolution scene"
+          ],
+          "confidence": 0.85
+        },
+        {
+          "severity": "critical",
+          "type": "isolated-scene",
+          "sceneIdx": 0,
+          "message": "Scene 1 has no causal connections to the story",
+          "impact": "This scene doesn't affect or get affected by the main plot. It may feel disconnected or unnecessary.",
+          "suggestions": [
+            "Add a causal connection: have this scene's events affect later scenes",
+            "Seed or pay off a promise in this scene to connect it to the main plot",
+            "Show character growth or relationship changes that carry forward",
+            "If truly standalone, evaluate whether this scene serves the story"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "severity": "critical",
+          "type": "isolated-scene",
+          "sceneIdx": 5,
+          "message": "Scene 6 has no causal connections to the story",
+          "impact": "This scene doesn't affect or get affected by the main plot. It may feel disconnected or unnecessary.",
+          "suggestions": [
+            "Add a causal connection: have this scene's events affect later scenes",
+            "Seed or pay off a promise in this scene to connect it to the main plot",
+            "Show character growth or relationship changes that carry forward",
+            "If truly standalone, evaluate whether this scene serves the story"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "severity": "critical",
+          "type": "backward-arc",
+          "message": "50% of causal links point backward — possible structural incoherence",
+          "impact": "Causal relationships should flow forward in story time. Backward links suggest structural confusion or act-order issues.",
+          "suggestions": [
+            "Review scene order: ensure setups come before payoffs",
+            "Check for flashback scenes that might be causing confusion",
+            "Verify that causal chains flow forward in narrative time",
+            "Consider whether act structure needs adjustment"
+          ],
+          "confidence": 0.7
+        }
+      ],
+      "medium": [
+        {
+          "severity": "medium",
+          "type": "isolated-scene",
+          "sceneIdx": 1,
+          "message": "Scene 2 has no causal connections to the story",
+          "impact": "This scene doesn't affect or get affected by the main plot. It may feel disconnected or unnecessary.",
+          "suggestions": [
+            "Add a causal connection: have this scene's events affect later scenes",
+            "Seed or pay off a promise in this scene to connect it to the main plot",
+            "Show character growth or relationship changes that carry forward",
+            "If truly standalone, evaluate whether this scene serves the story"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "severity": "medium",
+          "type": "isolated-scene",
+          "sceneIdx": 2,
+          "message": "Scene 3 has no causal connections to the story",
+          "impact": "This scene doesn't affect or get affected by the main plot. It may feel disconnected or unnecessary.",
+          "suggestions": [
+            "Add a causal connection: have this scene's events affect later scenes",
+            "Seed or pay off a promise in this scene to connect it to the main plot",
+            "Show character growth or relationship changes that carry forward",
+            "If truly standalone, evaluate whether this scene serves the story"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "severity": "medium",
+          "type": "isolated-scene",
+          "sceneIdx": 3,
+          "message": "Scene 4 has no causal connections to the story",
+          "impact": "This scene doesn't affect or get affected by the main plot. It may feel disconnected or unnecessary.",
+          "suggestions": [
+            "Add a causal connection: have this scene's events affect later scenes",
+            "Seed or pay off a promise in this scene to connect it to the main plot",
+            "Show character growth or relationship changes that carry forward",
+            "If truly standalone, evaluate whether this scene serves the story"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "severity": "medium",
+          "type": "isolated-scene",
+          "sceneIdx": 4,
+          "message": "Scene 5 has no causal connections to the story",
+          "impact": "This scene doesn't affect or get affected by the main plot. It may feel disconnected or unnecessary.",
+          "suggestions": [
+            "Add a causal connection: have this scene's events affect later scenes",
+            "Seed or pay off a promise in this scene to connect it to the main plot",
+            "Show character growth or relationship changes that carry forward",
+            "If truly standalone, evaluate whether this scene serves the story"
+          ],
+          "confidence": 0.8
+        },
+        {
+          "severity": "medium",
+          "type": "flat-tension",
+          "message": "Tension does not escalate across acts — story may feel static",
+          "impact": "Stories need escalation to maintain engagement. Flat tension across acts can make the story feel static or episodic.",
+          "suggestions": [
+            "Raise stakes in Act 2: introduce complications, obstacles, or reversals",
+            "Build toward climax: increase suspense and conflict in the final 25%",
+            "Add pressure points at act breaks to signal escalation",
+            "Ensure protagonist faces increasingly difficult challenges"
+          ],
+          "confidence": 0.75
+        }
+      ],
+      "low": [],
+      "strengths": []
+    },
+    "summary": {
+      "totalIssues": 10,
+      "criticalCount": 5,
+      "strengthCount": 0,
+      "overallAssessment": "weak"
+    },
+    "graphHealth": 16
+  },
+  "graphHealth": {
+    "graphHealthScore": 18,
+    "graphDeduction": 12,
+    "metrics": {
+      "promisePaymentRatio": 0,
+      "forwardEdgeRatio": 0.5,
+      "escalationMonotonicity": 0,
+      "arcCoherence": -0.49705012174770846,
+      "causalDensity": 0.875,
+      "isolatedSceneCount": 6
+    },
+    "findings": [
+      "Promise-payment ratio is 0.00 — 2 unpaid setup(s) may feel like plot holes.",
+      "Forward-edge ratio is 0.50 — causal links may flow backward, suggesting structural confusion.",
+      "Escalation monotonicity is 0.00 — tension does not consistently rise across acts.",
+      "Arc coherence is low — tension progression may not track with story position.",
+      "6 isolated scene(s) with no causal connections to the story."
+    ]
+  },
+  "disclosureAnalysis": {
+    "fairReveal": {
+      "fair": true,
+      "violations": [],
+      "support": "UNKNOWN"
+    },
+    "events": [
+      {
+        "factId": "jane",
+        "storyTimeIndex": 0,
+        "discourseIndex": 0,
+        "kind": "setup"
+      },
+      {
+        "factId": "mark",
+        "storyTimeIndex": 0,
+        "discourseIndex": 0,
+        "kind": "setup"
+      }
+    ],
+    "violationCount": 0,
+    "epistemicGaps": [],
+    "scored": true
+  },
+  "characterFunctions": [
+    {
+      "characterId": "JANE",
+      "function": "ally",
+      "confidence": 0.3,
+      "evidence": [
+        "insufficient signal for specific classification — defaulting to ally"
+      ],
+      "independentGoal": false
+    },
+    {
+      "characterId": "MARK",
+      "function": "ally",
+      "confidence": 0.3,
+      "evidence": [
+        "insufficient signal for specific classification — defaulting to ally"
+      ],
+      "independentGoal": false
+    }
+  ],
+  "subplots": {
+    "subplots": [
+      {
+        "subplotId": "mystery:jane",
+        "type": "mystery_thread",
+        "participants": [],
+        "openedAtScene": 0,
+        "resolvedAtScene": null,
+        "intersectionScenes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "opsCount": 1,
+        "description": "Mystery thread \"jane\" unresolved (seeded scene 0)"
+      },
+      {
+        "subplotId": "mystery:mark",
+        "type": "mystery_thread",
+        "participants": [],
+        "openedAtScene": 0,
+        "resolvedAtScene": null,
+        "intersectionScenes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "opsCount": 1,
+        "description": "Mystery thread \"mark\" unresolved (seeded scene 0)"
+      }
+    ],
+    "totalSubplots": 2,
+    "unresolvedSubplots": 2,
+    "intersectionCount": 6,
+    "scored": true
+  },
+  "ruleBreaking": {
+    "findings": [],
+    "checked": [
+      "passive_protagonist",
+      "minimal_dialogue",
+      "late_protagonist_clarity",
+      "abrupt_ending",
+      "repetitive_scene_shape",
+      "nonlinear_order",
+      "tonal_collision"
+    ],
+    "scored": true
+  },
+  "temporalConsistency": {
+    "contradictions": [],
+    "consistent": true,
+    "summary": "✓ No temporal contradictions detected. Timeline is consistent."
+  },
+  "rootCauses": [
+    {
+      "id": "7eb31e5aa83ada6a",
+      "title": "Widespread Structure & Pacing concerns",
+      "explanation": "10 issues across 2 pass(es) in Structure & Pacing point to the same underlying problem, mostly around no reversals.",
+      "severity": "major",
+      "memberRules": [
+        "NO_REVERSALS",
+        "ACT2_BOUNDARY_WEAK",
+        "EMOTIONAL_OPENING_NEUTRAL",
+        "SIMULTANEOUS_ACTION_ABSENT",
+        "VISUAL_TEXTURE_ABSENT",
+        "COLOR_ABSENCE",
+        "SET_DRESSING_DOMINANCE",
+        "ACTION_MIDDLE_SHORT_ABSENT",
+        "ACTION_FINALE_LONG_ABSENT",
+        "ACTION_MEDIUM_OPENING_ABSENT"
+      ],
+      "memberCount": 10,
+      "sceneIdxs": []
+    },
+    {
+      "id": "8bb2454c8922d756",
+      "title": "Widespread Plot Logic & Payoff concerns",
+      "explanation": "6 issues across 3 pass(es) in Plot Logic & Payoff point to the same underlying problem, mostly around exposition dump.",
+      "severity": "major",
+      "memberRules": [
+        "CHEKHOV_GUN_UNFIRED",
+        "DRAMATIC_TURN_CLUSTER",
+        "EXPOSITION_DUMP",
+        "TOLD_BELIEF_DOMINATION",
+        "FLAT_SUSPENSE_ARC"
+      ],
+      "memberCount": 6,
+      "sceneIdxs": []
+    },
+    {
+      "id": "aabf8561db76e1ee",
+      "title": "Widespread Character concerns",
+      "explanation": "4 issues across 3 pass(es) in Character point to the same underlying problem, mostly around entropy cluster.",
+      "severity": "major",
+      "memberRules": [
+        "ENTROPY_CLUSTER",
+        "ARC_EMOTIONAL_MONOTONE",
+        "ARC_OPENING_VOID",
+        "NO_RELATIONSHIP_MOVEMENT"
+      ],
+      "memberCount": 4,
+      "sceneIdxs": []
+    },
+    {
+      "id": "a3e93127b29a7415",
+      "title": "Recurring weak midpoint trouble in Scene 4",
+      "explanation": "2 issues converge here, mostly around weak midpoint — concentrated in Scene 4 (lines 45-51).",
+      "severity": "major",
+      "memberRules": [
+        "WEAK_MIDPOINT",
+        "ZERO_ENTROPY_SCENE"
+      ],
+      "memberCount": 2,
+      "sceneIdxs": [
+        3
+      ],
+      "startLine": 45,
+      "endLine": 51
+    },
+    {
+      "id": "4061fc60d5fa89ea",
+      "title": "Recurring dramatic turn aftermath void trouble in Scene 2",
+      "explanation": "2 issues converge here, mostly around dramatic turn aftermath void — concentrated in Scene 2 (lines 24-35).",
+      "severity": "major",
+      "memberRules": [
+        "DRAMATIC_TURN_AFTERMATH_VOID",
+        "ZERO_ENTROPY_SCENE"
+      ],
+      "memberCount": 2,
+      "sceneIdxs": [
+        1
+      ],
+      "startLine": 24,
+      "endLine": 35
+    }
+  ],
+  "locatedIssues": [
+    {
+      "issue": {
+        "location": "Scene 4 (midpoint)",
+        "rule": "WEAK_MIDPOINT",
+        "description": "Midpoint suspense pressure is flat — the story lacks a dramatic pivot",
+        "severity": "major",
+        "suggestedFix": "Insert a surprise revelation or reversal at the midpoint scene"
+      },
+      "pass": "structure",
+      "anchor": "scene",
+      "startLine": 45,
+      "endLine": 51
+    },
+    {
+      "issue": {
+        "location": "Overall structure",
+        "rule": "NO_REVERSALS",
+        "description": "No suspense-dip reversals detected — this checks only for a scene where the engine's danger/tension language drops sharply (suspenseDelta < -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn't also read as a tension drop. Reread the draft for that kind of turn before treating this as \"no opposition anywhere.\"",
+        "severity": "major",
+        "suggestedFix": "If a reread confirms the story truly never turns, add a scene where a character's plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector's coverage, not necessarily a craft problem."
+      },
+      "pass": "structure",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "End of Act 2 (Scene ~5)",
+        "rule": "ACT2_BOUNDARY_WEAK",
+        "description": "Scene 5 (Act 2 ending) has low suspense delta (0.0) — Act 2 should end with a climactic turn that forces entry into Act 3",
+        "severity": "major",
+        "suggestedFix": "The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment"
+      },
+      "pass": "structure",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Final scene (Scene 6)",
+        "rule": "FINAL_IMAGE_WEAK",
+        "severity": "minor",
+        "description": "The final scene (Scene 6) carries no charge on any channel — neutral emotion, no suspense, no relationship movement. The last image is what the audience carries out of the theatre; a closing beat that registers on nothing sends them off empty-handed, undercutting whatever the story built.",
+        "suggestedFix": "Give the final scene a deliberate charge: a last emotional turn (acceptance, grief, hard-won peace), a final relational note (a bond sealed or severed), or a resonant image that answers the opening. The ending does not need spectacle, but it must leave a mark."
+      },
+      "pass": "structure",
+      "anchor": "scene",
+      "startLine": 59,
+      "endLine": 65
+    },
+    {
+      "issue": {
+        "location": "Opening (Scenes 1–3) — emotional flatline",
+        "rule": "EMOTIONAL_OPENING_NEUTRAL",
+        "severity": "minor",
+        "description": "The first three scenes are all emotionally neutral — the opening establishes nothing on the emotional channel. The audience meets the story through flat affect and is given no feeling to attach to before the plot begins. An opening that engages the mind (plot, questions) but not the heart risks the audience watching from a distance rather than investing.",
+        "suggestedFix": "Charge at least one of the first three scenes emotionally: a moment of warmth, dread, grief, or longing that gives the audience a feeling to carry into the story. Emotional investment in the opening is what makes the later stakes matter — the audience must care before they can be made anxious."
+      },
+      "pass": "structure",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Scene 1 (INT. KITCHEN - DAY)",
+        "rule": "ACTION_WITHOUT_CONSEQUENCE",
+        "description": "Scene 1 plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected",
+        "severity": "major",
+        "suggestedFix": "Add a reaction scene where a character responds to or is affected by the action in this scene"
+      },
+      "pass": "causality",
+      "anchor": "scene",
+      "startLine": 4,
+      "endLine": 23
+    },
+    {
+      "issue": {
+        "location": "Scenes 1–3 (setup zone)",
+        "rule": "CHEKHOV_GUN_UNFIRED",
+        "description": "2 clue(s) seeded in the first half (jane, mark) have no matching payoff anywhere in the story — Chekhov's gun shown but never fired",
+        "severity": "major",
+        "suggestedFix": "Either fire the gun: add a payoff scene that calls back each planted clue. Or remove the clue from Act 1 if you don't intend to resolve it."
+      },
+      "pass": "causality",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Scene 2 (dramatic turn: )",
+        "rule": "DRAMATIC_TURN_AFTERMATH_VOID",
+        "severity": "minor",
+        "description": "Scene 2 delivers a dramatic turn (\"\") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.",
+        "suggestedFix": "Let the turn ripple: the scenes immediately after a reversal or revelation should show characters adjusting — an emotional shift, a relationship strained or realigned, suspense climbing as the new situation sinks in. The size of a turn is measured by its wake, not its announcement."
+      },
+      "pass": "causality",
+      "anchor": "scene",
+      "startLine": 24,
+      "endLine": 35
+    },
+    {
+      "issue": {
+        "location": "Scenes 1–3 — turn cluster",
+        "rule": "DRAMATIC_TURN_CLUSTER",
+        "severity": "minor",
+        "description": "Scenes 1–3 contain 3 dramatic turns in a row — reversals and revelations piled into a three-scene window. The audience gets no time to register one pivot before the next overwrites it, and the turns cannibalize each other's impact instead of compounding it.",
+        "suggestedFix": "Space the turns out. Let each reversal land and ripple — give the characters (and the audience) a scene to absorb and react before the next pivot. Bank some of the clustered turns for later acts where the story needs a fresh jolt."
+      },
+      "pass": "causality",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Character: JANE",
+        "rule": "INTENTION_INVISIBLE",
+        "description": "JANE appears in the screenplay but has no tracked beliefs or goals — their intention is opaque",
+        "severity": "minor",
+        "suggestedFix": "Give JANE a clear want in their first scene (verbal or physical action)"
+      },
+      "pass": "intention",
+      "anchor": "character",
+      "startLine": 8,
+      "endLine": 8
+    },
+    {
+      "issue": {
+        "location": "Character: MARK",
+        "rule": "INTENTION_INVISIBLE",
+        "description": "MARK appears in the screenplay but has no tracked beliefs or goals — their intention is opaque",
+        "severity": "minor",
+        "suggestedFix": "Give MARK a clear want in their first scene (verbal or physical action)"
+      },
+      "pass": "intention",
+      "anchor": "character",
+      "startLine": 13,
+      "endLine": 13
+    },
+    {
+      "issue": {
+        "location": "Scene 2 (EXT. BACKYARD - CONTINUOUS)",
+        "rule": "ZERO_ENTROPY_SCENE",
+        "description": "Scene 2 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+        "severity": "major",
+        "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+      },
+      "pass": "intention",
+      "anchor": "scene",
+      "startLine": 24,
+      "endLine": 35
+    },
+    {
+      "issue": {
+        "location": "Scene 3 (INT. KITCHEN - LATER)",
+        "rule": "ZERO_ENTROPY_SCENE",
+        "description": "Scene 3 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+        "severity": "major",
+        "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+      },
+      "pass": "intention",
+      "anchor": "scene",
+      "startLine": 36,
+      "endLine": 44
+    },
+    {
+      "issue": {
+        "location": "Scene 4 (INT. GARAGE - NIGHT)",
+        "rule": "ZERO_ENTROPY_SCENE",
+        "description": "Scene 4 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+        "severity": "major",
+        "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+      },
+      "pass": "intention",
+      "anchor": "scene",
+      "startLine": 45,
+      "endLine": 51
+    },
+    {
+      "issue": {
+        "location": "Scene 5 (INT. HALLWAY - NIGHT)",
+        "rule": "ZERO_ENTROPY_SCENE",
+        "description": "Scene 5 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+        "severity": "major",
+        "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
+      },
+      "pass": "intention",
+      "anchor": "scene",
+      "startLine": 52,
+      "endLine": 58
+    },
+    {
+      "issue": {
+        "location": "Scenes 3–5",
+        "rule": "ENTROPY_CLUSTER",
+        "description": "Three consecutive scenes (3–5) have low suspense and no relationship/clue advancement — the story stalls in a dead zone",
+        "severity": "major",
+        "suggestedFix": "Add a turning point, revelation, or relationship shift to one of these scenes; or consolidate them into a single tighter scene"
+      },
+      "pass": "intention",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Scenes 1–3",
+        "rule": "EXPOSITION_DUMP",
+        "description": "Scenes 1–3: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert",
+        "severity": "major",
+        "suggestedFix": "Break the exposition streak with a scene that shows rather than tells the key information"
+      },
+      "pass": "belief",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Scenes 4–6",
+        "rule": "EXPOSITION_DUMP",
+        "description": "Scenes 4–6: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert",
+        "severity": "major",
+        "suggestedFix": "Break the exposition streak with a scene that shows rather than tells the key information"
+      },
+      "pass": "belief",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Belief/revelation layer",
+        "rule": "TOLD_BELIEF_DOMINATION",
+        "description": "6 of 6 belief scenes (100%) are told-only with no witnessed revelation — the story tells far more than it shows",
+        "severity": "major",
+        "suggestedFix": "Convert at least one told-belief scene to a witnessed event — let the audience discover the truth through action or direct observation rather than a character asserting it"
+      },
+      "pass": "belief",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Overall conflict arc",
+        "rule": "FLAT_SUSPENSE_ARC",
+        "description": "Average suspense in the second half (0) does not exceed the first half — conflict fails to escalate",
+        "severity": "major",
+        "suggestedFix": "Increase the stakes in the second half by having a character lose something they cannot recover easily"
+      },
+      "pass": "conflict",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Emotional landscape",
+        "rule": "ARC_EMOTIONAL_MONOTONE",
+        "description": "100% of scenes carry the same emotional register (neutral) — the story has no emotional dynamics; every beat lands at the same pitch",
+        "severity": "major",
+        "suggestedFix": "Vary the emotional register scene to scene: a moment of levity before tragedy, a flash of hope before despair. Contrast is what makes any single emotion land."
+      },
+      "pass": "character-arc",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Scenes 1–2 (opening)",
+        "rule": "ARC_OPENING_VOID",
+        "description": "The opening two scenes are emotionally neutral with no revelation — the story begins without establishing the protagonist's emotional baseline. The arc has no departure point to measure transformation against.",
+        "severity": "minor",
+        "suggestedFix": "Give the protagonist a distinct emotional state in the opening scene — joy, fear, contentment, or dread — so the arc has a clearly felt starting point. The audience must know where the character is before they can feel where they end up."
+      },
+      "pass": "character-arc",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Action lines throughout",
+        "rule": "SIMULTANEOUS_ACTION_ABSENT",
+        "severity": "minor",
+        "description": "13 action lines contain no simultaneous-action language (\"while\", \"even as\", \"at the same time\") — every action is strictly sequential. Film captures two things happening at once in the frame; a scene with no simultaneity misses the visual layering that distinguishes screenplay from a prose sequence of events.",
+        "suggestedFix": "Add at least one simultaneous layer: \"While he talks, she reads the room.\" or \"Even as he smiles, his hands are shaking.\" Simultaneous action creates visual depth and reveals character through contradiction."
+      },
+      "pass": "rhythm",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Action lines throughout",
+        "rule": "VISUAL_TEXTURE_ABSENT",
+        "severity": "minor",
+        "description": "13 action lines contain no texture or material descriptor — the screenplay world has no tactile surface. Nothing is rough, worn, cracked, gleaming, or stained. Texture words are what make described objects feel real; their absence gives the visual world a blank, set-photograph quality.",
+        "suggestedFix": "Add at least 2-3 texture descriptors to the action: the worn armrest, the cracked plastic casing, the polished floor that reflects the overhead light. Texture is how the world tells the audience how old it is, how it has been used, and what it costs to be in it."
+      },
+      "pass": "rhythm",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Action lines throughout",
+        "rule": "COLOR_ABSENCE",
+        "severity": "minor",
+        "description": "13 action lines contain no color reference — the visual world is rendered without color. Film is a visual medium; color is one of the cinematographer's primary expressive tools. A scene description with no color information presents a monochrome world and gives the director nothing to work from visually.",
+        "suggestedFix": "Introduce at least one color reference in the action: the red exit sign, the grey concrete walls, the yellow stain on the ceiling. Color is not decoration — it is the screenplay's instruction to the visual department about the emotional temperature of the scene."
+      },
+      "pass": "rhythm",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Action lines throughout",
+        "rule": "SET_DRESSING_DOMINANCE",
+        "severity": "minor",
+        "description": "5 of 13 action lines (38%) reference static furniture or architectural elements (desk, chair, door, window, floor, etc.) — the prose is cataloguing the set rather than dramatizing the people in it. A screenplay's action lines should track what characters do; when furniture fills the page, the human drama is crowded out.",
+        "suggestedFix": "Anchor furniture and props to character behavior: instead of noting that a desk sits in the corner, show a character lean against it, avoid it, or slam a fist on its surface. Props earn their place by participating in action, not by being listed."
+      },
+      "pass": "rhythm",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Middle action lines (4–9) — no short line ≤4 words",
+        "rule": "ACTION_MIDDLE_SHORT_ABSENT",
+        "severity": "minor",
+        "description": "The middle 50% of action lines (lines 4–9) contains no short line of 4 words or fewer, while 3 short lines exist in the outer zones — the script's longest sustained section is written without any compressed beat. Short lines serve a pacing function in the middle of prose: they signal a gear-change, register a reaction in isolation, or land a beat without commentary. When the middle zone is uniformly dense, it risks feeling metronomically even — each line demands similar reading time, and the absence of the staccato beat removes the contrast that makes the surrounding longer lines feel deliberate rather than routine.",
+        "suggestedFix": "Add at least one short action line (≤4 words) in the middle section (action lines 4–9) — a one-word reaction, a two-word observation, a three-word beat that interrupts the density. The short line doesn't need to be climactic; it needs to change the reader's rhythm and signal that something just happened in a single beat."
+      },
+      "pass": "rhythm",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Finale action lines (10–13) — no long line ≥12 words",
+        "rule": "ACTION_FINALE_LONG_ABSENT",
+        "severity": "minor",
+        "description": "The final 25% of action lines (lines 10–13) contains no line of 12 words or more — the script's finale is written entirely in short and medium beats — while 3 long action lines appear in the first three-quarters. The finale is where the script delivers its most specific and physically-realized staging: the space where action lands, the texture of a confrontation, the exact geometry of a resolution. When the entire finale is telegraphic notation with no fully-constructed descriptive line, the climax is gestured at rather than rendered. A short line can deliver a beat with force, but without at least one long line anchoring the physical reality, the finale risks feeling like a summary of events rather than the events themselves.",
+        "suggestedFix": "Add at least one action line of 12+ words in the finale (action lines 10–13) — a line that renders the space, the physical action, or the specific detail that makes the climactic moment real rather than merely described. This does not need to be decorative; it needs to commit to the scene's specific reality in the way that only a fully-constructed sentence can."
+      },
+      "pass": "rhythm",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "opening 25% of action lines (first 3 of 13): no medium-length lines (5–11 words)",
+        "rule": "ACTION_MEDIUM_OPENING_ABSENT",
+        "severity": "minor",
+        "description": "The opening 25% of action lines contains no medium-length line (5–11 words), while 7 appear later in the script. The medium register — sentences neither clipped to a blunt beat nor expanded into a full descriptive block — is the workhorse prose that establishes scene mechanics, character action, and environment in measured strokes. An opening section that skips entirely to short staccato hits or long descriptive expansions starts the script at the rhythm extremes before the baseline is set. Its absence in the setup leaves the opening action either too punchy or too dense without the mid-range that grounds the dramatic world.",
+        "suggestedFix": "Look at the first 3 action lines. If they run to very short beats (≤4 words each) or to long descriptive passages (≥12 words), introduce at least one medium-length sentence (5–11 words) that establishes a concrete action, object, or spatial detail. The opening does not need to average medium length — just touch the register to calibrate the reader's ear for the prose that follows."
+      },
+      "pass": "rhythm",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Emotional arc throughout",
+        "rule": "EMOTIONAL_ARC_PLATEAU",
+        "description": "All 6 scenes have neutral emotional shifts — the story has no emotional peaks or valleys. Every scene leaves characters and audience in exactly the same affective state.",
+        "severity": "major",
+        "suggestedFix": "Give the story emotional shape: at least one scene should end on a positive note (relief, hope, connection) and one on a negative (loss, betrayal, setback). An emotionally flat story is not drama."
+      },
+      "pass": "originality",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Scene sluglines",
+        "rule": "SLUG_GENERIC_LOCATION",
+        "severity": "minor",
+        "description": "5 of 6 scene sluglines (83%) use generic location labels (ROOM, OFFICE, BUILDING, STREET, etc.) — placeholders rather than places. A screenplay grounds the audience in specific geography: \"INT. MARA'S CLUTTERED REPAIR SHOP - NIGHT\" anchors the scene; \"INT. ROOM - NIGHT\" gives them a void.",
+        "suggestedFix": "Give every location a specific name that carries information: the name of an establishment, a character, or a defining feature. Even a modest space earns texture when named — \"INT. THE BROKEN COMPASS BAR - NIGHT\" is a setting; \"INT. BAR - NIGHT\" is an empty stage."
+      },
+      "pass": "originality",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Action lines throughout",
+        "rule": "ACTION_MOTION_VERB_MONOTONE",
+        "severity": "minor",
+        "description": "7 of 12 action lines (58%) use a generic motion or displacement verb (\"walks\", \"enters\", \"moves\", \"crosses\", \"turns\", \"heads\"). When displacement verbs dominate the action, the script describes choreography — who moved where — rather than what characters are doing in any dramatically meaningful sense. Action prose reduced to traffic management under-describes the physical world and the psychological stakes behind movement.",
+        "suggestedFix": "Replace generic motion verbs with specific verbs that carry attitude and intent: \"walks toward\" → \"advances\", \"strides\", \"creeps\"; \"enters\" → \"bursts in\", \"slips in\", \"crashes through.\" Movement is always motivated — the verb should carry that motivation. When a character walks, how and why they walk is the character."
+      },
+      "pass": "voice",
+      "anchor": "document"
+    },
+    {
+      "issue": {
+        "location": "Entire screenplay",
+        "rule": "NO_RELATIONSHIP_MOVEMENT",
+        "description": "No relationship between any two characters shifts across the entire story. Relationships are static — the emotional engine is idle.",
+        "severity": "major",
+        "suggestedFix": "Identify the two characters whose bond matters most and give it at least one turn: a betrayal, a reconciliation, a shift in trust or power."
+      },
+      "pass": "relationship-arc",
+      "anchor": "document"
+    }
+  ],
+  "source": {
+    "format": "fountain"
+  }
+}
