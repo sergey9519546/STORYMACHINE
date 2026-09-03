@@ -139,7 +139,10 @@ jobs:
           fi
 
       # Mirrors ci.yml: names the env-gated suites that did NOT run, so a green
-      # release job is not mistaken for "everything was verified".
+      # release job is not mistaken for "everything was verified". Blocking
+      # since 2026-09-03 — a gate past its recorded `expires` date exits 1 here
+      # too (retrospective finding #9). A release is the last place to publish
+      # over a gap whose own deadline has passed.
       - name: Report unverified gates
         if: always()
         run: node scripts/report-unverified-gates.mjs

@@ -148,9 +148,14 @@ jobs:
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: npm run check-scoring-receipt
 
-      # Reports which env-gated suites did NOT run. Non-blocking by design:
-      # it does not fix the gap, it stops the gap being invisible. "0 failures"
-      # above does not mean the AUC ratchet was checked — it is skipped here.
+      # Reports which env-gated suites did NOT run: "0 failures" above does not
+      # mean the AUC ratchet was checked — it is skipped here. This step used to
+      # be non-blocking BY DESIGN, and the 2026-09-02 retrospective (finding #9)
+      # named that as the failure it looks like: a gap reported forever is a gap
+      # nobody has to close. Each gate may now carry an `expires` date; the
+      # script exits 1 once a still-open gate is past it, and this step fails.
+      # It is deliberately NOT continue-on-error, and tests/scripts/report-
+      # unverified-gates.test.ts covers the date arithmetic that decides it.
       - name: Report unverified gates
         if: always()
         run: node scripts/report-unverified-gates.mjs
