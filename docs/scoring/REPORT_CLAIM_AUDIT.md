@@ -21,7 +21,9 @@
 > mechanics, not the specific value) is unaffected.
 >
 > Authority: `ROADMAP.md`, `NORTH_STAR.md`, `AGENTS.md`,
-> `docs/reference/STORYMACHINE_ACTIVE_WORK_PROMPT.md` (Lever 1),
+> `docs/filed-backlog/STORYMACHINE_ACTIVE_WORK_PROMPT.md` (Lever 1;
+> archived 2026-09-03, superseded by `docs/DECISION_LOG.md` Decision #2 —
+> the "Lever 1" analysis itself is unaffected, only its P0-freeze framing),
 > `docs/user-validation/P1_BASELINE_INVENTORY.md`. The constitution's load-
 > bearing order is **correct before reproducible**: a broken ruler is perfectly
 > reproducible; determinism is worthless if the verdict is wrong

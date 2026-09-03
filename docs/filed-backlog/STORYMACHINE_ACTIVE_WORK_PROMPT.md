@@ -1,3 +1,17 @@
+> **ARCHIVED — filed backlog, not active direction.** Moved here 2026-09-03
+> from `docs/reference/`. This prompt describes the P0 hard-gate ("post-P0-
+> freeze, pre-validation," "The P0 freeze holds: no new product/engine
+> features...") as a live blocking constraint. That gate was retired
+> 2026-08-11 — see `docs/DECISION_LOG.md` Decision #2: engine work now
+> proceeds in parallel with P0, which remains a recommended evidence lane,
+> not a prerequisite. This prompt also says the rulebook is "frozen at
+> 3,216"; the live count is 3,217 (`docs/rulebook/README.md`), and no rule
+> count is frozen — see `CLAUDE.md`'s "Standing task" section. Nothing below
+> is current direction; for current direction read `docs/PATH_TO_EXCELLENCE.md`
+> (what to do next) and `ROADMAP.md` (canonical phase sequencing). Kept for
+> institutional memory only, per this repo's `docs/filed-backlog/README.md`
+> convention.
+
 # STORYMACHINE — active work prompt (post-P0-freeze, pre-validation)
 
 > Use this in a fresh agent session. It is scoped to the one thing that

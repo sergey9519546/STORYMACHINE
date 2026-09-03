@@ -36,3 +36,8 @@ same way: historical, not active.
   root. Archived 2026-09-03 per
   `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` finding #8; see
   its own archival header for why. Not active direction.
+- `STORYMACHINE_ACTIVE_WORK_PROMPT.md` (this directory, top level) — a
+  fresh-agent-session prompt written under the P0 hard-gate, formerly at
+  `docs/reference/`. Archived 2026-09-03: superseded by the gate's 2026-08-11
+  retirement (`docs/DECISION_LOG.md` Decision #2) and by
+  `docs/PATH_TO_EXCELLENCE.md`. Not active direction.
