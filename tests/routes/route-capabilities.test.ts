@@ -222,6 +222,9 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'POST /api/export/fdx', 'POST /api/export/docx', 'POST /api/export/print-html',
   'POST /api/export/coverage', 'POST /api/export/slate', 'POST /api/export/breakdown',
   'POST /api/export/pitchkit', 'POST /api/export/verify',
+  // server/routes/coverage-letter.ts — re-runs the deterministic doctor
+  // itself (same rationale as POST /api/export/coverage above), no LLM call
+  'POST /api/export/coverage-letter',
   // server/routes/game.ts
   'POST /api/init',
   'GET /api/scenes', 'GET /api/ledger', 'GET /api/state', 'POST /api/reset',
