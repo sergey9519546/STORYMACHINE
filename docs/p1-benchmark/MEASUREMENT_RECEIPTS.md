@@ -1050,13 +1050,20 @@ holds (full suite green at the commit carrying this note).
   movement; an identity-modulo-listed-keys proof is the correct, stronger
   receipt for that claim, same reasoning the 2026-08-21 and 2026-09-03
   entries above give for their own output-identity receipts.
-- **Baseline used:** `git archive main` at `0ad2b065` — the tip of the
-  branch being merged into at measurement time. `node_modules` was symlinked
-  into the extracted tree so both trees resolved the same dependency
-  versions; the comparison tree was this branch's own working tree. This
-  branch's own commit hashes are deliberately not cited anywhere in this
-  entry — they change on every rebase, and a receipt has to name something a
-  reviewer can still resolve.
+- **Baseline used:** `git archive main` at `568efc86` — re-measured after two
+  rebases onto a moving `main` (first `0ad2b065`, then `568efc86`); both
+  intermediate ranges (`0ad2b065..568efc86`) touch no scoring-path file
+  (`.gitignore`, a new coverage-letter export route/lib/tests, snapshot
+  trend/health capture in the writer UI — verified directly with
+  `git diff 0ad2b065..568efc86 --stat`), so re-running the full three-command
+  harness against the newer tip reproduced the IDENTICAL compare output
+  (same four ignored-key differ counts, same require-added confirmations,
+  same PASS line) rather than a coincidentally-similar one. `node_modules`
+  was symlinked into the extracted tree so both trees resolved the same
+  dependency versions; the comparison tree was this branch's own working
+  tree. This branch's own commit hashes are deliberately not cited anywhere
+  in this entry — they change on every rebase, and a receipt has to name
+  something a reviewer can still resolve.
 - **What was run — output identity, modulo the keys this range adds, over
   all 45 in-repo fixtures** (20 `data/screenplays/*.fountain`, 20
   calibration `REFERENCE_CORPUS` samples, the P0 sample script, 4 synthetic
@@ -1104,9 +1111,13 @@ holds (full suite green at the commit carrying this note).
   and read the PASS line and the per-key differ counts directly out of the
   compare run's own log file, along with its exit code. I separately wrote
   and ran the field-by-field spot check described above and read its
-  zero-mismatch result myself. This is an identity-modulo-listed-keys
-  receipt, not a discrimination-statistic measurement: no real-corpus AUC
-  measurement was run against this range, and none is claimed — the change
-  is copy and additive schema, not a formula, threshold, or weight edit, and
-  the byte-level identity of every non-listed field across all 45 reports is
-  the receipt it owes."
+  zero-mismatch result myself. I re-ran the same three-command harness a
+  second time after rebasing onto a later `main` tip (`568efc86`, once main
+  had moved again past the first baseline this entry was originally measured
+  against) and read an identical PASS line and identical per-key differ
+  counts out of that second run's own log file too. This is an
+  identity-modulo-listed-keys receipt, not a discrimination-statistic
+  measurement: no real-corpus AUC measurement was run against this range,
+  and none is claimed — the change is copy and additive schema, not a
+  formula, threshold, or weight edit, and the byte-level identity of every
+  non-listed field across all 45 reports is the receipt it owes."
