@@ -42,4 +42,46 @@ describe("decideSampleInstall (G0-01 writer safety)", () => {
     assert.equal(decision.allow, false);
     assert.equal(decision.reason, "draft-present");
   });
+
+  // Retrospective #2 — the second data-loss path: sample loads, writer
+  // select-all/deletes it back to an empty draft, then navigates away and
+  // back to Coverage. A remount resets any local "already fired" ref, but
+  // the draft's emptiness must NOT be read as "safe to auto-fill" once it is
+  // known to have held the sample — "writer cleared it" must beat
+  // "draft is empty."
+  it("refuses to silently reinstall into a draft the writer emptied after it held the sample", () => {
+    const decision = decideSampleInstall({
+      currentDraft: "",
+      incomingSample: SAMPLE,
+      sampleAlreadyInstalled: true,
+    });
+    assert.equal(decision.allow, false);
+    assert.equal(decision.reason, "cleared-by-writer");
+  });
+
+  it("still refuses a whitespace-only cleared draft the same way (not just byte-empty)", () => {
+    const decision = decideSampleInstall({
+      currentDraft: "   \n\t\n",
+      incomingSample: SAMPLE,
+      sampleAlreadyInstalled: true,
+    });
+    assert.equal(decision.allow, false);
+    assert.equal(decision.reason, "cleared-by-writer");
+  });
+
+  it("allows a fresh explicit install into a never-touched empty draft (sampleAlreadyInstalled unset)", () => {
+    const decision = decideSampleInstall({ currentDraft: "", incomingSample: SAMPLE });
+    assert.equal(decision.allow, true);
+    assert.equal(decision.reason, "empty-draft");
+  });
+
+  it("still allows an idempotent re-install when the draft already equals the sample, even if the flag is set", () => {
+    const decision = decideSampleInstall({
+      currentDraft: SAMPLE,
+      incomingSample: SAMPLE,
+      sampleAlreadyInstalled: true,
+    });
+    assert.equal(decision.allow, true);
+    assert.equal(decision.reason, "identical");
+  });
 });

@@ -420,6 +420,16 @@ export default function ScriptIDE({
   // on mount and auto-runs the built-in sample through its own loadSample
   // flow, preserving "sample" provenance end to end.
   const [doctorAutoSample, setDoctorAutoSample] = useState(false);
+  // Retrospective #2 (second data-loss path): true once the sample has been
+  // written into the draft during this component's lifetime, even after the
+  // writer clears it back to empty. Threaded into decideSampleInstall's
+  // `sampleAlreadyInstalled` so an empty draft that ONCE held the sample is
+  // never silently read as "safe to auto-fill" — e.g. a stale
+  // doctorAutoSample surviving a Coverage panel remount (AnimatePresence
+  // unmounts it per tab) must not repopulate a draft the writer just
+  // emptied. An explicit new "Try sample" click resets this ref first (see
+  // its two onClick handlers below), so a deliberate re-request still works.
+  const sampleEverInstalledRef = useRef(false);
   // Coverage freshness: after user edits, diagnosis is considered stale until
   // they re-open Coverage / re-run doctor (quiet intelligence, not a nag stack).
   const [coverageStale, setCoverageStale] = useState(false);
@@ -1354,9 +1364,15 @@ export default function ScriptIDE({
         // G0-01: never let the sample overwrite an existing draft. Only
         // auto-install into an empty editor; otherwise open Coverage on the
         // writer's OWN draft and explain why the sample was withheld.
+        // A fresh handoff from StartScreen's own "Try sample coverage" is an
+        // explicit new request — reset the cleared-tracking ref first so it
+        // is judged solely on the draft's current content, same as any other
+        // explicit "Try sample" click below.
+        sampleEverInstalledRef.current = false;
         const decision = decideSampleInstall({
           currentDraft: draftRef.current.scriptText,
           incomingSample: sampleScriptFountain,
+          sampleAlreadyInstalled: sampleEverInstalledRef.current,
         });
         setTask("coverage");
         setToolSlot("coverage");
@@ -2378,6 +2394,10 @@ export default function ScriptIDE({
               <button
                 type="button"
                 onClick={() => {
+                  // Explicit, deliberate request — a fresh ask, even if this
+                  // exact empty draft previously held (and was cleared of)
+                  // the sample. See sampleEverInstalledRef's doc comment.
+                  sampleEverInstalledRef.current = false;
                   setDoctorAutoSample(true);
                   handleTaskChange("coverage");
                 }}
@@ -2604,6 +2624,11 @@ export default function ScriptIDE({
                   <button
                     type="button"
                     onClick={() => {
+                      // Explicit, deliberate request — a fresh ask, even if
+                      // this exact empty draft previously held (and was
+                      // cleared of) the sample. See sampleEverInstalledRef's
+                      // doc comment.
+                      sampleEverInstalledRef.current = false;
                       setDoctorAutoSample(true);
                       handleTaskChange("coverage");
                     }}
@@ -3136,17 +3161,34 @@ export default function ScriptIDE({
               onLoadSampleIntoEditor={(text) => {
                 // G0-01 defense in depth: refuse to overwrite a non-empty draft
                 // that differs from the sample. The draft stays byte-identical.
+                // Retrospective #2: also refuse an empty draft that was
+                // cleared AFTER holding the sample (see sampleEverInstalledRef).
                 const decision = decideSampleInstall({
                   currentDraft: draftRef.current.scriptText,
                   incomingSample: text,
+                  sampleAlreadyInstalled: sampleEverInstalledRef.current,
                 });
                 if (!decision.allow) {
                   setSampleRefusedNotice(
-                    "Sample not loaded — your draft already has content. Clear the editor first if you want the sample instead.",
+                    decision.reason === "cleared-by-writer"
+                      ? "Sample not reloaded — you cleared it. Use \"Try sample\" again if you want it back."
+                      : "Sample not loaded — your draft already has content. Clear the editor first if you want the sample instead.",
                   );
                   return;
                 }
                 installDraft(text);
+                // Retrospective #2 (root fix): reset the auto-load flag the
+                // MOMENT the sample is actually installed, not only on the
+                // Coverage panel's close handler. AnimatePresence unmounts
+                // CoverageSummary per tab switch, which resets its local
+                // `sampleFired` ref — without this, a lingering
+                // doctorAutoSample=true silently refires the auto-install
+                // effect on the next Coverage remount and can repopulate a
+                // draft the writer just emptied. Also record that this
+                // specific draft now HAS held the sample, so the guard above
+                // refuses a later silent reinstall into it once cleared.
+                setDoctorAutoSample(false);
+                sampleEverInstalledRef.current = true;
                 setCoverageStale(false);
                 // G0-04: installing the sample is a request for *coverage*
                 // (deterministic, /api/scriptide/doctor) — not for AI scene
