@@ -1020,6 +1020,50 @@ describe('runScriptDoctor — plainSummary', () => {
       assert.ok(!report.plainSummary!.includes(rule), `plainSummary leaked raw rule token "${rule}"`);
     }
   });
+
+  // Writer-experience #3 (2026-09-03): the report's opening line reads in the
+  // voice of a script reader, not an engine status line — but the
+  // methodology fact that this is a deterministic, threshold-based verdict
+  // (not a human's read) is still stated, just moved to its own sentence
+  // right after, rather than folded into the reader sentence itself.
+  it('opens in reader voice with the score, then states the methodology caveat as its own sentence', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    assert.ok(report.plainSummary && report.verdict);
+
+    const READER_PHRASES: Record<string, string> = {
+      RECOMMEND: 'strong bones, ready to move forward',
+      CONSIDER: 'solid bones with fixable structural problems',
+      PASS: 'foundational problems that need real revision before this is ready',
+    };
+    const expectedOpening =
+      `${report.verdict} — ${READER_PHRASES[report.verdict!]}; overall score ${Math.round(report.health)}/100.`;
+    assert.ok(
+      report.plainSummary!.startsWith(expectedOpening),
+      `expected plainSummary to open with the reader-voice sentence "${expectedOpening}", got: ${report.plainSummary}`,
+    );
+
+    // Every number is unchanged by the copy rewrite: the health figure in
+    // the reader sentence is the same Math.round(health) the old "overall
+    // engine score" sentence carried.
+    assert.match(report.plainSummary!, new RegExp(`overall score ${Math.round(report.health)}/100\\.`));
+
+    // The old inline phrasing ("the engine's ... threshold-based verdict")
+    // is gone from the OPENING clause — the reader sentence itself no longer
+    // names the engine — but the underlying fact is preserved as its own
+    // sentence immediately after.
+    assert.ok(
+      !report.plainSummary!.startsWith(`${report.verdict} — the engine's`),
+      'the reader-voice opening must not read like an engine status line',
+    );
+    assert.match(
+      report.plainSummary!,
+      /This is the engine's deterministic, threshold-based verdict, not a human read\./,
+    );
+    // The caveat must come AFTER the reader sentence, not before or inside it.
+    const readerIdx = report.plainSummary!.indexOf(expectedOpening);
+    const caveatIdx = report.plainSummary!.indexOf('This is the engine\'s deterministic');
+    assert.ok(readerIdx === 0 && caveatIdx > readerIdx, 'the caveat must follow the reader sentence, not precede or replace it');
+  });
 });
 
 describe('runScriptDoctor — degenerate zero-scene truth contract', () => {

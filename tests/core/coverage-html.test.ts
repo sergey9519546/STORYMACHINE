@@ -127,7 +127,13 @@ function buildReport(overrides: Partial<ScriptDoctorReport> = {}): ScriptDoctorR
       'Nothing to fix in Character — clean across all 3 scene(s).',
       'No fatal flaws surfaced across 3 scenes — nothing here would sink the draft outright.',
     ],
-    plainSummary: 'CONSIDER — the engine\'s intermediate threshold-based verdict; overall engine score 73/100. '
+    // Reader-voice format (writer-experience #3, 2026-09-03): a reader
+    // sentence first, the methodology caveat immediately after (not folded
+    // into it), then the dimension bullets — matches doctor.ts's
+    // buildPlainSummary shape exactly, kept realistic per this function's
+    // own doc comment above.
+    plainSummary: 'CONSIDER — solid bones with fixable structural problems; overall score 73/100. '
+      + 'This is the engine\'s deterministic, threshold-based verdict, not a human read. '
       + 'Theme & Originality is the highest-scoring diagnostic dimension, at 95/100. '
       + 'Dialogue & Voice is the lowest-scoring diagnostic dimension, at 55/100 — most of the trouble is around dialogue on the nose.',
     contentHash: createHash('sha256').update('fixture-script-text').digest('hex'),

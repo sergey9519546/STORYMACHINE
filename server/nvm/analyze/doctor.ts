@@ -1736,18 +1736,35 @@ export function buildStrengths(input: StrengthsInput): string[] {
 
 // ── Plain-language summary ──────────────────────────────────────────────────
 
+// Reader-voice descriptors (writer-experience #3, 2026-09-03): the first
+// sentence of every report used to read like an engine status line ("the
+// engine's intermediate threshold-based verdict") — accurate, but nobody
+// who has ever gotten actual script coverage talks like that. A reader
+// hands back a one-line take, then a score. These three phrases are that
+// take, in the plain vocabulary professional coverage already uses
+// (RECOMMEND/CONSIDER/PASS is itself standard script-reader terminology).
+// The methodology fact these used to carry inline — that this is a
+// deterministic, threshold-based verdict rather than a person's read — is
+// NOT dropped; it moves to its own sentence immediately after (see
+// METHODOLOGY_CAVEAT below), so the reader-voice line can read naturally
+// without smuggling an engineering caveat into the middle of it.
 const VERDICT_DESCRIPTORS: Record<CoverageVerdict, string> = {
-  RECOMMEND: 'the engine\'s top threshold-based verdict',
-  CONSIDER: 'the engine\'s intermediate threshold-based verdict',
-  PASS: 'the engine\'s decline verdict below its score threshold',
+  RECOMMEND: 'strong bones, ready to move forward',
+  CONSIDER: 'solid bones with fixable structural problems',
+  PASS: 'foundational problems that need real revision before this is ready',
 };
 
-/** 2-4 template sentences: verdict + health, the strongest dimension, the
- *  weakest dimension (replaced with a "no weak spot" line when every
- *  dimension is clean), and — only when there's an actual top priority — a
- *  plain paraphrase of where to start. Every clause reads from
- *  already-computed data; nothing here re-derives or guesses, so identical
- *  input always produces an identical summary. */
+const METHODOLOGY_CAVEAT =
+  'This is the engine\'s deterministic, threshold-based verdict, not a human read.';
+
+/** 3-5 template sentences: a reader-voice verdict + score line, the
+ *  methodology caveat (moved here, right after the reader sentence, rather
+ *  than embedded inside it), the strongest dimension, the weakest dimension
+ *  (replaced with a "no weak spot" line when every dimension is clean), and
+ *  — only when there's an actual top priority — a plain paraphrase of where
+ *  to start. Every clause reads from already-computed data; nothing here
+ *  re-derives or guesses, so identical input always produces an identical
+ *  summary. */
 function buildPlainSummary(
   verdict: CoverageVerdict,
   health: number,
@@ -1755,7 +1772,8 @@ function buildPlainSummary(
   topPriorities: Array<RevisionIssue & { pass: PassName }>,
 ): string {
   const sentences: string[] = [
-    `${verdict} — ${VERDICT_DESCRIPTORS[verdict]}; overall engine score ${Math.round(health)}/100.`,
+    `${verdict} — ${VERDICT_DESCRIPTORS[verdict]}; overall score ${Math.round(health)}/100.`,
+    METHODOLOGY_CAVEAT,
   ];
 
   // Strongest/weakest picked with strict comparisons so the first dimension
