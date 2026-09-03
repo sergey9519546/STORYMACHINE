@@ -249,6 +249,44 @@ describe('routes/scriptide — HTTP behavior', async () => {
     assert.equal(body.server.scriptText, 'EXISTING');
   });
 
+  it('rejects a save body missing scriptText with 400, without touching the stored row (audit finding 3)', async () => {
+    const sid = freshSessionId();
+    const saveRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: 'THE REAL SCRIPT — MUST SURVIVE',
+        snapshots: [], characters: [], researchNotes: [], isDarkMode: false,
+      }),
+    });
+    assert.equal(saveRes.status, 200);
+    const saved = await saveRes.json();
+
+    // A save body that omits scriptText entirely is malformed, not "empty
+    // script": ScriptideSaveBodySchema now requires it, so this must 400
+    // before ever reaching Stage.saveScriptIDEState's full-row
+    // INSERT OR REPLACE — a schema that tolerated the omission would let
+    // this silently wipe the script above to ''.
+    const malformedRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        snapshots: [], characters: [], researchNotes: [], isDarkMode: false,
+      }),
+    });
+    assert.equal(malformedRes.status, 400);
+    const malformedBody = await malformedRes.json();
+    assert.match(malformedBody.error, /scriptText/);
+
+    const loadRes = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+    const loaded = await loadRes.json();
+    assert.equal(loaded.status, 'ok');
+    assert.equal(loaded.scriptText, 'THE REAL SCRIPT — MUST SURVIVE');
+    assert.equal(loaded.updatedAt, saved.updatedAt);
+  });
+
   // /api/scriptide/clean-action is aiLimiter-protected but this asserts only the
   // input-guard path (missing 'text'), which runs before any AI call — it does
   // not require a live Gemini key. See tests/routes/limiters.test.ts for the

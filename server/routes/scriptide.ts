@@ -280,7 +280,7 @@ export default router;
 router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema), withSessionCommand(async (req, res, session) => {
   const { stage } = session;
   const body = req.body as {
-    scriptText?: unknown;
+    scriptText: string;
     snapshots?: unknown;
     characters?: unknown;
     researchNotes?: unknown;
@@ -288,7 +288,14 @@ router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema
     titlePage?: unknown;
     expectedUpdatedAt?: number | null;
   };
-  const scriptText     = typeof body.scriptText     === 'string' ? body.scriptText.substring(0, 500_000) : '';
+  // scriptText is required by ScriptideSaveBodySchema above (audit finding
+  // 3, client-data-paths audit) — the validate() middleware already 400'd
+  // any body missing it, or over the 500_000-char cap, before this handler
+  // runs, so `body.scriptText` is guaranteed to be a string of at most
+  // 500,000 characters here. No `.substring()` re-clamp or `''` fallback is
+  // reachable (or needed): a fallback to '' for an omitted field is exactly
+  // the silent full-row overwrite this required field exists to prevent.
+  const scriptText     = body.scriptText;
   const snapshots      = Array.isArray(body.snapshots)     ? body.snapshots.slice(0, 20)  : [];
   const characters     = Array.isArray(body.characters)    ? body.characters.slice(0, 100) : [];
   const researchNotes  = Array.isArray(body.researchNotes) ? body.researchNotes.slice(0, 200) : [];
@@ -297,10 +304,10 @@ router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema
   // ScriptIDE_State's title_page_json column. ScriptideSaveBodySchema (the
   // `validate` middleware above) already rejected an out-of-shape titlePage
   // with a 400 before this handler runs; this re-derivation is the same
-  // defense-in-depth as scriptText/snapshots/etc. above — clamp to the exact
-  // shape and bounds rather than trust `body.titlePage`'s type at the call
-  // site. `null` (explicit clear) and "field omitted" both land here as null,
-  // matching every other field's full-state-save semantics.
+  // defense-in-depth as snapshots/characters/researchNotes above — clamp to
+  // the exact shape and bounds rather than trust `body.titlePage`'s type at
+  // the call site. `null` (explicit clear) and "field omitted" both land
+  // here as null, matching every other field's full-state-save semantics.
   const rawTitlePage = body.titlePage as { title?: unknown; author?: unknown; contact?: unknown } | null | undefined;
   const titlePage = rawTitlePage && typeof rawTitlePage === 'object'
     && typeof rawTitlePage.title === 'string'

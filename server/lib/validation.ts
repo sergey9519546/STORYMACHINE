@@ -991,13 +991,24 @@ export const TitlePageBodySchema = z.object({
 
 // POST /api/scriptide/save — persists the ScriptIDE editor's full working
 // state. Every cap below matches the route's own pre-existing inline
-// truncation exactly (`.substring(0, 500_000)`, `.slice(0, 20/100/200)`) —
-// this schema turns those silent truncations into an honest 400 for
-// malformed shapes (wrong type entirely), while leaving in-bounds-but-large
-// values to the route's own slice/substring as before, so valid payloads at
-// or under the existing caps are byte-for-byte unaffected.
+// truncation exactly (`.slice(0, 20/100/200)`) — this schema turns those
+// silent truncations into an honest 400 for malformed shapes (wrong type
+// entirely), while leaving in-bounds-but-large values to the route's own
+// slice as before, so valid payloads at or under the existing caps are
+// byte-for-byte unaffected.
+//
+// scriptText is REQUIRED, unlike the array/flag fields below (audit finding
+// 3, client-data-paths audit): a save is a full-state write straight into
+// Stage.saveScriptIDEState's `INSERT OR REPLACE`, which has no per-field
+// PATCH semantics. An `.optional()` scriptText let a body that omitted the
+// field pass validation and fall through the route's old `: ''` default,
+// silently wiping the server's stored script to empty on the next save. No
+// caller does this today (ScriptIDE.tsx always spreads a full draft object
+// that includes scriptText — see the route's own comment), but a body
+// missing the script is malformed, not "empty script": it must 400, not
+// resolve to a value the caller never sent.
 export const ScriptideSaveBodySchema = z.object({
-  scriptText: z.string().max(500_000).optional(),
+  scriptText: z.string().max(500_000),
   snapshots: z.array(z.unknown()).max(20).optional(),
   characters: z.array(z.unknown()).max(100).optional(),
   researchNotes: z.array(z.unknown()).max(200).optional(),

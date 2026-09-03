@@ -254,10 +254,21 @@ describe('validation-completeness — server/routes/scriptide.ts', async () => {
     });
     assert.equal(res.status, 400);
   });
-  it('POST /api/scriptide/save accepts an empty body with 200', async () => {
+  it('POST /api/scriptide/save rejects an empty body (missing required scriptText) with 400 (audit finding 3)', async () => {
+    // scriptText is a full-state write's script, not a patchable field — an
+    // omitted one used to pass validation and fall through the route's old
+    // ''-fallback into a full-row overwrite. See
+    // ScriptideSaveBodySchema's comment in validation.ts.
     const res = await fetch(`${server.baseUrl}/api/scriptide/save?sessionId=${freshSessionId()}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 400);
+  });
+  it('POST /api/scriptide/save accepts a body with just scriptText (keyless: not a 400)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/scriptide/save?sessionId=${freshSessionId()}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptText: 'INT. ROOM - DAY' }),
     });
     assert.equal(res.status, 200);
     assert.equal((await res.json()).status, 'saved');
