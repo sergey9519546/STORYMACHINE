@@ -382,6 +382,61 @@ Sum of all valid pairs across all four degradation types, treated as a single po
 
 ---
 
+### 4.7 Locking the AUC-24 Table (`npm run lock-auc24`)
+
+**Status: NOT YET LOCKED.** `tests/fixtures/auc24-table.json` does not exist in
+the repository. It cannot be produced anywhere the corpus is absent, so the
+step below is outstanding and is the owner's to run. Nothing has been estimated
+or back-filled in its place.
+
+**Why this step exists.** The AUC-24 floor is asserted in
+`tests/core/real-script-corpus.test.ts`, which is env-gated on
+`REAL_SCRIPT_CORPUS_DIR` and therefore skips on every CI run. The reasoning
+recorded across CLAUDE.md, NORTH_STAR §0 and the receipt ledger was: corpus is
+copyright-restricted and local-only → it can never reach CI → therefore the AUC
+can never be verified in CI. The last step does not follow. The AUC is a pure
+function of two arrays of health values produced by a seeded, deterministic
+degradation, and numbers are not copyrighted screenplay text — the repo already
+commits that shape in `tests/fixtures/real-corpus-manifest.json` (72 rows of
+hash plus numbers).
+
+**Run it (owner, on the machine with the corpus):**
+
+```bash
+REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run lock-auc24
+git add tests/fixtures/auc24-table.json && git commit
+```
+
+**What the table contains.** Per script (24 rows, manifest entries 0–23 in
+committed array order — never sorted): the manifest `contentHash`, the
+degradation seed as an integer, the intact health, and the degraded health.
+Plus a header: schema version, the degradation descriptor, the floor it was
+locked against, the computed AUC, the date, `git rev-parse HEAD`, and the
+manifest's sha256 and entry count. **No title, no filename, no line of
+screenplay text** — asserted, not merely intended, by
+`tests/scripts/lock-auc24.test.ts` and `tests/core/auc24-table.test.ts`.
+
+**What it refuses to do.** Run with `REAL_SCRIPT_CORPUS_DIR` unset (exit 1 — a
+table of invented numbers is worse than no table); write a partial table when
+fewer than 24 manifest entries resolve to files; or write a table whose local
+files' content hashes disagree with the manifest (re-lock the manifest first).
+A measurement BELOW the floor is still written, with the real number — the
+artifact exists to show that, and `tests/core/auc24-table.test.ts` then fails
+the build on it.
+
+**What it does NOT prove.** That the committed numbers came from the real
+corpus. Nothing in CI can check that. It raises the cost of a fabricated pass
+from one number typed into prose (the 2026-08-08 shape) to 48 individually
+plausible health values whose Mann-Whitney statistic lands on the claimed
+figure, and it makes every later change to those numbers a reviewable diff.
+
+**Until it is locked:** `tests/core/auc24-table.test.ts` skips with a message
+naming this command, and `scripts/report-unverified-gates.mjs` lists the
+missing file as an unverified gate with an expiry of **2026-10-01**, after
+which that CI step exits non-zero and blocks the build.
+
+---
+
 ## 5. Recording Results
 
 Once test evaluation is complete, results must be recorded in the permanent baseline document.

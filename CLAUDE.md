@@ -133,6 +133,14 @@ confused before): the ratchet is **AUC-24 >= 0.622**, asserted in
 `tests/core/real-script-corpus.test.ts` (env-gated on
 `REAL_SCRIPT_CORPUS_DIR`). It measures ONE combined degradation — shuffle
 scenes AND drop every third — over a 24-script subset; last measured 0.731.
+Since 2026-09-03 the same floor is ALSO asserted, on every CI run and with no
+corpus, by `tests/core/auc24-table.test.ts`, which recomputes the AUC from a
+committed table of 24 intact/degraded health values — but only once that table
+exists: it is produced by `npm run lock-auc24` on the owner's machine, is not
+committed yet, and until it is, that test skips and
+`scripts/report-unverified-gates.mjs` reports the gap (blocking from
+2026-10-01). Both the floor and the degradation recipe now live in
+`scripts/lib/auc.ts`; edit the constant there, not a literal in a test.
 
 It is NOT comparable to the 761-script P1 baseline
 (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`), which reports

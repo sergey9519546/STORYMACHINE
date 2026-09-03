@@ -34,7 +34,7 @@ migration with a receipt. Scoring-path; owes the owner's corpus run, so it
 ships as a ready branch, not to main.
 
 ## 2. "The AUC cannot be verified in CI" was false all along
-**MISTAKE · dispatched (lane R1)**
+**MISTAKE · machinery delivered (lane R1); the table itself awaits one owner-local run — `npm run lock-auc24`, blocking from 2026-10-01**
 
 CLAUDE.md, NORTH_STAR §0, the receipt ledger's header and the guard's own
 comment all reason: corpus is copyrighted → cannot reach CI → *therefore the
@@ -135,7 +135,7 @@ human-agreement evidence. Fix: a hand-maintained claims register with CI
 enforcement, and archive the catalog.
 
 ## 9. "Report unverified gates" is non-blocking by design
-**WEAK ROUTE · dispatched (lane R1)**
+**WEAK ROUTE · fixed 2026-09-03 (lane R1) — gates carry an `expires` date and the CI step exits non-zero past it; only the auc24-table gate has a date so far, the other four are the owner's call**
 
 The project's answer to an unverifiable gate was a beautiful reporter for it,
 when the gate was verifiable all along (finding 2). The pattern recurs:
@@ -232,14 +232,14 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | # | Finding | Class | Disposition |
 |---|---|---|---|
 | 1 | Verbosity bias | MISTAKE | R5 — ready branch, owner run to merge |
-| 2 | AUC verifiable from committed numbers | MISTAKE | R1 |
+| 2 | AUC verifiable from committed numbers | MISTAKE | R1 — machinery landed (`scripts/lib/auc.ts`, `npm run lock-auc24`, `tests/core/auc24-table.test.ts`); table not locked yet, corpus is owner-local |
 | 3 | Receipt gate misses `src/lib/fountain.ts` | MISTAKE | Fixed 2026-09-02 — reachability now ungated by directory, `REACHABLE_BUT_NOT_SCORING` starts empty |
 | 4 | Collab rooms unowned | MISTAKE | R3 — delivered: server-minted room ids, share-link model, `docs/AUTH.md` §Collaboration rooms |
 | 5 | Core imports AI + SQLite | WEAK ROUTE | R2 — fixed 2026-09-03: edges cut, reachable set 43 → 21 files outside the core dirs, `tests/core/pure-core-boundary.test.ts` + its allowlist enforce it |
 | 6 | 21 untested rules; false coverage claim | MISTAKE | R4 |
-| 7 | Ratchet never re-ratcheted | WEAK ROUTE | R1 |
+| 7 | Ratchet never re-ratcheted | WEAK ROUTE | R1 — floor moved to one place (`AUC24_FLOOR`) but NOT raised: the last real AUC-24 measurement is 2026-07-11, so the raise waits on the lock run |
 | 8 | Audit checks numbers, not claims | WEAK ROUTE | R4 |
-| 9 | Non-blocking-by-design reporter | WEAK ROUTE | R1 |
+| 9 | Non-blocking-by-design reporter | WEAK ROUTE | R1 — landed: per-gate `expires`, reporter exits 1 past a deadline, both workflow comments corrected |
 | 10 | No power analysis | OPEN | Delivered — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` + protocol §12; owner signs |
 | 11 | Generative half unevaluated | OPEN | owner decides |
 | 12 | Title page unpersisted | WEAK ROUTE | R6 — landed: `title_page_json` column + full round trip |
