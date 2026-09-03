@@ -36,7 +36,9 @@ import {
 import { readScriptIDEDraftIDB, writeScriptIDEDraftIDB } from "../lib/scriptide-idb-store";
 import { decideSampleInstall } from "../lib/sample-install-guard";
 import { isDraftStale, type ThreadedCoverageReport } from "../lib/coverage-staleness";
-import { fountain as sampleScriptFountain } from "../lib/sample-script";
+import { fountain as sampleScriptFountain, title as sampleScriptTitle } from "../lib/sample-script";
+import { deriveTitlePageFromScript, isDefaultTitlePage } from "../lib/title-page-autofill";
+import { scriptExportFilename } from "../lib/export-filename";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import { getLabsEnabled } from "../lib/feature-flags";
 import {
@@ -1224,6 +1226,22 @@ export default function ScriptIDE({
     return () => clearTimeout(timer);
   }, [scriptText]);
 
+  // Retrospective #1 ("Title survives"): parse a leading Fountain title
+  // block (Title:/Author(s):/Contact:) out of the script into titlePage
+  // state — covers typing, paste, and restoring a draft that already has
+  // one, since every one of those is just a scriptText change. Reads the
+  // CURRENT titlePage off draftRef (updated synchronously every render, see
+  // its assignment above) rather than depending on `titlePage` directly, so
+  // this doesn't re-run and no-op on every unrelated titlePage change (e.g.
+  // the writer editing the Title tab by hand). deriveTitlePageFromScript
+  // itself refuses to touch a titlePage the writer already set — see
+  // title-page-autofill.ts.
+  useEffect(() => {
+    const derived = deriveTitlePageFromScript(draftRef.current.titlePage, scriptText);
+    if (derived) setTitlePage(derived);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scriptText]);
+
   // Phase 2 MVP: Live Intent Debounce
   useEffect(() => {
     if (llmReady === false) return;
@@ -1759,7 +1777,7 @@ export default function ScriptIDE({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "script.fountain";
+    a.download = scriptExportFilename(titlePage.title, "fountain");
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1776,7 +1794,7 @@ export default function ScriptIDE({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "script.fdx";
+    a.download = scriptExportFilename(titlePage.title, "fdx");
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1791,7 +1809,7 @@ export default function ScriptIDE({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "script.pdf";
+    a.download = scriptExportFilename(titlePage.title, "pdf");
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1807,7 +1825,7 @@ export default function ScriptIDE({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "script.docx";
+    a.download = scriptExportFilename(titlePage.title, "docx");
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -3189,6 +3207,17 @@ export default function ScriptIDE({
                 // refuses a later silent reinstall into it once cleared.
                 setDoctorAutoSample(false);
                 sampleEverInstalledRef.current = true;
+                // Retrospective #1 ("Title survives"): the bundled sample's
+                // own Fountain text (src/lib/sample-script.ts) has no
+                // leading title block for the scriptText-watching effect
+                // above to find, so it never earned "Dead Frequency" from
+                // that generic parse. Its title is a known constant
+                // (sampleScriptTitle) instead — set it directly, but only
+                // when titlePage is still untouched, so this can never
+                // clobber a title the writer set on the Title tab.
+                if (isDefaultTitlePage(draftRef.current.titlePage)) {
+                  setTitlePage({ ...draftRef.current.titlePage, title: sampleScriptTitle });
+                }
                 setCoverageStale(false);
                 // G0-04: installing the sample is a request for *coverage*
                 // (deterministic, /api/scriptide/doctor) — not for AI scene
