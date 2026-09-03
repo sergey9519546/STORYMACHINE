@@ -31,3 +31,8 @@ same way: historical, not active.
   `ROADMAP.md` is canonical).
 - `TASKS_2026-07-11.md` (this directory, top level) — the 2026-07-11 task list
   for the retired wave program. Archived 2026-07-28; not active direction.
+- `MEGA_CATALOG_12700_SYSTEMS.md` (this directory, top level) — a mechanical
+  100x permutation catalog of genre/craft systems, formerly at the repo
+  root. Archived 2026-09-03 per
+  `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` finding #8; see
+  its own archival header for why. Not active direction.

@@ -1,6 +1,8 @@
 # Storytelling Coverage Map
 
-**What this is:** a gap-analysis reference derived from `MEGA_CATALOG_12700_SYSTEMS.md`,
+**What this is:** a gap-analysis reference derived from
+`docs/filed-backlog/MEGA_CATALOG_12700_SYSTEMS.md` (archived 2026-09-03; was
+at the repo root),
 used to check the engine's coverage of real storytelling craft against what
 exists in the world — for gradual, evidence-gated integration over time.
 

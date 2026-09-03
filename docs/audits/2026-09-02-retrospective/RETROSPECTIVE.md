@@ -122,7 +122,15 @@ back 0.109 of AUC — more than every structural wave ever won — and pass. The
 real target (≥ 0.9) sits in a `todo`, which never fails a build.
 
 ## 8. The honesty audit checks numbers, not claims, and exempts the docs that carry them
-**WEAK ROUTE · dispatched (lane R4)**
+**WEAK ROUTE · fixed 2026-09-03 (lane R4b)** — `docs/CLAIMS_REGISTER.md` (22
+rows: 20 supported, 2 retired) is now enforced by `honesty-audit.mjs`'s
+claims lane (CI-blocking, three invariants — see the script's
+"Claims-register lane" comment), exercised by
+`tests/core/honesty-audit-claims.test.ts`; the entrance's human-comparison
+line and its sibling in the slug-line intro were reworded (row 1→3, row
+2→4 in the register); and `MEGA_CATALOG_12700_SYSTEMS.md` is archived to
+`docs/filed-backlog/MEGA_CATALOG_12700_SYSTEMS.md` with a header explaining
+why. Original finding, for the record:
 
 `honesty-audit.mjs` is superlatives, one banned word, and five stale digit
 strings; `docs/**` is exempt by construction. So the rulebook's false coverage
@@ -238,7 +246,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 | 5 | Core imports AI + SQLite | WEAK ROUTE | R2 — fixed 2026-09-03: edges cut, reachable set 43 → 21 files outside the core dirs, `tests/core/pure-core-boundary.test.ts` + its allowlist enforce it |
 | 6 | 21 untested rules; false coverage claim | MISTAKE | R4 — part (a) delivered 2026-09-03 (0 untested, claim now measured, CI tripwire added); part (b) (line-count inversion) open |
 | 7 | Ratchet never re-ratcheted | WEAK ROUTE | R1 — floor moved to one place (`AUC24_FLOOR`) but NOT raised: the last real AUC-24 measurement is 2026-07-11, so the raise waits on the lock run |
-| 8 | Audit checks numbers, not claims | WEAK ROUTE | R4 |
+| 8 | Audit checks numbers, not claims | WEAK ROUTE | R4b — fixed: `docs/CLAIMS_REGISTER.md` + honesty-audit claims lane, entrance copy reworded, catalog archived |
 | 9 | Non-blocking-by-design reporter | WEAK ROUTE | R1 — landed: per-gate `expires`, reporter exits 1 past a deadline, both workflow comments corrected |
 | 10 | No power analysis | OPEN | Delivered — `docs/p1-benchmark/POWER_ANALYSIS_2026-09-02.md` + protocol §12; owner signs |
 | 11 | Generative half unevaluated | OPEN | owner decides |

@@ -658,6 +658,307 @@ function scanFile(filePath) {
   return hits;
 }
 
+// ---------------------------------------------------------------------------
+// Claims-register lane (2026-09-03, retrospective finding #8)
+// ---------------------------------------------------------------------------
+// WHY THIS EXISTS: everything above this comment catches banned WORDS
+// (superlatives, "provably", stale digit strings). Nothing above it can
+// catch an empirical CLAIM made in ordinary words — the entrance line "reads
+// your screenplay like a studio coverage reader" promised human-reader
+// agreement the product has never measured, and no lexical pattern fires on
+// it. docs/** is also exempt-by-construction above, which meant
+// MEGA_CATALOG_12700_SYSTEMS.md (since archived — see
+// docs/filed-backlog/MEGA_CATALOG_12700_SYSTEMS.md) and the six orientation
+// docs a contributor actually reads (README/ARCHITECTURE/NORTH_STAR/
+// ROADMAP/PATH_TO_EXCELLENCE/index.html) were never checked for this at all.
+//
+// docs/CLAIMS_REGISTER.md is the hand-maintained ledger of every such claim
+// this product makes, honest or not. This lane enforces THREE invariants
+// against it:
+//
+//   1. Every row with status `unsupported` or `retired` — a claim this
+//      register itself says the product cannot back — must not appear
+//      verbatim (whitespace-normalized) anywhere in the tracked tree, except
+//      the register itself and docs/audits/** (dated audit records are
+//      allowed to quote the problem they found).
+//   2. Every row with status `supported` must carry an evidence pointer
+//      that resolves to a real file on disk — a claim of evidence that does
+//      not exist is worse than no evidence type at all.
+//   3. A curated list of empirical-claim phrases (CLAIM_PHRASES below) is
+//      banned in src/** and the six named orientation docs UNLESS the exact
+//      sentence carrying the phrase is registered here as `supported` at
+//      that same file. This is what stops a new overclaim from landing
+//      un-registered — the register cannot just describe past sins, it has
+//      to be checked against future ones.
+//
+// Blocking (not warn-only, unlike the repo-metadata lane below): unlike repo
+// metadata, every fix here is something a contributor's own PR controls.
+const CLAIMS_REGISTER_PATH = 'docs/CLAIMS_REGISTER.md';
+
+// Named surfaces the docs/** exemption above must NOT extend to for this
+// lane — the orientation docs a contributor actually reads, per the task
+// that created this lane. src/** is walked in full (every extension), not
+// just the .ts/.tsx/.css the word-pattern lane above scopes to, because a
+// claim can land in any file under src/.
+const CLAIM_PHRASE_NAMED_ROOT_FILES = [
+  'README.md',
+  'ARCHITECTURE.md',
+  'NORTH_STAR.md',
+  'ROADMAP.md',
+  'docs/PATH_TO_EXCELLENCE.md',
+  'index.html',
+];
+
+// Examples from the task that created this lane, plus close variants already
+// known to occur in this codebase's history. Grows the same way
+// HISTORICAL_LABEL_RE above grows: by finding real phrasing, not guessing.
+const CLAIM_PHRASES = [
+  'like a studio coverage reader',
+  'as accurately as',
+  'professional reader',
+  'human-level',
+  'proven to',
+  'as good as a human',
+  'reads like a human',
+  'indistinguishable from human',
+];
+
+const DATED_AUDIT_PREFIX = 'docs/audits/';
+
+function normalizeWhitespace(text) {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/** Extract the leading file-path token from a claims-register "Where it
+ *  appears" or "Evidence pointer" cell, e.g. "src/foo.tsx:317 (note)" ->
+ *  "src/foo.tsx", or "`docs/x.md`" -> "docs/x.md". Multiple pointers in one
+ *  cell are ';'-separated; callers split on ';' first. */
+function extractPathToken(cell) {
+  const firstSegment = cell.trim().split(/[\s(]/)[0] ?? '';
+  return firstSegment
+    .replace(/^[`'"]+|[`'"]+$/g, '') // strip wrapping backticks/quotes
+    .replace(/:[\d,\-]+$/, ''); // strip trailing :line or :start-end
+}
+
+/** Parse the "## Register" markdown table in docs/CLAIMS_REGISTER.md into
+ *  { num, claim, location, evidenceType, evidencePointer, status } rows.
+ *  Returns null (with a printed reason) if the file is missing or has no
+ *  parseable rows — callers must treat that as its own violation, not as
+ *  "no claims to check". */
+function parseClaimsRegister() {
+  const full = join(ROOT, CLAIMS_REGISTER_PATH);
+  let raw;
+  try {
+    raw = readFileSync(full, 'utf8');
+  } catch {
+    return null;
+  }
+  const rows = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('|')) continue;
+    const body = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+    const cells = body.split('|').map((c) => c.trim());
+    if (cells.length < 6) continue;
+    const [num, claim, location, evidenceType, evidencePointer, status] = cells;
+    if (!/^\d+$/.test(num)) continue; // skips header row and the |---|---| rule row
+    rows.push({
+      num,
+      claim,
+      location,
+      evidenceType,
+      evidencePointer,
+      status: status.toLowerCase(),
+    });
+  }
+  return rows;
+}
+
+/** All git-tracked files (respects .gitignore; falls back to a manual walk —
+ *  same exclusions as walk() — in a non-git checkout, e.g. this lane's own
+ *  test fixture). Deliberately not extension-filtered like collectFiles()
+ *  above: a retired claim could be re-pasted into any tracked text file. */
+function listTrackedFiles() {
+  try {
+    const out = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' });
+    return out.split('\0').filter(Boolean).map((f) => join(ROOT, f));
+  } catch {
+    return [...walk(ROOT)];
+  }
+}
+
+// Extensions this lane will not attempt to read as text.
+const CLAIMS_LANE_BINARY_EXTS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.otf',
+  '.eot', '.pdf', '.zip', '.mp4', '.mp3', '.wav', '.db', '.sqlite', '.sqlite3',
+  '.bin', '.wasm',
+]);
+
+function isRetiredOrUnsupportedExempt(relPosixPath) {
+  return relPosixPath === CLAIMS_REGISTER_PATH || relPosixPath.startsWith(DATED_AUDIT_PREFIX);
+}
+
+/** Invariant 1: no `unsupported`/`retired` claim survives verbatim outside
+ *  the register and dated audit records. */
+function checkRetiredClaimsAbsent(rows) {
+  const targets = rows.filter((r) => r.status === 'unsupported' || r.status === 'retired');
+  if (targets.length === 0) return [];
+  const normalizedClaims = targets.map((r) => ({
+    row: r,
+    needle: normalizeWhitespace(r.claim).toLowerCase(),
+  }));
+
+  const hits = [];
+  for (const filePath of listTrackedFiles()) {
+    const rel = relative(ROOT, filePath).split(/[\\/]/).join('/');
+    if (isRetiredOrUnsupportedExempt(rel)) continue;
+    if (CLAIMS_LANE_BINARY_EXTS.has(extname(filePath))) continue;
+    let raw;
+    try {
+      raw = readFileSync(filePath, 'utf8');
+    } catch {
+      continue; // unreadable (binary sniffed wrong, or a race with git) — skip, don't crash the audit
+    }
+    if (raw.includes('\0')) continue; // binary despite the extension guard
+    const haystack = normalizeWhitespace(raw).toLowerCase();
+    for (const { row, needle } of normalizedClaims) {
+      if (needle.length > 0 && haystack.includes(needle)) {
+        hits.push({
+          file: rel,
+          pattern: `claims-register-row-${row.num}-${row.status}`,
+          match: row.claim,
+        });
+      }
+    }
+  }
+  return hits;
+}
+
+/** Invariant 2: every `supported` row's evidence pointer resolves to a real
+ *  file. A cell may hold multiple ';'-separated pointers — each must exist. */
+function checkSupportedEvidenceExists(rows) {
+  const hits = [];
+  for (const row of rows) {
+    if (row.status !== 'supported') continue;
+    const pointers = row.evidencePointer.split(';').map((p) => p.trim()).filter(Boolean);
+    if (pointers.length === 0) {
+      hits.push({
+        file: CLAIMS_REGISTER_PATH,
+        pattern: 'claims-register-missing-evidence',
+        match: `row ${row.num}: supported claim with no evidence pointer`,
+      });
+      continue;
+    }
+    for (const pointer of pointers) {
+      const pathToken = extractPathToken(pointer);
+      if (!pathToken || pathToken.toUpperCase() === 'NONE') {
+        hits.push({
+          file: CLAIMS_REGISTER_PATH,
+          pattern: 'claims-register-evidence-none',
+          match: `row ${row.num}: supported claim's evidence pointer is NONE ("${pointer}")`,
+        });
+        continue;
+      }
+      try {
+        statSync(join(ROOT, pathToken));
+      } catch {
+        hits.push({
+          file: CLAIMS_REGISTER_PATH,
+          pattern: 'claims-register-evidence-missing',
+          match: `row ${row.num}: evidence pointer "${pathToken}" does not exist on disk`,
+        });
+      }
+    }
+  }
+  return hits;
+}
+
+function collectClaimPhraseSurfaceFiles() {
+  const files = [...walk(join(ROOT, 'src'))];
+  for (const rel of CLAIM_PHRASE_NAMED_ROOT_FILES) {
+    const full = join(ROOT, rel);
+    try {
+      statSync(full);
+      files.push(full);
+    } catch {
+      // optional file not present — skip
+    }
+  }
+  return files;
+}
+
+/** Invariant 3: a curated empirical-claim phrase found in src/** or a named
+ *  orientation doc must be covered by a `supported` register row located at
+ *  that same file — otherwise it is either unregistered or registered as
+ *  something other than supported, and fails either way. */
+function checkClaimPhrasesRegistered(rows) {
+  const supportedByFile = new Map(); // relPosix path -> [normalized claim text]
+  for (const row of rows) {
+    if (row.status !== 'supported') continue;
+    const filePart = extractPathToken(row.location.split(';')[0]);
+    if (!filePart) continue;
+    const norm = normalizeWhitespace(row.claim).toLowerCase();
+    if (!supportedByFile.has(filePart)) supportedByFile.set(filePart, []);
+    supportedByFile.get(filePart).push(norm);
+  }
+
+  const hits = [];
+  for (const filePath of collectClaimPhraseSurfaceFiles()) {
+    const rel = relative(ROOT, filePath).split(/[\\/]/).join('/');
+    const ext = extname(filePath);
+    if (CLAIMS_LANE_BINARY_EXTS.has(ext)) continue;
+    let raw;
+    try {
+      raw = readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+    if (raw.includes('\0')) continue;
+    const stripped = COMMENT_STRIP_EXTS.has(ext) ? stripComments(raw) : raw;
+    const normalized = normalizeWhitespace(stripped).toLowerCase();
+    const allowedClaims = supportedByFile.get(rel) || [];
+    for (const phrase of CLAIM_PHRASES) {
+      const p = phrase.toLowerCase();
+      if (!normalized.includes(p)) continue;
+      const covered = allowedClaims.some((c) => c.includes(p));
+      if (!covered) {
+        hits.push({ file: rel, pattern: 'unregistered-empirical-claim-phrase', match: phrase });
+      }
+    }
+  }
+  return hits;
+}
+
+/** Runs all three claims-lane invariants. Returns the combined hit list; a
+ *  missing/unparseable register is itself reported as one hit rather than
+ *  silently skipping the lane. */
+function runClaimsLane() {
+  const rows = parseClaimsRegister();
+  if (rows === null) {
+    return [
+      {
+        file: CLAIMS_REGISTER_PATH,
+        pattern: 'claims-register-missing',
+        match: `${CLAIMS_REGISTER_PATH} not found or unreadable`,
+      },
+    ];
+  }
+  if (rows.length === 0) {
+    return [
+      {
+        file: CLAIMS_REGISTER_PATH,
+        pattern: 'claims-register-empty',
+        match: 'register table parsed but contained zero rows',
+      },
+    ];
+  }
+  return [
+    ...checkRetiredClaimsAbsent(rows),
+    ...checkSupportedEvidenceExists(rows),
+    ...checkClaimPhrasesRegistered(rows),
+  ];
+}
+
 async function main() {
   const files = collectFiles().filter(shouldScan);
   const allHits = [];
@@ -668,10 +969,14 @@ async function main() {
   const mdFiles = listTrackedMarkdown();
   allHits.push(...scanDocStaleNumbers(mdFiles));
 
+  const claimsHits = runClaimsLane();
+  allHits.push(...claimsHits);
+
   if (allHits.length > 0) {
     console.error(`honesty-audit: ${allHits.length} violation(s) found\n`);
     for (const h of allHits) {
-      console.error(`${h.file}:${h.line}: [${h.pattern}] "${h.match}"`);
+      const loc = 'line' in h ? `${h.file}:${h.line}` : h.file;
+      console.error(`${loc}: [${h.pattern}] "${h.match}"`);
     }
     console.error(`\nhonesty-audit: FAIL — remove or rewrite the strings above.`);
     // The repo-metadata lane still runs on a dirty tree: a contributor fixing
@@ -683,7 +988,8 @@ async function main() {
 
   console.log(
     `honesty-audit: scanned ${files.length} files, plus ${mdFiles.length} tracked ` +
-      `markdown files for stale rule-count numbers — clean.`
+      `markdown files for stale rule-count numbers, plus the claims register ` +
+      `(${parseClaimsRegister()?.length ?? 0} rows) — clean.`
   );
 
   const metadataBlocks = await runRepoMetadataLane();

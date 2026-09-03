@@ -314,7 +314,7 @@ export default function StartScreen({
                     which is voice, not the promise itself. Static (not
                     gated on isIntroResolved) so it reads immediately. */}
                 <p className="max-w-[46ch] text-sm leading-snug text-ink/80 sm:text-base">
-                  Reads your screenplay like a studio coverage reader and hands back a verdict, a craft score, and your next fix.
+                  Runs deterministic coverage on your screenplay and hands back a verdict, a craft score, and your next fix.
                 </p>
                 <SlugLineIntro onComplete={() => setIsIntroResolved(true)} />
               </header>

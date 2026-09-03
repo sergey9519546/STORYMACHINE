@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 const SLUG_LINES = [
   "FADE IN:",
   "INT. STORY MACHINE — DAY",
-  "The page, read the way a studio reader reads it.",
+  "The page, read the way the engine reads it.",
 ] as const;
 
 const FULL_TEXT = SLUG_LINES.join("\n");

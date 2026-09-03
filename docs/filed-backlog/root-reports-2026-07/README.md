@@ -20,7 +20,12 @@ succeeded vs. failed in this environment. Worth reading before running
 large agent fleets.
 
 Every cross-reference among these files is internal to this directory, so
-links keep resolving. MEGA_CATALOG_12700_SYSTEMS.md deliberately stays at
-the root: it is externally referenced (8 files, incl.
-docs/STORYTELLING_COVERAGE_MAP.md, its curated distillation) and the
-maintainer designated it a coverage map worth keeping.
+links keep resolving. MEGA_CATALOG_12700_SYSTEMS.md is not filed here — it
+stayed at the repo root past this 2026-08-04 filing, until
+`docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` finding #8 (2026-09-02)
+reversed the earlier "worth keeping at the root" call: sitting at the root
+of a public repo, it read as a live feature inventory rather than the
+speculative planning it is. It is now archived at
+`docs/filed-backlog/MEGA_CATALOG_12700_SYSTEMS.md` (2026-09-03). Its curated
+distillation, `docs/STORYTELLING_COVERAGE_MAP.md`, was not archived and
+still references it at its new path.

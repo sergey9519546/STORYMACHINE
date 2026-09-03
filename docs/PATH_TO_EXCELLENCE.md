@@ -44,7 +44,7 @@ here because three of them changed what the project believes about itself:
   jump button turned out not to *render at all* for the sample (its top
   finding is scene-anchored and the old code only parsed line numbers);
   Settings gained a real roving tabindex; and finding-identity is now
-  scene-anchored — browser-proven to turn a spurious "8 cleared · 8 new"
+  scene-anchored — browser-verified to turn a spurious "8 cleared · 8 new"
   after a one-line edit into an honest "no change."
 - `7d398a7` — docs truth-sync. `ARCHITECTURE.md` still claimed a 1000-scene
   analyzer ceiling (400 since W1), README's env table was missing seven live
@@ -306,14 +306,17 @@ machine.
   (identity = pass::rule::location, its line-number-drift noisiness
   documented in-code as an accepted limitation). Browser-proofed
   end-to-end on a real finding: jump → edit → re-run → cleared.
-- **E3 — DONE 2026-08-21.** Entrance promise line ("Reads your screenplay
-  like a studio coverage reader…"), privacy sentence ("Keyless by default —
-  your script stays in this deployment unless you turn on AI features
-  yourself" — worded to be true for visitors, since keys are opt-in via
-  Settings, not operator-only), CTA hierarchy preserved; all three visible
-  without scrolling at 1440px and 375px. Fixed a real pre-existing bug en
-  route: the CTA description inherited `.sm-btn`'s `white-space: nowrap`
-  and spilled past the button edge at every viewport.
+- **E3 — DONE 2026-08-21.** Entrance promise line (originally compared the
+  read to a human studio coverage reader — reworded 2026-09-03 per the
+  2026-09-02 retrospective's finding #8: an unsupported human-comparison
+  claim with zero human-agreement evidence; see `docs/CLAIMS_REGISTER.md`),
+  privacy sentence ("Keyless by
+  default — your script stays in this deployment unless you turn on AI
+  features yourself" — worded to be true for visitors, since keys are
+  opt-in via Settings, not operator-only), CTA hierarchy preserved; all
+  three visible without scrolling at 1440px and 375px. Fixed a real
+  pre-existing bug en route: the CTA description inherited `.sm-btn`'s
+  `white-space: nowrap` and spilled past the button edge at every viewport.
 - **E4 — DONE 2026-08-21.** IndexedDB draft mirror
   (`scriptide-idb-store.ts`, never-rejecting, wins on restore only when
   strictly newer than localStorage — the quota-failure recovery case,

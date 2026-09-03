@@ -419,8 +419,9 @@ cases). Shared blast radius and receipt with the D4 addendum above.
 `server/nvm/revision/passes/types.ts` (~50-65).
 
 **Found by:** a 2026-08-03 structural-form audit, prompted by
-`MEGA_CATALOG_12700_SYSTEMS.md` listing Kishōtenketsu and other non-Western
-forms. Recorded here because it is a construct-validity defect of exactly the
+`MEGA_CATALOG_12700_SYSTEMS.md` (then at the repo root; archived 2026-09-03 to
+`docs/filed-backlog/MEGA_CATALOG_12700_SYSTEMS.md`) listing Kishōtenketsu and
+other non-Western forms. Recorded here because it is a construct-validity defect of exactly the
 D1-D3 family — a rule asserting something its signals cannot see — and because
 it is *self-contradicting*, which makes it unusually cheap to confirm.
 

@@ -1,3 +1,22 @@
+> **ARCHIVED — filed backlog, not active direction.** Moved here 2026-09-03
+> from the repo root, per `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md`
+> finding #8: a mechanical 100x permutation exercise (30 base genres crossed
+> with themselves, national styles, historical periods, etc.) sitting at the
+> root of a public repo, read by anyone as a live feature inventory, when it
+> is speculative planning that was never built and never validated. It is
+> the same permutation reasoning `CLAUDE.md` and `NORTH_STAR.md` identify as
+> the root cause of the rulebook's own inflated, non-discriminating count
+> (`NORTH_STAR.md` §"Not chasing rule COUNT" — ~64% of the *rulebook's*
+> current entries are mechanical field × mode × position permutation of 7
+> template functions, contributing AUC ~0.076 to discrimination vs. scene-
+> count scarcity's AUC ~0.938). This catalog is that same generative pattern
+> applied to genre/craft systems instead of rules, and was never adopted.
+> Nothing below is current product scope, a roadmap, or a claim about what
+> the tool does — see `ROADMAP.md` for that. Kept for institutional memory
+> only, per this repo's `docs/filed-backlog/README.md` convention. Its
+> curated distillation, `docs/STORYTELLING_COVERAGE_MAP.md`, is a separate,
+> still-referenced document — this archival note does not apply to it.
+
 # 🎯 MEGA CATALOG: 12,700 SYSTEMS (100X EXPANSION)
 ## From 127 Systems → 12,700 Systems
 
