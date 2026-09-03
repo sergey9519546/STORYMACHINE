@@ -129,7 +129,7 @@ local poking accumulates real `.db` files there over time.
 - `npm run validate` - Run all checks (lint + check-docs + check-server-reachability + test)
 
 **Git Hooks:**
-- `npm run setup-hooks` - Install pre-commit hook for documentation quality checks
+- `npm run setup-hooks` - Install pre-commit hook for documentation quality checks. Runs automatically via npm's `prepare` lifecycle on `npm install`/`npm ci` in a normal clone; it's a no-op (not an error) in a checkout with no `.git` directory, e.g. a git worktree whose `.git` is a pointer file rather than a directory — run it by hand there if you want the hook.
 
 **Utilities:**
 - `npm run rulebook` - Generate rulebook from current rule set
@@ -149,7 +149,9 @@ local poking accumulates real `.db` files there over time.
 
 The project includes automated detection of AI-generated writing patterns in documentation:
 - Pre-commit hooks scan `.md` files for 25 high-confidence AI patterns
-- Run `npm run setup-hooks` to install (one-time setup)
+- Installed automatically on `npm install`/`npm ci` (via the `prepare`
+  script); run `npm run setup-hooks` by hand if it didn't (e.g. no `.git`
+  directory at install time)
 - Bypass when needed: `git commit --no-verify`
 - See `scripts/check-docs-quality.ts` for pattern definitions
 
