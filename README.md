@@ -204,6 +204,24 @@ docker run -p 3000:3000 -v storymachine-data:/app/data ghcr.io/<owner>/storymach
 No rebuild, no "reconstruct what was deployed" archaeology — confirm via
 `/health` that the rolled-back instance reports the expected `version`.
 
+**What `:latest` actually points at:** images are published only when
+`.github/workflows/release.yml` runs — a `v*` tag push, or a manual
+`workflow_dispatch` — never automatically on every merge to `main`. That
+means `:latest` (and any specific version tag) can lag `main` by however
+long it's been since the last release run, with no separate signal telling
+a puller that a gap exists. Don't assume `:latest` means "current `main`";
+check what it actually is:
+
+```
+docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' ghcr.io/<owner>/storymachine:latest
+```
+
+That label is the full git SHA the image was built from (the release
+workflow sets it at build time) — compare it against `git log` on `main` to
+see exactly how far behind the running image is, the same way `/health`'s
+`commit` field does for an already-running container (see "Reading the
+running version" above).
+
 ### Reverse proxies and rate limiting
 
 `gameLimiter`/`aiLimiter`/`heavyBodyLimiter` (`server/lib/session-store.ts`)
