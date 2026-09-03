@@ -65,9 +65,21 @@
 // honestly in fallbackScenes rather than silently degrading. This bounds a
 // single request's worst-case LLM spend regardless of script length.
 
+// ── Boundary note (retrospective #5, 2026-09-03) ──────────────────────────
+// This file is the ONE place the doctor's import graph touches a language
+// model, and it reaches it through server/lib/llm-port.ts — an interface plus
+// a registry with zero dependencies — never through a static import of
+// server/engine/ai.ts. That inversion is what keeps ARCHITECTURE.md §1's "pure
+// and keyless analysis core" a fact about the import graph rather than a
+// sentence in a document: without it, every doctor worker thread loaded an
+// HTTP provider stack in order to compute a deterministic score, and every
+// file that stack touches became scoring-path for
+// scripts/check-scoring-receipt.mjs. tests/core/pure-core-boundary.test.ts
+// fails if server/engine/ai.ts ever reappears in doctor.ts's reachable set.
+
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
-import { generateContent, modelForTask } from '../../engine/ai.ts';
+import { getLlmPort, type LlmPort } from '../../lib/llm-port.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
@@ -331,9 +343,10 @@ function cryptoHash(s: string): string {
 async function runBatch(
   batch: Array<{ sceneIdx: number; text: string }>,
   model: string,
+  llm: LlmPort,
 ): Promise<Map<number, DeepAnnotation>> {
   const prompt = buildBatchPrompt(batch);
-  const response = await generateContent(
+  const response = await llm.generateContent(
     {
       model,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -411,7 +424,22 @@ export async function deepReadRecords(
     };
   }
 
-  const model = modelForTask('ANALYSIS');
+  // Retrospective #5: the LLM transport arrives through server/lib/llm-port.ts
+  // rather than a static import of engine/ai.ts, so doctor.ts's import graph no
+  // longer drags the provider/HTTP stack into every worker thread. An
+  // unregistered port means no AI stack was ever loaded in this process — the
+  // same observable condition as a missing API key — and it degrades exactly
+  // the way the alignment guard above does: every scene keeps its lexicon
+  // signals and is reported honestly in fallbackScenes.
+  const llm = getLlmPort();
+  if (!llm) {
+    return {
+      records,
+      deepRead: { scenesRead: 0, scenesTotal, usedLLM: false, fallbackScenes: records.map(r => r.sceneIdx) },
+    };
+  }
+
+  const model = llm.modelForTask('ANALYSIS');
   const annotations = new Map<number, DeepAnnotation>();
   const pending: Array<{ sceneIdx: number; text: string }> = [];
 
@@ -434,7 +462,7 @@ export async function deepReadRecords(
 
   for (const batch of batchesToRun) {
     try {
-      const validated = await runBatch(batch, model);
+      const validated = await runBatch(batch, model, llm);
       const textBySceneIdx = new Map(batch.map(b => [b.sceneIdx, b.text]));
       for (const [sceneIdx, annotation] of validated) {
         annotations.set(sceneIdx, annotation);

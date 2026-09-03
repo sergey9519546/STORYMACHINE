@@ -72,23 +72,41 @@ export function evaluateRewrite(
   return { accept: true };
 }
 
-/**
- * Build a protected-spans comment for the LLM prompt.
- */
-function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): string {
-  if (spans.length === 0) return '';
-  const sections = spans.map(s => {
-    const excerpt = lines.slice(s.startLine - 1, s.endLine).join('\n');
-    return `  [APPROVED — DO NOT CHANGE — reason: ${s.reason}]\n${excerpt}`;
-  });
-  return '\nApproved sections that MUST remain unchanged:\n' + sections.join('\n\n');
+
+// ── LLM rewriter registry (retrospective #5, 2026-09-03) ─────────────────────
+// Everything below the diagnose-only short-circuit — prompt construction, the
+// craft-spec block, the provider call, the accept/reject logging — used to
+// live in this file behind `await import()` calls. Lazy imports do NOT hide a
+// module from scripts/lib/import-graph.mjs (it matches `import('…')` as an
+// edge, deliberately), so doctor.ts's reachable set contained
+// server/engine/ai.ts, its whole provider/HTTP stack, and
+// server/nvm/generate/craft-spec.ts — a file whose own header says it "must
+// never be imported by, or influence, the deterministic doctor/scoring path".
+//
+// The generative half now lives in ./rewrite-llm.ts, which registers itself at
+// module load. server/routes/nvm/revision.ts — the only entrypoint that ever
+// runs a pass OUTSIDE runDiagnoseOnly — imports it, so the product behaviour is
+// unchanged; the doctor, the calibration corpus builder and the worker threads
+// never load it and never could have used it (isDiagnoseOnly() returns before
+// this point on every one of those paths).
+//
+// An unregistered rewriter is therefore not a degraded state to warn about: it
+// is the ordinary condition of every deterministic caller, and it produces the
+// same value those callers already got — the draft, unchanged.
+export type LlmRewriter = (input: RewriteInput) => Promise<RewriteResult>;
+
+let llmRewriter: LlmRewriter | null = null;
+
+/** Called by ./rewrite-llm.ts at module load. Passing null unregisters. */
+export function registerLlmRewriter(rewriter: LlmRewriter | null): void {
+  llmRewriter = rewriter;
 }
 
 /**
  * Attempt an LLM prose rewrite. Returns original if LLM unavailable or fails.
  */
 export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
-  const { fountain, issues, passName, approvedSpans, storyContext, priorPassResults } = input;
+  const { fountain, issues } = input;
   if (issues.length === 0) return { revised: fountain, usedLLM: false };
   // Script Doctor diagnose-only contract: skip straight to the unchanged
   // fallback before any prompt-building or LLM work happens below, so
@@ -96,105 +114,7 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
   // even when a key is configured.
   if (isDiagnoseOnly()) return { revised: fountain, usedLLM: false };
 
-  const { sanitizeForPrompt } = await import('../../lib/prompt-utils.ts');
-
-  const lines = fountain.split('\n');
-  const issueBlock = issues
-    .map(i => {
-      const loc = sanitizeForPrompt(i.location, 120);
-      const desc = sanitizeForPrompt(i.description, 300);
-      const fix = i.suggestedFix ? ` (fix: ${sanitizeForPrompt(i.suggestedFix, 200)})` : '';
-      return `  [${i.severity.toUpperCase()}] ${loc} — ${i.rule}: ${desc}${fix}`;
-    })
-    .join('\n');
-
-  // Build story context preamble so the LLM understands the tone and stakes
-  const contextBlock: string[] = [];
-  if (storyContext?.theme) contextBlock.push(`STORY THEME: ${sanitizeForPrompt(storyContext.theme, 200)}`);
-  if (storyContext?.genre) contextBlock.push(`GENRE: ${sanitizeForPrompt(storyContext.genre, 80)}`);
-  if (storyContext?.directorStyle) contextBlock.push(`DIRECTOR STYLE: ${sanitizeForPrompt(storyContext.directorStyle, 150)}`);
-  if (storyContext?.characters) contextBlock.push(`CHARACTERS: ${sanitizeForPrompt(storyContext.characters, 400)}`);
-
-  // Build prior pass coordination block — tells the LLM what earlier passes
-  // already changed so it doesn't undo improvements or re-diagnose resolved issues.
-  const priorBlock: string[] = [];
-  if (priorPassResults && priorPassResults.length > 0) {
-    priorBlock.push('Revision passes already completed before this one:');
-    for (const r of priorPassResults) {
-      const changed = r.changed ? 'CHANGED' : 'no changes';
-      const summary = sanitizeForPrompt(r.summary, 100);
-      priorBlock.push(`  [${r.pass}] ${changed}: ${summary}`);
-    }
-    priorBlock.push('Do NOT undo any of the above improvements.');
-  }
-
-  // Craft-spec injection (user-directed P0 exception — see
-  // server/nvm/generate/craft-spec.ts header): compact form so the block
-  // stays proportionate next to the pass-scoped issue list and the full
-  // draft text below. Dynamic import mirrors the other lazy imports in this
-  // function and keeps the module out of the diagnose-only cost entirely
-  // (this line only runs after the early diagnose-only return above).
-  const { buildCraftPromptSection, looksLikeAnimationGenre } = await import('../generate/craft-spec.ts');
-  const craftBlock = buildCraftPromptSection({
-    compact: true,
-    animation: looksLikeAnimationGenre(storyContext?.genre),
-  });
-
-  const prompt = [
-    ...(contextBlock.length > 0 ? [...contextBlock, ''] : []),
-    `You are a screenplay editor performing the "${passName}" revision pass.`,
-    `Rewrite the following Fountain screenplay to fix ONLY the issues listed below.`,
-    `Preserve the story's theme, tone, and character voices. Do not change anything outside the scope of the "${passName}" pass.`,
-    `Return the COMPLETE revised Fountain text with no extra commentary.`,
-    '',
-    craftBlock,
-    '',
-    ...(priorBlock.length > 0 ? [...priorBlock, ''] : []),
-    'Issues to fix:',
-    issueBlock,
-    approvedSpanInstructions(approvedSpans, lines),
-    '',
-    '--- FOUNTAIN DRAFT ---',
-    fountain,
-    '--- END DRAFT ---',
-  ].join('\n');
-
-    // ── Try LLM ───────────────────────────────────────────────────────────────
-  try {
-    const ai = await import('../../engine/ai.ts');
-    const { logger } = await import('../../lib/logger.ts');
-    ai.getAI(); // throws if no key
-
-    // Budget output tokens to comfortably exceed the input so the model can return
-    // the full screenplay without truncation. Roughly 1 token ≈ 4 chars; add 50%
-    // headroom and clamp to a sane ceiling.
-    const estInputTokens = Math.ceil(fountain.length / 4);
-    const maxOutputTokens = Math.min(32_768, Math.max(8_192, Math.ceil(estInputTokens * 1.5)));
-
-    const response = await ai.geminiProvider.generate({
-      model: ai.modelForTask('REVISION'),
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { temperature: 0.4, maxOutputTokens },
-    });
-
-    const candidate = response.candidates?.[0];
-    const finishReason = candidate?.finishReason;
-    const text = (candidate?.content?.parts?.[0]?.text ?? '').trim();
-
-    const verdict = evaluateRewrite(text, fountain.length, finishReason);
-    if (verdict.accept) {
-      return { revised: text, usedLLM: true };
-    }
-    // Rejected — log why so silent quality loss is observable, then keep original.
-    logger.warn('revision_rewrite_rejected', {
-      passName, reason: verdict.reason, finishReason,
-      inputChars: fountain.length, outputChars: text.length,
-    });
-  } catch (err) {
-    // No key or LLM error — log then fall back to the unchanged draft.
-    const { logger } = await import('../../lib/logger.ts');
-    logger.warn('revision_rewrite_failed', { passName, message: (err as Error).message });
-  }
-
-  return { revised: fountain, usedLLM: false };
+  const rewriter = llmRewriter;
+  if (!rewriter) return { revised: fountain, usedLLM: false };
+  return rewriter(input);
 }

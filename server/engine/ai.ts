@@ -3,6 +3,7 @@ import type { GenerateContentParameters, GenerateContentResponse } from '@google
 import { logger } from '../lib/logger.ts';
 import { metrics } from '../lib/metrics.ts';
 import { aiProviderManager, FreeRideProvider, GeminiProvider, type AIProvider } from './ai-provider.ts';
+import { registerLlmPort } from '../lib/llm-port.ts';
 
 let _shared: GoogleGenAI | null = null;
 
@@ -489,3 +490,28 @@ export async function generateContentStream(
   }
   return tracked();
 }
+
+// ── Deterministic-core LLM port adapter (retrospective #5, 2026-09-03) ───────
+// server/lib/llm-port.ts declares the narrow LLM contract the deterministic
+// analysis core needs (deep-read.ts's scene sensor). This file is the ADAPTER
+// that satisfies it, and it registers itself at module load so that any
+// process which has already loaded the AI stack — every Express route, every
+// test that touches setLLMProvider/resetLLMProvider — is wired with no extra
+// composition step. A process that never loads this module (a doctor worker
+// thread, the calibration corpus builder, `npm run measure-real`) has no port,
+// which the core treats exactly as it treats a missing API key: it degrades to
+// its lexicon signals. That asymmetry is the whole point — the core must not
+// be able to reach this file's imports through a static edge, which
+// tests/core/pure-core-boundary.test.ts enforces.
+//
+// The casts are the adapter's job, not the core's: LlmPortRequest is written
+// out by hand in llm-port.ts precisely so the core's type graph carries no
+// @google/genai dependency, and widening it back to the SDK's own parameter
+// type belongs on this side of the boundary.
+registerLlmPort({
+  modelForTask: (task: string) => modelForTask(task as TaskType),
+  generateContent: (request, options) =>
+    generateContent(request as unknown as GenerateContentParameters, options),
+  generateDirect: (request) =>
+    geminiProvider.generate(request as unknown as GenerateContentParameters),
+});

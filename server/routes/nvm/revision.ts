@@ -10,6 +10,15 @@ import {
 } from '../../lib/session-store.ts';
 import { validate, CompileBodySchema, ReviseBodySchema } from '../../lib/validation.ts';
 import { logger } from '../../lib/logger.ts';
+// Side-effect import (retrospective #5, 2026-09-03): server/nvm/revision/
+// rewrite-llm.ts registers the generative prose rewriter with rewrite.ts at
+// module load. This file is the ONLY entrypoint that runs revision passes
+// outside runDiagnoseOnly(), so it is the one place that has to wire it — the
+// doctor, the calibration corpus builder and the worker pool all short-circuit
+// before the rewriter is consulted, which is exactly why the LLM half is no
+// longer allowed to sit in doctor.ts's import graph. See rewrite-llm.ts's
+// header and tests/core/pure-core-boundary.test.ts.
+import '../../nvm/revision/rewrite-llm.ts';
 
 const router = express.Router();
 export default router;
@@ -51,7 +60,8 @@ router.post('/api/nvm/compile', gameLimiter, validate(CompileBodySchema), asyncH
   const { analyzeStructure } = await import('../../nvm/screenplay/structure.ts');
   const { detectEndCondition } = await import('../../nvm/screenplay/end-condition.ts');
   const { compileScreenplay } = await import('../../nvm/screenplay/compile.ts');
-  const { buildNarrativeState, emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { buildNarrativeState } = await import('../../nvm/state/from-stage.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
@@ -81,7 +91,8 @@ router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandl
   const { analyzeStructure } = await import('../../nvm/screenplay/structure.ts');
   const { compileScreenplay } = await import('../../nvm/screenplay/compile.ts');
   const { runRevisionPipeline } = await import('../../nvm/revision/pipeline.ts');
-  const { buildNarrativeState, emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { emptyState } = await import('../../nvm/state/NarrativeState.ts');
+  const { buildNarrativeState } = await import('../../nvm/state/from-stage.ts');
   const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
   type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
@@ -146,7 +157,8 @@ router.get('/api/nvm/revise-stream', aiLimiter, async (req, res) => {
     const { analyzeStructure } = await import('../../nvm/screenplay/structure.ts');
     const { compileScreenplay } = await import('../../nvm/screenplay/compile.ts');
     const { runRevisionPipeline } = await import('../../nvm/revision/pipeline.ts');
-    const { buildNarrativeState, emptyState } = await import('../../nvm/state/NarrativeState.ts');
+    const { emptyState } = await import('../../nvm/state/NarrativeState.ts');
+    const { buildNarrativeState } = await import('../../nvm/state/from-stage.ts');
     const { applyStoryOps } = await import('../../nvm/ops/dispatcher.ts');
 
     type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
