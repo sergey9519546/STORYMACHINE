@@ -15,7 +15,7 @@ worse now. **OPEN QUESTION**: reasonable people disagree; owner decides.
 ---
 
 ## 1. The health score rewards padding — and the tests protect the defect
-**MISTAKE · dispatched (lane R5, unmerged branch)**
+**MISTAKE · FIXED on a ready branch (lane R5, 2026-09-03)** — the density denominator is now `(sceneCount * 30)^0.7`, not `wordCount^0.7`; `empty_verbosity` moved +5.4 → −4.4 and is a HARD gate; write-up, before/after tables and the owner command sequence in `docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md`. Unmerged by design: it owes `npm run measure-real` and a produced-anchor manifest re-lock, both owner-local.
 
 `docs/scoring/VERBOSITY_BIAS_2026-07-11.md`: appending stateless filler moves
 health 66.4 → 72.9 (+6.5), across a verdict tier (`verdictFor`,
@@ -239,7 +239,7 @@ sweeping for rot — is part of this verdict, not exempt from it.
 
 | # | Finding | Class | Disposition |
 |---|---|---|---|
-| 1 | Verbosity bias | MISTAKE | R5 — ready branch, owner run to merge |
+| 1 | Verbosity bias | MISTAKE | R5 — FIXED on a ready branch 2026-09-03 (scene-opportunity denominator, `empty_verbosity` now a hard gate, `docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md`); still owes the owner's `measure-real` + manifest re-lock before merge |
 | 2 | AUC verifiable from committed numbers | MISTAKE | R1 — machinery landed (`scripts/lib/auc.ts`, `npm run lock-auc24`, `tests/core/auc24-table.test.ts`); table not locked yet, corpus is owner-local |
 | 3 | Receipt gate misses `src/lib/fountain.ts` | MISTAKE | Fixed 2026-09-02 — reachability now ungated by directory, `REACHABLE_BUT_NOT_SCORING` starts empty |
 | 4 | Collab rooms unowned | MISTAKE | R3 — delivered: server-minted room ids, share-link model, `docs/AUTH.md` §Collaboration rooms |

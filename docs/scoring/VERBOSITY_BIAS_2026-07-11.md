@@ -1,5 +1,15 @@
 # Verbosity-bias fix — investigation & disposition (2026-07-11B)
 
+> **SUPERSEDED 2026-09-03 by `VERBOSITY_BIAS_FIX_2026-09-03.md` (lane R5).**
+> The HOLD below is over: the density denominator is now
+> `(sceneCount * 30)^0.7` instead of `wordCount^0.7`, `empty_verbosity` is a
+> HARD metamorphic gate, and the witness measures −4.4 instead of +5.4. This
+> file is kept as the record of the defect and of why every surgical lever
+> was ruled out — its §"Correct fix" was right that a from-scratch
+> re-derivation of the density regime was required, and that is what shipped.
+> Its one wrong prediction is worth noting: the corrective term is a change of
+> DENOMINATOR, not "a length-independent absolute issue-count term".
+
 **Decision: HOLD as a documented defect. The fix requires a full from-scratch
 re-calibration of the density regime — no zero-regression surgical patch exists.
 Proven three ways by measurement below.** Keep the `empty_verbosity` metamorphic
