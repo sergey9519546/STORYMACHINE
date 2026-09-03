@@ -121,3 +121,15 @@ the private reporting channel and response SLA.
   suite, honesty audit, metamorphic gate, build.
 - `.github/workflows/security.yml` — dependency review (PRs), `npm audit`
   (currently non-blocking), CodeQL scanning, weekly schedule.
+
+**If your PR's checks fail in ~2 seconds with no logs and no runner
+assigned, it is not your change.** That is the signature of a known
+account-level GitHub Actions block (a billing/spend limit or runner
+availability issue on the account, not a code failure) — every gate in
+`ci.yml` passes locally on the same commits when the failure looks like
+this. It cannot be diagnosed or fixed from a PR; see
+`docs/PATH_TO_EXCELLENCE.md`'s "GitHub Actions is not running jobs" entry
+for the full diagnosis and what the owner needs to check. Run the gates
+locally (`npm run lint && npm test && npm run build`, or `npm run
+validate`) and note that you did in the PR description if this is
+happening.
