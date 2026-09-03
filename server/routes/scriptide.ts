@@ -21,7 +21,7 @@ import {
   CharactersExportBodySchema, CharactersImportBodySchema,
 } from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
-import { locateIssues } from '../nvm/analyze/locate.ts';
+import { locateIssues, sceneLineSpans } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
 import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
@@ -512,7 +512,7 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // (click-a-finding → jump-to-line) without re-deriving scene/character
   // spans itself. Same shape /api/scriptide/diagnose already sends.
   const locatedIssues = locateIssues(issuesWithPass, fountain);
-  const rootCauses = clusterIssues(locatedIssues);
+  const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
   res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
 }));
 
@@ -617,7 +617,7 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
     const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
     // E2: same locatedIssues attachment as /doctor above.
     const locatedIssues = locateIssues(issuesWithPass, fountain);
-    const rootCauses = clusterIssues(locatedIssues);
+    const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
     emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, locatedIssues, source } });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
@@ -729,7 +729,7 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   // E2: same locatedIssues attachment as /doctor above.
   const locatedIssues = locateIssues(issuesWithPass, fountain);
-  const rootCauses = clusterIssues(locatedIssues);
+  const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
   res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
 }));
 
@@ -872,7 +872,7 @@ router.post(
     const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
     // E2: same locatedIssues attachment as /doctor above.
     const locatedIssues = locateIssues(issuesWithPass, converted.fountain);
-    const rootCauses = clusterIssues(locatedIssues);
+    const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(converted.fountain));
     res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, source });
   }),
 );
@@ -903,7 +903,7 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
 
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   const locatedIssues = locateIssues(issuesWithPass, fountain);
-  const rootCauses = clusterIssues(locatedIssues);
+  const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
   const analysisComplete = isWholeDraftAnalysisComplete(report);
 
   // Upgrade item #11: sceneHeatmap for the live editor's per-scene heatmap.

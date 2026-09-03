@@ -3,10 +3,11 @@
 // assert/strict, matching tests/core/locate.test.ts and
 // tests/core/fountain-analyzer.test.ts.
 
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { clusterIssues } from '../../server/nvm/analyze/cluster.ts';
-import { locateIssues } from '../../server/nvm/analyze/locate.ts';
+import { locateIssues, sceneLineSpans } from '../../server/nvm/analyze/locate.ts';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
 import type { LocatedIssue, IssueAnchor } from '../../server/nvm/analyze/types.ts';
@@ -686,6 +687,175 @@ describe('clusterIssues — Wave 1193 corpus-level proof (real script, real pipe
         assert.doesNotMatch(finding.title, /[A-Z]{3,}/);
         assert.doesNotMatch(finding.explanation, /[A-Z]{3,}/);
       }
+    }
+  });
+});
+
+// ── Member cap and scene cohesion (lane A2, 2026-09-03) ─────────────────────
+
+/** Eight scenes of four lines each — the same fixture shape
+ *  tests/core/locate.test.ts uses, so scene i (0-based) is lines 4i+1..4i+4
+ *  and every span asserted below is hand-checkable. */
+const EIGHT_SCENE_SPANS = Array.from({ length: 8 }, (_, i) => ({
+  startLine: 4 * i + 1,
+  endLine: 4 * i + 4,
+}));
+
+describe('clusterIssues — member cap', () => {
+  it('leaves an at-cap group whole, and its id byte-identical to the uncapped result', () => {
+    const members = Array.from({ length: 15 }, (_, i) =>
+      located(`RULE_${i}`, 'Scene 1 (INT. ONE)', 'scene', 'pacing', { startLine: 1, endLine: 4 }));
+    const findings = clusterIssues(members, EIGHT_SCENE_SPANS);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].memberCount, 15);
+    // The same 15 issues clustered with no scene map at all (the pre-lane call
+    // shape) must produce the same id — nothing about an unsplit group may
+    // depend on the cap machinery.
+    assert.equal(clusterIssues(members)[0].id, findings[0].id);
+  });
+
+  it('splits a group one member over the cap and keeps every part at or under it', () => {
+    const members = Array.from({ length: 16 }, (_, i) =>
+      located(`RULE_${i}`, `Scene ${(i % 8) + 1}`, 'scene', 'pacing',
+        { startLine: 4 * (i % 8) + 1, endLine: 4 * (i % 8) + 4 }));
+    const findings = clusterIssues(members, EIGHT_SCENE_SPANS);
+    assert.ok(findings.length >= 2, 'a 16-member convergence must not stay one finding');
+    for (const f of findings) assert.ok(f.memberCount <= 15, `member cap breached: ${f.memberCount}`);
+    assert.equal(findings.reduce((n, f) => n + f.memberCount, 0), 16, 'no member may be lost in the split');
+  });
+
+  it('splits along scene boundaries, not by slicing the member array', () => {
+    // 40 issues, five per scene, fed in an order that interleaves scenes so a
+    // naive "chunk the array" split would mix scene 1 with scene 8. Cohesive
+    // splitting must instead produce parts that are contiguous runs of scenes.
+    const members = [];
+    for (let round = 0; round < 5; round++) {
+      for (let scene = 0; scene < 8; scene++) {
+        members.push(located(`RULE_S${scene}_R${round}`, `Scene ${scene + 1}`, 'scene', 'pacing',
+          { startLine: 4 * scene + 1, endLine: 4 * scene + 4 }));
+      }
+    }
+    const findings = clusterIssues(members, EIGHT_SCENE_SPANS);
+    for (const f of findings) {
+      assert.ok(f.memberCount <= 15, `member cap breached: ${f.memberCount}`);
+      const idxs = f.sceneIdxs;
+      assert.ok(idxs.length > 0, 'a scene-anchored part must name its scenes');
+      assert.deepEqual(
+        idxs,
+        Array.from({ length: idxs[idxs.length - 1] - idxs[0] + 1 }, (_, k) => idxs[0] + k),
+        `part scenes are not contiguous: [${idxs.join(',')}]`,
+      );
+    }
+    assert.equal(findings.reduce((n, f) => n + f.memberCount, 0), 40);
+  });
+
+  it('chunks a single over-cap scene bucket rather than emitting it whole', () => {
+    // All 30 issues anchor to the SAME scene, so cohesion bucketing cannot
+    // separate them — the cap still has to hold.
+    const members = Array.from({ length: 30 }, (_, i) =>
+      located(`RULE_${i}`, 'Scene 4', 'scene', 'pacing', { startLine: 13, endLine: 16 }));
+    const findings = clusterIssues(members, EIGHT_SCENE_SPANS);
+    for (const f of findings) assert.ok(f.memberCount <= 15, `member cap breached: ${f.memberCount}`);
+    assert.equal(findings.reduce((n, f) => n + f.memberCount, 0), 30);
+    assert.equal(new Set(findings.map(f => f.id)).size, findings.length, 'split parts must not collide on id');
+  });
+
+  it('caps a document-family dump too, splitting it by pass', () => {
+    const passes: PassName[] = ['structure', 'pacing', 'rhythm'];
+    const members = Array.from({ length: 30 }, (_, i) =>
+      located(`RULE_${i}`, 'Dialogue throughout', 'document', passes[i % passes.length]));
+    const findings = clusterIssues(members, EIGHT_SCENE_SPANS);
+    assert.ok(findings.length >= 2);
+    for (const f of findings) assert.ok(f.memberCount <= 15, `member cap breached: ${f.memberCount}`);
+    assert.equal(new Set(findings.map(f => f.id)).size, findings.length, 'split parts must not collide on id');
+  });
+
+  it('is deterministic across two calls on the same input', () => {
+    const members = Array.from({ length: 37 }, (_, i) =>
+      located(`RULE_${i}`, `Scene ${(i % 8) + 1}`, 'scene', 'pacing',
+        { startLine: 4 * (i % 8) + 1, endLine: 4 * (i % 8) + 4 }));
+    assert.deepEqual(
+      clusterIssues(members, EIGHT_SCENE_SPANS),
+      clusterIssues(members, EIGHT_SCENE_SPANS),
+    );
+  });
+});
+
+describe('clusterIssues — scene indices from resolved spans', () => {
+  it('names the scenes of a range-anchored issue whose location text has no "Scene N"', () => {
+    // "Act 3 (Scenes 7–8)" is what locate.ts resolves to lines 25–32; the old
+    // SCENE_RE-only bookkeeping found nothing in that string and reported
+    // sceneIdxs: [], which is the heatmap dead end this fixes.
+    const members = [
+      located('ACT3_FLAT', 'Act 3 (Scenes 7–8)', 'scene', 'structure', { startLine: 25, endLine: 32 }),
+      located('ACT3_VOID', 'Act 3 (Scenes 7–8) — suspense void', 'scene', 'pacing', { startLine: 25, endLine: 32 }),
+    ];
+    const [finding] = clusterIssues(members, EIGHT_SCENE_SPANS);
+    assert.deepEqual(finding.sceneIdxs, [6, 7]);
+  });
+
+  it('agrees with the "Scene N" parse for a single-scene anchor', () => {
+    const members = [
+      located('A', 'Scene 3 (INT. THREE)', 'scene', 'structure', { startLine: 9, endLine: 12 }),
+      located('B', 'Scene 3 (INT. THREE)', 'scene', 'pacing', { startLine: 9, endLine: 12 }),
+    ];
+    assert.deepEqual(clusterIssues(members, EIGHT_SCENE_SPANS)[0].sceneIdxs, [2]);
+    assert.deepEqual(clusterIssues(members)[0].sceneIdxs, [2], 'unchanged without a scene map');
+  });
+});
+
+describe('clusterIssues — corpus and real-fixture invariants (lane A2)', () => {
+  /** Every finding must (a) stay at or under the cap, (b) carry a unique id,
+   *  and (c) name at least one scene whenever its own resolved span lands
+   *  inside one — otherwise the heatmap and jump-to-scene have nothing to
+   *  consume for exactly the findings that DO know where they are. */
+  function assertInvariants(
+    label: string,
+    findings: ReturnType<typeof clusterIssues>,
+    spans: Array<{ startLine: number; endLine: number }>,
+  ): void {
+    assert.equal(new Set(findings.map(f => f.id)).size, findings.length, `${label}: duplicate finding ids`);
+    for (const f of findings) {
+      assert.ok(f.memberCount <= 15, `${label}: ${f.memberCount}-member finding "${f.title}"`);
+      if (f.startLine === undefined || f.endLine === undefined) continue;
+      const touchesAScene = spans.some(s => s.startLine <= f.endLine! && f.startLine! <= s.endLine);
+      if (touchesAScene) {
+        assert.ok(
+          f.sceneIdxs.length > 0,
+          `${label}: "${f.title}" spans lines ${f.startLine}-${f.endLine} but names no scene`,
+        );
+      }
+    }
+  }
+
+  it('holds across all 20 calibration samples', async () => {
+    let clusters = 0;
+    let merged = 0;
+    for (const sample of REFERENCE_CORPUS) {
+      const report = await runScriptDoctor(sample.fountain);
+      const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+      const spans = sceneLineSpans(sample.fountain);
+      const findings = clusterIssues(locateIssues(issuesWithPass, sample.fountain), spans);
+      assertInvariants(sample.label, findings, spans);
+      clusters += findings.length;
+      merged += findings.filter(f => f.memberCount > 1).length;
+    }
+    assert.ok(clusters > 0, 'sanity: the corpus must produce clusters to measure');
+    assert.equal(merged, clusters, 'sanity: clustering must never emit a singleton');
+  });
+
+  it('holds on the two real screenplay fixtures', async () => {
+    for (const name of ['chain-of-custody', 'red-line']) {
+      const fountain = readFileSync(
+        new URL(`../../data/screenplays/${name}.fountain`, import.meta.url),
+        'utf8',
+      );
+      const report = await runScriptDoctor(fountain);
+      const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+      const spans = sceneLineSpans(fountain);
+      const findings = clusterIssues(locateIssues(issuesWithPass, fountain), spans);
+      assert.ok(findings.length > 0, `${name}: expected findings`);
+      assertInvariants(name, findings, spans);
     }
   });
 });

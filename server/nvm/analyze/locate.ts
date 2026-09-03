@@ -46,10 +46,18 @@ import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts'
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { LocatedIssue, IssueAnchor } from './types.ts';
 
+/** One scene's [startLine, endLine], 1-based and inclusive. Exported (as
+ *  SceneLineSpan, via sceneLineSpans below) so cluster.ts can turn a
+ *  LocatedIssue's line span back into the scene indices it covers — it only
+ *  ever receives LocatedIssue[], never the fountain, and since the 2026-09-03
+ *  range grammar an issue's own location text no longer always contains a
+ *  parseable "Scene N" to recover them from. */
 interface LineSpan {
   startLine: number;
   endLine: number;
 }
+
+export type SceneLineSpan = LineSpan;
 
 // "Scene N" — same case-insensitive pattern and same direct (0-based) index
 // interpretation as doctor.ts's SCENE_LOCATION_RE / buildSceneHeatmap, so a
@@ -363,4 +371,22 @@ export function locateIssues(
     pass,
     ...resolveLocation(issue.location, sceneSpans, characterFirstLines, totalLines),
   }));
+}
+
+/**
+ * Every scene's line span, in the same 0-based sceneIdx order locateIssues
+ * resolves "Scene N" against — the map cluster.ts needs to turn a
+ * LocatedIssue's line span back into scene indices.
+ *
+ * Exported rather than folded into locateIssues' return value so the existing
+ * LocatedIssue[] contract (and every caller and test of it) is unchanged. It
+ * does re-run parseFountain, which is a line-scan over the source and cheap
+ * next to the doctor run whose issues it is describing; a caller that wants
+ * both should call this once and reuse the array, exactly as the scriptide
+ * routes do.
+ */
+export function sceneLineSpans(fountain: string): SceneLineSpan[] {
+  if (!fountain || !fountain.trim()) return [];
+  const totalLines = fountain.split('\n').length;
+  return computeSceneSpans(parseFountain(fountain), totalLines);
 }

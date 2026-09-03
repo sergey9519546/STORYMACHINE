@@ -41,7 +41,44 @@
 
 import crypto from 'node:crypto';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
+import type { SceneLineSpan } from './locate.ts';
 import type { LocatedIssue, RootCauseFinding } from './types.ts';
+
+// ── Member cap and scene cohesion (lane A2, 2026-09-03) ─────────────────────
+// A root-cause finding is a NOTE — "start here, and here is why" — and a note
+// with 112 members is not a note, it is the flat issue list again wearing a
+// title. That number is measured, not hypothetical: on the red-line fixture
+// the generic overlap clusterer emitted one critical finding covering lines
+// 1–143 (the entire script, 12 of its 14 scenes), and the document-family
+// clusterer emitted 38-, 31-, 30- and 16-member rule-name dumps beside it.
+//
+// The overlap blowup is structural, not incidental. overlapClusters unions
+// TRANSITIVELY: A overlaps B and B overlaps C puts all three in one group
+// even when A and C share not a single line. That was tolerable while nearly
+// every anchor was one scene wide; once locate.ts started resolving act zones
+// and scene ranges (lane A1), a handful of quarter-of-the-script spans became
+// bridges that chain every scene-anchored issue in the draft into one
+// component.
+//
+// So: a hard cap, and a cohesion rule for splitting past it.
+//
+// WHY 15. Measured across all 20 REFERENCE_CORPUS samples plus the five real
+// fixtures the discovery run captured (25 documents):
+//
+//                        clusters   over 15   p50   p90   max
+//   before this lane          227    49 (22%)   6    44   112
+//   after                     378     0        8    13    15
+//
+// So the cap is not cosmetic — a fifth of all clusters were over it, and the
+// worst tenth were three to seven times over. 15 sits comfortably above the
+// median convergence (6 before, 8 after), so the ordinary "these five notes
+// are one problem" cluster is never touched, while being small enough that
+// the member list stays a list a writer reads rather than a wall they skim.
+// It is deliberately a round number rather than a tuned constant: nothing
+// downstream reads it and no score depends on it, so precision here would be
+// false precision. The guarantee that matters is that it is a HARD cap —
+// splitOversizedGroup can return parts smaller than the cap, never larger.
+const MAX_CLUSTER_MEMBERS = 15;
 
 type Severity = RevisionIssue['severity'];
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, major: 1, minor: 2 };
@@ -113,9 +150,29 @@ function dominantRuleArea(members: LocatedIssue[]): string {
   return humanizeRuleName(top);
 }
 
-function sceneIdxsOf(members: LocatedIssue[]): number[] {
+/** The scene indices a single located issue covers, read off its resolved
+ *  line span. Since lane A1, a scene-anchored issue's location text is often
+ *  a range ("Act 3 (Scenes 11–14)") or a percentage window ("Act 2a
+ *  (25–50%)") with no "Scene N" token to parse, so SCENE_RE alone silently
+ *  returned nothing for them and the finding surfaced with `sceneIdxs: []` —
+ *  a heatmap/navigation dead end for exactly the findings that DID know where
+ *  they were. Scene spans are disjoint and cover the document, so for a
+ *  single-scene anchor this returns the identical one index SCENE_RE would
+ *  have. */
+function spanSceneIdxs(li: LocatedIssue, sceneSpans: SceneLineSpan[]): number[] {
+  if (li.startLine === undefined || li.endLine === undefined) return [];
+  const out: number[] = [];
+  for (let i = 0; i < sceneSpans.length; i++) {
+    const s = sceneSpans[i];
+    if (s.startLine <= li.endLine && li.startLine <= s.endLine) out.push(i);
+  }
+  return out;
+}
+
+function sceneIdxsOf(members: LocatedIssue[], sceneSpans: SceneLineSpan[] = []): number[] {
   const idxs = new Set<number>();
   for (const m of members) {
+    for (const i of spanSceneIdxs(m, sceneSpans)) idxs.add(i);
     const match = SCENE_RE.exec(m.issue.location);
     // Labels are 1-based (writer-facing numbering); RootCauseFinding.sceneIdxs
     // stays 0-based like every other sceneIdx field — ScriptDoctorPanel
@@ -124,6 +181,100 @@ function sceneIdxsOf(members: LocatedIssue[]): number[] {
     if (match) idxs.add(parseInt(match[1], 10) - 1);
   }
   return [...idxs].sort((a, b) => a - b);
+}
+
+/** The cohesion key a member is bucketed under when a group has to be split.
+ *  Preference order, most cohesive first:
+ *    1. the scene its span STARTS in — two issues anchored to the same scene
+ *       (or the same act zone, which locate.ts resolves to that zone's first
+ *       scene's start line) share it exactly;
+ *    2. its raw start line, when spans are known but the line precedes the
+ *       first slugline (a pre-heading preamble);
+ *    3. its pass, for document-anchored members, which have no span at all —
+ *       within one dimension family the pass is the only cohesion axis left,
+ *       and it is a real one: "three structure-pass notes" reads as one
+ *       observation in a way "structure + pacing + rhythm" does not.
+ *  Numeric keys sort ahead of pass names so split parts come out in script
+ *  order; the ordering is total and derived only from the input, so it is
+ *  deterministic. */
+function cohesionKey(li: LocatedIssue, sceneSpans: SceneLineSpan[]): { rank: number; key: string } {
+  if (li.startLine !== undefined) {
+    for (let i = 0; i < sceneSpans.length; i++) {
+      if (sceneSpans[i].startLine <= li.startLine && li.startLine <= sceneSpans[i].endLine) {
+        return { rank: 0, key: String(i).padStart(8, '0') };
+      }
+    }
+    return { rank: 1, key: String(li.startLine).padStart(8, '0') };
+  }
+  return { rank: 2, key: li.pass };
+}
+
+/** Split one over-cap group into cohesive parts, each at most
+ *  MAX_CLUSTER_MEMBERS members.
+ *
+ *  A group at or under the cap is returned UNCHANGED and single — which is
+ *  what keeps every existing finding's id byte-identical, since an id is a
+ *  hash of the member rules plus the span and neither moves when nothing is
+ *  split. Only the pathological groups are touched.
+ *
+ *  Splitting is by cohesion key (above), never by an arbitrary slice of the
+ *  member array: members that belong to the same scene stay together, and
+ *  adjacent scenes are accumulated into a part until the part would exceed
+ *  the balanced target size, so the parts come out as contiguous runs of
+ *  script rather than interleaved. The target is ceil(n / ceil(n / cap)) —
+ *  the balanced part size — so a 112-member group becomes eight parts of ~14
+ *  rather than seven of 15 and one of 7.
+ *
+ *  Two degenerate cases are handled explicitly: a SINGLE cohesion bucket
+ *  bigger than the cap (dozens of issues all anchored to one scene) is chunked
+ *  in place, in input order; and a trailing part of one member is folded back
+ *  into its predecessor when there is room, because this module never returns
+ *  a singleton cluster (see the header) and silently dropping the member
+ *  would lose it from the root-cause view entirely. */
+function splitOversizedGroup(group: LocatedIssue[], sceneSpans: SceneLineSpan[]): LocatedIssue[][] {
+  if (group.length <= MAX_CLUSTER_MEMBERS) return [group];
+
+  const buckets = new Map<string, LocatedIssue[]>();
+  for (const li of group) {
+    const { rank, key } = cohesionKey(li, sceneSpans);
+    const composite = `${rank}:${key}`;
+    const bucket = buckets.get(composite) ?? [];
+    bucket.push(li);
+    buckets.set(composite, bucket);
+  }
+  const ordered = [...buckets.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+
+  const partCount = Math.ceil(group.length / MAX_CLUSTER_MEMBERS);
+  const target = Math.ceil(group.length / partCount);
+
+  const parts: LocatedIssue[][] = [];
+  let current: LocatedIssue[] = [];
+  for (const [, bucket] of ordered) {
+    // Chunk a single over-cap bucket so no chunk can ever push a part past
+    // the cap; a bucket at or under the cap is one chunk and stays whole.
+    const chunkCount = Math.ceil(bucket.length / MAX_CLUSTER_MEMBERS);
+    const chunkSize = Math.ceil(bucket.length / chunkCount);
+    for (let start = 0; start < bucket.length; start += chunkSize) {
+      const chunk = bucket.slice(start, start + chunkSize);
+      if (current.length > 0 && current.length + chunk.length > target) {
+        parts.push(current);
+        current = [];
+      }
+      current.push(...chunk);
+      if (current.length >= target) {
+        parts.push(current);
+        current = [];
+      }
+    }
+  }
+  if (current.length > 0) parts.push(current);
+
+  const last = parts[parts.length - 1];
+  if (parts.length > 1 && last.length === 1 && parts[parts.length - 2].length < MAX_CLUSTER_MEMBERS) {
+    parts.pop();
+    parts[parts.length - 1].push(last[0]);
+  }
+  return parts.filter(p => p.length >= 2);
 }
 
 function uniqueRules(members: LocatedIssue[]): string[] {
@@ -479,6 +630,7 @@ const ROOT_CAUSE_TEMPLATES: RootCauseTemplate[] = [
 function matchOverlapTemplate(
   template: RootCauseTemplate,
   located: LocatedIssue[],
+  sceneSpans: SceneLineSpan[],
 ): { consumed: LocatedIssue[]; findings: RootCauseFinding[] } {
   const candidates = located.filter(li =>
     template.requiredRules.includes(li.issue.rule)
@@ -522,7 +674,7 @@ function matchOverlapTemplate(
     const rulesPresent = new Set(group.map(m => m.issue.rule));
     const allRequiredPresent = template.requiredRules.every(r => rulesPresent.has(r));
     if (!allRequiredPresent) continue;
-    findings.push(synthesizeTemplateFinding(template, group));
+    findings.push(synthesizeTemplateFinding(template, group, sceneSpans));
     consumed.push(...group);
   }
   return { consumed, findings };
@@ -539,15 +691,20 @@ function matchOverlapTemplate(
 function matchDocumentTemplate(
   template: RootCauseTemplate,
   located: LocatedIssue[],
+  sceneSpans: SceneLineSpan[],
 ): { consumed: LocatedIssue[]; findings: RootCauseFinding[] } {
   const candidates = located.filter(li => template.requiredRules.includes(li.issue.rule));
   const rulesPresent = new Set(candidates.map(li => li.issue.rule));
   const allRequiredPresent = template.requiredRules.every(r => rulesPresent.has(r));
   if (!allRequiredPresent) return { consumed: [], findings: [] };
-  return { consumed: candidates, findings: [synthesizeTemplateFinding(template, candidates)] };
+  return { consumed: candidates, findings: [synthesizeTemplateFinding(template, candidates, sceneSpans)] };
 }
 
-function synthesizeTemplateFinding(template: RootCauseTemplate, members: LocatedIssue[]): RootCauseFinding {
+function synthesizeTemplateFinding(
+  template: RootCauseTemplate,
+  members: LocatedIssue[],
+  sceneSpans: SceneLineSpan[],
+): RootCauseFinding {
   const memberRules = uniqueRules(members);
   // Document-mode members (and, in principle, a mixed-anchor group) may
   // carry no line span at all — Math.min/max over an all-undefined array
@@ -557,7 +714,7 @@ function synthesizeTemplateFinding(template: RootCauseTemplate, members: Located
   const linedMembers = members.filter(m => m.startLine !== undefined && m.endLine !== undefined);
   const startLine = linedMembers.length > 0 ? Math.min(...linedMembers.map(m => m.startLine!)) : undefined;
   const endLine = linedMembers.length > 0 ? Math.max(...linedMembers.map(m => m.endLine!)) : undefined;
-  const sceneIdxs = sceneIdxsOf(members);
+  const sceneIdxs = sceneIdxsOf(members, sceneSpans);
   // sceneIdxs is 0-based (see sceneIdxsOf); labels shown to the writer are
   // 1-based, so re-encode with + 1 here.
   const where = sceneIdxs.length === 1
@@ -693,12 +850,16 @@ function documentFamilyClusters(located: LocatedIssue[]): Array<{ family: string
 
 // ── Finding synthesis ─────────────────────────────────────────────────────────
 
-function synthesizeSceneOrLinesFinding(members: LocatedIssue[]): RootCauseFinding {
+function synthesizeSceneOrLinesFinding(
+  members: LocatedIssue[],
+  sceneSpans: SceneLineSpan[],
+  partSuffix = '',
+): RootCauseFinding {
   const topRuleArea = dominantRuleArea(members);
   const memberRules = uniqueRules(members);
   const startLine = Math.min(...members.map(m => m.startLine!));
   const endLine = Math.max(...members.map(m => m.endLine!));
-  const sceneIdxs = sceneIdxsOf(members);
+  const sceneIdxs = sceneIdxsOf(members, sceneSpans);
   // sceneIdxs is 0-based (see sceneIdxsOf); labels shown to the writer are
   // 1-based, so re-encode with + 1 here.
   const where = sceneIdxs.length === 1
@@ -708,7 +869,7 @@ function synthesizeSceneOrLinesFinding(members: LocatedIssue[]): RootCauseFindin
       : `lines ${startLine}-${endLine}`;
 
   return {
-    id: findingId(memberRules, startLine, endLine),
+    id: findingId(memberRules, startLine, endLine, partSuffix),
     title: `Recurring ${topRuleArea} trouble in ${where}`,
     explanation: `${members.length} issues converge here, mostly around ${topRuleArea} `
       + `— concentrated in ${where} (lines ${startLine}-${endLine}).`,
@@ -721,15 +882,19 @@ function synthesizeSceneOrLinesFinding(members: LocatedIssue[]): RootCauseFindin
   };
 }
 
-function synthesizeCharacterFinding(members: LocatedIssue[]): RootCauseFinding {
+function synthesizeCharacterFinding(
+  members: LocatedIssue[],
+  sceneSpans: SceneLineSpan[],
+  partSuffix = '',
+): RootCauseFinding {
   const topRuleArea = dominantRuleArea(members);
   const memberRules = uniqueRules(members);
   const line = members[0].startLine!;
   const label = characterLabel(members[0].issue.location);
-  const sceneIdxs = sceneIdxsOf(members);
+  const sceneIdxs = sceneIdxsOf(members, sceneSpans);
 
   return {
-    id: findingId(memberRules, line, line),
+    id: findingId(memberRules, line, line, partSuffix),
     title: `Recurring ${topRuleArea} trouble for ${label}`,
     explanation: `${members.length} issues converge on ${label}, mostly around ${topRuleArea} `
       + `— first raised at line ${line}.`,
@@ -742,20 +907,25 @@ function synthesizeCharacterFinding(members: LocatedIssue[]): RootCauseFinding {
   };
 }
 
-function synthesizeDocumentFamilyFinding(family: string, members: LocatedIssue[]): RootCauseFinding {
+function synthesizeDocumentFamilyFinding(
+  family: string,
+  members: LocatedIssue[],
+  sceneSpans: SceneLineSpan[],
+  partSuffix = '',
+): RootCauseFinding {
   const topRuleArea = dominantRuleArea(members);
   const memberRules = uniqueRules(members);
   const passesInvolved = new Set(members.map(m => m.pass)).size;
 
   return {
-    id: findingId(memberRules, undefined, undefined, family),
+    id: findingId(memberRules, undefined, undefined, family + partSuffix),
     title: `Widespread ${family} concerns`,
     explanation: `${members.length} issues across ${passesInvolved} pass(es) in ${family} point to the same `
       + `underlying problem, mostly around ${topRuleArea}.`,
     severity: worstSeverity(members),
     memberRules,
     memberCount: members.length,
-    sceneIdxs: sceneIdxsOf(members),
+    sceneIdxs: sceneIdxsOf(members, sceneSpans),
     startLine: undefined,
     endLine: undefined,
   };
@@ -937,7 +1107,10 @@ function synthesizeFamilyFinding(family: DuplicateFamily, members: LocatedIssue[
  * randomness, no wall-clock reads), so the same LocatedIssue[] always
  * produces the same findings, in the same order, with the same ids.
  */
-export function clusterIssues(located: LocatedIssue[]): RootCauseFinding[] {
+export function clusterIssues(
+  located: LocatedIssue[],
+  sceneSpans: SceneLineSpan[] = [],
+): RootCauseFinding[] {
   const findings: RootCauseFinding[] = [];
   const consumed = new Set<LocatedIssue>();
 
@@ -962,17 +1135,37 @@ export function clusterIssues(located: LocatedIssue[]): RootCauseFinding[] {
   const afterFamilies = consumed.size === 0 ? located : located.filter(li => !consumed.has(li));
   for (const template of ROOT_CAUSE_TEMPLATES) {
     const { consumed: templateConsumed, findings: templateFindings } = template.mode === 'document'
-      ? matchDocumentTemplate(template, afterFamilies)
-      : matchOverlapTemplate(template, afterFamilies);
+      ? matchDocumentTemplate(template, afterFamilies, sceneSpans)
+      : matchOverlapTemplate(template, afterFamilies, sceneSpans);
     for (const li of templateConsumed) consumed.add(li);
     findings.push(...templateFindings);
   }
   const remaining = consumed.size === 0 ? located : located.filter(li => !consumed.has(li));
 
-  for (const group of overlapClusters(remaining)) findings.push(synthesizeSceneOrLinesFinding(group));
-  for (const group of characterClusters(remaining)) findings.push(synthesizeCharacterFinding(group));
+  // Each generic clusterer's groups pass through splitOversizedGroup before
+  // synthesis: a group at or under MAX_CLUSTER_MEMBERS comes back single and
+  // untouched (so its finding, and its id, are byte-identical to before this
+  // lane), and only an over-cap group is broken into cohesive parts. The part
+  // index joins the id hash ONLY when a group actually split, so unsplit
+  // findings keep the exact id scheme they had; two parts of one group can
+  // otherwise share a rule set and a span and would collide.
+  for (const group of overlapClusters(remaining)) {
+    const parts = splitOversizedGroup(group, sceneSpans);
+    parts.forEach((part, i) => {
+      findings.push(synthesizeSceneOrLinesFinding(part, sceneSpans, parts.length > 1 ? `part${i}` : ''));
+    });
+  }
+  for (const group of characterClusters(remaining)) {
+    const parts = splitOversizedGroup(group, sceneSpans);
+    parts.forEach((part, i) => {
+      findings.push(synthesizeCharacterFinding(part, sceneSpans, parts.length > 1 ? `part${i}` : ''));
+    });
+  }
   for (const { family, members } of documentFamilyClusters(remaining)) {
-    findings.push(synthesizeDocumentFamilyFinding(family, members));
+    const parts = splitOversizedGroup(members, sceneSpans);
+    parts.forEach((part, i) => {
+      findings.push(synthesizeDocumentFamilyFinding(family, part, sceneSpans, parts.length > 1 ? `part${i}` : ''));
+    });
   }
 
   // Severity first (critical findings lead), then how many issues each one
