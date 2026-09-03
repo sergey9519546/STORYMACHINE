@@ -50,26 +50,35 @@
 //
 //   --ignore-keys a,b,c        top-level report keys (dotted paths like
 //                              `provenance.structuralReliabilityNote` are
-//                              supported too — cheap plain-object nesting
-//                              only, not a general JSON Pointer) excluded
-//                              from the identity check. The compare still
-//                              PRINTS, per ignored key, how many of the N
-//                              compared reports actually differ in that key —
-//                              an ignore list is a claim ("only these moved"),
-//                              and the count is what makes the claim
-//                              falsifiable rather than a place to hide an
-//                              unrelated regression. Every byte outside the
-//                              ignored keys must still be identical or the
-//                              compare FAILS.
+//                              supported too — cheap plain-object nesting,
+//                              not a general JSON Pointer; a literal `*`
+//                              segment means "every element of the array
+//                              here", e.g. `passes.*.issues.*.id` for a field
+//                              nested inside every issue of every pass)
+//                              excluded from the identity check. The compare
+//                              still PRINTS, per ignored key, how many of the
+//                              N compared reports actually differ in that
+//                              key — a wildcard key differs for a fixture if
+//                              ANY matched element differs (or the matched
+//                              element COUNT differs) — an ignore list is a
+//                              claim ("only these moved"), and the count is
+//                              what makes the claim falsifiable rather than a
+//                              place to hide an unrelated regression. Every
+//                              byte outside the ignored keys must still be
+//                              identical or the compare FAILS.
 //
 //   --require-added x,y        the compare FAILS unless every listed key is
 //                              present in every AFTER report and ABSENT from
-//                              every BEFORE report. This is what stops
-//                              --ignore-keys from being used to launder a
-//                              removed or reshaped field as a "no-op" diff —
-//                              an ignored key must actually be a clean
-//                              addition, not a field that quietly changed
-//                              shape or disappeared.
+//                              every BEFORE report — for a wildcard key, "in
+//                              every report" means every MATCHED ELEMENT of
+//                              every report (one issue silently keeping the
+//                              old shape while its siblings gained the field
+//                              is exactly the partial-rollout bug this
+//                              catches). This is what stops --ignore-keys
+//                              from being used to launder a removed or
+//                              reshaped field as a "no-op" diff — an ignored
+//                              key must actually be a clean addition, not a
+//                              field that quietly changed shape or vanished.
 //
 // Typical additive-schema run:
 //   node scripts/check-doctor-output-identity.mjs --compare before after \
@@ -211,40 +220,71 @@ async function snapshotTree(treeArg, outDir) {
   process.stdout.write(`\nWrote ${index.length} report snapshots to ${outDir}\n`);
 }
 
-/** Read a dotted path ('a.b.c') out of a plain JSON object/array-free value.
- *  Returns {present, value}. Only walks plain objects — a segment that hits
- *  an array or a primitive before the path ends is treated as absent. That's
- *  the "cheap" dotted-path support the header promises: a real JSON Pointer
- *  implementation (array indices, escaping) is not needed for the report
- *  shape this harness inspects, and pretending otherwise would be unused
- *  complexity nobody could exercise. */
+/** Read a dotted path ('a.b.c') out of a plain JSON value. Returns
+ *  {present, value}. Only walks plain objects — a segment that hits an array
+ *  or a primitive before the path ends is treated as absent. That's the
+ *  "cheap" dotted-path support the header promises: a real JSON Pointer
+ *  implementation (escaping, numeric array indices) is not needed for the
+ *  report shape this harness inspects. For a path that names EVERY element
+ *  of an array (`passes.*.issues.*.id` — RevisionIssue.id lands nested
+ *  inside two array levels, not at a single fixed index), use
+ *  collectAtPath, which this function is a single-result convenience wrapper
+ *  around. */
 export function getAtPath(obj, dottedPath) {
-  const parts = dottedPath.split('.');
-  let cur = obj;
-  for (const part of parts) {
-    if (cur === null || typeof cur !== 'object' || Array.isArray(cur) || !(part in cur)) {
-      return { present: false, value: undefined };
-    }
-    cur = cur[part];
-  }
-  return { present: true, value: cur };
+  return collectAtPath(obj, dottedPath)[0] ?? { present: false, value: undefined };
 }
 
-/** Non-destructive: returns a NEW object with the dotted path removed,
- *  cloning only the spine of objects actually on the path. A path that does
- *  not resolve (missing key, or passes through a non-object) is a no-op —
- *  omitting an already-absent key must never throw, since a BEFORE snapshot
- *  legitimately lacks a key an AFTER snapshot adds. */
-export function omitAtPath(obj, dottedPath) {
-  const [head, ...rest] = dottedPath.split('.');
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj) || !(head in obj)) return obj;
-  if (rest.length === 0) {
-    const { [head]: _drop, ...remainder } = obj;
-    return remainder;
+/** Resolve a dotted path against a value, where a literal `*` segment means
+ *  "every element of the array here" — returning every {present, value} LEAF
+ *  the path reaches, in array order. A path with no `*` always resolves to
+ *  exactly one leaf, matching getAtPath's older single-result contract
+ *  exactly (getAtPath is now a thin wrapper over this). An array segment
+ *  hit by a NON-wildcard part (or a `*` hit by a non-array) is absent, same
+ *  as getAtPath's original array/primitive handling. A `*` over an empty
+ *  array contributes zero leaves — a vacuous match, not a violation either
+ *  way, which is the correct reading for "every element of nothing". */
+export function collectAtPath(obj, dottedPath) {
+  const parts = dottedPath.split('.');
+  function walk(value, idx) {
+    if (idx === parts.length) return [{ present: true, value }];
+    const part = parts[idx];
+    if (part === '*') {
+      if (!Array.isArray(value)) return [{ present: false, value: undefined }];
+      return value.flatMap((el) => walk(el, idx + 1));
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value) || !(part in value)) {
+      return [{ present: false, value: undefined }];
+    }
+    return walk(value[part], idx + 1);
   }
-  const nested = obj[head];
-  if (nested === null || typeof nested !== 'object' || Array.isArray(nested)) return obj;
-  return { ...obj, [head]: omitAtPath(nested, rest.join('.')) };
+  return walk(obj, 0);
+}
+
+/** Non-destructive: returns a NEW value with every leaf the dotted path
+ *  reaches removed, cloning only the spine actually on the path (arrays
+ *  touched by a `*` segment are shallow-mapped, not otherwise copied). A
+ *  path that does not resolve anywhere (missing key, passes through a
+ *  non-object, or a `*` over a non-array) is a no-op — omitting an
+ *  already-absent key must never throw, since a BEFORE snapshot
+ *  legitimately lacks a key an AFTER snapshot adds. `*` as the FINAL segment
+ *  (nothing named to drop from each element) is also a no-op. */
+export function omitAtPath(obj, dottedPath) {
+  const parts = dottedPath.split('.');
+  function omit(value, idx) {
+    const part = parts[idx];
+    const isLast = idx === parts.length - 1;
+    if (part === '*') {
+      if (!Array.isArray(value)) return value;
+      return isLast ? value : value.map((el) => omit(el, idx + 1));
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value) || !(part in value)) return value;
+    if (isLast) {
+      const { [part]: _drop, ...remainder } = value;
+      return remainder;
+    }
+    return { ...value, [part]: omit(value[part], idx + 1) };
+  }
+  return omit(obj, 0);
 }
 
 const safeName = (name) => name.replace(/[^A-Za-z0-9._-]+/g, '__');
@@ -301,20 +341,30 @@ export function computeCompare(beforeDir, afterDir, opts = {}) {
       const afterObj = JSON.parse(afterRaw);
 
       for (const key of requireAdded) {
-        if (getAtPath(beforeObj, key).present) {
+        // collectAtPath, not getAtPath: a wildcard key (`passes.*.issues.*.id`)
+        // must be checked against EVERY matched leaf, not just the first —
+        // one issue keeping the old (missing) shape while its siblings gained
+        // the new field is exactly the partial-rollout bug this check exists
+        // to catch.
+        const beforeLeaves = collectAtPath(beforeObj, key);
+        const afterLeaves = collectAtPath(afterObj, key);
+        if (beforeLeaves.some((l) => l.present)) {
           requireAddedViolations.push({ key, fixture: name, reason: 'present in BEFORE (must only exist after the change)' });
         }
-        if (!getAtPath(afterObj, key).present) {
-          requireAddedViolations.push({ key, fixture: name, reason: 'absent from AFTER (must be added by the change)' });
+        if (afterLeaves.some((l) => !l.present)) {
+          requireAddedViolations.push({ key, fixture: name, reason: 'absent from AFTER on at least one matched element (must be added by the change everywhere it applies)' });
         }
       }
 
       for (const key of ignoreKeys) {
-        const bv = getAtPath(beforeObj, key);
-        const av = getAtPath(afterObj, key);
-        if (bv.present !== av.present || JSON.stringify(bv.value) !== JSON.stringify(av.value)) {
-          ignoredKeyDiffCounts[key] += 1;
-        }
+        const beforeLeaves = collectAtPath(beforeObj, key);
+        const afterLeaves = collectAtPath(afterObj, key);
+        const differs = beforeLeaves.length !== afterLeaves.length
+          || beforeLeaves.some((bv, i) => {
+            const av = afterLeaves[i];
+            return bv.present !== av.present || JSON.stringify(bv.value) !== JSON.stringify(av.value);
+          });
+        if (differs) ignoredKeyDiffCounts[key] += 1;
       }
 
       if (b.sha256 !== a.sha256) {

@@ -250,12 +250,22 @@ function flattenIssues(report: ScriptDoctorReport): TaggedIssue[] {
   return report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
 }
 
-/** (rule, location) identity — deliberately NOT including `pass`: two issues
- *  with the same rule and location are the same finding for delta purposes
- *  even if a future rename ever moved a rule between passes. Matches
- *  types.ts's FixVerifyResult.cleared/introduced doc comment verbatim. */
+/** #5: prefer the STABLE id doctor.ts's aggregation assigns to every issue
+ *  (a hash of pass + rule + a NORMALIZED scene span — immune to a
+ *  location-text reword, e.g. a slugline edit between the baseline and
+ *  candidate run). Falls back to the legacy (rule, location) STRING identity
+ *  — deliberately NOT including `pass`, so two issues with the same rule and
+ *  location are the same finding for delta purposes even if a future rename
+ *  ever moved a rule between passes — only when `id` is absent (a report
+ *  built before this field existed, or hand-constructed by a test). Matches
+ *  types.ts's FixVerifyResult.cleared/introduced doc comment verbatim.
+ *
+ *  (This function's fallback branch used to carry a stray literal NUL byte
+ *  between `issue.rule` and `issue.location` instead of a space — harmless
+ *  as a Map key since JS strings tolerate embedded NULs, but clearly
+ *  unintentional corruption; fixed while this function was touched anyway.) */
 function issueKey(issue: RevisionIssue): string {
-  return `${issue.rule} ${issue.location}`;
+  return issue.id ?? `${issue.rule} ${issue.location}`;
 }
 
 /** Multiset diff: an issue present N times in baseline and M times in

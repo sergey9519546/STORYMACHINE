@@ -21,6 +21,7 @@ import { createHash } from 'node:crypto';
 import {
   canonical,
   getAtPath,
+  collectAtPath,
   omitAtPath,
   parseKeyList,
   computeCompare,
@@ -94,6 +95,39 @@ describe('getAtPath', () => {
   });
 });
 
+describe('collectAtPath — `*` wildcard over array elements', () => {
+  it('collects one leaf per array element at the wildcard position', () => {
+    const obj = { passes: [{ issues: [{ id: 'a' }, { id: 'b' }] }, { issues: [{ id: 'c' }] }] };
+    assert.deepEqual(collectAtPath(obj, 'passes.*.issues.*.id'), [
+      { present: true, value: 'a' },
+      { present: true, value: 'b' },
+      { present: true, value: 'c' },
+    ]);
+  });
+
+  it('reports a missing leaf as present:false without dropping the other matched elements', () => {
+    const obj = { issues: [{ id: 'a' }, { rule: 'X' }, { id: 'c' }] }; // middle element has no id
+    assert.deepEqual(collectAtPath(obj, 'issues.*.id'), [
+      { present: true, value: 'a' },
+      { present: false, value: undefined },
+      { present: true, value: 'c' },
+    ]);
+  });
+
+  it('a wildcard over an empty array collects zero leaves (vacuous, not a violation)', () => {
+    assert.deepEqual(collectAtPath({ issues: [] }, 'issues.*.id'), []);
+  });
+
+  it('a wildcard segment over a non-array is a single absent leaf', () => {
+    assert.deepEqual(collectAtPath({ issues: 'not-an-array' }, 'issues.*.id'), [{ present: false, value: undefined }]);
+  });
+
+  it('a non-wildcard path always collects exactly one leaf, matching getAtPath', () => {
+    assert.deepEqual(collectAtPath({ a: 1 }, 'a'), [{ present: true, value: 1 }]);
+    assert.equal(collectAtPath({ a: 1 }, 'a').length, 1);
+  });
+});
+
 describe('omitAtPath', () => {
   it('removes a top-level key without mutating the input', () => {
     const obj = { a: 1, b: 2 };
@@ -112,6 +146,17 @@ describe('omitAtPath', () => {
     const obj = { a: 1 };
     assert.deepEqual(omitAtPath(obj, 'missing'), obj);
     assert.deepEqual(omitAtPath(obj, 'a.deeper'), obj);
+  });
+
+  it('removes a field nested inside every element of a `*`-wildcarded array', () => {
+    const obj = { passes: [{ issues: [{ id: 'a', rule: 'X' }, { id: 'b', rule: 'Y' }] }] };
+    const out = omitAtPath(obj, 'passes.*.issues.*.id');
+    assert.deepEqual(out, { passes: [{ issues: [{ rule: 'X' }, { rule: 'Y' }] }] });
+  });
+
+  it('a `*` as the final segment is a no-op (nothing named to drop from each element)', () => {
+    const obj = { issues: [1, 2, 3] };
+    assert.deepEqual(omitAtPath(obj, 'issues.*'), obj);
   });
 });
 
@@ -282,6 +327,42 @@ describe('computeCompare — --require-added', () => {
     });
     assert.equal(result.exitCode, 1);
     assert.ok(result.requireAddedViolations.some((v) => /present in BEFORE/.test(v.reason)));
+  });
+
+  it('a `*`-wildcarded require-added key: id added to every issue of every pass, absent before -> PASS', () => {
+    const before = writeSnapshotDir([{
+      name: 'fixture/a',
+      report: baseReport({ passes: [{ pass: 'dialogue', issues: [{ rule: 'X' }, { rule: 'Y' }] }] }),
+    }]);
+    const after = writeSnapshotDir([{
+      name: 'fixture/a',
+      report: baseReport({ passes: [{ pass: 'dialogue', issues: [{ rule: 'X', id: 'h1' }, { rule: 'Y', id: 'h2' }] }] }),
+    }]);
+    const result = computeCompare(before, after, {
+      ignoreKeys: ['passes.*.issues.*.id'],
+      requireAdded: ['passes.*.issues.*.id'],
+    });
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.requireAddedViolations, []);
+    assert.equal(result.ignoredKeyDiffCounts['passes.*.issues.*.id'], 1);
+  });
+
+  it('a `*`-wildcarded require-added key catches a PARTIAL rollout: one issue missing the field fails', () => {
+    const before = writeSnapshotDir([{
+      name: 'fixture/a',
+      report: baseReport({ passes: [{ pass: 'dialogue', issues: [{ rule: 'X' }, { rule: 'Y' }] }] }),
+    }]);
+    const after = writeSnapshotDir([{
+      name: 'fixture/a',
+      // Only the first issue got an id — a bug the require-added check exists to catch.
+      report: baseReport({ passes: [{ pass: 'dialogue', issues: [{ rule: 'X', id: 'h1' }, { rule: 'Y' }] }] }),
+    }]);
+    const result = computeCompare(before, after, {
+      ignoreKeys: ['passes.*.issues.*.id'],
+      requireAdded: ['passes.*.issues.*.id'],
+    });
+    assert.equal(result.exitCode, 1);
+    assert.ok(result.requireAddedViolations.some((v) => /absent from AFTER/.test(v.reason)));
   });
 
   it('a require-added failure fails the compare even when content is otherwise byte-identical', () => {

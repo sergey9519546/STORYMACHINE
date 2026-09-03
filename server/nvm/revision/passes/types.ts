@@ -45,6 +45,19 @@ export interface RevisionIssue {
   /** How strongly current evidence supports this finding, kept separate from
    *  severity (TRACE §17.3). Absent ⇒ full legacy weight in the health formula. */
   confidenceTier?: import('./confidence.ts').ConfidenceTier;
+  /** #5: a stable identity for this finding, assigned at aggregation
+   *  (doctor.ts's aggregateReport) as a short hash of (pass, rule, a
+   *  NORMALIZED scene span) — deliberately NOT the display `location`
+   *  string, which is free-form English a pass can reword without the
+   *  underlying finding changing. Two reports of the SAME issue keep the
+   *  SAME id even when `location`'s wording differs (a scene relabeled, a
+   *  slugline edited). Absent on a RevisionIssue built directly by a pass
+   *  (passes emit issues with no `id`; doctor.ts assigns one only once it
+   *  has the full pipeline result to hash against) — never read before
+   *  aggregation completes. The fix-and-verify diff (server/nvm/analyze/
+   *  fix.ts's issueKey) matches on `id` when present, falling back to the
+   *  legacy `(rule, location)` identity when it is absent. */
+  id?: string;
 }
 
 export interface StoryContext {

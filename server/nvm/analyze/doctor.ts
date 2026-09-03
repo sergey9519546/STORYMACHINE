@@ -1806,6 +1806,36 @@ function buildStructureSummaryLine(analysis: FountainAnalysis): string {
  *  toward the report totals, per the SceneDiagnostics contract. */
 const SCENE_LOCATION_RE = /Scene (\d+)/i;
 
+// ── Stable finding ids (#5) ─────────────────────────────────────────────────
+// A `location` string is free-form English a pass composes for DISPLAY
+// ("Scene 3 (INT. BAR)") — it can be reworded (a slugline edit, a relabel)
+// without the underlying finding changing, so it is deliberately NOT part of
+// the id. What identifies a finding across two reports of the same
+// underlying issue is which PASS raised it, which RULE fired, and roughly
+// WHERE — reduced to the same "Scene N" token buildSceneHeatmap already
+// parses out of `location` (the finest-grained span every pass already
+// speaks in), never the surrounding prose. A location that names no scene
+// (an act-level or whole-script finding) normalizes to a single shared
+// bucket rather than hashing the prose, so two differently-worded whole-
+// script findings from the same (pass, rule) still collide on purpose — the
+// SAME whole-script finding, restated.
+function normalizedIssueSpan(location: string): string {
+  const m = SCENE_LOCATION_RE.exec(location);
+  return m ? `scene:${m[1]}` : 'document';
+}
+
+/** Short (16 hex char / 64-bit) sha256 prefix — collision-resistant enough
+ *  for the handful of distinct (pass, rule, span) triples one report can
+ *  produce, and short enough to be a reasonable id in a diff or a URL.
+ *  Deterministic: same (pass, rule, location) always hashes to the same id,
+ *  in this report and in any later report of the same script. */
+export function computeIssueId(pass: PassName, rule: string, location: string): string {
+  return crypto.createHash('sha256')
+    .update(`${pass}|${rule}|${normalizedIssueSpan(location)}`)
+    .digest('hex')
+    .slice(0, 16);
+}
+
 function buildSceneHeatmap(passes: DoctorPassSummary[], analysis: FountainAnalysis): SceneDiagnostics[] {
   // Seed one entry per scene so the heatmap is a complete strip: a zero-issue
   // scene is a data point (a healthy cell), not a gap — the panel renders
@@ -1904,9 +1934,13 @@ export function reconcileStrengthsWithCriticalFindings(
 // runScriptDoctorSequentialForTest below. No other caller needs it:
 // runScriptDoctor already wires it into the normal request path.
 export function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fountain: string): ScriptDoctorReport {
+  // #5: assign each issue its stable id HERE, before it fans out into
+  // topPriorities/sceneHeatmap below — both are built FROM `passes`, so
+  // attaching `id` once at the source means every downstream copy of an
+  // issue (passes[].issues[], topPriorities[]) carries the same id.
   const passes: DoctorPassSummary[] = result.passResults.map(pr => ({
     pass: pr.pass,
-    issues: pr.issues,
+    issues: pr.issues.map(issue => ({ ...issue, id: computeIssueId(pr.pass, issue.rule, issue.location) })),
     critical: pr.issues.filter(i => i.severity === 'critical').length,
     major: pr.issues.filter(i => i.severity === 'major').length,
     minor: pr.issues.filter(i => i.severity === 'minor').length,

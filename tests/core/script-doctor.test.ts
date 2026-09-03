@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import {
   runScriptDoctor, computeHealthScore, gradeForHealth, verdictFor, buildStrengths,
   computeDimensionScore, computeDimensionRawScore, aggregateReport, clearDoctorCache,
-  reconcileStrengthsWithCriticalFindings,
+  reconcileStrengthsWithCriticalFindings, computeIssueId,
 } from '../../server/nvm/analyze/doctor.ts';
 import { runDiagnoseOnly, rewritePass } from '../../server/nvm/revision/rewrite.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
@@ -1261,6 +1261,97 @@ function buildAnalysisFixture(sceneCount: number, wordCount: number): FountainAn
     characters: [], sceneCount, dialogueLineCount: 0, actionLineCount: 0, wordCount,
   };
 }
+
+/** A RevisionResult with exactly one issue, on the 'dialogue' pass, at the
+ *  given location — everything else about it fixed, so two calls that only
+ *  vary `location` isolate exactly the thing #5's id scheme claims to be
+ *  immune to. */
+function buildResultWithOneIssue(location: string, rule = 'DIALOGUE_ON_THE_NOSE'): RevisionResult {
+  const passResults: PassResult[] = PASS_ORDER.map(pass => ({
+    pass: pass as PassResult['pass'], issues: [] as RevisionIssue[],
+    revisedFountain: '', changed: false, summary: '',
+  }));
+  passResults.find(p => p.pass === 'dialogue')!.issues.push({
+    location, rule, description: 'synthetic test issue', severity: 'minor',
+  });
+  return {
+    passResults, finalFountain: '', originalFountain: '',
+    totalIssuesFound: 1, passesWithChanges: 0, failedPasses: [], completedAt: 0,
+  };
+}
+
+// ── Stable finding ids (#5) ──────────────────────────────────────────────────
+describe('computeIssueId — stable finding ids (#5)', () => {
+  it('is a pure, deterministic function of (pass, rule, normalized scene span)', () => {
+    const a = computeIssueId('theme', 'RULE', 'Scene 5 (EXT. ROOF)');
+    const b = computeIssueId('theme', 'RULE', 'Scene 5 (EXT. ROOF)');
+    assert.equal(a, b);
+    assert.ok(a.length > 0);
+  });
+
+  it('a reworded location for the SAME scene number produces the SAME id', () => {
+    const idA = computeIssueId('dialogue', 'DIALOGUE_ON_THE_NOSE', 'Scene 3 (INT. BAR)');
+    const idB = computeIssueId('dialogue', 'DIALOGUE_ON_THE_NOSE', 'Scene 3 (INT. THE OLD BAR — relabeled and re-slugged)');
+    assert.equal(idA, idB, 'reworded scene-location prose must not change the id — only the scene NUMBER does');
+  });
+
+  it('a genuinely different scene number produces a different id', () => {
+    const idScene3 = computeIssueId('dialogue', 'RULE', 'Scene 3 (INT. BAR)');
+    const idScene4 = computeIssueId('dialogue', 'RULE', 'Scene 4 (INT. BAR)');
+    assert.notEqual(idScene3, idScene4);
+  });
+
+  it('a different rule at the same location produces a different id', () => {
+    const idA = computeIssueId('dialogue', 'RULE_A', 'Scene 3 (INT. BAR)');
+    const idB = computeIssueId('dialogue', 'RULE_B', 'Scene 3 (INT. BAR)');
+    assert.notEqual(idA, idB);
+  });
+
+  it('a different pass for the same rule/location produces a different id', () => {
+    const idDialogue = computeIssueId('dialogue', 'SHARED_RULE_NAME', 'Scene 3 (INT. BAR)');
+    const idVoice = computeIssueId('voice', 'SHARED_RULE_NAME', 'Scene 3 (INT. BAR)');
+    assert.notEqual(idDialogue, idVoice);
+  });
+
+  it('two differently-worded whole-document (non-scene) locations collide on purpose — same finding, restated', () => {
+    const idA = computeIssueId('structure', 'ACT_IMBALANCE', 'Act 3 pacing');
+    const idB = computeIssueId('structure', 'ACT_IMBALANCE', 'Dialogue throughout');
+    assert.equal(idA, idB, 'neither location names a scene, so both normalize to the same document-level bucket');
+  });
+});
+
+describe('aggregateReport — stable finding ids reach the real report shape (#5)', () => {
+  it('the same underlying issue keeps its id across a location-text relabel: construct two reports whose ONLY difference is the location wording', () => {
+    const analysis = buildAnalysisFixture(9, 608);
+    const reportA = aggregateReport(
+      buildResultWithOneIssue('Scene 3 (INT. BAR)'), analysis, 'fixture fountain — original slugline',
+    );
+    const reportB = aggregateReport(
+      buildResultWithOneIssue('Scene 3 (INT. THE OLD BAR — relabeled)'), analysis, 'fixture fountain — relabeled slugline',
+    );
+
+    const issueA = reportA.passes.find(p => p.pass === 'dialogue')!.issues[0];
+    const issueB = reportB.passes.find(p => p.pass === 'dialogue')!.issues[0];
+    assert.ok(issueA.id && issueB.id, 'aggregateReport must assign an id to every issue');
+    assert.notEqual(issueA.location, issueB.location, 'sanity: the two reports really do differ only in location wording');
+    assert.equal(issueA.id, issueB.id, 'the id must survive the relabel — it is not derived from the display location string');
+
+    // The id must reach every place an issue is copied out of `passes`, not
+    // just the pass-level array it originates in.
+    assert.equal(reportA.topPriorities[0]?.id, issueA.id);
+    assert.equal(reportB.topPriorities[0]?.id, issueB.id);
+  });
+
+  it('a genuinely different scene number DOES change the id, even through the full aggregation path', () => {
+    const analysis = buildAnalysisFixture(9, 608);
+    const reportA = aggregateReport(buildResultWithOneIssue('Scene 3 (INT. BAR)'), analysis, 'fixture fountain a');
+    const reportC = aggregateReport(buildResultWithOneIssue('Scene 5 (INT. BAR)'), analysis, 'fixture fountain c');
+
+    const idA = reportA.passes.find(p => p.pass === 'dialogue')!.issues[0].id;
+    const idC = reportC.passes.find(p => p.pass === 'dialogue')!.issues[0].id;
+    assert.notEqual(idA, idC);
+  });
+});
 
 describe('runScriptDoctor report shape — dimension-collapse fix, end to end (Wave 18-β)', () => {
   it('FIRE: a short (9-scene, 608-word) script with skewed per-dimension issue counts produces non-identical dimension scores, ordered by issue density', () => {
