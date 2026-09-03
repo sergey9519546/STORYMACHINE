@@ -208,16 +208,24 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
   // Post-saturation-fix formula (doctor.ts's craftPenalty):
   //   penalty = DENSITY_SCALE * (weightedIssues / wordCount^WORD_COUNT_EXPONENT)^DENSITY_POWER
   //           + SCARCITY_SCALE / sceneCount
-  // with DENSITY_SCALE=2.5, WORD_COUNT_EXPONENT=0.7, DENSITY_POWER=3.75,
-  // SCARCITY_SCALE=140 (doctor.ts). The exponents are irrational-ish tuned
+  // with DENSITY_SCALE=8, WORD_COUNT_EXPONENT=0.7, DENSITY_POWER=2,
+  // SCARCITY_SCALE=140, SCENE_OPPORTUNITY_WORDS=30 (doctor.ts). Lane R5
+  // (2026-09-03) replaced the density denominator — wordCount^0.7 became
+  // (sceneCount * SCENE_OPPORTUNITY_WORDS)^0.7, because appended filler prose
+  // used to RAISE health — and re-derived the two curve constants for the
+  // density scale that produces. See
+  // docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md. The exponents are irrational-ish tuned
   // constants (see doctor.ts's craftPenalty comment for the empirical
   // rationale), so — like the prior formula's spot-checks — these assert
   // against the ROUNDED displayed value rather than hand-expanded arithmetic;
   // computeHealthScore itself is the single source of truth for the formula.
   it('matches the documented formula for a known issue count', () => {
-    // weightedIssues = 4*1 + 1.5*2 + 0.5*3 = 8.5; sceneCount=10, wordCount=300.
-    const health = computeHealthScore({ critical: 1, major: 2, minor: 3 }, 10, 300);
-    assert.equal(health, 86);
+    // weightedIssues = 4*1 + 1.5*2 + 0.5*3 = 8.5; sceneCount=10, so the
+    // opportunity denominator is (10*30)^0.7 — the same 300^0.7 the old
+    // word-based denominator produced for this fixture, so the locked value
+    // is unchanged by lane R5.
+    const health = computeHealthScore({ critical: 1, major: 2, minor: 3 }, 10);
+    assert.equal(health, 85.8); // 86 before lane R5's curve re-derivation
     assert.equal(gradeForHealth(health), 'strong');
   });
 
@@ -227,47 +235,54 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
     // craftPenalty comment): a report is never "0 issues, therefore
     // literally 100" purely from a big denominator, it's the scarcity
     // correction fading toward (not to) zero as scenes accumulate.
-    const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 25, 2000);
+    const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 25);
     assert.equal(health, 94.4);
     assert.equal(gradeForHealth(health), 'excellent');
   });
 
-  it('does NOT return 100 for zero issues at a tiny scene/word count — small-script sanity', () => {
-    // The defect this fix targets in the other direction: a 4-scene, 80-word
+  it('does NOT return 100 for zero issues at a tiny scene count — small-script sanity', () => {
+    // The defect this fix targets in the other direction: a 4-scene
     // fixture that happens to have zero issues must not read as a proven
     // "excellent" script — there wasn't enough material for most of the
     // pipeline's structural checks to have had a fair chance to fire.
     // scarcityPenalty (140/4 = 35) keeps even a clean tiny script in a
     // plausible mid band instead of at the ceiling.
-    const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 4, 80);
+    const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 4);
     assert.equal(health, 65);
     assert.equal(gradeForHealth(health), 'solid');
   });
 
   it('clamps to 0 when the penalty would exceed 100', () => {
-    const health = computeHealthScore({ critical: 10, major: 10, minor: 10 }, 5, 50);
+    // Lane R5 re-chose this fixture: saturation is now driven by issue
+    // volume against the SCENE count, not by an artificially tiny word count
+    // (the denominator no longer reads words at all). weightedIssues 180 over
+    // 5 scenes is density 5.5 against a (5*30)^0.7 = 32.5 denominator, which
+    // the re-derived curve takes well past the clamp (raw -160.9).
+    const health = computeHealthScore({ critical: 30, major: 30, minor: 30 }, 5);
     assert.equal(health, 0);
     assert.equal(gradeForHealth(health), 'troubled');
   });
 
   // P0.1 continuity/monotonicity: the density penalty must never reward a
   // denser issue mix. Crossing density=1 used to drop the penalty by ~7.5
-  // points; this asserts the continuous join cannot do that.
+  // points; this asserts the continuous curve cannot do that. Lane R5 retired
+  // the piecewise split entirely (one power curve now spans every density),
+  // so these two properties hold by construction — the assertions stay as the
+  // regression guard that they still do.
   it('P0.1: adding severity-weighted issues never improves health (monotonicity)', () => {
     const sceneCount = 12;
-    const wordCount = 600;
-    let prev = computeHealthScore({ critical: 0, major: 0, minor: 0 }, sceneCount, wordCount);
+    let prev = computeHealthScore({ critical: 0, major: 0, minor: 0 }, sceneCount);
     for (let minor = 1; minor <= 40; minor++) {
-      const next = computeHealthScore({ critical: 0, major: 0, minor }, sceneCount, wordCount);
+      const next = computeHealthScore({ critical: 0, major: 0, minor }, sceneCount);
       assert.ok(
         next <= prev + 1e-9,
         `health rose from ${prev} to ${next} when minor issues increased to ${minor}`,
       );
       prev = next;
     }
-    prev = computeHealthScore({ critical: 0, major: 0, minor: 0 }, sceneCount, wordCount);
+    prev = computeHealthScore({ critical: 0, major: 0, minor: 0 }, sceneCount);
     for (let major = 1; major <= 20; major++) {
-      const next = computeHealthScore({ critical: 0, major, minor: 0 }, sceneCount, wordCount);
+      const next = computeHealthScore({ critical: 0, major, minor: 0 }, sceneCount);
       assert.ok(
         next <= prev + 1e-9,
         `health rose from ${prev} to ${next} when major issues increased to ${major}`,
@@ -277,16 +292,16 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
   });
 
   it('P0.1: density penalty is continuous across the density=1 seam', () => {
-    // Opportunity words for wordCount=600: 600^0.7 ≈ 88.1.
-    // weightedIssues ≈ 88.1 ⇒ density ≈ 1. Probe just below and just above.
+    // Opportunity words for sceneCount=12: (12*30)^0.7 ≈ 61.6, so
+    // weightedIssues ≈ 61.6 ⇒ density ≈ 1 — where the retired piecewise
+    // formula's seam used to sit. Probe just below and just above it.
     const sceneCount = 12;
-    const wordCount = 600;
-    // minor weight = 0.5 → need ~176 minors for density≈1; use fine steps near seam.
+    // minor weight = 0.5 → need ~123 minors for density≈1; use fine steps near seam.
     const near = [];
-    for (let minor = 160; minor <= 200; minor++) {
+    for (let minor = 100; minor <= 150; minor++) {
       near.push({
         minor,
-        health: computeHealthScore({ critical: 0, major: 0, minor }, sceneCount, wordCount),
+        health: computeHealthScore({ critical: 0, major: 0, minor }, sceneCount),
       });
     }
     for (let i = 1; i < near.length; i++) {
@@ -737,10 +752,10 @@ describe('Wave 1183 — calibration-drift guard (strengths must never leak into 
       const report = await runScriptDoctor(sample.fountain);
       if ((report.strengths ?? []).some(s => WAVE_1183_MARKERS.some(m => s.includes(m)))) sawAWave1183Strength = true;
 
-      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount);
       assert.equal(
         report.health, expectedHealth,
-        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount) exactly — ` +
           `strengths and uncalibrated graph diagnostics must never move it`,
       );
     }
@@ -991,10 +1006,10 @@ describe('Wave 1187 — calibration-drift guard (strengths must never leak into 
       const report = await runScriptDoctor(sample.fountain);
       if ((report.strengths ?? []).some(s => WAVE_1187_MARKERS.some(m => s.includes(m)))) sawAWave1187Strength = true;
 
-      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount);
       assert.equal(
         report.health, expectedHealth,
-        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount) exactly — ` +
           `strengths and uncalibrated graph diagnostics must never move it`,
       );
     }
@@ -1162,18 +1177,19 @@ describe('runScriptDoctor — calibration percentiles', () => {
 
 describe('computeDimensionScore / computeDimensionRawScore — formula spot-check (Wave 18-β)', () => {
   it('separates 5 skewed dimension issue-mixes at the bug repro word/scene count, ordered by issue density', () => {
-    // Mirrors the bug's own repro shape: 608 words, 9 scenes, per-dimension
+    // Mirrors the bug's own repro shape: 9 scenes, per-dimension
     // weightedIssues 35/40/14/34/8 (minor-only counts of 70/80/28/68/16, since
-    // weightedIssues = 0.5*minorCount). Expected values below are this wave's
-    // own measured output (see doctor.ts's Wave 18-β comment) — computeDimensionScore
-    // itself is the single source of truth for the formula, same convention as
-    // computeHealthScore's own spot-check block above.
-    const wordCount = 608;
+    // weightedIssues = 0.5*minorCount). Expected values below are lane R5's
+    // measured output for the scene-opportunity denominator — before that
+    // change the same mix read [75.3, 69.8, 93.7, 76.3, 97.3] against a
+    // 608-word denominator. computeDimensionScore itself is the single source
+    // of truth for the formula, same convention as computeHealthScore's own
+    // spot-check block above.
     const sceneCount = 9;
     const minorCounts = [70, 80, 28, 68, 16]; // -> weightedIssues 35, 40, 14, 34, 8
-    const scores = minorCounts.map(minor => computeDimensionScore({ critical: 0, major: 0, minor }, wordCount, sceneCount));
+    const scores = minorCounts.map(minor => computeDimensionScore({ critical: 0, major: 0, minor }, sceneCount));
 
-    assert.deepEqual(scores, [75.3, 69.8, 93.7, 76.3, 97.3]);
+    assert.deepEqual(scores, [42, 29.2, 85.3, 44.5, 93.7]);
 
     // The historical bug: all 5 rendered IDENTICAL (84.4 x5). Direct regression
     // guard — this must never collapse back to a single repeated value.
@@ -1188,10 +1204,10 @@ describe('computeDimensionScore / computeDimensionRawScore — formula spot-chec
     assert.equal(Math.max(...scores), scores[4], 'the lightest-issue dimension must score highest');
   });
 
-  it('stays within [0, 100] even for a heavily-flagged dimension at a tiny word count', () => {
-    const score = computeDimensionScore({ critical: 50, major: 0, minor: 0 }, 20, 10);
+  it('stays within [0, 100] even for a heavily-flagged dimension at a small scene count', () => {
+    const score = computeDimensionScore({ critical: 50, major: 0, minor: 0 }, 10);
     assert.equal(score, 0);
-    const raw = computeDimensionRawScore({ critical: 50, major: 0, minor: 0 }, 20);
+    const raw = computeDimensionRawScore({ critical: 50, major: 0, minor: 0 }, 10);
     assert.ok(raw < 0, `expected the unclamped raw score to go negative, got ${raw}`);
   });
 
@@ -1201,18 +1217,32 @@ describe('computeDimensionScore / computeDimensionRawScore — formula spot-chec
     // above): the overall score keeps a scarcity surcharge even at zero
     // issues, but a dimension's displayed score has no such term by design
     // (Wave 18-β) — a genuinely clean dimension reads as a clean 100.
-    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 80, 4), 100);
-    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 2000, 25), 100);
+    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 4), 100);
+    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 25), 100);
   });
 
   it('honesty guard: rounds to the nearest whole point (not a tenth) below 3 scenes', () => {
-    const bySeverity = { critical: 0, major: 0, minor: 70 }; // weightedIssues 35
-    const wordCount = 608;
-    assert.equal(computeDimensionScore(bySeverity, wordCount, 1), 75, 'sceneCount=1 must round to a whole point');
-    assert.equal(computeDimensionScore(bySeverity, wordCount, 2), 75, 'sceneCount=2 must round to a whole point');
+    // Lane R5 note: sceneCount is now BOTH the rounding-precision switch and
+    // the density denominator, so the three probes below no longer share one
+    // underlying value — each is asserted against its own raw score, which is
+    // the property this test exists to guard (precision, not magnitude). All
+    // three raws carry a non-zero tenths digit, so whole-point vs tenths
+    // rounding is genuinely distinguishable.
+    const bySeverity = { critical: 0, major: 0, minor: 10 }; // weightedIssues 5
+    for (const sceneCount of [1, 2]) {
+      const raw = computeDimensionRawScore(bySeverity, sceneCount);
+      assert.notEqual(Math.round(raw * 10) / 10, Math.round(raw), 'fixture sanity: the raw score must have a tenths digit to round away');
+      assert.equal(
+        computeDimensionScore(bySeverity, sceneCount),
+        Math.round(raw),
+        `sceneCount=${sceneCount} must round to a whole point`,
+      );
+    }
     // sceneCount=3 clears the low-confidence floor (< 3, not <= 3) and keeps
     // the normal tenths-place precision.
-    assert.equal(computeDimensionScore(bySeverity, wordCount, 3), 75.3, 'sceneCount=3 must keep tenths precision');
+    const raw3 = computeDimensionRawScore(bySeverity, 3);
+    assert.equal(computeDimensionScore(bySeverity, 3), Math.round(raw3 * 10) / 10, 'sceneCount=3 must keep tenths precision');
+    assert.equal(computeDimensionScore(bySeverity, 3), 90.1);
   });
 });
 

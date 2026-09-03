@@ -314,7 +314,7 @@ export const RAW_SIGNAL_COLUMNS = [
  * This is an EXACT external zeroing, not an approximation, and it needs no
  * edit to doctor.ts. doctor.ts's health is
  *   health = max(0, round10(baseHealth - structural - arc - dialogue))
- * with baseHealth = computeHealthScore(bySeverity, sceneCount, wordCount)
+ * with baseHealth = computeHealthScore(bySeverity, sceneCount)
  * (doctor.ts line 1795), and computeHealthScore = clamp(100 -
  * densityPenalty(bySeverity, wordCount) - scarcityPenalty(sceneCount)).
  * densityPenalty is the ONLY term that reads bySeverity, and scarcityPenalty
@@ -331,8 +331,8 @@ export const RAW_SIGNAL_COLUMNS = [
  *    channel added back faithfully. The runner counts saturated scripts.
  */
 export function ruleChannelZeroAdjustment(report) {
-  const zero = computeHealthScore({ critical: 0, major: 0, minor: 0 }, report.sceneCount, report.wordCount);
-  const real = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+  const zero = computeHealthScore({ critical: 0, major: 0, minor: 0 }, report.sceneCount);
+  const real = computeHealthScore(report.bySeverity, report.sceneCount);
   return zero - real;
 }
 

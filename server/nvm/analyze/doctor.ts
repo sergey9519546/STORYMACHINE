@@ -368,6 +368,113 @@ export function doctorCacheAdopt(
 // can fix it; it is a missing-detector gap, not a compression gap, and stays
 // a discrimination.test.ts todo).
 //
+// ── VERBOSITY-BIAS FIX (lane R5, 2026-09-03): opportunity denominator ──────
+// FINDING (retrospective 2026-09-02 §1; docs/scoring/VERBOSITY_BIAS_2026-07-11.md;
+// full write-up in docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md): with
+// wordCount^0.7 as the denominator, appending stateless filler prose RAISED
+// health. Measured on evals/scoring/metamorphic/base.fountain: appending
+// "The wind continues. Nothing else happens. Time passes without event." to
+// every scene moved health 60.9 -> 66.3 (+5.4), across the CONSIDER/PASS
+// tier boundary. The filler adds words and action paragraphs but no scenes,
+// so the denominator grew 253 -> 343 words (+24% after the 0.7 power) while
+// weightedIssues grew only 79 -> 87.5 (+11%): density fell, penalty fell,
+// health rose. The metamorphic witness (`empty_verbosity`) had been held as
+// `disposition: 'known-failing'` for seven weeks because a fix was believed
+// to break the calibration bands — i.e. the corpus was being protected from
+// the score instead of the score from the corpus.
+//
+// WHAT CHANGED: the denominator is now an OPPORTUNITY count, not a word
+// count, expressed in the same units as before — "the word count a script of
+// this many scenes would carry at the calibration corpus's own prose rate":
+//
+//   was:  opportunityWords = wordCount^0.7
+//   now:  opportunityWords = (sceneCount * SCENE_OPPORTUNITY_WORDS)^0.7
+//
+// and the penalty curve over that density was RE-DERIVED, because the change
+// moves where every script sits on it. It could not be avoided: measured, the
+// 20-sample calibration corpus runs 30 words per scene while realistic drafts
+// run 43-161 (the 20 in-repo live-action fixtures) and produced features run
+// far higher, so under the old word denominator every realistic script was
+// LESS dense than the corpus, and under a scene denominator several are MORE
+// dense. The old DENSITY_POWER=3.75 curve was fitted to a band that spanned a
+// 1.6x density ratio; the new denominator's in-repo population spans 3.8x
+// (pairs 0.75 to the densest fixture 2.84), and 3.8^3.75 = 380x of penalty
+// cannot fit in 100 points — carrying 3.75 across measured every live-action
+// fixture at or near health 0, which is precisely the saturation defect the
+// opportunity design was introduced to remove. So:
+//
+//   was:  density < 1 ? logistic(SUB_DENSITY_*) : 10 + 2.5*(density^3.75 - 1)
+//   now:  DENSITY_SCALE * density^DENSITY_POWER             (8 and 2)
+//
+// The piecewise split and its logistic branch are GONE, not re-tuned. They
+// existed only because the word denominator pushed the 7-scene discrimination
+// fixtures into a sub-1.0 density regime that a power tuned for density >= 1.4
+// crushed to nothing (see the 2026-07-14 and 2026-07-15 notes below, kept for
+// the history). The scene denominator puts the whole population inside one
+// regime, so one continuous, strictly increasing curve covers it — which also
+// makes the monotonicity and seam-continuity properties those two fixes were
+// chasing true by construction rather than by a matched pair of constants.
+//
+// HOW THE TWO CONSTANTS WERE PICKED (a stated rule, not a fit to taste):
+// take every (DENSITY_SCALE, DENSITY_POWER) pair for which EVERY in-repo gate
+// still holds at its existing threshold — four-band monotonicity, no strong
+// sample under the troubled band average, all 6 discrimination pairs ordered,
+// the composite pair's >= 5-point gap, 1x/2x/3x length invariance within 10
+// points, both padding invariants (prose-only and scene-adding), the act-swap
+// deduction gate, no fixture within 10 points of either clamp — and among
+// those, pick the pair that MOVES THE EXISTING SCORES LEAST: minimum RMS
+// change in displayed health across all 45 output-identity fixtures plus the
+// calibration corpus and the length variants. Removing one channel from the
+// formula is not licence to rescore everything, so the tie-break is minimum
+// disruption, not best-looking separation.
+//
+// That rule lands on (8, 2) — "penalty grows with the square of issue
+// density". Measured: RMS displacement 23.5 points (the next-best viable
+// pairs run 20.5-28.4 but each breaks a gate or costs more separation), band
+// separation 11.1 raw points, composite-pair gap 5.2 displayed points, closest
+// fixture to a clamp 16.7. The one in-repo threshold this lane DID have to
+// re-lock is the dialogue-flatten gate in
+// tests/core/feature-scale-discrimination.test.ts, and for a reason that has
+// nothing to do with curve fitting — see that file's header. The sweep and the
+// full before/after table are in
+// docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md.
+//
+// WHY SCENES, AND ONLY SCENES — measured, not assumed. The retrospective
+// proposed "scenes, speeches, action paragraphs". All three were swept
+// against every in-repo criterion (20-sample band monotonicity, the 6
+// discrimination pairs, the metamorphic invariants, the 1x/2x/3x length
+// variants, the 20 live-action fixtures). Both of the other two units are
+// contaminated:
+//   * ACTION PARAGRAPHS are exactly what the filler adds — counting them
+//     leaves the bias in place. Measured: with denominator (scenes +
+//     speeches + action)^0.7 the padded variant is still 11% LESS dense than
+//     the base, so health still rises.
+//   * SPEECHES are inflated by the bad craft the score exists to detect —
+//     on-the-nose and repetitive writing says MORE, in more lines. Measured:
+//     the corpus's 'weak' band carries 16-18 speeches against 'strong''s
+//     13-15, so normalizing by speeches puts 'weak' BELOW 'competent'
+//     (band monotonicity breaks), and 2 of the 6 discrimination pairs invert
+//     (their "bad" halves carry 34 speeches against the "good" halves' 18-20).
+// Scene count is the one opportunity unit the writer cannot inflate without
+// actually adding structure, and it is the unit the issue count empirically
+// tracks: concatenating the 20 live-action fixtures into one 231-scene,
+// 19,480-word document grows weightedIssues 146 -> 806.5 as scenes grow
+// 13 -> 231 (weightedIssues ~ sceneCount^0.59), against a words relationship
+// that is nearly flat (the same fixtures span 434-1,831 words at a
+// near-constant 99-177 weightedIssues). See the fix doc for the full table.
+//
+// WHAT THIS COSTS, STATED PLAINLY: the score no longer gets cheaper as prose
+// gets longer, so a long script's health FALLS relative to the old formula
+// wherever it ran above the calibration corpus's ~30 words-per-scene rate.
+// That is the defect being removed, not a regression — but it moves every
+// produced-corpus anchor, and `tests/fixtures/real-corpus-manifest.json`
+// must be re-locked on the owner's machine before this can merge.
+//
+// ── History below this line: the two fixes that shaped the retired piecewise
+// curve. Kept because they record WHY a seam existed at all, and because the
+// contracts they established (a strictly increasing penalty, no discontinuity)
+// are still asserted — lane R5 satisfies them by construction rather than by
+// matching two branches. ──────────────────────────────────────────────────
 // MONOTONICITY FIX (2026-07-14): The prior piecewise formula had a ~7.5-point
 // discontinuity at density=1 — the logistic sub-1 branch saturated near 10,
 // while the power >=1 branch started at 2.5. A nominally worse issue density
@@ -378,12 +485,13 @@ export function doctorCacheAdopt(
 // a low-confidence zone where no corpus sample or discrimination pair landed;
 // the new curve is smooth across that region. See tests/core/monotonicity.test.ts
 // for property-based invariants enforcing this contract.
-/** The word-density half of craftPenalty, factored out on its own (Wave
+/** The issue-density half of craftPenalty, factored out on its own (Wave
  *  18-β) so a caller can apply it WITHOUT the scarcity term below — see
  *  computeDimensionScore's comment for why the per-dimension scores need
- *  exactly that. Byte-identical arithmetic to what craftPenalty always
- *  computed for this half at density >= 1.0; see the design comment above
- *  for the density < 1.0 branch this wave added.
+ *  exactly that. One continuous power curve over issues-per-opportunity since
+ *  lane R5 (2026-09-03) replaced the word denominator; see the design comment
+ *  above for the measurement behind both the denominator and the two
+ *  constants.
  *
  *  The tuned constants are declared LOCALLY (inside this function body)
  *  rather than at module scope, for the same TemporalDeadZone reason
@@ -393,37 +501,34 @@ export function doctorCacheAdopt(
  *  module-level `const` here would carry the identical hazard. */
 function densityPenalty(
   bySeverity: { critical: number; major: number; minor: number },
-  wordCount: number,
+  sceneCount: number,
 ): number {
   const WORD_COUNT_EXPONENT = 0.7;
-  const DENSITY_POWER = 3.75;
-  const DENSITY_SCALE = 2.5;
-  // CONTINUITY FIX (P0.1, 2026-07-15): the prior piecewise formula had a
-  // ~7.5-point discontinuity at density=1 — logistic sub-1 branch saturated
-  // near SUB_DENSITY_SCALE=10 while the power branch started at
-  // DENSITY_SCALE=2.5. Crossing the seam could IMPROVE health despite more
-  // weighted issues (non-monotonic at the branch boundary).
-  //
-  // Fix: keep the calibrated logistic for density < 1 (unchanged shape in the
-  // band where discrimination pairs live), and for density >= 1 use a power
-  // curve that starts at the same value the logistic reaches at density=1:
-  //   SUB_DENSITY_SCALE + DENSITY_SCALE * (density^DENSITY_POWER - 1)
-  // At density=1 both sides equal 10. Both sides are increasing, so the full
-  // function is continuous and monotonic. Above density=1 the penalty is
-  // higher than the old 2.5*density^3.75 by a constant +7.5 offset — denser
-  // scripts are scored more harshly, but never rewarded for crossing the seam.
-  const SUB_DENSITY_SCALE = 10;
-  const SUB_DENSITY_MIDPOINT = 0.52;
-  const SUB_DENSITY_STEEPNESS = 50;
-
+  // Re-derived by lane R5 for the scene-opportunity denominator (was 3.75 and
+  // 2.5 against wordCount^0.7) — see the "HOW THE TWO CONSTANTS WERE PICKED"
+  // paragraph in the design comment above for the selection rule and the
+  // measured outcome. The curve is a single continuous power law: strictly
+  // increasing in weightedIssues, zero at zero issues, no branch to cross.
+  const DENSITY_POWER = 2;
+  const DENSITY_SCALE = 8;
+  // UNIT CONVERSION, NOT A CLAIM ABOUT SCREENPLAYS (lane R5, see the
+  // verbosity-bias design comment above). The calibration corpus's own
+  // measured mean is 30.4 words per scene (20 samples, 256-337 words over
+  // 9-10 scenes); rounding it to 30 expresses the scene-opportunity
+  // denominator in the same units wordCount^0.7 used to, so `density` keeps
+  // its old reading ("weighted findings per scene-of-reference-length") and
+  // every corpus sample stays within (its own wps / 30)^0.7 = 0.93-1.08x of
+  // where it sat. A real feature runs 60-1500 words per scene; that is
+  // precisely the channel this constant refuses to read.
+  const SCENE_OPPORTUNITY_WORDS = 30;
   const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
-  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
+  const opportunityWords = Math.pow(
+    Math.max(sceneCount, 1) * SCENE_OPPORTUNITY_WORDS,
+    WORD_COUNT_EXPONENT,
+  );
   const density = weightedIssues / Math.max(opportunityWords, 1e-10);
 
-  if (density < 1) {
-    return SUB_DENSITY_SCALE / (1 + Math.exp(-SUB_DENSITY_STEEPNESS * (density - SUB_DENSITY_MIDPOINT)));
-  }
-  return SUB_DENSITY_SCALE + DENSITY_SCALE * (Math.pow(density, DENSITY_POWER) - 1);
+  return DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
 }
 
 /** The scene-scarcity half of craftPenalty, factored out on its own (Wave
@@ -599,7 +704,8 @@ export function climaxZoneDecayDeduction(signals: ClimaxZoneSignals): number {
 /** Shared penalty expression behind both computeRawCraftScore and
  *  computeHealthScore — factored out so the two can never drift apart. See
  *  the design comment above for the full rationale; in short:
- *    penalty = DENSITY_SCALE * (weightedIssues / wordCount^WORD_COUNT_EXPONENT)^DENSITY_POWER
+ *    penalty = DENSITY_SCALE
+ *            * (weightedIssues / (sceneCount * SCENE_OPPORTUNITY_WORDS)^WORD_COUNT_EXPONENT)^DENSITY_POWER
  *            + SCARCITY_SCALE / sceneCount
  *  where weightedIssues = 4·critical + 1.5·major + 0.5·minor (unchanged from
  *  the prior formula — only the normalization changed).
@@ -620,9 +726,8 @@ export function climaxZoneDecayDeduction(signals: ClimaxZoneSignals): number {
 function craftPenalty(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
-  wordCount: number,
 ): number {
-  return densityPenalty(bySeverity, wordCount) + scarcityPenalty(sceneCount);
+  return densityPenalty(bySeverity, sceneCount) + scarcityPenalty(sceneCount);
 }
 
 /** 100 − craftPenalty, with NO clamping — can go deeply negative for a
@@ -632,16 +737,16 @@ function craftPenalty(
  *  ranks on. Exported (rather than inlined) so it's independently
  *  spot-checkable, same rationale as computeHealthScore itself.
  *
- *  wordCount is the size parameter this fix added alongside sceneCount (see
- *  the opportunity-based design comment above) — both are required now
- *  because the penalty is a blend of word-based density and scene-based
- *  scarcity correction, not scene count alone. */
+ *  sceneCount is the ONLY size parameter (lane R5, 2026-09-03). It used to
+ *  take wordCount too, because the density term normalized by words; the
+ *  verbosity-bias fix above replaced that with a scene-opportunity
+ *  denominator, so both terms now key on sceneCount and the wordCount
+ *  parameter was removed rather than left accepted-and-ignored. */
 export function computeRawCraftScore(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
-  wordCount: number,
 ): number {
-  return 100 - craftPenalty(bySeverity, sceneCount, wordCount);
+  return 100 - craftPenalty(bySeverity, sceneCount);
 }
 
 /** health = 100 − craftPenalty(...), clamped to [0, 100] and rounded to 1
@@ -655,9 +760,8 @@ export function computeRawCraftScore(
 export function computeHealthScore(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
-  wordCount: number,
 ): number {
-  const clamped = Math.max(0, Math.min(100, computeRawCraftScore(bySeverity, sceneCount, wordCount)));
+  const clamped = Math.max(0, Math.min(100, computeRawCraftScore(bySeverity, sceneCount)));
   return Math.round(clamped * 10) / 10;
 }
 
@@ -769,14 +873,28 @@ const DIMENSION_LOW_CONFIDENCE_SCENES = 3;
  *  called by buildDimensions, called from aggregateReport). */
 function dimensionDensityPenalty(
   bySeverity: { critical: number; major: number; minor: number },
-  wordCount: number,
+  sceneCount: number,
 ): number {
   const WORD_COUNT_EXPONENT = 0.7;
   const DENSITY_POWER_DIM = 1.5;
   const DENSITY_SCALE_DIM = 100;
+  // Same scene-opportunity denominator, same constant, same reason as
+  // densityPenalty above (lane R5, 2026-09-03): the displayed dimension
+  // scores are derived from the identical issues-per-size ratio, so leaving
+  // this half on wordCount would have left a writer able to raise all five
+  // dimension numbers by appending filler even after the overall health
+  // number stopped moving. MEASURED before adopting (see the fix doc's
+  // dimension table): across the 20 live-action fixtures the substitution
+  // does NOT reintroduce Wave 18-β's dimension-collapse defect — no
+  // dimension pins to either clamp, and the per-script spread across the
+  // five dimensions WIDENS (e.g. chain-of-custody 25 points -> 55 points).
+  const SCENE_OPPORTUNITY_WORDS = 30;
 
   const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
-  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
+  const opportunityWords = Math.pow(
+    Math.max(sceneCount, 1) * SCENE_OPPORTUNITY_WORDS,
+    WORD_COUNT_EXPONENT,
+  );
   const density = weightedIssues / opportunityWords;
   return DENSITY_SCALE_DIM * Math.pow(density, DENSITY_POWER_DIM);
 }
@@ -790,9 +908,9 @@ function dimensionDensityPenalty(
  *  score below. */
 export function computeDimensionRawScore(
   bySeverity: { critical: number; major: number; minor: number },
-  wordCount: number,
+  sceneCount: number,
 ): number {
-  return 100 - dimensionDensityPenalty(bySeverity, wordCount);
+  return 100 - dimensionDensityPenalty(bySeverity, sceneCount);
 }
 
 /** DISPLAYED per-dimension score: computeDimensionRawScore, clamped to
@@ -802,10 +920,9 @@ export function computeDimensionRawScore(
  *  fix; see the design comment above computeDimensionRawScore. */
 export function computeDimensionScore(
   bySeverity: { critical: number; major: number; minor: number },
-  wordCount: number,
   sceneCount: number,
 ): number {
-  const clamped = Math.max(0, Math.min(100, computeDimensionRawScore(bySeverity, wordCount)));
+  const clamped = Math.max(0, Math.min(100, computeDimensionRawScore(bySeverity, sceneCount)));
   return sceneCount < DIMENSION_LOW_CONFIDENCE_SCENES
     ? Math.round(clamped)
     : Math.round(clamped * 10) / 10;
@@ -1020,12 +1137,13 @@ interface DimensionBuild {
  *  public DimensionScore so buildPlainSummary can name a top rule area for
  *  the weakest dimension without recomputing it from scratch.
  *
- *  wordCount is the WHOLE script's word count, shared across all 5
- *  dimensions — there's no per-dimension word count to measure (a dimension
- *  is a regrouping of issues by PASS, not a distinct slice of the prose), so
+ *  sceneCount is the WHOLE script's scene count, shared across all 5
+ *  dimensions — there's no per-dimension size to measure (a dimension is a
+ *  regrouping of issues by PASS, not a distinct slice of the script), so
  *  each dimension's own density penalty is scaled against the same
- *  script-wide word count as the overall health score, exactly as sceneCount
- *  already was before this fix.
+ *  script-wide opportunity count as the overall health score. It used to
+ *  take wordCount for the same purpose; lane R5 (2026-09-03) replaced the
+ *  word denominator with the scene-opportunity one — see densityPenalty.
  *
  *  The DISPLAYED `score` (Wave 18-β) is computeDimensionScore — density only,
  *  no scarcity term — so 5 dimensions built from the same sceneCount no
@@ -1034,7 +1152,7 @@ interface DimensionBuild {
  *  rationale. `rawScore` stays on the OLD (scarcity-included)
  *  computeRawCraftScore statistic — see DimensionBuild's own comment for why
  *  that field specifically must not change. */
-function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCount: number): DimensionBuild[] {
+function buildDimensions(passes: DoctorPassSummary[], sceneCount: number): DimensionBuild[] {
   return DIMENSION_DEFS.map(def => {
     const passSet = new Set<PassName>(def.passes);
     const issues = passes.filter(p => passSet.has(p.pass)).flatMap(p => p.issues);
@@ -1042,8 +1160,8 @@ function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCo
       (acc, i) => { acc[i.severity]++; return acc; },
       { critical: 0, major: 0, minor: 0 },
     );
-    const score = computeDimensionScore(bySeverity, wordCount, sceneCount);
-    const rawScore = computeRawCraftScore(bySeverity, sceneCount, wordCount);
+    const score = computeDimensionScore(bySeverity, sceneCount);
+    const rawScore = computeRawCraftScore(bySeverity, sceneCount);
     const mix = analyzeDimensionIssues(issues);
     return {
       mix,
@@ -1887,7 +2005,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     { critical: 0, major: 0, minor: 0 },
   );
 
-  const baseHealth = computeHealthScore(bySeverity, analysis.sceneCount, analysis.wordCount);
+  const baseHealth = computeHealthScore(bySeverity, analysis.sceneCount);
 
   // ── Structural-integrity deduction (health-formula wave, 2026-07-10) ─────
   // MEASURED MOTIVATION (degradation harness, tests/core/real-script-corpus
@@ -2044,7 +2162,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────
-  const dimensionBuilds = buildDimensions(passes, analysis.sceneCount, analysis.wordCount);
+  const dimensionBuilds = buildDimensions(passes, analysis.sceneCount);
   const dimensions = dimensionBuilds.map(d => d.score);
   // Verdict cap (AUC-conversion wave, 2026-07-10): a script whose scene ORDER
   // has collapsed pervasively (SCENE_CONTINUITY_PERVASIVE -- the rollup that
@@ -2146,7 +2264,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   let healthPercentile: number | undefined;
   try {
     const distribution = getReferenceDistribution();
-    const rawHealth = computeRawCraftScore(bySeverity, analysis.sceneCount, analysis.wordCount);
+    const rawHealth = computeRawCraftScore(bySeverity, analysis.sceneCount);
     if (distribution.health.length > 0) {
       healthPercentile = percentileRank(rawHealth, distribution.health);
     }

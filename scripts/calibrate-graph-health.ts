@@ -64,7 +64,7 @@ function bandRank(band: CorpusBand): number {
 async function scoreSample(label: string, band: CorpusBand, fountain: string): Promise<SampleResult> {
   const report = await runScriptDoctor(fountain);
   const gh = report.graphHealth;
-  const baseHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+  const baseHealth = computeHealthScore(report.bySeverity, report.sceneCount);
   const graphDeduction = gh?.graphDeduction ?? 0;
   const healthWithGraph = report.health;
 

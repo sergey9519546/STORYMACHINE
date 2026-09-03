@@ -197,43 +197,47 @@ describe('getReferenceDistribution', () => {
 });
 
 describe('computeRawCraftScore vs computeHealthScore', () => {
-  // Post-fix signature: both functions now also take wordCount, since
-  // craftPenalty (doctor.ts) blends a word-density term with a scene-based
-  // scarcity term instead of normalizing by scene count alone.
+  // Post-lane-R5 signature: sceneCount is the only size parameter. Both
+  // craftPenalty terms key on it — the density term through the
+  // (sceneCount * SCENE_OPPORTUNITY_WORDS)^0.7 opportunity denominator that
+  // replaced wordCount^0.7, and the scarcity term as before.
   it('equals computeHealthScore (up to 0.1 rounding) when unsaturated', () => {
     const bySeverity = { critical: 1, major: 1, minor: 1 };
     const sceneCount = 10;
-    const wordCount = 300;
-    const raw = computeRawCraftScore(bySeverity, sceneCount, wordCount);
-    const health = computeHealthScore(bySeverity, sceneCount, wordCount);
+    const raw = computeRawCraftScore(bySeverity, sceneCount);
+    const health = computeHealthScore(bySeverity, sceneCount);
     assert.equal(Math.round(raw * 10) / 10, health);
     assert.ok(raw > 0 && raw < 100, 'sanity: this fixture should be comfortably unsaturated');
   });
 
   it('goes negative (not 0) once the penalty exceeds 100', () => {
-    // A small wordCount (dense issue rate relative to the script's own size)
-    // is what drives the density term high enough to saturate now — see
-    // doctor.ts's craftPenalty comment for why density is word-based.
-    const bySeverity = { critical: 20, major: 0, minor: 0 };
+    // A small sceneCount (dense issue rate relative to the script's own
+    // structural size) is what drives the density term high enough to
+    // saturate — see doctor.ts's craftPenalty comment for why density is
+    // scene-opportunity-based since lane R5.
+    const bySeverity = { critical: 30, major: 30, minor: 30 };
     const sceneCount = 5;
-    const wordCount = 50;
-    const raw = computeRawCraftScore(bySeverity, sceneCount, wordCount);
-    const health = computeHealthScore(bySeverity, sceneCount, wordCount);
+    const raw = computeRawCraftScore(bySeverity, sceneCount);
+    const health = computeHealthScore(bySeverity, sceneCount);
     assert.ok(raw < 0, `expected a negative raw score, got ${raw}`);
     assert.equal(health, 0, 'the displayed score should still clamp to 0');
   });
 
   it('strictly orders two saturated severity mixes that computeHealthScore ties at 0', () => {
+    // Lane R5 re-chose both mixes: with the scene-opportunity denominator
+    // and the re-derived curve, 20 criticals over 10 scenes no longer
+    // saturates, so it could not demonstrate the tie-at-the-floor property
+    // this test exists for. 60 vs 90 criticals both clamp and still order
+    // (raw -70.9 vs -267.0).
     const sceneCount = 10;
-    const wordCount = 50;
-    const lighter = { critical: 20, major: 0, minor: 0 };
-    const heavier = { critical: 60, major: 0, minor: 0 };
+    const lighter = { critical: 60, major: 0, minor: 0 };
+    const heavier = { critical: 90, major: 0, minor: 0 };
 
-    assert.equal(computeHealthScore(lighter, sceneCount, wordCount), 0);
-    assert.equal(computeHealthScore(heavier, sceneCount, wordCount), 0, 'both mixes must tie at the clamped floor');
+    assert.equal(computeHealthScore(lighter, sceneCount), 0);
+    assert.equal(computeHealthScore(heavier, sceneCount), 0, 'both mixes must tie at the clamped floor');
 
-    const rawLighter = computeRawCraftScore(lighter, sceneCount, wordCount);
-    const rawHeavier = computeRawCraftScore(heavier, sceneCount, wordCount);
+    const rawLighter = computeRawCraftScore(lighter, sceneCount);
+    const rawHeavier = computeRawCraftScore(heavier, sceneCount);
     assert.ok(
       rawLighter > rawHeavier,
       `raw score must keep the lighter mix ranked above the heavier one: ${rawLighter} vs ${rawHeavier}`,
@@ -253,7 +257,7 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
 
 /** Recompute the same RAW (unclamped) craft-score statistic reference.ts's
  *  scoreSample uses, but from runScriptDoctor's own public report shape
- *  (DoctorPassSummary[] + sceneCount + wordCount) rather than reference.ts's
+ *  (DoctorPassSummary[] + sceneCount) rather than reference.ts's
  *  private scoring path — this exercises the real end-to-end pipeline
  *  (analyzeFountainText -> runRevisionPipeline -> aggregateReport) the way an
  *  actual Script Doctor request does, instead of re-deriving reference.ts's
@@ -262,10 +266,10 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
  *  report.health, which is CLAMPED) is exactly the saturation-safe ranking
  *  statistic this whole calibration layer is built on; see doctor.ts's
  *  aggregateReport calibration-layer comment for why the raw statistic is
- *  the one that must be used for any cross-sample ranking. wordCount is
- *  passed alongside sceneCount because the opportunity-based craftPenalty
- *  (the saturation fix) blends a word-density term with a scene-scarcity
- *  term — see craftPenalty's own comment in doctor.ts.
+ *  the one that must be used for any cross-sample ranking. sceneCount is
+ *  the only size parameter: lane R5 (2026-09-03) replaced the density term's
+ *  word denominator with a scene-opportunity one — see craftPenalty's own
+ *  comment in doctor.ts.
  */
 async function rawCraftScoreFor(sample: CorpusSample): Promise<number> {
   const report = await runScriptDoctor(sample.fountain);
@@ -277,7 +281,7 @@ async function rawCraftScoreFor(sample: CorpusSample): Promise<number> {
     }),
     { critical: 0, major: 0, minor: 0 },
   );
-  return computeRawCraftScore(bySeverity, report.sceneCount, report.wordCount);
+  return computeRawCraftScore(bySeverity, report.sceneCount);
 }
 
 async function bandAverageRawScore(band: CorpusBand): Promise<number> {
