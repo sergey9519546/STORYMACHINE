@@ -1,3 +1,20 @@
+> **ARCHIVED 2026-09-03.** A closed adversarial-review ledger: 41 review
+> agents against 178 files / 64,971 LOC, produced 2026-08-04. The file's own
+> integrity note records it was committed truncated (the REJECTED section
+> and the tail of the last PLAUSIBLE finding were lost) and that a sampled
+> re-verification found all 12 sampled findings genuinely fixed in code, with
+> two credit corrections. The closing commit
+> (`audit: the ULTRAREVIEW ledger is closed — all 57 findings verified, none
+> open`) marks every finding here resolved as of that date. Line-number
+> references throughout have drifted from current code and are not
+> re-verified. Filed, not deleted, as the historical record —
+> `server/engine/Orchestrator.ts`, `server/routes/game.ts`, and
+> `tests/routes/sse-wall-timer-cancellation.test.ts` still cite this filename
+> in comments explaining specific fixes; those citations remain
+> grep-findable at this new path. `docs/PATH_TO_DONE.md` cites it for the
+> dormant-code (OASIS/Labs-gated) verdicts and the two PLAUSIBLE findings —
+> both non-gating per that document.
+
 # ULTRAREVIEW — Whole-Codebase Adversarial Review
 
 Scope: 178 files / 64,971 LOC (server/nvm vendored + tests excluded). 41 sonnet review agents, adversarial sonnet verify per finding.

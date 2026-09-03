@@ -1,3 +1,10 @@
+> **ARCHIVED 2026-09-03.** A one-time baseline capture for task G0-00,
+> recorded 2026-07-23 against the then-current `main` (`5c49609`) and a
+> since-superseded `TODO.md` baseline pin. Nothing in the tree references
+> this file by name (`grep -rn "BASELINE\.md"` finds no hits outside itself).
+> Filed, not deleted, as a record of that reconciliation decision; not
+> current state — `main` has moved far past `5c49609`.
+
 # G0 Baseline (task G0-00)
 
 ## Toolchain

@@ -344,7 +344,7 @@ tasks 1-6 above.
   gate regardless of craft merit. Candidates, not commitments — the map's
   own standing rule.
 
-- **Dormant-code integration verdicts from `ULTRAREVIEW_FINDINGS.md`.** A
+- **Dormant-code integration verdicts from `docs/filed-backlog/ULTRAREVIEW_FINDINGS.md`.** A
   41-agent adversarial review of 178 files / 64,971 LOC found 55 confirmed +
   2 plausible defects. The large majority sit in the OASIS multi-agent
   engine (`server/planning/`, `server/engine/CausalSpine.ts`,
@@ -368,7 +368,7 @@ tasks 1-6 above.
   worth fixing but lives in Labs-gated or non-Doctor-path code — filed here,
   not promoted.
 
-- **`ULTRAREVIEW_FINDINGS.md`'s PLAUSIBLE findings** (2: a metamorphic-test
+- **`docs/filed-backlog/ULTRAREVIEW_FINDINGS.md`'s PLAUSIBLE findings** (2: a metamorphic-test
   LCG precision issue in `evals/scoring/runner/metamorphic-cases.ts`, and a
   shallow-clone aliasing bug in `server/planning/pddl-types.ts`) — both
   OASIS/eval-tooling adjacent, non-gating.

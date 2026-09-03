@@ -1,3 +1,15 @@
+> **ARCHIVED 2026-09-03.** `SECURITY.md` has always described this file as
+> "the historical internal audit findings" and "the audit record, not the
+> reporting policy" — it was already self-identified as historical, just
+> sitting at the repo root instead of filed. Produced 2026-07-14; its
+> SEC-001…SEC-030 findings and the wave-based repair plan describe a defect
+> state from that date. Most items were addressed by the repair work that
+> followed (see `docs/PATH_TO_DONE.md` and git history for what landed); this
+> file is not re-verified against current code and its line references will
+> have drifted. Filed, not deleted, as the audit record `SECURITY.md`
+> points to — see that file for the current vulnerability-reporting
+> process, which this document was never meant to be.
+
 # STORYMACHINE — Security & Reliability Audit
 
 *Produced 2026-07-14. Branch `fix/security-reliability-wave`. Worktree state:

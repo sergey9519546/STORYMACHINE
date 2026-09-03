@@ -2,7 +2,7 @@
 
 How to responsibly report a security vulnerability in STORYMACHINE, and what
 to expect. For the historical internal audit findings (SEC-001 … SEC-030),
-see **SECURITY_AUDIT_2026-07-14.md** — that document is the audit record,
+see **`docs/filed-backlog/SECURITY_AUDIT_2026-07-14.md`** — that document is the audit record,
 not the reporting policy.
 
 ## Reporting a vulnerability
@@ -74,4 +74,4 @@ through server-side Express routes, never from the frontend bundle.
 Known open security work (residuals from the reliability wave, including
 DNS-rebinding / resolve-and-pin) is tracked in
 **`docs/AGENT_HANDOFF.md`** under "P1 — security residual". The full audit
-history and finding catalog is in **SECURITY_AUDIT_2026-07-14.md**.
+history and finding catalog is in **`docs/filed-backlog/SECURITY_AUDIT_2026-07-14.md`**.

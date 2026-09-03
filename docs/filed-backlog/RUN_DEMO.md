@@ -1,3 +1,13 @@
+> **ARCHIVED 2026-09-03.** This was a root-level Windows quick-start for the
+> keyless deterministic demo, last touched 2026-08-08. It was superseded by
+> `docs/user-validation/RUN_DEMO.md`, the more complete "how to stand up the
+> live sample flow before a P0 session" doc that `FIRST_SESSION_QUICKSTART.md`
+> and the P0 operating kit actually reference — that file is canonical, not
+> this one. No live doc pointed at this file (verified: `grep -rn RUN_DEMO`
+> across the tree turns up only references to the `docs/user-validation/`
+> version). Filed, not deleted, for the Windows-specific troubleshooting
+> notes it still carries.
+
 # RUN_DEMO — keyless deterministic demo (Windows)
 
 This runs the full Story Machine demo **without any API key**. Everything the
