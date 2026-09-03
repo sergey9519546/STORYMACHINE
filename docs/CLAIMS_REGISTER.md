@@ -71,6 +71,7 @@ This file is enforced by `scripts/honesty-audit.mjs`'s claims lane (see its
 | 21 | AUC-24 >= 0.622 … last measured 0.731. | CLAUDE.md "Standing task" section; ROADMAP.md §3 | measured-owner-local | tests/core/real-script-corpus.test.ts (env-gated on `REAL_SCRIPT_CORPUS_DIR`, skipped in CI); `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` | supported |
 | 22 | The rulebook's 3,217 pass-scoped constants are a maintained conceptual set, not a quality claim; the weighted-rule channel contributes AUC ~0.076 to discrimination while scene-count scarcity carries AUC ~0.938. | CLAUDE.md "Standing task" section; NORTH_STAR.md | measured-in-repo | server/nvm/analyze/doctor.ts:1892-1898 | supported |
 | 23 | Live Notes squiggles — Always available (deterministic) | src/components/SettingsPanel.tsx:853 | measured-in-repo | tests/routes/keyless-smoke.test.ts:92 (`/api/scriptide/diagnose` on a keyless server); tests/core/generative-surface-labs-gate.test.ts | supported |
+| 24 | Cost: free to self-host — no account, no subscription, no per-report fee. The deterministic analysis surface … needs no API key at all; a key only unlocks optional generation features. | README.md (top section) | measured-in-repo | tests/routes/keyless-smoke.test.ts (no-API-key operation); package.json (no billing/payment/account dependency anywhere in the tree) | supported |
 
 ### Notes on rows 1–2 (the fix)
 

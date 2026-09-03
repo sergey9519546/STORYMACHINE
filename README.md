@@ -6,6 +6,12 @@
 
 Dual-engine creative writing tool: a multi-agent narrative simulation (Story Machine) paired with a Fountain screenplay authoring environment (Script IDE).
 
+**Cost:** free to self-host — no account, no subscription, no per-report
+fee. The deterministic analysis surface (Script Doctor, coverage export,
+What-If Lab, Writers' Room, interview receipts) needs no API key at all; a
+key only unlocks optional generation features (see "Environment Variables"
+below).
+
 ## Licensing
 
 `LICENSE` currently grants no license, right, or permission to any person or
