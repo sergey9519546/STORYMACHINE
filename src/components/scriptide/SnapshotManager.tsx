@@ -1,12 +1,105 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Save, Trash2, History } from "lucide-react";
+import type { CoverageVerdict } from "../../../server/nvm/analyze/types.ts";
+import { snapshotTrend, type SnapshotTrendEntry } from "../../lib/snapshot-trend.ts";
 
-interface Snapshot {
+// writer #9 (upgrade-writer-experience discovery) — "score over revisions".
+// The four score fields are ALL optional: a snapshot only carries them when
+// a report already existed for the EXACT text being saved at snapshot time
+// (ScriptIDE.tsx's confirmSnapshot never analyzes on save and never
+// fabricates a score), so every snapshot saved before this feature — and
+// any snapshot saved without a matching fresh report — simply omits them.
+// Exported so ScriptIDE.tsx (which owns the `snapshots` state) and
+// server/lib/validation.ts's SnapshotSchema share one shape.
+export interface Snapshot {
   id: string;
   name: string;
   text: string;
   date: string;
+  health?: number;
+  verdict?: CoverageVerdict;
+  sceneCount?: number;
+  analyzedAt?: number;
+}
+
+// ── Score-over-revisions trend (writer #9) ──────────────────────────────────
+function verdictColor(v: CoverageVerdict | null): string {
+  if (v === "RECOMMEND") return "var(--sm-ok)";
+  if (v === "CONSIDER") return "var(--sm-warn)";
+  if (v === "PASS") return "var(--sm-stamp)";
+  return "var(--sm-ink-mute)";
+}
+
+/** Tiny inline SVG sparkline of health across every SCORED snapshot, oldest
+ *  (left) to newest (right) — theme-token colours, no charting library.
+ *  Renders nothing when fewer than two snapshots carry a health value:
+ *  a single point or an all-empty trend has nothing to show a trend line. */
+function HealthSparkline({ entries }: { entries: SnapshotTrendEntry[] }) {
+  const points = [...entries].reverse().filter(
+    (e): e is SnapshotTrendEntry & { health: number } => e.health !== null,
+  );
+  if (points.length < 2) return null;
+
+  const width = 160;
+  const height = 28;
+  const pad = 3;
+  const healths = points.map((p) => p.health);
+  const min = Math.min(...healths);
+  const max = Math.max(...healths);
+  const span = max - min || 1;
+  const step = (width - pad * 2) / (points.length - 1);
+
+  const coords = points.map((p, i) => ({
+    x: pad + i * step,
+    y: pad + (1 - (p.health - min) / span) * (height - pad * 2),
+    color: verdictColor(p.verdict),
+  }));
+  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label={`Health trend across ${points.length} scored versions, from ${healths[0].toFixed(1)} to ${healths[healths.length - 1].toFixed(1)} out of 100`}
+      className="shrink-0"
+    >
+      <path d={path} fill="none" stroke="var(--sm-ink-mute)" strokeWidth={1.5} />
+      {coords.map((c, i) => (
+        <circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 2.5 : 1.5} fill={c.color} />
+      ))}
+    </svg>
+  );
+}
+
+/** One snapshot row's compact health/verdict + delta-vs-previous readout.
+ *  Renders nothing when this snapshot has no health value at all (saved
+ *  before this feature, or saved with no fresh report for that text). */
+function SnapshotTrendBadge({ entry }: { entry: SnapshotTrendEntry }) {
+  if (entry.health === null) return null;
+  const delta = entry.healthDelta;
+  const deltaLabel = delta === null ? null : delta === 0 ? "±0.0" : delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
+  const deltaColor = delta === null || delta === 0 ? "var(--sm-ink-mute)" : delta > 0 ? "var(--sm-ok)" : "var(--sm-stamp)";
+  const deltaArrow = delta === null || delta === 0 ? "→" : delta > 0 ? "▲" : "▼";
+
+  return (
+    <div className="flex items-center gap-2 text-[10px] font-mono mt-1 flex-wrap">
+      <span style={{ color: verdictColor(entry.verdict) }} className="font-bold uppercase">
+        {entry.verdict ?? "—"}
+      </span>
+      <span className="opacity-80">{entry.health.toFixed(1)}/100</span>
+      {deltaLabel && (
+        <span
+          style={{ color: deltaColor }}
+          aria-label={`Health change vs. the previous saved version: ${deltaLabel}`}
+        >
+          {deltaArrow} {deltaLabel}
+        </span>
+      )}
+    </div>
+  );
 }
 
 interface SnapshotManagerProps {
@@ -37,6 +130,9 @@ export default function SnapshotManager({
   onSetRestoreModal,
   hideList = false,
 }: SnapshotManagerProps) {
+  const trend = React.useMemo(() => snapshotTrend(snapshots), [snapshots]);
+  const hasAnyScore = trend.some((t) => t.health !== null);
+
   return (
     <>
       {!hideList && (
@@ -53,8 +149,16 @@ export default function SnapshotManager({
             <Save className="w-3 h-3" /> Save Version
           </button>
         </div>
+        {hasAnyScore && (
+          <div className="flex items-center gap-3 px-1">
+            <HealthSparkline entries={trend} />
+            <span className="text-[10px] font-mono opacity-60 uppercase tracking-widest">
+              Health trend across scored versions
+            </span>
+          </div>
+        )}
         <div className="space-y-4">
-          {snapshots.map((s) => (
+          {snapshots.map((s, i) => (
             <div
               key={s.id}
               className="bg-white dark:bg-zinc-800 p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] flex justify-between items-center"
@@ -62,6 +166,7 @@ export default function SnapshotManager({
               <div>
                 <div className="font-bold uppercase text-xs">{s.name}</div>
                 <div className="text-[10px] font-mono opacity-60">{s.date}</div>
+                <SnapshotTrendBadge entry={trend[i]} />
               </div>
               <div className="flex gap-2">
                 <button

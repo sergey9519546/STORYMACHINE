@@ -66,7 +66,7 @@ import Sidebar from "./Sidebar";
 
 // Sub-components
 import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
-import SnapshotManager from "./scriptide/SnapshotManager";
+import SnapshotManager, { type Snapshot } from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
 import Toolbar, { type IdeTask, type IdeToolSlot } from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
@@ -469,9 +469,9 @@ export default function ScriptIDE({
   // silent behavior change to the editor everyone gets). Persisted the same
   // plain on/off-string way as typewriter_sound above.
   const [isTypewriterFocus, setIsTypewriterFocus] = useState(() => lsGet("typewriter_focus") === "on");
-  const [snapshots, setSnapshots] = useState<
-    { id: string; name: string; text: string; date: string }[]
-  >(initialDraft.snapshots as { id: string; name: string; text: string; date: string }[]);
+  const [snapshots, setSnapshots] = useState<Snapshot[]>(
+    initialDraft.snapshots as Snapshot[],
+  );
   // Title/author/contact — persisted via the SAME draft envelope as
   // snapshots/researchNotes/isDarkMode below (src/lib/scriptide-draft-store.ts).
   // Previously this hardcoded placeholders unconditionally, ignoring
@@ -799,7 +799,7 @@ export default function ScriptIDE({
           skipNextLocalWriteRef.current = true;
           persistedGenerationRef.current = draftGenerationRef.current;
           mutateDraft(decision.server.scriptText);
-          setSnapshots(decision.server.snapshots as { id: string; name: string; text: string; date: string }[]);
+          setSnapshots(decision.server.snapshots as Snapshot[]);
           setCharacters(decision.server.characters as typeof characters);
           setResearchNotes(decision.server.researchNotes as typeof researchNotes);
           setIsDarkMode(decision.server.isDarkMode);
@@ -836,7 +836,7 @@ export default function ScriptIDE({
           draftEnvelopeRef.current = envelope;
           skipNextLocalWriteRef.current = true;
           mutateDraft(envelope.scriptText);
-          setSnapshots(envelope.snapshots as { id: string; name: string; text: string; date: string }[]);
+          setSnapshots(envelope.snapshots as Snapshot[]);
           setCharacters(envelope.characters as typeof characters);
           setResearchNotes(envelope.researchNotes as typeof researchNotes);
           setIsDarkMode(envelope.isDarkMode);
@@ -1955,11 +1955,26 @@ export default function ScriptIDE({
 
   const confirmSnapshot = () => {
     if (snapshotModal.name.trim()) {
-      const newSnapshot = {
+      // writer #9 (upgrade-writer-experience discovery) — "score over
+      // revisions". Only attach health/verdict/sceneCount/analyzedAt when
+      // `coverageReport` (the last report CoverageSummary/ScriptDoctorPanel
+      // computed — see its own doc comment above) was measured against the
+      // EXACT text being snapshotted right now. Never re-analyzes on save,
+      // never fabricates: a snapshot taken without a matching fresh report
+      // (never diagnosed, or edited since the last diagnosis) simply omits
+      // these fields, same as every snapshot saved before this feature.
+      const freshReport = coverageReport?.fountain === scriptText ? coverageReport.report : null;
+      const newSnapshot: Snapshot = {
         id: crypto.randomUUID(),
         name: snapshotModal.name.trim(),
         text: scriptText,
         date: new Date().toLocaleString('en-US'),
+        ...(freshReport ? {
+          health: freshReport.health,
+          verdict: freshReport.verdict,
+          sceneCount: freshReport.sceneCount,
+          analyzedAt: freshReport.analyzedAt,
+        } : {}),
       };
       setSnapshots([newSnapshot, ...snapshots].slice(0, 20));
     }

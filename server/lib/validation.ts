@@ -1009,6 +1009,32 @@ export const TitlePageBodySchema = z.object({
   contact: z.string().max(2_000),
 });
 
+// One entry of the ScriptIDE editor's `snapshots` array (SnapshotManager.tsx's
+// Snapshot type: { id, name, text, date }, plus writer #9's optional
+// score-over-revisions fields captured at save time — see
+// src/components/scriptide/SnapshotManager.tsx and
+// src/lib/scriptide-draft-store.ts's snapshotTrend). EVERY field is optional,
+// including the original four (id/name/text/date): this schema replaces a
+// bare `z.array(z.unknown())`, and real callers already save partial objects
+// through this exact route (e.g. tests/routes/game-reset-persistence.test.ts
+// posts `{ id: 'snapshot', text: '...' }` with no name/date) — tightening the
+// required fields would 400 traffic this route has always accepted. The new
+// health/verdict/sceneCount/analyzedAt fields are typed when present (so a
+// malformed value 400s instead of silently corrupting a stored row) but their
+// absence is normal: every snapshot saved before this feature, and any future
+// save where no report exists yet for the current text, omits them.
+// `.passthrough()` so an older or newer client's extra fields still round-trip.
+export const SnapshotSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  text: z.string().optional(),
+  date: z.string().optional(),
+  health: z.number().optional(),
+  verdict: z.enum(['RECOMMEND', 'CONSIDER', 'PASS']).optional(),
+  sceneCount: z.number().int().nonnegative().optional(),
+  analyzedAt: z.number().optional(),
+}).passthrough();
+
 // POST /api/scriptide/save — persists the ScriptIDE editor's full working
 // state. Every cap below matches the route's own pre-existing inline
 // truncation exactly (`.slice(0, 20/100/200)`) — this schema turns those
@@ -1029,7 +1055,7 @@ export const TitlePageBodySchema = z.object({
 // resolve to a value the caller never sent.
 export const ScriptideSaveBodySchema = z.object({
   scriptText: z.string().max(500_000),
-  snapshots: z.array(z.unknown()).max(20).optional(),
+  snapshots: z.array(SnapshotSchema).max(20).optional(),
   characters: z.array(z.unknown()).max(100).optional(),
   researchNotes: z.array(z.unknown()).max(200).optional(),
   isDarkMode: z.boolean().optional(),

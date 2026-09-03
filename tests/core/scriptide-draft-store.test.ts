@@ -539,4 +539,57 @@ describe('decideScriptIDELocalRestore', () => {
     };
     assert.deepEqual(decideScriptIDELocalRestore(envelope, idb), { action: 'use-indexeddb', envelope: idb });
   });
+
+  // writer #9 (upgrade-writer-experience discovery) — "score over revisions".
+  // This store treats `snapshots` as `unknown[]` (line 27 above): it never
+  // interprets snapshot shape, only round-trips whatever ScriptIDE.tsx hands
+  // it. So the only thing worth proving here is that the NEW optional
+  // health/verdict/sceneCount/analyzedAt fields survive the same
+  // localStorage JSON round trip a bare {id,name,text,date} snapshot already
+  // does — nothing in this module needs to change for that to hold, but a
+  // regression that started dropping unknown object keys somewhere in the
+  // read/write path would be a real, silent data-loss bug for this feature.
+  describe('score-over-revisions fields (writer #9) round-trip through localStorage', () => {
+    it('a snapshot with health/verdict/sceneCount/analyzedAt survives a write + read round trip byte-exact', () => {
+      const scoredSnapshot = {
+        id: 'snap-scored',
+        name: 'v2',
+        text: 'INT. SCORED DRAFT - DAY',
+        date: '2026-09-03T00:00:00.000Z',
+        health: 72.5,
+        verdict: 'CONSIDER',
+        sceneCount: 6,
+        analyzedAt: 1_787_279_939_609,
+      };
+      const withScoredSnapshot: ScriptIDEDraftEnvelope = {
+        ...envelope,
+        snapshots: [scoredSnapshot],
+      };
+      const storage = memoryStorage();
+      assert.equal(writeScriptIDEDraft(storage.write, withScoredSnapshot), true);
+      assert.deepEqual(readScriptIDEDraft(storage.read)?.snapshots, [scoredSnapshot]);
+    });
+
+    it('an old snapshot with no score fields at all still round-trips (older data keeps loading)', () => {
+      const legacySnapshot = { id: 'snap-legacy', name: 'v1', text: 'INT. OLD DRAFT - DAY', date: '2026-01-01' };
+      const withLegacySnapshot: ScriptIDEDraftEnvelope = {
+        ...envelope,
+        snapshots: [legacySnapshot],
+      };
+      const storage = memoryStorage();
+      assert.equal(writeScriptIDEDraft(storage.write, withLegacySnapshot), true);
+      assert.deepEqual(readScriptIDEDraft(storage.read)?.snapshots, [legacySnapshot]);
+    });
+
+    it('a mix of scored and unscored snapshots in one envelope round-trips both shapes intact', () => {
+      const mixed = [
+        { id: 'new', name: 'v2', text: 'NEW', date: 'd2', health: 40.1, verdict: 'PASS', sceneCount: 90, analyzedAt: 5 },
+        { id: 'old', name: 'v1', text: 'OLD', date: 'd1' },
+      ];
+      const withMixed: ScriptIDEDraftEnvelope = { ...envelope, snapshots: mixed };
+      const storage = memoryStorage();
+      assert.equal(writeScriptIDEDraft(storage.write, withMixed), true);
+      assert.deepEqual(readScriptIDEDraft(storage.read)?.snapshots, mixed);
+    });
+  });
 });
