@@ -8,6 +8,7 @@ import type { ScriptDoctorReport } from "../../../server/nvm/analyze/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
 import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
 import { isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
+import { computeJumpSpan } from "../../lib/jump-span.ts";
 import {
   streamDoctorProgress,
   applyDoctorProgressEvent,
@@ -377,23 +378,14 @@ export default function CoverageSummary({
   // resolve and which therefore showed no jump button at all. The root
   // cause's own span is the fallback, and the regex parse is the last resort
   // for a report shape that predates locatedIssues.
-  const jumpSpan: { startLine: number; endLine: number } | undefined = (() => {
-    if (typeof top?.location === "string") {
-      const located = report?.locatedIssues?.find(
-        (l) => l.issue.location === top.location && l.startLine !== undefined && l.endLine !== undefined,
-      );
-      if (located) return { startLine: located.startLine!, endLine: located.endLine! };
-    }
-    if (root?.startLine != null) {
-      return { startLine: root.startLine, endLine: root.endLine ?? root.startLine };
-    }
-    if (typeof top?.location !== "string") return undefined;
-    const m = top.location.match(/Lines?\s+~?(\d+)(?:\s*[-–—]\s*~?(\d+))?/i);
-    if (!m) return undefined;
-    const start = Number(m[1]);
-    const end = m[2] ? Number(m[2]) : start;
-    return { startLine: Math.min(start, end), endLine: Math.max(start, end) };
-  })();
+  // Retrospective #10 (tighter jump highlight): computeJumpSpan prefers a
+  // line-precise member span over a root cause's own wider envelope — see
+  // its doc comment in jump-span.ts for the full four-source priority order.
+  const jumpSpan = computeJumpSpan({
+    topLocation: top?.location,
+    root,
+    locatedIssues: report?.locatedIssues,
+  });
 
   const nextLabel =
     top?.description?.slice(0, 140) ||

@@ -22,6 +22,14 @@ const read = (rel: string) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 
 describe('CoverageSummary.tsx — jump button targets a span, not a bare line', () => {
   const source = read('components/scriptide/CoverageSummary.tsx');
+  // Retrospective #10 (tighter jump highlight): the span computation itself
+  // moved to lib/jump-span.ts's computeJumpSpan (unit-tested directly in
+  // tests/core/jump-span.test.ts) so the "prefer a line-precise member over
+  // a root cause's wider envelope" logic is testable without mounting the
+  // component. These two assertions now check the DELEGATION — that the
+  // component still calls it with the right inputs — rather than the old
+  // inline computation's exact source text.
+  const jumpSpanLibSource = read('lib/jump-span.ts');
 
   it('accepts the highlighting callback alongside the original one', () => {
     assert.match(source, /onNavigateToFinding\?: \(startLine: number, endLine: number\) => void;/);
@@ -31,17 +39,22 @@ describe('CoverageSummary.tsx — jump button targets a span, not a bare line', 
     assert.match(source, /\n  onNavigateToFinding,\n/);
   });
 
-  it('computes both endpoints of the span', () => {
-    assert.match(source, /const jumpSpan: \{ startLine: number; endLine: number \} \| undefined/);
-    assert.match(source, /endLine: root\.endLine \?\? root\.startLine/);
+  it('computes both endpoints of the span via computeJumpSpan', () => {
+    assert.match(source, /import \{ computeJumpSpan \} from "\.\.\/\.\.\/lib\/jump-span\.ts";/);
+    assert.match(source, /const jumpSpan = computeJumpSpan\(\{/);
+    assert.match(jumpSpanLibSource, /endLine: root\.endLine \?\? root\.startLine/);
+    // The retrospective #10 tightening itself — a line-precise member's span
+    // must win over the root's own wider envelope.
+    assert.match(jumpSpanLibSource, /l\.anchor === "lines" && memberSet\.has\(l\.issue\.rule\)/);
   });
 
   it('resolves the top priority through the server-computed locatedIssues anchors', () => {
     // Without this the button simply did not render for the ordinary case —
     // a scene-level top priority like "Scene 9 (climax peak)", which the
     // line-number regex can never resolve.
-    assert.match(source, /report\?\.locatedIssues\?\.find\(/);
-    assert.match(source, /l\.issue\.location === top\.location && l\.startLine !== undefined && l\.endLine !== undefined/);
+    assert.match(source, /locatedIssues: report\?\.locatedIssues,/);
+    assert.match(jumpSpanLibSource, /locatedIssues\?\.find\(/);
+    assert.match(jumpSpanLibSource, /l\.issue\.location === topLocation && l\.startLine !== undefined && l\.endLine !== undefined/);
     assert.match(source, /useState<DoctorReportWithAnchors \| null>\(null\)/);
   });
 
