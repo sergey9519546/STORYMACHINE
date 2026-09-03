@@ -20,7 +20,11 @@ or attestation says the measurement was not run (a `PENDING` entry, filed to
 record real work honestly while the owner's measurement is still outstanding)
 is a promise, not a receipt, and `scripts/check-scoring-receipt.mjs` refuses
 to count it as satisfying a range's requirement, no matter how well-formed
-the rest of the entry is.
+the rest of the entry is. An IDENTITY-MODULO-KEYS receipt (an additive report
+field, proven via `check-doctor-output-identity.mjs --ignore-keys <list>
+--require-added <list>`) must name every key it ignored and paste the
+compare's own output — the per-key differ-count and require-added lines —
+rather than just asserting "nothing else moved."
 
 **How to add an entry (after `npm run measure-real` or
 `measure-auc-split.mjs`):** append a new row/block below using the template
