@@ -26,6 +26,7 @@ import {
   buildConfigs, configHealth, ruleChannelZeroAdjustment,
   parseArgs, PARTITIONS, CAVEAT_BLOCK, USAGE,
 } from '../../scripts/lib/rebuild-experiment-lib.mjs';
+import { computeRawCraftScore } from '../../server/nvm/analyze/doctor.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -257,9 +258,13 @@ describe('rebuild-experiment — configuration matrix', () => {
 describe('rebuild-experiment — weighted-rule channel zeroing', () => {
   // Issue counts below are in the range the in-repo corpus actually produces
   // (see scripts/output/rebuild-experiment-signals-*.csv: 9-14-scene scripts
-  // carry a 10-59 point rule channel). A near-zero issue count at feature word
-  // count sits far below densityPenalty's logistic midpoint and correctly costs
-  // ~0 — that is the formula working, not the adjustment failing.
+  // carry a 10-59 point rule channel). A near-zero issue count sits at the
+  // bottom of densityPenalty's curve and correctly costs ~0 — that is the
+  // formula working, not the adjustment failing.
+  //
+  // wordCount is still carried on these fixtures because ScriptDoctorReport
+  // carries it; since lane R5 (2026-09-03) the health formula does not read it
+  // at all, which the third case below asserts directly.
   const REALISTIC_WORDS = 900;
 
   it('is zero when a report carries no issues (nothing to add back)', () => {
@@ -275,12 +280,37 @@ describe('rebuild-experiment — weighted-rule channel zeroing', () => {
     assert.ok(many > few, `add-back should grow with issue weight: ${many} !> ${few}`);
   });
 
-  it('ignores sceneCount-only changes (scarcity is not part of the rule channel)', () => {
+  it('excludes the scarcity term, and reads no word count at all', () => {
+    // The property this case has always been about: the "rule channel" the
+    // rebuild experiment measures must be the DENSITY term alone, with the
+    // scene-scarcity surcharge excluded. Until lane R5 that was asserted by
+    // holding the severity mix fixed and varying sceneCount — density read
+    // only wordCount then, so an invariant result proved scarcity had
+    // cancelled. Density now reads sceneCount too, so that particular probe
+    // would fail for a reason that has nothing to do with scarcity leaking in.
+    //
+    // Asserted directly instead, against the UNCLAMPED statistic, where the
+    // cancellation is exact rather than rounded: zero-issue minus real-issue
+    // raw craft score IS the density term, scarcity subtracted from both.
     const bySeverity = { critical: 5, major: 20, minor: 40 };
-    const a = ruleChannelZeroAdjustment({ bySeverity, sceneCount: 12, wordCount: REALISTIC_WORDS });
-    const b = ruleChannelZeroAdjustment({ bySeverity, sceneCount: 120, wordCount: REALISTIC_WORDS });
-    assert.ok(a > 0, 'fixture must produce a non-zero channel for this test to mean anything');
-    assert.equal(+a.toFixed(6), +b.toFixed(6));
+    const adjustment = ruleChannelZeroAdjustment({ bySeverity, sceneCount: 12, wordCount: REALISTIC_WORDS });
+    assert.ok(adjustment > 0, 'fixture must produce a non-zero channel for this test to mean anything');
+
+    const densityOnly =
+      computeRawCraftScore({ critical: 0, major: 0, minor: 0 }, 12) -
+      computeRawCraftScore(bySeverity, 12);
+    assert.ok(
+      Math.abs(adjustment - densityOnly) <= 0.05,
+      `the add-back must be the density term alone (scarcity cancels): ${adjustment} vs ${densityOnly}. ` +
+      'A gap larger than computeHealthScore\'s 0.1 rounding means the scarcity surcharge is ' +
+      'leaking into the measured rule channel.',
+    );
+    // Nothing about it may depend on how long the prose is — the point of
+    // docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md.
+    assert.equal(
+      ruleChannelZeroAdjustment({ bySeverity, sceneCount: 12, wordCount: 50 }),
+      ruleChannelZeroAdjustment({ bySeverity, sceneCount: 12, wordCount: 99_000 }),
+    );
   });
 });
 

@@ -217,17 +217,19 @@ async function scoreSample(fountain: string): Promise<{ health: number; dimensio
     for (const issue of pr.issues) bySeverityTotal[issue.severity]++;
   }
   // Raw (unclamped), NOT computeHealthScore's displayed [0, 100] value: even
-  // after doctor.ts's opportunity-based rebalance (craftPenalty now blends a
-  // word-density term with a scene-scarcity term instead of normalizing by
+  // after doctor.ts's opportunity-based rebalance (craftPenalty blends an
+  // issue-density term with a scene-scarcity term instead of normalizing by
   // scene count alone — see craftPenalty's own comment in doctor.ts), an
   // exceptionally issue-dense sample can still drive the pre-clamp score
   // deeply negative. Ranking on the unclamped statistic keeps any two such
   // samples distinguishable in the distribution instead of tying at the
   // clamped floor — see doctor.ts's aggregateReport calibration-layer
-  // comment for the full rationale. computeRawCraftScore now also takes
-  // wordCount (analysis.wordCount) alongside sceneCount, since the
-  // opportunity-based penalty is a blend of both.
-  const health = computeRawCraftScore(bySeverityTotal, analysis.sceneCount, analysis.wordCount);
+  // comment for the full rationale. computeRawCraftScore takes sceneCount as
+  // its only size parameter: lane R5 (2026-09-03) replaced the density
+  // term's wordCount denominator with a scene-opportunity one, so a writer
+  // can no longer lower the penalty by adding prose — see doctor.ts's
+  // verbosity-bias design comment.
+  const health = computeRawCraftScore(bySeverityTotal, analysis.sceneCount);
 
   const dimensions = {} as Record<DimensionKey, number>;
   for (const def of DIMENSION_PASS_MAP) {
@@ -238,11 +240,11 @@ async function scoreSample(fountain: string): Promise<{ health: number; dimensio
       for (const issue of pr.issues) bySeverity[issue.severity]++;
     }
     // Same reasoning as `health` above — raw, unclamped, for ranking
-    // symmetry, using the whole sample's wordCount (a dimension is a
-    // regrouping of issues by pass, not a distinct slice of the prose, so
-    // there's no separate per-dimension word count — same rationale as
-    // doctor.ts's buildDimensions).
-    dimensions[def.key] = computeRawCraftScore(bySeverity, analysis.sceneCount, analysis.wordCount);
+    // symmetry, using the whole sample's sceneCount (a dimension is a
+    // regrouping of issues by pass, not a distinct slice of the script, so
+    // there's no separate per-dimension opportunity count — same rationale
+    // as doctor.ts's buildDimensions).
+    dimensions[def.key] = computeRawCraftScore(bySeverity, analysis.sceneCount);
   }
 
   return { health, dimensions };

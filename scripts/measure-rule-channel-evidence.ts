@@ -211,7 +211,7 @@ console.log(`\ncorpus: ${sources.filter(s => s.origin === 'cc0').length} CC0 (tr
 // ruleChannelZeroAdjustment, generalised from "zero the whole channel" to
 // "keep an arbitrary SUBSET of rules". doctor.ts:
 //   health     = max(0, round10(baseHealth - structural - arc - dialogue))
-//   baseHealth = computeHealthScore(bySeverity, sceneCount, wordCount)
+//   baseHealth = computeHealthScore(bySeverity, sceneCount)
 //   computeHealthScore = clamp(100 - densityPenalty(bySeverity, wordCount)
 //                                  - scarcityPenalty(sceneCount))
 // densityPenalty is the ONLY term reading bySeverity. So for any rule subset
@@ -279,8 +279,8 @@ function healthKeeping(v: Variant, keep: Set<string> | null): number {
     if (!keep.has(rule)) continue;
     kept.critical += counts.critical; kept.major += counts.major; kept.minor += counts.minor;
   }
-  const adj = computeHealthScore(kept, v.sceneCount, v.wordCount)
-    - computeHealthScore(v.bySeverity, v.sceneCount, v.wordCount);
+  const adj = computeHealthScore(kept, v.sceneCount)
+    - computeHealthScore(v.bySeverity, v.sceneCount);
   return Math.max(0, Math.min(100, v.health + adj));
 }
 
@@ -523,13 +523,13 @@ function bandAverages(keep: Set<string> | null): Record<CorpusBand, number> {
     const members = scored.filter(s => s.src.origin === 'calibration' && s.src.band === band);
     const vals = members.map(s => {
       const v = s.intact;
-      if (keep === null) return computeRawCraftScore(v.bySeverity, v.sceneCount, v.wordCount);
+      if (keep === null) return computeRawCraftScore(v.bySeverity, v.sceneCount);
       const kept: BySeverity = { critical: 0, major: 0, minor: 0 };
       for (const [rule, c] of v.byRule) {
         if (!keep.has(rule)) continue;
         kept.critical += c.critical; kept.major += c.major; kept.minor += c.minor;
       }
-      return computeRawCraftScore(kept, v.sceneCount, v.wordCount);
+      return computeRawCraftScore(kept, v.sceneCount);
     });
     out[band] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : Number.NaN;
   }
