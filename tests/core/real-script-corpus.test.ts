@@ -41,6 +41,19 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
+// ONE definition of the AUC statistic, the degradation recipe, the subset
+// size and the floor — see scripts/lib/auc.ts. They used to live inline here,
+// in a file that SKIPS on every CI run, so nothing checked the arithmetic and
+// nothing stopped the floor drifting from the number other artifacts quoted.
+// tests/core/auc24-table.test.ts recomputes the same statistic from a
+// committed table of numbers on every run, corpus or no corpus, and asserts
+// this file still imports these rather than re-hardcoding them.
+import {
+  AUC24_FLOOR,
+  AUC24_SUBSET,
+  computeAuc,
+  shuffleDropDegrade,
+} from '../../scripts/lib/auc.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST = JSON.parse(
@@ -156,32 +169,26 @@ describe('real-script corpus — produced features through the full doctor', () 
 // (setup-before-payoff ordering, act shape, escalation coherence) must
 // reach. This is the north-star separation metric made executable.
 describe('real-script corpus — structural-degradation AUC', { skip: SKIP_REASON }, () => {
-  const SUBSET = 24; // grown from 12 (AUC-conversion wave, 2026-07-10)
+  const SUBSET = AUC24_SUBSET; // grown from 12 (AUC-conversion wave, 2026-07-10)
   async function measure() {
-    const { makePrng, seedFromString, shuffle } = await import('../../server/nvm/repro/seed.ts');
     const files = MANIFEST.slice(0, SUBSET).map(m => m.file);
     const goods: number[] = [], bads: number[] = [];
     for (const f of files) {
       const t = readFileSync(path.join(CORPUS_DIR, f), 'utf8');
-      const parts = t.split(/^(?=INT\.|EXT\.)/mi);
-      const head = /^(INT\.|EXT\.)/i.test(parts[0]) ? '' : parts.shift() ?? '';
-      const scenes = parts.filter(x => /^(INT\.|EXT\.)/i.test(x));
-      const rng = makePrng(seedFromString(`degrade:${f}`));
-      const degraded = head + shuffle(rng, scenes).filter((_, i) => i % 3 !== 2).join('');
       goods.push((await runScriptDoctor(t)).health);
-      bads.push((await runScriptDoctor(degraded)).health);
+      bads.push((await runScriptDoctor(shuffleDropDegrade(t, f))).health);
     }
-    let wins = 0, ties = 0;
-    for (const g of goods) for (const b of bads) { if (g > b) wins++; else if (g === b) ties++; }
-    return { auc: (wins + ties / 2) / (goods.length * bads.length), goods, bads };
+    return { auc: computeAuc(goods, bads), goods, bads };
   }
   let measured: { auc: number; goods: number[]; bads: number[] } | null = null;
   // Floor = measured-minus-0.05, never below 0.6 (per this wave's own brief).
-  // Measured AUC-24 after the deduction re-tune: 0.672 —> floor 0.622.
-  it('AUC hard floor: never regress below the measured baseline (0.622)', async () => {
+  // Measured AUC-24 after the deduction re-tune: 0.672 —> floor 0.622. The
+  // value now lives in scripts/lib/auc.ts as AUC24_FLOOR; changing it there
+  // changes it here and in the always-on table-driven test at the same time.
+  it(`AUC hard floor: never regress below the measured baseline (${AUC24_FLOOR})`, async () => {
     measured = await measure();
-    assert.ok(measured.auc >= 0.622,
-      `structural-degradation AUC ${measured.auc.toFixed(3)} fell below the 0.622 ratchet — a change made the doctor MORE structure-blind`);
+    assert.ok(measured.auc >= AUC24_FLOOR,
+      `structural-degradation AUC ${measured.auc.toFixed(3)} fell below the ${AUC24_FLOOR} ratchet — a change made the doctor MORE structure-blind`);
   });
   it('AUC target: intact features should dominate their scrambled selves (>= 0.9)', { todo: 'measured 0.731 (24-script subset) — up from 0.672 after the continuous arc-incoherence structural deduction (health re-architecture, 2026-07-11B); still short of the 0.9 target' }, async () => {
     const m = measured ?? await measure();
@@ -246,9 +253,7 @@ describe('real-script corpus — act-swap-degradation AUC (second recipe)', { sk
       goods.push((await runScriptDoctor(t)).health);
       bads.push((await runScriptDoctor(actSwap(t))).health);
     }
-    let wins = 0, ties = 0;
-    for (const g of goods) for (const b of bads) { if (g > b) wins++; else if (g === b) ties++; }
-    return { auc: (wins + ties / 2) / (goods.length * bads.length) };
+    return { auc: computeAuc(goods, bads) };
   }
   it("AUC baseline (todo, no hard floor — GLOBAL_ARC_INCOHERENCE moved this from 0.477 to 0.480, still far from the 0.55 ratchet bar)", {
     todo: "measured 0.615 (24-script subset) — up from 0.480 after the continuous arc-incoherence structural deduction (health re-architecture, 2026-07-11B) graduated the arc signal past the 0.55 bar; the deduction reads emotional-arc rampCorrelation/peakPosition as a bounded feature-scale structural deduction, giving the doctor genuine scene-ORDER detection (act-swap holds scene count constant, so scarcity cannot see it)",
@@ -297,10 +302,8 @@ describe('real-script corpus — Story Graph act-swap discrimination (Wave SG-1)
       goods.push(intactMetric);
       bads.push(swappedMetric);
     }
-    let wins = 0, ties = 0;
-    for (const g of goods) for (const b of bads) { if (g > b) wins++; else if (g === b) ties++; }
-    return { 
-      auc: (wins + ties / 2) / (goods.length * bads.length),
+    return {
+      auc: computeAuc(goods, bads),
       goods,
       bads,
       meanGood: goods.reduce((a, b) => a + b, 0) / goods.length,
