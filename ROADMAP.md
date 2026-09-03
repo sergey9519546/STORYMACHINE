@@ -454,10 +454,23 @@ they read as closed with a pointer rather than as open work):
 - **No prod CSP** — closed. A hand-set `Content-Security-Policy` is applied to every response under `NODE_ENV==='production'` (`server/app.ts:105` for the derivation comment, policy assembled and set at `:148-157`), deliberately not in dev, where Vite's HMR needs inline script and `eval`.
 - **Container runs root** — closed. `Dockerfile:74` is `USER node`, after a `chown -R node:node /app` at `:72`.
 
-NICE: 4 transitive dev-dep CVEs — **CLOSED. `npm audit` reports `found 0
-vulnerabilities` (run 2026-08-24).** Clean at last audit: session capability
-model, HTML export escaping, prompt-injection boundary, secrets never in
-bundle/logs, body/rate limits.
+NICE: transitive dependency CVEs — **OPEN / MONITORING (re-verified
+2026-09-03, supersedes the 2026-08-24 "0 vulnerabilities" CLOSED claim,
+which was false as of this re-check).** `npm audit` reports 4 vulnerabilities
+(3 moderate, 1 high): `browserslist` (high) is transitive via
+`@babel/helper-compilation-targets` and `autoprefixer`, both
+**devDependencies** — build-time only, not shipped to the running server.
+The other 3 (moderate) are a `qs` -> `body-parser` -> `express` chain;
+`express` is a **direct production dependency** (`package.json`
+`dependencies`, `server/app.ts`), so — unlike the prior "dev-dep" framing —
+this chain is reachable from the deployed server's HTTP framework, not
+confined to dev/build tooling. All four report a fix available via `npm
+audit fix`; none has been applied by this pass (no dependency bump,
+`package-lock.json` unchanged) — that upgrade is separately scoped work, not
+done here. Re-run `npm audit` before the next security pass or dependency
+bump. Unrelated to this: session capability model, HTML export escaping,
+prompt-injection boundary, secrets never in bundle/logs, and body/rate
+limits remain clean as of the last audit.
 
 Security work is **not** gated behind the §3 phases — a live deployment
 blocker is fixed when found, regardless of the active product phase.

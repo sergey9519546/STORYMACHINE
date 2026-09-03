@@ -6,7 +6,7 @@ exists in the world — for gradual, evidence-gated integration over time.
 
 **What this is NOT:** a backlog. It is not a list of things to build, and
 completing every row is not a goal. This project's documented central failure
-mode is inflating counts of things it covers: it shipped 3,216 generated rule
+mode is inflating counts of things it covers: it shipped 3,217 generated rule
 constants whose entire weighted-issue channel measures AUC ≈ 0.076 on the
 real-corpus shuffle-drop harness, while scene-count scarcity alone carries AUC
 ≈ 0.938 (`doctor.ts` ~line 1892, `docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`).
@@ -168,7 +168,7 @@ author (see STEP 4).
 | Register / dialect / sociolinguistic class markers | **ABSENT as the catalog means it** (false-friend) | `voice.ts`'s `TONE_REGISTER_MISMATCH`/`TONAL_REGISTER_COLLAPSE_ACT2` | This is the exact trap CLAUDE.md's task warns about: a rule using the word "register" exists, but it means **emotional tone** consistency (does the prose register match scene valence), not **sociolinguistic** register (class/education/domain-appropriate formality per speaker) or dialect. No detector reads whether a character's diction stays consistent with an established class/regional voice. |
 | Relationship-category taxonomy (family, romantic, professional, friendship, antagonistic) | **PARTIAL** | `relationship-arc.ts` (pair-level trust-dimension tracking) | Tracks *movement* of any relationship pair well; does not classify *which kind* of relationship a pair has, so it can't apply category-specific expectations (e.g. a mentor relationship's expected arc differs from a romantic one). |
 | Memory-as-plot-device (unreliable memory, gaslighting, generational trauma) | **ABSENT** | — | Not checked at all. |
-| Power dynamics between two characters | **COVERED** | `fountain-analyzer.ts`'s `detectPowerBalance` (`powerHolder`/`powerBalance`/`powerFlipped`, per-scene, dyad-restricted), consumed by rules in `character-arc.ts` (~line 629) and `conflict.ts` (~lines 7011-7074, e.g. checking whether one character holds power throughout vs. whether control flips late) | Confirmed wired and scored, not merely computed. Routes through the ordinary density-normalized issue channel like the rest of the 3,216-rule catalog, so its marginal discrimination contribution is unmeasured, but the concept itself is genuinely covered. |
+| Power dynamics between two characters | **COVERED** | `fountain-analyzer.ts`'s `detectPowerBalance` (`powerHolder`/`powerBalance`/`powerFlipped`, per-scene, dyad-restricted), consumed by rules in `character-arc.ts` (~line 629) and `conflict.ts` (~lines 7011-7074, e.g. checking whether one character holds power throughout vs. whether control flips late) | Confirmed wired and scored, not merely computed. Routes through the ordinary density-normalized issue channel like the rest of the 3,217-rule catalog, so its marginal discrimination contribution is unmeasured, but the concept itself is genuinely covered. |
 
 ### Category 3 — Dialogue
 

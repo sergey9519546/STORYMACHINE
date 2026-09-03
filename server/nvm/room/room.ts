@@ -73,7 +73,10 @@ export type CriticFn = (
   state: NarrativeState,
 ) => Critique[];
 
-const CRITICS: Array<{ id: string; fn: CriticFn }> = [
+// Exported so callers (and tests) can derive the standing-critic count from
+// data instead of a copy-pasted number — see tests/core/room-panel-critic-count.test.ts,
+// which pins RoomPanel.tsx's "Twelve critics" copy to CRITICS.length.
+export const CRITICS: Array<{ id: string; fn: CriticFn }> = [
   { id: 'showrunner',           fn: showrunnerCritic },
   { id: 'skeptic',              fn: skepticCritic },
   { id: 'continuity',           fn: continuityCritic },

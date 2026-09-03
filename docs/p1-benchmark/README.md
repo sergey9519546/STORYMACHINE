@@ -153,7 +153,7 @@ happened, this is the citation.
   CI, running `npm run measure-real` locally before merging any scoring
   change is a human step nothing in the suite checks for you — treat it as
   part of the change, not as something CI covers.
-- Nothing in this directory authorizes deleting or shrinking the 3,216-entry
+- Nothing in this directory authorizes deleting or shrinking the 3,217-entry
   generated rule catalog, sourcing further corpus expansion, or collecting
   human labels on anyone's behalf — those remain separately scoped work
   (see `SCREENPLAY_SOURCING_TODO.md` and `PRE_REGISTRATION_PROTOCOL.md`).

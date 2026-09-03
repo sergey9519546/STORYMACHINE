@@ -1,7 +1,7 @@
-// Writers' Room Panel (on-demand) — convenes the six standing critics against
-// the current story state and shows their live transcript. Deterministic and
-// keyless: two runs against the same story state produce the same verdict,
-// no AI key required.
+// Writers' Room Panel (on-demand) — convenes the twelve standing critics
+// against the current story state and shows their live transcript.
+// Deterministic and keyless: two runs against the same story state produce
+// the same verdict, no AI key required.
 //
 // Style idiom: ConvergePanel.tsx's terminal dark-slate inline-style idiom
 // (bg var(--sm-night) card, monospace, slate borders) — this panel is a sibling
@@ -156,7 +156,7 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
       </div>
 
       <p style={{ color: 'var(--sm-ink-mute)', fontSize: 11.5, marginTop: 0, marginBottom: 14 }}>
-        Six critics debate the current story state — deterministic, no AI key required.
+        Twelve critics debate the current story state — deterministic, no AI key required.
         Re-convene any time; the same state always produces the same verdict.
       </p>
 
@@ -266,7 +266,7 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
 
       {!result && state !== 'loading' && !error && !routeMissing && (
         <p style={{ color: 'var(--sm-ink-mute)', fontSize: 12, fontStyle: 'italic' }}>
-          Convene the room to see where the six critics stand on the story as it is right now.
+          Convene the room to see where the twelve critics stand on the story as it is right now.
         </p>
       )}
     </div>

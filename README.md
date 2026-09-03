@@ -86,7 +86,7 @@ npm test
 - `npm run lint` - Type check with TypeScript (no emit)
 - `npm run check-docs` - Scan documentation for AI writing patterns
 - `npm run check-docs:strict` - Same as check-docs but fails on high-severity patterns
-- `npm run validate` - Run all checks (lint + check-docs + test)
+- `npm run validate` - Run all checks (lint + check-docs + check-server-reachability + test)
 
 **Git Hooks:**
 - `npm run setup-hooks` - Install pre-commit hook for documentation quality checks
