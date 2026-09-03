@@ -324,7 +324,22 @@ export default function StartScreen({
                 animate={isIntroResolved ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
                 transition={{ duration: DUR_REVEAL, ease: EASE_OUT_EXPO }}
                 className="flex flex-col gap-6 sm:gap-12"
-                inert={!isIntroResolved || undefined}
+                // Retrospective #6 (tab order): this used to carry
+                // `inert={!isIntroResolved || undefined}`, removing the
+                // hero CTA and every action below it from the tab sequence
+                // for the ~1.2s the decorative slug-line typing animation
+                // runs. A keyboard user tabbing from page load (the common
+                // case, not an edge case) landed instead in FIVE unrelated
+                // below-the-fold re-entry buttons before ever reaching "Try
+                // sample coverage" — measured 7th, behind a transient dead
+                // stop on <body> at the exact moment `inert` was lifted
+                // mid-tab-sequence. The fade/lift above is purely visual;
+                // gating real keyboard reachability behind a decorative
+                // animation is the bug, not a feature, so this section stays
+                // interactive throughout — DOM order alone now puts the
+                // primary CTA first, matching what reduced-motion users
+                // (isIntroResolved=true from first paint, see above) already
+                // got.
               >
                 <section aria-labelledby="entrance-actions-heading" className="flex flex-col gap-4 sm:gap-5">
                   <h2
