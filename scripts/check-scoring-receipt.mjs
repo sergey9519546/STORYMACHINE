@@ -164,6 +164,29 @@
 // script was built against.
 // ---------------------------------------------------------------------------
 //
+// THE THIRD ENTRY KIND — PENDING. Two kinds of entry already pass this gate:
+// (1) a MEASURED receipt (Measured AUC-24 present, Command is `npm run
+//     measure-real` or `measure-auc-split.mjs`), and
+// (2) an OUTPUT-IDENTITY receipt (the score provably did not move —
+//     `check-doctor-output-identity.mjs` … `OUTPUT IDENTITY: PASS — all 45
+//     reports are byte-identical`).
+// A PENDING entry is neither: it is an honest ledger row, appended by a
+// scoring-change branch, whose own attestation says in the first person that
+// the real-corpus measurement was NOT run. The 2026-09-03 LANE R5 entry is
+// the worked example — headed `### 2026-09-03 — … PENDING OWNER
+// MEASUREMENT …`. Before 2026-09-03 this script accepted such an entry as a
+// valid receipt for the range (exit 0): it is well-formed, cites a real
+// baseline, and admits no simulation — but it is a promise to measure, not a
+// receipt of a measurement, and "the human step is checked-for, not hoped
+// for" (this file's own header, above) meant nothing if the checked-for step
+// could itself say "not done yet" and still pass. See isPendingEntry() below.
+// A pending entry does NOT count as a receipt for the range even when it
+// also contains an OUTPUT IDENTITY: PASS line elsewhere in its body — the
+// pending marker wins, so a moved score with an unrun measurement cannot be
+// laundered by pasting an identity line copied from a different kind of
+// change.
+// ---------------------------------------------------------------------------
+//
 // REACHABLE_BUT_NOT_SCORING — the one, documented exit from tier 2.
 //
 // A file reachable from doctor.ts belongs here ONLY after a specific proof
@@ -423,16 +446,76 @@ const HAS_DIGIT_RE = /[0-9]/;
  *  a two-line window (the disclaimer routinely wraps onto the next line). */
 const SHA_DISCLAIMED_RE = /does\s+not\s+exist|nonexistent|non-existent|no\s+longer\s+exists|not\s+resolvable|unresolvable|could\s+not\s+get\s+object/i;
 
-function fieldValue(entryLines, label) {
-  const start = entryLines.findIndex((l) => new RegExp(`\\*\\*\\s*${label.replace(/\s+/g, '\\s+')}\\s*:?\\s*\\*\\*`, 'i').test(l));
+/** A field's full text (its labeled line plus any continuation lines, up to
+ *  the next bolded bullet at any indent), located by a caller-supplied regex
+ *  rather than a label string — shared by fieldValue() (label-based lookup)
+ *  and the PENDING required-field scan (which needs each REQUIRED_FIELDS
+ *  pattern, including the "Git SHA (or Baseline used)" alternation, tried in
+ *  turn against the same line-matching logic). */
+function fieldValueByPattern(entryLines, pattern) {
+  const start = entryLines.findIndex((l) => pattern.test(l));
   if (start === -1) return null;
   const out = [entryLines[start]];
   for (let i = start + 1; i < entryLines.length; i++) {
-    // A new bolded bullet at any indent ends the field.
     if (/^\s*[-*]\s+\*\*/.test(entryLines[i])) break;
     out.push(entryLines[i]);
   }
   return out.join('\n');
+}
+
+function fieldValue(entryLines, label) {
+  return fieldValueByPattern(entryLines, new RegExp(`\\*\\*\\s*${label.replace(/\s+/g, '\\s+')}\\s*:?\\s*\\*\\*`, 'i'));
+}
+
+/** PENDING detection — see the header's "THE THIRD ENTRY KIND" section.
+ *
+ * Whole-word `PENDING` (case-insensitive) in the heading, or in the text of
+ * any §3 REQUIRED_FIELDS field, is how the ledger's own convention marks a
+ * filed-but-incomplete entry (the real LANE R5 entry's heading ends "…
+ * PENDING OWNER MEASUREMENT"). `\bPENDING\b` deliberately does not fire on
+ * "appending" or similar — both neighboring characters have to be non-word
+ * for the boundary to match.
+ *
+ * Separately, a short, deliberately tight phrase list catches an entry that
+ * states in plain prose that the measurement was not run without using the
+ * word PENDING anywhere a field-scan would see it. This list is intentionally
+ * NOT a general "not"/"no" scan — that would misfire on the honest
+ * 2026-08-21/2026-09-02/2026-09-03 output-identity entries, which correctly
+ * say "no scoring measurement, because no score moved". Each phrase below
+ * names the absence of a *run*, not the absence of a *score change*. */
+const PENDING_WORD_RE = /\bPENDING\b/i;
+const PENDING_PHRASES = [
+  'has not been run',
+  'was not run',
+  'not yet measured',
+  'pending owner measurement',
+];
+const PENDING_PHRASE_RES = PENDING_PHRASES.map(
+  (phrase) => new RegExp(phrase.replace(/\s+/g, '\\s+'), 'i'),
+);
+
+/** Returns a short human-readable reason if `entry` is a PENDING entry, or
+ *  null if it is not. A pending entry fails validation regardless of what
+ *  else it contains (see validateEntry) — the pending marker wins over an
+ *  incidental OUTPUT IDENTITY: PASS line elsewhere in the same body. */
+function pendingReason(entry) {
+  if (PENDING_WORD_RE.test(entry.heading)) {
+    return `the entry heading contains "PENDING"`;
+  }
+  for (const field of REQUIRED_FIELDS) {
+    for (const pattern of field.patterns) {
+      const value = fieldValueByPattern(entry.lines, pattern);
+      if (value && PENDING_WORD_RE.test(value)) {
+        return `the **${field.label}** field contains "PENDING"`;
+      }
+    }
+  }
+  const body = `${entry.heading}\n${entry.lines.join('\n')}`;
+  for (let i = 0; i < PENDING_PHRASE_RES.length; i++) {
+    const hit = PENDING_PHRASE_RES[i].exec(body);
+    if (hit) return `the entry states "${hit[0]}"`;
+  }
+  return null;
 }
 
 function collectCitedShas(entryLines) {
@@ -479,6 +562,18 @@ function shaResolves(sha) {
 export function validateEntry(entry, { objectExists = shaResolves } = {}) {
   const problems = [];
   const body = entry.lines.join('\n');
+
+  const pending = pendingReason(entry);
+  if (pending) {
+    problems.push(
+      `PENDING ENTRY (${entry.heading}) — this receipt records that no measurement happened `
+      + `(${pending}). A pending entry is a promise to measure, not a receipt of a measurement, `
+      + 'and it does not satisfy this range\'s requirement — even if the same entry also contains '
+      + 'an OUTPUT IDENTITY: PASS line elsewhere, the pending marker wins. To close this: run '
+      + '`REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` and append a superseding measured '
+      + 'entry.',
+    );
+  }
 
   for (const field of REQUIRED_FIELDS) {
     if (!field.patterns.some((re) => re.test(body))) {

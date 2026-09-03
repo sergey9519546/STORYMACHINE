@@ -192,6 +192,112 @@ describe('measurement-receipt entry validation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Part 1b — PENDING entries: a receipt that says no measurement happened
+// ---------------------------------------------------------------------------
+//
+// WHY THIS EXISTS: on 2026-09-03 the R5 verbosity-bias branch appended an
+// honest ledger entry headed `### 2026-09-03 — … PENDING OWNER
+// MEASUREMENT …`, whose Runner attestation says in the first person that
+// `npm run measure-real` was NOT run. `check-scoring-receipt.mjs` accepted it
+// (exit 0) — nothing mechanical distinguished "the measurement has not
+// happened yet" from an actual receipt. These tests pin the fix: a heading or
+// required field carrying the whole word PENDING, or an attestation using one
+// of the documented phrases, must fail validation — even when the very same
+// entry also carries a borrowed OUTPUT IDENTITY: PASS line.
+const alwaysExists = () => true;
+
+describe('measurement-receipt entry validation — PENDING entries', () => {
+  it('REJECTS an entry whose heading carries PENDING, naming the heading, the reason, the owner command, and the fix action', () => {
+    const heading = '### 2026-09-03 — LANE R5 VERBOSITY-BIAS FIX — PENDING OWNER MEASUREMENT';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-03',
+      '- **Baseline used:** `main` at `e40f4cf5`',
+      '- **Command:** `npm run lint` -> exit 0, `npm test` -> exit 0',
+      '- **Measured AUC-24:** NOT MEASURED.',
+      '- **Corpus fingerprint:** not applicable — no real-corpus text was read.',
+      '- **Runner attestation:** "I ran the in-repo checks myself and confirm no real-corpus measurement was performed."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+
+    assert.ok(problems.length > 0, 'a PENDING-headed entry must not validate');
+    const joined = problems.join('\n');
+    assert.match(joined, /PENDING ENTRY/);
+    assert.match(joined, new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'must name the entry heading');
+    assert.match(joined, /this receipt records that no measurement happened/);
+    assert.match(joined, /REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real/, 'must print the owner command');
+    assert.match(joined, /append a superseding measured entry/);
+  });
+
+  it('REJECTS an entry with a plain heading but PENDING inside a required field value', () => {
+    const heading = '### 2026-09-03 — fixture with a clean heading';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-03',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Command:** PENDING — not yet chosen.',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.ok(problems.length > 0, 'PENDING inside a required field must fail validation even with a clean heading');
+    assert.match(problems.join('\n'), /the \*\*Command\*\* field contains "PENDING"/);
+  });
+
+  it('REJECTS an entry using each documented not-run phrase without the word PENDING anywhere', () => {
+    const phrases = ['has not been run', 'was not run', 'not yet measured', 'pending owner measurement'];
+    for (const phrase of phrases) {
+      const heading = '### 2026-09-03 — fixture, no PENDING word in heading or fields';
+      const lines = [
+        '',
+        '- **Date:** 2026-09-03',
+        '- **Git SHA:** `e40f4cf5`',
+        '- **Command:** `npm test` -> exit 0',
+        '- **Corpus fingerprint:** not applicable',
+        `- **Runner attestation:** "the real-corpus measurement ${phrase} in this container."`,
+      ];
+      const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+      assert.ok(problems.length > 0, `phrase "${phrase}" must be detected as pending`);
+      assert.match(problems.join('\n'), /PENDING ENTRY/, `phrase "${phrase}" must produce the pending failure`);
+    }
+  });
+
+  it('a PENDING entry that ALSO contains an OUTPUT IDENTITY: PASS line still fails — the pending marker wins', () => {
+    const heading = '### 2026-09-03 — fixture — PENDING OWNER MEASUREMENT';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-03',
+      '- **Baseline used:** `main` at `e40f4cf5`',
+      '- **Command:** `node scripts/check-doctor-output-identity.mjs --compare before after` -> exit 0',
+      '- **Result:** `OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).`',
+      '- **Corpus fingerprint:** not applicable — no real-corpus text was read.',
+      '- **Runner attestation:** "I ran the identity harness myself, but a real-corpus measurement is still owed for the formula change in the same branch."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.ok(
+      problems.length > 0,
+      'a PENDING heading must fail the entry even alongside a borrowed OUTPUT IDENTITY: PASS line',
+    );
+    assert.match(problems.join('\n'), /PENDING ENTRY/);
+  });
+
+  it('ACCEPTS a genuine output-identity entry with no PENDING marker and no not-run phrase', () => {
+    const heading = '### 2026-08-24 — fixture output-identity entry';
+    const lines = [
+      '',
+      '- **Date:** 2026-08-24',
+      '- **Baseline used:** `git archive main` at `e40f4cf5`',
+      '- **Command:** `node scripts/check-doctor-output-identity.mjs --compare before after` -> exit 0',
+      '- **Result:** `OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).`',
+      '- **Corpus fingerprint:** not applicable — no real-corpus text was read.',
+      '- **Runner attestation:** "I ran the identity harness myself on 2026-08-24; no score moved, so no real-corpus measurement is owed."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.deepEqual(problems, [], `genuine identity entry must validate cleanly; got:\n${problems.join('\n')}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Part 2 — the push-event range, driven through the real script
 // ---------------------------------------------------------------------------
 
@@ -222,6 +328,63 @@ const validEntry = (sha: string) => [
   '- **Measured AUC-24:** 0.731',
   '- **Corpus fingerprint:** 71-script manifest',
   '- **Runner attestation:** "maintainer measured this locally on 2026-08-24."',
+  '',
+].join('\n');
+
+/** An output-identity entry shaped like the newest real entry in the ledger
+ *  (`### 2026-09-03 — RETROSPECTIVE #5 PURE-CORE BOUNDARY …`): a `Baseline
+ *  used` field in place of `Git SHA`, a `check-doctor-output-identity.mjs`
+ *  Command, and a Result line reading `OUTPUT IDENTITY: PASS`. No PENDING
+ *  marker anywhere and no not-run phrase — this must keep passing. */
+const identityEntry = () => [
+  '',
+  '### 2026-08-24 — fixture no-op change — no scoring measurement, because no score moved (output-identity receipt instead)',
+  '',
+  '- **Date:** 2026-08-24',
+  '- **Baseline used:** `git archive main` at `deadbeefcafe`',
+  '- **Command:** `node scripts/check-doctor-output-identity.mjs --compare before after`',
+  '- **Result:** `OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).`',
+  '- **Corpus fingerprint:** not applicable — no real-corpus text was read.',
+  '- **Runner attestation:** "maintainer ran the identity harness locally on 2026-08-24; no score moved."',
+  '',
+].join('\n');
+
+/** Shaped exactly like the real 2026-09-03 LANE R5 entry: score moved (an
+ *  output-identity FAIL, not PASS), no AUC measured, and a heading plus
+ *  attestation that say so in the first person. */
+const pendingEntry = () => [
+  '',
+  '### 2026-08-24 — fixture LANE R5-shaped change — PENDING OWNER MEASUREMENT',
+  '',
+  '- **Date:** 2026-08-24',
+  '- **Baseline used:** `main` at `deadbeefcafe`',
+  '- **Command:** `npm test` -> exit 0, `npm run lint` -> exit 0',
+  '- **Measured AUC-24:** NOT MEASURED.',
+  '- **Corpus fingerprint:** not applicable — no real-corpus text was read.',
+  '- **Runner attestation:** "I ran the in-repo checks myself. I did NOT run',
+  '  `npm run measure-real`, and this entry claims no AUC-24 value: the real',
+  '  corpus is not present in this container. This entry is PENDING OWNER',
+  '  MEASUREMENT until that number is added."',
+  '',
+].join('\n');
+
+/** Same shape as pendingEntry(), but with a borrowed identity-PASS line
+ *  pasted in alongside it — proving the pending marker wins even when an
+ *  identity line is also present in the same entry. */
+const pendingWithIdentityLine = () => [
+  '',
+  '### 2026-08-24 — fixture LANE R5-shaped change — PENDING OWNER MEASUREMENT',
+  '',
+  '- **Date:** 2026-08-24',
+  '- **Baseline used:** `main` at `deadbeefcafe`',
+  '- **Command:** `node scripts/check-doctor-output-identity.mjs --compare before after`',
+  '- **Result:** `OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).`',
+  '- **Measured AUC-24:** NOT MEASURED.',
+  '- **Corpus fingerprint:** not applicable — no real-corpus text was read.',
+  '- **Runner attestation:** "the identity harness passed for unrelated files,',
+  '  but this branch also changed the scoring formula and no real-corpus',
+  '  measurement was run for that part. This entry is PENDING OWNER',
+  '  MEASUREMENT."',
   '',
 ].join('\n');
 
@@ -536,6 +699,83 @@ describe('measurement-receipt guard — push-event range', () => {
       const r = runGuard(dir, { GITHUB_EVENT_NAME: 'pull_request', GITHUB_SHA: after });
       assert.equal(r.status, 1, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
       assert.match(r.stdout, /origin\/main\.\.\.HEAD/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Part 3 — end-to-end: a PENDING entry pushed alongside a real doctor.ts
+// change, driven through the real CLI (not just validateEntry() directly).
+// This is the exact shape of the incident this file exists to close: a
+// scoring-path file changes AND the ledger gains a new dated entry in the
+// same range, so the old structural check ("did a new entry appear?") was
+// satisfied — only the entry's own content says the measurement never ran.
+// ---------------------------------------------------------------------------
+
+describe('measurement-receipt guard — PENDING entries, end to end', () => {
+  it('a PENDING entry alongside a doctor.ts change fails the push, naming the entry and the fix', () => {
+    const { dir, before, after } = makePushRepo({
+      doctorBody: 'export const health = 9;\n',
+      receiptAppend: pendingEntry,
+    });
+    try {
+      const r = runGuard(dir, { GITHUB_EVENT_NAME: 'push', PUSH_BEFORE_SHA: before, GITHUB_SHA: after });
+      assert.equal(
+        r.status,
+        1,
+        `a PENDING entry must not satisfy the receipt requirement.\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, /PENDING ENTRY/);
+      assert.match(r.stderr, /PENDING OWNER MEASUREMENT/, 'must name the entry (its heading is quoted in the failure)');
+      assert.match(r.stderr, /this receipt records that no measurement happened/);
+      assert.match(r.stderr, /REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real/);
+      assert.match(r.stderr, /append a superseding measured entry/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a MEASURED entry alongside a doctor.ts change passes (exit 0)', () => {
+    const { dir, before, after } = makePushRepo({
+      doctorBody: 'export const health = 10;\n',
+      receiptAppend: validEntry,
+    });
+    try {
+      const r = runGuard(dir, { GITHUB_EVENT_NAME: 'push', PUSH_BEFORE_SHA: before, GITHUB_SHA: after });
+      assert.equal(r.status, 0, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('an identity entry (shaped like the newest ledger entry) alongside a doctor.ts change passes (exit 0)', () => {
+    const { dir, before, after } = makePushRepo({
+      doctorBody: 'export const health = 11;\n',
+      receiptAppend: identityEntry,
+    });
+    try {
+      const r = runGuard(dir, { GITHUB_EVENT_NAME: 'push', PUSH_BEFORE_SHA: before, GITHUB_SHA: after });
+      assert.equal(r.status, 0, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a PENDING entry that also carries a borrowed OUTPUT IDENTITY: PASS line still fails the push', () => {
+    const { dir, before, after } = makePushRepo({
+      doctorBody: 'export const health = 12;\n',
+      receiptAppend: pendingWithIdentityLine,
+    });
+    try {
+      const r = runGuard(dir, { GITHUB_EVENT_NAME: 'push', PUSH_BEFORE_SHA: before, GITHUB_SHA: after });
+      assert.equal(
+        r.status,
+        1,
+        `a PENDING entry must fail even with a borrowed identity-PASS line in the body.\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, /PENDING ENTRY/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

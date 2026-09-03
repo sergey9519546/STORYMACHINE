@@ -15,7 +15,12 @@ recompute it against. What CI enforces is that the step was not skipped:
 a scoring change ships only alongside an entry, real or fabricated. The
 entry's honesty is a human/reviewer responsibility, same as any other
 commit message — this ledger raises the cost of omission, not the cost of
-lying.
+lying. One honesty case IS mechanically enforced: an entry whose own heading
+or attestation says the measurement was not run (a `PENDING` entry, filed to
+record real work honestly while the owner's measurement is still outstanding)
+is a promise, not a receipt, and `scripts/check-scoring-receipt.mjs` refuses
+to count it as satisfying a range's requirement, no matter how well-formed
+the rest of the entry is.
 
 **How to add an entry (after `npm run measure-real` or
 `measure-auc-split.mjs`):** append a new row/block below using the template
