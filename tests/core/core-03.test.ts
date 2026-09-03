@@ -2070,6 +2070,33 @@ describe('Wave 91 — fountainToPdf', () => {
     assert.ok(text.includes('\\\\'), 'backslash escaped');
   });
 
+  // ── WinAnsiEncoding fidelity (retrospective: "PDF stops mangling Latin-1") ──
+  it('renders accented Latin-1 letters natively instead of mangling them to "?"', () => {
+    // é í ñ ö ü ç ø all sit in U+00A0-U+00FF, which WinAnsiEncoding maps to
+    // the SAME byte as the codepoint — the declared /Encoding on the font
+    // object (see the /Type /Font object below) can render every one of
+    // these without loss.
+    const pdf = fountainToPdf('INT. CAFÉ - DAY\n\nBOB\nMañana, José will visit Köln, Zürich, and Møn.');
+    const text = toLatin1(pdf);
+    assert.ok(text.includes('CAFÉ'), 'É renders as its own WinAnsi byte, not "?"');
+    assert.ok(!text.includes('CAF?'), 'the old blanket "?" fallback is gone for CAFÉ');
+    assert.ok(text.includes('Mañana'), 'ñ survives');
+    assert.ok(text.includes('José'), 'é survives');
+    assert.ok(text.includes('Köln'), 'ö survives');
+    assert.ok(text.includes('Zürich'), 'ü survives');
+    assert.ok(text.includes('Møn'), 'ø survives');
+    assert.ok(!text.includes('?'), 'no "?" anywhere — every character in this fixture has a WinAnsi slot');
+  });
+
+  it('still transliterates smart quotes and an em dash to their closest-ASCII form', () => {
+    const pdf = fountainToPdf('INT. ROOM - DAY\n\nBOB\n“I saw her—clearly,” he said. It’s ç-worthy.');
+    const text = toLatin1(pdf);
+    assert.ok(text.includes('"I saw her-clearly,"'), 'smart double quotes and em dash transliterated to ASCII');
+    assert.ok(text.includes("It's"), 'smart apostrophe transliterated to a straight one');
+    assert.ok(text.includes('ç-worthy'), 'ç (Latin-1) still renders natively alongside the transliterated punctuation');
+    assert.ok(!text.includes('?'), 'no "?" fallback anywhere in this fixture');
+  });
+
   // ── Title page (retrospective: "title page in every export") ──────────────
   function pageCount(bytes: Uint8Array): number {
     const text = toLatin1(bytes);

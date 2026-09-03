@@ -14,15 +14,27 @@ const LINE_HEIGHT = 12;            // matches screenplay-layout.ts's single-spac
 const CHAR_WIDTH = 7.2;            // Courier 12pt advance width (0.6em) — 10 cpi
 
 // Escape a string for a PDF literal string object: \ ( ) must be escaped, and
-// characters outside printable ASCII are normalised so StandardEncoding renders
-// them predictably (smart quotes / dashes → ASCII; anything else → '?').
+// characters outside printable ASCII are normalised so the declared
+// WinAnsiEncoding renders them correctly. WinAnsiEncoding is IDENTICAL to
+// Latin-1/ISO-8859-1 across U+00A0-U+00FF (the whole accented-letter range,
+// À-ÿ, sits at the SAME byte value as its codepoint), so that whole band maps
+// straight through instead of being lost to '?' — a script with "CAFÉ" used
+// to print "CAF?" even though the font's own declared encoding could render
+// the é natively. Only characters genuinely outside WinAnsiEncoding's
+// repertoire still fall back to '?'; smart quotes, en/em dash, and ellipsis
+// — which WinAnsi COULD also represent via a dedicated 0x80-0x9F byte — get
+// their closest-ASCII transliteration instead, which is simpler and just as
+// safe as reaching for that less-portable row for the same glyphs.
 function pdfEscape(s: string): string {
   const normalised = s
     .replace(/[‘’‛]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/[–—]/g, '-')
     .replace(/…/g, '...')
-    .replace(/[^\x20-\x7E]/g, '?');
+    .replace(/[^\x20-\x7E]/g, (ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code >= 0xA0 && code <= 0xFF ? String.fromCharCode(code) : '?';
+    });
   return normalised
     .replace(/\\/g, '\\\\')
     .replace(/\(/g, '\\(')
