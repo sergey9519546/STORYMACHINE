@@ -8,9 +8,9 @@ Wave 1180 additions (distinct-mode pivot — see Waves 1176-1179 in dialogue.ts/
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_REVELATION_FRONT_LOADED`
-- `ORIGINALITY_SEED_BACK_LOADED`
-- `ORIGINALITY_SUSPENSE_BACK_LOADED`
+- <a id="rule-originality_revelation_front_loaded"></a>`ORIGINALITY_REVELATION_FRONT_LOADED`
+- <a id="rule-originality_seed_back_loaded"></a>`ORIGINALITY_SEED_BACK_LOADED`
+- <a id="rule-originality_suspense_back_loaded"></a>`ORIGINALITY_SUSPENSE_BACK_LOADED`
 
 ## Wave 1166
 
@@ -18,9 +18,9 @@ Wave 1166 additions: after Wave 1152, revelation stood at five of six channels (
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ORIGINALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ORIGINALITY_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-originality_revelation_dialogue_highlight_aftermath_void"></a>`ORIGINALITY_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-originality_turn_dialogue_highlight_aftermath_void"></a>`ORIGINALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-originality_turn_staging_aftermath_void"></a>`ORIGINALITY_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1152
 
@@ -28,9 +28,9 @@ Wave 1152 additions: after Wave 1138, revelation and dramaticTurn were each at t
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID`
-- `ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID`
-- `ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_revelation_relational_aftermath_void"></a>`ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_revelation_staging_aftermath_void"></a>`ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-originality_turn_relational_aftermath_void"></a>`ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1138
 
@@ -38,9 +38,9 @@ Wave 1138 additions: revelation was at two of six channels (curiosityDelta, susp
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `ORIGINALITY_TURN_CURIOSITY_AFTERMATH_VOID`
-- `ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-originality_revelation_emotional_aftermath_void"></a>`ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_turn_curiosity_aftermath_void"></a>`ORIGINALITY_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-originality_turn_suspense_aftermath_void"></a>`ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1124
 
@@ -48,9 +48,9 @@ Wave 1124 additions: with all five tracked triggers (raise_stakes, clockRaised, 
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID`
-- `ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_revelation_curiosity_aftermath_void"></a>`ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-originality_revelation_suspense_aftermath_void"></a>`ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-originality_turn_emotional_aftermath_void"></a>`ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1110
 
@@ -58,9 +58,9 @@ Wave 1110 additions: ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID gives payoffSetup
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-originality_open_thread_relational_aftermath_void"></a>`ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_open_thread_staging_aftermath_void"></a>`ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-originality_payoff_staging_aftermath_void"></a>`ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID`
 
 ## Wave 1096
 
@@ -68,9 +68,9 @@ Wave 1096 additions: ORIGINALITY_CLOCK_STAGING_AFTERMATH_VOID gives clockRaised 
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_STAGING_AFTERMATH_VOID`
-- `ORIGINALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ORIGINALITY_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-originality_clock_staging_aftermath_void"></a>`ORIGINALITY_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-originality_payoff_dialogue_highlight_aftermath_void"></a>`ORIGINALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-originality_seed_staging_aftermath_void"></a>`ORIGINALITY_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 1082
 
@@ -78,9 +78,9 @@ Wave 1082 additions: raise_stakes reaches full six-channel saturation — ORIGIN
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ORIGINALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ORIGINALITY_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-originality_clock_dialogue_highlight_aftermath_void"></a>`ORIGINALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-originality_seed_dialogue_highlight_aftermath_void"></a>`ORIGINALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-originality_stakes_staging_aftermath_void"></a>`ORIGINALITY_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1068
 
@@ -88,9 +88,9 @@ Wave 1068 additions: this wave targets the two least-saturated triggers plus rai
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID`
-- `ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-originality_open_thread_emotional_aftermath_void"></a>`ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_payoff_relational_aftermath_void"></a>`ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_stakes_dialogue_highlight_aftermath_void"></a>`ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1054
 
@@ -98,9 +98,9 @@ Wave 1054 additions: ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID gives the h
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `ORIGINALITY_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_clock_suspense_aftermath_void"></a>`ORIGINALITY_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-originality_open_thread_suspense_aftermath_void"></a>`ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-originality_seed_relational_aftermath_void"></a>`ORIGINALITY_SEED_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1040
 
@@ -108,9 +108,9 @@ Wave 1040 additions: with raise_stakes now at four channels, this wave targets t
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `ORIGINALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `ORIGINALITY_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_clock_curiosity_aftermath_void"></a>`ORIGINALITY_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-originality_payoff_suspense_aftermath_void"></a>`ORIGINALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-originality_seed_emotional_aftermath_void"></a>`ORIGINALITY_SEED_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1026
 
@@ -118,9 +118,9 @@ Wave 1026 additions: three more fresh channels for existing triggers: ORIGINALIT
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID`
-- `ORIGINALITY_SEED_SUSPENSE_AFTERMATH_VOID`
-- `ORIGINALITY_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_payoff_curiosity_aftermath_void"></a>`ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-originality_seed_suspense_aftermath_void"></a>`ORIGINALITY_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-originality_stakes_emotional_aftermath_void"></a>`ORIGINALITY_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1012
 
@@ -128,9 +128,9 @@ Wave 1012 additions: this wave gives three more triggers a fresh consequence cha
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_clock_emotional_aftermath_void"></a>`ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_open_thread_curiosity_aftermath_void"></a>`ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-originality_stakes_relational_aftermath_void"></a>`ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 998
 
@@ -138,9 +138,9 @@ Wave 998 additions: zone-imbalance remains fully exhausted (ORIGINALITY_STAGING 
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID`
-- `ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-originality_payoff_emotional_aftermath_void"></a>`ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-originality_seed_curiosity_aftermath_void"></a>`ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-originality_stakes_suspense_aftermath_void"></a>`ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 984
 
@@ -148,9 +148,9 @@ Wave 984 additions: ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights arr
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID`
-- `ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE`
-- `ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-originality_clock_relationship_aftermath_void"></a>`ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-originality_highlight_zone_imbalance"></a>`ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-originality_stakes_curiosity_aftermath_void"></a>`ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 970
 
@@ -158,9 +158,9 @@ Wave 970 additions: auditing the three remaining trio-complete signals in this p
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_DELTA_ZONE_IMBALANCE`
-- `ORIGINALITY_EMOTION_ZONE_IMBALANCE`
-- `ORIGINALITY_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-originality_clock_delta_zone_imbalance"></a>`ORIGINALITY_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-originality_emotion_zone_imbalance"></a>`ORIGINALITY_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-originality_relationship_zone_imbalance"></a>`ORIGINALITY_RELATIONSHIP_ZONE_IMBALANCE`
 
 ## Wave 956
 
@@ -168,9 +168,9 @@ Wave 956 additions: continuing the non-purpose 4-zone rollout with three more tr
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CURIOSITY_ZONE_IMBALANCE`
-- `ORIGINALITY_OPEN_THREAD_ZONE_IMBALANCE`
-- `ORIGINALITY_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-originality_curiosity_zone_imbalance"></a>`ORIGINALITY_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-originality_open_thread_zone_imbalance"></a>`ORIGINALITY_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-originality_revelation_zone_imbalance"></a>`ORIGINALITY_REVELATION_ZONE_IMBALANCE`
 
 ## Wave 942
 
@@ -178,9 +178,9 @@ Wave 942 additions: extending the checkZoneImbalance rollout to three more signa
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_PAYOFF_ZONE_IMBALANCE`
-- `ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `ORIGINALITY_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-originality_payoff_zone_imbalance"></a>`ORIGINALITY_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-originality_positive_emotion_zone_imbalance"></a>`ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-originality_suspense_zone_imbalance"></a>`ORIGINALITY_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 928
 
@@ -188,9 +188,9 @@ Wave 928 additions: continuing the checkZoneImbalance rollout, this wave applies
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `ORIGINALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `ORIGINALITY_STAKES_ZONE_IMBALANCE`
+- <a id="rule-originality_character_moment_zone_imbalance"></a>`ORIGINALITY_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-originality_negative_emotion_zone_imbalance"></a>`ORIGINALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-originality_stakes_zone_imbalance"></a>`ORIGINALITY_STAKES_ZONE_IMBALANCE`
 
 ## Wave 914
 
@@ -198,9 +198,9 @@ Wave 914 additions: continuing the checkZoneImbalance rollout begun in Wave 886,
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_COMPLICATE_ZONE_IMBALANCE`
-- `ORIGINALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `ORIGINALITY_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-originality_complicate_zone_imbalance"></a>`ORIGINALITY_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-originality_introduce_conflict_zone_imbalance"></a>`ORIGINALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-originality_resolution_zone_imbalance"></a>`ORIGINALITY_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 900
 
@@ -208,9 +208,9 @@ Wave 900 additions: purpose === 'complicate' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_COMPLICATE_DROUGHT_RUN`
-- `ORIGINALITY_COMPLICATE_ZONE_CLUSTER`
-- `ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-originality_complicate_drought_run"></a>`ORIGINALITY_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-originality_complicate_zone_cluster"></a>`ORIGINALITY_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-originality_turning_point_zone_imbalance"></a>`ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 886
 
@@ -218,9 +218,9 @@ Wave 886 additions: ORIGINALITY_RESOLUTION_DROUGHT_RUN (run-based x purpose === 
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLIMAX_ZONE_IMBALANCE`
-- `ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `ORIGINALITY_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-originality_climax_zone_imbalance"></a>`ORIGINALITY_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-originality_establish_world_zone_imbalance"></a>`ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-originality_resolution_drought_run"></a>`ORIGINALITY_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 872
 
@@ -228,9 +228,9 @@ Wave 872 additions: ORIGINALITY_CLIMAX_DROUGHT_RUN (run-based x purpose === 'cli
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLIMAX_DROUGHT_RUN`
-- `ORIGINALITY_ESTABLISH_WORLD_DROUGHT_RUN`
-- `ORIGINALITY_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-originality_climax_drought_run"></a>`ORIGINALITY_CLIMAX_DROUGHT_RUN`
+- <a id="rule-originality_establish_world_drought_run"></a>`ORIGINALITY_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-originality_resolution_zone_cluster"></a>`ORIGINALITY_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 858
 
@@ -238,9 +238,9 @@ Wave 858 additions: ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emoti
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLIMAX_ZONE_CLUSTER`
-- `ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-originality_climax_zone_cluster"></a>`ORIGINALITY_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-originality_establish_world_zone_cluster"></a>`ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-originality_positive_emotion_drought_run"></a>`ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 844
 
@@ -248,9 +248,9 @@ Wave 844 additions: ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × pur
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `ORIGINALITY_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `ORIGINALITY_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-originality_introduce_conflict_drought_run"></a>`ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-originality_negative_emotion_drought_run"></a>`ORIGINALITY_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-originality_positive_emotion_zone_cluster"></a>`ORIGINALITY_POSITIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 830
 
@@ -258,9 +258,9 @@ Wave 830 additions: ORIGINALITY_TURNING_POINT_DROUGHT_RUN (run-based × purpose 
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `ORIGINALITY_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `ORIGINALITY_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-originality_introduce_conflict_zone_cluster"></a>`ORIGINALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-originality_negative_emotion_zone_cluster"></a>`ORIGINALITY_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-originality_turning_point_drought_run"></a>`ORIGINALITY_TURNING_POINT_DROUGHT_RUN`
 
 ## Wave 816
 
@@ -268,9 +268,9 @@ Wave 816 additions: ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timi
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN`
-- `ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `ORIGINALITY_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-originality_character_moment_drought_run"></a>`ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-originality_character_moment_zone_cluster"></a>`ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-originality_turning_point_zone_cluster"></a>`ORIGINALITY_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 802
 
@@ -278,10 +278,10 @@ Wave 802 additions: ORIGINALITY_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspen
 
 Rules named in this wave's header:
 
-- `DRAMATIC_TURN_ZONE_CLUSTER`
-- `ORIGINALITY_CURIOSITY_DROUGHT_RUN`
-- `ORIGINALITY_EMOTION_DROUGHT_RUN`
-- `ORIGINALITY_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-dramatic_turn_zone_cluster"></a>`DRAMATIC_TURN_ZONE_CLUSTER`
+- <a id="rule-originality_curiosity_drought_run"></a>`ORIGINALITY_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-originality_emotion_drought_run"></a>`ORIGINALITY_EMOTION_DROUGHT_RUN`
+- <a id="rule-originality_suspense_peak_uncaused"></a>`ORIGINALITY_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 788
 
@@ -289,9 +289,9 @@ Wave 788 additions: ORIGINALITY_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CURIOSITY_ZONE_CLUSTER`
-- `ORIGINALITY_EMOTION_ZONE_CLUSTER`
-- `ORIGINALITY_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-originality_curiosity_zone_cluster"></a>`ORIGINALITY_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-originality_emotion_zone_cluster"></a>`ORIGINALITY_EMOTION_ZONE_CLUSTER`
+- <a id="rule-originality_suspense_drought_run"></a>`ORIGINALITY_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 774
 
@@ -299,10 +299,10 @@ Wave 774 additions: ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED (backward-cause × clo
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED`
-- `ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER`
-- `ORIGINALITY_SUSPENSE_ZONE_CLUSTER`
-- `SCENE_SHAPE_TEMPLATING`
+- <a id="rule-originality_clock_delta_peak_uncaused"></a>`ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-originality_clock_delta_zone_cluster"></a>`ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-originality_suspense_zone_cluster"></a>`ORIGINALITY_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-scene_shape_templating"></a>`SCENE_SHAPE_TEMPLATING`
 
 ## Wave 760
 
@@ -310,9 +310,9 @@ Wave 760 additions: ORIGINALITY_REVELATION_PEAK_UNCAUSED (single-peak isolation/
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN`
-- `ORIGINALITY_REVELATION_PEAK_UNCAUSED`
-- `ORIGINALITY_STAKES_DROUGHT_RUN`
+- <a id="rule-originality_clock_delta_drought_run"></a>`ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-originality_revelation_peak_uncaused"></a>`ORIGINALITY_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-originality_stakes_drought_run"></a>`ORIGINALITY_STAKES_DROUGHT_RUN`
 
 ## Wave 746
 
@@ -320,9 +320,9 @@ Wave 746 additions: ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER (distribution/timing ×
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER`
-- `ORIGINALITY_STAKES_ZONE_CLUSTER`
-- `ORIGINALITY_TURN_DROUGHT_RUN`
+- <a id="rule-originality_open_thread_zone_cluster"></a>`ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-originality_stakes_zone_cluster"></a>`ORIGINALITY_STAKES_ZONE_CLUSTER`
+- <a id="rule-originality_turn_drought_run"></a>`ORIGINALITY_TURN_DROUGHT_RUN`
 
 ## Wave 732
 
@@ -330,9 +330,9 @@ Wave 732 additions: ORIGINALITY_RELATIONSHIP_DROUGHT_RUN (run-based × relations
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_OPEN_THREAD_PEAK_UNCAUSED`
-- `ORIGINALITY_RELATIONSHIP_DROUGHT_RUN`
-- `ORIGINALITY_REVELATION_ZONE_CLUSTER`
+- <a id="rule-originality_open_thread_peak_uncaused"></a>`ORIGINALITY_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-originality_relationship_drought_run"></a>`ORIGINALITY_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-originality_revelation_zone_cluster"></a>`ORIGINALITY_REVELATION_ZONE_CLUSTER`
 
 ## Wave 718
 
@@ -340,9 +340,9 @@ Wave 718 additions (built on the shared checks library): ORIGINALITY_SEED_PEAK_U
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_RELATIONSHIP_ZONE_CLUSTER`
-- `ORIGINALITY_SEED_PEAK_UNCAUSED`
-- `ORIGINALITY_STAGING_DROUGHT_RUN`
+- <a id="rule-originality_relationship_zone_cluster"></a>`ORIGINALITY_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-originality_seed_peak_uncaused"></a>`ORIGINALITY_SEED_PEAK_UNCAUSED`
+- <a id="rule-originality_staging_drought_run"></a>`ORIGINALITY_STAGING_DROUGHT_RUN`
 
 ## Wave 704
 
@@ -350,9 +350,9 @@ Wave 704 additions (built on the shared checks library): ORIGINALITY_HIGHLIGHT_D
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_HIGHLIGHT_DROUGHT_RUN`
-- `ORIGINALITY_SEED_ZONE_CLUSTER`
-- `ORIGINALITY_STAGING_PEAK_UNCAUSED`
+- <a id="rule-originality_highlight_drought_run"></a>`ORIGINALITY_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-originality_seed_zone_cluster"></a>`ORIGINALITY_SEED_ZONE_CLUSTER`
+- <a id="rule-originality_staging_peak_uncaused"></a>`ORIGINALITY_STAGING_PEAK_UNCAUSED`
 
 ## Wave 690
 
@@ -360,9 +360,9 @@ Wave 690 additions (built on the shared checks library): ORIGINALITY_PAYOFF_DROU
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_CLOCK_DROUGHT_RUN`
-- `ORIGINALITY_HIGHLIGHT_ZONE_CLUSTER`
-- `ORIGINALITY_PAYOFF_DROUGHT_RUN`
+- <a id="rule-originality_clock_drought_run"></a>`ORIGINALITY_CLOCK_DROUGHT_RUN`
+- <a id="rule-originality_highlight_zone_cluster"></a>`ORIGINALITY_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-originality_payoff_drought_run"></a>`ORIGINALITY_PAYOFF_DROUGHT_RUN`
 
 ## Wave 676
 
@@ -370,9 +370,9 @@ Wave 676 additions (built on the shared checks library, audit M2.2): ORIGINALITY
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_OPEN_THREAD_DROUGHT_RUN`
-- `ORIGINALITY_PAYOFF_PEAK_UNCAUSED`
-- `ORIGINALITY_STAGING_ZONE_CLUSTER`
+- <a id="rule-originality_open_thread_drought_run"></a>`ORIGINALITY_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-originality_payoff_peak_uncaused"></a>`ORIGINALITY_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-originality_staging_zone_cluster"></a>`ORIGINALITY_STAGING_ZONE_CLUSTER`
 
 ## Wave 662
 
@@ -380,10 +380,10 @@ Wave 662 additions (built on the shared checks library, audit M2.2): ORIGINALITY
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_HIGHLIGHT_PEAK_UNCAUSED`
-- `ORIGINALITY_PAYOFF_ZONE_CLUSTER`
-- `ORIGINALITY_SEED_DROUGHT_RUN`
-- `PURPOSE_CONSECUTIVE_RUN`
+- <a id="rule-originality_highlight_peak_uncaused"></a>`ORIGINALITY_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-originality_payoff_zone_cluster"></a>`ORIGINALITY_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-originality_seed_drought_run"></a>`ORIGINALITY_SEED_DROUGHT_RUN`
+- <a id="rule-purpose_consecutive_run"></a>`PURPOSE_CONSECUTIVE_RUN`
 
 ## Wave 648
 
@@ -391,9 +391,9 @@ Wave 648 additions (built on the shared checks library, audit M2.2): ORIGINALITY
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED`
-- `ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED`
-- `ORIGINALITY_REVELATION_DROUGHT_RUN`
+- <a id="rule-originality_payoff_curiosity_decoupled"></a>`ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED`
+- <a id="rule-originality_relationship_peak_uncaused"></a>`ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-originality_revelation_drought_run"></a>`ORIGINALITY_REVELATION_DROUGHT_RUN`
 
 ## Wave 634
 
@@ -401,9 +401,9 @@ Wave 634 additions (built on the shared checks library, audit M2.2): ORIGINALITY
 
 Rules named in this wave's header:
 
-- `ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED`
-- `ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID`
-- `ORIGINALITY_SEED_ZONE_IMBALANCE`
+- <a id="rule-originality_highlight_staging_decoupled"></a>`ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED`
+- <a id="rule-originality_open_thread_highlight_aftermath_void"></a>`ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-originality_seed_zone_imbalance"></a>`ORIGINALITY_SEED_ZONE_IMBALANCE`
 
 ## Wave 620
 
@@ -411,9 +411,9 @@ Wave 620 additions (built on the shared checks library, audit M2.2, plus one han
 
 Rules named in this wave's header:
 
-- `CLOCK_DELTA_FLATLINE`
-- `PAYOFF_PLACEMENT_ZONE_IMBALANCE`
-- `SEED_TURN_DECOUPLED`
+- <a id="rule-clock_delta_flatline"></a>`CLOCK_DELTA_FLATLINE`
+- <a id="rule-payoff_placement_zone_imbalance"></a>`PAYOFF_PLACEMENT_ZONE_IMBALANCE`
+- <a id="rule-seed_turn_decoupled"></a>`SEED_TURN_DECOUPLED`
 
 ## Wave 606
 
@@ -421,9 +421,9 @@ Wave 606 additions (built on the shared checks library, audit M2.2): CLOCK_RAISE
 
 Rules named in this wave's header:
 
-- `CLOCK_RAISED_ZONE_CLUSTER`
-- `OPEN_THREAD_CURIOSITY_DECOUPLED`
-- `SCENE_STAGING_ZONE_IMBALANCE`
+- <a id="rule-clock_raised_zone_cluster"></a>`CLOCK_RAISED_ZONE_CLUSTER`
+- <a id="rule-open_thread_curiosity_decoupled"></a>`OPEN_THREAD_CURIOSITY_DECOUPLED`
+- <a id="rule-scene_staging_zone_imbalance"></a>`SCENE_STAGING_ZONE_IMBALANCE`
 
 ## Wave 592
 
@@ -431,10 +431,10 @@ Wave 592 additions: dramatic turn zone cluster (distribution/timing × dramaticT
 
 Rules named in this wave's header:
 
-- `ELLIPSIS_OVERUSE`
-- `PURPOSE_BOOKEND_REPEAT`
-- `REVELATION_PURPOSE_MONOTONE`
-- `UNIFORM_SCENE_PURPOSES`
+- <a id="rule-ellipsis_overuse"></a>`ELLIPSIS_OVERUSE`
+- <a id="rule-purpose_bookend_repeat"></a>`PURPOSE_BOOKEND_REPEAT`
+- <a id="rule-revelation_purpose_monotone"></a>`REVELATION_PURPOSE_MONOTONE`
+- <a id="rule-uniform_scene_purposes"></a>`UNIFORM_SCENE_PURPOSES`
 
 ## Wave 578
 
@@ -442,7 +442,7 @@ Wave 578 additions: slug same-location run (run-based × slug × consecutive sam
 
 Rules named in this wave's header:
 
-- `SLUG_INT_EXT_MONOTONE`
+- <a id="rule-slug_int_ext_monotone"></a>`SLUG_INT_EXT_MONOTONE`
 
 ## Wave 564
 
@@ -450,15 +450,15 @@ Wave 564 additions: slug INT/EXT monotone (distribution/monotony × scene headin
 
 Rules named in this wave's header:
 
-- `ACTION_OPENER_MONOTONY`
-- `ACTION_THEN_OPENER_FLOOD`
-- `CONTINUOUS_SLUG_OVERUSE`
-- `DIALOGUE_ELLIPSIS_FLOOD`
-- `DIALOGUE_EXCLAMATION_FLOOD`
-- `LOCATION_REPETITION`
-- `OPENING_CONJUNCTION_OVERUSE`
-- `SCENE_SLUG_TIME_MONOTONE`
-- `SLUG_TIME_MONOTONE`
+- <a id="rule-action_opener_monotony"></a>`ACTION_OPENER_MONOTONY`
+- <a id="rule-action_then_opener_flood"></a>`ACTION_THEN_OPENER_FLOOD`
+- <a id="rule-continuous_slug_overuse"></a>`CONTINUOUS_SLUG_OVERUSE`
+- <a id="rule-dialogue_ellipsis_flood"></a>`DIALOGUE_ELLIPSIS_FLOOD`
+- <a id="rule-dialogue_exclamation_flood"></a>`DIALOGUE_EXCLAMATION_FLOOD`
+- <a id="rule-location_repetition"></a>`LOCATION_REPETITION`
+- <a id="rule-opening_conjunction_overuse"></a>`OPENING_CONJUNCTION_OVERUSE`
+- <a id="rule-scene_slug_time_monotone"></a>`SCENE_SLUG_TIME_MONOTONE`
+- <a id="rule-slug_time_monotone"></a>`SLUG_TIME_MONOTONE`
 
 ## Wave 550
 
@@ -466,8 +466,8 @@ Wave 550 additions: parenthetical flood (underweight/bloat × parenthetical × p
 
 Rules named in this wave's header:
 
-- `DIALOGUE_SHORT_SPEECH_FLOOD`
-- `PASSIVE_VERB_DOMINANCE`
+- <a id="rule-dialogue_short_speech_flood"></a>`DIALOGUE_SHORT_SPEECH_FLOOD`
+- <a id="rule-passive_verb_dominance"></a>`PASSIVE_VERB_DOMINANCE`
 
 ## Wave 536
 
@@ -475,8 +475,8 @@ Wave 536 additions: dialogue negative imperative flood (underweight/bloat × dia
 
 Rules named in this wave's header:
 
-- `DIALOGUE_AGREEMENT_RUN`
-- `DIALOGUE_COMMAND_FLOOD`
+- <a id="rule-dialogue_agreement_run"></a>`DIALOGUE_AGREEMENT_RUN`
+- <a id="rule-dialogue_command_flood"></a>`DIALOGUE_COMMAND_FLOOD`
 
 ## Wave 522
 
@@ -484,11 +484,11 @@ Wave 522 additions: dialogue hedging flood (underweight/bloat × dialogue × unc
 
 Rules named in this wave's header:
 
-- `DIALOGUE_HEDGING_FLOOD`
-- `DIALOGUE_I_DOMINANCE`
-- `DIALOGUE_QUESTION_RUN`
-- `DIALOGUE_SAME_SPEAKER_RUN`
-- `DIALOGUE_WISH_STATEMENT_FLOOD`
+- <a id="rule-dialogue_hedging_flood"></a>`DIALOGUE_HEDGING_FLOOD`
+- <a id="rule-dialogue_i_dominance"></a>`DIALOGUE_I_DOMINANCE`
+- <a id="rule-dialogue_question_run"></a>`DIALOGUE_QUESTION_RUN`
+- <a id="rule-dialogue_same_speaker_run"></a>`DIALOGUE_SAME_SPEAKER_RUN`
+- <a id="rule-dialogue_wish_statement_flood"></a>`DIALOGUE_WISH_STATEMENT_FLOOD`
 
 ## Wave 508
 
@@ -496,10 +496,10 @@ Wave 508 additions: dialogue same-speaker run (run-based × dialogue × speaker 
 
 Rules named in this wave's header:
 
-- `ACTION_PRONOUN_OPENER_FLOOD`
-- `DIALOGUE_SHORT_RUN`
-- `DIALOGUE_SPEAKER_SOLO`
-- `GERUND_OPENER_DOMINANCE`
+- <a id="rule-action_pronoun_opener_flood"></a>`ACTION_PRONOUN_OPENER_FLOOD`
+- <a id="rule-dialogue_short_run"></a>`DIALOGUE_SHORT_RUN`
+- <a id="rule-dialogue_speaker_solo"></a>`DIALOGUE_SPEAKER_SOLO`
+- <a id="rule-gerund_opener_dominance"></a>`GERUND_OPENER_DOMINANCE`
 
 ## Wave 494
 
@@ -507,8 +507,8 @@ Wave 494 additions: dialogue question run (≥4 consecutive dialogue speeches ea
 
 Rules named in this wave's header:
 
-- `DIALOGUE_FILLER_RUN`
-- `DIALOGUE_QUESTION_FLOOD`
+- <a id="rule-dialogue_filler_run"></a>`DIALOGUE_FILLER_RUN`
+- <a id="rule-dialogue_question_flood"></a>`DIALOGUE_QUESTION_FLOOD`
 
 ## Wave 480
 
@@ -516,7 +516,7 @@ Wave 480 additions: dialogue filler run (≥3 consecutive dialogue speeches each
 
 Rules named in this wave's header:
 
-- `DIALOGUE_FILLER_OPENER`
+- <a id="rule-dialogue_filler_opener"></a>`DIALOGUE_FILLER_OPENER`
 
 ## Wave 452
 
@@ -524,7 +524,7 @@ Wave 452 additions: dialogue ellipsis flood (>20% of dialogue lines end with "..
 
 Rules named in this wave's header:
 
-- `ELLIPSIS_ACTION_OVERUSE`
+- <a id="rule-ellipsis_action_overuse"></a>`ELLIPSIS_ACTION_OVERUSE`
 
 ## Wave 438
 
@@ -532,9 +532,9 @@ Wave 438 additions: passive verb dominance (>25% of action lines use passive con
 
 Rules named in this wave's header:
 
-- `COPULA_ACTION_DOMINANCE`
-- `DIALOGUE_QUESTION_DROUGHT`
-- `DIALOGUE_SHORT_LINE_DOMINANCE`
+- <a id="rule-copula_action_dominance"></a>`COPULA_ACTION_DOMINANCE`
+- <a id="rule-dialogue_question_drought"></a>`DIALOGUE_QUESTION_DROUGHT`
+- <a id="rule-dialogue_short_line_dominance"></a>`DIALOGUE_SHORT_LINE_DOMINANCE`
 
 ## Wave 410
 
@@ -542,75 +542,75 @@ Wave 410 additions: slow-motion crutch (≥2 "SLOW MOTION"/"SLO-MO" markers — 
 
 Rules named in this wave's header:
 
-- `DIRECTORIAL_INTRUSION`
-- `SMASH_CUT_OVERUSE`
+- <a id="rule-directorial_intrusion"></a>`DIRECTORIAL_INTRUSION`
+- <a id="rule-smash_cut_overuse"></a>`SMASH_CUT_OVERUSE`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ACT3_ACTION_DROUGHT` — Wave 231: Purpose bookend repeat, I-dominance in dialogue, Act 3 action drought
-- `ACTION_ADVERB_FLOOD` — Wave 424: INSERT_SHOT_CRUTCH, ELLIPSIS_ACTION_OVERUSE, ACTION_ADVERB_FLOOD
-- `ACTION_AVERAGE_LINE_BREVITY` — Wave 480: DIALOGUE_FILLER_RUN, ACTION_AVERAGE_LINE_BREVITY, ACTION_PEAK_PARAGRAPH
-- `ACTION_PEAK_PARAGRAPH` — Wave 480: DIALOGUE_FILLER_RUN, ACTION_AVERAGE_LINE_BREVITY, ACTION_PEAK_PARAGRAPH
-- `ACTION_POLYSYNDETON_FLOOD` — Wave 550: PARENTHETICAL_FLOOD, DIALOGUE_LONG_SPEECH_FLOOD, ACTION_ADVERB_FLOOD
-- `ACTION_PRESENT_CONTINUOUS_FLOOD` — Wave 578:
-- `ACTION_QUESTION_INTRUSION` — Wave 438: PASSIVE_VERB_DOMINANCE, DIALOGUE_MONOLOGUE_DROUGHT, ACTION_QUESTION_INTRUSION
-- `ADVERB_OVERSATURATION` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
-- `ARC_TELEGRAPHED` — Wave 149: Arc predictability, intro clichés, sensory monotone
-- `BACK_TO_SCENE_CRUTCH` — Wave 368: BACK_TO_SCENE_CRUTCH
-- `BEAT_DIRECTION_OVERUSE` — Wave 340: BEAT_DIRECTION_OVERUSE
-- `BODY_LANGUAGE_CLICHE_OVERUSE` — Wave 315: BODY_LANGUAGE_CLICHE_OVERUSE, SLUG_GENERIC_LOCATION, FLASHBACK_CRUTCH
-- `CAPS_EMPHASIS_OVERUSE` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
-- `CHAPTER_LABEL_CRUTCH` — Wave 382: CHAPTER_LABEL_CRUTCH
-- `CHARACTER_INTRO_CLICHE` — Wave 149: Arc predictability, intro clichés, sensory monotone
-- `CLICHE_PHRASE` — Cliché phrases
-- `COGNITION_IN_ACTION` — Wave 245: Gerund opener dominance, scene slug time monotone, cognition in action
-- `DIALOGUE_BACKSTORY_OPENER_FLOOD` — Wave 578:
-- `DIALOGUE_DOMINANCE` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
-- `DIALOGUE_EM_DASH_INTERRUPTION_FLOOD` — Wave 550: PARENTHETICAL_FLOOD, DIALOGUE_LONG_SPEECH_FLOOD, ACTION_ADVERB_FLOOD
-- `DIALOGUE_EXCLAMATION_RUN` — Wave 522 checks
-- `DIALOGUE_LONG_SPEECH_FLOOD` — Wave 550: PARENTHETICAL_FLOOD, DIALOGUE_LONG_SPEECH_FLOOD, ACTION_ADVERB_FLOOD
-- `DIALOGUE_MONOLOGUE_DROUGHT` — Wave 438: PASSIVE_VERB_DOMINANCE, DIALOGUE_MONOLOGUE_DROUGHT, ACTION_QUESTION_INTRUSION
-- `DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD` — Wave 522 checks
-- `DISTINCTIVE_WORD_ECHO` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
-- `DREAM_SEQUENCE_CRUTCH` — Wave 354: DREAM_SEQUENCE_CRUTCH
-- `ELLIPSIS_RUN_ACTION` — Wave 466: ACTION_PRONOUN_OPENER_FLOOD, DIALOGUE_QUESTION_FLOOD, ELLIPSIS_RUN_ACTION
-- `EMOTION_NAMING_IN_ACTION` — Emotion-naming in action lines (show-don't-tell)
-- `EMOTIONAL_ARC_PLATEAU` — Wave 163: Act 3 purpose monotone, reaction shot overuse, emotional plateau
-- `EXCLAMATION_IN_ACTION` — Wave 273: EXCLAMATION_IN_ACTION
-- `FADE_TRANSITION_OVERUSE` — Wave 354: FADE_TRANSITION_OVERUSE
-- `FILTERING_VERB_OVERUSE` — Wave 259: Copula action dominance, filtering-verb overuse, directorial intrusion
-- `FLASHBACK_CRUTCH` — Wave 315: BODY_LANGUAGE_CLICHE_OVERUSE, SLUG_GENERIC_LOCATION, FLASHBACK_CRUTCH
-- `FREEZE_FRAME_CRUTCH` — Wave 410: SLOW_MOTION_CRUTCH, FREEZE_FRAME_CRUTCH, SOUND_CUE_CRUTCH
-- `GENERIC_DESCRIPTOR` — Generic patterns
-- `GENRE_CLICHE` — Genre-specific forbidden clichés
-- `INSERT_SHOT_CRUTCH` — Wave 424: INSERT_SHOT_CRUTCH, ELLIPSIS_ACTION_OVERUSE, ACTION_ADVERB_FLOOD
-- `INTERCUT_OVERUSE` — Wave 354: INTERCUT_OVERUSE
-- `INTERIOR_MONOLOGUE_LEAK` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
-- `JUST_A_DREAM_REVEAL` — Wave 301: JUST_A_DREAM_REVEAL
-- `LOW_SCENE_VARIETY` — Scene purpose variety: fully uniform or critically low variety
-- `MATCH_CUT_OVERUSE` — Wave 382: MATCH_CUT_OVERUSE
-- `MIRROR_SELF_GAZE_CLICHE` — Wave 301: MIRROR_SELF_GAZE_CLICHE
-- `MONTAGE_CRUTCH` — Wave 326: MONTAGE_CRUTCH
-- `OFF_SCREEN_CUE_OVERUSE` — Wave 368: OFF_SCREEN_CUE_OVERUSE
-- `OPENING_WAKE_UP_CLICHE` — Wave 287: OPENING_WAKE_UP_CLICHE
-- `PARENTHETICAL_FLOOD` — Wave 273: PARENTHETICAL_FLOOD
-- `PASSIVE_VOICE_OVERLOAD` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
-- `REACTION_SHOT_OVERUSE` — Wave 163: Act 3 purpose monotone, reaction shot overuse, emotional plateau
-- `REPEATED_LOCATION_EXCESS` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
-- `SCENE_CLOSER_ELLIPSIS_FLOOD` — Wave 578:
-- `SCENE_PURPOSE_MONOTONE_ACT3` — Wave 163: Act 3 purpose monotone, reaction shot overuse, emotional plateau
-- `SENSORY_MONOTONE` — Wave 149: Arc predictability, intro clichés, sensory monotone
-- `SIMILE_OVERLOAD` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
-- `SLOW_MOTION_CRUTCH` — Wave 410: SLOW_MOTION_CRUTCH, FREEZE_FRAME_CRUTCH, SOUND_CUE_CRUTCH
-- `SLUG_GENERIC_LOCATION` — Wave 315: BODY_LANGUAGE_CLICHE_OVERUSE, SLUG_GENERIC_LOCATION, FLASHBACK_CRUTCH
-- `SLUG_INTERIOR_DOMINANCE` — Wave 287: SLUG_INTERIOR_DOMINANCE
-- `SLUG_SAME_LOCATION_RUN` — Wave 578:
-- `SOUND_CUE_CRUTCH` — Wave 410: SLOW_MOTION_CRUTCH, FREEZE_FRAME_CRUTCH, SOUND_CUE_CRUTCH
-- `SPLIT_SCREEN_CRUTCH` — Wave 382: SPLIT_SCREEN_CRUTCH
-- `TIME_CARD_CRUTCH` — Wave 326: TIME_CARD_CRUTCH
-- `TITLE_CARD_CRUTCH` — Wave 326: TITLE_CARD_CRUTCH
-- `VOICEOVER_CRUTCH` — Wave 340: VOICEOVER_CRUTCH
-- `WEATHER_OPENER_CRUTCH` — Wave 301: WEATHER_OPENER_CRUTCH
+- <a id="rule-act3_action_drought"></a>`ACT3_ACTION_DROUGHT` — Wave 231: Purpose bookend repeat, I-dominance in dialogue, Act 3 action drought
+- <a id="rule-action_adverb_flood"></a>`ACTION_ADVERB_FLOOD` — Wave 424: INSERT_SHOT_CRUTCH, ELLIPSIS_ACTION_OVERUSE, ACTION_ADVERB_FLOOD
+- <a id="rule-action_average_line_brevity"></a>`ACTION_AVERAGE_LINE_BREVITY` — Wave 480: DIALOGUE_FILLER_RUN, ACTION_AVERAGE_LINE_BREVITY, ACTION_PEAK_PARAGRAPH
+- <a id="rule-action_peak_paragraph"></a>`ACTION_PEAK_PARAGRAPH` — Wave 480: DIALOGUE_FILLER_RUN, ACTION_AVERAGE_LINE_BREVITY, ACTION_PEAK_PARAGRAPH
+- <a id="rule-action_polysyndeton_flood"></a>`ACTION_POLYSYNDETON_FLOOD` — Wave 550: PARENTHETICAL_FLOOD, DIALOGUE_LONG_SPEECH_FLOOD, ACTION_ADVERB_FLOOD
+- <a id="rule-action_present_continuous_flood"></a>`ACTION_PRESENT_CONTINUOUS_FLOOD` — Wave 578:
+- <a id="rule-action_question_intrusion"></a>`ACTION_QUESTION_INTRUSION` — Wave 438: PASSIVE_VERB_DOMINANCE, DIALOGUE_MONOLOGUE_DROUGHT, ACTION_QUESTION_INTRUSION
+- <a id="rule-adverb_oversaturation"></a>`ADVERB_OVERSATURATION` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
+- <a id="rule-arc_telegraphed"></a>`ARC_TELEGRAPHED` — Wave 149: Arc predictability, intro clichés, sensory monotone
+- <a id="rule-back_to_scene_crutch"></a>`BACK_TO_SCENE_CRUTCH` — Wave 368: BACK_TO_SCENE_CRUTCH
+- <a id="rule-beat_direction_overuse"></a>`BEAT_DIRECTION_OVERUSE` — Wave 340: BEAT_DIRECTION_OVERUSE
+- <a id="rule-body_language_cliche_overuse"></a>`BODY_LANGUAGE_CLICHE_OVERUSE` — Wave 315: BODY_LANGUAGE_CLICHE_OVERUSE, SLUG_GENERIC_LOCATION, FLASHBACK_CRUTCH
+- <a id="rule-caps_emphasis_overuse"></a>`CAPS_EMPHASIS_OVERUSE` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
+- <a id="rule-chapter_label_crutch"></a>`CHAPTER_LABEL_CRUTCH` — Wave 382: CHAPTER_LABEL_CRUTCH
+- <a id="rule-character_intro_cliche"></a>`CHARACTER_INTRO_CLICHE` — Wave 149: Arc predictability, intro clichés, sensory monotone
+- <a id="rule-cliche_phrase"></a>`CLICHE_PHRASE` — Cliché phrases
+- <a id="rule-cognition_in_action"></a>`COGNITION_IN_ACTION` — Wave 245: Gerund opener dominance, scene slug time monotone, cognition in action
+- <a id="rule-dialogue_backstory_opener_flood"></a>`DIALOGUE_BACKSTORY_OPENER_FLOOD` — Wave 578:
+- <a id="rule-dialogue_dominance"></a>`DIALOGUE_DOMINANCE` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
+- <a id="rule-dialogue_em_dash_interruption_flood"></a>`DIALOGUE_EM_DASH_INTERRUPTION_FLOOD` — Wave 550: PARENTHETICAL_FLOOD, DIALOGUE_LONG_SPEECH_FLOOD, ACTION_ADVERB_FLOOD
+- <a id="rule-dialogue_exclamation_run"></a>`DIALOGUE_EXCLAMATION_RUN` — Wave 522 checks
+- <a id="rule-dialogue_long_speech_flood"></a>`DIALOGUE_LONG_SPEECH_FLOOD` — Wave 550: PARENTHETICAL_FLOOD, DIALOGUE_LONG_SPEECH_FLOOD, ACTION_ADVERB_FLOOD
+- <a id="rule-dialogue_monologue_drought"></a>`DIALOGUE_MONOLOGUE_DROUGHT` — Wave 438: PASSIVE_VERB_DOMINANCE, DIALOGUE_MONOLOGUE_DROUGHT, ACTION_QUESTION_INTRUSION
+- <a id="rule-dialogue_negative_imperative_flood"></a>`DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD` — Wave 522 checks
+- <a id="rule-distinctive_word_echo"></a>`DISTINCTIVE_WORD_ECHO` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
+- <a id="rule-dream_sequence_crutch"></a>`DREAM_SEQUENCE_CRUTCH` — Wave 354: DREAM_SEQUENCE_CRUTCH
+- <a id="rule-ellipsis_run_action"></a>`ELLIPSIS_RUN_ACTION` — Wave 466: ACTION_PRONOUN_OPENER_FLOOD, DIALOGUE_QUESTION_FLOOD, ELLIPSIS_RUN_ACTION
+- <a id="rule-emotion_naming_in_action"></a>`EMOTION_NAMING_IN_ACTION` — Emotion-naming in action lines (show-don't-tell)
+- <a id="rule-emotional_arc_plateau"></a>`EMOTIONAL_ARC_PLATEAU` — Wave 163: Act 3 purpose monotone, reaction shot overuse, emotional plateau
+- <a id="rule-exclamation_in_action"></a>`EXCLAMATION_IN_ACTION` — Wave 273: EXCLAMATION_IN_ACTION
+- <a id="rule-fade_transition_overuse"></a>`FADE_TRANSITION_OVERUSE` — Wave 354: FADE_TRANSITION_OVERUSE
+- <a id="rule-filtering_verb_overuse"></a>`FILTERING_VERB_OVERUSE` — Wave 259: Copula action dominance, filtering-verb overuse, directorial intrusion
+- <a id="rule-flashback_crutch"></a>`FLASHBACK_CRUTCH` — Wave 315: BODY_LANGUAGE_CLICHE_OVERUSE, SLUG_GENERIC_LOCATION, FLASHBACK_CRUTCH
+- <a id="rule-freeze_frame_crutch"></a>`FREEZE_FRAME_CRUTCH` — Wave 410: SLOW_MOTION_CRUTCH, FREEZE_FRAME_CRUTCH, SOUND_CUE_CRUTCH
+- <a id="rule-generic_descriptor"></a>`GENERIC_DESCRIPTOR` — Generic patterns
+- <a id="rule-genre_cliche"></a>`GENRE_CLICHE` — Genre-specific forbidden clichés
+- <a id="rule-insert_shot_crutch"></a>`INSERT_SHOT_CRUTCH` — Wave 424: INSERT_SHOT_CRUTCH, ELLIPSIS_ACTION_OVERUSE, ACTION_ADVERB_FLOOD
+- <a id="rule-intercut_overuse"></a>`INTERCUT_OVERUSE` — Wave 354: INTERCUT_OVERUSE
+- <a id="rule-interior_monologue_leak"></a>`INTERIOR_MONOLOGUE_LEAK` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
+- <a id="rule-just_a_dream_reveal"></a>`JUST_A_DREAM_REVEAL` — Wave 301: JUST_A_DREAM_REVEAL
+- <a id="rule-low_scene_variety"></a>`LOW_SCENE_VARIETY` — Scene purpose variety: fully uniform or critically low variety
+- <a id="rule-match_cut_overuse"></a>`MATCH_CUT_OVERUSE` — Wave 382: MATCH_CUT_OVERUSE
+- <a id="rule-mirror_self_gaze_cliche"></a>`MIRROR_SELF_GAZE_CLICHE` — Wave 301: MIRROR_SELF_GAZE_CLICHE
+- <a id="rule-montage_crutch"></a>`MONTAGE_CRUTCH` — Wave 326: MONTAGE_CRUTCH
+- <a id="rule-off_screen_cue_overuse"></a>`OFF_SCREEN_CUE_OVERUSE` — Wave 368: OFF_SCREEN_CUE_OVERUSE
+- <a id="rule-opening_wake_up_cliche"></a>`OPENING_WAKE_UP_CLICHE` — Wave 287: OPENING_WAKE_UP_CLICHE
+- <a id="rule-parenthetical_flood"></a>`PARENTHETICAL_FLOOD` — Wave 273: PARENTHETICAL_FLOOD
+- <a id="rule-passive_voice_overload"></a>`PASSIVE_VOICE_OVERLOAD` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
+- <a id="rule-reaction_shot_overuse"></a>`REACTION_SHOT_OVERUSE` — Wave 163: Act 3 purpose monotone, reaction shot overuse, emotional plateau
+- <a id="rule-repeated_location_excess"></a>`REPEATED_LOCATION_EXCESS` — Wave 176: Conjunction openings, ellipsis overuse, caps emphasis
+- <a id="rule-scene_closer_ellipsis_flood"></a>`SCENE_CLOSER_ELLIPSIS_FLOOD` — Wave 578:
+- <a id="rule-scene_purpose_monotone_act3"></a>`SCENE_PURPOSE_MONOTONE_ACT3` — Wave 163: Act 3 purpose monotone, reaction shot overuse, emotional plateau
+- <a id="rule-sensory_monotone"></a>`SENSORY_MONOTONE` — Wave 149: Arc predictability, intro clichés, sensory monotone
+- <a id="rule-simile_overload"></a>`SIMILE_OVERLOAD` — Wave 201: Simile overload, dialogue dominance, adverb oversaturation
+- <a id="rule-slow_motion_crutch"></a>`SLOW_MOTION_CRUTCH` — Wave 410: SLOW_MOTION_CRUTCH, FREEZE_FRAME_CRUTCH, SOUND_CUE_CRUTCH
+- <a id="rule-slug_generic_location"></a>`SLUG_GENERIC_LOCATION` — Wave 315: BODY_LANGUAGE_CLICHE_OVERUSE, SLUG_GENERIC_LOCATION, FLASHBACK_CRUTCH
+- <a id="rule-slug_interior_dominance"></a>`SLUG_INTERIOR_DOMINANCE` — Wave 287: SLUG_INTERIOR_DOMINANCE
+- <a id="rule-slug_same_location_run"></a>`SLUG_SAME_LOCATION_RUN` — Wave 578:
+- <a id="rule-sound_cue_crutch"></a>`SOUND_CUE_CRUTCH` — Wave 410: SLOW_MOTION_CRUTCH, FREEZE_FRAME_CRUTCH, SOUND_CUE_CRUTCH
+- <a id="rule-split_screen_crutch"></a>`SPLIT_SCREEN_CRUTCH` — Wave 382: SPLIT_SCREEN_CRUTCH
+- <a id="rule-time_card_crutch"></a>`TIME_CARD_CRUTCH` — Wave 326: TIME_CARD_CRUTCH
+- <a id="rule-title_card_crutch"></a>`TITLE_CARD_CRUTCH` — Wave 326: TITLE_CARD_CRUTCH
+- <a id="rule-voiceover_crutch"></a>`VOICEOVER_CRUTCH` — Wave 340: VOICEOVER_CRUTCH
+- <a id="rule-weather_opener_crutch"></a>`WEATHER_OPENER_CRUTCH` — Wave 301: WEATHER_OPENER_CRUTCH
 

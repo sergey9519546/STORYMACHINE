@@ -8,7 +8,7 @@ Wave 1192 additions (Program v2, Type 1 — signal channel, cycle 3): POWER_STAS
 
 Rules named in this wave's header:
 
-- `POWER_STASIS`
+- <a id="rule-power_stasis"></a>`POWER_STASIS`
 
 ## Wave 1169
 
@@ -16,9 +16,9 @@ Wave 1169 additions: after Wave 1155, dramaticTurn stood at one channel (curiosi
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `RELATIONSHIP_TURN_AFTERMATH_VOID`
-- `RELATIONSHIP_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_payoff_emotional_aftermath_void"></a>`RELATIONSHIP_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_turn_aftermath_void"></a>`RELATIONSHIP_TURN_AFTERMATH_VOID`
+- <a id="rule-relationship_turn_emotional_aftermath_void"></a>`RELATIONSHIP_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1155
 
@@ -26,11 +26,11 @@ Wave 1155 additions: RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID gives revela
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID`
-- `RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relationship_payoff_suspense_aftermath_void"></a>`RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-relationship_revelation_staging_aftermath_void"></a>`RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_dramatic_turn_aftermath_void"></a>`RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_payoff_aftermath_void"></a>`RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID`
+- <a id="rule-relationship_turn_curiosity_aftermath_void"></a>`RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1141
 
@@ -38,9 +38,9 @@ Wave 1141 additions: clockRaised was at four of six channels and revelation at f
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RELATIONSHIP_CLOCK_STAGING_AFTERMATH_VOID`
-- `RELATIONSHIP_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-relationship_clock_dialogue_highlight_aftermath_void"></a>`RELATIONSHIP_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-relationship_clock_staging_aftermath_void"></a>`RELATIONSHIP_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-relationship_revelation_dialogue_highlight_aftermath_void"></a>`RELATIONSHIP_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1127
 
@@ -48,9 +48,9 @@ Wave 1127 additions: clockRaised was at three of six channels (curiosityDelta/su
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_CLOCK_AFTERMATH_VOID`
-- `RELATIONSHIP_REVELATION_AFTERMATH_VOID`
-- `RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_clock_aftermath_void"></a>`RELATIONSHIP_CLOCK_AFTERMATH_VOID`
+- <a id="rule-relationship_revelation_aftermath_void"></a>`RELATIONSHIP_REVELATION_AFTERMATH_VOID`
+- <a id="rule-relationship_revelation_emotional_aftermath_void"></a>`RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1113
 
@@ -58,9 +58,9 @@ Wave 1113 additions: this wave gives clockRaised and revelation further channels
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relationship_clock_emotional_aftermath_void"></a>`RELATIONSHIP_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_clock_suspense_aftermath_void"></a>`RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-relationship_revelation_curiosity_aftermath_void"></a>`RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1099
 
@@ -68,9 +68,9 @@ Wave 1099 additions: RELATIONSHIP_SHIFT_MAGNITUDE_RELATIONAL_AFTERMATH_VOID give
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `RELATIONSHIP_REVELATION_SUSPENSE_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_MAGNITUDE_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_clock_curiosity_aftermath_void"></a>`RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relationship_revelation_suspense_aftermath_void"></a>`RELATIONSHIP_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_magnitude_relational_aftermath_void"></a>`RELATIONSHIP_SHIFT_MAGNITUDE_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1085
 
@@ -78,9 +78,9 @@ Wave 1085 additions: continuing the relationshipShifts-as-trigger family — the
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_SHIFT_HIGHLIGHT_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_MAGNITUDE_CURIOSITY_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_MAGNITUDE_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_highlight_aftermath_void"></a>`RELATIONSHIP_SHIFT_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_magnitude_curiosity_aftermath_void"></a>`RELATIONSHIP_SHIFT_MAGNITUDE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_magnitude_suspense_aftermath_void"></a>`RELATIONSHIP_SHIFT_MAGNITUDE_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1071
 
@@ -88,9 +88,9 @@ Wave 1071 additions: with seededClueIds/unresolvedClues/raise_stakes all now ful
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_SHIFT_MAGNITUDE_EMOTIONAL_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_STAGING_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_magnitude_emotional_aftermath_void"></a>`RELATIONSHIP_SHIFT_MAGNITUDE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_magnitude_staging_aftermath_void"></a>`RELATIONSHIP_SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_staging_aftermath_void"></a>`RELATIONSHIP_SHIFT_STAGING_AFTERMATH_VOID`
 
 ## Wave 1057
 
@@ -98,9 +98,9 @@ Wave 1057 additions: this wave completes full standard-channel saturation (all s
 
 Rules named in this wave's header:
 
-- `RELATIONAL_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RELATIONAL_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RELATIONAL_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-relational_open_thread_dialogue_highlight_aftermath_void"></a>`RELATIONAL_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-relational_seed_dialogue_highlight_aftermath_void"></a>`RELATIONAL_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-relational_stakes_staging_aftermath_void"></a>`RELATIONAL_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1043
 
@@ -108,9 +108,9 @@ Wave 1043 additions: with raise_stakes/seededClueIds/unresolvedClues all now at 
 
 Rules named in this wave's header:
 
-- `RELATIONAL_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `RELATIONAL_SEED_SUSPENSE_AFTERMATH_VOID`
-- `RELATIONAL_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-relational_open_thread_suspense_aftermath_void"></a>`RELATIONAL_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-relational_seed_suspense_aftermath_void"></a>`RELATIONAL_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-relational_stakes_dialogue_highlight_aftermath_void"></a>`RELATIONAL_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1029
 
@@ -118,10 +118,10 @@ Wave 1029 additions: RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID gives raise_stak
 
 Rules named in this wave's header:
 
-- `RELATIONAL_OPEN_THREAD_AFTERMATH_VOID`
-- `RELATIONAL_SEED_AFTERMATH_VOID`
-- `RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID`
+- <a id="rule-relational_open_thread_aftermath_void"></a>`RELATIONAL_OPEN_THREAD_AFTERMATH_VOID`
+- <a id="rule-relational_seed_aftermath_void"></a>`RELATIONAL_SEED_AFTERMATH_VOID`
+- <a id="rule-relational_stakes_emotional_aftermath_void"></a>`RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_seed_aftermath_void"></a>`RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID`
 
 ## Wave 1015
 
@@ -129,9 +129,9 @@ Wave 1015 additions: this wave gives three more triggers a third consequence cha
 
 Rules named in this wave's header:
 
-- `RELATIONAL_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `RELATIONAL_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `RELATIONAL_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-relational_open_thread_curiosity_aftermath_void"></a>`RELATIONAL_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relational_seed_emotional_aftermath_void"></a>`RELATIONAL_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relational_stakes_suspense_aftermath_void"></a>`RELATIONAL_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1001
 
@@ -139,9 +139,9 @@ Wave 1001 additions: RELATIONAL_STAGING re-checked and re-excluded (same predica
 
 Rules named in this wave's header:
 
-- `RELATIONAL_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID`
-- `RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relational_open_thread_emotional_aftermath_void"></a>`RELATIONAL_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relational_seed_curiosity_aftermath_void"></a>`RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relational_stakes_curiosity_aftermath_void"></a>`RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 987
 
@@ -149,9 +149,9 @@ Wave 987 additions: RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights arra
 
 Rules named in this wave's header:
 
-- `RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE`
-- `RELATIONAL_STAKES_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-relational_highlight_zone_imbalance"></a>`RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-relational_stakes_aftermath_void"></a>`RELATIONAL_STAKES_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_curiosity_aftermath_void"></a>`RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 973
 
@@ -159,9 +159,9 @@ Wave 973 additions: auditing the three remaining trio-complete signals in this p
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE`
-- `RELATIONAL_CLOCK_ZONE_IMBALANCE`
-- `RELATIONAL_TURN_ZONE_IMBALANCE`
+- <a id="rule-relational_clock_delta_zone_imbalance"></a>`RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-relational_clock_zone_imbalance"></a>`RELATIONAL_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-relational_turn_zone_imbalance"></a>`RELATIONAL_TURN_ZONE_IMBALANCE`
 
 ## Wave 959
 
@@ -169,9 +169,9 @@ Wave 959 additions: continuing the non-purpose 4-zone rollout with three more tr
 
 Rules named in this wave's header:
 
-- `RELATIONAL_REVELATION_ZONE_IMBALANCE`
-- `RELATIONAL_SEED_ZONE_IMBALANCE`
-- `RELATIONAL_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-relational_revelation_zone_imbalance"></a>`RELATIONAL_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-relational_seed_zone_imbalance"></a>`RELATIONAL_SEED_ZONE_IMBALANCE`
+- <a id="rule-relational_suspense_zone_imbalance"></a>`RELATIONAL_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 945
 
@@ -179,9 +179,9 @@ Wave 945 additions: extending the checkZoneImbalance rollout to three more trio-
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CURIOSITY_ZONE_IMBALANCE`
-- `RELATIONAL_PAYOFF_ZONE_IMBALANCE`
-- `RELATIONAL_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-relational_curiosity_zone_imbalance"></a>`RELATIONAL_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-relational_payoff_zone_imbalance"></a>`RELATIONAL_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-relational_positive_emotion_zone_imbalance"></a>`RELATIONAL_POSITIVE_EMOTION_ZONE_IMBALANCE`
 
 ## Wave 931
 
@@ -189,9 +189,9 @@ Wave 931 additions: continuing the checkZoneImbalance rollout, this wave applies
 
 Rules named in this wave's header:
 
-- `RELATIONAL_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `RELATIONAL_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `RELATIONAL_STAKES_ZONE_IMBALANCE`
+- <a id="rule-relational_negative_emotion_zone_imbalance"></a>`RELATIONAL_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-relational_revelation_purpose_zone_imbalance"></a>`RELATIONAL_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-relational_stakes_zone_imbalance"></a>`RELATIONAL_STAKES_ZONE_IMBALANCE`
 
 ## Wave 917
 
@@ -199,9 +199,9 @@ Wave 917 additions: purpose === 'revelation' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `RELATIONAL_REVELATION_PURPOSE_DROUGHT_RUN`
-- `RELATIONAL_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-relational_character_moment_zone_imbalance"></a>`RELATIONAL_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-relational_revelation_purpose_drought_run"></a>`RELATIONAL_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-relational_revelation_purpose_zone_cluster"></a>`RELATIONAL_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 903
 
@@ -209,9 +209,9 @@ Wave 903 additions: continuing the checkZoneImbalance rollout begun in Wave 889,
 
 Rules named in this wave's header:
 
-- `RELATIONAL_COMPLICATE_ZONE_IMBALANCE`
-- `RELATIONAL_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `RELATIONAL_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-relational_complicate_zone_imbalance"></a>`RELATIONAL_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-relational_introduce_conflict_zone_imbalance"></a>`RELATIONAL_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-relational_turning_point_zone_imbalance"></a>`RELATIONAL_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 889
 
@@ -219,9 +219,9 @@ Wave 889 additions: no purpose value had ever been audited by the distinct 4-zon
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLIMAX_ZONE_IMBALANCE`
-- `RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `RELATIONAL_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-relational_climax_zone_imbalance"></a>`RELATIONAL_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-relational_establish_world_zone_imbalance"></a>`RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-relational_resolution_zone_imbalance"></a>`RELATIONAL_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 875
 
@@ -229,9 +229,9 @@ Wave 875 additions: RELATIONAL_RESOLUTION_DROUGHT_RUN (run-based x purpose === '
 
 Rules named in this wave's header:
 
-- `RELATIONAL_COMPLICATE_DROUGHT_RUN`
-- `RELATIONAL_COMPLICATE_ZONE_CLUSTER`
-- `RELATIONAL_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-relational_complicate_drought_run"></a>`RELATIONAL_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-relational_complicate_zone_cluster"></a>`RELATIONAL_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-relational_resolution_drought_run"></a>`RELATIONAL_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 861
 
@@ -239,9 +239,9 @@ Wave 861 additions: RELATIONAL_CLIMAX_DROUGHT_RUN (run-based x purpose === 'clim
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLIMAX_DROUGHT_RUN`
-- `RELATIONAL_ESTABLISH_WORLD_DROUGHT_RUN`
-- `RELATIONAL_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-relational_climax_drought_run"></a>`RELATIONAL_CLIMAX_DROUGHT_RUN`
+- <a id="rule-relational_establish_world_drought_run"></a>`RELATIONAL_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-relational_resolution_zone_cluster"></a>`RELATIONAL_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 847
 
@@ -249,9 +249,9 @@ Wave 847 additions: RELATIONAL_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotio
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLIMAX_ZONE_CLUSTER`
-- `RELATIONAL_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `RELATIONAL_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-relational_climax_zone_cluster"></a>`RELATIONAL_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-relational_establish_world_zone_cluster"></a>`RELATIONAL_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-relational_positive_emotion_drought_run"></a>`RELATIONAL_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 833
 
@@ -259,9 +259,9 @@ Wave 833 additions: RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/tim
 
 Rules named in this wave's header:
 
-- `RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-relational_introduce_conflict_drought_run"></a>`RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-relational_introduce_conflict_zone_cluster"></a>`RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-relational_positive_emotion_zone_cluster"></a>`RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 819
 
@@ -269,9 +269,9 @@ Wave 819 additions: RELATIONAL_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpos
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CHARACTER_MOMENT_DROUGHT_RUN`
-- `RELATIONAL_TURNING_POINT_DROUGHT_RUN`
-- `RELATIONAL_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-relational_character_moment_drought_run"></a>`RELATIONAL_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-relational_turning_point_drought_run"></a>`RELATIONAL_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-relational_turning_point_zone_cluster"></a>`RELATIONAL_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 805
 
@@ -279,12 +279,12 @@ Wave 805 additions: RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timin
 
 Rules named in this wave's header:
 
-- `NEGATIVE_ONLY_PAIR_MAJORITY`
-- `PAIR_EMOTION_FLAT`
-- `RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-negative_only_pair_majority"></a>`NEGATIVE_ONLY_PAIR_MAJORITY`
+- <a id="rule-pair_emotion_flat"></a>`PAIR_EMOTION_FLAT`
+- <a id="rule-relational_character_moment_zone_cluster"></a>`RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-relational_negative_emotion_drought_run"></a>`RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-relational_negative_emotion_zone_cluster"></a>`RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-relationship_shift_emotional_aftermath_void"></a>`RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 791
 
@@ -292,9 +292,9 @@ Wave 791 additions: RELATIONAL_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CURIOSITY_PEAK_UNCAUSED`
-- `RELATIONAL_REVELATION_PEAK_UNCAUSED`
-- `RELATIONAL_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-relational_curiosity_peak_uncaused"></a>`RELATIONAL_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-relational_revelation_peak_uncaused"></a>`RELATIONAL_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-relational_suspense_drought_run"></a>`RELATIONAL_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 777
 
@@ -302,9 +302,9 @@ Wave 777 additions: RELATIONAL_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspens
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CURIOSITY_ZONE_CLUSTER`
-- `RELATIONAL_REVELATION_DROUGHT_RUN`
-- `RELATIONAL_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-relational_curiosity_zone_cluster"></a>`RELATIONAL_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-relational_revelation_drought_run"></a>`RELATIONAL_REVELATION_DROUGHT_RUN`
+- <a id="rule-relational_suspense_peak_uncaused"></a>`RELATIONAL_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 763
 
@@ -312,10 +312,10 @@ Wave 763 additions: RELATIONAL_SUSPENSE_ZONE_CLUSTER (distribution/timing × sus
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CURIOSITY_DROUGHT_RUN`
-- `RELATIONAL_REVELATION_ZONE_CLUSTER`
-- `RELATIONAL_SUSPENSE_ZONE_CLUSTER`
-- `RELATIONSHIP_PEAK_REVELATION_ABSENT`
+- <a id="rule-relational_curiosity_drought_run"></a>`RELATIONAL_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-relational_revelation_zone_cluster"></a>`RELATIONAL_REVELATION_ZONE_CLUSTER`
+- <a id="rule-relational_suspense_zone_cluster"></a>`RELATIONAL_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-relationship_peak_revelation_absent"></a>`RELATIONSHIP_PEAK_REVELATION_ABSENT`
 
 ## Wave 749
 
@@ -323,9 +323,9 @@ Wave 749 additions: RELATIONAL_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLOCK_DELTA_ZONE_CLUSTER`
-- `RELATIONAL_OPEN_THREAD_PEAK_UNCAUSED`
-- `RELATIONAL_TURN_DROUGHT_RUN`
+- <a id="rule-relational_clock_delta_zone_cluster"></a>`RELATIONAL_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-relational_open_thread_peak_uncaused"></a>`RELATIONAL_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-relational_turn_drought_run"></a>`RELATIONAL_TURN_DROUGHT_RUN`
 
 ## Wave 735
 
@@ -333,9 +333,9 @@ Wave 735 additions: RELATIONAL_PAYOFF_ZONE_CLUSTER (distribution/timing × payof
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLOCK_DELTA_DROUGHT_RUN`
-- `RELATIONAL_OPEN_THREAD_ZONE_CLUSTER`
-- `RELATIONAL_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-relational_clock_delta_drought_run"></a>`RELATIONAL_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-relational_open_thread_zone_cluster"></a>`RELATIONAL_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-relational_payoff_zone_cluster"></a>`RELATIONAL_PAYOFF_ZONE_CLUSTER`
 
 ## Wave 721
 
@@ -343,9 +343,9 @@ Wave 721 additions (built on the shared checks library): RELATIONAL_HIGHLIGHT_ZO
 
 Rules named in this wave's header:
 
-- `RELATIONAL_HIGHLIGHT_ZONE_CLUSTER`
-- `RELATIONAL_PAYOFF_DROUGHT_RUN`
-- `RELATIONAL_STAKES_ZONE_CLUSTER`
+- <a id="rule-relational_highlight_zone_cluster"></a>`RELATIONAL_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-relational_payoff_drought_run"></a>`RELATIONAL_PAYOFF_DROUGHT_RUN`
+- <a id="rule-relational_stakes_zone_cluster"></a>`RELATIONAL_STAKES_ZONE_CLUSTER`
 
 ## Wave 707
 
@@ -353,9 +353,9 @@ Wave 707 additions (built on the shared checks library): RELATIONAL_STAGING_PEAK
 
 Rules named in this wave's header:
 
-- `RELATIONAL_HIGHLIGHT_DROUGHT_RUN`
-- `RELATIONAL_SEED_PEAK_UNCAUSED`
-- `RELATIONAL_STAGING_PEAK_UNCAUSED`
+- <a id="rule-relational_highlight_drought_run"></a>`RELATIONAL_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-relational_seed_peak_uncaused"></a>`RELATIONAL_SEED_PEAK_UNCAUSED`
+- <a id="rule-relational_staging_peak_uncaused"></a>`RELATIONAL_STAGING_PEAK_UNCAUSED`
 
 ## Wave 693
 
@@ -363,9 +363,9 @@ Wave 693 additions (built on the shared checks library): RELATIONAL_STAGING_DROU
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLOCK_DROUGHT_RUN`
-- `RELATIONAL_SEED_ZONE_CLUSTER`
-- `RELATIONAL_STAGING_DROUGHT_RUN`
+- <a id="rule-relational_clock_drought_run"></a>`RELATIONAL_CLOCK_DROUGHT_RUN`
+- <a id="rule-relational_seed_zone_cluster"></a>`RELATIONAL_SEED_ZONE_CLUSTER`
+- <a id="rule-relational_staging_drought_run"></a>`RELATIONAL_STAGING_DROUGHT_RUN`
 
 ## Wave 679
 
@@ -373,10 +373,10 @@ Wave 679 additions (built on the shared checks library, audit M2.2): RELATIONAL_
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED`
-- `RELATIONAL_STAKES_DROUGHT_RUN`
-- `RELATIONAL_TURN_ZONE_CLUSTER`
-- `RELATIONSHIP_SHIFT_PURPOSE_MONOTONE`
+- <a id="rule-relational_clock_delta_peak_uncaused"></a>`RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-relational_stakes_drought_run"></a>`RELATIONAL_STAKES_DROUGHT_RUN`
+- <a id="rule-relational_turn_zone_cluster"></a>`RELATIONAL_TURN_ZONE_CLUSTER`
+- <a id="rule-relationship_shift_purpose_monotone"></a>`RELATIONSHIP_SHIFT_PURPOSE_MONOTONE`
 
 ## Wave 665
 
@@ -384,9 +384,9 @@ Wave 665 additions (built on the shared checks library, audit M2.2): RELATIONAL_
 
 Rules named in this wave's header:
 
-- `RELATIONAL_CLOCK_ZONE_CLUSTER`
-- `RELATIONAL_PAYOFF_PEAK_UNCAUSED`
-- `RELATIONAL_SEED_DROUGHT_RUN`
+- <a id="rule-relational_clock_zone_cluster"></a>`RELATIONAL_CLOCK_ZONE_CLUSTER`
+- <a id="rule-relational_payoff_peak_uncaused"></a>`RELATIONAL_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-relational_seed_drought_run"></a>`RELATIONAL_SEED_DROUGHT_RUN`
 
 ## Wave 651
 
@@ -394,12 +394,12 @@ Wave 651 additions (built on the shared checks library, audit M2.2): RELATIONAL_
 
 Rules named in this wave's header:
 
-- `RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED`
-- `RELATIONAL_OPEN_THREAD_DROUGHT_RUN`
-- `RELATIONAL_STAGING_ZONE_CLUSTER`
-- `RELATIONSHIP_PEAK_UNCAUSED`
-- `RELATIONSHIP_SHIFT_DROUGHT`
-- `RUPTURE_THIRDS_CLUSTER`
+- <a id="rule-relational_highlight_peak_uncaused"></a>`RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-relational_open_thread_drought_run"></a>`RELATIONAL_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-relational_staging_zone_cluster"></a>`RELATIONAL_STAGING_ZONE_CLUSTER`
+- <a id="rule-relationship_peak_uncaused"></a>`RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-relationship_shift_drought"></a>`RELATIONSHIP_SHIFT_DROUGHT`
+- <a id="rule-rupture_thirds_cluster"></a>`RUPTURE_THIRDS_CLUSTER`
 
 ## Wave 637
 
@@ -407,9 +407,9 @@ Wave 637 additions (built on the shared checks library, audit M2.2): RELATIONAL_
 
 Rules named in this wave's header:
 
-- `RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
-- `RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-relational_highlight_open_thread_decoupled"></a>`RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
+- <a id="rule-relational_open_thread_staging_aftermath_void"></a>`RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-relational_open_thread_zone_imbalance"></a>`RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE`
 
 ## Wave 623
 
@@ -417,9 +417,9 @@ Wave 623 additions (built on the shared checks library, audit M2.2): RELATIONAL_
 
 Rules named in this wave's header:
 
-- `RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
-- `RELATIONAL_PAYOFF_STAGING_DECOUPLED`
-- `RELATIONAL_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-relational_dialogue_highlight_zone_imbalance"></a>`RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-relational_payoff_staging_decoupled"></a>`RELATIONAL_PAYOFF_STAGING_DECOUPLED`
+- <a id="rule-relational_seed_staging_aftermath_void"></a>`RELATIONAL_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 609
 
@@ -427,9 +427,9 @@ Wave 609 additions (built on the shared checks library, audit M2.2): OPEN_THREAD
 
 Rules named in this wave's header:
 
-- `OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED`
-- `PHYSICAL_PRESENCE_ZONE_IMBALANCE`
-- `RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-open_thread_relationship_shift_decoupled"></a>`OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED`
+- <a id="rule-physical_presence_zone_imbalance"></a>`PHYSICAL_PRESENCE_ZONE_IMBALANCE`
+- <a id="rule-relationship_shift_dialogue_highlight_aftermath_void"></a>`RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 595
 
@@ -437,8 +437,8 @@ Wave 595 additions: relationship shift purpose monotone (average/aggregate × re
 
 Rules named in this wave's header:
 
-- `PAIR_MIDPOINT_VOID`
-- `RELATIONSHIP_CLIMAX_VOID`
+- <a id="rule-pair_midpoint_void"></a>`PAIR_MIDPOINT_VOID`
+- <a id="rule-relationship_climax_void"></a>`RELATIONSHIP_CLIMAX_VOID`
 
 ## Wave 567
 
@@ -446,11 +446,11 @@ Wave 567 additions: relationship peak revelation absent (single-peak isolation �
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_CLOCK_DECOUPLED`
-- `RELATIONSHIP_CURIOSITY_PEAK_ABSENT`
-- `RELATIONSHIP_PEAK_EMOTION_FLAT`
-- `RELATIONSHIP_REVELATION_SILENT`
-- `RELATIONSHIP_SUSPENSE_PEAK_ABSENT`
+- <a id="rule-relationship_clock_decoupled"></a>`RELATIONSHIP_CLOCK_DECOUPLED`
+- <a id="rule-relationship_curiosity_peak_absent"></a>`RELATIONSHIP_CURIOSITY_PEAK_ABSENT`
+- <a id="rule-relationship_peak_emotion_flat"></a>`RELATIONSHIP_PEAK_EMOTION_FLAT`
+- <a id="rule-relationship_revelation_silent"></a>`RELATIONSHIP_REVELATION_SILENT`
+- <a id="rule-relationship_suspense_peak_absent"></a>`RELATIONSHIP_SUSPENSE_PEAK_ABSENT`
 
 ## Wave 553
 
@@ -458,13 +458,13 @@ Wave 553 additions: relationship emotion decoupled (average/aggregate × emotion
 
 Rules named in this wave's header:
 
-- `DIMENSION_ONE_WAY`
-- `PAIR_FIRST_HALF_VOID`
-- `PAIR_SECOND_HALF_VOID`
-- `RELATIONSHIP_CURIOSITY_DECOUPLED`
-- `RELATIONSHIP_RUPTURE_EMOTION_FLAT`
-- `RELATIONSHIP_SUSPENSE_DECOUPLED`
-- `WARMTH_UNFELT`
+- <a id="rule-dimension_one_way"></a>`DIMENSION_ONE_WAY`
+- <a id="rule-pair_first_half_void"></a>`PAIR_FIRST_HALF_VOID`
+- <a id="rule-pair_second_half_void"></a>`PAIR_SECOND_HALF_VOID`
+- <a id="rule-relationship_curiosity_decoupled"></a>`RELATIONSHIP_CURIOSITY_DECOUPLED`
+- <a id="rule-relationship_rupture_emotion_flat"></a>`RELATIONSHIP_RUPTURE_EMOTION_FLAT`
+- <a id="rule-relationship_suspense_decoupled"></a>`RELATIONSHIP_SUSPENSE_DECOUPLED`
+- <a id="rule-warmth_unfelt"></a>`WARMTH_UNFELT`
 
 ## Wave 539
 
@@ -472,8 +472,8 @@ Wave 539 additions: pair seed flat (co-occurrence × seed × per-pair — a pair
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_DIMENSION_RUN`
-- `RELATIONSHIP_SEED_DECOUPLED`
+- <a id="rule-relationship_dimension_run"></a>`RELATIONSHIP_DIMENSION_RUN`
+- <a id="rule-relationship_seed_decoupled"></a>`RELATIONSHIP_SEED_DECOUPLED`
 
 ## Wave 525
 
@@ -481,7 +481,7 @@ Wave 525 additions: relationship shift seed aftermath void (sequence/aftermath �
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_PAYOFF_DECOUPLED`
+- <a id="rule-relationship_payoff_decoupled"></a>`RELATIONSHIP_PAYOFF_DECOUPLED`
 
 ## Wave 511
 
@@ -489,8 +489,8 @@ Wave 511 additions: relationship shift dramatic turn aftermath void (sequence/af
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_DRAMATIC_TURN_DECOUPLED`
-- `RELATIONSHIP_WARMTH_CLUSTER`
+- <a id="rule-relationship_dramatic_turn_decoupled"></a>`RELATIONSHIP_DRAMATIC_TURN_DECOUPLED`
+- <a id="rule-relationship_warmth_cluster"></a>`RELATIONSHIP_WARMTH_CLUSTER`
 
 ## Wave 497
 
@@ -498,8 +498,8 @@ Wave 497 additions: relationship shift clock aftermath void (sequence/aftermath 
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_SHIFT_THIRDS_CLUSTER`
-- `SHIFT_DIMENSION_CONCENTRATION`
+- <a id="rule-relationship_shift_thirds_cluster"></a>`RELATIONSHIP_SHIFT_THIRDS_CLUSTER`
+- <a id="rule-shift_dimension_concentration"></a>`SHIFT_DIMENSION_CONCENTRATION`
 
 ## Wave 469
 
@@ -507,7 +507,7 @@ Wave 469 additions: relationship shift suspense aftermath void (sequence/afterma
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_SHIFT_CURIOSITY_VOID`
+- <a id="rule-relationship_shift_curiosity_void"></a>`RELATIONSHIP_SHIFT_CURIOSITY_VOID`
 
 ## Wave 455
 
@@ -515,9 +515,9 @@ Wave 455 additions: pair rupture unmotivated (backward-cause × negative shift �
 
 Rules named in this wave's header:
 
-- `PAIR_REPAIR_UNMOTIVATED`
-- `PAIR_RUPTURE_RUN`
-- `RELATIONSHIP_SHIFT_AFTERMATH_VOID`
+- <a id="rule-pair_repair_unmotivated"></a>`PAIR_REPAIR_UNMOTIVATED`
+- <a id="rule-pair_rupture_run"></a>`PAIR_RUPTURE_RUN`
+- <a id="rule-relationship_shift_aftermath_void"></a>`RELATIONSHIP_SHIFT_AFTERMATH_VOID`
 
 ## Wave 441
 
@@ -525,7 +525,7 @@ Wave 441 additions: pair ensemble solo (≥3 pairs each with ≥2 shifts yet no 
 
 Rules named in this wave's header:
 
-- `PAIR_AMPLITUDE_GROWTH`
+- <a id="rule-pair_amplitude_growth"></a>`PAIR_AMPLITUDE_GROWTH`
 
 ## Wave 134
 
@@ -533,74 +533,74 @@ Wave 134 — Pass 14: Relationship Arc Checks whether character relationships ac
 
 Rules named in this wave's header:
 
-- `MONOTONE_RELATIONSHIP`
-- `NO_RELATIONSHIP_MOVEMENT`
-- `STATIC_RELATIONSHIP`
+- <a id="rule-monotone_relationship"></a>`MONOTONE_RELATIONSHIP`
+- <a id="rule-no_relationship_movement"></a>`NO_RELATIONSHIP_MOVEMENT`
+- <a id="rule-static_relationship"></a>`STATIC_RELATIONSHIP`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ALL_PAIRS_SAME_DIRECTION` — Wave 177: Whiplash, uniform direction, unresolved rupture
-- `CLUSTER_SHIFT_SCENE` — Wave 192: Protagonist freeze, Act 1 void, cluster spike
-- `LATE_RELATIONSHIP_INTRODUCTION` — Wave 161: Single pair, late introduction, velocity collapse
-- `MULTI_PAIR_CLIMAX_CONVERGENCE` — Wave 248: Pair velocity spike, Act 1 relational desert, multi-pair climax convergence
-- `PAIR_AMPLITUDE_DECAY` — Wave 581:
-- `PAIR_CLOCK_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
-- `PAIR_CURIOSITY_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
-- `PAIR_DIMENSION_MONOPOLY` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `PAIR_DIMENSION_MONOTONE` — Wave 234: Pair dimension monotone, first-impression contradiction, resolution void
-- `PAIR_DRAMATIC_TURN_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
-- `PAIR_EARLY_PEAK_MAJORITY` — Wave 329: RELATIONSHIP_REVELATION_SILENT, PAIR_EARLY_PEAK_MAJORITY, RELATIONSHIP_SUSPENSE_DECOUPLED
-- `PAIR_ENSEMBLE_SOLO` — Wave 441: PAIR_ENSEMBLE_SOLO, PAIR_RUPTURE_RUN, RELATIONSHIP_CLIMAX_VOID
-- `PAIR_NET_ZERO_MAJORITY` — Wave 276: Midpoint freeze, net-zero majority, depth gap
-- `PAIR_OSCILLATION` — Wave 262: Pair oscillation, single-scene arc, late introduction
-- `PAIR_PAYOFF_FLAT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `PAIR_REVELATION_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
-- `PAIR_RUPTURE_UNMOTIVATED` — Wave 455: PAIR_RUPTURE_UNMOTIVATED, RELATIONSHIP_SHIFT_CURIOSITY_VOID, RELATIONSHIP_WARMTH_RUN
-- `PAIR_SEED_FLAT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `PAIR_SHIFT_RUN` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `PAIR_SINGLE_SCENE_ARC` — Wave 262: Pair oscillation, single-scene arc, late introduction
-- `PAIR_SUSPENSE_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
-- `PAIR_THIRDS_CONCENTRATED` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `PAIR_VELOCITY_SPIKE` — Wave 248: Pair velocity spike, Act 1 relational desert, multi-pair climax convergence
-- `PAIR_WEAK_SHIFT_DOMINANCE` — Wave 262: Pair oscillation, single-scene arc, late introduction
-- `POSITIVE_ONLY_PAIR_MAJORITY` — Wave 318: RELATIONSHIP_CURIOSITY_DECOUPLED, POSITIVE_ONLY_PAIR_MAJORITY, RELATIONSHIP_ACT2B_DESERT
-- `POWER_DYNAMIC_UNCHANGED` — Wave 147: Relationship climax & earned reversals
-- `PROTAGONIST_RELATIONSHIP_FREEZE` — Wave 192: Protagonist freeze, Act 1 void, cluster spike
-- `RAPID_RECONCILIATION` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
-- `RELATIONSHIP_ACT1_DESERT` — Wave 248: Pair velocity spike, Act 1 relational desert, multi-pair climax convergence
-- `RELATIONSHIP_ACT1_VOID` — Wave 192: Protagonist freeze, Act 1 void, cluster spike
-- `RELATIONSHIP_ACT2A_VOID` — Wave 483: RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID, RELATIONSHIP_SHIFT_THIRDS_CLUSTER, RELATIONSHIP_ACT2A_VOID
-- `RELATIONSHIP_ACT2B_DESERT` — Wave 318: RELATIONSHIP_CURIOSITY_DECOUPLED, POSITIVE_ONLY_PAIR_MAJORITY, RELATIONSHIP_ACT2B_DESERT
-- `RELATIONSHIP_AMPLITUDE_DECAY` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
-- `RELATIONSHIP_CLIMAX_TIMING` — Wave 147: Relationship climax & earned reversals
-- `RELATIONSHIP_CLOCK_VALENCE_UNIFORM` — Wave 581:
-- `RELATIONSHIP_DEPTH_GAP` — Wave 276: Midpoint freeze, net-zero majority, depth gap
-- `RELATIONSHIP_EMOTION_DECOUPLED` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION` — Wave 234: Pair dimension monotone, first-impression contradiction, resolution void
-- `RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD` — Wave 343: RELATIONSHIP_RUPTURE_EMOTION_FLAT, RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD, RELATIONSHIP_SHIFT_DROUGHT
-- `RELATIONSHIP_MIDPOINT_FREEZE` — Wave 276: Midpoint freeze, net-zero majority, depth gap
-- `RELATIONSHIP_OPENING_BURST` — Wave 290: RELATIONSHIP_OPENING_BURST
-- `RELATIONSHIP_PAYOFF_ABANDONED` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
-- `RELATIONSHIP_PEAK_CLOCK_ABSENT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
-- `RELATIONSHIP_REPAIR_UNEARNED` — RELATIONSHIP_REPAIR_UNEARNED
-- `RELATIONSHIP_RESOLUTION_VOID` — Wave 234: Pair dimension monotone, first-impression contradiction, resolution void
-- `RELATIONSHIP_REVELATION_EMOTION_DECOUPLED` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
-- `RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID` — Wave 497: RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID, RELATIONSHIP_WARMTH_CLUSTER, RELATIONSHIP_DIMENSION_RUN
-- `RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID` — Wave 483: RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID, RELATIONSHIP_SHIFT_THIRDS_CLUSTER, RELATIONSHIP_ACT2A_VOID
-- `RELATIONSHIP_SHIFT_STAKES_DECOUPLED` — Wave 581:
-- `RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID` — Wave 469: RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID, RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID, RELATIONSHIP_ACT1_VOID
-- `RELATIONSHIP_SHIFT_ZONE_IMBALANCE` — Wave 581:
-- `RELATIONSHIP_STAR_TOPOLOGY` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
-- `RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
-- `RELATIONSHIP_THREADS_SILOED` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
-- `RELATIONSHIP_UNEARNED_REVERSAL` — Wave 147: Relationship climax & earned reversals
-- `RELATIONSHIP_VELOCITY_COLLAPSE` — Wave 161: Single pair, late introduction, velocity collapse
-- `RELATIONSHIP_WARMTH_RUN` — Wave 455: PAIR_RUPTURE_UNMOTIVATED, RELATIONSHIP_SHIFT_CURIOSITY_VOID, RELATIONSHIP_WARMTH_RUN
-- `RELATIONSHIP_WHIPLASH` — Wave 177: Whiplash, uniform direction, unresolved rupture
-- `SHIFT_MAGNITUDE_UNIFORMITY` — Wave 304: SHIFT_MAGNITUDE_UNIFORMITY
-- `SINGLE_PAIR_RELATIONSHIP` — Wave 161: Single pair, late introduction, velocity collapse
-- `UNRESOLVED_RELATIONSHIP_RUPTURE` — Wave 177: Whiplash, uniform direction, unresolved rupture
+- <a id="rule-all_pairs_same_direction"></a>`ALL_PAIRS_SAME_DIRECTION` — Wave 177: Whiplash, uniform direction, unresolved rupture
+- <a id="rule-cluster_shift_scene"></a>`CLUSTER_SHIFT_SCENE` — Wave 192: Protagonist freeze, Act 1 void, cluster spike
+- <a id="rule-late_relationship_introduction"></a>`LATE_RELATIONSHIP_INTRODUCTION` — Wave 161: Single pair, late introduction, velocity collapse
+- <a id="rule-multi_pair_climax_convergence"></a>`MULTI_PAIR_CLIMAX_CONVERGENCE` — Wave 248: Pair velocity spike, Act 1 relational desert, multi-pair climax convergence
+- <a id="rule-pair_amplitude_decay"></a>`PAIR_AMPLITUDE_DECAY` — Wave 581:
+- <a id="rule-pair_clock_flat"></a>`PAIR_CLOCK_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
+- <a id="rule-pair_curiosity_flat"></a>`PAIR_CURIOSITY_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
+- <a id="rule-pair_dimension_monopoly"></a>`PAIR_DIMENSION_MONOPOLY` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-pair_dimension_monotone"></a>`PAIR_DIMENSION_MONOTONE` — Wave 234: Pair dimension monotone, first-impression contradiction, resolution void
+- <a id="rule-pair_dramatic_turn_flat"></a>`PAIR_DRAMATIC_TURN_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
+- <a id="rule-pair_early_peak_majority"></a>`PAIR_EARLY_PEAK_MAJORITY` — Wave 329: RELATIONSHIP_REVELATION_SILENT, PAIR_EARLY_PEAK_MAJORITY, RELATIONSHIP_SUSPENSE_DECOUPLED
+- <a id="rule-pair_ensemble_solo"></a>`PAIR_ENSEMBLE_SOLO` — Wave 441: PAIR_ENSEMBLE_SOLO, PAIR_RUPTURE_RUN, RELATIONSHIP_CLIMAX_VOID
+- <a id="rule-pair_net_zero_majority"></a>`PAIR_NET_ZERO_MAJORITY` — Wave 276: Midpoint freeze, net-zero majority, depth gap
+- <a id="rule-pair_oscillation"></a>`PAIR_OSCILLATION` — Wave 262: Pair oscillation, single-scene arc, late introduction
+- <a id="rule-pair_payoff_flat"></a>`PAIR_PAYOFF_FLAT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-pair_revelation_flat"></a>`PAIR_REVELATION_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
+- <a id="rule-pair_rupture_unmotivated"></a>`PAIR_RUPTURE_UNMOTIVATED` — Wave 455: PAIR_RUPTURE_UNMOTIVATED, RELATIONSHIP_SHIFT_CURIOSITY_VOID, RELATIONSHIP_WARMTH_RUN
+- <a id="rule-pair_seed_flat"></a>`PAIR_SEED_FLAT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-pair_shift_run"></a>`PAIR_SHIFT_RUN` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-pair_single_scene_arc"></a>`PAIR_SINGLE_SCENE_ARC` — Wave 262: Pair oscillation, single-scene arc, late introduction
+- <a id="rule-pair_suspense_flat"></a>`PAIR_SUSPENSE_FLAT` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
+- <a id="rule-pair_thirds_concentrated"></a>`PAIR_THIRDS_CONCENTRATED` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-pair_velocity_spike"></a>`PAIR_VELOCITY_SPIKE` — Wave 248: Pair velocity spike, Act 1 relational desert, multi-pair climax convergence
+- <a id="rule-pair_weak_shift_dominance"></a>`PAIR_WEAK_SHIFT_DOMINANCE` — Wave 262: Pair oscillation, single-scene arc, late introduction
+- <a id="rule-positive_only_pair_majority"></a>`POSITIVE_ONLY_PAIR_MAJORITY` — Wave 318: RELATIONSHIP_CURIOSITY_DECOUPLED, POSITIVE_ONLY_PAIR_MAJORITY, RELATIONSHIP_ACT2B_DESERT
+- <a id="rule-power_dynamic_unchanged"></a>`POWER_DYNAMIC_UNCHANGED` — Wave 147: Relationship climax & earned reversals
+- <a id="rule-protagonist_relationship_freeze"></a>`PROTAGONIST_RELATIONSHIP_FREEZE` — Wave 192: Protagonist freeze, Act 1 void, cluster spike
+- <a id="rule-rapid_reconciliation"></a>`RAPID_RECONCILIATION` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
+- <a id="rule-relationship_act1_desert"></a>`RELATIONSHIP_ACT1_DESERT` — Wave 248: Pair velocity spike, Act 1 relational desert, multi-pair climax convergence
+- <a id="rule-relationship_act1_void"></a>`RELATIONSHIP_ACT1_VOID` — Wave 192: Protagonist freeze, Act 1 void, cluster spike
+- <a id="rule-relationship_act2a_void"></a>`RELATIONSHIP_ACT2A_VOID` — Wave 483: RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID, RELATIONSHIP_SHIFT_THIRDS_CLUSTER, RELATIONSHIP_ACT2A_VOID
+- <a id="rule-relationship_act2b_desert"></a>`RELATIONSHIP_ACT2B_DESERT` — Wave 318: RELATIONSHIP_CURIOSITY_DECOUPLED, POSITIVE_ONLY_PAIR_MAJORITY, RELATIONSHIP_ACT2B_DESERT
+- <a id="rule-relationship_amplitude_decay"></a>`RELATIONSHIP_AMPLITUDE_DECAY` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
+- <a id="rule-relationship_climax_timing"></a>`RELATIONSHIP_CLIMAX_TIMING` — Wave 147: Relationship climax & earned reversals
+- <a id="rule-relationship_clock_valence_uniform"></a>`RELATIONSHIP_CLOCK_VALENCE_UNIFORM` — Wave 581:
+- <a id="rule-relationship_depth_gap"></a>`RELATIONSHIP_DEPTH_GAP` — Wave 276: Midpoint freeze, net-zero majority, depth gap
+- <a id="rule-relationship_emotion_decoupled"></a>`RELATIONSHIP_EMOTION_DECOUPLED` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-relationship_first_impression_contradiction"></a>`RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION` — Wave 234: Pair dimension monotone, first-impression contradiction, resolution void
+- <a id="rule-relationship_global_amplitude_frontload"></a>`RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD` — Wave 343: RELATIONSHIP_RUPTURE_EMOTION_FLAT, RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD, RELATIONSHIP_SHIFT_DROUGHT
+- <a id="rule-relationship_midpoint_freeze"></a>`RELATIONSHIP_MIDPOINT_FREEZE` — Wave 276: Midpoint freeze, net-zero majority, depth gap
+- <a id="rule-relationship_opening_burst"></a>`RELATIONSHIP_OPENING_BURST` — Wave 290: RELATIONSHIP_OPENING_BURST
+- <a id="rule-relationship_payoff_abandoned"></a>`RELATIONSHIP_PAYOFF_ABANDONED` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
+- <a id="rule-relationship_peak_clock_absent"></a>`RELATIONSHIP_PEAK_CLOCK_ABSENT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-relationship_peak_dramatic_turn_absent"></a>`RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- <a id="rule-relationship_repair_unearned"></a>`RELATIONSHIP_REPAIR_UNEARNED` — RELATIONSHIP_REPAIR_UNEARNED
+- <a id="rule-relationship_resolution_void"></a>`RELATIONSHIP_RESOLUTION_VOID` — Wave 234: Pair dimension monotone, first-impression contradiction, resolution void
+- <a id="rule-relationship_revelation_emotion_decoupled"></a>`RELATIONSHIP_REVELATION_EMOTION_DECOUPLED` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
+- <a id="rule-relationship_shift_clock_aftermath_void"></a>`RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID` — Wave 497: RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID, RELATIONSHIP_WARMTH_CLUSTER, RELATIONSHIP_DIMENSION_RUN
+- <a id="rule-relationship_shift_revelation_aftermath_void"></a>`RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID` — Wave 483: RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID, RELATIONSHIP_SHIFT_THIRDS_CLUSTER, RELATIONSHIP_ACT2A_VOID
+- <a id="rule-relationship_shift_stakes_decoupled"></a>`RELATIONSHIP_SHIFT_STAKES_DECOUPLED` — Wave 581:
+- <a id="rule-relationship_shift_suspense_aftermath_void"></a>`RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID` — Wave 469: RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID, RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID, RELATIONSHIP_ACT1_VOID
+- <a id="rule-relationship_shift_zone_imbalance"></a>`RELATIONSHIP_SHIFT_ZONE_IMBALANCE` — Wave 581:
+- <a id="rule-relationship_star_topology"></a>`RELATIONSHIP_STAR_TOPOLOGY` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
+- <a id="rule-relationship_third_act_escalation_absent"></a>`RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
+- <a id="rule-relationship_threads_siloed"></a>`RELATIONSHIP_THREADS_SILOED` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
+- <a id="rule-relationship_unearned_reversal"></a>`RELATIONSHIP_UNEARNED_REVERSAL` — Wave 147: Relationship climax & earned reversals
+- <a id="rule-relationship_velocity_collapse"></a>`RELATIONSHIP_VELOCITY_COLLAPSE` — Wave 161: Single pair, late introduction, velocity collapse
+- <a id="rule-relationship_warmth_run"></a>`RELATIONSHIP_WARMTH_RUN` — Wave 455: PAIR_RUPTURE_UNMOTIVATED, RELATIONSHIP_SHIFT_CURIOSITY_VOID, RELATIONSHIP_WARMTH_RUN
+- <a id="rule-relationship_whiplash"></a>`RELATIONSHIP_WHIPLASH` — Wave 177: Whiplash, uniform direction, unresolved rupture
+- <a id="rule-shift_magnitude_uniformity"></a>`SHIFT_MAGNITUDE_UNIFORMITY` — Wave 304: SHIFT_MAGNITUDE_UNIFORMITY
+- <a id="rule-single_pair_relationship"></a>`SINGLE_PAIR_RELATIONSHIP` — Wave 161: Single pair, late introduction, velocity collapse
+- <a id="rule-unresolved_relationship_rupture"></a>`UNRESOLVED_RELATIONSHIP_RUPTURE` — Wave 177: Whiplash, uniform direction, unresolved rupture
 

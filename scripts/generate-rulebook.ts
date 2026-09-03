@@ -571,7 +571,15 @@ function renderPassDoc(extraction: PassExtraction): string {
     // wave number here would read as a contradiction rather than context.
     // The wave's own prose above is the authoritative context in this case.
     for (const r of groupRules) {
-      lines.push(`- \`${r.rule}\``);
+      // Upgrade item #12: a stable per-rule anchor (#rule-<lowercase name>)
+      // so a finding in the app can link straight to its rulebook entry.
+      // Plain markdown headings would auto-anchor on GitHub, but a per-rule
+      // heading would blow up this doc's structure (238 headings in
+      // structure.md alone) — an inline HTML anchor on the existing list
+      // item gets the same stable, linkable id without that. `rule` is
+      // always `[A-Z][A-Z0-9_]*` (RULE_LITERAL_RE), so lowercasing it is a
+      // safe, unambiguous anchor slug with no further escaping needed.
+      lines.push(`- <a id="rule-${r.rule.toLowerCase()}"></a>\`${r.rule}\``);
     }
     lines.push('');
   }
@@ -592,7 +600,8 @@ function renderPassDoc(extraction: PassExtraction): string {
     lines.push('');
     for (const r of unattributed.slice().sort((a, b) => a.rule.localeCompare(b.rule))) {
       const label = r.sectionTitle ? ` — ${r.sectionTitle}` : '';
-      lines.push(`- \`${r.rule}\`${label}`);
+      // Same #rule-<lowercase> anchor as the wave-attributed list above.
+      lines.push(`- <a id="rule-${r.rule.toLowerCase()}"></a>\`${r.rule}\`${label}`);
     }
     lines.push('');
   }

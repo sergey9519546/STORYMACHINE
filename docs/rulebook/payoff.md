@@ -8,9 +8,9 @@ Wave 1182 additions (Program v2, Type 1 — first signal-channel wave, sets the 
 
 Rules named in this wave's header:
 
-- `DEAD_QUESTION_ZONE`
-- `INSTANT_GRATIFICATION_PATTERN`
-- `UNANSWERED_QUESTION_FLOOD`
+- <a id="rule-dead_question_zone"></a>`DEAD_QUESTION_ZONE`
+- <a id="rule-instant_gratification_pattern"></a>`INSTANT_GRATIFICATION_PATTERN`
+- <a id="rule-unanswered_question_flood"></a>`UNANSWERED_QUESTION_FLOOD`
 
 ## Wave 1168
 
@@ -18,9 +18,9 @@ Wave 1168 additions: after Wave 1154, suspenseDelta stood at two channels (curio
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID`
-- `PAYOFF_EMOTION_SUSPENSE_AFTERMATH_VOID`
-- `PAYOFF_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_delta_relational_aftermath_void"></a>`PAYOFF_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_emotion_suspense_aftermath_void"></a>`PAYOFF_EMOTION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-payoff_suspense_relational_aftermath_void"></a>`PAYOFF_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1154
 
@@ -28,9 +28,9 @@ Wave 1154 additions: after Wave 1140, suspenseDelta, emotionalShift, and clockDe
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID`
-- `PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID`
-- `PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_delta_emotional_aftermath_void"></a>`PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_emotion_curiosity_aftermath_void"></a>`PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_suspense_emotional_aftermath_void"></a>`PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1140
 
@@ -38,9 +38,9 @@ Wave 1140 additions: with every tracked trigger exhausted, this wave introduces 
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID`
-- `PAYOFF_EMOTION_RELATIONAL_AFTERMATH_VOID`
-- `PAYOFF_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_delta_curiosity_aftermath_void"></a>`PAYOFF_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_emotion_relational_aftermath_void"></a>`PAYOFF_EMOTION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_suspense_curiosity_aftermath_void"></a>`PAYOFF_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1126
 
@@ -48,9 +48,9 @@ Wave 1126 additions: with raise_stakes, clockRaised, seededClueIds, and dramatic
 
 Rules named in this wave's header:
 
-- `PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PAYOFF_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-payoff_open_thread_staging_aftermath_void"></a>`PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-payoff_revelation_dialogue_highlight_aftermath_void"></a>`PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-payoff_revelation_staging_aftermath_void"></a>`PAYOFF_REVELATION_STAGING_AFTERMATH_VOID`
 
 ## Wave 1112
 
@@ -58,9 +58,9 @@ Wave 1112 additions: clockRaised, seededClueIds, and dramaticTurn are genuinely 
 
 Rules named in this wave's header:
 
-- `PAYOFF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PAYOFF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PAYOFF_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-payoff_open_thread_dialogue_highlight_aftermath_void"></a>`PAYOFF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-payoff_stakes_dialogue_highlight_aftermath_void"></a>`PAYOFF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-payoff_stakes_staging_aftermath_void"></a>`PAYOFF_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1098
 
@@ -68,9 +68,9 @@ Wave 1098 additions: PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives clockR
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PAYOFF_SEED_STAGING_AFTERMATH_VOID`
-- `PAYOFF_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_dialogue_highlight_aftermath_void"></a>`PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-payoff_seed_staging_aftermath_void"></a>`PAYOFF_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-payoff_turn_staging_aftermath_void"></a>`PAYOFF_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1084
 
@@ -78,9 +78,9 @@ Wave 1084 additions: with all six main triggers now at four channels each, this 
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `PAYOFF_SEED_RELATIONAL_AFTERMATH_VOID`
-- `PAYOFF_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_suspense_aftermath_void"></a>`PAYOFF_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-payoff_seed_relational_aftermath_void"></a>`PAYOFF_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_turn_emotional_aftermath_void"></a>`PAYOFF_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1070
 
@@ -88,9 +88,9 @@ Wave 1070 additions: this wave targets the three least-saturated triggers, each 
 
 Rules named in this wave's header:
 
-- `PAYOFF_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `PAYOFF_REVELATION_SUSPENSE_AFTERMATH_VOID`
-- `PAYOFF_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_open_thread_relational_aftermath_void"></a>`PAYOFF_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_revelation_suspense_aftermath_void"></a>`PAYOFF_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-payoff_stakes_relational_aftermath_void"></a>`PAYOFF_STAKES_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1056
 
@@ -98,9 +98,9 @@ Wave 1056 additions: three triggers each get a fourth consequence channel, none 
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID`
-- `PAYOFF_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_emotional_aftermath_void"></a>`PAYOFF_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_seed_suspense_aftermath_void"></a>`PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-payoff_turn_relational_aftermath_void"></a>`PAYOFF_TURN_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1042
 
@@ -108,9 +108,9 @@ Wave 1042 additions: three less-saturated triggers each get a curiosityDelta cha
 
 Rules named in this wave's header:
 
-- `PAYOFF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID`
-- `PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_open_thread_curiosity_aftermath_void"></a>`PAYOFF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_seed_curiosity_aftermath_void"></a>`PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_turn_curiosity_aftermath_void"></a>`PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1028
 
@@ -118,9 +118,9 @@ Wave 1028 additions: three more triggers get a third consequence channel: PAYOFF
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_relational_aftermath_void"></a>`PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_revelation_emotional_aftermath_void"></a>`PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_stakes_emotional_aftermath_void"></a>`PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1014
 
@@ -128,9 +128,9 @@ Wave 1014 additions: this wave gives three more triggers a second consequence ch
 
 Rules named in this wave's header:
 
-- `PAYOFF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `PAYOFF_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `PAYOFF_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-payoff_open_thread_emotional_aftermath_void"></a>`PAYOFF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_revelation_curiosity_aftermath_void"></a>`PAYOFF_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_stakes_suspense_aftermath_void"></a>`PAYOFF_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1000
 
@@ -138,9 +138,9 @@ Wave 1000 additions: PAYOFF_STAGING re-checked and re-excluded (same predicate m
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-payoff_clock_curiosity_aftermath_void"></a>`PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_seed_emotional_aftermath_void"></a>`PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-payoff_turn_suspense_aftermath_void"></a>`PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 986
 
@@ -148,9 +148,9 @@ Wave 986 additions: zone-imbalance is now fully exhausted in this pass (the only
 
 Rules named in this wave's header:
 
-- `PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID`
-- `PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_open_thread_suspense_aftermath_void"></a>`PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-payoff_revelation_relationship_aftermath_void"></a>`PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-payoff_stakes_curiosity_aftermath_void"></a>`PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 972
 
@@ -158,9 +158,9 @@ Wave 972 additions: auditing the three remaining trio-complete signals in this p
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE`
-- `PAYOFF_CLOCK_ZONE_IMBALANCE`
-- `PAYOFF_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-payoff_clock_delta_zone_imbalance"></a>`PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-payoff_clock_zone_imbalance"></a>`PAYOFF_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-payoff_highlight_zone_imbalance"></a>`PAYOFF_HIGHLIGHT_ZONE_IMBALANCE`
 
 ## Wave 958
 
@@ -168,9 +168,9 @@ Wave 958 additions: continuing the non-purpose 4-zone rollout with three more tr
 
 Rules named in this wave's header:
 
-- `PAYOFF_CURIOSITY_ZONE_IMBALANCE`
-- `PAYOFF_REVELATION_ZONE_IMBALANCE`
-- `PAYOFF_TURN_ZONE_IMBALANCE`
+- <a id="rule-payoff_curiosity_zone_imbalance"></a>`PAYOFF_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-payoff_revelation_zone_imbalance"></a>`PAYOFF_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-payoff_turn_zone_imbalance"></a>`PAYOFF_TURN_ZONE_IMBALANCE`
 
 ## Wave 944
 
@@ -178,9 +178,9 @@ Wave 944 additions: extending the checkZoneImbalance rollout to three more trio-
 
 Rules named in this wave's header:
 
-- `PAYOFF_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `PAYOFF_RELATIONSHIP_ZONE_IMBALANCE`
-- `PAYOFF_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-payoff_positive_emotion_zone_imbalance"></a>`PAYOFF_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-payoff_relationship_zone_imbalance"></a>`PAYOFF_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-payoff_suspense_zone_imbalance"></a>`PAYOFF_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 930
 
@@ -188,9 +188,9 @@ Wave 930 additions: continuing the checkZoneImbalance rollout, this wave applies
 
 Rules named in this wave's header:
 
-- `PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `PAYOFF_STAKES_ZONE_IMBALANCE`
+- <a id="rule-payoff_negative_emotion_zone_imbalance"></a>`PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-payoff_revelation_purpose_zone_imbalance"></a>`PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-payoff_stakes_zone_imbalance"></a>`PAYOFF_STAKES_ZONE_IMBALANCE`
 
 ## Wave 916
 
@@ -198,9 +198,9 @@ Wave 916 additions: purpose === 'revelation' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN`
-- `PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-payoff_character_moment_zone_imbalance"></a>`PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-payoff_revelation_purpose_drought_run"></a>`PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-payoff_revelation_purpose_zone_cluster"></a>`PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 902
 
@@ -208,9 +208,9 @@ Wave 902 additions: continuing the checkZoneImbalance rollout begun in Wave 888,
 
 Rules named in this wave's header:
 
-- `PAYOFF_COMPLICATE_ZONE_IMBALANCE`
-- `PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `PAYOFF_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-payoff_complicate_zone_imbalance"></a>`PAYOFF_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-payoff_introduce_conflict_zone_imbalance"></a>`PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-payoff_turning_point_zone_imbalance"></a>`PAYOFF_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 888
 
@@ -218,9 +218,9 @@ Wave 888 additions: no purpose value had ever been audited by the distinct 4-zon
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLIMAX_ZONE_IMBALANCE`
-- `PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `PAYOFF_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-payoff_climax_zone_imbalance"></a>`PAYOFF_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-payoff_establish_world_zone_imbalance"></a>`PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-payoff_resolution_zone_imbalance"></a>`PAYOFF_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 874
 
@@ -228,9 +228,9 @@ Wave 874 additions: PAYOFF_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'reso
 
 Rules named in this wave's header:
 
-- `PAYOFF_COMPLICATE_DROUGHT_RUN`
-- `PAYOFF_COMPLICATE_ZONE_CLUSTER`
-- `PAYOFF_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-payoff_complicate_drought_run"></a>`PAYOFF_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-payoff_complicate_zone_cluster"></a>`PAYOFF_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-payoff_resolution_drought_run"></a>`PAYOFF_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 860
 
@@ -238,11 +238,11 @@ Wave 860 additions: PAYOFF_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' 
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLIMAX_DROUGHT_RUN`
-- `PAYOFF_ESTABLISH_WORLD_DROUGHT_RUN`
-- `PAYOFF_POST_CLIMAX_CLUSTER`
-- `PAYOFF_RESOLUTION_ZONE_CLUSTER`
-- `RESOLUTION_CRAMMED_AT_END`
+- <a id="rule-payoff_climax_drought_run"></a>`PAYOFF_CLIMAX_DROUGHT_RUN`
+- <a id="rule-payoff_establish_world_drought_run"></a>`PAYOFF_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-payoff_post_climax_cluster"></a>`PAYOFF_POST_CLIMAX_CLUSTER`
+- <a id="rule-payoff_resolution_zone_cluster"></a>`PAYOFF_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-resolution_crammed_at_end"></a>`RESOLUTION_CRAMMED_AT_END`
 
 ## Wave 846
 
@@ -250,9 +250,9 @@ Wave 846 additions: PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalS
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLIMAX_ZONE_CLUSTER`
-- `PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-payoff_climax_zone_cluster"></a>`PAYOFF_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-payoff_establish_world_zone_cluster"></a>`PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-payoff_positive_emotion_drought_run"></a>`PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 832
 
@@ -260,9 +260,9 @@ Wave 832 additions: PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing 
 
 Rules named in this wave's header:
 
-- `PAYOFF_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `PAYOFF_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-payoff_introduce_conflict_drought_run"></a>`PAYOFF_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-payoff_introduce_conflict_zone_cluster"></a>`PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-payoff_positive_emotion_zone_cluster"></a>`PAYOFF_POSITIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 818
 
@@ -270,9 +270,9 @@ Wave 818 additions: PAYOFF_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose ==
 
 Rules named in this wave's header:
 
-- `PAYOFF_CHARACTER_MOMENT_DROUGHT_RUN`
-- `PAYOFF_TURNING_POINT_DROUGHT_RUN`
-- `PAYOFF_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-payoff_character_moment_drought_run"></a>`PAYOFF_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-payoff_turning_point_drought_run"></a>`PAYOFF_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-payoff_turning_point_zone_cluster"></a>`PAYOFF_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 804
 
@@ -280,9 +280,9 @@ Wave 804 additions: PAYOFF_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDel
 
 Rules named in this wave's header:
 
-- `PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `PAYOFF_REVELATION_PEAK_UNCAUSED`
-- `PAYOFF_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-payoff_character_moment_zone_cluster"></a>`PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-payoff_revelation_peak_uncaused"></a>`PAYOFF_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-payoff_suspense_peak_uncaused"></a>`PAYOFF_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 790
 
@@ -290,10 +290,10 @@ Wave 790 additions: PAYOFF_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 ab
 
 Rules named in this wave's header:
 
-- `PAYOFF_REVELATION_DISCONNECT`
-- `PAYOFF_REVELATION_DROUGHT_RUN`
-- `PAYOFF_REVELATION_ZONE_CLUSTER`
-- `PAYOFF_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-payoff_revelation_disconnect"></a>`PAYOFF_REVELATION_DISCONNECT`
+- <a id="rule-payoff_revelation_drought_run"></a>`PAYOFF_REVELATION_DROUGHT_RUN`
+- <a id="rule-payoff_revelation_zone_cluster"></a>`PAYOFF_REVELATION_ZONE_CLUSTER`
+- <a id="rule-payoff_suspense_drought_run"></a>`PAYOFF_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 776
 
@@ -301,14 +301,14 @@ Wave 776 additions: PAYOFF_CURIOSITY_PEAK_UNCAUSED (backward-cause × curiosityD
 
 Rules named in this wave's header:
 
-- `PAYOFF_CURIOSITY_PEAK_DECOUPLED`
-- `PAYOFF_CURIOSITY_PEAK_UNCAUSED`
-- `PAYOFF_CURIOSITY_ZONE_CLUSTER`
-- `PAYOFF_SUSPENSE_MISMATCH`
-- `PAYOFF_SUSPENSE_PEAK_DECOUPLED`
-- `PAYOFF_SUSPENSE_RECOIL_ABSENT`
-- `PAYOFF_SUSPENSE_ZONE_CLUSTER`
-- `SEED_SUSPENSE_AFTERMATH_ABSENT`
+- <a id="rule-payoff_curiosity_peak_decoupled"></a>`PAYOFF_CURIOSITY_PEAK_DECOUPLED`
+- <a id="rule-payoff_curiosity_peak_uncaused"></a>`PAYOFF_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-payoff_curiosity_zone_cluster"></a>`PAYOFF_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-payoff_suspense_mismatch"></a>`PAYOFF_SUSPENSE_MISMATCH`
+- <a id="rule-payoff_suspense_peak_decoupled"></a>`PAYOFF_SUSPENSE_PEAK_DECOUPLED`
+- <a id="rule-payoff_suspense_recoil_absent"></a>`PAYOFF_SUSPENSE_RECOIL_ABSENT`
+- <a id="rule-payoff_suspense_zone_cluster"></a>`PAYOFF_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-seed_suspense_aftermath_absent"></a>`SEED_SUSPENSE_AFTERMATH_ABSENT`
 
 ## Wave 762
 
@@ -316,9 +316,9 @@ Wave 762 additions: PAYOFF_CLOCK_ZONE_CLUSTER (distribution/timing × clockRaise
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_ZONE_CLUSTER`
-- `PAYOFF_CURIOSITY_DROUGHT_RUN`
-- `PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-payoff_clock_zone_cluster"></a>`PAYOFF_CLOCK_ZONE_CLUSTER`
+- <a id="rule-payoff_curiosity_drought_run"></a>`PAYOFF_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-payoff_negative_emotion_drought_run"></a>`PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 748
 
@@ -326,9 +326,9 @@ Wave 748 additions: PAYOFF_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × cloc
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DELTA_ZONE_CLUSTER`
-- `PAYOFF_STAKES_DROUGHT_RUN`
-- `PAYOFF_TURN_ZONE_CLUSTER`
+- <a id="rule-payoff_clock_delta_zone_cluster"></a>`PAYOFF_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-payoff_stakes_drought_run"></a>`PAYOFF_STAKES_DROUGHT_RUN`
+- <a id="rule-payoff_turn_zone_cluster"></a>`PAYOFF_TURN_ZONE_CLUSTER`
 
 ## Wave 734
 
@@ -336,9 +336,9 @@ Wave 734 additions: PAYOFF_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × rel
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DELTA_DROUGHT_RUN`
-- `PAYOFF_RELATIONSHIP_ZONE_CLUSTER`
-- `PAYOFF_SEED_ZONE_CLUSTER`
+- <a id="rule-payoff_clock_delta_drought_run"></a>`PAYOFF_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-payoff_relationship_zone_cluster"></a>`PAYOFF_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-payoff_seed_zone_cluster"></a>`PAYOFF_SEED_ZONE_CLUSTER`
 
 ## Wave 720
 
@@ -346,9 +346,9 @@ Wave 720 additions (built on the shared checks library): PAYOFF_HIGHLIGHT_PEAK_U
 
 Rules named in this wave's header:
 
-- `PAYOFF_HIGHLIGHT_PEAK_UNCAUSED`
-- `PAYOFF_OPEN_THREAD_DROUGHT_RUN`
-- `PAYOFF_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-payoff_highlight_peak_uncaused"></a>`PAYOFF_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-payoff_open_thread_drought_run"></a>`PAYOFF_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-payoff_relationship_drought_run"></a>`PAYOFF_RELATIONSHIP_DROUGHT_RUN`
 
 ## Wave 706
 
@@ -356,9 +356,9 @@ Wave 706 additions (built on the shared checks library): PAYOFF_STAGING_DROUGHT_
 
 Rules named in this wave's header:
 
-- `PAYOFF_HIGHLIGHT_ZONE_CLUSTER`
-- `PAYOFF_OPEN_THREAD_PEAK_UNCAUSED`
-- `PAYOFF_STAGING_DROUGHT_RUN`
+- <a id="rule-payoff_highlight_zone_cluster"></a>`PAYOFF_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-payoff_open_thread_peak_uncaused"></a>`PAYOFF_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-payoff_staging_drought_run"></a>`PAYOFF_STAGING_DROUGHT_RUN`
 
 ## Wave 692
 
@@ -366,9 +366,9 @@ Wave 692 additions (built on the shared checks library): PAYOFF_SEED_PEAK_UNCAUS
 
 Rules named in this wave's header:
 
-- `PAYOFF_SEED_PEAK_UNCAUSED`
-- `PAYOFF_SETUP_PEAK_UNCAUSED`
-- `PAYOFF_STAKES_ZONE_CLUSTER`
+- <a id="rule-payoff_seed_peak_uncaused"></a>`PAYOFF_SEED_PEAK_UNCAUSED`
+- <a id="rule-payoff_setup_peak_uncaused"></a>`PAYOFF_SETUP_PEAK_UNCAUSED`
+- <a id="rule-payoff_stakes_zone_cluster"></a>`PAYOFF_STAKES_ZONE_CLUSTER`
 
 ## Wave 678
 
@@ -376,10 +376,10 @@ Wave 678 additions (built on the shared checks library, audit M2.2): PAYOFF_CLOC
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED`
-- `PAYOFF_CLOCK_PEAK_DECOUPLED`
-- `PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `PAYOFF_TURN_DROUGHT_RUN`
+- <a id="rule-payoff_clock_delta_peak_uncaused"></a>`PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-payoff_clock_peak_decoupled"></a>`PAYOFF_CLOCK_PEAK_DECOUPLED`
+- <a id="rule-payoff_negative_emotion_zone_cluster"></a>`PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-payoff_turn_drought_run"></a>`PAYOFF_TURN_DROUGHT_RUN`
 
 ## Wave 664
 
@@ -387,10 +387,10 @@ Wave 664 additions (built on the shared checks library, audit M2.2): PAYOFF_RELA
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DROUGHT_RUN`
-- `PAYOFF_RELATIONSHIP_PEAK_DECOUPLED`
-- `PAYOFF_RELATIONSHIP_PEAK_UNCAUSED`
-- `PAYOFF_STAGING_ZONE_CLUSTER`
+- <a id="rule-payoff_clock_drought_run"></a>`PAYOFF_CLOCK_DROUGHT_RUN`
+- <a id="rule-payoff_relationship_peak_decoupled"></a>`PAYOFF_RELATIONSHIP_PEAK_DECOUPLED`
+- <a id="rule-payoff_relationship_peak_uncaused"></a>`PAYOFF_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-payoff_staging_zone_cluster"></a>`PAYOFF_STAGING_ZONE_CLUSTER`
 
 ## Wave 650
 
@@ -398,9 +398,9 @@ Wave 650 additions (built on the shared checks library, audit M2.2): this 113-ru
 
 Rules named in this wave's header:
 
-- `PAYOFF_HIGHLIGHT_DROUGHT_RUN`
-- `PAYOFF_OPEN_THREAD_ZONE_CLUSTER`
-- `PAYOFF_STAGING_PEAK_UNCAUSED`
+- <a id="rule-payoff_highlight_drought_run"></a>`PAYOFF_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-payoff_open_thread_zone_cluster"></a>`PAYOFF_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-payoff_staging_peak_uncaused"></a>`PAYOFF_STAGING_PEAK_UNCAUSED`
 
 ## Wave 636
 
@@ -408,9 +408,9 @@ Wave 636 additions (built on the shared checks library, audit M2.2): PAYOFF_HIGH
 
 Rules named in this wave's header:
 
-- `PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
-- `PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
-- `PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-payoff_dialogue_highlight_zone_imbalance"></a>`PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-payoff_highlight_open_thread_decoupled"></a>`PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
+- <a id="rule-payoff_turn_highlight_aftermath_void"></a>`PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 622
 
@@ -418,9 +418,9 @@ Wave 622 additions (built on the shared checks library, audit M2.2): VISUAL_BEAT
 
 Rules named in this wave's header:
 
-- `CLOCK_STAGING_AFTERMATH_VOID`
-- `PAYOFF_OPEN_THREAD_ZONE_IMBALANCE`
-- `VISUAL_BEAT_OPEN_THREAD_DECOUPLED`
+- <a id="rule-clock_staging_aftermath_void"></a>`CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-payoff_open_thread_zone_imbalance"></a>`PAYOFF_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-visual_beat_open_thread_decoupled"></a>`VISUAL_BEAT_OPEN_THREAD_DECOUPLED`
 
 ## Wave 608
 
@@ -428,9 +428,9 @@ Wave 608 additions (built on the shared checks library, audit M2.2): PAYOFF_DIAL
 
 Rules named in this wave's header:
 
-- `PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED`
-- `SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `VISUAL_STAGING_ZONE_IMBALANCE`
+- <a id="rule-payoff_dialogue_highlight_decoupled"></a>`PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED`
+- <a id="rule-seed_dialogue_highlight_aftermath_void"></a>`SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-visual_staging_zone_imbalance"></a>`VISUAL_STAGING_ZONE_IMBALANCE`
 
 ## Wave 594
 
@@ -438,11 +438,11 @@ Wave 594 additions: seed purpose monotone (average/aggregate × seed × scene-pu
 
 Rules named in this wave's header:
 
-- `CLUE_SEED_TEMPORAL_CLUSTER`
-- `PAYOFF_DROUGHT_RUN`
-- `SEED_EMOTIONAL_VALENCE_UNIFORM`
-- `SEED_PURPOSE_MONOTONE`
-- `SETUP_CLUSTERING`
+- <a id="rule-clue_seed_temporal_cluster"></a>`CLUE_SEED_TEMPORAL_CLUSTER`
+- <a id="rule-payoff_drought_run"></a>`PAYOFF_DROUGHT_RUN`
+- <a id="rule-seed_emotional_valence_uniform"></a>`SEED_EMOTIONAL_VALENCE_UNIFORM`
+- <a id="rule-seed_purpose_monotone"></a>`SEED_PURPOSE_MONOTONE`
+- <a id="rule-setup_clustering"></a>`SETUP_CLUSTERING`
 
 ## Wave 580
 
@@ -450,8 +450,8 @@ Wave 580 additions: seed opening zone absent (zone presence/absence × seed × o
 
 Rules named in this wave's header:
 
-- `PAYOFF_CONSECUTIVE_RUN`
-- `SEED_ACT3_VOID`
+- <a id="rule-payoff_consecutive_run"></a>`PAYOFF_CONSECUTIVE_RUN`
+- <a id="rule-seed_act3_void"></a>`SEED_ACT3_VOID`
 
 ## Wave 566
 
@@ -459,14 +459,14 @@ Wave 566 additions: payoff clock peak decoupled (single-peak isolation × clockD
 
 Rules named in this wave's header:
 
-- `CLUE_SEED_EMOTION_FLAT`
-- `CLUE_SEED_FRONT_LOADED`
-- `CLUE_SEED_LATE_MAJORITY`
-- `CLUE_SEED_MIDPOINT_VOID`
-- `PAYOFF_EMOTIONAL_VALENCE_UNIFORM`
-- `PAYOFF_TEMPORAL_CLUSTER`
-- `SEED_EMOTION_AFTERMATH_ABSENT`
-- `SEED_RELATIONSHIP_VALENCE_UNIFORM`
+- <a id="rule-clue_seed_emotion_flat"></a>`CLUE_SEED_EMOTION_FLAT`
+- <a id="rule-clue_seed_front_loaded"></a>`CLUE_SEED_FRONT_LOADED`
+- <a id="rule-clue_seed_late_majority"></a>`CLUE_SEED_LATE_MAJORITY`
+- <a id="rule-clue_seed_midpoint_void"></a>`CLUE_SEED_MIDPOINT_VOID`
+- <a id="rule-payoff_emotional_valence_uniform"></a>`PAYOFF_EMOTIONAL_VALENCE_UNIFORM`
+- <a id="rule-payoff_temporal_cluster"></a>`PAYOFF_TEMPORAL_CLUSTER`
+- <a id="rule-seed_emotion_aftermath_absent"></a>`SEED_EMOTION_AFTERMATH_ABSENT`
+- <a id="rule-seed_relationship_valence_uniform"></a>`SEED_RELATIONSHIP_VALENCE_UNIFORM`
 
 ## Wave 552
 
@@ -474,8 +474,8 @@ Wave 552 additions: payoff drought run (run-based × payoff × consecutive absen
 
 Rules named in this wave's header:
 
-- `PAYOFF_RELATIONSHIP_VALENCE_UNIFORM`
-- `SEED_DROUGHT_RUN`
+- <a id="rule-payoff_relationship_valence_uniform"></a>`PAYOFF_RELATIONSHIP_VALENCE_UNIFORM`
+- <a id="rule-seed_drought_run"></a>`SEED_DROUGHT_RUN`
 
 ## Wave 538
 
@@ -483,9 +483,9 @@ Wave 538 additions: payoff dramatic turn aftermath absent (sequence/aftermath ×
 
 Rules named in this wave's header:
 
-- `CLUE_SEED_CLOCK_DECOUPLED`
-- `CLUE_SEED_RELATIONSHIP_DECOUPLED`
-- `PAYOFF_DRAMATIC_TURN_DECOUPLED`
+- <a id="rule-clue_seed_clock_decoupled"></a>`CLUE_SEED_CLOCK_DECOUPLED`
+- <a id="rule-clue_seed_relationship_decoupled"></a>`CLUE_SEED_RELATIONSHIP_DECOUPLED`
+- <a id="rule-payoff_dramatic_turn_decoupled"></a>`PAYOFF_DRAMATIC_TURN_DECOUPLED`
 
 ## Wave 524
 
@@ -493,12 +493,12 @@ Wave 524 additions: seed suspense aftermath absent (sequence/aftermath × suspen
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_AFTERMATH_ABSENT`
-- `PAYOFF_REVELATION_AFTERMATH_ABSENT`
-- `PAYOFF_SEED_AFTERMATH_ABSENT`
-- `SEED_CURIOSITY_AFTERMATH_ABSENT`
-- `SEED_DRAMATIC_TURN_AFTERMATH_ABSENT`
-- `SEED_REVELATION_AFTERMATH_ABSENT`
+- <a id="rule-payoff_clock_aftermath_absent"></a>`PAYOFF_CLOCK_AFTERMATH_ABSENT`
+- <a id="rule-payoff_revelation_aftermath_absent"></a>`PAYOFF_REVELATION_AFTERMATH_ABSENT`
+- <a id="rule-payoff_seed_aftermath_absent"></a>`PAYOFF_SEED_AFTERMATH_ABSENT`
+- <a id="rule-seed_curiosity_aftermath_absent"></a>`SEED_CURIOSITY_AFTERMATH_ABSENT`
+- <a id="rule-seed_dramatic_turn_aftermath_absent"></a>`SEED_DRAMATIC_TURN_AFTERMATH_ABSENT`
+- <a id="rule-seed_revelation_aftermath_absent"></a>`SEED_REVELATION_AFTERMATH_ABSENT`
 
 ## Wave 510
 
@@ -506,8 +506,8 @@ Wave 510 additions: seed revelation aftermath absent (sequence/aftermath × reve
 
 Rules named in this wave's header:
 
-- `CLUE_SEED_CONSECUTIVE_RUN`
-- `SETUP_PAYOFF_DEAD_RUN`
+- <a id="rule-clue_seed_consecutive_run"></a>`CLUE_SEED_CONSECUTIVE_RUN`
+- <a id="rule-setup_payoff_dead_run"></a>`SETUP_PAYOFF_DEAD_RUN`
 
 ## Wave 496
 
@@ -515,7 +515,7 @@ Wave 496 additions: payoff temporal cluster (distribution/timing × payoff × th
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DECOUPLED`
+- <a id="rule-payoff_clock_decoupled"></a>`PAYOFF_CLOCK_DECOUPLED`
 
 ## Wave 440
 
@@ -523,9 +523,9 @@ Wave 440 additions: payoff backloaded (>70% of payoffs in the second half while 
 
 Rules named in this wave's header:
 
-- `PAYOFF_AFTERMATH_QUESTION_VOID`
-- `PAYOFF_EMOTION_DECOUPLED`
-- `PAYOFF_FRONT_LOADED`
+- <a id="rule-payoff_aftermath_question_void"></a>`PAYOFF_AFTERMATH_QUESTION_VOID`
+- <a id="rule-payoff_emotion_decoupled"></a>`PAYOFF_EMOTION_DECOUPLED`
+- <a id="rule-payoff_front_loaded"></a>`PAYOFF_FRONT_LOADED`
 
 ## Wave 426
 
@@ -533,8 +533,8 @@ Wave 426 additions: payoff aftermath question void (sequence/aftermath — every
 
 Rules named in this wave's header:
 
-- `CLUSTERED_PAYOFFS`
-- `THREAD_CONVERGENCE_ABSENT`
+- <a id="rule-clustered_payoffs"></a>`CLUSTERED_PAYOFFS`
+- <a id="rule-thread_convergence_absent"></a>`THREAD_CONVERGENCE_ABSENT`
 
 ## Wave 412
 
@@ -542,69 +542,69 @@ Wave 412 additions: clue seed curiosity peak decoupled (the single highest-curio
 
 Rules named in this wave's header:
 
-- `PAYOFF_RELATIONSHIP_DECOUPLED`
+- <a id="rule-payoff_relationship_decoupled"></a>`PAYOFF_RELATIONSHIP_DECOUPLED`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ANTICIPATION_WINDOW_DECAY` — Wave 206: Setup burst, mid-story payoff void, clue drought
-- `CLUE_DENSITY_FRONT_COLLAPSE` — Wave 289: CLUE_DENSITY_FRONT_COLLAPSE
-- `CLUE_DROUGHT` — Wave 206: Setup burst, mid-story payoff void, clue drought
-- `CLUE_GLUT` — Wave 181: Flat payoffs, clue glut, scrambled setup/payoff order
-- `CLUE_REPLANT` — Wave 303: CLUE_REPLANT
-- `CLUE_SEED_CAUSELESS` — Wave 454: PAYOFF_CAUSELESS, CLUE_SEED_CAUSELESS, CLUE_SEED_CONSECUTIVE_RUN
-- `CLUE_SEED_CURIOSITY_FLAT` — Wave 328: PAYOFF_RELATIONSHIP_DECOUPLED, CLUE_SEED_CURIOSITY_FLAT, CLUE_SEED_EMOTION_FLAT
-- `CLUE_SEED_CURIOSITY_PEAK_DECOUPLED` — Wave 412: CLUE_SEED_CURIOSITY_PEAK_DECOUPLED, CLUE_SEED_SUSPENSE_PEAK_DECOUPLED, PAYOFF_RELATIONSHIP_PEAK_DECOUPLED
-- `CLUE_SEED_DRAMATIC_TURN_DECOUPLED` — Wave 356: CLUE_SEED_DRAMATIC_TURN_DECOUPLED, PAYOFF_CLOCK_DECOUPLED, LATE_CLUE_PLANT
-- `CLUE_SEED_REVELATION_DECOUPLED` — Wave 398: CLUE_SEED_SUSPENSE_FLAT, PAYOFF_MIDPOINT_VOID, CLUE_SEED_REVELATION_DECOUPLED
-- `CLUE_SEED_SUSPENSE_FLAT` — Wave 398: CLUE_SEED_SUSPENSE_FLAT, PAYOFF_MIDPOINT_VOID, CLUE_SEED_REVELATION_DECOUPLED
-- `CLUE_SEED_SUSPENSE_PEAK_DECOUPLED` — Wave 412: CLUE_SEED_CURIOSITY_PEAK_DECOUPLED, CLUE_SEED_SUSPENSE_PEAK_DECOUPLED, PAYOFF_RELATIONSHIP_PEAK_DECOUPLED
-- `CLUE_SEED_ZONE_IMBALANCE` — Wave 580:
-- `CONCURRENT_THREAD_OVERLOAD` — Wave 206: Setup burst, mid-story payoff void, clue drought
-- `DANGLING_PAYOFF` — Dangling payoffs (PAYOFF_SETUP with no matching clue ever seeded)
-- `FLAT_PAYOFF` — Wave 181: Flat payoffs, clue glut, scrambled setup/payoff order
-- `LATE_CLUE_PLANT` — Wave 356: CLUE_SEED_DRAMATIC_TURN_DECOUPLED, PAYOFF_CLOCK_DECOUPLED, LATE_CLUE_PLANT
-- `MIDSTORY_PAYOFF_VOID` — Wave 206: Setup burst, mid-story payoff void, clue drought
-- `NO_SETUPS` — No clues planted at all (no setup/payoff engine)
-- `OPEN_CLUES_AT_END` — Open clue count in structure
-- `ORPHAN_CLUE` — Orphan clues (never paid off)
-- `ORPHAN_CLUE_PERVASIVE` — Orphan clues (never paid off)
-- `PAYOFF_ACT2A_VOID` — Wave 275: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew
-- `PAYOFF_ACT3_ABSENT` — Wave 370: PAYOFF_CURIOSITY_PEAK_DECOUPLED, PAYOFF_ACT3_ABSENT, CLUE_SEED_MIDPOINT_VOID
-- `PAYOFF_AFTERMATH_RELATIONSHIP_VOID` — Wave 482: SEED_CURIOSITY_AFTERMATH_ABSENT, SEED_ACT3_VOID, PAYOFF_AFTERMATH_RELATIONSHIP_VOID
-- `PAYOFF_BACKLOADED` — Wave 440: PAYOFF_BACKLOADED, PAYOFF_EMOTIONAL_RECOIL_ABSENT, PAYOFF_SUSPENSE_RECOIL_ABSENT
-- `PAYOFF_BEFORE_CLIMAX` — Wave 154: Clustered payoffs, premature resolution, setup imbalance
-- `PAYOFF_BEFORE_SETUP` — Wave 167: Payoff-before-setup, setup clustering, payoff rate decline
-- `PAYOFF_CAUSELESS` — Wave 454: PAYOFF_CAUSELESS, CLUE_SEED_CAUSELESS, CLUE_SEED_CONSECUTIVE_RUN
-- `PAYOFF_CONSECUTIVE_VALENCE_RUN` — Wave 580:
-- `PAYOFF_CURIOSITY_MISMATCH` — Wave 317: PAYOFF_EMOTION_DECOUPLED, UNRESOLVED_CLUE_RATIO_HIGH, PAYOFF_CURIOSITY_MISMATCH
-- `PAYOFF_DOUBLE_FIRE` — Wave 303: PAYOFF_DOUBLE_FIRE
-- `PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT` — Wave 524 checks
-- `PAYOFF_EMOTIONAL_RECOIL_ABSENT` — Wave 440: PAYOFF_BACKLOADED, PAYOFF_EMOTIONAL_RECOIL_ABSENT, PAYOFF_SUSPENSE_RECOIL_ABSENT
-- `PAYOFF_GAP_EXCESSIVE` — Wave 261: Payoff precedes setup, payoff gap excessive, payoff front-loaded
-- `PAYOFF_MEMORY_GAP` — Consequence-delayed payoff (Wave 140)
-- `PAYOFF_MIDPOINT_VOID` — Wave 398: CLUE_SEED_SUSPENSE_FLAT, PAYOFF_MIDPOINT_VOID, CLUE_SEED_REVELATION_DECOUPLED
-- `PAYOFF_ORPHAN_RATE` — Wave 233: Payoff orphan rate, post-climax cluster, gap uniformity
-- `PAYOFF_PRECEDES_SETUP` — Wave 261: Payoff precedes setup, payoff gap excessive, payoff front-loaded
-- `PAYOFF_PURPOSE_MONOTONE` — Wave 580:
-- `PAYOFF_RATE_DECLINE` — Wave 167: Payoff-before-setup, setup clustering, payoff rate decline
-- `PAYOFF_RELATIONAL_AFTERMATH_ABSENT` — Wave 524 checks
-- `PAYOFF_SEED_DECOUPLED` — Wave 580:
-- `PAYOFF_SINGLE_SCENE_DUMP` — Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b
-- `PAYOFF_TOO_QUICK` — Clue paid off too quickly (same scene or very next scene)
-- `REINCORPORATION_VOID` — REINCORPORATION_VOID
-- `SEED_CLOCK_AFTERMATH_ABSENT` — Wave 524 checks
-- `SEED_EMOTIONAL_AFTERMATH_ABSENT` — Wave 468: PAYOFF_REVELATION_AFTERMATH_ABSENT, SEED_SUSPENSE_AFTERMATH_ABSENT, SEED_EMOTIONAL_AFTERMATH_ABSENT
-- `SEED_OPENING_ZONE_ABSENT` — Wave 580:
-- `SEED_RELATIONSHIP_AFTERMATH_ABSENT` — Wave 524 checks
-- `SETUP_ACT3_SURGE` — Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b
-- `SETUP_BURST` — Wave 206: Setup burst, mid-story payoff void, clue drought
-- `SETUP_DESERT_ACT2B` — Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b
-- `SETUP_FRONT_GAP` — Wave 154: Clustered payoffs, premature resolution, setup imbalance
-- `SETUP_PAYOFF_ACT_SKEW` — Wave 275: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew
-- `SETUP_PAYOFF_GAP_UNIFORMITY` — Wave 233: Payoff orphan rate, post-climax cluster, gap uniformity
-- `SETUP_PAYOFF_ORDER_SCRAMBLED` — Wave 181: Flat payoffs, clue glut, scrambled setup/payoff order
-- `SETUP_WITHOUT_CONSEQUENCE` — Setup without consequence (Wave 140)
-- `UNRESOLVED_CLUE_RATIO_HIGH` — Wave 317: PAYOFF_EMOTION_DECOUPLED, UNRESOLVED_CLUE_RATIO_HIGH, PAYOFF_CURIOSITY_MISMATCH
+- <a id="rule-anticipation_window_decay"></a>`ANTICIPATION_WINDOW_DECAY` — Wave 206: Setup burst, mid-story payoff void, clue drought
+- <a id="rule-clue_density_front_collapse"></a>`CLUE_DENSITY_FRONT_COLLAPSE` — Wave 289: CLUE_DENSITY_FRONT_COLLAPSE
+- <a id="rule-clue_drought"></a>`CLUE_DROUGHT` — Wave 206: Setup burst, mid-story payoff void, clue drought
+- <a id="rule-clue_glut"></a>`CLUE_GLUT` — Wave 181: Flat payoffs, clue glut, scrambled setup/payoff order
+- <a id="rule-clue_replant"></a>`CLUE_REPLANT` — Wave 303: CLUE_REPLANT
+- <a id="rule-clue_seed_causeless"></a>`CLUE_SEED_CAUSELESS` — Wave 454: PAYOFF_CAUSELESS, CLUE_SEED_CAUSELESS, CLUE_SEED_CONSECUTIVE_RUN
+- <a id="rule-clue_seed_curiosity_flat"></a>`CLUE_SEED_CURIOSITY_FLAT` — Wave 328: PAYOFF_RELATIONSHIP_DECOUPLED, CLUE_SEED_CURIOSITY_FLAT, CLUE_SEED_EMOTION_FLAT
+- <a id="rule-clue_seed_curiosity_peak_decoupled"></a>`CLUE_SEED_CURIOSITY_PEAK_DECOUPLED` — Wave 412: CLUE_SEED_CURIOSITY_PEAK_DECOUPLED, CLUE_SEED_SUSPENSE_PEAK_DECOUPLED, PAYOFF_RELATIONSHIP_PEAK_DECOUPLED
+- <a id="rule-clue_seed_dramatic_turn_decoupled"></a>`CLUE_SEED_DRAMATIC_TURN_DECOUPLED` — Wave 356: CLUE_SEED_DRAMATIC_TURN_DECOUPLED, PAYOFF_CLOCK_DECOUPLED, LATE_CLUE_PLANT
+- <a id="rule-clue_seed_revelation_decoupled"></a>`CLUE_SEED_REVELATION_DECOUPLED` — Wave 398: CLUE_SEED_SUSPENSE_FLAT, PAYOFF_MIDPOINT_VOID, CLUE_SEED_REVELATION_DECOUPLED
+- <a id="rule-clue_seed_suspense_flat"></a>`CLUE_SEED_SUSPENSE_FLAT` — Wave 398: CLUE_SEED_SUSPENSE_FLAT, PAYOFF_MIDPOINT_VOID, CLUE_SEED_REVELATION_DECOUPLED
+- <a id="rule-clue_seed_suspense_peak_decoupled"></a>`CLUE_SEED_SUSPENSE_PEAK_DECOUPLED` — Wave 412: CLUE_SEED_CURIOSITY_PEAK_DECOUPLED, CLUE_SEED_SUSPENSE_PEAK_DECOUPLED, PAYOFF_RELATIONSHIP_PEAK_DECOUPLED
+- <a id="rule-clue_seed_zone_imbalance"></a>`CLUE_SEED_ZONE_IMBALANCE` — Wave 580:
+- <a id="rule-concurrent_thread_overload"></a>`CONCURRENT_THREAD_OVERLOAD` — Wave 206: Setup burst, mid-story payoff void, clue drought
+- <a id="rule-dangling_payoff"></a>`DANGLING_PAYOFF` — Dangling payoffs (PAYOFF_SETUP with no matching clue ever seeded)
+- <a id="rule-flat_payoff"></a>`FLAT_PAYOFF` — Wave 181: Flat payoffs, clue glut, scrambled setup/payoff order
+- <a id="rule-late_clue_plant"></a>`LATE_CLUE_PLANT` — Wave 356: CLUE_SEED_DRAMATIC_TURN_DECOUPLED, PAYOFF_CLOCK_DECOUPLED, LATE_CLUE_PLANT
+- <a id="rule-midstory_payoff_void"></a>`MIDSTORY_PAYOFF_VOID` — Wave 206: Setup burst, mid-story payoff void, clue drought
+- <a id="rule-no_setups"></a>`NO_SETUPS` — No clues planted at all (no setup/payoff engine)
+- <a id="rule-open_clues_at_end"></a>`OPEN_CLUES_AT_END` — Open clue count in structure
+- <a id="rule-orphan_clue"></a>`ORPHAN_CLUE` — Orphan clues (never paid off)
+- <a id="rule-orphan_clue_pervasive"></a>`ORPHAN_CLUE_PERVASIVE` — Orphan clues (never paid off)
+- <a id="rule-payoff_act2a_void"></a>`PAYOFF_ACT2A_VOID` — Wave 275: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew
+- <a id="rule-payoff_act3_absent"></a>`PAYOFF_ACT3_ABSENT` — Wave 370: PAYOFF_CURIOSITY_PEAK_DECOUPLED, PAYOFF_ACT3_ABSENT, CLUE_SEED_MIDPOINT_VOID
+- <a id="rule-payoff_aftermath_relationship_void"></a>`PAYOFF_AFTERMATH_RELATIONSHIP_VOID` — Wave 482: SEED_CURIOSITY_AFTERMATH_ABSENT, SEED_ACT3_VOID, PAYOFF_AFTERMATH_RELATIONSHIP_VOID
+- <a id="rule-payoff_backloaded"></a>`PAYOFF_BACKLOADED` — Wave 440: PAYOFF_BACKLOADED, PAYOFF_EMOTIONAL_RECOIL_ABSENT, PAYOFF_SUSPENSE_RECOIL_ABSENT
+- <a id="rule-payoff_before_climax"></a>`PAYOFF_BEFORE_CLIMAX` — Wave 154: Clustered payoffs, premature resolution, setup imbalance
+- <a id="rule-payoff_before_setup"></a>`PAYOFF_BEFORE_SETUP` — Wave 167: Payoff-before-setup, setup clustering, payoff rate decline
+- <a id="rule-payoff_causeless"></a>`PAYOFF_CAUSELESS` — Wave 454: PAYOFF_CAUSELESS, CLUE_SEED_CAUSELESS, CLUE_SEED_CONSECUTIVE_RUN
+- <a id="rule-payoff_consecutive_valence_run"></a>`PAYOFF_CONSECUTIVE_VALENCE_RUN` — Wave 580:
+- <a id="rule-payoff_curiosity_mismatch"></a>`PAYOFF_CURIOSITY_MISMATCH` — Wave 317: PAYOFF_EMOTION_DECOUPLED, UNRESOLVED_CLUE_RATIO_HIGH, PAYOFF_CURIOSITY_MISMATCH
+- <a id="rule-payoff_double_fire"></a>`PAYOFF_DOUBLE_FIRE` — Wave 303: PAYOFF_DOUBLE_FIRE
+- <a id="rule-payoff_dramatic_turn_aftermath_absent"></a>`PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT` — Wave 524 checks
+- <a id="rule-payoff_emotional_recoil_absent"></a>`PAYOFF_EMOTIONAL_RECOIL_ABSENT` — Wave 440: PAYOFF_BACKLOADED, PAYOFF_EMOTIONAL_RECOIL_ABSENT, PAYOFF_SUSPENSE_RECOIL_ABSENT
+- <a id="rule-payoff_gap_excessive"></a>`PAYOFF_GAP_EXCESSIVE` — Wave 261: Payoff precedes setup, payoff gap excessive, payoff front-loaded
+- <a id="rule-payoff_memory_gap"></a>`PAYOFF_MEMORY_GAP` — Consequence-delayed payoff (Wave 140)
+- <a id="rule-payoff_midpoint_void"></a>`PAYOFF_MIDPOINT_VOID` — Wave 398: CLUE_SEED_SUSPENSE_FLAT, PAYOFF_MIDPOINT_VOID, CLUE_SEED_REVELATION_DECOUPLED
+- <a id="rule-payoff_orphan_rate"></a>`PAYOFF_ORPHAN_RATE` — Wave 233: Payoff orphan rate, post-climax cluster, gap uniformity
+- <a id="rule-payoff_precedes_setup"></a>`PAYOFF_PRECEDES_SETUP` — Wave 261: Payoff precedes setup, payoff gap excessive, payoff front-loaded
+- <a id="rule-payoff_purpose_monotone"></a>`PAYOFF_PURPOSE_MONOTONE` — Wave 580:
+- <a id="rule-payoff_rate_decline"></a>`PAYOFF_RATE_DECLINE` — Wave 167: Payoff-before-setup, setup clustering, payoff rate decline
+- <a id="rule-payoff_relational_aftermath_absent"></a>`PAYOFF_RELATIONAL_AFTERMATH_ABSENT` — Wave 524 checks
+- <a id="rule-payoff_seed_decoupled"></a>`PAYOFF_SEED_DECOUPLED` — Wave 580:
+- <a id="rule-payoff_single_scene_dump"></a>`PAYOFF_SINGLE_SCENE_DUMP` — Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b
+- <a id="rule-payoff_too_quick"></a>`PAYOFF_TOO_QUICK` — Clue paid off too quickly (same scene or very next scene)
+- <a id="rule-reincorporation_void"></a>`REINCORPORATION_VOID` — REINCORPORATION_VOID
+- <a id="rule-seed_clock_aftermath_absent"></a>`SEED_CLOCK_AFTERMATH_ABSENT` — Wave 524 checks
+- <a id="rule-seed_emotional_aftermath_absent"></a>`SEED_EMOTIONAL_AFTERMATH_ABSENT` — Wave 468: PAYOFF_REVELATION_AFTERMATH_ABSENT, SEED_SUSPENSE_AFTERMATH_ABSENT, SEED_EMOTIONAL_AFTERMATH_ABSENT
+- <a id="rule-seed_opening_zone_absent"></a>`SEED_OPENING_ZONE_ABSENT` — Wave 580:
+- <a id="rule-seed_relationship_aftermath_absent"></a>`SEED_RELATIONSHIP_AFTERMATH_ABSENT` — Wave 524 checks
+- <a id="rule-setup_act3_surge"></a>`SETUP_ACT3_SURGE` — Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b
+- <a id="rule-setup_burst"></a>`SETUP_BURST` — Wave 206: Setup burst, mid-story payoff void, clue drought
+- <a id="rule-setup_desert_act2b"></a>`SETUP_DESERT_ACT2B` — Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b
+- <a id="rule-setup_front_gap"></a>`SETUP_FRONT_GAP` — Wave 154: Clustered payoffs, premature resolution, setup imbalance
+- <a id="rule-setup_payoff_act_skew"></a>`SETUP_PAYOFF_ACT_SKEW` — Wave 275: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew
+- <a id="rule-setup_payoff_gap_uniformity"></a>`SETUP_PAYOFF_GAP_UNIFORMITY` — Wave 233: Payoff orphan rate, post-climax cluster, gap uniformity
+- <a id="rule-setup_payoff_order_scrambled"></a>`SETUP_PAYOFF_ORDER_SCRAMBLED` — Wave 181: Flat payoffs, clue glut, scrambled setup/payoff order
+- <a id="rule-setup_without_consequence"></a>`SETUP_WITHOUT_CONSEQUENCE` — Setup without consequence (Wave 140)
+- <a id="rule-unresolved_clue_ratio_high"></a>`UNRESOLVED_CLUE_RATIO_HIGH` — Wave 317: PAYOFF_EMOTION_DECOUPLED, UNRESOLVED_CLUE_RATIO_HIGH, PAYOFF_CURIOSITY_MISMATCH
 

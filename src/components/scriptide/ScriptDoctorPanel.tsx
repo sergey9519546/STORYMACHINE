@@ -230,6 +230,27 @@ function formatPassName(pass: PassName): string {
     .join(" ");
 }
 
+// Upgrade item #12: "why this matters" — a finding's `pass` + `rule` is
+// exactly the (filename, anchor) pair docs/rulebook/generate-rulebook.ts
+// generates: docs/rulebook/<pass>.md, with a `#rule-<rule.toLowerCase()>`
+// anchor on that rule's list item (both sides asserted to agree in
+// tests/rulebook/rule-links.test.ts). PassName's 14 values already match
+// the rulebook's filenames one-for-one (server/nvm/revision/passes/types.ts).
+//
+// No in-app route serves docs/** (server/app.ts only serves the built
+// frontend bundle), and nothing else in this codebase links out to GitHub —
+// there's no existing "doc link" convention here to follow. Rather than
+// invent a host, this points at the repository's own actual GitHub remote
+// (`git remote -v` at the time this was written; update alongside any future
+// rename/fork/self-host of this repo) — a real, resolvable destination for
+// anyone with repo access, which a bare relative path to an unserved file
+// would not be.
+const RULEBOOK_REPO_BLOB_BASE = "https://github.com/sergey9519546/STORYMACHINE/blob/main/docs/rulebook";
+
+function rulebookHref(pass: PassName, rule: string): string {
+  return `${RULEBOOK_REPO_BLOB_BASE}/${pass}.md#rule-${rule.toLowerCase()}`;
+}
+
 /** Turn a raw rule identifier (e.g. "CHARACTER_INTRO_CLICHE", the ALL_CAPS
  *  snake_case convention every revision pass uses for RevisionIssue.rule)
  *  into a plain-language phrase ("character intro cliche") for the root-cause
@@ -1267,8 +1288,23 @@ function IssueCard({
           </button>
         )}
       </div>
-      <p className="text-[10px] font-bold uppercase text-black dark:text-white mb-1">
+      <p className="text-[10px] font-bold uppercase text-black dark:text-white mb-1 flex items-center gap-1.5 flex-wrap">
         {issue.rule}
+        {/* Upgrade item #12: links straight to this rule's rulebook entry
+            (docs/rulebook/<pass>.md#rule-<rule>) — undefined only when no
+            pass is known for this issue (e.g. a root-cause card's synthetic
+            member-rule row), matching `pass`'s own optionality above. */}
+        {pass && (
+          <a
+            href={rulebookHref(pass, issue.rule)}
+            target="_blank"
+            rel="noreferrer noopener"
+            title={`Why this matters — rulebook entry for ${issue.rule}`}
+            className="inline-flex items-center gap-0.5 normal-case font-mono text-[9px] font-normal text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white underline decoration-dotted"
+          >
+            <Info className="w-2.5 h-2.5" aria-hidden="true" /> Why this matters
+          </a>
+        )}
       </p>
       <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
         {issue.description}

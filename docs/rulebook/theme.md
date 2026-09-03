@@ -8,9 +8,9 @@ Wave 1172 additions: after Wave 1158, dramaticTurn and revelation were each at o
 
 Rules named in this wave's header:
 
-- `THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `THEME_TURN_EMOTIONAL_AFTERMATH_VOID`
-- `THEME_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-theme_revelation_emotional_aftermath_void"></a>`THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_turn_emotional_aftermath_void"></a>`THEME_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_turn_suspense_aftermath_void"></a>`THEME_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1158
 
@@ -18,9 +18,9 @@ Wave 1158 additions: THEME_CLOCK_STAGING_AFTERMATH_VOID gives clockRaised its si
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_STAGING_AFTERMATH_VOID`
-- `THEME_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `THEME_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_clock_staging_aftermath_void"></a>`THEME_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-theme_revelation_curiosity_aftermath_void"></a>`THEME_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_turn_curiosity_aftermath_void"></a>`THEME_TURN_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1144
 
@@ -28,9 +28,9 @@ Wave 1144 additions: payoffSetupIds and clockRaised were each at four of six cha
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `THEME_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-theme_clock_dialogue_highlight_aftermath_void"></a>`THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-theme_payoff_dialogue_highlight_aftermath_void"></a>`THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-theme_payoff_staging_aftermath_void"></a>`THEME_PAYOFF_STAGING_AFTERMATH_VOID`
 
 ## Wave 1130
 
@@ -38,9 +38,9 @@ Wave 1130 additions: payoffSetupIds was at three of six channels (curiosityDelta
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `THEME_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-theme_clock_emotional_aftermath_void"></a>`THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_clock_relational_aftermath_void"></a>`THEME_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_payoff_suspense_aftermath_void"></a>`THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1116
 
@@ -48,9 +48,9 @@ Wave 1116 additions: this wave gives payoffSetupIds and clockRaised further chan
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `THEME_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `THEME_PAYOFF_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_clock_curiosity_aftermath_void"></a>`THEME_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_payoff_emotional_aftermath_void"></a>`THEME_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_payoff_relational_aftermath_void"></a>`THEME_PAYOFF_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1102
 
@@ -58,9 +58,9 @@ Wave 1102 additions: THEME_STAGING_REPEAT_AFTERMATH_VOID gives the visualBeats(>
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID`
-- `THEME_STAGING_REPEAT_AFTERMATH_VOID`
+- <a id="rule-theme_clock_suspense_aftermath_void"></a>`THEME_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-theme_payoff_curiosity_aftermath_void"></a>`THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_staging_repeat_aftermath_void"></a>`THEME_STAGING_REPEAT_AFTERMATH_VOID`
 
 ## Wave 1088
 
@@ -68,9 +68,9 @@ Wave 1088 additions: THEME_OPEN_THREAD_STAGING_AFTERMATH_VOID gives unresolvedCl
 
 Rules named in this wave's header:
 
-- `THEME_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `THEME_STAGED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `THEME_STAGED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_open_thread_staging_aftermath_void"></a>`THEME_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-theme_staged_dialogue_highlight_aftermath_void"></a>`THEME_STAGED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-theme_staged_relational_aftermath_void"></a>`THEME_STAGED_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1074
 
@@ -78,9 +78,9 @@ Wave 1074 additions: raise_stakes and seededClueIds each reach full six-channel 
 
 Rules named in this wave's header:
 
-- `THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `THEME_SEED_STAGING_AFTERMATH_VOID`
-- `THEME_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-theme_open_thread_dialogue_highlight_aftermath_void"></a>`THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-theme_seed_staging_aftermath_void"></a>`THEME_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-theme_stakes_staging_aftermath_void"></a>`THEME_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1060
 
@@ -88,9 +88,9 @@ Wave 1060 additions: THEME_SEED_SUSPENSE_AFTERMATH_VOID gives seededClueIds a fi
 
 Rules named in this wave's header:
 
-- `THEME_SEED_SUSPENSE_AFTERMATH_VOID`
-- `THEME_STAGING_SUSPENSE_AFTERMATH_VOID`
-- `THEME_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-theme_seed_suspense_aftermath_void"></a>`THEME_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-theme_staging_suspense_aftermath_void"></a>`THEME_STAGING_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-theme_stakes_dialogue_highlight_aftermath_void"></a>`THEME_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1046
 
@@ -98,9 +98,9 @@ Wave 1046 additions: with raise_stakes and seededClueIds now at four channels ea
 
 Rules named in this wave's header:
 
-- `THEME_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `THEME_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `THEME_STAGING_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_open_thread_relational_aftermath_void"></a>`THEME_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_open_thread_suspense_aftermath_void"></a>`THEME_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-theme_staging_emotional_aftermath_void"></a>`THEME_STAGING_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1032
 
@@ -108,9 +108,9 @@ Wave 1032 additions: THEME_STAKES_RELATIONAL_AFTERMATH_VOID gives raise_stakes a
 
 Rules named in this wave's header:
 
-- `THEME_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `THEME_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `THEME_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_open_thread_curiosity_aftermath_void"></a>`THEME_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_seed_emotional_aftermath_void"></a>`THEME_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_stakes_relational_aftermath_void"></a>`THEME_STAKES_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1018
 
@@ -118,9 +118,9 @@ Wave 1018 additions: this wave gives three more triggers a fresh consequence cha
 
 Rules named in this wave's header:
 
-- `THEME_SEED_RELATIONAL_AFTERMATH_VOID`
-- `THEME_STAGING_CURIOSITY_AFTERMATH_VOID`
-- `THEME_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_seed_relational_aftermath_void"></a>`THEME_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_staging_curiosity_aftermath_void"></a>`THEME_STAGING_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_stakes_emotional_aftermath_void"></a>`THEME_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1004
 
@@ -128,9 +128,9 @@ Wave 1004 additions: THEME_STAGING re-checked and re-excluded (same predicate mi
 
 Rules named in this wave's header:
 
-- `THEME_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `THEME_SEED_CURIOSITY_AFTERMATH_VOID`
-- `THEME_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-theme_open_thread_emotional_aftermath_void"></a>`THEME_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-theme_seed_curiosity_aftermath_void"></a>`THEME_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_stakes_suspense_aftermath_void"></a>`THEME_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 990
 
@@ -138,9 +138,9 @@ Wave 990 additions: THEME_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights array) an
 
 Rules named in this wave's header:
 
-- `THEME_HIGHLIGHT_ZONE_IMBALANCE`
-- `THEME_OPEN_THREAD_ZONE_IMBALANCE`
-- `THEME_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-theme_highlight_zone_imbalance"></a>`THEME_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-theme_open_thread_zone_imbalance"></a>`THEME_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-theme_stakes_curiosity_aftermath_void"></a>`THEME_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 976
 
@@ -148,9 +148,9 @@ Wave 976 additions: auditing three more trio-complete signals in this pass, span
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_DELTA_ZONE_IMBALANCE`
-- `THEME_CLOCK_ZONE_IMBALANCE`
-- `THEME_TURN_ZONE_IMBALANCE`
+- <a id="rule-theme_clock_delta_zone_imbalance"></a>`THEME_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-theme_clock_zone_imbalance"></a>`THEME_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-theme_turn_zone_imbalance"></a>`THEME_TURN_ZONE_IMBALANCE`
 
 ## Wave 962
 
@@ -158,9 +158,9 @@ Wave 962 additions: continuing the non-purpose 4-zone rollout with three more tr
 
 Rules named in this wave's header:
 
-- `THEME_CURIOSITY_ZONE_IMBALANCE`
-- `THEME_RELATIONSHIP_ZONE_IMBALANCE`
-- `THEME_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-theme_curiosity_zone_imbalance"></a>`THEME_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-theme_relationship_zone_imbalance"></a>`THEME_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-theme_revelation_zone_imbalance"></a>`THEME_REVELATION_ZONE_IMBALANCE`
 
 ## Wave 948
 
@@ -168,9 +168,9 @@ Wave 948 additions: extending the checkZoneImbalance rollout to three more trio-
 
 Rules named in this wave's header:
 
-- `THEME_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `THEME_SEED_ZONE_IMBALANCE`
-- `THEME_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-theme_positive_emotion_zone_imbalance"></a>`THEME_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-theme_seed_zone_imbalance"></a>`THEME_SEED_ZONE_IMBALANCE`
+- <a id="rule-theme_suspense_zone_imbalance"></a>`THEME_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 934
 
@@ -178,9 +178,9 @@ Wave 934 additions: continuing the checkZoneImbalance rollout, this wave applies
 
 Rules named in this wave's header:
 
-- `THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `THEME_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `THEME_STAKES_ZONE_IMBALANCE`
+- <a id="rule-theme_negative_emotion_zone_imbalance"></a>`THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-theme_revelation_purpose_zone_imbalance"></a>`THEME_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-theme_stakes_zone_imbalance"></a>`THEME_STAKES_ZONE_IMBALANCE`
 
 ## Wave 920
 
@@ -188,9 +188,9 @@ Wave 920 additions: purpose === 'revelation' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `THEME_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `THEME_REVELATION_PURPOSE_DROUGHT_RUN`
-- `THEME_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-theme_character_moment_zone_imbalance"></a>`THEME_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-theme_revelation_purpose_drought_run"></a>`THEME_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-theme_revelation_purpose_zone_cluster"></a>`THEME_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 906
 
@@ -198,9 +198,9 @@ Wave 906 additions: continuing the checkZoneImbalance rollout begun in Wave 892,
 
 Rules named in this wave's header:
 
-- `THEME_COMPLICATE_ZONE_IMBALANCE`
-- `THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `THEME_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-theme_complicate_zone_imbalance"></a>`THEME_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-theme_introduce_conflict_zone_imbalance"></a>`THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-theme_turning_point_zone_imbalance"></a>`THEME_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 892
 
@@ -208,9 +208,9 @@ Wave 892 additions: no purpose value had ever been audited by the distinct 4-zon
 
 Rules named in this wave's header:
 
-- `THEME_CLIMAX_ZONE_IMBALANCE`
-- `THEME_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `THEME_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-theme_climax_zone_imbalance"></a>`THEME_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-theme_establish_world_zone_imbalance"></a>`THEME_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-theme_resolution_zone_imbalance"></a>`THEME_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 878
 
@@ -218,9 +218,9 @@ Wave 878 additions: THEME_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resol
 
 Rules named in this wave's header:
 
-- `THEME_COMPLICATE_DROUGHT_RUN`
-- `THEME_COMPLICATE_ZONE_CLUSTER`
-- `THEME_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-theme_complicate_drought_run"></a>`THEME_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-theme_complicate_zone_cluster"></a>`THEME_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-theme_resolution_drought_run"></a>`THEME_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 864
 
@@ -228,10 +228,10 @@ Wave 864 additions: THEME_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' a
 
 Rules named in this wave's header:
 
-- `THEME_CLIMAX_DROUGHT_RUN`
-- `THEME_ESTABLISH_WORLD_DROUGHT_RUN`
-- `THEME_RESOLUTION_SILENT`
-- `THEME_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-theme_climax_drought_run"></a>`THEME_CLIMAX_DROUGHT_RUN`
+- <a id="rule-theme_establish_world_drought_run"></a>`THEME_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-theme_resolution_silent"></a>`THEME_RESOLUTION_SILENT`
+- <a id="rule-theme_resolution_zone_cluster"></a>`THEME_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 850
 
@@ -239,10 +239,10 @@ Wave 850 additions: THEME_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalSh
 
 Rules named in this wave's header:
 
-- `THEME_CLIMAX_SCENE_SILENT`
-- `THEME_CLIMAX_ZONE_CLUSTER`
-- `THEME_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `THEME_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-theme_climax_scene_silent"></a>`THEME_CLIMAX_SCENE_SILENT`
+- <a id="rule-theme_climax_zone_cluster"></a>`THEME_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-theme_establish_world_zone_cluster"></a>`THEME_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-theme_positive_emotion_drought_run"></a>`THEME_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 836
 
@@ -250,9 +250,9 @@ Wave 836 additions: THEME_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 't
 
 Rules named in this wave's header:
 
-- `THEME_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `THEME_POSITIVE_EMOTION_ZONE_CLUSTER`
-- `THEME_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-theme_introduce_conflict_drought_run"></a>`THEME_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-theme_positive_emotion_zone_cluster"></a>`THEME_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-theme_turning_point_drought_run"></a>`THEME_TURNING_POINT_DROUGHT_RUN`
 
 ## Wave 822
 
@@ -260,9 +260,9 @@ Wave 822 additions: THEME_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_st
 
 Rules named in this wave's header:
 
-- `THEME_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `THEME_STAKES_DROUGHT_RUN`
-- `THEME_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-theme_introduce_conflict_zone_cluster"></a>`THEME_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-theme_stakes_drought_run"></a>`THEME_STAKES_DROUGHT_RUN`
+- <a id="rule-theme_turning_point_zone_cluster"></a>`THEME_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 808
 
@@ -270,10 +270,10 @@ Wave 808 additions: THEME_REVELATION_PEAK_UNCAUSED (backward-cause × revelation
 
 Rules named in this wave's header:
 
-- `THEME_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `THEME_RAISE_STAKES_SILENT`
-- `THEME_REVELATION_PEAK_UNCAUSED`
-- `THEME_STAKES_ZONE_CLUSTER`
+- <a id="rule-theme_negative_emotion_drought_run"></a>`THEME_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-theme_raise_stakes_silent"></a>`THEME_RAISE_STAKES_SILENT`
+- <a id="rule-theme_revelation_peak_uncaused"></a>`THEME_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-theme_stakes_zone_cluster"></a>`THEME_STAKES_ZONE_CLUSTER`
 
 ## Wave 794
 
@@ -281,13 +281,13 @@ Wave 794 additions: THEME_REVELATION_ZONE_CLUSTER (distribution/timing × revela
 
 Rules named in this wave's header:
 
-- `THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT`
-- `THEME_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `THEME_RESONANCE_EMOTIONALLY_LOPSIDED`
-- `THEME_REVELATION_DECOUPLED`
-- `THEME_REVELATION_DROUGHT_RUN`
-- `THEME_REVELATION_SILENT`
-- `THEME_REVELATION_ZONE_CLUSTER`
+- <a id="rule-theme_negative_emotion_aftermath_silent"></a>`THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT`
+- <a id="rule-theme_negative_emotion_zone_cluster"></a>`THEME_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-theme_resonance_emotionally_lopsided"></a>`THEME_RESONANCE_EMOTIONALLY_LOPSIDED`
+- <a id="rule-theme_revelation_decoupled"></a>`THEME_REVELATION_DECOUPLED`
+- <a id="rule-theme_revelation_drought_run"></a>`THEME_REVELATION_DROUGHT_RUN`
+- <a id="rule-theme_revelation_silent"></a>`THEME_REVELATION_SILENT`
+- <a id="rule-theme_revelation_zone_cluster"></a>`THEME_REVELATION_ZONE_CLUSTER`
 
 ## Wave 780
 
@@ -295,10 +295,10 @@ Wave 780 additions: THEME_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 abs
 
 Rules named in this wave's header:
 
-- `THEME_CURIOSITY_DROUGHT_RUN`
-- `THEME_CURIOSITY_PEAK_ABSENT`
-- `THEME_CURIOSITY_PEAK_UNCAUSED`
-- `THEME_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-theme_curiosity_drought_run"></a>`THEME_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-theme_curiosity_peak_absent"></a>`THEME_CURIOSITY_PEAK_ABSENT`
+- <a id="rule-theme_curiosity_peak_uncaused"></a>`THEME_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-theme_suspense_drought_run"></a>`THEME_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 766
 
@@ -306,10 +306,10 @@ Wave 766 additions: THEME_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspense
 
 Rules named in this wave's header:
 
-- `THEME_CURIOSITY_ZONE_CLUSTER`
-- `THEME_SUSPENSE_PEAK_ABSENT`
-- `THEME_SUSPENSE_PEAK_UNCAUSED`
-- `THEME_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-theme_curiosity_zone_cluster"></a>`THEME_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-theme_suspense_peak_absent"></a>`THEME_SUSPENSE_PEAK_ABSENT`
+- <a id="rule-theme_suspense_peak_uncaused"></a>`THEME_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-theme_suspense_zone_cluster"></a>`THEME_SUSPENSE_ZONE_CLUSTER`
 
 ## Wave 752
 
@@ -317,9 +317,9 @@ Wave 752 additions: THEME_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clock
 
 Rules named in this wave's header:
 
-- `THEME_CHARACTER_MOMENT_DROUGHT_RUN`
-- `THEME_CLOCK_DELTA_ZONE_CLUSTER`
-- `THEME_TURN_DROUGHT_RUN`
+- <a id="rule-theme_character_moment_drought_run"></a>`THEME_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-theme_clock_delta_zone_cluster"></a>`THEME_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-theme_turn_drought_run"></a>`THEME_TURN_DROUGHT_RUN`
 
 ## Wave 738
 
@@ -327,9 +327,9 @@ Wave 738 additions: THEME_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogu
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_DELTA_DROUGHT_RUN`
-- `THEME_HIGHLIGHT_ZONE_CLUSTER`
-- `THEME_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-theme_clock_delta_drought_run"></a>`THEME_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-theme_highlight_zone_cluster"></a>`THEME_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-theme_relationship_zone_cluster"></a>`THEME_RELATIONSHIP_ZONE_CLUSTER`
 
 ## Wave 724
 
@@ -337,9 +337,9 @@ Wave 724 additions: THEME_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unres
 
 Rules named in this wave's header:
 
-- `THEME_HIGHLIGHT_PEAK_UNCAUSED`
-- `THEME_OPEN_THREAD_ZONE_CLUSTER`
-- `THEME_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-theme_highlight_peak_uncaused"></a>`THEME_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-theme_open_thread_zone_cluster"></a>`THEME_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-theme_relationship_drought_run"></a>`THEME_RELATIONSHIP_DROUGHT_RUN`
 
 ## Wave 710
 
@@ -347,9 +347,9 @@ Wave 710 additions: THEME_CLOCK_ZONE_CLUSTER (distribution/timing × clockRaised
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_ZONE_CLUSTER`
-- `THEME_OPEN_THREAD_DROUGHT_RUN`
-- `THEME_SEED_PEAK_UNCAUSED`
+- <a id="rule-theme_clock_zone_cluster"></a>`THEME_CLOCK_ZONE_CLUSTER`
+- <a id="rule-theme_open_thread_drought_run"></a>`THEME_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-theme_seed_peak_uncaused"></a>`THEME_SEED_PEAK_UNCAUSED`
 
 ## Wave 696
 
@@ -357,9 +357,9 @@ Wave 696 additions: THEME_STAGING_ZONE_CLUSTER (distribution/timing × visualBea
 
 Rules named in this wave's header:
 
-- `THEME_PAYOFF_PEAK_UNCAUSED`
-- `THEME_SEED_DROUGHT_RUN`
-- `THEME_STAGING_ZONE_CLUSTER`
+- <a id="rule-theme_payoff_peak_uncaused"></a>`THEME_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-theme_seed_drought_run"></a>`THEME_SEED_DROUGHT_RUN`
+- <a id="rule-theme_staging_zone_cluster"></a>`THEME_STAGING_ZONE_CLUSTER`
 
 ## Wave 682
 
@@ -367,10 +367,10 @@ Wave 682 additions: THEME_CLOCK_DELTA_PEAK_UNCAUSED (single-peak isolation/backw
 
 Rules named in this wave's header:
 
-- `THEME_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `THEME_CLOCK_DELTA_PEAK_UNCAUSED`
-- `THEME_CLOCK_PEAK_ABSENT`
-- `THEME_STAGING_DROUGHT_RUN`
+- <a id="rule-theme_character_moment_zone_cluster"></a>`THEME_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-theme_clock_delta_peak_uncaused"></a>`THEME_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-theme_clock_peak_absent"></a>`THEME_CLOCK_PEAK_ABSENT`
+- <a id="rule-theme_staging_drought_run"></a>`THEME_STAGING_DROUGHT_RUN`
 
 ## Wave 668
 
@@ -378,11 +378,11 @@ Wave 668 additions: THEME_RELATIONSHIP_PEAK_UNCAUSED (single-peak isolation/back
 
 Rules named in this wave's header:
 
-- `THEME_PAYOFF_DROUGHT_RUN`
-- `THEME_PAYOFF_PEAK_ABSENT`
-- `THEME_RELATIONSHIP_PEAK_ABSENT`
-- `THEME_RELATIONSHIP_PEAK_UNCAUSED`
-- `THEME_TURN_ZONE_CLUSTER`
+- <a id="rule-theme_payoff_drought_run"></a>`THEME_PAYOFF_DROUGHT_RUN`
+- <a id="rule-theme_payoff_peak_absent"></a>`THEME_PAYOFF_PEAK_ABSENT`
+- <a id="rule-theme_relationship_peak_absent"></a>`THEME_RELATIONSHIP_PEAK_ABSENT`
+- <a id="rule-theme_relationship_peak_uncaused"></a>`THEME_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-theme_turn_zone_cluster"></a>`THEME_TURN_ZONE_CLUSTER`
 
 ## Wave 654
 
@@ -390,9 +390,9 @@ Wave 654 additions: THEME_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backw
 
 Rules named in this wave's header:
 
-- `THEME_HIGHLIGHT_DROUGHT_RUN`
-- `THEME_OPEN_THREAD_PEAK_UNCAUSED`
-- `THEME_SEED_ZONE_CLUSTER`
+- <a id="rule-theme_highlight_drought_run"></a>`THEME_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-theme_open_thread_peak_uncaused"></a>`THEME_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-theme_seed_zone_cluster"></a>`THEME_SEED_ZONE_CLUSTER`
 
 ## Wave 640
 
@@ -400,9 +400,9 @@ Wave 640 additions: THEME_CLOCK_DROUGHT_RUN (run-based × clockRaised absence �
 
 Rules named in this wave's header:
 
-- `THEME_CLOCK_DROUGHT_RUN`
-- `THEME_PAYOFF_ZONE_CLUSTER`
-- `THEME_STAGING_PEAK_UNCAUSED`
+- <a id="rule-theme_clock_drought_run"></a>`THEME_CLOCK_DROUGHT_RUN`
+- <a id="rule-theme_payoff_zone_cluster"></a>`THEME_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-theme_staging_peak_uncaused"></a>`THEME_STAGING_PEAK_UNCAUSED`
 
 ## Wave 626
 
@@ -410,9 +410,9 @@ Wave 626 additions: THEME_PAYOFF_STAGING_DECOUPLED, THEME_SEED_DIALOGUE_HIGHLIGH
 
 Rules named in this wave's header:
 
-- `THEME_PAYOFF_STAGING_DECOUPLED`
-- `THEME_PAYOFF_ZONE_IMBALANCE`
-- `THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-theme_payoff_staging_decoupled"></a>`THEME_PAYOFF_STAGING_DECOUPLED`
+- <a id="rule-theme_payoff_zone_imbalance"></a>`THEME_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-theme_seed_dialogue_highlight_aftermath_void"></a>`THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 612
 
@@ -420,9 +420,9 @@ Wave 612 additions: THEME_VISUAL_BEAT_DECOUPLED, THEME_VISUAL_BEAT_ZONE_IMBALANC
 
 Rules named in this wave's header:
 
-- `THEME_VISUAL_BEAT_AFTERMATH_SILENT`
-- `THEME_VISUAL_BEAT_DECOUPLED`
-- `THEME_VISUAL_BEAT_ZONE_IMBALANCE`
+- <a id="rule-theme_visual_beat_aftermath_silent"></a>`THEME_VISUAL_BEAT_AFTERMATH_SILENT`
+- <a id="rule-theme_visual_beat_decoupled"></a>`THEME_VISUAL_BEAT_DECOUPLED`
+- <a id="rule-theme_visual_beat_zone_imbalance"></a>`THEME_VISUAL_BEAT_ZONE_IMBALANCE`
 
 ## Wave 598
 
@@ -430,8 +430,8 @@ Wave 598 additions: unresolved clue decoupled (co-occurrence/decoupling × reson
 
 Rules named in this wave's header:
 
-- `THEME_CLUE_DECOUPLED`
-- `THEME_RESONANCE_THIRDS_CLUSTER`
+- <a id="rule-theme_clue_decoupled"></a>`THEME_CLUE_DECOUPLED`
+- <a id="rule-theme_resonance_thirds_cluster"></a>`THEME_RESONANCE_THIRDS_CLUSTER`
 
 ## Wave 556
 
@@ -439,10 +439,10 @@ Wave 556 additions: resonant aftermath suspense void (sequence/aftermath × susp
 
 Rules named in this wave's header:
 
-- `THEME_DIALOGUE_PEAK_SILENT`
-- `THEME_QUIET_SCENES_ONLY`
-- `THEME_RESONANT_AFTERMATH_CURIOSITY_VOID`
-- `THEME_RESONANT_SUSPENSE_FLAT`
+- <a id="rule-theme_dialogue_peak_silent"></a>`THEME_DIALOGUE_PEAK_SILENT`
+- <a id="rule-theme_quiet_scenes_only"></a>`THEME_QUIET_SCENES_ONLY`
+- <a id="rule-theme_resonant_aftermath_curiosity_void"></a>`THEME_RESONANT_AFTERMATH_CURIOSITY_VOID`
+- <a id="rule-theme_resonant_suspense_flat"></a>`THEME_RESONANT_SUSPENSE_FLAT`
 
 ## Wave 528
 
@@ -450,7 +450,7 @@ Wave 528 additions: relationship shift aftermath silent (sequence/aftermath × r
 
 Rules named in this wave's header:
 
-- `THEME_RELATIONSHIP_DECOUPLED`
+- <a id="rule-theme_relationship_decoupled"></a>`THEME_RELATIONSHIP_DECOUPLED`
 
 ## Wave 514
 
@@ -458,8 +458,8 @@ Wave 514 additions: seed aftermath silent (sequence/aftermath × seed trigger �
 
 Rules named in this wave's header:
 
-- `THEME_PAYOFF_AFTERMATH_SILENT`
-- `THEME_PEAK_SUSPENSE_AFTERMATH_SILENT`
+- <a id="rule-theme_payoff_aftermath_silent"></a>`THEME_PAYOFF_AFTERMATH_SILENT`
+- <a id="rule-theme_peak_suspense_aftermath_silent"></a>`THEME_PEAK_SUSPENSE_AFTERMATH_SILENT`
 
 ## Wave 500
 
@@ -467,9 +467,9 @@ Wave 500 additions: negative emotion aftermath silent (sequence/aftermath × neg
 
 Rules named in this wave's header:
 
-- `THEME_FIRST_RESONANT_CAUSELESS`
-- `THEME_POSITIVE_EMOTION_AFTERMATH_SILENT`
-- `THEME_REVELATION_AFTERMATH_SILENT`
+- <a id="rule-theme_first_resonant_causeless"></a>`THEME_FIRST_RESONANT_CAUSELESS`
+- <a id="rule-theme_positive_emotion_aftermath_silent"></a>`THEME_POSITIVE_EMOTION_AFTERMATH_SILENT`
+- <a id="rule-theme_revelation_aftermath_silent"></a>`THEME_REVELATION_AFTERMATH_SILENT`
 
 ## Wave 486
 
@@ -477,9 +477,9 @@ Wave 486 additions: positive emotion aftermath silent (sequence/aftermath × pos
 
 Rules named in this wave's header:
 
-- `THEME_ALL_RESONANCE_CAUSELESS`
-- `THEME_FRONT_LOADED`
-- `THEME_POSITIVE_EMOTION_DECOUPLED`
+- <a id="rule-theme_all_resonance_causeless"></a>`THEME_ALL_RESONANCE_CAUSELESS`
+- <a id="rule-theme_front_loaded"></a>`THEME_FRONT_LOADED`
+- <a id="rule-theme_positive_emotion_decoupled"></a>`THEME_POSITIVE_EMOTION_DECOUPLED`
 
 ## Wave 458
 
@@ -487,7 +487,7 @@ Wave 458 additions: relationship decoupled (co-occurrence/decoupling × relation
 
 Rules named in this wave's header:
 
-- `THEME_PEAK_UNMOTIVATED`
+- <a id="rule-theme_peak_unmotivated"></a>`THEME_PEAK_UNMOTIVATED`
 
 ## Wave 444
 
@@ -495,7 +495,7 @@ Wave 444 additions: resonant cluster flood (run-based — 4+ consecutive scenes 
 
 Rules named in this wave's header:
 
-- `THEME_RESONANT_SINGLETON_RUN`
+- <a id="rule-theme_resonant_singleton_run"></a>`THEME_RESONANT_SINGLETON_RUN`
 
 ## Wave 130
 
@@ -503,82 +503,82 @@ Wave 130 — Pass 13: Theme Resonance Checks whether each scene's dialogue, acti
 
 Rules named in this wave's header:
 
-- `THEME_RESONANCE_GAP`
-- `THEME_UNRESOLVED`
+- <a id="rule-theme_resonance_gap"></a>`THEME_RESONANCE_GAP`
+- <a id="rule-theme_unresolved"></a>`THEME_UNRESOLVED`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `THEME_ACCELERATING_DENSITY_ABSENT` — Wave 162: Midpoint silence, accelerating density, Act 3 dialectic
-- `THEME_ACT1_DENSITY_DROP` — Wave 374: THEME_ACT1_DENSITY_DROP, THEME_CLOCK_PEAK_ABSENT, THEME_CHARGED_SCENE_SILENT
-- `THEME_ACT2_DESERT` — Wave 174: Opening silence, single-keyword reliance, climax silence
-- `THEME_ACT2A_DENSITY_DROP` — Wave 402: THEME_ACT2A_DENSITY_DROP, THEME_SEED_PEAK_ABSENT, THEME_PAYOFF_PEAK_ABSENT
-- `THEME_ACT2B_DENSITY_DROP` — Wave 332: THEME_DEVELOPMENT_SCENE_DESERT, THEME_CURIOSITY_PEAK_ABSENT, THEME_ACT2B_DENSITY_DROP
-- `THEME_ACT2B_RESONANT_CAUSELESS` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_ACT3_DENSITY_DROP` — Wave 360: THEME_ACT3_DENSITY_DROP, THEME_RELATIONSHIP_PEAK_ABSENT, THEME_DUAL_PEAK_ABSENT
-- `THEME_BACK_HEAVY` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_CHARGED_SCENE_SILENT` — Wave 374: THEME_ACT1_DENSITY_DROP, THEME_CLOCK_PEAK_ABSENT, THEME_CHARGED_SCENE_SILENT
-- `THEME_CLOCK_AFTERMATH_SILENT` — Wave 458: THEME_RELATIONSHIP_DECOUPLED, THEME_CLOCK_AFTERMATH_SILENT, THEME_ALL_RESONANCE_CAUSELESS
-- `THEME_CLOCK_RESONANCE_ABSENT` — Wave 237: Revelation decoupled, clock resonance absent, relationship-shift decoupled
-- `THEME_CLOCK_SCENE_SILENT` — Wave 293: THEME_CLOCK_SCENE_SILENT
-- `THEME_CLOSING_QUARTER_SILENT` — Wave 346: THEME_SUSPENSE_PEAK_ABSENT, THEME_LATE_DEBUT, THEME_CLOSING_QUARTER_SILENT
-- `THEME_CONSECUTIVE_RESONANT_SURFEIT` — Wave 208: Consecutive resonant surfeit, first-act resolution, subplot isolation
-- `THEME_CURIOSITY_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_CURIOSITY_DECOUPLED` — Wave 265: Clue decoupled, curiosity decoupled, payoff decoupled
-- `THEME_DENSITY_INVERSION` — Wave 174: Opening silence, single-keyword reliance, climax silence
-- `THEME_DEVELOPMENT_SCENE_DESERT` — Wave 332: THEME_DEVELOPMENT_SCENE_DESERT, THEME_CURIOSITY_PEAK_ABSENT, THEME_ACT2B_DENSITY_DROP
-- `THEME_DIALECTIC_IN_ACT3_ABSENT` — Wave 162: Midpoint silence, accelerating density, Act 3 dialectic
-- `THEME_DIALOGUE_HIGHLIGHT_DECOUPLED` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_DRAMATIC_TURN_AFTERMATH_SILENT` — Wave 430: THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_UNMOTIVATED, THEME_RESONANCE_EMOTIONALLY_LOPSIDED
-- `THEME_DRAMATIC_TURN_DECOUPLED` — Wave 279: Dramatic-turn decoupled, negative-shift silent, suspense cluster silent
-- `THEME_DUAL_PEAK_ABSENT` — Wave 360: THEME_ACT3_DENSITY_DROP, THEME_RELATIONSHIP_PEAK_ABSENT, THEME_DUAL_PEAK_ABSENT
-- `THEME_DUAL_RISE_DECOUPLED` — Wave 416: THEME_RESONANT_SINGLETON_RUN, THEME_PEAK_SUSPENSE_AFTERMATH_SILENT, THEME_DUAL_RISE_DECOUPLED
-- `THEME_FINAL_SCENE_SILENT` — Wave 251: Final scene silent, positive shift silent, resonance clustering
-- `THEME_FIRST_ACT_RESOLUTION` — Wave 208: Consecutive resonant surfeit, first-act resolution, subplot isolation
-- `THEME_HEAVY_HANDED` — Wave 148: Theme craft — heavy-handedness, dialectic, front-loading
-- `THEME_HIGH_SUSPENSE_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_LAST_RESONANT_CAUSELESS` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_LATE_DEBUT` — Wave 346: THEME_SUSPENSE_PEAK_ABSENT, THEME_LATE_DEBUT, THEME_CLOSING_QUARTER_SILENT
-- `THEME_LONG_SILENT_STRETCH` — Wave 430: THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_UNMOTIVATED, THEME_RESONANCE_EMOTIONALLY_LOPSIDED
-- `THEME_MIDPOINT_DENSITY_DROP` — Wave 388: THEME_MIDPOINT_DENSITY_DROP, THEME_OPENING_IMAGE_SILENT, THEME_PROACTIVE_DECOUPLED
-- `THEME_MIDPOINT_RESONANT_CAUSELESS` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_MIDPOINT_SILENT` — Wave 162: Midpoint silence, accelerating density, Act 3 dialectic
-- `THEME_NEGATIVE_SHIFT_SILENT` — Wave 279: Dramatic-turn decoupled, negative-shift silent, suspense cluster silent
-- `THEME_NO_DIALECTIC` — Wave 148: Theme craft — heavy-handedness, dialectic, front-loading
-- `THEME_OPENING_IMAGE_SILENT` — Wave 388: THEME_MIDPOINT_DENSITY_DROP, THEME_OPENING_IMAGE_SILENT, THEME_PROACTIVE_DECOUPLED
-- `THEME_OPENING_SILENT` — Wave 174: Opening silence, single-keyword reliance, climax silence
-- `THEME_ORPHANED` — THEME_ORPHANED — theme set but no scene has any resonance at all
-- `THEME_PAYOFF_DECOUPLED` — Wave 265: Clue decoupled, curiosity decoupled, payoff decoupled
-- `THEME_PAYOFF_SILENT` — Wave 293: THEME_PAYOFF_SILENT
-- `THEME_PEAK_BEFORE_MIDPOINT` — Wave 321: peak-before-midpoint, raise-stakes silent, suspense-release silent
-- `THEME_POLES_NEVER_COSTAGED` — Wave 223: THEME_POLES_NEVER_COSTAGED
-- `THEME_POSITIVE_SHIFT_SILENT` — Wave 251: Final scene silent, positive shift silent, resonance clustering
-- `THEME_PROACTIVE_DECOUPLED` — Wave 388: THEME_MIDPOINT_DENSITY_DROP, THEME_OPENING_IMAGE_SILENT, THEME_PROACTIVE_DECOUPLED
-- `THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RELATIONSHIP_SHIFT_DECOUPLED` — Wave 237: Revelation decoupled, clock resonance absent, relationship-shift decoupled
-- `THEME_RESONANCE_BURST` — Wave 307: shallow resonance, quiet scenes only, resonance burst
-- `THEME_RESONANCE_CLUSTERING` — Wave 251: Final scene silent, positive shift silent, resonance clustering
-- `THEME_RESONANCE_EMOTIONALLY_INERT` — Wave 223: THEME_RESONANCE_EMOTIONALLY_INERT
-- `THEME_RESONANT_AFTERMATH_CLOCK_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_AFTERMATH_EMOTION_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_AFTERMATH_SUSPENSE_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_AFTERMATH_TURN_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_CLOCK_FLAT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_CLUSTER_FLOOD` — Wave 430: THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_UNMOTIVATED, THEME_RESONANCE_EMOTIONALLY_LOPSIDED
-- `THEME_RESONANT_CURIOSITY_FLAT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_EMOTION_FLAT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_RESONANT_VALENCE_UNIFORM` — Wave 472: THEME_POSITIVE_EMOTION_DECOUPLED, THEME_RESONANT_VALENCE_UNIFORM, THEME_DIALOGUE_PEAK_SILENT
-- `THEME_SEED_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_SEED_PEAK_ABSENT` — Wave 402: THEME_ACT2A_DENSITY_DROP, THEME_SEED_PEAK_ABSENT, THEME_PAYOFF_PEAK_ABSENT
-- `THEME_SHALLOW_RESONANCE` — Wave 307: shallow resonance, quiet scenes only, resonance burst
-- `THEME_SILENT_STRETCH` — Wave 223: THEME_SILENT_STRETCH
-- `THEME_SINGLE_KEYWORD_RELIANCE` — Wave 174: Opening silence, single-keyword reliance, climax silence
-- `THEME_SUBPLOT_ISOLATION` — Wave 208: Consecutive resonant surfeit, first-act resolution, subplot isolation
-- `THEME_SUSPENSE_CLUSTER_SILENT` — Wave 279: Dramatic-turn decoupled, negative-shift silent, suspense cluster silent
-- `THEME_SUSPENSE_RELEASE_SILENT` — Wave 321: peak-before-midpoint, raise-stakes silent, suspense-release silent
-- `THEME_UNRESOLVED_CLUE_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_UNRESOLVED_CLUE_DECOUPLED` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
-- `THEME_UNRESOLVED_CLUE_ZONE_IMBALANCE` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_accelerating_density_absent"></a>`THEME_ACCELERATING_DENSITY_ABSENT` — Wave 162: Midpoint silence, accelerating density, Act 3 dialectic
+- <a id="rule-theme_act1_density_drop"></a>`THEME_ACT1_DENSITY_DROP` — Wave 374: THEME_ACT1_DENSITY_DROP, THEME_CLOCK_PEAK_ABSENT, THEME_CHARGED_SCENE_SILENT
+- <a id="rule-theme_act2_desert"></a>`THEME_ACT2_DESERT` — Wave 174: Opening silence, single-keyword reliance, climax silence
+- <a id="rule-theme_act2a_density_drop"></a>`THEME_ACT2A_DENSITY_DROP` — Wave 402: THEME_ACT2A_DENSITY_DROP, THEME_SEED_PEAK_ABSENT, THEME_PAYOFF_PEAK_ABSENT
+- <a id="rule-theme_act2b_density_drop"></a>`THEME_ACT2B_DENSITY_DROP` — Wave 332: THEME_DEVELOPMENT_SCENE_DESERT, THEME_CURIOSITY_PEAK_ABSENT, THEME_ACT2B_DENSITY_DROP
+- <a id="rule-theme_act2b_resonant_causeless"></a>`THEME_ACT2B_RESONANT_CAUSELESS` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_act3_density_drop"></a>`THEME_ACT3_DENSITY_DROP` — Wave 360: THEME_ACT3_DENSITY_DROP, THEME_RELATIONSHIP_PEAK_ABSENT, THEME_DUAL_PEAK_ABSENT
+- <a id="rule-theme_back_heavy"></a>`THEME_BACK_HEAVY` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_charged_scene_silent"></a>`THEME_CHARGED_SCENE_SILENT` — Wave 374: THEME_ACT1_DENSITY_DROP, THEME_CLOCK_PEAK_ABSENT, THEME_CHARGED_SCENE_SILENT
+- <a id="rule-theme_clock_aftermath_silent"></a>`THEME_CLOCK_AFTERMATH_SILENT` — Wave 458: THEME_RELATIONSHIP_DECOUPLED, THEME_CLOCK_AFTERMATH_SILENT, THEME_ALL_RESONANCE_CAUSELESS
+- <a id="rule-theme_clock_resonance_absent"></a>`THEME_CLOCK_RESONANCE_ABSENT` — Wave 237: Revelation decoupled, clock resonance absent, relationship-shift decoupled
+- <a id="rule-theme_clock_scene_silent"></a>`THEME_CLOCK_SCENE_SILENT` — Wave 293: THEME_CLOCK_SCENE_SILENT
+- <a id="rule-theme_closing_quarter_silent"></a>`THEME_CLOSING_QUARTER_SILENT` — Wave 346: THEME_SUSPENSE_PEAK_ABSENT, THEME_LATE_DEBUT, THEME_CLOSING_QUARTER_SILENT
+- <a id="rule-theme_consecutive_resonant_surfeit"></a>`THEME_CONSECUTIVE_RESONANT_SURFEIT` — Wave 208: Consecutive resonant surfeit, first-act resolution, subplot isolation
+- <a id="rule-theme_curiosity_aftermath_silent"></a>`THEME_CURIOSITY_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_curiosity_decoupled"></a>`THEME_CURIOSITY_DECOUPLED` — Wave 265: Clue decoupled, curiosity decoupled, payoff decoupled
+- <a id="rule-theme_density_inversion"></a>`THEME_DENSITY_INVERSION` — Wave 174: Opening silence, single-keyword reliance, climax silence
+- <a id="rule-theme_development_scene_desert"></a>`THEME_DEVELOPMENT_SCENE_DESERT` — Wave 332: THEME_DEVELOPMENT_SCENE_DESERT, THEME_CURIOSITY_PEAK_ABSENT, THEME_ACT2B_DENSITY_DROP
+- <a id="rule-theme_dialectic_in_act3_absent"></a>`THEME_DIALECTIC_IN_ACT3_ABSENT` — Wave 162: Midpoint silence, accelerating density, Act 3 dialectic
+- <a id="rule-theme_dialogue_highlight_decoupled"></a>`THEME_DIALOGUE_HIGHLIGHT_DECOUPLED` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_dramatic_turn_aftermath_silent"></a>`THEME_DRAMATIC_TURN_AFTERMATH_SILENT` — Wave 430: THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_UNMOTIVATED, THEME_RESONANCE_EMOTIONALLY_LOPSIDED
+- <a id="rule-theme_dramatic_turn_decoupled"></a>`THEME_DRAMATIC_TURN_DECOUPLED` — Wave 279: Dramatic-turn decoupled, negative-shift silent, suspense cluster silent
+- <a id="rule-theme_dual_peak_absent"></a>`THEME_DUAL_PEAK_ABSENT` — Wave 360: THEME_ACT3_DENSITY_DROP, THEME_RELATIONSHIP_PEAK_ABSENT, THEME_DUAL_PEAK_ABSENT
+- <a id="rule-theme_dual_rise_decoupled"></a>`THEME_DUAL_RISE_DECOUPLED` — Wave 416: THEME_RESONANT_SINGLETON_RUN, THEME_PEAK_SUSPENSE_AFTERMATH_SILENT, THEME_DUAL_RISE_DECOUPLED
+- <a id="rule-theme_final_scene_silent"></a>`THEME_FINAL_SCENE_SILENT` — Wave 251: Final scene silent, positive shift silent, resonance clustering
+- <a id="rule-theme_first_act_resolution"></a>`THEME_FIRST_ACT_RESOLUTION` — Wave 208: Consecutive resonant surfeit, first-act resolution, subplot isolation
+- <a id="rule-theme_heavy_handed"></a>`THEME_HEAVY_HANDED` — Wave 148: Theme craft — heavy-handedness, dialectic, front-loading
+- <a id="rule-theme_high_suspense_aftermath_silent"></a>`THEME_HIGH_SUSPENSE_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_last_resonant_causeless"></a>`THEME_LAST_RESONANT_CAUSELESS` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_late_debut"></a>`THEME_LATE_DEBUT` — Wave 346: THEME_SUSPENSE_PEAK_ABSENT, THEME_LATE_DEBUT, THEME_CLOSING_QUARTER_SILENT
+- <a id="rule-theme_long_silent_stretch"></a>`THEME_LONG_SILENT_STRETCH` — Wave 430: THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_UNMOTIVATED, THEME_RESONANCE_EMOTIONALLY_LOPSIDED
+- <a id="rule-theme_midpoint_density_drop"></a>`THEME_MIDPOINT_DENSITY_DROP` — Wave 388: THEME_MIDPOINT_DENSITY_DROP, THEME_OPENING_IMAGE_SILENT, THEME_PROACTIVE_DECOUPLED
+- <a id="rule-theme_midpoint_resonant_causeless"></a>`THEME_MIDPOINT_RESONANT_CAUSELESS` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_midpoint_silent"></a>`THEME_MIDPOINT_SILENT` — Wave 162: Midpoint silence, accelerating density, Act 3 dialectic
+- <a id="rule-theme_negative_shift_silent"></a>`THEME_NEGATIVE_SHIFT_SILENT` — Wave 279: Dramatic-turn decoupled, negative-shift silent, suspense cluster silent
+- <a id="rule-theme_no_dialectic"></a>`THEME_NO_DIALECTIC` — Wave 148: Theme craft — heavy-handedness, dialectic, front-loading
+- <a id="rule-theme_opening_image_silent"></a>`THEME_OPENING_IMAGE_SILENT` — Wave 388: THEME_MIDPOINT_DENSITY_DROP, THEME_OPENING_IMAGE_SILENT, THEME_PROACTIVE_DECOUPLED
+- <a id="rule-theme_opening_silent"></a>`THEME_OPENING_SILENT` — Wave 174: Opening silence, single-keyword reliance, climax silence
+- <a id="rule-theme_orphaned"></a>`THEME_ORPHANED` — THEME_ORPHANED — theme set but no scene has any resonance at all
+- <a id="rule-theme_payoff_decoupled"></a>`THEME_PAYOFF_DECOUPLED` — Wave 265: Clue decoupled, curiosity decoupled, payoff decoupled
+- <a id="rule-theme_payoff_silent"></a>`THEME_PAYOFF_SILENT` — Wave 293: THEME_PAYOFF_SILENT
+- <a id="rule-theme_peak_before_midpoint"></a>`THEME_PEAK_BEFORE_MIDPOINT` — Wave 321: peak-before-midpoint, raise-stakes silent, suspense-release silent
+- <a id="rule-theme_poles_never_costaged"></a>`THEME_POLES_NEVER_COSTAGED` — Wave 223: THEME_POLES_NEVER_COSTAGED
+- <a id="rule-theme_positive_shift_silent"></a>`THEME_POSITIVE_SHIFT_SILENT` — Wave 251: Final scene silent, positive shift silent, resonance clustering
+- <a id="rule-theme_proactive_decoupled"></a>`THEME_PROACTIVE_DECOUPLED` — Wave 388: THEME_MIDPOINT_DENSITY_DROP, THEME_OPENING_IMAGE_SILENT, THEME_PROACTIVE_DECOUPLED
+- <a id="rule-theme_relationship_shift_aftermath_silent"></a>`THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_relationship_shift_decoupled"></a>`THEME_RELATIONSHIP_SHIFT_DECOUPLED` — Wave 237: Revelation decoupled, clock resonance absent, relationship-shift decoupled
+- <a id="rule-theme_resonance_burst"></a>`THEME_RESONANCE_BURST` — Wave 307: shallow resonance, quiet scenes only, resonance burst
+- <a id="rule-theme_resonance_clustering"></a>`THEME_RESONANCE_CLUSTERING` — Wave 251: Final scene silent, positive shift silent, resonance clustering
+- <a id="rule-theme_resonance_emotionally_inert"></a>`THEME_RESONANCE_EMOTIONALLY_INERT` — Wave 223: THEME_RESONANCE_EMOTIONALLY_INERT
+- <a id="rule-theme_resonant_aftermath_clock_void"></a>`THEME_RESONANT_AFTERMATH_CLOCK_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_aftermath_emotion_void"></a>`THEME_RESONANT_AFTERMATH_EMOTION_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_aftermath_relationship_void"></a>`THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_aftermath_suspense_void"></a>`THEME_RESONANT_AFTERMATH_SUSPENSE_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_aftermath_turn_void"></a>`THEME_RESONANT_AFTERMATH_TURN_VOID` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_clock_flat"></a>`THEME_RESONANT_CLOCK_FLAT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_cluster_flood"></a>`THEME_RESONANT_CLUSTER_FLOOD` — Wave 430: THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_UNMOTIVATED, THEME_RESONANCE_EMOTIONALLY_LOPSIDED
+- <a id="rule-theme_resonant_curiosity_flat"></a>`THEME_RESONANT_CURIOSITY_FLAT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_emotion_flat"></a>`THEME_RESONANT_EMOTION_FLAT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_resonant_valence_uniform"></a>`THEME_RESONANT_VALENCE_UNIFORM` — Wave 472: THEME_POSITIVE_EMOTION_DECOUPLED, THEME_RESONANT_VALENCE_UNIFORM, THEME_DIALOGUE_PEAK_SILENT
+- <a id="rule-theme_seed_aftermath_silent"></a>`THEME_SEED_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_seed_peak_absent"></a>`THEME_SEED_PEAK_ABSENT` — Wave 402: THEME_ACT2A_DENSITY_DROP, THEME_SEED_PEAK_ABSENT, THEME_PAYOFF_PEAK_ABSENT
+- <a id="rule-theme_shallow_resonance"></a>`THEME_SHALLOW_RESONANCE` — Wave 307: shallow resonance, quiet scenes only, resonance burst
+- <a id="rule-theme_silent_stretch"></a>`THEME_SILENT_STRETCH` — Wave 223: THEME_SILENT_STRETCH
+- <a id="rule-theme_single_keyword_reliance"></a>`THEME_SINGLE_KEYWORD_RELIANCE` — Wave 174: Opening silence, single-keyword reliance, climax silence
+- <a id="rule-theme_subplot_isolation"></a>`THEME_SUBPLOT_ISOLATION` — Wave 208: Consecutive resonant surfeit, first-act resolution, subplot isolation
+- <a id="rule-theme_suspense_cluster_silent"></a>`THEME_SUSPENSE_CLUSTER_SILENT` — Wave 279: Dramatic-turn decoupled, negative-shift silent, suspense cluster silent
+- <a id="rule-theme_suspense_release_silent"></a>`THEME_SUSPENSE_RELEASE_SILENT` — Wave 321: peak-before-midpoint, raise-stakes silent, suspense-release silent
+- <a id="rule-theme_unresolved_clue_aftermath_silent"></a>`THEME_UNRESOLVED_CLUE_AFTERMATH_SILENT` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_unresolved_clue_decoupled"></a>`THEME_UNRESOLVED_CLUE_DECOUPLED` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
+- <a id="rule-theme_unresolved_clue_zone_imbalance"></a>`THEME_UNRESOLVED_CLUE_ZONE_IMBALANCE` — Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER
 

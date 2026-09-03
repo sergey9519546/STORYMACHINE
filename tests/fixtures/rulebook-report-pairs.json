@@ -1,0 +1,742 @@
+[
+  {
+    "pass": "belief",
+    "rule": "BELIEF_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "belief",
+    "rule": "BELIEF_MIDPOINT_VOID"
+  },
+  {
+    "pass": "belief",
+    "rule": "BELIEF_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "belief",
+    "rule": "BELIEF_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "belief",
+    "rule": "BELIEF_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "belief",
+    "rule": "EXPOSITION_DUMP"
+  },
+  {
+    "pass": "belief",
+    "rule": "TOLD_BELIEF_DOMINATION"
+  },
+  {
+    "pass": "causality",
+    "rule": "ACT3_DISCHARGE_ABSENT"
+  },
+  {
+    "pass": "causality",
+    "rule": "ACTION_WITHOUT_CONSEQUENCE"
+  },
+  {
+    "pass": "causality",
+    "rule": "CAUSALITY_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "causality",
+    "rule": "CAUSALITY_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "causality",
+    "rule": "CAUSALITY_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "causality",
+    "rule": "CAUSAL_MIDPOINT_VOID"
+  },
+  {
+    "pass": "causality",
+    "rule": "CHEKHOV_GUN_UNFIRED"
+  },
+  {
+    "pass": "causality",
+    "rule": "CLUE_SEED_CLUSTER"
+  },
+  {
+    "pass": "causality",
+    "rule": "CONSEQUENCE_CHAIN_BREAK"
+  },
+  {
+    "pass": "causality",
+    "rule": "CURIOSITY_PEAK_NO_FOLLOWTHROUGH"
+  },
+  {
+    "pass": "causality",
+    "rule": "DRAMATIC_TURN_AFTERMATH_VOID"
+  },
+  {
+    "pass": "causality",
+    "rule": "DRAMATIC_TURN_CLUSTER"
+  },
+  {
+    "pass": "causality",
+    "rule": "DRAMATIC_TURN_NO_EMOTION"
+  },
+  {
+    "pass": "causality",
+    "rule": "DRAMATIC_TURN_RELATIONSHIP_VOID"
+  },
+  {
+    "pass": "causality",
+    "rule": "EMOTIONAL_NEUTRAL_RUN"
+  },
+  {
+    "pass": "causality",
+    "rule": "GOAL_WITHOUT_OPPOSITION"
+  },
+  {
+    "pass": "causality",
+    "rule": "SEED_AFTERMATH_CURIOSITY_VOID"
+  },
+  {
+    "pass": "causality",
+    "rule": "SEED_SCENE_EMOTION_VOID"
+  },
+  {
+    "pass": "causality",
+    "rule": "SETUP_PAYOFF_IMBALANCE"
+  },
+  {
+    "pass": "causality",
+    "rule": "SUSPENSE_PLATEAU_FLATLINE"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_EMOTIONAL_FLATLINE"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_EMOTIONAL_MONOTONE"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_FINAL_ACT_CHARACTER_STATIC"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_MIDPOINT_RELATIONAL_VOID"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_OPENING_VOID"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_POSITIVE_MIDPOINT_ABSENT"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_SEED_EMOTIONAL_AFTERMATH_VOID"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_STALL_IN_ACT2"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_SUSPENSE_FRONT_LOADED"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "ARC_TURN_EMOTION_ABSENT"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "CHARACTER_LATE_INTRODUCTION"
+  },
+  {
+    "pass": "character-arc",
+    "rule": "SECONDARY_CHARACTER_VOID"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_ACT3_DEFLATION"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_CLOSING_SUSPENSE_VOID"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_DRAMATIC_TURN_VOID"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_MIDPOINT_ABSENT"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "conflict",
+    "rule": "CONFLICT_SUSPENSE_FRONT_LOADED"
+  },
+  {
+    "pass": "conflict",
+    "rule": "FLAT_SUSPENSE_ARC"
+  },
+  {
+    "pass": "conflict",
+    "rule": "NO_REVERSALS_LONG_STORY"
+  },
+  {
+    "pass": "conflict",
+    "rule": "TOO_MANY_OPEN_CONFLICTS"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_NEGATION_BACK_LOADED"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_NEGATION_FLOOD"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_RETROSPECTIVE_FLOOD"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_SPARSE_RUN"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "DIALOGUE_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "INTERRUPTION_VOID"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "LONG_SPEECH_DOMINANCE"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "PUNCTUATION_FLATLINE"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "QUESTION_DODGE"
+  },
+  {
+    "pass": "dialogue",
+    "rule": "VOCATIVE_NAME_OVERUSE"
+  },
+  {
+    "pass": "intention",
+    "rule": "ENTROPY_CLUSTER"
+  },
+  {
+    "pass": "intention",
+    "rule": "ENTROPY_SPIKE_MISPLACED"
+  },
+  {
+    "pass": "intention",
+    "rule": "GOAL_INVERSION_ABSENT"
+  },
+  {
+    "pass": "intention",
+    "rule": "INTENTION_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "intention",
+    "rule": "INTENTION_DISCOVERY_ABSENT"
+  },
+  {
+    "pass": "intention",
+    "rule": "INTENTION_INVISIBLE"
+  },
+  {
+    "pass": "intention",
+    "rule": "INTENTION_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "intention",
+    "rule": "INTENTION_REACTIVE_CLIMAX"
+  },
+  {
+    "pass": "intention",
+    "rule": "INTENTION_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "intention",
+    "rule": "INTENTION_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_ACT2A_VOID"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_CLOCK_AFTERMATH_ABSENT"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_DESERT_RUN"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_EMOTIONAL_RECOIL_ABSENT"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_EMOTION_DECOUPLED"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_MIDPOINT_VOID"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_RELATIONSHIP_VOID"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_REVELATION_ABSENT"
+  },
+  {
+    "pass": "intention",
+    "rule": "PROACTIVE_SUSPENSE_AFTERMATH_ABSENT"
+  },
+  {
+    "pass": "intention",
+    "rule": "SEED_CLOCKLESS"
+  },
+  {
+    "pass": "intention",
+    "rule": "SEED_EMOTIONAL_DECOUPLED"
+  },
+  {
+    "pass": "intention",
+    "rule": "SEED_MIDPOINT_VOID"
+  },
+  {
+    "pass": "intention",
+    "rule": "SEED_PEAK_UNCAUSED"
+  },
+  {
+    "pass": "intention",
+    "rule": "ZERO_ENTROPY_SCENE"
+  },
+  {
+    "pass": "originality",
+    "rule": "CAPS_EMPHASIS_OVERUSE"
+  },
+  {
+    "pass": "originality",
+    "rule": "DIALOGUE_LONG_SPEECH_FLOOD"
+  },
+  {
+    "pass": "originality",
+    "rule": "EMOTIONAL_ARC_PLATEAU"
+  },
+  {
+    "pass": "originality",
+    "rule": "ORIGINALITY_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "originality",
+    "rule": "ORIGINALITY_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "originality",
+    "rule": "PURPOSE_BOOKEND_REPEAT"
+  },
+  {
+    "pass": "originality",
+    "rule": "PURPOSE_CONSECUTIVE_RUN"
+  },
+  {
+    "pass": "originality",
+    "rule": "SCENE_SHAPE_TEMPLATING"
+  },
+  {
+    "pass": "pacing",
+    "rule": "PACING_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "pacing",
+    "rule": "PACING_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "pacing",
+    "rule": "PACING_PLATEAU"
+  },
+  {
+    "pass": "pacing",
+    "rule": "PACING_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "pacing",
+    "rule": "PACING_SUSPENSE_EARLY_PEAK"
+  },
+  {
+    "pass": "pacing",
+    "rule": "PACING_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "pacing",
+    "rule": "PEAK_LENGTH_MISPLACED"
+  },
+  {
+    "pass": "pacing",
+    "rule": "SEED_AFTERMATH_EMOTION_FLAT"
+  },
+  {
+    "pass": "pacing",
+    "rule": "SUSPENSE_CLOSING_ZONE_ABSENT"
+  },
+  {
+    "pass": "pacing",
+    "rule": "SUSPENSE_FLATLINE_RUN"
+  },
+  {
+    "pass": "pacing",
+    "rule": "SUSPENSE_MIDPOINT_TROUGH"
+  },
+  {
+    "pass": "pacing",
+    "rule": "SUSPENSE_PEAK_SCENE_BLOAT"
+  },
+  {
+    "pass": "pacing",
+    "rule": "TURN_AFTERMATH_EMOTION_FLAT"
+  },
+  {
+    "pass": "payoff",
+    "rule": "CLUE_DROUGHT"
+  },
+  {
+    "pass": "payoff",
+    "rule": "CLUE_GLUT"
+  },
+  {
+    "pass": "payoff",
+    "rule": "CLUE_SEED_EMOTION_FLAT"
+  },
+  {
+    "pass": "payoff",
+    "rule": "CLUE_SEED_FRONT_LOADED"
+  },
+  {
+    "pass": "payoff",
+    "rule": "CLUE_SEED_MIDPOINT_VOID"
+  },
+  {
+    "pass": "payoff",
+    "rule": "CLUE_SEED_RELATIONSHIP_DECOUPLED"
+  },
+  {
+    "pass": "payoff",
+    "rule": "CONCURRENT_THREAD_OVERLOAD"
+  },
+  {
+    "pass": "payoff",
+    "rule": "PAYOFF_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "payoff",
+    "rule": "PAYOFF_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "payoff",
+    "rule": "PAYOFF_ORPHAN_RATE"
+  },
+  {
+    "pass": "payoff",
+    "rule": "PAYOFF_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "payoff",
+    "rule": "SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "payoff",
+    "rule": "SEED_EMOTIONAL_AFTERMATH_ABSENT"
+  },
+  {
+    "pass": "payoff",
+    "rule": "SETUP_BURST"
+  },
+  {
+    "pass": "payoff",
+    "rule": "SETUP_CLUSTERING"
+  },
+  {
+    "pass": "payoff",
+    "rule": "SETUP_PAYOFF_DEAD_RUN"
+  },
+  {
+    "pass": "relationship-arc",
+    "rule": "NO_RELATIONSHIP_MOVEMENT"
+  },
+  {
+    "pass": "relationship-arc",
+    "rule": "RELATIONAL_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "relationship-arc",
+    "rule": "RELATIONAL_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "relationship-arc",
+    "rule": "RELATIONAL_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "relationship-arc",
+    "rule": "RELATIONAL_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "relationship-arc",
+    "rule": "RELATIONSHIP_ACT1_VOID"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "ACTION_CONSECUTIVE_LONG_RUN"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "ACTION_SHORTEST_OUTLIER"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "OPEN_THREAD_SIGNAL_DROUGHT_RUN"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "RHYTHM_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "RHYTHM_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "SEED_SIGNAL_DROUGHT_RUN"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "SIMULTANEOUS_ACTION_ABSENT"
+  },
+  {
+    "pass": "rhythm",
+    "rule": "VISUAL_TEXTURE_ABSENT"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT1_WARMTH_ABSENT"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT2A_CURIOSITY_VOID"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT2A_EMOTIONAL_FLATLINE"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT2A_SUSPENSE_VOID"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT2B_EMOTIONAL_FLATLINE"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT2B_SUSPENSE_VOID"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT2_BOUNDARY_WEAK"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT2_DEAD_ZONE"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT3_CURIOSITY_SPIKE_ABSENT"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT3_EMOTIONAL_FLATLINE"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT3_SCENE_EXCESS"
+  },
+  {
+    "pass": "structure",
+    "rule": "ACT3_SUSPENSE_VOID"
+  },
+  {
+    "pass": "structure",
+    "rule": "CLIMAX_TOO_EARLY"
+  },
+  {
+    "pass": "structure",
+    "rule": "DARK_NIGHT_ABSENT"
+  },
+  {
+    "pass": "structure",
+    "rule": "DRAMATIC_VACUUM_STRETCH"
+  },
+  {
+    "pass": "structure",
+    "rule": "EMOTIONAL_ARC_UNIFORM"
+  },
+  {
+    "pass": "structure",
+    "rule": "EMOTIONAL_OPENING_NEUTRAL"
+  },
+  {
+    "pass": "structure",
+    "rule": "FALSE_CLIMAX"
+  },
+  {
+    "pass": "structure",
+    "rule": "FINAL_IMAGE_WEAK"
+  },
+  {
+    "pass": "structure",
+    "rule": "MIDPOINT_CURIOSITY_VOID"
+  },
+  {
+    "pass": "structure",
+    "rule": "MIDPOINT_EMOTIONAL_FLATLINE"
+  },
+  {
+    "pass": "structure",
+    "rule": "MIDPOINT_REVERSAL_ABSENT"
+  },
+  {
+    "pass": "structure",
+    "rule": "MIDPOINT_SUSPENSE_VOID"
+  },
+  {
+    "pass": "structure",
+    "rule": "NO_REVERSALS"
+  },
+  {
+    "pass": "structure",
+    "rule": "PURPOSE_CLIMAX_ABSENT"
+  },
+  {
+    "pass": "structure",
+    "rule": "PURPOSE_MONOTONE_RUN"
+  },
+  {
+    "pass": "structure",
+    "rule": "REVELATION_DROUGHT"
+  },
+  {
+    "pass": "structure",
+    "rule": "STRUCTURE_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "structure",
+    "rule": "STRUCTURE_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "structure",
+    "rule": "STRUCTURE_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "structure",
+    "rule": "STRUCTURE_SUSPENSE_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "structure",
+    "rule": "TENSION_FRONTLOADED_COM"
+  },
+  {
+    "pass": "structure",
+    "rule": "TRY_FAIL_RHYTHM_ABSENT"
+  },
+  {
+    "pass": "structure",
+    "rule": "WEAK_MIDPOINT"
+  },
+  {
+    "pass": "voice",
+    "rule": "DIALOGUE_ASSERTION_RUN"
+  },
+  {
+    "pass": "voice",
+    "rule": "TONAL_REGISTER_COLLAPSE_ACT2"
+  },
+  {
+    "pass": "voice",
+    "rule": "UNRESOLVED_CLUE_DROUGHT_RUN"
+  },
+  {
+    "pass": "voice",
+    "rule": "VOICE_CURIOSITY_ZONE_IMBALANCE"
+  },
+  {
+    "pass": "voice",
+    "rule": "VOICE_OPEN_THREAD_DROUGHT_RUN"
+  },
+  {
+    "pass": "voice",
+    "rule": "VOICE_SEED_DROUGHT_RUN"
+  },
+  {
+    "pass": "voice",
+    "rule": "VOICE_SUSPENSE_ZONE_IMBALANCE"
+  }
+]

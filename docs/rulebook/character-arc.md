@@ -8,9 +8,9 @@ Wave 1177 additions (continues the deliberate pivot away from sequence/aftermath
 
 Rules named in this wave's header:
 
-- `ARC_HIGHLIGHT_BACK_LOADED`
-- `ARC_RELATIONAL_EMOTION_DECOUPLED`
-- `ARC_RELATIONAL_REVELATION_DECOUPLED`
+- <a id="rule-arc_highlight_back_loaded"></a>`ARC_HIGHLIGHT_BACK_LOADED`
+- <a id="rule-arc_relational_emotion_decoupled"></a>`ARC_RELATIONAL_EMOTION_DECOUPLED`
+- <a id="rule-arc_relational_revelation_decoupled"></a>`ARC_RELATIONAL_REVELATION_DECOUPLED`
 
 ## Wave 1163
 
@@ -18,9 +18,9 @@ Wave 1163 additions: after Wave 1149, the positive-emotion trigger stood at thre
 
 Rules named in this wave's header:
 
-- `ARC_NEGATIVE_SUSPENSE_AFTERMATH_VOID`
-- `ARC_POSITIVE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ARC_POSITIVE_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_negative_suspense_aftermath_void"></a>`ARC_NEGATIVE_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_positive_dialogue_highlight_aftermath_void"></a>`ARC_POSITIVE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_positive_staging_aftermath_void"></a>`ARC_POSITIVE_STAGING_AFTERMATH_VOID`
 
 ## Wave 1149
 
@@ -28,10 +28,10 @@ Wave 1149 additions: with all eight main triggers (dramaticTurn, clockRaised, ra
 
 Rules named in this wave's header:
 
-- `ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID`
-- `ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID`
-- `ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID`
-- `ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_negative_curiosity_aftermath_void"></a>`ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_negative_relational_aftermath_void"></a>`ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_positive_curiosity_aftermath_void"></a>`ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_positive_suspense_aftermath_void"></a>`ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1135
 
@@ -39,9 +39,9 @@ Wave 1135 additions: re-verifying against actual rule: names (not just a channel
 
 Rules named in this wave's header:
 
-- `ARC_SUSPENSE_RECURRENCE_AFTERMATH_VOID`
-- `ARC_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ARC_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_suspense_recurrence_aftermath_void"></a>`ARC_SUSPENSE_RECURRENCE_AFTERMATH_VOID`
+- <a id="rule-arc_turn_dialogue_highlight_aftermath_void"></a>`ARC_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_turn_staging_aftermath_void"></a>`ARC_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1121
 
@@ -49,10 +49,10 @@ Wave 1121 additions: with the six main triggers exhausted, this wave advances tw
 
 Rules named in this wave's header:
 
-- `ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID`
-- `ARC_SUSPENSE_STAGING_AFTERMATH_VOID`
-- `ARC_TURN_CURIOSITY_AFTERMATH_VOID`
-- `ARC_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_dramatic_turn_relational_aftermath_void"></a>`ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_suspense_staging_aftermath_void"></a>`ARC_SUSPENSE_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_turn_curiosity_aftermath_void"></a>`ARC_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_turn_suspense_aftermath_void"></a>`ARC_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1107
 
@@ -60,9 +60,9 @@ Wave 1107 additions: ARC_REVELATION_STAGING_AFTERMATH_VOID gives revelation its 
 
 Rules named in this wave's header:
 
-- `ARC_REVELATION_STAGING_AFTERMATH_VOID`
-- `ARC_SEED_RELATIONAL_AFTERMATH_VOID`
-- `ARC_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_revelation_staging_aftermath_void"></a>`ARC_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_seed_relational_aftermath_void"></a>`ARC_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_seed_staging_aftermath_void"></a>`ARC_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 1093
 
@@ -70,9 +70,9 @@ Wave 1093 additions: ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID gives heavy unres
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_clock_dialogue_highlight_aftermath_void"></a>`ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_open_thread_relational_aftermath_void"></a>`ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_revelation_dialogue_highlight_aftermath_void"></a>`ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1079
 
@@ -80,9 +80,9 @@ Wave 1079 additions: ARC_STAKES_STAGING_AFTERMATH_VOID gives raise_stakes its si
 
 Rules named in this wave's header:
 
-- `ARC_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ARC_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `ARC_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_open_thread_dialogue_highlight_aftermath_void"></a>`ARC_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_payoff_dialogue_highlight_aftermath_void"></a>`ARC_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_stakes_staging_aftermath_void"></a>`ARC_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1065
 
@@ -90,9 +90,9 @@ Wave 1065 additions: with seededClueIds, suspenseDelta-as-trigger, and unresolve
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_clock_suspense_aftermath_void"></a>`ARC_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_payoff_suspense_aftermath_void"></a>`ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_stakes_dialogue_highlight_aftermath_void"></a>`ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1051
 
@@ -100,9 +100,9 @@ Wave 1051 additions: with revelation, raise_stakes, payoffSetupIds, and clockRai
 
 Rules named in this wave's header:
 
-- `ARC_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `ARC_SEED_SUSPENSE_AFTERMATH_VOID`
-- `ARC_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-arc_open_thread_suspense_aftermath_void"></a>`ARC_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_seed_suspense_aftermath_void"></a>`ARC_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_suspense_dialogue_highlight_aftermath_void"></a>`ARC_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1037
 
@@ -110,9 +110,9 @@ Wave 1037 additions: ARC_STAKES_EMOTIONAL_AFTERMATH_VOID gives raise_stakes a fo
 
 Rules named in this wave's header:
 
-- `ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `ARC_REVELATION_SUSPENSE_AFTERMATH_VOID`
-- `ARC_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_open_thread_curiosity_aftermath_void"></a>`ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_revelation_suspense_aftermath_void"></a>`ARC_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_stakes_emotional_aftermath_void"></a>`ARC_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1023
 
@@ -120,9 +120,9 @@ Wave 1023 additions: with clock and payoff now at four channels each, this wave 
 
 Rules named in this wave's header:
 
-- `ARC_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `ARC_STAKES_SUSPENSE_AFTERMATH_VOID`
-- `ARC_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_revelation_curiosity_aftermath_void"></a>`ARC_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_stakes_suspense_aftermath_void"></a>`ARC_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-arc_suspense_emotional_aftermath_void"></a>`ARC_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1009
 
@@ -130,9 +130,9 @@ Wave 1009 additions: this pass's aftermath-void family now covers most triggers 
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID`
-- `ARC_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_clock_emotional_aftermath_void"></a>`ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_payoff_relational_aftermath_void"></a>`ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_seed_curiosity_aftermath_void"></a>`ARC_SEED_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 995
 
@@ -140,9 +140,9 @@ Wave 995 additions: re-auditing the cluster/drought inventory turned up two cons
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_ZONE_IMBALANCE`
-- `ARC_HIGHLIGHT_ZONE_IMBALANCE`
-- `ARC_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_clock_zone_imbalance"></a>`ARC_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-arc_highlight_zone_imbalance"></a>`ARC_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-arc_stakes_curiosity_aftermath_void"></a>`ARC_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 981
 
@@ -150,9 +150,9 @@ Wave 981 additions: continuing the aftermath-void mode with three trigger/output
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_STAGING_AFTERMATH_VOID`
-- `ARC_PAYOFF_STAGING_AFTERMATH_VOID`
-- `ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_clock_staging_aftermath_void"></a>`ARC_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_payoff_staging_aftermath_void"></a>`ARC_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_suspense_relational_aftermath_void"></a>`ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 967
 
@@ -160,9 +160,9 @@ Wave 967 additions: with the underweight/bloat (zone-imbalance) mode now saturat
 
 Rules named in this wave's header:
 
-- `ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `ARC_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_payoff_emotional_aftermath_void"></a>`ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_revelation_emotional_aftermath_void"></a>`ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_stakes_relational_aftermath_void"></a>`ARC_STAKES_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 953
 
@@ -170,9 +170,9 @@ Wave 953 additions: with arc's valence/delta/purpose/clue-array signals now satu
 
 Rules named in this wave's header:
 
-- `ARC_RELATIONAL_ZONE_IMBALANCE`
-- `ARC_REVELATION_ZONE_IMBALANCE`
-- `ARC_TURN_ZONE_IMBALANCE`
+- <a id="rule-arc_relational_zone_imbalance"></a>`ARC_RELATIONAL_ZONE_IMBALANCE`
+- <a id="rule-arc_revelation_zone_imbalance"></a>`ARC_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-arc_turn_zone_imbalance"></a>`ARC_TURN_ZONE_IMBALANCE`
 
 ## Wave 939
 
@@ -180,9 +180,9 @@ Wave 939 additions: continuing the checkZoneImbalance rollout, this wave extends
 
 Rules named in this wave's header:
 
-- `ARC_OPEN_THREAD_ZONE_IMBALANCE`
-- `ARC_PAYOFF_ZONE_IMBALANCE`
-- `ARC_SEED_ZONE_IMBALANCE`
+- <a id="rule-arc_open_thread_zone_imbalance"></a>`ARC_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-arc_payoff_zone_imbalance"></a>`ARC_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-arc_seed_zone_imbalance"></a>`ARC_SEED_ZONE_IMBALANCE`
 
 ## Wave 925
 
@@ -190,9 +190,9 @@ Wave 925 additions: with every purpose enum value and both emotion valences now 
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_DELTA_ZONE_IMBALANCE`
-- `ARC_CURIOSITY_ZONE_IMBALANCE`
-- `ARC_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-arc_clock_delta_zone_imbalance"></a>`ARC_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-arc_curiosity_zone_imbalance"></a>`ARC_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-arc_suspense_zone_imbalance"></a>`ARC_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 911
 
@@ -200,9 +200,9 @@ Wave 911 additions: every purpose enum value except 'revelation' has now been au
 
 Rules named in this wave's header:
 
-- `ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `ARC_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `ARC_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-arc_negative_emotion_zone_imbalance"></a>`ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-arc_positive_emotion_zone_imbalance"></a>`ARC_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-arc_revelation_purpose_zone_imbalance"></a>`ARC_REVELATION_PURPOSE_ZONE_IMBALANCE`
 
 ## Wave 897
 
@@ -210,9 +210,9 @@ Wave 897 additions (opens the twenty-third rotation cycle): purpose === 'revelat
 
 Rules named in this wave's header:
 
-- `ARC_REVELATION_PURPOSE_DROUGHT_RUN`
-- `ARC_REVELATION_PURPOSE_ZONE_CLUSTER`
-- `ARC_STAKES_ZONE_IMBALANCE`
+- <a id="rule-arc_revelation_purpose_drought_run"></a>`ARC_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-arc_revelation_purpose_zone_cluster"></a>`ARC_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-arc_stakes_zone_imbalance"></a>`ARC_STAKES_ZONE_IMBALANCE`
 
 ## Wave 883
 
@@ -220,9 +220,9 @@ Wave 883 additions: continuing the checkZoneImbalance rollout begun in Wave 869,
 
 Rules named in this wave's header:
 
-- `ARC_COMPLICATE_ZONE_IMBALANCE`
-- `ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `ARC_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-arc_complicate_zone_imbalance"></a>`ARC_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-arc_introduce_conflict_zone_imbalance"></a>`ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-arc_turning_point_zone_imbalance"></a>`ARC_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 869
 
@@ -230,9 +230,9 @@ Wave 869 additions: with every primary purpose value now trio-complete via check
 
 Rules named in this wave's header:
 
-- `ARC_CLIMAX_ZONE_IMBALANCE`
-- `ARC_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-arc_climax_zone_imbalance"></a>`ARC_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-arc_establish_world_zone_imbalance"></a>`ARC_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-arc_resolution_purpose_zone_imbalance"></a>`ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE`
 
 ## Wave 855
 
@@ -240,10 +240,10 @@ Wave 855 additions: ARC_CLIMAX_DROUGHT_RUN (run-based × purpose === 'climax' ab
 
 Rules named in this wave's header:
 
-- `ARC_CLIMAX_DROUGHT_RUN`
-- `ARC_RESOLUTION_ABSENT`
-- `ARC_RESOLUTION_PURPOSE_DROUGHT_RUN`
-- `ARC_RESOLUTION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-arc_climax_drought_run"></a>`ARC_CLIMAX_DROUGHT_RUN`
+- <a id="rule-arc_resolution_absent"></a>`ARC_RESOLUTION_ABSENT`
+- <a id="rule-arc_resolution_purpose_drought_run"></a>`ARC_RESOLUTION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-arc_resolution_purpose_zone_cluster"></a>`ARC_RESOLUTION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 841
 
@@ -251,10 +251,10 @@ Wave 841 additions: ARC_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose === 'e
 
 Rules named in this wave's header:
 
-- `ARC_CLIMAX_VOID`
-- `ARC_CLIMAX_ZONE_CLUSTER`
-- `ARC_COMPLICATE_DROUGHT_RUN`
-- `ARC_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-arc_climax_void"></a>`ARC_CLIMAX_VOID`
+- <a id="rule-arc_climax_zone_cluster"></a>`ARC_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-arc_complicate_drought_run"></a>`ARC_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-arc_establish_world_drought_run"></a>`ARC_ESTABLISH_WORLD_DROUGHT_RUN`
 
 ## Wave 827
 
@@ -262,9 +262,9 @@ Wave 827 additions: ARC_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose ===
 
 Rules named in this wave's header:
 
-- `ARC_COMPLICATE_ZONE_CLUSTER`
-- `ARC_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `ARC_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-arc_complicate_zone_cluster"></a>`ARC_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-arc_establish_world_zone_cluster"></a>`ARC_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-arc_introduce_conflict_drought_run"></a>`ARC_INTRODUCE_CONFLICT_DROUGHT_RUN`
 
 ## Wave 813
 
@@ -272,11 +272,11 @@ Wave 813 additions: ARC_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing × em
 
 Rules named in this wave's header:
 
-- `ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `ARC_PEAK_POSITIVE_UNCAUSED`
-- `ARC_POSITIVE_EMOTION_DROUGHT_RUN`
-- `ARC_POSITIVE_EMOTION_RUN`
-- `ARC_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-arc_introduce_conflict_zone_cluster"></a>`ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-arc_peak_positive_uncaused"></a>`ARC_PEAK_POSITIVE_UNCAUSED`
+- <a id="rule-arc_positive_emotion_drought_run"></a>`ARC_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-arc_positive_emotion_run"></a>`ARC_POSITIVE_EMOTION_RUN`
+- <a id="rule-arc_positive_emotion_zone_cluster"></a>`ARC_POSITIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 799
 
@@ -284,10 +284,10 @@ Wave 799 additions: ARC_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShif
 
 Rules named in this wave's header:
 
-- `ARC_CURIOSITY_ZONE_CLUSTER`
-- `ARC_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `ARC_TURNING_POINT_DROUGHT_RUN`
-- `ARC_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-arc_curiosity_zone_cluster"></a>`ARC_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-arc_negative_emotion_drought_run"></a>`ARC_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-arc_turning_point_drought_run"></a>`ARC_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-arc_turning_point_zone_cluster"></a>`ARC_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 785
 
@@ -295,10 +295,10 @@ Wave 785 additions: ARC_REVELATION_DROUGHT_RUN (run-based × revelation absence 
 
 Rules named in this wave's header:
 
-- `ARC_NEGATIVE_EMOTION_RUN`
-- `ARC_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `ARC_REVELATION_DROUGHT_RUN`
-- `ARC_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-arc_negative_emotion_run"></a>`ARC_NEGATIVE_EMOTION_RUN`
+- <a id="rule-arc_negative_emotion_zone_cluster"></a>`ARC_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-arc_revelation_drought_run"></a>`ARC_REVELATION_DROUGHT_RUN`
+- <a id="rule-arc_revelation_peak_uncaused"></a>`ARC_REVELATION_PEAK_UNCAUSED`
 
 ## Wave 771
 
@@ -306,10 +306,10 @@ Wave 771 additions: ARC_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-
 
 Rules named in this wave's header:
 
-- `ARC_REVELATION_LATE_CLUSTER`
-- `ARC_REVELATION_ZONE_CLUSTER`
-- `ARC_STAKES_ZONE_CLUSTER`
-- `ARC_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-arc_revelation_late_cluster"></a>`ARC_REVELATION_LATE_CLUSTER`
+- <a id="rule-arc_revelation_zone_cluster"></a>`ARC_REVELATION_ZONE_CLUSTER`
+- <a id="rule-arc_stakes_zone_cluster"></a>`ARC_STAKES_ZONE_CLUSTER`
+- <a id="rule-arc_suspense_peak_uncaused"></a>`ARC_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 757
 
@@ -317,11 +317,11 @@ Wave 757 additions: ARC_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDe
 
 Rules named in this wave's header:
 
-- `ARC_EMOTION_CONCENTRATION`
-- `ARC_EMOTION_ZONE_CLUSTER`
-- `ARC_EMOTIONAL_DROUGHT_RUN`
-- `ARC_STAKES_DROUGHT_RUN`
-- `ARC_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-arc_emotion_concentration"></a>`ARC_EMOTION_CONCENTRATION`
+- <a id="rule-arc_emotion_zone_cluster"></a>`ARC_EMOTION_ZONE_CLUSTER`
+- <a id="rule-arc_emotional_drought_run"></a>`ARC_EMOTIONAL_DROUGHT_RUN`
+- <a id="rule-arc_stakes_drought_run"></a>`ARC_STAKES_DROUGHT_RUN`
+- <a id="rule-arc_suspense_zone_cluster"></a>`ARC_SUSPENSE_ZONE_CLUSTER`
 
 ## Wave 743
 
@@ -329,9 +329,9 @@ Wave 743 additions: ARC_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × pu
 
 Rules named in this wave's header:
 
-- `ARC_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `ARC_CLOCK_ZONE_CLUSTER`
-- `ARC_TURN_DROUGHT_RUN`
+- <a id="rule-arc_character_moment_zone_cluster"></a>`ARC_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-arc_clock_zone_cluster"></a>`ARC_CLOCK_ZONE_CLUSTER`
+- <a id="rule-arc_turn_drought_run"></a>`ARC_TURN_DROUGHT_RUN`
 
 ## Wave 729
 
@@ -339,10 +339,10 @@ Wave 729 additions: ARC_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresol
 
 Rules named in this wave's header:
 
-- `ARC_CHARACTER_MOMENT_DROUGHT_RUN`
-- `ARC_CURIOSITY_PEAK_RELATIONAL_VOID`
-- `ARC_CURIOSITY_PEAK_UNCAUSED`
-- `ARC_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-arc_character_moment_drought_run"></a>`ARC_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-arc_curiosity_peak_relational_void"></a>`ARC_CURIOSITY_PEAK_RELATIONAL_VOID`
+- <a id="rule-arc_curiosity_peak_uncaused"></a>`ARC_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-arc_open_thread_zone_cluster"></a>`ARC_OPEN_THREAD_ZONE_CLUSTER`
 
 ## Wave 715
 
@@ -350,9 +350,9 @@ Wave 715 additions (built on the shared checks library): ARC_RESOLUTION_DROUGHT_
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_DELTA_DROUGHT_RUN`
-- `ARC_OPEN_THREAD_PEAK_UNCAUSED`
-- `ARC_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-arc_clock_delta_drought_run"></a>`ARC_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-arc_open_thread_peak_uncaused"></a>`ARC_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-arc_resolution_drought_run"></a>`ARC_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 701
 
@@ -360,10 +360,10 @@ Wave 701 additions (built on the shared checks library): ARC_STAGING_ZONE_CLUSTE
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_DELTA_ZONE_CLUSTER`
-- `ARC_CLOCK_DROUGHT_RUN`
-- `ARC_SEED_PEAK_UNCAUSED`
-- `ARC_STAGING_ZONE_CLUSTER`
+- <a id="rule-arc_clock_delta_zone_cluster"></a>`ARC_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-arc_clock_drought_run"></a>`ARC_CLOCK_DROUGHT_RUN`
+- <a id="rule-arc_seed_peak_uncaused"></a>`ARC_SEED_PEAK_UNCAUSED`
+- <a id="rule-arc_staging_zone_cluster"></a>`ARC_STAGING_ZONE_CLUSTER`
 
 ## Wave 687
 
@@ -371,9 +371,9 @@ Wave 687 additions (built on the shared checks library): ARC_PAYOFF_PEAK_UNCAUSE
 
 Rules named in this wave's header:
 
-- `ARC_HIGHLIGHT_ZONE_CLUSTER`
-- `ARC_PAYOFF_PEAK_UNCAUSED`
-- `ARC_STAGING_DROUGHT_RUN`
+- <a id="rule-arc_highlight_zone_cluster"></a>`ARC_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-arc_payoff_peak_uncaused"></a>`ARC_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-arc_staging_drought_run"></a>`ARC_STAGING_DROUGHT_RUN`
 
 ## Wave 673
 
@@ -381,9 +381,9 @@ Wave 673 additions (built on the shared checks library, audit M2.2): ARC_CLOCK_D
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_DELTA_PEAK_UNCAUSED`
-- `ARC_HIGHLIGHT_DROUGHT_RUN`
-- `ARC_SEED_ZONE_CLUSTER`
+- <a id="rule-arc_clock_delta_peak_uncaused"></a>`ARC_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-arc_highlight_drought_run"></a>`ARC_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-arc_seed_zone_cluster"></a>`ARC_SEED_ZONE_CLUSTER`
 
 ## Wave 659
 
@@ -391,9 +391,9 @@ Wave 659 additions (built on the shared checks library, audit M2.2): ARC_STAGING
 
 Rules named in this wave's header:
 
-- `ARC_OPEN_THREAD_DROUGHT_RUN`
-- `ARC_PAYOFF_ZONE_CLUSTER`
-- `ARC_STAGING_PEAK_UNCAUSED`
+- <a id="rule-arc_open_thread_drought_run"></a>`ARC_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-arc_payoff_zone_cluster"></a>`ARC_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-arc_staging_peak_uncaused"></a>`ARC_STAGING_PEAK_UNCAUSED`
 
 ## Wave 645
 
@@ -401,9 +401,9 @@ Wave 645 additions (built on the shared checks library, audit M2.2): ARC_HIGHLIG
 
 Rules named in this wave's header:
 
-- `ARC_HIGHLIGHT_PEAK_UNCAUSED`
-- `ARC_OPEN_THREAD_CURIOSITY_DECOUPLED`
-- `ARC_SEED_DROUGHT_RUN`
+- <a id="rule-arc_highlight_peak_uncaused"></a>`ARC_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-arc_open_thread_curiosity_decoupled"></a>`ARC_OPEN_THREAD_CURIOSITY_DECOUPLED`
+- <a id="rule-arc_seed_drought_run"></a>`ARC_SEED_DROUGHT_RUN`
 
 ## Wave 631
 
@@ -411,9 +411,9 @@ Wave 631 additions (built on the shared checks library, audit M2.2): ARC_DIALOGU
 
 Rules named in this wave's header:
 
-- `ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED`
-- `ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
-- `ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-arc_dialogue_highlight_staging_decoupled"></a>`ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED`
+- <a id="rule-arc_dialogue_highlight_zone_imbalance"></a>`ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-arc_open_thread_staging_aftermath_void"></a>`ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID`
 
 ## Wave 617
 
@@ -421,9 +421,9 @@ Wave 617 additions (built on the shared checks library, audit M2.2): PAYOFF_VISU
 
 Rules named in this wave's header:
 
-- `ARC_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PAYOFF_VISUAL_BEAT_DECOUPLED`
+- <a id="rule-arc_character_moment_zone_imbalance"></a>`ARC_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-arc_seed_dialogue_highlight_aftermath_void"></a>`ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-payoff_visual_beat_decoupled"></a>`PAYOFF_VISUAL_BEAT_DECOUPLED`
 
 ## Wave 603
 
@@ -431,9 +431,9 @@ Wave 603 additions (built on the shared checks library, audit M2.2): RELATIONSHI
 
 Rules named in this wave's header:
 
-- `OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED`
-- `VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER`
+- <a id="rule-open_thread_emotional_aftermath_void"></a>`OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-relationship_shift_dialogue_highlight_decoupled"></a>`RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED`
+- <a id="rule-visual_staging_emotional_flatness_cluster"></a>`VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER`
 
 ## Wave 589
 
@@ -441,10 +441,10 @@ Wave 589 additions: dramatic-turn relational aftermath void (sequence/aftermath 
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID`
-- `ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID`
-- `ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_clock_relational_aftermath_void"></a>`ARC_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_dramatic_turn_emotional_aftermath_void"></a>`ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_payoff_aftermath_emotional_void"></a>`ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID`
+- <a id="rule-arc_suspense_curiosity_aftermath_void"></a>`ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 575
 
@@ -452,11 +452,11 @@ Wave 575 additions: curiosity zone cluster (distribution/timing × curiosity × 
 
 Rules named in this wave's header:
 
-- `ARC_CURIOSITY_PLATEAU`
-- `ARC_RELATIONAL_ZONE_CLUSTER`
-- `ARC_REVELATION_CURIOSITY_DECOUPLED`
-- `ARC_SUSPENSE_DROUGHT_RUN`
-- `ARC_SUSPENSE_EMOTION_DECOUPLED`
+- <a id="rule-arc_curiosity_plateau"></a>`ARC_CURIOSITY_PLATEAU`
+- <a id="rule-arc_relational_zone_cluster"></a>`ARC_RELATIONAL_ZONE_CLUSTER`
+- <a id="rule-arc_revelation_curiosity_decoupled"></a>`ARC_REVELATION_CURIOSITY_DECOUPLED`
+- <a id="rule-arc_suspense_drought_run"></a>`ARC_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-arc_suspense_emotion_decoupled"></a>`ARC_SUSPENSE_EMOTION_DECOUPLED`
 
 ## Wave 561
 
@@ -464,9 +464,9 @@ Wave 561 additions: suspense drought run (run-based × suspenseDelta × absence 
 
 Rules named in this wave's header:
 
-- `ARC_SHIFT_CONCENTRATION`
-- `ARC_SUSPENSE_OPENING_ZONE_ABSENT`
-- `ARC_TURN_ZONE_CLUSTER`
+- <a id="rule-arc_shift_concentration"></a>`ARC_SHIFT_CONCENTRATION`
+- <a id="rule-arc_suspense_opening_zone_absent"></a>`ARC_SUSPENSE_OPENING_ZONE_ABSENT`
+- <a id="rule-arc_turn_zone_cluster"></a>`ARC_TURN_ZONE_CLUSTER`
 
 ## Wave 547
 
@@ -474,9 +474,9 @@ Wave 547 additions: suspense opening zone absent (zone presence/absence × suspe
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_OPENING_ZONE_ABSENT`
-- `ARC_FIRST_HALF_EMOTIONALLY_FLAT`
-- `ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_clock_opening_zone_absent"></a>`ARC_CLOCK_OPENING_ZONE_ABSENT`
+- <a id="rule-arc_first_half_emotionally_flat"></a>`ARC_FIRST_HALF_EMOTIONALLY_FLAT`
+- <a id="rule-arc_positive_relational_aftermath_void"></a>`ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 533
 
@@ -484,9 +484,9 @@ Wave 533 additions: curiosity peak relational void (single-peak isolation × cur
 
 Rules named in this wave's header:
 
-- `ARC_CURIOSITY_DROUGHT_RUN`
-- `ARC_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `ARC_SUSPENSE_FRONT_LOADED`
+- <a id="rule-arc_curiosity_drought_run"></a>`ARC_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-arc_seed_emotional_aftermath_void"></a>`ARC_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_suspense_front_loaded"></a>`ARC_SUSPENSE_FRONT_LOADED`
 
 ## Wave 519
 
@@ -494,10 +494,10 @@ Wave 519 additions: curiosity drought run (run-based × curiosityDelta × absenc
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `ARC_EMOTIONAL_FRONT_LOADED`
-- `ARC_PAYOFF_DROUGHT_RUN`
-- `ARC_RELATIONAL_FRONT_LOADED`
+- <a id="rule-arc_clock_curiosity_aftermath_void"></a>`ARC_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-arc_emotional_front_loaded"></a>`ARC_EMOTIONAL_FRONT_LOADED`
+- <a id="rule-arc_payoff_drought_run"></a>`ARC_PAYOFF_DROUGHT_RUN`
+- <a id="rule-arc_relational_front_loaded"></a>`ARC_RELATIONAL_FRONT_LOADED`
 
 ## Wave 505
 
@@ -505,8 +505,8 @@ Wave 505 additions: seed emotional aftermath void (sequence/aftermath × seed �
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_PEAK_EMOTION_ABSENT`
-- `ARC_RELATIONAL_DROUGHT_RUN`
+- <a id="rule-arc_clock_peak_emotion_absent"></a>`ARC_CLOCK_PEAK_EMOTION_ABSENT`
+- <a id="rule-arc_relational_drought_run"></a>`ARC_RELATIONAL_DROUGHT_RUN`
 
 ## Wave 491
 
@@ -514,10 +514,10 @@ Wave 491 additions: clock peak emotion absent (single-peak isolation × clock-de
 
 Rules named in this wave's header:
 
-- `ARC_CLOCK_EMOTION_DECOUPLED`
-- `ARC_PAYOFF_EMOTION_DECOUPLED`
-- `ARC_PEAK_CURIOSITY_EMOTION_ABSENT`
-- `ARC_PEAK_SUSPENSE_EMOTION_ABSENT`
+- <a id="rule-arc_clock_emotion_decoupled"></a>`ARC_CLOCK_EMOTION_DECOUPLED`
+- <a id="rule-arc_payoff_emotion_decoupled"></a>`ARC_PAYOFF_EMOTION_DECOUPLED`
+- <a id="rule-arc_peak_curiosity_emotion_absent"></a>`ARC_PEAK_CURIOSITY_EMOTION_ABSENT`
+- <a id="rule-arc_peak_suspense_emotion_absent"></a>`ARC_PEAK_SUSPENSE_EMOTION_ABSENT`
 
 ## Wave 477
 
@@ -525,8 +525,8 @@ Wave 477 additions: positive relational aftermath void (every positive-emotion s
 
 Rules named in this wave's header:
 
-- `ARC_PEAK_RELATIONAL_UNCAUSED`
-- `ARC_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_peak_relational_uncaused"></a>`ARC_PEAK_RELATIONAL_UNCAUSED`
+- <a id="rule-arc_revelation_relational_aftermath_void"></a>`ARC_REVELATION_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 463
 
@@ -534,10 +534,10 @@ Wave 463 additions: suspense relational decoupled (≥3 suspense-positive scenes
 
 Rules named in this wave's header:
 
-- `ARC_CURIOSITY_RELATIONAL_DECOUPLED`
-- `ARC_RELATIONAL_BACK_LOADED`
-- `ARC_REVELATION_EMOTION_ABSENT`
-- `ARC_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-arc_curiosity_relational_decoupled"></a>`ARC_CURIOSITY_RELATIONAL_DECOUPLED`
+- <a id="rule-arc_relational_back_loaded"></a>`ARC_RELATIONAL_BACK_LOADED`
+- <a id="rule-arc_revelation_emotion_absent"></a>`ARC_REVELATION_EMOTION_ABSENT`
+- <a id="rule-arc_turn_emotional_aftermath_void"></a>`ARC_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 449
 
@@ -545,7 +545,7 @@ Wave 449 additions: relational drought run (≥5 consecutive scenes with no rela
 
 Rules named in this wave's header:
 
-- `ARC_TURN_EMOTION_ABSENT`
+- <a id="rule-arc_turn_emotion_absent"></a>`ARC_TURN_EMOTION_ABSENT`
 
 ## Wave 435
 
@@ -553,8 +553,8 @@ Wave 435 additions: emotional overload (≥80% of scenes are non-neutral with bo
 
 Rules named in this wave's header:
 
-- `ARC_EMOTIONAL_FLATLINE`
-- `ARC_PEAK_RELATIONAL_EMOTION_ABSENT`
+- <a id="rule-arc_emotional_flatline"></a>`ARC_EMOTIONAL_FLATLINE`
+- <a id="rule-arc_peak_relational_emotion_absent"></a>`ARC_PEAK_RELATIONAL_EMOTION_ABSENT`
 
 ## Wave 421
 
@@ -562,7 +562,7 @@ Wave 421 additions: relational negative-only (≥3 shifts, zero positive — eve
 
 Rules named in this wave's header:
 
-- `ARC_RELATIONAL_POSITIVE_ONLY`
+- <a id="rule-arc_relational_positive_only"></a>`ARC_RELATIONAL_POSITIVE_ONLY`
 
 ## Wave 407
 
@@ -570,9 +570,9 @@ Wave 407 additions: relational positive-only (≥3 relationship shifts, none neg
 
 Rules named in this wave's header:
 
-- `ARC_EMOTIONAL_BACK_LOADED`
-- `ARC_EMOTIONAL_RECOVERY_ABSENT`
-- `ARC_POSITIVE_ONLY`
+- <a id="rule-arc_emotional_back_loaded"></a>`ARC_EMOTIONAL_BACK_LOADED`
+- <a id="rule-arc_emotional_recovery_absent"></a>`ARC_EMOTIONAL_RECOVERY_ABSENT`
+- <a id="rule-arc_positive_only"></a>`ARC_POSITIVE_ONLY`
 
 ## Wave 138
 
@@ -580,54 +580,54 @@ Wave 138 additions: per-character relational arc tracking using relationship shi
 
 Rules named in this wave's header:
 
-- `CHARACTER_ARC_PROTAGONIST_PASSIVE`
-- `CHARACTER_ARC_RELATIONAL_STASIS`
+- <a id="rule-character_arc_protagonist_passive"></a>`CHARACTER_ARC_PROTAGONIST_PASSIVE`
+- <a id="rule-character_arc_relational_stasis"></a>`CHARACTER_ARC_RELATIONAL_STASIS`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ARC_ACT1_RELATIONAL_DESERT` — Wave 242: Act 1 relational desert, midpoint positive absent, revelation unincorporated
-- `ARC_BOOKEND_IDENTICAL` — Wave 196: Opening void, catharsis absent, bookend identical
-- `ARC_CATHARSIS_ABSENT` — Wave 196: Opening void, catharsis absent, bookend identical
-- `ARC_CURIOSITY_BACK_LOADED` — Wave 519 checks
-- `ARC_CURIOSITY_EMOTION_DECOUPLED` — Wave 312: ARC_CURIOSITY_EMOTION_DECOUPLED
-- `ARC_DRAMATIC_TURN_MONOTONE` — Wave 298: ARC_DRAMATIC_TURN_MONOTONE
-- `ARC_EMOTIONAL_MONOTONE` — Wave 153: Arc monotone, late introduction, emotional whiplash
-- `ARC_EMOTIONAL_OVERLOAD` — Wave 435: ARC_EMOTIONAL_OVERLOAD, ARC_CLOCK_EMOTION_DECOUPLED, ARC_PEAK_RELATIONAL_UNCAUSED
-- `ARC_EMOTIONAL_RESOLUTION_ABSENT` — Wave 284: ARC_EMOTIONAL_RESOLUTION_ABSENT
-- `ARC_FINAL_ACT_CHARACTER_STATIC` — Wave 228: Protagonist social invulnerability, midpoint relational void, final-act stasis
-- `ARC_GRIEF_SKIPPED` — Wave 298: ARC_GRIEF_SKIPPED
-- `ARC_LATE_LOW_POINT_ABSENT` — Wave 393: ARC_EMOTIONAL_BACK_LOADED, ARC_POSITIVE_EMOTION_RUN, ARC_LATE_LOW_POINT_ABSENT
-- `ARC_LATE_RELATIONAL_VOID` — Wave 270: ARC_LATE_RELATIONAL_VOID
-- `ARC_LATE_TURN_UNSUPPORTED` — Wave 213: Arc dynamics — multi-signal narrative physics
-- `ARC_MIDPOINT_INERT` — Wave 213: Arc dynamics — multi-signal narrative physics
-- `ARC_MIDPOINT_RELATIONAL_VOID` — Wave 228: Protagonist social invulnerability, midpoint relational void, final-act stasis
-- `ARC_NEGATIVE_ONLY` — Wave 256: Relational dimension monotony, emotional flatline, negative-only arc
-- `ARC_OPENING_VOID` — Wave 196: Opening void, catharsis absent, bookend identical
-- `ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID` — Wave 519 checks
-- `ARC_PAYOFF_FRONT_LOADED` — Wave 519 checks
-- `ARC_POSITIVE_MIDPOINT_ABSENT` — Wave 242: Act 1 relational desert, midpoint positive absent, revelation unincorporated
-- `ARC_PROTAGONIST_UNTESTED_SOCIALLY` — Wave 228: Protagonist social invulnerability, midpoint relational void, final-act stasis
-- `ARC_RELATIONAL_FIRST_HALF_FLAT` — Wave 351: ARC_SECOND_HALF_EMOTIONALLY_FLAT, ARC_EMOTIONAL_RECOVERY_ABSENT, ARC_RELATIONAL_FIRST_HALF_FLAT
-- `ARC_RELATIONAL_MIDPOINT_VOID` — Wave 421: ARC_RELATIONAL_NEGATIVE_ONLY, ARC_PEAK_RELATIONAL_EMOTION_ABSENT, ARC_RELATIONAL_MIDPOINT_VOID
-- `ARC_RELATIONAL_NEGATIVE_ONLY` — Wave 421: ARC_RELATIONAL_NEGATIVE_ONLY, ARC_PEAK_RELATIONAL_EMOTION_ABSENT, ARC_RELATIONAL_MIDPOINT_VOID
-- `ARC_RELATIONAL_RECOVERY_ABSENT` — Wave 407: ARC_RELATIONAL_POSITIVE_ONLY, ARC_RELATIONAL_BACK_LOADED, ARC_RELATIONAL_RECOVERY_ABSENT
-- `ARC_RELATIONAL_SHIFT_EMOTION_FLAT` — Wave 365: ARC_PEAK_SUSPENSE_EMOTION_ABSENT, ARC_PEAK_CURIOSITY_EMOTION_ABSENT, ARC_RELATIONAL_SHIFT_EMOTION_FLAT
-- `ARC_REVELATION_UNINCORPORATED` — Wave 242: Act 1 relational desert, midpoint positive absent, revelation unincorporated
-- `ARC_SECOND_HALF_EMOTIONALLY_FLAT` — Wave 351: ARC_SECOND_HALF_EMOTIONALLY_FLAT, ARC_EMOTIONAL_RECOVERY_ABSENT, ARC_RELATIONAL_FIRST_HALF_FLAT
-- `ARC_SINGLE_DIMENSION` — Wave 256: Relational dimension monotony, emotional flatline, negative-only arc
-- `ARC_STALL_IN_ACT2` — Wave 182: Arc stall in Act 2, secondary arc mirror, climax void
-- `ARC_SUSPENSE_CURIOSITY_DECOUPLED` — Wave 337: ARC_SUSPENSE_CURIOSITY_DECOUPLED, ARC_REVELATION_EMOTION_ABSENT, ARC_REVELATION_CURIOSITY_DECOUPLED
-- `ARC_SUSPENSE_RELATIONAL_DECOUPLED` — Wave 463: ARC_SUSPENSE_RELATIONAL_DECOUPLED, ARC_RELATIONAL_FRONT_LOADED, ARC_REVELATION_RELATIONAL_AFTERMATH_VOID
-- `ARC_UNCONTESTED_ASCENT` — Wave 213: Arc dynamics — multi-signal narrative physics
-- `CHARACTER_LATE_INTRODUCTION` — Wave 153: Arc monotone, late introduction, emotional whiplash
-- `CLIMAX_EMOTIONALLY_FLAT` — Approaching climax without emotional peak
-- `EMOTIONAL_WHIPLASH` — Wave 153: Arc monotone, late introduction, emotional whiplash
-- `FLAT_CHARACTER_ARC` — Compute emotional journey per "character zone"
-- `NO_REVELATIONS` — No revelation scenes in a complete story
-- `RELATIONAL_SYMMETRY_ABSENT` — Wave 168: Relational symmetry, arc resolution, secondary character void
-- `SECONDARY_ARC_MIRROR` — Wave 182: Arc stall in Act 2, secondary arc mirror, climax void
-- `SECONDARY_CHARACTER_VOID` — Wave 168: Relational symmetry, arc resolution, secondary character void
-- `UNMOTIVATED_TRANSFORMATION` — Transformation without a causal scene
+- <a id="rule-arc_act1_relational_desert"></a>`ARC_ACT1_RELATIONAL_DESERT` — Wave 242: Act 1 relational desert, midpoint positive absent, revelation unincorporated
+- <a id="rule-arc_bookend_identical"></a>`ARC_BOOKEND_IDENTICAL` — Wave 196: Opening void, catharsis absent, bookend identical
+- <a id="rule-arc_catharsis_absent"></a>`ARC_CATHARSIS_ABSENT` — Wave 196: Opening void, catharsis absent, bookend identical
+- <a id="rule-arc_curiosity_back_loaded"></a>`ARC_CURIOSITY_BACK_LOADED` — Wave 519 checks
+- <a id="rule-arc_curiosity_emotion_decoupled"></a>`ARC_CURIOSITY_EMOTION_DECOUPLED` — Wave 312: ARC_CURIOSITY_EMOTION_DECOUPLED
+- <a id="rule-arc_dramatic_turn_monotone"></a>`ARC_DRAMATIC_TURN_MONOTONE` — Wave 298: ARC_DRAMATIC_TURN_MONOTONE
+- <a id="rule-arc_emotional_monotone"></a>`ARC_EMOTIONAL_MONOTONE` — Wave 153: Arc monotone, late introduction, emotional whiplash
+- <a id="rule-arc_emotional_overload"></a>`ARC_EMOTIONAL_OVERLOAD` — Wave 435: ARC_EMOTIONAL_OVERLOAD, ARC_CLOCK_EMOTION_DECOUPLED, ARC_PEAK_RELATIONAL_UNCAUSED
+- <a id="rule-arc_emotional_resolution_absent"></a>`ARC_EMOTIONAL_RESOLUTION_ABSENT` — Wave 284: ARC_EMOTIONAL_RESOLUTION_ABSENT
+- <a id="rule-arc_final_act_character_static"></a>`ARC_FINAL_ACT_CHARACTER_STATIC` — Wave 228: Protagonist social invulnerability, midpoint relational void, final-act stasis
+- <a id="rule-arc_grief_skipped"></a>`ARC_GRIEF_SKIPPED` — Wave 298: ARC_GRIEF_SKIPPED
+- <a id="rule-arc_late_low_point_absent"></a>`ARC_LATE_LOW_POINT_ABSENT` — Wave 393: ARC_EMOTIONAL_BACK_LOADED, ARC_POSITIVE_EMOTION_RUN, ARC_LATE_LOW_POINT_ABSENT
+- <a id="rule-arc_late_relational_void"></a>`ARC_LATE_RELATIONAL_VOID` — Wave 270: ARC_LATE_RELATIONAL_VOID
+- <a id="rule-arc_late_turn_unsupported"></a>`ARC_LATE_TURN_UNSUPPORTED` — Wave 213: Arc dynamics — multi-signal narrative physics
+- <a id="rule-arc_midpoint_inert"></a>`ARC_MIDPOINT_INERT` — Wave 213: Arc dynamics — multi-signal narrative physics
+- <a id="rule-arc_midpoint_relational_void"></a>`ARC_MIDPOINT_RELATIONAL_VOID` — Wave 228: Protagonist social invulnerability, midpoint relational void, final-act stasis
+- <a id="rule-arc_negative_only"></a>`ARC_NEGATIVE_ONLY` — Wave 256: Relational dimension monotony, emotional flatline, negative-only arc
+- <a id="rule-arc_opening_void"></a>`ARC_OPENING_VOID` — Wave 196: Opening void, catharsis absent, bookend identical
+- <a id="rule-arc_payoff_curiosity_aftermath_void"></a>`ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID` — Wave 519 checks
+- <a id="rule-arc_payoff_front_loaded"></a>`ARC_PAYOFF_FRONT_LOADED` — Wave 519 checks
+- <a id="rule-arc_positive_midpoint_absent"></a>`ARC_POSITIVE_MIDPOINT_ABSENT` — Wave 242: Act 1 relational desert, midpoint positive absent, revelation unincorporated
+- <a id="rule-arc_protagonist_untested_socially"></a>`ARC_PROTAGONIST_UNTESTED_SOCIALLY` — Wave 228: Protagonist social invulnerability, midpoint relational void, final-act stasis
+- <a id="rule-arc_relational_first_half_flat"></a>`ARC_RELATIONAL_FIRST_HALF_FLAT` — Wave 351: ARC_SECOND_HALF_EMOTIONALLY_FLAT, ARC_EMOTIONAL_RECOVERY_ABSENT, ARC_RELATIONAL_FIRST_HALF_FLAT
+- <a id="rule-arc_relational_midpoint_void"></a>`ARC_RELATIONAL_MIDPOINT_VOID` — Wave 421: ARC_RELATIONAL_NEGATIVE_ONLY, ARC_PEAK_RELATIONAL_EMOTION_ABSENT, ARC_RELATIONAL_MIDPOINT_VOID
+- <a id="rule-arc_relational_negative_only"></a>`ARC_RELATIONAL_NEGATIVE_ONLY` — Wave 421: ARC_RELATIONAL_NEGATIVE_ONLY, ARC_PEAK_RELATIONAL_EMOTION_ABSENT, ARC_RELATIONAL_MIDPOINT_VOID
+- <a id="rule-arc_relational_recovery_absent"></a>`ARC_RELATIONAL_RECOVERY_ABSENT` — Wave 407: ARC_RELATIONAL_POSITIVE_ONLY, ARC_RELATIONAL_BACK_LOADED, ARC_RELATIONAL_RECOVERY_ABSENT
+- <a id="rule-arc_relational_shift_emotion_flat"></a>`ARC_RELATIONAL_SHIFT_EMOTION_FLAT` — Wave 365: ARC_PEAK_SUSPENSE_EMOTION_ABSENT, ARC_PEAK_CURIOSITY_EMOTION_ABSENT, ARC_RELATIONAL_SHIFT_EMOTION_FLAT
+- <a id="rule-arc_revelation_unincorporated"></a>`ARC_REVELATION_UNINCORPORATED` — Wave 242: Act 1 relational desert, midpoint positive absent, revelation unincorporated
+- <a id="rule-arc_second_half_emotionally_flat"></a>`ARC_SECOND_HALF_EMOTIONALLY_FLAT` — Wave 351: ARC_SECOND_HALF_EMOTIONALLY_FLAT, ARC_EMOTIONAL_RECOVERY_ABSENT, ARC_RELATIONAL_FIRST_HALF_FLAT
+- <a id="rule-arc_single_dimension"></a>`ARC_SINGLE_DIMENSION` — Wave 256: Relational dimension monotony, emotional flatline, negative-only arc
+- <a id="rule-arc_stall_in_act2"></a>`ARC_STALL_IN_ACT2` — Wave 182: Arc stall in Act 2, secondary arc mirror, climax void
+- <a id="rule-arc_suspense_curiosity_decoupled"></a>`ARC_SUSPENSE_CURIOSITY_DECOUPLED` — Wave 337: ARC_SUSPENSE_CURIOSITY_DECOUPLED, ARC_REVELATION_EMOTION_ABSENT, ARC_REVELATION_CURIOSITY_DECOUPLED
+- <a id="rule-arc_suspense_relational_decoupled"></a>`ARC_SUSPENSE_RELATIONAL_DECOUPLED` — Wave 463: ARC_SUSPENSE_RELATIONAL_DECOUPLED, ARC_RELATIONAL_FRONT_LOADED, ARC_REVELATION_RELATIONAL_AFTERMATH_VOID
+- <a id="rule-arc_uncontested_ascent"></a>`ARC_UNCONTESTED_ASCENT` — Wave 213: Arc dynamics — multi-signal narrative physics
+- <a id="rule-character_late_introduction"></a>`CHARACTER_LATE_INTRODUCTION` — Wave 153: Arc monotone, late introduction, emotional whiplash
+- <a id="rule-climax_emotionally_flat"></a>`CLIMAX_EMOTIONALLY_FLAT` — Approaching climax without emotional peak
+- <a id="rule-emotional_whiplash"></a>`EMOTIONAL_WHIPLASH` — Wave 153: Arc monotone, late introduction, emotional whiplash
+- <a id="rule-flat_character_arc"></a>`FLAT_CHARACTER_ARC` — Compute emotional journey per "character zone"
+- <a id="rule-no_revelations"></a>`NO_REVELATIONS` — No revelation scenes in a complete story
+- <a id="rule-relational_symmetry_absent"></a>`RELATIONAL_SYMMETRY_ABSENT` — Wave 168: Relational symmetry, arc resolution, secondary character void
+- <a id="rule-secondary_arc_mirror"></a>`SECONDARY_ARC_MIRROR` — Wave 182: Arc stall in Act 2, secondary arc mirror, climax void
+- <a id="rule-secondary_character_void"></a>`SECONDARY_CHARACTER_VOID` — Wave 168: Relational symmetry, arc resolution, secondary character void
+- <a id="rule-unmotivated_transformation"></a>`UNMOTIVATED_TRANSFORMATION` — Transformation without a causal scene
 

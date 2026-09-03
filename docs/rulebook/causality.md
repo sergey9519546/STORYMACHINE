@@ -8,15 +8,15 @@ Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story
 
 Rules named in this wave's header:
 
-- `CHEKHOV_GUN_UNFIRED`
-- `COINCIDENCE_RESOLUTION`
-- `DEUS_EX_MACHINA`
-- `INVERSE_CHEKHOV_GUN`
-- `MOTIVATION_REVERSAL_UNCAUSED`
-- `PLOT_ARMOR`
-- `PROTAGONIST_UNTESTED`
-- `SETUP_PAYOFF_IMBALANCE`
-- `UNMOTIVATED_BETRAYAL`
+- <a id="rule-chekhov_gun_unfired"></a>`CHEKHOV_GUN_UNFIRED`
+- <a id="rule-coincidence_resolution"></a>`COINCIDENCE_RESOLUTION`
+- <a id="rule-deus_ex_machina"></a>`DEUS_EX_MACHINA`
+- <a id="rule-inverse_chekhov_gun"></a>`INVERSE_CHEKHOV_GUN`
+- <a id="rule-motivation_reversal_uncaused"></a>`MOTIVATION_REVERSAL_UNCAUSED`
+- <a id="rule-plot_armor"></a>`PLOT_ARMOR`
+- <a id="rule-protagonist_untested"></a>`PROTAGONIST_UNTESTED`
+- <a id="rule-setup_payoff_imbalance"></a>`SETUP_PAYOFF_IMBALANCE`
+- <a id="rule-unmotivated_betrayal"></a>`UNMOTIVATED_BETRAYAL`
 
 ## Wave 1175
 
@@ -24,9 +24,9 @@ Wave 1175 additions (closes rotation cycle 44, dialogue.ts Wave 1162 - causality
 
 Rules named in this wave's header:
 
-- `CAUSALITY_REVELATION_STAGING_AFTERMATH_VOID`
-- `CAUSALITY_REVELATION_SUSPENSE_AFTERMATH_VOID`
-- `CAUSALITY_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_revelation_staging_aftermath_void"></a>`CAUSALITY_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-causality_revelation_suspense_aftermath_void"></a>`CAUSALITY_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-causality_suspense_relational_aftermath_void"></a>`CAUSALITY_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1161
 
@@ -34,9 +34,9 @@ Wave 1161 additions: revelation and suspenseDelta each had only their one Wave-1
 
 Rules named in this wave's header:
 
-- `CAUSALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `CAUSALITY_REVELATION_RELATIONAL_AFTERMATH_VOID`
-- `CAUSALITY_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-causality_revelation_emotional_aftermath_void"></a>`CAUSALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_revelation_relational_aftermath_void"></a>`CAUSALITY_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_suspense_curiosity_aftermath_void"></a>`CAUSALITY_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1147
 
@@ -44,9 +44,9 @@ Wave 1147 additions: CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives dram
 
 Rules named in this wave's header:
 
-- `CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
-- `CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-causality_revelation_curiosity_aftermath_void"></a>`CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-causality_suspense_emotional_aftermath_void"></a>`CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_turn_dialogue_highlight_aftermath_void"></a>`CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1133
 
@@ -54,9 +54,9 @@ Wave 1133 additions (closes rotation cycle 40, belief.ts Wave 1132 - causality.t
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID`
-- `CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID`
-- `CAUSALITY_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-causality_clock_staging_aftermath_void"></a>`CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-causality_turn_relational_aftermath_void"></a>`CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_turn_staging_aftermath_void"></a>`CAUSALITY_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1119
 
@@ -64,9 +64,9 @@ Wave 1119 additions (opens the thirty-ninth rotation cycle continuation of cycle
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CAUSALITY_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `CAUSALITY_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_clock_dialogue_highlight_aftermath_void"></a>`CAUSALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-causality_clock_suspense_aftermath_void"></a>`CAUSALITY_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-causality_turn_emotional_aftermath_void"></a>`CAUSALITY_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1105
 
@@ -74,9 +74,9 @@ Wave 1105 additions (closes the thirty-seventh rotation cycle, 1092-1105): this 
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `CAUSALITY_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `CAUSALITY_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-causality_clock_emotional_aftermath_void"></a>`CAUSALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_clock_relational_aftermath_void"></a>`CAUSALITY_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_turn_curiosity_aftermath_void"></a>`CAUSALITY_TURN_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1091
 
@@ -84,11 +84,11 @@ Wave 1091 additions (closes the thirty-sixth rotation cycle, 1078-1091): CAUSALI
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID`
-- `CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID`
-- `CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID`
+- <a id="rule-causality_clock_curiosity_aftermath_void"></a>`CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-causality_payoff_staging_aftermath_void"></a>`CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-causality_turn_suspense_aftermath_void"></a>`CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-clock_curiosity_aftermath_void"></a>`CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-stated_belief_dramatic_turn_aftermath_void"></a>`STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID`
 
 ## Wave 1077
 
@@ -96,9 +96,9 @@ Wave 1077 additions (closes the thirty-fifth rotation cycle, 1064-1077): seededC
 
 Rules named in this wave's header:
 
-- `CAUSALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `CAUSALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CAUSALITY_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-causality_open_thread_staging_aftermath_void"></a>`CAUSALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-causality_payoff_dialogue_highlight_aftermath_void"></a>`CAUSALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-causality_seed_staging_aftermath_void"></a>`CAUSALITY_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 1063
 
@@ -106,9 +106,9 @@ Wave 1063 additions (closes the thirty-fourth rotation cycle, 1050-1063): CAUSAL
 
 Rules named in this wave's header:
 
-- `CAUSALITY_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CAUSALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CAUSALITY_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-causality_open_thread_dialogue_highlight_aftermath_void"></a>`CAUSALITY_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-causality_seed_dialogue_highlight_aftermath_void"></a>`CAUSALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-causality_stakes_staging_aftermath_void"></a>`CAUSALITY_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1049
 
@@ -116,9 +116,9 @@ Wave 1049 additions (closes the thirty-third rotation cycle, 1036-1049): with ra
 
 Rules named in this wave's header:
 
-- `CAUSALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `CAUSALITY_SEED_RELATIONAL_AFTERMATH_VOID`
-- `CAUSALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-causality_open_thread_curiosity_aftermath_void"></a>`CAUSALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-causality_seed_relational_aftermath_void"></a>`CAUSALITY_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_stakes_dialogue_highlight_aftermath_void"></a>`CAUSALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1035
 
@@ -126,9 +126,9 @@ Wave 1035 additions (closes the thirty-second rotation cycle, 1022-1035): with r
 
 Rules named in this wave's header:
 
-- `CAUSALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `CAUSALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID`
-- `CAUSALITY_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-causality_open_thread_relational_aftermath_void"></a>`CAUSALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_payoff_curiosity_aftermath_void"></a>`CAUSALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-causality_seed_suspense_aftermath_void"></a>`CAUSALITY_SEED_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1021
 
@@ -136,9 +136,9 @@ Wave 1021 additions (closes the thirty-first rotation cycle, 1008-1021): three m
 
 Rules named in this wave's header:
 
-- `CAUSALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `CAUSALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `CAUSALITY_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_open_thread_emotional_aftermath_void"></a>`CAUSALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_payoff_suspense_aftermath_void"></a>`CAUSALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-causality_stakes_relational_aftermath_void"></a>`CAUSALITY_STAKES_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1007
 
@@ -146,9 +146,9 @@ Wave 1007 additions (opens the thirty-first rotation cycle for this pass): this 
 
 Rules named in this wave's header:
 
-- `CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID`
-- `CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-causality_payoff_relational_aftermath_void"></a>`CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_seed_emotional_aftermath_void"></a>`CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_stakes_suspense_aftermath_void"></a>`CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 993
 
@@ -156,10 +156,10 @@ Wave 993 additions (closes the twenty-ninth rotation cycle, 980-993): CAUSALITY_
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_ZONE_IMBALANCE`
-- `CAUSALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `CAUSALITY_STAKES_CURIOSITY_AFTERMATH_VOID`
-- `PAYOFF_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-causality_clock_zone_imbalance"></a>`CAUSALITY_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-causality_payoff_emotional_aftermath_void"></a>`CAUSALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_stakes_curiosity_aftermath_void"></a>`CAUSALITY_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-payoff_relationship_aftermath_void"></a>`PAYOFF_RELATIONSHIP_AFTERMATH_VOID`
 
 ## Wave 979
 
@@ -167,9 +167,9 @@ Wave 979 additions (closes the twenty-eighth rotation cycle, 966-979): with zone
 
 Rules named in this wave's header:
 
-- `CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID`
-- `CAUSALITY_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-causality_open_thread_suspense_aftermath_void"></a>`CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-causality_seed_curiosity_aftermath_void"></a>`CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-causality_stakes_emotional_aftermath_void"></a>`CAUSALITY_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 965
 
@@ -177,9 +177,9 @@ Wave 965 additions (closes the twenty-seventh rotation cycle, 952-965): auditing
 
 Rules named in this wave's header:
 
-- `CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE`
-- `CAUSALITY_REVELATION_ZONE_IMBALANCE`
-- `CAUSALITY_TURN_ZONE_IMBALANCE`
+- <a id="rule-causality_relationship_zone_imbalance"></a>`CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-causality_revelation_zone_imbalance"></a>`CAUSALITY_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-causality_turn_zone_imbalance"></a>`CAUSALITY_TURN_ZONE_IMBALANCE`
 
 ## Wave 951
 
@@ -187,9 +187,9 @@ Wave 951 additions (closes the twenty-sixth rotation cycle, 938-951): with causa
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE`
-- `CAUSALITY_PAYOFF_ZONE_IMBALANCE`
-- `CAUSALITY_SEED_ZONE_IMBALANCE`
+- <a id="rule-causality_clock_delta_zone_imbalance"></a>`CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-causality_payoff_zone_imbalance"></a>`CAUSALITY_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-causality_seed_zone_imbalance"></a>`CAUSALITY_SEED_ZONE_IMBALANCE`
 
 ## Wave 937
 
@@ -197,9 +197,9 @@ Wave 937 additions (closes the twenty-fifth rotation cycle, 924-937): continuing
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CURIOSITY_ZONE_IMBALANCE`
-- `CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-causality_curiosity_zone_imbalance"></a>`CAUSALITY_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-causality_positive_emotion_zone_imbalance"></a>`CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-causality_revelation_purpose_zone_imbalance"></a>`CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE`
 
 ## Wave 923
 
@@ -207,9 +207,9 @@ Wave 923 additions (closes the twenty-fourth rotation cycle, 910-923): purpose =
 
 Rules named in this wave's header:
 
-- `CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN`
-- `CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-causality_negative_emotion_zone_imbalance"></a>`CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-causality_revelation_purpose_drought_run"></a>`CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-causality_revelation_purpose_zone_cluster"></a>`CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 909
 
@@ -217,9 +217,9 @@ Wave 909 additions (closes the twenty-third rotation cycle, 896-909): continuing
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `CAUSALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `CAUSALITY_STAKES_ZONE_IMBALANCE`
+- <a id="rule-causality_character_moment_zone_imbalance"></a>`CAUSALITY_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-causality_introduce_conflict_zone_imbalance"></a>`CAUSALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-causality_stakes_zone_imbalance"></a>`CAUSALITY_STAKES_ZONE_IMBALANCE`
 
 ## Wave 895
 
@@ -227,9 +227,9 @@ Wave 895 additions (closes the twenty-second rotation cycle, 882-895): continuin
 
 Rules named in this wave's header:
 
-- `CAUSALITY_COMPLICATE_ZONE_IMBALANCE`
-- `CAUSALITY_RESOLUTION_ZONE_IMBALANCE`
-- `CAUSALITY_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-causality_complicate_zone_imbalance"></a>`CAUSALITY_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-causality_resolution_zone_imbalance"></a>`CAUSALITY_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-causality_turning_point_zone_imbalance"></a>`CAUSALITY_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 881
 
@@ -237,9 +237,9 @@ Wave 881 additions: CAUSALITY_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'c
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLIMAX_ZONE_IMBALANCE`
-- `CAUSALITY_COMPLICATE_DROUGHT_RUN`
-- `CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-causality_climax_zone_imbalance"></a>`CAUSALITY_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-causality_complicate_drought_run"></a>`CAUSALITY_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-causality_establish_world_zone_imbalance"></a>`CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE`
 
 ## Wave 867
 
@@ -247,9 +247,9 @@ Wave 867 additions (closes the twentieth rotation cycle, 854-867): CAUSALITY_COM
 
 Rules named in this wave's header:
 
-- `CAUSALITY_COMPLICATE_ZONE_CLUSTER`
-- `CAUSALITY_CURIOSITY_ZONE_CLUSTER`
-- `CAUSALITY_TURN_ZONE_CLUSTER`
+- <a id="rule-causality_complicate_zone_cluster"></a>`CAUSALITY_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-causality_curiosity_zone_cluster"></a>`CAUSALITY_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-causality_turn_zone_cluster"></a>`CAUSALITY_TURN_ZONE_CLUSTER`
 
 ## Wave 853
 
@@ -257,9 +257,9 @@ Wave 853 additions (closes the nineteenth rotation cycle, 840-853): CAUSALITY_CL
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLIMAX_DROUGHT_RUN`
-- `CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN`
-- `CAUSALITY_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-causality_climax_drought_run"></a>`CAUSALITY_CLIMAX_DROUGHT_RUN`
+- <a id="rule-causality_establish_world_drought_run"></a>`CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-causality_resolution_drought_run"></a>`CAUSALITY_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 839
 
@@ -267,9 +267,9 @@ Wave 839 additions (closes the eighteenth rotation cycle, 826-839): CAUSALITY_CL
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLIMAX_ZONE_CLUSTER`
-- `CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `CAUSALITY_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-causality_climax_zone_cluster"></a>`CAUSALITY_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-causality_establish_world_zone_cluster"></a>`CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-causality_resolution_zone_cluster"></a>`CAUSALITY_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 825
 
@@ -277,9 +277,9 @@ Wave 825 additions (closes the seventeenth rotation cycle, 812-825): CAUSALITY_I
 
 Rules named in this wave's header:
 
-- `CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN`
-- `CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-causality_introduce_conflict_drought_run"></a>`CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-causality_positive_emotion_drought_run"></a>`CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-causality_positive_emotion_zone_cluster"></a>`CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 811
 
@@ -287,9 +287,9 @@ Wave 811 additions (closes the sixteenth rotation cycle, 798-811): CAUSALITY_TUR
 
 Rules named in this wave's header:
 
-- `CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `CAUSALITY_TURNING_POINT_DROUGHT_RUN`
-- `CAUSALITY_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-causality_introduce_conflict_zone_cluster"></a>`CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-causality_turning_point_drought_run"></a>`CAUSALITY_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-causality_turning_point_zone_cluster"></a>`CAUSALITY_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 797
 
@@ -297,9 +297,9 @@ Wave 797 additions (closes the fifteenth rotation cycle, 784-797): CAUSALITY_CHA
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN`
-- `CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-causality_character_moment_drought_run"></a>`CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-causality_negative_emotion_drought_run"></a>`CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-causality_negative_emotion_zone_cluster"></a>`CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 783
 
@@ -307,11 +307,11 @@ Wave 783 additions (closes the fourteenth rotation cycle, 770-783): CAUSALITY_RE
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `CAUSALITY_CURIOSITY_DROUGHT_RUN`
-- `CAUSALITY_REVELATION_DROUGHT_RUN`
-- `CURIOSITY_SPIKE_WITHOUT_CAUSE`
-- `CURIOSITY_TEMPORAL_CLUSTER`
+- <a id="rule-causality_character_moment_zone_cluster"></a>`CAUSALITY_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-causality_curiosity_drought_run"></a>`CAUSALITY_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-causality_revelation_drought_run"></a>`CAUSALITY_REVELATION_DROUGHT_RUN`
+- <a id="rule-curiosity_spike_without_cause"></a>`CURIOSITY_SPIKE_WITHOUT_CAUSE`
+- <a id="rule-curiosity_temporal_cluster"></a>`CURIOSITY_TEMPORAL_CLUSTER`
 
 ## Wave 769
 
@@ -319,13 +319,13 @@ Wave 769 additions (closes the thirteenth rotation cycle, 756-769): CAUSALITY_TU
 
 Rules named in this wave's header:
 
-- `CAUSALITY_REVELATION_PEAK_UNCAUSED`
-- `CAUSALITY_REVELATION_ZONE_CLUSTER`
-- `CAUSALITY_TURN_DROUGHT_RUN`
-- `DRAMATIC_TURN_CLUSTER`
-- `DRAMATIC_TURN_WITHOUT_CAUSE`
-- `REVELATION_CASCADE`
-- `REVELATION_FRONT_LOADING`
+- <a id="rule-causality_revelation_peak_uncaused"></a>`CAUSALITY_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-causality_revelation_zone_cluster"></a>`CAUSALITY_REVELATION_ZONE_CLUSTER`
+- <a id="rule-causality_turn_drought_run"></a>`CAUSALITY_TURN_DROUGHT_RUN`
+- <a id="rule-dramatic_turn_cluster"></a>`DRAMATIC_TURN_CLUSTER`
+- <a id="rule-dramatic_turn_without_cause"></a>`DRAMATIC_TURN_WITHOUT_CAUSE`
+- <a id="rule-revelation_cascade"></a>`REVELATION_CASCADE`
+- <a id="rule-revelation_front_loading"></a>`REVELATION_FRONT_LOADING`
 
 ## Wave 755
 
@@ -333,9 +333,9 @@ Wave 755 additions (closes the twelfth rotation cycle, 742-755): CAUSALITY_PAYOF
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_DROUGHT_RUN`
-- `CAUSALITY_PAYOFF_ZONE_CLUSTER`
-- `CAUSALITY_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-causality_clock_drought_run"></a>`CAUSALITY_CLOCK_DROUGHT_RUN`
+- <a id="rule-causality_payoff_zone_cluster"></a>`CAUSALITY_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-causality_suspense_drought_run"></a>`CAUSALITY_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 741
 
@@ -343,9 +343,9 @@ Wave 741 additions (closes the eleventh rotation cycle, 728-741): CAUSALITY_CLOC
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER`
-- `CAUSALITY_PAYOFF_PEAK_UNCAUSED`
-- `CAUSALITY_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-causality_clock_delta_zone_cluster"></a>`CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-causality_payoff_peak_uncaused"></a>`CAUSALITY_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-causality_relationship_zone_cluster"></a>`CAUSALITY_RELATIONSHIP_ZONE_CLUSTER`
 
 ## Wave 727
 
@@ -353,9 +353,9 @@ Wave 727 additions (closes the tenth rotation cycle, 713-727): CAUSALITY_CLOCK_D
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_DELTA_DROUGHT_RUN`
-- `CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED`
-- `CAUSALITY_SEED_DROUGHT_RUN`
+- <a id="rule-causality_clock_delta_drought_run"></a>`CAUSALITY_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-causality_relationship_peak_uncaused"></a>`CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-causality_seed_drought_run"></a>`CAUSALITY_SEED_DROUGHT_RUN`
 
 ## Wave 713
 
@@ -363,9 +363,9 @@ Wave 713 additions (opens the tenth rotation cycle): CAUSALITY_OPEN_THREAD_ZONE_
 
 Rules named in this wave's header:
 
-- `CAUSALITY_OPEN_THREAD_ZONE_CLUSTER`
-- `CAUSALITY_SEED_PEAK_UNCAUSED`
-- `CAUSALITY_STAKES_DROUGHT_RUN`
+- <a id="rule-causality_open_thread_zone_cluster"></a>`CAUSALITY_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-causality_seed_peak_uncaused"></a>`CAUSALITY_SEED_PEAK_UNCAUSED`
+- <a id="rule-causality_stakes_drought_run"></a>`CAUSALITY_STAKES_DROUGHT_RUN`
 
 ## Wave 699
 
@@ -373,9 +373,9 @@ Wave 699 additions (closes the eighth rotation cycle, 686-699): CAUSALITY_CLOCK_
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_ZONE_CLUSTER`
-- `CAUSALITY_RELATIONSHIP_DROUGHT_RUN`
-- `CAUSALITY_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-causality_clock_zone_cluster"></a>`CAUSALITY_CLOCK_ZONE_CLUSTER`
+- <a id="rule-causality_relationship_drought_run"></a>`CAUSALITY_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-causality_suspense_peak_uncaused"></a>`CAUSALITY_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 685
 
@@ -383,9 +383,9 @@ Wave 685 additions (closes the seventh rotation cycle, 671-685): CAUSALITY_CLOCK
 
 Rules named in this wave's header:
 
-- `CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED`
-- `CAUSALITY_PAYOFF_DROUGHT_RUN`
-- `CAUSALITY_SEED_ZONE_CLUSTER`
+- <a id="rule-causality_clock_delta_peak_uncaused"></a>`CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-causality_payoff_drought_run"></a>`CAUSALITY_PAYOFF_DROUGHT_RUN`
+- <a id="rule-causality_seed_zone_cluster"></a>`CAUSALITY_SEED_ZONE_CLUSTER`
 
 ## Wave 671
 
@@ -393,9 +393,9 @@ Wave 671 additions (built on the shared checks library, audit M2.2): opens the s
 
 Rules named in this wave's header:
 
-- `CAUSALITY_HIGHLIGHT_DROUGHT_RUN`
-- `CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED`
-- `CAUSALITY_STAKES_ZONE_CLUSTER`
+- <a id="rule-causality_highlight_drought_run"></a>`CAUSALITY_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-causality_open_thread_peak_uncaused"></a>`CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-causality_stakes_zone_cluster"></a>`CAUSALITY_STAKES_ZONE_CLUSTER`
 
 ## Wave 657
 
@@ -403,9 +403,9 @@ Wave 657 additions (built on the shared checks library, audit M2.2): completes t
 
 Rules named in this wave's header:
 
-- `CAUSAL_STAGING_ZONE_CLUSTER`
-- `CAUSALITY_HIGHLIGHT_PEAK_UNCAUSED`
-- `CAUSALITY_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-causal_staging_zone_cluster"></a>`CAUSAL_STAGING_ZONE_CLUSTER`
+- <a id="rule-causality_highlight_peak_uncaused"></a>`CAUSALITY_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-causality_open_thread_drought_run"></a>`CAUSALITY_OPEN_THREAD_DROUGHT_RUN`
 
 ## Wave 643
 
@@ -413,9 +413,9 @@ Wave 643 additions (built on the shared checks library, audit M2.2): CAUSALITY_V
 
 Rules named in this wave's header:
 
-- `CAUSAL_HIGHLIGHT_ZONE_CLUSTER`
-- `CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED`
-- `CAUSALITY_VISUAL_BEAT_DROUGHT_RUN`
+- <a id="rule-causal_highlight_zone_cluster"></a>`CAUSAL_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-causality_open_thread_curiosity_decoupled"></a>`CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED`
+- <a id="rule-causality_visual_beat_drought_run"></a>`CAUSALITY_VISUAL_BEAT_DROUGHT_RUN`
 
 ## Wave 629
 
@@ -423,9 +423,9 @@ Wave 629 additions (built on the shared checks library, audit M2.2): CAUSAL_HIGH
 
 Rules named in this wave's header:
 
-- `CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
-- `CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE`
-- `VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-causal_highlight_open_thread_decoupled"></a>`CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
+- <a id="rule-causality_open_thread_zone_imbalance"></a>`CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-visual_beat_dialogue_highlight_aftermath_void"></a>`VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 615
 
@@ -433,9 +433,9 @@ Wave 615 additions (built on the shared checks library, audit M2.2): VISUAL_BEAT
 
 Rules named in this wave's header:
 
-- `OPEN_THREAD_DRAMATIC_TURN_DECOUPLED`
-- `VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE`
-- `VISUAL_BEAT_PEAK_UNCAUSED`
+- <a id="rule-open_thread_dramatic_turn_decoupled"></a>`OPEN_THREAD_DRAMATIC_TURN_DECOUPLED`
+- <a id="rule-visual_beat_causality_zone_imbalance"></a>`VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE`
+- <a id="rule-visual_beat_peak_uncaused"></a>`VISUAL_BEAT_PEAK_UNCAUSED`
 
 ## Wave 587
 
@@ -443,10 +443,10 @@ Wave 587 additions: dramatic-turn suspense aftermath void (sequence/aftermath ×
 
 Rules named in this wave's header:
 
-- `CLOCK_RAISE_CURIOSITY_VOID`
-- `CLOCK_RAISE_NO_SUSPENSE`
-- `DRAMATIC_TURN_AFTERMATH_VOID`
-- `RELATIONSHIP_OPENING_THIRD_ABSENT`
+- <a id="rule-clock_raise_curiosity_void"></a>`CLOCK_RAISE_CURIOSITY_VOID`
+- <a id="rule-clock_raise_no_suspense"></a>`CLOCK_RAISE_NO_SUSPENSE`
+- <a id="rule-dramatic_turn_aftermath_void"></a>`DRAMATIC_TURN_AFTERMATH_VOID`
+- <a id="rule-relationship_opening_third_absent"></a>`RELATIONSHIP_OPENING_THIRD_ABSENT`
 
 ## Wave 573
 
@@ -454,10 +454,10 @@ Wave 573 additions: relationship opening third absent (zone presence/absence × 
 
 Rules named in this wave's header:
 
-- `CLOCK_TEMPORAL_CLUSTER`
-- `CURIOSITY_FRONT_LOADED`
-- `RELATIONSHIP_CLOSING_THIRD_ABSENT`
-- `SUSPENSE_TEMPORAL_CLUSTER`
+- <a id="rule-clock_temporal_cluster"></a>`CLOCK_TEMPORAL_CLUSTER`
+- <a id="rule-curiosity_front_loaded"></a>`CURIOSITY_FRONT_LOADED`
+- <a id="rule-relationship_closing_third_absent"></a>`RELATIONSHIP_CLOSING_THIRD_ABSENT`
+- <a id="rule-suspense_temporal_cluster"></a>`SUSPENSE_TEMPORAL_CLUSTER`
 
 ## Wave 559
 
@@ -465,10 +465,10 @@ Wave 559 additions: relationship shift uncaused (backward-cause × relationship 
 
 Rules named in this wave's header:
 
-- `DRAMATIC_TURN_RELATIONSHIP_VOID`
-- `PAYOFF_AFTERMATH_CURIOSITY_VOID`
-- `PAYOFF_RELATIONSHIP_VOID`
-- `RELATIONSHIP_STASIS_RUN`
+- <a id="rule-dramatic_turn_relationship_void"></a>`DRAMATIC_TURN_RELATIONSHIP_VOID`
+- <a id="rule-payoff_aftermath_curiosity_void"></a>`PAYOFF_AFTERMATH_CURIOSITY_VOID`
+- <a id="rule-payoff_relationship_void"></a>`PAYOFF_RELATIONSHIP_VOID`
+- <a id="rule-relationship_stasis_run"></a>`RELATIONSHIP_STASIS_RUN`
 
 ## Wave 545
 
@@ -476,8 +476,8 @@ Wave 545 additions: payoff aftermath curiosity void (average/aggregate × payoff
 
 Rules named in this wave's header:
 
-- `EMOTIONAL_CLOSING_THIRD_ABSENT`
-- `PAYOFF_AFTERMATH_SUSPENSE_VOID`
+- <a id="rule-emotional_closing_third_absent"></a>`EMOTIONAL_CLOSING_THIRD_ABSENT`
+- <a id="rule-payoff_aftermath_suspense_void"></a>`PAYOFF_AFTERMATH_SUSPENSE_VOID`
 
 ## Wave 531
 
@@ -485,11 +485,11 @@ Wave 531 additions: suspense spike relationship void (co-occurrence/decoupling �
 
 Rules named in this wave's header:
 
-- `DRAMATIC_TURN_TEMPORAL_CLUSTER`
-- `SEED_AFTERMATH_CURIOSITY_VOID`
-- `SUSPENSE_SPIKE_NO_CURIOSITY`
-- `SUSPENSE_SPIKE_NO_EMOTION`
-- `SUSPENSE_SPIKE_NO_FALLOUT`
+- <a id="rule-dramatic_turn_temporal_cluster"></a>`DRAMATIC_TURN_TEMPORAL_CLUSTER`
+- <a id="rule-seed_aftermath_curiosity_void"></a>`SEED_AFTERMATH_CURIOSITY_VOID`
+- <a id="rule-suspense_spike_no_curiosity"></a>`SUSPENSE_SPIKE_NO_CURIOSITY`
+- <a id="rule-suspense_spike_no_emotion"></a>`SUSPENSE_SPIKE_NO_EMOTION`
+- <a id="rule-suspense_spike_no_fallout"></a>`SUSPENSE_SPIKE_NO_FALLOUT`
 
 ## Wave 517
 
@@ -497,9 +497,9 @@ Wave 517 additions: payoff aftermath suspense void (average/aggregate × payoff 
 
 Rules named in this wave's header:
 
-- `CLOCK_FINAL_THIRD_ABSENT`
-- `POSITIVE_EMOTION_UNBROKEN_RUN`
-- `REVELATION_AFTERMATH_SUSPENSE_VOID`
+- <a id="rule-clock_final_third_absent"></a>`CLOCK_FINAL_THIRD_ABSENT`
+- <a id="rule-positive_emotion_unbroken_run"></a>`POSITIVE_EMOTION_UNBROKEN_RUN`
+- <a id="rule-revelation_aftermath_suspense_void"></a>`REVELATION_AFTERMATH_SUSPENSE_VOID`
 
 ## Wave 503
 
@@ -507,9 +507,9 @@ Wave 503 additions: revelation aftermath suspense void (sequence/aftermath × re
 
 Rules named in this wave's header:
 
-- `CLOCK_CLUSTERING`
-- `CLOCK_SINGLE_SCENE`
-- `SUSPENSE_DECLINE_RUN`
+- <a id="rule-clock_clustering"></a>`CLOCK_CLUSTERING`
+- <a id="rule-clock_single_scene"></a>`CLOCK_SINGLE_SCENE`
+- <a id="rule-suspense_decline_run"></a>`SUSPENSE_DECLINE_RUN`
 
 ## Wave 489
 
@@ -517,9 +517,9 @@ Wave 489 additions: dramatic turn temporal cluster (distribution/timing × drama
 
 Rules named in this wave's header:
 
-- `EMOTIONAL_ZONE_CLUSTER`
-- `PAYOFF_ZONE_CLUSTER`
-- `SEED_TEMPORAL_CLUSTER`
+- <a id="rule-emotional_zone_cluster"></a>`EMOTIONAL_ZONE_CLUSTER`
+- <a id="rule-payoff_zone_cluster"></a>`PAYOFF_ZONE_CLUSTER`
+- <a id="rule-seed_temporal_cluster"></a>`SEED_TEMPORAL_CLUSTER`
 
 ## Wave 475
 
@@ -527,9 +527,9 @@ Wave 475 additions: emotional zone cluster (distribution/timing — >75% of emot
 
 Rules named in this wave's header:
 
-- `CLUE_SEED_CLUSTER`
-- `EMOTIONAL_POSITIVE_DESERT`
-- `PAYOFF_BACK_LOADED`
+- <a id="rule-clue_seed_cluster"></a>`CLUE_SEED_CLUSTER`
+- <a id="rule-emotional_positive_desert"></a>`EMOTIONAL_POSITIVE_DESERT`
+- <a id="rule-payoff_back_loaded"></a>`PAYOFF_BACK_LOADED`
 
 ## Wave 461
 
@@ -537,12 +537,12 @@ Wave 461 additions: payoff relationship void (every payoff scene carries no rela
 
 Rules named in this wave's header:
 
-- `CLUE_SEED_SUSPENSE_VOID`
-- `EMOTIONAL_NEUTRAL_RUN`
-- `PAYOFF_CURIOSITY_DECOUPLED`
-- `PAYOFF_NO_EMOTION`
-- `PAYOFF_SUSPENSE_VOID`
-- `SEED_SCENE_CURIOSITY_VOID`
+- <a id="rule-clue_seed_suspense_void"></a>`CLUE_SEED_SUSPENSE_VOID`
+- <a id="rule-emotional_neutral_run"></a>`EMOTIONAL_NEUTRAL_RUN`
+- <a id="rule-payoff_curiosity_decoupled"></a>`PAYOFF_CURIOSITY_DECOUPLED`
+- <a id="rule-payoff_no_emotion"></a>`PAYOFF_NO_EMOTION`
+- <a id="rule-payoff_suspense_void"></a>`PAYOFF_SUSPENSE_VOID`
+- <a id="rule-seed_scene_curiosity_void"></a>`SEED_SCENE_CURIOSITY_VOID`
 
 ## Wave 447
 
@@ -550,13 +550,13 @@ Wave 447 additions: suspense decline run (4+ consecutive scenes each with suspen
 
 Rules named in this wave's header:
 
-- `CURIOSITY_DECLINE_RUN`
-- `CURIOSITY_SPIKE_NO_FALLOUT`
-- `DRAMATIC_TURN_CURIOSITY_VOID`
-- `DRAMATIC_TURN_NO_EMOTION`
-- `DRAMATIC_TURN_NO_SUSPENSE`
-- `SUSPENSE_PEAK_UNCAUSED`
-- `SUSPENSE_UNRELEASED_RUN`
+- <a id="rule-curiosity_decline_run"></a>`CURIOSITY_DECLINE_RUN`
+- <a id="rule-curiosity_spike_no_fallout"></a>`CURIOSITY_SPIKE_NO_FALLOUT`
+- <a id="rule-dramatic_turn_curiosity_void"></a>`DRAMATIC_TURN_CURIOSITY_VOID`
+- <a id="rule-dramatic_turn_no_emotion"></a>`DRAMATIC_TURN_NO_EMOTION`
+- <a id="rule-dramatic_turn_no_suspense"></a>`DRAMATIC_TURN_NO_SUSPENSE`
+- <a id="rule-suspense_peak_uncaused"></a>`SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-suspense_unreleased_run"></a>`SUSPENSE_UNRELEASED_RUN`
 
 ## Wave 405
 
@@ -564,61 +564,61 @@ Wave 405 additions: positive reaction without cause (a positive emotional shift 
 
 Rules named in this wave's header:
 
-- `REACTION_WITHOUT_CAUSE`
-- `SUSPENSE_SPIKE_NO_CAUSE`
+- <a id="rule-reaction_without_cause"></a>`REACTION_WITHOUT_CAUSE`
+- <a id="rule-suspense_spike_no_cause"></a>`SUSPENSE_SPIKE_NO_CAUSE`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ABANDONED_GOAL` — Wave 141: Motivation coherence & action consequence
-- `ACT2_CAUSAL_DESERT` — Wave 212: Setup-payoff imbalance, act2 causal desert, causal midpoint void
-- `ACT3_DISCHARGE_ABSENT` — Wave 197: Causal Act1 void, Act3 discharge absent, motivation reversal
-- `ACTION_WITHOUT_CONSEQUENCE` — Wave 141: Motivation coherence & action consequence
-- `ANTAGONIST_SECOND_HALF_SILENT` — Wave 226: ANTAGONIST_SECOND_HALF_SILENT
-- `CAUSAL_ACT1_VOID` — Wave 197: Causal Act1 void, Act3 discharge absent, motivation reversal
-- `CAUSAL_DENSITY_INVERSION` — Wave 226: CAUSAL_DENSITY_INVERSION
-- `CAUSAL_MIDPOINT_VOID` — Wave 212: Setup-payoff imbalance, act2 causal desert, causal midpoint void
-- `CLOCK_DELTA_WITHOUT_RAISE` — Wave 296: CLOCK_DELTA_WITHOUT_RAISE
-- `CLOCK_GHOST` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
-- `CLOCK_PEAK_UNCAUSED` — Wave 489: DRAMATIC_TURN_TEMPORAL_CLUSTER, CLOCK_PEAK_UNCAUSED, SEED_AFTERMATH_CURIOSITY_VOID
-- `CLOCK_RAISE_NO_FALLOUT` — Wave 391: SUSPENSE_SPIKE_NO_EMOTION, CLOCK_RAISE_NO_FALLOUT, CURIOSITY_SPIKE_NO_FALLOUT
-- `CLOCK_RAISE_RELATIONSHIP_VOID` — Wave 419: REVELATION_RELATIONSHIP_VOID, PAYOFF_SUSPENSE_VOID, CLOCK_RAISE_RELATIONSHIP_VOID
-- `CLOCK_RAISED_NO_DELTA` — Wave 324: SUSPENSE_UNRELEASED_RUN, CLOCK_RAISED_NO_DELTA, EMOTIONAL_NEUTRAL_RUN
-- `CLOCK_RAISED_NO_EMOTION` — Wave 349: CLOCK_RAISED_NO_EMOTION, DRAMATIC_TURN_NO_SUSPENSE, SUSPENSE_SPIKE_NO_FALLOUT
-- `CLOCK_RAISED_WITHOUT_PAYOFF` — Wave 180: Revelation without reaction, reaction without cause, clock without payoff
-- `CLOCK_RELIEF_UNEXPLAINED` — Wave 310: CLOCK_RELIEF_UNEXPLAINED
-- `COINCIDENCE_RESOLVES_PROBLEM` — COINCIDENCE_RESOLVES_PROBLEM
-- `CONSEQUENCE_CHAIN_BREAK` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
-- `CONSEQUENCE_DELAY_EXCESSIVE` — Wave 166: Chekhov's gun, consequence delay, revelation front-loading
-- `CURIOSITY_OPEN_LOOP` — Wave 240: CURIOSITY_OPEN_LOOP
-- `CURIOSITY_PEAK_NO_FOLLOWTHROUGH` — Wave 447: SUSPENSE_DECLINE_RUN, DRAMATIC_TURN_RELATIONSHIP_VOID, CURIOSITY_PEAK_NO_FOLLOWTHROUGH
-- `DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `EMOTION_WITHOUT_DRIVER_RUN` — Wave 310: EMOTION_WITHOUT_DRIVER_RUN
-- `EMOTIONAL_MONOTONY` — Consecutive scenes with identical emotional shift
-- `EMOTIONAL_OPENING_THIRD_ABSENT` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `EMOTIONAL_WHIPLASH` — Wave 240: EMOTIONAL_WHIPLASH
-- `ESCALATION_PLATEAU` — Wave 226: ESCALATION_PLATEAU
-- `GOAL_WITHOUT_OPPOSITION` — Wave 155: Deus ex machina, suspense spike, goal-conflict absence
-- `NEGATIVE_EMOTION_UNBROKEN_RUN` — Wave 503 checks
-- `PAYOFF_CLOSING_THIRD_ABSENT` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `PAYOFF_PEAK_INERT` — Wave 433: SUSPENSE_PEAK_UNCAUSED, CURIOSITY_DECLINE_RUN, PAYOFF_PEAK_INERT
-- `PAYOFF_WITHOUT_SETUP` — Wave 254: PAYOFF_WITHOUT_SETUP
-- `POSITIVE_REACTION_WITHOUT_CAUSE` — Wave 405: POSITIVE_REACTION_WITHOUT_CAUSE, CURIOSITY_SPIKE_WITHOUT_CAUSE, DRAMATIC_TURN_WITHOUT_CAUSE
-- `POSITIVE_SHIFT_ORPHAN` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
-- `RELATIONSHIP_SHIFT_UNCAUSED` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `REVELATION_RELATIONSHIP_VOID` — Wave 419: REVELATION_RELATIONSHIP_VOID, PAYOFF_SUSPENSE_VOID, CLOCK_RAISE_RELATIONSHIP_VOID
-- `REVELATION_WITHOUT_CURIOSITY` — Wave 240: REVELATION_WITHOUT_CURIOSITY
-- `REVELATION_WITHOUT_REACTION` — Wave 180: Revelation without reaction, reaction without cause, clock without payoff
-- `REVELATION_WITHOUT_SETUP` — Revelation without any prior planted clue
-- `SEED_AFTERMATH_SUSPENSE_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `SEED_SCENE_EMOTION_VOID` — Wave 461: PAYOFF_RELATIONSHIP_VOID, SEED_SCENE_EMOTION_VOID, RELATIONSHIP_STASIS_RUN
-- `SEED_STASIS_RUN` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `STATED_BELIEF_REVELATION_DECOUPLED` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `STATED_BELIEF_ZONE_IMBALANCE` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `SUSPENSE_PLATEAU_FLATLINE` — Wave 254: SUSPENSE_PLATEAU_FLATLINE
-- `SUSPENSE_SAWTOOTH` — Wave 296: SUSPENSE_SAWTOOTH
-- `SUSPENSE_SPIKE_RELATIONSHIP_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
-- `UNEXPLAINED_SUSPENSE_DROP` — Suspense drop without a reversal scene
-- `UNMOTIVATED_DECISION` — Wave 141: Motivation coherence & action consequence
+- <a id="rule-abandoned_goal"></a>`ABANDONED_GOAL` — Wave 141: Motivation coherence & action consequence
+- <a id="rule-act2_causal_desert"></a>`ACT2_CAUSAL_DESERT` — Wave 212: Setup-payoff imbalance, act2 causal desert, causal midpoint void
+- <a id="rule-act3_discharge_absent"></a>`ACT3_DISCHARGE_ABSENT` — Wave 197: Causal Act1 void, Act3 discharge absent, motivation reversal
+- <a id="rule-action_without_consequence"></a>`ACTION_WITHOUT_CONSEQUENCE` — Wave 141: Motivation coherence & action consequence
+- <a id="rule-antagonist_second_half_silent"></a>`ANTAGONIST_SECOND_HALF_SILENT` — Wave 226: ANTAGONIST_SECOND_HALF_SILENT
+- <a id="rule-causal_act1_void"></a>`CAUSAL_ACT1_VOID` — Wave 197: Causal Act1 void, Act3 discharge absent, motivation reversal
+- <a id="rule-causal_density_inversion"></a>`CAUSAL_DENSITY_INVERSION` — Wave 226: CAUSAL_DENSITY_INVERSION
+- <a id="rule-causal_midpoint_void"></a>`CAUSAL_MIDPOINT_VOID` — Wave 212: Setup-payoff imbalance, act2 causal desert, causal midpoint void
+- <a id="rule-clock_delta_without_raise"></a>`CLOCK_DELTA_WITHOUT_RAISE` — Wave 296: CLOCK_DELTA_WITHOUT_RAISE
+- <a id="rule-clock_ghost"></a>`CLOCK_GHOST` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
+- <a id="rule-clock_peak_uncaused"></a>`CLOCK_PEAK_UNCAUSED` — Wave 489: DRAMATIC_TURN_TEMPORAL_CLUSTER, CLOCK_PEAK_UNCAUSED, SEED_AFTERMATH_CURIOSITY_VOID
+- <a id="rule-clock_raise_no_fallout"></a>`CLOCK_RAISE_NO_FALLOUT` — Wave 391: SUSPENSE_SPIKE_NO_EMOTION, CLOCK_RAISE_NO_FALLOUT, CURIOSITY_SPIKE_NO_FALLOUT
+- <a id="rule-clock_raise_relationship_void"></a>`CLOCK_RAISE_RELATIONSHIP_VOID` — Wave 419: REVELATION_RELATIONSHIP_VOID, PAYOFF_SUSPENSE_VOID, CLOCK_RAISE_RELATIONSHIP_VOID
+- <a id="rule-clock_raised_no_delta"></a>`CLOCK_RAISED_NO_DELTA` — Wave 324: SUSPENSE_UNRELEASED_RUN, CLOCK_RAISED_NO_DELTA, EMOTIONAL_NEUTRAL_RUN
+- <a id="rule-clock_raised_no_emotion"></a>`CLOCK_RAISED_NO_EMOTION` — Wave 349: CLOCK_RAISED_NO_EMOTION, DRAMATIC_TURN_NO_SUSPENSE, SUSPENSE_SPIKE_NO_FALLOUT
+- <a id="rule-clock_raised_without_payoff"></a>`CLOCK_RAISED_WITHOUT_PAYOFF` — Wave 180: Revelation without reaction, reaction without cause, clock without payoff
+- <a id="rule-clock_relief_unexplained"></a>`CLOCK_RELIEF_UNEXPLAINED` — Wave 310: CLOCK_RELIEF_UNEXPLAINED
+- <a id="rule-coincidence_resolves_problem"></a>`COINCIDENCE_RESOLVES_PROBLEM` — COINCIDENCE_RESOLVES_PROBLEM
+- <a id="rule-consequence_chain_break"></a>`CONSEQUENCE_CHAIN_BREAK` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
+- <a id="rule-consequence_delay_excessive"></a>`CONSEQUENCE_DELAY_EXCESSIVE` — Wave 166: Chekhov's gun, consequence delay, revelation front-loading
+- <a id="rule-curiosity_open_loop"></a>`CURIOSITY_OPEN_LOOP` — Wave 240: CURIOSITY_OPEN_LOOP
+- <a id="rule-curiosity_peak_no_followthrough"></a>`CURIOSITY_PEAK_NO_FOLLOWTHROUGH` — Wave 447: SUSPENSE_DECLINE_RUN, DRAMATIC_TURN_RELATIONSHIP_VOID, CURIOSITY_PEAK_NO_FOLLOWTHROUGH
+- <a id="rule-dramatic_turn_suspense_aftermath_void"></a>`DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-emotion_without_driver_run"></a>`EMOTION_WITHOUT_DRIVER_RUN` — Wave 310: EMOTION_WITHOUT_DRIVER_RUN
+- <a id="rule-emotional_monotony"></a>`EMOTIONAL_MONOTONY` — Consecutive scenes with identical emotional shift
+- <a id="rule-emotional_opening_third_absent"></a>`EMOTIONAL_OPENING_THIRD_ABSENT` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-emotional_whiplash"></a>`EMOTIONAL_WHIPLASH` — Wave 240: EMOTIONAL_WHIPLASH
+- <a id="rule-escalation_plateau"></a>`ESCALATION_PLATEAU` — Wave 226: ESCALATION_PLATEAU
+- <a id="rule-goal_without_opposition"></a>`GOAL_WITHOUT_OPPOSITION` — Wave 155: Deus ex machina, suspense spike, goal-conflict absence
+- <a id="rule-negative_emotion_unbroken_run"></a>`NEGATIVE_EMOTION_UNBROKEN_RUN` — Wave 503 checks
+- <a id="rule-payoff_closing_third_absent"></a>`PAYOFF_CLOSING_THIRD_ABSENT` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-payoff_peak_inert"></a>`PAYOFF_PEAK_INERT` — Wave 433: SUSPENSE_PEAK_UNCAUSED, CURIOSITY_DECLINE_RUN, PAYOFF_PEAK_INERT
+- <a id="rule-payoff_without_setup"></a>`PAYOFF_WITHOUT_SETUP` — Wave 254: PAYOFF_WITHOUT_SETUP
+- <a id="rule-positive_reaction_without_cause"></a>`POSITIVE_REACTION_WITHOUT_CAUSE` — Wave 405: POSITIVE_REACTION_WITHOUT_CAUSE, CURIOSITY_SPIKE_WITHOUT_CAUSE, DRAMATIC_TURN_WITHOUT_CAUSE
+- <a id="rule-positive_shift_orphan"></a>`POSITIVE_SHIFT_ORPHAN` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
+- <a id="rule-relationship_shift_uncaused"></a>`RELATIONSHIP_SHIFT_UNCAUSED` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-revelation_relationship_void"></a>`REVELATION_RELATIONSHIP_VOID` — Wave 419: REVELATION_RELATIONSHIP_VOID, PAYOFF_SUSPENSE_VOID, CLOCK_RAISE_RELATIONSHIP_VOID
+- <a id="rule-revelation_without_curiosity"></a>`REVELATION_WITHOUT_CURIOSITY` — Wave 240: REVELATION_WITHOUT_CURIOSITY
+- <a id="rule-revelation_without_reaction"></a>`REVELATION_WITHOUT_REACTION` — Wave 180: Revelation without reaction, reaction without cause, clock without payoff
+- <a id="rule-revelation_without_setup"></a>`REVELATION_WITHOUT_SETUP` — Revelation without any prior planted clue
+- <a id="rule-seed_aftermath_suspense_void"></a>`SEED_AFTERMATH_SUSPENSE_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-seed_scene_emotion_void"></a>`SEED_SCENE_EMOTION_VOID` — Wave 461: PAYOFF_RELATIONSHIP_VOID, SEED_SCENE_EMOTION_VOID, RELATIONSHIP_STASIS_RUN
+- <a id="rule-seed_stasis_run"></a>`SEED_STASIS_RUN` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-stated_belief_revelation_decoupled"></a>`STATED_BELIEF_REVELATION_DECOUPLED` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-stated_belief_zone_imbalance"></a>`STATED_BELIEF_ZONE_IMBALANCE` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-suspense_plateau_flatline"></a>`SUSPENSE_PLATEAU_FLATLINE` — Wave 254: SUSPENSE_PLATEAU_FLATLINE
+- <a id="rule-suspense_sawtooth"></a>`SUSPENSE_SAWTOOTH` — Wave 296: SUSPENSE_SAWTOOTH
+- <a id="rule-suspense_spike_relationship_void"></a>`SUSPENSE_SPIKE_RELATIONSHIP_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
+- <a id="rule-unexplained_suspense_drop"></a>`UNEXPLAINED_SUSPENSE_DROP` — Suspense drop without a reversal scene
+- <a id="rule-unmotivated_decision"></a>`UNMOTIVATED_DECISION` — Wave 141: Motivation coherence & action consequence
 

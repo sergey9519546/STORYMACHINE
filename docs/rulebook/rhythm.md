@@ -8,9 +8,9 @@ Wave 1190 additions (Program v2, Type 1 — signal channel #3, closes cycle 2): 
 
 Rules named in this wave's header:
 
-- `RHYTHM_MONOLOGUE_REVELATION_DECOUPLED`
-- `RHYTHM_SOLO_VOICE_DROUGHT_RUN`
-- `RHYTHM_SOLO_VOICE_ZONE_CLUSTER`
+- <a id="rule-rhythm_monologue_revelation_decoupled"></a>`RHYTHM_MONOLOGUE_REVELATION_DECOUPLED`
+- <a id="rule-rhythm_solo_voice_drought_run"></a>`RHYTHM_SOLO_VOICE_DROUGHT_RUN`
+- <a id="rule-rhythm_solo_voice_zone_cluster"></a>`RHYTHM_SOLO_VOICE_ZONE_CLUSTER`
 
 ## Wave 1170
 
@@ -18,9 +18,9 @@ Wave 1170 additions: after Wave 1156, clockRaised stood at four of six channels 
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RHYTHM_CLOCK_STAGING_AFTERMATH_VOID`
-- `RHYTHM_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_clock_dialogue_highlight_aftermath_void"></a>`RHYTHM_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-rhythm_clock_staging_aftermath_void"></a>`RHYTHM_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-rhythm_suspense_curiosity_aftermath_void"></a>`RHYTHM_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1156
 
@@ -28,9 +28,9 @@ Wave 1156 additions: after Wave 1142, unresolvedClues was at four of six channel
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `RHYTHM_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RHYTHM_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-rhythm_clock_relational_aftermath_void"></a>`RHYTHM_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_open_thread_dialogue_highlight_aftermath_void"></a>`RHYTHM_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-rhythm_open_thread_staging_aftermath_void"></a>`RHYTHM_OPEN_THREAD_STAGING_AFTERMATH_VOID`
 
 ## Wave 1142
 
@@ -38,9 +38,9 @@ Wave 1142 additions: unresolvedClues was at three of six channels; clockRaised a
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_clock_emotional_aftermath_void"></a>`RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_clock_suspense_aftermath_void"></a>`RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-rhythm_open_thread_relational_aftermath_void"></a>`RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1128
 
@@ -48,9 +48,9 @@ Wave 1128 additions: unresolvedClues (length>0) had only its one Wave-1114 chann
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `RHYTHM_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `RHYTHM_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-rhythm_clock_curiosity_aftermath_void"></a>`RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_open_thread_emotional_aftermath_void"></a>`RHYTHM_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_open_thread_suspense_aftermath_void"></a>`RHYTHM_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1114
 
@@ -58,9 +58,9 @@ Wave 1114 additions: RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and RHYTHM_SE
 
 Rules named in this wave's header:
 
-- `RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RHYTHM_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-rhythm_open_thread_curiosity_aftermath_void"></a>`RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_seed_dialogue_highlight_aftermath_void"></a>`RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-rhythm_seed_staging_aftermath_void"></a>`RHYTHM_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 1100
 
@@ -68,9 +68,9 @@ Wave 1100 additions: with all four boolean triggers already fully saturated, thi
 
 Rules named in this wave's header:
 
-- `RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID`
-- `RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-rhythm_seed_emotional_aftermath_void"></a>`RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_seed_relational_aftermath_void"></a>`RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_seed_suspense_aftermath_void"></a>`RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1086
 
@@ -78,9 +78,9 @@ Wave 1086 additions: dramaticTurn and raise_stakes each reach full six-channel s
 
 Rules named in this wave's header:
 
-- `RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID`
-- `RHYTHM_STAKES_STAGING_AFTERMATH_VOID`
-- `RHYTHM_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-rhythm_seed_curiosity_aftermath_void"></a>`RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_stakes_staging_aftermath_void"></a>`RHYTHM_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-rhythm_turn_staging_aftermath_void"></a>`RHYTHM_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1072
 
@@ -88,9 +88,9 @@ Wave 1072 additions: RHYTHM_PAYOFF_STAGING_AFTERMATH_VOID gives payoffSetupIds i
 
 Rules named in this wave's header:
 
-- `RHYTHM_PAYOFF_STAGING_AFTERMATH_VOID`
-- `RHYTHM_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RHYTHM_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-rhythm_payoff_staging_aftermath_void"></a>`RHYTHM_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-rhythm_stakes_dialogue_highlight_aftermath_void"></a>`RHYTHM_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-rhythm_turn_dialogue_highlight_aftermath_void"></a>`RHYTHM_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1058
 
@@ -98,9 +98,9 @@ Wave 1058 additions: RHYTHM_REVELATION_STAGING_AFTERMATH_VOID gives revelation i
 
 Rules named in this wave's header:
 
-- `RHYTHM_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RHYTHM_REVELATION_STAGING_AFTERMATH_VOID`
-- `RHYTHM_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-rhythm_payoff_dialogue_highlight_aftermath_void"></a>`RHYTHM_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-rhythm_revelation_staging_aftermath_void"></a>`RHYTHM_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-rhythm_turn_suspense_aftermath_void"></a>`RHYTHM_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1044
 
@@ -108,9 +108,9 @@ Wave 1044 additions: with raise_stakes and revelation now at four channels each,
 
 Rules named in this wave's header:
 
-- `RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID`
-- `RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_payoff_relational_aftermath_void"></a>`RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_revelation_dialogue_highlight_aftermath_void"></a>`RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-rhythm_turn_curiosity_aftermath_void"></a>`RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1030
 
@@ -118,9 +118,9 @@ Wave 1030 additions: RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID gives raise_stakes a
 
 Rules named in this wave's header:
 
-- `RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID`
-- `RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_payoff_suspense_aftermath_void"></a>`RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-rhythm_revelation_suspense_aftermath_void"></a>`RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-rhythm_stakes_emotional_aftermath_void"></a>`RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1016
 
@@ -128,9 +128,9 @@ Wave 1016 additions: this wave gives three more triggers a third consequence cha
 
 Rules named in this wave's header:
 
-- `RHYTHM_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `RHYTHM_STAKES_RELATIONAL_AFTERMATH_VOID`
-- `RHYTHM_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_revelation_curiosity_aftermath_void"></a>`RHYTHM_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_stakes_relational_aftermath_void"></a>`RHYTHM_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_turn_emotional_aftermath_void"></a>`RHYTHM_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1002
 
@@ -138,9 +138,9 @@ Wave 1002 additions: CLOCK_SIGNAL re-checked and re-excluded (confirmed same two
 
 Rules named in this wave's header:
 
-- `RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID`
-- `RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID`
-- `RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-rhythm_payoff_curiosity_aftermath_void"></a>`RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_revelation_relational_aftermath_void"></a>`RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_stakes_suspense_aftermath_void"></a>`RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 988
 
@@ -148,9 +148,9 @@ Wave 988 additions: re-auditing the zone-cluster/drought-run rule inventory turn
 
 Rules named in this wave's header:
 
-- `DIALOGUE_SIGNAL_ZONE_IMBALANCE`
-- `PAYOFF_SIGNAL_ZONE_IMBALANCE`
-- `RELATIONAL_SIGNAL_ZONE_IMBALANCE`
+- <a id="rule-dialogue_signal_zone_imbalance"></a>`DIALOGUE_SIGNAL_ZONE_IMBALANCE`
+- <a id="rule-payoff_signal_zone_imbalance"></a>`PAYOFF_SIGNAL_ZONE_IMBALANCE`
+- <a id="rule-relational_signal_zone_imbalance"></a>`RELATIONAL_SIGNAL_ZONE_IMBALANCE`
 
 ## Wave 974
 
@@ -158,9 +158,9 @@ Wave 974 additions: with the zone-imbalance mode now exhausted for this pass, pi
 
 Rules named in this wave's header:
 
-- `RHYTHM_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID`
-- `RHYTHM_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_payoff_emotional_aftermath_void"></a>`RHYTHM_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-rhythm_stakes_curiosity_aftermath_void"></a>`RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-rhythm_turn_relational_aftermath_void"></a>`RHYTHM_TURN_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 960
 
@@ -168,9 +168,9 @@ Wave 960 additions: auditing the three remaining trio-complete signals in this p
 
 Rules named in this wave's header:
 
-- `RHYTHM_CURIOSITY_ZONE_IMBALANCE`
-- `RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `RHYTHM_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-rhythm_curiosity_zone_imbalance"></a>`RHYTHM_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-rhythm_revelation_purpose_zone_imbalance"></a>`RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-rhythm_revelation_zone_imbalance"></a>`RHYTHM_REVELATION_ZONE_IMBALANCE`
 
 ## Wave 946
 
@@ -178,9 +178,9 @@ Wave 946 additions: extending the checkZoneImbalance rollout to three more trio-
 
 Rules named in this wave's header:
 
-- `RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `RHYTHM_STAKES_ZONE_IMBALANCE`
-- `RHYTHM_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-rhythm_positive_emotion_zone_imbalance"></a>`RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-rhythm_stakes_zone_imbalance"></a>`RHYTHM_STAKES_ZONE_IMBALANCE`
+- <a id="rule-rhythm_suspense_zone_imbalance"></a>`RHYTHM_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 932
 
@@ -188,9 +188,9 @@ Wave 932 additions: purpose === 'revelation' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `RHYTHM_COMPLICATE_ZONE_IMBALANCE`
-- `RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN`
-- `RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-rhythm_complicate_zone_imbalance"></a>`RHYTHM_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-rhythm_revelation_purpose_drought_run"></a>`RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-rhythm_revelation_purpose_zone_cluster"></a>`RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 918
 
@@ -198,9 +198,9 @@ Wave 918 additions: purpose === 'complicate' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `RHYTHM_COMPLICATE_DROUGHT_RUN`
-- `RHYTHM_COMPLICATE_ZONE_CLUSTER`
-- `RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-rhythm_complicate_drought_run"></a>`RHYTHM_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-rhythm_complicate_zone_cluster"></a>`RHYTHM_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-rhythm_negative_emotion_zone_imbalance"></a>`RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE`
 
 ## Wave 904
 
@@ -208,9 +208,9 @@ Wave 904 additions: continuing the checkZoneImbalance rollout begun in Wave 890,
 
 Rules named in this wave's header:
 
-- `RHYTHM_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `RHYTHM_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `RHYTHM_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-rhythm_character_moment_zone_imbalance"></a>`RHYTHM_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-rhythm_introduce_conflict_zone_imbalance"></a>`RHYTHM_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-rhythm_turning_point_zone_imbalance"></a>`RHYTHM_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 890
 
@@ -218,9 +218,9 @@ Wave 890 additions: the distinct 4-zone checkZoneImbalance mode had only ever be
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLIMAX_ZONE_IMBALANCE`
-- `RHYTHM_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `RHYTHM_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-rhythm_climax_zone_imbalance"></a>`RHYTHM_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-rhythm_establish_world_zone_imbalance"></a>`RHYTHM_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-rhythm_resolution_zone_imbalance"></a>`RHYTHM_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 876
 
@@ -228,9 +228,9 @@ Wave 876 additions: RHYTHM_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' 
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLIMAX_DROUGHT_RUN`
-- `RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN`
-- `RHYTHM_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-rhythm_climax_drought_run"></a>`RHYTHM_CLIMAX_DROUGHT_RUN`
+- <a id="rule-rhythm_establish_world_drought_run"></a>`RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-rhythm_resolution_drought_run"></a>`RHYTHM_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 862
 
@@ -238,9 +238,9 @@ Wave 862 additions: RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing x p
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLIMAX_ZONE_CLUSTER`
-- `RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `RHYTHM_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-rhythm_climax_zone_cluster"></a>`RHYTHM_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-rhythm_establish_world_zone_cluster"></a>`RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-rhythm_resolution_zone_cluster"></a>`RHYTHM_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 848
 
@@ -248,9 +248,9 @@ Wave 848 additions: RHYTHM_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_s
 
 Rules named in this wave's header:
 
-- `RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN`
-- `RHYTHM_STAKES_DROUGHT_RUN`
+- <a id="rule-rhythm_introduce_conflict_drought_run"></a>`RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-rhythm_positive_emotion_drought_run"></a>`RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-rhythm_stakes_drought_run"></a>`RHYTHM_STAKES_DROUGHT_RUN`
 
 ## Wave 834
 
@@ -258,10 +258,10 @@ Wave 834 additions: RHYTHM_STAKES_ZONE_CLUSTER (distribution/timing × purpose =
 
 Rules named in this wave's header:
 
-- `RHYTHM_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `RHYTHM_POSITIVE_EMOTION_ZONE_CLUSTER`
-- `RHYTHM_STAKES_ZONE_CLUSTER`
-- `STAKES_ZONE_IMBALANCE`
+- <a id="rule-rhythm_introduce_conflict_zone_cluster"></a>`RHYTHM_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-rhythm_positive_emotion_zone_cluster"></a>`RHYTHM_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-rhythm_stakes_zone_cluster"></a>`RHYTHM_STAKES_ZONE_CLUSTER`
+- <a id="rule-stakes_zone_imbalance"></a>`STAKES_ZONE_IMBALANCE`
 
 ## Wave 820
 
@@ -269,9 +269,9 @@ Wave 820 additions: RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose ==
 
 Rules named in this wave's header:
 
-- `RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN`
-- `RHYTHM_TURNING_POINT_DROUGHT_RUN`
-- `RHYTHM_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-rhythm_character_moment_drought_run"></a>`RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-rhythm_turning_point_drought_run"></a>`RHYTHM_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-rhythm_turning_point_zone_cluster"></a>`RHYTHM_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 806
 
@@ -279,9 +279,9 @@ Wave 806 additions: RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
 
 Rules named in this wave's header:
 
-- `RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-rhythm_character_moment_zone_cluster"></a>`RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-rhythm_negative_emotion_drought_run"></a>`RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-rhythm_negative_emotion_zone_cluster"></a>`RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 792
 
@@ -289,9 +289,9 @@ Wave 792 additions: RHYTHM_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDel
 
 Rules named in this wave's header:
 
-- `RHYTHM_CURIOSITY_PEAK_UNCAUSED`
-- `RHYTHM_REVELATION_ZONE_CLUSTER`
-- `RHYTHM_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-rhythm_curiosity_peak_uncaused"></a>`RHYTHM_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-rhythm_revelation_zone_cluster"></a>`RHYTHM_REVELATION_ZONE_CLUSTER`
+- <a id="rule-rhythm_suspense_peak_uncaused"></a>`RHYTHM_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 778
 
@@ -299,9 +299,9 @@ Wave 778 additions: RHYTHM_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 ab
 
 Rules named in this wave's header:
 
-- `RHYTHM_CURIOSITY_ZONE_CLUSTER`
-- `RHYTHM_REVELATION_DROUGHT_RUN`
-- `RHYTHM_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-rhythm_curiosity_zone_cluster"></a>`RHYTHM_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-rhythm_revelation_drought_run"></a>`RHYTHM_REVELATION_DROUGHT_RUN`
+- <a id="rule-rhythm_suspense_drought_run"></a>`RHYTHM_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 764
 
@@ -309,10 +309,10 @@ Wave 764 additions: RHYTHM_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspens
 
 Rules named in this wave's header:
 
-- `RHYTHM_CURIOSITY_DROUGHT_RUN`
-- `RHYTHM_REVELATION_PEAK_UNCAUSED`
-- `RHYTHM_SUSPENSE_ZONE_CLUSTER`
-- `SUSPENSE_SIGNAL_FLATLINE`
+- <a id="rule-rhythm_curiosity_drought_run"></a>`RHYTHM_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-rhythm_revelation_peak_uncaused"></a>`RHYTHM_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-rhythm_suspense_zone_cluster"></a>`RHYTHM_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-suspense_signal_flatline"></a>`SUSPENSE_SIGNAL_FLATLINE`
 
 ## Wave 750
 
@@ -320,9 +320,9 @@ Wave 750 additions: RHYTHM_CLOCK_ZONE_CLUSTER (distribution/timing × clockRaise
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLOCK_ZONE_CLUSTER`
-- `RHYTHM_EMOTION_DROUGHT_RUN`
-- `RHYTHM_TURN_DROUGHT_RUN`
+- <a id="rule-rhythm_clock_zone_cluster"></a>`RHYTHM_CLOCK_ZONE_CLUSTER`
+- <a id="rule-rhythm_emotion_drought_run"></a>`RHYTHM_EMOTION_DROUGHT_RUN`
+- <a id="rule-rhythm_turn_drought_run"></a>`RHYTHM_TURN_DROUGHT_RUN`
 
 ## Wave 736
 
@@ -330,9 +330,9 @@ Wave 736 additions: RHYTHM_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 
 
 Rules named in this wave's header:
 
-- `RHYTHM_CLOCK_DELTA_DROUGHT_RUN`
-- `RHYTHM_OPEN_THREAD_ZONE_CLUSTER`
-- `RHYTHM_STAGING_ZONE_CLUSTER`
+- <a id="rule-rhythm_clock_delta_drought_run"></a>`RHYTHM_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-rhythm_open_thread_zone_cluster"></a>`RHYTHM_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-rhythm_staging_zone_cluster"></a>`RHYTHM_STAGING_ZONE_CLUSTER`
 
 ## Wave 722
 
@@ -340,9 +340,9 @@ Wave 722 additions: CLOCK_SIGNAL_ZONE_CLUSTER (distribution/timing × clockDelta
 
 Rules named in this wave's header:
 
-- `CLOCK_SIGNAL_ZONE_CLUSTER`
-- `STAGING_SIGNAL_PEAK_UNCAUSED`
-- `UNRESOLVED_SIGNAL_PEAK_UNCAUSED`
+- <a id="rule-clock_signal_zone_cluster"></a>`CLOCK_SIGNAL_ZONE_CLUSTER`
+- <a id="rule-staging_signal_peak_uncaused"></a>`STAGING_SIGNAL_PEAK_UNCAUSED`
+- <a id="rule-unresolved_signal_peak_uncaused"></a>`UNRESOLVED_SIGNAL_PEAK_UNCAUSED`
 
 ## Wave 708
 
@@ -350,9 +350,9 @@ Wave 708 additions: DIALOGUE_SIGNAL_ZONE_CLUSTER (distribution/timing × dialogu
 
 Rules named in this wave's header:
 
-- `DIALOGUE_SIGNAL_ZONE_CLUSTER`
-- `PAYOFF_SIGNAL_DROUGHT_RUN`
-- `SEED_SIGNAL_PEAK_UNCAUSED`
+- <a id="rule-dialogue_signal_zone_cluster"></a>`DIALOGUE_SIGNAL_ZONE_CLUSTER`
+- <a id="rule-payoff_signal_drought_run"></a>`PAYOFF_SIGNAL_DROUGHT_RUN`
+- <a id="rule-seed_signal_peak_uncaused"></a>`SEED_SIGNAL_PEAK_UNCAUSED`
 
 ## Wave 694
 
@@ -360,9 +360,9 @@ Wave 694 additions: RELATIONAL_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backw
 
 Rules named in this wave's header:
 
-- `DIALOGUE_SIGNAL_DROUGHT_RUN`
-- `RELATIONAL_SIGNAL_PEAK_UNCAUSED`
-- `SEED_SIGNAL_ZONE_CLUSTER`
+- <a id="rule-dialogue_signal_drought_run"></a>`DIALOGUE_SIGNAL_DROUGHT_RUN`
+- <a id="rule-relational_signal_peak_uncaused"></a>`RELATIONAL_SIGNAL_PEAK_UNCAUSED`
+- <a id="rule-seed_signal_zone_cluster"></a>`SEED_SIGNAL_ZONE_CLUSTER`
 
 ## Wave 680
 
@@ -370,9 +370,9 @@ Wave 680 additions: PAYOFF_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backward-
 
 Rules named in this wave's header:
 
-- `OPEN_THREAD_SIGNAL_DROUGHT_RUN`
-- `PAYOFF_SIGNAL_PEAK_UNCAUSED`
-- `RELATIONAL_SIGNAL_ZONE_CLUSTER`
+- <a id="rule-open_thread_signal_drought_run"></a>`OPEN_THREAD_SIGNAL_DROUGHT_RUN`
+- <a id="rule-payoff_signal_peak_uncaused"></a>`PAYOFF_SIGNAL_PEAK_UNCAUSED`
+- <a id="rule-relational_signal_zone_cluster"></a>`RELATIONAL_SIGNAL_ZONE_CLUSTER`
 
 ## Wave 666
 
@@ -380,9 +380,9 @@ Wave 666 additions: DIALOGUE_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backwar
 
 Rules named in this wave's header:
 
-- `DIALOGUE_SIGNAL_PEAK_UNCAUSED`
-- `SEED_SIGNAL_DROUGHT_RUN`
-- `TURN_SIGNAL_ZONE_CLUSTER`
+- <a id="rule-dialogue_signal_peak_uncaused"></a>`DIALOGUE_SIGNAL_PEAK_UNCAUSED`
+- <a id="rule-seed_signal_drought_run"></a>`SEED_SIGNAL_DROUGHT_RUN`
+- <a id="rule-turn_signal_zone_cluster"></a>`TURN_SIGNAL_ZONE_CLUSTER`
 
 ## Wave 652
 
@@ -390,9 +390,9 @@ Wave 652 additions: this 110-rule pass already imports all six shared-checks-lib
 
 Rules named in this wave's header:
 
-- `EMOTIONAL_SIGNAL_ZONE_CLUSTER`
-- `OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED`
-- `STAGING_SIGNAL_DROUGHT_RUN`
+- <a id="rule-emotional_signal_zone_cluster"></a>`EMOTIONAL_SIGNAL_ZONE_CLUSTER`
+- <a id="rule-open_thread_curiosity_signal_decoupled"></a>`OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED`
+- <a id="rule-staging_signal_drought_run"></a>`STAGING_SIGNAL_DROUGHT_RUN`
 
 ## Wave 638
 
@@ -400,9 +400,9 @@ Wave 638 additions: PAYOFF_SIGNAL_ZONE_CLUSTER (distribution/timing × payoffSet
 
 Rules named in this wave's header:
 
-- `DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID`
-- `OPEN_THREAD_SIGNAL_DECOUPLED`
-- `PAYOFF_SIGNAL_ZONE_CLUSTER`
+- <a id="rule-dramatic_turn_payoff_aftermath_void"></a>`DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID`
+- <a id="rule-open_thread_signal_decoupled"></a>`OPEN_THREAD_SIGNAL_DECOUPLED`
+- <a id="rule-payoff_signal_zone_cluster"></a>`PAYOFF_SIGNAL_ZONE_CLUSTER`
 
 ## Wave 624
 
@@ -410,9 +410,9 @@ Wave 624 additions: VERBAL_STAGING_SIGNAL_DECOUPLED (co-occurrence/decoupling ×
 
 Rules named in this wave's header:
 
-- `CLOCK_SIGNAL_DROUGHT_RUN`
-- `SEED_SIGNAL_ZONE_IMBALANCE`
-- `VERBAL_STAGING_SIGNAL_DECOUPLED`
+- <a id="rule-clock_signal_drought_run"></a>`CLOCK_SIGNAL_DROUGHT_RUN`
+- <a id="rule-seed_signal_zone_imbalance"></a>`SEED_SIGNAL_ZONE_IMBALANCE`
+- <a id="rule-verbal_staging_signal_decoupled"></a>`VERBAL_STAGING_SIGNAL_DECOUPLED`
 
 ## Wave 610
 
@@ -420,9 +420,9 @@ Wave 610 additions: RELATIONAL_SIGNAL_DROUGHT_RUN (run-based × relationshipShif
 
 Rules named in this wave's header:
 
-- `CLOCK_SIGNAL_PEAK_UNCAUSED`
-- `RELATIONAL_SIGNAL_DROUGHT_RUN`
-- `REVELATION_SIGNAL_AFTERMATH_FLAT`
+- <a id="rule-clock_signal_peak_uncaused"></a>`CLOCK_SIGNAL_PEAK_UNCAUSED`
+- <a id="rule-relational_signal_drought_run"></a>`RELATIONAL_SIGNAL_DROUGHT_RUN`
+- <a id="rule-revelation_signal_aftermath_flat"></a>`REVELATION_SIGNAL_AFTERMATH_FLAT`
 
 ## Wave 596
 
@@ -430,7 +430,7 @@ Wave 596 additions: suspense signal flatline, curiosity signal flatline (record-
 
 Rules named in this wave's header:
 
-- `ACTION_WORDCOUNT_FLATLINE`
+- <a id="rule-action_wordcount_flatline"></a>`ACTION_WORDCOUNT_FLATLINE`
 
 ## Wave 582
 
@@ -438,8 +438,8 @@ Wave 582 additions: action long single sentence (co-occurrence × long word coun
 
 Rules named in this wave's header:
 
-- `ACTION_CONSECUTIVE_MEDIUM_RUN`
-- `MONOTONOUS_RHYTHM`
+- <a id="rule-action_consecutive_medium_run"></a>`ACTION_CONSECUTIVE_MEDIUM_RUN`
+- <a id="rule-monotonous_rhythm"></a>`MONOTONOUS_RHYTHM`
 
 ## Wave 568
 
@@ -447,9 +447,9 @@ Wave 568 additions: action long thirds cluster (distribution/timing × long ≥1
 
 Rules named in this wave's header:
 
-- `ACTION_DENSITY_PEAK_EARLY`
-- `ACTION_SHORTLONG_SEGREGATED`
-- `SHORT_LINE_POVERTY`
+- <a id="rule-action_density_peak_early"></a>`ACTION_DENSITY_PEAK_EARLY`
+- <a id="rule-action_shortlong_segregated"></a>`ACTION_SHORTLONG_SEGREGATED`
+- <a id="rule-short_line_poverty"></a>`SHORT_LINE_POVERTY`
 
 ## Wave 554
 
@@ -457,8 +457,8 @@ Wave 554 additions: action long beat uncaused (backward-cause × long channel �
 
 Rules named in this wave's header:
 
-- `ACTION_COMMA_DENSE_FLOOD`
-- `ACTION_SENTENCE_AVERAGE_HIGH`
+- <a id="rule-action_comma_dense_flood"></a>`ACTION_COMMA_DENSE_FLOOD`
+- <a id="rule-action_sentence_average_high"></a>`ACTION_SENTENCE_AVERAGE_HIGH`
 
 ## Wave 526
 
@@ -466,9 +466,9 @@ Wave 526 additions: action word-count ascent run (run-based × strictly increasi
 
 Rules named in this wave's header:
 
-- `ACTION_WORD_COUNT_DESCENT_RUN`
-- `COMMA_SPLICE_OVERUSE`
-- `POLYSYNDETON_OVERLOAD`
+- <a id="rule-action_word_count_descent_run"></a>`ACTION_WORD_COUNT_DESCENT_RUN`
+- <a id="rule-comma_splice_overuse"></a>`COMMA_SPLICE_OVERUSE`
+- <a id="rule-polysyndeton_overload"></a>`POLYSYNDETON_OVERLOAD`
 
 ## Wave 512
 
@@ -476,9 +476,9 @@ Wave 512 additions: action middle short absent (zone presence/absence × short c
 
 Rules named in this wave's header:
 
-- `ADVERB_CLUSTERING`
-- `INTENSIFIER_FLOOD`
-- `SUDDENLY_OVERUSE`
+- <a id="rule-adverb_clustering"></a>`ADVERB_CLUSTERING`
+- <a id="rule-intensifier_flood"></a>`INTENSIFIER_FLOOD`
+- <a id="rule-suddenly_overuse"></a>`SUDDENLY_OVERUSE`
 
 ## Wave 498
 
@@ -486,8 +486,8 @@ Wave 498 additions: opening long absent (zone presence/absence × long channel �
 
 Rules named in this wave's header:
 
-- `ACTION_MIDDLE_LONG_ABSENT`
-- `CONSECUTIVE_SHORT_RUN`
+- <a id="rule-action_middle_long_absent"></a>`ACTION_MIDDLE_LONG_ABSENT`
+- <a id="rule-consecutive_short_run"></a>`CONSECUTIVE_SHORT_RUN`
 
 ## Wave 456
 
@@ -495,10 +495,10 @@ Wave 456 additions: consecutive long run (run-based — 5+ consecutive action li
 
 Rules named in this wave's header:
 
-- `ACTION_FINALE_BLOAT`
-- `ACTION_LONG_RECOVERY_ABSENT`
-- `LONGEST_ACTION_OUTLIER`
-- `SINGLE_SENTENCE_FLOOD`
+- <a id="rule-action_finale_bloat"></a>`ACTION_FINALE_BLOAT`
+- <a id="rule-action_long_recovery_absent"></a>`ACTION_LONG_RECOVERY_ABSENT`
+- <a id="rule-longest_action_outlier"></a>`LONGEST_ACTION_OUTLIER`
+- <a id="rule-single_sentence_flood"></a>`SINGLE_SENTENCE_FLOOD`
 
 ## Wave 428
 
@@ -506,7 +506,7 @@ Wave 428 additions: consecutive opener run (run-based — 5+ consecutive action 
 
 Rules named in this wave's header:
 
-- `LONG_LINE_FLOOD`
+- <a id="rule-long_line_flood"></a>`LONG_LINE_FLOOD`
 
 ## Wave 414
 
@@ -514,87 +514,87 @@ Wave 414 additions: vague-quantifier overload (>25% of action lines lean on impr
 
 Rules named in this wave's header:
 
-- `COLOR_ABSENCE`
-- `NUMBER_WORD_FLOOD`
+- <a id="rule-color_absence"></a>`COLOR_ABSENCE`
+- <a id="rule-number_word_flood"></a>`NUMBER_WORD_FLOOD`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ABSTRACT_NOUN_OVERLOAD` — Wave 184: Abstract noun overload, filler gestures, gerund fragments
-- `ACTION_ALTERNATION_RUN` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
-- `ACTION_CERTAINTY_ADVERB_FLOOD` — Wave 512: ACTION_MIDDLE_SHORT_ABSENT, ACTION_WORD_COUNT_DESCENT_RUN, ACTION_CERTAINTY_ADVERB_FLOOD
-- `ACTION_CONSECUTIVE_LONG_RUN` — Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK
-- `ACTION_DENSITY_PEAK_LATE` — Wave 498: ACTION_OPENING_LONG_ABSENT, ACTION_DENSITY_PEAK_LATE, ACTION_SHORT_MULTICLAUSAL
-- `ACTION_FINALE_LONG_ABSENT` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
-- `ACTION_FINALE_SHORT_ABSENT` — Wave 484: CONSECUTIVE_SHORT_RUN, ACTION_FINALE_SHORT_ABSENT, ACTION_SENTENCE_AVERAGE_HIGH
-- `ACTION_IMPACT_BEAT_UNCAUSED` — Wave 470: ACTION_MIDDLE_LONG_ABSENT, ACTION_IMPACT_BEAT_UNCAUSED, ACTION_DENSITY_PEAK_EARLY
-- `ACTION_LINE_WORD_FLOOR` — Wave 291: ACTION_LINE_WORD_FLOOR
-- `ACTION_LONG_BEAT_UNCAUSED` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
-- `ACTION_LONG_SINGLE_SENTENCE` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
-- `ACTION_LONG_THIRDS_CLUSTER` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
-- `ACTION_MEDIUM_OPENING_ABSENT` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
-- `ACTION_MIDDLE_SHORT_ABSENT` — Wave 512: ACTION_MIDDLE_SHORT_ABSENT, ACTION_WORD_COUNT_DESCENT_RUN, ACTION_CERTAINTY_ADVERB_FLOOD
-- `ACTION_OPENING_LONG_ABSENT` — Wave 498: ACTION_OPENING_LONG_ABSENT, ACTION_DENSITY_PEAK_LATE, ACTION_SHORT_MULTICLAUSAL
-- `ACTION_OPENING_SHORT_ABSENT` — Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK
-- `ACTION_PARENTHESIS_ASIDE` — Wave 305: ACTION_PARENTHESIS_ASIDE
-- `ACTION_PUNCTUATION_DESERT` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
-- `ACTION_SENTENCE_BURST_RUN` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
-- `ACTION_SENTENCE_COUNT_PEAK` — Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK
-- `ACTION_SHORT_EXPANSION_ABSENT` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
-- `ACTION_SHORT_MULTICLAUSAL` — Wave 498: ACTION_OPENING_LONG_ABSENT, ACTION_DENSITY_PEAK_LATE, ACTION_SHORT_MULTICLAUSAL
-- `ACTION_SHORT_THIRDS_CLUSTER` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
-- `ACTION_SHORTEST_OUTLIER` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
-- `ACTION_WORD_COUNT_ASCENT_RUN` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
-- `ACTION_WORD_COUNT_MODAL_LOCK` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
-- `ARTICLE_OPENER_DOMINANCE` — Wave 386: COMMA_SPLICE_OVERUSE, ARTICLE_OPENER_DOMINANCE, CONNECTIVE_OPENER_OVERUSE
-- `ATMOSPHERE_ABSTRACTION_OVERLOAD` — Wave 414: VAGUE_QUANTIFIER_OVERLOAD, ATMOSPHERE_ABSTRACTION_OVERLOAD, COLOR_DESCRIPTION_OVERLOAD
-- `BODY_PART_OVERLOAD` — Wave 277: Body-part overload, single-sentence flood, ellipsis chain
-- `CAMERA_DIRECTION_OVERREACH` — Wave 151: Camera-direction, adverb clustering, over-description
-- `COLON_IN_ACTION` — Wave 358: COLON_IN_ACTION, SOUND_DESCRIPTION_OVERLOAD, INTENSIFIER_FLOOD
-- `COLOR_DESCRIPTION_OVERLOAD` — Wave 414: VAGUE_QUANTIFIER_OVERLOAD, ATMOSPHERE_ABSTRACTION_OVERLOAD, COLOR_DESCRIPTION_OVERLOAD
-- `CONJUNCTION_OPENER_EXCESS` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
-- `CONNECTIVE_OPENER_OVERUSE` — Wave 386: COMMA_SPLICE_OVERUSE, ARTICLE_OPENER_DOMINANCE, CONNECTIVE_OPENER_OVERUSE
-- `CONSECUTIVE_OPENER_RUN` — Wave 428: CONSECUTIVE_OPENER_RUN, ACTION_FINALE_BLOAT, LONGEST_ACTION_OUTLIER
-- `CURIOSITY_SIGNAL_FLATLINE` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
-- `DASH_CHAIN` — Wave 305: DASH_CHAIN
-- `DECLARATIVE_PILE` — Wave 235: Declarative pile, simultaneous-action absent, motion-verb overload
-- `ELLIPSIS_CHAIN` — Wave 277: Body-part overload, single-sentence flood, ellipsis chain
-- `EXCLAMATION_IN_ACTION` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
-- `FILLER_GESTURE_EXCESS` — Wave 184: Abstract noun overload, filler gestures, gerund fragments
-- `GERUND_FRAGMENT_CHAIN` — Wave 184: Abstract noun overload, filler gestures, gerund fragments
-- `INTRACLAUSE_CADENCE_ABSENT` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
-- `LIGHT_DESCRIPTION_OVERLOAD` — Wave 330: WE_SEE_FLOOD, LIGHT_DESCRIPTION_OVERLOAD, SET_DRESSING_DOMINANCE
-- `LINE_ENDING_REPETITION` — Wave 400: LONG_LINE_FLOOD, LINE_ENDING_REPETITION, PROGRESSIVE_VERB_OVERUSE
-- `MID_LINE_EM_DASH_OVERUSE` — Wave 372: TRIADIC_LIST_OVERLOAD, MID_LINE_EM_DASH_OVERUSE, TEMPORAL_OPENER_OVERUSE
-- `MOTION_VERB_OVERLOAD` — Wave 235: Declarative pile, simultaneous-action absent, motion-verb overload
-- `NEAR_WORD_REPEAT` — Wave 170: Opening-word repetition, sensory imbalance, near-word repeat
-- `NEGATION_ACTION_FLOOD` — Wave 305: NEGATION_ACTION_FLOOD
-- `OPENING_WORD_REPETITION` — Wave 170: Opening-word repetition, sensory imbalance, near-word repeat
-- `OVER_DESCRIPTION` — Wave 151: Camera-direction, adverb clustering, over-description
-- `PASSIVE_VOICE_OVERUSE` — Passive voice: agentless constructions dilute cinematic drive
-- `PHYSICAL_INTERIORITY_LEAK` — Wave 319: SUDDENLY_OVERUSE, PRONOUN_OPENER_DOMINANCE, PHYSICAL_INTERIORITY_LEAK
-- `PREPOSITIONAL_OPENING_DOMINANCE` — Wave 291: PREPOSITIONAL_OPENING_DOMINANCE
-- `PROGRESSIVE_VERB_OVERUSE` — Wave 400: LONG_LINE_FLOOD, LINE_ENDING_REPETITION, PROGRESSIVE_VERB_OVERUSE
-- `PRONOUN_OPENER_DOMINANCE` — Wave 319: SUDDENLY_OVERUSE, PRONOUN_OPENER_DOMINANCE, PHYSICAL_INTERIORITY_LEAK
-- `PROSE_LENGTH_RAMP` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
-- `PROSE_RHYTHM_BLOCKING` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
-- `QUESTION_IN_ACTION` — Wave 263: Question in action, simile excess, color absence
-- `RUN_ON_ACTION` — Run-on action block: >5 consecutive long lines
-- `SEMICOLON_IN_ACTION` — Wave 344: POLYSYNDETON_OVERLOAD, SEMICOLON_IN_ACTION, WEATHER_DESCRIPTION_OVERLOAD
-- `SENSORY_IMBALANCE` — Wave 170: Opening-word repetition, sensory imbalance, near-word repeat
-- `SET_DRESSING_DOMINANCE` — Wave 330: WE_SEE_FLOOD, LIGHT_DESCRIPTION_OVERLOAD, SET_DRESSING_DOMINANCE
-- `SIMILE_EXCESS` — Wave 263: Question in action, simile excess, color absence
-- `SIMULTANEOUS_ACTION_ABSENT` — Wave 235: Declarative pile, simultaneous-action absent, motion-verb overload
-- `SOUND_DESCRIPTION_OVERLOAD` — Wave 358: COLON_IN_ACTION, SOUND_DESCRIPTION_OVERLOAD, INTENSIFIER_FLOOD
-- `SPATIAL_ANCHOR_ABSENT` — Wave 249: Short line poverty, visual texture absent, spatial anchor absent
-- `STACCATO_FRAGMENTATION` — Staccato: >4 consecutive very short lines
-- `TEMPORAL_OPENER_OVERUSE` — Wave 372: TRIADIC_LIST_OVERLOAD, MID_LINE_EM_DASH_OVERUSE, TEMPORAL_OPENER_OVERUSE
-- `THEN_CHAIN` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
-- `TRIADIC_LIST_OVERLOAD` — Wave 372: TRIADIC_LIST_OVERLOAD, MID_LINE_EM_DASH_OVERUSE, TEMPORAL_OPENER_OVERUSE
-- `VAGUE_QUANTIFIER_OVERLOAD` — Wave 414: VAGUE_QUANTIFIER_OVERLOAD, ATMOSPHERE_ABSTRACTION_OVERLOAD, COLOR_DESCRIPTION_OVERLOAD
-- `VISUAL_TEXTURE_ABSENT` — Wave 249: Short line poverty, visual texture absent, spatial anchor absent
-- `WE_SEE_FLOOD` — Wave 330: WE_SEE_FLOOD, LIGHT_DESCRIPTION_OVERLOAD, SET_DRESSING_DOMINANCE
-- `WEAK_VERB_CHAIN` — Weak-verb chains: "started to run", "began to speak"
-- `WEATHER_DESCRIPTION_OVERLOAD` — Wave 344: POLYSYNDETON_OVERLOAD, SEMICOLON_IN_ACTION, WEATHER_DESCRIPTION_OVERLOAD
+- <a id="rule-abstract_noun_overload"></a>`ABSTRACT_NOUN_OVERLOAD` — Wave 184: Abstract noun overload, filler gestures, gerund fragments
+- <a id="rule-action_alternation_run"></a>`ACTION_ALTERNATION_RUN` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
+- <a id="rule-action_certainty_adverb_flood"></a>`ACTION_CERTAINTY_ADVERB_FLOOD` — Wave 512: ACTION_MIDDLE_SHORT_ABSENT, ACTION_WORD_COUNT_DESCENT_RUN, ACTION_CERTAINTY_ADVERB_FLOOD
+- <a id="rule-action_consecutive_long_run"></a>`ACTION_CONSECUTIVE_LONG_RUN` — Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK
+- <a id="rule-action_density_peak_late"></a>`ACTION_DENSITY_PEAK_LATE` — Wave 498: ACTION_OPENING_LONG_ABSENT, ACTION_DENSITY_PEAK_LATE, ACTION_SHORT_MULTICLAUSAL
+- <a id="rule-action_finale_long_absent"></a>`ACTION_FINALE_LONG_ABSENT` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
+- <a id="rule-action_finale_short_absent"></a>`ACTION_FINALE_SHORT_ABSENT` — Wave 484: CONSECUTIVE_SHORT_RUN, ACTION_FINALE_SHORT_ABSENT, ACTION_SENTENCE_AVERAGE_HIGH
+- <a id="rule-action_impact_beat_uncaused"></a>`ACTION_IMPACT_BEAT_UNCAUSED` — Wave 470: ACTION_MIDDLE_LONG_ABSENT, ACTION_IMPACT_BEAT_UNCAUSED, ACTION_DENSITY_PEAK_EARLY
+- <a id="rule-action_line_word_floor"></a>`ACTION_LINE_WORD_FLOOR` — Wave 291: ACTION_LINE_WORD_FLOOR
+- <a id="rule-action_long_beat_uncaused"></a>`ACTION_LONG_BEAT_UNCAUSED` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
+- <a id="rule-action_long_single_sentence"></a>`ACTION_LONG_SINGLE_SENTENCE` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
+- <a id="rule-action_long_thirds_cluster"></a>`ACTION_LONG_THIRDS_CLUSTER` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
+- <a id="rule-action_medium_opening_absent"></a>`ACTION_MEDIUM_OPENING_ABSENT` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
+- <a id="rule-action_middle_short_absent"></a>`ACTION_MIDDLE_SHORT_ABSENT` — Wave 512: ACTION_MIDDLE_SHORT_ABSENT, ACTION_WORD_COUNT_DESCENT_RUN, ACTION_CERTAINTY_ADVERB_FLOOD
+- <a id="rule-action_opening_long_absent"></a>`ACTION_OPENING_LONG_ABSENT` — Wave 498: ACTION_OPENING_LONG_ABSENT, ACTION_DENSITY_PEAK_LATE, ACTION_SHORT_MULTICLAUSAL
+- <a id="rule-action_opening_short_absent"></a>`ACTION_OPENING_SHORT_ABSENT` — Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK
+- <a id="rule-action_parenthesis_aside"></a>`ACTION_PARENTHESIS_ASIDE` — Wave 305: ACTION_PARENTHESIS_ASIDE
+- <a id="rule-action_punctuation_desert"></a>`ACTION_PUNCTUATION_DESERT` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
+- <a id="rule-action_sentence_burst_run"></a>`ACTION_SENTENCE_BURST_RUN` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
+- <a id="rule-action_sentence_count_peak"></a>`ACTION_SENTENCE_COUNT_PEAK` — Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK
+- <a id="rule-action_short_expansion_absent"></a>`ACTION_SHORT_EXPANSION_ABSENT` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
+- <a id="rule-action_short_multiclausal"></a>`ACTION_SHORT_MULTICLAUSAL` — Wave 498: ACTION_OPENING_LONG_ABSENT, ACTION_DENSITY_PEAK_LATE, ACTION_SHORT_MULTICLAUSAL
+- <a id="rule-action_short_thirds_cluster"></a>`ACTION_SHORT_THIRDS_CLUSTER` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
+- <a id="rule-action_shortest_outlier"></a>`ACTION_SHORTEST_OUTLIER` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
+- <a id="rule-action_word_count_ascent_run"></a>`ACTION_WORD_COUNT_ASCENT_RUN` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
+- <a id="rule-action_word_count_modal_lock"></a>`ACTION_WORD_COUNT_MODAL_LOCK` — Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD
+- <a id="rule-article_opener_dominance"></a>`ARTICLE_OPENER_DOMINANCE` — Wave 386: COMMA_SPLICE_OVERUSE, ARTICLE_OPENER_DOMINANCE, CONNECTIVE_OPENER_OVERUSE
+- <a id="rule-atmosphere_abstraction_overload"></a>`ATMOSPHERE_ABSTRACTION_OVERLOAD` — Wave 414: VAGUE_QUANTIFIER_OVERLOAD, ATMOSPHERE_ABSTRACTION_OVERLOAD, COLOR_DESCRIPTION_OVERLOAD
+- <a id="rule-body_part_overload"></a>`BODY_PART_OVERLOAD` — Wave 277: Body-part overload, single-sentence flood, ellipsis chain
+- <a id="rule-camera_direction_overreach"></a>`CAMERA_DIRECTION_OVERREACH` — Wave 151: Camera-direction, adverb clustering, over-description
+- <a id="rule-colon_in_action"></a>`COLON_IN_ACTION` — Wave 358: COLON_IN_ACTION, SOUND_DESCRIPTION_OVERLOAD, INTENSIFIER_FLOOD
+- <a id="rule-color_description_overload"></a>`COLOR_DESCRIPTION_OVERLOAD` — Wave 414: VAGUE_QUANTIFIER_OVERLOAD, ATMOSPHERE_ABSTRACTION_OVERLOAD, COLOR_DESCRIPTION_OVERLOAD
+- <a id="rule-conjunction_opener_excess"></a>`CONJUNCTION_OPENER_EXCESS` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
+- <a id="rule-connective_opener_overuse"></a>`CONNECTIVE_OPENER_OVERUSE` — Wave 386: COMMA_SPLICE_OVERUSE, ARTICLE_OPENER_DOMINANCE, CONNECTIVE_OPENER_OVERUSE
+- <a id="rule-consecutive_opener_run"></a>`CONSECUTIVE_OPENER_RUN` — Wave 428: CONSECUTIVE_OPENER_RUN, ACTION_FINALE_BLOAT, LONGEST_ACTION_OUTLIER
+- <a id="rule-curiosity_signal_flatline"></a>`CURIOSITY_SIGNAL_FLATLINE` — Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN
+- <a id="rule-dash_chain"></a>`DASH_CHAIN` — Wave 305: DASH_CHAIN
+- <a id="rule-declarative_pile"></a>`DECLARATIVE_PILE` — Wave 235: Declarative pile, simultaneous-action absent, motion-verb overload
+- <a id="rule-ellipsis_chain"></a>`ELLIPSIS_CHAIN` — Wave 277: Body-part overload, single-sentence flood, ellipsis chain
+- <a id="rule-exclamation_in_action"></a>`EXCLAMATION_IN_ACTION` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
+- <a id="rule-filler_gesture_excess"></a>`FILLER_GESTURE_EXCESS` — Wave 184: Abstract noun overload, filler gestures, gerund fragments
+- <a id="rule-gerund_fragment_chain"></a>`GERUND_FRAGMENT_CHAIN` — Wave 184: Abstract noun overload, filler gestures, gerund fragments
+- <a id="rule-intraclause_cadence_absent"></a>`INTRACLAUSE_CADENCE_ABSENT` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
+- <a id="rule-light_description_overload"></a>`LIGHT_DESCRIPTION_OVERLOAD` — Wave 330: WE_SEE_FLOOD, LIGHT_DESCRIPTION_OVERLOAD, SET_DRESSING_DOMINANCE
+- <a id="rule-line_ending_repetition"></a>`LINE_ENDING_REPETITION` — Wave 400: LONG_LINE_FLOOD, LINE_ENDING_REPETITION, PROGRESSIVE_VERB_OVERUSE
+- <a id="rule-mid_line_em_dash_overuse"></a>`MID_LINE_EM_DASH_OVERUSE` — Wave 372: TRIADIC_LIST_OVERLOAD, MID_LINE_EM_DASH_OVERUSE, TEMPORAL_OPENER_OVERUSE
+- <a id="rule-motion_verb_overload"></a>`MOTION_VERB_OVERLOAD` — Wave 235: Declarative pile, simultaneous-action absent, motion-verb overload
+- <a id="rule-near_word_repeat"></a>`NEAR_WORD_REPEAT` — Wave 170: Opening-word repetition, sensory imbalance, near-word repeat
+- <a id="rule-negation_action_flood"></a>`NEGATION_ACTION_FLOOD` — Wave 305: NEGATION_ACTION_FLOOD
+- <a id="rule-opening_word_repetition"></a>`OPENING_WORD_REPETITION` — Wave 170: Opening-word repetition, sensory imbalance, near-word repeat
+- <a id="rule-over_description"></a>`OVER_DESCRIPTION` — Wave 151: Camera-direction, adverb clustering, over-description
+- <a id="rule-passive_voice_overuse"></a>`PASSIVE_VOICE_OVERUSE` — Passive voice: agentless constructions dilute cinematic drive
+- <a id="rule-physical_interiority_leak"></a>`PHYSICAL_INTERIORITY_LEAK` — Wave 319: SUDDENLY_OVERUSE, PRONOUN_OPENER_DOMINANCE, PHYSICAL_INTERIORITY_LEAK
+- <a id="rule-prepositional_opening_dominance"></a>`PREPOSITIONAL_OPENING_DOMINANCE` — Wave 291: PREPOSITIONAL_OPENING_DOMINANCE
+- <a id="rule-progressive_verb_overuse"></a>`PROGRESSIVE_VERB_OVERUSE` — Wave 400: LONG_LINE_FLOOD, LINE_ENDING_REPETITION, PROGRESSIVE_VERB_OVERUSE
+- <a id="rule-pronoun_opener_dominance"></a>`PRONOUN_OPENER_DOMINANCE` — Wave 319: SUDDENLY_OVERUSE, PRONOUN_OPENER_DOMINANCE, PHYSICAL_INTERIORITY_LEAK
+- <a id="rule-prose_length_ramp"></a>`PROSE_LENGTH_RAMP` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
+- <a id="rule-prose_rhythm_blocking"></a>`PROSE_RHYTHM_BLOCKING` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
+- <a id="rule-question_in_action"></a>`QUESTION_IN_ACTION` — Wave 263: Question in action, simile excess, color absence
+- <a id="rule-run_on_action"></a>`RUN_ON_ACTION` — Run-on action block: >5 consecutive long lines
+- <a id="rule-semicolon_in_action"></a>`SEMICOLON_IN_ACTION` — Wave 344: POLYSYNDETON_OVERLOAD, SEMICOLON_IN_ACTION, WEATHER_DESCRIPTION_OVERLOAD
+- <a id="rule-sensory_imbalance"></a>`SENSORY_IMBALANCE` — Wave 170: Opening-word repetition, sensory imbalance, near-word repeat
+- <a id="rule-set_dressing_dominance"></a>`SET_DRESSING_DOMINANCE` — Wave 330: WE_SEE_FLOOD, LIGHT_DESCRIPTION_OVERLOAD, SET_DRESSING_DOMINANCE
+- <a id="rule-simile_excess"></a>`SIMILE_EXCESS` — Wave 263: Question in action, simile excess, color absence
+- <a id="rule-simultaneous_action_absent"></a>`SIMULTANEOUS_ACTION_ABSENT` — Wave 235: Declarative pile, simultaneous-action absent, motion-verb overload
+- <a id="rule-sound_description_overload"></a>`SOUND_DESCRIPTION_OVERLOAD` — Wave 358: COLON_IN_ACTION, SOUND_DESCRIPTION_OVERLOAD, INTENSIFIER_FLOOD
+- <a id="rule-spatial_anchor_absent"></a>`SPATIAL_ANCHOR_ABSENT` — Wave 249: Short line poverty, visual texture absent, spatial anchor absent
+- <a id="rule-staccato_fragmentation"></a>`STACCATO_FRAGMENTATION` — Staccato: >4 consecutive very short lines
+- <a id="rule-temporal_opener_overuse"></a>`TEMPORAL_OPENER_OVERUSE` — Wave 372: TRIADIC_LIST_OVERLOAD, MID_LINE_EM_DASH_OVERUSE, TEMPORAL_OPENER_OVERUSE
+- <a id="rule-then_chain"></a>`THEN_CHAIN` — Wave 207: Conjunction opener excess, then-chain, exclamation in action
+- <a id="rule-triadic_list_overload"></a>`TRIADIC_LIST_OVERLOAD` — Wave 372: TRIADIC_LIST_OVERLOAD, MID_LINE_EM_DASH_OVERUSE, TEMPORAL_OPENER_OVERUSE
+- <a id="rule-vague_quantifier_overload"></a>`VAGUE_QUANTIFIER_OVERLOAD` — Wave 414: VAGUE_QUANTIFIER_OVERLOAD, ATMOSPHERE_ABSTRACTION_OVERLOAD, COLOR_DESCRIPTION_OVERLOAD
+- <a id="rule-visual_texture_absent"></a>`VISUAL_TEXTURE_ABSENT` — Wave 249: Short line poverty, visual texture absent, spatial anchor absent
+- <a id="rule-we_see_flood"></a>`WE_SEE_FLOOD` — Wave 330: WE_SEE_FLOOD, LIGHT_DESCRIPTION_OVERLOAD, SET_DRESSING_DOMINANCE
+- <a id="rule-weak_verb_chain"></a>`WEAK_VERB_CHAIN` — Weak-verb chains: "started to run", "began to speak"
+- <a id="rule-weather_description_overload"></a>`WEATHER_DESCRIPTION_OVERLOAD` — Wave 344: POLYSYNDETON_OVERLOAD, SEMICOLON_IN_ACTION, WEATHER_DESCRIPTION_OVERLOAD
 

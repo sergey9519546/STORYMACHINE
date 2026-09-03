@@ -8,9 +8,9 @@ Wave 1176 additions (deliberate pivot away from the sequence/aftermath monocultu
 
 Rules named in this wave's header:
 
-- `DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED`
-- `DIALOGUE_HIGHLIGHT_FRONT_LOADED`
-- `DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED`
+- <a id="rule-dialogue_highlight_emotion_decoupled"></a>`DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED`
+- <a id="rule-dialogue_highlight_front_loaded"></a>`DIALOGUE_HIGHLIGHT_FRONT_LOADED`
+- <a id="rule-dialogue_highlight_suspense_decoupled"></a>`DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED`
 
 ## Wave 1162
 
@@ -18,9 +18,9 @@ Wave 1162 additions (opens rotation cycle 44): revelation and suspenseDelta each
 
 Rules named in this wave's header:
 
-- `DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID`
-- `DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_revelation_emotional_aftermath_void"></a>`DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_revelation_relational_aftermath_void"></a>`DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_suspense_curiosity_aftermath_void"></a>`DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1148
 
@@ -28,9 +28,9 @@ Wave 1148 additions: DIALOGUE_TURN_HIGHLIGHT_AFTERMATH_VOID gives dramaticTurn i
 
 Rules named in this wave's header:
 
-- `DIALOGUE_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `DIALOGUE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
-- `DIALOGUE_TURN_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-dialogue_revelation_curiosity_aftermath_void"></a>`DIALOGUE_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_suspense_emotional_aftermath_void"></a>`DIALOGUE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_turn_highlight_aftermath_void"></a>`DIALOGUE_TURN_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1134
 
@@ -38,9 +38,9 @@ Wave 1134 additions (opens rotation cycle 41): DIALOGUE_CLOCK_STAGING_AFTERMATH_
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID`
-- `DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID`
-- `DIALOGUE_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-dialogue_clock_staging_aftermath_void"></a>`DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-dialogue_turn_relational_aftermath_void"></a>`DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_turn_staging_aftermath_void"></a>`DIALOGUE_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1120
 
@@ -48,9 +48,9 @@ Wave 1120 additions (opens the thirty-ninth rotation cycle for this pass): clock
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID`
-- `DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_clock_highlight_aftermath_void"></a>`DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-dialogue_clock_suspense_aftermath_void"></a>`DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-dialogue_turn_emotional_aftermath_void"></a>`DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1106
 
@@ -58,9 +58,9 @@ Wave 1106 additions (opens the thirty-eighth rotation cycle for this pass): this
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `DIALOGUE_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `DIALOGUE_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_clock_emotional_aftermath_void"></a>`DIALOGUE_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_clock_relational_aftermath_void"></a>`DIALOGUE_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_turn_curiosity_aftermath_void"></a>`DIALOGUE_TURN_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1092
 
@@ -68,7 +68,7 @@ Wave 1092 additions (opens the thirty-seventh rotation cycle for this pass): DIA
 
 Rules named in this wave's header:
 
-- `DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_shift_relational_aftermath_void"></a>`DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1078
 
@@ -76,9 +76,9 @@ Wave 1078 additions: raise_stakes and heavy unresolvedClues debt each reach full
 
 Rules named in this wave's header:
 
-- `DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID`
-- `DIALOGUE_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-dialogue_open_thread_staging_aftermath_void"></a>`DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-dialogue_shift_highlight_aftermath_void"></a>`DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-dialogue_stakes_staging_aftermath_void"></a>`DIALOGUE_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1064
 
@@ -86,13 +86,13 @@ Wave 1064 — seededClueIds). With those exhausted, this wave introduces two tri
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_AFTERMATH_SILENT`
-- `DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT`
-- `DIALOGUE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `DIALOGUE_SEED_HIGHLIGHT_AFTERMATH_VOID`
-- `DIALOGUE_STAKES_RELATIONAL_AFTERMATH_VOID`
-- `DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-dialogue_clock_aftermath_silent"></a>`DIALOGUE_CLOCK_AFTERMATH_SILENT`
+- <a id="rule-dialogue_clock_curiosity_aftermath_void"></a>`DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_dramatic_turn_aftermath_silent"></a>`DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT`
+- <a id="rule-dialogue_open_thread_relational_aftermath_void"></a>`DIALOGUE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_seed_highlight_aftermath_void"></a>`DIALOGUE_SEED_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-dialogue_stakes_relational_aftermath_void"></a>`DIALOGUE_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_turn_suspense_aftermath_void"></a>`DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1050
 
@@ -100,9 +100,9 @@ Wave 1050 additions (opens the thirty-fourth rotation cycle for this pass): with
 
 Rules named in this wave's header:
 
-- `DIALOGUE_SEED_STAGING_AFTERMATH_VOID`
-- `DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID`
-- `DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-dialogue_seed_staging_aftermath_void"></a>`DIALOGUE_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-dialogue_shift_emotional_aftermath_void"></a>`DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_shift_suspense_aftermath_void"></a>`DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1036
 
@@ -110,9 +110,9 @@ Wave 1036 additions (opens the thirty-third rotation cycle for this pass): with 
 
 Rules named in this wave's header:
 
-- `DIALOGUE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `DIALOGUE_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `DIALOGUE_SHIFT_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_open_thread_suspense_aftermath_void"></a>`DIALOGUE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-dialogue_seed_emotional_aftermath_void"></a>`DIALOGUE_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_shift_curiosity_aftermath_void"></a>`DIALOGUE_SHIFT_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1022
 
@@ -120,9 +120,9 @@ Wave 1022 additions (opens the thirty-second rotation cycle for this pass): thre
 
 Rules named in this wave's header:
 
-- `DIALOGUE_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `DIALOGUE_SEED_CURIOSITY_AFTERMATH_VOID`
-- `DIALOGUE_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-dialogue_open_thread_emotional_aftermath_void"></a>`DIALOGUE_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_seed_curiosity_aftermath_void"></a>`DIALOGUE_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_stakes_suspense_aftermath_void"></a>`DIALOGUE_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1008
 
@@ -130,9 +130,9 @@ Wave 1008 additions: this wave gives three existing aftermath-void triggers a fr
 
 Rules named in this wave's header:
 
-- `DIALOGUE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `DIALOGUE_SEED_RELATIONAL_AFTERMATH_VOID`
-- `DIALOGUE_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_open_thread_curiosity_aftermath_void"></a>`DIALOGUE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_seed_relational_aftermath_void"></a>`DIALOGUE_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-dialogue_stakes_emotional_aftermath_void"></a>`DIALOGUE_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 994
 
@@ -140,9 +140,9 @@ Wave 994 additions (opens the thirty-first rotation cycle): DIALOGUE_CLOCK_DELTA
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE`
-- `DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID`
-- `DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-dialogue_clock_delta_zone_imbalance"></a>`DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-dialogue_seed_suspense_aftermath_void"></a>`DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-dialogue_stakes_curiosity_aftermath_void"></a>`DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 980
 
@@ -150,9 +150,9 @@ Wave 980 additions (opens the twenty-ninth rotation cycle): auditing three more 
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_ZONE_IMBALANCE`
-- `DIALOGUE_EMOTION_ZONE_IMBALANCE`
-- `DIALOGUE_SEED_ZONE_IMBALANCE`
+- <a id="rule-dialogue_clock_zone_imbalance"></a>`DIALOGUE_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-dialogue_emotion_zone_imbalance"></a>`DIALOGUE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-dialogue_seed_zone_imbalance"></a>`DIALOGUE_SEED_ZONE_IMBALANCE`
 
 ## Wave 966
 
@@ -160,9 +160,9 @@ Wave 966 additions (opens the twenty-eighth rotation cycle): continuing the non-
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CURIOSITY_ZONE_IMBALANCE`
-- `DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE`
-- `DIALOGUE_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-dialogue_curiosity_zone_imbalance"></a>`DIALOGUE_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-dialogue_relationship_zone_imbalance"></a>`DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-dialogue_revelation_zone_imbalance"></a>`DIALOGUE_REVELATION_ZONE_IMBALANCE`
 
 ## Wave 952
 
@@ -170,9 +170,9 @@ Wave 952 additions (opens the twenty-seventh rotation cycle): extending the chec
 
 Rules named in this wave's header:
 
-- `DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE`
-- `DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `DIALOGUE_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-dialogue_open_thread_zone_imbalance"></a>`DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-dialogue_revelation_purpose_zone_imbalance"></a>`DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-dialogue_suspense_zone_imbalance"></a>`DIALOGUE_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 938
 
@@ -180,9 +180,9 @@ Wave 938 additions (opens the twenty-sixth rotation cycle): purpose === 'revelat
 
 Rules named in this wave's header:
 
-- `DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN`
-- `DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-dialogue_positive_emotion_zone_imbalance"></a>`DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-dialogue_revelation_purpose_drought_run"></a>`DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-dialogue_revelation_purpose_zone_cluster"></a>`DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 924
 
@@ -190,9 +190,9 @@ Wave 924 additions (opens the twenty-fifth rotation cycle): continuing the check
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `DIALOGUE_STAKES_ZONE_IMBALANCE`
+- <a id="rule-dialogue_character_moment_zone_imbalance"></a>`DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-dialogue_negative_emotion_zone_imbalance"></a>`DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-dialogue_stakes_zone_imbalance"></a>`DIALOGUE_STAKES_ZONE_IMBALANCE`
 
 ## Wave 910
 
@@ -200,9 +200,9 @@ Wave 910 additions (opens the twenty-fourth rotation cycle): continuing the chec
 
 Rules named in this wave's header:
 
-- `DIALOGUE_COMPLICATE_ZONE_IMBALANCE`
-- `DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `DIALOGUE_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-dialogue_complicate_zone_imbalance"></a>`DIALOGUE_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-dialogue_introduce_conflict_zone_imbalance"></a>`DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-dialogue_turning_point_zone_imbalance"></a>`DIALOGUE_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 896
 
@@ -210,9 +210,9 @@ Wave 896 additions (opens the twenty-third rotation cycle): no purpose value had
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLIMAX_ZONE_IMBALANCE`
-- `DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `DIALOGUE_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-dialogue_climax_zone_imbalance"></a>`DIALOGUE_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-dialogue_establish_world_zone_imbalance"></a>`DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-dialogue_resolution_zone_imbalance"></a>`DIALOGUE_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 882
 
@@ -220,9 +220,9 @@ Wave 882 additions (opens the twenty-second rotation cycle): DIALOGUE_RESOLUTION
 
 Rules named in this wave's header:
 
-- `DIALOGUE_COMPLICATE_DROUGHT_RUN`
-- `DIALOGUE_COMPLICATE_ZONE_CLUSTER`
-- `DIALOGUE_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-dialogue_complicate_drought_run"></a>`DIALOGUE_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-dialogue_complicate_zone_cluster"></a>`DIALOGUE_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-dialogue_resolution_drought_run"></a>`DIALOGUE_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 868
 
@@ -230,9 +230,9 @@ Wave 868 additions (opens the twenty-first rotation cycle): DIALOGUE_CLIMAX_DROU
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLIMAX_DROUGHT_RUN`
-- `DIALOGUE_ESTABLISH_WORLD_DROUGHT_RUN`
-- `DIALOGUE_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-dialogue_climax_drought_run"></a>`DIALOGUE_CLIMAX_DROUGHT_RUN`
+- <a id="rule-dialogue_establish_world_drought_run"></a>`DIALOGUE_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-dialogue_resolution_zone_cluster"></a>`DIALOGUE_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 854
 
@@ -240,9 +240,9 @@ Wave 854 additions (opens the twentieth rotation cycle): DIALOGUE_POSITIVE_EMOTI
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLIMAX_ZONE_CLUSTER`
-- `DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-dialogue_climax_zone_cluster"></a>`DIALOGUE_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-dialogue_establish_world_zone_cluster"></a>`DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-dialogue_positive_emotion_drought_run"></a>`DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 840
 
@@ -250,9 +250,9 @@ Wave 840 additions (opens the nineteenth rotation cycle): DIALOGUE_INTRODUCE_CON
 
 Rules named in this wave's header:
 
-- `DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-dialogue_introduce_conflict_drought_run"></a>`DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-dialogue_negative_emotion_drought_run"></a>`DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-dialogue_positive_emotion_zone_cluster"></a>`DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER`
 
 ## Wave 826
 
@@ -260,9 +260,9 @@ Wave 826 additions (opens the eighteenth rotation cycle): DIALOGUE_TURNING_POINT
 
 Rules named in this wave's header:
 
-- `DIALOGUE_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `DIALOGUE_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `DIALOGUE_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-dialogue_introduce_conflict_zone_cluster"></a>`DIALOGUE_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-dialogue_negative_emotion_zone_cluster"></a>`DIALOGUE_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-dialogue_turning_point_drought_run"></a>`DIALOGUE_TURNING_POINT_DROUGHT_RUN`
 
 ## Wave 812
 
@@ -270,9 +270,9 @@ Wave 812 additions (opens the seventeenth rotation cycle): DIALOGUE_STAKES_ZONE_
 
 Rules named in this wave's header:
 
-- `DIALOGUE_STAKES_DROUGHT_RUN`
-- `DIALOGUE_STAKES_ZONE_CLUSTER`
-- `DIALOGUE_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-dialogue_stakes_drought_run"></a>`DIALOGUE_STAKES_DROUGHT_RUN`
+- <a id="rule-dialogue_stakes_zone_cluster"></a>`DIALOGUE_STAKES_ZONE_CLUSTER`
+- <a id="rule-dialogue_turning_point_zone_cluster"></a>`DIALOGUE_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 798
 
@@ -280,9 +280,9 @@ Wave 798 additions (opens the sixteenth rotation cycle): DIALOGUE_REVELATION_DRO
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `DIALOGUE_REVELATION_DROUGHT_RUN`
-- `DIALOGUE_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-dialogue_character_moment_zone_cluster"></a>`DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-dialogue_revelation_drought_run"></a>`DIALOGUE_REVELATION_DROUGHT_RUN`
+- <a id="rule-dialogue_revelation_peak_uncaused"></a>`DIALOGUE_REVELATION_PEAK_UNCAUSED`
 
 ## Wave 784
 
@@ -290,9 +290,9 @@ Wave 784 additions (opens the fifteenth rotation cycle): DIALOGUE_REVELATION_ZON
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER`
-- `DIALOGUE_EMOTION_DROUGHT_RUN`
-- `DIALOGUE_REVELATION_ZONE_CLUSTER`
+- <a id="rule-dialogue_clock_raised_zone_cluster"></a>`DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER`
+- <a id="rule-dialogue_emotion_drought_run"></a>`DIALOGUE_EMOTION_DROUGHT_RUN`
+- <a id="rule-dialogue_revelation_zone_cluster"></a>`DIALOGUE_REVELATION_ZONE_CLUSTER`
 
 ## Wave 770
 
@@ -300,9 +300,9 @@ Wave 770 additions: DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × cl
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER`
-- `DIALOGUE_RELATIONSHIP_DROUGHT_RUN`
-- `DIALOGUE_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-dialogue_clock_delta_zone_cluster"></a>`DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-dialogue_relationship_drought_run"></a>`DIALOGUE_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-dialogue_suspense_peak_uncaused"></a>`DIALOGUE_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 756
 
@@ -310,9 +310,9 @@ Wave 756 additions (opens the thirteenth rotation cycle): DIALOGUE_RELATIONSHIP_
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_DELTA_DROUGHT_RUN`
-- `DIALOGUE_RELATIONSHIP_ZONE_CLUSTER`
-- `DIALOGUE_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-dialogue_clock_delta_drought_run"></a>`DIALOGUE_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-dialogue_relationship_zone_cluster"></a>`DIALOGUE_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-dialogue_suspense_drought_run"></a>`DIALOGUE_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 742
 
@@ -320,9 +320,9 @@ Wave 742 additions (opens the twelfth rotation cycle): DIALOGUE_CURIOSITY_ZONE_C
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CURIOSITY_ZONE_CLUSTER`
-- `DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED`
-- `DIALOGUE_STAGING_DROUGHT_RUN`
+- <a id="rule-dialogue_curiosity_zone_cluster"></a>`DIALOGUE_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-dialogue_open_thread_peak_uncaused"></a>`DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-dialogue_staging_drought_run"></a>`DIALOGUE_STAGING_DROUGHT_RUN`
 
 ## Wave 728
 
@@ -330,9 +330,9 @@ Wave 728 additions (opens the eleventh rotation cycle): DIALOGUE_CURIOSITY_PEAK_
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CURIOSITY_PEAK_UNCAUSED`
-- `DIALOGUE_OPEN_THREAD_DROUGHT_RUN`
-- `DIALOGUE_STAGING_ZONE_CLUSTER`
+- <a id="rule-dialogue_curiosity_peak_uncaused"></a>`DIALOGUE_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-dialogue_open_thread_drought_run"></a>`DIALOGUE_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-dialogue_staging_zone_cluster"></a>`DIALOGUE_STAGING_ZONE_CLUSTER`
 
 ## Wave 714
 
@@ -340,9 +340,9 @@ Wave 714 additions: HIGHLIGHTED_DIALOGUE_DROUGHT_RUN (run-based × dialogueHighl
 
 Rules named in this wave's header:
 
-- `DIALOGUE_PAYOFF_PEAK_UNCAUSED`
-- `DIALOGUE_SEED_ZONE_CLUSTER`
-- `HIGHLIGHTED_DIALOGUE_DROUGHT_RUN`
+- <a id="rule-dialogue_payoff_peak_uncaused"></a>`DIALOGUE_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-dialogue_seed_zone_cluster"></a>`DIALOGUE_SEED_ZONE_CLUSTER`
+- <a id="rule-highlighted_dialogue_drought_run"></a>`HIGHLIGHTED_DIALOGUE_DROUGHT_RUN`
 
 ## Wave 700
 
@@ -350,9 +350,9 @@ Wave 700 additions (opens the ninth rotation cycle): DIALOGUE_HIGHLIGHT_ZONE_CLU
 
 Rules named in this wave's header:
 
-- `DIALOGUE_HIGHLIGHT_ZONE_CLUSTER`
-- `DIALOGUE_PAYOFF_DROUGHT_RUN`
-- `DIALOGUE_SEED_PEAK_UNCAUSED`
+- <a id="rule-dialogue_highlight_zone_cluster"></a>`DIALOGUE_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-dialogue_payoff_drought_run"></a>`DIALOGUE_PAYOFF_DROUGHT_RUN`
+- <a id="rule-dialogue_seed_peak_uncaused"></a>`DIALOGUE_SEED_PEAK_UNCAUSED`
 
 ## Wave 686
 
@@ -360,9 +360,9 @@ Wave 686 additions (opens the eighth rotation cycle): DIALOGUE_RELATIONSHIP_PEAK
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN`
-- `DIALOGUE_EMOTION_ZONE_CLUSTER`
-- `DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-dialogue_character_moment_drought_run"></a>`DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-dialogue_emotion_zone_cluster"></a>`DIALOGUE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-dialogue_relationship_peak_uncaused"></a>`DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED`
 
 ## Wave 672
 
@@ -370,10 +370,10 @@ Wave 672 additions (built on the shared checks library, audit M2.2): DIALOGUE_CL
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED`
-- `DIALOGUE_CLOCK_DROUGHT_RUN`
-- `DIALOGUE_CLOCK_PEAK_SILENT`
-- `DIALOGUE_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-dialogue_clock_delta_peak_uncaused"></a>`DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-dialogue_clock_drought_run"></a>`DIALOGUE_CLOCK_DROUGHT_RUN`
+- <a id="rule-dialogue_clock_peak_silent"></a>`DIALOGUE_CLOCK_PEAK_SILENT`
+- <a id="rule-dialogue_suspense_zone_cluster"></a>`DIALOGUE_SUSPENSE_ZONE_CLUSTER`
 
 ## Wave 658
 
@@ -381,10 +381,10 @@ Wave 658 additions (built on the shared checks library, audit M2.2): DIALOGUE_ST
 
 Rules named in this wave's header:
 
-- `DIALOGUE_PAYOFF_ZONE_CLUSTER`
-- `DIALOGUE_SEED_DROUGHT_RUN`
-- `DIALOGUE_STAGING_PEAK_UNCAUSED`
-- `DIALOGUE_VERBAL_PEAK_UNCAUSED`
+- <a id="rule-dialogue_payoff_zone_cluster"></a>`DIALOGUE_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-dialogue_seed_drought_run"></a>`DIALOGUE_SEED_DROUGHT_RUN`
+- <a id="rule-dialogue_staging_peak_uncaused"></a>`DIALOGUE_STAGING_PEAK_UNCAUSED`
+- <a id="rule-dialogue_verbal_peak_uncaused"></a>`DIALOGUE_VERBAL_PEAK_UNCAUSED`
 
 ## Wave 644
 
@@ -392,10 +392,10 @@ Wave 644 additions (built on the shared checks library, audit M2.2): introduces 
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CURIOSITY_DROUGHT_RUN`
-- `DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID`
-- `DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED`
-- `DIALOGUE_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-dialogue_curiosity_drought_run"></a>`DIALOGUE_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-dialogue_curiosity_spike_scene_void"></a>`DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID`
+- <a id="rule-dialogue_highlight_peak_uncaused"></a>`DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-dialogue_open_thread_zone_cluster"></a>`DIALOGUE_OPEN_THREAD_ZONE_CLUSTER`
 
 ## Wave 630
 
@@ -403,9 +403,9 @@ Wave 630 additions (built on the shared checks library, audit M2.2): DIALOGUE_PA
 
 Rules named in this wave's header:
 
-- `DIALOGUE_PAYOFF_STAGING_DECOUPLED`
-- `DIALOGUE_PAYOFF_ZONE_IMBALANCE`
-- `DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID`
+- <a id="rule-dialogue_payoff_staging_decoupled"></a>`DIALOGUE_PAYOFF_STAGING_DECOUPLED`
+- <a id="rule-dialogue_payoff_zone_imbalance"></a>`DIALOGUE_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-dialogue_shift_staging_aftermath_void"></a>`DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID`
 
 ## Wave 616
 
@@ -413,9 +413,9 @@ Wave 616 additions (built on the shared checks library, audit M2.2): PURPOSE_DIA
 
 Rules named in this wave's header:
 
-- `CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED`
-- `RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-character_moment_zone_imbalance"></a>`CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-purpose_dialogue_highlight_decoupled"></a>`PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED`
+- <a id="rule-raise_stakes_dialogue_highlight_aftermath_void"></a>`RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 602
 
@@ -423,9 +423,9 @@ Wave 602 additions (built on the shared checks library, audit M2.2): DIALOGUE_HI
 
 Rules named in this wave's header:
 
-- `DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
-- `OPEN_THREAD_DIALOGUE_AFTERMATH_VOID`
-- `VISUAL_BEAT_ZONE_IMBALANCE`
+- <a id="rule-dialogue_highlight_open_thread_decoupled"></a>`DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
+- <a id="rule-open_thread_dialogue_aftermath_void"></a>`OPEN_THREAD_DIALOGUE_AFTERMATH_VOID`
+- <a id="rule-visual_beat_zone_imbalance"></a>`VISUAL_BEAT_ZONE_IMBALANCE`
 
 ## Wave 588
 
@@ -433,11 +433,11 @@ Wave 588 additions: dialogue curiosity-spike scene void (co-occurrence/decouplin
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CURIOSITY_PEAK_SILENT`
-- `DIALOGUE_MIDDLE_ZONE_SILENT`
-- `DIALOGUE_NEGATION_BACK_LOADED`
-- `DIALOGUE_OPENING_SILENT`
-- `DIALOGUE_SUSPENSE_AFTERMATH_SILENT`
+- <a id="rule-dialogue_curiosity_peak_silent"></a>`DIALOGUE_CURIOSITY_PEAK_SILENT`
+- <a id="rule-dialogue_middle_zone_silent"></a>`DIALOGUE_MIDDLE_ZONE_SILENT`
+- <a id="rule-dialogue_negation_back_loaded"></a>`DIALOGUE_NEGATION_BACK_LOADED`
+- <a id="rule-dialogue_opening_silent"></a>`DIALOGUE_OPENING_SILENT`
+- <a id="rule-dialogue_suspense_aftermath_silent"></a>`DIALOGUE_SUSPENSE_AFTERMATH_SILENT`
 
 ## Wave 574
 
@@ -445,11 +445,11 @@ Wave 574 additions: dialogue clock peak silent (single-peak isolation × clockDe
 
 Rules named in this wave's header:
 
-- `DIALOGUE_NEGATION_FLOOD`
-- `DIALOGUE_NEGATION_FRONT_LOADED`
-- `DIALOGUE_QUESTION_BACK_LOADED`
-- `DIALOGUE_SCENE_TEMPORAL_CLUSTER`
-- `DIALOGUE_SILENCE_RUN`
+- <a id="rule-dialogue_negation_flood"></a>`DIALOGUE_NEGATION_FLOOD`
+- <a id="rule-dialogue_negation_front_loaded"></a>`DIALOGUE_NEGATION_FRONT_LOADED`
+- <a id="rule-dialogue_question_back_loaded"></a>`DIALOGUE_QUESTION_BACK_LOADED`
+- <a id="rule-dialogue_scene_temporal_cluster"></a>`DIALOGUE_SCENE_TEMPORAL_CLUSTER`
+- <a id="rule-dialogue_silence_run"></a>`DIALOGUE_SILENCE_RUN`
 
 ## Wave 560
 
@@ -457,9 +457,9 @@ Wave 560 additions: dialogue clock aftermath silent (sequence/aftermath × clock
 
 Rules named in this wave's header:
 
-- `DIALOGUE_CLOCK_SCENE_VOID`
-- `DIALOGUE_PAYOFF_AFTERMATH_SILENT`
-- `SEED_SCENE_DIALOGUE_ABSENT`
+- <a id="rule-dialogue_clock_scene_void"></a>`DIALOGUE_CLOCK_SCENE_VOID`
+- <a id="rule-dialogue_payoff_aftermath_silent"></a>`DIALOGUE_PAYOFF_AFTERMATH_SILENT`
+- <a id="rule-seed_scene_dialogue_absent"></a>`SEED_SCENE_DIALOGUE_ABSENT`
 
 ## Wave 546
 
@@ -467,7 +467,7 @@ Wave 546 additions: dialogue relationship peak silent (single-peak isolation × 
 
 Rules named in this wave's header:
 
-- `RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT`
+- <a id="rule-relationship_shift_scene_dialogue_absent"></a>`RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT`
 
 ## Wave 532
 
@@ -475,8 +475,8 @@ Wave 532 additions: dialogue dramatic-turn aftermath silent (sequence/aftermath 
 
 Rules named in this wave's header:
 
-- `DIALOGUE_DRAMATIC_TURN_SCENE_VOID`
-- `DIALOGUE_REVELATION_AFTERMATH_SILENT`
+- <a id="rule-dialogue_dramatic_turn_scene_void"></a>`DIALOGUE_DRAMATIC_TURN_SCENE_VOID`
+- <a id="rule-dialogue_revelation_aftermath_silent"></a>`DIALOGUE_REVELATION_AFTERMATH_SILENT`
 
 ## Wave 518
 
@@ -484,8 +484,8 @@ Wave 518 additions: seed scene dialogue absent (co-occurrence/decoupling × seed
 
 Rules named in this wave's header:
 
-- `DIALOGUE_DENSE_AFTERMATH_SILENT`
-- `PAYOFF_SCENE_DIALOGUE_ABSENT`
+- <a id="rule-dialogue_dense_aftermath_silent"></a>`DIALOGUE_DENSE_AFTERMATH_SILENT`
+- <a id="rule-payoff_scene_dialogue_absent"></a>`PAYOFF_SCENE_DIALOGUE_ABSENT`
 
 ## Wave 490
 
@@ -493,7 +493,7 @@ Wave 490 additions: dialogue verbal peak uncaused (backward-cause × dialogue de
 
 Rules named in this wave's header:
 
-- `DIALOGUE_POSITIVE_SCENE_VOID`
+- <a id="rule-dialogue_positive_scene_void"></a>`DIALOGUE_POSITIVE_SCENE_VOID`
 
 ## Wave 462
 
@@ -501,9 +501,9 @@ Wave 462 additions: dramatic-turn scene void (every dramatic-turn scene contains
 
 Rules named in this wave's header:
 
-- `DIALOGUE_AFFIRMATION_FLOOD`
-- `DIALOGUE_CLIMAX_VOID`
-- `DIALOGUE_REVELATION_SCENE_VOID`
+- <a id="rule-dialogue_affirmation_flood"></a>`DIALOGUE_AFFIRMATION_FLOOD`
+- <a id="rule-dialogue_climax_void"></a>`DIALOGUE_CLIMAX_VOID`
+- <a id="rule-dialogue_revelation_scene_void"></a>`DIALOGUE_REVELATION_SCENE_VOID`
 
 ## Wave 448
 
@@ -511,91 +511,91 @@ Wave 448 additions: curiosity peak silent (the scene with the story's highest cu
 
 Rules named in this wave's header:
 
-- `DIALOGUE_HEDGE_FRONT_LOADED`
-- `DIALOGUE_TENSION_PEAK_SILENT`
+- <a id="rule-dialogue_hedge_front_loaded"></a>`DIALOGUE_HEDGE_FRONT_LOADED`
+- <a id="rule-dialogue_tension_peak_silent"></a>`DIALOGUE_TENSION_PEAK_SILENT`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `APOLOGY_LOOP` — Wave 297: APOLOGY_LOOP
-- `AS_YOU_KNOW_BOB` — As-you-know exposition
-- `CADENCE_MONOTONY` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
-- `CHARACTER_VOICE_UNIFORMITY` — Wave 164: Rhetorical question flood, dialogue density inversion, voice uniformity
-- `CONTRACTION_STARVATION` — Wave 297: CONTRACTION_STARVATION
-- `DEADLOCK_DIALOGUE` — Wave 150: Talking heads, over-parenthetical, deadlock dialogue
-- `DENIAL_INVERSION` — Level 2: Implicit subtext divergence (requires memory records)
-- `DIALOGUE_ABSOLUTE_OVERUSE` — Wave 325: DIALOGUE_EXPLETIVE_OPENER_OVERUSE, DIALOGUE_ABSOLUTE_OVERUSE, DIALOGUE_WITHIN_LINE_WORD_ECHO
-- `DIALOGUE_AGREEMENT_CHAIN` — Wave 269: DIALOGUE_AGREEMENT_CHAIN
-- `DIALOGUE_AMPLIFIER_FLOOD` — Wave 392: DIALOGUE_EMOTION_NAMING, DIALOGUE_AMPLIFIER_FLOOD, DIALOGUE_TIME_MARKER_FLOOD
-- `DIALOGUE_ANAPHORA_RUN` — Wave 378: DIALOGUE_SUPERLATIVE_FLOOD, DIALOGUE_ANAPHORA_RUN, DIALOGUE_VERBAL_TIC_FLOOD
-- `DIALOGUE_CLOSING_ZONE_SILENT` — Wave 504 checks
-- `DIALOGUE_CONDITIONAL_OVERLOAD` — Wave 283: DIALOGUE_CONDITIONAL_OVERLOAD
-- `DIALOGUE_DENSITY_FRONT_HEAVY` — Wave 504 checks
-- `DIALOGUE_DENSITY_INVERSION` — Wave 164: Rhetorical question flood, dialogue density inversion, voice uniformity
-- `DIALOGUE_EMOTION_NAMING` — Wave 392: DIALOGUE_EMOTION_NAMING, DIALOGUE_AMPLIFIER_FLOOD, DIALOGUE_TIME_MARKER_FLOOD
-- `DIALOGUE_EXCUSE_FLOOD` — Wave 420: DIALOGUE_INTERRUPT_FLOOD, DIALOGUE_EXCUSE_FLOOD, DIALOGUE_AFFIRMATION_FLOOD
-- `DIALOGUE_EXPLETIVE_OPENER_OVERUSE` — Wave 325: DIALOGUE_EXPLETIVE_OPENER_OVERUSE, DIALOGUE_ABSOLUTE_OVERUSE, DIALOGUE_WITHIN_LINE_WORD_ECHO
-- `DIALOGUE_FILLER_SOUND_OVERUSE` — Wave 311: DIALOGUE_FILLER_SOUND_OVERUSE
-- `DIALOGUE_FIRST_PERSON_SATURATION` — Wave 364: DIALOGUE_FIRST_PERSON_SATURATION, DIALOGUE_PASSIVE_CONSTRUCT_FLOOD, DIALOGUE_PRESENT_PERFECT_FLOOD
-- `DIALOGUE_HEDGE_BACK_LOADED` — Wave 504 checks
-- `DIALOGUE_HEDGE_SATURATION` — Wave 311: DIALOGUE_HEDGE_SATURATION
-- `DIALOGUE_INTERRUPT_FLOOD` — Wave 420: DIALOGUE_INTERRUPT_FLOOD, DIALOGUE_EXCUSE_FLOOD, DIALOGUE_AFFIRMATION_FLOOD
-- `DIALOGUE_LEXICAL_POVERTY` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
-- `DIALOGUE_MIDSENTENCE_CAPS_FLOOD` — Wave 336: DIALOGUE_QUESTION_FLOOD, DIALOGUE_NEGATIVE_OPENER_FLOOD, DIALOGUE_MIDSENTENCE_CAPS_FLOOD
-- `DIALOGUE_MIRROR_SYNDROME` — Wave 227: DIALOGUE_MIRROR_SYNDROME
-- `DIALOGUE_NEGATIVE_OPENER_FLOOD` — Wave 336: DIALOGUE_QUESTION_FLOOD, DIALOGUE_NEGATIVE_OPENER_FLOOD, DIALOGUE_MIDSENTENCE_CAPS_FLOOD
-- `DIALOGUE_NEGATIVE_SCENE_VOID` — Wave 490: DIALOGUE_VERBAL_PEAK_UNCAUSED, DIALOGUE_NEGATIVE_SCENE_VOID, DIALOGUE_SCENE_TEMPORAL_CLUSTER
-- `DIALOGUE_OATH_INTENSIFIER_FLOOD` — Wave 406: DIALOGUE_VAGUE_NOUN_FLOOD, DIALOGUE_REPORTED_SPEECH_FLOOD, DIALOGUE_OATH_INTENSIFIER_FLOOD
-- `DIALOGUE_ONE_WORD_DOMINANCE` — Wave 311: DIALOGUE_ONE_WORD_DOMINANCE
-- `DIALOGUE_OPENER_MONOTONY` — Wave 283: DIALOGUE_OPENER_MONOTONY
-- `DIALOGUE_PASSIVE_CONSTRUCT_FLOOD` — Wave 364: DIALOGUE_FIRST_PERSON_SATURATION, DIALOGUE_PASSIVE_CONSTRUCT_FLOOD, DIALOGUE_PRESENT_PERFECT_FLOOD
-- `DIALOGUE_PRESENT_PERFECT_FLOOD` — Wave 364: DIALOGUE_FIRST_PERSON_SATURATION, DIALOGUE_PASSIVE_CONSTRUCT_FLOOD, DIALOGUE_PRESENT_PERFECT_FLOOD
-- `DIALOGUE_QUESTION_CLUSTER` — Wave 269: DIALOGUE_QUESTION_CLUSTER
-- `DIALOGUE_QUESTION_FLOOD` — Wave 336: DIALOGUE_QUESTION_FLOOD, DIALOGUE_NEGATIVE_OPENER_FLOOD, DIALOGUE_MIDSENTENCE_CAPS_FLOOD
-- `DIALOGUE_RELATIONSHIP_PEAK_SILENT` — Wave 504 checks
-- `DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT` — Wave 504 checks
-- `DIALOGUE_REPEATED_LINE` — Wave 297: DIALOGUE_REPEATED_LINE
-- `DIALOGUE_REPORTED_SPEECH_FLOOD` — Wave 406: DIALOGUE_VAGUE_NOUN_FLOOD, DIALOGUE_REPORTED_SPEECH_FLOOD, DIALOGUE_OATH_INTENSIFIER_FLOOD
-- `DIALOGUE_RETROSPECTIVE_FLOOD` — Wave 241: DIALOGUE_RETROSPECTIVE_FLOOD
-- `DIALOGUE_SEED_AFTERMATH_SILENT` — Wave 504 checks
-- `DIALOGUE_SELF_CORRECTION_ABSENT` — Wave 241: DIALOGUE_SELF_CORRECTION_ABSENT
-- `DIALOGUE_SELF_REFERENCE` — Wave 350: DIALOGUE_YOU_OPENER_FLOOD, DIALOGUE_THANKS_OVERUSE, DIALOGUE_SELF_REFERENCE
-- `DIALOGUE_SPARSE_RUN` — Wave 504 checks
-- `DIALOGUE_STACCATO_OVERUSE` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
-- `DIALOGUE_SUPERLATIVE_FLOOD` — Wave 378: DIALOGUE_SUPERLATIVE_FLOOD, DIALOGUE_ANAPHORA_RUN, DIALOGUE_VERBAL_TIC_FLOOD
-- `DIALOGUE_THANKS_OVERUSE` — Wave 350: DIALOGUE_YOU_OPENER_FLOOD, DIALOGUE_THANKS_OVERUSE, DIALOGUE_SELF_REFERENCE
-- `DIALOGUE_TIME_MARKER_FLOOD` — Wave 392: DIALOGUE_EMOTION_NAMING, DIALOGUE_AMPLIFIER_FLOOD, DIALOGUE_TIME_MARKER_FLOOD
-- `DIALOGUE_VAGUE_NOUN_FLOOD` — Wave 406: DIALOGUE_VAGUE_NOUN_FLOOD, DIALOGUE_REPORTED_SPEECH_FLOOD, DIALOGUE_OATH_INTENSIFIER_FLOOD
-- `DIALOGUE_VERBAL_TIC_FLOOD` — Wave 378: DIALOGUE_SUPERLATIVE_FLOOD, DIALOGUE_ANAPHORA_RUN, DIALOGUE_VERBAL_TIC_FLOOD
-- `DIALOGUE_WITHIN_LINE_WORD_ECHO` — Wave 325: DIALOGUE_EXPLETIVE_OPENER_OVERUSE, DIALOGUE_ABSOLUTE_OVERUSE, DIALOGUE_WITHIN_LINE_WORD_ECHO
-- `DIALOGUE_YOU_OPENER_FLOOD` — Wave 350: DIALOGUE_YOU_OPENER_FLOOD, DIALOGUE_THANKS_OVERUSE, DIALOGUE_SELF_REFERENCE
-- `ELLIPSIS_OVERUSE` — Wave 255: ELLIPSIS_OVERUSE
-- `EMOTIONAL_SUPPRESSION` — Level 2: Implicit subtext divergence (requires memory records)
-- `EXCLAMATION_OVERUSE` — Wave 255: EXCLAMATION_OVERUSE
-- `FILLER_OPENER_OVERUSE` — Wave 178: Greeting ritual, vocative overuse, filler openers
-- `FUTURE_TENSE_FLOOD` — Wave 283: FUTURE_TENSE_FLOOD
-- `GREETING_RITUAL_OVERUSE` — Wave 178: Greeting ritual, vocative overuse, filler openers
-- `IMPERATIVE_DOMINANCE` — Wave 227: IMPERATIVE_DOMINANCE
-- `INTERRUPTION_VOID` — Wave 185: Question dominance, interruption void, speaker monopoly
-- `LAST_ACT_EXPOSITION_SPIKE` — Wave 227: LAST_ACT_EXPOSITION_SPIKE
-- `LONG_SPEECH_DOMINANCE` — Wave 269: LONG_SPEECH_DOMINANCE
-- `NO_DIALOGUE` — No dialogue at all
-- `NON_RESPONSIVE_EXCHANGE` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
-- `ON_THE_NOSE` — On-the-nose emotion statements
-- `OVER_PARENTHETICAL` — Wave 150: Talking heads, over-parenthetical, deadlock dialogue
-- `POWER_SILENCE` — Level 2: Implicit subtext divergence (requires memory records)
-- `PRONOUN_I_OVERLOAD` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
-- `PUNCTUATION_FLATLINE` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
-- `QUESTION_DODGE` — Level 2: Implicit subtext divergence (requires memory records)
-- `QUESTION_DOMINANCE` — Wave 185: Question dominance, interruption void, speaker monopoly
-- `RHETORICAL_QUESTION_FLOOD` — Wave 164: Rhetorical question flood, dialogue density inversion, voice uniformity
-- `SPEAKER_MONOPOLY` — Wave 185: Question dominance, interruption void, speaker monopoly
-- `SPEAKER_PAIR_MONOPOLY` — Wave 241: SPEAKER_PAIR_MONOPOLY
-- `SYCOPHANTIC_AGREEMENT` — Consecutive agreements (sycophantic echo)
-- `TAG_QUESTION_OVERUSE` — Wave 255: TAG_QUESTION_OVERUSE
-- `TALKING_HEADS` — Wave 150: Talking heads, over-parenthetical, deadlock dialogue
-- `TRAIT_LABELING` — Trait labeling (show don't tell)
-- `UNINTERRUPTED_MONOLOGUE` — Long monologue (>6 lines without interruption)
-- `VOCATIVE_NAME_OVERUSE` — Wave 178: Greeting ritual, vocative overuse, filler openers
+- <a id="rule-apology_loop"></a>`APOLOGY_LOOP` — Wave 297: APOLOGY_LOOP
+- <a id="rule-as_you_know_bob"></a>`AS_YOU_KNOW_BOB` — As-you-know exposition
+- <a id="rule-cadence_monotony"></a>`CADENCE_MONOTONY` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
+- <a id="rule-character_voice_uniformity"></a>`CHARACTER_VOICE_UNIFORMITY` — Wave 164: Rhetorical question flood, dialogue density inversion, voice uniformity
+- <a id="rule-contraction_starvation"></a>`CONTRACTION_STARVATION` — Wave 297: CONTRACTION_STARVATION
+- <a id="rule-deadlock_dialogue"></a>`DEADLOCK_DIALOGUE` — Wave 150: Talking heads, over-parenthetical, deadlock dialogue
+- <a id="rule-denial_inversion"></a>`DENIAL_INVERSION` — Level 2: Implicit subtext divergence (requires memory records)
+- <a id="rule-dialogue_absolute_overuse"></a>`DIALOGUE_ABSOLUTE_OVERUSE` — Wave 325: DIALOGUE_EXPLETIVE_OPENER_OVERUSE, DIALOGUE_ABSOLUTE_OVERUSE, DIALOGUE_WITHIN_LINE_WORD_ECHO
+- <a id="rule-dialogue_agreement_chain"></a>`DIALOGUE_AGREEMENT_CHAIN` — Wave 269: DIALOGUE_AGREEMENT_CHAIN
+- <a id="rule-dialogue_amplifier_flood"></a>`DIALOGUE_AMPLIFIER_FLOOD` — Wave 392: DIALOGUE_EMOTION_NAMING, DIALOGUE_AMPLIFIER_FLOOD, DIALOGUE_TIME_MARKER_FLOOD
+- <a id="rule-dialogue_anaphora_run"></a>`DIALOGUE_ANAPHORA_RUN` — Wave 378: DIALOGUE_SUPERLATIVE_FLOOD, DIALOGUE_ANAPHORA_RUN, DIALOGUE_VERBAL_TIC_FLOOD
+- <a id="rule-dialogue_closing_zone_silent"></a>`DIALOGUE_CLOSING_ZONE_SILENT` — Wave 504 checks
+- <a id="rule-dialogue_conditional_overload"></a>`DIALOGUE_CONDITIONAL_OVERLOAD` — Wave 283: DIALOGUE_CONDITIONAL_OVERLOAD
+- <a id="rule-dialogue_density_front_heavy"></a>`DIALOGUE_DENSITY_FRONT_HEAVY` — Wave 504 checks
+- <a id="rule-dialogue_density_inversion"></a>`DIALOGUE_DENSITY_INVERSION` — Wave 164: Rhetorical question flood, dialogue density inversion, voice uniformity
+- <a id="rule-dialogue_emotion_naming"></a>`DIALOGUE_EMOTION_NAMING` — Wave 392: DIALOGUE_EMOTION_NAMING, DIALOGUE_AMPLIFIER_FLOOD, DIALOGUE_TIME_MARKER_FLOOD
+- <a id="rule-dialogue_excuse_flood"></a>`DIALOGUE_EXCUSE_FLOOD` — Wave 420: DIALOGUE_INTERRUPT_FLOOD, DIALOGUE_EXCUSE_FLOOD, DIALOGUE_AFFIRMATION_FLOOD
+- <a id="rule-dialogue_expletive_opener_overuse"></a>`DIALOGUE_EXPLETIVE_OPENER_OVERUSE` — Wave 325: DIALOGUE_EXPLETIVE_OPENER_OVERUSE, DIALOGUE_ABSOLUTE_OVERUSE, DIALOGUE_WITHIN_LINE_WORD_ECHO
+- <a id="rule-dialogue_filler_sound_overuse"></a>`DIALOGUE_FILLER_SOUND_OVERUSE` — Wave 311: DIALOGUE_FILLER_SOUND_OVERUSE
+- <a id="rule-dialogue_first_person_saturation"></a>`DIALOGUE_FIRST_PERSON_SATURATION` — Wave 364: DIALOGUE_FIRST_PERSON_SATURATION, DIALOGUE_PASSIVE_CONSTRUCT_FLOOD, DIALOGUE_PRESENT_PERFECT_FLOOD
+- <a id="rule-dialogue_hedge_back_loaded"></a>`DIALOGUE_HEDGE_BACK_LOADED` — Wave 504 checks
+- <a id="rule-dialogue_hedge_saturation"></a>`DIALOGUE_HEDGE_SATURATION` — Wave 311: DIALOGUE_HEDGE_SATURATION
+- <a id="rule-dialogue_interrupt_flood"></a>`DIALOGUE_INTERRUPT_FLOOD` — Wave 420: DIALOGUE_INTERRUPT_FLOOD, DIALOGUE_EXCUSE_FLOOD, DIALOGUE_AFFIRMATION_FLOOD
+- <a id="rule-dialogue_lexical_poverty"></a>`DIALOGUE_LEXICAL_POVERTY` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
+- <a id="rule-dialogue_midsentence_caps_flood"></a>`DIALOGUE_MIDSENTENCE_CAPS_FLOOD` — Wave 336: DIALOGUE_QUESTION_FLOOD, DIALOGUE_NEGATIVE_OPENER_FLOOD, DIALOGUE_MIDSENTENCE_CAPS_FLOOD
+- <a id="rule-dialogue_mirror_syndrome"></a>`DIALOGUE_MIRROR_SYNDROME` — Wave 227: DIALOGUE_MIRROR_SYNDROME
+- <a id="rule-dialogue_negative_opener_flood"></a>`DIALOGUE_NEGATIVE_OPENER_FLOOD` — Wave 336: DIALOGUE_QUESTION_FLOOD, DIALOGUE_NEGATIVE_OPENER_FLOOD, DIALOGUE_MIDSENTENCE_CAPS_FLOOD
+- <a id="rule-dialogue_negative_scene_void"></a>`DIALOGUE_NEGATIVE_SCENE_VOID` — Wave 490: DIALOGUE_VERBAL_PEAK_UNCAUSED, DIALOGUE_NEGATIVE_SCENE_VOID, DIALOGUE_SCENE_TEMPORAL_CLUSTER
+- <a id="rule-dialogue_oath_intensifier_flood"></a>`DIALOGUE_OATH_INTENSIFIER_FLOOD` — Wave 406: DIALOGUE_VAGUE_NOUN_FLOOD, DIALOGUE_REPORTED_SPEECH_FLOOD, DIALOGUE_OATH_INTENSIFIER_FLOOD
+- <a id="rule-dialogue_one_word_dominance"></a>`DIALOGUE_ONE_WORD_DOMINANCE` — Wave 311: DIALOGUE_ONE_WORD_DOMINANCE
+- <a id="rule-dialogue_opener_monotony"></a>`DIALOGUE_OPENER_MONOTONY` — Wave 283: DIALOGUE_OPENER_MONOTONY
+- <a id="rule-dialogue_passive_construct_flood"></a>`DIALOGUE_PASSIVE_CONSTRUCT_FLOOD` — Wave 364: DIALOGUE_FIRST_PERSON_SATURATION, DIALOGUE_PASSIVE_CONSTRUCT_FLOOD, DIALOGUE_PRESENT_PERFECT_FLOOD
+- <a id="rule-dialogue_present_perfect_flood"></a>`DIALOGUE_PRESENT_PERFECT_FLOOD` — Wave 364: DIALOGUE_FIRST_PERSON_SATURATION, DIALOGUE_PASSIVE_CONSTRUCT_FLOOD, DIALOGUE_PRESENT_PERFECT_FLOOD
+- <a id="rule-dialogue_question_cluster"></a>`DIALOGUE_QUESTION_CLUSTER` — Wave 269: DIALOGUE_QUESTION_CLUSTER
+- <a id="rule-dialogue_question_flood"></a>`DIALOGUE_QUESTION_FLOOD` — Wave 336: DIALOGUE_QUESTION_FLOOD, DIALOGUE_NEGATIVE_OPENER_FLOOD, DIALOGUE_MIDSENTENCE_CAPS_FLOOD
+- <a id="rule-dialogue_relationship_peak_silent"></a>`DIALOGUE_RELATIONSHIP_PEAK_SILENT` — Wave 504 checks
+- <a id="rule-dialogue_relationship_shift_aftermath_silent"></a>`DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT` — Wave 504 checks
+- <a id="rule-dialogue_repeated_line"></a>`DIALOGUE_REPEATED_LINE` — Wave 297: DIALOGUE_REPEATED_LINE
+- <a id="rule-dialogue_reported_speech_flood"></a>`DIALOGUE_REPORTED_SPEECH_FLOOD` — Wave 406: DIALOGUE_VAGUE_NOUN_FLOOD, DIALOGUE_REPORTED_SPEECH_FLOOD, DIALOGUE_OATH_INTENSIFIER_FLOOD
+- <a id="rule-dialogue_retrospective_flood"></a>`DIALOGUE_RETROSPECTIVE_FLOOD` — Wave 241: DIALOGUE_RETROSPECTIVE_FLOOD
+- <a id="rule-dialogue_seed_aftermath_silent"></a>`DIALOGUE_SEED_AFTERMATH_SILENT` — Wave 504 checks
+- <a id="rule-dialogue_self_correction_absent"></a>`DIALOGUE_SELF_CORRECTION_ABSENT` — Wave 241: DIALOGUE_SELF_CORRECTION_ABSENT
+- <a id="rule-dialogue_self_reference"></a>`DIALOGUE_SELF_REFERENCE` — Wave 350: DIALOGUE_YOU_OPENER_FLOOD, DIALOGUE_THANKS_OVERUSE, DIALOGUE_SELF_REFERENCE
+- <a id="rule-dialogue_sparse_run"></a>`DIALOGUE_SPARSE_RUN` — Wave 504 checks
+- <a id="rule-dialogue_staccato_overuse"></a>`DIALOGUE_STACCATO_OVERUSE` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
+- <a id="rule-dialogue_superlative_flood"></a>`DIALOGUE_SUPERLATIVE_FLOOD` — Wave 378: DIALOGUE_SUPERLATIVE_FLOOD, DIALOGUE_ANAPHORA_RUN, DIALOGUE_VERBAL_TIC_FLOOD
+- <a id="rule-dialogue_thanks_overuse"></a>`DIALOGUE_THANKS_OVERUSE` — Wave 350: DIALOGUE_YOU_OPENER_FLOOD, DIALOGUE_THANKS_OVERUSE, DIALOGUE_SELF_REFERENCE
+- <a id="rule-dialogue_time_marker_flood"></a>`DIALOGUE_TIME_MARKER_FLOOD` — Wave 392: DIALOGUE_EMOTION_NAMING, DIALOGUE_AMPLIFIER_FLOOD, DIALOGUE_TIME_MARKER_FLOOD
+- <a id="rule-dialogue_vague_noun_flood"></a>`DIALOGUE_VAGUE_NOUN_FLOOD` — Wave 406: DIALOGUE_VAGUE_NOUN_FLOOD, DIALOGUE_REPORTED_SPEECH_FLOOD, DIALOGUE_OATH_INTENSIFIER_FLOOD
+- <a id="rule-dialogue_verbal_tic_flood"></a>`DIALOGUE_VERBAL_TIC_FLOOD` — Wave 378: DIALOGUE_SUPERLATIVE_FLOOD, DIALOGUE_ANAPHORA_RUN, DIALOGUE_VERBAL_TIC_FLOOD
+- <a id="rule-dialogue_within_line_word_echo"></a>`DIALOGUE_WITHIN_LINE_WORD_ECHO` — Wave 325: DIALOGUE_EXPLETIVE_OPENER_OVERUSE, DIALOGUE_ABSOLUTE_OVERUSE, DIALOGUE_WITHIN_LINE_WORD_ECHO
+- <a id="rule-dialogue_you_opener_flood"></a>`DIALOGUE_YOU_OPENER_FLOOD` — Wave 350: DIALOGUE_YOU_OPENER_FLOOD, DIALOGUE_THANKS_OVERUSE, DIALOGUE_SELF_REFERENCE
+- <a id="rule-ellipsis_overuse"></a>`ELLIPSIS_OVERUSE` — Wave 255: ELLIPSIS_OVERUSE
+- <a id="rule-emotional_suppression"></a>`EMOTIONAL_SUPPRESSION` — Level 2: Implicit subtext divergence (requires memory records)
+- <a id="rule-exclamation_overuse"></a>`EXCLAMATION_OVERUSE` — Wave 255: EXCLAMATION_OVERUSE
+- <a id="rule-filler_opener_overuse"></a>`FILLER_OPENER_OVERUSE` — Wave 178: Greeting ritual, vocative overuse, filler openers
+- <a id="rule-future_tense_flood"></a>`FUTURE_TENSE_FLOOD` — Wave 283: FUTURE_TENSE_FLOOD
+- <a id="rule-greeting_ritual_overuse"></a>`GREETING_RITUAL_OVERUSE` — Wave 178: Greeting ritual, vocative overuse, filler openers
+- <a id="rule-imperative_dominance"></a>`IMPERATIVE_DOMINANCE` — Wave 227: IMPERATIVE_DOMINANCE
+- <a id="rule-interruption_void"></a>`INTERRUPTION_VOID` — Wave 185: Question dominance, interruption void, speaker monopoly
+- <a id="rule-last_act_exposition_spike"></a>`LAST_ACT_EXPOSITION_SPIKE` — Wave 227: LAST_ACT_EXPOSITION_SPIKE
+- <a id="rule-long_speech_dominance"></a>`LONG_SPEECH_DOMINANCE` — Wave 269: LONG_SPEECH_DOMINANCE
+- <a id="rule-no_dialogue"></a>`NO_DIALOGUE` — No dialogue at all
+- <a id="rule-non_responsive_exchange"></a>`NON_RESPONSIVE_EXCHANGE` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
+- <a id="rule-on_the_nose"></a>`ON_THE_NOSE` — On-the-nose emotion statements
+- <a id="rule-over_parenthetical"></a>`OVER_PARENTHETICAL` — Wave 150: Talking heads, over-parenthetical, deadlock dialogue
+- <a id="rule-power_silence"></a>`POWER_SILENCE` — Level 2: Implicit subtext divergence (requires memory records)
+- <a id="rule-pronoun_i_overload"></a>`PRONOUN_I_OVERLOAD` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
+- <a id="rule-punctuation_flatline"></a>`PUNCTUATION_FLATLINE` — Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload
+- <a id="rule-question_dodge"></a>`QUESTION_DODGE` — Level 2: Implicit subtext divergence (requires memory records)
+- <a id="rule-question_dominance"></a>`QUESTION_DOMINANCE` — Wave 185: Question dominance, interruption void, speaker monopoly
+- <a id="rule-rhetorical_question_flood"></a>`RHETORICAL_QUESTION_FLOOD` — Wave 164: Rhetorical question flood, dialogue density inversion, voice uniformity
+- <a id="rule-speaker_monopoly"></a>`SPEAKER_MONOPOLY` — Wave 185: Question dominance, interruption void, speaker monopoly
+- <a id="rule-speaker_pair_monopoly"></a>`SPEAKER_PAIR_MONOPOLY` — Wave 241: SPEAKER_PAIR_MONOPOLY
+- <a id="rule-sycophantic_agreement"></a>`SYCOPHANTIC_AGREEMENT` — Consecutive agreements (sycophantic echo)
+- <a id="rule-tag_question_overuse"></a>`TAG_QUESTION_OVERUSE` — Wave 255: TAG_QUESTION_OVERUSE
+- <a id="rule-talking_heads"></a>`TALKING_HEADS` — Wave 150: Talking heads, over-parenthetical, deadlock dialogue
+- <a id="rule-trait_labeling"></a>`TRAIT_LABELING` — Trait labeling (show don't tell)
+- <a id="rule-uninterrupted_monologue"></a>`UNINTERRUPTED_MONOLOGUE` — Long monologue (>6 lines without interruption)
+- <a id="rule-vocative_name_overuse"></a>`VOCATIVE_NAME_OVERUSE` — Wave 178: Greeting ritual, vocative overuse, filler openers
 

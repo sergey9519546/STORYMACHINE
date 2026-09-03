@@ -8,9 +8,9 @@ Wave 1174 additions: with all seven tracked triggers (raise_stakes, payoffSetupI
 
 Rules named in this wave's header:
 
-- `BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID`
-- `BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
-- `BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_emotion_curiosity_aftermath_void"></a>`BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_suspense_curiosity_aftermath_void"></a>`BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_suspense_emotional_aftermath_void"></a>`BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1160
 
@@ -18,9 +18,9 @@ Wave 1160 additions: after Wave 1146, clockRaised was at five of six channels an
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_STAGING_AFTERMATH_VOID`
-- `BELIEF_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `BELIEF_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-belief_clock_staging_aftermath_void"></a>`BELIEF_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-belief_turn_dialogue_highlight_aftermath_void"></a>`BELIEF_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-belief_turn_staging_aftermath_void"></a>`BELIEF_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1146
 
@@ -28,9 +28,9 @@ Wave 1146 additions (opens rotation cycle 42): clockRaised was at four of six ch
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `BELIEF_TURN_CURIOSITY_AFTERMATH_VOID`
-- `BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_clock_dialogue_highlight_aftermath_void"></a>`BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-belief_turn_curiosity_aftermath_void"></a>`BELIEF_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_turn_emotional_aftermath_void"></a>`BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1132
 
@@ -38,9 +38,9 @@ Wave 1132 additions: clockRaised was at two of six channels (curiosityDelta/susp
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `BELIEF_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `BELIEF_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-belief_clock_emotional_aftermath_void"></a>`BELIEF_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_clock_relational_aftermath_void"></a>`BELIEF_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_turn_suspense_aftermath_void"></a>`BELIEF_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1118
 
@@ -48,9 +48,9 @@ Wave 1118 additions: with all five main triggers fully saturated, this wave intr
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `BELIEF_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_clock_curiosity_aftermath_void"></a>`BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_clock_suspense_aftermath_void"></a>`BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-belief_turn_relational_aftermath_void"></a>`BELIEF_TURN_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1104
 
@@ -58,9 +58,9 @@ Wave 1104 additions: BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID, BELIEF_REVELATI
 
 Rules named in this wave's header:
 
-- `BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `BELIEF_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-belief_revelation_dialogue_highlight_aftermath_void"></a>`BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-belief_revelation_emotional_aftermath_void"></a>`BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_revelation_staging_aftermath_void"></a>`BELIEF_REVELATION_STAGING_AFTERMATH_VOID`
 
 ## Wave 1090
 
@@ -68,9 +68,9 @@ Wave 1090 additions: with all four of this pass's main triggers (raise_stakes, p
 
 Rules named in this wave's header:
 
-- `BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID`
-- `BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-belief_revelation_curiosity_aftermath_void"></a>`BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_revelation_relational_aftermath_void"></a>`BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_revelation_suspense_aftermath_void"></a>`BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1076
 
@@ -78,9 +78,9 @@ Wave 1076 additions: seededClueIds reaches full six-channel saturation — BELIE
 
 Rules named in this wave's header:
 
-- `BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `BELIEF_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-belief_open_thread_dialogue_highlight_aftermath_void"></a>`BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-belief_open_thread_staging_aftermath_void"></a>`BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-belief_seed_staging_aftermath_void"></a>`BELIEF_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 1062
 
@@ -88,9 +88,9 @@ Wave 1062 additions: raise_stakes and payoffSetupIds each reach full six-channel
 
 Rules named in this wave's header:
 
-- `BELIEF_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `BELIEF_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `BELIEF_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-belief_payoff_dialogue_highlight_aftermath_void"></a>`BELIEF_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-belief_seed_dialogue_highlight_aftermath_void"></a>`BELIEF_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-belief_stakes_staging_aftermath_void"></a>`BELIEF_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1048
 
@@ -98,9 +98,9 @@ Wave 1048 additions: with raise_stakes, payoffSetupIds, and seededClueIds all no
 
 Rules named in this wave's header:
 
-- `BELIEF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `BELIEF_PAYOFF_STAGING_AFTERMATH_VOID`
-- `BELIEF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-belief_open_thread_suspense_aftermath_void"></a>`BELIEF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-belief_payoff_staging_aftermath_void"></a>`BELIEF_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-belief_stakes_dialogue_highlight_aftermath_void"></a>`BELIEF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1034
 
@@ -108,9 +108,9 @@ Wave 1034 additions: with raise_stakes and payoffSetupIds now at four channels e
 
 Rules named in this wave's header:
 
-- `BELIEF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `BELIEF_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `BELIEF_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_open_thread_emotional_aftermath_void"></a>`BELIEF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_open_thread_relational_aftermath_void"></a>`BELIEF_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_seed_curiosity_aftermath_void"></a>`BELIEF_SEED_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1020
 
@@ -118,9 +118,9 @@ Wave 1020 additions: three more fresh channels for existing triggers: BELIEF_STA
 
 Rules named in this wave's header:
 
-- `BELIEF_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `BELIEF_SEED_RELATIONAL_AFTERMATH_VOID`
-- `BELIEF_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_payoff_suspense_aftermath_void"></a>`BELIEF_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-belief_seed_relational_aftermath_void"></a>`BELIEF_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_stakes_curiosity_aftermath_void"></a>`BELIEF_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1006
 
@@ -128,9 +128,9 @@ Wave 1006 additions: this pass's aftermath-void family is now large enough that 
 
 Rules named in this wave's header:
 
-- `BELIEF_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `BELIEF_SEED_SUSPENSE_AFTERMATH_VOID`
-- `BELIEF_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_payoff_emotional_aftermath_void"></a>`BELIEF_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_seed_suspense_aftermath_void"></a>`BELIEF_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-belief_stakes_emotional_aftermath_void"></a>`BELIEF_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 992
 
@@ -138,9 +138,9 @@ Wave 992 additions: BELIEF_CLOCK_DELTA was checked as a zone-imbalance candidate
 
 Rules named in this wave's header:
 
-- `BELIEF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `BELIEF_PAYOFF_RELATIONSHIP_AFTERMATH_VOID`
-- `BELIEF_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-belief_open_thread_curiosity_aftermath_void"></a>`BELIEF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_payoff_relationship_aftermath_void"></a>`BELIEF_PAYOFF_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-belief_stakes_suspense_aftermath_void"></a>`BELIEF_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 978
 
@@ -148,9 +148,9 @@ Wave 978 additions: with the zone-imbalance mode now exhausted for this pass, pi
 
 Rules named in this wave's header:
 
-- `BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID`
-- `BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-belief_payoff_curiosity_aftermath_void"></a>`BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-belief_seed_emotional_aftermath_void"></a>`BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-belief_stakes_relationship_aftermath_void"></a>`BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID`
 
 ## Wave 964
 
@@ -158,9 +158,9 @@ Wave 964 additions: auditing the three remaining trio-complete signals in this p
 
 Rules named in this wave's header:
 
-- `BELIEF_HIGHLIGHT_ZONE_IMBALANCE`
-- `BELIEF_RELATIONSHIP_ZONE_IMBALANCE`
-- `BELIEF_TURN_ZONE_IMBALANCE`
+- <a id="rule-belief_highlight_zone_imbalance"></a>`BELIEF_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-belief_relationship_zone_imbalance"></a>`BELIEF_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-belief_turn_zone_imbalance"></a>`BELIEF_TURN_ZONE_IMBALANCE`
 
 ## Wave 950
 
@@ -168,9 +168,9 @@ Wave 950 additions: with belief's valence and delta signals now saturated by the
 
 Rules named in this wave's header:
 
-- `BELIEF_OPEN_THREAD_ZONE_IMBALANCE`
-- `BELIEF_PAYOFF_ZONE_IMBALANCE`
-- `BELIEF_SEED_ZONE_IMBALANCE`
+- <a id="rule-belief_open_thread_zone_imbalance"></a>`BELIEF_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-belief_payoff_zone_imbalance"></a>`BELIEF_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-belief_seed_zone_imbalance"></a>`BELIEF_SEED_ZONE_IMBALANCE`
 
 ## Wave 936
 
@@ -178,9 +178,9 @@ Wave 936 additions: continuing the checkZoneImbalance rollout, this wave extends
 
 Rules named in this wave's header:
 
-- `BELIEF_CURIOSITY_ZONE_IMBALANCE`
-- `BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `BELIEF_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-belief_curiosity_zone_imbalance"></a>`BELIEF_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-belief_positive_emotion_zone_imbalance"></a>`BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-belief_suspense_zone_imbalance"></a>`BELIEF_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 922
 
@@ -188,9 +188,9 @@ Wave 922 additions: continuing the checkZoneImbalance rollout, this wave applies
 
 Rules named in this wave's header:
 
-- `BELIEF_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `BELIEF_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `BELIEF_STAKES_ZONE_IMBALANCE`
+- <a id="rule-belief_negative_emotion_zone_imbalance"></a>`BELIEF_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-belief_revelation_purpose_zone_imbalance"></a>`BELIEF_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-belief_stakes_zone_imbalance"></a>`BELIEF_STAKES_ZONE_IMBALANCE`
 
 ## Wave 908
 
@@ -198,9 +198,9 @@ Wave 908 additions: purpose === 'revelation' has never been isolated as its own 
 
 Rules named in this wave's header:
 
-- `BELIEF_COMPLICATE_ZONE_IMBALANCE`
-- `BELIEF_REVELATION_PURPOSE_DROUGHT_RUN`
-- `BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-belief_complicate_zone_imbalance"></a>`BELIEF_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-belief_revelation_purpose_drought_run"></a>`BELIEF_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-belief_revelation_purpose_zone_cluster"></a>`BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 894
 
@@ -208,9 +208,9 @@ Wave 894 additions: BELIEF_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'comp
 
 Rules named in this wave's header:
 
-- `BELIEF_COMPLICATE_DROUGHT_RUN`
-- `BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `BELIEF_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-belief_complicate_drought_run"></a>`BELIEF_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-belief_introduce_conflict_zone_imbalance"></a>`BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-belief_turning_point_zone_imbalance"></a>`BELIEF_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 880
 
@@ -218,9 +218,9 @@ Wave 880 additions: with climax, establish_world, and resolution now all trio-co
 
 Rules named in this wave's header:
 
-- `BELIEF_CLIMAX_ZONE_IMBALANCE`
-- `BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `BELIEF_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-belief_climax_zone_imbalance"></a>`BELIEF_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-belief_establish_world_zone_imbalance"></a>`BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-belief_resolution_zone_imbalance"></a>`BELIEF_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 866
 
@@ -228,10 +228,10 @@ Wave 866 additions: BELIEF_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose === 
 
 Rules named in this wave's header:
 
-- `BELIEF_CLIMAX_DROUGHT_RUN`
-- `BELIEF_ESTABLISH_WORLD_DROUGHT_RUN`
-- `BELIEF_RESOLUTION_ABSENT`
-- `BELIEF_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-belief_climax_drought_run"></a>`BELIEF_CLIMAX_DROUGHT_RUN`
+- <a id="rule-belief_establish_world_drought_run"></a>`BELIEF_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-belief_resolution_absent"></a>`BELIEF_RESOLUTION_ABSENT`
+- <a id="rule-belief_resolution_drought_run"></a>`BELIEF_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 852
 
@@ -239,9 +239,9 @@ Wave 852 additions: BELIEF_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose =
 
 Rules named in this wave's header:
 
-- `BELIEF_CLIMAX_ZONE_CLUSTER`
-- `BELIEF_COMPLICATE_ZONE_CLUSTER`
-- `BELIEF_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-belief_climax_zone_cluster"></a>`BELIEF_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-belief_complicate_zone_cluster"></a>`BELIEF_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-belief_resolution_zone_cluster"></a>`BELIEF_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 838
 
@@ -249,9 +249,9 @@ Wave 838 additions: BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose 
 
 Rules named in this wave's header:
 
-- `BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `BELIEF_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-belief_establish_world_zone_cluster"></a>`BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-belief_introduce_conflict_drought_run"></a>`BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-belief_positive_emotion_drought_run"></a>`BELIEF_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 824
 
@@ -259,10 +259,10 @@ Wave 824 additions: BELIEF_TURNING_POINT_DROUGHT_RUN (run-based × purpose === '
 
 Rules named in this wave's header:
 
-- `ASSERTION_POSITIVE_DECOUPLED`
-- `BELIEF_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `BELIEF_POSITIVE_EMOTION_ZONE_CLUSTER`
-- `BELIEF_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-assertion_positive_decoupled"></a>`ASSERTION_POSITIVE_DECOUPLED`
+- <a id="rule-belief_introduce_conflict_zone_cluster"></a>`BELIEF_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-belief_positive_emotion_zone_cluster"></a>`BELIEF_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-belief_turning_point_drought_run"></a>`BELIEF_TURNING_POINT_DROUGHT_RUN`
 
 ## Wave 810
 
@@ -270,9 +270,9 @@ Wave 810 additions: BELIEF_STAKES_ZONE_CLUSTER (distribution/timing × purpose =
 
 Rules named in this wave's header:
 
-- `BELIEF_STAKES_DROUGHT_RUN`
-- `BELIEF_STAKES_ZONE_CLUSTER`
-- `BELIEF_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-belief_stakes_drought_run"></a>`BELIEF_STAKES_DROUGHT_RUN`
+- <a id="rule-belief_stakes_zone_cluster"></a>`BELIEF_STAKES_ZONE_CLUSTER`
+- <a id="rule-belief_turning_point_zone_cluster"></a>`BELIEF_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 796
 
@@ -280,13 +280,13 @@ Wave 796 additions: BELIEF_REVELATION_PEAK_UNCAUSED (backward-cause × revelatio
 
 Rules named in this wave's header:
 
-- `ASSERTION_EMOTIONAL_AFTERMATH_FLAT`
-- `BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `BELIEF_REVELATION_PEAK_UNCAUSED`
-- `REVELATION_DROUGHT`
-- `REVELATION_EMOTIONAL_MONOTONE`
-- `REVELATION_UNPREPARED_CLIMAX`
+- <a id="rule-assertion_emotional_aftermath_flat"></a>`ASSERTION_EMOTIONAL_AFTERMATH_FLAT`
+- <a id="rule-belief_negative_emotion_drought_run"></a>`BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-belief_negative_emotion_zone_cluster"></a>`BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-belief_revelation_peak_uncaused"></a>`BELIEF_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-revelation_drought"></a>`REVELATION_DROUGHT`
+- <a id="rule-revelation_emotional_monotone"></a>`REVELATION_EMOTIONAL_MONOTONE`
+- <a id="rule-revelation_unprepared_climax"></a>`REVELATION_UNPREPARED_CLIMAX`
 
 ## Wave 782
 
@@ -294,11 +294,11 @@ Wave 782 additions: BELIEF_CURIOSITY_ZONE_CLUSTER (distribution/timing × curios
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_RAISED_ZONE_CLUSTER`
-- `BELIEF_CURIOSITY_PEAK_UNCAUSED`
-- `BELIEF_CURIOSITY_ZONE_CLUSTER`
-- `REVELATION_CURIOSITY_PEAK_EARLY`
-- `TOLD_BELIEF_CURIOSITY_PEAK_ABSENT`
+- <a id="rule-belief_clock_raised_zone_cluster"></a>`BELIEF_CLOCK_RAISED_ZONE_CLUSTER`
+- <a id="rule-belief_curiosity_peak_uncaused"></a>`BELIEF_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-belief_curiosity_zone_cluster"></a>`BELIEF_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-revelation_curiosity_peak_early"></a>`REVELATION_CURIOSITY_PEAK_EARLY`
+- <a id="rule-told_belief_curiosity_peak_absent"></a>`TOLD_BELIEF_CURIOSITY_PEAK_ABSENT`
 
 ## Wave 768
 
@@ -306,9 +306,9 @@ Wave 768 additions: BELIEF_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × rel
 
 Rules named in this wave's header:
 
-- `BELIEF_CHARACTER_MOMENT_DROUGHT_RUN`
-- `BELIEF_RELATIONSHIP_ZONE_CLUSTER`
-- `BELIEF_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-belief_character_moment_drought_run"></a>`BELIEF_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-belief_relationship_zone_cluster"></a>`BELIEF_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-belief_suspense_drought_run"></a>`BELIEF_SUSPENSE_DROUGHT_RUN`
 
 ## Wave 754
 
@@ -316,9 +316,9 @@ Wave 754 additions: BELIEF_RELATIONSHIP_PEAK_UNCAUSED (single-peak isolation/bac
 
 Rules named in this wave's header:
 
-- `BELIEF_RELATIONSHIP_PEAK_UNCAUSED`
-- `BELIEF_SUSPENSE_ZONE_CLUSTER`
-- `BELIEF_TURN_DROUGHT_RUN`
+- <a id="rule-belief_relationship_peak_uncaused"></a>`BELIEF_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-belief_suspense_zone_cluster"></a>`BELIEF_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-belief_turn_drought_run"></a>`BELIEF_TURN_DROUGHT_RUN`
 
 ## Wave 740
 
@@ -326,9 +326,9 @@ Wave 740 additions: BELIEF_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_DELTA_DROUGHT_RUN`
-- `BELIEF_OPEN_THREAD_PEAK_UNCAUSED`
-- `BELIEF_STAGING_DROUGHT_RUN`
+- <a id="rule-belief_clock_delta_drought_run"></a>`BELIEF_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-belief_open_thread_peak_uncaused"></a>`BELIEF_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-belief_staging_drought_run"></a>`BELIEF_STAGING_DROUGHT_RUN`
 
 ## Wave 726
 
@@ -336,9 +336,9 @@ Wave 726 additions: BELIEF_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × cloc
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_DELTA_ZONE_CLUSTER`
-- `BELIEF_OPEN_THREAD_ZONE_CLUSTER`
-- `BELIEF_STAGING_PEAK_UNCAUSED`
+- <a id="rule-belief_clock_delta_zone_cluster"></a>`BELIEF_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-belief_open_thread_zone_cluster"></a>`BELIEF_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-belief_staging_peak_uncaused"></a>`BELIEF_STAGING_PEAK_UNCAUSED`
 
 ## Wave 712
 
@@ -346,9 +346,9 @@ Wave 712 additions (closes the ninth rotation cycle, 700-712): BELIEF_PAYOFF_ZON
 
 Rules named in this wave's header:
 
-- `BELIEF_HIGHLIGHT_DROUGHT_RUN`
-- `BELIEF_PAYOFF_ZONE_CLUSTER`
-- `BELIEF_SEED_DROUGHT_RUN`
+- <a id="rule-belief_highlight_drought_run"></a>`BELIEF_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-belief_payoff_zone_cluster"></a>`BELIEF_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-belief_seed_drought_run"></a>`BELIEF_SEED_DROUGHT_RUN`
 
 ## Wave 698
 
@@ -356,9 +356,9 @@ Wave 698 additions: BELIEF_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds absen
 
 Rules named in this wave's header:
 
-- `BELIEF_HIGHLIGHT_ZONE_CLUSTER`
-- `BELIEF_PAYOFF_DROUGHT_RUN`
-- `BELIEF_SEED_PEAK_UNCAUSED`
+- <a id="rule-belief_highlight_zone_cluster"></a>`BELIEF_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-belief_payoff_drought_run"></a>`BELIEF_PAYOFF_DROUGHT_RUN`
+- <a id="rule-belief_seed_peak_uncaused"></a>`BELIEF_SEED_PEAK_UNCAUSED`
 
 ## Wave 684
 
@@ -366,9 +366,9 @@ Wave 684 additions: BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing ×
 
 Rules named in this wave's header:
 
-- `BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `BELIEF_CURIOSITY_DROUGHT_RUN`
-- `BELIEF_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-belief_character_moment_zone_cluster"></a>`BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-belief_curiosity_drought_run"></a>`BELIEF_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-belief_suspense_peak_uncaused"></a>`BELIEF_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 670
 
@@ -376,9 +376,9 @@ Wave 670 additions: BELIEF_HIGHLIGHT_PEAK_UNCAUSED (single-peak isolation/backwa
 
 Rules named in this wave's header:
 
-- `BELIEF_HIGHLIGHT_PEAK_UNCAUSED`
-- `BELIEF_RELATIONSHIP_DROUGHT_RUN`
-- `BELIEF_TURN_ZONE_CLUSTER`
+- <a id="rule-belief_highlight_peak_uncaused"></a>`BELIEF_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-belief_relationship_drought_run"></a>`BELIEF_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-belief_turn_zone_cluster"></a>`BELIEF_TURN_ZONE_CLUSTER`
 
 ## Wave 656
 
@@ -386,9 +386,9 @@ Wave 656 additions: BELIEF_PAYOFF_PEAK_UNCAUSED (single-peak isolation/backward-
 
 Rules named in this wave's header:
 
-- `BELIEF_CLOCK_DROUGHT_RUN`
-- `BELIEF_PAYOFF_PEAK_UNCAUSED`
-- `BELIEF_SEED_ZONE_CLUSTER`
+- <a id="rule-belief_clock_drought_run"></a>`BELIEF_CLOCK_DROUGHT_RUN`
+- <a id="rule-belief_payoff_peak_uncaused"></a>`BELIEF_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-belief_seed_zone_cluster"></a>`BELIEF_SEED_ZONE_CLUSTER`
 
 ## Wave 642
 
@@ -396,9 +396,9 @@ Wave 642 additions: BELIEF_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues
 
 Rules named in this wave's header:
 
-- `BELIEF_OPEN_THREAD_DROUGHT_RUN`
-- `BELIEF_SEED_CURIOSITY_DECOUPLED`
-- `BELIEF_STAGING_ZONE_CLUSTER`
+- <a id="rule-belief_open_thread_drought_run"></a>`BELIEF_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-belief_seed_curiosity_decoupled"></a>`BELIEF_SEED_CURIOSITY_DECOUPLED`
+- <a id="rule-belief_staging_zone_cluster"></a>`BELIEF_STAGING_ZONE_CLUSTER`
 
 ## Wave 628
 
@@ -406,9 +406,9 @@ Wave 628 additions (built on the shared checks library, audit M2.2): BELIEF_PAYO
 
 Rules named in this wave's header:
 
-- `BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `BELIEF_PAYOFF_SEED_DECOUPLED`
-- `CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-belief_character_moment_zone_imbalance"></a>`BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-belief_payoff_seed_decoupled"></a>`BELIEF_PAYOFF_SEED_DECOUPLED`
+- <a id="rule-clock_delta_peak_uncaused"></a>`CLOCK_DELTA_PEAK_UNCAUSED`
 
 ## Wave 614
 
@@ -416,9 +416,9 @@ Wave 614 additions (built on the shared checks library, audit M2.2): BELIEF_STAG
 
 Rules named in this wave's header:
 
-- `BELIEF_STAGING_ZONE_IMBALANCE`
-- `CLOCK_SIGNAL_FLATLINE`
-- `VISUAL_BEAT_BELIEF_DECOUPLED`
+- <a id="rule-belief_staging_zone_imbalance"></a>`BELIEF_STAGING_ZONE_IMBALANCE`
+- <a id="rule-clock_signal_flatline"></a>`CLOCK_SIGNAL_FLATLINE`
+- <a id="rule-visual_beat_belief_decoupled"></a>`VISUAL_BEAT_BELIEF_DECOUPLED`
 
 ## Wave 600
 
@@ -426,7 +426,7 @@ Wave 600 additions: clue debt belief decoupled (co-occurrence/decoupling × unre
 
 Rules named in this wave's header:
 
-- `UNRESOLVED_BELIEF_EXCESS`
+- <a id="rule-unresolved_belief_excess"></a>`UNRESOLVED_BELIEF_EXCESS`
 
 ## Wave 586
 
@@ -434,9 +434,9 @@ Wave 586 additions: revelation dramatic-turn aftermath void (sequence/aftermath 
 
 Rules named in this wave's header:
 
-- `ASSERTION_PAYOFF_AFTERMATH_VOID`
-- `REVELATION_RELATIONSHIP_AFTERMATH_VOID`
-- `TURN_REVELATION_AFTERMATH_VOID`
+- <a id="rule-assertion_payoff_aftermath_void"></a>`ASSERTION_PAYOFF_AFTERMATH_VOID`
+- <a id="rule-revelation_relationship_aftermath_void"></a>`REVELATION_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-turn_revelation_aftermath_void"></a>`TURN_REVELATION_AFTERMATH_VOID`
 
 ## Wave 572
 
@@ -444,8 +444,8 @@ Wave 572 additions: assertion clock aftermath void (sequence/aftermath × assert
 
 Rules named in this wave's header:
 
-- `ASSERTION_AFTERMATH_VOID`
-- `ASSERTION_PAYOFF_DECOUPLED`
+- <a id="rule-assertion_aftermath_void"></a>`ASSERTION_AFTERMATH_VOID`
+- <a id="rule-assertion_payoff_decoupled"></a>`ASSERTION_PAYOFF_DECOUPLED`
 
 ## Wave 558
 
@@ -453,9 +453,9 @@ Wave 558 additions: assertion emotional aftermath flat (average/aggregate × ass
 
 Rules named in this wave's header:
 
-- `REVELATION_CURIOSITY_PEAK_ABSENT`
-- `REVELATION_EMOTIONAL_AFTERMATH_FLAT`
-- `REVELATION_TEMPORAL_CLUSTER`
+- <a id="rule-revelation_curiosity_peak_absent"></a>`REVELATION_CURIOSITY_PEAK_ABSENT`
+- <a id="rule-revelation_emotional_aftermath_flat"></a>`REVELATION_EMOTIONAL_AFTERMATH_FLAT`
+- <a id="rule-revelation_temporal_cluster"></a>`REVELATION_TEMPORAL_CLUSTER`
 
 ## Wave 544
 
@@ -463,9 +463,9 @@ Wave 544 additions: revelation closing quarter absent (zone presence/absence × 
 
 Rules named in this wave's header:
 
-- `ASSERTION_TURN_AFTERMATH_VOID`
-- `REVELATION_DRAMATIC_TURN_DECOUPLED`
-- `REVELATION_FINAL_ACT_ONLY`
+- <a id="rule-assertion_turn_aftermath_void"></a>`ASSERTION_TURN_AFTERMATH_VOID`
+- <a id="rule-revelation_dramatic_turn_decoupled"></a>`REVELATION_DRAMATIC_TURN_DECOUPLED`
+- <a id="rule-revelation_final_act_only"></a>`REVELATION_FINAL_ACT_ONLY`
 
 ## Wave 530
 
@@ -473,9 +473,9 @@ Wave 530 additions: assertion positive decoupled (co-occurrence × positive emot
 
 Rules named in this wave's header:
 
-- `ASSERTION_NEGATIVE_DECOUPLED`
-- `NEGATIVE_SCENE_REVELATION_VOID`
-- `TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED`
+- <a id="rule-assertion_negative_decoupled"></a>`ASSERTION_NEGATIVE_DECOUPLED`
+- <a id="rule-negative_scene_revelation_void"></a>`NEGATIVE_SCENE_REVELATION_VOID`
+- <a id="rule-told_belief_dramatic_turn_decoupled"></a>`TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED`
 
 ## Wave 516
 
@@ -483,9 +483,9 @@ Wave 516 additions: revelation relationship aftermath void (sequence/aftermath �
 
 Rules named in this wave's header:
 
-- `REVELATION_CLOCK_DECOUPLED`
-- `REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `REVELATION_SEED_DECOUPLED`
+- <a id="rule-revelation_clock_decoupled"></a>`REVELATION_CLOCK_DECOUPLED`
+- <a id="rule-revelation_curiosity_aftermath_void"></a>`REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-revelation_seed_decoupled"></a>`REVELATION_SEED_DECOUPLED`
 
 ## Wave 502
 
@@ -493,10 +493,10 @@ Wave 502 additions: revelation seed decoupled (co-occurrence × revelation × se
 
 Rules named in this wave's header:
 
-- `ASSERTION_CURIOSITY_AFTERMATH_VOID`
-- `ASSERTION_SINGLETON_RUN`
-- `REVELATION_CURIOSITY_DECOUPLED`
-- `REVELATION_PAYOFF_DECOUPLED`
+- <a id="rule-assertion_curiosity_aftermath_void"></a>`ASSERTION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-assertion_singleton_run"></a>`ASSERTION_SINGLETON_RUN`
+- <a id="rule-revelation_curiosity_decoupled"></a>`REVELATION_CURIOSITY_DECOUPLED`
+- <a id="rule-revelation_payoff_decoupled"></a>`REVELATION_PAYOFF_DECOUPLED`
 
 ## Wave 488
 
@@ -504,9 +504,9 @@ Wave 488 additions: revelation temporal cluster (distribution/timing × revelati
 
 Rules named in this wave's header:
 
-- `ASSERTION_TEMPORAL_CLUSTER`
-- `REVELATION_RELATIONSHIP_DECOUPLED`
-- `TOLD_BELIEF_EMOTIONAL_FLATLINE`
+- <a id="rule-assertion_temporal_cluster"></a>`ASSERTION_TEMPORAL_CLUSTER`
+- <a id="rule-revelation_relationship_decoupled"></a>`REVELATION_RELATIONSHIP_DECOUPLED`
+- <a id="rule-told_belief_emotional_flatline"></a>`TOLD_BELIEF_EMOTIONAL_FLATLINE`
 
 ## Wave 474
 
@@ -514,8 +514,8 @@ Wave 474 additions: assertion temporal cluster (distribution/timing — >75% of 
 
 Rules named in this wave's header:
 
-- `REVELATION_SUSPENSE_DEFLATION`
-- `TOLD_BELIEF_CURIOSITY_FLAT`
+- <a id="rule-revelation_suspense_deflation"></a>`REVELATION_SUSPENSE_DEFLATION`
+- <a id="rule-told_belief_curiosity_flat"></a>`TOLD_BELIEF_CURIOSITY_FLAT`
 
 ## Wave 460
 
@@ -523,7 +523,7 @@ Wave 460 additions: assertion causal vacuum (every assertion scene is unpreceded
 
 Rules named in this wave's header:
 
-- `TOLD_BELIEF_SEED_DECOUPLED`
+- <a id="rule-told_belief_seed_decoupled"></a>`TOLD_BELIEF_SEED_DECOUPLED`
 
 ## Wave 446
 
@@ -531,9 +531,9 @@ Wave 446 additions: revelation drought (≥6 consecutive scenes with no disclosu
 
 Rules named in this wave's header:
 
-- `REVELATION_ASSERTION_DISCONNECT`
-- `REVELATION_DRAMA_VACUUM`
-- `TOLD_BELIEF_DROUGHT`
+- <a id="rule-revelation_assertion_disconnect"></a>`REVELATION_ASSERTION_DISCONNECT`
+- <a id="rule-revelation_drama_vacuum"></a>`REVELATION_DRAMA_VACUUM`
+- <a id="rule-told_belief_drought"></a>`TOLD_BELIEF_DROUGHT`
 
 ## Wave 432
 
@@ -541,75 +541,75 @@ Wave 432 additions: revelation emotional monotone (all emotionally charged revel
 
 Rules named in this wave's header:
 
-- `REVELATION_CONSECUTIVE_FLOOD`
+- <a id="rule-revelation_consecutive_flood"></a>`REVELATION_CONSECUTIVE_FLOOD`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ADJACENT_DECEPTION_PAYOFF` — Wave 253: ADJACENT_DECEPTION_PAYOFF
-- `ASSERTION_ACT1_ONLY` — Wave 404: REVELATION_PAYOFF_DECOUPLED, TOLD_BELIEF_SEED_DECOUPLED, ASSERTION_ACT1_ONLY
-- `ASSERTION_ACT2A_VOID` — Wave 418: REVELATION_CONSECUTIVE_FLOOD, ASSERTION_ACT2A_VOID, ASSERTION_AFTERMATH_VOID
-- `ASSERTION_CAUSAL_VACUUM` — Wave 460: ASSERTION_CAUSAL_VACUUM, REVELATION_SUSPENSE_DEFLATION, ASSERTION_PAYOFF_DECOUPLED
-- `ASSERTION_CLOCK_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `ASSERTION_CONSECUTIVE_FLOOD` — Wave 502 checks
-- `ASSERTION_DROUGHT` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `ASSERTION_MIDPOINT_VOID` — Wave 376: REVELATION_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CLOCK_DECOUPLED, ASSERTION_MIDPOINT_VOID
-- `ASSERTION_REACTIVE_VOID` — Wave 446: REVELATION_DROUGHT, ASSERTION_REACTIVE_VOID, NEGATIVE_SCENE_REVELATION_VOID
-- `ASSERTION_RELATIONSHIP_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `ASSERTION_SEED_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `ASSERTION_VOID` — Wave 309: ASSERTION_VOID
-- `BELIEF_ACT2B_VOID` — Wave 281: Revelation drama vacuum, Act 2b void, told belief final scene
-- `BELIEF_ASYMMETRY` — Wave 159: Revelation isolated, told domination, belief asymmetry
-- `BELIEF_ECHO_CHAMBER` — Wave 253: BELIEF_ECHO_CHAMBER
-- `BELIEF_FRONT_LOADED` — Wave 267: BELIEF_FRONT_LOADED
-- `BELIEF_FRONT_LOADED_REVELATIONS` — Wave 225: BELIEF_FRONT_LOADED_REVELATIONS
-- `BELIEF_ISOLATION` — Wave 145: Deception consequence & belief reversals
-- `BELIEF_MIDPOINT_VOID` — Wave 199: Midpoint void, single revelation, revelation delayed
-- `BELIEF_OPENING_INERT` — Wave 295: BELIEF_OPENING_INERT
-- `BELIEF_REVERSAL_UNSUPPORTED` — Wave 145: Deception consequence & belief reversals
-- `BELIEF_STAGNATION` — Wave 175: Revelation clustering, belief stagnation, scene overload
-- `BELIEF_WITHOUT_CONTEXT` — Told belief without prior setup
-- `CLUE_DEBT_BELIEF_DECOUPLED` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `CLUE_DEBT_CLOCK_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `CLUE_DEBT_ZONE_IMBALANCE` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `COLD_OPEN_BELIEF_VOID` — Wave 190: Cold open void, unresolved excess, back-weighted revelations
-- `DECEPTION_SETUP_VOID` — Wave 225: DECEPTION_SETUP_VOID
-- `DECEPTION_WITHOUT_CONSEQUENCE` — Wave 145: Deception consequence & belief reversals
-- `EXPOSITION_DUMP` — Consecutive told-beliefs with no witness
-- `LATE_DECEPTION_PLANT` — Wave 211: Revelation Act 3 void, late deception plant, belief resolution absent
-- `POSITIVE_SCENE_REVELATION_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `REVELATION_ACT2A_DESERT` — Wave 253: REVELATION_ACT2A_DESERT
-- `REVELATION_ACT3_VOID` — Wave 211: Revelation Act 3 void, late deception plant, belief resolution absent
-- `REVELATION_AFTERMATH_ABSENT` — Wave 225: REVELATION_AFTERMATH_ABSENT
-- `REVELATION_BACK_WEIGHTED` — Wave 190: Cold open void, unresolved excess, back-weighted revelations
-- `REVELATION_BELIEF_PROPAGATION_ABSENT` — Wave 239: REVELATION_BELIEF_PROPAGATION_ABSENT
-- `REVELATION_CLOCK_AFTERMATH_VOID` — Wave 502 checks
-- `REVELATION_CLOSING_QUARTER_ABSENT` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `REVELATION_CLUSTERING` — Wave 175: Revelation clustering, belief stagnation, scene overload
-- `REVELATION_DELAYED` — Wave 199: Midpoint void, single revelation, revelation delayed
-- `REVELATION_DENSITY_DROP` — Wave 295: REVELATION_DENSITY_DROP
-- `REVELATION_DRAMATIC_TURN_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `REVELATION_ISOLATED` — Wave 159: Revelation isolated, told domination, belief asymmetry
-- `REVELATION_LATE_FIRST` — Wave 309: REVELATION_LATE_FIRST
-- `REVELATION_MIDPOINT_VOID` — Wave 348: REVELATION_ASSERTION_DISCONNECT, REVELATION_MIDPOINT_VOID, TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED
-- `REVELATION_PAYOFF_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `REVELATION_RELATIONSHIP_PEAK_ABSENT` — Wave 488: REVELATION_TEMPORAL_CLUSTER, REVELATION_RELATIONSHIP_PEAK_ABSENT, ASSERTION_NEGATIVE_DECOUPLED
-- `REVELATION_SEED_AFTERMATH_VOID` — Wave 502 checks
-- `REVELATION_SUSPENSE_DECOUPLED` — Wave 295: REVELATION_SUSPENSE_DECOUPLED
-- `REVELATION_SUSPENSE_PEAK_ABSENT` — Wave 376: REVELATION_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CLOCK_DECOUPLED, ASSERTION_MIDPOINT_VOID
-- `REVELATION_UNEARNED` — Revelation without any prior told-belief contradiction
-- `SEED_TEMPORAL_CLUSTER` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
-- `SINGLE_REVELATION_STORY` — Wave 199: Midpoint void, single revelation, revelation delayed
-- `SINGLE_SCENE_BELIEF_OVERLOAD` — Wave 175: Revelation clustering, belief stagnation, scene overload
-- `SOLE_ASSERTER` — Wave 239: SOLE_ASSERTER
-- `TOLD_BELIEF_ACT3_ABSENT` — Wave 362: REVELATION_CLOCK_DECOUPLED, TOLD_BELIEF_ACT3_ABSENT, REVELATION_CURIOSITY_PEAK_ABSENT
-- `TOLD_BELIEF_ACT3_SURGE` — Wave 239: TOLD_BELIEF_ACT3_SURGE
-- `TOLD_BELIEF_CLOCK_DECOUPLED` — Wave 376: REVELATION_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CLOCK_DECOUPLED, ASSERTION_MIDPOINT_VOID
-- `TOLD_BELIEF_CLUSTERING` — Wave 267: TOLD_BELIEF_CLUSTERING
-- `TOLD_BELIEF_DOMINATION` — Wave 159: Revelation isolated, told domination, belief asymmetry
-- `TOLD_BELIEF_FINAL_SCENE` — Wave 281: Revelation drama vacuum, Act 2b void, told belief final scene
-- `TOLD_BELIEF_RELATIONSHIP_DECOUPLED` — Wave 323: REVELATION_CURIOSITY_DECOUPLED, TOLD_BELIEF_CURIOSITY_FLAT, TOLD_BELIEF_RELATIONSHIP_DECOUPLED
-- `TOLD_BELIEF_SUSPENSE_DECOUPLED` — Wave 334: TOLD_BELIEF_SUSPENSE_DECOUPLED, TOLD_BELIEF_EMOTIONAL_FLATLINE, REVELATION_RELATIONSHIP_DECOUPLED
-- `TOLD_BELIEF_SUSPENSE_PEAK_ABSENT` — Wave 390: REVELATION_DRAMATIC_TURN_DECOUPLED, TOLD_BELIEF_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CURIOSITY_PEAK_ABSENT
+- <a id="rule-adjacent_deception_payoff"></a>`ADJACENT_DECEPTION_PAYOFF` — Wave 253: ADJACENT_DECEPTION_PAYOFF
+- <a id="rule-assertion_act1_only"></a>`ASSERTION_ACT1_ONLY` — Wave 404: REVELATION_PAYOFF_DECOUPLED, TOLD_BELIEF_SEED_DECOUPLED, ASSERTION_ACT1_ONLY
+- <a id="rule-assertion_act2a_void"></a>`ASSERTION_ACT2A_VOID` — Wave 418: REVELATION_CONSECUTIVE_FLOOD, ASSERTION_ACT2A_VOID, ASSERTION_AFTERMATH_VOID
+- <a id="rule-assertion_causal_vacuum"></a>`ASSERTION_CAUSAL_VACUUM` — Wave 460: ASSERTION_CAUSAL_VACUUM, REVELATION_SUSPENSE_DEFLATION, ASSERTION_PAYOFF_DECOUPLED
+- <a id="rule-assertion_clock_aftermath_void"></a>`ASSERTION_CLOCK_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-assertion_consecutive_flood"></a>`ASSERTION_CONSECUTIVE_FLOOD` — Wave 502 checks
+- <a id="rule-assertion_drought"></a>`ASSERTION_DROUGHT` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-assertion_midpoint_void"></a>`ASSERTION_MIDPOINT_VOID` — Wave 376: REVELATION_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CLOCK_DECOUPLED, ASSERTION_MIDPOINT_VOID
+- <a id="rule-assertion_reactive_void"></a>`ASSERTION_REACTIVE_VOID` — Wave 446: REVELATION_DROUGHT, ASSERTION_REACTIVE_VOID, NEGATIVE_SCENE_REVELATION_VOID
+- <a id="rule-assertion_relationship_aftermath_void"></a>`ASSERTION_RELATIONSHIP_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-assertion_seed_aftermath_void"></a>`ASSERTION_SEED_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-assertion_void"></a>`ASSERTION_VOID` — Wave 309: ASSERTION_VOID
+- <a id="rule-belief_act2b_void"></a>`BELIEF_ACT2B_VOID` — Wave 281: Revelation drama vacuum, Act 2b void, told belief final scene
+- <a id="rule-belief_asymmetry"></a>`BELIEF_ASYMMETRY` — Wave 159: Revelation isolated, told domination, belief asymmetry
+- <a id="rule-belief_echo_chamber"></a>`BELIEF_ECHO_CHAMBER` — Wave 253: BELIEF_ECHO_CHAMBER
+- <a id="rule-belief_front_loaded"></a>`BELIEF_FRONT_LOADED` — Wave 267: BELIEF_FRONT_LOADED
+- <a id="rule-belief_front_loaded_revelations"></a>`BELIEF_FRONT_LOADED_REVELATIONS` — Wave 225: BELIEF_FRONT_LOADED_REVELATIONS
+- <a id="rule-belief_isolation"></a>`BELIEF_ISOLATION` — Wave 145: Deception consequence & belief reversals
+- <a id="rule-belief_midpoint_void"></a>`BELIEF_MIDPOINT_VOID` — Wave 199: Midpoint void, single revelation, revelation delayed
+- <a id="rule-belief_opening_inert"></a>`BELIEF_OPENING_INERT` — Wave 295: BELIEF_OPENING_INERT
+- <a id="rule-belief_reversal_unsupported"></a>`BELIEF_REVERSAL_UNSUPPORTED` — Wave 145: Deception consequence & belief reversals
+- <a id="rule-belief_stagnation"></a>`BELIEF_STAGNATION` — Wave 175: Revelation clustering, belief stagnation, scene overload
+- <a id="rule-belief_without_context"></a>`BELIEF_WITHOUT_CONTEXT` — Told belief without prior setup
+- <a id="rule-clue_debt_belief_decoupled"></a>`CLUE_DEBT_BELIEF_DECOUPLED` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-clue_debt_clock_aftermath_void"></a>`CLUE_DEBT_CLOCK_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-clue_debt_zone_imbalance"></a>`CLUE_DEBT_ZONE_IMBALANCE` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-cold_open_belief_void"></a>`COLD_OPEN_BELIEF_VOID` — Wave 190: Cold open void, unresolved excess, back-weighted revelations
+- <a id="rule-deception_setup_void"></a>`DECEPTION_SETUP_VOID` — Wave 225: DECEPTION_SETUP_VOID
+- <a id="rule-deception_without_consequence"></a>`DECEPTION_WITHOUT_CONSEQUENCE` — Wave 145: Deception consequence & belief reversals
+- <a id="rule-exposition_dump"></a>`EXPOSITION_DUMP` — Consecutive told-beliefs with no witness
+- <a id="rule-late_deception_plant"></a>`LATE_DECEPTION_PLANT` — Wave 211: Revelation Act 3 void, late deception plant, belief resolution absent
+- <a id="rule-positive_scene_revelation_void"></a>`POSITIVE_SCENE_REVELATION_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-revelation_act2a_desert"></a>`REVELATION_ACT2A_DESERT` — Wave 253: REVELATION_ACT2A_DESERT
+- <a id="rule-revelation_act3_void"></a>`REVELATION_ACT3_VOID` — Wave 211: Revelation Act 3 void, late deception plant, belief resolution absent
+- <a id="rule-revelation_aftermath_absent"></a>`REVELATION_AFTERMATH_ABSENT` — Wave 225: REVELATION_AFTERMATH_ABSENT
+- <a id="rule-revelation_back_weighted"></a>`REVELATION_BACK_WEIGHTED` — Wave 190: Cold open void, unresolved excess, back-weighted revelations
+- <a id="rule-revelation_belief_propagation_absent"></a>`REVELATION_BELIEF_PROPAGATION_ABSENT` — Wave 239: REVELATION_BELIEF_PROPAGATION_ABSENT
+- <a id="rule-revelation_clock_aftermath_void"></a>`REVELATION_CLOCK_AFTERMATH_VOID` — Wave 502 checks
+- <a id="rule-revelation_closing_quarter_absent"></a>`REVELATION_CLOSING_QUARTER_ABSENT` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-revelation_clustering"></a>`REVELATION_CLUSTERING` — Wave 175: Revelation clustering, belief stagnation, scene overload
+- <a id="rule-revelation_delayed"></a>`REVELATION_DELAYED` — Wave 199: Midpoint void, single revelation, revelation delayed
+- <a id="rule-revelation_density_drop"></a>`REVELATION_DENSITY_DROP` — Wave 295: REVELATION_DENSITY_DROP
+- <a id="rule-revelation_dramatic_turn_aftermath_void"></a>`REVELATION_DRAMATIC_TURN_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-revelation_isolated"></a>`REVELATION_ISOLATED` — Wave 159: Revelation isolated, told domination, belief asymmetry
+- <a id="rule-revelation_late_first"></a>`REVELATION_LATE_FIRST` — Wave 309: REVELATION_LATE_FIRST
+- <a id="rule-revelation_midpoint_void"></a>`REVELATION_MIDPOINT_VOID` — Wave 348: REVELATION_ASSERTION_DISCONNECT, REVELATION_MIDPOINT_VOID, TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED
+- <a id="rule-revelation_payoff_aftermath_void"></a>`REVELATION_PAYOFF_AFTERMATH_VOID` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-revelation_relationship_peak_absent"></a>`REVELATION_RELATIONSHIP_PEAK_ABSENT` — Wave 488: REVELATION_TEMPORAL_CLUSTER, REVELATION_RELATIONSHIP_PEAK_ABSENT, ASSERTION_NEGATIVE_DECOUPLED
+- <a id="rule-revelation_seed_aftermath_void"></a>`REVELATION_SEED_AFTERMATH_VOID` — Wave 502 checks
+- <a id="rule-revelation_suspense_decoupled"></a>`REVELATION_SUSPENSE_DECOUPLED` — Wave 295: REVELATION_SUSPENSE_DECOUPLED
+- <a id="rule-revelation_suspense_peak_absent"></a>`REVELATION_SUSPENSE_PEAK_ABSENT` — Wave 376: REVELATION_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CLOCK_DECOUPLED, ASSERTION_MIDPOINT_VOID
+- <a id="rule-revelation_unearned"></a>`REVELATION_UNEARNED` — Revelation without any prior told-belief contradiction
+- <a id="rule-seed_temporal_cluster"></a>`SEED_TEMPORAL_CLUSTER` — Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID
+- <a id="rule-single_revelation_story"></a>`SINGLE_REVELATION_STORY` — Wave 199: Midpoint void, single revelation, revelation delayed
+- <a id="rule-single_scene_belief_overload"></a>`SINGLE_SCENE_BELIEF_OVERLOAD` — Wave 175: Revelation clustering, belief stagnation, scene overload
+- <a id="rule-sole_asserter"></a>`SOLE_ASSERTER` — Wave 239: SOLE_ASSERTER
+- <a id="rule-told_belief_act3_absent"></a>`TOLD_BELIEF_ACT3_ABSENT` — Wave 362: REVELATION_CLOCK_DECOUPLED, TOLD_BELIEF_ACT3_ABSENT, REVELATION_CURIOSITY_PEAK_ABSENT
+- <a id="rule-told_belief_act3_surge"></a>`TOLD_BELIEF_ACT3_SURGE` — Wave 239: TOLD_BELIEF_ACT3_SURGE
+- <a id="rule-told_belief_clock_decoupled"></a>`TOLD_BELIEF_CLOCK_DECOUPLED` — Wave 376: REVELATION_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CLOCK_DECOUPLED, ASSERTION_MIDPOINT_VOID
+- <a id="rule-told_belief_clustering"></a>`TOLD_BELIEF_CLUSTERING` — Wave 267: TOLD_BELIEF_CLUSTERING
+- <a id="rule-told_belief_domination"></a>`TOLD_BELIEF_DOMINATION` — Wave 159: Revelation isolated, told domination, belief asymmetry
+- <a id="rule-told_belief_final_scene"></a>`TOLD_BELIEF_FINAL_SCENE` — Wave 281: Revelation drama vacuum, Act 2b void, told belief final scene
+- <a id="rule-told_belief_relationship_decoupled"></a>`TOLD_BELIEF_RELATIONSHIP_DECOUPLED` — Wave 323: REVELATION_CURIOSITY_DECOUPLED, TOLD_BELIEF_CURIOSITY_FLAT, TOLD_BELIEF_RELATIONSHIP_DECOUPLED
+- <a id="rule-told_belief_suspense_decoupled"></a>`TOLD_BELIEF_SUSPENSE_DECOUPLED` — Wave 334: TOLD_BELIEF_SUSPENSE_DECOUPLED, TOLD_BELIEF_EMOTIONAL_FLATLINE, REVELATION_RELATIONSHIP_DECOUPLED
+- <a id="rule-told_belief_suspense_peak_absent"></a>`TOLD_BELIEF_SUSPENSE_PEAK_ABSENT` — Wave 390: REVELATION_DRAMATIC_TURN_DECOUPLED, TOLD_BELIEF_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CURIOSITY_PEAK_ABSENT
 

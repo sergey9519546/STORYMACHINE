@@ -8,8 +8,8 @@ Wave 1184 additions (Program v2, Type 3 — genre-conditioned): ENERGY_MONOTONE 
 
 Rules named in this wave's header:
 
-- `ENERGY_MONOTONE`
-- `PACING_PLATEAU`
+- <a id="rule-energy_monotone"></a>`ENERGY_MONOTONE`
+- <a id="rule-pacing_plateau"></a>`PACING_PLATEAU`
 
 ## Wave 1181
 
@@ -17,9 +17,9 @@ Wave 1181 additions (distinct-mode pivot — see Waves 1176-1180 in dialogue.ts/
 
 Rules named in this wave's header:
 
-- `PACING_HIGHLIGHT_BACK_LOADED`
-- `PACING_OPEN_THREAD_FRONT_LOADED`
-- `PACING_PAYOFF_BACK_LOADED`
+- <a id="rule-pacing_highlight_back_loaded"></a>`PACING_HIGHLIGHT_BACK_LOADED`
+- <a id="rule-pacing_open_thread_front_loaded"></a>`PACING_OPEN_THREAD_FRONT_LOADED`
+- <a id="rule-pacing_payoff_back_loaded"></a>`PACING_PAYOFF_BACK_LOADED`
 
 ## Wave 1167
 
@@ -27,9 +27,9 @@ Wave 1167 additions: after Wave 1153, emotionalShift stood at five of six channe
 
 Rules named in this wave's header:
 
-- `PACING_CURIOSITY_EMOTIONAL_AFTERMATH_VOID`
-- `PACING_CURIOSITY_SUSPENSE_AFTERMATH_VOID`
-- `PACING_EMOTION_RECURRENCE_AFTERMATH_VOID`
+- <a id="rule-pacing_curiosity_emotional_aftermath_void"></a>`PACING_CURIOSITY_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_curiosity_suspense_aftermath_void"></a>`PACING_CURIOSITY_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-pacing_emotion_recurrence_aftermath_void"></a>`PACING_EMOTION_RECURRENCE_AFTERMATH_VOID`
 
 ## Wave 1153
 
@@ -37,9 +37,9 @@ Wave 1153 additions: after Wave 1139, suspenseDelta>0 and emotionalShift were ea
 
 Rules named in this wave's header:
 
-- `PACING_EMOTION_STAGING_AFTERMATH_VOID`
-- `PACING_SUSPENSE_RECURRENCE_AFTERMATH_VOID`
-- `PACING_SUSPENSE_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_emotion_staging_aftermath_void"></a>`PACING_EMOTION_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_suspense_recurrence_aftermath_void"></a>`PACING_SUSPENSE_RECURRENCE_AFTERMATH_VOID`
+- <a id="rule-pacing_suspense_staging_aftermath_void"></a>`PACING_SUSPENSE_STAGING_AFTERMATH_VOID`
 
 ## Wave 1139
 
@@ -47,9 +47,9 @@ Wave 1139 additions: suspenseDelta>0 was at three of six channels (curiosityDelt
 
 Rules named in this wave's header:
 
-- `PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PACING_EMOTION_SUSPENSE_AFTERMATH_VOID`
-- `PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_emotion_dialogue_highlight_aftermath_void"></a>`PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_emotion_suspense_aftermath_void"></a>`PACING_EMOTION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-pacing_suspense_dialogue_highlight_aftermath_void"></a>`PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1125
 
@@ -57,9 +57,9 @@ Wave 1125 additions: suspenseDelta>0 and emotionalShift (non-neutral) each had e
 
 Rules named in this wave's header:
 
-- `PACING_EMOTION_CURIOSITY_AFTERMATH_VOID`
-- `PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
-- `PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_emotion_curiosity_aftermath_void"></a>`PACING_EMOTION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-pacing_suspense_emotional_aftermath_void"></a>`PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_suspense_relational_aftermath_void"></a>`PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1111
 
@@ -67,9 +67,9 @@ Wave 1111 additions: PACING_CLOCK_DELTA_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives 
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DELTA_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PACING_EMOTION_RELATIONAL_AFTERMATH_VOID`
-- `PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_delta_dialogue_highlight_aftermath_void"></a>`PACING_CLOCK_DELTA_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_emotion_relational_aftermath_void"></a>`PACING_EMOTION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_suspense_curiosity_aftermath_void"></a>`PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 1097
 
@@ -77,9 +77,9 @@ Wave 1097 additions: with all six boolean/purpose/length triggers (raise_stakes,
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID`
-- `PACING_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID`
-- `PACING_CLOCK_DELTA_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_delta_emotional_aftermath_void"></a>`PACING_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_delta_relational_aftermath_void"></a>`PACING_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_delta_staging_aftermath_void"></a>`PACING_CLOCK_DELTA_STAGING_AFTERMATH_VOID`
 
 ## Wave 1083
 
@@ -87,9 +87,9 @@ Wave 1083 additions: with revelation/seededClueIds/payoffSetupIds/dramaticTurn/c
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID`
-- `PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID`
-- `PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_delta_curiosity_aftermath_void"></a>`PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_delta_suspense_aftermath_void"></a>`PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-pacing_open_thread_dialogue_highlight_aftermath_void"></a>`PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1069
 
@@ -97,9 +97,9 @@ Wave 1069 additions: payoffSetupIds and raise_stakes are the last two triggers s
 
 Rules named in this wave's header:
 
-- `PACING_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `PACING_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PACING_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_open_thread_staging_aftermath_void"></a>`PACING_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_payoff_dialogue_highlight_aftermath_void"></a>`PACING_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_stakes_dialogue_highlight_aftermath_void"></a>`PACING_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1055
 
@@ -107,9 +107,9 @@ Wave 1055 additions: with revelation/seededClueIds/payoffSetupIds/dramaticTurn/c
 
 Rules named in this wave's header:
 
-- `PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `PACING_STAKES_RELATIONAL_AFTERMATH_VOID`
-- `PACING_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_open_thread_relational_aftermath_void"></a>`PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_stakes_relational_aftermath_void"></a>`PACING_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_stakes_staging_aftermath_void"></a>`PACING_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1041
 
@@ -117,9 +117,9 @@ Wave 1041 additions: this wave extends the dialogueHighlights consequence channe
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PACING_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PACING_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_dialogue_highlight_aftermath_void"></a>`PACING_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_revelation_dialogue_highlight_aftermath_void"></a>`PACING_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_turn_dialogue_highlight_aftermath_void"></a>`PACING_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1027
 
@@ -127,9 +127,9 @@ Wave 1027 additions: payoffSetupIds and dramaticTurn are the last two triggers s
 
 Rules named in this wave's header:
 
-- `PACING_PAYOFF_STAGING_AFTERMATH_VOID`
-- `PACING_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `PACING_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_payoff_staging_aftermath_void"></a>`PACING_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_seed_dialogue_highlight_aftermath_void"></a>`PACING_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-pacing_turn_staging_aftermath_void"></a>`PACING_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1013
 
@@ -137,9 +137,9 @@ Wave 1013 additions: reconnaissance found dramaticTurn and clockRaised fully sat
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `PACING_CLOCK_STAGING_AFTERMATH_VOID`
-- `PACING_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_relational_aftermath_void"></a>`PACING_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-pacing_clock_staging_aftermath_void"></a>`PACING_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_turn_relational_aftermath_void"></a>`PACING_TURN_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 999
 
@@ -147,9 +147,9 @@ Wave 999 additions: PACING_STAGING re-checked and re-excluded (same predicate mi
 
 Rules named in this wave's header:
 
-- `PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID`
-- `PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID`
-- `PACING_SEED_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-pacing_payoff_relationship_aftermath_void"></a>`PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-pacing_revelation_relationship_aftermath_void"></a>`PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID`
+- <a id="rule-pacing_seed_relationship_aftermath_void"></a>`PACING_SEED_RELATIONSHIP_AFTERMATH_VOID`
 
 ## Wave 985
 
@@ -157,9 +157,9 @@ Wave 985 additions: PACING_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights array) a
 
 Rules named in this wave's header:
 
-- `PACING_HIGHLIGHT_ZONE_IMBALANCE`
-- `PACING_STAKES_CURIOSITY_AFTERMATH_VOID`
-- `PACING_TURN_ZONE_IMBALANCE`
+- <a id="rule-pacing_highlight_zone_imbalance"></a>`PACING_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-pacing_stakes_curiosity_aftermath_void"></a>`PACING_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-pacing_turn_zone_imbalance"></a>`PACING_TURN_ZONE_IMBALANCE`
 
 ## Wave 971
 
@@ -167,9 +167,9 @@ Wave 971 additions: auditing the three remaining trio-complete signals in this p
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DELTA_ZONE_IMBALANCE`
-- `PACING_RELATIONSHIP_ZONE_IMBALANCE`
-- `PACING_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-pacing_clock_delta_zone_imbalance"></a>`PACING_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-pacing_relationship_zone_imbalance"></a>`PACING_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-pacing_revelation_zone_imbalance"></a>`PACING_REVELATION_ZONE_IMBALANCE`
 
 ## Wave 957
 
@@ -177,9 +177,9 @@ Wave 957 additions: continuing the non-purpose 4-zone rollout with three more tr
 
 Rules named in this wave's header:
 
-- `PACING_PAYOFF_ZONE_IMBALANCE`
-- `PACING_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `PACING_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-pacing_payoff_zone_imbalance"></a>`PACING_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-pacing_positive_emotion_zone_imbalance"></a>`PACING_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-pacing_suspense_zone_imbalance"></a>`PACING_SUSPENSE_ZONE_IMBALANCE`
 
 ## Wave 943
 
@@ -187,9 +187,9 @@ Wave 943 additions: extending the checkZoneImbalance rollout to three more signa
 
 Rules named in this wave's header:
 
-- `PACING_CURIOSITY_ZONE_IMBALANCE`
-- `PACING_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `PACING_SEED_ZONE_IMBALANCE`
+- <a id="rule-pacing_curiosity_zone_imbalance"></a>`PACING_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-pacing_revelation_purpose_zone_imbalance"></a>`PACING_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-pacing_seed_zone_imbalance"></a>`PACING_SEED_ZONE_IMBALANCE`
 
 ## Wave 929
 
@@ -197,9 +197,9 @@ Wave 929 additions: purpose === 'revelation' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `PACING_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `PACING_REVELATION_PURPOSE_DROUGHT_RUN`
-- `PACING_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-pacing_negative_emotion_zone_imbalance"></a>`PACING_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-pacing_revelation_purpose_drought_run"></a>`PACING_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-pacing_revelation_purpose_zone_cluster"></a>`PACING_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 915
 
@@ -207,9 +207,9 @@ Wave 915 additions: continuing the checkZoneImbalance rollout begun in Wave 887,
 
 Rules named in this wave's header:
 
-- `PACING_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `PACING_STAKES_ZONE_IMBALANCE`
+- <a id="rule-pacing_character_moment_zone_imbalance"></a>`PACING_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-pacing_introduce_conflict_zone_imbalance"></a>`PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-pacing_stakes_zone_imbalance"></a>`PACING_STAKES_ZONE_IMBALANCE`
 
 ## Wave 901
 
@@ -217,9 +217,9 @@ Wave 901 additions: continuing the checkZoneImbalance rollout begun in Wave 887,
 
 Rules named in this wave's header:
 
-- `PACING_COMPLICATE_ZONE_IMBALANCE`
-- `PACING_RESOLUTION_ZONE_IMBALANCE`
-- `PACING_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-pacing_complicate_zone_imbalance"></a>`PACING_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-pacing_resolution_zone_imbalance"></a>`PACING_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-pacing_turning_point_zone_imbalance"></a>`PACING_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 887
 
@@ -227,9 +227,9 @@ Wave 887 additions: PACING_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'comp
 
 Rules named in this wave's header:
 
-- `PACING_CLIMAX_ZONE_IMBALANCE`
-- `PACING_COMPLICATE_DROUGHT_RUN`
-- `PACING_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-pacing_climax_zone_imbalance"></a>`PACING_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-pacing_complicate_drought_run"></a>`PACING_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-pacing_establish_world_zone_imbalance"></a>`PACING_ESTABLISH_WORLD_ZONE_IMBALANCE`
 
 ## Wave 873
 
@@ -237,9 +237,9 @@ Wave 873 additions: PACING_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' 
 
 Rules named in this wave's header:
 
-- `PACING_CLIMAX_DROUGHT_RUN`
-- `PACING_COMPLICATE_ZONE_CLUSTER`
-- `PACING_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-pacing_climax_drought_run"></a>`PACING_CLIMAX_DROUGHT_RUN`
+- <a id="rule-pacing_complicate_zone_cluster"></a>`PACING_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-pacing_resolution_drought_run"></a>`PACING_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 859
 
@@ -247,9 +247,9 @@ Wave 859 additions: PACING_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose ===
 
 Rules named in this wave's header:
 
-- `PACING_CLIMAX_ZONE_CLUSTER`
-- `PACING_ESTABLISH_WORLD_DROUGHT_RUN`
-- `PACING_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-pacing_climax_zone_cluster"></a>`PACING_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-pacing_establish_world_drought_run"></a>`PACING_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-pacing_resolution_zone_cluster"></a>`PACING_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 845
 
@@ -257,9 +257,9 @@ Wave 845 additions: PACING_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose 
 
 Rules named in this wave's header:
 
-- `PACING_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `PACING_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `PACING_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-pacing_establish_world_zone_cluster"></a>`PACING_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-pacing_introduce_conflict_drought_run"></a>`PACING_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-pacing_positive_emotion_drought_run"></a>`PACING_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 831
 
@@ -267,9 +267,9 @@ Wave 831 additions: PACING_TURNING_POINT_DROUGHT_RUN (run-based × purpose === '
 
 Rules named in this wave's header:
 
-- `PACING_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `PACING_POSITIVE_EMOTION_ZONE_CLUSTER`
-- `PACING_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-pacing_introduce_conflict_zone_cluster"></a>`PACING_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-pacing_positive_emotion_zone_cluster"></a>`PACING_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-pacing_turning_point_drought_run"></a>`PACING_TURNING_POINT_DROUGHT_RUN`
 
 ## Wave 817
 
@@ -277,9 +277,9 @@ Wave 817 additions: PACING_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing ×
 
 Rules named in this wave's header:
 
-- `PACING_CHARACTER_MOMENT_DROUGHT_RUN`
-- `PACING_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `PACING_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-pacing_character_moment_drought_run"></a>`PACING_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-pacing_character_moment_zone_cluster"></a>`PACING_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-pacing_turning_point_zone_cluster"></a>`PACING_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 803
 
@@ -287,9 +287,9 @@ Wave 803 additions: PACING_REVELATION_PEAK_UNCAUSED (backward-cause × revelatio
 
 Rules named in this wave's header:
 
-- `PACING_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `PACING_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `PACING_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-pacing_negative_emotion_drought_run"></a>`PACING_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-pacing_negative_emotion_zone_cluster"></a>`PACING_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-pacing_revelation_peak_uncaused"></a>`PACING_REVELATION_PEAK_UNCAUSED`
 
 ## Wave 789
 
@@ -297,10 +297,10 @@ Wave 789 additions: PACING_EMOTION_ZONE_CLUSTER (distribution/timing × emotiona
 
 Rules named in this wave's header:
 
-- `PACING_EMOTION_ZONE_CLUSTER`
-- `PACING_REVELATION_DROUGHT_RUN`
-- `PACING_REVELATION_ZONE_CLUSTER`
-- `REVELATION_MIDDLE_ZONE_ABSENT`
+- <a id="rule-pacing_emotion_zone_cluster"></a>`PACING_EMOTION_ZONE_CLUSTER`
+- <a id="rule-pacing_revelation_drought_run"></a>`PACING_REVELATION_DROUGHT_RUN`
+- <a id="rule-pacing_revelation_zone_cluster"></a>`PACING_REVELATION_ZONE_CLUSTER`
+- <a id="rule-revelation_middle_zone_absent"></a>`REVELATION_MIDDLE_ZONE_ABSENT`
 
 ## Wave 775
 
@@ -308,10 +308,10 @@ Wave 775 additions: PACING_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspens
 
 Rules named in this wave's header:
 
-- `CURIOSITY_PEAK_UNCAUSED`
-- `PACING_CURIOSITY_DROUGHT_RUN`
-- `PACING_STAGING_ZONE_CLUSTER`
-- `PACING_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-curiosity_peak_uncaused"></a>`CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-pacing_curiosity_drought_run"></a>`PACING_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-pacing_staging_zone_cluster"></a>`PACING_STAGING_ZONE_CLUSTER`
+- <a id="rule-pacing_suspense_zone_cluster"></a>`PACING_SUSPENSE_ZONE_CLUSTER`
 
 ## Wave 761
 
@@ -319,10 +319,10 @@ Wave 761 additions: PACING_STAGING_DROUGHT_RUN (run-based × visualBeats absence
 
 Rules named in this wave's header:
 
-- `PACING_CURIOSITY_ZONE_CLUSTER`
-- `PACING_STAGING_DROUGHT_RUN`
-- `PACING_SUSPENSE_DROUGHT_RUN`
-- `SUSPENSE_CLOSING_ZONE_ABSENT`
+- <a id="rule-pacing_curiosity_zone_cluster"></a>`PACING_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-pacing_staging_drought_run"></a>`PACING_STAGING_DROUGHT_RUN`
+- <a id="rule-pacing_suspense_drought_run"></a>`PACING_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-suspense_closing_zone_absent"></a>`SUSPENSE_CLOSING_ZONE_ABSENT`
 
 ## Wave 747
 
@@ -330,9 +330,9 @@ Wave 747 additions: PACING_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipSh
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DELTA_ZONE_CLUSTER`
-- `PACING_RELATIONSHIP_DROUGHT_RUN`
-- `PACING_STAKES_DROUGHT_RUN`
+- <a id="rule-pacing_clock_delta_zone_cluster"></a>`PACING_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-pacing_relationship_drought_run"></a>`PACING_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-pacing_stakes_drought_run"></a>`PACING_STAKES_DROUGHT_RUN`
 
 ## Wave 733
 
@@ -340,9 +340,9 @@ Wave 733 additions: PACING_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlight
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DELTA_DROUGHT_RUN`
-- `PACING_HIGHLIGHT_DROUGHT_RUN`
-- `PACING_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-pacing_clock_delta_drought_run"></a>`PACING_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-pacing_highlight_drought_run"></a>`PACING_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-pacing_relationship_zone_cluster"></a>`PACING_RELATIONSHIP_ZONE_CLUSTER`
 
 ## Wave 719
 
@@ -350,9 +350,9 @@ Wave 719 additions (built on the shared checks library): PACING_OPEN_THREAD_ZONE
 
 Rules named in this wave's header:
 
-- `PACING_HIGHLIGHT_PEAK_UNCAUSED`
-- `PACING_OPEN_THREAD_ZONE_CLUSTER`
-- `PACING_PAYOFF_DROUGHT_RUN`
+- <a id="rule-pacing_highlight_peak_uncaused"></a>`PACING_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-pacing_open_thread_zone_cluster"></a>`PACING_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-pacing_payoff_drought_run"></a>`PACING_PAYOFF_DROUGHT_RUN`
 
 ## Wave 705
 
@@ -360,9 +360,9 @@ Wave 705 additions (built on the shared checks library): PACING_SEED_ZONE_CLUSTE
 
 Rules named in this wave's header:
 
-- `PACING_OPEN_THREAD_PEAK_UNCAUSED`
-- `PACING_PAYOFF_PEAK_UNCAUSED`
-- `PACING_SEED_ZONE_CLUSTER`
+- <a id="rule-pacing_open_thread_peak_uncaused"></a>`PACING_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-pacing_payoff_peak_uncaused"></a>`PACING_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-pacing_seed_zone_cluster"></a>`PACING_SEED_ZONE_CLUSTER`
 
 ## Wave 691
 
@@ -370,10 +370,10 @@ Wave 691 additions (built on the shared checks library): PACING_SEED_PEAK_UNCAUS
 
 Rules named in this wave's header:
 
-- `CLOCK_ZONE_CLUSTER`
-- `PACING_CLOCK_DROUGHT_RUN`
-- `PACING_SEED_PEAK_UNCAUSED`
-- `PACING_TURN_ZONE_CLUSTER`
+- <a id="rule-clock_zone_cluster"></a>`CLOCK_ZONE_CLUSTER`
+- <a id="rule-pacing_clock_drought_run"></a>`PACING_CLOCK_DROUGHT_RUN`
+- <a id="rule-pacing_seed_peak_uncaused"></a>`PACING_SEED_PEAK_UNCAUSED`
+- <a id="rule-pacing_turn_zone_cluster"></a>`PACING_TURN_ZONE_CLUSTER`
 
 ## Wave 677
 
@@ -381,10 +381,10 @@ Wave 677 additions (built on the shared checks library, audit M2.2): PACING_CLOC
 
 Rules named in this wave's header:
 
-- `PACING_CLOCK_DELTA_PEAK_UNCAUSED`
-- `PACING_STAKES_ZONE_CLUSTER`
-- `PACING_TURN_DROUGHT_RUN`
-- `STAKES_AFTERMATH_EMOTION_FLAT`
+- <a id="rule-pacing_clock_delta_peak_uncaused"></a>`PACING_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-pacing_stakes_zone_cluster"></a>`PACING_STAKES_ZONE_CLUSTER`
+- <a id="rule-pacing_turn_drought_run"></a>`PACING_TURN_DROUGHT_RUN`
+- <a id="rule-stakes_aftermath_emotion_flat"></a>`STAKES_AFTERMATH_EMOTION_FLAT`
 
 ## Wave 663
 
@@ -392,9 +392,9 @@ Wave 663 additions (built on the shared checks library, audit M2.2): PACING_RELA
 
 Rules named in this wave's header:
 
-- `PACING_PAYOFF_ZONE_CLUSTER`
-- `PACING_RELATIONSHIP_PEAK_UNCAUSED`
-- `PACING_SEED_DROUGHT_RUN`
+- <a id="rule-pacing_payoff_zone_cluster"></a>`PACING_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-pacing_relationship_peak_uncaused"></a>`PACING_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-pacing_seed_drought_run"></a>`PACING_SEED_DROUGHT_RUN`
 
 ## Wave 649
 
@@ -402,10 +402,10 @@ Wave 649 additions (built on the shared checks library, audit M2.2): this 112-ru
 
 Rules named in this wave's header:
 
-- `PACING_HIGHLIGHT_ZONE_CLUSTER`
-- `PACING_OPEN_THREAD_DROUGHT_RUN`
-- `PACING_STAGING_PEAK_UNCAUSED`
-- `PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-pacing_highlight_zone_cluster"></a>`PACING_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-pacing_open_thread_drought_run"></a>`PACING_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-pacing_staging_peak_uncaused"></a>`PACING_STAGING_PEAK_UNCAUSED`
+- <a id="rule-payoff_peak_uncaused"></a>`PAYOFF_PEAK_UNCAUSED`
 
 ## Wave 635
 
@@ -413,9 +413,9 @@ Wave 635 additions: PACING_OPEN_THREAD_STAGING_DECOUPLED (co-occurrence/decoupli
 
 Rules named in this wave's header:
 
-- `PACING_OPEN_THREAD_STAGING_DECOUPLED`
-- `PACING_OPEN_THREAD_ZONE_IMBALANCE`
-- `PACING_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-pacing_open_thread_staging_decoupled"></a>`PACING_OPEN_THREAD_STAGING_DECOUPLED`
+- <a id="rule-pacing_open_thread_zone_imbalance"></a>`PACING_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-pacing_seed_staging_aftermath_void"></a>`PACING_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 621
 
@@ -423,9 +423,9 @@ Wave 621 additions: PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat 
 
 Rules named in this wave's header:
 
-- `PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
-- `PACING_PAYOFF_STAGING_DECOUPLED`
-- `REVELATION_AFTERMATH_STAGING_FLAT`
+- <a id="rule-pacing_dialogue_highlight_zone_imbalance"></a>`PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-pacing_payoff_staging_decoupled"></a>`PACING_PAYOFF_STAGING_DECOUPLED`
+- <a id="rule-revelation_aftermath_staging_flat"></a>`REVELATION_AFTERMATH_STAGING_FLAT`
 
 ## Wave 607
 
@@ -433,9 +433,9 @@ Wave 607 additions: OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT, OPEN_THREAD_AFTERMATH_C
 
 Rules named in this wave's header:
 
-- `OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT`
-- `OPEN_THREAD_AFTERMATH_EMOTION_FLAT`
-- `OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT`
+- <a id="rule-open_thread_aftermath_curiosity_flat"></a>`OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT`
+- <a id="rule-open_thread_aftermath_emotion_flat"></a>`OPEN_THREAD_AFTERMATH_EMOTION_FLAT`
+- <a id="rule-open_thread_aftermath_suspense_flat"></a>`OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT`
 
 ## Wave 579
 
@@ -443,8 +443,8 @@ Wave 579 additions: payoff peak uncaused (backward-cause × payoff channel × si
 
 Rules named in this wave's header:
 
-- `CLOCK_PRESSURE_RUN`
-- `SUSPENSE_FLATLINE_RUN`
+- <a id="rule-clock_pressure_run"></a>`CLOCK_PRESSURE_RUN`
+- <a id="rule-suspense_flatline_run"></a>`SUSPENSE_FLATLINE_RUN`
 
 ## Wave 551
 
@@ -452,8 +452,8 @@ Wave 551 additions: turn aftermath suspense flat (sequence/aftermath × suspense
 
 Rules named in this wave's header:
 
-- `CLOCK_AFTERMATH_EMOTION_FLAT`
-- `REVELATION_CURIOSITY_AFTERMATH_FLAT`
+- <a id="rule-clock_aftermath_emotion_flat"></a>`CLOCK_AFTERMATH_EMOTION_FLAT`
+- <a id="rule-revelation_curiosity_aftermath_flat"></a>`REVELATION_CURIOSITY_AFTERMATH_FLAT`
 
 ## Wave 523
 
@@ -461,8 +461,8 @@ Wave 523 additions: clock aftermath emotion flat (sequence/aftermath × emotion 
 
 Rules named in this wave's header:
 
-- `PAYOFF_SUSPENSE_DECOUPLED`
-- `REVELATION_EMOTIONAL_AFTERMATH_FLAT`
+- <a id="rule-payoff_suspense_decoupled"></a>`PAYOFF_SUSPENSE_DECOUPLED`
+- <a id="rule-revelation_emotional_aftermath_flat"></a>`REVELATION_EMOTIONAL_AFTERMATH_FLAT`
 
 ## Wave 509
 
@@ -470,8 +470,8 @@ Wave 509 additions: suspense flatline run (5+ consecutive scenes with suspenseDe
 
 Rules named in this wave's header:
 
-- `CLOCK_AFTERMATH_CURIOSITY_FLAT`
-- `EMOTIONAL_FLATLINE_RUN`
+- <a id="rule-clock_aftermath_curiosity_flat"></a>`CLOCK_AFTERMATH_CURIOSITY_FLAT`
+- <a id="rule-emotional_flatline_run"></a>`EMOTIONAL_FLATLINE_RUN`
 
 ## Wave 495
 
@@ -479,11 +479,11 @@ Wave 495 additions: clock aftermath curiosity flat (≥3 clock-raising scenes no
 
 Rules named in this wave's header:
 
-- `CLOCK_AFTERMATH_SUSPENSE_FLAT`
-- `EMOTIONAL_PEAK_UNCAUSED`
-- `REVELATION_SUSPENSE_AFTERMATH_FLAT`
-- `SUSPENSE_EMOTIONAL_AFTERMATH_FLAT`
-- `SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-clock_aftermath_suspense_flat"></a>`CLOCK_AFTERMATH_SUSPENSE_FLAT`
+- <a id="rule-emotional_peak_uncaused"></a>`EMOTIONAL_PEAK_UNCAUSED`
+- <a id="rule-revelation_suspense_aftermath_flat"></a>`REVELATION_SUSPENSE_AFTERMATH_FLAT`
+- <a id="rule-suspense_emotional_aftermath_flat"></a>`SUSPENSE_EMOTIONAL_AFTERMATH_FLAT`
+- <a id="rule-suspense_peak_uncaused"></a>`SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 453
 
@@ -491,8 +491,8 @@ Wave 453 additions: emotional flatline run (5+ consecutive scenes with neutral e
 
 Rules named in this wave's header:
 
-- `CURIOSITY_AFTERMATH_FLAT`
-- `CURIOSITY_FLATLINE_RUN`
+- <a id="rule-curiosity_aftermath_flat"></a>`CURIOSITY_AFTERMATH_FLAT`
+- <a id="rule-curiosity_flatline_run"></a>`CURIOSITY_FLATLINE_RUN`
 
 ## Wave 439
 
@@ -500,8 +500,8 @@ Wave 439 additions: suspense curiosity decoupled (high-suspense scenes — suspe
 
 Rules named in this wave's header:
 
-- `CURIOSITY_FRONTLOAD`
-- `SUSPENSE_CURIOSITY_DECOUPLED`
+- <a id="rule-curiosity_frontload"></a>`CURIOSITY_FRONTLOAD`
+- <a id="rule-suspense_curiosity_decoupled"></a>`SUSPENSE_CURIOSITY_DECOUPLED`
 
 ## Wave 425
 
@@ -509,7 +509,7 @@ Wave 425 additions: scene expansion run (5+ consecutive scenes each strictly lon
 
 Rules named in this wave's header:
 
-- `SCENE_COMPRESSION_SPIRAL`
+- <a id="rule-scene_compression_spiral"></a>`SCENE_COMPRESSION_SPIRAL`
 
 ## Wave 411
 
@@ -517,86 +517,86 @@ Wave 411 additions: suspense peak scene bloat (the single highest-suspense scene
 
 Rules named in this wave's header:
 
-- `OPENING_SCENE_BLOAT`
-- `RESOLUTION_TOO_BRIEF`
-- `SUSPENSE_PEAK_SCENE_UNDERWEIGHT`
+- <a id="rule-opening_scene_bloat"></a>`OPENING_SCENE_BLOAT`
+- <a id="rule-resolution_too_brief"></a>`RESOLUTION_TOO_BRIEF`
+- <a id="rule-suspense_peak_scene_underweight"></a>`SUSPENSE_PEAK_SCENE_UNDERWEIGHT`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ACT_TRANSITION_JOLT` — Wave 232: Pacing spike scene, peak length misplaced, act-transition jolt
-- `ACT1_OVEREXTENDED` — Wave 260: Opening scene bloat, Act 1 overextended, short-scene flood
-- `ACT1_TOO_LONG` — Act-level pacing: Act 1 too long, Act 3 too short
-- `ACT2_DEAD_WEIGHT` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
-- `ACT2_PACING_VALLEY` — Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat
-- `ACT2_PAGE_WEIGHT` — Wave 274: ACT2_PAGE_WEIGHT
-- `ACT3_PAGE_OVERRUN` — Wave 274: ACT3_PAGE_OVERRUN
-- `ACT3_TOO_SHORT` — Act-level pacing: Act 1 too long, Act 3 too short
-- `CLIMAX_NO_AFTERMATH` — CLIMAX_NO_AFTERMATH
-- `CLIMAX_RUNWAY_OVERLONG` — Wave 189: Velocity drop, climax runway, resolution bloat
-- `CLIMAX_SCENE_UNDERSIZED` — Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat
-- `CLIMAX_SCENE_UNDERWEIGHT` — Wave 157: Climax underweight, midpoint collapse, resolution brevity
-- `CLOCK_SCENE_PACING_MISMATCH` — Wave 316: REVELATION_SCENE_UNDERWEIGHT, PACING_CURIOSITY_MIDZONE_GAP, CLOCK_SCENE_PACING_MISMATCH
-- `CLOCK_SCENE_UNDERWEIGHT` — Wave 369: CLOCK_SCENE_UNDERWEIGHT, REVELATION_SCENE_BLOAT, PAYOFF_SCENE_BLOAT
-- `COMPRESSED_TURNING_POINT` — Scenes that are disproportionately long
-- `CONFLICT_SCENE_BLOAT` — Wave 383: CONFLICT_SCENE_BLOAT, DRAMATIC_TURN_SCENE_BLOAT, EMOTIONAL_PEAK_SCENE_BLOAT
-- `CONFLICT_SCENE_UNDERWEIGHT` — Wave 341: CONFLICT_SCENE_UNDERWEIGHT, CURIOSITY_PEAK_SCENE_UNDERWEIGHT, QUIET_SCENE_BLOAT
-- `CURIOSITY_PEAK_SCENE_BLOAT` — Wave 397: SEED_SCENE_UNDERWEIGHT, STAKES_SCENE_BLOAT, CURIOSITY_PEAK_SCENE_BLOAT
-- `CURIOSITY_PEAK_SCENE_UNDERWEIGHT` — Wave 341: CONFLICT_SCENE_UNDERWEIGHT, CURIOSITY_PEAK_SCENE_UNDERWEIGHT, QUIET_SCENE_BLOAT
-- `DRAMATIC_TURN_SCENE_BLOAT` — Wave 383: CONFLICT_SCENE_BLOAT, DRAMATIC_TURN_SCENE_BLOAT, EMOTIONAL_PEAK_SCENE_BLOAT
-- `DRAMATIC_TURN_SCENE_UNDERWEIGHT` — Wave 327: DRAMATIC_TURN_SCENE_UNDERWEIGHT, PAYOFF_SCENE_UNDERWEIGHT, EMOTIONAL_PEAK_SCENE_UNDERWEIGHT
-- `EMOTIONAL_CURIOSITY_DECOUPLED` — Wave 467: REVELATION_SUSPENSE_AFTERMATH_FLAT, CLOCK_PRESSURE_RUN, EMOTIONAL_CURIOSITY_DECOUPLED
-- `EMOTIONAL_PEAK_SCENE_BLOAT` — Wave 383: CONFLICT_SCENE_BLOAT, DRAMATIC_TURN_SCENE_BLOAT, EMOTIONAL_PEAK_SCENE_BLOAT
-- `EMOTIONAL_PEAK_SCENE_UNDERWEIGHT` — Wave 327: DRAMATIC_TURN_SCENE_UNDERWEIGHT, PAYOFF_SCENE_UNDERWEIGHT, EMOTIONAL_PEAK_SCENE_UNDERWEIGHT
-- `ENDING_ON_PEAK` — Wave 302: ENDING_ON_PEAK
-- `ENERGY_PLACEMENT_MISMATCH` — Wave 143: Energy monotone & rhythm variety
-- `LATE_EXPANSION` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
-- `LONG_SCENE_FLOOD` — Wave 274: LONG_SCENE_FLOOD
-- `MIDPOINT_BLOAT` — Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat
-- `MIDPOINT_COLLAPSE` — Wave 157: Climax underweight, midpoint collapse, resolution brevity
-- `NET_TENSION_DEFICIT` — Wave 302: NET_TENSION_DEFICIT
-- `OPENING_SCENE_UNDERWEIGHT` — Wave 411: SUSPENSE_PEAK_SCENE_BLOAT, RESOLUTION_BLOAT, OPENING_SCENE_UNDERWEIGHT
-- `OVERLONG_LOW_TENSION` — Scenes that are disproportionately long
-- `PACE_DECELERATION_TREND` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
-- `PACING_CURIOSITY_FINAL_DROP` — Wave 288: PACING_CURIOSITY_FINAL_DROP
-- `PACING_CURIOSITY_MIDZONE_GAP` — Wave 316: REVELATION_SCENE_UNDERWEIGHT, PACING_CURIOSITY_MIDZONE_GAP, CLOCK_SCENE_PACING_MISMATCH
-- `PACING_CURIOSITY_OPENING_FLATLINE` — Wave 288: PACING_CURIOSITY_OPENING_FLATLINE
-- `PACING_SPIKE_SCENE` — Wave 232: Pacing spike scene, peak length misplaced, act-transition jolt
-- `PACING_SUSPENSE_EARLY_PEAK` — Wave 288: PACING_SUSPENSE_EARLY_PEAK
-- `PAGE_SPACE_INEQUALITY` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
-- `PAYOFF_AFTERMATH_CURIOSITY_FLAT` — Wave 509: SUSPENSE_FLATLINE_RUN, PAYOFF_SUSPENSE_DECOUPLED, PAYOFF_AFTERMATH_CURIOSITY_FLAT
-- `PAYOFF_AFTERMATH_EMOTION_FLAT` — Wave 523 checks
-- `PAYOFF_AFTERMATH_SUSPENSE_FLAT` — Wave 523 checks
-- `PAYOFF_OPENING_ZONE_ABSENT` — Wave 523 checks
-- `PAYOFF_SCENE_BLOAT` — Wave 369: CLOCK_SCENE_UNDERWEIGHT, REVELATION_SCENE_BLOAT, PAYOFF_SCENE_BLOAT
-- `PAYOFF_SCENE_UNDERWEIGHT` — Wave 327: DRAMATIC_TURN_SCENE_UNDERWEIGHT, PAYOFF_SCENE_UNDERWEIGHT, EMOTIONAL_PEAK_SCENE_UNDERWEIGHT
-- `PEAK_LENGTH_MISPLACED` — Wave 232: Pacing spike scene, peak length misplaced, act-transition jolt
-- `POST_RELEASE_DEAD_AIR` — Wave 302: POST_RELEASE_DEAD_AIR
-- `QUIET_SCENE_BLOAT` — Wave 341: CONFLICT_SCENE_UNDERWEIGHT, CURIOSITY_PEAK_SCENE_UNDERWEIGHT, QUIET_SCENE_BLOAT
-- `RESOLUTION_BLOAT` — Wave 411: SUSPENSE_PEAK_SCENE_BLOAT, RESOLUTION_BLOAT, OPENING_SCENE_UNDERWEIGHT
-- `RESOLUTION_SCENE_BLOAT` — Wave 189: Velocity drop, climax runway, resolution bloat
-- `REVELATION_SCENE_BLOAT` — Wave 369: CLOCK_SCENE_UNDERWEIGHT, REVELATION_SCENE_BLOAT, PAYOFF_SCENE_BLOAT
-- `REVELATION_SCENE_UNDERWEIGHT` — Wave 316: REVELATION_SCENE_UNDERWEIGHT, PACING_CURIOSITY_MIDZONE_GAP, CLOCK_SCENE_PACING_MISMATCH
-- `RHYTHM_INVERSION` — Wave 143: Energy monotone & rhythm variety
-- `RHYTHMIC_ALTERNATION_ABSENT` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
-- `SCENE_EXPANSION_RUN` — Wave 425: SCENE_EXPANSION_RUN, SUSPENSE_MIDPOINT_TROUGH, CURIOSITY_FRONTLOAD
-- `SCENE_VELOCITY_DROP` — Wave 189: Velocity drop, climax runway, resolution bloat
-- `SEED_AFTERMATH_CURIOSITY_FLAT` — Wave 523 checks
-- `SEED_AFTERMATH_EMOTION_FLAT` — Wave 523 checks
-- `SEED_AFTERMATH_SUSPENSE_FLAT` — Wave 523 checks
-- `SEED_SCENE_BLOAT` — Wave 355: SUSPENSE_PEAK_SCENE_UNDERWEIGHT, SEED_SCENE_BLOAT, STAKES_SCENE_UNDERWEIGHT
-- `SEED_SCENE_UNDERWEIGHT` — Wave 397: SEED_SCENE_UNDERWEIGHT, STAKES_SCENE_BLOAT, CURIOSITY_PEAK_SCENE_BLOAT
-- `SHORT_SCENE_FLOOD` — Wave 260: Opening scene bloat, Act 1 overextended, short-scene flood
-- `STAKES_AFTERMATH_CURIOSITY_FLAT` — Wave 579:
-- `STAKES_AFTERMATH_SUSPENSE_FLAT` — Wave 579:
-- `STAKES_SCENE_BLOAT` — Wave 397: SEED_SCENE_UNDERWEIGHT, STAKES_SCENE_BLOAT, CURIOSITY_PEAK_SCENE_BLOAT
-- `STAKES_SCENE_UNDERWEIGHT` — Wave 355: SUSPENSE_PEAK_SCENE_UNDERWEIGHT, SEED_SCENE_BLOAT, STAKES_SCENE_UNDERWEIGHT
-- `SUSPENSE_EMOTION_DECOUPLED` — Wave 453: EMOTIONAL_FLATLINE_RUN, SUSPENSE_EMOTIONAL_AFTERMATH_FLAT, SUSPENSE_EMOTION_DECOUPLED
-- `SUSPENSE_LENGTH_DECOUPLING` — Wave 172: Plateau, opening bloat, suspense/length decoupling
-- `SUSPENSE_MIDPOINT_TROUGH` — Wave 425: SCENE_EXPANSION_RUN, SUSPENSE_MIDPOINT_TROUGH, CURIOSITY_FRONTLOAD
-- `SUSPENSE_PEAK_SCENE_BLOAT` — Wave 411: SUSPENSE_PEAK_SCENE_BLOAT, RESOLUTION_BLOAT, OPENING_SCENE_UNDERWEIGHT
-- `TURN_AFTERMATH_CURIOSITY_FLAT` — Wave 523 checks
-- `TURN_AFTERMATH_EMOTION_FLAT` — Wave 523 checks
-- `TURN_AFTERMATH_SUSPENSE_FLAT` — Wave 523 checks
+- <a id="rule-act_transition_jolt"></a>`ACT_TRANSITION_JOLT` — Wave 232: Pacing spike scene, peak length misplaced, act-transition jolt
+- <a id="rule-act1_overextended"></a>`ACT1_OVEREXTENDED` — Wave 260: Opening scene bloat, Act 1 overextended, short-scene flood
+- <a id="rule-act1_too_long"></a>`ACT1_TOO_LONG` — Act-level pacing: Act 1 too long, Act 3 too short
+- <a id="rule-act2_dead_weight"></a>`ACT2_DEAD_WEIGHT` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
+- <a id="rule-act2_pacing_valley"></a>`ACT2_PACING_VALLEY` — Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat
+- <a id="rule-act2_page_weight"></a>`ACT2_PAGE_WEIGHT` — Wave 274: ACT2_PAGE_WEIGHT
+- <a id="rule-act3_page_overrun"></a>`ACT3_PAGE_OVERRUN` — Wave 274: ACT3_PAGE_OVERRUN
+- <a id="rule-act3_too_short"></a>`ACT3_TOO_SHORT` — Act-level pacing: Act 1 too long, Act 3 too short
+- <a id="rule-climax_no_aftermath"></a>`CLIMAX_NO_AFTERMATH` — CLIMAX_NO_AFTERMATH
+- <a id="rule-climax_runway_overlong"></a>`CLIMAX_RUNWAY_OVERLONG` — Wave 189: Velocity drop, climax runway, resolution bloat
+- <a id="rule-climax_scene_undersized"></a>`CLIMAX_SCENE_UNDERSIZED` — Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat
+- <a id="rule-climax_scene_underweight"></a>`CLIMAX_SCENE_UNDERWEIGHT` — Wave 157: Climax underweight, midpoint collapse, resolution brevity
+- <a id="rule-clock_scene_pacing_mismatch"></a>`CLOCK_SCENE_PACING_MISMATCH` — Wave 316: REVELATION_SCENE_UNDERWEIGHT, PACING_CURIOSITY_MIDZONE_GAP, CLOCK_SCENE_PACING_MISMATCH
+- <a id="rule-clock_scene_underweight"></a>`CLOCK_SCENE_UNDERWEIGHT` — Wave 369: CLOCK_SCENE_UNDERWEIGHT, REVELATION_SCENE_BLOAT, PAYOFF_SCENE_BLOAT
+- <a id="rule-compressed_turning_point"></a>`COMPRESSED_TURNING_POINT` — Scenes that are disproportionately long
+- <a id="rule-conflict_scene_bloat"></a>`CONFLICT_SCENE_BLOAT` — Wave 383: CONFLICT_SCENE_BLOAT, DRAMATIC_TURN_SCENE_BLOAT, EMOTIONAL_PEAK_SCENE_BLOAT
+- <a id="rule-conflict_scene_underweight"></a>`CONFLICT_SCENE_UNDERWEIGHT` — Wave 341: CONFLICT_SCENE_UNDERWEIGHT, CURIOSITY_PEAK_SCENE_UNDERWEIGHT, QUIET_SCENE_BLOAT
+- <a id="rule-curiosity_peak_scene_bloat"></a>`CURIOSITY_PEAK_SCENE_BLOAT` — Wave 397: SEED_SCENE_UNDERWEIGHT, STAKES_SCENE_BLOAT, CURIOSITY_PEAK_SCENE_BLOAT
+- <a id="rule-curiosity_peak_scene_underweight"></a>`CURIOSITY_PEAK_SCENE_UNDERWEIGHT` — Wave 341: CONFLICT_SCENE_UNDERWEIGHT, CURIOSITY_PEAK_SCENE_UNDERWEIGHT, QUIET_SCENE_BLOAT
+- <a id="rule-dramatic_turn_scene_bloat"></a>`DRAMATIC_TURN_SCENE_BLOAT` — Wave 383: CONFLICT_SCENE_BLOAT, DRAMATIC_TURN_SCENE_BLOAT, EMOTIONAL_PEAK_SCENE_BLOAT
+- <a id="rule-dramatic_turn_scene_underweight"></a>`DRAMATIC_TURN_SCENE_UNDERWEIGHT` — Wave 327: DRAMATIC_TURN_SCENE_UNDERWEIGHT, PAYOFF_SCENE_UNDERWEIGHT, EMOTIONAL_PEAK_SCENE_UNDERWEIGHT
+- <a id="rule-emotional_curiosity_decoupled"></a>`EMOTIONAL_CURIOSITY_DECOUPLED` — Wave 467: REVELATION_SUSPENSE_AFTERMATH_FLAT, CLOCK_PRESSURE_RUN, EMOTIONAL_CURIOSITY_DECOUPLED
+- <a id="rule-emotional_peak_scene_bloat"></a>`EMOTIONAL_PEAK_SCENE_BLOAT` — Wave 383: CONFLICT_SCENE_BLOAT, DRAMATIC_TURN_SCENE_BLOAT, EMOTIONAL_PEAK_SCENE_BLOAT
+- <a id="rule-emotional_peak_scene_underweight"></a>`EMOTIONAL_PEAK_SCENE_UNDERWEIGHT` — Wave 327: DRAMATIC_TURN_SCENE_UNDERWEIGHT, PAYOFF_SCENE_UNDERWEIGHT, EMOTIONAL_PEAK_SCENE_UNDERWEIGHT
+- <a id="rule-ending_on_peak"></a>`ENDING_ON_PEAK` — Wave 302: ENDING_ON_PEAK
+- <a id="rule-energy_placement_mismatch"></a>`ENERGY_PLACEMENT_MISMATCH` — Wave 143: Energy monotone & rhythm variety
+- <a id="rule-late_expansion"></a>`LATE_EXPANSION` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
+- <a id="rule-long_scene_flood"></a>`LONG_SCENE_FLOOD` — Wave 274: LONG_SCENE_FLOOD
+- <a id="rule-midpoint_bloat"></a>`MIDPOINT_BLOAT` — Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat
+- <a id="rule-midpoint_collapse"></a>`MIDPOINT_COLLAPSE` — Wave 157: Climax underweight, midpoint collapse, resolution brevity
+- <a id="rule-net_tension_deficit"></a>`NET_TENSION_DEFICIT` — Wave 302: NET_TENSION_DEFICIT
+- <a id="rule-opening_scene_underweight"></a>`OPENING_SCENE_UNDERWEIGHT` — Wave 411: SUSPENSE_PEAK_SCENE_BLOAT, RESOLUTION_BLOAT, OPENING_SCENE_UNDERWEIGHT
+- <a id="rule-overlong_low_tension"></a>`OVERLONG_LOW_TENSION` — Scenes that are disproportionately long
+- <a id="rule-pace_deceleration_trend"></a>`PACE_DECELERATION_TREND` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
+- <a id="rule-pacing_curiosity_final_drop"></a>`PACING_CURIOSITY_FINAL_DROP` — Wave 288: PACING_CURIOSITY_FINAL_DROP
+- <a id="rule-pacing_curiosity_midzone_gap"></a>`PACING_CURIOSITY_MIDZONE_GAP` — Wave 316: REVELATION_SCENE_UNDERWEIGHT, PACING_CURIOSITY_MIDZONE_GAP, CLOCK_SCENE_PACING_MISMATCH
+- <a id="rule-pacing_curiosity_opening_flatline"></a>`PACING_CURIOSITY_OPENING_FLATLINE` — Wave 288: PACING_CURIOSITY_OPENING_FLATLINE
+- <a id="rule-pacing_spike_scene"></a>`PACING_SPIKE_SCENE` — Wave 232: Pacing spike scene, peak length misplaced, act-transition jolt
+- <a id="rule-pacing_suspense_early_peak"></a>`PACING_SUSPENSE_EARLY_PEAK` — Wave 288: PACING_SUSPENSE_EARLY_PEAK
+- <a id="rule-page_space_inequality"></a>`PAGE_SPACE_INEQUALITY` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
+- <a id="rule-payoff_aftermath_curiosity_flat"></a>`PAYOFF_AFTERMATH_CURIOSITY_FLAT` — Wave 509: SUSPENSE_FLATLINE_RUN, PAYOFF_SUSPENSE_DECOUPLED, PAYOFF_AFTERMATH_CURIOSITY_FLAT
+- <a id="rule-payoff_aftermath_emotion_flat"></a>`PAYOFF_AFTERMATH_EMOTION_FLAT` — Wave 523 checks
+- <a id="rule-payoff_aftermath_suspense_flat"></a>`PAYOFF_AFTERMATH_SUSPENSE_FLAT` — Wave 523 checks
+- <a id="rule-payoff_opening_zone_absent"></a>`PAYOFF_OPENING_ZONE_ABSENT` — Wave 523 checks
+- <a id="rule-payoff_scene_bloat"></a>`PAYOFF_SCENE_BLOAT` — Wave 369: CLOCK_SCENE_UNDERWEIGHT, REVELATION_SCENE_BLOAT, PAYOFF_SCENE_BLOAT
+- <a id="rule-payoff_scene_underweight"></a>`PAYOFF_SCENE_UNDERWEIGHT` — Wave 327: DRAMATIC_TURN_SCENE_UNDERWEIGHT, PAYOFF_SCENE_UNDERWEIGHT, EMOTIONAL_PEAK_SCENE_UNDERWEIGHT
+- <a id="rule-peak_length_misplaced"></a>`PEAK_LENGTH_MISPLACED` — Wave 232: Pacing spike scene, peak length misplaced, act-transition jolt
+- <a id="rule-post_release_dead_air"></a>`POST_RELEASE_DEAD_AIR` — Wave 302: POST_RELEASE_DEAD_AIR
+- <a id="rule-quiet_scene_bloat"></a>`QUIET_SCENE_BLOAT` — Wave 341: CONFLICT_SCENE_UNDERWEIGHT, CURIOSITY_PEAK_SCENE_UNDERWEIGHT, QUIET_SCENE_BLOAT
+- <a id="rule-resolution_bloat"></a>`RESOLUTION_BLOAT` — Wave 411: SUSPENSE_PEAK_SCENE_BLOAT, RESOLUTION_BLOAT, OPENING_SCENE_UNDERWEIGHT
+- <a id="rule-resolution_scene_bloat"></a>`RESOLUTION_SCENE_BLOAT` — Wave 189: Velocity drop, climax runway, resolution bloat
+- <a id="rule-revelation_scene_bloat"></a>`REVELATION_SCENE_BLOAT` — Wave 369: CLOCK_SCENE_UNDERWEIGHT, REVELATION_SCENE_BLOAT, PAYOFF_SCENE_BLOAT
+- <a id="rule-revelation_scene_underweight"></a>`REVELATION_SCENE_UNDERWEIGHT` — Wave 316: REVELATION_SCENE_UNDERWEIGHT, PACING_CURIOSITY_MIDZONE_GAP, CLOCK_SCENE_PACING_MISMATCH
+- <a id="rule-rhythm_inversion"></a>`RHYTHM_INVERSION` — Wave 143: Energy monotone & rhythm variety
+- <a id="rule-rhythmic_alternation_absent"></a>`RHYTHMIC_ALTERNATION_ABSENT` — Wave 200: Compression spiral, Act 2 dead weight, late expansion
+- <a id="rule-scene_expansion_run"></a>`SCENE_EXPANSION_RUN` — Wave 425: SCENE_EXPANSION_RUN, SUSPENSE_MIDPOINT_TROUGH, CURIOSITY_FRONTLOAD
+- <a id="rule-scene_velocity_drop"></a>`SCENE_VELOCITY_DROP` — Wave 189: Velocity drop, climax runway, resolution bloat
+- <a id="rule-seed_aftermath_curiosity_flat"></a>`SEED_AFTERMATH_CURIOSITY_FLAT` — Wave 523 checks
+- <a id="rule-seed_aftermath_emotion_flat"></a>`SEED_AFTERMATH_EMOTION_FLAT` — Wave 523 checks
+- <a id="rule-seed_aftermath_suspense_flat"></a>`SEED_AFTERMATH_SUSPENSE_FLAT` — Wave 523 checks
+- <a id="rule-seed_scene_bloat"></a>`SEED_SCENE_BLOAT` — Wave 355: SUSPENSE_PEAK_SCENE_UNDERWEIGHT, SEED_SCENE_BLOAT, STAKES_SCENE_UNDERWEIGHT
+- <a id="rule-seed_scene_underweight"></a>`SEED_SCENE_UNDERWEIGHT` — Wave 397: SEED_SCENE_UNDERWEIGHT, STAKES_SCENE_BLOAT, CURIOSITY_PEAK_SCENE_BLOAT
+- <a id="rule-short_scene_flood"></a>`SHORT_SCENE_FLOOD` — Wave 260: Opening scene bloat, Act 1 overextended, short-scene flood
+- <a id="rule-stakes_aftermath_curiosity_flat"></a>`STAKES_AFTERMATH_CURIOSITY_FLAT` — Wave 579:
+- <a id="rule-stakes_aftermath_suspense_flat"></a>`STAKES_AFTERMATH_SUSPENSE_FLAT` — Wave 579:
+- <a id="rule-stakes_scene_bloat"></a>`STAKES_SCENE_BLOAT` — Wave 397: SEED_SCENE_UNDERWEIGHT, STAKES_SCENE_BLOAT, CURIOSITY_PEAK_SCENE_BLOAT
+- <a id="rule-stakes_scene_underweight"></a>`STAKES_SCENE_UNDERWEIGHT` — Wave 355: SUSPENSE_PEAK_SCENE_UNDERWEIGHT, SEED_SCENE_BLOAT, STAKES_SCENE_UNDERWEIGHT
+- <a id="rule-suspense_emotion_decoupled"></a>`SUSPENSE_EMOTION_DECOUPLED` — Wave 453: EMOTIONAL_FLATLINE_RUN, SUSPENSE_EMOTIONAL_AFTERMATH_FLAT, SUSPENSE_EMOTION_DECOUPLED
+- <a id="rule-suspense_length_decoupling"></a>`SUSPENSE_LENGTH_DECOUPLING` — Wave 172: Plateau, opening bloat, suspense/length decoupling
+- <a id="rule-suspense_midpoint_trough"></a>`SUSPENSE_MIDPOINT_TROUGH` — Wave 425: SCENE_EXPANSION_RUN, SUSPENSE_MIDPOINT_TROUGH, CURIOSITY_FRONTLOAD
+- <a id="rule-suspense_peak_scene_bloat"></a>`SUSPENSE_PEAK_SCENE_BLOAT` — Wave 411: SUSPENSE_PEAK_SCENE_BLOAT, RESOLUTION_BLOAT, OPENING_SCENE_UNDERWEIGHT
+- <a id="rule-turn_aftermath_curiosity_flat"></a>`TURN_AFTERMATH_CURIOSITY_FLAT` — Wave 523 checks
+- <a id="rule-turn_aftermath_emotion_flat"></a>`TURN_AFTERMATH_EMOTION_FLAT` — Wave 523 checks
+- <a id="rule-turn_aftermath_suspense_flat"></a>`TURN_AFTERMATH_SUSPENSE_FLAT` — Wave 523 checks
 

@@ -8,7 +8,7 @@ Wave 1192 additions (Program v2, Type 1 — signal channel, cycle 3): BETRAYAL_W
 
 Rules named in this wave's header:
 
-- `BETRAYAL_WITHOUT_SETUP`
+- <a id="rule-betrayal_without_setup"></a>`BETRAYAL_WITHOUT_SETUP`
 
 ## Wave 1186
 
@@ -16,9 +16,9 @@ Wave 1186 additions (Program v2, Type 1 — signal channel, closes cycle 1): fou
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLIMAX_UNCONTESTED`
-- `CONFLICT_INTERROGATION_MONOPOLY`
-- `CONFLICT_POWER_STATIC_FLATLINE`
+- <a id="rule-conflict_climax_uncontested"></a>`CONFLICT_CLIMAX_UNCONTESTED`
+- <a id="rule-conflict_interrogation_monopoly"></a>`CONFLICT_INTERROGATION_MONOPOLY`
+- <a id="rule-conflict_power_static_flatline"></a>`CONFLICT_POWER_STATIC_FLATLINE`
 
 ## Wave 1178
 
@@ -26,9 +26,9 @@ Wave 1178 additions (continues the pivot to distinct analytical modes begun in d
 
 Rules named in this wave's header:
 
-- `CONFLICT_EMOTION_BACK_LOADED`
-- `CONFLICT_STAGING_BACK_LOADED`
-- `CONFLICT_SUSPENSE_FRONT_LOADED`
+- <a id="rule-conflict_emotion_back_loaded"></a>`CONFLICT_EMOTION_BACK_LOADED`
+- <a id="rule-conflict_staging_back_loaded"></a>`CONFLICT_STAGING_BACK_LOADED`
+- <a id="rule-conflict_suspense_front_loaded"></a>`CONFLICT_SUSPENSE_FRONT_LOADED`
 
 ## Wave 1164
 
@@ -36,9 +36,9 @@ Wave 1164 additions: after Wave 1150, revelation stood at five of six channels, 
 
 Rules named in this wave's header:
 
-- `CONFLICT_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CONFLICT_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
-- `CONFLICT_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_revelation_dialogue_highlight_aftermath_void"></a>`CONFLICT_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-conflict_suspense_curiosity_aftermath_void"></a>`CONFLICT_SUSPENSE_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_suspense_emotional_aftermath_void"></a>`CONFLICT_SUSPENSE_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1150
 
@@ -46,9 +46,9 @@ Wave 1150 additions: after Wave 1136, clockRaised stood at four of six standard 
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CONFLICT_CLOCK_STAGING_AFTERMATH_VOID`
-- `CONFLICT_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-conflict_clock_dialogue_highlight_aftermath_void"></a>`CONFLICT_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-conflict_clock_staging_aftermath_void"></a>`CONFLICT_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-conflict_revelation_staging_aftermath_void"></a>`CONFLICT_REVELATION_STAGING_AFTERMATH_VOID`
 
 ## Wave 1136
 
@@ -56,9 +56,9 @@ Wave 1136 additions: revelation was at three of six channels (curiosityDelta, em
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `CONFLICT_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_clock_emotional_aftermath_void"></a>`CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_clock_relational_aftermath_void"></a>`CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_revelation_relational_aftermath_void"></a>`CONFLICT_REVELATION_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1122
 
@@ -66,10 +66,10 @@ Wave 1122 additions: revelation and clockRaised each had exactly one checkAfterm
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `CONFLICT_CLOCK_TURN_AFTERMATH_VOID`
-- `CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-conflict_clock_curiosity_aftermath_void"></a>`CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_clock_turn_aftermath_void"></a>`CONFLICT_CLOCK_TURN_AFTERMATH_VOID`
+- <a id="rule-conflict_revelation_emotional_aftermath_void"></a>`CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_revelation_suspense_aftermath_void"></a>`CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1108
 
@@ -77,9 +77,9 @@ Wave 1108 additions: CONFLICT_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives seede
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `CONFLICT_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-conflict_clock_suspense_aftermath_void"></a>`CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-conflict_revelation_curiosity_aftermath_void"></a>`CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_seed_dialogue_highlight_aftermath_void"></a>`CONFLICT_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1094
 
@@ -87,9 +87,9 @@ Wave 1094 additions: with all four main triggers fully saturated since Wave 1080
 
 Rules named in this wave's header:
 
-- `CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID`
-- `CONFLICT_SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-conflict_seed_emotional_aftermath_void"></a>`CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_seed_relational_aftermath_void"></a>`CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_seed_staging_aftermath_void"></a>`CONFLICT_SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 1080
 
@@ -97,10 +97,10 @@ Wave 1080 additions: with raise_stakes, payoffSetupIds, and heavy unresolvedClue
 
 Rules named in this wave's header:
 
-- `CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID`
-- `CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID`
-- `CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-conflict_seed_curiosity_aftermath_void"></a>`CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_seed_suspense_aftermath_void"></a>`CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-conflict_turn_dialogue_highlight_aftermath_void"></a>`CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-conflict_turn_suspense_aftermath_void"></a>`CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1066
 
@@ -108,9 +108,9 @@ Wave 1066 additions: raise_stakes, payoffSetupIds, and heavy unresolvedClues deb
 
 Rules named in this wave's header:
 
-- `CONFLICT_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `CONFLICT_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CONFLICT_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-conflict_open_thread_suspense_aftermath_void"></a>`CONFLICT_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-conflict_payoff_dialogue_highlight_aftermath_void"></a>`CONFLICT_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-conflict_stakes_staging_aftermath_void"></a>`CONFLICT_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1052
 
@@ -118,9 +118,9 @@ Wave 1052 additions: with all four main triggers (raise_stakes, payoffSetupIds, 
 
 Rules named in this wave's header:
 
-- `CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID`
-- `CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-conflict_open_thread_dialogue_highlight_aftermath_void"></a>`CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-conflict_payoff_staging_aftermath_void"></a>`CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-conflict_stakes_dialogue_highlight_aftermath_void"></a>`CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1038
 
@@ -128,9 +128,9 @@ Wave 1038 additions: with raise_stakes now at four channels, this wave targets t
 
 Rules named in this wave's header:
 
-- `CONFLICT_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID`
-- `CONFLICT_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_open_thread_emotional_aftermath_void"></a>`CONFLICT_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_payoff_relational_aftermath_void"></a>`CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_turn_relational_aftermath_void"></a>`CONFLICT_TURN_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1024
 
@@ -138,9 +138,9 @@ Wave 1024 additions: three more fresh channels for existing triggers: CONFLICT_S
 
 Rules named in this wave's header:
 
-- `CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID`
-- `CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID`
-- `CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_payoff_curiosity_aftermath_void"></a>`CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_stakes_relational_aftermath_void"></a>`CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_turn_emotional_aftermath_void"></a>`CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1010
 
@@ -148,9 +148,9 @@ Wave 1010 additions: this wave gives three more triggers a fresh consequence cha
 
 Rules named in this wave's header:
 
-- `CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `CONFLICT_STAKES_EMOTIONAL_AFTERMATH_VOID`
-- `CONFLICT_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_payoff_suspense_aftermath_void"></a>`CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-conflict_stakes_emotional_aftermath_void"></a>`CONFLICT_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_turn_curiosity_aftermath_void"></a>`CONFLICT_TURN_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 996
 
@@ -158,9 +158,9 @@ Wave 996 additions: zone-imbalance is now fully exhausted (the only remaining cl
 
 Rules named in this wave's header:
 
-- `CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-conflict_open_thread_curiosity_aftermath_void"></a>`CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_payoff_emotional_aftermath_void"></a>`CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-conflict_stakes_suspense_aftermath_void"></a>`CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 982
 
@@ -168,9 +168,9 @@ Wave 982 additions: auditing the last two clean zone-imbalance candidates in thi
 
 Rules named in this wave's header:
 
-- `CONFLICT_EMOTION_ZONE_IMBALANCE`
-- `CONFLICT_HIGHLIGHT_ZONE_IMBALANCE`
-- `CONFLICT_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-conflict_emotion_zone_imbalance"></a>`CONFLICT_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-conflict_highlight_zone_imbalance"></a>`CONFLICT_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-conflict_stakes_curiosity_aftermath_void"></a>`CONFLICT_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 968
 
@@ -178,9 +178,9 @@ Wave 968 additions: auditing the three remaining cleanly-defined trio-complete s
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE`
-- `CONFLICT_CLOCK_ZONE_IMBALANCE`
-- `CONFLICT_SEED_ZONE_IMBALANCE`
+- <a id="rule-conflict_clock_delta_zone_imbalance"></a>`CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-conflict_clock_zone_imbalance"></a>`CONFLICT_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-conflict_seed_zone_imbalance"></a>`CONFLICT_SEED_ZONE_IMBALANCE`
 
 ## Wave 954
 
@@ -188,9 +188,9 @@ Wave 954 additions: with conflict's valence/delta/clue-array/purpose signals now
 
 Rules named in this wave's header:
 
-- `CONFLICT_RELATIONSHIP_ZONE_IMBALANCE`
-- `CONFLICT_REVELATION_ZONE_IMBALANCE`
-- `CONFLICT_TURN_ZONE_IMBALANCE`
+- <a id="rule-conflict_relationship_zone_imbalance"></a>`CONFLICT_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-conflict_revelation_zone_imbalance"></a>`CONFLICT_REVELATION_ZONE_IMBALANCE`
+- <a id="rule-conflict_turn_zone_imbalance"></a>`CONFLICT_TURN_ZONE_IMBALANCE`
 
 ## Wave 940
 
@@ -198,9 +198,9 @@ Wave 940 additions: continuing the checkZoneImbalance rollout, this wave extends
 
 Rules named in this wave's header:
 
-- `CONFLICT_CURIOSITY_ZONE_IMBALANCE`
-- `CONFLICT_OPEN_THREAD_ZONE_IMBALANCE`
-- `CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-conflict_curiosity_zone_imbalance"></a>`CONFLICT_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-conflict_open_thread_zone_imbalance"></a>`CONFLICT_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-conflict_positive_emotion_zone_imbalance"></a>`CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE`
 
 ## Wave 926
 
@@ -208,9 +208,9 @@ Wave 926 additions: continuing the checkZoneImbalance rollout, this wave applies
 
 Rules named in this wave's header:
 
-- `CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `CONFLICT_STAKES_ZONE_IMBALANCE`
+- <a id="rule-conflict_negative_emotion_zone_imbalance"></a>`CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-conflict_revelation_purpose_zone_imbalance"></a>`CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-conflict_stakes_zone_imbalance"></a>`CONFLICT_STAKES_ZONE_IMBALANCE`
 
 ## Wave 912
 
@@ -218,9 +218,9 @@ Wave 912 additions: continuing the checkZoneImbalance rollout begun in Wave 884,
 
 Rules named in this wave's header:
 
-- `CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `CONFLICT_COMPLICATE_ZONE_IMBALANCE`
-- `CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-conflict_character_moment_zone_imbalance"></a>`CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-conflict_complicate_zone_imbalance"></a>`CONFLICT_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-conflict_introduce_conflict_zone_imbalance"></a>`CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
 
 ## Wave 898
 
@@ -228,9 +228,9 @@ Wave 898 additions: purpose === 'revelation' has never been referenced anywhere 
 
 Rules named in this wave's header:
 
-- `CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN`
-- `CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER`
-- `CONFLICT_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-conflict_revelation_purpose_drought_run"></a>`CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-conflict_revelation_purpose_zone_cluster"></a>`CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-conflict_turning_point_zone_imbalance"></a>`CONFLICT_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 884
 
@@ -238,9 +238,9 @@ Wave 884 additions: no purpose value has ever been audited by the distinct 4-zon
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLIMAX_ZONE_IMBALANCE`
-- `CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE`
-- `CONFLICT_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-conflict_climax_zone_imbalance"></a>`CONFLICT_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-conflict_establish_world_zone_imbalance"></a>`CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-conflict_resolution_zone_imbalance"></a>`CONFLICT_RESOLUTION_ZONE_IMBALANCE`
 
 ## Wave 870
 
@@ -248,9 +248,9 @@ Wave 870 additions: CONFLICT_RESOLUTION_DROUGHT_RUN (run-based x purpose === 're
 
 Rules named in this wave's header:
 
-- `CONFLICT_COMPLICATE_DROUGHT_RUN`
-- `CONFLICT_COMPLICATE_ZONE_CLUSTER`
-- `CONFLICT_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-conflict_complicate_drought_run"></a>`CONFLICT_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-conflict_complicate_zone_cluster"></a>`CONFLICT_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-conflict_resolution_drought_run"></a>`CONFLICT_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 856
 
@@ -258,10 +258,10 @@ Wave 856 additions: CONFLICT_CLIMAX_DROUGHT_RUN (run-based × purpose === 'clima
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLIMAX_DROUGHT_RUN`
-- `CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN`
-- `CONFLICT_RESOLUTION_PREMATURE`
-- `CONFLICT_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-conflict_climax_drought_run"></a>`CONFLICT_CLIMAX_DROUGHT_RUN`
+- <a id="rule-conflict_establish_world_drought_run"></a>`CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-conflict_resolution_premature"></a>`CONFLICT_RESOLUTION_PREMATURE`
+- <a id="rule-conflict_resolution_zone_cluster"></a>`CONFLICT_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 842
 
@@ -269,9 +269,9 @@ Wave 842 additions: CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotiona
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLIMAX_ZONE_CLUSTER`
-- `CONFLICT_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-conflict_climax_zone_cluster"></a>`CONFLICT_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-conflict_establish_world_zone_cluster"></a>`CONFLICT_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-conflict_positive_emotion_drought_run"></a>`CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 828
 
@@ -279,9 +279,9 @@ Wave 828 additions: CONFLICT_TURNING_POINT_ZONE_CLUSTER (distribution/timing × 
 
 Rules named in this wave's header:
 
-- `CONFLICT_POSITIVE_EMOTION_ZONE_CLUSTER`
-- `CONFLICT_TURNING_POINT_DROUGHT_RUN`
-- `CONFLICT_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-conflict_positive_emotion_zone_cluster"></a>`CONFLICT_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-conflict_turning_point_drought_run"></a>`CONFLICT_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-conflict_turning_point_zone_cluster"></a>`CONFLICT_TURNING_POINT_ZONE_CLUSTER`
 
 ## Wave 814
 
@@ -289,9 +289,9 @@ Wave 814 additions: CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpos
 
 Rules named in this wave's header:
 
-- `CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN`
-- `CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-conflict_character_moment_drought_run"></a>`CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-conflict_character_moment_zone_cluster"></a>`CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-conflict_introduce_conflict_drought_run"></a>`CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN`
 
 ## Wave 800
 
@@ -299,10 +299,10 @@ Wave 800 additions: CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing 
 
 Rules named in this wave's header:
 
-- `CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN`
-- `CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `NEGATIVE_SPIRAL_UNBROKEN`
+- <a id="rule-conflict_introduce_conflict_zone_cluster"></a>`CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-conflict_negative_emotion_drought_run"></a>`CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-conflict_negative_emotion_zone_cluster"></a>`CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-negative_spiral_unbroken"></a>`NEGATIVE_SPIRAL_UNBROKEN`
 
 ## Wave 786
 
@@ -310,9 +310,9 @@ Wave 786 additions: CONFLICT_EMOTION_DROUGHT_RUN (run-based × emotionalShift !=
 
 Rules named in this wave's header:
 
-- `CONFLICT_EMOTION_DROUGHT_RUN`
-- `CONFLICT_TURN_DROUGHT_RUN`
-- `CONFLICT_TURN_ZONE_CLUSTER`
+- <a id="rule-conflict_emotion_drought_run"></a>`CONFLICT_EMOTION_DROUGHT_RUN`
+- <a id="rule-conflict_turn_drought_run"></a>`CONFLICT_TURN_DROUGHT_RUN`
+- <a id="rule-conflict_turn_zone_cluster"></a>`CONFLICT_TURN_ZONE_CLUSTER`
 
 ## Wave 772
 
@@ -320,10 +320,10 @@ Wave 772 additions: CONFLICT_STAKES_ZONE_CLUSTER (distribution/timing × purpose
 
 Rules named in this wave's header:
 
-- `CONFLICT_EMOTION_ZONE_CLUSTER`
-- `CONFLICT_PEAK_REVELATION_ABSENT`
-- `CONFLICT_REVELATION_PEAK_UNCAUSED`
-- `CONFLICT_STAKES_ZONE_CLUSTER`
+- <a id="rule-conflict_emotion_zone_cluster"></a>`CONFLICT_EMOTION_ZONE_CLUSTER`
+- <a id="rule-conflict_peak_revelation_absent"></a>`CONFLICT_PEAK_REVELATION_ABSENT`
+- <a id="rule-conflict_revelation_peak_uncaused"></a>`CONFLICT_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-conflict_stakes_zone_cluster"></a>`CONFLICT_STAKES_ZONE_CLUSTER`
 
 ## Wave 758
 
@@ -331,9 +331,9 @@ Wave 758 additions: CONFLICT_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>
 
 Rules named in this wave's header:
 
-- `CONFLICT_CURIOSITY_DROUGHT_RUN`
-- `CONFLICT_REVELATION_ZONE_CLUSTER`
-- `CONFLICT_STAKES_DROUGHT_RUN`
+- <a id="rule-conflict_curiosity_drought_run"></a>`CONFLICT_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-conflict_revelation_zone_cluster"></a>`CONFLICT_REVELATION_ZONE_CLUSTER`
+- <a id="rule-conflict_stakes_drought_run"></a>`CONFLICT_STAKES_DROUGHT_RUN`
 
 ## Wave 744
 
@@ -341,9 +341,9 @@ Wave 744 additions: CONFLICT_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × r
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_DROUGHT_RUN`
-- `CONFLICT_CURIOSITY_PEAK_UNCAUSED`
-- `CONFLICT_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-conflict_clock_drought_run"></a>`CONFLICT_CLOCK_DROUGHT_RUN`
+- <a id="rule-conflict_curiosity_peak_uncaused"></a>`CONFLICT_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-conflict_relationship_zone_cluster"></a>`CONFLICT_RELATIONSHIP_ZONE_CLUSTER`
 
 ## Wave 730
 
@@ -351,9 +351,9 @@ Wave 730 additions: CONFLICT_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffS
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_DELTA_ZONE_CLUSTER`
-- `CONFLICT_PAYOFF_ZONE_CLUSTER`
-- `CONFLICT_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-conflict_clock_delta_zone_cluster"></a>`CONFLICT_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-conflict_payoff_zone_cluster"></a>`CONFLICT_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-conflict_relationship_peak_uncaused"></a>`CONFLICT_RELATIONSHIP_PEAK_UNCAUSED`
 
 ## Wave 716
 
@@ -361,9 +361,9 @@ Wave 716 additions (built on the shared checks library): CONFLICT_SEED_PEAK_UNCA
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_DELTA_DROUGHT_RUN`
-- `CONFLICT_PAYOFF_DROUGHT_RUN`
-- `CONFLICT_SEED_PEAK_UNCAUSED`
+- <a id="rule-conflict_clock_delta_drought_run"></a>`CONFLICT_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-conflict_payoff_drought_run"></a>`CONFLICT_PAYOFF_DROUGHT_RUN`
+- <a id="rule-conflict_seed_peak_uncaused"></a>`CONFLICT_SEED_PEAK_UNCAUSED`
 
 ## Wave 702
 
@@ -371,9 +371,9 @@ Wave 702 additions (built on the shared checks library): CONFLICT_OPEN_THREAD_PE
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_ZONE_CLUSTER`
-- `CONFLICT_OPEN_THREAD_PEAK_UNCAUSED`
-- `CONFLICT_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-conflict_clock_zone_cluster"></a>`CONFLICT_CLOCK_ZONE_CLUSTER`
+- <a id="rule-conflict_open_thread_peak_uncaused"></a>`CONFLICT_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-conflict_relationship_drought_run"></a>`CONFLICT_RELATIONSHIP_DROUGHT_RUN`
 
 ## Wave 688
 
@@ -381,9 +381,9 @@ Wave 688 additions (built on the shared checks library): CONFLICT_HIGHLIGHT_PEAK
 
 Rules named in this wave's header:
 
-- `CONFLICT_HIGHLIGHT_PEAK_UNCAUSED`
-- `CONFLICT_SEED_ZONE_CLUSTER`
-- `CONFLICT_STAGING_DROUGHT_RUN`
+- <a id="rule-conflict_highlight_peak_uncaused"></a>`CONFLICT_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-conflict_seed_zone_cluster"></a>`CONFLICT_SEED_ZONE_CLUSTER`
+- <a id="rule-conflict_staging_drought_run"></a>`CONFLICT_STAGING_DROUGHT_RUN`
 
 ## Wave 674
 
@@ -391,9 +391,9 @@ Wave 674 additions (built on the shared checks library, audit M2.2): CONFLICT_CL
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_DELTA_PEAK_UNCAUSED`
-- `CONFLICT_HIGHLIGHT_DROUGHT_RUN`
-- `CONFLICT_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-conflict_clock_delta_peak_uncaused"></a>`CONFLICT_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-conflict_highlight_drought_run"></a>`CONFLICT_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-conflict_open_thread_zone_cluster"></a>`CONFLICT_OPEN_THREAD_ZONE_CLUSTER`
 
 ## Wave 660
 
@@ -401,10 +401,10 @@ Wave 660 additions (built on the shared checks library, audit M2.2): CONFLICT_PA
 
 Rules named in this wave's header:
 
-- `CONFLICT_PAYOFF_PEAK_UNCAUSED`
-- `CONFLICT_PEAK_PAYOFF_ABSENT`
-- `CONFLICT_SEED_DROUGHT_RUN`
-- `CONFLICT_STAGING_ZONE_CLUSTER`
+- <a id="rule-conflict_payoff_peak_uncaused"></a>`CONFLICT_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-conflict_peak_payoff_absent"></a>`CONFLICT_PEAK_PAYOFF_ABSENT`
+- <a id="rule-conflict_seed_drought_run"></a>`CONFLICT_SEED_DROUGHT_RUN`
+- <a id="rule-conflict_staging_zone_cluster"></a>`CONFLICT_STAGING_ZONE_CLUSTER`
 
 ## Wave 646
 
@@ -412,9 +412,9 @@ Wave 646 additions (built on the shared checks library, audit M2.2): this 114-ru
 
 Rules named in this wave's header:
 
-- `CONFLICT_HIGHLIGHT_ZONE_CLUSTER`
-- `CONFLICT_OPEN_THREAD_DROUGHT_RUN`
-- `CONFLICT_STAGING_PEAK_UNCAUSED`
+- <a id="rule-conflict_highlight_zone_cluster"></a>`CONFLICT_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-conflict_open_thread_drought_run"></a>`CONFLICT_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-conflict_staging_peak_uncaused"></a>`CONFLICT_STAGING_PEAK_UNCAUSED`
 
 ## Wave 632
 
@@ -422,9 +422,9 @@ Wave 632 additions (built on the shared checks library, audit M2.2): CONFLICT_HI
 
 Rules named in this wave's header:
 
-- `CONFLICT_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
-- `CONFLICT_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
-- `CONFLICT_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-conflict_dialogue_highlight_zone_imbalance"></a>`CONFLICT_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-conflict_highlight_open_thread_decoupled"></a>`CONFLICT_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
+- <a id="rule-conflict_open_thread_staging_aftermath_void"></a>`CONFLICT_OPEN_THREAD_STAGING_AFTERMATH_VOID`
 
 ## Wave 618
 
@@ -432,9 +432,9 @@ Wave 618 additions (built on the shared checks library, audit M2.2): CONFLICT_PA
 
 Rules named in this wave's header:
 
-- `CONFLICT_PAYOFF_STAGING_DECOUPLED`
-- `CONFLICT_PAYOFF_ZONE_IMBALANCE`
-- `CONFLICT_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-conflict_payoff_staging_decoupled"></a>`CONFLICT_PAYOFF_STAGING_DECOUPLED`
+- <a id="rule-conflict_payoff_zone_imbalance"></a>`CONFLICT_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-conflict_turn_staging_aftermath_void"></a>`CONFLICT_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 604
 
@@ -442,9 +442,9 @@ Wave 604 additions (built on the shared checks library, audit M2.2): OPEN_THREAD
 
 Rules named in this wave's header:
 
-- `OPEN_THREAD_REPAIR_AFTERMATH_VOID`
-- `OPEN_THREAD_RUPTURE_DECOUPLED`
-- `VISUAL_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-open_thread_repair_aftermath_void"></a>`OPEN_THREAD_REPAIR_AFTERMATH_VOID`
+- <a id="rule-open_thread_rupture_decoupled"></a>`OPEN_THREAD_RUPTURE_DECOUPLED`
+- <a id="rule-visual_conflict_zone_imbalance"></a>`VISUAL_CONFLICT_ZONE_IMBALANCE`
 
 ## Wave 590
 
@@ -452,8 +452,8 @@ Wave 590 additions: seed suspense aftermath void (sequence/aftermath × seed tri
 
 Rules named in this wave's header:
 
-- `CONFLICT_REVELATION_DROUGHT_RUN`
-- `CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID`
+- <a id="rule-conflict_revelation_drought_run"></a>`CONFLICT_REVELATION_DROUGHT_RUN`
+- <a id="rule-conflict_turn_aftermath_suspense_void"></a>`CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID`
 
 ## Wave 576
 
@@ -461,7 +461,7 @@ Wave 576 additions: curiosity zone cluster (distribution/timing × curiosityDelt
 
 Rules named in this wave's header:
 
-- `CONFLICT_REPAIR_DROUGHT_RUN`
+- <a id="rule-conflict_repair_drought_run"></a>`CONFLICT_REPAIR_DROUGHT_RUN`
 
 ## Wave 562
 
@@ -469,9 +469,9 @@ Wave 562 additions: repair drought run (run-based × repair absence × valence �
 
 Rules named in this wave's header:
 
-- `CONFLICT_CALM_STRETCH`
-- `CONFLICT_POSITIVE_EMOTION_RUPTURE`
-- `CONFLICT_POSITIVE_SPIRAL`
+- <a id="rule-conflict_calm_stretch"></a>`CONFLICT_CALM_STRETCH`
+- <a id="rule-conflict_positive_emotion_rupture"></a>`CONFLICT_POSITIVE_EMOTION_RUPTURE`
+- <a id="rule-conflict_positive_spiral"></a>`CONFLICT_POSITIVE_SPIRAL`
 
 ## Wave 548
 
@@ -479,10 +479,10 @@ Wave 548 additions: peak repair uncaused (backward-cause × single-peak isolatio
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_AFTERMATH_VOID`
-- `CONFLICT_REVELATION_REPAIR_DECOUPLED`
-- `CONFLICT_RUPTURE_SEED_AFTERMATH_VOID`
-- `THREAT_AMNESIA`
+- <a id="rule-conflict_clock_aftermath_void"></a>`CONFLICT_CLOCK_AFTERMATH_VOID`
+- <a id="rule-conflict_revelation_repair_decoupled"></a>`CONFLICT_REVELATION_REPAIR_DECOUPLED`
+- <a id="rule-conflict_rupture_seed_aftermath_void"></a>`CONFLICT_RUPTURE_SEED_AFTERMATH_VOID`
+- <a id="rule-threat_amnesia"></a>`THREAT_AMNESIA`
 
 ## Wave 534
 
@@ -490,8 +490,8 @@ Wave 534 additions: clock rupture decoupled (co-occurrence/decoupling × clock �
 
 Rules named in this wave's header:
 
-- `CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT`
-- `CONFLICT_REPAIR_FRONT_LOADED`
+- <a id="rule-conflict_curiosity_closing_zone_absent"></a>`CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT`
+- <a id="rule-conflict_repair_front_loaded"></a>`CONFLICT_REPAIR_FRONT_LOADED`
 
 ## Wave 520
 
@@ -499,8 +499,8 @@ Wave 520 additions: rupture payoff aftermath void (sequence/aftermath × payoff 
 
 Rules named in this wave's header:
 
-- `CONFLICT_PAYOFF_DECOUPLED`
-- `CONFLICT_REPAIR_CLOSING_ABSENT`
+- <a id="rule-conflict_payoff_decoupled"></a>`CONFLICT_PAYOFF_DECOUPLED`
+- <a id="rule-conflict_repair_closing_absent"></a>`CONFLICT_REPAIR_CLOSING_ABSENT`
 
 ## Wave 506
 
@@ -508,10 +508,10 @@ Wave 506 additions: rupture seed aftermath void (sequence/aftermath × seed × r
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOSING_SUSPENSE_VOID`
-- `CONFLICT_CLUE_DECOUPLED`
-- `CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED`
-- `CONFLICT_REVELATION_DECOUPLED`
+- <a id="rule-conflict_closing_suspense_void"></a>`CONFLICT_CLOSING_SUSPENSE_VOID`
+- <a id="rule-conflict_clue_decoupled"></a>`CONFLICT_CLUE_DECOUPLED`
+- <a id="rule-conflict_dramatic_turn_repair_decoupled"></a>`CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED`
+- <a id="rule-conflict_revelation_decoupled"></a>`CONFLICT_REVELATION_DECOUPLED`
 
 ## Wave 492
 
@@ -519,11 +519,11 @@ Wave 492 additions: dramatic-turn repair decoupled (co-occurrence × dramatic-tu
 
 Rules named in this wave's header:
 
-- `CONFLICT_ACT3_ABSENT`
-- `CONFLICT_BREATHING_ROOM_ABSENT`
-- `CONFLICT_DRAMATIC_TURN_VOID`
-- `CONFLICT_REPAIR_UNCAUSED`
-- `ESCALATION_PLATEAU`
+- <a id="rule-conflict_act3_absent"></a>`CONFLICT_ACT3_ABSENT`
+- <a id="rule-conflict_breathing_room_absent"></a>`CONFLICT_BREATHING_ROOM_ABSENT`
+- <a id="rule-conflict_dramatic_turn_void"></a>`CONFLICT_DRAMATIC_TURN_VOID`
+- <a id="rule-conflict_repair_uncaused"></a>`CONFLICT_REPAIR_UNCAUSED`
+- <a id="rule-escalation_plateau"></a>`ESCALATION_PLATEAU`
 
 ## Wave 478
 
@@ -531,7 +531,7 @@ Wave 478 additions: rupture temporal cluster (distribution/timing — >75% of ru
 
 Rules named in this wave's header:
 
-- `CONFLICT_PEAK_RUPTURE_UNCAUSED`
+- <a id="rule-conflict_peak_rupture_uncaused"></a>`CONFLICT_PEAK_RUPTURE_UNCAUSED`
 
 ## Wave 464
 
@@ -539,7 +539,7 @@ Wave 464 additions: rupture revelation aftermath void (every rupture is followed
 
 Rules named in this wave's header:
 
-- `CONFLICT_RUPTURE_CAUSE_VOID`
+- <a id="rule-conflict_rupture_cause_void"></a>`CONFLICT_RUPTURE_CAUSE_VOID`
 
 ## Wave 450
 
@@ -547,9 +547,9 @@ Wave 450 additions: clock aftermath void (≥2 clock scenes all followed by 2 sc
 
 Rules named in this wave's header:
 
-- `CONFLICT_CLOCK_DECOUPLED`
-- `CONFLICT_EMOTION_DECOUPLED`
-- `CONFLICT_RUPTURE_SUSPENSE_VOID`
+- <a id="rule-conflict_clock_decoupled"></a>`CONFLICT_CLOCK_DECOUPLED`
+- <a id="rule-conflict_emotion_decoupled"></a>`CONFLICT_EMOTION_DECOUPLED`
+- <a id="rule-conflict_rupture_suspense_void"></a>`CONFLICT_RUPTURE_SUSPENSE_VOID`
 
 ## Wave 436
 
@@ -557,79 +557,79 @@ Wave 436 additions: positive spiral (≥3 consecutive scenes each with a positiv
 
 Rules named in this wave's header:
 
-- `CONFLICT_AFTERMATH_CURIOSITY_VOID`
-- `CONFLICT_RELENTLESS_RUN`
+- <a id="rule-conflict_aftermath_curiosity_void"></a>`CONFLICT_AFTERMATH_CURIOSITY_VOID`
+- <a id="rule-conflict_relentless_run"></a>`CONFLICT_RELENTLESS_RUN`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `ANTAGONIST_FORCE_ONLY` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
-- `ANTAGONIST_TELEGRAPHED` — Wave 229: Reversal tempo flatline, telegraphed antagonist, positive resolution too early
-- `ANTAGONIST_VANISH` — Wave 158: Threat amnesia, antagonist vanish, single-register conflict
-- `CLIMAX_APPROACH_FLAT` — Approaching climax without intensification
-- `CLOCK_WITHOUT_CONFRONTATION` — Clock pressure without confrontation
-- `CONFLICT_ACT1_ABSENT` — Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent
-- `CONFLICT_ACT2A_VOID` — Wave 380: CONFLICT_ACT2A_VOID, CONFLICT_SECOND_HALF_MONOPOLY, CONFLICT_REVELATION_DECOUPLED
-- `CONFLICT_ACT2B_VOID` — Wave 271: CONFLICT_ACT2B_VOID
-- `CONFLICT_ACT3_DEFLATION` — Wave 195: Midpoint absent, Act 3 deflation, frequency drop
-- `CONFLICT_CLOCK_RUPTURE_DECOUPLED` — Wave 520 checks
-- `CONFLICT_CLOSING_CLOCK_ABSENT` — Wave 520 checks
-- `CONFLICT_CONCENTRATION_SPIKE` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
-- `CONFLICT_CONVERGENCE_ABSENT` — Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent
-- `CONFLICT_CURIOSITY_DECOUPLED` — Wave 313: CONFLICT_CURIOSITY_DECOUPLED
-- `CONFLICT_CURIOSITY_FRONT_LOADED` — Wave 520 checks
-- `CONFLICT_CURIOSITY_ZONE_CLUSTER` — Wave 520 checks
-- `CONFLICT_FATIGUE` — Wave 144: Escalation plateau & confrontation quality
-- `CONFLICT_FIRST_HALF_MONOPOLY` — Wave 338: CONFLICT_CLOCK_DECOUPLED, CONFLICT_DRAMATIC_TURN_VOID, CONFLICT_FIRST_HALF_MONOPOLY
-- `CONFLICT_FREQUENCY_DROP` — Wave 195: Midpoint absent, Act 3 deflation, frequency drop
-- `CONFLICT_LATE_FIRST_RUPTURE` — Wave 366: CONFLICT_PEAK_DRAMATIC_TURN_ABSENT, CONFLICT_PEAK_CLOCK_ABSENT, CONFLICT_LATE_FIRST_RUPTURE
-- `CONFLICT_MAGNITUDE_PEAK_EARLY` — Wave 313: CONFLICT_MAGNITUDE_PEAK_EARLY
-- `CONFLICT_MIDPOINT_ABSENT` — Wave 195: Midpoint absent, Act 3 deflation, frequency drop
-- `CONFLICT_OPENING_VOID` — Wave 257: Conflict Act 3 absent, reconciliation absent, conflict opening void
-- `CONFLICT_PAIR_DENSITY_GAP` — Wave 271: CONFLICT_PAIR_DENSITY_GAP
-- `CONFLICT_PAIR_SHIFT_IMBALANCE` — Wave 422: CONFLICT_RUPTURE_CAUSE_VOID, CONFLICT_AFTERMATH_CURIOSITY_VOID, CONFLICT_PAIR_SHIFT_IMBALANCE
-- `CONFLICT_PEAK_CLOCK_ABSENT` — Wave 366: CONFLICT_PEAK_DRAMATIC_TURN_ABSENT, CONFLICT_PEAK_CLOCK_ABSENT, CONFLICT_LATE_FIRST_RUPTURE
-- `CONFLICT_PEAK_CURIOSITY_ABSENT` — Wave 352: CONFLICT_PEAK_SUSPENSE_ABSENT, CONFLICT_PEAK_EMOTION_ABSENT, CONFLICT_PEAK_CURIOSITY_ABSENT
-- `CONFLICT_PEAK_DRAMATIC_TURN_ABSENT` — Wave 366: CONFLICT_PEAK_DRAMATIC_TURN_ABSENT, CONFLICT_PEAK_CLOCK_ABSENT, CONFLICT_LATE_FIRST_RUPTURE
-- `CONFLICT_PEAK_EMOTION_ABSENT` — Wave 352: CONFLICT_PEAK_SUSPENSE_ABSENT, CONFLICT_PEAK_EMOTION_ABSENT, CONFLICT_PEAK_CURIOSITY_ABSENT
-- `CONFLICT_PEAK_REPAIR_UNCAUSED` — Wave 520 checks
-- `CONFLICT_PEAK_SEED_ABSENT` — Wave 408: CONFLICT_PEAK_REVELATION_ABSENT, CONFLICT_PEAK_PAYOFF_ABSENT, CONFLICT_PEAK_SEED_ABSENT
-- `CONFLICT_PEAK_SUSPENSE_ABSENT` — Wave 352: CONFLICT_PEAK_SUSPENSE_ABSENT, CONFLICT_PEAK_EMOTION_ABSENT, CONFLICT_PEAK_CURIOSITY_ABSENT
-- `CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID` — Wave 478: CONFLICT_RUPTURE_TEMPORAL_CLUSTER, CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID, CONFLICT_REPAIR_UNCAUSED
-- `CONFLICT_PURPOSE_MONOTONE` — Wave 243: Conflict recovery too fast, single-pair conflict, conflict purpose monotone
-- `CONFLICT_RECOVERY_TOO_FAST` — Wave 243: Conflict recovery too fast, single-pair conflict, conflict purpose monotone
-- `CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID` — Wave 520 checks
-- `CONFLICT_REPAIR_EMOTION_DECOUPLED` — Wave 520 checks
-- `CONFLICT_RUPTURE_AFTERMATH_VOID` — Wave 394: CONFLICT_CLUE_DECOUPLED, CONFLICT_PAYOFF_DECOUPLED, CONFLICT_RUPTURE_AFTERMATH_VOID
-- `CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID` — Wave 450: CONFLICT_CLOCK_AFTERMATH_VOID, CONFLICT_POSITIVE_EMOTION_RUPTURE, CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID
-- `CONFLICT_RUPTURE_CURIOSITY_VOID` — Wave 520 checks
-- `CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID` — Wave 464: CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID, CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID, CONFLICT_PEAK_RUPTURE_UNCAUSED
-- `CONFLICT_RUPTURE_DROUGHT_RUN` — Wave 520 checks
-- `CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID` — Wave 520 checks
-- `CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID` — Wave 464: CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID, CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID, CONFLICT_PEAK_RUPTURE_UNCAUSED
-- `CONFLICT_RUPTURE_TEMPORAL_CLUSTER` — Wave 478: CONFLICT_RUPTURE_TEMPORAL_CLUSTER, CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID, CONFLICT_REPAIR_UNCAUSED
-- `CONFLICT_SECOND_HALF_MONOPOLY` — Wave 380: CONFLICT_ACT2A_VOID, CONFLICT_SECOND_HALF_MONOPOLY, CONFLICT_REVELATION_DECOUPLED
-- `CONFLICT_SEED_REPAIR_DECOUPLED` — Wave 520 checks
-- `CONFLICT_SUSPENSE_DECOUPLED` — Wave 285: CONFLICT_SUSPENSE_DECOUPLED
-- `CONFLICT_WITHOUT_DEADLINE` — Wave 169: Deadline absence, low-stakes conflict, interpersonal peak timing
-- `CONFRONTATION_AVOIDANCE` — Wave 144: Escalation plateau & confrontation quality
-- `ELEVENTH_HOUR_CONFLICT` — Wave 299: ELEVENTH_HOUR_CONFLICT
-- `FLAT_SUSPENSE_ARC` — Flat suspense arc
-- `INTERPERSONAL_CONFLICT_ONLY` — Wave 271: INTERPERSONAL_CONFLICT_ONLY
-- `INTERPERSONAL_PEAK_TOO_EARLY` — Wave 169: Deadline absence, low-stakes conflict, interpersonal peak timing
-- `LOW_STAKES_CONFLICT` — Wave 169: Deadline absence, low-stakes conflict, interpersonal peak timing
-- `NO_REVERSALS_LONG_STORY` — Reversal density too low
-- `POSITIVE_RESOLUTION_TOO_EARLY` — Wave 229: Reversal tempo flatline, telegraphed antagonist, positive resolution too early
-- `POSITIVE_SPIRAL_TRAP` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
-- `RECONCILIATION_ABSENT` — Wave 257: Conflict Act 3 absent, reconciliation absent, conflict opening void
-- `REVERSAL_MAGNITUDE_DECAY` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
-- `REVERSAL_SYMMETRY_BREAK` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
-- `REVERSAL_TEMPO_FLATLINE` — Wave 229: Reversal tempo flatline, telegraphed antagonist, positive resolution too early
-- `REVERSAL_WITHOUT_CONSEQUENCE` — Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent
-- `SINGLE_PAIR_CONFLICT` — Wave 243: Conflict recovery too fast, single-pair conflict, conflict purpose monotone
-- `SINGLE_REGISTER_CONFLICT` — Wave 158: Threat amnesia, antagonist vanish, single-register conflict
-- `STAKES_LABEL_UNBACKED` — Wave 299: STAKES_LABEL_UNBACKED
-- `TOO_MANY_OPEN_CONFLICTS` — Open clues without tension
-- `UNRELIEVED_TENSION_ASCENT` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
+- <a id="rule-antagonist_force_only"></a>`ANTAGONIST_FORCE_ONLY` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
+- <a id="rule-antagonist_telegraphed"></a>`ANTAGONIST_TELEGRAPHED` — Wave 229: Reversal tempo flatline, telegraphed antagonist, positive resolution too early
+- <a id="rule-antagonist_vanish"></a>`ANTAGONIST_VANISH` — Wave 158: Threat amnesia, antagonist vanish, single-register conflict
+- <a id="rule-climax_approach_flat"></a>`CLIMAX_APPROACH_FLAT` — Approaching climax without intensification
+- <a id="rule-clock_without_confrontation"></a>`CLOCK_WITHOUT_CONFRONTATION` — Clock pressure without confrontation
+- <a id="rule-conflict_act1_absent"></a>`CONFLICT_ACT1_ABSENT` — Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent
+- <a id="rule-conflict_act2a_void"></a>`CONFLICT_ACT2A_VOID` — Wave 380: CONFLICT_ACT2A_VOID, CONFLICT_SECOND_HALF_MONOPOLY, CONFLICT_REVELATION_DECOUPLED
+- <a id="rule-conflict_act2b_void"></a>`CONFLICT_ACT2B_VOID` — Wave 271: CONFLICT_ACT2B_VOID
+- <a id="rule-conflict_act3_deflation"></a>`CONFLICT_ACT3_DEFLATION` — Wave 195: Midpoint absent, Act 3 deflation, frequency drop
+- <a id="rule-conflict_clock_rupture_decoupled"></a>`CONFLICT_CLOCK_RUPTURE_DECOUPLED` — Wave 520 checks
+- <a id="rule-conflict_closing_clock_absent"></a>`CONFLICT_CLOSING_CLOCK_ABSENT` — Wave 520 checks
+- <a id="rule-conflict_concentration_spike"></a>`CONFLICT_CONCENTRATION_SPIKE` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
+- <a id="rule-conflict_convergence_absent"></a>`CONFLICT_CONVERGENCE_ABSENT` — Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent
+- <a id="rule-conflict_curiosity_decoupled"></a>`CONFLICT_CURIOSITY_DECOUPLED` — Wave 313: CONFLICT_CURIOSITY_DECOUPLED
+- <a id="rule-conflict_curiosity_front_loaded"></a>`CONFLICT_CURIOSITY_FRONT_LOADED` — Wave 520 checks
+- <a id="rule-conflict_curiosity_zone_cluster"></a>`CONFLICT_CURIOSITY_ZONE_CLUSTER` — Wave 520 checks
+- <a id="rule-conflict_fatigue"></a>`CONFLICT_FATIGUE` — Wave 144: Escalation plateau & confrontation quality
+- <a id="rule-conflict_first_half_monopoly"></a>`CONFLICT_FIRST_HALF_MONOPOLY` — Wave 338: CONFLICT_CLOCK_DECOUPLED, CONFLICT_DRAMATIC_TURN_VOID, CONFLICT_FIRST_HALF_MONOPOLY
+- <a id="rule-conflict_frequency_drop"></a>`CONFLICT_FREQUENCY_DROP` — Wave 195: Midpoint absent, Act 3 deflation, frequency drop
+- <a id="rule-conflict_late_first_rupture"></a>`CONFLICT_LATE_FIRST_RUPTURE` — Wave 366: CONFLICT_PEAK_DRAMATIC_TURN_ABSENT, CONFLICT_PEAK_CLOCK_ABSENT, CONFLICT_LATE_FIRST_RUPTURE
+- <a id="rule-conflict_magnitude_peak_early"></a>`CONFLICT_MAGNITUDE_PEAK_EARLY` — Wave 313: CONFLICT_MAGNITUDE_PEAK_EARLY
+- <a id="rule-conflict_midpoint_absent"></a>`CONFLICT_MIDPOINT_ABSENT` — Wave 195: Midpoint absent, Act 3 deflation, frequency drop
+- <a id="rule-conflict_opening_void"></a>`CONFLICT_OPENING_VOID` — Wave 257: Conflict Act 3 absent, reconciliation absent, conflict opening void
+- <a id="rule-conflict_pair_density_gap"></a>`CONFLICT_PAIR_DENSITY_GAP` — Wave 271: CONFLICT_PAIR_DENSITY_GAP
+- <a id="rule-conflict_pair_shift_imbalance"></a>`CONFLICT_PAIR_SHIFT_IMBALANCE` — Wave 422: CONFLICT_RUPTURE_CAUSE_VOID, CONFLICT_AFTERMATH_CURIOSITY_VOID, CONFLICT_PAIR_SHIFT_IMBALANCE
+- <a id="rule-conflict_peak_clock_absent"></a>`CONFLICT_PEAK_CLOCK_ABSENT` — Wave 366: CONFLICT_PEAK_DRAMATIC_TURN_ABSENT, CONFLICT_PEAK_CLOCK_ABSENT, CONFLICT_LATE_FIRST_RUPTURE
+- <a id="rule-conflict_peak_curiosity_absent"></a>`CONFLICT_PEAK_CURIOSITY_ABSENT` — Wave 352: CONFLICT_PEAK_SUSPENSE_ABSENT, CONFLICT_PEAK_EMOTION_ABSENT, CONFLICT_PEAK_CURIOSITY_ABSENT
+- <a id="rule-conflict_peak_dramatic_turn_absent"></a>`CONFLICT_PEAK_DRAMATIC_TURN_ABSENT` — Wave 366: CONFLICT_PEAK_DRAMATIC_TURN_ABSENT, CONFLICT_PEAK_CLOCK_ABSENT, CONFLICT_LATE_FIRST_RUPTURE
+- <a id="rule-conflict_peak_emotion_absent"></a>`CONFLICT_PEAK_EMOTION_ABSENT` — Wave 352: CONFLICT_PEAK_SUSPENSE_ABSENT, CONFLICT_PEAK_EMOTION_ABSENT, CONFLICT_PEAK_CURIOSITY_ABSENT
+- <a id="rule-conflict_peak_repair_uncaused"></a>`CONFLICT_PEAK_REPAIR_UNCAUSED` — Wave 520 checks
+- <a id="rule-conflict_peak_seed_absent"></a>`CONFLICT_PEAK_SEED_ABSENT` — Wave 408: CONFLICT_PEAK_REVELATION_ABSENT, CONFLICT_PEAK_PAYOFF_ABSENT, CONFLICT_PEAK_SEED_ABSENT
+- <a id="rule-conflict_peak_suspense_absent"></a>`CONFLICT_PEAK_SUSPENSE_ABSENT` — Wave 352: CONFLICT_PEAK_SUSPENSE_ABSENT, CONFLICT_PEAK_EMOTION_ABSENT, CONFLICT_PEAK_CURIOSITY_ABSENT
+- <a id="rule-conflict_positive_emotion_aftermath_void"></a>`CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID` — Wave 478: CONFLICT_RUPTURE_TEMPORAL_CLUSTER, CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID, CONFLICT_REPAIR_UNCAUSED
+- <a id="rule-conflict_purpose_monotone"></a>`CONFLICT_PURPOSE_MONOTONE` — Wave 243: Conflict recovery too fast, single-pair conflict, conflict purpose monotone
+- <a id="rule-conflict_recovery_too_fast"></a>`CONFLICT_RECOVERY_TOO_FAST` — Wave 243: Conflict recovery too fast, single-pair conflict, conflict purpose monotone
+- <a id="rule-conflict_repair_curiosity_aftermath_void"></a>`CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID` — Wave 520 checks
+- <a id="rule-conflict_repair_emotion_decoupled"></a>`CONFLICT_REPAIR_EMOTION_DECOUPLED` — Wave 520 checks
+- <a id="rule-conflict_rupture_aftermath_void"></a>`CONFLICT_RUPTURE_AFTERMATH_VOID` — Wave 394: CONFLICT_CLUE_DECOUPLED, CONFLICT_PAYOFF_DECOUPLED, CONFLICT_RUPTURE_AFTERMATH_VOID
+- <a id="rule-conflict_rupture_clock_aftermath_void"></a>`CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID` — Wave 450: CONFLICT_CLOCK_AFTERMATH_VOID, CONFLICT_POSITIVE_EMOTION_RUPTURE, CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID
+- <a id="rule-conflict_rupture_curiosity_void"></a>`CONFLICT_RUPTURE_CURIOSITY_VOID` — Wave 520 checks
+- <a id="rule-conflict_rupture_dramatic_turn_aftermath_void"></a>`CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID` — Wave 464: CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID, CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID, CONFLICT_PEAK_RUPTURE_UNCAUSED
+- <a id="rule-conflict_rupture_drought_run"></a>`CONFLICT_RUPTURE_DROUGHT_RUN` — Wave 520 checks
+- <a id="rule-conflict_rupture_payoff_aftermath_void"></a>`CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID` — Wave 520 checks
+- <a id="rule-conflict_rupture_revelation_aftermath_void"></a>`CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID` — Wave 464: CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID, CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID, CONFLICT_PEAK_RUPTURE_UNCAUSED
+- <a id="rule-conflict_rupture_temporal_cluster"></a>`CONFLICT_RUPTURE_TEMPORAL_CLUSTER` — Wave 478: CONFLICT_RUPTURE_TEMPORAL_CLUSTER, CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID, CONFLICT_REPAIR_UNCAUSED
+- <a id="rule-conflict_second_half_monopoly"></a>`CONFLICT_SECOND_HALF_MONOPOLY` — Wave 380: CONFLICT_ACT2A_VOID, CONFLICT_SECOND_HALF_MONOPOLY, CONFLICT_REVELATION_DECOUPLED
+- <a id="rule-conflict_seed_repair_decoupled"></a>`CONFLICT_SEED_REPAIR_DECOUPLED` — Wave 520 checks
+- <a id="rule-conflict_suspense_decoupled"></a>`CONFLICT_SUSPENSE_DECOUPLED` — Wave 285: CONFLICT_SUSPENSE_DECOUPLED
+- <a id="rule-conflict_without_deadline"></a>`CONFLICT_WITHOUT_DEADLINE` — Wave 169: Deadline absence, low-stakes conflict, interpersonal peak timing
+- <a id="rule-confrontation_avoidance"></a>`CONFRONTATION_AVOIDANCE` — Wave 144: Escalation plateau & confrontation quality
+- <a id="rule-eleventh_hour_conflict"></a>`ELEVENTH_HOUR_CONFLICT` — Wave 299: ELEVENTH_HOUR_CONFLICT
+- <a id="rule-flat_suspense_arc"></a>`FLAT_SUSPENSE_ARC` — Flat suspense arc
+- <a id="rule-interpersonal_conflict_only"></a>`INTERPERSONAL_CONFLICT_ONLY` — Wave 271: INTERPERSONAL_CONFLICT_ONLY
+- <a id="rule-interpersonal_peak_too_early"></a>`INTERPERSONAL_PEAK_TOO_EARLY` — Wave 169: Deadline absence, low-stakes conflict, interpersonal peak timing
+- <a id="rule-low_stakes_conflict"></a>`LOW_STAKES_CONFLICT` — Wave 169: Deadline absence, low-stakes conflict, interpersonal peak timing
+- <a id="rule-no_reversals_long_story"></a>`NO_REVERSALS_LONG_STORY` — Reversal density too low
+- <a id="rule-positive_resolution_too_early"></a>`POSITIVE_RESOLUTION_TOO_EARLY` — Wave 229: Reversal tempo flatline, telegraphed antagonist, positive resolution too early
+- <a id="rule-positive_spiral_trap"></a>`POSITIVE_SPIRAL_TRAP` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
+- <a id="rule-reconciliation_absent"></a>`RECONCILIATION_ABSENT` — Wave 257: Conflict Act 3 absent, reconciliation absent, conflict opening void
+- <a id="rule-reversal_magnitude_decay"></a>`REVERSAL_MAGNITUDE_DECAY` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
+- <a id="rule-reversal_symmetry_break"></a>`REVERSAL_SYMMETRY_BREAK` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
+- <a id="rule-reversal_tempo_flatline"></a>`REVERSAL_TEMPO_FLATLINE` — Wave 229: Reversal tempo flatline, telegraphed antagonist, positive resolution too early
+- <a id="rule-reversal_without_consequence"></a>`REVERSAL_WITHOUT_CONSEQUENCE` — Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent
+- <a id="rule-single_pair_conflict"></a>`SINGLE_PAIR_CONFLICT` — Wave 243: Conflict recovery too fast, single-pair conflict, conflict purpose monotone
+- <a id="rule-single_register_conflict"></a>`SINGLE_REGISTER_CONFLICT` — Wave 158: Threat amnesia, antagonist vanish, single-register conflict
+- <a id="rule-stakes_label_unbacked"></a>`STAKES_LABEL_UNBACKED` — Wave 299: STAKES_LABEL_UNBACKED
+- <a id="rule-too_many_open_conflicts"></a>`TOO_MANY_OPEN_CONFLICTS` — Open clues without tension
+- <a id="rule-unrelieved_tension_ascent"></a>`UNRELIEVED_TENSION_ASCENT` — Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only
 

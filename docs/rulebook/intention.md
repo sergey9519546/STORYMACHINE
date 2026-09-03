@@ -8,16 +8,16 @@ Wave 1179 additions (distinct-mode pivot — see Waves 1176/1177/1178 in dialogu
 
 Rules named in this wave's header:
 
-- `AGENCY_FRONTLOADED`
-- `AGENCY_WITHOUT_CONSEQUENCE`
-- `ENTROPY_CLUSTER`
-- `GOAL_INVERSION_ABSENT`
-- `INTENTION_CLOCK_DELTA_BACK_LOADED`
-- `INTENTION_HIGHLIGHT_BACK_LOADED`
-- `INTENTION_RELATIONSHIP_FRONT_LOADED`
-- `PASSIVE_ESCALATION`
-- `PROACTIVE_FRONTLOADED`
-- `ZERO_ENTROPY_SCENE`
+- <a id="rule-agency_frontloaded"></a>`AGENCY_FRONTLOADED`
+- <a id="rule-agency_without_consequence"></a>`AGENCY_WITHOUT_CONSEQUENCE`
+- <a id="rule-entropy_cluster"></a>`ENTROPY_CLUSTER`
+- <a id="rule-goal_inversion_absent"></a>`GOAL_INVERSION_ABSENT`
+- <a id="rule-intention_clock_delta_back_loaded"></a>`INTENTION_CLOCK_DELTA_BACK_LOADED`
+- <a id="rule-intention_highlight_back_loaded"></a>`INTENTION_HIGHLIGHT_BACK_LOADED`
+- <a id="rule-intention_relationship_front_loaded"></a>`INTENTION_RELATIONSHIP_FRONT_LOADED`
+- <a id="rule-passive_escalation"></a>`PASSIVE_ESCALATION`
+- <a id="rule-proactive_frontloaded"></a>`PROACTIVE_FRONTLOADED`
+- <a id="rule-zero_entropy_scene"></a>`ZERO_ENTROPY_SCENE`
 
 ## Wave 1165
 
@@ -25,9 +25,9 @@ Wave 1165 additions: after Wave 1151, revelation stood at two of six channels (c
 
 Rules named in this wave's header:
 
-- `INTENTION_REVELATION_RELATIONAL_AFTERMATH_VOID`
-- `INTENTION_REVELATION_STAGING_AFTERMATH_VOID`
-- `INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-intention_revelation_relational_aftermath_void"></a>`INTENTION_REVELATION_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_revelation_staging_aftermath_void"></a>`INTENTION_REVELATION_STAGING_AFTERMATH_VOID`
+- <a id="rule-intention_revelation_suspense_aftermath_void"></a>`INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1151
 
@@ -35,9 +35,9 @@ Wave 1151 additions: dramaticTurn stood at five of six channels after Wave 1137,
 
 Rules named in this wave's header:
 
-- `INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID`
-- `INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID`
-- `INTENTION_TURN_STAGING_AFTERMATH_VOID`
+- <a id="rule-intention_revelation_curiosity_aftermath_void"></a>`INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-intention_revelation_emotional_aftermath_void"></a>`INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_turn_staging_aftermath_void"></a>`INTENTION_TURN_STAGING_AFTERMATH_VOID`
 
 ## Wave 1137
 
@@ -45,9 +45,9 @@ Wave 1137 additions: payoffSetupIds and dramaticTurn were each at four of six ch
 
 Rules named in this wave's header:
 
-- `INTENTION_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `INTENTION_PAYOFF_STAGING_AFTERMATH_VOID`
-- `INTENTION_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-intention_payoff_dialogue_highlight_aftermath_void"></a>`INTENTION_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-intention_payoff_staging_aftermath_void"></a>`INTENTION_PAYOFF_STAGING_AFTERMATH_VOID`
+- <a id="rule-intention_turn_dialogue_highlight_aftermath_void"></a>`INTENTION_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1123
 
@@ -55,9 +55,9 @@ Wave 1123 additions: payoffSetupIds was at three of six standard channels (curio
 
 Rules named in this wave's header:
 
-- `INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `INTENTION_TURN_CURIOSITY_AFTERMATH_VOID`
-- `INTENTION_TURN_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_payoff_suspense_aftermath_void"></a>`INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-intention_turn_curiosity_aftermath_void"></a>`INTENTION_TURN_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-intention_turn_relational_aftermath_void"></a>`INTENTION_TURN_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1109
 
@@ -65,9 +65,9 @@ Wave 1109 additions: this wave gives payoffSetupIds and dramaticTurn further cha
 
 Rules named in this wave's header:
 
-- `INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
-- `INTENTION_PAYOFF_RELATIONAL_AFTERMATH_VOID`
-- `INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_payoff_emotional_aftermath_void"></a>`INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_payoff_relational_aftermath_void"></a>`INTENTION_PAYOFF_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_turn_emotional_aftermath_void"></a>`INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1095
 
@@ -75,9 +75,9 @@ Wave 1095 additions: INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID giv
 
 Rules named in this wave's header:
 
-- `INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID`
-- `INTENTION_TURN_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-intention_open_thread_dialogue_highlight_aftermath_void"></a>`INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-intention_payoff_curiosity_aftermath_void"></a>`INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-intention_turn_suspense_aftermath_void"></a>`INTENTION_TURN_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1081
 
@@ -85,9 +85,9 @@ Wave 1081 additions: raise_stakes reaches full six-channel saturation — INTENT
 
 Rules named in this wave's header:
 
-- `INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
-- `INTENTION_OPEN_THREAD_STAGING_AFTERMATH_VOID`
-- `INTENTION_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-intention_open_thread_relational_aftermath_void"></a>`INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_open_thread_staging_aftermath_void"></a>`INTENTION_OPEN_THREAD_STAGING_AFTERMATH_VOID`
+- <a id="rule-intention_stakes_dialogue_highlight_aftermath_void"></a>`INTENTION_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
 
 ## Wave 1067
 
@@ -95,9 +95,9 @@ Wave 1067 additions: seededClueIds and clockRaised each reach full six-channel s
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
-- `INTENTION_STAKES_STAGING_AFTERMATH_VOID`
+- <a id="rule-intention_clock_dialogue_highlight_aftermath_void"></a>`INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-intention_seed_dialogue_highlight_aftermath_void"></a>`INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID`
+- <a id="rule-intention_stakes_staging_aftermath_void"></a>`INTENTION_STAKES_STAGING_AFTERMATH_VOID`
 
 ## Wave 1053
 
@@ -105,9 +105,9 @@ Wave 1053 additions: INTENTION_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID gives the hea
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_RELATIONAL_AFTERMATH_VOID`
-- `INTENTION_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
-- `INTENTION_SEED_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_clock_relational_aftermath_void"></a>`INTENTION_CLOCK_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_open_thread_suspense_aftermath_void"></a>`INTENTION_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-intention_seed_relational_aftermath_void"></a>`INTENTION_SEED_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 1039
 
@@ -115,9 +115,9 @@ Wave 1039 additions: with raise_stakes now at four channels, this wave targets t
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID`
-- `INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
-- `INTENTION_SEED_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-intention_clock_suspense_aftermath_void"></a>`INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-intention_open_thread_emotional_aftermath_void"></a>`INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_seed_suspense_aftermath_void"></a>`INTENTION_SEED_SUSPENSE_AFTERMATH_VOID`
 
 ## Wave 1025
 
@@ -125,9 +125,9 @@ Wave 1025 additions: three more fresh channels for existing triggers: INTENTION_
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_CURIOSITY_AFTERMATH_VOID`
-- `INTENTION_SEED_EMOTIONAL_AFTERMATH_VOID`
-- `INTENTION_STAKES_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_clock_curiosity_aftermath_void"></a>`INTENTION_CLOCK_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-intention_seed_emotional_aftermath_void"></a>`INTENTION_SEED_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_stakes_emotional_aftermath_void"></a>`INTENTION_STAKES_EMOTIONAL_AFTERMATH_VOID`
 
 ## Wave 1011
 
@@ -135,9 +135,9 @@ Wave 1011 additions: this wave gives three more triggers a fresh consequence cha
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID`
-- `INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
-- `INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_clock_emotional_aftermath_void"></a>`INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID`
+- <a id="rule-intention_open_thread_curiosity_aftermath_void"></a>`INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-intention_stakes_relational_aftermath_void"></a>`INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID`
 
 ## Wave 997
 
@@ -145,9 +145,9 @@ Wave 997 additions: REVELATION_ZONE_IMBALANCE (revelation string field != null) 
 
 Rules named in this wave's header:
 
-- `INTENTION_SEED_CURIOSITY_AFTERMATH_VOID`
-- `INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID`
-- `REVELATION_ZONE_IMBALANCE`
+- <a id="rule-intention_seed_curiosity_aftermath_void"></a>`INTENTION_SEED_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-intention_stakes_suspense_aftermath_void"></a>`INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-revelation_zone_imbalance"></a>`REVELATION_ZONE_IMBALANCE`
 
 ## Wave 983
 
@@ -155,9 +155,9 @@ Wave 983 additions: auditing the last two clean zone-imbalance candidates in thi
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_ZONE_IMBALANCE`
-- `INTENTION_HIGHLIGHT_ZONE_IMBALANCE`
-- `INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID`
+- <a id="rule-intention_clock_zone_imbalance"></a>`INTENTION_CLOCK_ZONE_IMBALANCE`
+- <a id="rule-intention_highlight_zone_imbalance"></a>`INTENTION_HIGHLIGHT_ZONE_IMBALANCE`
+- <a id="rule-intention_stakes_curiosity_aftermath_void"></a>`INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID`
 
 ## Wave 969
 
@@ -165,9 +165,9 @@ Wave 969 additions: auditing the three remaining trio-complete signals in this p
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_DELTA_ZONE_IMBALANCE`
-- `INTENTION_RELATIONSHIP_ZONE_IMBALANCE`
-- `INTENTION_TURN_ZONE_IMBALANCE`
+- <a id="rule-intention_clock_delta_zone_imbalance"></a>`INTENTION_CLOCK_DELTA_ZONE_IMBALANCE`
+- <a id="rule-intention_relationship_zone_imbalance"></a>`INTENTION_RELATIONSHIP_ZONE_IMBALANCE`
+- <a id="rule-intention_turn_zone_imbalance"></a>`INTENTION_TURN_ZONE_IMBALANCE`
 
 ## Wave 955
 
@@ -175,9 +175,9 @@ Wave 955 additions: completing the non-purpose 4-zone rollout with the complemen
 
 Rules named in this wave's header:
 
-- `INTENTION_CURIOSITY_ZONE_IMBALANCE`
-- `INTENTION_NEGATIVE_EMOTION_ZONE_IMBALANCE`
-- `INTENTION_SEED_ZONE_IMBALANCE`
+- <a id="rule-intention_curiosity_zone_imbalance"></a>`INTENTION_CURIOSITY_ZONE_IMBALANCE`
+- <a id="rule-intention_negative_emotion_zone_imbalance"></a>`INTENTION_NEGATIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-intention_seed_zone_imbalance"></a>`INTENTION_SEED_ZONE_IMBALANCE`
 
 ## Wave 941
 
@@ -185,10 +185,10 @@ Wave 941 additions: extending the checkZoneImbalance rollout beyond purpose valu
 
 Rules named in this wave's header:
 
-- `INTENTION_PAYOFF_ZONE_IMBALANCE`
-- `INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE`
-- `INTENTION_SUSPENSE_ZONE_IMBALANCE`
-- `PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-intention_payoff_zone_imbalance"></a>`INTENTION_PAYOFF_ZONE_IMBALANCE`
+- <a id="rule-intention_positive_emotion_zone_imbalance"></a>`INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE`
+- <a id="rule-intention_suspense_zone_imbalance"></a>`INTENTION_SUSPENSE_ZONE_IMBALANCE`
+- <a id="rule-payoff_zone_imbalance"></a>`PAYOFF_ZONE_IMBALANCE`
 
 ## Wave 927
 
@@ -196,9 +196,9 @@ Wave 927 additions: continuing the checkZoneImbalance rollout begun in Wave 885,
 
 Rules named in this wave's header:
 
-- `INTENTION_CHARACTER_MOMENT_ZONE_IMBALANCE`
-- `INTENTION_REVELATION_PURPOSE_ZONE_IMBALANCE`
-- `INTENTION_STAKES_ZONE_IMBALANCE`
+- <a id="rule-intention_character_moment_zone_imbalance"></a>`INTENTION_CHARACTER_MOMENT_ZONE_IMBALANCE`
+- <a id="rule-intention_revelation_purpose_zone_imbalance"></a>`INTENTION_REVELATION_PURPOSE_ZONE_IMBALANCE`
+- <a id="rule-intention_stakes_zone_imbalance"></a>`INTENTION_STAKES_ZONE_IMBALANCE`
 
 ## Wave 913
 
@@ -206,9 +206,9 @@ Wave 913 additions: continuing the checkZoneImbalance rollout begun in Wave 885,
 
 Rules named in this wave's header:
 
-- `INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
-- `INTENTION_RESOLUTION_ZONE_IMBALANCE`
-- `INTENTION_TURNING_POINT_ZONE_IMBALANCE`
+- <a id="rule-intention_introduce_conflict_zone_imbalance"></a>`INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE`
+- <a id="rule-intention_resolution_zone_imbalance"></a>`INTENTION_RESOLUTION_ZONE_IMBALANCE`
+- <a id="rule-intention_turning_point_zone_imbalance"></a>`INTENTION_TURNING_POINT_ZONE_IMBALANCE`
 
 ## Wave 899
 
@@ -216,9 +216,9 @@ Wave 899 additions: purpose === 'revelation' has never been isolated as its own 
 
 Rules named in this wave's header:
 
-- `INTENTION_COMPLICATE_ZONE_IMBALANCE`
-- `INTENTION_REVELATION_PURPOSE_DROUGHT_RUN`
-- `INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER`
+- <a id="rule-intention_complicate_zone_imbalance"></a>`INTENTION_COMPLICATE_ZONE_IMBALANCE`
+- <a id="rule-intention_revelation_purpose_drought_run"></a>`INTENTION_REVELATION_PURPOSE_DROUGHT_RUN`
+- <a id="rule-intention_revelation_purpose_zone_cluster"></a>`INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER`
 
 ## Wave 885
 
@@ -226,9 +226,9 @@ Wave 885 additions: INTENTION_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'c
 
 Rules named in this wave's header:
 
-- `INTENTION_CLIMAX_ZONE_IMBALANCE`
-- `INTENTION_COMPLICATE_DROUGHT_RUN`
-- `INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE`
+- <a id="rule-intention_climax_zone_imbalance"></a>`INTENTION_CLIMAX_ZONE_IMBALANCE`
+- <a id="rule-intention_complicate_drought_run"></a>`INTENTION_COMPLICATE_DROUGHT_RUN`
+- <a id="rule-intention_establish_world_zone_imbalance"></a>`INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE`
 
 ## Wave 871
 
@@ -236,9 +236,9 @@ Wave 871 additions: INTENTION_CLIMAX_DROUGHT_RUN (run-based x purpose === 'clima
 
 Rules named in this wave's header:
 
-- `INTENTION_CLIMAX_DROUGHT_RUN`
-- `INTENTION_COMPLICATE_ZONE_CLUSTER`
-- `INTENTION_RESOLUTION_DROUGHT_RUN`
+- <a id="rule-intention_climax_drought_run"></a>`INTENTION_CLIMAX_DROUGHT_RUN`
+- <a id="rule-intention_complicate_zone_cluster"></a>`INTENTION_COMPLICATE_ZONE_CLUSTER`
+- <a id="rule-intention_resolution_drought_run"></a>`INTENTION_RESOLUTION_DROUGHT_RUN`
 
 ## Wave 857
 
@@ -246,9 +246,9 @@ Wave 857 additions: INTENTION_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose 
 
 Rules named in this wave's header:
 
-- `INTENTION_CLIMAX_ZONE_CLUSTER`
-- `INTENTION_ESTABLISH_WORLD_DROUGHT_RUN`
-- `INTENTION_RESOLUTION_ZONE_CLUSTER`
+- <a id="rule-intention_climax_zone_cluster"></a>`INTENTION_CLIMAX_ZONE_CLUSTER`
+- <a id="rule-intention_establish_world_drought_run"></a>`INTENTION_ESTABLISH_WORLD_DROUGHT_RUN`
+- <a id="rule-intention_resolution_zone_cluster"></a>`INTENTION_RESOLUTION_ZONE_CLUSTER`
 
 ## Wave 843
 
@@ -256,9 +256,9 @@ Wave 843 additions: INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpo
 
 Rules named in this wave's header:
 
-- `INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER`
-- `INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN`
-- `INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-intention_establish_world_zone_cluster"></a>`INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER`
+- <a id="rule-intention_introduce_conflict_drought_run"></a>`INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN`
+- <a id="rule-intention_negative_emotion_drought_run"></a>`INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN`
 
 ## Wave 829
 
@@ -266,9 +266,9 @@ Wave 829 additions: INTENTION_TURNING_POINT_DROUGHT_RUN (run-based × purpose ==
 
 Rules named in this wave's header:
 
-- `INTENTION_INTRODUCE_CONFLICT_ZONE_CLUSTER`
-- `INTENTION_NEGATIVE_EMOTION_ZONE_CLUSTER`
-- `INTENTION_TURNING_POINT_DROUGHT_RUN`
+- <a id="rule-intention_introduce_conflict_zone_cluster"></a>`INTENTION_INTRODUCE_CONFLICT_ZONE_CLUSTER`
+- <a id="rule-intention_negative_emotion_zone_cluster"></a>`INTENTION_NEGATIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-intention_turning_point_drought_run"></a>`INTENTION_TURNING_POINT_DROUGHT_RUN`
 
 ## Wave 815
 
@@ -276,10 +276,10 @@ Wave 815 additions: INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing
 
 Rules named in this wave's header:
 
-- `INTENTION_CHARACTER_MOMENT_DROUGHT_RUN`
-- `INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER`
-- `INTENTION_TURNING_POINT_ZONE_CLUSTER`
-- `REPEATED_PURPOSE`
+- <a id="rule-intention_character_moment_drought_run"></a>`INTENTION_CHARACTER_MOMENT_DROUGHT_RUN`
+- <a id="rule-intention_character_moment_zone_cluster"></a>`INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER`
+- <a id="rule-intention_turning_point_zone_cluster"></a>`INTENTION_TURNING_POINT_ZONE_CLUSTER`
+- <a id="rule-repeated_purpose"></a>`REPEATED_PURPOSE`
 
 ## Wave 801
 
@@ -287,9 +287,9 @@ Wave 801 additions: INTENTION_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspense
 
 Rules named in this wave's header:
 
-- `INTENTION_CURIOSITY_PEAK_UNCAUSED`
-- `INTENTION_POSITIVE_EMOTION_DROUGHT_RUN`
-- `INTENTION_SUSPENSE_PEAK_UNCAUSED`
+- <a id="rule-intention_curiosity_peak_uncaused"></a>`INTENTION_CURIOSITY_PEAK_UNCAUSED`
+- <a id="rule-intention_positive_emotion_drought_run"></a>`INTENTION_POSITIVE_EMOTION_DROUGHT_RUN`
+- <a id="rule-intention_suspense_peak_uncaused"></a>`INTENTION_SUSPENSE_PEAK_UNCAUSED`
 
 ## Wave 787
 
@@ -297,9 +297,9 @@ Wave 787 additions: INTENTION_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0
 
 Rules named in this wave's header:
 
-- `INTENTION_CURIOSITY_ZONE_CLUSTER`
-- `INTENTION_SUSPENSE_DROUGHT_RUN`
-- `INTENTION_TURN_ZONE_CLUSTER`
+- <a id="rule-intention_curiosity_zone_cluster"></a>`INTENTION_CURIOSITY_ZONE_CLUSTER`
+- <a id="rule-intention_suspense_drought_run"></a>`INTENTION_SUSPENSE_DROUGHT_RUN`
+- <a id="rule-intention_turn_zone_cluster"></a>`INTENTION_TURN_ZONE_CLUSTER`
 
 ## Wave 773
 
@@ -307,14 +307,14 @@ Wave 773 additions: INTENTION_SUSPENSE_ZONE_CLUSTER (distribution/timing × susp
 
 Rules named in this wave's header:
 
-- `CURIOSITY_WITHOUT_AGENCY`
-- `INTENTION_CURIOSITY_DROUGHT_RUN`
-- `INTENTION_SUSPENSE_ZONE_CLUSTER`
-- `INTENTION_TURN_DROUGHT_RUN`
-- `PROACTIVE_CURIOSITY_DECOUPLED`
-- `PROACTIVE_CURIOSITY_PEAK_DECOUPLED`
-- `PROACTIVE_SUSPENSE_DECOUPLED`
-- `TURNS_UNDRIVEN`
+- <a id="rule-curiosity_without_agency"></a>`CURIOSITY_WITHOUT_AGENCY`
+- <a id="rule-intention_curiosity_drought_run"></a>`INTENTION_CURIOSITY_DROUGHT_RUN`
+- <a id="rule-intention_suspense_zone_cluster"></a>`INTENTION_SUSPENSE_ZONE_CLUSTER`
+- <a id="rule-intention_turn_drought_run"></a>`INTENTION_TURN_DROUGHT_RUN`
+- <a id="rule-proactive_curiosity_decoupled"></a>`PROACTIVE_CURIOSITY_DECOUPLED`
+- <a id="rule-proactive_curiosity_peak_decoupled"></a>`PROACTIVE_CURIOSITY_PEAK_DECOUPLED`
+- <a id="rule-proactive_suspense_decoupled"></a>`PROACTIVE_SUSPENSE_DECOUPLED`
+- <a id="rule-turns_undriven"></a>`TURNS_UNDRIVEN`
 
 ## Wave 759
 
@@ -322,9 +322,9 @@ Wave 759 additions: INTENTION_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × c
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_DELTA_ZONE_CLUSTER`
-- `INTENTION_REVELATION_PEAK_UNCAUSED`
-- `INTENTION_STAKES_ZONE_CLUSTER`
+- <a id="rule-intention_clock_delta_zone_cluster"></a>`INTENTION_CLOCK_DELTA_ZONE_CLUSTER`
+- <a id="rule-intention_revelation_peak_uncaused"></a>`INTENTION_REVELATION_PEAK_UNCAUSED`
+- <a id="rule-intention_stakes_zone_cluster"></a>`INTENTION_STAKES_ZONE_CLUSTER`
 
 ## Wave 745
 
@@ -332,9 +332,9 @@ Wave 745 additions: INTENTION_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × 
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_DELTA_DROUGHT_RUN`
-- `INTENTION_RELATIONSHIP_ZONE_CLUSTER`
-- `INTENTION_SEED_DROUGHT_RUN`
+- <a id="rule-intention_clock_delta_drought_run"></a>`INTENTION_CLOCK_DELTA_DROUGHT_RUN`
+- <a id="rule-intention_relationship_zone_cluster"></a>`INTENTION_RELATIONSHIP_ZONE_CLUSTER`
+- <a id="rule-intention_seed_drought_run"></a>`INTENTION_SEED_DROUGHT_RUN`
 
 ## Wave 731
 
@@ -342,9 +342,9 @@ Wave 731 additions: INTENTION_STAGING_ZONE_CLUSTER (distribution/timing × visua
 
 Rules named in this wave's header:
 
-- `INTENTION_RELATIONSHIP_DROUGHT_RUN`
-- `INTENTION_SEED_ZONE_CLUSTER`
-- `INTENTION_STAGING_ZONE_CLUSTER`
+- <a id="rule-intention_relationship_drought_run"></a>`INTENTION_RELATIONSHIP_DROUGHT_RUN`
+- <a id="rule-intention_seed_zone_cluster"></a>`INTENTION_SEED_ZONE_CLUSTER`
+- <a id="rule-intention_staging_zone_cluster"></a>`INTENTION_STAGING_ZONE_CLUSTER`
 
 ## Wave 717
 
@@ -352,9 +352,9 @@ Wave 717 additions (built on the shared checks library): INTENTION_HIGHLIGHT_ZON
 
 Rules named in this wave's header:
 
-- `INTENTION_HIGHLIGHT_ZONE_CLUSTER`
-- `INTENTION_OPEN_THREAD_PEAK_UNCAUSED`
-- `INTENTION_PAYOFF_DROUGHT_RUN`
+- <a id="rule-intention_highlight_zone_cluster"></a>`INTENTION_HIGHLIGHT_ZONE_CLUSTER`
+- <a id="rule-intention_open_thread_peak_uncaused"></a>`INTENTION_OPEN_THREAD_PEAK_UNCAUSED`
+- <a id="rule-intention_payoff_drought_run"></a>`INTENTION_PAYOFF_DROUGHT_RUN`
 
 ## Wave 703
 
@@ -362,9 +362,9 @@ Wave 703 additions (built on the shared checks library): INTENTION_HIGHLIGHT_PEA
 
 Rules named in this wave's header:
 
-- `INTENTION_HIGHLIGHT_PEAK_UNCAUSED`
-- `INTENTION_OPEN_THREAD_DROUGHT_RUN`
-- `INTENTION_PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-intention_highlight_peak_uncaused"></a>`INTENTION_HIGHLIGHT_PEAK_UNCAUSED`
+- <a id="rule-intention_open_thread_drought_run"></a>`INTENTION_OPEN_THREAD_DROUGHT_RUN`
+- <a id="rule-intention_payoff_peak_uncaused"></a>`INTENTION_PAYOFF_PEAK_UNCAUSED`
 
 ## Wave 689
 
@@ -372,9 +372,9 @@ Wave 689 additions (built on the shared checks library): INTENTION_SEED_PEAK_UNC
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_ZONE_CLUSTER`
-- `INTENTION_SEED_PEAK_UNCAUSED`
-- `INTENTION_STAGING_DROUGHT_RUN`
+- <a id="rule-intention_clock_zone_cluster"></a>`INTENTION_CLOCK_ZONE_CLUSTER`
+- <a id="rule-intention_seed_peak_uncaused"></a>`INTENTION_SEED_PEAK_UNCAUSED`
+- <a id="rule-intention_staging_drought_run"></a>`INTENTION_STAGING_DROUGHT_RUN`
 
 ## Wave 675
 
@@ -382,11 +382,11 @@ Wave 675 additions (built on the shared checks library, audit M2.2): INTENTION_C
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_DELTA_PEAK_UNCAUSED`
-- `INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER`
-- `INTENTION_STAKES_DROUGHT_RUN`
-- `PROACTIVE_EMOTION_DECOUPLED`
-- `STAKES_RAISED_EXTERNALLY`
+- <a id="rule-intention_clock_delta_peak_uncaused"></a>`INTENTION_CLOCK_DELTA_PEAK_UNCAUSED`
+- <a id="rule-intention_positive_emotion_zone_cluster"></a>`INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER`
+- <a id="rule-intention_stakes_drought_run"></a>`INTENTION_STAKES_DROUGHT_RUN`
+- <a id="rule-proactive_emotion_decoupled"></a>`PROACTIVE_EMOTION_DECOUPLED`
+- <a id="rule-stakes_raised_externally"></a>`STAKES_RAISED_EXTERNALLY`
 
 ## Wave 661
 
@@ -394,9 +394,9 @@ Wave 661 additions (built on the shared checks library, audit M2.2): INTENTION_R
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_DROUGHT_RUN`
-- `INTENTION_PAYOFF_ZONE_CLUSTER`
-- `INTENTION_RELATIONSHIP_PEAK_UNCAUSED`
+- <a id="rule-intention_clock_drought_run"></a>`INTENTION_CLOCK_DROUGHT_RUN`
+- <a id="rule-intention_payoff_zone_cluster"></a>`INTENTION_PAYOFF_ZONE_CLUSTER`
+- <a id="rule-intention_relationship_peak_uncaused"></a>`INTENTION_RELATIONSHIP_PEAK_UNCAUSED`
 
 ## Wave 647
 
@@ -404,12 +404,12 @@ Wave 647 additions (built on the shared checks library, audit M2.2): INTENTION_H
 
 Rules named in this wave's header:
 
-- `INTENTION_HIGHLIGHT_DROUGHT_RUN`
-- `INTENTION_OPEN_THREAD_ZONE_CLUSTER`
-- `INTENTION_STAGING_CURIOSITY_DECOUPLED`
-- `REVELATION_DROUGHT_RUN`
-- `REVELATION_ZONE_CLUSTER`
-- `SEED_ZONE_CLUSTER`
+- <a id="rule-intention_highlight_drought_run"></a>`INTENTION_HIGHLIGHT_DROUGHT_RUN`
+- <a id="rule-intention_open_thread_zone_cluster"></a>`INTENTION_OPEN_THREAD_ZONE_CLUSTER`
+- <a id="rule-intention_staging_curiosity_decoupled"></a>`INTENTION_STAGING_CURIOSITY_DECOUPLED`
+- <a id="rule-revelation_drought_run"></a>`REVELATION_DROUGHT_RUN`
+- <a id="rule-revelation_zone_cluster"></a>`REVELATION_ZONE_CLUSTER`
+- <a id="rule-seed_zone_cluster"></a>`SEED_ZONE_CLUSTER`
 
 ## Wave 633
 
@@ -417,9 +417,9 @@ Wave 633 additions (built on the shared checks library, audit M2.2): INTENTION_H
 
 Rules named in this wave's header:
 
-- `INTENTION_CLOCK_STAGING_AFTERMATH_VOID`
-- `INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
-- `INTENTION_OPEN_THREAD_ZONE_IMBALANCE`
+- <a id="rule-intention_clock_staging_aftermath_void"></a>`INTENTION_CLOCK_STAGING_AFTERMATH_VOID`
+- <a id="rule-intention_highlight_open_thread_decoupled"></a>`INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED`
+- <a id="rule-intention_open_thread_zone_imbalance"></a>`INTENTION_OPEN_THREAD_ZONE_IMBALANCE`
 
 ## Wave 619
 
@@ -427,9 +427,9 @@ Wave 619 additions (built on the shared checks library, audit M2.2): PAYOFF_PHYS
 
 Rules named in this wave's header:
 
-- `PAYOFF_PHYSICAL_STAGING_DECOUPLED`
-- `PHYSICAL_STAGING_PEAK_UNCAUSED`
-- `SEED_STAGING_AFTERMATH_VOID`
+- <a id="rule-payoff_physical_staging_decoupled"></a>`PAYOFF_PHYSICAL_STAGING_DECOUPLED`
+- <a id="rule-physical_staging_peak_uncaused"></a>`PHYSICAL_STAGING_PEAK_UNCAUSED`
+- <a id="rule-seed_staging_aftermath_void"></a>`SEED_STAGING_AFTERMATH_VOID`
 
 ## Wave 605
 
@@ -437,9 +437,9 @@ Wave 605 additions (built on the shared checks library, audit M2.2): OPEN_THREAD
 
 Rules named in this wave's header:
 
-- `OPEN_THREAD_PAYOFF_AFTERMATH_VOID`
-- `OPEN_THREAD_REVELATION_DECOUPLED`
-- `PHYSICAL_STAGING_ZONE_IMBALANCE`
+- <a id="rule-open_thread_payoff_aftermath_void"></a>`OPEN_THREAD_PAYOFF_AFTERMATH_VOID`
+- <a id="rule-open_thread_revelation_decoupled"></a>`OPEN_THREAD_REVELATION_DECOUPLED`
+- <a id="rule-physical_staging_zone_imbalance"></a>`PHYSICAL_STAGING_ZONE_IMBALANCE`
 
 ## Wave 591
 
@@ -447,11 +447,11 @@ Wave 591 additions: payoff relationship decoupled (co-occurrence/decoupling × p
 
 Rules named in this wave's header:
 
-- `PAYOFF_BACK_LOADED`
-- `PAYOFF_FINAL_ZONE_VOID`
-- `PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT`
-- `PROACTIVE_ZONE_IMBALANCE`
-- `REVELATION_EMOTION_DECOUPLED`
+- <a id="rule-payoff_back_loaded"></a>`PAYOFF_BACK_LOADED`
+- <a id="rule-payoff_final_zone_void"></a>`PAYOFF_FINAL_ZONE_VOID`
+- <a id="rule-proactive_relationship_aftermath_absent"></a>`PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT`
+- <a id="rule-proactive_zone_imbalance"></a>`PROACTIVE_ZONE_IMBALANCE`
+- <a id="rule-revelation_emotion_decoupled"></a>`REVELATION_EMOTION_DECOUPLED`
 
 ## Wave 577
 
@@ -459,7 +459,7 @@ Wave 577 additions: seed zone cluster (distribution/timing × seed × structural
 
 Rules named in this wave's header:
 
-- `REVELATION_CLOCK_AFTERMATH_VOID`
+- <a id="rule-revelation_clock_aftermath_void"></a>`REVELATION_CLOCK_AFTERMATH_VOID`
 
 ## Wave 563
 
@@ -467,10 +467,10 @@ Wave 563 additions: revelation drought run (run-based × revelation absence — 
 
 Rules named in this wave's header:
 
-- `PAYOFF_CLOCK_DECOUPLED`
-- `PROACTIVE_CLOCK_AFTERMATH_ABSENT`
-- `REVELATION_CAUSE_VOID`
-- `REVELATION_CLOSING_VOID`
+- <a id="rule-payoff_clock_decoupled"></a>`PAYOFF_CLOCK_DECOUPLED`
+- <a id="rule-proactive_clock_aftermath_absent"></a>`PROACTIVE_CLOCK_AFTERMATH_ABSENT`
+- <a id="rule-revelation_cause_void"></a>`REVELATION_CAUSE_VOID`
+- <a id="rule-revelation_closing_void"></a>`REVELATION_CLOSING_VOID`
 
 ## Wave 549
 
@@ -478,10 +478,10 @@ Wave 549 additions: revelation suspense flat (average/aggregate × revelation ×
 
 Rules named in this wave's header:
 
-- `PAYOFF_PEAK_UNCAUSED`
-- `PROACTIVE_REVELATION_ABSENT`
-- `SEED_CAUSE_VOID`
-- `SEED_EMOTIONAL_DECOUPLED`
+- <a id="rule-payoff_peak_uncaused"></a>`PAYOFF_PEAK_UNCAUSED`
+- <a id="rule-proactive_revelation_absent"></a>`PROACTIVE_REVELATION_ABSENT`
+- <a id="rule-seed_cause_void"></a>`SEED_CAUSE_VOID`
+- <a id="rule-seed_emotional_decoupled"></a>`SEED_EMOTIONAL_DECOUPLED`
 
 ## Wave 535
 
@@ -489,9 +489,9 @@ Wave 535 additions: payoff clock decoupled (co-occurrence/decoupling × payoff �
 
 Rules named in this wave's header:
 
-- `PAYOFF_EMOTION_DECOUPLED`
-- `PAYOFF_SUSPENSE_AFTERMATH_VOID`
-- `SEED_PEAK_UNCAUSED`
+- <a id="rule-payoff_emotion_decoupled"></a>`PAYOFF_EMOTION_DECOUPLED`
+- <a id="rule-payoff_suspense_aftermath_void"></a>`PAYOFF_SUSPENSE_AFTERMATH_VOID`
+- <a id="rule-seed_peak_uncaused"></a>`SEED_PEAK_UNCAUSED`
 
 ## Wave 521
 
@@ -499,9 +499,9 @@ Wave 521 additions: seed peak uncaused (backward-cause × single-peak × seed �
 
 Rules named in this wave's header:
 
-- `PAYOFF_SEED_DECOUPLED`
-- `PROACTIVE_PAYOFF_PEAK_DECOUPLED`
-- `PROACTIVE_SUSPENSE_PEAK_DECOUPLED`
+- <a id="rule-payoff_seed_decoupled"></a>`PAYOFF_SEED_DECOUPLED`
+- <a id="rule-proactive_payoff_peak_decoupled"></a>`PROACTIVE_PAYOFF_PEAK_DECOUPLED`
+- <a id="rule-proactive_suspense_peak_decoupled"></a>`PROACTIVE_SUSPENSE_PEAK_DECOUPLED`
 
 ## Wave 507
 
@@ -509,11 +509,11 @@ Wave 507 additions: payoff suspense aftermath void (average/aggregate × payoff 
 
 Rules named in this wave's header:
 
-- `PAYOFF_CURIOSITY_FLAT`
-- `PAYOFF_DRAMA_DECOUPLED`
-- `PROACTIVE_SUSPENSE_AFTERMATH_ABSENT`
-- `REVELATION_FRONTLOADED`
-- `SEED_DRAMA_DECOUPLED`
+- <a id="rule-payoff_curiosity_flat"></a>`PAYOFF_CURIOSITY_FLAT`
+- <a id="rule-payoff_drama_decoupled"></a>`PAYOFF_DRAMA_DECOUPLED`
+- <a id="rule-proactive_suspense_aftermath_absent"></a>`PROACTIVE_SUSPENSE_AFTERMATH_ABSENT`
+- <a id="rule-revelation_frontloaded"></a>`REVELATION_FRONTLOADED`
+- <a id="rule-seed_drama_decoupled"></a>`SEED_DRAMA_DECOUPLED`
 
 ## Wave 493
 
@@ -521,10 +521,10 @@ Wave 493 additions: payoff curiosity flat (≥3 payoff scenes averaging curiosit
 
 Rules named in this wave's header:
 
-- `REVELATION_CURIOSITY_FLAT`
-- `REVELATION_RUN`
-- `SEED_FRONTLOADED`
-- `SEED_MIDPOINT_VOID`
+- <a id="rule-revelation_curiosity_flat"></a>`REVELATION_CURIOSITY_FLAT`
+- <a id="rule-revelation_run"></a>`REVELATION_RUN`
+- <a id="rule-seed_frontloaded"></a>`SEED_FRONTLOADED`
+- <a id="rule-seed_midpoint_void"></a>`SEED_MIDPOINT_VOID`
 
 ## Wave 479
 
@@ -532,8 +532,8 @@ Wave 479 additions: revelation run (≥3 consecutive revelation scenes — rapid
 
 Rules named in this wave's header:
 
-- `PROACTIVE_DESERT_RUN`
-- `SEED_RUN_ISOLATED`
+- <a id="rule-proactive_desert_run"></a>`PROACTIVE_DESERT_RUN`
+- <a id="rule-seed_run_isolated"></a>`SEED_RUN_ISOLATED`
 
 ## Wave 409
 
@@ -541,8 +541,8 @@ Wave 409 additions: proactive payoff peak decoupled (the scene that resolves the
 
 Rules named in this wave's header:
 
-- `PROACTIVE_RELATIONSHIP_PEAK_ABSENT`
-- `SEED_BACKLOADED`
+- <a id="rule-proactive_relationship_peak_absent"></a>`PROACTIVE_RELATIONSHIP_PEAK_ABSENT`
+- <a id="rule-seed_backloaded"></a>`SEED_BACKLOADED`
 
 ## Wave 395
 
@@ -550,59 +550,59 @@ Wave 395 additions: proactive relationship peak absent (the single largest relat
 
 Rules named in this wave's header:
 
-- `INTENTION_SEED_GRAVEYARD`
+- <a id="rule-intention_seed_graveyard"></a>`INTENTION_SEED_GRAVEYARD`
 
 ## Unattributed (no explicit wave-header mention)
 
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
-- `AGENCY_ENTROPY_COLLAPSE` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
-- `AGENCY_PROXY` — AGENCY_PROXY
-- `CLIMAX_WITHOUT_CHOICE` — Act 3 without a character making the climactic choice
-- `CLOCK_REVELATION_AFTERMATH_VOID` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
-- `COMMITMENT_RAMP_INVERSION` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
-- `ENTROPY_CLIFF` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
-- `ENTROPY_SPIKE_MISPLACED` — Wave 171: ENTROPY_SPIKE_MISPLACED
-- `ESCALATION_ENTROPY_FLAT` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
-- `GOAL_PIVOT_ABSENT` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
-- `INTENTION_CONVERGENCE_ABSENT` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
-- `INTENTION_DISCOVERY_ABSENT` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
-- `INTENTION_DROPOUT` — INTENTION_DROPOUT
-- `INTENTION_INVISIBLE` — Characters with no dialogue/belief traces may be props
-- `INTENTION_PURPOSE_MONOTONE` — Wave 286: INTENTION_PURPOSE_MONOTONE
-- `INTENTION_REACTIVE_CLIMAX` — Wave 286: INTENTION_REACTIVE_CLIMAX
-- `PASSIVE_ACT3_INTENTION` — Wave 171: PASSIVE_ACT3_INTENTION
-- `PAYOFF_RELATIONSHIP_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
-- `PAYOFF_RUN` — Wave 493: PAYOFF_CURIOSITY_FLAT, SEED_ACT1_VOID, PAYOFF_RUN
-- `PAYOFF_WITHOUT_EFFORT` — Wave 272: PAYOFF_WITHOUT_EFFORT
-- `PROACTIVE_ACT2A_VOID` — Wave 272: PROACTIVE_ACT2A_VOID
-- `PROACTIVE_ACT2B_VOID` — Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT
-- `PROACTIVE_ACT3_VOID` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
-- `PROACTIVE_ADVERSITY_ABSENT` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
-- `PROACTIVE_AFTERMATH_CURIOSITY_ABSENT` — Wave 423: SEED_MIDPOINT_VOID, PROACTIVE_AFTERMATH_CURIOSITY_ABSENT, SEED_DRAMA_DECOUPLED
-- `PROACTIVE_BACKLOADED` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
-- `PROACTIVE_EMOTIONAL_RECOIL_ABSENT` — Wave 395: PROACTIVE_RELATIONSHIP_PEAK_ABSENT, PROACTIVE_EMOTIONAL_RECOIL_ABSENT, SEED_BACKLOADED
-- `PROACTIVE_GLOBAL_SCARCITY` — Wave 314: PROACTIVE_GLOBAL_SCARCITY
-- `PROACTIVE_LATE_SURGE` — Wave 272: PROACTIVE_LATE_SURGE
-- `PROACTIVE_MIDPOINT_VOID` — Wave 258: Proactive midpoint void, proactive desert run, revelation without proactive
-- `PROACTIVE_OPENING_ABSENT` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
-- `PROACTIVE_OVERCLUSTERING` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
-- `PROACTIVE_PAYOFF_COINCIDENCE_ABSENT` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
-- `PROACTIVE_RELATIONSHIP_VOID` — Wave 339: PROACTIVE_EMOTION_DECOUPLED, PROACTIVE_REVELATION_ABSENT, PROACTIVE_RELATIONSHIP_VOID
-- `PROACTIVE_REVELATION_COINCIDENCE_ABSENT` — Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT
-- `PROTAGONIST_ACTED_UPON_FINALE` — PROTAGONIST_ACTED_UPON_FINALE
-- `PROTAGONIST_DECISION_VACUUM` — P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM
-- `PROTAGONIST_DEFERENCE_RUN` — PROTAGONIST_DEFERENCE_RUN
-- `PROTAGONIST_REACTIVE_DOMINANCE` — Wave 156: Protagonist reactive dominance
-- `REACTIVE_GOAL_ADOPTION` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
-- `REVELATION_RELATIONSHIP_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
-- `REVELATION_SUSPENSE_FLAT` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
-- `REVELATION_WITHOUT_PROACTIVE` — Wave 258: Proactive midpoint void, proactive desert run, revelation without proactive
-- `SECONDARY_INTENTION_VACUUM` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
-- `SEED_ACT1_VOID` — Wave 493: PAYOFF_CURIOSITY_FLAT, SEED_ACT1_VOID, PAYOFF_RUN
-- `SEED_CLOCKLESS` — Wave 437: SEED_RUN_ISOLATED, PROACTIVE_ZONE_IMBALANCE, SEED_CLOCKLESS
-- `SEED_CURIOSITY_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
-- `SEEDING_CURIOSITY_FLAT` — Wave 300: SEEDING_CURIOSITY_FLAT
-- `STAKES_NEVER_PERSONAL` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
-- `WANT_FEAR_COLLISION_ABSENT` — WANT_FEAR_COLLISION_ABSENT
+- <a id="rule-agency_entropy_collapse"></a>`AGENCY_ENTROPY_COLLAPSE` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
+- <a id="rule-agency_proxy"></a>`AGENCY_PROXY` — AGENCY_PROXY
+- <a id="rule-climax_without_choice"></a>`CLIMAX_WITHOUT_CHOICE` — Act 3 without a character making the climactic choice
+- <a id="rule-clock_revelation_aftermath_void"></a>`CLOCK_REVELATION_AFTERMATH_VOID` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
+- <a id="rule-commitment_ramp_inversion"></a>`COMMITMENT_RAMP_INVERSION` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
+- <a id="rule-entropy_cliff"></a>`ENTROPY_CLIFF` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
+- <a id="rule-entropy_spike_misplaced"></a>`ENTROPY_SPIKE_MISPLACED` — Wave 171: ENTROPY_SPIKE_MISPLACED
+- <a id="rule-escalation_entropy_flat"></a>`ESCALATION_ENTROPY_FLAT` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
+- <a id="rule-goal_pivot_absent"></a>`GOAL_PIVOT_ABSENT` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
+- <a id="rule-intention_convergence_absent"></a>`INTENTION_CONVERGENCE_ABSENT` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
+- <a id="rule-intention_discovery_absent"></a>`INTENTION_DISCOVERY_ABSENT` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
+- <a id="rule-intention_dropout"></a>`INTENTION_DROPOUT` — INTENTION_DROPOUT
+- <a id="rule-intention_invisible"></a>`INTENTION_INVISIBLE` — Characters with no dialogue/belief traces may be props
+- <a id="rule-intention_purpose_monotone"></a>`INTENTION_PURPOSE_MONOTONE` — Wave 286: INTENTION_PURPOSE_MONOTONE
+- <a id="rule-intention_reactive_climax"></a>`INTENTION_REACTIVE_CLIMAX` — Wave 286: INTENTION_REACTIVE_CLIMAX
+- <a id="rule-passive_act3_intention"></a>`PASSIVE_ACT3_INTENTION` — Wave 171: PASSIVE_ACT3_INTENTION
+- <a id="rule-payoff_relationship_decoupled"></a>`PAYOFF_RELATIONSHIP_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
+- <a id="rule-payoff_run"></a>`PAYOFF_RUN` — Wave 493: PAYOFF_CURIOSITY_FLAT, SEED_ACT1_VOID, PAYOFF_RUN
+- <a id="rule-payoff_without_effort"></a>`PAYOFF_WITHOUT_EFFORT` — Wave 272: PAYOFF_WITHOUT_EFFORT
+- <a id="rule-proactive_act2a_void"></a>`PROACTIVE_ACT2A_VOID` — Wave 272: PROACTIVE_ACT2A_VOID
+- <a id="rule-proactive_act2b_void"></a>`PROACTIVE_ACT2B_VOID` — Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT
+- <a id="rule-proactive_act3_void"></a>`PROACTIVE_ACT3_VOID` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
+- <a id="rule-proactive_adversity_absent"></a>`PROACTIVE_ADVERSITY_ABSENT` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
+- <a id="rule-proactive_aftermath_curiosity_absent"></a>`PROACTIVE_AFTERMATH_CURIOSITY_ABSENT` — Wave 423: SEED_MIDPOINT_VOID, PROACTIVE_AFTERMATH_CURIOSITY_ABSENT, SEED_DRAMA_DECOUPLED
+- <a id="rule-proactive_backloaded"></a>`PROACTIVE_BACKLOADED` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
+- <a id="rule-proactive_emotional_recoil_absent"></a>`PROACTIVE_EMOTIONAL_RECOIL_ABSENT` — Wave 395: PROACTIVE_RELATIONSHIP_PEAK_ABSENT, PROACTIVE_EMOTIONAL_RECOIL_ABSENT, SEED_BACKLOADED
+- <a id="rule-proactive_global_scarcity"></a>`PROACTIVE_GLOBAL_SCARCITY` — Wave 314: PROACTIVE_GLOBAL_SCARCITY
+- <a id="rule-proactive_late_surge"></a>`PROACTIVE_LATE_SURGE` — Wave 272: PROACTIVE_LATE_SURGE
+- <a id="rule-proactive_midpoint_void"></a>`PROACTIVE_MIDPOINT_VOID` — Wave 258: Proactive midpoint void, proactive desert run, revelation without proactive
+- <a id="rule-proactive_opening_absent"></a>`PROACTIVE_OPENING_ABSENT` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
+- <a id="rule-proactive_overclustering"></a>`PROACTIVE_OVERCLUSTERING` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
+- <a id="rule-proactive_payoff_coincidence_absent"></a>`PROACTIVE_PAYOFF_COINCIDENCE_ABSENT` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
+- <a id="rule-proactive_relationship_void"></a>`PROACTIVE_RELATIONSHIP_VOID` — Wave 339: PROACTIVE_EMOTION_DECOUPLED, PROACTIVE_REVELATION_ABSENT, PROACTIVE_RELATIONSHIP_VOID
+- <a id="rule-proactive_revelation_coincidence_absent"></a>`PROACTIVE_REVELATION_COINCIDENCE_ABSENT` — Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT
+- <a id="rule-protagonist_acted_upon_finale"></a>`PROTAGONIST_ACTED_UPON_FINALE` — PROTAGONIST_ACTED_UPON_FINALE
+- <a id="rule-protagonist_decision_vacuum"></a>`PROTAGONIST_DECISION_VACUUM` — P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM
+- <a id="rule-protagonist_deference_run"></a>`PROTAGONIST_DEFERENCE_RUN` — PROTAGONIST_DEFERENCE_RUN
+- <a id="rule-protagonist_reactive_dominance"></a>`PROTAGONIST_REACTIVE_DOMINANCE` — Wave 156: Protagonist reactive dominance
+- <a id="rule-reactive_goal_adoption"></a>`REACTIVE_GOAL_ADOPTION` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
+- <a id="rule-revelation_relationship_decoupled"></a>`REVELATION_RELATIONSHIP_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
+- <a id="rule-revelation_suspense_flat"></a>`REVELATION_SUSPENSE_FLAT` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
+- <a id="rule-revelation_without_proactive"></a>`REVELATION_WITHOUT_PROACTIVE` — Wave 258: Proactive midpoint void, proactive desert run, revelation without proactive
+- <a id="rule-secondary_intention_vacuum"></a>`SECONDARY_INTENTION_VACUUM` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
+- <a id="rule-seed_act1_void"></a>`SEED_ACT1_VOID` — Wave 493: PAYOFF_CURIOSITY_FLAT, SEED_ACT1_VOID, PAYOFF_RUN
+- <a id="rule-seed_clockless"></a>`SEED_CLOCKLESS` — Wave 437: SEED_RUN_ISOLATED, PROACTIVE_ZONE_IMBALANCE, SEED_CLOCKLESS
+- <a id="rule-seed_curiosity_decoupled"></a>`SEED_CURIOSITY_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
+- <a id="rule-seeding_curiosity_flat"></a>`SEEDING_CURIOSITY_FLAT` — Wave 300: SEEDING_CURIOSITY_FLAT
+- <a id="rule-stakes_never_personal"></a>`STAKES_NEVER_PERSONAL` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
+- <a id="rule-want_fear_collision_absent"></a>`WANT_FEAR_COLLISION_ABSENT` — WANT_FEAR_COLLISION_ABSENT
 
