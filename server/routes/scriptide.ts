@@ -446,18 +446,29 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
     source = { format: 'fountain' };
   }
 
-  // Upgrade item #3: short-circuit BEFORE the doctor ever runs on text with
-  // no recognizable scene heading — see hasSceneHeading's comment above for
-  // why this belongs here rather than in doctor.ts. 200, not 4xx: this isn't
-  // a malformed-request error (the body validated fine against
-  // DoctorBodySchema) or a server fault — it's a legitimate, complete answer
-  // ("this text isn't a screenplay") that the client renders as its own
-  // banner, exactly like `formatUnrecognized` is not `error`. A 4xx would
-  // also route it into every consumer's generic "!res.ok -> throw" catch
-  // block (see streamDoctorProgress and this panel's own pdf/deep branches),
-  // collapsing this distinct, actionable signal into the same bucket as a
-  // real failure.
-  if (!hasSceneHeading(fountain)) {
+  // Upgrade item #3: short-circuit BEFORE the doctor ever runs on NON-EMPTY
+  // text with no recognizable scene heading — see hasSceneHeading's comment
+  // above for why this belongs here rather than in doctor.ts. The
+  // fountain.trim() !== '' guard deliberately excludes blank/whitespace-only
+  // input: that already gets an honest answer from doctor.ts's own
+  // zero-scene degenerate-report path (analysisComplete: false, scores
+  // withheld — tested by "POST a whitespace-only fountain returns an
+  // explicitly incomplete, scoreless report" in scriptide-doctor.test.ts,
+  // which predates this change). This short-circuit exists for the OTHER
+  // case that path doesn't cover: real prose that IS content, just not
+  // screenplay-shaped, which used to read as a fully-analyzed COMPLETE
+  // report (health 0, verdict PASS, five false "nothing to fix" strengths)
+  // instead of an honestly incomplete one.
+  //
+  // 200, not 4xx: this isn't a malformed-request error (the body validated
+  // fine against DoctorBodySchema) or a server fault — it's a legitimate,
+  // complete answer ("this text isn't a screenplay") that the client renders
+  // as its own banner, exactly like `formatUnrecognized` is not `error`. A
+  // 4xx would also route it into every consumer's generic "!res.ok -> throw"
+  // catch block (see streamDoctorProgress and this panel's own pdf/deep
+  // branches), collapsing this distinct, actionable signal into the same
+  // bucket as a real failure.
+  if (fountain.trim() !== '' && !hasSceneHeading(fountain)) {
     res.json({ formatUnrecognized: true, reason: FORMAT_UNRECOGNIZED_REASON, hint: FORMAT_UNRECOGNIZED_HINT });
     return;
   }
@@ -583,12 +594,14 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
     source = { format: 'fountain' };
   }
 
-  // Upgrade item #3: same short-circuit as /doctor above, in the one shape
-  // this route's SSE transport actually has — a distinct frame type, so the
+  // Upgrade item #3: same short-circuit as /doctor above (including the
+  // fountain.trim() !== '' guard — see that route's comment for why blank/
+  // whitespace-only input is deliberately excluded), in the one shape this
+  // route's SSE transport actually has — a distinct frame type, so the
   // client (streamDoctorProgress, src/lib/doctor-stream.ts) can tell it apart
   // from both `doctor_result` and `doctor_error` instead of the writer seeing
   // either a self-contradicting report or a bare "Diagnosis failed".
-  if (!hasSceneHeading(fountain)) {
+  if (fountain.trim() !== '' && !hasSceneHeading(fountain)) {
     emitSSE({ type: 'doctor_format_unrecognized', reason: FORMAT_UNRECOGNIZED_REASON, hint: FORMAT_UNRECOGNIZED_HINT });
     ensureEnded();
     return;

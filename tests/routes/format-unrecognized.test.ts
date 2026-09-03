@@ -74,6 +74,11 @@ describe('hasSceneHeading — mirror agrees with the real Fountain parser', () =
     assert.equal(parserHasSceneHeading(THREE_LINE_NO_HEADING), false);
   });
 
+  it('agrees with the real parser on whitespace-only input (both false)', () => {
+    assert.equal(hasSceneHeading('   \n  '), false);
+    assert.equal(parserHasSceneHeading('   \n  '), false);
+  });
+
   it('agrees with the real parser on a valid multi-scene script (both true)', () => {
     assert.equal(hasSceneHeading(VALID_SCRIPT), true);
     assert.equal(parserHasSceneHeading(VALID_SCRIPT), true);
@@ -128,6 +133,22 @@ describe('routes/scriptide/doctor and /doctor/stream — unrecognized-format sho
     assert.equal('passes' in body, false);
     assert.equal('verdict' in body, false);
     assert.equal('strengths' in body, false);
+  });
+
+  it('POST /doctor with whitespace-only input is NOT caught by the short-circuit (pre-existing honest zero-scene path)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: '   \n  ' }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    // NOT formatUnrecognized — this stays on doctor.ts's own zero-scene
+    // degenerate-report path (see tests/routes/scriptide-doctor.test.ts's
+    // "POST a whitespace-only fountain..." test for the full contract).
+    assert.equal(body.formatUnrecognized, undefined);
+    assert.equal(body.analysisComplete, false);
+    assert.equal(body.sceneCount, 0);
   });
 
   it('POST /doctor with a valid multi-scene script still runs the doctor normally', async () => {
