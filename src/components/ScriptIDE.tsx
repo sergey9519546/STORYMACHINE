@@ -469,9 +469,7 @@ export default function ScriptIDE({
   // silent behavior change to the editor everyone gets). Persisted the same
   // plain on/off-string way as typewriter_sound above.
   const [isTypewriterFocus, setIsTypewriterFocus] = useState(() => lsGet("typewriter_focus") === "on");
-  const [snapshots, setSnapshots] = useState<Snapshot[]>(
-    initialDraft.snapshots as Snapshot[],
-  );
+  const [snapshots, setSnapshots] = useState<Snapshot[]>(initialDraft.snapshots as Snapshot[]);
   // Title/author/contact — persisted via the SAME draft envelope as
   // snapshots/researchNotes/isDarkMode below (src/lib/scriptide-draft-store.ts).
   // Previously this hardcoded placeholders unconditionally, ignoring
