@@ -1013,3 +1013,112 @@ holds (full suite green at the commit carrying this note).
   trees and read both module lists. No real-corpus measurement was run, and
   none is claimed: this change moves module boundaries, not numbers, and the
   byte-level identity of all 45 reports is the receipt it owes."
+
+---
+
+### 2026-09-03 — LANE R5 VERBOSITY-BIAS FIX: the health formula's density denominator changed from words to scene opportunities — **PENDING OWNER MEASUREMENT**
+
+**This entry carries NO AUC-24 number, and the branch it belongs to must not
+merge until one is added.** It is filed so the work that WAS done is recorded
+honestly, not to satisfy the gate. The runner attestation below says in the
+first person that `npm run measure-real` was not run.
+
+- **Date:** 2026-09-03
+- **Baseline used:** `main` at `e40f4cf5` — the tip of the branch being merged
+  into at measurement time, not the fork point; this branch was rebased onto
+  that tip before measuring. `node_modules` was symlinked into the extracted
+  tree so both trees resolved the same dependency versions. This branch's own
+  commit hashes are deliberately not cited: they change on every rebase, and a
+  receipt has to name something a reviewer can still resolve.
+- **What changed, and why this is a scoring-path change:**
+  `server/nvm/analyze/doctor.ts`'s `densityPenalty` and
+  `dimensionDensityPenalty` now normalize weighted findings by
+  `(sceneCount * 30)^0.7` instead of `wordCount^0.7`, and the density curve is
+  a single continuous `8 * density^2` instead of the retired
+  logistic / `2.5·density^3.75` piecewise pair. The defect being removed:
+  appending stateless filler prose RAISED health (measured 60.9 → 66.3 on
+  `evals/scoring/metamorphic/base.fountain`), which had stood as a
+  `known-failing` metamorphic witness since 2026-07-11. Diagnosis, the sweep
+  behind the two constants, the full before/after tables and the owner
+  checklist are in `docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md`.
+- **Measured AUC-24: NOT MEASURED.** No real-corpus run was performed.
+  `REAL_SCRIPT_CORPUS_DIR` was never set, the corpus is not present in this
+  container, and no AUC value is claimed, estimated or extrapolated anywhere
+  in this branch.
+- **Flag-run AUCs:** none.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read.
+  `tests/fixtures/real-corpus-manifest.json` is UNCHANGED by this range and is
+  now STALE: all 72 rows carry `health`/`verdict` values computed by the old
+  formula, and this change moves them. Re-locking it needs the corpus and is
+  item 3 of the owner checklist.
+- **Command:** the in-repo measurements that WERE run, all in the foreground,
+  each exit code read from its own redirected log —
+
+  ```
+  npm run lint                                                      -> exit 0
+  npm test                                                          -> exit 0
+  npm run test:metamorphic                                          -> exit 0
+  npm run check-no-console                                          -> exit 0
+  npm run check-server-reachability                                 -> exit 0
+  git archive main | tar -x -C <baseline>
+  ln -s "$PWD/node_modules" <baseline>/node_modules
+  node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>  -> exit 0
+  node scripts/check-doctor-output-identity.mjs --tree .          --out <after>   -> exit 0
+  node scripts/check-doctor-output-identity.mjs --compare <before> <after>        -> exit 1
+  ```
+
+- **Output-identity result — which fixtures changed, and by how much.**
+  `OUTPUT IDENTITY: FAIL — 45 fixture(s) differ.` **All 45 of 45 reports moved
+  health; 28 changed verdict.** Health delta range **−39.9 to +24.2, mean
+  −11.2**. Nothing clamped: the lowest report is 16.7, the highest 81.5. A
+  FAIL is the expected and correct result here — this is a deliberate formula
+  change, not a pure refactor, so the identity harness is being used as a
+  change inventory rather than as a proof of purity. Representative rows (the
+  full 45-row table is in the fix doc §5.4):
+
+  | fixture | before → after | verdict |
+  |---|---|---|
+  | calibration `Merge` | 20.9 → 45.1 (+24.2) | PASS → PASS |
+  | calibration `The Grift` | 17.6 → 37.1 (+19.5) | PASS → PASS |
+  | calibration `The Long Game` | 68.8 → 66.6 (−2.2) | CONSIDER → CONSIDER |
+  | synthetic 300-scenes | 88.4 → 81.5 (−6.9) | RECOMMEND → CONSIDER |
+  | synthetic 120-scenes | 86.6 → 69.0 (−17.6) | RECOMMEND → CONSIDER |
+  | `dead-frequency` (= P0 sample) | 78.3 → 54.8 (−23.5) | CONSIDER → PASS |
+  | `runoff` (161 words/scene) | 74.6 → 53.5 (−21.1) | CONSIDER → PASS |
+  | `room-12` (43 words/scene) | 30.9 → 21.4 (−9.5) | PASS → PASS |
+  | `mise` | 72.9 → 33.0 (−39.9) | CONSIDER → PASS |
+
+  The direction is the defect being removed: the wordier a fixture was, the
+  more it loses; the word-thin end of the calibration corpus rises, because
+  those samples were being penalized for brevity rather than for craft.
+
+- **Metamorphic result:** `empty_verbosity` moved from **+5.4 (KNOWN FAIL)** to
+  **−4.4 (PASS)** and is now a HARD case; a new `filler_scenes` hard case
+  (filler that DOES add scene headings) measures −7.8. `scene_dup_padding`'s
+  margin tightened from −10.5 to −2.3, which the fix doc flags as the binding
+  constraint on the density scale. 8/8 pass, no known-failing witnesses.
+
+- **Calibration result:** four-band monotonicity holds on the band-average raw
+  craft statistic (61.92 / 58.36 / 54.77 / 50.78, strong → troubled), no sample
+  at either clamp, no `strong` sample below the `troubled` average. The band
+  separation narrows from 25.31 to 11.13 raw points — recorded as a cost, not
+  glossed. No corpus sample was edited.
+
+- **Discrimination result:** all 6 pairs still ordered correctly; the composite
+  pair's gap is 5.2 displayed points against its unchanged ≥ 5.0 gate (8.5
+  before).
+
+- **Runner attestation:** "I, the Claude Code session running lane R5
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), ran every command
+  listed above myself on 2026-09-03 and read each exit code out of its own log
+  file. **I did NOT run `npm run measure-real`, and this entry claims no
+  AUC-24 value, because there is none: the real corpus is not present in this
+  container and `REAL_SCRIPT_CORPUS_DIR` was deliberately left unset.** This is
+  a scoring-path change that moves 45 of 45 in-repo reports, so it owes a real
+  corpus measurement, and that measurement is the owner's:
+  `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, then
+  `npm run lock-auc24`, then re-lock `tests/fixtures/real-corpus-manifest.json`
+  in place, then supersede this entry with one carrying the measured number.
+  Until that entry exists this branch must not merge, and this heading says
+  PENDING OWNER MEASUREMENT so no reviewer can mistake this for the receipt
+  the change actually owes."
