@@ -23,22 +23,29 @@
 // diagnostic) and into the keymap (Mod-Shift-f fixes the current line's
 // worst diagnostic) — see buildFixButton/fixCurrentLine below.
 
+// `import type` for DecorationSet/Tooltip/Extension/Range is load-bearing, not
+// style — the same wall fix-action.ts's own header documents. All four are
+// type-only exports of their packages, so a plain named import makes this
+// module unloadable under `node --experimental-strip-types` (the repo's test
+// runner does no cross-usage elision) with "does not provide an export named
+// 'DecorationSet'". Splitting them lets
+// tests/core/generative-surface-labs-gate.test.ts build a real EditorState
+// from the SHIPPED scriptDiagnostics() rather than a copy of it. Vite and tsc
+// erase both forms identically; the bundle is unchanged.
 import {
   EditorView,
   Decoration,
-  DecorationSet,
   ViewPlugin,
   ViewUpdate,
   hoverTooltip,
-  Tooltip,
   keymap,
 } from '@codemirror/view';
+import type { DecorationSet, Tooltip } from '@codemirror/view';
 import {
   StateField,
   StateEffect,
-  Extension,
-  Range,
 } from '@codemirror/state';
+import type { Extension, Range } from '@codemirror/state';
 import {
   fixAction,
   runFix,
@@ -164,8 +171,9 @@ export const diagnosticsField = StateField.define<LocatedIssue[]>({
  *  folded into the squiggle decoration below (an extra CSS class, not a
  *  separate mark) so the pending state is visible on the squiggle itself,
  *  not only in the tooltip or the receipt widget that lands later. */
-function computePendingLines(phases: Map<string, FixPhase>): Set<number> {
+function computePendingLines(phases: Map<string, FixPhase> | undefined): Set<number> {
   const lines = new Set<number>();
+  if (!phases) return lines;
   for (const phase of phases.values()) {
     if (phase.status !== 'pending') continue;
     for (let n = phase.span.startLine; n <= phase.span.endLine; n++) lines.add(n);
@@ -209,6 +217,14 @@ function buildDiagnosticDecorations(
   return Decoration.set(ranges);
 }
 
+// `field(fixPhasesField, false)` — the NON-throwing lookup — everywhere here,
+// not the plain `field(...)`. Since Decision #3 (2026-09-03) fixAction() is
+// only installed when the generative half is enabled (Labs ON), so with Labs
+// OFF this StateField genuinely does not exist in the editor state and the
+// throwing form would take down the whole squiggle plugin — i.e. it would
+// break the DETERMINISTIC Live Notes that the decision explicitly kept on the
+// default surface. `undefined` here just means "no fix is in flight", which is
+// exactly right when there is no way to start one.
 const diagnosticsDecorationPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -216,19 +232,19 @@ const diagnosticsDecorationPlugin = ViewPlugin.fromClass(
       this.decorations = buildDiagnosticDecorations(
         view.state,
         view.state.field(diagnosticsField),
-        computePendingLines(view.state.field(fixPhasesField)),
+        computePendingLines(view.state.field(fixPhasesField, false)),
       );
     }
     update(update: ViewUpdate) {
       if (
         update.docChanged ||
         update.state.field(diagnosticsField) !== update.startState.field(diagnosticsField) ||
-        update.state.field(fixPhasesField) !== update.startState.field(fixPhasesField)
+        update.state.field(fixPhasesField, false) !== update.startState.field(fixPhasesField, false)
       ) {
         this.decorations = buildDiagnosticDecorations(
           update.state,
           update.state.field(diagnosticsField),
-          computePendingLines(update.state.field(fixPhasesField)),
+          computePendingLines(update.state.field(fixPhasesField, false)),
         );
       }
     }
@@ -348,7 +364,7 @@ function fixCurrentLine(view: EditorView): boolean {
 const fixKeymap = keymap.of([{ key: 'Mod-Shift-f', run: fixCurrentLine, preventDefault: true }]);
 
 // ── Hover tooltip ─────────────────────────────────────────────────────────────
-function diagnosticHoverSource(view: EditorView, pos: number): Tooltip | null {
+function diagnosticHoverSource(view: EditorView, pos: number, generative: boolean): Tooltip | null {
   const issues = view.state.field(diagnosticsField, false);
   if (!issues || issues.length === 0) return null;
 
@@ -405,10 +421,18 @@ function diagnosticHoverSource(view: EditorView, pos: number): Tooltip | null {
           item.appendChild(fix);
         }
 
-        const actions = document.createElement('div');
-        actions.className = 'cm-diagnostic-tooltip-actions';
-        actions.appendChild(buildFixButton(view, li));
-        item.appendChild(actions);
+        // Decision #3 (2026-09-03): "Fix with AI" is a GENERATIVE affordance,
+        // so with Labs OFF the tooltip renders the diagnostic and stops —
+        // no actions row at all, rather than a permanently-disabled button
+        // advertising a feature the default surface does not offer. The
+        // squiggle itself (deterministic /api/scriptide/diagnose) is
+        // untouched: Live Notes stays keyless-first product, not Labs.
+        if (generative) {
+          const actions = document.createElement('div');
+          actions.className = 'cm-diagnostic-tooltip-actions';
+          actions.appendChild(buildFixButton(view, li));
+          item.appendChild(actions);
+        }
 
         dom.appendChild(item);
       }
@@ -608,21 +632,34 @@ export interface ScriptDiagnosticsOptions {
    *  secondary belt-and-suspenders guard for any caller that constructs the
    *  extension directly without going through a Compartment. Default: true. */
   enabled?: boolean;
+  /** Decision #3 (2026-09-03, docs/DECISION_LOG.md): when false, the
+   *  GENERATIVE half of Live Notes is left out entirely — no fixAction()
+   *  StateFields, no /api/ai-config probe, no Mod-Shift-f binding, and no
+   *  "Fix with AI" button in the hover tooltip. The DETERMINISTIC half
+   *  (squiggles + hover text from /api/scriptide/diagnose) is unaffected,
+   *  because that is the keyless front door and is not what the decision
+   *  demoted. Omitting the extensions (rather than disabling the button) is
+   *  the point: with Labs OFF the editor must make no LLM-adjacent network
+   *  call at all. Default: true, so every existing caller — including
+   *  tests/core/fix-action.test.ts, which drives fixAction() directly —
+   *  keeps the pre-decision behavior. */
+  generative?: boolean;
 }
 
 export function scriptDiagnostics(opts: ScriptDiagnosticsOptions = {}): Extension {
   if (opts.enabled === false) return [];
+  const generative = opts.generative !== false;
   return [
     diagnosticsField,
     diagnosticsDecorationPlugin,
     diagnosticsTheme,
-    hoverTooltip(diagnosticHoverSource, { hoverTime: 300 }),
+    hoverTooltip((view, pos) => diagnosticHoverSource(view, pos, generative), { hoverTime: 300 }),
     diagnosticsTrigger,
     // Run 17-D: bridges a squiggle to POST /api/scriptide/fix. fixAction()
     // owns the network contract, pending/result lifecycle, and the inline
     // verify-receipt widget; this file only wires the tooltip button and the
     // keyboard shortcut into it (see buildFixButton/fixCurrentLine above).
-    fixAction(),
-    fixKeymap,
+    // Labs-gated since Decision #3 — see ScriptDiagnosticsOptions.generative.
+    ...(generative ? [fixAction(), fixKeymap] : []),
   ];
 }

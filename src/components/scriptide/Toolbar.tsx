@@ -583,15 +583,24 @@ export default function Toolbar({
                   setOverflowOpen(false);
                 }}
               />
-              <OverflowItem
-                icon={<Zap className="h-3.5 w-3.5" />}
-                label={autoAnalysis ? "Auto-analysis on" : "Auto-analysis off"}
-                pressed={autoAnalysis}
-                onClick={() => {
-                  onToggleAutoAnalysis();
-                  setOverflowOpen(false);
-                }}
-              />
+              {/* Decision #3 (2026-09-03, docs/DECISION_LOG.md): auto-analysis
+                  fires POST /api/analyze-script — an aiLimiter route that runs
+                  an LLM pass plus image/audio generation — so it is part of the
+                  generative surface demoted to Labs. Same `labsEnabled &&`
+                  mechanism as Studio/Director/Slate above; ScriptIDE
+                  independently refuses to schedule the call when Labs is off,
+                  so a stale localStorage preference can't fire it either. */}
+              {labsEnabled && (
+                <OverflowItem
+                  icon={<Zap className="h-3.5 w-3.5" />}
+                  label={autoAnalysis ? "Auto-analysis on" : "Auto-analysis off"}
+                  pressed={autoAnalysis}
+                  onClick={() => {
+                    onToggleAutoAnalysis();
+                    setOverflowOpen(false);
+                  }}
+                />
+              )}
               <OverflowItem
                 label={isTypewriterSound ? "Typewriter SFX on" : "Typewriter SFX off"}
                 pressed={isTypewriterSound}

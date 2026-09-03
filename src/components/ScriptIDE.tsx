@@ -548,6 +548,14 @@ export default function ScriptIDE({
   const [collabBusy, setCollabBusy] = useState(false);
   const [collabError, setCollabError] = useState<string | null>(null);
   const [collabCopied, setCollabCopied] = useState(false);
+  // ROADMAP P2 / Decision #3 (2026-09-03, docs/DECISION_LOG.md): the single
+  // Labs flag now gates the GENERATIVE surface as well as OASIS/research.
+  // Read on EVERY render (not memoized, not read once at mount) for the same
+  // reason App.tsx reads it that way — toggling Labs in Settings has to take
+  // effect immediately, without a reload. Everything downstream of this one
+  // read: the editor's "Fix with AI" bridge, auto-analysis, the live-intent
+  // copilot, the palette's generative rows, and the keyless banner.
+  const labsEnabled = getLabsEnabled();
   // Keyless-honesty banner (finding E): whether explicit generation features
   // (world-building, simulation turns, rewriting) have an AI key behind them.
   // null = not yet fetched; the banner only ever renders once we know for
@@ -1242,8 +1250,15 @@ export default function ScriptIDE({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scriptText]);
 
-  // Phase 2 MVP: Live Intent Debounce
+  // Phase 2 MVP: Live Intent Debounce — the background copilot. It POSTs the
+  // last 2,000 characters of the draft to /api/live/intent (an aiLimiter
+  // route) every time the writer pauses, with no control anywhere in the UI
+  // to turn it off. Decision #3 (2026-09-03) demotes it with the rest of the
+  // generative surface: with Labs OFF this effect schedules nothing and the
+  // draft never leaves the editor on a copilot's behalf, which is also what
+  // makes the StartScreen's keyless claim literally true on the default path.
   useEffect(() => {
+    if (!labsEnabled) return;
     if (llmReady === false) return;
     const timer = setTimeout(async () => {
       const snippet = scriptText.slice(-2000);
@@ -1268,7 +1283,7 @@ export default function ScriptIDE({
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [scriptText, llmReady]);
+  }, [scriptText, llmReady, labsEnabled]);
 
   // handleScroll removed — CM6 editor manages its own scroll internally
 
@@ -1673,7 +1688,13 @@ export default function ScriptIDE({
     // autoAnalysis is explicitly on — default config never fires
     // triggerAnalysis from typing alone. Explicit "Analyze" actions elsewhere
     // call triggerAnalysis directly and are unaffected.
-    typingTimeoutRef.current = scheduleAutoAnalysis(autoAnalysis, () => {
+    // Decision #3 (2026-09-03): AND'd with labsEnabled, because
+    // /api/analyze-script is an aiLimiter route that fans out to LLM analysis
+    // plus image/audio generation. The toggle itself is Labs-gated in the
+    // Toolbar and the palette, but the preference PERSISTS in localStorage
+    // ("auto_analysis"), so a writer who once enabled it under Labs and then
+    // turned Labs off would otherwise keep firing generation on every pause.
+    typingTimeoutRef.current = scheduleAutoAnalysis(autoAnalysis && labsEnabled, () => {
       triggerAnalysis(text);
     }, 2000);
   };
@@ -1951,7 +1972,16 @@ export default function ScriptIDE({
 
   const confirmRestore = () => {
     mutateDraft(restoreModal.text);
-    triggerAnalysis(restoreModal.text);
+    // Decision #3 (2026-09-03): Restore Snapshot is reachable from ShipPanel
+    // — the ALWAYS-VISIBLE, non-Labs task tab (see ShipPanel.tsx's own doc
+    // comment) — not only from the Labs-only Studio "Versions" tab. Without
+    // this guard, restoring a snapshot on the default surface would still
+    // fire triggerAnalysis's POST /api/analyze-script (LLM analysis + image/
+    // audio generation), the exact request Decision #3 removed from every
+    // other default-surface path. The engine state it produces is only ever
+    // displayed inside the Labs-gated Studio tabs, so skipping it with Labs
+    // off wastes nothing a writer could see.
+    if (labsEnabled) triggerAnalysis(restoreModal.text);
     setRestoreModal({ open: false, text: "" });
   };
 
@@ -2087,8 +2117,8 @@ export default function ScriptIDE({
   // point onto real dispatch, never a parallel implementation. Rebuilt each
   // render (cheap — a few dozen small object literals, and only actually
   // consumed while paletteOpen is true) rather than memoized, so it can
-  // never show a stale on/off label or a stale scene list.
-  const labsEnabled = getLabsEnabled();
+  // never show a stale on/off label or a stale scene list. (`labsEnabled` is
+  // read once at the top of the component — see its declaration there.)
   const sceneActions: PaletteAction[] = parsedBlocks
     .map((b, i) => ({ block: b, index: i }))
     .filter(({ block }) => block.type === "scene_heading")
@@ -2179,12 +2209,6 @@ export default function ScriptIDE({
       run: toggleLiveDiagnostics,
     },
     {
-      id: "toggle-auto-analysis",
-      label: autoAnalysis ? "Turn off auto-analysis" : "Turn on auto-analysis",
-      group: "View",
-      run: toggleAutoAnalysis,
-    },
-    {
       id: "toggle-typewriter-sound",
       label: isTypewriterSound ? "Turn off typewriter sound" : "Turn on typewriter sound",
       group: "View",
@@ -2198,6 +2222,16 @@ export default function ScriptIDE({
     // Editor, and that includes the palette's own contents).
     ...(labsEnabled
       ? ([
+          // Decision #3 (2026-09-03): auto-analysis fires POST
+          // /api/analyze-script (LLM analysis + image/audio generation), so
+          // its palette row moved out of "View" and into "Labs" alongside the
+          // research entries — same gate, same group, one place to look.
+          {
+            id: "toggle-auto-analysis",
+            label: autoAnalysis ? "Turn off auto-analysis" : "Turn on auto-analysis",
+            group: "Labs",
+            run: toggleAutoAnalysis,
+          },
           { id: "open-studio", label: "Open Studio", group: "Labs", run: () => openToolSlot("studio") },
           { id: "open-director", label: "Director HUD", group: "Labs", run: () => openToolSlot("director") },
           { id: "open-slate", label: "Slate compare", group: "Labs", run: () => openToolSlot("slate") },
@@ -2496,7 +2530,11 @@ export default function ScriptIDE({
             </>
           )}
 
-          {llmReady === false && !llmBannerDismissed && (
+          {/* Decision #3 (2026-09-03): with Labs OFF nothing on the default
+              surface can use a key, so "No AI key · analysis ok" would be
+              answering a question the writer was never asked — it stays, but
+              only where a generative control is actually reachable. */}
+          {labsEnabled && llmReady === false && !llmBannerDismissed && (
             <button
               type="button"
               onClick={dismissLlmBanner}
@@ -2604,6 +2642,9 @@ export default function ScriptIDE({
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
+            // Decision #3: Live Notes' deterministic squiggles stay on the
+            // default surface; its "Fix with AI" bridge is Labs-only.
+            generativeFixes={labsEnabled}
             isTypewriterFocus={isTypewriterFocus}
           />
 
@@ -3216,7 +3257,9 @@ export default function ScriptIDE({
                 // path, or the P0 golden path silently spends three provider
                 // calls the user never asked for (and emits a 503 console
                 // error on a keyless demo box).
-                if (autoAnalysis) triggerAnalysis(text);
+                // Decision #3: AND'd with labsEnabled — a stale autoAnalysis
+                // preference must not fire this once Labs is off.
+                if (autoAnalysis && labsEnabled) triggerAnalysis(text);
               }}
               onJumpToLine={(line1) => {
                 editorRef.current?.navigateTo(line1);
@@ -3256,7 +3299,10 @@ export default function ScriptIDE({
               // programmatic draft install (converted FDX/PDF, accepted fix)
               // is not an explicit "Analyze" click, so it must not fire
               // /api/analyze-script unless auto-analysis is opted into.
-              if (autoAnalysis) triggerAnalysis(text);
+              // Decision #3 (2026-09-03): AND'd with labsEnabled — see the
+              // matching call site above for why a stale preference isn't
+              // enough on its own.
+              if (autoAnalysis && labsEnabled) triggerAnalysis(text);
             }}
             autoLoadSample={false}
             onNavigateToFinding={(startLine, endLine) => {

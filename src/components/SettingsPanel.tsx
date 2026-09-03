@@ -75,6 +75,35 @@ const TAB_LABELS: Record<Tab, string> = {
 
 const TAB_ORDER = Object.keys(TAB_LABELS) as Tab[];
 
+// ── Decision #3 (2026-09-03, docs/DECISION_LOG.md) ───────────────────────────
+// The five tabs that exist ONLY to point a generative feature at a provider —
+// an endpoint, a model name, and an API key each. With the generative surface
+// demoted to Labs there is nothing on the default surface that can consume any
+// of them, so they are HIDDEN rather than shown-and-inert: an API-key form on
+// the keyless front door invites a writer to paste a secret into a deployment
+// that will not use it, which is the opposite of the privacy claim
+// StartScreen makes. LabsTab (always visible) carries the one-line pointer.
+//
+// Story stays visible on purpose: its axes are deterministic engine config
+// (docs/CLAIMS_REGISTER.md row 16 — "no AI key required"), not a provider
+// form. Session stays visible because it holds Delete Everything, and Labs
+// stays visible because it is the way back to all of this — the two tabs the
+// phone-width fix below was written to protect are exactly the two that
+// survive here, so the default strip goes 8 tabs -> 3 and Session gets
+// strictly easier to reach, never harder.
+const GENERATIVE_TABS: readonly Tab[] = ['providers', 'llm', 'image', 'tts', 'embeddings'];
+
+/** The tab strip actually rendered, in order, for a given Labs state. Kept as
+ *  a named pure function (rather than inlined into the render) so the decision
+ *  lives in one readable place and so
+ *  tests/core/generative-surface-labs-gate.test.ts can assert both states —
+ *  that test re-derives it from this file's own TAB_LABELS and GENERATIVE_TABS
+ *  declarations, since a .tsx module cannot be imported under
+ *  `node --experimental-strip-types`. Exported to mark it as the contract. */
+export function visibleSettingsTabs(labsEnabled: boolean): Tab[] {
+  return labsEnabled ? [...TAB_ORDER] : TAB_ORDER.filter((t) => !GENERATIVE_TABS.includes(t));
+}
+
 // ── Story-axis config (server-persisted, saves immediately per control) ──────
 // Mirrors GET /api/story-config's response shape (server/routes/config.ts).
 // character_arc_mode is optional: the /api/character-arc-mode route (mirroring
@@ -758,15 +787,21 @@ function SessionTab({ onBeginDataWipe }: { onBeginDataWipe?: () => void }) {
 // Default OFF — writers see Doctor + Editor only. Enabling Labs reveals
 // experimental features like OASIS Story Machine and NVM research surfaces.
 
-function LabsTab() {
-  const [labsEnabled, setLabsEnabledState] = useState(getLabsEnabled());
-  
+function LabsTab({
+  labsEnabled,
+  onToggle,
+}: {
+  labsEnabled: boolean;
+  onToggle: (enabled: boolean) => void;
+}) {
+  // State lifted to SettingsPanel (Decision #3): the tab strip itself now
+  // depends on the flag, so the toggle has to re-render the whole panel, not
+  // just this tab. App.tsx and ScriptIDE still read the flag straight from
+  // localStorage on their own next render — nothing here needs a reload.
   const handleToggle = (enabled: boolean) => {
-    setLabsEnabled(enabled);
-    setLabsEnabledState(enabled);
-    // Immediate feedback — no page reload required, App.tsx checks on render
+    onToggle(enabled);
   };
-  
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
@@ -787,9 +822,11 @@ function LabsTab() {
             Enable Labs Features
           </div>
           <div className="text-xs text-gray-600 font-mono leading-relaxed">
-            Unlocks OASIS Story Machine (multi-agent simulation) and NVM research
-            panels (converge, twin, epistemic map, etc.). These are experimental
-            surfaces not yet validated with users.
+            Unlocks OASIS Story Machine (multi-agent simulation), NVM research
+            panels (converge, twin, epistemic map, etc.), and the generative
+            features — Deep read, Fix with AI, auto-analysis, and the
+            AI-provider settings tabs. These are experimental surfaces not yet
+            validated with users.
           </div>
         </label>
       </div>
@@ -799,7 +836,11 @@ function LabsTab() {
         <ul className="list-disc list-inside space-y-1">
           <li>OASIS Story Machine — Multi-agent narrative simulation</li>
           <li>Research panels — NVM, converge, twin, room, etc.</li>
-          <li>Experimental generation features</li>
+          <li>
+            Generative features live in Labs — Deep read, Fix with AI,
+            auto-analysis, and the AI-provider tabs (Providers, Text LLM,
+            Image, TTS, Embeddings)
+          </li>
         </ul>
       </div>
       
@@ -809,6 +850,7 @@ function LabsTab() {
           <li>Script Doctor — Always available</li>
           <li>Script IDE — Always available</li>
           <li>Coverage export — Always available</li>
+          <li>Live Notes squiggles — Always available (deterministic)</li>
           <li>Deterministic core — Always available</li>
         </ul>
       </div>
@@ -827,7 +869,23 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
   // convention.
   const dialogRef = useRef<HTMLDivElement | null>(null);
   useModalFocusTrap(dialogRef);
-  const [activeTab, setActiveTab] = useState<Tab>("providers");
+  // Decision #3 (2026-09-03): the strip's CONTENTS depend on the Labs flag, so
+  // the flag is panel state here rather than LabsTab-local — flipping the
+  // toggle has to add/remove five tabs in the same render.
+  const [labsEnabled, setLabsEnabledState] = useState(getLabsEnabled());
+  const visibleTabs = visibleSettingsTabs(labsEnabled);
+  const [activeTab, setActiveTab] = useState<Tab>(() =>
+    getLabsEnabled() ? "providers" : "story",
+  );
+  const handleLabsToggle = (enabled: boolean) => {
+    setLabsEnabled(enabled);
+    setLabsEnabledState(enabled);
+    // Turning Labs OFF while sitting on a tab that just disappeared would
+    // leave the strip with nothing selected and an empty tabpanel — land on
+    // the first surviving tab instead. (Turning it ON only adds tabs, so the
+    // current selection is always still valid.)
+    if (!enabled && GENERATIVE_TABS.includes(activeTab)) setActiveTab("story");
+  };
   // One DOM node per tab, so an arrow key can move real focus and not just
   // the selected state — a roving tabindex that never calls .focus() looks
   // right in the markup and does nothing for the person pressing the key.
@@ -840,10 +898,13 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
    *  button activation still works. preventDefault matters for Home/End,
    *  which would otherwise scroll the dialog while "moving" the tab. */
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const next = nextRovingIndex(e.key, index, TAB_ORDER.length);
+    // Indexes are into the VISIBLE strip (Decision #3 hides five tabs when
+    // Labs is off), not the full TAB_ORDER — otherwise ArrowRight would
+    // "move" to a tab that isn't rendered and focus would go nowhere.
+    const next = nextRovingIndex(e.key, index, visibleTabs.length);
     if (next === null) return;
     e.preventDefault();
-    const target = TAB_ORDER[next];
+    const target = visibleTabs[next];
     setActiveTab(target);
     tabRefs.current[target]?.focus();
   };
@@ -977,14 +1038,14 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
                 The strip is ONE Tab stop: only the selected tab carries
                 tabIndex 0, the rest are -1, so Tab moves past the whole strip
                 into the panel instead of making a keyboard user press it
-                eight times to get anywhere. Left/Right move (and select, per
+                three times (eight with Labs on) to get anywhere. Left/Right move (and select, per
                 APG's automatic-activation guidance — every panel here is
                 local state, nothing to fetch), Home/End jump to the ends. */}
-            {/* Phone-width fix (375/390px): all 8 tabs carry `flex-1`, which
+            {/* Phone-width fix (375/390px): all tabs carry `flex-1`, which
                 only grows/shrinks evenly when the row's items CAN shrink
                 below their own content width — flex items default to
                 `min-width: auto`, so once the dialog narrows to `w-full
-                mx-4` on phones (well under the 8 tabs' combined intrinsic
+                mx-4` on phones (well under the 8 Labs-ON tabs' combined intrinsic
                 width), the row stops shrinking and instead spills past the
                 dialog's right edge with no scrollbar (the dialog itself is
                 default `overflow: visible`), silently clipping "Session"
@@ -993,9 +1054,11 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
                 below `sm` turns that silent clip into a reachable
                 horizontal scroll; `sm:overflow-x-visible` restores the
                 exact desktop rendering (all 8 tabs already fit the
-                `max-w-xl` dialog there, so this is a no-op above `sm`). */}
+                `max-w-xl` dialog there, so this is a no-op above `sm`).
+                Decision #3 makes the DEFAULT strip 3 tabs, which strictly
+                helps here — this stays for the Labs-ON case. */}
             <div className="flex overflow-x-auto border-b-4 border-black sm:overflow-x-visible" role="tablist" aria-label="Settings sections">
-              {TAB_ORDER.map((tab, index) => (
+              {visibleTabs.map((tab, index) => (
                 <button
                   key={tab}
                   id={`settings-tab-${tab}`}
@@ -1089,7 +1152,9 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
               )}
               {activeTab === "story" && <StoryTab />}
               {activeTab === "session" && <SessionTab onBeginDataWipe={onBeginDataWipe} />}
-              {activeTab === "labs" && <LabsTab />}
+              {activeTab === "labs" && (
+                <LabsTab labsEnabled={labsEnabled} onToggle={handleLabsToggle} />
+              )}
             </div>
 
             {/* Footer — AI-config actions only; the Story, Session, Providers, and

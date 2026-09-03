@@ -24,6 +24,17 @@
 // cannot be imported under `node --experimental-strip-types`. This test
 // therefore asserts on the component source: every triggerAnalysis call
 // reachable from a non-explicit path must sit behind the autoAnalysis flag.
+//
+// Decision #3 (2026-09-03, docs/DECISION_LOG.md) strengthened the guard at
+// both sites from `autoAnalysis` alone to `autoAnalysis && labsEnabled`: the
+// auto-analysis preference persists in localStorage across a Labs toggle, so
+// a writer who once opted in under Labs and then turned Labs off would
+// otherwise still fire POST /api/analyze-script from these two programmatic
+// paths — the exact stale-preference leak this file already existed to
+// catch, just not yet closed for the case where Labs (not auto-analysis
+// itself) is the thing that got turned off. The assertions below were
+// updated to match, not deleted — the underlying claim (no bare,
+// unconditional triggerAnalysis on a programmatic install) is unchanged.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -54,8 +65,8 @@ describe('G0-04 — programmatic draft installs respect the auto-analysis gate',
     );
     assert.match(
       body,
-      /if\s*\(\s*autoAnalysis\s*\)\s*triggerAnalysis/,
-      'sample install must gate triggerAnalysis behind autoAnalysis (else the P0 golden path fires /api/analyze-script unasked)',
+      /if\s*\(\s*autoAnalysis\s*&&\s*labsEnabled\s*\)\s*triggerAnalysis/,
+      'sample install must gate triggerAnalysis behind autoAnalysis && labsEnabled (else the P0 golden path fires /api/analyze-script unasked, or a stale auto-analysis preference fires it with Labs off)',
     );
   });
 
@@ -67,19 +78,19 @@ describe('G0-04 — programmatic draft installs respect the auto-analysis gate',
     const body = source.slice(idx, idx + 1200);
     assert.match(
       body,
-      /if\s*\(\s*autoAnalysis\s*\)\s*triggerAnalysis/,
-      'onLoadFountain must gate triggerAnalysis behind autoAnalysis',
+      /if\s*\(\s*autoAnalysis\s*&&\s*labsEnabled\s*\)\s*triggerAnalysis/,
+      'onLoadFountain must gate triggerAnalysis behind autoAnalysis && labsEnabled',
     );
   });
 
   it('no bare `triggerAnalysis(` call survives outside an explicit-action or guarded site', () => {
     // Every call site must be one of:
-    //   - guarded:   if (autoAnalysis) triggerAnalysis(
+    //   - guarded:   if (autoAnalysis && labsEnabled) triggerAnalysis(
     //   - explicit:  invoked from a user-initiated Analyze handler
     //   - the declaration itself
     // We assert the two programmatic-install sites specifically (above) and
     // here pin the total count so a NEW ungated site can't be added silently.
-    const guarded = source.match(/if\s*\(\s*autoAnalysis\s*\)\s*triggerAnalysis\(/g) ?? [];
+    const guarded = source.match(/if\s*\(\s*autoAnalysis\s*&&\s*labsEnabled\s*\)\s*triggerAnalysis\(/g) ?? [];
     assert.ok(
       guarded.length >= 2,
       `expected at least the 2 programmatic-install sites to be guarded, found ${guarded.length}`,

@@ -7,7 +7,13 @@
 //      panel's finding clicks already did, instead of only moving the cursor.
 //   B. The Settings tab strip follows the WAI-ARIA tabs keyboard pattern:
 //      one Tab stop for the whole strip, Left/Right/Home/End move focus and
-//      selection, aria-selected follows.
+//      selection, aria-selected follows. Since Decision #3 (2026-09-03,
+//      docs/DECISION_LOG.md) the strip has two shapes — 3 tabs on the default
+//      surface (the five AI-provider tabs went behind Labs with the rest of
+//      the generative surface) and 8 with Labs on — so B walks the pattern on
+//      the default strip and then, using the real in-panel Labs toggle,
+//      re-walks it on the grown one. The pattern is now asserted on both,
+//      which is strictly more than the pre-decision single walk covered.
 //   C. The findings delta is quiet when an edit only shifts line numbers.
 //      Measured, not asserted: both doctor runs' reports are captured off the
 //      wire, the churn the OLD identity (raw `pass::rule::location`) would
@@ -226,30 +232,41 @@ try {
     JSON.stringify(initial.tabIndexes));
   record('B', 'exactly one tab is aria-selected', initial.selected.length === 1, JSON.stringify(initial.selected));
 
+  // Decision #3 (2026-09-03): the DEFAULT strip is Story / Session / Labs —
+  // the five AI-provider tabs (Providers, Text LLM, Image, TTS, Embeddings)
+  // exist only to point a generative feature at a provider, and moved behind
+  // Labs with the rest of that surface. verify-p2-p3-surfaces.mjs owns the
+  // "which tabs are here" claim; this block owns the KEYBOARD pattern over
+  // whichever tabs are here, so the expected ids below moved with the strip.
+  record('B', 'the default strip is exactly Story / Session / Labs (Decision #3)',
+    JSON.stringify(initial.tabIndexes.map((s) => s.split(':')[0])) ===
+      JSON.stringify(['settings-tab-story', 'settings-tab-session', 'settings-tab-labs']),
+    JSON.stringify(initial.tabIndexes));
+
   // Tab from the dialog's close button must land on the selected tab, and one
   // more Tab must leave the strip entirely — the point of the pattern.
   await page.getByRole('button', { name: /close settings/i }).first().focus();
   await page.keyboard.press('Tab');
   const afterFirstTab = await tabState();
   record('B', 'Tab enters the strip at the selected tab',
-    afterFirstTab.active === 'settings-tab-providers', `activeElement=${afterFirstTab.active}`);
+    afterFirstTab.active === 'settings-tab-story', `activeElement=${afterFirstTab.active}`);
   await page.keyboard.press('Tab');
   const afterSecondTab = await page.evaluate(() => document.activeElement?.id ?? document.activeElement?.tagName ?? null);
-  record('B', 'the next Tab leaves the strip instead of visiting the other seven tabs',
+  record('B', 'the next Tab leaves the strip instead of visiting the remaining tabs',
     !/^settings-tab-/.test(String(afterSecondTab)), `activeElement=${afterSecondTab}`);
 
   // Arrow keys.
-  await page.locator('#settings-tab-providers').focus();
+  await page.locator('#settings-tab-story').focus();
   await page.keyboard.press('ArrowRight');
   const right = await tabState();
   record('B', 'ArrowRight moves focus AND selection to the next tab',
-    right.active === 'settings-tab-llm' && right.selected[0] === 'settings-tab-llm',
+    right.active === 'settings-tab-session' && right.selected[0] === 'settings-tab-session',
     JSON.stringify(right));
   await page.screenshot({ path: join(SHOTS, 'B2-arrow-right.png'), fullPage: false });
 
   await page.keyboard.press('ArrowLeft');
   const left = await tabState();
-  record('B', 'ArrowLeft moves back', left.active === 'settings-tab-providers' && left.selected[0] === 'settings-tab-providers', JSON.stringify(left));
+  record('B', 'ArrowLeft moves back', left.active === 'settings-tab-story' && left.selected[0] === 'settings-tab-story', JSON.stringify(left));
 
   await page.keyboard.press('ArrowLeft');
   const wrapped = await tabState();
@@ -257,7 +274,7 @@ try {
 
   await page.keyboard.press('Home');
   const home = await tabState();
-  record('B', 'Home jumps to the first tab', home.active === 'settings-tab-providers', JSON.stringify(home.active));
+  record('B', 'Home jumps to the first tab', home.active === 'settings-tab-story', JSON.stringify(home.active));
 
   await page.keyboard.press('End');
   const end = await tabState();
@@ -272,6 +289,44 @@ try {
   record('B', 'the visible tabpanel follows the selected tab',
     panelShown.activeTab === 'settings-tab-labs' && panelShown.panelId === 'settings-panel-labs',
     JSON.stringify(panelShown));
+
+  // ── B, part two (Decision #3) — the same pattern over the GROWN strip. End
+  // left us on the Labs tab, whose toggle is the real, writer-facing way to
+  // bring the five provider tabs back; flipping it must re-render the strip in
+  // place, and the keyboard pattern must still hold across all eight. This is
+  // the eight-tab walk the pre-decision version of this block did — kept
+  // rather than dropped, it just needs the toggle now to reach that strip. ──
+  await page.locator('#labs-toggle').check();
+  await page.waitForTimeout(250);
+  const grown = await tabState();
+  record('B', 'flipping the in-panel Labs toggle grows the strip back to all eight tabs',
+    grown.tabIndexes.length === 8, JSON.stringify(grown.tabIndexes));
+  record('B', 'still exactly one tab in the Tab order after the strip grows',
+    grown.tabIndexes.filter((s) => s.endsWith(':0')).length === 1, JSON.stringify(grown.tabIndexes));
+  record('B', 'the selection survives the strip growing (still Labs)',
+    grown.selected.length === 1 && grown.selected[0] === 'settings-tab-labs', JSON.stringify(grown.selected));
+
+  await page.locator('#settings-tab-providers').focus();
+  await page.keyboard.press('ArrowRight');
+  const grownRight = await tabState();
+  record('B', 'ArrowRight moves Providers -> Text LLM on the grown strip',
+    grownRight.active === 'settings-tab-llm' && grownRight.selected[0] === 'settings-tab-llm',
+    JSON.stringify(grownRight));
+
+  await page.keyboard.press('Home');
+  const grownHome = await tabState();
+  record('B', 'Home jumps to Providers on the grown strip',
+    grownHome.active === 'settings-tab-providers', JSON.stringify(grownHome.active));
+
+  await page.keyboard.press('End');
+  const grownEnd = await tabState();
+  record('B', 'End jumps to Labs on the grown strip',
+    grownEnd.active === 'settings-tab-labs', JSON.stringify(grownEnd.active));
+
+  await page.keyboard.press('ArrowRight');
+  const grownWrap = await tabState();
+  record('B', 'ArrowRight from the last tab wraps to Providers on the grown strip',
+    grownWrap.active === 'settings-tab-providers', JSON.stringify(grownWrap.active));
 } catch (err) {
   record('harness', 'the proof run completed without throwing', false, String(err && err.stack ? err.stack : err));
 } finally {

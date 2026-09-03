@@ -46,6 +46,7 @@ import { diffLines } from "../../lib/diff.ts";
 import { decideWriteBack, isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
 import { trackDoctorRun, trackEvent } from "../../lib/analytics";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
+import { getLabsEnabled } from "../../lib/feature-flags.ts";
 import {
   DOCTOR_STREAM_TOTAL_PASSES,
   applyDoctorProgressEvent,
@@ -1869,10 +1870,21 @@ export default function ScriptDoctorPanel({
   // meaningful for fountain/fdx sources — a pdf upload always runs the quick
   // path regardless (see runDiagnosis's `useDeepRead` computation and the
   // pdf-route follow-up note there).
-  const [deepReadEnabled, setDeepReadEnabled] = useState<boolean>(() => loadDeepReadPref());
+  // ROADMAP P2 / Decision #3 (2026-09-03, docs/DECISION_LOG.md): Deep read and
+  // Fix & verify are the two GENERATIVE controls on this otherwise fully
+  // deterministic panel, so both are Labs-gated. Read every render (same
+  // reason App.tsx does) so toggling Labs in Settings lands immediately.
+  const labsEnabled = getLabsEnabled();
+  const [deepReadPref, setDeepReadEnabled] = useState<boolean>(() => loadDeepReadPref());
   useEffect(() => {
-    saveDeepReadPref(deepReadEnabled);
-  }, [deepReadEnabled]);
+    saveDeepReadPref(deepReadPref);
+  }, [deepReadPref]);
+  // The stored preference survives a Labs toggle (nothing wipes it), so the
+  // EFFECTIVE value — the one every run, label, and history stamp below reads
+  // — is AND'd with the flag. Without this, a writer who once ticked Deep read
+  // under Labs and then turned Labs off would keep silently paying for LLM
+  // scene reads from a control they can no longer see.
+  const deepReadEnabled = deepReadPref && labsEnabled;
   // Which mode the IN-FLIGHT or MOST RECENT run actually targeted — drives the
   // loading-state copy so "Reading each scene with AI…" only appears for a
   // real deep-read request, not just because the toggle happens to be checked
@@ -3256,7 +3268,7 @@ export default function ScriptDoctorPanel({
                   (quick-only for now, see runDiagnosis's useDeepRead note).
                   The quick path below is never gated on llmReady — it's the
                   product's always-available front door. */}
-              {(() => {
+              {labsEnabled && (() => {
                 const disabledReason = isPdfUpload
                   ? "Deep read isn't available for PDF uploads yet — this will run as a quick (deterministic) read."
                   : llmReady === false
@@ -3282,6 +3294,9 @@ export default function ScriptDoctorPanel({
                   </label>
                 );
               })()}
+              {/* Labs OFF: no substitute control, no "upgrade" nag — the quick
+                  deterministic read IS the product's front door, and the
+                  paragraph above already describes exactly what it does. */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => runDiagnosis()}
@@ -3662,7 +3677,15 @@ export default function ScriptDoctorPanel({
                     // POST /api/scriptide/fix otherwise (see FixRunState's
                     // doc comment).
                     const hasAnchor = finding.startLine !== undefined && finding.endLine !== undefined;
-                    const fixState: RootCauseFixState | null = reportIsComplete && hasAnchor
+                    // Decision #3 (2026-09-03): "Fix & verify" POSTs to
+                    // /api/scriptide/fix and hands back an LLM rewrite, so it
+                    // is Labs-gated. Withholding the whole fixState object
+                    // (rather than disabling the button) means RootCauseCard
+                    // renders no fix affordance at all — the same
+                    // hide-don't-disable rule the Toolbar's Simulate control
+                    // follows. Navigation to the finding's lines is
+                    // deterministic and stays available either way.
+                    const fixState: RootCauseFixState | null = labsEnabled && reportIsComplete && hasAnchor
                       ? {
                           pending: fixPendingId === finding.id,
                           blockedByOtherPending: fixPendingId !== null && fixPendingId !== finding.id,

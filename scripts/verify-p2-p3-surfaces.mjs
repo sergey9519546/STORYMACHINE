@@ -15,10 +15,16 @@
 // this suite's report wait and nobody noticed for days because nothing ran it.
 // `playwright` is now a pinned devDependency and the `browser` job in
 // .github/workflows/ci.yml runs `npx playwright install --with-deps chromium`
-// before `npm run verify:browser`, so these 115 assertions gate every push and
+// before `npm run verify:browser`, so these 135 assertions gate every push and
 // block `publish` in release.yml. Run it by hand too, after touching
 // feature-flags.ts, Toolbar.tsx, App.tsx's hash-routing/Labs gating, the
 // export/verify routes, or the events instrumentation.
+//
+// DECISION #3 (2026-09-03, docs/DECISION_LOG.md) added the "P2-generative"
+// phase below: the generative half of the product (Fix with AI, Deep read,
+// Fix & verify, auto-analysis, the AI-provider Settings tabs) is now gated by
+// the SAME Labs flag as OASIS, so this script — the machine-checked statement
+// of what the default surface is — asserts both directions for it too.
 //
 // Boot/launch/console-capture/report-wait and the PASS/FAIL summary live in
 // scripts/lib/browser-verify.mjs — change them there, not here. This file is
@@ -50,6 +56,55 @@ import {
 } from './lib/browser-verify.mjs';
 
 const REPO = process.cwd();
+
+// Cmd on macOS, Ctrl elsewhere — same convention as
+// scripts/verify-e5-command-palette.mjs, which owns the palette's own proof.
+const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+// A tiny, valid Fountain file used only to put ScriptDoctorPanel back into its
+// IDLE state on demand. Uploading a script is the one deterministic route to
+// that state once a report is on screen (handleFileSelected sets status
+// 'idle' and clears the report), and idle is where the "Deep read" toggle
+// lives — so this is how both contexts below check that control from the same
+// starting point instead of racing a Re-run/Cancel.
+const IDLE_PROBE_FOUNTAIN = `Title: Idle Probe
+
+INT. PROBE ROOM - DAY
+
+A short scene, only ever used to return the panel to its idle state.
+
+ANA
+We are checking a checkbox, not a script.
+`;
+
+/** Uploads IDLE_PROBE_FOUNTAIN through ScriptDoctorPanel's real file input
+ *  (the hidden <input type="file"> behind its "Upload" trigger), which is the
+ *  panel's own supported way back to the idle state. */
+async function returnDoctorPanelToIdle(page) {
+  await page.setInputFiles('input[aria-label^="Upload script file"]', {
+    name: 'idle-probe.fountain',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(IDLE_PROBE_FOUNTAIN, 'utf8'),
+  });
+  // handleFileSelected is async (file.text()); wait for the idle state's own
+  // "Run Diagnosis" button rather than a bare sleep.
+  await page
+    .getByRole('button', { name: 'Run Diagnosis', exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: 10000 });
+}
+
+/** The Settings dialog's tab labels, in strip order. Opened the same way a
+ *  writer opens it: Toolbar overflow -> "Labs & Settings". */
+async function openSettingsTabLabels(page) {
+  await page.getByRole('button', { name: 'More tools' }).first().click();
+  const menu = page.getByRole('menu').first();
+  await menu.waitFor({ timeout: 10000 });
+  await menu.getByRole('menuitem', { name: /labs/i }).first().click();
+  await page.locator('[role="tablist"][aria-label="Settings sections"]').waitFor({ timeout: 15000 });
+  const labels = await page.getByRole('tab').allTextContents();
+  return labels.map((t) => t.trim());
+}
 
 const ISOLATED_PORT = await pickFreePort();
 const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
@@ -311,6 +366,19 @@ async function main() {
   record('P2', 'Toolbar overflow: "Open Simulate" ABSENT with Labs OFF', !hasSimulateOff, `items=${JSON.stringify(overflowLabelsOff)}`);
   record('P2', 'Toolbar overflow: "Labs & Settings" reachable (so a writer can turn Labs on)', overflowLabelsOff.some((l) => /labs/i.test(l)), `items=${JSON.stringify(overflowLabelsOff)}`);
 
+  // ── Decision #3 (2026-09-03) — auto-analysis toggles POST
+  // /api/analyze-script, an aiLimiter route that runs an LLM pass plus image
+  // and audio generation on every typing pause. It sat in this menu, one
+  // click from the default surface, with nothing anywhere asserting that what
+  // it produced was any good. It is now Labs-gated like Studio/Director/Slate.
+  const hasAutoAnalysisOff = overflowLabelsOff.some((l) => /auto-analysis/i.test(l));
+  record(
+    'P2-generative',
+    'Toolbar overflow: "Auto-analysis" (POST /api/analyze-script) ABSENT with Labs OFF',
+    !hasAutoAnalysisOff,
+    `items=${JSON.stringify(overflowLabelsOff)}`,
+  );
+
   // W6 (docs/PATH_TO_EXCELLENCE.md Phase W): the always-visible "Ship" task
   // tab used to bypass the Labs gate by mounting toolSlot="studio" (the
   // PRODUCTION/ANALYSIS/ENGINE/CODEX research shell) just to show a
@@ -393,6 +461,83 @@ async function main() {
 
   await pageA.getByRole('button', { name: 'Write', exact: true }).first().click();
   await pageA.waitForTimeout(150);
+
+  // ── Decision #3, second entry point: the command palette. E5's rule is that
+  // every palette row dispatches through the same callback a visible control
+  // calls — so a gated control whose palette row survived would be a real
+  // bypass, not a cosmetic one. ────────────────────────────────────────────
+  const editorA = pageA.locator('.cm-content').first();
+  await editorA.waitFor({ timeout: 10000 });
+  await editorA.focus();
+  await pageA.keyboard.press(`${MOD}+k`);
+  const paletteA = pageA.getByRole('dialog', { name: 'Command palette' });
+  const paletteOpenedA = await paletteA.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  record('P2-generative', 'Command palette opens on the default surface (Cmd/Ctrl+K)', paletteOpenedA, '');
+  if (paletteOpenedA) {
+    await pageA.keyboard.type('analysis', { delay: 10 });
+    await pageA.waitForTimeout(200);
+    const autoAnalysisRowsOff = await pageA.getByRole('option', { name: /auto-analysis/i }).count();
+    record(
+      'P2-generative',
+      'Command palette omits the auto-analysis command with Labs OFF',
+      autoAnalysisRowsOff === 0,
+      `matching option rows=${autoAnalysisRowsOff}`,
+    );
+    // The palette must still be USEFUL — this is a gate, not a lobotomy.
+    await pageA.keyboard.press('Control+a');
+    await pageA.keyboard.type('coverage', { delay: 10 });
+    await pageA.waitForTimeout(200);
+    const doctorRowOff = await pageA.getByRole('option', { name: /diagnose this draft/i }).count();
+    record(
+      'P2-generative',
+      'Command palette still offers the deterministic Doctor command with Labs OFF',
+      doctorRowOff >= 1,
+      `matching option rows=${doctorRowOff}`,
+    );
+    await pageA.keyboard.press('Escape');
+    await pageA.waitForTimeout(150);
+  }
+
+  // ── Decision #3, third entry point: Settings' five AI-provider tabs
+  // (Providers / Text LLM / Image / TTS / Embeddings). They exist only to
+  // point a generative feature at an endpoint, a model and an API key, and
+  // with the generative surface demoted there is nothing on the default
+  // surface that can consume any of them — so an API-key form on the keyless
+  // front door would invite a writer to paste a secret into a deployment that
+  // will not use it. Hidden, not shown-and-inert. Session (Delete Everything)
+  // and Labs (the way back) must survive, and do: the strip goes 8 -> 3. ───
+  const settingsTabsOff = await openSettingsTabLabels(pageA);
+  const AI_PROVIDER_TABS = ['Providers', 'Text LLM', 'Image', 'TTS', 'Embeddings'];
+  const leakedProviderTabs = AI_PROVIDER_TABS.filter((t) => settingsTabsOff.includes(t));
+  record(
+    'P2-generative',
+    'Settings: all five AI-provider tabs (Providers/Text LLM/Image/TTS/Embeddings) ABSENT with Labs OFF',
+    leakedProviderTabs.length === 0,
+    `tabs=${JSON.stringify(settingsTabsOff)} leaked=${JSON.stringify(leakedProviderTabs)}`,
+  );
+  record(
+    'P2-generative',
+    'Settings: "Session" STILL reachable with Labs OFF (the only route to Delete Everything)',
+    settingsTabsOff.includes('Session'),
+    `tabs=${JSON.stringify(settingsTabsOff)}`,
+  );
+  record(
+    'P2-generative',
+    'Settings: "Labs" STILL reachable with Labs OFF (the only route back to the generative half)',
+    settingsTabsOff.includes('Labs'),
+    `tabs=${JSON.stringify(settingsTabsOff)}`,
+  );
+  await pageA.getByRole('tab', { name: 'Labs', exact: true }).click();
+  await pageA.waitForTimeout(200);
+  const labsPanelTextOff = await pageA.locator('[role="tabpanel"]').first().innerText();
+  record(
+    'P2-generative',
+    'Settings -> Labs says, in one line, where the generative features went',
+    /Generative features live in Labs/i.test(labsPanelTextOff),
+    `panel text=${JSON.stringify(labsPanelTextOff.slice(0, 240))}`,
+  );
+  await pageA.getByRole('button', { name: /close settings/i }).first().click();
+  await pageA.waitForTimeout(200);
 
   // ══════════════════════════════════════════════════════════════════════
   // P3 — THE VERIFY LOOP, still Labs OFF (verify is deliberately outside
@@ -482,6 +627,46 @@ async function main() {
   const downloadPath = await download.path();
   const exportedHtml = downloadPath ? readFileSync(downloadPath, 'utf8') : '';
   record('P3', 'Export coverage report downloads an HTML file', exportedHtml.length > 0, `${exportedHtml.length} bytes, filename=${download.suggestedFilename()}`);
+
+  // ── Decision #3, inside Script Doctor itself. The panel is open on a real,
+  // complete report — the exact state where "Fix & verify" (POST
+  // /api/scriptide/fix, an LLM rewrite) renders under each root cause. With
+  // Labs OFF the whole fixState is withheld, so no button renders at all —
+  // hide, don't disable, the same rule the Toolbar's Simulate control follows.
+  // Deliberately AFTER the export above: this block changes the panel's active
+  // source, and the export needed the sample report intact. ────────────────
+  const fixVerifyCountOff = await pageA.getByRole('button', { name: /fix & verify/i }).count();
+  record(
+    'P2-generative',
+    'Script Doctor: "Fix & verify" (POST /api/scriptide/fix) ABSENT on a complete report with Labs OFF',
+    fixVerifyCountOff === 0,
+    `found ${fixVerifyCountOff} button(s)`,
+  );
+  // The deterministic half of the same card must survive — this is a gate on
+  // generation, not on the report.
+  const rootCauseHeadingOff = await pageA.getByText(/contributing note/i).count();
+  record(
+    'P2-generative',
+    'Script Doctor: root-cause findings still render with Labs OFF (deterministic content untouched)',
+    rootCauseHeadingOff >= 1,
+    `contributing-note disclosures=${rootCauseHeadingOff}`,
+  );
+
+  await returnDoctorPanelToIdle(pageA);
+  const deepReadCountOff = await pageA.getByText(/Deep read \(AI reads each scene/i).count();
+  record(
+    'P2-generative',
+    'Script Doctor idle state: "Deep read" toggle (POST /api/scriptide/doctor/deep) ABSENT with Labs OFF',
+    deepReadCountOff === 0,
+    `found ${deepReadCountOff} matching label(s)`,
+  );
+  const runDiagnosisIdleOff = await pageA.getByRole('button', { name: 'Run Diagnosis', exact: true }).count();
+  record(
+    'P2-generative',
+    'Script Doctor idle state: the deterministic "Run Diagnosis" front door is still there with Labs OFF',
+    runDiagnosisIdleOff >= 1,
+    `found ${runDiagnosisIdleOff} button(s)`,
+  );
 
   const hashMatch = exportedHtml.match(/Script-text hash \(SHA-256, full\)<\/dt><dd><code>([0-9a-f]{64})<\/code>/);
   const healthMatch = exportedHtml.match(/<dt>Health<\/dt><dd><code>([\d.]+)<\/code>/);
@@ -658,6 +843,16 @@ async function main() {
   record('P2', 'Toolbar overflow: "Slate compare" APPEARS with Labs ON', hasSlateOn, `items=${JSON.stringify(overflowLabelsOn)}`);
   record('P2', 'Toolbar overflow: "Open Simulate" APPEARS with Labs ON', hasSimulateOn, `items=${JSON.stringify(overflowLabelsOn)}`);
 
+  // Decision #3, mirrored: the generative controls must come BACK with Labs
+  // ON. This is the half that proves the change is a gate and not a deletion.
+  const hasAutoAnalysisOn = overflowLabelsOn.some((l) => /auto-analysis/i.test(l));
+  record(
+    'P2-generative',
+    'Toolbar overflow: "Auto-analysis" APPEARS with Labs ON',
+    hasAutoAnalysisOn,
+    `items=${JSON.stringify(overflowLabelsOn)}`,
+  );
+
   // Same Ship toolbar row check as CONTEXT A, mirrored for Labs ON — proves the
   // gate is the Labs flag (onOpenStoryMachine truthiness), not dead/removed code.
   const shipTaskBtnOn = pageB.getByRole('button', { name: 'Ship', exact: true }).first();
@@ -722,6 +917,93 @@ async function main() {
         : 'research-shell tab-bar text NOT found after clicking "Open Studio" — the shell may have been deleted rather than gated',
     );
   }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Decision #3, CONTEXT B mirror — every control CONTEXT A found absent must
+  // be present and working here, from the same starting points.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== P2-generative — Labs ON: the generative surface APPEARS ===');
+
+  // Close the studio shell opened just above, back to the editor.
+  await pageB.keyboard.press('Escape');
+  await pageB.waitForTimeout(300);
+  await pageB.getByRole('button', { name: 'Write', exact: true }).first().click();
+  await pageB.waitForTimeout(200);
+
+  const editorB = pageB.locator('.cm-content').first();
+  await editorB.waitFor({ timeout: 10000 });
+  await editorB.focus();
+  await pageB.keyboard.press(`${MOD}+k`);
+  const paletteB = pageB.getByRole('dialog', { name: 'Command palette' });
+  const paletteOpenedB = await paletteB.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  if (paletteOpenedB) {
+    await pageB.keyboard.type('analysis', { delay: 10 });
+    await pageB.waitForTimeout(200);
+    const autoAnalysisRowsOn = await pageB.getByRole('option', { name: /auto-analysis/i }).count();
+    record(
+      'P2-generative',
+      'Command palette OFFERS the auto-analysis command with Labs ON',
+      autoAnalysisRowsOn >= 1,
+      `matching option rows=${autoAnalysisRowsOn}`,
+    );
+    await pageB.keyboard.press('Escape');
+    await pageB.waitForTimeout(150);
+  } else {
+    record('P2-generative', 'Command palette OFFERS the auto-analysis command with Labs ON', false, 'palette did not open');
+  }
+
+  const settingsTabsOn = await openSettingsTabLabels(pageB);
+  const missingProviderTabs = AI_PROVIDER_TABS.filter((t) => !settingsTabsOn.includes(t));
+  record(
+    'P2-generative',
+    'Settings: all five AI-provider tabs APPEAR with Labs ON',
+    missingProviderTabs.length === 0,
+    `tabs=${JSON.stringify(settingsTabsOn)} missing=${JSON.stringify(missingProviderTabs)}`,
+  );
+  record(
+    'P2-generative',
+    'Settings: Session and Labs are still in the strip with Labs ON (nothing was traded away)',
+    settingsTabsOn.includes('Session') && settingsTabsOn.includes('Labs'),
+    `tabs=${JSON.stringify(settingsTabsOn)}`,
+  );
+  await pageB.getByRole('button', { name: /close settings/i }).first().click();
+  await pageB.waitForTimeout(200);
+
+  // Same sample-coverage flow CONTEXT A ran, so the two Script Doctor
+  // assertions below start from a byte-identical report. localStorage.clear()
+  // is safe here: contextB's addInitScript re-sets sm_labs_enabled on the very
+  // next navigation, before any app code runs.
+  await pageB.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} });
+  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  const labsStillOn = await pageB.evaluate(() => localStorage.getItem('sm_labs_enabled'));
+  record('P2-generative', 'Labs flag survives the reset (the ON context is genuinely ON)', labsStillOn === 'true', `sm_labs_enabled=${labsStillOn}`);
+
+  await pageB.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: 15000 });
+  const verdictRenderedB = await pageB
+    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: 30000 })
+    .then(() => true)
+    .catch(() => false);
+  record('P2-generative', 'Sample coverage still produces a verdict with Labs ON', verdictRenderedB, '');
+  await pageB.getByRole('button', { name: 'Full report', exact: true }).first().click();
+  await pageB.waitForSelector('[role="dialog"]', { timeout: 10000 });
+  await pageB.waitForTimeout(500);
+
+  const fixVerifyCountOn = await pageB.getByRole('button', { name: /fix & verify/i }).count();
+  record(
+    'P2-generative',
+    'Script Doctor: "Fix & verify" APPEARS on the same complete report with Labs ON',
+    fixVerifyCountOn >= 1,
+    `found ${fixVerifyCountOn} button(s)`,
+  );
+
+  await returnDoctorPanelToIdle(pageB);
+  const deepReadCountOn = await pageB.getByText(/Deep read \(AI reads each scene/i).count();
+  record(
+    'P2-generative',
+    'Script Doctor idle state: "Deep read" toggle APPEARS with Labs ON',
+    deepReadCountOn >= 1,
+    `found ${deepReadCountOn} matching label(s)`,
+  );
 
   await contextB.close();
 

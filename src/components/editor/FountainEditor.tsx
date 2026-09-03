@@ -72,6 +72,18 @@ export interface FountainEditorProps {
    */
   liveDiagnostics?: boolean;
   /**
+   * Decision #3 (2026-09-03, docs/DECISION_LOG.md): whether Live Notes may
+   * offer its GENERATIVE half — the per-squiggle "Fix with AI" button and its
+   * Mod-Shift-f shortcut, both of which POST to /api/scriptide/fix. ScriptIDE
+   * passes the Labs flag here, so with Labs OFF the extension is built without
+   * fixAction() at all: no button, no keybinding, no /api/ai-config probe from
+   * the editor. The deterministic squiggles and hover text are NOT affected by
+   * this prop — they are the keyless front door and stay on the default
+   * surface. Defaults to false so a caller that forgets it gets the safe,
+   * demoted behavior rather than silently re-exposing the generative path.
+   */
+  generativeFixes?: boolean;
+  /**
    * E5: Typewriter Focus — keeps the cursor's line vertically centered in
    * the viewport as the writer types or moves the cursor, mirroring
    * dedicated screenwriting apps' "typewriter mode." Deliberately narrower
@@ -257,6 +269,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       collabRoom,
       collabUserName,
       liveDiagnostics = false,
+      generativeFixes = false,
       isTypewriterFocus = false,
     },
     ref,
@@ -395,7 +408,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           // ── Screenplay element autocomplete (Enter/click accept) ─────────────
           screenplayCompletion,
           // ── Live Notes: in-editor narrative diagnostics (squiggles + hover) ──
-          diagnosticsCompartment.current.of(liveDiagnostics ? scriptDiagnostics() : []),
+          diagnosticsCompartment.current.of(
+            liveDiagnostics ? scriptDiagnostics({ generative: generativeFixes }) : [],
+          ),
           // ── E5: Typewriter Focus (see typewriterFocusExtensions above) ──────
           typewriterFocusCompartment.current.of(isTypewriterFocus ? typewriterFocusExtensions : []),
           // ── Fountain highlighting ───────────────────────────────────────────
@@ -501,10 +516,13 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       if (!view) return;
       view.dispatch({
         effects: diagnosticsCompartment.current.reconfigure(
-          liveDiagnostics ? scriptDiagnostics() : [],
+          liveDiagnostics ? scriptDiagnostics({ generative: generativeFixes }) : [],
         ),
       });
-    }, [liveDiagnostics]);
+      // generativeFixes is in the dep list, not just liveDiagnostics: toggling
+      // Labs while the editor is mounted has to rebuild the extension, or the
+      // "Fix with AI" button would keep whatever state it had at mount.
+    }, [liveDiagnostics, generativeFixes]);
 
     // ── Hot-swap Typewriter Focus on/off (E5) ──────────────────────────────────
     useEffect(() => {

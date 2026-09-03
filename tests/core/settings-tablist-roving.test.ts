@@ -58,9 +58,25 @@ describe('nextRovingIndex', () => {
 });
 
 describe('SettingsPanel.tsx — tab strip wiring', () => {
+  // Decision #3 (2026-09-03, docs/DECISION_LOG.md) put one derivation between
+  // TAB_LABELS and the rendered strip: visibleSettingsTabs() drops the five
+  // generative provider tabs when Labs is off. The invariant this test has
+  // always protected — ONE ordered list, derived from TAB_LABELS, and the
+  // strip renders from it rather than repeating the order by hand — is
+  // unchanged; the list the strip renders is now that list filtered.
   it('derives one ordered tab list from TAB_LABELS and renders from it', () => {
     assert.match(source, /const TAB_ORDER = Object\.keys\(TAB_LABELS\) as Tab\[\];/);
-    assert.match(source, /\{TAB_ORDER\.map\(\(tab, index\) => \(/);
+    assert.match(source, /export function visibleSettingsTabs\(labsEnabled: boolean\): Tab\[\] \{/);
+    // The visible list is DERIVED from TAB_ORDER, never a second hand-written
+    // order that could drift out of sync with TAB_LABELS.
+    const helper = source.slice(
+      source.indexOf('export function visibleSettingsTabs'),
+      source.indexOf('// ── Story-axis config'),
+    );
+    assert.match(helper, /TAB_ORDER/);
+    assert.doesNotMatch(helper, /'session'\s*,\s*'labs'/);
+    assert.match(source, /const visibleTabs = visibleSettingsTabs\(labsEnabled\);/);
+    assert.match(source, /\{visibleTabs\.map\(\(tab, index\) => \(/);
   });
 
   it('puts only the selected tab in the Tab order (roving tabindex)', () => {
@@ -85,7 +101,11 @@ describe('SettingsPanel.tsx — tab strip wiring', () => {
       source.indexOf('const [cfg, setCfg]'),
     );
     assert.ok(handler.length > 0, 'handleTabKeyDown not found in SettingsPanel.tsx');
-    assert.match(handler, /nextRovingIndex\(e\.key, index, TAB_ORDER\.length\)/);
+    // Indexes are into the VISIBLE strip since Decision #3 — using
+    // TAB_ORDER.length here would let ArrowRight "move" to a tab that is not
+    // rendered when Labs is off, and focus would silently go nowhere.
+    assert.match(handler, /nextRovingIndex\(e\.key, index, visibleTabs\.length\)/);
+    assert.match(handler, /const target = visibleTabs\[next\];/);
     // Bail out BEFORE preventDefault for unowned keys, or Tab stops working.
     assert.ok(
       handler.indexOf('if (next === null) return;') < handler.indexOf('e.preventDefault()'),
