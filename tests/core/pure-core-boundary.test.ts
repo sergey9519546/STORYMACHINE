@@ -72,6 +72,8 @@ const CORE_DIRS = ['server/nvm/analyze/', 'server/nvm/revision/'];
 const CORE_ALLOWLIST: Record<string, string> = {
   'server/engine/types.ts':
     'Shared narrative type vocabulary (StoryGenre, EmotionalArc, Belief) plus one ACTION_TYPES constant; declarations only — it reaches no engine runtime.',
+  'server/lib/build-info.ts':
+    'commit (aliased engineCommit) — feeds ScriptDoctorReport.provenance.engineCommit; a build-time env read at module load, no imports, no I/O per call.',
   'server/lib/genre-router.ts':
     'GENRE_RULE_MODIFIERS / TONE_REGISTERS / composeThresholds — genre- and tone-conditioned rule thresholds four revision passes read to pick a number.',
   'server/lib/llm-port.ts':
@@ -80,8 +82,12 @@ const CORE_ALLOWLIST: Record<string, string> = {
     'Structured JSON sink used by revision/pipeline.ts; a dependency-free leaf since requestLogger() moved to server/lib/request-logger.ts.',
   'server/lib/prompt-utils.ts':
     'sanitizeForPrompt — pure clamp + control-character strip, applied by deep-read.ts to validated model output; no imports.',
+  'server/lib/rulebook-count.ts':
+    'rulebookCount — feeds ScriptDoctorReport.provenance.rulebookCount; reads docs/rulebook/coverage.json ONCE at module load (never per report), no imports.',
   'server/lib/string-utils.ts':
     'fastWordCount — the word counter behind pages/word-count figures in the report; pure, no imports.',
+  'server/lib/structural-reliability.ts':
+    'computeStructuralReliabilityNote — feeds ScriptDoctorReport.provenance.structuralReliabilityNote; pure function of sceneCount, no imports.',
   'server/lib/structure-presets.ts':
     'expectedTensionAt and the structure/arc preset tables analyze/metrics.ts scores the emotional arc against; pure data + pure functions.',
   'server/nvm/ops/StoryOp.ts':
