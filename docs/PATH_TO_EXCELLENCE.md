@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-04, main @ fe0a02aa (two session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-04, main @ bee9310e (three session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,93 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-04, later — the hardening batch.** Three read-only audits aimed at
+what the day's own changes had added, then four fix lanes. The audits were
+worth more than the fixes: each found something a passing test suite could
+not have caught, because the tests asserted the behaviour that was written,
+not the promise that was made.
+
+- **"Delete Everything" did not.** A live run with a marker string found FOUR
+  stores surviving the control: a full SQLite copy of the script in the
+  reset-backup directory; the collab room and its Y.Doc, still joinable and
+  still holding the shared text (a token request answered 200 for a room the
+  session had just deleted); the doctor's report cache; and the worker realms.
+  All four are cleared now, and a reload no longer rejoins through the
+  `?collab=` capability left in the URL. Two promises were CORRECTED rather
+  than implemented: the privacy page's "no server-side backup by default" was
+  false for anyone who had used Reset, and the operator's own archive is
+  deliberately left alone — the app must not reach into an operator's offline
+  backups. The E4 safety net went from 8 assertions to 23, enumerating
+  IndexedDB instead of assuming its names and byte-searching both on-disk
+  roots.
+- **One unauthenticated request froze the whole server.** The worker pool
+  exists so that a long analysis cannot stall everyone; five export routes —
+  including the coverage-letter route added hours earlier — called the doctor
+  directly instead. Measured `/health` p95 while each was under load:
+  coverage-letter 1,794 → 15 ms, coverage 1,875 → 122 ms, pitchkit 1,749 →
+  104 ms, slate 3,939 → 11 ms, verify 1,567 → 7 ms. Reports byte-identical
+  across the worker boundary, proven 45/45 and pinned by a test that renders
+  each export twice, pooled and unpooled, and compares bytes. The agent
+  corrected the brief twice: `/breakdown` never calls the doctor at all, and
+  `/slate` — which analyses every script in the slate — was the worst site.
+- **The parser's own error message leaked the script.** V8's `JSON.parse`
+  embeds a verbatim snippet of the offending input in its `SyntaxError`, so a
+  malformed model response starting mid-prose put the writer's words into the
+  logs through a line nobody wrote; the OpenRouter error path did the same
+  with the raw response body. 27 sites now log a length and a hash prefix
+  instead of names and story text, with hashed id references so an operator
+  can still correlate lines about one character without learning who they
+  are. The raw text lives behind `STORYMACHINE_LOG_WRITER_CONTENT`, off by
+  default, documented as unsafe on a deployment holding other people's
+  scripts — and the test proves both states, not just the safe one.
+- **Some text was invisible, and no one had measured.** The first systematic
+  accessibility pass found that `design-system.css` loads after Tailwind, so
+  colour utilities meant to override `.sm-title` silently lost — rendering
+  panel titles ink-on-ink at roughly 1:1. Four Fountain syntax colours had no
+  dark value at all. Several tokens could not satisfy both the paper and
+  night grounds at once, proven with luminance maths rather than adjusted
+  until the checker went quiet, so they are split per background. There was
+  no `<main>` landmark anywhere in the editor. The keyboard-only journey had
+  never been driven end to end; it now is, as a gated assertion, and
+  `verify:a11y` joins the browser chain as its seventh suite.
+
+Then the follow-ups, and the audits kept earning their keep:
+
+- **The last main-thread analysis is gone, and it was never two.** The
+  compare route was thought to run one analysis too many; reading the code
+  showed it ran up to TWENTY-TWO, because the corpus vectoriser analyses
+  every reference screenplay when its cache is cold and `data/` is gitignored,
+  so every fresh checkout is cold. `/health` p95 under that route's load:
+  2,420 → 51 ms, with the control route moving 1 ms — which is what makes the
+  figure believable. The agent also declined the design this brief preferred,
+  with a reason: moving the rule index into the workers would have made a
+  reported field vary by which worker served the request, to save 1.35 ms.
+  The pool guard's allow-list is down to its one permanent exception.
+- **The keyboard trap is closed at the arrival, not the exit.** Tab-escape now
+  arms automatically when focus lands on the editor from a bare Tab keypress
+  elsewhere on the page, and never for a click, a jump-to-line, or the
+  command palette — so a writer who tabs past the editor tabs onward, while a
+  writer who tabs in and starts typing still gets element cycling.
+- **A specificity tie was silently deciding colours.** The `dark:` variant is
+  defined through `:where()`, which adds zero specificity, so every
+  light/dark token pair added the day before was tied with its sibling and
+  won or lost on generated source order. Caught because the new dark-theme
+  coverage rendered a surface no earlier test had. Every pair is now explicit.
+  The same new coverage found five spans in the Labs diagnostics with no
+  colour class at all — near-black on near-black in dark theme.
+
+Two items stay unfixed ON PURPOSE and are named where a reader will find
+them: the scrollable-region fix was implemented, tested, and reverted because
+it made the keyboard trap easier to hit (plausibly safe now, but unproven, so
+it is not claimed), and two Labs panels have no dark-mode support at all —
+a different and larger problem than a contrast miss, so it was flagged rather
+than folded in. The battery also caught two bugs in the test tooling itself:
+`verify:a11y` resolved its dependency through a path relative to the current
+directory and so died before its first assertion in any git worktree, and the
+privacy sweep asserted that no saved row existed while the editor it had just
+driven was autosaving into that row — a correct 409 failing a wrong
+assertion, visible only under load.
 
 **2026-09-04 session — from fixing what was wrong to building what was
 missing.** With the retrospective's twelve findings closed, the owner's brief
