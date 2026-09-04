@@ -49,9 +49,17 @@ import {
   waitForRenderedText,
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
+import { createRequire } from 'node:module';
 
 const REPO = process.cwd();
-const AXE_PATH = `${REPO}/node_modules/axe-core/axe.min.js`;
+// Resolve axe-core through node's own resolver rather than assuming it sits
+// in THIS directory's node_modules. A git worktree has its own cwd but no
+// install of its own, so the hardcoded path made this suite die ENOENT
+// before its first assertion whenever it ran from one — a failure that says
+// nothing about the app. Resolution walks up to whichever checkout holds the
+// pinned devDependency, which is the version the assertions were written
+// against either way.
+const AXE_PATH = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 const OUT_DIR = `${REPO}/scripts/output`;
 mkdirSync(OUT_DIR, { recursive: true });
 

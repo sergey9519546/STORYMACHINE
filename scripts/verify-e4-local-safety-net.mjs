@@ -328,6 +328,15 @@ async function main() {
       return { status: res.status, json: await res.json().catch(() => null) };
     };
     out.doctor = (await post('/api/scriptide/doctor', { fountain: script })).status;
+    // Read the current revision instead of asserting there is none. This sweep
+    // drives the REAL editor, which autosaves under the same session id, so a
+    // row usually exists by now — `expectedUpdatedAt: null` means "I expect no
+    // row", and the server correctly answered 409 whenever the autosave won
+    // the race (it did under battery load, not when this suite ran alone).
+    // Passing the revision we actually just read still exercises the real CAS
+    // path; it just stops the sweep asserting a precondition it does not
+    // control.
+    const loaded = await (await fetch('/api/scriptide/load', { headers })).json();
     out.save = (await post('/api/scriptide/save', {
       scriptText: script,
       titlePage: { title: `THE ${marker} AFFAIR`, author: `${marker} Writer`, contact: `${marker}@example.com` },
@@ -340,7 +349,7 @@ async function main() {
       characters: [{ name: `DET ${marker}`, notes: 'lead' }],
       researchNotes: [{ text: `research ${marker}` }],
       isDarkMode: false,
-      expectedUpdatedAt: null,
+      expectedUpdatedAt: loaded?.updatedAt ?? null,
     })).status;
     out.letter = (await post('/api/export/coverage-letter', {
       fountain: script, title: `THE ${marker} AFFAIR`, author: `${marker} Writer`,
