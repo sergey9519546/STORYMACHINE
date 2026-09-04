@@ -40,6 +40,7 @@ import { fountain as sampleScriptFountain, title as sampleScriptTitle } from "..
 import { deriveTitlePageFromScript, isDefaultTitlePage } from "../lib/title-page-autofill";
 import { scriptExportFilename } from "../lib/export-filename";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
+import { useIdleDebouncedValue } from "../hooks/useIdleDebouncedValue.ts";
 import { getLabsEnabled } from "../lib/feature-flags";
 import {
   createCollabRoom,
@@ -1151,20 +1152,38 @@ export default function ScriptIDE({
   }, [toolSlot]);
 
   // ── Memos ────────────────────────────────────────────────────────────────────
-  const parsedBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
+  // parsedBlocks used to be `useMemo(() => parseFountain(scriptText), ...)` —
+  // a full-document parse run SYNCHRONOUSLY on every single keystroke. With
+  // the editor's own incremental decoration landed (incremental-decorator.ts,
+  // incremental-reparse.ts) this became the dominant remaining per-keystroke
+  // cost — measured 16-33ms/keystroke of extra, document-size-proportional
+  // cost on a 430-scene/136KB script (position-independent: START and END
+  // medians matched each other, unlike the old CM6 decorator's viewport-
+  // dependent cost) — see docs/perf/parsed-blocks-debounce-benchmark.md for
+  // the full before/after numbers and the container-contention caveat.
+  // Every consumer of parsedBlocks — the Sidebar scene/character list, the
+  // command palette's scene entries, the Production tab's shot list, the
+  // Analysis tab's per-block "Clean" actions — is read from a background
+  // panel or list the writer glances at between keystrokes, never from
+  // something that must reflect the character just typed. So it's debounced
+  // (leading + trailing, 200ms idle) via useIdleDebouncedValue: the FIRST
+  // keystroke of a burst still parses immediately (no perceived staleness
+  // when a lone edit is made), and a typing burst re-parses once more when it
+  // settles, instead of once per character. See src/hooks/idle-debounce.ts
+  // for the framework-agnostic core and its regression test asserting the
+  // debounced result matches a synchronous parse once settled.
+  const parsedBlocks = useIdleDebouncedValue(scriptText, 200, parseFountain);
   // highlightedText removed — CM6 FountainEditor extension handles syntax highlighting
 
+  // Live word count for the toolbar — genuinely needs to be synchronous (the
+  // writer sees it update as they type), but does NOT need parsedBlocks: it
+  // never depended on the parse, only on scriptText itself.
+  // Zero-allocation word count: `.trim().split(/\s+/)` allocates a full
+  // intermediate array on every keystroke-driven recompute, which shows up as
+  // real GC pressure on feature-length (90-120pp) scripts. A single
+  // char-code scan needs no intermediate array and has no empty-string
+  // special case to get wrong.
   const stats = useMemo(() => {
-    const blocks = parsedBlocks;
-    const charCounts: Record<string, number> = {};
-    const locCounts: Record<string, number> = {};
-    let dialogueLines = 0;
-    let actionLines = 0;
-    // Zero-allocation word count: `.trim().split(/\s+/)` allocates a full
-    // intermediate array on every keystroke-driven recompute (this useMemo
-    // reruns on every scriptText change), which shows up as real GC pressure
-    // on feature-length (90-120pp) scripts. A single char-code scan needs no
-    // intermediate array and has no empty-string special case to get wrong.
     let wordCount = 0;
     let inWord = false;
     for (let i = 0; i < scriptText.length; i++) {
@@ -1174,41 +1193,9 @@ export default function ScriptIDE({
         inWord = false;
       }
     }
-
-    blocks.forEach((block) => {
-      if (block.type === "character") {
-        const name = block.text.trim().toUpperCase();
-        charCounts[name] = (charCounts[name] || 0) + 1;
-      } else if (block.type === "scene_heading") {
-        const loc = block.text.trim().toUpperCase();
-        locCounts[loc] = (locCounts[loc] || 0) + 1;
-      } else if (block.type === "dialogue") {
-        dialogueLines++;
-      } else if (block.type === "action") {
-        actionLines++;
-      }
-    });
-
-    const charData = Object.entries(charCounts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-    const locData = Object.entries(locCounts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-
     const estimatedMinutes = Math.ceil(wordCount / 250);
-
-    return {
-      charData,
-      locData,
-      dialogueLines,
-      actionLines,
-      wordCount,
-      estimatedMinutes,
-    };
-  }, [scriptText, parsedBlocks]); // eslint-disable-line react-hooks/exhaustive-deps
+    return { wordCount, estimatedMinutes };
+  }, [scriptText]);
 
   // Finding 2 (audit-client-data-paths.md): a soft, non-blocking warning once
   // scriptText nears the server's hard 500,000-char save cap
