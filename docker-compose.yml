@@ -1,0 +1,116 @@
+# Convenience layer over the README "Running a published image" docker run
+# one-liner, which only ever passed 2 of .env.example's 30+ documented
+# variables. Every variable name and default below is copied from
+# .env.example / the code that reads it (server/lib/session-store.ts,
+# server/app.ts) — grep those before changing one here.
+#
+# Quick start:
+#   cp .env.example .env   # fill in GEMINI_API_KEY / OPENROUTER_API_KEY, or
+#                           # leave both unset to run keyless in analysis-only
+#                           # mode (see README "Environment Variables")
+#   docker compose up -d
+#   curl http://localhost:3000/health
+#
+# docker compose automatically reads a `.env` file next to this one (if
+# present) to fill in the ${VAR:-default} references below — it is NOT the
+# same mechanism as the commented `env_file:` line under the service, and it
+# is not an error for that file to be absent (every reference here has a
+# `:-default` fallback). Never commit a real `.env` — `.gitignore` already
+# excludes `.env*`.
+services:
+  storymachine:
+    # STORYMACHINE_TAG is a convenience for this compose file only — it is
+    # not one of .env.example's server variables. Override it to pin a
+    # version (`STORYMACHINE_TAG=1.2.3 docker compose up -d`) or track the
+    # unversioned main branch (`STORYMACHINE_TAG=edge`) instead of `latest`.
+    image: ghcr.io/<owner>/storymachine:${STORYMACHINE_TAG:-latest}
+    # Build from source instead of pulling the published image — swap the
+    # `image:` line above for this block (see README "Releases" for what
+    # VERSION/GIT_SHA are used for; both are optional):
+    # build:
+    #   context: .
+    #   args:
+    #     VERSION: dev
+    #     GIT_SHA: dev
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    # Loads every variable in .env into the container as-is (AI provider
+    # keys included) — uncomment once you have run `cp .env.example .env`.
+    # Left off by default so `docker compose config` (see below) never
+    # requires a file this repo deliberately does not commit.
+    # env_file:
+    #   - .env
+    environment:
+      # ── AI provider (all optional — the server boots keyless into
+      # analysis-only mode: doctor, diagnose, coverage, what-if, room,
+      # interview receipts all work with no key at all) ──
+      # GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+
+      # ── Server config ──
+      PORT: ${PORT:-3000}
+
+      # ── Session persistence and growth bounds (server/lib/session-store.ts) ──
+      # SESSION_DB_DIR is left at the image's own default (./data/sessions,
+      # i.e. /app/data/sessions given the image's WORKDIR) so it lines up
+      # with the storymachine-data volume below with no extra config; set it
+      # here only to point somewhere else inside that same volume, or to
+      # :memory: to disable disk persistence entirely.
+      SESSION_IDLE_TTL_MINUTES: ${SESSION_IDLE_TTL_MINUTES:-1440}
+      SESSION_FILE_TTL_HOURS: ${SESSION_FILE_TTL_HOURS:-168}
+
+      # ── Concurrency / session limits ──
+      MAX_SESSIONS: ${MAX_SESSIONS:-100}
+      MAX_ROOMS: ${MAX_ROOMS:-50}
+
+      # ── Session backups (server/lib/backup.ts, `npm run backup`) ──
+      # Off by default (no BACKUP_INTERVAL_HOURS = no in-process timer, no
+      # backup/ directory created) — matches the image's own keyless-first
+      # default. BACKUP_DIR points at the storymachine-backups volume below
+      # so a manual `docker compose exec storymachine npm run backup` (or the
+      # timer, once enabled) persists snapshots across container restarts.
+      BACKUP_DIR: /app/backup
+      # BACKUP_INTERVAL_HOURS: 6
+      # BACKUP_RETENTION_DAYS: 14
+      # BACKUP_RETENTION_KEEP: 20
+
+      # ── Optional admin/metrics tokens and reverse-proxy trust ──
+      # Uncomment ADMIN_TOKEN / METRICS_TOKEN only if this container is
+      # reachable by anything other than you on loopback — both routes are
+      # loopback-only by default, so a same-host `curl` needs neither.
+      # ADMIN_TOKEN: ${ADMIN_TOKEN:-}      # required for POST /api/ai-config[/test] from a non-loopback caller
+      # METRICS_TOKEN: ${METRICS_TOKEN:-}  # required for GET /metrics from a non-loopback caller
+      # Uncomment TRUST_PROXY only when a reverse proxy or load balancer
+      # (nginx, Cloudflare, a PaaS edge) terminates in front of this
+      # container — otherwise every request's client IP collapses onto the
+      # proxy's own address for rate limiting. Leave unset for a direct,
+      # no-proxy deployment (e.g. `ports:` above exposed straight to the
+      # internet) — see README "Reverse proxies and rate limiting".
+      # TRUST_PROXY: "1"
+      # Required in production if you also run the collaborative-editing
+      # WebSocket with more than one server process/restart:
+      # COLLAB_SECRET: ${COLLAB_SECRET:-}
+      # COLLAB_MAX_ROOMS: ${COLLAB_MAX_ROOMS:-200}
+    volumes:
+      # Per-session SQLite files (data/sessions/) and reset-recovery
+      # artifacts (data/backups/session-resets/) — see README "Session data".
+      - storymachine-data:/app/data
+      # Periodic full-DB backup snapshots (`npm run backup` / BACKUP_DIR
+      # above) — separate from storymachine-data because the two have
+      # different retention/lifecycle policies (see README "Backing it up
+      # safely").
+      - storymachine-backups:/app/backup
+    healthcheck:
+      # Same check as the image's own Dockerfile HEALTHCHECK — restated here
+      # so `docker compose ps` reports health without relying on the image
+      # having one baked in (e.g. when building locally from an older tag).
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  storymachine-data:
+  storymachine-backups:

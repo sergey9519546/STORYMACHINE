@@ -213,6 +213,24 @@ docker run -p 3000:3000 \
 (`GEMINI_API_KEY` is optional — see analysis-only mode above; the volume
 mount is optional too, see "Session data" below.)
 
+**Or with Docker Compose** (`docker-compose.yml`, repo root): wires up the
+published image with a named volume for session data, a second named volume
+for periodic backups, a healthcheck against `/health`, a restart policy, and
+every persistence/session-limit variable from `.env.example` — the `docker
+run` one-liner above only ever covers 2 of the 30+ variables that file
+documents. A commented block covers `ADMIN_TOKEN`/`METRICS_TOKEN`/
+`TRUST_PROXY` with a one-line note on when each applies, and a commented
+`build:` block replaces the `image:` line to build from source instead of
+pulling. Copy `.env.example` to `.env` first if you want AI features (the
+file itself explains how compose picks it up); running keyless needs no
+`.env` at all:
+
+```
+cp .env.example .env   # optional — only needed for AI-backed features
+docker compose up -d
+curl http://localhost:3000/health
+```
+
 **Reading the running version:**
 
 ```
