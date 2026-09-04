@@ -4,9 +4,9 @@
 // mode, unlinks the .db/-wal/-shm/-journal files. tests/routes/helpers.ts
 // runs every route test against SESSION_DB_DIR=':memory:', so this file
 // covers the in-memory eviction contract; PERSIST-mode file deletion itself
-// is exercised by tests/core/session-eviction.test.ts and
-// tests/routes/session-rotation-persistence.test.ts's existing coverage of
-// destroySession's sibling primitives.
+// is exercised by tests/core/session-eviction.test.ts and the
+// tests/routes/session-rotation-persistence*.test.ts family's existing
+// coverage of destroySession's sibling primitives.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, freshSessionId, type TestServer } from './helpers.ts';
