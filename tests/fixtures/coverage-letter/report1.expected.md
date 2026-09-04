@@ -22,9 +22,9 @@ CONSIDER — solid bones with fixable structural problems; overall score 67/100.
 
 ## Priorities to Address First
 
-1. **MAJOR — Scene 4 (midpoint)** — Midpoint suspense pressure is flat — the story lacks a dramatic pivot. Suggested fix: Insert a surprise revelation or reversal at the midpoint scene
-2. **MAJOR — End of Act 2 (Scene ~5)** — Scene 5 (Act 2 ending) has low suspense delta (0.0) — Act 2 should end with a climactic turn that forces entry into Act 3. Suggested fix: The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment
-3. **MAJOR — Scene 1 (INT. KITCHEN - DAY)** — Scene 1 plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected. Suggested fix: Add a reaction scene where a character responds to or is affected by the action in this scene
+1. **MAJOR — Scene 4 (midpoint)** — Midpoint suspense pressure is flat — the story lacks a dramatic pivot. Suggested fix: Insert a surprise revelation or reversal at the midpoint scene.
+2. **MAJOR — End of Act 2 (Scene ~5)** — Scene 5 (Act 2 ending) has low suspense delta (0.0) — Act 2 should end with a climactic turn that forces entry into Act 3. Suggested fix: The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment.
+3. **MAJOR — Scene 1 (INT. KITCHEN - DAY)** — Scene 1 plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected. Suggested fix: Add a reaction scene where a character responds to or is affected by the action in this scene.
 
 ## How to Read This Report
 

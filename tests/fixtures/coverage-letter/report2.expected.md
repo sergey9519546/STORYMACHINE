@@ -22,9 +22,9 @@ CONSIDER — solid bones with fixable structural problems; overall score 67/100.
 
 ## Priorities to Address First
 
-1. **MAJOR — Scene 4 (midpoint)** — Midpoint suspense pressure is flat — the story lacks a dramatic pivot. Suggested fix: Insert a surprise revelation or reversal at the midpoint scene
-2. **MAJOR — End of Act 2 (Scene ~5)** — Scene 5 (Act 2 ending) has low suspense delta (-1.0) — Act 2 should end with a climactic turn that forces entry into Act 3. Suggested fix: The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment
-3. **MAJOR — Scene 5 (INT. HALLWAY - NIGHT)** — Scene 5 shows a major decision (high suspense, relationship shift, or revelation) with no setup in the 2 preceding scenes — the decision feels arbitrary. Suggested fix: Add a setup scene 1-2 scenes before where a character learns information, faces pressure, or confronts tension that motivates this decision
+1. **MAJOR — Scene 4 (midpoint)** — Midpoint suspense pressure is flat — the story lacks a dramatic pivot. Suggested fix: Insert a surprise revelation or reversal at the midpoint scene.
+2. **MAJOR — End of Act 2 (Scene ~5)** — Scene 5 (Act 2 ending) has low suspense delta (-1.0) — Act 2 should end with a climactic turn that forces entry into Act 3. Suggested fix: The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment.
+3. **MAJOR — Scene 5 (INT. HALLWAY - NIGHT)** — Scene 5 shows a major decision (high suspense, relationship shift, or revelation) with no setup in the 2 preceding scenes — the decision feels arbitrary. Suggested fix: Add a setup scene 1-2 scenes before where a character learns information, faces pressure, or confronts tension that motivates this decision.
 
 ## How to Read This Report
 

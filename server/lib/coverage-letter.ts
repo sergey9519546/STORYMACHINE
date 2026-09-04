@@ -149,6 +149,15 @@ function buildRootCauses(rootCauses: RootCauseFinding[] | undefined): ListEntry[
   });
 }
 
+/** Sentence-terminate without doubling: findings arrive both ways — some
+ *  `description`s already end in a period, some do not, and the letter used
+ *  to append one unconditionally ("...their own story's highest moment.."). */
+function endWithPeriod(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed === '') return trimmed;
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 function buildPriorities(topPriorities: Array<RevisionIssue & { pass: PassName }> | undefined): ListEntry[] {
   const list = topPriorities ?? [];
   if (list.length === 0) return [];
@@ -157,10 +166,10 @@ function buildPriorities(topPriorities: Array<RevisionIssue & { pass: PassName }
   const chosen = [...anchored, ...unanchored].slice(0, 3);
 
   return chosen.map(issue => {
-    const fix = issue.suggestedFix ? ` Suggested fix: ${issue.suggestedFix}` : '';
+    const fix = issue.suggestedFix ? ` Suggested fix: ${endWithPeriod(issue.suggestedFix)}` : '';
     return {
       heading: `${severityWord(issue.severity)} — ${issue.location}`,
-      body: `${issue.description}.${fix}`,
+      body: `${endWithPeriod(issue.description)}${fix}`,
     };
   });
 }
