@@ -282,3 +282,12 @@ in this document come from `runScriptDoctor` on the twelve fixtures and on
 `REFERENCE_CORPUS`, on the tree named at the top. The richness table is a
 direct count over `corpus.ts`; the counterfactual recomputes the published
 formula with word and scene counts substituted and nothing else.
+
+## Follow-up: the two pending scoring branches
+
+`BLIND_PAIRS_ON_BRANCHES_2026-09-04.md` scores the same twelve fixtures on
+the R5 verbosity-bias branch and the advice-rule-fixes branch. R5 un-pins
+the scripts (3 of 6 ordered, none tied) but only by exposing the raw
+weighted-issue order, which is itself at chance here; advice-rule-fixes
+leaves the result unchanged; the two branches conflict on five files, so the
+stacked tree could not be scored.
