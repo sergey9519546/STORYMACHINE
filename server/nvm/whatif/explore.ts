@@ -200,8 +200,13 @@ function buildInterveneOps(
   return out;
 }
 
-/** Same as buildInterveneOps but preserves scene grouping for arc-tracker. */
-function buildInterveneSceneOps(
+/** Same as buildInterveneOps but preserves scene grouping for arc-tracker.
+ *  EXPORTED (2026-09-04) so ./materialize.ts compiles the counterfactual
+ *  timeline to Fountain from the EXACT same graph cut this module's
+ *  consequences list is derived from — a second, re-derived copy of this rule
+ *  could drift and show a writer text that disagrees with the consequences
+ *  printed beside it. */
+export function buildInterveneSceneOps(
   commits: StoryCommit[],
   intervention: Intervention,
   report: CounterfactualReport,

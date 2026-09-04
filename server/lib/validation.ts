@@ -699,6 +699,24 @@ export const WhatIfExploreBodySchema = z.object({
   branchLimit: z.number().int().min(1).max(5).optional(),
 });
 
+// POST /api/nvm/whatif/doctor — the What-If Lab's Script Doctor readout
+// (2026-09-04). DELIBERATELY the same body shape as WhatIfExploreBodySchema
+// above, field for field: this route answers the same question about the same
+// intervention, it just also compiles each branch to Fountain
+// (server/nvm/whatif/materialize.ts) and scores it. Reusing the shape means a
+// client that can call /explore can call this with the identical body, and
+// there is one intervention vocabulary in the system rather than two.
+// `title` is the only addition — the title-page line every projected variant
+// carries, capped so a caller cannot push an unbounded string into the
+// projector's output (and therefore into the doctor's input).
+export const WhatIfDoctorBodySchema = z.object({
+  sessionId: sessionIdField,
+  opId: z.string().min(1),
+  replacement: z.unknown().optional(),
+  branchLimit: z.number().int().min(1).max(5).optional(),
+  title: z.string().max(200).optional(),
+});
+
 // POST /api/nvm/room/critique — on-demand Writers' Room (Run 6). The 6
 // critics (server/nvm/room/critics/*.ts) take a whole (ir, state) pair with
 // no per-scene or per-critic targeting parameter — room.ts has no concept of

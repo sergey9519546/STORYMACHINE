@@ -15,9 +15,11 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
+import type { CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
 import {
   GitBranch, Eye, Zap, X, Check, AlertTriangle, FlaskConical, Play, Ban, Link2, Clock3,
+  Stethoscope, FileDown,
 } from 'lucide-react';
 
 interface GhostCommit {
@@ -133,6 +135,55 @@ interface WhatIfExploreResult {
   branches: WhatIfBranch[];
 }
 
+// ── Script Doctor readout types (POST /api/nvm/whatif/doctor) ────────────────
+// The Lab's second question: not "what breaks?" but "is the resulting SCRIPT
+// any good?". The server materialises each branch as a real Fountain draft
+// (server/nvm/whatif/materialize.ts, deterministic, no LLM) and runs the same
+// pooled Script Doctor POST /api/scriptide/doctor uses, so these numbers are
+// the doctor's own — nothing here re-derives or re-weights a score.
+//
+// health/grade/verdict are OPTIONAL because the route withholds them for any
+// variant it could not analyze whole (the same isWholeDraftAnalysisComplete
+// predicate the editor's own surfaces use), and formatUnrecognized marks the
+// one case it never even runs the doctor on: a projected draft with no scenes.
+interface WhatIfDoctorDraft {
+  fountain: string;
+  formatUnrecognized?: boolean;
+  analysisComplete?: boolean;
+  sceneCount?: number;
+  analyzedAt?: number;
+  health?: number;
+  grade?: string;
+  verdict?: CoverageVerdict;
+  // Descriptive document aggregates — NEVER part of health. Same two channels,
+  // same wording, as ScriptDoctorPanel's "Shape & Rhythm" section.
+  meanAbsDialogueShareDelta?: number;
+  actionSentenceCvOverall?: number;
+}
+
+interface WhatIfBranchDoctor extends WhatIfDoctorDraft {
+  branchId: string;
+  summary: string;
+  /** This branch's health minus the base draft's. Absent unless BOTH sides
+   *  were analyzed whole — never a delta against a withheld score. */
+  healthDelta?: number;
+}
+
+interface WhatIfDoctorResult {
+  base: WhatIfDoctorDraft;
+  intervened: string;
+  consequences: WhatIfConsequence[];
+  branches: WhatIfBranchDoctor[];
+}
+
+// Per-branch promote flow — two-step confirm like the adopt flow above, but a
+// promote writes SCRIPT TEXT into the editor rather than ops into canon, so it
+// is deliberately a separate control with its own confirmation copy.
+interface PromoteFlowState {
+  confirming?: boolean;
+  promoted?: boolean;
+}
+
 // Per-branch adopt flow — same shape as GhostFlowState's commit half, keyed
 // by branchId instead of ghostId so Lab cards and ghost rows never collide.
 interface LabFlowState {
@@ -148,6 +199,31 @@ interface WhatIfPanelProps {
   // Optional refresh hook — mirrors DirectorCutPanel's (currently unwired)
   // onInjected prop. The per-row "committed" state is the primary feedback.
   onCommitted?: (commitId: string) => void;
+  /** "Promote this branch": hands the branch's materialised Fountain (plus the
+   *  doctor numbers measured against that exact text) up to the editor, which
+   *  snapshots the current draft first and then saves the promoted text as its
+   *  own snapshot. Absent when no editor is mounted behind this panel, in
+   *  which case the promote control is not rendered at all rather than
+   *  rendered as a dead button. */
+  onPromoteToEditor?: (promotion: BranchPromotion) => void;
+}
+
+/** Everything the editor needs to save a promoted branch as a scored snapshot.
+ *  The score fields mirror SnapshotManager.tsx's `Snapshot` exactly and are all
+ *  optional for the same reason they are optional there: they are attached only
+ *  when a real report existed for THIS text, and are never fabricated. */
+export interface BranchPromotion {
+  branchId: string;
+  /** Short human label — becomes the snapshot name. */
+  label: string;
+  /** The branch's materialised Fountain draft. */
+  text: string;
+  health?: number;
+  verdict?: CoverageVerdict;
+  sceneCount?: number;
+  analyzedAt?: number;
+  meanAbsDialogueShareDelta?: number;
+  actionSentenceCvOverall?: number;
 }
 
 // ── Intervention-target vocabulary ───────────────────────────────────────────
@@ -328,12 +404,90 @@ function SnapshotCard({ label, tone, snapshot }: { label: string; tone: 'gray' |
   );
 }
 
+// Verdict tint. Mirrors the three CoverageVerdict values the Script Doctor
+// emits; anything else (or nothing) renders neutral rather than guessing at a
+// colour that would imply a signal the data doesn't carry — the same rule
+// consequenceTone above already follows.
+function verdictTone(verdict?: CoverageVerdict): string {
+  if (verdict === 'RECOMMEND') return 'border-green-700 bg-green-900/20 text-green-200';
+  if (verdict === 'CONSIDER') return 'border-yellow-700 bg-yellow-900/20 text-yellow-200';
+  if (verdict === 'PASS') return 'border-red-700 bg-red-900/20 text-red-200';
+  return 'border-[#333] bg-[#111] text-gray-300';
+}
+
+// The Script Doctor readout for ONE materialised draft (the base draft, or one
+// branch's variant of it). Renders the doctor's own health/verdict/grade, the
+// signed delta against the base when there is one, and the two descriptive
+// structural aggregates — labelled with the SAME copy ScriptDoctorPanel.tsx's
+// Shape & Rhythm surfaces use ("descriptive, not part of the score" /
+// "Talk/action swing" / "Action-prose variation"), because they are the same
+// two numbers and must never read as a second, competing score.
+//
+// Withholding is the point of the branches below: when the server could not
+// analyze a variant whole it sends no health/grade/verdict at all, and this
+// says so plainly instead of rendering a 0 that looks like a measurement.
+function DoctorReadout({ label, draft, delta }: {
+  label: string;
+  draft: WhatIfDoctorDraft;
+  delta?: number;
+}) {
+  const scored = draft.health !== undefined;
+  return (
+    <div className={`rounded border p-2 ${scored ? verdictTone(draft.verdict) : 'border-[#333] bg-[#111] text-gray-400'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-widest font-bold opacity-80">{label}</span>
+        {draft.sceneCount !== undefined && (
+          <span className="text-[10px] font-mono opacity-70">{draft.sceneCount} scene{draft.sceneCount === 1 ? '' : 's'}</span>
+        )}
+      </div>
+      {scored ? (
+        <>
+          <div className="flex items-baseline gap-2 flex-wrap mt-1">
+            <span className="text-sm font-mono font-bold">{draft.health!.toFixed(1)}</span>
+            <span className="text-[11px] font-mono opacity-90">/ 100</span>
+            {draft.verdict && <span className="text-[11px] font-bold uppercase tracking-widest">{draft.verdict}</span>}
+            {draft.grade && <span className="text-[11px] font-mono opacity-80">grade {draft.grade}</span>}
+            {delta !== undefined && (
+              <span className="text-[11px] font-mono opacity-90">
+                {delta >= 0 ? '+' : ''}{delta.toFixed(1)} vs base
+              </span>
+            )}
+          </div>
+          {draft.meanAbsDialogueShareDelta !== undefined && draft.actionSentenceCvOverall !== undefined && (
+            <div className="text-[10px] font-mono opacity-75 flex items-center gap-2 flex-wrap mt-1">
+              <span className="uppercase tracking-widest font-bold">
+                Shape &amp; rhythm (descriptive, not part of the score)
+              </span>
+              <span>Talk/action swing {draft.meanAbsDialogueShareDelta.toFixed(2)}</span>
+              <span>Action-prose variation {draft.actionSentenceCvOverall.toFixed(2)}</span>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-[11px] mt-1">
+          {draft.formatUnrecognized
+            ? 'Nothing to score yet — this timeline has no scenes.'
+            : 'The whole draft could not be analyzed, so no health, grade or verdict is shown.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // One ranked branch card: scores, ops (via the copied ConvergePanel idiom),
 // and the adopt flow — two-step confirm, then commitOpsToStory, matching the
 // ghost row's UI exactly (confirmation copy differs since this writes a
 // branch rather than restores a ghost, but the mechanics are identical).
+//
+// 2026-09-04: the card also carries the Script Doctor readout for this
+// branch's materialised script (`doctor`, absent until the writer runs it) and
+// the promote-to-editor flow beside adopt. Adopt and promote are deliberately
+// distinct and both kept: adopt writes the branch's OPS into canon through the
+// one commit pen (/api/nvm/converge/commit), promote writes the branch's TEXT
+// into the editor as a snapshot. Neither replaces the other.
 function BranchCard({
   branch, rank, flow, onRequestAdopt, onCancelAdopt, onAdopt,
+  doctor, promoteFlow, onRequestPromote, onCancelPromote, onPromote,
 }: {
   branch: WhatIfBranch;
   rank: number;
@@ -341,6 +495,11 @@ function BranchCard({
   onRequestAdopt: (branchId: string) => void;
   onCancelAdopt: (branchId: string) => void;
   onAdopt: (branch: WhatIfBranch) => void;
+  doctor?: WhatIfBranchDoctor;
+  promoteFlow?: PromoteFlowState;
+  onRequestPromote?: (branchId: string) => void;
+  onCancelPromote?: (branchId: string) => void;
+  onPromote?: (doctor: WhatIfBranchDoctor, rank: number) => void;
 }) {
   return (
     <div className={`rounded-lg border p-3 ${rank === 1 ? 'border-purple-500 bg-purple-900/10' : 'border-[#333] bg-[#111]'}`}>
@@ -367,14 +526,62 @@ function BranchCard({
         </div>
       )}
 
-      {!flow.committed && !flow.confirming && (
-        <button
-          onClick={() => onRequestAdopt(branch.branchId)}
-          disabled={flow.committing}
-          className="flex items-center gap-1 bg-green-900/40 hover:bg-green-900/60 disabled:opacity-40 text-green-300 text-[11px] px-2 py-1 rounded font-medium transition-colors"
-        >
-          <Check className="w-3 h-3" /> Adopt this branch
-        </button>
+      {/* Script Doctor readout for this branch's materialised script. */}
+      {doctor && (
+        <div className="mb-2">
+          <DoctorReadout label="Script Doctor" draft={doctor} delta={doctor.healthDelta} />
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {!flow.committed && !flow.confirming && (
+          <button
+            onClick={() => onRequestAdopt(branch.branchId)}
+            disabled={flow.committing}
+            className="flex items-center gap-1 bg-green-900/40 hover:bg-green-900/60 disabled:opacity-40 text-green-300 text-[11px] px-2 py-1 rounded font-medium transition-colors"
+          >
+            <Check className="w-3 h-3" /> Adopt this branch
+          </button>
+        )}
+
+        {/* Promote is offered only once the branch HAS a materialised script to
+            promote — before the doctor run there is no text, so the control is
+            absent rather than disabled-and-confusing. */}
+        {doctor && onRequestPromote && !promoteFlow?.promoted && !promoteFlow?.confirming && (
+          <button
+            onClick={() => onRequestPromote(branch.branchId)}
+            className="flex items-center gap-1 bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 text-[11px] px-2 py-1 rounded font-medium transition-colors"
+          >
+            <FileDown className="w-3 h-3" /> Promote this branch
+          </button>
+        )}
+      </div>
+
+      {doctor && promoteFlow?.confirming && onPromote && onCancelPromote && (
+        <div className="mt-2 bg-purple-900/20 border border-purple-700 rounded p-2">
+          <p className="text-purple-200 text-[11px] mb-2 flex items-start gap-1">
+            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+            This replaces the editor&rsquo;s draft with this branch&rsquo;s script. Your current draft is
+            snapshotted first, so you can restore it from Versions.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onPromote(doctor, rank)}
+              className="bg-purple-500 hover:bg-purple-400 text-black text-[11px] font-bold px-2 py-1 rounded"
+            >
+              Yes, promote
+            </button>
+            <button onClick={() => onCancelPromote(branch.branchId)} className="text-gray-400 hover:text-white text-[11px] px-2 py-1">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {promoteFlow?.promoted && (
+        <div className="flex items-center gap-1 text-purple-300 text-[11px] mt-2">
+          <Check className="w-3 h-3" /> Promoted into the editor as a new snapshot
+        </div>
       )}
 
       {flow.confirming && (
@@ -425,7 +632,7 @@ type CommitOutcome =
   | { status: 'conflict'; error: string; failures: string[] }
   | { status: 'error'; message: string };
 
-export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) {
+export default function WhatIfPanel({ onClose, onCommitted, onPromoteToEditor }: WhatIfPanelProps) {
   const [ghosts, setGhosts] = useState<GhostCommit[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<GhostCommit | null>(null);
@@ -446,8 +653,14 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
   const [labNotDeployed, setLabNotDeployed] = useState(false);
   const [labResult, setLabResult] = useState<WhatIfExploreResult | null>(null);
   const [labFlows, setLabFlows] = useState<Record<string, LabFlowState>>({});
+  // ── Script Doctor state (POST /api/nvm/whatif/doctor) ──────────────────────
+  const [doctorLoading, setDoctorLoading] = useState(false);
+  const [doctorError, setDoctorError] = useState<string | null>(null);
+  const [doctorResult, setDoctorResult] = useState<WhatIfDoctorResult | null>(null);
+  const [promoteFlows, setPromoteFlows] = useState<Record<string, PromoteFlowState>>({});
   const scmAbortRef = useRef<AbortController | null>(null);
   const labAbortRef = useRef<AbortController | null>(null);
+  const doctorAbortRef = useRef<AbortController | null>(null);
   // mountedRef guards setState after unmount for fetchGhosts (loadScm/exploreLab
   // already use AbortController; only fetchGhosts was missing the guard).
   const mountedRef = useRef(true);
@@ -498,6 +711,7 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
     return () => {
       mountedRef.current = false;
       labAbortRef.current?.abort();
+      doctorAbortRef.current?.abort();
     };
   }, []);
 
@@ -517,6 +731,12 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
     setLabResult(null);
     setLabError(null);
     setLabNotDeployed(false);
+    // A doctor readout belongs to ONE intervention's branches. Changing the
+    // target invalidates it, so it is cleared rather than left showing numbers
+    // measured against scripts nobody is looking at any more.
+    setDoctorResult(null);
+    setDoctorError(null);
+    setPromoteFlows({});
   }, []);
 
   // Explore: POST the selected intervention to the parallel-landing
@@ -558,6 +778,72 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
       if (!controller.signal.aborted) setLabLoading(false);
     }
   }, [selectedOpId, branchLimit]);
+
+  // Score: POST the SAME intervention to /api/nvm/whatif/doctor, which
+  // materialises the base draft and every branch as real Fountain
+  // (server/nvm/whatif/materialize.ts) and runs each through the pooled Script
+  // Doctor server-side. Nothing about the score is computed in this bundle —
+  // the panel only renders numbers the server measured, exactly like
+  // ScriptDoctorPanel does for the editor's draft.
+  const runDoctor = useCallback(async () => {
+    if (!selectedOpId) return;
+    doctorAbortRef.current?.abort();
+    const controller = new AbortController();
+    doctorAbortRef.current = controller;
+    setDoctorLoading(true);
+    setDoctorError(null);
+    setDoctorResult(null);
+    setPromoteFlows({});
+    try {
+      const res = await fetch('/api/nvm/whatif/doctor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opId: selectedOpId, replacement: null, branchLimit }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Script Doctor failed (${res.status})`);
+      setDoctorResult(await res.json() as WhatIfDoctorResult);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      setDoctorError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      if (!controller.signal.aborted) setDoctorLoading(false);
+    }
+  }, [selectedOpId, branchLimit]);
+
+  const doctorByBranch = useMemo(() => {
+    const map = new Map<string, WhatIfBranchDoctor>();
+    for (const b of doctorResult?.branches ?? []) map.set(b.branchId, b);
+    return map;
+  }, [doctorResult]);
+
+  // ── Promote (branch script → editor snapshot) ──────────────────────────────
+  const requestPromote = useCallback((branchId: string) => {
+    setPromoteFlows(f => ({ ...f, [branchId]: { ...f[branchId], confirming: true } }));
+  }, []);
+
+  const cancelPromote = useCallback((branchId: string) => {
+    setPromoteFlows(f => ({ ...f, [branchId]: { ...f[branchId], confirming: false } }));
+  }, []);
+
+  // Hands the branch's own materialised text and the doctor numbers measured
+  // against THAT EXACT text up to the editor. The score fields are forwarded
+  // only when present — a variant the server declined to score promotes as an
+  // unscored snapshot rather than one carrying an invented health.
+  const promoteBranch = useCallback((branch: WhatIfBranchDoctor, rank: number) => {
+    onPromoteToEditor?.({
+      branchId: branch.branchId,
+      label: `What-If branch #${rank}`,
+      text: branch.fountain,
+      health: branch.health,
+      verdict: branch.verdict,
+      sceneCount: branch.sceneCount,
+      analyzedAt: branch.analyzedAt,
+      meanAbsDialogueShareDelta: branch.meanAbsDialogueShareDelta,
+      actionSentenceCvOverall: branch.actionSentenceCvOverall,
+    });
+    setPromoteFlows(f => ({ ...f, [branch.branchId]: { confirming: false, promoted: true } }));
+  }, [onPromoteToEditor]);
 
   // THE SHARED COMMIT PATH — both the ghost "road not taken" flow (commitGhost,
   // pre-existing) and the Lab's branch-adopt flow (adoptBranch, new) call this
@@ -814,6 +1100,17 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
                     <Play className="w-3 h-3" />
                     {labLoading ? 'Exploring…' : 'Explore'}
                   </button>
+                  {/* Separate control, not folded into Explore: scoring runs the
+                      full 14-pass doctor once per branch, so the cheap "what
+                      breaks?" answer never has to pay for it. */}
+                  <button
+                    onClick={runDoctor}
+                    disabled={!selectedOpId || !labResult || doctorLoading}
+                    className="flex items-center gap-1.5 bg-[#1a1a2e] border border-purple-700 hover:border-purple-500 disabled:opacity-40 text-purple-200 text-xs px-3 py-1.5 rounded font-medium transition-colors"
+                  >
+                    <Stethoscope className="w-3 h-3" />
+                    {doctorLoading ? 'Scoring…' : 'Score with Script Doctor'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -876,6 +1173,28 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
                     )}
                   </div>
 
+                  {/* Script Doctor — the base draft's own reading, so every
+                      per-branch delta below has a visible reference point. */}
+                  {doctorError && <p className="text-red-400 text-xs">{doctorError}</p>}
+                  {doctorLoading && (
+                    <p className="text-gray-400 text-xs animate-pulse py-2">
+                      Materialising each branch as a script and running the Script Doctor…
+                    </p>
+                  )}
+                  {!doctorLoading && !doctorError && !doctorResult && (
+                    <p className="text-gray-500 text-xs italic">
+                      Branches are story moves, not text — until they are compiled into a script there is
+                      nothing for the Script Doctor to read. &ldquo;Score with Script Doctor&rdquo; compiles
+                      each branch into a Fountain draft (deterministic, no AI key) and scores it.
+                    </p>
+                  )}
+                  {!doctorLoading && !doctorError && doctorResult && (
+                    <div>
+                      <div className="text-white font-medium text-xs mb-1.5">Script Doctor</div>
+                      <DoctorReadout label="Base draft (this story as it stands)" draft={doctorResult.base} />
+                    </div>
+                  )}
+
                   {/* Branch cards */}
                   {labResult.branches.length > 0 && (
                     <div>
@@ -892,6 +1211,11 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
                             onRequestAdopt={requestAdopt}
                             onCancelAdopt={cancelAdopt}
                             onAdopt={adoptBranch}
+                            doctor={doctorByBranch.get(b.branchId)}
+                            promoteFlow={promoteFlows[b.branchId]}
+                            onRequestPromote={onPromoteToEditor ? requestPromote : undefined}
+                            onCancelPromote={cancelPromote}
+                            onPromote={promoteBranch}
                           />
                         ))}
                       </div>

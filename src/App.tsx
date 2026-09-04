@@ -3,6 +3,9 @@ import { MotionConfig } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { StoryConfig } from './types';
 import { getLabsEnabled } from './lib/feature-flags';
+// Type-only — StoryMachine and ScriptIDE are both lazy; this only shares the
+// promote payload's shape between them.
+import type { BranchPromotion } from './components/WhatIfPanel';
 // Side-effect-only: registers use-modal-focus-trap's module-scope
 // document-level `focusin` history tracker as soon as the app boots, not
 // whenever some dialog's OWN lazy chunk happens to load it first. Every
@@ -149,6 +152,25 @@ export default function App() {
     setImportedCharacters(undefined);
   }, []);
 
+  // What-If Lab "Promote this branch" (2026-09-04). Deliberately a SEPARATE
+  // channel from importedScript above rather than a reuse of it: an OASIS
+  // export replaces the draft outright, whereas a promote must snapshot the
+  // current draft first (the undo path) and then save the promoted text as its
+  // own scored snapshot. ScriptIDE owns both of those steps — see its
+  // `promotedBranch` effect — so App only routes the payload and gets out of
+  // the way, closing StoryMachine so the writer lands on the editor holding the
+  // script they just promoted.
+  const [promotedBranch, setPromotedBranch] = useState<BranchPromotion | undefined>(undefined);
+
+  const handlePromoteBranchToEditor = useCallback((promotion: BranchPromotion) => {
+    setPromotedBranch(promotion);
+    setShowStoryMachine(false);
+  }, []);
+
+  const handlePromotionConsumed = useCallback(() => {
+    setPromotedBranch(undefined);
+  }, []);
+
   // Audit finding D: StartScreen's "Open OASIS Story Machine" CTA called
   // onOpenStoryMachine?.() but App never passed one in — a dead no-op. Also
   // seeds a default config (only if none is set yet) so closing StoryMachine
@@ -215,6 +237,7 @@ export default function App() {
             <StoryMachine
               onClose={() => setShowStoryMachine(false)}
               onExportToIDE={handleExportToIDE}
+              onPromoteBranchToEditor={handlePromoteBranchToEditor}
             />
           ) : config ? (
             <ScriptIDE
@@ -223,6 +246,8 @@ export default function App() {
               importedScript={importedScript}
               importedCharacters={importedCharacters}
               onImportConsumed={handleClearImport}
+              promotedBranch={promotedBranch}
+              onPromotionConsumed={handlePromotionConsumed}
               onNewStory={handleNewStory}
             />
           ) : (

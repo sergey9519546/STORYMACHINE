@@ -247,6 +247,27 @@ recovery case. Settings → Session offers a confirm-gated "delete everything"
 that wipes both stores and calls `POST /api/session/delete`; `#privacy` states
 what stays in the browser, what the server holds, and what leaves.
 
+**What-If Lab -> Script Doctor** (`src/components/WhatIfPanel.tsx`, Labs-gated
+inside StoryMachine). A What-If branch is a `StoryOp[]` — semantic story moves
+with no screenplay text anywhere in the 14-kind union — so until 2026-09-04 a
+branch could never carry a health, verdict or grade. `POST
+/api/nvm/whatif/doctor` closes that: `server/nvm/whatif/materialize.ts`
+compiles the base timeline, the counterfactual timeline and each branch into
+Fountain through the existing `project(canon, 'fountain')` projector
+(`server/nvm/project/index.ts`), using the same graph cut `whatif/explore.ts`
+derives its consequences from, then scores each draft through the same pooled
+doctor and content-hash LRU `POST /api/scriptide/doctor` uses. Deterministic
+and keyless end to end — no LLM, no `randomUUID`, no wall-clock read — so the
+same intervention always compiles to byte-identical text and re-scores nothing.
+The panel renders the doctor's own health/verdict/grade plus the delta against
+the base, alongside the two descriptive structural aggregates under the same
+"descriptive, not part of the score" labelling ScriptDoctorPanel's Shape &
+Rhythm section uses; a variant the route could not analyze whole shows no score
+at all rather than a plausible-looking zero. "Promote this branch" hands that
+text to `ScriptIDE`, which snapshots the current draft first (the undo path)
+and then saves the promoted script as its own snapshot carrying health and both
+aggregates, through the one snapshot mechanism every other version uses.
+
 **Command palette** (Cmd/Ctrl+K): `src/components/scriptide/CommandPalette.tsx`
 over the DOM-free registry and filter logic in `src/lib/command-palette.ts`.
 Every action's `run` is the same named callback the visible button already

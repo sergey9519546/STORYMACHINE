@@ -19,6 +19,7 @@ const panel = read('../../src/components/scriptide/ScriptDoctorPanel.tsx');
 const snapshotManager = read('../../src/components/scriptide/SnapshotManager.tsx');
 const scriptIde = read('../../src/components/ScriptIDE.tsx');
 const doctorStream = read('../../src/lib/doctor-stream.ts');
+const whatIfPanel = read('../../src/components/WhatIfPanel.tsx');
 
 describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
   it('renders a "Shape & Rhythm" heading', () => {
@@ -134,5 +135,34 @@ describe('Snapshot / Versions — Shape & Rhythm trend (2026-09-04)', () => {
   it('renders a second line under the health trend, labelled descriptive', () => {
     assert.match(snapshotManager, /function ShapeRhythmTrendLine/);
     assert.match(snapshotManager, /Shape &amp;.*rhythm \(descriptive, not part of the score\)/);
+  });
+});
+
+describe("WhatIfPanel — the Lab's Script Doctor readout (2026-09-04)", () => {
+  it('reuses the SAME "descriptive, not part of the score" labelling, not a second wording', () => {
+    assert.match(whatIfPanel, /Shape &amp;\s*rhythm \(descriptive, not part of the score\)/);
+    assert.match(whatIfPanel, /Talk\/action swing/);
+    assert.match(whatIfPanel, /Action-prose variation/);
+  });
+
+  it('gates both aggregates on the server having actually sent them — never a fabricated 0', () => {
+    assert.match(
+      whatIfPanel,
+      /draft\.meanAbsDialogueShareDelta !== undefined && draft\.actionSentenceCvOverall !== undefined/,
+    );
+  });
+
+  it('renders health/verdict/grade only when the server sent a health, and says so plainly otherwise', () => {
+    assert.match(whatIfPanel, /const scored = draft\.health !== undefined;/);
+    assert.match(whatIfPanel, /no health, grade or verdict is shown/);
+  });
+
+  it('states that branches carry no text until they are compiled into a script', () => {
+    assert.match(whatIfPanel, /Branches are story moves, not text/);
+  });
+
+  it('never computes a score in the bundle — it only POSTs to the server route', () => {
+    assert.match(whatIfPanel, /'\/api\/nvm\/whatif\/doctor'/);
+    assert.doesNotMatch(whatIfPanel, /runScriptDoctor/);
   });
 });

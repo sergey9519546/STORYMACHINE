@@ -68,6 +68,9 @@ import Sidebar from "./Sidebar";
 // Sub-components
 import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
 import type { Snapshot } from "./scriptide/SnapshotManager";
+// Type-only — WhatIfPanel is lazy-loaded inside StoryMachine and never enters
+// this chunk; this only shares the promote payload's shape.
+import type { BranchPromotion } from "./WhatIfPanel";
 import ResearchNotes from "./scriptide/ResearchNotes";
 import Toolbar, { type IdeTask, type IdeToolSlot } from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
@@ -303,6 +306,12 @@ interface ScriptIDEProps {
     need: string;
   }>;
   onImportConsumed?: () => void;
+  /** What-If Lab "Promote this branch" (App.tsx routes it here). Applied once,
+   *  then cleared through onPromotionConsumed — same one-shot contract
+   *  importedScript above uses, but with an undo path: the CURRENT draft is
+   *  snapshotted before the promoted text replaces it. */
+  promotedBranch?: BranchPromotion;
+  onPromotionConsumed?: () => void;
   /** Sends the user back to the setup wizard, clearing the persisted config (App.tsx). */
   onNewStory?: () => void;
 }
@@ -376,6 +385,8 @@ export default function ScriptIDE({
   importedScript,
   importedCharacters,
   onImportConsumed,
+  promotedBranch,
+  onPromotionConsumed,
   onNewStory,
 }: ScriptIDEProps) {
   const initialDraftRef = useRef<ScriptIDEDraftEnvelope | null>(null);
@@ -1054,6 +1065,88 @@ export default function ScriptIDE({
   // importedCharacters is stable (array literal from parent memo) — safe to omit.
   // onImportConsumed must be in deps so we always call the current prop version.
   }, [importedScript, onImportConsumed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Consume a promoted What-If branch ───────────────────────────────────────
+  // "Promote this branch" in the What-If Lab (src/components/WhatIfPanel.tsx)
+  // hands over ONE branch's materialised Fountain draft plus the Script Doctor
+  // numbers the server measured against that exact text. Three things happen
+  // here, in this order, and the order is the feature:
+  //
+  //   1. THE UNDO PATH FIRST. The draft that is about to be replaced is saved
+  //      as its own snapshot, so a promote is always reversible from the
+  //      Versions list — nothing a writer typed can be lost to one click in a
+  //      research panel. It carries score fields under exactly the same rule
+  //      confirmSnapshot uses (only when `coverageReport` was measured against
+  //      that same text — never re-analyzed on save, never fabricated).
+  //   2. The promoted text is installed with installDraft (not mutateDraft) so
+  //      the programmatic install doesn't read as a keystroke and immediately
+  //      re-flag coverage as stale.
+  //   3. The promoted text is saved as a snapshot too, carrying the health /
+  //      verdict / sceneCount / analyzedAt and the two descriptive structural
+  //      aggregates the server reported FOR THAT TEXT — the same optional
+  //      fields, with the same never-fabricated rule, snapshots have carried
+  //      since ff9e2d54 / c49ea3d6. A branch the server declined to score
+  //      simply lands as an unscored snapshot.
+  //
+  // Both snapshots go in through the same `snapshots` state and 20-entry cap
+  // every other snapshot uses; there is no second snapshot mechanism here.
+  // One-shot guard. Unlike the importedScript effect above — whose only
+  // action, mutateDraft, is idempotent — this effect APPENDS two snapshots, so
+  // a second invocation for the same promotion is not a harmless repeat: it
+  // duplicates the pair and pushes two real versions off the 20-entry cap.
+  // React 18's StrictMode double-invokes every effect in development, and the
+  // browser battery caught exactly that (four snapshots where two were
+  // expected), so the guard is required, not defensive decoration.
+  const appliedPromotionRef = useRef<BranchPromotion | null>(null);
+  useEffect(() => {
+    if (!promotedBranch) return;
+    if (appliedPromotionRef.current === promotedBranch) return;
+    appliedPromotionRef.current = promotedBranch;
+    const previousText = draftRef.current.scriptText;
+    const stamp = new Date().toLocaleString("en-US");
+    const previousReport = coverageReport?.fountain === previousText ? coverageReport.report : null;
+    const previousSignals = previousReport?.structuralSignals;
+
+    const undoSnapshot: Snapshot = {
+      id: crypto.randomUUID(),
+      name: `Before ${promotedBranch.label}`,
+      text: previousText,
+      date: stamp,
+      ...(previousReport ? {
+        health: previousReport.health,
+        verdict: previousReport.verdict,
+        sceneCount: previousReport.sceneCount,
+        analyzedAt: previousReport.analyzedAt,
+      } : {}),
+      ...(previousSignals?.scored ? {
+        meanAbsDialogueShareDelta: previousSignals.meanAbsDialogueShareDelta,
+        actionSentenceCvOverall: previousSignals.actionSentenceCvOverall,
+      } : {}),
+    };
+
+    const promotedSnapshot: Snapshot = {
+      id: crypto.randomUUID(),
+      name: promotedBranch.label,
+      text: promotedBranch.text,
+      date: stamp,
+      ...(promotedBranch.health !== undefined ? { health: promotedBranch.health } : {}),
+      ...(promotedBranch.verdict !== undefined ? { verdict: promotedBranch.verdict } : {}),
+      ...(promotedBranch.sceneCount !== undefined ? { sceneCount: promotedBranch.sceneCount } : {}),
+      ...(promotedBranch.analyzedAt !== undefined ? { analyzedAt: promotedBranch.analyzedAt } : {}),
+      ...(promotedBranch.meanAbsDialogueShareDelta !== undefined
+        ? { meanAbsDialogueShareDelta: promotedBranch.meanAbsDialogueShareDelta } : {}),
+      ...(promotedBranch.actionSentenceCvOverall !== undefined
+        ? { actionSentenceCvOverall: promotedBranch.actionSentenceCvOverall } : {}),
+    };
+
+    setSnapshots((prev) => [promotedSnapshot, undoSnapshot, ...prev].slice(0, 20));
+    installDraft(promotedBranch.text);
+    setActiveTab("production");
+    onPromotionConsumed?.();
+  // coverageReport is read through the closure on purpose (it is only used to
+  // decide whether the OUTGOING draft already had a matching report); adding it
+  // to deps would re-run this one-shot effect on every re-analysis.
+  }, [promotedBranch, onPromotionConsumed, installDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Initialize engine state ──────────────────────────────────────────────────
   useEffect(() => {

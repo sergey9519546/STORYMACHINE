@@ -1100,6 +1100,153 @@ async function main() {
     `found ${deepReadCountOn} matching label(s)`,
   );
 
+  // ══════════════════════════════════════════════════════════════════════
+  // P2-whatif — the What-If Lab's Script Doctor readout and "Promote this
+  // branch" (2026-09-04). Same Labs-ON context: this is a Labs surface, and
+  // the two claims here are exactly the ones a source read cannot settle —
+  // that a BRANCH actually renders a Doctor VERDICT (branches are StoryOps,
+  // which carry no text at all until server/nvm/whatif/materialize.ts compiles
+  // them into Fountain), and that promoting one really lands in the editor's
+  // own snapshot list rather than merely claiming to.
+  //
+  // The session is seeded through the SAME keyless POST /api/nvm/inject-ops
+  // route tests/routes/nvm-whatif-doctor.test.ts uses. It is issued from
+  // INSIDE the page so it rides src/main.tsx's fetch wrapper and therefore
+  // lands on the very session the panel is about to read — no session id is
+  // constructed here.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== P2-whatif — What-If Lab x Script Doctor ===');
+
+  await pageB.evaluate(() => { try { localStorage.removeItem('sm_app_view_v1'); } catch {} });
+  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+
+  const seedOk = await pageB.evaluate(async () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [
+        { op: 'ADD_FACT', fact: { factId: 'wf1', subject: 'door', predicate: 'is', object: 'locked', addedAtTurn: 0, validFrom: 0, validTo: null } },
+        { op: 'RAISE_CLOCK', clockId: 'bomb', amount: 40 },
+        { op: 'SEED_CLUE', clueId: 'key-under-mat', carrier: 'object' },
+      ] },
+      { sceneIdx: 1, ops: [
+        { op: 'UPDATE_BELIEF', charId: 'mara', belief: { proposition: 'the key is gone', confidence: 0.8 } },
+        { op: 'SHIFT_RELATIONSHIP', pair: ['mara', 'ivo'], delta: { dimension: 'trust', amount: -0.4, reason: 'she caught him lying' } },
+      ] },
+    ];
+    for (const scene of scenes) {
+      const res = await fetch('/api/nvm/inject-ops', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(scene),
+      });
+      if (!res.ok) return false;
+    }
+    return true;
+  });
+  record('P2-whatif', 'Session seeds with real StoryCommits via the keyless inject-ops route', seedOk, seedOk ? '' : 'inject-ops did not return 200');
+
+  const advancedSimForLab = pageB.getByRole('button', { name: /advanced: simulation/i }).first();
+  await advancedSimForLab.waitFor({ state: 'visible', timeout: timing.ms(15000) });
+  await advancedSimForLab.click();
+
+  const inspectBtn = pageB.getByRole('button', { name: /^inspect$/i }).first();
+  await inspectBtn.waitFor({ timeout: timing.ms(15000) });
+  await inspectBtn.click();
+  const whatIfItem = pageB.getByRole('menuitem', { name: 'What-if', exact: true }).first();
+  await whatIfItem.waitFor({ timeout: timing.ms(10000) });
+  await whatIfItem.click();
+
+  const labDialog = pageB.getByRole('dialog').first();
+  await labDialog.waitFor({ timeout: timing.ms(15000) });
+
+  // Pick the seeded clock op as the intervention target, then Explore.
+  const clockTarget = labDialog.getByRole('button', { name: /remove: clock bomb/i }).first();
+  const clockTargetVisible = await clockTarget.waitFor({ state: 'visible', timeout: timing.ms(15000) }).then(() => true).catch(() => false);
+  record('P2-whatif', 'Intervention picker lists the seeded clock op', clockTargetVisible, clockTargetVisible ? '' : 'no "remove: clock bomb" target rendered');
+
+  let verdictShown = false;
+  let descriptiveLabelShown = false;
+  let deltaShown = false;
+  let promotedSnapshotNames = [];
+  let editorHoldsPromotedText = false;
+
+  if (clockTargetVisible) {
+    await clockTarget.click();
+    await labDialog.getByRole('button', { name: /^Explore$/ }).first().click();
+    await labDialog.getByText(/#1 . best/).first().waitFor({ timeout: timing.ms(20000) });
+
+    // BEFORE: with no doctor run, a branch card carries composite/tension/
+    // quality only — no health, no verdict, no grade anywhere in the dialog.
+    const preScoreText = (await labDialog.textContent()) || '';
+    const noVerdictBefore = !/\b(RECOMMEND|CONSIDER)\b/.test(preScoreText);
+    record('P2-whatif', 'Before scoring, a branch shows no Doctor verdict (branches are ops, not text)', noVerdictBefore, noVerdictBefore ? '' : 'a verdict token was already present');
+
+    await labDialog.getByRole('button', { name: /Score with Script Doctor/i }).first().click();
+
+    // AFTER: the branch card renders the doctor's own verdict for the script
+    // that branch was compiled into.
+    const verdictLocator = labDialog.getByText(/^(RECOMMEND|CONSIDER|PASS)$/).first();
+    verdictShown = await verdictLocator.waitFor({ state: 'visible', timeout: timing.ms(60000) }).then(() => true).catch(() => false);
+    record('P2-whatif', 'After scoring, a branch renders a Script Doctor VERDICT', verdictShown, verdictShown ? '' : 'no RECOMMEND/CONSIDER/PASS token appeared in the Lab dialog');
+
+    const postScoreText = (await labDialog.textContent()) || '';
+    descriptiveLabelShown = /descriptive, not part of the score/i.test(postScoreText)
+      && /Talk\/action swing/i.test(postScoreText)
+      && /Action-prose variation/i.test(postScoreText);
+    record('P2-whatif', 'The two structural aggregates carry the Shape & Rhythm "descriptive, not part of the score" labelling', descriptiveLabelShown, descriptiveLabelShown ? '' : 'aggregate labels missing from the scored dialog');
+
+    deltaShown = /vs base/.test(postScoreText);
+    record('P2-whatif', 'A scored branch shows its health delta against the base draft', deltaShown, deltaShown ? '' : 'no "vs base" delta rendered');
+
+    // ── Promote ───────────────────────────────────────────────────────────
+    const promoteBtn = labDialog.getByRole('button', { name: /Promote this branch/i }).first();
+    const promoteVisible = await promoteBtn.waitFor({ state: 'visible', timeout: timing.ms(20000) }).then(() => true).catch(() => false);
+    record('P2-whatif', '"Promote this branch" is offered once the branch has a materialised script', promoteVisible, promoteVisible ? '' : 'promote control not rendered');
+
+    if (promoteVisible) {
+      await promoteBtn.click();
+      await pageB.getByRole('button', { name: /Yes, promote/i }).first().click();
+
+      // Promote closes StoryMachine and lands the writer in the editor.
+      await pageB.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(20000) });
+
+      // The persisted draft envelope is the authoritative record of what the
+      // editor's own snapshot mechanism actually saved — read it rather than
+      // trusting the panel's "Promoted" confirmation.
+      const draftState = await pageB.evaluate(() => {
+        try { return JSON.parse(localStorage.getItem('scriptide_draft_v1') || 'null'); } catch { return null; }
+      });
+      promotedSnapshotNames = (draftState?.snapshots ?? []).map((s) => s?.name);
+      const promotedCount = promotedSnapshotNames.filter((n) => /^What-If branch #/.test(n || '')).length;
+      const undoCount = promotedSnapshotNames.filter((n) => /^Before What-If branch #/.test(n || '')).length;
+      record('P2-whatif', 'Promote creates a SNAPSHOT of the branch through the editor\'s own snapshot mechanism', promotedCount === 1, `snapshots=${JSON.stringify(promotedSnapshotNames)}`);
+      record('P2-whatif', 'Promote snapshots the PREVIOUS draft first (the undo path)', undoCount === 1, `snapshots=${JSON.stringify(promotedSnapshotNames)}`);
+      // EXACTLY one pair, not two: React 18 StrictMode double-invokes effects in
+      // development and the first cut of the promote effect duplicated the pair
+      // (measured here). ScriptIDE.tsx's appliedPromotionRef guard is what makes
+      // this assertion hold — counting, not merely existence, is the point.
+      record('P2-whatif', 'Promote applies exactly ONCE (no duplicated snapshot pair)', promotedCount === 1 && undoCount === 1, `promoted=${promotedCount} undo=${undoCount}`);
+
+      const promotedSnapshot = (draftState?.snapshots ?? []).find((s) => /^What-If branch #/.test(s?.name || ''));
+      const carriesScore = promotedSnapshot
+        && typeof promotedSnapshot.health === 'number'
+        && typeof promotedSnapshot.meanAbsDialogueShareDelta === 'number'
+        && typeof promotedSnapshot.actionSentenceCvOverall === 'number';
+      record('P2-whatif', 'The promoted snapshot carries health + the two descriptive aggregates, like every other scored snapshot', !!carriesScore, `snapshot=${JSON.stringify(promotedSnapshot ?? null)}`);
+
+      editorHoldsPromotedText = typeof draftState?.scriptText === 'string'
+        && draftState.scriptText === promotedSnapshot?.text;
+      record('P2-whatif', 'The editor draft IS the promoted branch\'s script', editorHoldsPromotedText, editorHoldsPromotedText ? '' : 'editor text does not match the promoted snapshot');
+
+      // And it is visible where a writer would look for it: Ship -> Versions.
+      const shipTab = pageB.getByRole('button', { name: /^Ship$/ }).first();
+      const shipReachable = await shipTab.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+      if (shipReachable) {
+        await shipTab.click();
+        const nameVisible = await pageB.getByText(/What-If branch #1/).first()
+          .waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+        record('P2-whatif', 'The promoted snapshot is listed in Ship -> Versions', nameVisible, nameVisible ? '' : 'promoted snapshot name not visible in the Ship panel');
+      }
+    }
+  }
+
   await contextB.close();
 
   if (genuineConsoleErrors.length > 0) {

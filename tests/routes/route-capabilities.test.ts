@@ -270,6 +270,7 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   // server/routes/nvm/twin-whatif.ts
   'POST /api/nvm/redteam', 'GET /api/nvm/twin/scm', 'POST /api/nvm/twin/do',
   'POST /api/nvm/whatif/explore',        // route's own comment: DETERMINISTIC, KEYLESS
+  'POST /api/nvm/whatif/doctor',         // materialize (project/index.ts) + runScriptDoctorOffThread — pure CPU, same no-LLM path as POST /api/scriptide/doctor
   'POST /api/nvm/author/fixed-points', 'POST /api/nvm/author/backchain',
   'GET /api/nvm/branch/field',
 ]);

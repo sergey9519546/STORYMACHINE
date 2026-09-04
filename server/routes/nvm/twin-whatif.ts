@@ -12,7 +12,11 @@ import {
 import {
   validate, RedteamBodySchema, TwinDoBodySchema,
   FixedPointsBodySchema, BackchainBodySchema, WhatIfExploreBodySchema,
+  WhatIfDoctorBodySchema,
 } from '../../lib/validation.ts';
+import { requestAbortSignal } from '../../lib/doctor-request.ts';
+import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
+import type { ScriptDoctorReport } from '../../nvm/analyze/types.ts';
 
 const router = express.Router();
 export default router;
@@ -96,6 +100,129 @@ router.post('/api/nvm/whatif/explore', gameLimiter, validate(WhatIfExploreBodySc
   });
 
   res.json(result);
+}));
+
+// ── What-If Lab × Script Doctor (2026-09-04) ────────────────────────────────
+// POST /api/nvm/whatif/doctor — the same intervention /explore above answers,
+// plus the piece that was missing entirely until now: a branch's HEALTH,
+// VERDICT and GRADE.
+//
+// WHY THIS ROUTE EXISTS RATHER THAN A FIELD ON /explore. Scoring is orders of
+// magnitude more expensive than exploring — /explore is a fold over data
+// already in memory, whereas this runs the full 14-pass doctor once per
+// variant (up to six runs at branchLimit 5). Bolting it onto /explore would
+// have made the Lab's existing, cheap "what breaks?" answer pay that cost on
+// every click. Two routes, one body shape (WhatIfDoctorBodySchema is
+// WhatIfExploreBodySchema plus an optional title), so the client asks the
+// second question about the exact intervention it just asked the first about.
+//
+// DETERMINISTIC AND KEYLESS, like every route in this file: materializeWhatIf
+// compiles each branch to Fountain through server/nvm/project/index.ts's
+// existing StoryCommit -> Fountain projector (no LLM, no randomUUID, no
+// wall-clock read — see materialize.ts's header), and runScriptDoctorOffThread
+// is the SAME entry point, worker pool and content-hash LRU that
+// POST /api/scriptide/doctor uses, so a repeated explore of one intervention
+// re-scores nothing. gameLimiter for the same reason /explore and
+// /api/scriptide/doctor both take it: pure CPU, never a model call.
+//
+// HONESTY. Nothing here re-implements or re-weights the doctor. health/grade
+// are withheld exactly where the route layer already withholds them
+// (isWholeDraftAnalysisComplete — server/lib/analysis-completeness.ts), so a
+// variant the doctor could not analyze whole reports `analysisComplete: false`
+// and NO score rather than a plausible-looking number. The two structural
+// aggregates ride along only when structuralSignals is present AND `scored`
+// (>= 2 scenes); they are descriptive, never part of health.
+router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySchema), asyncHandler(async (req, res) => {
+  const { stage } = getOrCreateSession(sessionId(req));
+  const { buildSCM } = await import('../../nvm/twin/scm.ts');
+  const { exploreWhatIf } = await import('../../nvm/whatif/explore.ts');
+  const { materializeWhatIf } = await import('../../nvm/whatif/materialize.ts');
+  const { runScriptDoctorOffThread } = await import('../../nvm/analyze/doctor-pool.ts');
+  type StoryOpT = import('../../nvm/ops/StoryOp.ts').StoryOp;
+  const { opId, replacement, branchLimit, title } = req.body as {
+    opId: string; replacement?: StoryOpT | null; branchLimit?: number; title?: string;
+  };
+
+  const state = buildEnrichedState(stage);
+  const commits = stage.getLiveCommits();
+  const scm = buildSCM(stage);
+  const intervention = { opId, replacement: replacement ?? null };
+
+  const explored = exploreWhatIf({ state, commits, scm, intervention, branchLimit });
+  const materialized = materializeWhatIf({
+    commits, state, scm, intervention, branches: explored.branches, title,
+  });
+
+  const signal = requestAbortSignal(res);
+
+  // Presents ONE doctor report the way the client is allowed to read it. Mirrors
+  // server/routes/scriptide.ts's publicDoctorReport contract (health/grade are
+  // withheld unless the whole draft was analyzed) rather than re-deriving a
+  // second, looser notion of "scored".
+  function presentReport(report: ScriptDoctorReport) {
+    const complete = isWholeDraftAnalysisComplete(report);
+    const signals = report.structuralSignals;
+    return {
+      formatUnrecognized: false,
+      analysisComplete: complete,
+      sceneCount: report.sceneCount,
+      analyzedAt: report.analyzedAt,
+      ...(complete ? { health: report.health, grade: report.grade } : {}),
+      // `verdict` is already optional on the report and is only meaningful
+      // alongside a real score — gated on the same flag for the same reason.
+      ...(complete && report.verdict !== undefined ? { verdict: report.verdict } : {}),
+      ...(signals?.scored ? {
+        meanAbsDialogueShareDelta: signals.meanAbsDialogueShareDelta,
+        actionSentenceCvOverall: signals.actionSentenceCvOverall,
+      } : {}),
+    };
+  }
+
+  // A projected draft with zero commits is a bare title page — no slugline
+  // anywhere. Scoring it is the EXACT trap POST /api/scriptide/doctor's
+  // hasSceneHeading short-circuit exists to close: the doctor reads such a
+  // document as a fully-analyzed health-0 / verdict PASS report rather than an
+  // honestly incomplete one (measured, not assumed — see this route's test
+  // "withholds health and grade ... rather than inventing a score"). Same
+  // answer as that route gives, reached without running the doctor at all.
+  const unscorable = { formatUnrecognized: true, analysisComplete: false, sceneCount: 0 } as const;
+  const scoreDraft = async (draft: { fountain: string; sceneCount: number }) =>
+    draft.sceneCount === 0
+      ? unscorable
+      : presentReport(await runScriptDoctorOffThread(draft.fountain, undefined, { signal }));
+
+  // Sequential, not Promise.all: the pool queues anyway, and a serial walk lets
+  // an aborted request (client navigated away) stop before paying for variants
+  // nobody will read.
+  const baseReport = await scoreDraft(materialized.base);
+  const baseHealth = 'health' in baseReport ? baseReport.health : undefined;
+
+  const branchById = new Map(explored.branches.map(b => [b.branchId, b]));
+  const branches = [];
+  for (const variant of materialized.variants) {
+    const branch = branchById.get(variant.branchId);
+    const scored = await scoreDraft(variant);
+    const health = 'health' in scored ? scored.health : undefined;
+    branches.push({
+      branchId: variant.branchId,
+      summary: branch?.summary ?? '',
+      scores: branch?.scores ?? null,
+      fountain: variant.fountain,
+      ...scored,
+      // Only a real number minus a real number. Absent whenever either side was
+      // not analyzed whole — never a delta against a withheld score.
+      ...(health !== undefined && baseHealth !== undefined
+        ? { healthDelta: Math.round((health - baseHealth) * 10) / 10 }
+        : {}),
+    });
+  }
+
+  res.json({
+    base: { fountain: materialized.base.fountain, ...baseReport },
+    intervened: materialized.intervened.fountain,
+    consequences: explored.consequences,
+    branches,
+  });
 }));
 
 // POST /api/nvm/author/fixed-points — backward-chain toward a narrative attractor

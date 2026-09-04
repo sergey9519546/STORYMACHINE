@@ -19,6 +19,10 @@ import { HarvestPanel } from "./HarvestPanel";
 import { CorpusPanel } from "./CorpusPanel";
 import { ArcTimelinePanel } from "./ArcTimelinePanel";
 import { withSession } from "../lib/session.ts";
+// Type-only: the lazy WhatIfPanel import below is the runtime one — this keeps
+// the promote payload one shape across panel -> StoryMachine -> App -> editor
+// without pulling the panel into this chunk.
+import type { BranchPromotion } from "./WhatIfPanel";
 
 // Lazily loaded — every one of these is a conditionally-rendered overlay
 // behind a showX boolean, never needed on first paint. This is what pushed
@@ -98,6 +102,12 @@ const PERSUASION_BADGE: Record<string, string> = {
 interface StoryMachineProps {
   onClose?: () => void;
   onExportToIDE?: (fountain: string, characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>) => void;
+  /** What-If Lab "Promote this branch" — hands a branch's materialised script
+   *  (plus the Script Doctor numbers measured against that exact text) to the
+   *  editor, which snapshots the current draft before replacing it. Threaded
+   *  straight through to WhatIfPanel; when absent, that panel does not render
+   *  the promote control at all. */
+  onPromoteBranchToEditor?: (promotion: BranchPromotion) => void;
 }
 
 const BEAT_COLORS: Record<string, string> = {
@@ -125,7 +135,7 @@ const INFO_POS_LABEL: Record<string, string> = {
   parity:   'PARITY',
 };
 
-export default function StoryMachine({ onClose, onExportToIDE }: StoryMachineProps) {
+export default function StoryMachine({ onClose, onExportToIDE, onPromoteBranchToEditor }: StoryMachineProps) {
   const [agents, setAgents] = useState<CharacterSheet[]>([]);
   const [nodes, setNodes] = useState<Location[]>([]);
   const [ledger, setLedger] = useState<ActionLogEntry[]>([]);
@@ -1395,7 +1405,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showWhatIf && (
         <Suspense fallback={<PanelLoadingOverlay />}>
-          <WhatIfPanel onClose={() => setShowWhatIf(false)} />
+          <WhatIfPanel onClose={() => setShowWhatIf(false)} onPromoteToEditor={onPromoteBranchToEditor} />
         </Suspense>
       )}
 
