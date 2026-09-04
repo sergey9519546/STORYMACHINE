@@ -6,7 +6,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { snapshotTrend } from '../../src/lib/snapshot-trend.ts';
+import { snapshotTrend, computeDraftRank } from '../../src/lib/snapshot-trend.ts';
 import type { Snapshot } from '../../src/components/scriptide/SnapshotManager.tsx';
 
 function snap(overrides: Partial<Snapshot> & { id: string }): Snapshot {
@@ -115,6 +115,60 @@ describe('snapshotTrend', () => {
     const input = [snap({ id: 'a', health: 10 }), snap({ id: 'b', health: 20 })];
     const copy = JSON.parse(JSON.stringify(input));
     snapshotTrend(input);
+    assert.deepEqual(input, copy);
+  });
+});
+
+// ── computeDraftRank — "rank among your own saved drafts" ──────────────────
+// The second, honest denominator alongside the calibration reference-set
+// percentile (2026-09-04): where does the current draft's health land
+// against the WRITER'S OWN saved snapshots of this script, never against any
+// other writer's work.
+
+describe('computeDraftRank', () => {
+  it('returns null when currentHealth is not a finite number — never a fabricated position', () => {
+    assert.equal(computeDraftRank([], null), null);
+    assert.equal(computeDraftRank([], undefined), null);
+    assert.equal(computeDraftRank([], Number.NaN), null);
+  });
+
+  it('with no saved snapshots at all, the current draft is "1st of 1"', () => {
+    assert.deepEqual(computeDraftRank([], 70), { rank: 1, of: 1 });
+  });
+
+  it('with saved snapshots that carry no health value (legacy/unscored), still "1st of 1"', () => {
+    const snapshots = [snap({ id: 'a' }), snap({ id: 'b' })];
+    assert.deepEqual(computeDraftRank(snapshots, 70), { rank: 1, of: 1 });
+  });
+
+  it('ranks the current draft among saved snapshots by health, descending', () => {
+    const snapshots = [
+      snap({ id: 'a', health: 90 }),
+      snap({ id: 'b', health: 60 }),
+      snap({ id: 'c', health: 40 }),
+    ];
+    assert.deepEqual(computeDraftRank(snapshots, 70), { rank: 2, of: 4 }, 'behind 90, ahead of 60 and 40');
+    assert.deepEqual(computeDraftRank(snapshots, 95), { rank: 1, of: 4 }, 'ahead of every saved draft');
+    assert.deepEqual(computeDraftRank(snapshots, 10), { rank: 4, of: 4 }, 'behind every saved draft');
+  });
+
+  it('an exact tie shares the better rank rather than being bumped down', () => {
+    const snapshots = [snap({ id: 'a', health: 70 })];
+    assert.deepEqual(computeDraftRank(snapshots, 70), { rank: 1, of: 2 });
+  });
+
+  it('ignores snapshots with no health value when counting, but keeps the ones that have one', () => {
+    const snapshots = [
+      snap({ id: 'scored', health: 55 }),
+      snap({ id: 'unscored' }),
+    ];
+    assert.deepEqual(computeDraftRank(snapshots, 80), { rank: 1, of: 2 });
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [snap({ id: 'a', health: 10 }), snap({ id: 'b', health: 20 })];
+    const copy = JSON.parse(JSON.stringify(input));
+    computeDraftRank(input, 50);
     assert.deepEqual(input, copy);
   });
 });

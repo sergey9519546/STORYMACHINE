@@ -3353,6 +3353,7 @@ export default function ScriptIDE({
             title={titlePage.title}
             getDraftGeneration={getDraftGeneration}
             initialReport={coverageReport}
+            snapshots={snapshots}
             onLoadFountain={(text) => {
               installDraft(text);
               setCoverageStale(false);

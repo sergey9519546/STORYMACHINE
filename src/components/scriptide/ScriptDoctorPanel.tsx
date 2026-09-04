@@ -48,6 +48,8 @@ import { decideWriteBack, isDraftStale, type ThreadedCoverageReport } from "../.
 import { trackDoctorRun, trackEvent } from "../../lib/analytics";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 import { getLabsEnabled } from "../../lib/feature-flags.ts";
+import { computeDraftRank, type DraftRank } from "../../lib/snapshot-trend.ts";
+import type { Snapshot } from "./SnapshotManager.tsx";
 import {
   DOCTOR_STREAM_TOTAL_PASSES,
   applyDoctorProgressEvent,
@@ -106,6 +108,13 @@ interface ScriptDoctorPanelProps {
    *  when a host doesn't wire an editor up to it. */
   onNavigateToFinding?: (startLine: number, endLine: number) => void;
   onClose: () => void;
+  /** 2026-09-04 — the ScriptIDE editor's saved snapshots for THIS script, so
+   *  this panel can show a second, honest denominator beside the calibration
+   *  reference-set percentile: rank among the writer's OWN saved drafts
+   *  (src/lib/snapshot-trend.ts's computeDraftRank), never a comparison to
+   *  any other writer's work. Optional so the panel still renders (minus
+   *  that line) when a host doesn't wire snapshots up to it. */
+  snapshots?: Snapshot[];
 }
 
 /** A file read client-side to diagnose instead of the editor's `fountain` prop.
@@ -367,6 +376,24 @@ function percentileBand(pct: number): string {
   if (clamped <= 10) return 'bottom 10%';
   const topShare = Math.ceil((100 - clamped) / 10) * 10;
   return `top ${topShare}%`;
+}
+
+/** 2026-09-04 — second, honest denominator beside the calibration
+ *  reference-set percentile line above: rank among the writer's OWN saved
+ *  drafts of this script (../../lib/snapshot-trend.ts's computeDraftRank),
+ *  never a comparison to any other writer's work. `of <= 1` (no saved draft
+ *  carries a health value yet) renders "first saved draft" copy rather than
+ *  a fabricated "1st of 1", matching the same rule the coverage letter's
+ *  server-side rendering of this same field follows
+ *  (server/lib/coverage-letter.ts's buildCaveats). */
+function DraftRankLine({ draftRank, className }: { draftRank: DraftRank; className: string }) {
+  return (
+    <div className={`text-[10px] font-mono mt-0.5 ${className}`}>
+      {draftRank.of <= 1
+        ? "First saved draft — rank among your drafts appears after your next save"
+        : `Rank among your drafts: ${ordinal(draftRank.rank)} of ${draftRank.of} (by health, your own saved drafts of this script)`}
+    </div>
+  );
 }
 
 // ─── Story metrics (server/nvm/analyze/metrics.ts via report.metrics) ───────
@@ -1812,6 +1839,7 @@ export default function ScriptDoctorPanel({
   initialReport,
   onNavigateToFinding,
   onClose,
+  snapshots,
 }: ScriptDoctorPanelProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [report, setReport] = useState<DoctorReportWithAnchors | null>(null);
@@ -1821,6 +1849,15 @@ export default function ScriptDoctorPanel({
   // shown here as if it were current.
   const [handoffOutdated, setHandoffOutdated] = useState(false);
   const reportIsComplete = report !== null && isWholeDraftAnalysisComplete(report);
+  // 2026-09-04 — second, honest denominator beside the calibration
+  // reference-set percentile: rank among the writer's OWN saved drafts of
+  // this script. Gated on reportIsComplete the same way healthPercentile
+  // display is below — an incomplete analysis's `health` is a sentinel (0),
+  // never a real score, so it must never enter a rank.
+  const draftRank: DraftRank | null = useMemo(
+    () => (reportIsComplete && report ? computeDraftRank(snapshots ?? [], report.health) : null),
+    [reportIsComplete, report, snapshots],
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Upgrade item #3: set instead of (never alongside) errorMessage when the
   // server recognized the submission as having no scene headings at all —
@@ -2743,7 +2780,7 @@ export default function ScriptDoctorPanel({
     setCoverageLetterError(null);
 
     const exportTitle = activeReportTitle ?? title;
-    let payload: { fountain?: string; fdx?: string; title?: string };
+    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: DraftRank };
     if (report.source?.format === "pdf") {
       const converted = report.source.convertedFountain;
       if (!converted) {
@@ -2759,6 +2796,12 @@ export default function ScriptDoctorPanel({
       // handleExportReport's identical fallback above.
       payload = { fountain: activeText, title: exportTitle };
     }
+    // 2026-09-04 — pass the already-computed "rank among your own saved
+    // drafts" through so the server-rendered letter can state it alongside
+    // the reference-set percentile (server/lib/coverage-letter.ts's
+    // buildCaveats). Purely additive: absent when snapshots weren't wired up
+    // or there's nothing yet to rank, same as the in-panel line above.
+    if (draftRank) payload.draftRank = draftRank;
 
     fetch("/api/export/coverage-letter", {
       method: "POST",
@@ -3710,6 +3753,7 @@ export default function ScriptDoctorPanel({
                     Health percentile: {percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
                   </div>
                 )}
+                {draftRank && <DraftRankLine draftRank={draftRank} className="text-ink/60" />}
                 <p className="text-xs font-mono leading-relaxed mt-3 pt-3 border-t border-ink/15 text-ink/80">
                   {VERDICT_META[report.verdict].explainer}
                 </p>
@@ -3758,6 +3802,7 @@ export default function ScriptDoctorPanel({
                         Health percentile: {percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
                       </div>
                     )}
+                    {draftRank && <DraftRankLine draftRank={draftRank} className="opacity-70" />}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4">

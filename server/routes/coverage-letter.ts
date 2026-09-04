@@ -45,8 +45,15 @@ const router = express.Router();
 export default router;
 
 router.post('/api/export/coverage-letter', gameLimiter, validate(CoverageLetterBodySchema), asyncHandler(async (req, res) => {
-  const { fountain: fountainBody, fdx, author: authorBody } = req.body as {
+  const { fountain: fountainBody, fdx, author: authorBody, draftRank } = req.body as {
     fountain?: string; fdx?: string; title?: string; author?: string;
+    // "Rank among your own saved drafts of this script" (2026-09-04) — the
+    // client computes this from its own ScriptIDE `snapshots` array
+    // (src/lib/snapshot-trend.ts's computeDraftRank) and passes it through
+    // exactly like title/author: caller-attested display copy this
+    // stateless route neither recomputes nor verifies. Shape validated by
+    // CoverageLetterBodySchema's DraftRankSchema.
+    draftRank?: { rank: number; of: number };
   };
 
   // Same fdx->Fountain resolution as POST /api/export/coverage: convert here
@@ -125,7 +132,7 @@ router.post('/api/export/coverage-letter', gameLimiter, validate(CoverageLetterB
 
     const { markdown, text } = renderCoverageLetter(
       { ...report, rootCauses },
-      { title: resolvedTitle, author: resolvedAuthor },
+      { title: resolvedTitle, author: resolvedAuthor, draftRank },
     );
 
     res.json({ markdown, text, contentHash: report.contentHash ?? null });

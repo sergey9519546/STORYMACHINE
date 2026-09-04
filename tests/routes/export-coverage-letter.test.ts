@@ -143,6 +143,32 @@ describe('routes/export/coverage-letter — HTTP behavior', async () => {
     assert.equal(res.status, 400);
   });
 
+  // ── draftRank (2026-09-04) — "rank among your own saved drafts of this
+  // script", passed through by the client the same way title/author are. ──
+  it('POST with a draftRank renders the rank-among-your-drafts line into the letter', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait', draftRank: { rank: 2, of: 5 } });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.match(body.markdown, /ranks 2nd of 5 by health/);
+  });
+
+  it('POST with no draftRank omits the rank-among-your-drafts line', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait' });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(!body.markdown.includes('saved draft'));
+  });
+
+  it('POST a malformed draftRank (rank > of) returns 400', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, draftRank: { rank: 5, of: 2 } });
+    assert.equal(res.status, 400);
+  });
+
+  it('POST a malformed draftRank (non-integer) returns 400', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, draftRank: { rank: 1.5, of: 2 } });
+    assert.equal(res.status, 400);
+  });
+
   it('refuses to export a letter from a scene-truncated partial analysis', async () => {
     const res = await post({ fountain: buildSceneTruncatedFountain(), title: 'Partial Draft' });
     assert.equal(res.status, 422);

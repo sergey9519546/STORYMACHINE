@@ -274,6 +274,46 @@ describe('renderCoverageLetter — shape and wording', () => {
     assert.ok(!withoutPct.includes('percentile'));
   });
 
+  // ── draftRank (2026-09-04) — second, honest denominator alongside the
+  // reference-set percentile: rank among the writer's OWN saved drafts. ──
+  it('omitting opts.draftRank renders byte-identically to a call with no draftRank at all', () => {
+    const report = buildReport({ healthPercentile: 42 });
+    const withoutOpt = renderCoverageLetter(report, { title: 'X' }).markdown;
+    const withExplicitUndefined = renderCoverageLetter(report, { title: 'X', draftRank: undefined }).markdown;
+    assert.equal(withoutOpt, withExplicitUndefined);
+    assert.ok(!withoutOpt.includes('saved draft'), 'no draftRank line when opts.draftRank is absent');
+  });
+
+  it('states the draft-rank line beside (not instead of) the reference-set percentile line', () => {
+    const { markdown } = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 2, of: 5 } },
+    );
+    // Both denominators present — this is additive, not a replacement.
+    assert.match(markdown, /42(nd|st|rd|th)? percentile/);
+    assert.match(markdown, /ranks 2nd of 5 by health/);
+    assert.match(markdown, /not to the reference set above or to any other writer/i);
+  });
+
+  it('renders "first saved draft" copy, not a fabricated rank, when of <= 1', () => {
+    const { markdown } = renderCoverageLetter(
+      buildReport(),
+      { title: 'X', draftRank: { rank: 1, of: 1 } },
+    );
+    assert.match(markdown, /first saved draft of this script/i);
+    assert.match(markdown, /rank among your own drafts will appear after your next save/i);
+    assert.doesNotMatch(markdown, /ranks 1st of 1 by health/);
+  });
+
+  it('draftRank line renders even when healthPercentile is absent', () => {
+    const { markdown } = renderCoverageLetter(
+      buildReport({ healthPercentile: undefined }),
+      { title: 'X', draftRank: { rank: 3, of: 4 } },
+    );
+    assert.ok(!markdown.includes('percentile'));
+    assert.match(markdown, /ranks 3rd of 4 by health/);
+  });
+
   it('states the >40-scene structural-reliability caveat only above the threshold', () => {
     const short = renderCoverageLetter(buildReport({ sceneCount: 40 })).markdown;
     assert.ok(!short.includes('most reliable under'));

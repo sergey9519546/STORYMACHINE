@@ -768,11 +768,31 @@ export const DeepDoctorBodySchema = DoctorBodySchema;
 // Fountain title page). Kept as its own schema rather than reusing
 // DoctorBodySchema so `author` doesn't leak into every other doctor-shaped
 // route's accepted body.
+// 2026-09-04 — `draftRank`: "rank among the writer's own saved drafts of
+// this script" (src/lib/snapshot-trend.ts's computeDraftRank), the second,
+// honest denominator alongside the calibration reference-set percentile.
+// Computed CLIENT-SIDE (the client already holds the ScriptIDE editor's
+// `snapshots` array — this stateless route has no sessionId and never sees
+// them) and passed through here so the server can render it into the letter
+// additively; the server never recomputes or trusts it as a score claim,
+// only as display copy the writer's own client attests to about their own
+// saved history — same trust posture as the `title`/`author` fields already
+// on this schema. Bounded to plausible values (both positive integers,
+// rank <= of, of capped at the snapshot array's own 20-entry cap plus one
+// for the current draft — server/lib/validation.ts's ScriptideSaveBodySchema
+// `snapshots` cap) so a malformed or hostile body 400s rather than rendering
+// a nonsensical rank.
+const DraftRankSchema = z.object({
+  rank: z.number().int().min(1).max(21),
+  of: z.number().int().min(1).max(21),
+}).refine((v) => v.rank <= v.of, 'rank must not exceed of');
+
 export const CoverageLetterBodySchema = z.object({
   fountain: fountainField().optional(),
   fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
   title: z.string().max(300).optional(),
   author: z.string().max(300).optional(),
+  draftRank: DraftRankSchema.optional(),
 }).refine(
   (body) => (body.fountain !== undefined) !== (body.fdx !== undefined),
   'provide exactly one of fountain or fdx',

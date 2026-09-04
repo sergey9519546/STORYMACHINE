@@ -11,7 +11,10 @@
 // renders byte-identical output every time (tested). Every sentence is
 // assembled from fields the report already carries — verdict, plainSummary,
 // rootCauses, topPriorities, strengths, healthPercentile, sceneCount,
-// contentHash, provenance — never a new claim invented for the letter. The
+// contentHash, provenance — never a new claim invented for the letter, with
+// one deliberate exception: opts.draftRank (2026-09-04) is caller-supplied
+// display copy, not derived from the report, the same trust posture as
+// opts.title/opts.author already had — see CoverageLetterOptions. The
 // deterministic-analysis disclaimer is this module's own wording, but the
 // >40-scene structural-reliability note is a CONSUMER of
 // report.provenance.structuralReliabilityNote (server/lib/structural-
@@ -57,6 +60,17 @@ import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 export interface CoverageLetterOptions {
   title?: string;
   author?: string;
+  /** 2026-09-04 — "rank among the writer's OWN saved drafts of this
+   *  script" (src/lib/snapshot-trend.ts's computeDraftRank), a second,
+   *  honest denominator rendered ADDITIVELY alongside the calibration
+   *  reference-set percentile below — never a replacement for it. Computed
+   *  client-side (the client holds the ScriptIDE editor's `snapshots`
+   *  array; this module has no session and never sees them) and passed in
+   *  the same way `title`/`author` are: display copy the caller attests to,
+   *  not a value this module recomputes or verifies. Optional and additive
+   *  — a call that omits it renders byte-identical output to before this
+   *  field existed. */
+  draftRank?: { rank: number; of: number };
 }
 
 export interface CoverageLetterResult {
@@ -97,6 +111,19 @@ const VERDICT_LABEL: Record<CoverageVerdict, string> = {
 // generality like "Overall structure". Matches "Scene 4", "Scenes 1-3",
 // "Scene ~5", and "Lines 40-42".
 const ANCHORED_LOCATION_RE = /\b(scenes?|lines?)\s*~?\d/i;
+
+/** Ordinal suffix ("1st", "2nd", "3rd", "4th"…) for the draftRank line —
+ *  handles the 11-13 teens exception (11th/12th/13th, not 11st/12nd/13rd). */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
 
 function severityWord(sev: RevisionIssue['severity']): string {
   return sev.toUpperCase();
@@ -191,7 +218,7 @@ function buildPriorities(topPriorities: Array<RevisionIssue & { pass: PassName }
   });
 }
 
-function buildCaveats(report: ScriptDoctorReport): string[] {
+function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): string[] {
   const caveats: string[] = [
     'This is a deterministic read: the engine scored this draft using rule-based analysis alone — '
     + 'no generative AI wrote or judged any part of it. Running the identical script text through the '
@@ -203,6 +230,23 @@ function buildCaveats(report: ScriptDoctorReport): string[] {
       `Health ranks in the ${Math.round(report.healthPercentile)}th percentile against a fixed, `
       + '20-sample, hand-authored reference set — not against other scripts you might send it, '
       + 'and not a market comparison.',
+    );
+  }
+
+  // 2026-09-04 — a second, honest denominator alongside the reference-set
+  // percentile above: rank among the WRITER'S OWN saved drafts of this
+  // script (src/lib/snapshot-trend.ts's computeDraftRank). Purely additive:
+  // a caller that omits opts.draftRank gets byte-identical output to before
+  // this field existed.
+  if (opts.draftRank) {
+    const { rank, of } = opts.draftRank;
+    caveats.push(
+      of <= 1
+        ? 'This is your first saved draft of this script — a rank among your own drafts will appear '
+          + 'after your next save.'
+        : `Among your own saved drafts of this script, this one ranks ${ordinal(rank)} of ${formatNumber(of)} `
+          + 'by health — a comparison to your own history, not to the reference set above or to any '
+          + 'other writer’s work.',
     );
   }
 
@@ -282,7 +326,7 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     strengths,
     rootCauses: buildRootCauses(report.rootCauses),
     priorities: buildPriorities(report.topPriorities),
-    caveats: buildCaveats(report),
+    caveats: buildCaveats(report, opts),
     hashLine,
     verifyLine,
     provenanceLine,
