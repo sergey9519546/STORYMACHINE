@@ -11,10 +11,16 @@
 // renders byte-identical output every time (tested). Every sentence is
 // assembled from fields the report already carries — verdict, plainSummary,
 // rootCauses, topPriorities, strengths, healthPercentile, sceneCount,
-// contentHash — never a new claim invented for the letter. The provenance
-// caveats reuse wording already used by coverage-html.ts (the deterministic-
-// analysis disclaimer, the >40-scene structural-reliability note) rather than
-// phrasing the same claim two different ways in two exports.
+// contentHash, provenance — never a new claim invented for the letter. The
+// deterministic-analysis disclaimer is this module's own wording, but the
+// >40-scene structural-reliability note is a CONSUMER of
+// report.provenance.structuralReliabilityNote (server/lib/structural-
+// reliability.ts, falling back to computing it locally only for a report
+// that predates the field) — the same single source of truth coverage-
+// html.ts's footer caveat already reads, so the two exports can never
+// disagree on that wording. The footer also republishes provenance's
+// engineCommit/rulebookCount, mirroring the exported coverage HTML's own
+// verify block.
 //
 // SECURITY: report content (title, author, scene text, issue descriptions,
 // the plain-language summary) is screenplay text supplied by whoever ran the
@@ -29,6 +35,7 @@ import type {
 } from '../nvm/analyze/types.ts';
 import type { RevisionIssue, PassName } from '../nvm/revision/passes/types.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
+import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 
 export interface CoverageLetterOptions {
   title?: string;
@@ -68,13 +75,6 @@ const VERDICT_LABEL: Record<CoverageVerdict, string> = {
   PASS: 'PASS (decline)',
 };
 
-// Mirrors coverage-html.ts's own STRUCTURAL_ABSORPTION_THRESHOLD constant and
-// caveat wording (buildFooterSection). Duplicated rather than imported for
-// the same reason as the formatters above: this module has no dependency on
-// coverage-html.ts and must stay independently pure. Keep the wording and the
-// threshold in sync with coverage-html.ts if either changes.
-const STRUCTURAL_ABSORPTION_THRESHOLD = 40;
-
 // A finding/priority is "scene- or lines-anchored" when its location string
 // names a specific scene or line range rather than reading as a whole-draft
 // generality like "Overall structure". Matches "Scene 4", "Scenes 1-3",
@@ -111,6 +111,7 @@ interface LetterData {
   caveats: string[];
   hashLine: string | null;
   verifyLine: string;
+  provenanceLine: string | null;
   generatedLine: string;
 }
 
@@ -179,17 +180,17 @@ function buildCaveats(report: ScriptDoctorReport): string[] {
     );
   }
 
-  // Same claim and threshold as coverage-html.ts's buildFooterSection
-  // structuralCaveat (Category B honesty caveat, 2026-07-28), worded for
-  // connected prose rather than a footer aside.
-  if (typeof report.sceneCount === 'number' && report.sceneCount > STRUCTURAL_ABSORPTION_THRESHOLD) {
-    caveats.push(
-      `This draft has ${report.sceneCount} scenes. The engine's structural signals (act shape, climax `
-      + `placement, escalation) are most reliable under ~${STRUCTURAL_ABSORPTION_THRESHOLD} scenes; at `
-      + 'feature length they are partially absorbed by length-normalization, so weight the dialogue and '
-      + 'per-scene notes above more heavily than the structural read.',
-    );
-  }
+  // Same field coverage-html.ts's buildFooterSection reads (Category B
+  // honesty caveat, 2026-07-28) — this module is now a CONSUMER of
+  // report.provenance.structuralReliabilityNote, not an independent
+  // recomputation of the same claim, so the two exports can never drift on
+  // wording the way this caveat once had (see structural-reliability.ts's
+  // header: both need to say EXACTLY the same thing). Falls back to
+  // computing it locally only for a report that predates the provenance
+  // field, matching coverage-html.ts's own fallback.
+  const structuralNote = report.provenance?.structuralReliabilityNote
+    ?? computeStructuralReliabilityNote(report.sceneCount);
+  if (structuralNote) caveats.push(structuralNote);
 
   caveats.push(
     'It does not read for market fit, casting, or budget — those require a human reader’s '
@@ -222,6 +223,15 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
       + 'and hash above all match.'
     : 'This report has no verification hash attached and cannot be independently re-verified.';
 
+  // Same two provenance fields the exported coverage HTML's verify block
+  // publishes (coverage-html.ts's buildFooterSection dl: "Engine commit" /
+  // "Rulebook count") — absent (never a placeholder like "unknown") on a
+  // report that predates ScriptDoctorReport.provenance, same posture as that
+  // dl's own conditional render.
+  const provenanceLine = report.provenance
+    ? `Engine commit: ${report.provenance.engineCommit} · Rulebook: ${formatNumber(report.provenance.rulebookCount)} rule concepts.`
+    : null;
+
   return {
     title,
     author,
@@ -235,6 +245,7 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     caveats: buildCaveats(report),
     hashLine,
     verifyLine,
+    provenanceLine,
     generatedLine: `Generated ${formatDateTime(analyzedAt)}`,
   };
 }
@@ -292,6 +303,7 @@ function renderMarkdown(d: LetterData): string {
   lines.push('---');
   if (d.hashLine) lines.push(d.hashLine);
   lines.push(d.verifyLine);
+  if (d.provenanceLine) lines.push(d.provenanceLine);
   lines.push(d.generatedLine);
 
   return lines.join('\n');
@@ -347,6 +359,7 @@ function renderText(d: LetterData): string {
   lines.push('----------------------------------------');
   if (d.hashLine) lines.push(d.hashLine);
   lines.push(d.verifyLine);
+  if (d.provenanceLine) lines.push(d.provenanceLine);
   lines.push(d.generatedLine);
 
   return lines.join('\n');

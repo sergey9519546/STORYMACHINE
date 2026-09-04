@@ -41,6 +41,7 @@ import type {
   PassName,
 } from "../../../server/nvm/revision/passes/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
+import { slugifyScriptTitle } from "../../lib/export-filename.ts";
 import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
 import { diffLines } from "../../lib/diff.ts";
 import { decideWriteBack, isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
@@ -1842,6 +1843,18 @@ export default function ScriptDoctorPanel({
   const [pitchkitError, setPitchkitError] = useState<string | null>(null);
   const pitchkitAbortRef = useRef<AbortController | null>(null);
 
+  // "Coverage letter" (POST /api/export/coverage-letter): the one-to-two-page
+  // connected-prose sibling of Export report's dashboard-style HTML. Its own
+  // independent in-flight/error state, same rationale as exportStatus above.
+  // Unlike Export report, this route has no deep-read variant either (like
+  // Breakdown CSV / Pitch kit it always re-runs a quick deterministic pass
+  // server-side), so it is likewise NOT gated on report.deepRead — only on
+  // reportIsComplete, since the route 422s on an incomplete analysis (see
+  // server/routes/coverage-letter.ts).
+  const [coverageLetterStatus, setCoverageLetterStatus] = useState<ExportStatus>("idle");
+  const [coverageLetterError, setCoverageLetterError] = useState<string | null>(null);
+  const coverageLetterAbortRef = useRef<AbortController | null>(null);
+
   // Whether an AI key is configured server-side — gates the "Deep read"
   // toggle only, never the quick (deterministic) diagnosis path, which is
   // this product's always-available front door (see CLAUDE.md's gotcha on
@@ -2650,6 +2663,80 @@ export default function ScriptDoctorPanel({
     );
   };
 
+  /** "Coverage letter" export: unlike Export report / Breakdown CSV / Pitch
+   *  kit above, POST /api/export/coverage-letter returns JSON
+   *  ({ markdown, text, contentHash }), not a file blob with a
+   *  Content-Disposition header — the letter is content the client formats
+   *  into a file itself, not something the server already packaged for
+   *  download. Same snapshot-sourcing rules as handleExportReport /
+   *  runProducerExport (never live editor/upload state — whatever the
+   *  DISPLAYED report actually analyzed) and gated on reportIsComplete
+   *  exactly like Pitch kit, since the route 422s
+   *  (`{ error: 'analysis_incomplete' }`) on an incomplete analysis. Filename
+   *  is `<title-slug>-coverage-letter.md`, built from slugifyScriptTitle
+   *  (src/lib/export-filename.ts) rather than scriptExportFilename — that
+   *  helper only ever produces `<slug>.<ext>`, which has no room for the
+   *  `-coverage-letter` infix without editing its output string afterward. */
+  const handleExportCoverageLetter = () => {
+    if (!report || !reportIsComplete) return;
+
+    coverageLetterAbortRef.current?.abort();
+    const controller = new AbortController();
+    coverageLetterAbortRef.current = controller;
+
+    setCoverageLetterStatus("loading");
+    setCoverageLetterError(null);
+
+    const exportTitle = activeReportTitle ?? title;
+    let payload: { fountain?: string; fdx?: string; title?: string };
+    if (report.source?.format === "pdf") {
+      const converted = report.source.convertedFountain;
+      if (!converted) {
+        setCoverageLetterStatus("error");
+        setCoverageLetterError("This PDF-sourced report has no converted Fountain text to export.");
+        return;
+      }
+      payload = { fountain: converted, title: exportTitle };
+    } else if (analyzedSnapshot) {
+      payload = { ...analyzedSnapshot, title: exportTitle };
+    } else {
+      // Defensive fallback — unreachable in practice, same as
+      // handleExportReport's identical fallback above.
+      payload = { fountain: activeText, title: exportTitle };
+    }
+
+    fetch("/api/export/coverage-letter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        const body = (await res.json().catch(() => null)) as
+          | { markdown?: string; error?: string; message?: string }
+          | null;
+        if (!res.ok) {
+          const fallback =
+            res.status === 404
+              ? "Coverage letter export isn't live yet — the /api/export/coverage-letter route hasn't been deployed."
+              : `Export failed (${res.status})`;
+          throw new Error(body?.message ?? body?.error ?? fallback);
+        }
+        if (!body?.markdown) throw new Error("Coverage letter export returned no content.");
+        return body.markdown;
+      })
+      .then((markdown) => {
+        const slug = slugifyScriptTitle(exportTitle ?? "") ?? "script";
+        downloadBlob(new Blob([markdown], { type: "text/markdown" }), `${slug}-coverage-letter.md`);
+        setCoverageLetterStatus("idle");
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return; // cancelled — no error state
+        setCoverageLetterStatus("error");
+        setCoverageLetterError(err instanceof Error ? err.message : "Export failed");
+      });
+  };
+
   /** The exact Fountain text the DISPLAYED report analyzed — same snapshot
    *  rationale as handleExportReport's payload above (never live editor/
    *  upload state, which may have moved on since diagnosis succeeded).
@@ -2851,6 +2938,7 @@ export default function ScriptDoctorPanel({
       exportAbortRef.current?.abort();
       breakdownAbortRef.current?.abort();
       pitchkitAbortRef.current?.abort();
+      coverageLetterAbortRef.current?.abort();
       fixAbortRef.current?.abort();
       if (loadedNoticeTimerRef.current) clearTimeout(loadedNoticeTimerRef.current);
       if (fixToastTimerRef.current) clearTimeout(fixToastTimerRef.current);
@@ -3035,6 +3123,42 @@ export default function ScriptDoctorPanel({
             Pitch kit
           </button>
         )}
+        {/* Coverage letter: the one-to-two-page connected-prose sibling of
+            Export report above (POST /api/export/coverage-letter). Disabled
+            with a visible reason — not hover-only, per Retrospective #5
+            above — whenever there's no complete report to export yet, since
+            the route 422s on an incomplete analysis. */}
+        {status === "success" && report && (() => {
+          const coverageLetterDisabledReason = !reportIsComplete
+            ? "Coverage letter requires a complete whole-draft analysis — re-run after resolving the incomplete analysis."
+            : null;
+          return (
+            <>
+              <button
+                onClick={handleExportCoverageLetter}
+                disabled={coverageLetterStatus === "loading" || !!coverageLetterDisabledReason}
+                aria-label="Export a connected-prose coverage letter as Markdown"
+                title={
+                  coverageLetterDisabledReason
+                    ?? "Download a one-to-two-page coverage letter (Markdown): logline, root causes, priorities, and a recommendation"
+                }
+                className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
+              >
+                {coverageLetterStatus === "loading" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                )}
+                Coverage letter
+              </button>
+              {coverageLetterDisabledReason && coverageLetterStatus !== "loading" && (
+                <p className="w-full basis-full text-[10px] font-mono text-[var(--sm-cream)]/60">
+                  {coverageLetterDisabledReason}
+                </p>
+              )}
+            </>
+          );
+        })()}
         {status === "success" && (
           <button
             onClick={() => runDiagnosis()}
@@ -3149,6 +3273,21 @@ export default function ScriptDoctorPanel({
           <button
             onClick={() => setPitchkitError(null)}
             aria-label="Dismiss pitch kit export error"
+            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      {coverageLetterStatus === "error" && coverageLetterError && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+        >
+          <span>Coverage letter export failed: {coverageLetterError}</span>
+          <button
+            onClick={() => setCoverageLetterError(null)}
+            aria-label="Dismiss coverage letter export error"
             className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
           >
             <X className="w-3 h-3" aria-hidden="true" />

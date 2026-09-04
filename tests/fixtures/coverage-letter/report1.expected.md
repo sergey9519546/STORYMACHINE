@@ -6,7 +6,7 @@ Health 66.7/100 (Solid) · 6 scenes · 167 words · ~2 pages / ~2 min (est.)
 
 ## Summary
 
-CONSIDER — the engine's intermediate threshold-based verdict; overall engine score 67/100. Dialogue & Voice is the highest-scoring diagnostic dimension, at 100/100. Character is the lowest-scoring diagnostic dimension, at 81/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: Midpoint suspense pressure is flat — the story lacks a dramatic pivot.
+CONSIDER — solid bones with fixable structural problems; overall score 67/100. This is the engine's deterministic, threshold-based verdict, not a human read. Dialogue & Voice is the highest-scoring diagnostic dimension, at 100/100. Character is the lowest-scoring diagnostic dimension, at 81/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: Midpoint suspense pressure is flat — the story lacks a dramatic pivot.
 
 *This reads like an excerpt (6 scenes analyzed): scores and verdicts are computed the same way as for a full script, but with this little material they should be read as feedback on the pages, not coverage of a feature.*
 
@@ -35,4 +35,5 @@ It does not read for market fit, casting, or budget — those require a human re
 ---
 Script-text hash (SHA-256): 42f08fc26ba8a760b26ff903ceaa934ad6fcc7b6caa89c95ce9fab7902ffee42
 To verify this letter, run the identical script text through Story Machine’s Script Doctor again (the app’s #verify page, or POST /api/export/verify) and confirm the health, verdict, and hash above all match.
+Engine commit: dev · Rulebook: 3,217 rule concepts.
 Generated August 21, 2026 at 02:38:59 AM UTC

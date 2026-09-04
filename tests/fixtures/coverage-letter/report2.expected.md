@@ -6,7 +6,7 @@ Health 66.7/100 (Solid) · 6 scenes · 209 words · ~2 pages / ~2 min (est.)
 
 ## Summary
 
-CONSIDER — the engine's intermediate threshold-based verdict; overall engine score 67/100. Theme & Originality is the highest-scoring diagnostic dimension, at 100/100. Plot Logic & Payoff is the lowest-scoring diagnostic dimension, at 82/100 — most of the trouble is around unmotivated decision. Start with the highest-priority fix: Midpoint suspense pressure is flat — the story lacks a dramatic pivot.
+CONSIDER — solid bones with fixable structural problems; overall score 67/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 100/100. Plot Logic & Payoff is the lowest-scoring diagnostic dimension, at 82/100 — most of the trouble is around unmotivated decision. Start with the highest-priority fix: Midpoint suspense pressure is flat — the story lacks a dramatic pivot.
 
 *This reads like an excerpt (6 scenes analyzed): scores and verdicts are computed the same way as for a full script, but with this little material they should be read as feedback on the pages, not coverage of a feature.*
 
@@ -35,4 +35,5 @@ It does not read for market fit, casting, or budget — those require a human re
 ---
 Script-text hash (SHA-256): 0b0951620b81e3b7f42b875249fe29a685931a43f333b57d661cac9f14bdff74
 To verify this letter, run the identical script text through Story Machine’s Script Doctor again (the app’s #verify page, or POST /api/export/verify) and confirm the health, verdict, and hash above all match.
+Engine commit: dev · Rulebook: 3,217 rule concepts.
 Generated August 21, 2026 at 02:39:46 AM UTC

@@ -27,7 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderCoverageLetter } from '../../server/lib/coverage-letter.ts';
 import type {
-  ScriptDoctorReport, CoverageVerdict, DoctorGrade, RootCauseFinding,
+  ScriptDoctorReport, CoverageVerdict, DoctorGrade, RootCauseFinding, ReportProvenance,
 } from '../../server/nvm/analyze/types.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
@@ -281,6 +281,45 @@ describe('renderCoverageLetter — shape and wording', () => {
     const long = renderCoverageLetter(buildReport({ sceneCount: 55 })).markdown;
     assert.match(long, /This draft has 55 scenes/);
     assert.match(long, /most reliable under ~40 scenes/);
+  });
+
+  it('prefers report.provenance.structuralReliabilityNote verbatim over recomputing it locally', () => {
+    // Proves buildCaveats is a CONSUMER of the shared field (server/lib/
+    // structural-reliability.ts), not an independent computation of the same
+    // claim — a distinct sentinel string on provenance must win over whatever
+    // computeStructuralReliabilityNote(sceneCount) would have produced.
+    const provenance: ReportProvenance = {
+      engineCommit: 'abc1234',
+      rulebookCount: 3217,
+      groundTruthSource: 'mechanical-degradation',
+      percentileBasis: 'internal-calibration-corpus-20-samples',
+      structuralReliabilityNote: 'SENTINEL — provenance note, not recomputed.',
+    };
+    const { markdown } = renderCoverageLetter(buildReport({ sceneCount: 55, provenance }));
+    assert.match(markdown, /SENTINEL — provenance note, not recomputed\./);
+    assert.ok(!markdown.includes('This draft has 55 scenes'), 'must not ALSO recompute its own version');
+  });
+
+  it('falls back to computing the structural-reliability note locally when provenance is absent', () => {
+    const { markdown } = renderCoverageLetter(buildReport({ sceneCount: 55, provenance: undefined }));
+    assert.match(markdown, /This draft has 55 scenes/);
+    assert.match(markdown, /most reliable under ~40 scenes/);
+  });
+
+  it('publishes the engine commit and rulebook count in the footer only when provenance is present', () => {
+    const provenance: ReportProvenance = {
+      engineCommit: 'abc1234',
+      rulebookCount: 3217,
+      groundTruthSource: 'mechanical-degradation',
+      percentileBasis: 'internal-calibration-corpus-20-samples',
+    };
+    const withProvenance = renderCoverageLetter(buildReport({ provenance })).markdown;
+    assert.match(withProvenance, /Engine commit: abc1234/);
+    assert.match(withProvenance, /Rulebook: 3,217 rule concepts\./);
+
+    const withoutProvenance = renderCoverageLetter(buildReport({ provenance: undefined })).markdown;
+    assert.ok(!withoutProvenance.includes('Engine commit:'));
+    assert.ok(!withoutProvenance.includes('Rulebook:'));
   });
 
   it('surfaces excerptNote verbatim when present', () => {

@@ -15,7 +15,7 @@
 // this suite's report wait and nobody noticed for days because nothing ran it.
 // `playwright` is now a pinned devDependency and the `browser` job in
 // .github/workflows/ci.yml runs `npx playwright install --with-deps chromium`
-// before `npm run verify:browser`, so these 135 assertions gate every push and
+// before `npm run verify:browser`, so these 137 assertions gate every push and
 // block `publish` in release.yml. Run it by hand too, after touching
 // feature-flags.ts, Toolbar.tsx, App.tsx's hash-routing/Labs gating, the
 // export/verify routes, or the events instrumentation.
@@ -627,6 +627,39 @@ async function main() {
   const downloadPath = await download.path();
   const exportedHtml = downloadPath ? readFileSync(downloadPath, 'utf8') : '';
   record('P3', 'Export coverage report downloads an HTML file', exportedHtml.length > 0, `${exportedHtml.length} bytes, filename=${download.suggestedFilename()}`);
+
+  // "Coverage letter" (POST /api/export/coverage-letter) — the connected-
+  // prose sibling of Export report above, added to ScriptDoctorPanel.tsx
+  // beside Export report / Breakdown CSV / Pitch kit. Same toolbar, same
+  // complete report already on screen: assert the action is reachable
+  // (visible and enabled — the route 422s on an incomplete analysis, so this
+  // is the one state where it must NOT be disabled) and that clicking it
+  // actually produces a downloadable Markdown file carrying the letter's own
+  // sections, not just that a button with the right label exists.
+  const coverageLetterBtn = pageA
+    .getByRole('button', { name: 'Export a connected-prose coverage letter as Markdown', exact: true })
+    .first();
+  const coverageLetterVisible = await coverageLetterBtn.isVisible().catch(() => false);
+  const coverageLetterEnabled = coverageLetterVisible && await coverageLetterBtn.isEnabled().catch(() => false);
+  record(
+    'P3',
+    'Coverage letter export action is reachable (visible and enabled) on a complete report',
+    coverageLetterVisible && coverageLetterEnabled,
+    `visible=${coverageLetterVisible} enabled=${coverageLetterEnabled}`,
+  );
+
+  const [letterDownload] = await Promise.all([
+    pageA.waitForEvent('download', { timeout: 20000 }),
+    coverageLetterBtn.click(),
+  ]);
+  const letterDownloadPath = await letterDownload.path();
+  const letterMarkdown = letterDownloadPath ? readFileSync(letterDownloadPath, 'utf8') : '';
+  record(
+    'P3',
+    'Coverage letter export downloads a Markdown file with the expected sections',
+    letterMarkdown.includes('## How to Read This Report') && /-coverage-letter\.md$/.test(letterDownload.suggestedFilename()),
+    `${letterMarkdown.length} bytes, filename=${letterDownload.suggestedFilename()}`,
+  );
 
   // ── Decision #3, inside Script Doctor itself. The panel is open on a real,
   // complete report — the exact state where "Fix & verify" (POST
