@@ -184,6 +184,57 @@ export async function waitForRenderedText(page, needle, { timeoutMs = 45000, pol
 }
 
 /**
+ * Waits for the page's DOM to stop mutating — a real signal, not a sleep.
+ * A MutationObserver on `document.documentElement` (attributes incl. `style`
+ * — how Framer Motion's rAF-driven transforms/opacity actually land in the
+ * DOM — plus childList/subtree/characterData) resets a `quietMs` timer on
+ * every mutation; resolves once `quietMs` passes with nothing observed, or
+ * `timeoutMs` elapses regardless (a hard cap so a page with some genuinely
+ * continuous DOM churn — polling, a live region — can't hang a caller
+ * forever). CSS-only animations (@keyframes opacity/transform, the common
+ * case for decorative pulses/spinners) don't mutate the DOM and so don't
+ * reset the timer — this only tracks JS-driven, DOM-visible change.
+ *
+ * Added for the 2026-09-04 a11y fix: `verify-a11y.mjs`'s axe sweep of the
+ * landing page used to run the instant "Start fresh" attached to the DOM,
+ * which is BEFORE the entrance's own ~1.2s typed intro and ~700ms fade/lift
+ * reveal land at their rest state — Playwright's default `visible` wait
+ * doesn't require opacity:1, only a non-empty box and no `visibility:hidden`.
+ * An independent re-verification found this made that surface's axe PASS a
+ * timing artifact: clean at the audit's own moment, 11 violating nodes ~1s
+ * later mid-animation, 4 real ones once actually at rest — invisible to the
+ * gate throughout. This helper is the fix's real-signal half (see
+ * `StartScreen.tsx`'s `data-reveal-done` for the completion-signal half).
+ */
+export async function waitForDomQuiet(page, { quietMs = 250, timeoutMs = 4000 } = {}) {
+  await page.evaluate(
+    ({ quietMs, timeoutMs }) => new Promise((resolve) => {
+      let timer;
+      let obs;
+      const finish = () => {
+        clearTimeout(timer);
+        try { obs?.disconnect(); } catch { /* already disconnected */ }
+        resolve();
+      };
+      const reset = () => {
+        clearTimeout(timer);
+        timer = setTimeout(finish, quietMs);
+      };
+      obs = new MutationObserver(reset);
+      obs.observe(document.documentElement, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      reset();
+      setTimeout(finish, timeoutMs);
+    }),
+    { quietMs, timeoutMs },
+  );
+}
+
+/**
  * PASS/FAIL bookkeeping + the shared summary block.
  *
  * `grouped: true`  -> record(group, assertion, pass, detail)  ("[PASS] g :: a")

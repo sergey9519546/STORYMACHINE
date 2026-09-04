@@ -103,6 +103,32 @@ not the promise that was made.
   never been driven end to end; it now is, as a gated assertion, and
   `verify:a11y` joins the browser chain as its seventh suite.
 
+  **CORRECTION (2026-09-04, later — independent re-verification).** This
+  entry's "gated assertion" was true of the surfaces above but not of the
+  landing page, and the gap was not visible from the suite's own PASS: an
+  independent re-verifier ran axe-core directly against the landing (no
+  exclusions) and found FOUR serious `color-contrast` violations at rest, in
+  both themes (`#entrance-actions-heading` 3.45:1, two badge spans on the
+  primary CTA at 3.05:1 and 3.55:1, and a `.text-ink/35` tertiary link at
+  2.23:1 — all under the 4.5:1 AA minimum). `verify-a11y.mjs` reported this
+  surface CLEAN because it audited the instant "Start fresh" attached to the
+  DOM — before the entrance's own ~1.2s typed intro and ~700ms fade/lift
+  reveal ever reached their rest state (Playwright's default `visible` wait
+  does not require `opacity:1`). Re-auditing the same page at three moments
+  in one session showed the mechanism directly: CLEAN at the suite's own
+  moment, 11 violating nodes ~1s later mid-animation, 4 real and stable ones
+  once the page actually settled — a timing artifact, not a passing gate.
+  The gate now waits for the entrance's own completion signals
+  (`data-slug-done`, `data-reveal-done`) plus a DOM-mutation-quiet window
+  before auditing, audits the landing at two post-settle moments and records
+  the worse, and was confirmed to FAIL on the four violations above before
+  they were fixed (all now use established `-on-light`/`-on-dark`-family
+  tokens; see `src/components/StartScreen.tsx` and
+  `scripts/verify-a11y.mjs`/`scripts/lib/browser-verify.mjs`). Every other
+  surface this suite audits was re-checked with the same at-rest discipline
+  and reported byte-identical results — the timing gap was specific to the
+  landing's own entrance animation.
+
 Then the follow-ups, and the audits kept earning their keep:
 
 - **The last main-thread analysis is gone, and it was never two.** The

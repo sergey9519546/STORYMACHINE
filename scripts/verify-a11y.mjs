@@ -46,6 +46,7 @@ import {
   launchChromium,
   pickFreePort,
   shutdown,
+  waitForDomQuiet,
   waitForRenderedText,
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
@@ -97,25 +98,96 @@ const GATED_IMPACTS = new Set(['serious', 'critical']);
 // Escape press.
 const KNOWN_UNFIXED_RULE_IDS = new Set([]);
 
-/** Runs axe against the current DOM and records one PASS/FAIL per surface:
- *  fails the surface if any serious/critical violation is found OUTSIDE
- *  KNOWN_UNFIXED_RULE_IDS (logs the rule id, impact, node count and up to
- *  3 offending selectors for every violation regardless, in results[] via
- *  the returned object — the caller decides gate vs log for anything
- *  below "serious"). */
-async function auditSurface(page, surfaceName) {
+/** Raw axe run against the current DOM — no recording, just the violation
+ *  list, so callers that need more than one moment (see
+ *  `auditLandingAtRest` below) can run it more than once per surface. */
+async function runAxeRaw(page) {
   await page.addScriptTag({ path: AXE_PATH });
   const results = await page.evaluate(async (tags) => {
     // @ts-ignore — axe is attached to window by the injected script above.
     return await window.axe.run(document, { runOnly: { type: 'tag', values: tags } });
   }, AXE_TAGS);
-
-  const gated = results.violations.filter((v) => GATED_IMPACTS.has(v.impact) && !KNOWN_UNFIXED_RULE_IDS.has(v.id));
-  const detail = results.violations
-    .map((v) => `${v.impact}:${v.id}(${v.nodes.length}) [${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}]`)
-    .join('; ');
-  record(surfaceName, 'axe: zero serious/critical violations', gated.length === 0, detail || 'clean');
   return results.violations;
+}
+
+const gatedOf = (violations) => violations.filter((v) => GATED_IMPACTS.has(v.impact) && !KNOWN_UNFIXED_RULE_IDS.has(v.id));
+const detailOf = (violations) => violations
+  .map((v) => `${v.impact}:${v.id}(${v.nodes.length}) [${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}]`)
+  .join('; ');
+
+/** Runs axe against the current DOM and records one PASS/FAIL per surface:
+ *  fails the surface if any serious/critical violation is found OUTSIDE
+ *  KNOWN_UNFIXED_RULE_IDS (logs the rule id, impact, node count and up to
+ *  3 offending selectors for every violation regardless — the caller
+ *  decides gate vs log for anything below "serious").
+ *
+ *  a11y pass (2026-09-04): waits for the DOM to stop mutating
+ *  (`waitForDomQuiet` — a real signal, not a sleep; see its own header)
+ *  before running axe, so a still-animating reveal isn't measured mid-
+ *  transition. This is the universal half of the at-rest fix, applied to
+ *  every surface this suite audits; the landing surface additionally gets
+ *  its own two-moment worst-of audit below, because it's the surface whose
+ *  own entrance animation this bug was found on. */
+async function auditSurface(page, surfaceName) {
+  await waitForDomQuiet(page);
+  const violations = await runAxeRaw(page);
+  const gated = gatedOf(violations);
+  record(surfaceName, 'axe: zero serious/critical violations', gated.length === 0, detailOf(violations) || 'clean');
+  return violations;
+}
+
+/**
+ * The landing surface, specifically: audited at >=2 moments and the WORSE
+ * one is what's recorded, per the 2026-09-04 correction (see
+ * `waitForDomQuiet`'s header for why this exists at all).
+ *
+ *   moment A — "settle signal": StartScreen's own completion signals
+ *     (`[data-slug-done="true"]` from SlugLineIntro, then
+ *     `main[data-reveal-done="true"]` from StartScreen's reveal — the real
+ *     "this animation is actually done" state, not a guess) plus one
+ *     DOM-quiet window.
+ *   moment B — a second, longer DOM-quiet window past that, to catch
+ *     anything moment A's signals don't cover (a font swap reflow, a
+ *     transition this pass didn't know to name).
+ *
+ * Both counts are printed so a reader can see the audit wasn't taken mid-
+ * animation; the recorded PASS/FAIL and detail come from whichever moment
+ * had MORE gated violations (a real bug is real at every moment it's
+ * measured — the settled moment should never be strictly worse than an
+ * earlier one, but this doesn't assume that).
+ */
+async function auditLandingAtRest(page) {
+  await page.waitForFunction(
+    () => document.querySelector('[data-slug-done="true"]') !== null,
+    { timeout: 5000 },
+  ).catch(() => {});
+  await page.waitForFunction(
+    () => document.querySelector('main[data-reveal-done="true"]') !== null,
+    { timeout: 5000 },
+  ).catch(() => {});
+  await waitForDomQuiet(page, { quietMs: 250, timeoutMs: 3000 });
+  const violationsA = await runAxeRaw(page);
+  const gatedA = gatedOf(violationsA);
+
+  await waitForDomQuiet(page, { quietMs: 400, timeoutMs: 3000 });
+  const violationsB = await runAxeRaw(page);
+  const gatedB = gatedOf(violationsB);
+
+  console.log(
+    `[verify] landing at-rest moments — settle-signal+quiet: ${gatedA.length} serious/critical; `
+    + `+second quiet window: ${gatedB.length} serious/critical`,
+  );
+
+  const worseIsB = gatedB.length > gatedA.length;
+  const worstViolations = worseIsB ? violationsB : violationsA;
+  const worstGated = worseIsB ? gatedB : gatedA;
+  record(
+    'landing',
+    'axe: zero serious/critical violations (worst of 2 at-rest moments)',
+    worstGated.length === 0,
+    detailOf(worstViolations) || 'clean',
+  );
+  return worstViolations;
 }
 
 async function main() {
@@ -132,7 +204,12 @@ async function main() {
   await page1.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
   const startFreshBtn = page1.getByRole('button', { name: /start fresh/i }).first();
   await startFreshBtn.waitFor({ timeout: 15000 });
-  await auditSurface(page1, 'landing');
+  // a11y pass (2026-09-04): NOT auditSurface(page1, 'landing') here on
+  // purpose — Playwright's `visible` wait above doesn't require opacity:1,
+  // so it resolves the instant "Start fresh" attaches to the DOM, well
+  // before the entrance's typed intro / fade-lift reveal actually settles.
+  // See auditLandingAtRest's own header for what this replaced and why.
+  await auditLandingAtRest(page1);
 
   // KEYBOARD JOURNEY step 1: land -> reach "Start fresh" via Tab alone,
   // activate with Enter (no .click() anywhere in this journey).

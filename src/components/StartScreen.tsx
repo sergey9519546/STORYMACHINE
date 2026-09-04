@@ -165,10 +165,24 @@ export default function StartScreen({
   // this reveal never animates for them — main renders already-visible.
   const reducedMotion = usePrefersReducedMotion();
   const [isIntroResolved, setIsIntroResolved] = useState(reducedMotion);
+  // a11y pass (2026-09-04): a durable "the fade/lift is visually done" signal
+  // for anything that needs to measure the entrance AT REST — the independent
+  // re-verification found verify-a11y.mjs auditing the landing the instant
+  // "Start fresh" attaches to the DOM (opacity:0, mid-fade), which is BEFORE
+  // this reveal's own contrast bugs ever render at a stable state — axe
+  // scored that moment clean by accident (invisible/mid-blend text isn't
+  // measured the same way as settled text), not because the page was
+  // actually fixed. `data-reveal-done` on <main> below, alongside
+  // SlugLineIntro's existing `data-slug-done`, is the real completion signal
+  // a test should wait on instead of a fixed sleep.
+  const [isMainRevealed, setIsMainRevealed] = useState(reducedMotion);
   React.useEffect(() => {
     // If the OS setting flips mid-visit, don't leave the primary actions
     // stuck invisible waiting on an animation that will no longer run.
-    if (reducedMotion) setIsIntroResolved(true);
+    if (reducedMotion) {
+      setIsIntroResolved(true);
+      setIsMainRevealed(true);
+    }
   }, [reducedMotion]);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -301,7 +315,16 @@ export default function StartScreen({
                 {/* a11y pass: text-ink/50 measured 3.45:1 on this cream
                     background — under the 4.5:1 AA text minimum for
                     11px type; /65 clears it (4.7-5.6:1 across the paper
-                    family) while staying visually secondary. */}
+                    family) while staying visually secondary.
+                    CORRECTION (2026-09-04, independent re-verification):
+                    this fix was applied here but NOT to the other
+                    text-ink/50 instance below (the "Start here" heading) or
+                    the wizard's own step header — both were still shipping
+                    at 3.43:1 with axe's own PASS resting on a timing
+                    artifact (verify-a11y.mjs audited the landing before its
+                    reveal animation settled). Both now carry the same /65
+                    fix; see verify-a11y.mjs's header for the gate fix and
+                    docs/PATH_TO_EXCELLENCE.md's 2026-09-04 correction. */}
                 <p className="hidden font-mono text-[11px] uppercase tracking-[0.4em] text-ink/65 sm:block">
                   Coverage Report — Reader&rsquo;s Copy
                 </p>
@@ -327,6 +350,14 @@ export default function StartScreen({
                 initial={{ opacity: 0, y: 12 }}
                 animate={isIntroResolved ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
                 transition={{ duration: DUR_REVEAL, ease: EASE_OUT_EXPO }}
+                // a11y pass (2026-09-04): fires once this reveal actually
+                // lands at its target (opacity:1) — guarded on isIntroResolved
+                // so the no-op "animation" at mount (animate === initial,
+                // before the slug line completes) can't mark this done early.
+                onAnimationComplete={() => {
+                  if (isIntroResolved) setIsMainRevealed(true);
+                }}
+                data-reveal-done={isMainRevealed}
                 className="flex flex-col gap-6 sm:gap-12"
                 // Retrospective #6 (tab order): this used to carry
                 // `inert={!isIntroResolved || undefined}`, removing the
@@ -346,9 +377,14 @@ export default function StartScreen({
                 // got.
               >
                 <section aria-labelledby="entrance-actions-heading" className="flex flex-col gap-4 sm:gap-5">
+                  {/* a11y pass (2026-09-04, correction): text-ink/50 measured
+                      3.43:1 on this cream background — under the 4.5:1 AA text
+                      minimum, missed by the earlier pass (see the sibling
+                      comment above the "Coverage Report" line). /65 clears it
+                      at 5.58:1, same fix already applied there. */}
                   <h2
                     id="entrance-actions-heading"
-                    className="font-mono text-xs uppercase tracking-[0.3em] text-ink/50"
+                    className="font-mono text-xs uppercase tracking-[0.3em] text-ink/65"
                   >
                     Start here
                   </h2>
@@ -386,7 +422,15 @@ export default function StartScreen({
                     >
                       Recommended
                     </span>
-                    <span className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.3em] text-[var(--sm-cream)]/70">
+                    {/* a11y pass (2026-09-04, correction): cream/70 on the
+                        stamp button background measured 3.05:1 — under the
+                        4.5:1 AA text minimum. --sm-cream-mute (the
+                        established "secondary text" token) is designed for
+                        night/ink backgrounds and measures only 2.13:1 here —
+                        the wrong pairing, not a usable fix. Solid --sm-cream
+                        (already the headline's own color, one weight up)
+                        clears it at 4.81:1; no new color introduced. */}
+                    <span className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.3em] text-[var(--sm-cream)]">
                       One click · instant feedback
                     </span>
                     <span className="flex items-center gap-3 font-[family-name:var(--sm-font-display)] text-3xl uppercase tracking-wide text-[var(--sm-cream)] sm:text-4xl">
@@ -401,7 +445,10 @@ export default function StartScreen({
                         wrapping. Same family of bug as the W5 ribbon fix
                         above; fixed the same way, narrowly, without touching
                         the shared .sm-btn rule other buttons rely on. */}
-                    <span className="max-w-[46ch] whitespace-normal text-[13px] leading-snug text-[var(--sm-cream)]/80 sm:text-[15px] sm:leading-relaxed">
+                    {/* a11y pass (2026-09-04, correction): cream/80 on the
+                        stamp background measured 3.55:1 — under 4.5:1. Same
+                        fix as the caption above: solid --sm-cream, 4.81:1. */}
+                    <span className="max-w-[46ch] whitespace-normal text-[13px] leading-snug text-[var(--sm-cream)] sm:text-[15px] sm:leading-relaxed">
                       Loads the built-in sample screenplay for a full verdict, craft score, and top issues. No setup.
                     </span>
                   </button>
@@ -510,21 +557,28 @@ export default function StartScreen({
                       Verify a report
                     </a>
                     {onOpenStoryMachine && (
+                      // a11y pass (2026-09-04, correction): text-ink/35 on
+                      // paper measured 2.24:1 — well under 4.5:1. The
+                      // established --sm-ink-mute token ("secondary text",
+                      // design-system.css) is the same de-emphasized role at
+                      // full opacity: 5.34:1, no new color.
                       <button
                         type="button"
                         onClick={() => onOpenStoryMachine()}
-                        className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/35 transition-colors ${MICRO_TRANSITION} hover:text-ink/60 ${FOCUS_RING}`}
+                        className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sm-ink-mute)] transition-colors ${MICRO_TRANSITION} hover:text-ink/60 ${FOCUS_RING}`}
                       >
                         <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
                         Advanced: Simulation
                       </button>
                     )}
                   </div>
+                  {/* a11y pass (2026-09-04, correction): same text-ink/35
+                      -> --sm-ink-mute fix as "Advanced: Simulation" above. */}
                   <button
                     type="button"
                     onClick={() => setView("wizard")}
                     disabled={isGenerating}
-                    className={`group inline-flex min-h-[40px] items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/35 transition-colors ${MICRO_TRANSITION} hover:text-ink/60 disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`group inline-flex min-h-[40px] items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sm-ink-mute)] transition-colors ${MICRO_TRANSITION} hover:text-ink/60 disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
                     <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
                     Advanced: Story wizard
@@ -764,7 +818,11 @@ export default function StartScreen({
               </button>
               <div className="flex items-end justify-between gap-6">
                 <div>
-                  <p className="font-mono text-xs uppercase tracking-[0.3em] text-ink/50">
+                  {/* a11y pass (2026-09-04, correction): same text-ink/50
+                      bug as the entrance headings above (3.43:1) — the
+                      wizard view was never in the audited surface set, so it
+                      shipped unfixed. Same /65 fix, 5.58:1. */}
+                  <p className="font-mono text-xs uppercase tracking-[0.3em] text-ink/65">
                     New Story — Configuration
                   </p>
                   <h2 className="mt-2 font-display text-3xl uppercase leading-none text-ink sm:text-4xl">
