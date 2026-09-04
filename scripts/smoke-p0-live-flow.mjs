@@ -36,6 +36,7 @@
 import { spawn } from 'node:child_process';
 import {
   bootKeylessServer,
+  getTiming,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -61,6 +62,11 @@ let browser = null;
 const genuineErrors = [];
 
 async function main() {
+  // Read the load-derived timing policy FIRST — before the server boots or
+  // Chromium launches — so VERIFY_MAX_LOAD_PER_CPU can refuse the whole run
+  // without paying for either. See scripts/lib/browser-verify.mjs.
+  const timing = getTiming({ logPrefix: 'smoke' });
+
   // 1. Boot the server keyless on the isolated port, neutralizing inherited
   // provider configuration as well as Gemini's direct environment key.
   serverProc = await bootKeylessServer({
@@ -76,11 +82,11 @@ async function main() {
   wireConsoleCapture(page, genuineErrors);
 
   console.log(`[smoke] loading ${BASE} ...`);
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
   // StartScreen → "Try sample coverage"
   const sampleCta = await page.getByRole('button', { name: /try sample coverage/i }).first();
-  await sampleCta.click({ timeout: 15000 });
+  await sampleCta.click({ timeout: timing.ms(15000) });
   console.log('[smoke] clicked "Try sample coverage"; waiting for report...');
 
   // Wait for the report to RENDER, not for the route to answer — see

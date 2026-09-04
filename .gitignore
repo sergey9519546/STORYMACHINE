@@ -96,3 +96,9 @@ screenplay-training/
 # every lane to date has deliberately left them uncommitted, and committing
 # binaries that change on each run would bloat history for no evidence value.
 scripts/output/*.png
+
+# scripts/verify-browser-battery.mjs's --retry-flaky logs: per-run debug
+# transcripts of a failed-then-retried suite, not evidence artifacts like the
+# JSON/CSV above — regenerable on every retry, would otherwise bloat history
+# with console noise from whichever machine happened to be loaded.
+scripts/output/flaky-retries/

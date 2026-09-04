@@ -45,7 +45,7 @@
     "verify:llm-providers": "node scripts/smoke-llm-providers.mjs",
     "verify:a11y": "node scripts/verify-a11y.mjs",
     "verify:production": "node scripts/verify-production-build.mjs",
-    "verify:browser": "npm run verify:p0-flow && npm run verify:focus-traps && npm run verify:surfaces && npm run verify:ui-polish && npm run verify:local-safety-net && npm run verify:command-palette && npm run verify:a11y && npm run verify:production"
+    "verify:browser": "node scripts/verify-browser-battery.mjs verify:p0-flow verify:focus-traps verify:surfaces verify:ui-polish verify:local-safety-net verify:command-palette verify:a11y verify:production"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

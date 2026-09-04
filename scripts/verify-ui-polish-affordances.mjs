@@ -40,6 +40,7 @@ import { join } from 'node:path';
 import {
   bootKeylessServer,
   createRecorder,
+  getTiming,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -53,6 +54,11 @@ const PORT = await pickFreePort();
 const BASE = `http://127.0.0.1:${PORT}`;
 let serverProc = null;
 let browser = null;
+
+// Read the load-derived timing policy FIRST — before the server boots or
+// Chromium launches — so VERIFY_MAX_LOAD_PER_CPU can refuse the whole run
+// without paying for either. See scripts/lib/browser-verify.mjs.
+const timing = getTiming();
 
 const { record, printSummary } = createRecorder({ grouped: true, groupKey: 'phase' });
 
@@ -103,12 +109,12 @@ try {
 
   // ── A. Coverage "Jump to line" highlights ────────────────────────────────
   console.log('\n=== A — Coverage "Jump to line" flashes the lines ===');
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} });
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
-  await page.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: 15000 });
-  await page.waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: 40000 });
+  await page.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
+  await page.waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: timing.ms(40000) });
   await page.screenshot({ path: join(SHOTS, 'A1-coverage-summary.png'), fullPage: false });
 
   const jumpBtn = page.getByRole('button', { name: /jump to line \d+/i }).first();
@@ -123,7 +129,7 @@ try {
     // The decoration is removed after its 2.2s fade (FountainEditor.tsx), so
     // look immediately.
     const flashed = await page
-      .waitForSelector('.cm-sm-finding-flash', { timeout: 2000 })
+      .waitForSelector('.cm-sm-finding-flash', { timeout: timing.ms(2000) })
       .then(() => true)
       .catch(() => false);
     record('A', 'clicking it paints the highlightRange decoration in the editor', flashed, '.cm-sm-finding-flash present');
@@ -139,8 +145,8 @@ try {
   // ── C. The delta is quiet after an upstream edit ─────────────────────────
   // Done before B because it continues from the same coverage run.
   console.log('\n=== C — findings delta after an edit that only shifts line numbers ===');
-  await page.getByRole('button', { name: 'Full report', exact: true }).first().click({ timeout: 15000 });
-  await page.waitForSelector('[role="dialog"]', { timeout: 15000 });
+  await page.getByRole('button', { name: 'Full report', exact: true }).first().click({ timeout: timing.ms(15000) });
+  await page.waitForSelector('[role="dialog"]', { timeout: timing.ms(15000) });
   await page.screenshot({ path: join(SHOTS, 'C1-full-report.png'), fullPage: false });
 
   // Edit an EARLY scene, with the doctor panel still open (it is a 640px
@@ -163,7 +169,7 @@ try {
     .filter({ hasText: /since your last run|No change in findings/ })
     .first();
   const deltaAppeared = await deltaLine
-    .waitFor({ state: 'attached', timeout: 90000 })
+    .waitFor({ state: 'attached', timeout: timing.ms(90000) })
     .then(() => true)
     .catch(() => false);
   if (!deltaAppeared) await page.screenshot({ path: join(SHOTS, 'C-debug-no-delta.png'), fullPage: false });
@@ -205,16 +211,16 @@ try {
   // ── B. Settings tab strip keyboard pattern ───────────────────────────────
   console.log('\n=== B — Settings tab strip: one Tab stop, arrows move ===');
   await page.keyboard.press('Escape'); // close the doctor panel
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(timing.ms(500));
   // Same path a writer takes: Toolbar overflow ("More tools") → "Labs &
   // Settings". Selector convention lifted from
   // scripts/verify-p2-p3-surfaces.mjs's getOverflowMenuItemLabels.
-  await page.getByRole('button', { name: 'More tools' }).first().click({ timeout: 15000 });
+  await page.getByRole('button', { name: 'More tools' }).first().click({ timeout: timing.ms(15000) });
   const menu = page.getByRole('menu').first();
-  await menu.waitFor({ timeout: 10000 });
-  await menu.getByRole('menuitem', { name: /labs/i }).first().click({ timeout: 10000 });
+  await menu.waitFor({ timeout: timing.ms(10000) });
+  await menu.getByRole('menuitem', { name: /labs/i }).first().click({ timeout: timing.ms(10000) });
   const tablist = page.locator('[role="tablist"][aria-label="Settings sections"]');
-  await tablist.waitFor({ timeout: 15000 });
+  await tablist.waitFor({ timeout: timing.ms(15000) });
   await page.screenshot({ path: join(SHOTS, 'B1-settings-open.png'), fullPage: false });
 
   // Scoped to the Settings tablist specifically: Sidebar.tsx's own
@@ -309,7 +315,7 @@ try {
   // the eight-tab walk the pre-decision version of this block did — kept
   // rather than dropped, it just needs the toggle now to reach that strip. ──
   await page.locator('#labs-toggle').check();
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(timing.ms(250));
   const grown = await tabState();
   record('B', 'flipping the in-panel Labs toggle grows the strip back to all eight tabs',
     grown.tabIndexes.length === 8, JSON.stringify(grown.tabIndexes));

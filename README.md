@@ -122,6 +122,28 @@ look:
   directly: **just over three minutes** wall clock with Chromium pre-cached,
   all eight green. CI runs it as its own blocking `browser` job.
 
+  **Timing under load.** Every `waitForFunction`/`waitForSelector`/download/
+  boot timeout the battery uses is scaled by one shared policy
+  (`scripts/lib/browser-verify.mjs`'s `getTiming()`): each suite reads
+  `os.loadavg()[0] / os.cpus().length` once at startup and multiplies its
+  base timeouts by a factor of 1.0x at or below 1.0 load/cpu, growing
+  linearly, capped at 4.0x — so a machine running several agents' worth of
+  concurrent work doesn't turn a base-value timeout tuned for an idle box
+  into a false failure. The one line it logs per suite —
+  `[verify] load L/cpus → timeout scale Sx` — is the whole visible contract.
+  Set **`VERIFY_MAX_LOAD_PER_CPU`** (a number, e.g. `2`) to make a suite
+  refuse to run at all above that per-CPU load instead of scaling: it exits
+  **3**, naming the measured load, without booting the server or launching
+  Chromium. Unset (the default) never refuses.
+  Pass **`--retry-flaky N`** to `node scripts/verify-browser-battery.mjs`
+  (the runner behind `npm run verify:browser`, which itself passes no flag —
+  CI always runs with `N=0`) to re-run a suite that fails ALONE, up to `N`
+  more times, before giving up on it; a suite that only passes on a retry is
+  reported as `flaky-pass`, never as a plain pass, and both the failing and
+  the passing attempt's full logs are kept under
+  `scripts/output/flaky-retries/` (gitignored). Example:
+  `node scripts/verify-browser-battery.mjs --retry-flaky 2 verify:p0-flow verify:a11y`.
+
 For local UI/manual-testing iteration, set `SESSION_DB_DIR=:memory:` before
 `npm run dev` (or export it for the session). Without it, every `npm run dev`
 boot persists session state to `data/sessions/<sessionId>.db` on disk (the

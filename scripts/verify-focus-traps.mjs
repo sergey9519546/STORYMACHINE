@@ -40,6 +40,7 @@
 import {
   bootKeylessServer,
   createRecorder,
+  getTiming,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -54,6 +55,7 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 
 let serverProc = null;
 let browser = null;
+let timing = null; // set at the top of main() — see scripts/lib/browser-verify.mjs
 const genuineConsoleErrors = [];
 
 // { dialog, assertion, pass, detail }
@@ -110,11 +112,11 @@ async function activeElementInfo(page) {
  * not a text-match, which could pass on a same-looking-but-different node.
  */
 async function verifyDialog(page, { name, restoreTriggerHandle, closeDialog }) {
-  await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
+  await page.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) });
   // Let framer-motion enter animations and the hook's own effect settle —
   // ScriptDoctorPanel's spring exit alone takes ~600ms; give entry the same
   // headroom rather than tuning per-dialog constants.
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(timing.ms(400));
 
   // 1. INITIAL FOCUS
   const initial = await activeElementInfo(page);
@@ -128,7 +130,7 @@ async function verifyDialog(page, { name, restoreTriggerHandle, closeDialog }) {
     // 2. TRAP FORWARD: focus last, Tab -> first (or same element if only one).
     await focusNth(page, -1);
     await page.keyboard.press('Tab');
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(timing.ms(150));
     const fwd = await activeElementInfo(page);
     const fwdOk = fwd.insideDialog && fwd.desc === focusables[0];
     record(name, 'TRAP FORWARD wraps last -> first', fwdOk, `got="${fwd.desc}" expected="${focusables[0]}"`);
@@ -136,7 +138,7 @@ async function verifyDialog(page, { name, restoreTriggerHandle, closeDialog }) {
     // 3. TRAP BACKWARD: focus first, Shift+Tab -> last.
     await focusNth(page, 0);
     await page.keyboard.press('Shift+Tab');
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(timing.ms(150));
     const bwd = await activeElementInfo(page);
     const bwdOk = bwd.insideDialog && bwd.desc === focusables[focusables.length - 1];
     record(name, 'TRAP BACKWARD wraps first -> last', bwdOk, `got="${bwd.desc}" expected="${focusables[focusables.length - 1]}"`);
@@ -146,8 +148,8 @@ async function verifyDialog(page, { name, restoreTriggerHandle, closeDialog }) {
   await closeDialog();
   // ScriptDoctorPanel's framer-motion exit spring needs real time to finish
   // before React actually unmounts it and the hook's cleanup runs.
-  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: 3000 }).catch(() => {});
-  await page.waitForTimeout(150);
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: timing.ms(3000) }).catch(() => {});
+  await page.waitForTimeout(timing.ms(150));
   let restoreOk = false;
   let restoreDetail = '';
   if (restoreTriggerHandle) {
@@ -164,6 +166,11 @@ async function verifyDialog(page, { name, restoreTriggerHandle, closeDialog }) {
 }
 
 async function main() {
+  // Read the load-derived timing policy FIRST — before the server boots or
+  // Chromium launches — so VERIFY_MAX_LOAD_PER_CPU can refuse the whole run
+  // without paying for either. See scripts/lib/browser-verify.mjs.
+  timing = getTiming();
+
   serverProc = await bootKeylessServer({ repo: REPO, port: ISOLATED_PORT, baseUrl: BASE });
   browser = await launchChromium();
 
@@ -175,10 +182,10 @@ async function main() {
     wireConsoleCapture(page, genuineConsoleErrors);
 
     console.log('\n=== ScriptDoctorPanel (StartScreen -> Try sample coverage -> Full report) ===');
-    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
     const sampleCta = page.getByRole('button', { name: /try sample coverage/i }).first();
-    await sampleCta.click({ timeout: 15000 });
+    await sampleCta.click({ timeout: timing.ms(15000) });
     // The coverage card streams over SSE (/api/scriptide/doctor/stream), whose
     // 200 arrives at connection-open — before the report exists. The shared
     // helper polls the rendered text against a real deadline; it was the third
@@ -212,13 +219,13 @@ async function main() {
     const page = await context.newPage();
     wireConsoleCapture(page, genuineConsoleErrors);
 
-    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
     const advancedBtn = page.getByRole('button', { name: /advanced: simulation/i }).first();
-    await advancedBtn.waitFor({ timeout: 15000 });
+    await advancedBtn.waitFor({ timeout: timing.ms(15000) });
     await advancedBtn.click();
 
     const inspectBtn = page.getByRole('button', { name: /^inspect$/i }).first();
-    await inspectBtn.waitFor({ timeout: 15000 });
+    await inspectBtn.waitFor({ timeout: timing.ms(15000) });
     // The "Inspect" button itself is the correct RESTORE target for every
     // dialog opened from its dropdown: the specific menu item unmounts (the
     // menu closes) in the same click that opens the dialog, but "Inspect"
@@ -233,7 +240,7 @@ async function main() {
       console.log(`\n=== ${dialogName} (StoryMachine -> Inspect -> ${menuLabel}) ===`);
       await inspectBtn.click();
       const menuItem = page.getByRole('menuitem', { name: menuLabel, exact: true }).first();
-      await menuItem.waitFor({ timeout: 10000 });
+      await menuItem.waitFor({ timeout: timing.ms(10000) });
       await menuItem.click();
 
       await verifyDialog(page, {

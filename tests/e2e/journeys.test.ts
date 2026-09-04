@@ -19,15 +19,23 @@ import { fileURLToPath } from 'node:url';
 // that smoke certified, rather than a separately-authored fixture that could
 // drift from the one-click demo path.
 import { title as sampleTitle, fountain as sampleFountain } from '../../src/lib/sample-script.ts';
+// This suite does NOT go through scripts/lib/browser-verify.mjs's
+// bootKeylessServer/launchChromium (it drives the server over raw fetch, no
+// Playwright/Chromium involved) — but it has its own hard-coded boot-wait
+// timeout, so it gets the SAME load-derived timing policy those helpers use,
+// from the same one place, rather than a second copy of the idea.
+import { getTiming } from '../../scripts/lib/browser-verify.mjs';
 
 const RUN_E2E = process.env.RUN_E2E === '1';
 const PORT = 4577; // fixed ephemeral-range port for this suite's own server instance
 const BASE = `http://127.0.0.1:${PORT}`;
 
 let server: ChildProcess | undefined;
+let timing: { ms: (base: number) => number } | undefined;
 
 async function waitForServer(timeoutMs = 20_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
+  const scaledTimeoutMs = timing ? timing.ms(timeoutMs) : timeoutMs;
+  const deadline = Date.now() + scaledTimeoutMs;
   while (Date.now() < deadline) {
     try {
       const res = await fetch(`${BASE}/api/ai-config`);
@@ -87,6 +95,9 @@ Maybe I already know the answer.
 
 before(async () => {
   if (!RUN_E2E) return;
+  // Read the load-derived timing policy FIRST — before the server even
+  // spawns. See scripts/lib/browser-verify.mjs.
+  timing = getTiming({ logPrefix: 'e2e' });
   const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
   server = spawn(
     process.execPath,
@@ -117,7 +128,7 @@ after(async () => {
   if (!RUN_E2E || !server) return;
   process.env.__E2E_SHUTTING_DOWN__ = '1';
   server.kill('SIGTERM');
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, timing ? timing.ms(200) : 200));
 });
 
 describe('e2e journeys (Run 17-A)', { skip: !RUN_E2E && 'RUN_E2E not set -- set RUN_E2E=1 to spawn the real server and run journeys' }, () => {

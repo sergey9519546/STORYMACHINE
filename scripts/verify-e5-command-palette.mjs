@@ -18,6 +18,7 @@ import { mkdirSync } from 'node:fs';
 import {
   bootKeylessServer,
   createRecorder,
+  getTiming,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -32,6 +33,7 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 
 let serverProc = null;
 let browser = null;
+let timing = null; // set at the top of main() — see scripts/lib/browser-verify.mjs
 
 const { record, printSummary } = createRecorder();
 
@@ -39,6 +41,11 @@ const isMac = process.platform === 'darwin';
 const MOD = isMac ? 'Meta' : 'Control';
 
 async function main() {
+  // Read the load-derived timing policy FIRST — before the server boots or
+  // Chromium launches — so VERIFY_MAX_LOAD_PER_CPU can refuse the whole run
+  // without paying for either. See scripts/lib/browser-verify.mjs.
+  timing = getTiming();
+
   serverProc = await bootKeylessServer({ repo: REPO, port: ISOLATED_PORT, baseUrl: BASE });
   browser = await launchChromium();
   const context = await browser.newContext();
@@ -48,8 +55,8 @@ async function main() {
   // 1) Entrance — Tab-order walk + screenshot.
   // ══════════════════════════════════════════════════════════════════════
   console.log('\n=== 1) Entrance: Tab-order walk ===');
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page.getByRole('button', { name: /start fresh/i }).first().waitFor({ timeout: 15000 });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page.getByRole('button', { name: /start fresh/i }).first().waitFor({ timeout: timing.ms(15000) });
   await page.screenshot({ path: `${OUT_DIR}/e5-entrance.png`, fullPage: false });
 
   // Click somewhere neutral first so focus starts from a known place (the
@@ -84,10 +91,10 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   console.log('\n=== 2) Command palette: open, filter, run a real action ===');
   await page.getByRole('button', { name: /start fresh/i }).first().click();
-  await page.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await page.getByRole('button', { name: 'Write', exact: true }).first().click();
   const editor = page.locator('.cm-content').first();
-  await editor.waitFor({ timeout: 10000 });
+  await editor.waitFor({ timeout: timing.ms(10000) });
   // Type a line first — some palette actions (export, snapshot) are
   // disabled on an empty draft, and this exercises a real Tab-out-of-editor
   // too (Tab is documented as unbound, not intercepted).
@@ -99,7 +106,7 @@ async function main() {
 
   await page.keyboard.press(`${MOD}+k`);
   const paletteDialog = page.getByRole('dialog', { name: 'Command palette' });
-  await paletteDialog.waitFor({ timeout: 5000 }).then(() => record('Cmd/Ctrl+K opens the command palette (role="dialog")', true))
+  await paletteDialog.waitFor({ timeout: timing.ms(5000) }).then(() => record('Cmd/Ctrl+K opens the command palette (role="dialog")', true))
     .catch((e) => record('Cmd/Ctrl+K opens the command palette (role="dialog")', false, e.message));
 
   const paletteInputFocused = await page.evaluate(() => document.activeElement?.getAttribute('role') === 'combobox');
@@ -109,9 +116,9 @@ async function main() {
 
   // Type to filter down to the real "Open Ship" action.
   await page.keyboard.type('ship', { delay: 20 });
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(timing.ms(150));
   const shipOption = page.getByRole('option', { name: /open ship/i }).first();
-  const shipOptionVisible = await shipOption.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  const shipOptionVisible = await shipOption.waitFor({ timeout: timing.ms(3000) }).then(() => true).catch(() => false);
   record('Typing "ship" filters the palette down to "Open Ship (export & versions)"', shipOptionVisible);
 
   const filteredCount = await page.getByRole('option').count();
@@ -121,7 +128,7 @@ async function main() {
 
   // Enter runs the SAME handler the Ship task-tab button calls.
   await page.keyboard.press('Enter');
-  const shipPanelOpened = await page.locator('[aria-labelledby="ship-panel-title"]').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  const shipPanelOpened = await page.locator('[aria-labelledby="ship-panel-title"]').waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   record('Enter on the highlighted action runs it for real: the Ship panel opens', shipPanelOpened);
 
   const paletteClosedAfterRun = await paletteDialog.count().then((n) => n === 0);
@@ -131,23 +138,23 @@ async function main() {
 
   // Close Ship (back to Write) before the next check.
   await page.getByRole('button', { name: /close ship panel/i }).click();
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(timing.ms(200));
 
   // ══════════════════════════════════════════════════════════════════════
   // 3) Escape restores focus to where the writer was.
   // ══════════════════════════════════════════════════════════════════════
   console.log('\n=== 3) Escape restores focus ===');
   await editor.focus();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(timing.ms(100));
   await page.keyboard.press(`${MOD}+k`);
-  await paletteDialog.waitFor({ timeout: 5000 });
+  await paletteDialog.waitFor({ timeout: timing.ms(5000) });
   await page.keyboard.press('Escape');
   // CommandPalette exits via AnimatePresence (0.14s fade/scale) — the
   // <dialog> node stays mounted for that long even after React state
   // flips paletteOpen false, so an immediate .count() check would
   // (falsely) still see it. Same margin used after every other
   // exit-animated close below.
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(timing.ms(400));
   const paletteClosedOnEscape = await paletteDialog.count().then((n) => n === 0);
   record('Escape closes the command palette', paletteClosedOnEscape);
   const focusRestoredToEditor = await page.evaluate(() => document.activeElement?.className?.includes('cm-') ?? false);
@@ -161,13 +168,13 @@ async function main() {
   console.log('\n=== 4) Keyboard shortcuts panel ===');
   await page.keyboard.press(`${MOD}+/`);
   const shortcutDialog = page.getByRole('dialog', { name: /keyboard shortcuts/i });
-  const shortcutDialogOpened = await shortcutDialog.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  const shortcutDialogOpened = await shortcutDialog.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   record('Cmd/Ctrl+/ opens the Keyboard Shortcuts panel as a real dialog', shortcutDialogOpened);
   const mentionsPalette = await page.getByText(/open the command palette/i).count();
   record('The shortcuts panel documents Cmd/Ctrl+K (the palette itself)', mentionsPalette > 0);
   await page.screenshot({ path: `${OUT_DIR}/e5-shortcuts-panel.png` });
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(timing.ms(400));
   const shortcutDialogClosedOnEscape = await shortcutDialog.count().then((n) => n === 0);
   record('Escape closes the Keyboard Shortcuts panel (E5 fix — it had no Escape handling before this pass)', shortcutDialogClosedOnEscape);
 
@@ -178,10 +185,10 @@ async function main() {
   const overflowBtn = page.getByRole('button', { name: 'More tools' }).first();
   await overflowBtn.click();
   const menu = page.getByRole('menu').first();
-  await menu.waitFor({ timeout: 5000 });
+  await menu.waitFor({ timeout: timing.ms(5000) });
   await menu.getByRole('menuitem', { name: /labs & settings|labs is on/i }).first().click();
   const settingsDialog = page.getByRole('dialog', { name: /settings/i });
-  const settingsOpened = await settingsDialog.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  const settingsOpened = await settingsDialog.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   record('Settings opens as role="dialog" aria-modal="true"', settingsOpened);
   await page.screenshot({ path: `${OUT_DIR}/e5-settings-panel.png` });
 
@@ -198,7 +205,7 @@ async function main() {
   record('Settings dialog traps Tab — 25 presses never escape it', stayedInDialog);
 
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(timing.ms(300));
   const settingsClosedOnEscape = await settingsDialog.count().then((n) => n === 0);
   record('Escape closes the Settings dialog', settingsClosedOnEscape);
 

@@ -49,6 +49,7 @@ import { join, relative } from 'node:path';
 import {
   bootKeylessServer,
   createRecorder,
+  getTiming,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -91,7 +92,7 @@ async function returnDoctorPanelToIdle(page) {
   await page
     .getByRole('button', { name: 'Run Diagnosis', exact: true })
     .first()
-    .waitFor({ state: 'visible', timeout: 10000 });
+    .waitFor({ state: 'visible', timeout: timing.ms(10000) });
 }
 
 /** The Settings dialog's tab labels, in strip order. Opened the same way a
@@ -99,10 +100,10 @@ async function returnDoctorPanelToIdle(page) {
 async function openSettingsTabLabels(page) {
   await page.getByRole('button', { name: 'More tools' }).first().click();
   const menu = page.getByRole('menu').first();
-  await menu.waitFor({ timeout: 10000 });
+  await menu.waitFor({ timeout: timing.ms(10000) });
   await menu.getByRole('menuitem', { name: /labs/i }).first().click();
   const tablist = page.locator('[role="tablist"][aria-label="Settings sections"]');
-  await tablist.waitFor({ timeout: 15000 });
+  await tablist.waitFor({ timeout: timing.ms(15000) });
   // Scoped to this tablist specifically: Sidebar.tsx's own Scenes/
   // Characters switcher (2026-09-04 a11y pass) is now ALSO a real
   // role="tab" pair, always present underneath this dialog — an unscoped
@@ -117,6 +118,7 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 
 let serverProc = null;
 let browser = null;
+let timing = null; // set at the top of main() — see scripts/lib/browser-verify.mjs
 const genuineConsoleErrors = [];
 
 // { phase, assertion, pass, detail }
@@ -292,7 +294,7 @@ async function getOverflowMenuItemLabels(page) {
   const btn = page.getByRole('button', { name: 'More tools' }).first();
   await btn.click();
   const menu = page.getByRole('menu').first();
-  await menu.waitFor({ timeout: 5000 });
+  await menu.waitFor({ timeout: timing.ms(5000) });
   const items = await menu.getByRole('menuitem').allTextContents();
   await page.keyboard.press('Escape'); // close it back up
   return items.map((s) => s.trim());
@@ -310,6 +312,11 @@ function hasResearchShellChrome(bodyText) {
 }
 
 async function main() {
+  // Read the load-derived timing policy FIRST — before the server boots or
+  // Chromium launches — so VERIFY_MAX_LOAD_PER_CPU can refuse the whole run
+  // without paying for either. See scripts/lib/browser-verify.mjs.
+  timing = getTiming();
+
   const { fountain: sampleFountain, title: sampleTitle } = loadSampleScript();
   console.log(`[verify] loaded sample script "${sampleTitle}" (${sampleFountain.length} chars) for the verify loop.`);
 
@@ -340,10 +347,10 @@ async function main() {
   wireConsoleCapture(pageA, genuineConsoleErrors);
 
   console.log('\n=== P2 — DEFAULT SURFACE (Labs OFF, fresh profile) ===');
-  await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
   const sampleCta = pageA.getByRole('button', { name: /try sample coverage/i }).first();
-  await sampleCta.waitFor({ timeout: 15000 });
+  await sampleCta.waitFor({ timeout: timing.ms(15000) });
   record('P2', 'StartScreen offers the sample-coverage CTA', true, '"Try sample coverage" button found');
 
   const advancedSimBtnOff = pageA.getByRole('button', { name: /advanced: simulation/i });
@@ -355,7 +362,7 @@ async function main() {
   const startFreshBtn = pageA.getByRole('button', { name: /start fresh/i }).first();
   await startFreshBtn.click();
   const toolbarHeader = pageA.locator('header.sm-pagetop');
-  await toolbarHeader.waitFor({ timeout: 15000 });
+  await toolbarHeader.waitFor({ timeout: timing.ms(15000) });
 
   const overflowLabelsOff = await getOverflowMenuItemLabels(pageA);
   // "director" alone also matches the unrelated, never-gated "Director
@@ -400,8 +407,8 @@ async function main() {
   // 2026-08-21 addendum for the closure record.
   const shipTaskBtn = pageA.getByRole('button', { name: 'Ship', exact: true }).first();
   await shipTaskBtn.click();
-  await pageA.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: 10000 });
-  await pageA.waitForTimeout(200);
+  await pageA.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: timing.ms(10000) });
+  await pageA.waitForTimeout(timing.ms(200));
   const shipBodyTextOff = await pageA.locator('body').innerText();
   const shipHasResearchChromeOff = hasResearchShellChrome(shipBodyTextOff);
   record(
@@ -466,22 +473,22 @@ async function main() {
   );
 
   await pageA.getByRole('button', { name: 'Write', exact: true }).first().click();
-  await pageA.waitForTimeout(150);
+  await pageA.waitForTimeout(timing.ms(150));
 
   // ── Decision #3, second entry point: the command palette. E5's rule is that
   // every palette row dispatches through the same callback a visible control
   // calls — so a gated control whose palette row survived would be a real
   // bypass, not a cosmetic one. ────────────────────────────────────────────
   const editorA = pageA.locator('.cm-content').first();
-  await editorA.waitFor({ timeout: 10000 });
+  await editorA.waitFor({ timeout: timing.ms(10000) });
   await editorA.focus();
   await pageA.keyboard.press(`${MOD}+k`);
   const paletteA = pageA.getByRole('dialog', { name: 'Command palette' });
-  const paletteOpenedA = await paletteA.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  const paletteOpenedA = await paletteA.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   record('P2-generative', 'Command palette opens on the default surface (Cmd/Ctrl+K)', paletteOpenedA, '');
   if (paletteOpenedA) {
     await pageA.keyboard.type('analysis', { delay: 10 });
-    await pageA.waitForTimeout(200);
+    await pageA.waitForTimeout(timing.ms(200));
     const autoAnalysisRowsOff = await pageA.getByRole('option', { name: /auto-analysis/i }).count();
     record(
       'P2-generative',
@@ -492,7 +499,7 @@ async function main() {
     // The palette must still be USEFUL — this is a gate, not a lobotomy.
     await pageA.keyboard.press('Control+a');
     await pageA.keyboard.type('coverage', { delay: 10 });
-    await pageA.waitForTimeout(200);
+    await pageA.waitForTimeout(timing.ms(200));
     const doctorRowOff = await pageA.getByRole('option', { name: /diagnose this draft/i }).count();
     record(
       'P2-generative',
@@ -501,7 +508,7 @@ async function main() {
       `matching option rows=${doctorRowOff}`,
     );
     await pageA.keyboard.press('Escape');
-    await pageA.waitForTimeout(150);
+    await pageA.waitForTimeout(timing.ms(150));
   }
 
   // ── Decision #3, third entry point: Settings' five AI-provider tabs
@@ -534,7 +541,7 @@ async function main() {
     `tabs=${JSON.stringify(settingsTabsOff)}`,
   );
   await pageA.getByRole('tab', { name: 'Labs', exact: true }).click();
-  await pageA.waitForTimeout(200);
+  await pageA.waitForTimeout(timing.ms(200));
   // Scoped to the Settings dialog specifically: Sidebar.tsx's own
   // Scenes/Characters switcher (2026-09-04 a11y pass) is now ALSO a real
   // role="tablist"/tab"/"tabpanel" set, so an unscoped `[role="tabpanel"]`
@@ -548,7 +555,7 @@ async function main() {
     `panel text=${JSON.stringify(labsPanelTextOff.slice(0, 240))}`,
   );
   await pageA.getByRole('button', { name: /close settings/i }).first().click();
-  await pageA.waitForTimeout(200);
+  await pageA.waitForTimeout(timing.ms(200));
 
   // ══════════════════════════════════════════════════════════════════════
   // P3 — THE VERIFY LOOP, still Labs OFF (verify is deliberately outside
@@ -559,7 +566,7 @@ async function main() {
   // Clean slate so the sample flow starts from StartScreen again (the
   // "Start fresh" draft above persisted a config into localStorage).
   await pageA.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} });
-  await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
   const summaryBeforeP3Res = await fetch(`${BASE}/api/events/summary`);
   const summaryBeforeP3 = await summaryBeforeP3Res.json();
@@ -575,7 +582,7 @@ async function main() {
   });
 
   const sampleCta2 = pageA.getByRole('button', { name: /try sample coverage/i }).first();
-  await sampleCta2.click({ timeout: 15000 });
+  await sampleCta2.click({ timeout: timing.ms(15000) });
   // Phase E exit-gate punch list, P2: CoverageSummary now streams its
   // progress from POST /api/scriptide/doctor/stream (src/lib/doctor-
   // stream.ts) instead of awaiting one JSON response from the plain
@@ -588,7 +595,7 @@ async function main() {
   // timeout budget generous enough for a real run (matches the old
   // waitForResponse's 30s allowance).
   const verdictRendered = await pageA
-    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: 30000 })
+    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: timing.ms(30000) })
     .then(() => true)
     .catch(() => false);
   record('P3', 'Sample coverage produces a rendered verdict (Doctor reachable end to end)', verdictRendered, 'checked CoverageSummary body for a verdict word');
@@ -612,12 +619,12 @@ async function main() {
   };
   pageA.on('request', onSecondDoctorCall);
   await fullReportBtn.click();
-  await pageA.waitForSelector('[role="dialog"]', { timeout: 10000 });
+  await pageA.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) });
 
   const exportBtn = pageA.getByRole('button', { name: 'Export coverage report as an HTML document', exact: true }).first();
   const runDiagnosisBtnW4 = pageA.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
   const exportVisibleImmediately = await exportBtn
-    .waitFor({ state: 'visible', timeout: 5000 })
+    .waitFor({ state: 'visible', timeout: timing.ms(5000) })
     .then(() => true)
     .catch(() => false);
   const idleRunDiagnosisVisible = await runDiagnosisBtnW4.isVisible().catch(() => false);
@@ -628,11 +635,11 @@ async function main() {
     exportVisibleImmediately && !idleRunDiagnosisVisible && !secondDoctorCallSeen,
     `exportVisibleImmediately=${exportVisibleImmediately} idleRunDiagnosisVisible=${idleRunDiagnosisVisible} secondDoctorCallSeen=${secondDoctorCallSeen}`,
   );
-  await pageA.waitForTimeout(400);
+  await pageA.waitForTimeout(timing.ms(400));
 
 
   const [download] = await Promise.all([
-    pageA.waitForEvent('download', { timeout: 20000 }),
+    pageA.waitForEvent('download', { timeout: timing.ms(20000) }),
     exportBtn.click(),
   ]);
   const downloadPath = await download.path();
@@ -660,7 +667,7 @@ async function main() {
   );
 
   const [letterDownload] = await Promise.all([
-    pageA.waitForEvent('download', { timeout: 20000 }),
+    pageA.waitForEvent('download', { timeout: timing.ms(20000) }),
     coverageLetterBtn.click(),
   ]);
   const letterDownloadPath = await letterDownload.path();
@@ -704,7 +711,7 @@ async function main() {
       const flashBeforeShapeClick = await pageA.locator('.cm-sm-finding-flash').count();
       await sceneBar.click();
       const flashedFromSceneBar = await pageA
-        .waitForSelector('.cm-sm-finding-flash', { timeout: 2000 })
+        .waitForSelector('.cm-sm-finding-flash', { timeout: timing.ms(2000) })
         .then(() => true)
         .catch(() => false);
       record(
@@ -777,9 +784,9 @@ async function main() {
 
   // Close the dialog, navigate to #verify.
   await pageA.keyboard.press('Escape');
-  await pageA.waitForTimeout(200);
-  await pageA.goto(`${BASE}#verify`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  await pageA.getByRole('heading', { name: /verify a report/i }).waitFor({ timeout: 10000 });
+  await pageA.waitForTimeout(timing.ms(200));
+  await pageA.goto(`${BASE}#verify`, { waitUntil: 'domcontentloaded', timeout: timing.ms(15000) });
+  await pageA.getByRole('heading', { name: /verify a report/i }).waitFor({ timeout: timing.ms(10000) });
 
   async function runVerify(scriptText) {
     await pageA.getByLabel('Original script text', { exact: true }).fill(scriptText);
@@ -793,7 +800,7 @@ async function main() {
 
     const verifyBtn = pageA.getByRole('button', { name: /^verify$/i }).first();
     const [resp] = await Promise.all([
-      pageA.waitForResponse((r) => /\/api\/export\/verify$/.test(r.url()), { timeout: 20000 }),
+      pageA.waitForResponse((r) => /\/api\/export\/verify$/.test(r.url()), { timeout: timing.ms(20000) }),
       verifyBtn.click(),
     ]);
     return resp.json();
@@ -867,9 +874,9 @@ async function main() {
   // dedicated browser-proof run, not this shared surface-completeness walk.
   // ══════════════════════════════════════════════════════════════════════
   console.log('\n=== E4-prep — #privacy page reachable and states all four claims ===');
-  await pageA.goto(`${BASE}#privacy`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  await pageA.goto(`${BASE}#privacy`, { waitUntil: 'domcontentloaded', timeout: timing.ms(15000) });
   const privacyHeadingOk = await pageA.getByRole('heading', { name: /^privacy$/i })
-    .waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+    .waitFor({ timeout: timing.ms(10000) }).then(() => true).catch(() => false);
   record('E4', '#privacy route renders the Privacy page', privacyHeadingOk, privacyHeadingOk ? '' : '"Privacy" heading not found');
 
   for (const sectionName of [
@@ -895,19 +902,19 @@ async function main() {
   const pageB = await contextB.newPage();
   wireConsoleCapture(pageB, genuineConsoleErrors);
 
-  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
   // StartScreen's hero wraps in `inert={!isIntroResolved || undefined}`
   // until its intro animation resolves — the button exists in the DOM
   // immediately but Playwright must wait for it to become genuinely
   // actionable rather than checking isVisible() on the very next tick.
   const advancedSimBtnOn = pageB.getByRole('button', { name: /advanced: simulation/i }).first();
-  const advancedSimVisibleOn = await advancedSimBtnOn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+  const advancedSimVisibleOn = await advancedSimBtnOn.waitFor({ state: 'visible', timeout: timing.ms(15000) }).then(() => true).catch(() => false);
   record('P2', 'StartScreen "Advanced: Simulation" APPEARS with Labs ON', advancedSimVisibleOn, advancedSimVisibleOn ? '' : 'button not found/visible with Labs ON');
 
   if (advancedSimVisibleOn) {
     await advancedSimBtnOn.click();
-    await pageB.waitForTimeout(600);
+    await pageB.waitForTimeout(timing.ms(600));
     const smBodyText = await pageB.textContent('body').catch(() => '');
     const reachedStoryMachine = /Story Machine/i.test(smBodyText) && /Agents/i.test(smBodyText);
     record('P2', 'Clicking through reaches the OASIS/simulation surface (agent-roster jargon present)', reachedStoryMachine, 'checked body text for "Story Machine" + "Agents"');
@@ -915,11 +922,11 @@ async function main() {
 
   // Fresh page (same context) to check Toolbar gating with Labs ON.
   await pageB.evaluate(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); localStorage.removeItem('sm_app_view_v1'); } catch {} });
-  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   const startFreshBtnOn = pageB.getByRole('button', { name: /start fresh/i }).first();
-  await startFreshBtnOn.waitFor({ timeout: 15000 });
+  await startFreshBtnOn.waitFor({ timeout: timing.ms(15000) });
   await startFreshBtnOn.click();
-  await pageB.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await pageB.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
 
   const overflowLabelsOn = await getOverflowMenuItemLabels(pageB);
   const hasStudioOn = overflowLabelsOn.some((l) => /studio/i.test(l));
@@ -945,9 +952,9 @@ async function main() {
   // gate is the Labs flag (onOpenStoryMachine truthiness), not dead/removed code.
   const shipTaskBtnOn = pageB.getByRole('button', { name: 'Ship', exact: true }).first();
   await shipTaskBtnOn.click();
-  await pageB.waitForTimeout(300);
+  await pageB.waitForTimeout(timing.ms(300));
   const simulateBtnOn = pageB.getByRole('button', { name: 'Simulate', exact: true }).first();
-  const simulateVisibleOn = await simulateBtnOn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+  const simulateVisibleOn = await simulateBtnOn.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   record(
     'P2',
     'Ship toolbar row: "Simulate" button (reachable equivalent) APPEARS with Labs ON',
@@ -956,7 +963,7 @@ async function main() {
   );
 
   const persistentSimOn = pageB.getByRole('button', { name: 'Simulate in Story Machine', exact: true }).first();
-  const persistentSimVisibleOn = await persistentSimOn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+  const persistentSimVisibleOn = await persistentSimOn.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   record(
     'P2',
     'Persistent Toolbar: "Simulate in Story Machine" control APPEARS with Labs ON',
@@ -967,7 +974,7 @@ async function main() {
   // W6, mirrored for Labs ON: Ship must show the SAME writer-facing
   // ShipPanel — zero research-chrome tab bar — regardless of the Labs flag.
   // Ship is not a Labs surface; only Studio (below) is.
-  await pageB.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: 10000 });
+  await pageB.waitForSelector('[aria-labelledby="ship-panel-title"]', { timeout: timing.ms(10000) });
   const shipBodyTextOn = await pageB.locator('body').innerText();
   const shipHasResearchChromeOn = hasResearchShellChrome(shipBodyTextOn);
   record(
@@ -985,7 +992,7 @@ async function main() {
   // it's a z-50 fixed overlay that sits above the z-20 header while open,
   // so the toolbar's own overflow button is behind it until closed.
   await pageB.getByRole('button', { name: 'Close ship panel' }).click();
-  await pageB.waitForTimeout(200);
+  await pageB.waitForTimeout(timing.ms(200));
   const moreBtnOn = pageB.getByRole('button', { name: 'More tools' }).first();
   await moreBtnOn.click();
   const openStudioItem = pageB.getByRole('menuitem', { name: /open studio/i });
@@ -993,7 +1000,7 @@ async function main() {
   record('P2-W6', 'Toolbar overflow "Open Studio" (Labs ON) is present and clickable', openStudioCountOn === 1, `count=${openStudioCountOn}`);
   if (openStudioCountOn === 1) {
     await openStudioItem.click();
-    await pageB.waitForTimeout(400);
+    await pageB.waitForTimeout(timing.ms(400));
     const studioBodyTextOn = await pageB.locator('body').innerText();
     const studioShellReachable = hasResearchShellChrome(studioBodyTextOn);
     record(
@@ -1014,19 +1021,19 @@ async function main() {
 
   // Close the studio shell opened just above, back to the editor.
   await pageB.keyboard.press('Escape');
-  await pageB.waitForTimeout(300);
+  await pageB.waitForTimeout(timing.ms(300));
   await pageB.getByRole('button', { name: 'Write', exact: true }).first().click();
-  await pageB.waitForTimeout(200);
+  await pageB.waitForTimeout(timing.ms(200));
 
   const editorB = pageB.locator('.cm-content').first();
-  await editorB.waitFor({ timeout: 10000 });
+  await editorB.waitFor({ timeout: timing.ms(10000) });
   await editorB.focus();
   await pageB.keyboard.press(`${MOD}+k`);
   const paletteB = pageB.getByRole('dialog', { name: 'Command palette' });
-  const paletteOpenedB = await paletteB.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+  const paletteOpenedB = await paletteB.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   if (paletteOpenedB) {
     await pageB.keyboard.type('analysis', { delay: 10 });
-    await pageB.waitForTimeout(200);
+    await pageB.waitForTimeout(timing.ms(200));
     const autoAnalysisRowsOn = await pageB.getByRole('option', { name: /auto-analysis/i }).count();
     record(
       'P2-generative',
@@ -1035,7 +1042,7 @@ async function main() {
       `matching option rows=${autoAnalysisRowsOn}`,
     );
     await pageB.keyboard.press('Escape');
-    await pageB.waitForTimeout(150);
+    await pageB.waitForTimeout(timing.ms(150));
   } else {
     record('P2-generative', 'Command palette OFFERS the auto-analysis command with Labs ON', false, 'palette did not open');
   }
@@ -1055,26 +1062,26 @@ async function main() {
     `tabs=${JSON.stringify(settingsTabsOn)}`,
   );
   await pageB.getByRole('button', { name: /close settings/i }).first().click();
-  await pageB.waitForTimeout(200);
+  await pageB.waitForTimeout(timing.ms(200));
 
   // Same sample-coverage flow CONTEXT A ran, so the two Script Doctor
   // assertions below start from a byte-identical report. localStorage.clear()
   // is safe here: contextB's addInitScript re-sets sm_labs_enabled on the very
   // next navigation, before any app code runs.
   await pageB.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} });
-  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   const labsStillOn = await pageB.evaluate(() => localStorage.getItem('sm_labs_enabled'));
   record('P2-generative', 'Labs flag survives the reset (the ON context is genuinely ON)', labsStillOn === 'true', `sm_labs_enabled=${labsStillOn}`);
 
-  await pageB.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: 15000 });
+  await pageB.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
   const verdictRenderedB = await pageB
-    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: 30000 })
+    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: timing.ms(30000) })
     .then(() => true)
     .catch(() => false);
   record('P2-generative', 'Sample coverage still produces a verdict with Labs ON', verdictRenderedB, '');
   await pageB.getByRole('button', { name: 'Full report', exact: true }).first().click();
-  await pageB.waitForSelector('[role="dialog"]', { timeout: 10000 });
-  await pageB.waitForTimeout(500);
+  await pageB.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) });
+  await pageB.waitForTimeout(timing.ms(500));
 
   const fixVerifyCountOn = await pageB.getByRole('button', { name: /fix & verify/i }).count();
   record(

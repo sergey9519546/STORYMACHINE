@@ -22,6 +22,7 @@ import { join } from 'node:path';
 import {
   bootKeylessServer,
   createRecorder,
+  getTiming,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -59,6 +60,7 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 
 let serverProc = null;
 let browser = null;
+let timing = null; // set at the top of main() — see scripts/lib/browser-verify.mjs
 
 const { record, printSummary } = createRecorder();
 
@@ -78,7 +80,7 @@ const { record, printSummary } = createRecorder();
  */
 async function confirmDeleteAndWaitForReload(page) {
   const navigated = page
-    .waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame(), timeout: 20000 })
+    .waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame(), timeout: timing.ms(20000) })
     .then(() => true)
     .catch(() => false);
   await page.getByRole('button', { name: /yes, delete everything/i }).click();
@@ -86,7 +88,7 @@ async function confirmDeleteAndWaitForReload(page) {
   // The reloaded app re-mints a session id on its first /api/ call and
   // re-renders; give those mount-time effects room to settle before any store
   // is read, so a "clean" reading cannot be an artifact of reading too early.
-  await page.locator('body').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.locator('body').waitFor({ timeout: timing.ms(10000) }).catch(() => {});
   await sleep(1200);
   return didNavigate;
 }
@@ -95,15 +97,20 @@ async function getOverflowMenuItem(page, namePattern) {
   const btn = page.getByRole('button', { name: 'More tools' }).first();
   await btn.click();
   const menu = page.getByRole('menu').first();
-  await menu.waitFor({ timeout: 5000 });
+  await menu.waitFor({ timeout: timing.ms(5000) });
   const item = menu.getByRole('menuitem', { name: namePattern }).first();
-  await item.waitFor({ timeout: 5000 });
+  await item.waitFor({ timeout: timing.ms(5000) });
   return item;
 }
 
 const DRAFT_TEXT = 'INT. SAFE HOUSE - NIGHT\n\nA line only this browser has ever seen — E4 local safety net proof.';
 
 async function main() {
+  // Read the load-derived timing policy FIRST — before the server boots or
+  // Chromium launches — so VERIFY_MAX_LOAD_PER_CPU can refuse the whole run
+  // without paying for either. See scripts/lib/browser-verify.mjs.
+  timing = getTiming();
+
   serverProc = await bootKeylessServer({ repo: REPO, port: ISOLATED_PORT, baseUrl: BASE });
   browser = await launchChromium();
   const context = await browser.newContext();
@@ -114,13 +121,13 @@ async function main() {
   //    localStorage both feed the mount-time restore path).
   // ══════════════════════════════════════════════════════════════════════
   console.log('\n=== 1) autosave -> reload -> restored ===');
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await page.getByRole('button', { name: /start fresh/i }).first().click();
-  await page.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await page.getByRole('button', { name: 'Write', exact: true }).first().click();
 
   const editor = page.locator('.cm-content').first();
-  await editor.waitFor({ timeout: 10000 });
+  await editor.waitFor({ timeout: timing.ms(10000) });
   // An empty draft shows a centered "the page is yours" coach card
   // (ScriptIDE.tsx) that is deliberately pointer-events-auto so a writer can
   // interact with it — it visually covers the middle of .cm-content, so a
@@ -156,8 +163,8 @@ async function main() {
   const idbHasDraft = !!idbSnapshotBeforeReload && idbSnapshotBeforeReload.scriptText === DRAFT_TEXT;
   record('IndexedDB mirror holds the typed draft before reload', idbHasDraft, idbHasDraft ? '' : `got: ${JSON.stringify(idbSnapshotBeforeReload)}`);
 
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page.locator('.cm-content').first().waitFor({ timeout: 15000 });
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page.locator('.cm-content').first().waitFor({ timeout: timing.ms(15000) });
   await sleep(300); // let the mount-time restore effects settle
   const restoredText = await page.locator('.cm-content').first().innerText();
   const restored = restoredText.includes('A line only this browser has ever seen');
@@ -244,12 +251,12 @@ async function main() {
   // Land on the entrance (StartScreen), not the editor with a stale draft —
   // the clean-slate proof.
   const startScreenBack = await page.getByRole('button', { name: /try sample coverage/i }).first()
-    .waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+    .waitFor({ timeout: timing.ms(10000) }).then(() => true).catch(() => false);
   record('App shows the entrance (StartScreen) after delete-everything + reload — not a leftover draft', startScreenBack);
 
   if (startScreenBack) {
     await page.getByRole('button', { name: /start fresh/i }).first().click();
-    await page.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+    await page.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
     await page.getByRole('button', { name: 'Write', exact: true }).first().click();
     const editorTextAfterDelete = await page.locator('.cm-content').first().innerText();
     const isClean = !editorTextAfterDelete.includes('A line only this browser has ever seen');
@@ -260,8 +267,8 @@ async function main() {
   // 3) Screenshot the privacy page.
   // ══════════════════════════════════════════════════════════════════════
   console.log('\n=== 3) #privacy page screenshot ===');
-  await page.goto(`${BASE}#privacy`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  await page.getByRole('heading', { name: /^privacy$/i }).waitFor({ timeout: 10000 });
+  await page.goto(`${BASE}#privacy`, { waitUntil: 'domcontentloaded', timeout: timing.ms(15000) });
+  await page.getByRole('heading', { name: /^privacy$/i }).waitFor({ timeout: timing.ms(10000) });
   const screenshotPath = `${REPO}/scripts/output/e4-privacy-page.png`;
   await page.screenshot({ path: screenshotPath, fullPage: true });
   record('#privacy page screenshot captured', existsSync(screenshotPath), screenshotPath);
@@ -306,12 +313,12 @@ async function main() {
 
   const sweepContext = await browser.newContext();
   const sweep = await sweepContext.newPage();
-  await sweep.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await sweep.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await sweep.getByRole('button', { name: /start fresh/i }).first().click();
-  await sweep.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await sweep.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await sweep.getByRole('button', { name: 'Write', exact: true }).first().click();
   const sweepEditor = sweep.locator('.cm-content').first();
-  await sweepEditor.waitFor({ timeout: 10000 });
+  await sweepEditor.waitFor({ timeout: timing.ms(10000) });
   await sweepEditor.focus();
   await sweep.keyboard.type(MARKED_SCRIPT, { delay: 1 });
   await sleep(1500);
@@ -526,17 +533,17 @@ async function main() {
   // not be the answer to an ordinary reload.
   const refreshContext = await browser.newContext();
   const refresh = await refreshContext.newPage();
-  await refresh.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await refresh.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await refresh.getByRole('button', { name: /start fresh/i }).first().click();
-  await refresh.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await refresh.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await refresh.getByRole('button', { name: 'Write', exact: true }).first().click();
   const refreshEditor = refresh.locator('.cm-content').first();
-  await refreshEditor.waitFor({ timeout: 10000 });
+  await refreshEditor.waitFor({ timeout: timing.ms(10000) });
   await refreshEditor.focus();
   await refresh.keyboard.type(`INT. ${MARKER} ROOM - DAY\n\nA line a refresh must not destroy.`, { delay: 2 });
   await sleep(1500);
-  await refresh.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
-  await refresh.locator('.cm-content').first().waitFor({ timeout: 15000 });
+  await refresh.reload({ waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await refresh.locator('.cm-content').first().waitFor({ timeout: timing.ms(15000) });
   await sleep(500);
   const afterRefresh = await refresh.locator('.cm-content').first().innerText();
   record(

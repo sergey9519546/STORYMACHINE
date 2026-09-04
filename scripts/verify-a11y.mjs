@@ -43,6 +43,7 @@ import { mkdirSync } from 'node:fs';
 import {
   bootKeylessServer,
   createRecorder,
+  getTiming,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -68,6 +69,7 @@ const ISOLATED_PORT = await pickFreePort();
 const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 let serverProc = null;
 let browser = null;
+let timing = null; // set at the top of main() — see scripts/lib/browser-verify.mjs
 const genuineConsoleErrors = [];
 
 const isMac = process.platform === 'darwin';
@@ -159,11 +161,11 @@ async function auditSurface(page, surfaceName) {
 async function auditLandingAtRest(page) {
   await page.waitForFunction(
     () => document.querySelector('[data-slug-done="true"]') !== null,
-    { timeout: 5000 },
+    { timeout: timing.ms(5000) },
   ).catch(() => {});
   await page.waitForFunction(
     () => document.querySelector('main[data-reveal-done="true"]') !== null,
-    { timeout: 5000 },
+    { timeout: timing.ms(5000) },
   ).catch(() => {});
   await waitForDomQuiet(page, { quietMs: 250, timeoutMs: 3000 });
   const violationsA = await runAxeRaw(page);
@@ -191,6 +193,11 @@ async function auditLandingAtRest(page) {
 }
 
 async function main() {
+  // Read the load-derived timing policy FIRST — before the server boots or
+  // Chromium launches — so VERIFY_MAX_LOAD_PER_CPU can refuse the whole run
+  // without paying for either. See scripts/lib/browser-verify.mjs.
+  timing = getTiming();
+
   serverProc = await bootKeylessServer({ repo: REPO, port: ISOLATED_PORT, baseUrl: BASE });
   browser = await launchChromium();
 
@@ -201,9 +208,9 @@ async function main() {
   const context1 = await browser.newContext();
   const page1 = await context1.newPage();
   wireConsoleCapture(page1, genuineConsoleErrors);
-  await page1.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page1.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   const startFreshBtn = page1.getByRole('button', { name: /start fresh/i }).first();
-  await startFreshBtn.waitFor({ timeout: 15000 });
+  await startFreshBtn.waitFor({ timeout: timing.ms(15000) });
   // a11y pass (2026-09-04): NOT auditSurface(page1, 'landing') here on
   // purpose — Playwright's `visible` wait above doesn't require opacity:1,
   // so it resolves the instant "Start fresh" attaches to the DOM, well
@@ -221,7 +228,7 @@ async function main() {
   }
   record('keyboard-journey', 'land: "Start fresh" reachable via Tab alone (25 presses)', reachedStartFresh);
   await page1.keyboard.press('Enter');
-  const toolbarAppeared = await page1.locator('header.sm-pagetop').waitFor({ timeout: 15000 }).then(() => true).catch(() => false);
+  const toolbarAppeared = await page1.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) }).then(() => true).catch(() => false);
   record('keyboard-journey', 'land: Enter on "Start fresh" opens the editor (no mouse)', toolbarAppeared);
   await context1.close();
 
@@ -232,12 +239,12 @@ async function main() {
   const context2 = await browser.newContext();
   const page2 = await context2.newPage();
   wireConsoleCapture(page2, genuineConsoleErrors);
-  await page2.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page2.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-  await page2.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page2.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page2.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page2.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
 
   const editor = page2.locator('.cm-content').first();
-  await editor.waitFor({ timeout: 10000 });
+  await editor.waitFor({ timeout: timing.ms(10000) });
 
   // KEYBOARD JOURNEY step 2: reach the editor via Tab alone, then type
   // (paste stands in for real Fountain text — Enter on "Write" isn't
@@ -271,26 +278,26 @@ async function main() {
   // inside this same typed-content editor.
   const palette = page2.getByRole('dialog', { name: 'Command palette' });
   await page2.keyboard.press(`${MOD}+k`);
-  await palette.waitFor({ timeout: 5000 }).catch(() => {});
-  await page2.waitForTimeout(200);
+  await palette.waitFor({ timeout: timing.ms(5000) }).catch(() => {});
+  await page2.waitForTimeout(timing.ms(200));
   await auditSurface(page2, 'command-palette');
   await page2.keyboard.press('Escape');
-  await page2.waitForTimeout(300);
+  await page2.waitForTimeout(timing.ms(300));
 
   await editor.focus();
   await page2.keyboard.press(`${MOD}+f`);
-  await page2.waitForTimeout(200);
+  await page2.waitForTimeout(timing.ms(200));
   await auditSurface(page2, 'find-replace');
   await page2.keyboard.press('Escape');
-  await page2.waitForTimeout(200);
+  await page2.waitForTimeout(timing.ms(200));
 
   await page2.keyboard.press(`${MOD}+/`);
   const shortcutDialog = page2.getByRole('dialog', { name: /keyboard shortcuts/i });
-  await shortcutDialog.waitFor({ timeout: 5000 }).catch(() => {});
-  await page2.waitForTimeout(200);
+  await shortcutDialog.waitFor({ timeout: timing.ms(5000) }).catch(() => {});
+  await page2.waitForTimeout(timing.ms(200));
   await auditSurface(page2, 'shortcuts-panel');
   await page2.keyboard.press('Escape');
-  await page2.waitForTimeout(200);
+  await page2.waitForTimeout(timing.ms(200));
 
   // ── Accessible-name spot checks on icon-only controls actually present
   //    on this surface (SettingsPanel's close X, Sidebar's close X, the
@@ -324,9 +331,9 @@ async function main() {
   const context2b = await browser.newContext();
   const page2b = await context2b.newPage();
   wireConsoleCapture(page2b, genuineConsoleErrors);
-  await page2b.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page2b.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   const sampleCta = page2b.getByRole('button', { name: /try sample coverage/i }).first();
-  await sampleCta.waitFor({ timeout: 15000 });
+  await sampleCta.waitFor({ timeout: timing.ms(15000) });
   // Its accessible name is the button's full text content — the
   // "Recommended" ribbon span + caption + headline all concatenate into
   // one long string ("RecommendedOne click...Try sample coverage...") —
@@ -351,7 +358,7 @@ async function main() {
   const reportBody = await waitForRenderedText(page2b, 'CONSIDER', { timeoutMs: 45000 });
   const reportAppeared = /CONSIDER|RECOMMEND|PASS/.test(reportBody);
   record('keyboard-journey', 'analyze: a report renders after activating "Try sample coverage" with Enter (no mouse)', reportAppeared);
-  await page2b.waitForTimeout(400);
+  await page2b.waitForTimeout(timing.ms(400));
   await auditSurface(page2b, 'doctor-report');
 
   // Live region wiring for the analysis progress readout (role=status,
@@ -413,7 +420,7 @@ async function main() {
   if (jumpBtnExists) {
     await jumpBtn.focus();
     await page2b.keyboard.press('Enter');
-    await page2b.waitForTimeout(300);
+    await page2b.waitForTimeout(timing.ms(300));
     jumpedToLine = await page2b.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false);
   }
   record('keyboard-journey', 'read/jump: activating "jump to line" (Enter) moves focus into the editor', jumpedToLine);
@@ -429,7 +436,7 @@ async function main() {
   record('keyboard-journey', 'read/jump: after a PROGRAMMATIC "jump to line" focus (not a raw Tab arrival — see section 8), Tab is still captured — deliberately unchanged, recoverable via Escape+Tab below', capturedInEditor);
 
   await page2b.keyboard.press('Escape');
-  await page2b.waitForTimeout(100);
+  await page2b.waitForTimeout(timing.ms(100));
   await page2b.keyboard.press('Tab');
   const recoveredFromCapture = await page2b.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false) === false;
   record('keyboard-journey', 'read/jump: Escape-then-Tab recovers from that capture (the documented idiom actually works)', recoveredFromCapture);
@@ -438,16 +445,16 @@ async function main() {
   // path — verify-e5-command-palette.mjs), reaching a real export button
   // afterward.
   await page2b.keyboard.press('Escape');
-  await page2b.waitForTimeout(150);
+  await page2b.waitForTimeout(timing.ms(150));
   await page2b.keyboard.press(`${MOD}+k`);
   const palette2b = page2b.getByRole('dialog', { name: 'Command palette' });
-  await palette2b.waitFor({ timeout: 5000 }).catch(() => {});
+  await palette2b.waitFor({ timeout: timing.ms(5000) }).catch(() => {});
   await page2b.keyboard.type('ship', { delay: 15 });
   const shipOption = page2b.getByRole('option', { name: /open ship/i }).first();
-  const shipOptionVisible = await shipOption.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  const shipOptionVisible = await shipOption.waitFor({ timeout: timing.ms(3000) }).then(() => true).catch(() => false);
   record('keyboard-journey', 'export: "Open Ship" is reachable by typing in the palette', shipOptionVisible);
   await page2b.keyboard.press('Enter');
-  await page2b.waitForTimeout(400);
+  await page2b.waitForTimeout(timing.ms(400));
   await auditSurface(page2b, 'export-ship');
 
   let reachedExportBtn = false;
@@ -468,16 +475,16 @@ async function main() {
   const context3 = await browser.newContext();
   const page3 = await context3.newPage();
   wireConsoleCapture(page3, genuineConsoleErrors);
-  await page3.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page3.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-  await page3.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page3.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page3.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page3.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await page3.getByRole('button', { name: 'More tools' }).first().click();
   const menu3 = page3.getByRole('menu').first();
-  await menu3.waitFor({ timeout: 5000 });
+  await menu3.waitFor({ timeout: timing.ms(5000) });
   await menu3.getByRole('menuitem', { name: /labs & settings|labs is on/i }).first().click();
   const settingsDialog = page3.getByRole('dialog', { name: /settings/i });
-  await settingsDialog.waitFor({ timeout: 5000 });
-  await page3.waitForTimeout(400);
+  await settingsDialog.waitFor({ timeout: timing.ms(5000) });
+  await page3.waitForTimeout(timing.ms(400));
 
   const tabsOff = settingsDialog.getByRole('tab');
   const tabCountOff = await tabsOff.count();
@@ -487,22 +494,22 @@ async function main() {
     const label = await t.textContent();
     await t.focus();
     await page3.keyboard.press('Enter');
-    await page3.waitForTimeout(150);
+    await page3.waitForTimeout(timing.ms(150));
     await auditSurface(page3, `settings-tab-${label}`);
   }
   await page3.keyboard.press('Escape');
-  await page3.waitForTimeout(300);
+  await page3.waitForTimeout(timing.ms(300));
 
   await page3.evaluate(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); localStorage.removeItem('sm_app_view_v1'); } catch {} });
-  await page3.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page3.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-  await page3.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page3.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page3.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page3.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await page3.getByRole('button', { name: 'More tools' }).first().click();
   const menu3b = page3.getByRole('menu').first();
-  await menu3b.waitFor({ timeout: 5000 });
+  await menu3b.waitFor({ timeout: timing.ms(5000) });
   await menu3b.getByRole('menuitem', { name: /labs/i }).first().click();
-  await settingsDialog.waitFor({ timeout: 5000 });
-  await page3.waitForTimeout(400);
+  await settingsDialog.waitFor({ timeout: timing.ms(5000) });
+  await page3.waitForTimeout(timing.ms(400));
   const tabsOn = settingsDialog.getByRole('tab');
   const tabCountOn = await tabsOn.count();
   record('settings', 'Labs ON shows all 8 tabs', tabCountOn === 8, `count=${tabCountOn}`);
@@ -511,7 +518,7 @@ async function main() {
     const label = await t.textContent();
     await t.focus();
     await page3.keyboard.press('Enter');
-    await page3.waitForTimeout(150);
+    await page3.waitForTimeout(timing.ms(150));
     await auditSurface(page3, `settings-labs-on-${label}`);
   }
   await context3.close();
@@ -523,12 +530,12 @@ async function main() {
   const context4 = await browser.newContext();
   const page4 = await context4.newPage();
   wireConsoleCapture(page4, genuineConsoleErrors);
-  await page4.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page4.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-  await page4.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page4.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page4.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page4.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await page4.getByRole('tab', { name: /characters/i }).first().click();
   await page4.getByRole('button', { name: /add character/i }).first().click();
-  await page4.waitForTimeout(200);
+  await page4.waitForTimeout(timing.ms(200));
   // aside input[0] is the Scenes/Characters search box — the character
   // name field is index 1. Blur it empty to trigger the real validation
   // error path (aria-invalid + aria-describedby + role="alert").
@@ -537,7 +544,7 @@ async function main() {
   await nameInput.fill('x');
   await nameInput.fill('');
   await nameInput.blur();
-  await page4.waitForTimeout(300);
+  await page4.waitForTimeout(timing.ms(300));
   const errorState = await page4.evaluate(() => {
     const input = document.querySelector('aside input[aria-invalid="true"]');
     if (!input) return null;
@@ -564,45 +571,45 @@ async function main() {
   const context5 = await browser.newContext();
   const page5 = await context5.newPage();
   wireConsoleCapture(page5, genuineConsoleErrors);
-  await page5.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page5.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-  await page5.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page5.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page5.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page5.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   const editor5 = page5.locator('.cm-content').first();
-  await editor5.waitFor({ timeout: 10000 });
+  await editor5.waitFor({ timeout: timing.ms(10000) });
   await editor5.focus();
   await page5.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
-  await page5.waitForTimeout(300);
+  await page5.waitForTimeout(timing.ms(300));
   const isDark = await page5.evaluate(() => document.documentElement.classList.contains('dark'));
   record('dark-theme', 'Alt+Shift+D actually toggles the .dark class on <html>', isDark);
 
   await page5.keyboard.type('INT. DARK ROOM - NIGHT\n\nDark-theme a11y sweep.\n\nJANE\nDoes this still read at 4.5 to 1?\n', { delay: 1 });
-  await page5.waitForTimeout(200);
+  await page5.waitForTimeout(timing.ms(200));
   await auditSurface(page5, 'dark-editor');
 
   const coverageNavBtn = page5.getByRole('button', { name: 'Coverage', exact: true }).first();
   await coverageNavBtn.click();
   const runDiagnosisBtn = page5.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
   if (await runDiagnosisBtn.count()) {
-    await runDiagnosisBtn.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await runDiagnosisBtn.waitFor({ state: 'visible', timeout: timing.ms(10000) }).catch(() => {});
     await runDiagnosisBtn.click().catch(() => {});
   }
-  await page5.waitForFunction(() => /CONSIDER|RECOMMEND|PASS/.test(document.body.textContent || ''), { timeout: 45000 }).catch(() => {});
-  await page5.waitForTimeout(400);
+  await page5.waitForFunction(() => /CONSIDER|RECOMMEND|PASS/.test(document.body.textContent || ''), { timeout: timing.ms(45000) }).catch(() => {});
+  await page5.waitForTimeout(timing.ms(400));
   await auditSurface(page5, 'dark-doctor-report');
 
   const fullReportBtn5 = page5.getByRole('button', { name: 'Full report', exact: true }).first();
   if (await fullReportBtn5.count()) {
     await fullReportBtn5.click();
-    await page5.waitForSelector('[role="dialog"]', { timeout: 10000 }).catch(() => {});
-    await page5.waitForTimeout(500);
+    await page5.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) }).catch(() => {});
+    await page5.waitForTimeout(timing.ms(500));
     await auditSurface(page5, 'dark-full-report-dialog');
     await page5.keyboard.press('Escape');
-    await page5.waitForTimeout(300);
+    await page5.waitForTimeout(timing.ms(300));
   }
 
   const shipBtn5 = page5.getByRole('button', { name: 'Ship', exact: true }).first();
   await shipBtn5.click();
-  await page5.waitForTimeout(300);
+  await page5.waitForTimeout(timing.ms(300));
   await auditSurface(page5, 'dark-export-ship');
   await context5.close();
 
@@ -624,9 +631,9 @@ async function main() {
   const context6 = await browser.newContext();
   const page6 = await context6.newPage();
   wireConsoleCapture(page6, genuineConsoleErrors);
-  await page6.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page6.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   const sampleCta6 = page6.getByRole('button', { name: /try sample coverage/i }).first();
-  await sampleCta6.waitFor({ timeout: 15000 });
+  await sampleCta6.waitFor({ timeout: timing.ms(15000) });
   await sampleCta6.click();
   const reportBody6 = await waitForRenderedText(page6, 'CONSIDER', { timeoutMs: 45000 });
   record('dark-theme-rich', 'rich report: a report renders from "Try sample coverage"', /CONSIDER|RECOMMEND|PASS/.test(reportBody6));
@@ -635,10 +642,10 @@ async function main() {
   // ScriptIDE's own global keydown listener, so any focus inside it works —
   // the editor is the reliable, always-present target).
   const editor6 = page6.locator('.cm-content').first();
-  await editor6.waitFor({ timeout: 10000 });
+  await editor6.waitFor({ timeout: timing.ms(10000) });
   await editor6.focus();
   await page6.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
-  await page6.waitForTimeout(300);
+  await page6.waitForTimeout(timing.ms(300));
   const isDark6 = await page6.evaluate(() => document.documentElement.classList.contains('dark'));
   record('dark-theme-rich', 'Alt+Shift+D toggles dark mode on the rich-report view', isDark6);
 
@@ -680,24 +687,24 @@ async function main() {
   const page7 = await context7.newPage();
   wireConsoleCapture(page7, genuineConsoleErrors);
   await page7.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch {} });
-  await page7.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page7.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-  await page7.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page7.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page7.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page7.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
   await page7.keyboard.press(`${MOD}+k`);
   const palette7 = page7.getByRole('dialog', { name: 'Command palette' });
-  await palette7.waitFor({ timeout: 5000 }).catch(() => {});
+  await palette7.waitFor({ timeout: timing.ms(5000) }).catch(() => {});
   await page7.keyboard.type('studio', { delay: 15 });
   const studioOption = page7.getByRole('option', { name: /open studio/i }).first();
-  const studioOptionVisible = await studioOption.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  const studioOptionVisible = await studioOption.waitFor({ timeout: timing.ms(3000) }).then(() => true).catch(() => false);
   record('labs-research-panel', 'Labs ON: "Open Studio" is reachable via the command palette', studioOptionVisible);
   if (studioOptionVisible) {
     await page7.keyboard.press('Enter');
     const engineTabBtn = page7.getByRole('button', { name: 'Engine', exact: true }).first();
-    const engineTabVisible = await engineTabBtn.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    const engineTabVisible = await engineTabBtn.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
     record('labs-research-panel', 'Studio panel opens with an "Engine" tab', engineTabVisible);
     if (engineTabVisible) {
       await engineTabBtn.click();
-      await page7.waitForTimeout(200);
+      await page7.waitForTimeout(timing.ms(200));
       await auditSurface(page7, 'labs-story-engine-panel');
       // Keyless mode: "Generate Scene" runs against a server with no AI key
       // configured, which resolves usedLLM:false with a `note` explaining
@@ -708,8 +715,8 @@ async function main() {
         await beatInput.fill('A quiet moment before the storm.');
         const generateBtn = page7.getByRole('button', { name: /generate scene/i }).first();
         await generateBtn.click();
-        await page7.waitForFunction(() => /result/i.test(document.body.textContent || ''), { timeout: 20000 }).catch(() => {});
-        await page7.waitForTimeout(300);
+        await page7.waitForFunction(() => /result/i.test(document.body.textContent || ''), { timeout: timing.ms(20000) }).catch(() => {});
+        await page7.waitForTimeout(timing.ms(300));
         await auditSurface(page7, 'labs-story-engine-result');
       }
       // Same surface again in dark mode — AIPanel.tsx has no dark: variants
@@ -718,7 +725,7 @@ async function main() {
       // document-level listener (ScriptIDE.tsx), so no specific focus target
       // is required here.
       await page7.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
-      await page7.waitForTimeout(300);
+      await page7.waitForTimeout(timing.ms(300));
       await auditSurface(page7, 'labs-story-engine-panel-dark');
     }
   }
@@ -764,9 +771,9 @@ async function main() {
    *  starts from "Start fresh", so it varies with however many toolbar
    *  controls precede the editor). */
   async function tabIntoEditorByRawKeyboard(page) {
-    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await page.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-    await page.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+    await page.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+    await page.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
     let reached = false;
     let arrivedViaScroller = false;
     let wasOnScroller = false;
@@ -811,7 +818,7 @@ async function main() {
   record('editor-tab-trap', 'raw-Tab journey reaches the editor a second time (fresh reload)', reachedRaw2);
   await page8.keyboard.type('x', { delay: 5 }); // commits to editing — disarms the auto-arm (tabEscapeArmedField's own docChanged rule)
   await page8.keyboard.press('Backspace'); // back to an empty, cycle-eligible line — the disarm itself already happened on the keystroke above
-  await page8.waitForTimeout(50);
+  await page8.waitForTimeout(timing.ms(50));
   await page8.keyboard.press('Tab'); // should now CYCLE (handled, stays in editor), not exit
   const cyclingAfterTyping = await page8.evaluate(() => {
     const stillInEditor = document.activeElement?.className?.includes?.('cm-') ?? false;
@@ -827,13 +834,13 @@ async function main() {
   // Dismiss the pending cycle from the Tab press above before re-testing
   // Escape-then-Tab below, so it starts from a clean state.
   await page8.keyboard.press('Escape');
-  await page8.waitForTimeout(50);
+  await page8.waitForTimeout(timing.ms(50));
 
   // Pre-existing idiom, re-verified after the fix above: Escape (arm) then
   // Tab (consume + exit) — the documented manual escape hatch for a writer
   // already mid-session, unaffected by the auto-arm addition.
   await page8.keyboard.press('Escape');
-  await page8.waitForTimeout(50);
+  await page8.waitForTimeout(timing.ms(50));
   await page8.keyboard.press('Tab');
   const escapeThenTabStillWorks = (await page8.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false)) === false;
   record('editor-tab-trap', 'Escape-then-Tab idiom still exits the editor (unchanged pre-existing manual path)', escapeThenTabStillWorks);
@@ -860,47 +867,47 @@ async function main() {
   const page9 = await context9.newPage();
   wireConsoleCapture(page9, genuineConsoleErrors);
   await page9.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch {} });
-  await page9.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page9.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
-  await page9.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page9.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page9.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page9.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
 
   // ── 9a) AnalysisPanel — Studio's "Analysis" tab. ──
   await page9.keyboard.press(`${MOD}+k`);
   const palette9 = page9.getByRole('dialog', { name: 'Command palette' });
-  await palette9.waitFor({ timeout: 5000 }).catch(() => {});
+  await palette9.waitFor({ timeout: timing.ms(5000) }).catch(() => {});
   await page9.keyboard.type('studio', { delay: 15 });
   const studioOption9 = page9.getByRole('option', { name: /open studio/i }).first();
-  const studioOpened = await studioOption9.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  const studioOpened = await studioOption9.waitFor({ timeout: timing.ms(3000) }).then(() => true).catch(() => false);
   record('labs-panels', 'AnalysisPanel: "Open Studio" is reachable via the command palette', studioOpened);
   if (studioOpened) {
     await page9.keyboard.press('Enter');
     const analysisTabBtn = page9.getByRole('button', { name: 'Analysis', exact: true }).first();
-    const analysisTabVisible = await analysisTabBtn.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    const analysisTabVisible = await analysisTabBtn.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
     record('labs-panels', 'Studio panel opens with an "Analysis" tab', analysisTabVisible);
     if (analysisTabVisible) {
       await analysisTabBtn.click();
-      await page9.waitForTimeout(200);
+      await page9.waitForTimeout(timing.ms(200));
       await auditSurface(page9, 'labs-analysis-panel');
       await page9.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
-      await page9.waitForTimeout(300);
+      await page9.waitForTimeout(timing.ms(300));
       await auditSurface(page9, 'labs-analysis-panel-dark');
       await page9.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D'); // back to light for 9b
-      await page9.waitForTimeout(300);
+      await page9.waitForTimeout(timing.ms(300));
     }
   }
 
   // ── 9b) DirectorPanel — the "Director HUD" tool slot, next to
   //    "open-studio" in the same Labs command-palette group. ──
   await page9.keyboard.press(`${MOD}+k`);
-  await palette9.waitFor({ timeout: 5000 }).catch(() => {});
+  await palette9.waitFor({ timeout: timing.ms(5000) }).catch(() => {});
   await page9.keyboard.type('director', { delay: 15 });
   const directorOption = page9.getByRole('option', { name: /director hud/i }).first();
-  const directorOpened = await directorOption.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  const directorOpened = await directorOption.waitFor({ timeout: timing.ms(3000) }).then(() => true).catch(() => false);
   record('labs-panels', 'DirectorPanel: "Director HUD" is reachable via the command palette', directorOpened);
   if (directorOpened) {
     await page9.keyboard.press('Enter');
     const directorDialog = page9.getByRole('dialog', { name: 'AI Director State' });
-    const directorVisible = await directorDialog.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    const directorVisible = await directorDialog.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
     record('labs-panels', 'Director HUD opens as a real dialog (role="dialog", labelled)', directorVisible);
     if (directorVisible) {
       await auditSurface(page9, 'labs-director-panel-scene-tab');
@@ -911,23 +918,23 @@ async function main() {
       const psychTabBtn = page9.getByRole('button', { name: 'Psychology', exact: true }).first();
       if (await psychTabBtn.count()) {
         await psychTabBtn.click();
-        await page9.waitForTimeout(150);
+        await page9.waitForTimeout(timing.ms(150));
         await auditSurface(page9, 'labs-director-panel-psychology-tab');
       }
       const outlineTabBtn = page9.getByRole('button', { name: 'Outline', exact: true }).first();
       if (await outlineTabBtn.count()) {
         await outlineTabBtn.click();
-        await page9.waitForTimeout(150);
+        await page9.waitForTimeout(timing.ms(150));
         await auditSurface(page9, 'labs-director-panel-outline-tab');
       }
       // Same surfaces again in dark mode.
       await page9.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
-      await page9.waitForTimeout(300);
+      await page9.waitForTimeout(timing.ms(300));
       await auditSurface(page9, 'labs-director-panel-outline-tab-dark');
       const sceneTabBtn = page9.getByRole('button', { name: 'Scene', exact: true }).first();
       if (await sceneTabBtn.count()) {
         await sceneTabBtn.click();
-        await page9.waitForTimeout(150);
+        await page9.waitForTimeout(timing.ms(150));
         await auditSurface(page9, 'labs-director-panel-scene-tab-dark');
       }
     }

@@ -28,9 +28,85 @@
 import { spawn, execSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browser-certification.mjs';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED TIMING POLICY — the fix for "passed alone, flaked under load."
+//
+// Measured history: on a 4-vCPU box with load average above ~7 (several
+// agents running suites concurrently), the suites hit fixed
+// waitForFunction/waitForSelector timeouts that were sized for an idle
+// machine — Playwright itself was never slow, the CPU just wasn't free to
+// schedule the server/renderer/GC work those waits are actually timing. The
+// fix is not bigger constants (that only moves the flake threshold); it's
+// ONE timing policy, read once per suite process and applied everywhere a
+// timeout is handed to Playwright (or to a raw boot/HTTP wait), so a base
+// value written for an idle machine still means the same thing under load.
+//
+// `getTiming()` reads `os.loadavg()[0] / os.cpus().length` (the 1-minute
+// load average per logical CPU) exactly once per process — memoized, since
+// every suite here is its own `node scripts/verify-*.mjs` invocation, so
+// "once per process" already is "once per suite start" — and derives a
+// scale: 1.0x at or below 1.0 load/cpu (an idle-to-normal machine gets the
+// base values unchanged), growing linearly, capped at 4.0x (a pathologically
+// loaded box gets waits stretched 4x, never unbounded). `timing.ms(base)`
+// applies it; `timing.scale` is the raw factor for suites that need it
+// directly (e.g. to inflate a raw socket timeout inline). The one log line
+// this prints is the whole visible contract: `[verify] load L/cpus →
+// timeout scale Sx`.
+//
+// VERIFY_MAX_LOAD_PER_CPU is the companion refuse-above-threshold mode:
+// unset (the default) never refuses — scaling is the whole story. Set it and
+// a suite that would start above that per-CPU load exits 3 WITHOUT launching
+// Chromium or booting the server, naming the load in its message. This is
+// for a caller who would rather fail fast and retry later than spend minutes
+// producing a run so scaled it stops being a meaningful timing proof.
+const MIN_SCALE = 1.0;
+const MAX_SCALE = 4.0;
+
+let cachedTiming = null;
+
+/** Read load once, log once, refuse once — memoized so every later call in
+ *  the same suite process (including the ones the shared helpers below make
+ *  internally) reuses the same scale without repeating the log line or the
+ *  refusal check. `logPrefix` only affects the FIRST call in a process (the
+ *  one that actually computes and logs); later calls ignore it. */
+export function getTiming({ logPrefix = 'verify', maxLoadPerCpu } = {}) {
+  if (cachedTiming) return cachedTiming;
+  const load1 = os.loadavg()[0];
+  const cpus = os.cpus().length || 1;
+  const perCpu = load1 / cpus;
+  const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, perCpu));
+  console.log(`[${logPrefix}] load ${load1.toFixed(1)}/${cpus} cpus → timeout scale ${scale.toFixed(1)}x`);
+
+  const envMax = maxLoadPerCpu ?? (
+    process.env.VERIFY_MAX_LOAD_PER_CPU !== undefined && process.env.VERIFY_MAX_LOAD_PER_CPU !== ''
+      ? Number(process.env.VERIFY_MAX_LOAD_PER_CPU)
+      : undefined
+  );
+  if (envMax !== undefined && Number.isFinite(envMax) && perCpu > envMax) {
+    console.error(
+      `[${logPrefix}] refusing to run: load ${perCpu.toFixed(2)}/cpu exceeds `
+      + `VERIFY_MAX_LOAD_PER_CPU=${envMax} (loadavg=${load1.toFixed(2)}, cpus=${cpus}) — `
+      + 'not launching Chromium or booting the server. Retry once load drops, '
+      + 'or unset VERIFY_MAX_LOAD_PER_CPU to run scaled instead of refusing.',
+    );
+    process.exit(3);
+  }
+
+  cachedTiming = {
+    scale,
+    load1,
+    cpus,
+    perCpu,
+    /** Scale one base millisecond value by the load-derived factor. */
+    ms: (base) => Math.round(base * scale),
+  };
+  return cachedTiming;
+}
 
 /** An ephemeral free port on loopback, so concurrent suites never collide. */
 export function pickFreePort() {
@@ -62,6 +138,7 @@ export function pickFreePort() {
 export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'verify', extraEnv } = {}) {
   const cwd = repo ?? process.cwd();
   const base = baseUrl ?? `http://127.0.0.1:${port}`;
+  const timing = getTiming({ logPrefix });
   console.log(`[${logPrefix}] booting keyless server on port ${port}...`);
   const serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd,
@@ -69,7 +146,8 @@ export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'veri
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;
-  const bootTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('server boot timeout (30s)')), 30000));
+  const bootTimeoutMs = timing.ms(30000);
+  const bootTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error(`server boot timeout (${bootTimeoutMs}ms)`)), bootTimeoutMs));
   const bootReady = new Promise((resolve) => {
     let buf = '';
     const sniff = (d) => { buf += d; if (buf.includes('server_started')) { booted = true; resolve(); } };
@@ -172,7 +250,8 @@ export function wireConsoleCapture(page, sink) {
  * surfaces as a failed assertion with the real page content, not an exception.
  */
 export async function waitForRenderedText(page, needle, { timeoutMs = 45000, pollMs = 250 } = {}) {
-  const deadline = Date.now() + timeoutMs;
+  const scaledTimeoutMs = getTiming().ms(timeoutMs);
+  const deadline = Date.now() + scaledTimeoutMs;
   let body = '';
   for (;;) {
     body = (await page.textContent('body')) ?? '';
@@ -207,6 +286,9 @@ export async function waitForRenderedText(page, needle, { timeoutMs = 45000, pol
  * `StartScreen.tsx`'s `data-reveal-done` for the completion-signal half).
  */
 export async function waitForDomQuiet(page, { quietMs = 250, timeoutMs = 4000 } = {}) {
+  const timing = getTiming();
+  const scaledQuietMs = timing.ms(quietMs);
+  const scaledTimeoutMs = timing.ms(timeoutMs);
   await page.evaluate(
     ({ quietMs, timeoutMs }) => new Promise((resolve) => {
       let timer;
@@ -230,7 +312,7 @@ export async function waitForDomQuiet(page, { quietMs = 250, timeoutMs = 4000 } 
       reset();
       setTimeout(finish, timeoutMs);
     }),
-    { quietMs, timeoutMs },
+    { quietMs: scaledQuietMs, timeoutMs: scaledTimeoutMs },
   );
 }
 

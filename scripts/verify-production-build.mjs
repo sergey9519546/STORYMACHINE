@@ -51,6 +51,7 @@ import { join } from 'node:path';
 import {
   bootKeylessServer,
   createRecorder,
+  getTiming,
   launchChromium,
   shutdown,
   waitForRenderedText,
@@ -59,6 +60,13 @@ import {
 import { keylessBrowserServerEnv as buildKeylessEnv } from './lib/keyless-browser-certification.mjs';
 
 const REPO = process.cwd();
+
+// Read the load-derived timing policy FIRST — before `npm run build`, before
+// either server boots, before Chromium launches — so VERIFY_MAX_LOAD_PER_CPU
+// can refuse the whole (expensive: it runs a real production build) run
+// without paying for any of it. See scripts/lib/browser-verify.mjs.
+const timing = getTiming({ logPrefix: 'verify:production' });
+
 const OUT_DIR = join(REPO, 'scripts', 'output');
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -107,7 +115,7 @@ function rawRequest(baseUrl, path, { method = 'GET', headers = {}, body } = {}) 
         // This suite deliberately sends a 10MB body (attack test 3.2) — the
         // default header-parsing timeout is fine, but give the socket real
         // headroom for that one large write/response round trip.
-        timeout: 30000,
+        timeout: timing.ms(30000),
       },
       (res) => {
         const chunks = [];
@@ -187,7 +195,7 @@ async function bootProduction() {
   });
   await Promise.race([
     bootReady,
-    new Promise((_, rej) => setTimeout(() => rej(new Error('production server boot timeout (30s)')), 30000)),
+    new Promise((_, rej) => setTimeout(() => rej(new Error(`production server boot timeout (${timing.ms(30000)}ms)`)), timing.ms(30000))),
   ]);
   if (!booted) throw new Error('production server exited without emitting server_started');
   return proc;
@@ -475,8 +483,8 @@ try {
   });
 
   // land -> paste the sample -> analyze
-  await page.goto(PROD_BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await page.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: 15000 });
+  await page.goto(PROD_BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
   // NOT a bare /RECOMMEND|CONSIDER|PASS/ poll — the doctor's OWN live-progress
   // UI renders "RUNNING PASS 1 OF 14…" while streaming (ScriptDoctorPanel.tsx),
   // and that literal "PASS" is a false-positive match for the regex a plain
@@ -500,7 +508,7 @@ try {
   record('journey', 'the report renders a "Jump to line" affordance', hasJump);
   if (hasJump) {
     await jumpBtn.click();
-    const flashed = await page.waitForSelector('.cm-sm-finding-flash', { timeout: 2000 }).then(() => true).catch(() => false);
+    const flashed = await page.waitForSelector('.cm-sm-finding-flash', { timeout: timing.ms(2000) }).then(() => true).catch(() => false);
     record('journey', 'clicking it highlights the finding\'s lines in the editor', flashed);
   }
 
@@ -514,12 +522,12 @@ try {
   // threads the already-computed report into ScriptDoctorPanel (see
   // ScriptIDE.tsx's "W4" comment) — click it first to reach the real button.
   const fullReportBtn = page.getByRole('button', { name: 'Full report', exact: true }).first();
-  await fullReportBtn.click({ timeout: 10000 }).catch(() => {});
+  await fullReportBtn.click({ timeout: timing.ms(10000) }).catch(() => {});
   const coverageLetterBtn = page.getByRole('button', { name: /export a connected-prose coverage letter/i }).first();
-  await coverageLetterBtn.waitFor({ timeout: 10000 }).catch(() => {});
+  await coverageLetterBtn.waitFor({ timeout: timing.ms(10000) }).catch(() => {});
   if (await coverageLetterBtn.count() > 0) {
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 15000 }).catch(() => null),
+      page.waitForEvent('download', { timeout: timing.ms(15000) }).catch(() => null),
       coverageLetterBtn.click(),
     ]);
     record('journey', 'export: Coverage letter downloads a file', download !== null, download?.suggestedFilename());
@@ -530,7 +538,7 @@ try {
   // click below — its own close control, not a raw Escape keypress, so this
   // exercises the real UI affordance rather than relying on the modal's
   // keydown handler.
-  await page.getByRole('button', { name: 'Close Script Doctor panel', exact: true }).click({ timeout: 5000 }).catch(() => {});
+  await page.getByRole('button', { name: 'Close Script Doctor panel', exact: true }).click({ timeout: timing.ms(5000) }).catch(() => {});
 
   // export: Fountain / FDX / PDF, from the Write tab's Export menu — client-
   // side blob downloads, so this specifically proves the PRODUCTION bundle's
@@ -539,7 +547,7 @@ try {
   const writeTab = page.getByRole('button', { name: 'Write', exact: true }).first();
   if (await writeTab.count() > 0) {
     await writeTab.click();
-    await page.locator('.cm-content').first().waitFor({ timeout: 10000 }).catch(() => {});
+    await page.locator('.cm-content').first().waitFor({ timeout: timing.ms(10000) }).catch(() => {});
     const exportMenuBtn = page.getByRole('button', { name: 'Export', exact: true }).first();
     for (const label of ['Fountain', 'Final Draft', 'PDF']) {
       await exportMenuBtn.click();
@@ -547,7 +555,7 @@ try {
       const itemVisible = await item.count() > 0;
       if (!itemVisible) { record('journey', `export: ${label} menu item present`, false); continue; }
       const [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: 15000 }).catch(() => null),
+        page.waitForEvent('download', { timeout: timing.ms(15000) }).catch(() => null),
         item.click(),
       ]);
       record('journey', `export: ${label} downloads a file (production bundle's dynamic import resolved)`, download !== null, download?.suggestedFilename());
@@ -561,26 +569,26 @@ try {
   if (await overflowBtn.count() > 0) {
     await overflowBtn.click();
     const menu = page.getByRole('menu').first();
-    await menu.waitFor({ timeout: 5000 }).catch(() => {});
+    await menu.waitFor({ timeout: timing.ms(5000) }).catch(() => {});
     const settingsItem = menu.getByRole('menuitem', { name: /labs & settings|labs is on/i }).first();
     if (await settingsItem.count() > 0) {
       await settingsItem.click();
       const sessionTab = page.getByRole('tab', { name: 'Session', exact: true });
-      await sessionTab.click({ timeout: 5000 }).catch(() => {});
+      await sessionTab.click({ timeout: timing.ms(5000) }).catch(() => {});
       const deleteBtn = page.getByRole('button', { name: 'Delete Everything', exact: true }).first();
       const deleteVisible = await deleteBtn.count() > 0;
       record('journey', 'Settings -> Session -> Delete Everything control is reachable', deleteVisible);
       if (deleteVisible) {
         const navigated = page
-          .waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame(), timeout: 20000 })
+          .waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame(), timeout: timing.ms(20000) })
           .then(() => true).catch(() => false);
         await deleteBtn.click();
-        await page.getByRole('button', { name: /yes, delete everything/i }).click({ timeout: 5000 }).catch(() => {});
+        await page.getByRole('button', { name: /yes, delete everything/i }).click({ timeout: timing.ms(5000) }).catch(() => {});
         const didNavigate = await navigated;
         record('journey', 'Delete Everything performs its own reload', didNavigate);
         await sleep(1000);
         const backAtEntrance = await page.getByRole('button', { name: /try sample coverage/i }).first()
-          .waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+          .waitFor({ timeout: timing.ms(10000) }).then(() => true).catch(() => false);
         record('journey', 'after Delete Everything + reload, the app shows the entrance (clean slate), not a leftover draft', backAtEntrance);
       }
     } else {
