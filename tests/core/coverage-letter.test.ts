@@ -429,12 +429,63 @@ describe('renderCoverageLetter — snapshot against real captured reports', () =
     assert.equal(markdown, expected);
   });
 
+  // report3.json (2026-09-04) — the same real captured report shape as
+  // report1/report2, PLUS a structuralSignals block (report1/report2 predate
+  // that field and must stay byte-identical to their committed expected
+  // letters — proven by the two tests above and the "field absent" test
+  // below). Proves the "Shape and rhythm" paragraph renders on a real report
+  // shape, not just a hand-built fixture.
+  it('matches the committed expected letter for report3.json (carries structuralSignals)', () => {
+    const report = loadReport('report3.json');
+    assert.ok(report.structuralSignals?.scored, 'fixture must actually carry a scored structuralSignals block');
+    const { markdown } = renderCoverageLetter(report, { title: 'Third Sample' });
+    const expected = readFileSync(path.join(FIXTURES_DIR, 'report3.expected.md'), 'utf8');
+    assert.equal(markdown, expected);
+  });
+
   it('is deterministic on the real captured reports too', () => {
     const report = loadReport('report1.json');
     const a = renderCoverageLetter(report, { title: 'Dead Frequency' });
     const b = renderCoverageLetter(report, { title: 'Dead Frequency' });
     assert.equal(a.markdown, b.markdown);
     assert.equal(a.text, b.text);
+  });
+});
+
+// ── Shape & rhythm caveat (2026-09-04) ───────────────────────────────────────
+
+describe('renderCoverageLetter — shape and rhythm caveat', () => {
+  it('states neither the aggregates nor the "Shape and rhythm" label when structuralSignals is absent', () => {
+    const { markdown } = renderCoverageLetter(buildReport({ structuralSignals: undefined }));
+    assert.ok(!markdown.includes('Shape and rhythm'));
+  });
+
+  it('states neither when structuralSignals is present but unscored (fewer than 2 scenes)', () => {
+    const { markdown } = renderCoverageLetter(buildReport({
+      structuralSignals: {
+        scored: false, sceneCount: 1, scenes: [], sceneLengthCv: 0, meanAbsDialogueShareDelta: 0,
+        dialogueShareRange: 0, newPairSceneRate: 0, lastNewPairPosition: 0, meanSpeakersPerScene: 0,
+        meanTurnWords: 0, meanLeadShare: 0, leadShareSlope: 0, speakerEntropy: 0,
+        actionSentenceCvOverall: 0, meanOpenCloseShift: 0, openCloseModeFlipRate: 0,
+      },
+    }));
+    assert.ok(!markdown.includes('Shape and rhythm'));
+  });
+
+  it('names both aggregates, in order, with the "not part of the score" label when scored', () => {
+    const report = loadReport('report3.json');
+    const { markdown } = renderCoverageLetter(report, { title: 'Third Sample' });
+    assert.match(markdown, /Shape and rhythm:/);
+    const meanAbsIdx = markdown.indexOf(
+      `dialogue\\/action word mix is ${report.structuralSignals!.meanAbsDialogueShareDelta.toFixed(2)}`.replace('\\/', '/'),
+    );
+    const cvIdx = markdown.indexOf(
+      `action lines is ${report.structuralSignals!.actionSentenceCvOverall.toFixed(2)}`,
+    );
+    assert.ok(meanAbsIdx !== -1, 'must state meanAbsDialogueShareDelta');
+    assert.ok(cvIdx !== -1, 'must state actionSentenceCvOverall');
+    assert.ok(meanAbsIdx < cvIdx, 'meanAbsDialogueShareDelta must be named before actionSentenceCvOverall');
+    assert.match(markdown, /no part of the score, grade, or verdict/);
   });
 });
 

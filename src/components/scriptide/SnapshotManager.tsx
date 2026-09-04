@@ -21,6 +21,16 @@ export interface Snapshot {
   verdict?: CoverageVerdict;
   sceneCount?: number;
   analyzedAt?: number;
+  // 2026-09-04 — Shape & Rhythm (ScriptDoctorReport.structuralSignals):
+  // the same two document aggregates ScriptDoctorPanel.tsx's "Shape &
+  // Rhythm" section and coverage-letter.ts's caveat surface, captured at
+  // snapshot time exactly like health/verdict/sceneCount above — present
+  // only when a fresh, SCORED report existed for the exact text being
+  // snapshotted (see ScriptIDE.tsx's confirmSnapshot); never fabricated,
+  // never re-derived from anything but the report itself. Purely additive —
+  // descriptive numbers, not part of the score.
+  meanAbsDialogueShareDelta?: number;
+  actionSentenceCvOverall?: number;
 }
 
 // ── Score-over-revisions trend (writer #9) ──────────────────────────────────
@@ -78,6 +88,41 @@ function HealthSparkline({ entries }: { entries: SnapshotTrendEntry[] }) {
         <circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 2.5 : 1.5} fill={c.color} />
       ))}
     </svg>
+  );
+}
+
+/** Shape & Rhythm trend line (2026-09-04) — a second, descriptive-only line
+ *  under the health sparkline's caption, oldest-scored → newest-scored, for
+ *  the same two aggregates ScriptDoctorPanel.tsx's "Shape & Rhythm" section
+ *  and coverage-letter.ts's caveat surface already show. Renders nothing
+ *  when fewer than one entry carries a reading (every snapshot predates the
+ *  field, or none was scored) — a single reading still shows as a bare
+ *  value, since "trend" here is oldest-vs-newest, not a two-point minimum
+ *  the way the sparkline requires. */
+function ShapeRhythmTrendLine({ entries }: { entries: SnapshotTrendEntry[] }) {
+  const points = [...entries].reverse().filter(
+    (e): e is SnapshotTrendEntry & { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number } =>
+      e.meanAbsDialogueShareDelta !== null && e.actionSentenceCvOverall !== null,
+  );
+  if (points.length === 0) return null;
+
+  const oldest = points[0];
+  const newest = points[points.length - 1];
+  const swingText =
+    points.length > 1
+      ? `${oldest.meanAbsDialogueShareDelta.toFixed(2)} → ${newest.meanAbsDialogueShareDelta.toFixed(2)}`
+      : newest.meanAbsDialogueShareDelta.toFixed(2);
+  const cvText =
+    points.length > 1
+      ? `${oldest.actionSentenceCvOverall.toFixed(2)} → ${newest.actionSentenceCvOverall.toFixed(2)}`
+      : newest.actionSentenceCvOverall.toFixed(2);
+
+  return (
+    <div className="flex items-center gap-3 px-1 flex-wrap text-[10px] font-mono text-[var(--sm-ink-mute)]">
+      <span className="uppercase tracking-widest font-bold">Shape &amp; rhythm (descriptive, not part of the score)</span>
+      <span>Talk/action swing {swingText}</span>
+      <span>Action-prose variation {cvText}</span>
+    </div>
   );
 }
 
@@ -157,13 +202,18 @@ export default function SnapshotManager({
           </button>
         </div>
         {hasAnyScore && (
-          <div className="flex items-center gap-3 px-1">
-            <HealthSparkline entries={trend} />
-            {/* a11y pass: same opacity-60-on-inherited-color pattern as the
-                snapshot date caption below — replaced for the same reason. */}
-            <span className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
-              Health trend across scored versions
-            </span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-3 px-1">
+              <HealthSparkline entries={trend} />
+              {/* a11y pass: same opacity-60-on-inherited-color pattern as the
+                  snapshot date caption below — replaced for the same reason. */}
+              <span className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
+                Health trend across scored versions
+              </span>
+            </div>
+            {/* Second line under the health trend (2026-09-04) — Shape &
+                Rhythm, descriptive only. */}
+            <ShapeRhythmTrendLine entries={trend} />
           </div>
         )}
         <div className="space-y-4">

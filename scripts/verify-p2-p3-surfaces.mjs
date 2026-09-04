@@ -672,6 +672,50 @@ async function main() {
     `${letterMarkdown.length} bytes, filename=${letterDownload.suggestedFilename()}`,
   );
 
+  // ── Shape & Rhythm (2026-09-04) — server/nvm/analyze/structural-signals.ts
+  // surfaced, advisory-only, in ScriptDoctorPanel.tsx. The panel is still
+  // open on the same complete sample report the export checks above just
+  // used. Proves: the section renders on the sample script, and clicking a
+  // scene bar moves the editor — same `.cm-sm-finding-flash` proof proof A
+  // in verify-ui-polish-affordances.mjs uses for "Jump to line". ──────────
+  const shapeRhythmHeading = pageA.getByRole('button', { name: /Shape & Rhythm/i }).first();
+  const shapeRhythmVisible = await shapeRhythmHeading.isVisible().catch(() => false);
+  record('P3-shape-rhythm', 'Script Doctor renders a "Shape & Rhythm" section on the sample script', shapeRhythmVisible);
+
+  if (shapeRhythmVisible) {
+    const notPartOfScoreCount = await pageA.getByText(/not part of the score/i).count();
+    record('P3-shape-rhythm', 'the section labels its readings "not part of the score"', notPartOfScoreCount >= 1, `matches=${notPartOfScoreCount}`);
+
+    const talkSwingCount = await pageA.getByText(/Talk\/action swing/i).count();
+    const actionVariationCount = await pageA.getByText(/Action-prose variation/i).count();
+    record(
+      'P3-shape-rhythm',
+      'both document aggregates (talk/action swing, action-prose variation) render',
+      talkSwingCount >= 1 && actionVariationCount >= 1,
+      `talkSwing=${talkSwingCount} actionVariation=${actionVariationCount}`,
+    );
+
+    const sceneGroup = pageA.getByRole('group', { name: /Per-scene shape and rhythm readings/i }).first();
+    const sceneBar = sceneGroup.locator('button[title*="—"]').first();
+    const sceneBarCount = await sceneBar.count();
+    record('P3-shape-rhythm', 'the per-scene strip renders at least one scene bar', sceneBarCount > 0, `count=${sceneBarCount}`);
+
+    if (sceneBarCount > 0) {
+      const flashBeforeShapeClick = await pageA.locator('.cm-sm-finding-flash').count();
+      await sceneBar.click();
+      const flashedFromSceneBar = await pageA
+        .waitForSelector('.cm-sm-finding-flash', { timeout: 2000 })
+        .then(() => true)
+        .catch(() => false);
+      record(
+        'P3-shape-rhythm',
+        'clicking a scene bar moves the editor (paints the same highlightRange decoration "Jump to line" uses)',
+        flashedFromSceneBar,
+        `flashBefore=${flashBeforeShapeClick} flashedAfterClick=${flashedFromSceneBar}`,
+      );
+    }
+  }
+
   // ── Decision #3, inside Script Doctor itself. The panel is open on a real,
   // complete report — the exact state where "Fix & verify" (POST
   // /api/scriptide/fix, an LLM rewrite) renders under each root cause. With

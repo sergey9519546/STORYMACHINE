@@ -1964,6 +1964,13 @@ export default function ScriptIDE({
       // (never diagnosed, or edited since the last diagnosis) simply omits
       // these fields, same as every snapshot saved before this feature.
       const freshReport = coverageReport?.fountain === scriptText ? coverageReport.report : null;
+      // 2026-09-04 — Shape & Rhythm: the same two document aggregates from
+      // freshReport.structuralSignals, additive alongside health/verdict/
+      // sceneCount/analyzedAt above — only when that block is present AND
+      // scored (>= 2 scenes; see server/nvm/analyze/structural-signals.ts).
+      // Never fabricated: a freshReport with an absent or unscored block
+      // simply omits these two fields too.
+      const signals = freshReport?.structuralSignals;
       const newSnapshot: Snapshot = {
         id: crypto.randomUUID(),
         name: snapshotModal.name.trim(),
@@ -1974,6 +1981,10 @@ export default function ScriptIDE({
           verdict: freshReport.verdict,
           sceneCount: freshReport.sceneCount,
           analyzedAt: freshReport.analyzedAt,
+        } : {}),
+        ...(signals?.scored ? {
+          meanAbsDialogueShareDelta: signals.meanAbsDialogueShareDelta,
+          actionSentenceCvOverall: signals.actionSentenceCvOverall,
         } : {}),
       };
       setSnapshots([newSnapshot, ...snapshots].slice(0, 20));

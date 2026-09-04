@@ -82,6 +82,16 @@ const DOCTOR_DEEP_BUDGET: AiBudgetLimits = {
   timeoutMs: aiBudgetEnvNumber('AI_BUDGET_SCRIPTIDE_DOCTOR_DEEP_TIMEOUT_MS', 120_000),
 };
 
+// Shape-&-rhythm delta for POST /api/scriptide/fix (2026-09-04) — see that
+// route's comment. Just the two ordered aggregates from
+// docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md §4, not the full per-scene
+// block: this is a small, purely descriptive addition to the fix receipt,
+// not a re-export of StructuralSignalsReport.
+interface FixResponseStructuralSignals {
+  before: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+  after: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+}
+
 /** The core keeps health/grade sentinel fields for internal compatibility, but
  * a browser response must never serialize those values as if they were an
  * assessment when the whole draft was not analyzed. Partial issue evidence is
@@ -518,7 +528,14 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // (click-a-finding → jump-to-line) without re-deriving scene/character
   // spans itself. Same shape /api/scriptide/diagnose already sends.
   const locatedIssues = locateIssues(issuesWithPass, fountain);
-  const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
+  // Shape-&-rhythm jump-to-scene (2026-09-04): the same per-scene line spans
+  // clusterIssues already needs, computed once and reused rather than
+  // re-derived, so the client can resolve a structuralSignals scene row
+  // (which carries only sceneIdx/slug, no line numbers) to a concrete editor
+  // span the same way it already does for topPriorities/per-pass issues via
+  // locatedIssues. Index i of this array is scene i's { startLine, endLine }.
+  const spans = sceneLineSpans(fountain);
+  const rootCauses = clusterIssues(locatedIssues, spans);
   // A3 (2026-09-03): `prioritized` is the "start here" ordering — see
   // server/nvm/analyze/prioritize.ts for why it is attached beside
   // `topPriorities` instead of replacing it (topPriorities is a published
@@ -531,7 +548,10 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   const characterSummaries = buildCharacterSummaries(
     report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
   );
-  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source });
+  res.json({
+    ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source,
+    sceneLineSpans: spans,
+  });
 }));
 
 // POST /api/scriptide/doctor/stream — E1 (2026-08-21): live-progress sibling
@@ -648,13 +668,22 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
     const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
     // E2: same locatedIssues attachment as /doctor above.
     const locatedIssues = locateIssues(issuesWithPass, fountain);
-    const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
+    // Shape-&-rhythm jump-to-scene: same sceneLineSpans attachment as
+    // /doctor above.
+    const spans = sceneLineSpans(fountain);
+    const rootCauses = clusterIssues(locatedIssues, spans);
     const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
     // A4: same characterSummaries attachment as /doctor above.
     const characterSummaries = buildCharacterSummaries(
       report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
     );
-    emitSSE({ type: 'doctor_result', report: { ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source } });
+    emitSSE({
+      type: 'doctor_result',
+      report: {
+        ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source,
+        sceneLineSpans: spans,
+      },
+    });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       // The client already disconnected (that's what fired the abort in the
@@ -772,13 +801,18 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   // E2: same locatedIssues attachment as /doctor above.
   const locatedIssues = locateIssues(issuesWithPass, fountain);
-  const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
+  // Shape-&-rhythm jump-to-scene: same sceneLineSpans attachment as /doctor above.
+  const spans = sceneLineSpans(fountain);
+  const rootCauses = clusterIssues(locatedIssues, spans);
   const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
   // A4: same characterSummaries attachment as /doctor above.
   const characterSummaries = buildCharacterSummaries(
     report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
   );
-  res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source });
+  res.json({
+    ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source,
+    sceneLineSpans: spans,
+  });
 }));
 
 // POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
@@ -925,13 +959,18 @@ router.post(
     const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
     // E2: same locatedIssues attachment as /doctor above.
     const locatedIssues = locateIssues(issuesWithPass, converted.fountain);
-    const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(converted.fountain));
+    // Shape-&-rhythm jump-to-scene: same sceneLineSpans attachment as /doctor above.
+    const spans = sceneLineSpans(converted.fountain);
+    const rootCauses = clusterIssues(locatedIssues, spans);
     const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
     // A4: same characterSummaries attachment as /doctor above.
     const characterSummaries = buildCharacterSummaries(
       report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
     );
-    res.json({ ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source });
+    res.json({
+      ...publicDoctorReport(report), rootCauses, locatedIssues, prioritized, characterSummaries, source,
+      sceneLineSpans: spans,
+    });
   }),
 );
 
@@ -1044,7 +1083,36 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
   // attempts caveat as DOCTOR_DEEP_BUDGET above; the deadline is what's real.
   try {
     const result = await withAiBudget(FIX_BUDGET, () => fixAndVerify(fountain, span, issues));
-    res.json(result);
+    // Shape-&-rhythm delta (2026-09-04, advisory only): when the fix produced
+    // a verified candidate, compute the two ordered structural-signal
+    // aggregates (docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md §4) on both
+    // the original and candidate whole-document text and attach them
+    // alongside the health delta the client already renders from
+    // `result.before`/`result.after`. Deliberately a SEPARATE top-level
+    // field, never folded into FixVerifyResult itself — types.ts is the
+    // receipt-gated scoring-path contract this task does not touch, so a
+    // client reading only FixVerifyResult's documented shape sees no change.
+    // computeStructuralSignals is pure/cheap (no LLM, no doctor re-run), so
+    // this costs nothing beyond fixAndVerify's own work.
+    let structuralSignals: FixResponseStructuralSignals | undefined;
+    if (result.usedLLM && result.candidateFountain) {
+      const { computeStructuralSignals } = await import('../nvm/analyze/structural-signals.ts');
+      const before = computeStructuralSignals(fountain);
+      const after = computeStructuralSignals(result.candidateFountain);
+      if (before.scored && after.scored) {
+        structuralSignals = {
+          before: {
+            meanAbsDialogueShareDelta: before.meanAbsDialogueShareDelta,
+            actionSentenceCvOverall: before.actionSentenceCvOverall,
+          },
+          after: {
+            meanAbsDialogueShareDelta: after.meanAbsDialogueShareDelta,
+            actionSentenceCvOverall: after.actionSentenceCvOverall,
+          },
+        };
+      }
+    }
+    res.json(structuralSignals ? { ...result, structuralSignals } : result);
   } catch (err) {
     if (isAiBudgetExceededError(err)) {
       res.status(503).json({

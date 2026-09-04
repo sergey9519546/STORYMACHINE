@@ -273,9 +273,42 @@ Raw values on set D for the four channels the discussion below turns on
   diagnostics)" section: one bar per scene, filled by that scene's dialogue
   share, with the full per-scene row on hover, plus a document summary line.
   Its own copy states that no part of the score is derived from it.
-* `server/lib/coverage-letter.ts` — one line in "How to Read This Report",
-  emitted only when the block is present, saying the same thing in the
-  letter's voice.
+* `server/lib/coverage-letter.ts` — a "Shape and rhythm" paragraph in "How to
+  Read This Report", emitted only when the block is present AND scored,
+  naming `meanAbsDialogueShareDelta` and `actionSentenceCvOverall` with their
+  actual values and stating both are descriptive only. Gated on the field's
+  presence so the two pre-existing captured-report fixtures
+  (`tests/fixtures/coverage-letter/report{1,2}.json`, which predate this
+  field) render byte-identically to before; a third fixture pair
+  (`report3.json`/`report3.expected.md`) carries the field and exercises the
+  paragraph.
+* `src/components/scriptide/ScriptDoctorPanel.tsx` — a collapsible "Shape &
+  Rhythm" section (state remembered in `localStorage`, same try/catch
+  idiom as the panel's other client-side preferences): the per-scene strip
+  (scene index, words, dialogue share, speakers, length z-score, open/close
+  register shift — the full row on hover, matching coverage-html.ts's
+  tooltip text verbatim) plus the same two document aggregates as the letter,
+  each with one plain sentence and an explicit "not part of the score" label.
+  Clicking a scene bar jumps the editor to that scene, resolved through
+  `sceneLineSpans` — a route-level attachment (`server/routes/scriptide.ts`,
+  mirroring the existing `locatedIssues`/`rootCauses` attachment) of
+  `server/nvm/analyze/locate.ts`'s per-scene line spans, since
+  `StructuralSignalsReport`'s own scene rows carry no line numbers.
+* `src/components/scriptide/ScriptDoctorPanel.tsx`'s fix-and-verify receipt
+  (`FixReceiptCard`) — when POST `/api/scriptide/fix` produced a verified
+  candidate and BOTH the original and candidate whole-document text scored,
+  the route (not `server/nvm/analyze/fix.ts` or `types.ts`'s
+  `FixVerifyResult`, both left untouched) attaches a separate
+  `structuralSignals: { before, after }` field carrying the same two
+  aggregates, rendered beside the health delta and labelled descriptive.
+* `src/components/scriptide/SnapshotManager.tsx` (the Versions tab) — the
+  same two aggregates are captured per saved snapshot, additively, exactly
+  like `health`/`verdict`/`sceneCount` already are (only when a fresh SCORED
+  report exists for the exact text being snapshotted); a second line renders
+  under the health-trend sparkline caption, oldest-scored → newest-scored,
+  labelled descriptive. `src/lib/snapshot-trend.ts`'s `SnapshotTrendEntry`
+  carries them as `number | null`, resolving to `null` under the same
+  missing-data rule as every other field there.
 
 ---
 

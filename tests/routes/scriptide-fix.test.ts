@@ -150,6 +150,38 @@ describe('routes/scriptide/fix — HTTP behavior', async () => {
     assert.equal('candidateFountain' in body, false);
     assert.equal('cleared' in body, false);
     assert.equal('introduced' in body, false);
+    // Shape & rhythm delta (2026-09-04) — "field absent" path #1: no
+    // candidate means nothing to measure a delta between, so the field is
+    // absent entirely rather than a fabricated/zeroed value.
+    assert.equal('structuralSignals' in body, false);
+  });
+
+  // Shape & rhythm delta (2026-09-04) — "field absent" path #2: a valid
+  // rewrite on a document that never reaches the 2-scene floor
+  // structural-signals.ts requires to score. The receipt (before/after
+  // health, cleared/introduced) still renders in full; only the additive
+  // structuralSignals field is missing.
+  it('mocked provider, single-scene document: full receipt, but no structuralSignals (unscored on both sides)', async () => {
+    const singleScene = 'INT. ROOM - DAY\n\nJAX\nHello there, is anyone home right now.\n';
+    const span = { startLine: 4, endLine: 4 };
+    const replacement = 'Hi, is anyone home right now.';
+    setLLMProvider({ generate: async () => ({ text: replacement } as never) });
+    try {
+      const res = await post({
+        fountain: singleScene,
+        span,
+        issues: [{ rule: 'VOICE_FLAT', description: 'This line reads flat.' }],
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.usedLLM, true);
+      assert.equal(typeof body.candidateFountain, 'string');
+      assert.equal(typeof body.before.health, 'number');
+      assert.equal(typeof body.after.health, 'number');
+      assert.equal('structuralSignals' in body, false, 'a single-scene document never scores structural signals');
+    } finally {
+      resetLLMProvider();
+    }
   });
 
   it('mocked provider (ai.ts seam): a valid rewrite yields 200 with a full receipt', async () => {
@@ -170,6 +202,18 @@ describe('routes/scriptide/fix — HTTP behavior', async () => {
       assert.equal(typeof body.before.contentHash, 'string');
       assert.equal(typeof body.after.contentHash, 'string');
       assert.notEqual(body.before.contentHash, body.after.contentHash);
+
+      // Shape & rhythm delta (2026-09-04, advisory only) — a SEPARATE
+      // top-level field alongside `before`/`after`, present here because
+      // FOUNTAIN carries 3 scenes on both sides of the fix (>= the 2-scene
+      // floor structural-signals.ts requires to score). Never folded into
+      // `before`/`after` themselves — those stay exactly the shape asserted
+      // above (types.ts's FixVerifyResult contract, untouched).
+      assert.equal(typeof body.structuralSignals, 'object');
+      assert.equal(typeof body.structuralSignals.before.meanAbsDialogueShareDelta, 'number');
+      assert.equal(typeof body.structuralSignals.before.actionSentenceCvOverall, 'number');
+      assert.equal(typeof body.structuralSignals.after.meanAbsDialogueShareDelta, 'number');
+      assert.equal(typeof body.structuralSignals.after.actionSentenceCvOverall, 'number');
 
       assert.ok(Array.isArray(body.cleared));
       assert.ok(Array.isArray(body.introduced));

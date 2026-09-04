@@ -33,6 +33,15 @@ export interface SnapshotTrendEntry {
   /** sceneCount - previous snapshot's sceneCount. null under the same
    *  missing-data conditions as healthDelta. */
   sceneCountDelta: number | null;
+  // 2026-09-04 — Shape & Rhythm (ScriptDoctorReport.structuralSignals): the
+  // same two document aggregates ScriptDoctorPanel.tsx's "Shape & Rhythm"
+  // section and coverage-letter.ts's caveat surface, read as-is from the
+  // snapshot (never re-derived, never fabricated) — null under the same
+  // missing-data rule as every other field above: a snapshot saved before
+  // this field existed, or saved with an unscored/absent structuralSignals
+  // block, simply has no reading here. Purely descriptive, never scored. */
+  meanAbsDialogueShareDelta: number | null;
+  actionSentenceCvOverall: number | null;
 }
 
 function round1(n: number): number {
@@ -109,6 +118,8 @@ export function snapshotTrend(snapshots: readonly Snapshot[]): SnapshotTrendEntr
       analyzedAt: numberOrNull(snap.analyzedAt),
       healthDelta: health !== null && prevHealth !== null ? round1(health - prevHealth) : null,
       sceneCountDelta: sceneCount !== null && prevSceneCount !== null ? sceneCount - prevSceneCount : null,
+      meanAbsDialogueShareDelta: numberOrNull(snap.meanAbsDialogueShareDelta),
+      actionSentenceCvOverall: numberOrNull(snap.actionSentenceCvOverall),
     };
   });
 }

@@ -1167,6 +1167,14 @@ export const SnapshotSchema = z.object({
   verdict: z.enum(['RECOMMEND', 'CONSIDER', 'PASS']).optional(),
   sceneCount: z.number().int().nonnegative().optional(),
   analyzedAt: z.number().optional(),
+  // 2026-09-04 — the same two Shape & Rhythm aggregates ScriptDoctorPanel.tsx
+  // and coverage-letter.ts surface (server/nvm/analyze/structural-signals.ts's
+  // meanAbsDialogueShareDelta/actionSentenceCvOverall), captured at snapshot
+  // time the same optional, additive way as health/verdict/sceneCount above —
+  // see src/components/ScriptIDE.tsx's confirmSnapshot and src/lib/
+  // snapshot-trend.ts.
+  meanAbsDialogueShareDelta: z.number().optional(),
+  actionSentenceCvOverall: z.number().optional(),
 }).passthrough();
 
 // POST /api/scriptide/save — persists the ScriptIDE editor's full working

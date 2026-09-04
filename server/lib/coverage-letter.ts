@@ -264,15 +264,23 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
 
   // Additive, 2026-09-04. Gated on the field's PRESENCE so a report
   // serialized before the structural-signal block existed renders exactly the
-  // letter it always did — the two committed fixtures under
-  // tests/fixtures/coverage-letter/ are such reports, and stay byte-identical.
+  // letter it always did — report1.json/report2.json under
+  // tests/fixtures/coverage-letter/ are such reports and stay byte-identical;
+  // report3.json is a third fixture that carries the field, covering this
+  // paragraph. Names the same two aggregates, in the same order, that
+  // docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md §4 found ordering all three
+  // separation sets it measured — the same pair ScriptDoctorPanel.tsx's
+  // "Shape & Rhythm" section and the exported coverage HTML's strip surface.
   if (report.structuralSignals?.scored) {
+    const { meanAbsDialogueShareDelta, actionSentenceCvOverall } = report.structuralSignals;
     caveats.push(
-      'The exported HTML report carries a new “Structural Signals” strip — scene length, '
-      + 'talk-versus-action mix, speech turns, speaker pairings and action-prose variation, '
-      + 'read from the shape of the document rather than from any word list. Those readings '
-      + 'are new and deliberately unwired: they are shown as diagnostics and no part of the '
-      + 'score, grade, or verdict above is derived from them.',
+      'Shape and rhythm: the exported HTML report carries a new "Structural Signals" strip — scene '
+      + 'length, talk-versus-action mix, speech turns, speaker pairings and action-prose variation, read '
+      + 'from the shape of the document rather than from any word list. Two readings from it: the mean '
+      + `scene-to-scene change in the dialogue/action word mix is ${meanAbsDialogueShareDelta.toFixed(2)}, `
+      + `and the sentence-length variation across the draft's action lines is ${actionSentenceCvOverall.toFixed(2)}. `
+      + 'Both are descriptive only — new and deliberately unwired: they are shown as diagnostics and no '
+      + 'part of the score, grade, or verdict above is derived from them.',
     );
   }
 

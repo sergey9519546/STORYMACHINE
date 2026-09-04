@@ -15,6 +15,7 @@ import type {
   DoctorProgressEvent,
   LocatedIssue,
 } from "../../server/nvm/analyze/types.ts";
+import type { SceneLineSpan } from "../../server/nvm/analyze/locate.ts";
 
 // server/nvm/revision/pipeline.ts's fixed pass count.
 export const DOCTOR_STREAM_TOTAL_PASSES = 14;
@@ -31,7 +32,16 @@ export interface DoctorStreamProgress {
 // attaches `rootCauses` — a route-level enrichment, not part of the
 // ScriptDoctorReport contract in server/nvm/analyze/types.ts (that interface
 // is a fixed contract).
-export type DoctorReportWithAnchors = ScriptDoctorReport & { locatedIssues?: LocatedIssue[] };
+// Shape-&-rhythm jump-to-scene (2026-09-04): same route-level attachment as
+// `locatedIssues` above — index i is scene i's { startLine, endLine }, so a
+// structuralSignals scene row (sceneIdx/slug only, no line numbers on the
+// scoring-path StructuralSignalsReport itself) can resolve to a concrete
+// editor span the same way a topPriorities/per-pass issue already does via
+// locatedIssues. Optional: absent on any route/response that predates it.
+export type DoctorReportWithAnchors = ScriptDoctorReport & {
+  locatedIssues?: LocatedIssue[];
+  sceneLineSpans?: SceneLineSpan[];
+};
 
 type DoctorStreamPayload =
   | { type: "doctor_progress"; event: DoctorProgressEvent }

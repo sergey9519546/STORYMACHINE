@@ -119,6 +119,53 @@ describe('snapshotTrend', () => {
   });
 });
 
+// ── Shape & Rhythm aggregates (2026-09-04) — additive, optional per-snapshot
+//    fields (server/nvm/analyze/structural-signals.ts's
+//    meanAbsDialogueShareDelta/actionSentenceCvOverall). Read as-is, never
+//    fabricated: absent under the exact same "field predates this feature or
+//    was never scored" rule as health/verdict/sceneCount above.
+
+describe('snapshotTrend — Shape & Rhythm aggregates', () => {
+  it('carries meanAbsDialogueShareDelta/actionSentenceCvOverall through as-is when present', () => {
+    const [entry] = snapshotTrend([
+      snap({ id: 's1', meanAbsDialogueShareDelta: 0.12, actionSentenceCvOverall: 0.55 }),
+    ]);
+    assert.equal(entry.meanAbsDialogueShareDelta, 0.12);
+    assert.equal(entry.actionSentenceCvOverall, 0.55);
+  });
+
+  it('resolves to null (not undefined, not 0) when absent — the "field absent" path', () => {
+    const [entry] = snapshotTrend([snap({ id: 's1' })]);
+    assert.equal(entry.meanAbsDialogueShareDelta, null);
+    assert.equal(entry.actionSentenceCvOverall, null);
+  });
+
+  it('a legacy snapshot with health but no structural-signal fields still resolves those two to null', () => {
+    const [entry] = snapshotTrend([snap({ id: 's1', health: 72, verdict: 'CONSIDER', sceneCount: 6 })]);
+    assert.equal(entry.health, 72);
+    assert.equal(entry.meanAbsDialogueShareDelta, null);
+    assert.equal(entry.actionSentenceCvOverall, null);
+  });
+
+  it('resolves each snapshot independently — no delta-vs-previous is computed for these two fields', () => {
+    const entries = snapshotTrend([
+      snap({ id: 'newest', meanAbsDialogueShareDelta: 0.3, actionSentenceCvOverall: 0.7 }),
+      snap({ id: 'oldest', meanAbsDialogueShareDelta: 0.1, actionSentenceCvOverall: 0.4 }),
+    ]);
+    assert.equal(entries[0].meanAbsDialogueShareDelta, 0.3);
+    assert.equal(entries[1].meanAbsDialogueShareDelta, 0.1);
+    assert.equal(entries[0].actionSentenceCvOverall, 0.7);
+    assert.equal(entries[1].actionSentenceCvOverall, 0.4);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [snap({ id: 'a', meanAbsDialogueShareDelta: 0.2, actionSentenceCvOverall: 0.5 })];
+    const copy = JSON.parse(JSON.stringify(input));
+    snapshotTrend(input);
+    assert.deepEqual(input, copy);
+  });
+});
+
 // ── computeDraftRank — "rank among your own saved drafts" ──────────────────
 // The second, honest denominator alongside the calibration reference-set
 // percentile (2026-09-04): where does the current draft's health land

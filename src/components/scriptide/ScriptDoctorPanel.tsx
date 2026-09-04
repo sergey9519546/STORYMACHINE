@@ -36,6 +36,7 @@ import type {
   FixVerifyResult,
 } from "../../../server/nvm/analyze/types.ts";
 import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
+import type { StructuralSignalsReport, SceneStructuralSignals } from "../../../server/nvm/analyze/structural-signals.ts";
 import type {
   RevisionIssue,
   PassName,
@@ -522,6 +523,196 @@ function MetricSparkline({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ─── Shape & rhythm (client-side collapse preference, localStorage) ────────
+// Advisory-only surface for ScriptDoctorReport.structuralSignals (server/nvm/
+// analyze/structural-signals.ts) — twelve lexicon-free per-scene channels and
+// thirteen document aggregates read from the SHAPE of the document (word/
+// line/sentence/turn/speaker counts). NEVER part of health, grade, verdict,
+// dimensions, or topPriorities — see that module's header and
+// docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md. Same try/catch-degrades-to-
+// default idiom as the deep-read toggle preference above.
+const SHAPE_RHYTHM_OPEN_KEY = "sm_doctor_shape_rhythm_open_v1";
+
+function loadShapeRhythmOpenPref(): boolean {
+  try {
+    const raw = localStorage.getItem(SHAPE_RHYTHM_OPEN_KEY);
+    return raw === null ? true : raw === "1";
+  } catch {
+    return true;
+  }
+}
+
+function saveShapeRhythmOpenPref(open: boolean): void {
+  try {
+    localStorage.setItem(SHAPE_RHYTHM_OPEN_KEY, open ? "1" : "0");
+  } catch {
+    // Private-mode localStorage access, or quota exceeded — the toggle just
+    // doesn't persist; the section still works fine for this session.
+  }
+}
+
+/** One scene row's full reading, matching server/lib/coverage-html.ts's
+ *  buildStructuralSignalsSection tooltip text verbatim (whitespace
+ *  collapsed the same way — it lands in an HTML `title` attribute here too). */
+function structuralSceneTooltip(scene: SceneStructuralSignals): string {
+  const talkPct = Math.max(0, Math.min(100, Math.round(scene.dialogueShare * 100)));
+  return (
+    `${scene.slug.replace(/\s+/g, " ")} — ${scene.words} words (z ${scene.lengthZ.toFixed(2)}) · `
+    + `dialogue ${talkPct}% (Δ ${scene.dialogueShareDelta >= 0 ? "+" : ""}${scene.dialogueShareDelta.toFixed(2)}) · `
+    + `${scene.speakers} speaker(s), ${scene.speakerTurns} turn(s), ${scene.meanTurnWords.toFixed(1)} words/turn · `
+    + `lead share ${Math.round(scene.leadShare * 100)}% · new pairings ${scene.newPairs} · `
+    + `open/close shift ${scene.openCloseShift.toFixed(2)}`
+  );
+}
+
+/** The "Shape & Rhythm" report section: a per-scene strip (scene index,
+ *  words, dialogue share, speakers, length z-score, open/close register
+ *  shift — all in the hover tooltip, matching coverage-html.ts's diagnostic
+ *  strip) plus the two document aggregates that ordered all three separation
+ *  sets measured in the design doc's §4 (meanAbsDialogueShareDelta,
+ *  actionSentenceCvOverall). Collapsible, state remembered in localStorage.
+ *  Clicking a scene bar jumps the editor to that scene via the same
+ *  onNavigateToFinding mechanism topPriorities/per-pass issues already use,
+ *  resolved through `sceneLineSpans` (server/routes/scriptide.ts's route-
+ *  level attachment, index i = scene i's line span) — a scene with no
+ *  resolvable span (report predates that field) renders as a plain,
+ *  unclickable bar instead of a dead click target. */
+function ShapeRhythmSection({
+  signals,
+  sceneLineSpans,
+  onNavigateToFinding,
+}: {
+  signals: StructuralSignalsReport;
+  sceneLineSpans?: Array<{ startLine: number; endLine: number }>;
+  onNavigateToFinding?: (startLine: number, endLine: number) => void;
+}) {
+  const [open, setOpen] = useState<boolean>(loadShapeRhythmOpenPref);
+
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      saveShapeRhythmOpenPref(next);
+      return next;
+    });
+  };
+
+  return (
+    <div>
+      <button
+        onClick={toggle}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-2 p-3 text-left border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest">
+          {open ? (
+            <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          )}
+          Shape &amp; Rhythm
+        </span>
+        <span className="text-[9px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
+          Descriptive — not part of the score
+        </span>
+      </button>
+      {open && (
+        <div className="p-3 border-2 border-t-0 border-black dark:border-white/20 bg-white dark:bg-zinc-900 space-y-3">
+          <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug">
+            Read from the shape of the document — word, line, sentence, turn and speaker counts — with no
+            word list involved. Diagnostic only: nothing here feeds health, grade, verdict, or any priority
+            above.
+          </p>
+
+          {/* Per-scene strip — one bar per scene, filled by dialogue share
+              (same reading as coverage-html.ts's diagnostic strip); hover (or
+              a screen reader's label) carries the full row: words, lengthZ,
+              dialogueShare, speakers, and openCloseShift. */}
+          <div>
+            {/* role="group", not "list" — every child is a real, individually
+                actionable <button> (a listitem child would strip its button
+                semantics from the accessibility tree), matching the
+                interactive-strip pattern rather than the passive heatmap
+                strips above/below this section. */}
+            <div
+              className="flex gap-0.5 overflow-x-auto pb-1"
+              role="group"
+              aria-label="Per-scene shape and rhythm readings"
+            >
+              {signals.scenes.map((scene) => {
+                const talkPct = Math.max(0, Math.min(100, Math.round(scene.dialogueShare * 100)));
+                const span = sceneLineSpans?.[scene.sceneIdx];
+                const clickable = !!span && !!onNavigateToFinding;
+                return (
+                  <button
+                    key={scene.sceneIdx}
+                    type="button"
+                    title={structuralSceneTooltip(scene)}
+                    disabled={!clickable}
+                    onClick={
+                      clickable ? () => onNavigateToFinding!(span!.startLine, span!.endLine) : undefined
+                    }
+                    aria-label={`Scene ${scene.sceneIdx + 1}: ${scene.slug}${
+                      clickable ? " — jump to this scene" : ""
+                    }`}
+                    className={`flex-1 min-w-[10px] h-10 flex flex-col justify-end border border-black/20 dark:border-white/20 bg-gray-100 dark:bg-zinc-800 ${
+                      clickable
+                        ? "cursor-pointer hover:ring-2 hover:ring-black/40 dark:hover:ring-white/40"
+                        : "cursor-default"
+                    }`}
+                  >
+                    <div
+                      className="w-full bg-zinc-500 dark:bg-zinc-400"
+                      style={{ height: talkPct === 0 ? "1px" : `${talkPct}%` }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex justify-between text-[9px] font-mono text-gray-400 mt-1 uppercase">
+              <span>Scene 1</span>
+              <span>Scene {signals.scenes.length}</span>
+            </div>
+          </div>
+
+          {/* Document aggregates — the two channels docs/scoring/
+              STRUCTURAL_SIGNALS_2026-09-04.md §4 found ordering all three
+              separation sets it measured, shown in that order. */}
+          <div className="space-y-2">
+            <div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-black">
+                  Talk/action swing
+                </span>
+                <span className="text-xs font-bold text-black">
+                  {signals.meanAbsDialogueShareDelta.toFixed(2)}
+                </span>
+              </div>
+              <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-0.5">
+                Mean scene-to-scene change in the dialogue/action word mix — descriptive only, not part of
+                the score.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-black">
+                  Action-prose variation
+                </span>
+                <span className="text-xs font-bold text-black">
+                  {signals.actionSentenceCvOverall.toFixed(2)}
+                </span>
+              </div>
+              <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-0.5">
+                Sentence-length variation across the draft&rsquo;s action lines — descriptive only, not part
+                of the score.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1576,8 +1767,22 @@ function RootCauseCard({
 // receipt can render a real diffLines(before, after) for the span; it is
 // never sent anywhere and never substitutes for the server's own honesty
 // fields.
+// Shape-&-rhythm delta on the fix-and-verify receipt (2026-09-04, advisory
+// only): POST /api/scriptide/fix (server/routes/scriptide.ts) attaches this
+// as a SEPARATE top-level field alongside FixVerifyResult's own before/after
+// (health/verdict/contentHash) rather than folding it into that interface —
+// server/nvm/analyze/types.ts is the receipt-gated scoring-path contract
+// this feature does not touch. Present only when both the original and
+// candidate whole-document text scored (>= 2 scenes) on structural signals.
+interface FixStructuralSignalsDelta {
+  before: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+  after: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+}
+
+type FixVerifyResultWithSignals = FixVerifyResult & { structuralSignals?: FixStructuralSignalsDelta };
+
 interface FixRunState {
-  result: FixVerifyResult;
+  result: FixVerifyResultWithSignals;
   originalSpanText: string;
 }
 
@@ -1751,6 +1956,27 @@ function FixReceiptCard({
           </span>
         )}
       </div>
+
+      {/* Shape & rhythm delta (2026-09-04) — descriptive only, next to the
+          health delta above but never merged into it: these two aggregates
+          are not part of the score (docs/scoring/
+          STRUCTURAL_SIGNALS_2026-09-04.md). Renders only when the server
+          attached it (both whole-document texts scored). */}
+      {result.structuralSignals && (
+        <div className="text-[10px] font-mono text-[var(--sm-ink-mute)] flex items-center gap-3 flex-wrap">
+          <span className="uppercase tracking-widest font-bold">Shape &amp; rhythm (descriptive, not part of the score)</span>
+          <span>
+            Talk/action swing {result.structuralSignals.before.meanAbsDialogueShareDelta.toFixed(2)}
+            {" → "}
+            {result.structuralSignals.after.meanAbsDialogueShareDelta.toFixed(2)}
+          </span>
+          <span>
+            Action-prose variation {result.structuralSignals.before.actionSentenceCvOverall.toFixed(2)}
+            {" → "}
+            {result.structuralSignals.after.actionSentenceCvOverall.toFixed(2)}
+          </span>
+        </div>
+      )}
 
       {/* Cleared / introduced — same prominence, always both mounted (never
           one collapsed while the other is open); only the span diff below
@@ -2920,7 +3146,7 @@ export default function ScriptDoctorPanel({
               : `Fix failed (${res.status})`;
           throw new Error(body?.error ?? fallback);
         }
-        return (await res.json()) as FixVerifyResult;
+        return (await res.json()) as FixVerifyResultWithSignals;
       })
       .then((data) => {
         if (myGeneration !== fixGenerationRef.current) return; // superseded — ignore
@@ -4163,6 +4389,20 @@ export default function ScriptDoctorPanel({
                   <span>Scene {report.sceneHeatmap.length}</span>
                 </div>
               </div>
+            )}
+
+            {/* Shape & rhythm — advisory-only structural-signal strip
+                (report.structuralSignals). Rendered only when the field is
+                present and scored (>= 2 scenes) — reports produced/cached
+                before it existed, or with too few scenes, degrade gracefully
+                with no gap, same optional-field convention as
+                report.metrics/storyGraph below. */}
+            {reportIsComplete && report.structuralSignals?.scored && (
+              <ShapeRhythmSection
+                signals={report.structuralSignals}
+                sceneLineSpans={report.sceneLineSpans}
+                onNavigateToFinding={onNavigateToFinding}
+              />
             )}
 
             {/* Story metrics — deterministic narrative-shape readings from

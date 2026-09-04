@@ -121,6 +121,41 @@ describe('routes/scriptide/doctor — HTTP behavior', async () => {
     assert.deepEqual(body.passes, []);
     assert.equal(body.sceneCount, 0);
     assert.match(body.plainSummary, /score and verdict are withheld/i);
+    // Shape-&-rhythm jump-to-scene (2026-09-04) — "field absent" path: a
+    // blank submission has no scenes, so sceneLineSpans() returns [] rather
+    // than a fabricated span.
+    assert.deepEqual(body.sceneLineSpans, []);
+  });
+
+  // Shape-&-rhythm jump-to-scene (2026-09-04): server/routes/scriptide.ts
+  // attaches sceneLineSpans (server/nvm/analyze/locate.ts) to /doctor the
+  // same way it already attaches locatedIssues/rootCauses — one
+  // { startLine, endLine } per scene, index i = scene i, so the client can
+  // resolve report.structuralSignals.scenes[i] (which carries no line
+  // numbers of its own) to a jump-to-scene target.
+  it('attaches sceneLineSpans — one 1-based inclusive line span per scene, in scene order', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    assert.ok(Array.isArray(body.sceneLineSpans));
+    assert.equal(body.sceneLineSpans.length, body.sceneCount);
+    assert.equal(body.sceneLineSpans.length, 4);
+
+    let previousEnd = 0;
+    for (const span of body.sceneLineSpans) {
+      assert.equal(typeof span.startLine, 'number');
+      assert.equal(typeof span.endLine, 'number');
+      assert.ok(span.startLine >= 1, 'startLine is 1-based');
+      assert.ok(span.endLine >= span.startLine, 'endLine must not precede startLine');
+      assert.ok(span.startLine > previousEnd, 'scenes must not overlap and must stay in document order');
+      previousEnd = span.endLine;
+    }
+
+    // Sanity: structuralSignals also scored on this 4-scene fixture, so a
+    // real client can resolve every one of its scene rows through this array.
+    assert.equal(body.structuralSignals.scored, true);
+    assert.equal(body.structuralSignals.scenes.length, body.sceneLineSpans.length);
   });
 
   it('does not serialize headline scores for a scene-truncated partial draft', async () => {
