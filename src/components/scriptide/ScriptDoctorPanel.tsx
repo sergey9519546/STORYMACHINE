@@ -590,21 +590,39 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
   const [expandedDiagnostic, setExpandedDiagnostic] = useState<string | null>(null);
 
   // Overall assessment styling
+  // a11y pass (2026-09-04, follow-up): this card's own bg (bg-*-50) was
+  // measured against StoryGraphSection's real ambient — the fixed slide-in
+  // panel's theme-invariant bg-[var(--sm-panel)] (see the comment on
+  // PERCENTILE_BADGE_CLASS below for why "dark mode" never actually darkens
+  // that panel). Two bugs, computed with the WCAG relative-luminance
+  // formula: (1) text-*-600 on bg-*-50 measured 2.79-2.80:1 in LIGHT mode
+  // already — a plain Tailwind 600-weight color is simply too light against
+  // a near-white chip background, dark toggle or not; (2) the dark: bg
+  // variants (bg-*-900/20) are alpha-blended OVER the still-light panel,
+  // not over a real dark surface, landing at a pale, differently-tinted
+  // ~2:1 combination — never the near-black background the *-400 text
+  // shade was designed for. Fix: the -on-light token (already proven at
+  // 5.59-6.30:1 against this exact bg-*-50 in the design-system.css a11y
+  // pass) covers both states identically, so the dark: bg/text variants are
+  // dropped rather than patched — this card renders the same in both
+  // themes now, which is honest given the panel itself never changes.
   const assessmentMeta = {
-    strong: { label: "Strong Structure", color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20", icon: CheckCircle2 },
-    good: { label: "Good Structure", color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20", icon: CheckCircle2 },
-    "needs-work": { label: "Needs Work", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20", icon: AlertCircle },
-    weak: { label: "Weak Structure", color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/20", icon: AlertTriangle },
+    strong: { label: "Strong Structure", color: "text-[var(--sm-ok-on-light)]", bg: "bg-green-50", icon: CheckCircle2 },
+    good: { label: "Good Structure", color: "text-[var(--sm-ok-on-light)]", bg: "bg-green-50", icon: CheckCircle2 },
+    "needs-work": { label: "Needs Work", color: "text-[var(--sm-warn-on-light)]", bg: "bg-amber-50", icon: AlertCircle },
+    weak: { label: "Weak Structure", color: "text-[var(--sm-stamp-on-light)]", bg: "bg-red-50", icon: AlertTriangle },
   };
 
   const assessment = assessmentMeta[summary.overallAssessment];
 
-  // Severity icons
+  // Severity icons — same -on-light fix as assessmentMeta above (this object
+  // sits directly on the theme-invariant panel with no bg of its own, and
+  // measured the same 2.79-2.80:1 in light mode before the fix).
   const severityIcons = {
-    critical: { Icon: AlertTriangle, color: "text-red-600 dark:text-red-400" },
-    medium: { Icon: AlertCircle, color: "text-amber-600 dark:text-amber-400" },
+    critical: { Icon: AlertTriangle, color: "text-[var(--sm-stamp-on-light)]" },
+    medium: { Icon: AlertCircle, color: "text-[var(--sm-warn-on-light)]" },
     low: { Icon: Info, color: "text-zinc-500 dark:text-zinc-400" },
-    strength: { Icon: CheckCircle2, color: "text-green-600 dark:text-green-400" },
+    strength: { Icon: CheckCircle2, color: "text-[var(--sm-ok-on-light)]" },
   };
 
   return (
@@ -642,8 +660,8 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
       {diagnostics.critical.length > 0 && (
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" aria-hidden="true" />
-            <h4 className="text-[9px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400">
+            <AlertTriangle className="w-3.5 h-3.5 text-[var(--sm-stamp-on-light)]" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-stamp-on-light)]">
               Critical ({diagnostics.critical.length})
             </h4>
           </div>
@@ -661,15 +679,15 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                     className="w-full text-left flex items-start gap-2"
                   >
                     {isExpanded ? (
-                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-600" />
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--sm-stamp-on-light)]" />
                     ) : (
-                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-600" />
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--sm-stamp-on-light)]" />
                     )}
                     <div className="flex-1">
-                      <p className="text-[11px] font-bold text-red-900 dark:text-red-200 leading-snug">
+                      <p className="text-[11px] font-bold text-[var(--sm-stamp-on-light)] leading-snug">
                         {diag.message}
                         {diag.sceneIdx !== undefined && (
-                          <span className="ml-1.5 text-[10px] font-mono text-red-700 dark:text-red-400">
+                          <span className="ml-1.5 text-[10px] font-mono text-[var(--sm-stamp-on-light)]">
                             (Scene {diag.sceneIdx + 1})
                           </span>
                         )}
@@ -689,7 +707,7 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                           <ul className="space-y-1">
                             {diag.suggestions.map((suggestion, si) => (
                               <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
-                                <span className="text-red-600 shrink-0">→</span>
+                                <span className="text-[var(--sm-stamp-on-light)] shrink-0">→</span>
                                 <span>{suggestion}</span>
                               </li>
                             ))}
@@ -709,8 +727,8 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
       {diagnostics.medium.length > 0 && (
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-            <h4 className="text-[9px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+            <AlertCircle className="w-3.5 h-3.5 text-[var(--sm-warn-on-light)]" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-warn-on-light)]">
               Medium ({diagnostics.medium.length})
             </h4>
           </div>
@@ -728,15 +746,15 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                     className="w-full text-left flex items-start gap-2"
                   >
                     {isExpanded ? (
-                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--sm-warn-on-light)]" />
                     ) : (
-                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--sm-warn-on-light)]" />
                     )}
                     <div className="flex-1">
-                      <p className="text-[11px] font-bold text-amber-900 dark:text-amber-200 leading-snug">
+                      <p className="text-[11px] font-bold text-[var(--sm-warn-on-light)] leading-snug">
                         {diag.message}
                         {diag.sceneIdx !== undefined && (
-                          <span className="ml-1.5 text-[10px] font-mono text-amber-700 dark:text-amber-400">
+                          <span className="ml-1.5 text-[10px] font-mono text-[var(--sm-warn-on-light)]">
                             (Scene {diag.sceneIdx + 1})
                           </span>
                         )}
@@ -756,7 +774,7 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                           <ul className="space-y-1">
                             {diag.suggestions.map((suggestion, si) => (
                               <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
-                                <span className="text-amber-600 shrink-0">→</span>
+                                <span className="text-[var(--sm-warn-on-light)] shrink-0">→</span>
                                 <span>{suggestion}</span>
                               </li>
                             ))}
@@ -807,8 +825,8 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
       {diagnostics.strengths.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" aria-hidden="true" />
-            <h4 className="text-[9px] font-bold uppercase tracking-widest text-green-600 dark:text-green-400">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[var(--sm-ok-on-light)]" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)]">
               Strengths ({diagnostics.strengths.length})
             </h4>
           </div>
@@ -819,9 +837,9 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                 className="border-2 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10 p-2.5"
               >
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-green-600" aria-hidden="true" />
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--sm-ok-on-light)]" aria-hidden="true" />
                   <div className="flex-1">
-                    <p className="text-[11px] font-bold text-green-900 dark:text-green-200 leading-snug mb-1">
+                    <p className="text-[11px] font-bold text-[var(--sm-ok-on-light)] leading-snug mb-1">
                       {strength.message}
                     </p>
                     <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
@@ -1078,7 +1096,13 @@ function relativeTimeFrom(at: number): string {
 function DeltaGlyph({ delta, invert = false }: { delta: number; invert?: boolean }) {
   const improved = invert ? delta < 0 : delta > 0;
   const flat = delta === 0;
-  const color = flat ? "text-gray-400" : improved ? "text-green-600" : "text-red-500";
+  // a11y pass follow-up: every call site renders this inside a `bg-gray-50
+  // dark:bg-zinc-800` card (a REAL dark surface, unlike the theme-invariant
+  // --sm-panel elsewhere in this file) — plain text-green-600/text-red-500
+  // measured under 4.5:1 against bg-gray-50 in light mode. Full responsive
+  // pair: -on-light against the light card, the *-400 shade (already proven
+  // >=8:1 against zinc-800/900 elsewhere in this file) for dark.
+  const color = flat ? "text-gray-400" : improved ? "text-[var(--sm-ok-on-light)] dark:text-green-400" : "text-[var(--sm-stamp-on-light)] dark:text-red-400";
   const Icon = flat ? Minus : delta > 0 ? ArrowUp : ArrowDown;
   return (
     <span className={`inline-flex items-center gap-0.5 font-bold ${color}`}>
@@ -1193,11 +1217,11 @@ function CrossVersionNotice({
       ? "One draft was a quick (deterministic) read and the other was a deep read (AI-sensed signals) — the underlying signals came from a different process, so scores aren’t directly comparable"
       : "Scores aren’t directly comparable";
   return (
-    <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-800 p-3 space-y-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+    <div className="bg-amber-50 border-2 border-amber-300 p-3 space-y-1.5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-warn-on-light)] flex items-center gap-1.5">
         <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {heading}
       </p>
-      <p className="text-xs font-mono leading-relaxed text-amber-900 dark:text-amber-200">
+      <p className="text-xs font-mono leading-relaxed text-[var(--sm-warn-on-light)]">
         {bodyLead}
         {previous.verdict && current.verdict ? (
           <>
@@ -1343,7 +1367,7 @@ function IssueCard({
         {issue.description}
       </p>
       {issue.suggestedFix && (
-        <p className="text-[10px] font-mono text-green-700 dark:text-green-400 mt-2 pl-2 border-l-2 border-green-500">
+        <p className="text-[10px] font-mono text-[var(--sm-ok-on-light)] dark:text-green-400 mt-2 pl-2 border-l-2 border-green-500">
           Fix: {issue.suggestedFix}
         </p>
       )}
@@ -1495,7 +1519,7 @@ function RootCauseCard({
             );
           })()}
           {fixState.error && (
-            <p role="alert" className="text-[10px] font-mono text-red-600 dark:text-red-400">
+            <p role="alert" className="text-[10px] font-mono text-[var(--sm-stamp-on-light)] dark:text-red-400">
               {fixState.error}
             </p>
           )}
@@ -1572,7 +1596,7 @@ function FixDeltaList({
     <div>
       <p
         className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${
-          isCleared ? "text-green-600" : "text-red-600"
+          isCleared ? "text-[var(--sm-ok-on-light)] dark:text-[var(--sm-ok-on-dark)]" : "text-[var(--sm-stamp-on-light)] dark:text-[var(--sm-stamp-on-dark)]"
         }`}
       >
         {isCleared ? "Cleared" : "Introduced"} ({items.length})
@@ -1586,8 +1610,8 @@ function FixDeltaList({
               key={i}
               className={`text-[10px] font-mono leading-snug ${
                 isCleared
-                  ? "text-green-700 dark:text-green-400"
-                  : "text-red-700 dark:text-red-400"
+                  ? "text-[var(--sm-ok-on-light)] dark:text-green-400"
+                  : "text-[var(--sm-stamp-on-light)] dark:text-red-400"
               }`}
             >
               <span className="font-bold uppercase">{humanizeRule(issue.rule)}</span>
@@ -1683,7 +1707,7 @@ function FixReceiptCard({
           Fix &amp; verify receipt
         </p>
         {applied && (
-          <span className="text-[9px] font-bold uppercase tracking-widest text-green-600 flex items-center gap-1">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)] dark:text-green-400 flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Applied to editor
           </span>
         )}
@@ -3253,7 +3277,7 @@ export default function ScriptDoctorPanel({
       {uploadError && (
         <div
           role="alert"
-          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0"
+          className="px-6 py-2 bg-red-50 border-b-2 border-red-300 text-[10px] font-mono text-[var(--sm-stamp-on-light)] shrink-0"
         >
           {uploadError}
         </div>
@@ -3265,13 +3289,13 @@ export default function ScriptDoctorPanel({
       {exportStatus === "error" && exportError && (
         <div
           role="alert"
-          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+          className="px-6 py-2 bg-red-50 border-b-2 border-red-300 text-[10px] font-mono text-[var(--sm-stamp-on-light)] shrink-0 flex items-center justify-between gap-3"
         >
           <span>Export failed: {exportError}</span>
           <button
             onClick={() => setExportError(null)}
             aria-label="Dismiss export error"
-            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+            className="shrink-0 hover:text-red-900"
           >
             <X className="w-3 h-3" aria-hidden="true" />
           </button>
@@ -3283,13 +3307,13 @@ export default function ScriptDoctorPanel({
       {breakdownStatus === "error" && breakdownError && (
         <div
           role="alert"
-          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+          className="px-6 py-2 bg-red-50 border-b-2 border-red-300 text-[10px] font-mono text-[var(--sm-stamp-on-light)] shrink-0 flex items-center justify-between gap-3"
         >
           <span>Breakdown export failed: {breakdownError}</span>
           <button
             onClick={() => setBreakdownError(null)}
             aria-label="Dismiss breakdown export error"
-            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+            className="shrink-0 hover:text-red-900"
           >
             <X className="w-3 h-3" aria-hidden="true" />
           </button>
@@ -3298,13 +3322,13 @@ export default function ScriptDoctorPanel({
       {pitchkitStatus === "error" && pitchkitError && (
         <div
           role="alert"
-          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+          className="px-6 py-2 bg-red-50 border-b-2 border-red-300 text-[10px] font-mono text-[var(--sm-stamp-on-light)] shrink-0 flex items-center justify-between gap-3"
         >
           <span>Pitch kit export failed: {pitchkitError}</span>
           <button
             onClick={() => setPitchkitError(null)}
             aria-label="Dismiss pitch kit export error"
-            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+            className="shrink-0 hover:text-red-900"
           >
             <X className="w-3 h-3" aria-hidden="true" />
           </button>
@@ -3313,13 +3337,13 @@ export default function ScriptDoctorPanel({
       {coverageLetterStatus === "error" && coverageLetterError && (
         <div
           role="alert"
-          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+          className="px-6 py-2 bg-red-50 border-b-2 border-red-300 text-[10px] font-mono text-[var(--sm-stamp-on-light)] shrink-0 flex items-center justify-between gap-3"
         >
           <span>Coverage letter export failed: {coverageLetterError}</span>
           <button
             onClick={() => setCoverageLetterError(null)}
             aria-label="Dismiss coverage letter export error"
-            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+            className="shrink-0 hover:text-red-900"
           >
             <X className="w-3 h-3" aria-hidden="true" />
           </button>
@@ -3333,7 +3357,7 @@ export default function ScriptDoctorPanel({
       {fixToast && (
         <div
           role="status"
-          className="px-6 py-2 bg-green-50 dark:bg-green-950/40 border-b-2 border-green-300 dark:border-green-800 text-[10px] font-mono text-green-700 dark:text-green-300 shrink-0 flex items-center gap-2"
+          className="px-6 py-2 bg-green-50 border-b-2 border-green-300 text-[10px] font-mono text-[var(--sm-ok-on-light)] shrink-0 flex items-center gap-2"
         >
           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {fixToast}
         </div>
@@ -3347,7 +3371,7 @@ export default function ScriptDoctorPanel({
       {handoffOutdated && (
         <div
           role="alert"
-          className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b-2 border-amber-400 dark:border-amber-700 text-[10px] font-mono text-amber-800 dark:text-amber-200 shrink-0 flex items-center gap-2"
+          className="px-6 py-2 bg-amber-50 border-b-2 border-amber-400 text-[10px] font-mono text-[var(--sm-warn-on-light)] shrink-0 flex items-center gap-2"
         >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0">
@@ -3373,12 +3397,12 @@ export default function ScriptDoctorPanel({
       {status === "success" && reportStale && (
         <div
           role="status"
-          className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b-2 border-amber-400 dark:border-amber-700 text-[10px] font-mono text-amber-800 dark:text-amber-200 shrink-0 flex items-center gap-2"
+          className="px-6 py-2 bg-amber-50 border-b-2 border-amber-400 text-[10px] font-mono text-[var(--sm-warn-on-light)] shrink-0 flex items-center gap-2"
         >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0">
             Draft changed since this report ran — press{" "}
-            <kbd className="px-1 py-0.5 border border-amber-400 dark:border-amber-700 font-bold">Cmd/Ctrl+Enter</kbd>{" "}
+            <kbd className="px-1 py-0.5 border border-amber-400 font-bold">Cmd/Ctrl+Enter</kbd>{" "}
             or Re-run to refresh.
           </span>
         </div>
@@ -3388,7 +3412,7 @@ export default function ScriptDoctorPanel({
       {staleWriteBackNotice && (
         <div
           role="alert"
-          className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b-2 border-amber-400 dark:border-amber-700 text-[10px] font-mono text-amber-800 dark:text-amber-200 shrink-0 flex items-center gap-2"
+          className="px-6 py-2 bg-amber-50 border-b-2 border-amber-400 text-[10px] font-mono text-[var(--sm-warn-on-light)] shrink-0 flex items-center gap-2"
         >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0">{staleWriteBackNotice}</span>
@@ -3601,11 +3625,11 @@ export default function ScriptDoctorPanel({
 
         {/* ── Error state ── */}
         {status === "error" && !formatUnrecognized && (
-          <div className="bg-red-50 dark:bg-red-950/40 border-2 border-red-300 dark:border-red-800 p-4 space-y-3">
-            <p className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-2">
+          <div className="bg-red-50 border-2 border-red-300 p-4 space-y-3">
+            <p className="text-[10px] font-bold text-[var(--sm-stamp-on-light)] uppercase flex items-center gap-2">
               <ShieldAlert className="w-4 h-4" aria-hidden="true" /> Diagnosis failed
             </p>
-            <p className="text-xs text-red-800 dark:text-red-300 leading-relaxed">{errorMessage}</p>
+            <p className="text-xs text-[var(--sm-stamp-on-light)] leading-relaxed">{errorMessage}</p>
             <button
               onClick={() => runDiagnosis()}
               disabled={isEmpty}
@@ -3765,15 +3789,15 @@ export default function ScriptDoctorPanel({
                 right after the verdict/grade box, since it changes how to
                 read every score below it. */}
             {report.deepRead && (
-              <div className="bg-indigo-50 dark:bg-indigo-950/30 border-2 border-indigo-300 dark:border-indigo-800 p-3 space-y-1.5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+              <div className="bg-indigo-50 border-2 border-indigo-300 p-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                   {report.deepRead.usedLLM
                     ? `Deep read: ${report.deepRead.scenesRead} of ${report.deepRead.scenesTotal} scenes read by AI`
                     : "AI unavailable — this ran as a quick read"}
                 </p>
                 {report.deepRead.fallbackScenes.length > 0 && (
-                  <p className="text-[10px] font-mono text-indigo-800 dark:text-indigo-200 leading-relaxed">
+                  <p className="text-[10px] font-mono text-indigo-700 leading-relaxed">
                     Fell back to lexicon signals for scene
                     {report.deepRead.fallbackScenes.length === 1 ? "" : "s"}{" "}
                     {report.deepRead.fallbackScenes.map((idx) => idx + 1).join(", ")}.
@@ -3800,11 +3824,11 @@ export default function ScriptDoctorPanel({
                     "No change in findings since your last run."
                   ) : (
                     <>
-                      <span className="text-green-600 dark:text-green-400 font-bold">
+                      <span className="text-[var(--sm-ok-on-light)] dark:text-green-400 font-bold">
                         {findingsDelta.cleared} finding{findingsDelta.cleared === 1 ? "" : "s"} cleared
                       </span>
                       {" · "}
-                      <span className="text-amber-600 dark:text-amber-400 font-bold">
+                      <span className="text-[var(--sm-warn-on-light)] dark:text-amber-400 font-bold">
                         {findingsDelta.added} new
                       </span>
                       {" since your last run"}
@@ -4001,7 +4025,7 @@ export default function ScriptDoctorPanel({
                       className="flex items-start gap-2 text-xs font-mono text-black dark:text-gray-100 leading-relaxed"
                     >
                       <CheckCircle2
-                        className="w-3.5 h-3.5 shrink-0 mt-0.5 text-green-600"
+                        className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--sm-ok-on-light)]"
                         aria-hidden="true"
                       />
                       <span>{s}</span>
@@ -4028,7 +4052,7 @@ export default function ScriptDoctorPanel({
                         {source.warnings.map((w, i) => (
                           <li
                             key={i}
-                            className="text-[10px] font-mono text-amber-700 dark:text-amber-400 flex items-start gap-1.5"
+                            className="text-[10px] font-mono text-[var(--sm-warn-on-light)] dark:text-amber-400 flex items-start gap-1.5"
                           >
                             <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" aria-hidden="true" />
                             <span>{w}</span>
@@ -4059,7 +4083,7 @@ export default function ScriptDoctorPanel({
                           Fountain into editor
                         </button>
                         {loadedNotice && (
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-green-600 flex items-center gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)] dark:text-green-400 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Loaded into editor
                           </span>
                         )}
@@ -4122,7 +4146,7 @@ export default function ScriptDoctorPanel({
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold">Graph Health</span>
-                        <span className="text-xs font-mono">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-red-500">−{report.graphHealth.graphDeduction}hp</span>}</span>
+                        <span className="text-xs font-mono">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-[var(--sm-stamp-on-light)] dark:text-red-400">−{report.graphHealth.graphDeduction}hp</span>}</span>
                       </div>
                       {report.graphHealth.findings.length > 0 && (
                         <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
@@ -4243,7 +4267,7 @@ export default function ScriptDoctorPanel({
                         </span>
                         <span className="flex items-center gap-1.5 flex-wrap justify-end">
                           {p.issues.length === 0 ? (
-                            <span className="text-[9px] font-mono text-green-600 uppercase font-bold">
+                            <span className="text-[9px] font-mono text-[var(--sm-ok-on-light)] dark:text-green-400 uppercase font-bold">
                               Clean
                             </span>
                           ) : (
@@ -4346,7 +4370,7 @@ export default function ScriptDoctorPanel({
                                 whose signals came from a different process. */}
                             {entryMode(entry) === "deep" && (
                               <span
-                                className="text-[9px] italic text-indigo-500 dark:text-indigo-400 shrink-0"
+                                className="text-[9px] italic text-indigo-700 shrink-0"
                                 title="This diagnosis was a deep read — an LLM sensed each scene's meaning into the same signal schema, rather than the deterministic lexicon alone."
                               >
                                 (deep read)
@@ -4358,7 +4382,7 @@ export default function ScriptDoctorPanel({
                     <div className="pt-2 border-t border-black/10 dark:border-white/10">
                       {confirmingClearHistory ? (
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-mono text-red-600 dark:text-red-400">
+                          <span className="text-[10px] font-mono text-[var(--sm-stamp-on-light)]">
                             Clear all {history.length} saved draft{history.length === 1 ? "" : "s"}?
                           </span>
                           <button

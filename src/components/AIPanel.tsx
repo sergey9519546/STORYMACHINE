@@ -193,7 +193,17 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
 
       {(result || note) && (
         <div className="sm-panel p-4">
-          <h3 className="sm-title mb-2 text-[var(--sm-stamp)]">Result</h3>
+          {/* a11y pass follow-up: `.sm-title` (design-system.css) sets its own
+              `color: var(--sm-ink)` at the same specificity as this Tailwind
+              arbitrary-value utility, so without `!` the intended stamp-red
+              silently lost the cascade to `.sm-title`'s color — the same
+              collision ShipPanel.tsx and CoverageSummary.tsx already fix with
+              `!text-[var(--sm-cream)]`; matching that precedent here. Uses
+              --sm-stamp-on-light rather than raw --sm-stamp: this h3 sits on
+              the light `.sm-panel` background (var(--sm-panel)), where raw
+              --sm-stamp measures 4.27:1 (design-system.css) — under 4.5:1 —
+              while -on-light clears it (4.96-5.73:1 on this exact surface). */}
+          <h3 className="sm-title mb-2 !text-[var(--sm-stamp-on-light)]">Result</h3>
           {result && (
             <div className="bg-[var(--sm-panel-2)] p-3 border border-[var(--sm-ink)] text-xs font-[family-name:var(--sm-font-mono)] whitespace-pre-wrap text-[var(--sm-ink)] max-h-64 overflow-y-auto">
               {result}

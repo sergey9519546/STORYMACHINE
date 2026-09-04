@@ -275,19 +275,23 @@ async function main() {
   // off the writer's cursor). Sequential Tab from the top of the page DOES
   // reach "Full report" (the panel's own last control) — proven below —
   // but NOT "Jump to line", because the very next Tab past it lands on
-  // `.cm-content` (the editor, next in DOM order) and gets CAPTURED there:
-  // a real, live, KNOWN ISSUE this suite found (see FountainEditor.tsx's
-  // matching comment) — fountain-keymap.ts's Tab handling only releases
-  // focus once tab-escape is armed by a prior Escape press in that editor
-  // session, which never happened on this path (focus arrived at the
-  // editor via blind Tab-walking, not a click or keystroke). Escape, then
-  // Tab — the documented idiom (ShortcutModal.tsx) — DOES recover from
-  // this (verified below), so it is a real but recoverable trap, not a
-  // dead end; filed for a dedicated fix rather than patched here (needs
-  // care not to regress the deliberate-typing case that idiom already
-  // serves correctly). This suite asserts what's actually true: "Full
-  // report" reachable by Tab, capture on the very next Tab, and recovery
-  // via Escape+Tab.
+  // `.cm-content` (the editor, next in DOM order) and gets CAPTURED there.
+  //
+  // UPDATE (a11y follow-up, item 1): the RAW-TAB arrival trap this comment
+  // used to describe here is fixed — see section 8 below and
+  // fountain-keymap.ts's header. What THIS specific probe exercises is a
+  // narrower, DELIBERATELY UNCHANGED case: focus below arrives at the editor
+  // via `jumpBtn.focus()` + Enter — a programmatic `view.focus()` call from
+  // FountainEditor's `navigateTo`/`highlightRange` (the "jump to line" and
+  // command-palette actions both use it), not a bare Tab keydown — so
+  // fountain-keymap.ts's auto-arm correctly does NOT fire here (arming on
+  // every programmatic focus would re-trap a writer using "jump to line" or
+  // the palette on their very next Tab, which is not this bug). Tab-escape
+  // stays disarmed on this path exactly as before, so it is still a real,
+  // recoverable capture — Escape-then-Tab (the documented idiom,
+  // ShortcutModal.tsx) still recovers it, verified below. This suite asserts
+  // what's actually true: "Full report" reachable by Tab, capture on the
+  // very next Tab after "jump to line", and recovery via Escape+Tab.
   let reachedFullReport = false;
   for (let i = 0; i < 30; i++) {
     await page2b.keyboard.press('Tab');
@@ -330,7 +334,7 @@ async function main() {
   // this suite is done reading it).
   await page2b.keyboard.press('Tab');
   const capturedInEditor = await page2b.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false);
-  record('keyboard-journey', 'read/jump: KNOWN ISSUE — Tab from inside the editor (no tab-escape armed) is captured there (filed, not fixed — see this file\'s header)', capturedInEditor);
+  record('keyboard-journey', 'read/jump: after a PROGRAMMATIC "jump to line" focus (not a raw Tab arrival — see section 8), Tab is still captured — deliberately unchanged, recoverable via Escape+Tab below', capturedInEditor);
 
   await page2b.keyboard.press('Escape');
   await page2b.waitForTimeout(100);
@@ -509,6 +513,204 @@ async function main() {
   await page5.waitForTimeout(300);
   await auditSurface(page5, 'dark-export-ship');
   await context5.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 6) Dark theme, RICH report — this a11y pass's real bugs (ScriptDoctorPanel's
+  //    ~30 red/green/amber/indigo dark: pairs: StoryGraphSection's Critical/
+  //    Medium/Strengths cards, the "different read modes" card, the
+  //    deep-read badge, error/toast banners) never rendered under (5) above,
+  //    because that flow's hand-typed 4-line script is too thin for the
+  //    structural engine to produce any diagnostics — so axe never measured
+  //    them, and the bugs shipped invisibly. "Try sample coverage" is the
+  //    SAME proven-fast deterministic path (2b) but on a real multi-scene
+  //    script, so StoryGraphSection actually has content to report. Toggling
+  //    dark mode AFTER the report renders re-uses the exact same report DOM
+  //    (no re-run needed — dark mode is a pure `.dark` class flip), so this
+  //    is cheap on top of the already-paid sample-report cost.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== 6) Dark theme, rich report — StoryGraphSection + error/toast banners ===');
+  const context6 = await browser.newContext();
+  const page6 = await context6.newPage();
+  wireConsoleCapture(page6, genuineConsoleErrors);
+  await page6.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  const sampleCta6 = page6.getByRole('button', { name: /try sample coverage/i }).first();
+  await sampleCta6.waitFor({ timeout: 15000 });
+  await sampleCta6.click();
+  const reportBody6 = await waitForRenderedText(page6, 'CONSIDER', { timeoutMs: 45000 });
+  record('dark-theme-rich', 'rich report: a report renders from "Try sample coverage"', /CONSIDER|RECOMMEND|PASS/.test(reportBody6));
+
+  // Toggle dark mode AFTER the report exists (Alt+Shift+D is wired on
+  // ScriptIDE's own global keydown listener, so any focus inside it works —
+  // the editor is the reliable, always-present target).
+  const editor6 = page6.locator('.cm-content').first();
+  await editor6.waitFor({ timeout: 10000 });
+  await editor6.focus();
+  await page6.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+  await page6.waitForTimeout(300);
+  const isDark6 = await page6.evaluate(() => document.documentElement.classList.contains('dark'));
+  record('dark-theme-rich', 'Alt+Shift+D toggles dark mode on the rich-report view', isDark6);
+
+  // Confirm StoryGraphSection's severity groups actually rendered — this is
+  // exactly the "the panels were never rendered in the audited states" gap
+  // this section exists to close. Logged, not gated: a future sample-script
+  // change that shifts diagnostics is not itself an a11y regression, but a
+  // silent flip to false here means this coverage quietly stopped meaning
+  // anything and is worth noticing.
+  const storyGraphPresence = await page6.evaluate(() => {
+    const text = document.body.textContent || '';
+    return {
+      critical: /Critical \(\d+\)/.test(text),
+      medium: /Medium \(\d+\)/.test(text),
+      strengths: /Strengths \(\d+\)/.test(text),
+    };
+  });
+  record(
+    'dark-theme-rich',
+    'StoryGraphSection severity cards are present on this sample script (coverage sanity check)',
+    storyGraphPresence.critical || storyGraphPresence.medium || storyGraphPresence.strengths,
+    JSON.stringify(storyGraphPresence),
+  );
+  await auditSurface(page6, 'dark-doctor-report-rich');
+  await context6.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 7) Labs research panel — AIPanel's "Story Engine" tab (Engine), reached
+  //    via the command palette's "Open Studio" action the same way E5's own
+  //    suite reaches Ship. This is the surface AIPanel.tsx's `.sm-title`
+  //    cascade-collision fix (this pass) lives on; it was never in the
+  //    audited set before because Studio is a Labs-gated surface entirely
+  //    absent from sections 1-6 above.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== 7) Labs research panel — Story Engine (AIPanel) ===');
+  const context7 = await browser.newContext();
+  const page7 = await context7.newPage();
+  wireConsoleCapture(page7, genuineConsoleErrors);
+  await page7.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch {} });
+  await page7.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page7.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
+  await page7.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+  await page7.keyboard.press(`${MOD}+k`);
+  const palette7 = page7.getByRole('dialog', { name: 'Command palette' });
+  await palette7.waitFor({ timeout: 5000 }).catch(() => {});
+  await page7.keyboard.type('studio', { delay: 15 });
+  const studioOption = page7.getByRole('option', { name: /open studio/i }).first();
+  const studioOptionVisible = await studioOption.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  record('labs-research-panel', 'Labs ON: "Open Studio" is reachable via the command palette', studioOptionVisible);
+  if (studioOptionVisible) {
+    await page7.keyboard.press('Enter');
+    const engineTabBtn = page7.getByRole('button', { name: 'Engine', exact: true }).first();
+    const engineTabVisible = await engineTabBtn.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    record('labs-research-panel', 'Studio panel opens with an "Engine" tab', engineTabVisible);
+    if (engineTabVisible) {
+      await engineTabBtn.click();
+      await page7.waitForTimeout(200);
+      await auditSurface(page7, 'labs-story-engine-panel');
+      // Keyless mode: "Generate Scene" runs against a server with no AI key
+      // configured, which resolves usedLLM:false with a `note` explaining
+      // why — not an error — and renders the Result panel (the `.sm-title`
+      // fix's own surface) without ever calling out to a real provider.
+      const beatInput = page7.locator('textarea').first();
+      if (await beatInput.count()) {
+        await beatInput.fill('A quiet moment before the storm.');
+        const generateBtn = page7.getByRole('button', { name: /generate scene/i }).first();
+        await generateBtn.click();
+        await page7.waitForFunction(() => /result/i.test(document.body.textContent || ''), { timeout: 20000 }).catch(() => {});
+        await page7.waitForTimeout(300);
+        await auditSurface(page7, 'labs-story-engine-result');
+      }
+      // Same surface again in dark mode — AIPanel.tsx has no dark: variants
+      // at all, so this mainly re-confirms the sm-title fix holds when the
+      // rest of the app chrome goes dark around it. The shortcut is on a
+      // document-level listener (ScriptIDE.tsx), so no specific focus target
+      // is required here.
+      await page7.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+      await page7.waitForTimeout(300);
+      await auditSurface(page7, 'labs-story-engine-panel-dark');
+    }
+  }
+  await context7.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 8) The editor Tab trap — proving BOTH halves of fountain-keymap.ts's
+  //    auto-arm fix (see that file's header for THE RULE and HOW):
+  //      A) a keyboard user who reaches the editor by RAW SEQUENTIAL TAB —
+  //         never clicking, never Cmd/Ctrl+K, never typing here yet — can
+  //         Tab straight back OUT on the very next press, no Escape needed
+  //         first. This is the actual trap section (2b)'s KNOWN ISSUE
+  //         documented and left unfixed; it is fixed now.
+  //      B) a writer who tabs in and THEN commits to editing (types) still
+  //         gets Tab-cycling on their NEXT Tab — the auto-arm must not
+  //         regress the writing aid for the writer actually using it.
+  //    The pre-existing Escape-then-Tab idiom (the deliberate-editing path)
+  //    is re-verified at the end, unchanged.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== 8) Editor Tab trap — raw keyboard arrival vs. typed arrival ===');
+  const context8 = await browser.newContext();
+  const page8 = await context8.newPage();
+  wireConsoleCapture(page8, genuineConsoleErrors);
+
+  /** Lands on "Start fresh" and walks forward by REAL Tab presses only
+   *  (no .click(), no .focus()) until `.cm-content` has focus — the exact
+   *  arrival fountain-keymap.ts's auto-arm targets. */
+  async function tabIntoEditorByRawKeyboard(page) {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await page.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
+    await page.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+    let reached = false;
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.press('Tab');
+      const isCm = await page.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false);
+      if (isCm) { reached = true; break; }
+    }
+    return reached;
+  }
+
+  // (A) Raw-Tab arrival: the very next Tab exits, no Escape needed first.
+  const reachedRaw1 = await tabIntoEditorByRawKeyboard(page8);
+  record('editor-tab-trap', 'raw-Tab journey reaches the editor (.cm-content) via Tab alone', reachedRaw1);
+  await page8.keyboard.press('Tab');
+  const exitedWithoutEscape = (await page8.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false)) === false;
+  record(
+    'editor-tab-trap',
+    'FIX (item 1): a raw-Tab arrival auto-arms tab-escape — the very next Tab moves focus OUT with no Escape press first',
+    exitedWithoutEscape,
+  );
+
+  // (B) Raw-Tab arrival, then the writer types: the writing aid (Tab-cycling)
+  // must still work on the NEXT Tab after that — auto-arm must not regress
+  // the deliberate-editing case. Fresh reload for a clean arrival.
+  const reachedRaw2 = await tabIntoEditorByRawKeyboard(page8);
+  record('editor-tab-trap', 'raw-Tab journey reaches the editor a second time (fresh reload)', reachedRaw2);
+  await page8.keyboard.type('x', { delay: 5 }); // commits to editing — disarms the auto-arm (tabEscapeArmedField's own docChanged rule)
+  await page8.keyboard.press('Backspace'); // back to an empty, cycle-eligible line — the disarm itself already happened on the keystroke above
+  await page8.waitForTimeout(50);
+  await page8.keyboard.press('Tab'); // should now CYCLE (handled, stays in editor), not exit
+  const cyclingAfterTyping = await page8.evaluate(() => {
+    const stillInEditor = document.activeElement?.className?.includes?.('cm-') ?? false;
+    const cyclingVisible = !!document.querySelector('.cm-content .cm-sp-action'); // planCycleStep(null, 1) lands on 'action' first
+    return stillInEditor && cyclingVisible;
+  });
+  record(
+    'editor-tab-trap',
+    'typing after a raw-Tab arrival disarms the auto-arm — the NEXT Tab cycles element type instead of leaving (writer-typing behavior unregressed)',
+    cyclingAfterTyping,
+  );
+
+  // Dismiss the pending cycle from the Tab press above before re-testing
+  // Escape-then-Tab below, so it starts from a clean state.
+  await page8.keyboard.press('Escape');
+  await page8.waitForTimeout(50);
+
+  // Pre-existing idiom, re-verified after the fix above: Escape (arm) then
+  // Tab (consume + exit) — the documented manual escape hatch for a writer
+  // already mid-session, unaffected by the auto-arm addition.
+  await page8.keyboard.press('Escape');
+  await page8.waitForTimeout(50);
+  await page8.keyboard.press('Tab');
+  const escapeThenTabStillWorks = (await page8.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false)) === false;
+  record('editor-tab-trap', 'Escape-then-Tab idiom still exits the editor (unchanged pre-existing manual path)', escapeThenTabStillWorks);
+
+  await context8.close();
 
   // ── Console errors, same convention as the rest of the browser battery. ─
   if (genuineConsoleErrors.length > 0) {

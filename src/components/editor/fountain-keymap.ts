@@ -66,6 +66,43 @@
 // are unhandled unconditionally (ordinary focus-order Tab) until pressed
 // again.
 //
+// THE REAL TAB TRAP (a11y follow-up): Escape-then-Tab is a fine idiom for a
+// writer already mid-session in the editor, but it is undiscoverable for a
+// keyboard user who reaches the editor for the first time by raw sequential
+// Tab — they have never pressed Escape here, so tabEscapeArmedField is still
+// false, and their very next Tab gets captured by cycleElement/insertTab
+// with no visible cue why. THE RULE this file implements to fix that,
+// stated in plain language: auto-arm tab-escape the moment focus lands on
+// the editor via a bare keyboard Tab/Shift-Tab press FROM SOMEWHERE ELSE ON
+// THE PAGE, and never auto-arm it for a click, a programmatic `view.focus()`
+// (FountainEditor's `navigateTo`/`highlightRange`, both used by "jump to
+// line" and the command palette), or any focus event not immediately
+// preceded by a bare Tab keydown — so a writer who deliberately clicks or is
+// sent into the editor still gets the writing-aid Tab-cycling behavior on
+// their very first Tab, unchanged from before this fix.
+//
+// HOW the two arrivals are told apart: a small, app-wide "was the last
+// keyboard/pointer interaction a bare Tab press" flag (installGlobalTabTracking
+// below — the same technique the WICG focus-visible polyfill uses to tell
+// keyboard focus from pointer focus). A capturing `keydown` listener on
+// `document` sets the flag true only for `Tab` (covers Shift-Tab too, same
+// key) and false for every other key; a capturing `mousedown`/`pointerdown`
+// listener also clears it, so a click that happens to follow an unrelated
+// Tab press elsewhere on the page is never mistaken for a Tab arrival. The
+// flag is read (and immediately reset) inside a `focus` DOM handler on the
+// editor's own content element: focus events fire synchronously right after
+// the keydown that caused them, so by the time this handler runs, the flag
+// still reflects the very keypress that produced this specific focus change
+// — not a stale one from earlier. Because the flag is cleared by every
+// keydown that isn't Tab and by every mousedown, a `view.focus()` call
+// triggered by clicking "Jump to line" or pressing Enter in the command
+// palette always sees the flag false, and never auto-arms.
+//
+// tabEscapeArmedField's own update() (above) already disarms on the writer's
+// first real keystroke or cursor move, so auto-arming here costs nothing
+// once they start actually typing — Tab still cycles element types on their
+// very next press after that, exactly as before.
+//
 // What's also left: Enter's "commit" auto-uppercase. When the cursor is
 // about to leave a scene heading / transition / character cue, uppercase
 // that line's real text (a normal undoable, collab-safe `view.dispatch`)
@@ -233,6 +270,53 @@ const tabCaptureDisabledField: StateField<boolean> = StateField.define<boolean>(
   },
 });
 
+// ── Auto-arm tab-escape on a raw keyboard-Tab arrival (see the long comment
+// above for THE RULE and HOW). Module-scoped rather than per-EditorView
+// because the signal it tracks — "was the last physical interaction on this
+// PAGE a bare Tab keydown" — is inherently page-wide, not editor-scoped: the
+// keydown that matters happens on whatever control had focus BEFORE the
+// editor, which is never the editor's own DOM. Guarded so multiple
+// FountainEditor instances (or re-renders) install the listeners once. ────
+let lastInteractionWasBareTabKey = false;
+let globalTabTrackingInstalled = false;
+function installGlobalTabTrackingOnce(): void {
+  if (globalTabTrackingInstalled || typeof document === 'undefined') return;
+  globalTabTrackingInstalled = true;
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      lastInteractionWasBareTabKey = e.key === 'Tab';
+    },
+    true, // capture: run before the target's own handlers, so a later focus event still sees this
+  );
+  const clear = () => {
+    lastInteractionWasBareTabKey = false;
+  };
+  document.addEventListener('mousedown', clear, true);
+  document.addEventListener('pointerdown', clear, true);
+}
+installGlobalTabTrackingOnce();
+
+/**
+ * `.cm-content`'s own `focus` DOM event (NOT a CodeMirror transaction — this
+ * fires on every focus arrival, including the very first one this session,
+ * before any transaction would exist to hook). `event.relatedTarget` is the
+ * element focus is arriving FROM; it is non-null for a Tab arrival (the
+ * previously-focused sibling control) and for a click that moves focus away
+ * from something else, but null when nothing on the page held focus before
+ * (e.g. focus arriving from the browser chrome) — bare-Tab tracking already
+ * excludes that case since no in-page keydown would have set the flag.
+ */
+const autoArmTabEscapeOnKeyboardArrival: Extension = EditorView.domEventHandlers({
+  focus(event, view) {
+    if (lastInteractionWasBareTabKey && event.relatedTarget) {
+      lastInteractionWasBareTabKey = false; // one-shot: consume so a later, unrelated focus event on this same view can't reuse it
+      view.dispatch({ effects: armTabEscape.of() });
+    }
+    return false; // never claim the event — this only ever adds a side effect, real focus handling is the browser's
+  },
+});
+
 /**
  * State fields + decoration this file's keymap depends on — must be added
  * to the EditorState's own `extensions` array alongside
@@ -245,6 +329,7 @@ export const fountainKeymapExtensions: Extension[] = [
   pendingCycleDecorations,
   tabEscapeArmedField,
   tabCaptureDisabledField,
+  autoArmTabEscapeOnKeyboardArrival,
 ];
 
 /** Tab/Shift-Tab eligibility + line content, shared by both cycle directions. */
