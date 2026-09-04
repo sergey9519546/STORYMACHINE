@@ -1,0 +1,116 @@
+name: Edge Image
+
+# Publishes ghcr.io/<owner>/storymachine:edge from the tip of `main` whenever
+# CI (ci.yml) finishes green there — never on a PR, never on any other
+# branch, and NEVER as :latest (that tag is release.yml's exclusively, and is
+# reserved for a tagged, versioned release — see release.yml's own comment on
+# why a prerelease version must not move it).
+#
+# WHY A SEPARATE FILE INSTEAD OF A NEW JOB IN release.yml:
+# tests/core/ci-gates-intact.test.ts asserts release.yml mirrors ci.yml
+# step-for-step (same step names AND same run bodies, per its "mirrored gate
+# steps run the SAME commands" check) and that release.yml's `publish` job
+# specifically needs [test, browser] with `packages: write` scoped to only
+# that job. Wedging an edge-publish job into release.yml risks tripping one
+# of those assertions for a change that has nothing to do with what they
+# protect (release.yml's tag-triggered, versioned release path). A dedicated
+# workflow file is invisible to that test (which only reads ci.yml,
+# release.yml and security.yml) and keeps this concern from ever being able
+# to weaken release.yml's mirror claim, deliberately at the cost of a little
+# duplication with release.yml's own publish steps below.
+#
+# WHY workflow_run INSTEAD OF ANOTHER `on: push` TRIGGER: this workflow must
+# publish an image built from a commit that has ACTUALLY PASSED ci.yml's
+# gates ("a green push to main"), not merely reached main. Triggering on
+# `push` directly here would race ci.yml — this file has no gates of its own
+# to duplicate that race away without becoming a second release.yml (see
+# above). `workflow_run` fires only after ci.yml's run for that commit has
+# fully concluded, so `github.event.workflow_run.conclusion` is the real,
+# already-computed verdict of BOTH ci.yml jobs (test and browser) for that
+# exact SHA — no separate polling or job-status lookup needed.
+#
+# THIS CANNOT BE PROVEN BY A REAL RUN RIGHT NOW: GitHub Actions is currently
+# blocked at the account level for this repository (see
+# docs/PATH_TO_EXCELLENCE.md) — ci.yml's own runs are failing with no runner
+# assigned and no downloadable log, the account-level-block signature, not a
+# code failure. That means this workflow cannot fire even in principle until
+# an owner clears the block, and nothing here has executed end-to-end. What
+# IS verified: `docker compose config`-equivalent YAML validity (this file
+# parses as valid GitHub Actions workflow YAML) and
+# tests/core/ci-gates-intact.test.ts staying green with this file present
+# (it does not read edge.yml at all, by design — see above).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish-edge:
+    # Only a completed, GREEN run of CI for a push to `main` itself (not a PR
+    # build, not any other branch, and not a failed/cancelled run) publishes.
+    # workflow_run always fires regardless of the upstream run's outcome or
+    # branch, so both conditions are asserted here rather than left to the
+    # trigger.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    # Scoped to this job only, same reasoning as release.yml's `publish` job:
+    # the registry-write token must never be inherited by a step that runs
+    # arbitrary installed code (there is no such step here, but the pattern
+    # stays consistent so a future edit does not have to relearn it).
+    permissions:
+      contents: read
+      packages: write
+    # A second push to main while an edge build is still running should
+    # replace it, not queue behind it — :edge is a moving pointer, not a
+    # retained version like release.yml's tags.
+    concurrency:
+      group: edge-image
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Build exactly the commit CI just certified, not whatever `main`
+          # has moved to since (workflow_run's checkout defaults to the
+          # workflow FILE's own ref, which is not what we want to build).
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Same lowercasing reasoning as release.yml: ghcr.io requires a
+      # lowercase repository path, and github.repository is not guaranteed
+      # lowercase.
+      - name: Compute lowercase image name
+        id: image
+        run: echo "name=${REGISTRY}/${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push :edge
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          build-args: |
+            VERSION=edge
+            GIT_SHA=${{ github.event.workflow_run.head_sha }}
+          tags: ${{ steps.image.outputs.name }}:edge
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            org.opencontainers.image.version=edge
