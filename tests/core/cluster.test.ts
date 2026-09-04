@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { clusterIssues } from '../../server/nvm/analyze/cluster.ts';
+import { clusterIssues, isNamedRootCause } from '../../server/nvm/analyze/cluster.ts';
 import { locateIssues, sceneLineSpans } from '../../server/nvm/analyze/locate.ts';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
@@ -552,6 +552,182 @@ describe('clusterIssues — duplicate-family merge: dual-authorship rules', () =
       located('THEME_MUDDLED', 'Theme clarity', 'document', 'theme'),
     ];
     assert.deepEqual(clusterIssues(issues), []);
+  });
+});
+
+// ── 2026-09-04 additions (advice-quality audit item 6, presentation half
+// only) — see cluster.ts's own comment above the four new DUPLICATE_FAMILIES
+// entries for the full verification trail (each member rule's predicate and
+// threshold config, checked against the pass source). Unlike the Wave 1193
+// families above, the three zone-imbalance families here ARE resolved to a
+// real scene span by locate.ts, so these fixtures use anchor 'scene' with a
+// startLine/endLine, matching how the real rules actually locate.
+
+describe('clusterIssues — duplicate-family merge: zone-imbalance and seed-suspense families', () => {
+  it('merges *_STAKES_ZONE_IMBALANCE fired by 3 distinct passes into one scene-anchored finding', () => {
+    const zoneText = 'Act 2a (25–50%), Act 3 (75–100%) empty; Act 1 (0–25%) has 2/4 stakes-raising scenes';
+    const issues = [
+      located('STRUCTURE_STAKES_ZONE_IMBALANCE', zoneText, 'scene', 'structure', { severity: 'minor', startLine: 57, endLine: 169 }),
+      located('CAUSALITY_STAKES_ZONE_IMBALANCE', zoneText, 'scene', 'causality', { severity: 'minor', startLine: 57, endLine: 169 }),
+      located('DIALOGUE_STAKES_ZONE_IMBALANCE', zoneText, 'scene', 'dialogue', { severity: 'minor', startLine: 57, endLine: 169 }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Stakes-raising scenes are bunched, not spread');
+    assert.ok(finding, 'expected the stakes-zone-imbalance family to merge');
+    assert.ok(finding!.id.startsWith('stakes-zone-imbalance-'));
+    assert.ok(isNamedRootCause(finding!));
+    assert.equal(finding!.memberCount, 3);
+    assert.equal(finding!.startLine, 57);
+    assert.equal(finding!.endLine, 169);
+    assert.match(finding!.explanation, /3 separate checks agree/);
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    // Only ONE finding for these 3 issues — no leftover generic cluster.
+    assert.equal(findings.length, 1);
+  });
+
+  it('merges *_CLOCK_ZONE_IMBALANCE fired by 2 distinct passes', () => {
+    const zoneText = 'Act 3 (75–100%) empty; Act 1 (0–25%) has 3/5 clock-raising scenes';
+    const issues = [
+      located('STRUCTURE_CLOCK_ZONE_IMBALANCE', zoneText, 'scene', 'structure', { severity: 'minor', startLine: 10, endLine: 20 }),
+      located('DIALOGUE_CLOCK_ZONE_IMBALANCE', zoneText, 'scene', 'dialogue', { severity: 'minor', startLine: 10, endLine: 20 }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Deadline pressure is bunched, not spread');
+    assert.ok(finding, 'expected the clock-zone-imbalance family to merge');
+    assert.equal(finding!.memberCount, 2);
+    assert.match(finding!.explanation, /2 separate checks agree/);
+  });
+
+  it('does NOT fold *_CLOCK_DELTA_ZONE_IMBALANCE into the clock-zone-imbalance family — different signal', () => {
+    // Only ONE *_CLOCK_ZONE_IMBALANCE candidate here (no second pass to
+    // corroborate it), so the family cannot fire; the CLOCK_DELTA variant is
+    // never a member of this family at all (see cluster.ts's comment on why
+    // the boolean clockRaised check and the numeric clockDelta check are kept
+    // separate). The two still share a span, so the generic overlap
+    // clusterer picks them up as an ordinary auto-titled cluster instead.
+    const issues = [
+      located('STRUCTURE_CLOCK_ZONE_IMBALANCE', 'zone text', 'scene', 'structure', { startLine: 10, endLine: 20 }),
+      located('STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE', 'zone text', 'scene', 'structure', { startLine: 10, endLine: 20 }),
+    ];
+    const findings = clusterIssues(issues);
+    assert.equal(findings.length, 1);
+    assert.notEqual(findings[0].title, 'Deadline pressure is bunched, not spread');
+    assert.equal(isNamedRootCause(findings[0]), false);
+  });
+
+  it('merges *_STAGING_ZONE_IMBALANCE fired by 3 distinct passes', () => {
+    const zoneText = 'Act 1 (0–25%) empty; Act 2b (50–75%) has 4/6 visually dense scenes';
+    const issues = [
+      located('BELIEF_STAGING_ZONE_IMBALANCE', zoneText, 'scene', 'belief', { startLine: 30, endLine: 40 }),
+      located('PHYSICAL_STAGING_ZONE_IMBALANCE', zoneText, 'scene', 'intention', { startLine: 30, endLine: 40 }),
+      located('VOICE_STAGING_ZONE_IMBALANCE', zoneText, 'scene', 'voice', { startLine: 30, endLine: 40 }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Physical staging is bunched, not spread');
+    assert.ok(finding, 'expected the staging-zone-imbalance family to merge');
+    assert.equal(finding!.memberCount, 3);
+  });
+
+  it('merges *_SEED_SUSPENSE_AFTERMATH_VOID fired by 4 distinct passes (document-anchored, no span)', () => {
+    const issues = [
+      located('ARC_SEED_SUSPENSE_AFTERMATH_VOID', '2 seed aftermath(s) — no suspense rise within 2 scenes', 'document', 'character-arc'),
+      located('BELIEF_SEED_SUSPENSE_AFTERMATH_VOID', '2 seed aftermath(s) — no suspense rise within 2 scenes', 'document', 'belief'),
+      located('CAUSALITY_SEED_SUSPENSE_AFTERMATH_VOID', '2 seed aftermath(s) — no suspense rise within 2 scenes', 'document', 'causality'),
+      located('CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID', 'All 2 clue-seeding aftermath window(s) — suspense flat', 'document', 'conflict'),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Planted clues raise no suspense once they land');
+    assert.ok(finding, 'expected the seed-suspense-aftermath-void family to merge');
+    assert.equal(finding!.memberCount, 4);
+    assert.equal(finding!.startLine, undefined);
+    assert.equal(finding!.endLine, undefined);
+    assert.match(finding!.explanation, /4 independent checks agree/);
+  });
+
+  it('does not merge a zone-imbalance family when only one pass fires it', () => {
+    const issues = [
+      located('STRUCTURE_STAKES_ZONE_IMBALANCE', 'zone text', 'scene', 'structure', { startLine: 5, endLine: 15 }),
+      located('UNRELATED_RULE', 'Some other observation', 'scene', 'voice', { startLine: 5, endLine: 15 }),
+    ];
+    const findings = clusterIssues(issues);
+    // The lone STRUCTURE_STAKES_ZONE_IMBALANCE still overlaps UNRELATED_RULE
+    // in span, so the generic overlap clusterer forms an ordinary 2-member
+    // finding — but it must NOT be the named family finding.
+    assert.equal(findings.length, 1);
+    assert.notEqual(findings[0].title, 'Stakes-raising scenes are bunched, not spread');
+  });
+});
+
+// ── isNamedRootCause and the comparator promotion it feeds (2026-09-04,
+// advice-quality audit item 1) — the audit found the hand-written named
+// templates/families rendered below generic auto-titled clusters of the same
+// severity because the old comparator's only tiebreak was memberCount, which
+// a 13-15-member generic cluster always wins. isNamedRootCause is the real,
+// structural flag (an id-shape test, not title-sniffing) this fix reads.
+
+describe('isNamedRootCause', () => {
+  it('is false for a generic auto-titled cluster (bare 16-hex-character id)', () => {
+    const issues = [
+      located('THIN_SCENE', 'Scene 3 (INT. BAR)', 'scene', 'pacing', { startLine: 10, endLine: 20 }),
+      located('FLAT_CONFLICT', 'Scene 3 (INT. BAR)', 'scene', 'conflict', { startLine: 10, endLine: 20 }),
+    ];
+    const [finding] = clusterIssues(issues);
+    assert.match(finding.id, /^[0-9a-f]{16}$/);
+    assert.equal(isNamedRootCause(finding), false);
+  });
+
+  it('is true for a fired root-cause template id (slug-prefixed, not a bare hash)', () => {
+    const issues = [
+      located('WEAK_MIDPOINT', 'Scene 5 (midpoint)', 'scene', 'structure', { startLine: 40, endLine: 50 }),
+      located('MIDPOINT_EMOTIONAL_FLATLINE', 'Scene 5 (midpoint)', 'scene', 'structure', { startLine: 40, endLine: 50 }),
+    ];
+    const [finding] = clusterIssues(issues);
+    assert.doesNotMatch(finding.id, /^[0-9a-f]{16}$/);
+    assert.ok(isNamedRootCause(finding));
+  });
+
+  it('is true for a fired duplicate-family id (slug-prefixed, not a bare hash)', () => {
+    const issues = [
+      located('PAYOFF_EMOTION_DECOUPLED', '3 payoff scenes — all emotionally neutral', 'document', 'intention'),
+      located('PAYOFF_EMOTION_DECOUPLED', 'Payoff scenes — emotional register', 'document', 'payoff'),
+    ];
+    const [finding] = clusterIssues(issues);
+    assert.doesNotMatch(finding.id, /^[0-9a-f]{16}$/);
+    assert.ok(isNamedRootCause(finding));
+  });
+});
+
+describe('clusterIssues — named findings rank above same-severity generic clusters', () => {
+  it('sorts a 2-member named template ahead of a same-severity 5-member generic cluster', () => {
+    const issues = [
+      // 5-member generic cluster, all 'major', Scene 2.
+      ...Array.from({ length: 5 }, (_, i) =>
+        located(`GENERIC_RULE_${i}`, 'Scene 2 (INT. OFFICE)', 'scene', 'pacing', { severity: 'major', startLine: 5, endLine: 8 })),
+      // 2-member named template (midpoint-stall), also 'major', Scene 6 —
+      // non-overlapping with the generic cluster's span, so these stay two
+      // separate findings and the test isolates the ranking, not a merge.
+      located('WEAK_MIDPOINT', 'Scene 6 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 40, endLine: 50 }),
+      located('MIDPOINT_EMOTIONAL_FLATLINE', 'Scene 6 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 40, endLine: 50 }),
+    ];
+    const findings = clusterIssues(issues);
+    assert.equal(findings.length, 2);
+    // Old comparator (severity, memberCount desc) would put the 5-member
+    // generic cluster first — the exact bug the audit measured.
+    assert.equal(findings[0].title, 'The middle has no engine');
+    assert.equal(findings[0].memberCount, 2);
+    assert.equal(findings[1].memberCount, 5);
+  });
+
+  it('still ranks a critical generic cluster above a major named template — severity wins first', () => {
+    const issues = [
+      located('CRIT_A', 'Scene 2 (INT. OFFICE)', 'scene', 'pacing', { severity: 'critical', startLine: 5, endLine: 8 }),
+      located('CRIT_B', 'Scene 2 (INT. OFFICE)', 'scene', 'conflict', { severity: 'critical', startLine: 5, endLine: 8 }),
+      located('WEAK_MIDPOINT', 'Scene 6 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 40, endLine: 50 }),
+      located('MIDPOINT_EMOTIONAL_FLATLINE', 'Scene 6 (midpoint)', 'scene', 'structure', { severity: 'major', startLine: 40, endLine: 50 }),
+    ];
+    const findings = clusterIssues(issues);
+    assert.equal(findings[0].severity, 'critical');
+    assert.notEqual(findings[0].title, 'The middle has no engine');
   });
 });
 

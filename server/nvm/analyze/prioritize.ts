@@ -110,6 +110,26 @@ function findClaimingFinding(li: LocatedIssue, findings: RootCauseFinding[]): Ro
   return best;
 }
 
+// ── NOT WIRED INTO THE UI (2026-09-04, advice-quality audit item 12) ───────
+// buildPrioritizedIssues below is attached to every /doctor response (routes/
+// scriptide.ts's `prioritized` field, alongside `rootCauses`/
+// `characterSummaries`) but has ZERO consumers: no reference anywhere in
+// src/, server/lib/coverage-html.ts, or scripts/generate-p0-sample-report.ts.
+// This is deliberate, not an oversight to "finish" by wiring it in. The audit
+// (.../scratchpad/advice-quality-audit.md, "Note on prioritize.ts") ran this
+// exact ordering against the audit's own deliberately-excellent fixture: it
+// LEADS with AS_YOU_KNOW_BOB — a false positive the audit's R6 finding
+// documents firing on a line whose whole function is to REFUSE exposition —
+// followed by QUESTION_DODGE, TALKING_HEADS, ACTION_SHORTEST_OUTLIER,
+// ACTION_CONSECUTIVE_LONG_RUN. Anchor-quality-first ranking (this module's
+// key #1) promotes exactly the typographic/line-anchored rules, because those
+// are the only findings carrying a line anchor — not because they are the
+// most important craft problems. Wiring this in as-is would make the report
+// WORSE on well-made scripts, the exact population the audit's false-positive
+// table (45/54 = 83% on the three well-made fixtures) says the current
+// severity-ordered `topPriorities` is already least reliable on. Fix the
+// anchored rules the audit's R6/R7 name first, THEN wire this in — not
+// before.
 /**
  * Order located issues by how actionable they are, most first, and return the
  * top PRIORITIZED_LIMIT. Pure and deterministic: every sort key is derived
@@ -262,4 +282,80 @@ export function buildCharacterSummaries(
     issueCount: issueCounts.get(name) ?? 0,
     swapRiskWith: swapRiskByName.get(name) ?? [],
   }));
+}
+
+// ── Contradiction suppression (2026-09-04, advice-quality audit item 10) ───
+// A writer reading a top-ten list should never be told two things that
+// cannot both be true about the same script — even when each is individually
+// a defensible read of its own signal. The audit measured real reports where
+// that happens (.../scratchpad/advice-quality-audit.md, R8 "Contradictions
+// inside one top-10"). This is deliberately a SMALL, EXPLICIT, hand-curated
+// table — not a generic "these two rules often disagree" heuristic — because
+// judging which claim to keep requires reading what each rule actually
+// measures, and only the pairs below were audited that way.
+//
+// PAIR 1 — front-loaded intensity vs. a late first turn. CLIMAX_TOO_EARLY
+// (structure.ts) and FALSE_CLIMAX (structure.ts) both read the SAME primary
+// signal — the location of the story's peak-suspense scene, the number the
+// engine's own structure dimension is built from — and FALSE_CLIMAX cites it
+// directly ("Peak suspense (3.0) occurs at Scene 1"). INCITING_INCIDENT_
+// TOO_LATE (structure.ts) instead reads a narrower categorical flag (is a
+// reversal-or-revelation event present before the 40% mark) that can move
+// independently of the intensity curve's actual shape. On the audit's
+// EXCELLENT fixture all three fired in one top-ten, telling the writer in the
+// same breath that the story peaks in its first 40% and that its first big
+// beat doesn't land until 90% in. When the early-peak claim is present, it is
+// kept (grounded in the same measured curve as the health score's own
+// structure dimension) and the late-first-turn claim is dropped as the
+// weaker, boolean-flag corroboration of a claim its own peers already
+// contradict.
+//
+// PAIR 2 — a climax scene named vs. no climax scene at all. PROTAGONIST_
+// PASSIVITY_CLIMAX (structure.ts) names a specific scene ("Scene 9 (climax
+// peak)") and cites its measured suspense value ("suspense 4.0"). PURPOSE_
+// CLIMAX_ABSENT (structure.ts) is document-anchored ("Story structure —
+// climax layer") and asserts no scene carries climax purpose at all. Both
+// fired in the built-in sample's top-ten (audit's Sample #1 vs #9) —
+// "here is your climax scene, and it has a problem" beside "you have no
+// climax scene." The scene-anchored, value-citing claim is kept as strictly
+// more specific (it names WHERE and cites a number; the document-anchored one
+// names neither) and the document-anchored one is dropped.
+//
+// Both entries are one-directional (suppress ONLY fires when the surviving
+// rule(s) are present) so a report where only the suppressed rule fires on
+// its own is completely unaffected — this table removes a contradiction,
+// never a lone, uncorroborated finding.
+interface ContradictoryPair {
+  /** The rule dropped when it co-occurs with any rule in `keepWhenPresent`. */
+  suppress: string;
+  /** If ANY of these rules is also present in the same list, `suppress` is
+   *  removed. Never the reverse — these rules are never themselves dropped
+   *  by this pair. */
+  keepWhenPresent: string[];
+}
+
+const CONTRADICTORY_PAIRS: ContradictoryPair[] = [
+  { suppress: 'INCITING_INCIDENT_TOO_LATE', keepWhenPresent: ['CLIMAX_TOO_EARLY', 'FALSE_CLIMAX'] },
+  { suppress: 'PURPOSE_CLIMAX_ABSENT', keepWhenPresent: ['PROTAGONIST_PASSIVITY_CLIMAX'] },
+];
+
+/**
+ * Drop the losing half of any listed contradictory pair that co-occurs in
+ * `items` (see CONTRADICTORY_PAIRS above for the two audited pairs and why
+ * each winner was chosen). Pure and order-preserving: items that were never
+ * part of a fired pair pass through untouched, in their original order.
+ * Generic over anything carrying a `rule` string so it applies equally to
+ * ScriptDoctorReport['topPriorities'] (RevisionIssue & {pass}) and to a bare
+ * RevisionIssue[].
+ */
+export function suppressContradictoryFindings<T extends { rule: string }>(items: T[]): T[] {
+  const present = new Set(items.map(i => i.rule));
+  const toDrop = new Set<string>();
+  for (const pair of CONTRADICTORY_PAIRS) {
+    if (present.has(pair.suppress) && pair.keepWhenPresent.some(r => present.has(r))) {
+      toDrop.add(pair.suppress);
+    }
+  }
+  if (toDrop.size === 0) return items;
+  return items.filter(i => !toDrop.has(i.rule));
 }

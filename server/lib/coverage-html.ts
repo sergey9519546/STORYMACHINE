@@ -23,6 +23,8 @@ import type {
 import type { RevisionIssue, PassName } from '../nvm/revision/passes/types.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 import { computeStructuralReliabilityNote } from './structural-reliability.ts';
+import { isNamedRootCause } from '../nvm/analyze/cluster.ts';
+import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the
@@ -235,7 +237,16 @@ function buildHeatmapSection(heatmap: SceneDiagnostics[]): string {
   </section>`;
 }
 
-function buildTopPrioritiesSection(topPriorities: Array<RevisionIssue & { pass: PassName }>): string {
+function buildTopPrioritiesSection(topPrioritiesIn: Array<RevisionIssue & { pass: PassName }>): string {
+  // Audit item 10 (.../scratchpad/advice-quality-audit.md, R8): a reader
+  // should never see two top-ten findings that cannot both be true about the
+  // same script. Filtered here, at the render boundary, so every caller of
+  // renderCoverageHtml (the live /coverage export, the PDF route, the P0
+  // sample report generator) gets the suppression regardless of whether the
+  // route that built this report already applied it — see
+  // prioritize.ts's suppressContradictoryFindings for the table and the
+  // reasoning behind each kept/dropped rule.
+  const topPriorities = suppressContradictoryFindings(topPrioritiesIn);
   if (topPriorities.length === 0) {
     return `
   <section class="section">
@@ -277,20 +288,24 @@ function buildTopPrioritiesSection(topPriorities: Array<RevisionIssue & { pass: 
 // straight from Top Priorities to the raw 181-item Full Pass Appendix, so the
 // most reader-friendly layer of the system was computed and never shown to
 // the person receiving the static report (one of the two documented P0
-// exposure modes). Placed between Top Priorities and the appendix: the
-// appendix stays as the exhaustive record, but a reader now has the collapsed
-// synthesis first.
-function buildRootCausesSection(rootCauses: RootCauseFinding[] | undefined): string {
-  // Guard: only render when the report actually carries a synthesis — an
-  // absent/empty rootCauses means the caller never attached one (this field
-  // is optional on ScriptDoctorReport; only the /doctor, /doctor/deep, and
-  // /doctor/pdf routes attach it today, per each route's own clustering step
-  // in server/routes/scriptide.ts), not that clustering ran and found nothing
-  // to group. Matches buildStrengthsSection's own "omit entirely rather than
-  // render a hollow section" convention.
-  if (!rootCauses || rootCauses.length === 0) return '';
-
-  const items = rootCauses.map(rc => {
+// exposure modes).
+//
+// 2026-09-04 (advice-quality audit item 1): that single section is now TWO.
+// The audit found the hand-written, evidence-backed NAMED templates/families
+// in cluster.ts ("The middle has no engine — Two independent checks agree
+// that Scene 6 is the story's dead center… That's not two problems, it's one
+// missing pivot") are the best writing in the product and the one layer
+// measured to actually discriminate a deliberately excellent script from a
+// deliberately bad one — yet they rendered BELOW Top Priorities, sorted below
+// generic 13-15-member auto-titled clusters of the same severity (fixed
+// separately in cluster.ts's comparator; see isNamedRootCause there). Named
+// findings are split out and rendered ABOVE Top Priorities, under the "Root
+// Causes" heading the pilot session's fix originally gave the combined list;
+// the generic auto-titled clusters are NOT deleted — see
+// buildClusterFindingsSection below — they stay, ranked below, in the
+// original Top-Priorities-then-appendix position.
+function rootCauseListItems(rootCauses: RootCauseFinding[]): string {
+  return rootCauses.map(rc => {
     const scenes = rc.sceneIdxs.length > 0
       ? rc.sceneIdxs.map(i => `Scene ${i + 1}`).join(', ')
       : null;
@@ -307,13 +322,50 @@ function buildRootCausesSection(rootCauses: RootCauseFinding[] | undefined): str
       <div class="issue-fix">${memberLine}</div>
     </li>`;
   }).join('\n');
+}
+
+/** The hand-written, evidence-backed named diagnoses only (isNamedRootCause)
+ *  — rendered ABOVE Top Priorities, since these are the findings the audit
+ *  showed a writer should read first. Omitted entirely (not a hollow
+ *  section, matching buildStrengthsSection's convention) whenever
+ *  clustering produced no named finding for this report — most reports,
+ *  since named templates require a specific, audited rule co-occurrence. */
+function buildNamedRootCausesSection(rootCauses: RootCauseFinding[] | undefined): string {
+  if (!rootCauses) return '';
+  const named = rootCauses.filter(isNamedRootCause);
+  if (named.length === 0) return '';
 
   return `
   <section class="section">
     <h2>Root Causes</h2>
-    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(rootCauses.length)} finding${rootCauses.length === 1 ? '' : 's'} below cluster the detailed issue list into named underlying problems &mdash; read this before the full appendix.</p>
+    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(named.length)} finding${named.length === 1 ? '' : 's'} below name the specific underlying craft problem behind several issues at once &mdash; read these first.</p>
     <ol class="priority-list">
-      ${items}
+      ${rootCauseListItems(named)}
+    </ol>
+  </section>`;
+}
+
+/** The generic, auto-titled convergence clusters ("Recurring X trouble in
+ *  Scene N" / "Widespread X concerns") — kept (never deleted, per the audit's
+ *  explicit instruction), but ranked below Top Priorities, in the position
+ *  the combined Root Causes section held before this split. */
+function buildClusterFindingsSection(rootCauses: RootCauseFinding[] | undefined): string {
+  // Guard: only render when the report actually carries a synthesis — an
+  // absent rootCauses means the caller never attached one (this field is
+  // optional on ScriptDoctorReport; only the /doctor, /doctor/deep, and
+  // /doctor/pdf routes attach it today, per each route's own clustering step
+  // in server/routes/scriptide.ts), not that clustering ran and found nothing
+  // to group.
+  if (!rootCauses) return '';
+  const generic = rootCauses.filter(rc => !isNamedRootCause(rc));
+  if (generic.length === 0) return '';
+
+  return `
+  <section class="section">
+    <h2>Recurring Issue Clusters</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(generic.length)} finding${generic.length === 1 ? '' : 's'} below cluster the detailed issue list by where they land in the script &mdash; read after Top Priorities, alongside the full appendix.</p>
+    <ol class="priority-list">
+      ${rootCauseListItems(generic)}
     </ol>
   </section>`;
 }
@@ -887,8 +939,9 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildStrengthsSection(strengths),
     buildGodmodeSection(report),
     buildHeatmapSection(report.sceneHeatmap ?? []),
+    buildNamedRootCausesSection(report.rootCauses),
     buildTopPrioritiesSection(report.topPriorities ?? []),
-    buildRootCausesSection(report.rootCauses),
+    buildClusterFindingsSection(report.rootCauses),
     buildAppendixSection(report.passes ?? []),
     buildFooterSection(report),
   ].join('\n');

@@ -433,11 +433,18 @@ describe('renderCoverageHtml — the verify block (P3 independent verification)'
 // Pilot session 2026-08-07 finding #3 (PILOT_SESSION_REPORT.md §0.3/§6/§9.3):
 // the API report carries a rootCauses synthesis that the exported coverage.html
 // never rendered — it jumped straight from Top Priorities to the raw Full Pass
-// Appendix. renderCoverageHtml now renders a Root Causes section between the
-// two, only when the report actually carries one.
+// Appendix. renderCoverageHtml now renders it, only when the report actually
+// carries one.
+//
+// 2026-09-04 (advice-quality audit item 1): that single section is now TWO.
+// `id` below is shaped like cluster.ts actually produces it — a template/
+// family slug plus a hyphen plus a 16-hex hash for a NAMED finding
+// (isNamedRootCause reads exactly this shape, not the title) — so these
+// fixtures exercise the real discriminator, not a coincidence of the id
+// string 'rc-1' the pre-split fixture used.
 function makeRootCause(overrides: Partial<RootCauseFinding> = {}): RootCauseFinding {
   return {
-    id: 'rc-1',
+    id: 'protagonist-passivity-climax-a1b2c3d4e5f67890',
     title: 'Protagonist checks out at the climax',
     explanation: 'The climax scene shows no protagonist engagement — neutral emotion, no clock pressure, no discovery.',
     severity: 'critical',
@@ -448,9 +455,24 @@ function makeRootCause(overrides: Partial<RootCauseFinding> = {}): RootCauseFind
   };
 }
 
-describe('renderCoverageHtml — Root Causes section', () => {
+/** A generic, auto-titled cluster — id is a BARE 16-hex hash, exactly what
+ *  cluster.ts's synthesize*Finding functions emit with no slug prefix. */
+function makeGenericRootCause(overrides: Partial<RootCauseFinding> = {}): RootCauseFinding {
+  return {
+    id: 'a1b2c3d4e5f67890',
+    title: 'Recurring Structure & Pacing trouble in Scene 3',
+    explanation: '5 issues converge here, mostly around structure — concentrated in Scene 3 (lines 40-60).',
+    severity: 'major',
+    memberRules: ['THIN_SCENE', 'FLAT_CONFLICT'],
+    memberCount: 5,
+    sceneIdxs: [2],
+    ...overrides,
+  };
+}
+
+describe('renderCoverageHtml — Root Causes sections', () => {
   it('ends at the closing html tag without trailing whitespace', () => {
-    const html = renderCoverageHtml(buildReport({ rootCauses: [makeRootCause()] }), 'Whitespace-Free Export');
+    const html = renderCoverageHtml(buildReport({ rootCauses: [makeRootCause(), makeGenericRootCause()] }), 'Whitespace-Free Export');
 
     assert.equal(html, html.trimEnd(), 'generated exports must be reproducible without post-render whitespace cleanup');
     assert.ok(html.endsWith('</html>'));
@@ -461,23 +483,43 @@ describe('renderCoverageHtml — Root Causes section', () => {
     assert.deepEqual(trailingWhitespaceLines, [], 'no generated line may need manual trailing-whitespace cleanup');
   });
 
-  it('omits the Root Causes section entirely when the report carries no rootCauses field', () => {
+  it('omits both sections entirely when the report carries no rootCauses field', () => {
     const html = renderCoverageHtml(buildReport(), 'A Draft With No Clustering');
-    assert.ok(!html.includes('<h2>Root Causes</h2>'), 'heading must not render when rootCauses is absent');
+    assert.ok(!html.includes('<h2>Root Causes</h2>'), 'named-findings heading must not render when rootCauses is absent');
+    assert.ok(!html.includes('<h2>Recurring Issue Clusters</h2>'), 'generic-clusters heading must not render when rootCauses is absent');
   });
 
-  it('omits the Root Causes section when rootCauses is an empty array', () => {
+  it('omits both sections when rootCauses is an empty array', () => {
     const html = renderCoverageHtml(buildReport({ rootCauses: [] }), 'A Draft With No Clustering');
-    assert.ok(!html.includes('<h2>Root Causes</h2>'), 'heading must not render for an empty rootCauses array');
+    assert.ok(!html.includes('<h2>Root Causes</h2>'));
+    assert.ok(!html.includes('<h2>Recurring Issue Clusters</h2>'));
     assert.ok(!html.includes('Subsumes'), 'no root-cause list markup when nothing clustered');
   });
 
-  it('renders a Root Causes section, positioned after Top Priorities and before the Full Pass Appendix, when rootCauses is non-empty', () => {
+  it('renders only Root Causes (named) when every rootCause is named, above Top Priorities', () => {
+    const html = renderCoverageHtml(buildReport({ rootCauses: [makeRootCause()] }), 'Named Only');
+    assert.match(html, /<h2>Root Causes<\/h2>/);
+    assert.ok(!html.includes('<h2>Recurring Issue Clusters</h2>'), 'no generic section when nothing generic clustered');
+    const rootCausesIdx = html.indexOf('<h2>Root Causes</h2>');
+    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
+    assert.ok(rootCausesIdx >= 0 && topPrioritiesIdx > rootCausesIdx, 'named Root Causes must render BEFORE Top Priorities');
+  });
+
+  it('renders only Recurring Issue Clusters (generic) when every rootCause is generic, below Top Priorities', () => {
+    const html = renderCoverageHtml(buildReport({ rootCauses: [makeGenericRootCause()] }), 'Generic Only');
+    assert.ok(!html.includes('<h2>Root Causes</h2>'), 'no named section when nothing named clustered');
+    assert.match(html, /<h2>Recurring Issue Clusters<\/h2>/);
+    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
+    const clustersIdx = html.indexOf('<h2>Recurring Issue Clusters</h2>');
+    assert.ok(topPrioritiesIdx >= 0 && clustersIdx > topPrioritiesIdx, 'generic clusters must render AFTER Top Priorities');
+  });
+
+  it('renders a mix in the order: Root Causes (named) < Top Priorities < Recurring Issue Clusters (generic) < Full Pass Appendix', () => {
     const report = buildReport({
       rootCauses: [
         makeRootCause(),
-        makeRootCause({
-          id: 'rc-2',
+        makeGenericRootCause({
+          id: 'b2c3d4e5f6789012',
           title: 'On-the-nose exposition in the office scene',
           explanation: 'Ottie delivers backstory in one unbroken speech with no witnessed confirmation.',
           severity: 'major',
@@ -495,15 +537,19 @@ describe('renderCoverageHtml — Root Causes section', () => {
     assert.match(html, /Subsumes 4 issues/);
     assert.match(html, /Scene 9/, 'sceneIdxs must render 1-based, matching the codebase-wide display convention');
     assert.match(html, /PROTAGONIST_PASSIVITY_CLIMAX/);
+    assert.match(html, /<h2>Recurring Issue Clusters<\/h2>/);
+    assert.match(html, /On-the-nose exposition in the office scene/);
 
-    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
     const rootCausesIdx = html.indexOf('<h2>Root Causes</h2>');
+    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
+    const clustersIdx = html.indexOf('<h2>Recurring Issue Clusters</h2>');
     const appendixIdx = html.indexOf('<h2>Full Pass Appendix</h2>');
-    assert.ok(topPrioritiesIdx >= 0 && rootCausesIdx > topPrioritiesIdx, 'Root Causes must render after Top Priorities');
-    assert.ok(appendixIdx > rootCausesIdx, 'Root Causes must render before the Full Pass Appendix, which must still be kept');
+    assert.ok(rootCausesIdx >= 0 && topPrioritiesIdx > rootCausesIdx, 'named Root Causes must render before Top Priorities');
+    assert.ok(clustersIdx > topPrioritiesIdx, 'generic clusters must render after Top Priorities');
+    assert.ok(appendixIdx > clustersIdx, 'generic clusters must render before the Full Pass Appendix, which must still be kept');
   });
 
-  it('escapes an XSS payload in a root cause title, explanation, and member rule', () => {
+  it('escapes an XSS payload in a named root cause title, explanation, and member rule', () => {
     const report = buildReport({
       rootCauses: [
         makeRootCause({
@@ -520,6 +566,57 @@ describe('renderCoverageHtml — Root Causes section', () => {
     assert.ok(html.includes('&lt;script&gt;alert(document.cookie)&lt;/script&gt;'), 'explanation must be HTML-escaped');
     assert.ok(html.includes('&lt;script&gt;alert(2)&lt;/script&gt;'), 'member rule names must be HTML-escaped');
     assert.ok(html.includes('&quot;hello&quot;'), 'quotes in the explanation must be escaped');
+  });
+
+  it('escapes an XSS payload in a generic root cause title', () => {
+    const report = buildReport({
+      rootCauses: [makeGenericRootCause({ title: '<script>alert(3)</script>' })],
+    });
+    const html = renderCoverageHtml(report, 'Malicious Generic Cluster');
+    assert.ok(!/<script/i.test(html));
+    assert.ok(html.includes('&lt;script&gt;alert(3)&lt;/script&gt;'));
+  });
+});
+
+// ── Contradiction suppression in Top Priorities (2026-09-04, advice-quality
+// audit item 10) — see prioritize.ts's CONTRADICTORY_PAIRS for the table.
+// buildTopPrioritiesSection applies it so every renderCoverageHtml caller
+// (the live /coverage export, PDF, the P0 sample report generator) gets the
+// suppression even when the route that built the report didn't already
+// filter — see server/routes/scriptide.ts's publicDoctorReport for the
+// separate route-layer application to the live JSON API.
+describe('renderCoverageHtml — Top Priorities contradiction suppression', () => {
+  function issueOf(rule: string): RevisionIssue & { pass: PassName } {
+    return {
+      rule,
+      location: `${rule} location`,
+      description: `${rule} description`,
+      severity: 'major',
+      pass: 'structure',
+    };
+  }
+
+  it('never renders both INCITING_INCIDENT_TOO_LATE and FALSE_CLIMAX in the same report', () => {
+    const html = renderCoverageHtml(
+      buildReport({ topPriorities: [issueOf('FALSE_CLIMAX'), issueOf('INCITING_INCIDENT_TOO_LATE')] }),
+      'Contradiction A',
+    );
+    assert.match(html, /FALSE_CLIMAX location/);
+    assert.ok(!html.includes('INCITING_INCIDENT_TOO_LATE location'), 'the suppressed rule must not reach the rendered page');
+  });
+
+  it('never renders both PURPOSE_CLIMAX_ABSENT and PROTAGONIST_PASSIVITY_CLIMAX in the same report', () => {
+    const html = renderCoverageHtml(
+      buildReport({ topPriorities: [issueOf('PROTAGONIST_PASSIVITY_CLIMAX'), issueOf('PURPOSE_CLIMAX_ABSENT')] }),
+      'Contradiction B',
+    );
+    assert.match(html, /PROTAGONIST_PASSIVITY_CLIMAX location/);
+    assert.ok(!html.includes('PURPOSE_CLIMAX_ABSENT location'));
+  });
+
+  it('renders an uncorroborated suppressed rule fine on its own', () => {
+    const html = renderCoverageHtml(buildReport({ topPriorities: [issueOf('PURPOSE_CLIMAX_ABSENT')] }), 'Lone Finding');
+    assert.match(html, /PURPOSE_CLIMAX_ABSENT location/);
   });
 });
 

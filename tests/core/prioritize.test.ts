@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPrioritizedIssues } from '../../server/nvm/analyze/prioritize.ts';
+import { buildPrioritizedIssues, suppressContradictoryFindings } from '../../server/nvm/analyze/prioritize.ts';
 import { clusterIssues } from '../../server/nvm/analyze/cluster.ts';
 import { locateIssues, sceneLineSpans } from '../../server/nvm/analyze/locate.ts';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
@@ -199,5 +199,85 @@ describe('buildPrioritizedIssues — the anchored-lead guarantee on real analysi
         );
       }
     }
+  });
+});
+
+// ── Contradiction suppression (2026-09-04, advice-quality audit item 10) ───
+// Both pairs below are the exact ones the audit measured against real script
+// text — see prioritize.ts's CONTRADICTORY_PAIRS comment for the full
+// reasoning behind each kept/dropped rule.
+function priorityIssue(rule: string, overrides: Partial<RevisionIssue> = {}): RevisionIssue & { pass: PassName } {
+  return {
+    rule,
+    location: `${rule} location`,
+    description: `${rule} description`,
+    severity: 'major',
+    pass: 'structure',
+    ...overrides,
+  };
+}
+
+describe('suppressContradictoryFindings', () => {
+  it('drops INCITING_INCIDENT_TOO_LATE when FALSE_CLIMAX is also present', () => {
+    const items = [priorityIssue('FALSE_CLIMAX'), priorityIssue('INCITING_INCIDENT_TOO_LATE')];
+    const rules = suppressContradictoryFindings(items).map(i => i.rule);
+    assert.deepEqual(rules, ['FALSE_CLIMAX']);
+  });
+
+  it('drops INCITING_INCIDENT_TOO_LATE when CLIMAX_TOO_EARLY is also present', () => {
+    const items = [priorityIssue('CLIMAX_TOO_EARLY'), priorityIssue('INCITING_INCIDENT_TOO_LATE')];
+    const rules = suppressContradictoryFindings(items).map(i => i.rule);
+    assert.deepEqual(rules, ['CLIMAX_TOO_EARLY']);
+  });
+
+  it('drops PURPOSE_CLIMAX_ABSENT when PROTAGONIST_PASSIVITY_CLIMAX is also present', () => {
+    const items = [priorityIssue('PROTAGONIST_PASSIVITY_CLIMAX'), priorityIssue('PURPOSE_CLIMAX_ABSENT')];
+    const rules = suppressContradictoryFindings(items).map(i => i.rule);
+    assert.deepEqual(rules, ['PROTAGONIST_PASSIVITY_CLIMAX']);
+  });
+
+  it('never contains both members of any listed pair, on either input order', () => {
+    const pairs: Array<[string, string]> = [
+      ['CLIMAX_TOO_EARLY', 'INCITING_INCIDENT_TOO_LATE'],
+      ['FALSE_CLIMAX', 'INCITING_INCIDENT_TOO_LATE'],
+      ['PROTAGONIST_PASSIVITY_CLIMAX', 'PURPOSE_CLIMAX_ABSENT'],
+    ];
+    for (const [a, b] of pairs) {
+      for (const items of [[priorityIssue(a), priorityIssue(b)], [priorityIssue(b), priorityIssue(a)]]) {
+        const rules = new Set(suppressContradictoryFindings(items).map(i => i.rule));
+        assert.ok(!(rules.has(a) && rules.has(b)), `both ${a} and ${b} survived together`);
+      }
+    }
+  });
+
+  it('is one-directional: the suppressed rule survives alone, uncorroborated', () => {
+    const items = [priorityIssue('INCITING_INCIDENT_TOO_LATE'), priorityIssue('PURPOSE_CLIMAX_ABSENT')];
+    assert.deepEqual(
+      suppressContradictoryFindings(items).map(i => i.rule).sort(),
+      ['INCITING_INCIDENT_TOO_LATE', 'PURPOSE_CLIMAX_ABSENT'],
+    );
+  });
+
+  it('leaves unrelated findings, and their order, untouched', () => {
+    const items = [
+      priorityIssue('DIALOGUE_ON_THE_NOSE'),
+      priorityIssue('FALSE_CLIMAX'),
+      priorityIssue('WEAK_MIDPOINT'),
+      priorityIssue('INCITING_INCIDENT_TOO_LATE'),
+      priorityIssue('NO_REVERSALS'),
+    ];
+    assert.deepEqual(
+      suppressContradictoryFindings(items).map(i => i.rule),
+      ['DIALOGUE_ON_THE_NOSE', 'FALSE_CLIMAX', 'WEAK_MIDPOINT', 'NO_REVERSALS'],
+    );
+  });
+
+  it('is a no-op on an input with no contradictory rule present', () => {
+    const items = [priorityIssue('DIALOGUE_ON_THE_NOSE'), priorityIssue('WEAK_MIDPOINT')];
+    assert.deepEqual(suppressContradictoryFindings(items), items);
+  });
+
+  it('is a no-op on an empty list', () => {
+    assert.deepEqual(suppressContradictoryFindings([]), []);
   });
 });

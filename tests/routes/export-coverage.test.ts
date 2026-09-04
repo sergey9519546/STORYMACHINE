@@ -169,24 +169,41 @@ describe('routes/export/coverage — HTTP behavior', async () => {
   // hardcoding an assumption about what this fixture clusters into, so the
   // test proves the two routes now agree instead of asserting a brittle
   // fixture-specific outcome.
-  it('surfaces a Root Causes section exactly when the live doctor report would cluster one for the same script', async () => {
+  //
+  // 2026-09-04 (advice-quality audit item 1): that single section is now
+  // TWO — named findings under "Root Causes" (above Top Priorities) and
+  // generic auto-titled clusters under "Recurring Issue Clusters" (below).
+  // isBareHashId below applies cluster.ts's own isNamedRootCause id-shape
+  // test client-side (the route response carries only the finding, not the
+  // helper) so this assertion stays exact rather than degrading to "some
+  // heading rendered".
+  it('surfaces Root Causes / Recurring Issue Clusters exactly when the live doctor report would cluster them for the same script', async () => {
     const doctorRes = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fountain: MULTI_SCENE_FOUNTAIN }),
     });
     assert.equal(doctorRes.status, 200);
-    const doctorBody = await doctorRes.json() as { rootCauses?: unknown[] };
+    const doctorBody = await doctorRes.json() as { rootCauses?: Array<{ id: string }> };
+    const rootCauses = doctorBody.rootCauses ?? [];
+    const isBareHashId = (id: string) => /^[0-9a-f]{16}$/.test(id);
+    const hasNamed = rootCauses.some(rc => !isBareHashId(rc.id));
+    const hasGeneric = rootCauses.some(rc => isBareHashId(rc.id));
 
     const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait' });
     assert.equal(res.status, 200);
     const html = await res.text();
 
-    if (Array.isArray(doctorBody.rootCauses) && doctorBody.rootCauses.length > 0) {
-      assert.match(html, /<h2>Root Causes<\/h2>/, 'coverage export must surface Root Causes when the doctor would cluster one for this script');
+    if (hasNamed) {
+      assert.match(html, /<h2>Root Causes<\/h2>/, 'coverage export must surface Root Causes when the doctor would cluster a named finding for this script');
       assert.match(html, /Subsumes \d+ issue/);
     } else {
-      assert.ok(!html.includes('<h2>Root Causes</h2>'), 'no Root Causes heading when nothing clusters for this script');
+      assert.ok(!html.includes('<h2>Root Causes</h2>'), 'no Root Causes heading when nothing named clusters for this script');
+    }
+    if (hasGeneric) {
+      assert.match(html, /<h2>Recurring Issue Clusters<\/h2>/, 'coverage export must surface Recurring Issue Clusters when the doctor would cluster a generic finding for this script');
+    } else {
+      assert.ok(!html.includes('<h2>Recurring Issue Clusters</h2>'), 'no Recurring Issue Clusters heading when nothing generic clusters for this script');
     }
   });
 });

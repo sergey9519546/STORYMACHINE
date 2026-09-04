@@ -23,7 +23,7 @@ import {
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues, sceneLineSpans } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
-import { buildPrioritizedIssues, buildCharacterSummaries } from '../nvm/analyze/prioritize.ts';
+import { buildPrioritizedIssues, buildCharacterSummaries, suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
@@ -86,8 +86,17 @@ const DOCTOR_DEEP_BUDGET: AiBudgetLimits = {
  * assessment when the whole draft was not analyzed. Partial issue evidence is
  * still returned and explicitly marked through analysisComplete. */
 function publicDoctorReport(report: ScriptDoctorReport): Omit<ScriptDoctorReport, 'health' | 'grade'> | ScriptDoctorReport {
-  if (isWholeDraftAnalysisComplete(report)) return report;
-  const { health: _health, grade: _grade, ...withoutHeadlineScores } = report;
+  // Audit item 10 (2026-09-04, .../scratchpad/advice-quality-audit.md): strip
+  // mutually contradictory findings out of topPriorities at the same
+  // route-layer boundary that already attaches rootCauses/prioritized/
+  // characterSummaries — a presentation-only reshaping of the published
+  // field for what the CLIENT reads, not a change to doctor.ts's own
+  // severity-ordered `report.topPriorities` (still scoring-path, untouched
+  // here; `report` below is a fresh object, the input is never mutated). See
+  // prioritize.ts's suppressContradictoryFindings for the table.
+  const presented: ScriptDoctorReport = { ...report, topPriorities: suppressContradictoryFindings(report.topPriorities) };
+  if (isWholeDraftAnalysisComplete(presented)) return presented;
+  const { health: _health, grade: _grade, ...withoutHeadlineScores } = presented;
   return withoutHeadlineScores;
 }
 

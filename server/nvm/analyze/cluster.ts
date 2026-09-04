@@ -299,6 +299,35 @@ function findingId(memberRules: string[], startLine?: number, endLine?: number, 
   return crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
 }
 
+// A bare-hash id (findingId's return, 16 lowercase hex characters, used
+// verbatim as `id` by every generic synthesize*Finding below) can ONLY be a
+// generic auto-titled cluster. A named finding's id is a template/family slug
+// PLUS a hyphen PLUS that same 16-hex hash (see synthesizeTemplateFinding and
+// synthesizeFamilyFinding below: `` `${template.id}-${findingId(...)}` `` /
+// `` `${family.id}-${findingId(...)}` ``) — deliberately so, per the Wave
+// 1185 comment on synthesizeTemplateFinding ("identifiable at a glance, never
+// just an opaque hash"). No slug used anywhere in this file (see
+// ROOT_CAUSE_TEMPLATES / DUPLICATE_FAMILIES ids) is or ever could be exactly
+// 16 lowercase hex characters — every one is a multi-word, hyphenated,
+// human-authored name — so the regex below is an exact, lossless partition of
+// every id this module can produce, not a heuristic. This is the real,
+// structural flag the 2026-09-04 advice-quality audit asked for in place of
+// title-prefix string-sniffing: RootCauseFinding (types.ts) is on the scoring
+// path (reachable from doctor.ts), so a new boolean field there is out of
+// scope for this presentation-only change — the id's existing shape already
+// carries the same information losslessly, so no new field is needed.
+const BARE_HASH_ID_RE = /^[0-9a-f]{16}$/;
+
+/** Whether `finding` is one of the small set of hand-written, evidence-backed
+ *  named diagnoses (a RootCauseTemplate or DuplicateFamily match) rather than
+ *  a generic auto-titled cluster ("Recurring X trouble in Scene N" /
+ *  "Widespread X concerns"). Exported so presentation-layer callers
+ *  (coverage-html.ts) can rank/group named findings above generic ones
+ *  without re-deriving the distinction or matching on title text. */
+export function isNamedRootCause(finding: Pick<RootCauseFinding, 'id'>): boolean {
+  return !BARE_HASH_ID_RE.test(finding.id);
+}
+
 // ── Wave 1185 additions (Program v2, Type 4 — root-cause templates) ────────
 //
 // Everything above this point turns co-firing issues into a GENERIC finding
@@ -1062,32 +1091,175 @@ const DUPLICATE_FAMILIES: DuplicateFamily[] = [
       + `it. Most revelations should reframe a relationship (the truth about who someone is changes how `
       + `much they're trusted); let at least one disclosure land on a relationship, not just on the plot.`,
   },
+
+  // ── 2026-09-04 additions (advice-quality audit item 6, presentation half
+  // only) — four more families, all "the SAME check, implemented once per
+  // pass" duplication like PAYOFF_EMOTION_DECOUPLED above, not the "related
+  // but distinct channel" kind like seed-scene-emotional-flatline. The audit
+  // measured this exact pattern on the built-in sample script: one stakes-
+  // zone observation reaching the writer 14 times under 14 rule names with an
+  // identical first sentence and only a pass-flavoured tail, plus 9 clock-
+  // delta clones and 8 clock clones — 31 of 174 findings (18%) from three
+  // underlying observations. Explicitly NOT done here: doctor.ts's own issue
+  // count / health weight (CLAUDE.md's scoring-path boundary; that half
+  // belongs to a separate scoring lane) — this only changes how cluster.ts's
+  // ALREADY-presentation-only rootCauses synthesis groups and titles the
+  // identical flat issue list doctor.ts still returns.
+  //
+  // Every member rule below was verified against the pass source (not
+  // assumed from the shared "*_ZONE_IMBALANCE" / "*_AFTERMATH_VOID" suffix):
+  // each one calls the shared checks-library helper (checkZoneImbalance /
+  // checkAftermathVoid) with the IDENTICAL predicate and threshold
+  // configuration as every other member of its family — see
+  // matchDuplicateFamily's 2026-09-04 comment above for the full argument on
+  // why rule-presence matching (no spatial overlap check needed) is still
+  // correct for the three zone-imbalance families, which — unlike the
+  // original four above — ARE resolved to a real scene span by locate.ts.
+  //
+  //   stakes-zone-imbalance    — *_STAKES_ZONE_IMBALANCE (15 rules, 13 passes
+  //     — rhythm.ts defines two: the bare STAKES_ZONE_IMBALANCE and
+  //     RHYTHM_STAKES_ZONE_IMBALANCE). Every member: checkZoneImbalance with
+  //     isPresent: r => r.purpose === 'raise_stakes', minRecords 10, minCount
+  //     4, bloatRatio 0.5.
+  //   clock-zone-imbalance     — *_CLOCK_ZONE_IMBALANCE (8 rules, 8 passes).
+  //     Every member: checkZoneImbalance with isPresent: r => r.clockRaised
+  //     === true, same thresholds. Deliberately NOT merged with the separate
+  //     *_CLOCK_DELTA_ZONE_IMBALANCE rules (a different, numeric-magnitude
+  //     signal on the clockDelta field, not the clockRaised boolean this
+  //     family audits) — the audit's own count ("9 clock-delta clones and 8
+  //     clock clones") already treats them as two distinct observations, and
+  //     conflating a boolean presence check with a magnitude check would be
+  //     exactly the kind of false merge the Wave 1193 header above warns
+  //     against.
+  //   staging-zone-imbalance   — *_STAGING_ZONE_IMBALANCE (5 rules: BELIEF_,
+  //     PHYSICAL_ [intention.ts], SCENE_ [originality.ts], VISUAL_
+  //     [payoff.ts], VOICE_). Every member: checkZoneImbalance with
+  //     isPresent: r => (r.visualBeats ?? []).length >= 2, same thresholds.
+  //   seed-suspense-aftermath-void — *_SEED_SUSPENSE_AFTERMATH_VOID (12
+  //     rules, 12 passes). Every member: checkAftermathVoid with isTrigger:
+  //     r => (r.seededClueIds ?? []).length > 0, isAftermath: r =>
+  //     (r.suspenseDelta ?? 0) > 0, minRecords 8, minTriggerCount 2,
+  //     minAftermathCount 2, window 2 — document-anchored (a single
+  //     whole-script count summary, no "Scene N" in its location text), same
+  //     shape as the original four families above.
+  {
+    id: 'stakes-zone-imbalance',
+    memberRules: [
+      'ARC_STAKES_ZONE_IMBALANCE', 'BELIEF_STAKES_ZONE_IMBALANCE', 'CAUSALITY_STAKES_ZONE_IMBALANCE',
+      'CONFLICT_STAKES_ZONE_IMBALANCE', 'DIALOGUE_STAKES_ZONE_IMBALANCE', 'INTENTION_STAKES_ZONE_IMBALANCE',
+      'ORIGINALITY_STAKES_ZONE_IMBALANCE', 'PACING_STAKES_ZONE_IMBALANCE', 'PAYOFF_STAKES_ZONE_IMBALANCE',
+      'RELATIONAL_STAKES_ZONE_IMBALANCE', 'RHYTHM_STAKES_ZONE_IMBALANCE', 'STAKES_ZONE_IMBALANCE',
+      'STRUCTURE_STAKES_ZONE_IMBALANCE', 'THEME_STAKES_ZONE_IMBALANCE', 'VOICE_STAKES_ZONE_IMBALANCE',
+    ],
+    title: 'Stakes-raising scenes are bunched, not spread',
+    observation: (members, passCount) =>
+      `${passCount} separate checks agree on the same thing: the scenes where this story raises the `
+      + `stakes are bunched into one quarter of the structure and absent from another. Escalation should `
+      + `arrive throughout the piece, not in one cluster and then a long silence; move at least one `
+      + `stakes-raising beat into the empty quarter this convergence names.`,
+  },
+  {
+    id: 'clock-zone-imbalance',
+    memberRules: [
+      'ARC_CLOCK_ZONE_IMBALANCE', 'CAUSALITY_CLOCK_ZONE_IMBALANCE', 'CONFLICT_CLOCK_ZONE_IMBALANCE',
+      'DIALOGUE_CLOCK_ZONE_IMBALANCE', 'INTENTION_CLOCK_ZONE_IMBALANCE', 'PAYOFF_CLOCK_ZONE_IMBALANCE',
+      'RELATIONAL_CLOCK_ZONE_IMBALANCE', 'STRUCTURE_CLOCK_ZONE_IMBALANCE', 'THEME_CLOCK_ZONE_IMBALANCE',
+    ],
+    title: 'Deadline pressure is bunched, not spread',
+    observation: (members, passCount) =>
+      `${passCount} separate checks agree on the same thing: the scenes that raise a ticking clock are `
+      + `bunched into one quarter of the structure and absent from another. Deadline pressure should be `
+      + `felt throughout the piece, not concentrated in one stretch and forgotten elsewhere; introduce `
+      + `time pressure into at least one scene in the empty quarter this convergence names.`,
+  },
+  {
+    id: 'staging-zone-imbalance',
+    memberRules: [
+      'BELIEF_STAGING_ZONE_IMBALANCE', 'PHYSICAL_STAGING_ZONE_IMBALANCE', 'SCENE_STAGING_ZONE_IMBALANCE',
+      'VISUAL_STAGING_ZONE_IMBALANCE', 'VOICE_STAGING_ZONE_IMBALANCE',
+    ],
+    title: 'Physical staging is bunched, not spread',
+    observation: (members, passCount) =>
+      `${passCount} separate checks agree on the same thing: the scenes with substantial physical `
+      + `staging — real business, movement, action the camera can see — are bunched into one quarter of `
+      + `the structure and absent from another. Showing rather than stating should be available `
+      + `throughout the piece; bring at least one physically staged beat into the empty quarter this `
+      + `convergence names.`,
+  },
+  {
+    id: 'seed-suspense-aftermath-void',
+    memberRules: [
+      'ARC_SEED_SUSPENSE_AFTERMATH_VOID', 'BELIEF_SEED_SUSPENSE_AFTERMATH_VOID', 'CAUSALITY_SEED_SUSPENSE_AFTERMATH_VOID',
+      'CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID', 'DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID', 'INTENTION_SEED_SUSPENSE_AFTERMATH_VOID',
+      'ORIGINALITY_SEED_SUSPENSE_AFTERMATH_VOID', 'PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID', 'RELATIONAL_SEED_SUSPENSE_AFTERMATH_VOID',
+      'RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID', 'THEME_SEED_SUSPENSE_AFTERMATH_VOID', 'VOICE_SEED_SUSPENSE_AFTERMATH_VOID',
+    ],
+    title: 'Planted clues raise no suspense once they land',
+    observation: (members, passCount) =>
+      `${passCount} independent checks agree on the same thing: in the two scenes after this script `
+      + `plants a clue, tension never rises — the plant registers as information, not as a ticking `
+      + `question. A seed should leave the audience wanting the next answer; let at least one planted `
+      + `clue's immediate aftermath raise the tension instead of holding it flat.`,
+  },
 ];
 
-/** Run one family's recognizer: filter to the family's member rules
- *  (document-anchored only — see the Wave 1193 comment above for why all
- *  four current families are), require the DISTINCT-PASS count to be 2+ (a
- *  single pass repeating itself isn't a cross-pass duplicate), and — when
- *  satisfied — claim every matching issue into one merged finding. Mirrors
- *  matchDocumentTemplate's shape deliberately (same anchor assumption, same
- *  "claim everything that matched" behavior) but is kept as its own function
+/** Run one family's recognizer: filter to the family's member rules —
+ *  document-, scene-, or lines-anchored (never 'character': no family below
+ *  names a character-anchored rule) — require the DISTINCT-PASS count to be
+ *  2+ (a single pass repeating itself isn't a cross-pass duplicate), and —
+ *  when satisfied — claim every matching issue into one merged finding.
+ *  Mirrors matchDocumentTemplate's shape deliberately (same "claim
+ *  everything that matched" behavior) but is kept as its own function
  *  because the fire condition is a genuinely different quantifier: a
  *  template requires EVERY required rule; a family requires only 2+ of its
  *  member rules, since partial agreement between passes is already the
- *  noise this mechanism exists to remove. */
+ *  noise this mechanism exists to remove.
+ *
+ *  Accepting scene/lines anchors (not just 'document') was added 2026-09-04
+ *  for the *_STAKES_ZONE_IMBALANCE / *_CLOCK_ZONE_IMBALANCE /
+ *  *_STAGING_ZONE_IMBALANCE families below (advice-quality audit item 6):
+ *  unlike the original four Wave 1193 families, those three ARE resolved to
+ *  a real scene span by locate.ts (their "Act 2a (25-50%)... empty; Act 1
+ *  (0-25%) has N/M ... scenes" location text is locate.ts's own documented
+ *  multi-zone example — see that module's header comment). Matching on rule
+ *  presence alone (no spatial overlap check, unlike matchOverlapTemplate) is
+ *  still correct here because every member rule in a zone-imbalance family
+ *  is independently built on the SAME shared checkZoneImbalance() helper
+ *  with the IDENTICAL predicate and the SAME whole-script `records` array
+ *  (verified against the pass source, not assumed from rule-name similarity
+ *  — e.g. every *_STAKES_ZONE_IMBALANCE rule uses `purpose === 'raise_stakes'`,
+ *  every *_CLOCK_ZONE_IMBALANCE rule uses `clockRaised === true`, every
+ *  *_STAGING_ZONE_IMBALANCE rule uses `(visualBeats ?? []).length >= 2`) —
+ *  so when two of them fire, they compute the identical zone split and the
+ *  identical location text, by construction, not by coincidence. */
 function matchDuplicateFamily(
   family: DuplicateFamily,
   located: LocatedIssue[],
+  sceneSpans: SceneLineSpan[],
 ): { consumed: LocatedIssue[]; findings: RootCauseFinding[] } {
-  const candidates = located.filter(li => family.memberRules.includes(li.issue.rule) && li.anchor === 'document');
+  const candidates = located.filter(li => family.memberRules.includes(li.issue.rule) && li.anchor !== 'character');
   if (candidates.length < 2) return { consumed: [], findings: [] };
   const passesInvolved = new Set(candidates.map(li => li.pass));
   if (passesInvolved.size < 2) return { consumed: [], findings: [] };
-  return { consumed: candidates, findings: [synthesizeFamilyFinding(family, candidates, passesInvolved.size)] };
+  return { consumed: candidates, findings: [synthesizeFamilyFinding(family, candidates, passesInvolved.size, sceneSpans)] };
 }
 
-function synthesizeFamilyFinding(family: DuplicateFamily, members: LocatedIssue[], passCount: number): RootCauseFinding {
+function synthesizeFamilyFinding(
+  family: DuplicateFamily,
+  members: LocatedIssue[],
+  passCount: number,
+  sceneSpans: SceneLineSpan[],
+): RootCauseFinding {
   const memberRules = uniqueRules(members);
+  // Document-anchored members (the original four families) carry no line
+  // span at all; the newer scene/lines-anchored families (see
+  // matchDuplicateFamily's comment) do — scoped to whichever members DO
+  // carry one, same guard as synthesizeTemplateFinding's identical logic,
+  // so a fully document-anchored family's output is byte-identical to
+  // before this addition.
+  const linedMembers = members.filter(m => m.startLine !== undefined && m.endLine !== undefined);
+  const startLine = linedMembers.length > 0 ? Math.min(...linedMembers.map(m => m.startLine!)) : undefined;
+  const endLine = linedMembers.length > 0 ? Math.max(...linedMembers.map(m => m.endLine!)) : undefined;
   return {
     id: `${family.id}-${findingId(memberRules, undefined, undefined, family.id)}`,
     title: family.title,
@@ -1095,9 +1267,9 @@ function synthesizeFamilyFinding(family: DuplicateFamily, members: LocatedIssue[
     severity: worstSeverity(members),
     memberRules,
     memberCount: members.length,
-    sceneIdxs: sceneIdxsOf(members),
-    startLine: undefined,
-    endLine: undefined,
+    sceneIdxs: sceneIdxsOf(members, sceneSpans),
+    startLine,
+    endLine,
   };
 }
 
@@ -1120,7 +1292,7 @@ export function clusterIssues(
   // (see the Wave 1193 comment above for why this is a different mechanism
   // from claim-before-generic template matching, not a special case of it).
   for (const family of DUPLICATE_FAMILIES) {
-    const { consumed: familyConsumed, findings: familyFindings } = matchDuplicateFamily(family, located);
+    const { consumed: familyConsumed, findings: familyFindings } = matchDuplicateFamily(family, located, sceneSpans);
     for (const li of familyConsumed) consumed.add(li);
     findings.push(...familyFindings);
   }
@@ -1168,8 +1340,21 @@ export function clusterIssues(
     });
   }
 
-  // Severity first (critical findings lead), then how many issues each one
-  // subsumes — matches doctor.ts's buildTopPriorities ordering convention.
-  findings.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.memberCount - a.memberCount);
+  // Severity first (critical findings lead), matching doctor.ts's
+  // buildTopPriorities ordering convention. THEN — 2026-09-04, advice-quality
+  // audit finding #1 (.../scratchpad/advice-quality-audit.md) — named beats
+  // generic: a hand-written template/family finding (isNamedRootCause) is the
+  // one layer of this whole product measured to actually discriminate a
+  // deliberately excellent script from a deliberately bad one (1 vs 7 named
+  // findings on the audit's matched fixtures), but the OLD third key here,
+  // memberCount alone, let a same-severity 13-15-member auto-titled cluster
+  // ("Recurring X trouble in Scene N") always outrank a 2-4-member named one
+  // ("The middle has no engine") — exactly backwards from what a writer
+  // should read first. Only THEN member count, so within either tier the
+  // biggest convergence still leads.
+  findings.sort((a, b) =>
+    SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+    || Number(isNamedRootCause(b)) - Number(isNamedRootCause(a))
+    || b.memberCount - a.memberCount);
   return findings;
 }

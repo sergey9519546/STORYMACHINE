@@ -203,9 +203,17 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
   });
 
   // A3 (2026-09-03): `prioritized` is the route-layer "start here" ordering
-  // (server/nvm/analyze/prioritize.ts) — attached beside, never in place of,
-  // the report's own severity-first `topPriorities`.
-  it('/doctor attaches `prioritized` leading with anchored issues, and leaves topPriorities untouched', async () => {
+  // (server/nvm/analyze/prioritize.ts) — attached beside, never REORDERED in
+  // place of, the report's own severity-first `topPriorities`. 2026-09-04
+  // (advice-quality audit item 10) refined "untouched": the route now also
+  // applies suppressContradictoryFindings to topPriorities (same function
+  // coverage-html.ts's export applies at render time) — a presentation-only
+  // REMOVAL of a mutually-contradictory pair's weaker half, never a reorder
+  // or a rewrite of any surviving entry. So the real invariant checked below
+  // is that body.topPriorities equals the raw doctor topPriorities with that
+  // one filter applied — not raw byte-identity, which was only ever a proxy
+  // for "the route doesn't silently rewrite this field".
+  it('/doctor attaches `prioritized` leading with anchored issues, and topPriorities is untouched except for contradiction suppression', async () => {
     const res = await postDoctor({ fountain: MULTI_SCENE_FOUNTAIN });
     assert.equal(res.status, 200);
     const body = await res.json();
@@ -239,12 +247,15 @@ describe('routes/scriptide/diagnose — HTTP behavior', async () => {
     }
 
     // topPriorities is the SAME field the doctor itself computes — attaching
-    // `prioritized` beside it must not move it. Verified against a direct,
-    // route-free call to the doctor on the identical content (deterministic:
-    // same contentHash always produces the same report).
+    // `prioritized` beside it must not reorder or rewrite it, and the only
+    // permitted difference from the raw doctor output is contradiction
+    // suppression (see this test's header comment). Verified against a
+    // direct, route-free call to the doctor on the identical content
+    // (deterministic: same contentHash always produces the same report).
     const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
+    const { suppressContradictoryFindings } = await import('../../server/nvm/analyze/prioritize.ts');
     const direct = await runScriptDoctor(MULTI_SCENE_FOUNTAIN);
-    assert.deepEqual(body.topPriorities, direct.topPriorities);
+    assert.deepEqual(body.topPriorities, suppressContradictoryFindings(direct.topPriorities));
   });
 
   // A4 (2026-09-03): `characterSummaries` — per-character roll-up derived
