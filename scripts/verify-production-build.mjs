@@ -366,7 +366,11 @@ try {
     console.log(`  ${c.file}: ${(c.rawBytes / 1024).toFixed(1)}KB / ${(c.gzipBytes / 1024).toFixed(1)}KB gzip${flag}`);
   }
   const oversized = jsChunks.filter((c) => c.rawBytes > SIZE_FLAG_BYTES);
-  record('bundle-sizes', `no more than the known oversized chunk stays unflagged (${oversized.length} chunk(s) over 500KB — see log above for names/sizes; this is a report, not a hard failure, matching the build's own warning)`, true, oversized.map((c) => `${c.file}=${(c.rawBytes / 1024).toFixed(0)}KB`).join(', ') || 'none over 500KB');
+  // Hard cap (was a report-only flag): once every chunk fit under 500KB raw
+  // (lazy-loading the ScriptIDE side panels + a manualChunks split for the
+  // eager CodeMirror editor stack — see vite.config.ts), there was no more
+  // reason to let a future regression back over the line pass silently.
+  record('bundle-sizes', `every JS chunk stays under the 500KB raw cap (${oversized.length} chunk(s) over — see log above for names/sizes)`, oversized.length === 0, oversized.map((c) => `${c.file}=${(c.rawBytes / 1024).toFixed(0)}KB`).join(', ') || 'none over 500KB');
   const totalRaw = jsChunks.reduce((s, c) => s + c.rawBytes, 0);
   const totalGzip = jsChunks.reduce((s, c) => s + c.gzipBytes, 0);
   console.log(`[verify:production] total JS: ${(totalRaw / 1024).toFixed(1)}KB raw, ${(totalGzip / 1024).toFixed(1)}KB gzip`);

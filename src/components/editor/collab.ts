@@ -7,10 +7,22 @@
 // the server (server/collab/yjs-server.ts) speaks the standard y-protocols
 // sync + awareness framing, so the stock y-websocket provider is compatible.
 
-import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
-import { yCollab } from 'y-codemirror.next';
+// yjs/y-websocket/y-codemirror.next are NOT imported statically here — they
+// pull in a real-time-CRDT stack (~150KB+ minified) that's only ever needed
+// by the ~1-in-N writer who actually opens a collaboration room, never by
+// first paint or by local (non-collab) typing. A static import here would
+// bundle straight into FountainEditor's (eager, must-stay-fast) chunk since
+// FountainEditor imports createCollabSession unconditionally. Instead the
+// three packages are dynamic-imported inside createCollabSession() below,
+// which Rollup then splits into their own lazily-fetched chunk — loaded only
+// when `collabRoom` is actually set (see FountainEditor.tsx's effect). Every
+// other export in this file (createCollabRoom, share-link helpers,
+// roomIdFromLocation) stays a normal top-level export: those ARE needed
+// synchronously at mount (e.g. reading `?collab=` from the URL) and carry no
+// heavy dependency of their own.
 import type { Extension } from '@codemirror/state';
+import type * as Y from 'yjs';
+import type { WebsocketProvider } from 'y-websocket';
 
 export interface CollabSession {
   /** The CM6 extension to include in the editor's state. */
@@ -149,7 +161,17 @@ async function fetchCollabToken(roomId: string): Promise<string> {
  * use of a Compartment to hot-swap the extension in once this resolves.
  */
 export async function createCollabSession(opts: CollabOptions): Promise<CollabSession> {
-  const doc = new Y.Doc();
+  // Deferred until a room is actually being joined — see the header comment
+  // above. All three settle before any of their exports are used; a rejected
+  // token fetch below (the more common failure) still has to run in
+  // parallel with this since neither depends on the other's result.
+  const [{ Doc }, { WebsocketProvider: WSProvider }, { yCollab }] = await Promise.all([
+    import('yjs'),
+    import('y-websocket'),
+    import('y-codemirror.next'),
+  ]);
+
+  const doc = new Doc();
   const ytext = doc.getText('script');
 
   let token: string;
@@ -165,7 +187,7 @@ export async function createCollabSession(opts: CollabOptions): Promise<CollabSe
   // `params` is serialized as a query string by y-websocket, landing after the
   // room segment (…/collab/<room>?token=…), which the server parses separately
   // from the room path — see parseRoomId/parseToken in yjs-server.ts.
-  const provider = new WebsocketProvider(collabWsBase(), opts.roomId, doc, { params: { token } });
+  const provider = new WSProvider(collabWsBase(), opts.roomId, doc, { params: { token } });
 
   const name = opts.userName ?? 'Writer';
   provider.awareness.setLocalStateField('user', {

@@ -34,7 +34,7 @@ export default function AnalysisPanel({
   // were failing WCAG even in light mode. Fixed by moving every structural
   // color to the design system's own paper/ink tokens (bg-[var(--sm-panel)],
   // border/text-[var(--sm-ink)], bg-[var(--sm-panel-2)] for nested "inset"
-  // boxes, text-[var(--sm-ink-faint/-mute)] for captions) instead of adding
+  // boxes, text-[var(--sm-ink-faint)] for captions) instead of adding
   // dark: pairs: body itself (src/index.css) and every sibling card in this
   // same sidebar (ScriptIDE.tsx's AUDIO PRODUCTION/Codex cards) already use
   // bg-[var(--sm-panel)] with NO dark override anywhere in the codebase —

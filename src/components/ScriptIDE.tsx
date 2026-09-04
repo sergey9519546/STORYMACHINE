@@ -67,7 +67,7 @@ import Sidebar from "./Sidebar";
 
 // Sub-components
 import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
-import SnapshotManager, { type Snapshot } from "./scriptide/SnapshotManager";
+import type { Snapshot } from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
 import Toolbar, { type IdeTask, type IdeToolSlot } from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
@@ -96,6 +96,15 @@ const SlatePanel = lazy(() => import("./SlatePanel"));
 // see ShipPanel.tsx's header comment for why this replaced the "studio"
 // research-shell mount on the always-visible Ship task tab.
 const ShipPanel = lazy(() => import("./scriptide/ShipPanel"));
+// Versions history + the take/restore-snapshot modals. Note: one instance of
+// this is mounted almost UNCONDITIONALLY below (the `hideList` one, so the
+// snapshot/restore modals stay reachable from anywhere) — that mount uses
+// `fallback={null}` rather than TabPanelFallback/DrawerPanelFallback, since
+// with both modals closed (the default) SnapshotManager itself renders
+// nothing; a `null` Suspense fallback keeps first paint's DOM byte-identical
+// to the pre-lazy version instead of flashing a loading placeholder nothing
+// was ever going to replace.
+const SnapshotManager = lazy(() => import("./scriptide/SnapshotManager"));
 
 // Matches the DirectorPanel/ScriptDoctorPanel shell (fixed right-side drawer,
 // same sm-btn/white-bg idiom) so first-open doesn't flash blank space
@@ -3196,18 +3205,20 @@ export default function ScriptIDE({
 
           {activeTab === "versions" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <SnapshotManager
-                snapshots={snapshots}
-                snapshotModal={snapshotModal}
-                restoreModal={restoreModal}
-                onTakeSnapshot={takeSnapshot}
-                onConfirmSnapshot={confirmSnapshot}
-                onRestoreSnapshot={restoreSnapshot}
-                onConfirmRestore={confirmRestore}
-                onDeleteSnapshot={deleteSnapshot}
-                onSetSnapshotModal={setSnapshotModal}
-                onSetRestoreModal={setRestoreModal}
-              />
+              <Suspense fallback={<TabPanelFallback />}>
+                <SnapshotManager
+                  snapshots={snapshots}
+                  snapshotModal={snapshotModal}
+                  restoreModal={restoreModal}
+                  onTakeSnapshot={takeSnapshot}
+                  onConfirmSnapshot={confirmSnapshot}
+                  onRestoreSnapshot={restoreSnapshot}
+                  onConfirmRestore={confirmRestore}
+                  onDeleteSnapshot={deleteSnapshot}
+                  onSetSnapshotModal={setSnapshotModal}
+                  onSetRestoreModal={setRestoreModal}
+                />
+              </Suspense>
             </motion.div>
           )}
         </div>
@@ -3439,19 +3450,27 @@ export default function ScriptIDE({
       {/* Snapshot modals when neither Ship nor the (Labs-only) Studio's own
           Versions tab is already mounting the full manager. */}
       {!(toolSlot === "ship" || (toolSlot === "studio" && activeTab === "versions")) && (
-        <SnapshotManager
-          snapshots={snapshots}
-          snapshotModal={snapshotModal}
-          restoreModal={restoreModal}
-          onTakeSnapshot={takeSnapshot}
-          onConfirmSnapshot={confirmSnapshot}
-          onRestoreSnapshot={restoreSnapshot}
-          onConfirmRestore={confirmRestore}
-          onDeleteSnapshot={deleteSnapshot}
-          onSetSnapshotModal={setSnapshotModal}
-          onSetRestoreModal={setRestoreModal}
-          hideList
-        />
+        // fallback={null}: this instance is mounted from first paint (it's
+        // only excluded behind Ship/Studio-Versions, neither the default
+        // state), and with both modals closed SnapshotManager itself renders
+        // nothing — so the fallback must render nothing too, or first paint
+        // would flash a loading placeholder for a component that was never
+        // going to draw anything in the first place.
+        <Suspense fallback={null}>
+          <SnapshotManager
+            snapshots={snapshots}
+            snapshotModal={snapshotModal}
+            restoreModal={restoreModal}
+            onTakeSnapshot={takeSnapshot}
+            onConfirmSnapshot={confirmSnapshot}
+            onRestoreSnapshot={restoreSnapshot}
+            onConfirmRestore={confirmRestore}
+            onDeleteSnapshot={deleteSnapshot}
+            onSetSnapshotModal={setSnapshotModal}
+            onSetRestoreModal={setRestoreModal}
+            hideList
+          />
+        </Suspense>
       )}
     </div>
   );
