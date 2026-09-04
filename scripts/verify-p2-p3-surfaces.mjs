@@ -15,7 +15,7 @@
 // this suite's report wait and nobody noticed for days because nothing ran it.
 // `playwright` is now a pinned devDependency and the `browser` job in
 // .github/workflows/ci.yml runs `npx playwright install --with-deps chromium`
-// before `npm run verify:browser`, so these 137 assertions gate every push and
+// before `npm run verify:browser`, so these 141 assertions gate every push and
 // block `publish` in release.yml. Run it by hand too, after touching
 // feature-flags.ts, Toolbar.tsx, App.tsx's hash-routing/Labs gating, the
 // export/verify routes, or the events instrumentation.
