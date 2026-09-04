@@ -8,9 +8,9 @@
 // through the exact keyboard interactions a screen-reader/keyboard-only user
 // would perform, against dialogs wired with `src/lib/use-modal-focus-trap.ts`
 // (ScriptDoctorPanel, WhatIfPanel, RoomPanel, SnapshotManager's Save Snapshot
-// modal) — and it is what actually found real, live bugs that every prior
-// source-read review missed (see the commit history / doc comments in
-// use-modal-focus-trap.ts, App.tsx, and SnapshotManager.tsx).
+// and Restore Snapshot? modals) — and it is what actually found real, live
+// bugs that every prior source-read review missed (see the commit history /
+// doc comments in use-modal-focus-trap.ts, App.tsx, and SnapshotManager.tsx).
 //
 // THIS RUNS IN CI (2026-09-02). It used to say the opposite — "not a CI test,
 // CI has no browser provisioned" — and that was a self-imposed limitation, not
@@ -285,6 +285,55 @@ async function main() {
     await verifyDialog(page, {
       name: 'SnapshotManager (Save Snapshot)',
       restoreTriggerHandle: triggerHandle,
+      closeDialog: async () => page.keyboard.press('Escape'),
+    });
+
+    await context.close();
+  }
+
+  // ── Context 4: SnapshotManager's "Restore Snapshot?" confirm modal. ──────
+  // Same defect, same fix, same file (SnapshotManager.tsx) as Context 3's
+  // Save modal — a bare `motion.div` with no role="dialog", no aria-modal,
+  // no accessible name, no useModalFocusTrap, and (unlike the Save modal,
+  // which at least had an input-level Escape handler) no Escape handling of
+  // any kind at all. Reached by actually completing a save first (the
+  // default "Version 1" name, via the same Save Snapshot modal Context 3
+  // exercises), so a real row with a real "Restore snapshot: …" trigger
+  // exists in the list — the trigger CoverageSummary-style dialogs restore
+  // to.
+  {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    wireConsoleCapture(page, genuineConsoleErrors);
+
+    console.log('\n=== SnapshotManager Restore modal (… -> Ship -> Snapshot -> Save -> Restore) ===');
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+
+    const sampleCta = page.getByRole('button', { name: /try sample coverage/i }).first();
+    await sampleCta.click({ timeout: timing.ms(15000) });
+    await waitForRenderedText(page, 'CONSIDER');
+
+    const shipTab = page.getByRole('button', { name: 'Ship', exact: true }).first();
+    await shipTab.click({ timeout: timing.ms(15000) });
+
+    const snapshotBtn = page.getByRole('button', { name: 'Snapshot', exact: true }).first();
+    await snapshotBtn.click({ timeout: timing.ms(15000) });
+    await page.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) });
+    const saveBtn = page.getByRole('button', { name: 'Save', exact: true }).first();
+    await saveBtn.click({ timeout: timing.ms(15000) });
+    // The Save modal unmounts once the snapshot is recorded; give its exit
+    // animation + the list re-render real time before looking for the row.
+    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: timing.ms(3000) }).catch(() => {});
+    await page.waitForTimeout(timing.ms(400));
+
+    const restoreBtn = page.getByRole('button', { name: /^Restore snapshot: /i }).first();
+    await restoreBtn.waitFor({ timeout: timing.ms(10000) });
+    const restoreTriggerHandle = await restoreBtn.elementHandle();
+    await restoreBtn.click({ timeout: timing.ms(15000) });
+
+    await verifyDialog(page, {
+      name: 'SnapshotManager (Restore Snapshot)',
+      restoreTriggerHandle,
       closeDialog: async () => page.keyboard.press('Escape'),
     });
 

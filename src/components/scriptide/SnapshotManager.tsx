@@ -248,6 +248,72 @@ function SaveSnapshotModal({
   );
 }
 
+// Same 2026-09-04 a11y fix, same reason (see SaveSnapshotModal's header
+// comment above): the "Restore Snapshot?" confirm modal had the identical
+// defect — bare motion.div, no role="dialog", no aria-modal, no accessible
+// name, no useModalFocusTrap, and (unlike the Save modal, which at least had
+// an input-level Escape handler) no Escape handling of any kind — only a
+// mouse click on Cancel/Restore could dismiss it. Extracted the same way,
+// for the same mount-timing reason.
+function RestoreSnapshotModal({
+  onSetRestoreModal,
+  onConfirmRestore,
+}: {
+  onSetRestoreModal: SnapshotManagerProps["onSetRestoreModal"];
+  onConfirmRestore: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useModalFocusTrap(dialogRef);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+    >
+      <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="restore-snapshot-modal-title"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            onSetRestoreModal({ open: false, text: "" });
+          }
+        }}
+        initial={{ scale: 0.9 }}
+        animate={{ scale: 1 }}
+        exit={{ scale: 0.9 }}
+        className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
+      >
+        <h3 id="restore-snapshot-modal-title" className="font-bold uppercase text-xs tracking-widest">
+          Restore Snapshot?
+        </h3>
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+          Current unsaved changes will be lost.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={() => onSetRestoreModal({ open: false, text: "" })}
+            className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirmRestore}
+            className="px-4 py-2 text-xs font-bold uppercase sm-btn--ink hover:bg-[var(--sm-stamp)]"
+          >
+            Restore
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 interface SnapshotManagerProps {
   snapshots: Snapshot[];
   snapshotModal: { open: boolean; name: string };
@@ -370,40 +436,10 @@ export default function SnapshotManager({
       {/* Restore confirm modal */}
       <AnimatePresence>
         {restoreModal.open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
-            >
-              <h3 className="font-bold uppercase text-xs tracking-widest">
-                Restore Snapshot?
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                Current unsaved changes will be lost.
-              </p>
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => onSetRestoreModal({ open: false, text: "" })}
-                  className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={onConfirmRestore}
-                  className="px-4 py-2 text-xs font-bold uppercase sm-btn--ink hover:bg-[var(--sm-stamp)]"
-                >
-                  Restore
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <RestoreSnapshotModal
+            onSetRestoreModal={onSetRestoreModal}
+            onConfirmRestore={onConfirmRestore}
+          />
         )}
       </AnimatePresence>
     </>
