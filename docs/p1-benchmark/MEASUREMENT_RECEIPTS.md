@@ -1641,3 +1641,104 @@ is that reports over these fixtures were wrong and had to move.
   formula, threshold, deduction, weight, or verdict-band-boundary edit, and
   the byte-level identity of every field other than `plainSummary` across
   all 45 reports is the receipt it owes."
+
+### 2026-09-04 — STRUCTURAL SIGNALS: a dense, lexicon-free `structuralSignals` block added to every report — identity-modulo-one-added-key receipt (no real-corpus measurement run, and none claimed)
+
+- **What changed on the scoring path:** one additive report field and nothing
+  else. A new leaf module `server/nvm/analyze/structural-signals.ts`
+  (`computeStructuralSignals`) reads document shape only — counts of words,
+  lines, sentences, speech turns and speakers — and emits twelve per-scene
+  channels plus thirteen document aggregates.
+  `server/nvm/analyze/doctor.ts` gained exactly one import and one line in its
+  report literal (`structuralSignals: computeStructuralSignals(fountain)`),
+  alongside the existing diagnostic blocks (`emotionalArc`, `antiSlop`,
+  `silence`, `patternEstablishment`, `temporalConsistency`).
+  `server/nvm/analyze/types.ts` gained the optional field declaration. No
+  formula, threshold, deduction, weight, lexicon, rule, pass, or verdict-band
+  constant was touched, and no code reads the block back: a test in
+  `server/nvm/analyze/structural-signals.test.ts` asserts that structurally
+  (doctor.ts may mention the identifier exactly once; no other file under
+  `analyze/` or `revision/` may mention it at all). The renderer changes
+  (`server/lib/coverage-html.ts` strip, one `server/lib/coverage-letter.ts`
+  caveat line gated on the field's presence) are outside the report entirely.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` with the
+  additive-schema flags — NOT `npm run measure-real`. This range claims zero
+  health/verdict/grade/sceneCount movement; an identity-modulo-listed-keys
+  proof is the correct and stronger receipt for that claim, same reasoning as
+  the 2026-08-21, 2026-09-03 LANE R6, and 2026-09-04 entries above.
+- **Baseline used:** `git archive main` at `0a0edcc9`. The extracted tree's
+  `node_modules` was symlinked to the repository's own so both trees resolved
+  identical dependency versions; the comparison tree was this branch's working
+  tree, rebased onto that same `0a0edcc9` tip before the harness was run, so
+  the baseline is the branch being merged into and not a stale fork point.
+  This branch's own commit hashes are deliberately not cited — they change on
+  every rebase, and a receipt has to name something a reviewer can resolve.
+- **What was run — output identity, modulo the one key this range adds, over
+  all 45 in-repo fixtures** (20 `data/screenplays/*.fountain`, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, 4 synthetic concatenations
+  at 60/120/240/300 scenes):
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then
+  `node scripts/check-doctor-output-identity.mjs --compare <before> <after> --ignore-keys structuralSignals --require-added structuralSignals`.
+  Exit codes 0 / 0 / 0, each captured by redirecting the run to a log file and
+  reading `$?`. Compare output, verbatim:
+  ```
+  Ignored keys (excluded from the identity check, over 45 compared reports):
+    "structuralSignals": differs in 45/45 reports
+
+  Required-added keys confirmed present in every AFTER report and absent from every BEFORE report: structuralSignals
+
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical modulo the ignored key(s) [structuralSignals] (analyzedAt excluded).
+  ```
+  The ignored key genuinely differs in all 45 reports, so the ignore list is
+  not hiding a no-op, and the require-added line confirms it is a clean
+  addition (absent on the baseline tree, present on every report on this one)
+  rather than a reshaped or removed field laundered through the ignore list. A
+  run with NO flags over the same two snapshot directories was captured as a
+  negative control: `OUTPUT IDENTITY: FAIL — 45 fixture(s) differ.`, exit 1,
+  with the reported diff lines landing on `structuralSignals` sub-keys —
+  proving the flagged run above does real work rather than trivially passing.
+- **Second check — the headline fields read back directly, not just implied by
+  the compare's silence.** A small script re-read `health`, `verdict`,
+  `sceneCount`, `totalIssues`, `grade`, `wordCount`, `healthPercentile`,
+  `contentHash`, `plainSummary`, and the ordered `(pass, rule, location)`
+  identity of every `topPriorities` entry out of all 45 before/after snapshot
+  pairs and diffed them field by field: **0 mismatches across 45 fixtures ×
+  10 comparisons (450 comparisons).**
+- **Flag-run AUCs:** none. No `measure-auc-split.mjs` or `measure-real` flag
+  run was performed against this range.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the
+  45 in-repo fixtures are the whole input, same as the 2026-09-03 LANE R6 and
+  RETROSPECTIVE #5 entries above. `tests/fixtures/real-corpus-manifest.json`
+  is unchanged by this range and no re-lock was needed, because no produced
+  script's health, verdict, or scene count moved — which is what the identity
+  PASS and the independent field-by-field check above say.
+- **Separately measured, and NOT a scoring claim:** the density and separation
+  of the new block's own channels, over the 20 CC0 fixtures plus the 20
+  calibration samples (427 scenes), recorded in
+  `docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md` and reproducible with
+  `node --experimental-strip-types scripts/measure-structural-signals.ts`.
+  Ten of twelve per-scene channels are non-zero on 75–100% of scenes against
+  6.8–7.3% for the lexicon channels they answer. Separation was measured on
+  two small in-repo sets only (a 1-pair audit fixture and a 25-pair
+  calibration band comparison), both of which that document states the
+  limitations of; the real-writing question is untouched by this range and is
+  explicitly left open.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the baseline
+  tree from `git archive main` at `0a0edcc9` myself, rebased this branch onto
+  that same tip, ran the three harness commands above myself on 2026-09-04,
+  and read the PASS line, the per-key differ count, and the require-added
+  confirmation directly out of the compare run's own log file along with its
+  exit code. I separately ran the same compare with no flags as a negative
+  control and read its FAIL line and exit code, and I wrote and ran the
+  field-by-field re-read described above and read its zero-mismatch result
+  myself. This is an identity-modulo-one-added-key receipt, not a
+  discrimination-statistic measurement: **no real-corpus AUC measurement was
+  run against this range, and none is claimed.** The change is additive schema
+  plus a leaf module nothing on the scoring path reads, and the byte-level
+  identity of every field other than the one added key, across all 45 reports,
+  is the receipt it owes. Wiring any channel in this block into `health` is a
+  separate future change that would owe a real `npm run measure-real` run
+  against the AUC-24 floor; the path is written down in §6 of
+  `docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md`."
