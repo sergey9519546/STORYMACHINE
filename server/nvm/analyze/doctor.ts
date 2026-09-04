@@ -1736,22 +1736,39 @@ export function buildStrengths(input: StrengthsInput): string[] {
 
 // ── Plain-language summary ──────────────────────────────────────────────────
 
-// Reader-voice descriptors (writer-experience #3, 2026-09-03): the first
-// sentence of every report used to read like an engine status line ("the
-// engine's intermediate threshold-based verdict") — accurate, but nobody
-// who has ever gotten actual script coverage talks like that. A reader
-// hands back a one-line take, then a score. These three phrases are that
-// take, in the plain vocabulary professional coverage already uses
-// (RECOMMEND/CONSIDER/PASS is itself standard script-reader terminology).
-// The methodology fact these used to carry inline — that this is a
+// Reader-voice descriptors (writer-experience #3, 2026-09-03; corrected
+// 2026-09-04). The first sentence of every report used to read like an
+// engine status line ("the engine's intermediate threshold-based verdict")
+// — accurate, but nobody who has ever gotten actual script coverage talks
+// like that. A reader hands back a one-line take, then a score. So far so
+// good — but the FIRST reader-voice pass (2026-09-03) went further than
+// "reader voice" required: it swapped the status line for craft-quality
+// language ("solid bones", "strong bones", "foundational problems") that
+// evaluates the SCRIPT. An advice-quality audit caught it immediately: the
+// engine described a deliberately excellent script and a deliberately bad
+// one, both landing at health 76.0, with the identical CONSIDER sentence —
+// "solid bones with fixable structural problems" — because the descriptor
+// is keyed on the VERDICT, not on anything the engine read in the draft.
+// "Solid bones" is a claim about the script the engine cannot back; the
+// only thing it actually knows is which threshold band the number landed
+// in. These three phrases now say exactly that and nothing more: a plain
+// description of the band and its relationship to the two named threshold
+// lines (the RECOMMEND floor at health>=85 && sceneCount>=8, and the PASS
+// ceiling at health<60 — see verdictFor above), worded so it stays TRUE of
+// any script that lands in that band, including the short-script cap that
+// holds an otherwise-85+ draft at CONSIDER — which is why CONSIDER's
+// phrasing names what the top band REQUIRES rather than asserting the
+// score itself sits below 85 (it may not, when the cap is what held it
+// back). Non-flattering, non-condemning, no craft judgment either way. The
+// methodology fact these used to carry inline — that this is a
 // deterministic, threshold-based verdict rather than a person's read — is
-// NOT dropped; it moves to its own sentence immediately after (see
+// still not dropped; it stays on its own sentence immediately after (see
 // METHODOLOGY_CAVEAT below), so the reader-voice line can read naturally
 // without smuggling an engineering caveat into the middle of it.
 const VERDICT_DESCRIPTORS: Record<CoverageVerdict, string> = {
-  RECOMMEND: 'strong bones, ready to move forward',
-  CONSIDER: 'solid bones with fixable structural problems',
-  PASS: 'foundational problems that need real revision before this is ready',
+  RECOMMEND: 'scored in the top band, clearing the recommend line on both the score and the scene count',
+  CONSIDER: 'scored in the middle band, above the decline line but short of what the recommend line requires',
+  PASS: 'scored in the bottom band, below the decline line',
 };
 
 const METHODOLOGY_CAVEAT =

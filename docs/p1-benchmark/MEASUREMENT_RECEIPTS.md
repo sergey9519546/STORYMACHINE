@@ -1556,3 +1556,88 @@ is that reports over these fixtures were wrong and had to move.
   provenance header produces, and precisely the pattern the 20 in-repo fixtures
   showed before this fix (9 of 20 peaking at scene 1 alone, 0 of 20 after).
   That competing explanation has never been ruled out."
+
+### 2026-09-04 — VERDICT DESCRIPTOR CORRECTION: `plainSummary`'s reader-voice phrase stopped evaluating the script and started naming the threshold band — identity-modulo-`plainSummary` receipt (no real-corpus measurement claimed)
+
+- **What changed on the scoring path:** one copy-only change to
+  `VERDICT_DESCRIPTORS` in `server/nvm/analyze/doctor.ts`, and nothing else —
+  no formula, threshold, deduction, weight, or verdict-band constant touched.
+  `verdictFor`'s three boundaries (`health>=85 && sceneCount>=8` for
+  RECOMMEND, `health<60` for PASS, else CONSIDER) are byte-for-byte
+  unchanged. The reader-voice sentence introduced 2026-09-03 (LANE R6
+  above — "solid bones with fixable structural problems" / "strong bones,
+  ready to move forward" / "foundational problems that need real revision
+  before this is ready") described the SCRIPT's craft, not the threshold
+  band the number landed in. An advice-quality audit found this made the
+  CONSIDER sentence read identically — same words, same confidence — over a
+  deliberately excellent script and a deliberately bad one both landing at
+  health 76.0, because the phrase is keyed on the verdict alone and the
+  engine has no other basis for a craft claim. The three descriptors are
+  rewritten to state only the band and its relationship to the two named
+  threshold lines (a "recommend line" and a "decline line"), worded so each
+  stays TRUE of any script landing in that band — including the
+  short-script cap that holds an otherwise-85+ score at CONSIDER, which is
+  why the CONSIDER phrasing names what the top band's combined bar
+  *requires* rather than asserting the score itself sits below 85 (it may
+  not, when the cap alone is what held it back). `Math.round(health)` in
+  the sentence, the methodology-caveat sentence immediately after it, and
+  every other clause of `buildPlainSummary` are unchanged bit for bit —
+  only the descriptor phrase moved.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` with
+  `--ignore-keys plainSummary` — NOT `npm run measure-real`. This range
+  claims zero health/verdict/sceneCount movement; an identity-modulo-one-key
+  proof is the correct, stronger receipt for that claim, same reasoning the
+  2026-09-03 LANE R6 entry above gives for its own identity-modulo-
+  listed-keys receipt.
+- **Baseline used:** `git archive main` at
+  `c21fdc5b494e6431c679763e525fc12e759183d8` — the tip of the branch being
+  merged into at the time of this measurement, extracted into a scratch tree
+  with `node_modules` symlinked to the repo's own install so both trees
+  resolved identical dependency versions. This branch's own commit hashes
+  are deliberately not cited: the change was still uncommitted working-tree
+  state at measurement time, and a commit made afterward changes on every
+  rebase — a receipt has to name something a reviewer can still resolve.
+- **What was run — output identity, modulo `plainSummary`, over all 45
+  in-repo fixtures** (20 `data/screenplays/*.fountain`, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, 4 synthetic
+  concatenations at 60/120/240/300 scenes):
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then
+  `node scripts/check-doctor-output-identity.mjs --compare <before> <after> --ignore-keys plainSummary`.
+  Exit codes 0 / 0 / 0, captured by redirecting each run to a log file and
+  reading `$?`. Compare output, verbatim:
+  ```
+  Ignored keys (excluded from the identity check, over 45 compared reports):
+    "plainSummary": differs in 45/45 reports
+
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical modulo the ignored key(s) [plainSummary] (analyzedAt excluded).
+  ```
+  `plainSummary` genuinely differs in all 45 reports — the ignore list isn't
+  hiding a no-op key — and every other field (health, verdict, sceneCount,
+  grade, totalIssues, wordCount, healthPercentile, every dimension score,
+  every issue, every root cause, every strength) is byte-identical between
+  the two trees. A run with NO flags on the same two snapshot directories
+  was captured as a negative control: it reports
+  `OUTPUT IDENTITY: FAIL — 45 fixture(s) differ.`, exit 1, with every one of
+  the 45 reported diffs landing on the `"plainSummary"` line and nowhere
+  else in the report — proving the flagged run above isolates exactly one
+  field rather than trivially passing because the comparison itself is a
+  no-op.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the
+  45 in-repo fixtures are the whole input, same as the 2026-09-03 LANE R6
+  and RETROSPECTIVE #5 entries above.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the
+  baseline tree from `git archive main` myself, ran the three-command
+  harness above myself on 2026-09-04, and read the PASS line and the
+  `plainSummary` differ count directly out of the compare run's own log
+  file, along with its exit code. I separately ran the same compare with no
+  flags as a negative control and read its FAIL line, its exit code, and
+  confirmed by eye that every one of the 45 reported diffs is on the
+  `plainSummary` line and nothing else. This is an identity-modulo-one-key
+  receipt, not a discrimination-statistic measurement: no real-corpus AUC
+  measurement was run against this range, and none is claimed — the change
+  is a copy-only rewrite of three fixed strings keyed on the verdict, not a
+  formula, threshold, deduction, weight, or verdict-band-boundary edit, and
+  the byte-level identity of every field other than `plainSummary` across
+  all 45 reports is the receipt it owes."

@@ -155,9 +155,15 @@ their ranked findings became build lanes. 55 commits, 163 files. What landed:
   note past 40 scenes. Verification now distinguishes a report whose text was
   edited from one where only the engine moved on — different accusations,
   previously indistinguishable. Findings carry stable ids so two drafts can be
-  diffed. The verdict sentence reads like a reader ("solid bones with fixable
-  structural problems") with the methodology caveat kept as its own sentence
-  rather than dropped.
+  diffed. The verdict sentence reads like a reader, in a sentence that names
+  the threshold band the score landed in ("scored in the middle band, above
+  the decline line but short of what the recommend line requires") rather
+  than a craft judgment of the script — corrected 2026-09-04 after an
+  advice-quality audit found the first reader-voice pass ("solid bones with
+  fixable structural problems") described a deliberately excellent script
+  and a deliberately bad one identically at the same score, because the
+  phrase was keyed on the verdict band, not on anything the engine actually
+  read. The methodology caveat stays its own sentence rather than dropped.
 - **A script with an accented name was invisible to the engine.** `MARÍA`
   parsed as an action line and took her dialogue with her — in the parser and
   again in the doctor's own duplicate ASCII-only regex — so every

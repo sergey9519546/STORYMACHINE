@@ -6,7 +6,7 @@ Health 66.7/100 (Solid) · 6 scenes · 209 words · ~2 pages / ~2 min (est.)
 
 ## Summary
 
-CONSIDER — solid bones with fixable structural problems; overall score 67/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 100/100. Plot Logic & Payoff is the lowest-scoring diagnostic dimension, at 82/100 — most of the trouble is around unmotivated decision. Start with the highest-priority fix: Midpoint suspense pressure is flat — the story lacks a dramatic pivot.
+CONSIDER — scored in the middle band, above the decline line but short of what the recommend line requires; overall score 67/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 100/100. Plot Logic & Payoff is the lowest-scoring diagnostic dimension, at 82/100 — most of the trouble is around unmotivated decision. Start with the highest-priority fix: Midpoint suspense pressure is flat — the story lacks a dramatic pivot.
 
 *This reads like an excerpt (6 scenes analyzed): scores and verdicts are computed the same way as for a full script, but with this little material they should be read as feedback on the pages, not coverage of a feature.*
 

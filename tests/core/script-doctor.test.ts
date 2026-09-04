@@ -1031,9 +1031,9 @@ describe('runScriptDoctor — plainSummary', () => {
     assert.ok(report.plainSummary && report.verdict);
 
     const READER_PHRASES: Record<string, string> = {
-      RECOMMEND: 'strong bones, ready to move forward',
-      CONSIDER: 'solid bones with fixable structural problems',
-      PASS: 'foundational problems that need real revision before this is ready',
+      RECOMMEND: 'scored in the top band, clearing the recommend line on both the score and the scene count',
+      CONSIDER: 'scored in the middle band, above the decline line but short of what the recommend line requires',
+      PASS: 'scored in the bottom band, below the decline line',
     };
     const expectedOpening =
       `${report.verdict} — ${READER_PHRASES[report.verdict!]}; overall score ${Math.round(report.health)}/100.`;
