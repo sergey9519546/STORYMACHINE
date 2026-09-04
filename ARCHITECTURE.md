@@ -87,7 +87,8 @@ Browser (React SPA — same-origin fetch / SSE / WebSocket)
   │                security headers, CSP (prod), rate limits
   │                │
   │                ├─ routes/config.ts     health, AI config, session delete/rotate, simulation observation export, retired JSON import
-  │                ├─ routes/scriptide.ts  doctor, doctor/stream (SSE), diagnose, copilot, fix-and-verify
+  │                ├─ routes/scriptide.ts  doctor, doctor/stream (SSE), diagnose, copilot,
+  │                │                        fix-and-verify (generated | writer-supplied)
   │                ├─ routes/export.ts     coverage HTML, FDX/DOCX/print
   │                ├─ routes/game.ts       OASIS simulation (init/turn/room/interview)
   │                ├─ routes/events.ts     closed-vocabulary instrumentation sink + /api/events/summary
@@ -246,6 +247,25 @@ when strictly newer than localStorage — the localStorage-quota-failure
 recovery case. Settings → Session offers a confirm-gated "delete everything"
 that wipes both stores and calls `POST /api/session/delete`; `#privacy` states
 what stays in the browser, what the server holds, and what leaves.
+
+**Fix & verify / Verify my rewrite** (`src/components/scriptide/ScriptDoctorPanel.tsx`,
+`POST /api/scriptide/fix`). One route, two ways to obtain a candidate draft and
+exactly one way to verify it. **Generated** (`span` + `issues`) asks the model
+for a span rewrite — needs a key, Labs-gated, `usedLLM: true`.
+**Writer-supplied** (`candidateFountain`, 2026-09-04) takes the writer's own
+rewrite straight out of the editor, reaches no model at all, and answers
+`usedLLM: false, source: 'writer'`; it is the version a keyless deploy has, and
+it is NOT Labs-gated (see `docs/DECISION_LOG.md` Decision #3's 2026-09-04
+amendment — that decision gates unevaluated generation, and this path generates
+nothing). Both run the whole 14-pass doctor on both documents through the same
+pooled path `/api/scriptide/doctor` uses, and both build their receipt with
+`server/nvm/analyze/fix-delta.ts` — one implementation of health/verdict
+movement, whole-document `cleared`/`introduced` (multiset, matched by stable
+issue id), and dual `contentHash`es so anyone can re-POST either text to
+`/doctor` and get the same numbers. The descriptive shape-&-rhythm aggregates
+ride alongside under the same "not part of the score" labelling used everywhere
+else; when no candidate exists at all, the baseline reading still goes out on
+its own rather than nothing.
 
 **What-If Lab -> Script Doctor** (`src/components/WhatIfPanel.tsx`, Labs-gated
 inside StoryMachine). A What-If branch is a `StoryOp[]` — semantic story moves

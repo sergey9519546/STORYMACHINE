@@ -150,10 +150,35 @@ describe('routes/scriptide/fix — HTTP behavior', async () => {
     assert.equal('candidateFountain' in body, false);
     assert.equal('cleared' in body, false);
     assert.equal('introduced' in body, false);
-    // Shape & rhythm delta (2026-09-04) — "field absent" path #1: no
-    // candidate means nothing to measure a delta between, so the field is
-    // absent entirely rather than a fabricated/zeroed value.
-    assert.equal('structuralSignals' in body, false);
+    // Shape & rhythm (2026-09-04, revised by the 2026-09-04 audit): no
+    // candidate means no DELTA — `after` is absent rather than fabricated or
+    // zeroed — but the BASELINE reading of the draft the writer is looking at
+    // is still a true thing to report, so `before` goes out on its own.
+    assert.equal(typeof body.structuralSignals, 'object');
+    assert.equal(typeof body.structuralSignals.before.meanAbsDialogueShareDelta, 'number');
+    assert.equal(typeof body.structuralSignals.before.actionSentenceCvOverall, 'number');
+    assert.equal('after' in body.structuralSignals, false, 'no candidate means no after-side reading');
+  });
+
+  it('keyless: the baseline-only reading matches what /doctor reports for the same text', async () => {
+    // Not a new number invented for this receipt — the same aggregates the
+    // Shape & Rhythm section of the report already shows for this draft.
+    const fixRes = await post({ fountain: FOUNTAIN, span: SPAN, issues: ISSUES });
+    const fixBody = await fixRes.json();
+    const doctorRes = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: FOUNTAIN }),
+    });
+    const doctorBody = await doctorRes.json();
+    assert.equal(
+      fixBody.structuralSignals.before.meanAbsDialogueShareDelta,
+      doctorBody.structuralSignals.meanAbsDialogueShareDelta,
+    );
+    assert.equal(
+      fixBody.structuralSignals.before.actionSentenceCvOverall,
+      doctorBody.structuralSignals.actionSentenceCvOverall,
+    );
   });
 
   // Shape & rhythm delta (2026-09-04) — "field absent" path #2: a valid
@@ -178,7 +203,7 @@ describe('routes/scriptide/fix — HTTP behavior', async () => {
       assert.equal(typeof body.candidateFountain, 'string');
       assert.equal(typeof body.before.health, 'number');
       assert.equal(typeof body.after.health, 'number');
-      assert.equal('structuralSignals' in body, false, 'a single-scene document never scores structural signals');
+      assert.equal('structuralSignals' in body, false, 'a single-scene document never scores structural signals — not even a baseline-only reading');
     } finally {
       resetLLMProvider();
     }
@@ -270,6 +295,150 @@ describe('routes/scriptide/fix — HTTP behavior', async () => {
 
   it('400 on an empty-string fountain', async () => {
     const res = await post({ fountain: '', span: SPAN, issues: ISSUES });
+    assert.equal(res.status, 400);
+  });
+
+  // ── Writer-supplied candidate (2026-09-04) ────────────────────────────────
+  // The keyless half of this route: the writer rewrote the draft themselves
+  // and POSTs it as `candidateFountain`. No span, no issues, no model. This
+  // is the only path a keyless deploy — the product's front door — can reach,
+  // and before it existed the receipt's whole render path was unreachable
+  // there (adversarial audit, 2026-09-04).
+  //
+  // WRITER_CANDIDATE is the exact document the GENERATED path produces from
+  // VALID_REPLACEMENT above (the same span, the same splice), which is what
+  // lets the parity test below compare the two receipts field for field.
+  const spliceSpan = (text: string, span: { startLine: number; endLine: number }, replacement: string) => {
+    const lines = text.split('\n');
+    return [
+      ...lines.slice(0, span.startLine - 1),
+      ...replacement.split('\n'),
+      ...lines.slice(span.endLine),
+    ].join('\n');
+  };
+  const WRITER_CANDIDATE = spliceSpan(FOUNTAIN, SPAN, VALID_REPLACEMENT);
+
+  it('writer-supplied candidate: 200 with the full receipt, usedLLM:false, source:"writer"', async () => {
+    // A provider that THROWS if it is ever called — the assertion that this
+    // path reaches no model is behavioural, not a comment.
+    setLLMProvider({ generate: async () => { throw new Error('the writer path must never call the model'); } });
+    try {
+      const res = await post({ fountain: FOUNTAIN, candidateFountain: WRITER_CANDIDATE });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+
+      assert.equal(body.usedLLM, false, 'nothing was generated, so usedLLM stays honestly false');
+      assert.equal(body.source, 'writer');
+      assert.equal('note' in body, false, 'a real candidate carries no "no candidate" note');
+      assert.equal(body.candidateFountain, WRITER_CANDIDATE);
+      // No span/spanReplacement: this is a whole-document candidate.
+      assert.equal('span' in body, false);
+      assert.equal('spanReplacement' in body, false);
+
+      assert.equal(typeof body.before.health, 'number');
+      assert.equal(typeof body.after.health, 'number');
+      assert.equal(typeof body.before.contentHash, 'string');
+      assert.equal(typeof body.after.contentHash, 'string');
+      assert.notEqual(body.before.contentHash, body.after.contentHash);
+
+      assert.ok(Array.isArray(body.cleared));
+      assert.ok(Array.isArray(body.introduced));
+      assert.ok(
+        body.cleared.some((i: { rule: string }) => i.rule === 'DIALOGUE_QUESTION_FLOOD'),
+        `expected DIALOGUE_QUESTION_FLOOD in cleared, got: ${JSON.stringify(body.cleared)}`,
+      );
+
+      // The descriptive shape-&-rhythm aggregates ride along on this path too
+      // (3 scenes on both sides, so both score) — the writer sees the same
+      // "not part of the score" strip a generated fix's receipt shows.
+      assert.equal(typeof body.structuralSignals, 'object');
+      assert.equal(typeof body.structuralSignals.before.meanAbsDialogueShareDelta, 'number');
+      assert.equal(typeof body.structuralSignals.after.actionSentenceCvOverall, 'number');
+
+      // Reproducible: re-POSTing the candidate to /doctor yields byte-identical
+      // numbers, exactly as it does for a generated candidate.
+      const verifyRes = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fountain: body.candidateFountain }),
+      });
+      const verifyBody = await verifyRes.json();
+      assert.equal(verifyBody.health, body.after.health);
+      assert.equal(verifyBody.contentHash, body.after.contentHash);
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('writer-supplied candidate: the receipt is the SAME one the generated path returns for the same candidate', async () => {
+    // One implementation of "what changed" (server/nvm/analyze/fix-delta.ts),
+    // proven behaviourally rather than by inspection: generate the candidate
+    // through the LLM path, then verify the identical text through the writer
+    // path, and require every verified field to match.
+    setLLMProvider({ generate: async () => ({ text: VALID_REPLACEMENT } as never) });
+    let generated: Record<string, unknown>;
+    try {
+      const genRes = await post({ fountain: FOUNTAIN, span: SPAN, issues: ISSUES });
+      assert.equal(genRes.status, 200);
+      generated = await genRes.json();
+      assert.equal(generated.usedLLM, true);
+    } finally {
+      resetLLMProvider();
+    }
+
+    clearDoctorCache();
+    const writerRes = await post({ fountain: FOUNTAIN, candidateFountain: generated.candidateFountain });
+    assert.equal(writerRes.status, 200);
+    const writer = await writerRes.json();
+
+    assert.deepEqual(writer.before, generated.before);
+    assert.deepEqual(writer.after, generated.after);
+    assert.deepEqual(writer.cleared, generated.cleared);
+    assert.deepEqual(writer.introduced, generated.introduced);
+    assert.deepEqual(writer.structuralSignals, generated.structuralSignals);
+  });
+
+  it('writer-supplied candidate: an identical candidate yields exactly zero deltas', async () => {
+    const res = await post({ fountain: FOUNTAIN, candidateFountain: FOUNTAIN });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.usedLLM, false);
+    assert.equal(body.source, 'writer');
+    assert.deepEqual(body.cleared, [], 'no findings can clear when the text did not change');
+    assert.deepEqual(body.introduced, [], 'no findings can appear when the text did not change');
+    assert.equal(body.after.health, body.before.health);
+    assert.equal(body.after.verdict, body.before.verdict);
+    assert.equal(body.after.contentHash, body.before.contentHash);
+    // The descriptive aggregates are equal too — same text, same reading.
+    assert.deepEqual(body.structuralSignals.after, body.structuralSignals.before);
+  });
+
+  it('400 on a pathological candidateFountain (the same shape guard the fountain field applies)', async () => {
+    // A single unbroken run past MAX_FOUNTAIN_TOKEN_CHARS — one of the two
+    // measured O(n^2) analyzer shapes. A candidate exempt from this guard
+    // would be a straight bypass of it, since the candidate goes to the same
+    // analyzer the `fountain` field does.
+    const res = await post({
+      fountain: FOUNTAIN,
+      candidateFountain: `${FOUNTAIN}\n${'x'.repeat(2_001)}\n`,
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(String(body.error), /candidateFountain/);
+  });
+
+  it('400 on an empty-string candidateFountain', async () => {
+    const res = await post({ fountain: FOUNTAIN, candidateFountain: '' });
+    assert.equal(res.status, 400);
+  });
+
+  it('400 when neither candidateFountain nor span+issues is provided', async () => {
+    const res = await post({ fountain: FOUNTAIN });
+    assert.equal(res.status, 400);
+  });
+
+  it('400 when span is given without issues and no candidateFountain', async () => {
+    const res = await post({ fountain: FOUNTAIN, span: SPAN });
     assert.equal(res.status, 400);
   });
 });

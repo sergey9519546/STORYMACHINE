@@ -89,7 +89,60 @@ const DOCTOR_DEEP_BUDGET: AiBudgetLimits = {
 // not a re-export of StructuralSignalsReport.
 interface FixResponseStructuralSignals {
   before: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
-  after: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+  /** Absent when there is no candidate to compare against (a keyless or
+   *  guard-rejected generation attempt), or when the candidate itself is too
+   *  short to score. `before` alone is still worth sending: it tells the
+   *  writer where the draft they are looking at stands, which is a true
+   *  reading, and withholding it made the "no candidate" receipt emptier than
+   *  the facts warranted (audit, 2026-09-04). */
+  after?: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+}
+
+/** The two ordered aggregates for a fix receipt.
+ *
+ *  With `afterFountain`, this is the before/after PAIR — a delta the receipt
+ *  renders beside the health movement. Without one (no candidate was
+ *  produced), it is the baseline reading alone. Undefined only when the
+ *  ORIGINAL draft is too short to score at all (structural-signals.ts needs
+ *  >= 2 scenes) — there is then nothing true to say and nothing is said.
+ *
+ *  Shared by BOTH producers of a receipt — the generated fix and the
+ *  writer-supplied candidate — so the descriptive strip a writer sees does
+ *  not depend on which path produced the candidate. computeStructuralSignals
+ *  is pure and cheap (no LLM, no doctor re-run), so this costs nothing beyond
+ *  the verification already being done. */
+async function fixStructuralSignals(
+  beforeFountain: string,
+  afterFountain?: string,
+): Promise<FixResponseStructuralSignals | undefined> {
+  const { computeStructuralSignals } = await import('../nvm/analyze/structural-signals.ts');
+  const before = computeStructuralSignals(beforeFountain);
+  if (!before.scored) return undefined;
+  const beforeAggregates = {
+    meanAbsDialogueShareDelta: before.meanAbsDialogueShareDelta,
+    actionSentenceCvOverall: before.actionSentenceCvOverall,
+  };
+  if (afterFountain === undefined) return { before: beforeAggregates };
+  const after = computeStructuralSignals(afterFountain);
+  // A DELTA needs both sides scored; a candidate that fell under the floor
+  // gets the baseline reading alone rather than a half-invented pair.
+  if (!(before.scored && after.scored)) return { before: beforeAggregates };
+  return {
+    before: beforeAggregates,
+    after: {
+      meanAbsDialogueShareDelta: after.meanAbsDialogueShareDelta,
+      actionSentenceCvOverall: after.actionSentenceCvOverall,
+    },
+  };
+}
+
+/** `{ structuralSignals: { before } }`, or `{}` when the draft is too short
+ *  to score — spread into a receipt that carries no candidate, so even the
+ *  honest "nothing was produced" answer still tells the writer where their
+ *  draft stands. */
+async function baselineOnlySignals(fountain: string): Promise<{ structuralSignals?: FixResponseStructuralSignals }> {
+  const structuralSignals = await fixStructuralSignals(fountain);
+  return structuralSignals ? { structuralSignals } : {};
 }
 
 /** The core keeps health/grade sentinel fields for internal compatibility, but
@@ -1052,27 +1105,113 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
 // either the original or candidate text to /doctor and get byte-identical
 // numbers back.
 //
-// aiLimiter, not gameLimiter — unlike /doctor and /diagnose, this route DOES
-// reach the LLM (fix.ts's one generation call), so it belongs on the same
-// stricter, LLM-aware budget every other generative route in this file uses.
+// TWO WAYS TO GET A CANDIDATE, ONE WAY TO VERIFY IT (2026-09-04):
+//   - `span` + `issues`  → GENERATED. fixAndVerify() asks the model for a
+//                          span rewrite. Needs a key; Labs-gated in the UI
+//                          (docs/DECISION_LOG.md Decision #3).
+//   - `candidateFountain` → WRITER-SUPPLIED. The writer rewrote the draft
+//                          themselves; the route verifies it and never
+//                          touches the model. Works keyless, which is the
+//                          only reason this receipt is reachable at all on
+//                          the deploy CLAUDE.md calls the product's front
+//                          door. Answers with `source: 'writer'`.
+// Both build their receipt with the same fix-delta.ts builder — see that
+// file's header. Verification is identical; only generation differs.
+//
+// aiLimiter, not gameLimiter — one path of this route DOES reach the LLM
+// (fix.ts's one generation call), so the whole route sits on the stricter,
+// LLM-aware budget every other generative route in this file uses. The
+// writer path is deterministic and would qualify for gameLimiter on its own,
+// but a limiter is chosen per ROUTE, not per branch (tests/routes/
+// route-capabilities.test.ts walks Express's own router tree), and the
+// stricter tier is always the safe side of that choice.
 //
 // Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage — the
-// route only needs the fountain text, the target span, and the issues to fix,
-// exactly what FixBodySchema (validation.ts) validates.
+// route only needs the fountain text plus either a candidate to verify or
+// the span and issues to fix, exactly what FixBodySchema (validation.ts)
+// validates.
 //
-// Keyless / model-failure behavior is a 200, never a 500 — fixAndVerify
+// Keyless / model-failure behavior on the GENERATED path is a 200, never a
+// 500 — fixAndVerify
 // (server/nvm/analyze/fix.ts) degrades to { usedLLM: false, note } for a
 // missing key, a network failure, or any of its four validation-guard
 // rejections (empty output, out-of-range length ratio, a slugline-count
 // mismatch, or an unchanged rewrite), matching the keyless-honesty posture
 // every other AI-backed route in this file already holds.
 router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandler(async (req, res) => {
-  const { fountain, span, issues } = req.body as {
+  const { fountain, span, issues, candidateFountain } = req.body as {
     fountain: string;
-    span: { startLine: number; endLine: number };
-    issues: Array<{ rule: string; description: string; suggestedFix?: string }>;
+    span?: { startLine: number; endLine: number };
+    issues?: Array<{ rule: string; description: string; suggestedFix?: string }>;
+    candidateFountain?: string;
   };
 
+  // ── Path 2: WRITER-SUPPLIED CANDIDATE (2026-09-04) ─────────────────────
+  // The writer rewrote the draft themselves and wants the same proof the
+  // generated path produces. No model is consulted, no key is needed, and no
+  // LLM is reachable from here: this is the deterministic doctor reading two
+  // whole documents and reporting the difference. It is the version of this
+  // feature a KEYLESS deploy actually has — and a keyless deploy is the
+  // product's front door (CLAUDE.md's boot gotcha), so until this existed the
+  // receipt's whole render path was dead code on the default surface.
+  //
+  // Pooled, not in-process: two full 14-pass analyses of a feature-length
+  // script on the main thread is exactly the stall server/lib/doctor-request.ts
+  // exists to prevent, and runScriptDoctorForRequest also threads the
+  // client-disconnect signal through (returning undefined when the writer
+  // navigated away, so this simply stops rather than writing to a dead
+  // socket). The doctor's content-hash LRU usually makes the baseline
+  // analysis free here — the writer just ran /doctor on that exact text to
+  // GET the report they are now improving on.
+  if (candidateFountain !== undefined) {
+    const baseline = await runScriptDoctorForRequest(fountain, res);
+    if (!baseline) return; // client disconnected mid-analysis
+    if (!isWholeDraftAnalysisComplete(baseline)) {
+      res.json({
+        usedLLM: false,
+        source: 'writer',
+        note: 'Verification is unavailable because the analysis of the original draft is incomplete. Re-run the analysis first.',
+        ...await baselineOnlySignals(fountain),
+      });
+      return;
+    }
+
+    const candidateReport = await runScriptDoctorForRequest(candidateFountain, res);
+    if (!candidateReport) return; // client disconnected mid-analysis
+    if (!isWholeDraftAnalysisComplete(candidateReport)) {
+      res.json({
+        usedLLM: false,
+        source: 'writer',
+        note: 'Your rewrite could not be fully analyzed, so there is no honest score to compare it against. Check the draft and try again.',
+        ...await baselineOnlySignals(fountain),
+      });
+      return;
+    }
+
+    // The SAME receipt builder fixAndVerify() uses (fix-delta.ts) — one
+    // implementation of "what changed", so a writer's receipt and a generated
+    // fix's receipt can never disagree about how a delta is computed. Every
+    // field below is measured; none is asserted.
+    const { buildVerifyReceipt } = await import('../nvm/analyze/fix-delta.ts');
+    const receipt = buildVerifyReceipt(baseline, candidateReport);
+    const structuralSignals = await fixStructuralSignals(fountain, candidateFountain);
+
+    // `usedLLM: false` is the literal truth and stays false — that flag is
+    // the receipt's honesty statement about GENERATION, not about whether a
+    // candidate exists. `source: 'writer'` is what lets a client tell the two
+    // usedLLM:false shapes apart, since the generated path's keyless/failed
+    // result is also usedLLM:false but carries no candidate at all.
+    res.json({
+      usedLLM: false,
+      source: 'writer',
+      candidateFountain,
+      ...receipt,
+      ...(structuralSignals ? { structuralSignals } : {}),
+    });
+    return;
+  }
+
+  // ── Path 1: GENERATED FIX (unchanged) ─────────────────────────────────
   // Dynamic import — same lazy-load convention as the doctor routes above:
   // fix.ts pulls in the full analyzer + all 14 revision passes via
   // runScriptDoctor, so routes that never call it don't pay the cost at
@@ -1082,7 +1221,10 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
   // seam from this file (server/nvm/analyze/fix.ts) — same documented-only
   // attempts caveat as DOCTOR_DEEP_BUDGET above; the deadline is what's real.
   try {
-    const result = await withAiBudget(FIX_BUDGET, () => fixAndVerify(fountain, span, issues));
+    // span/issues are non-null on this branch by FixBodySchema's refinement
+    // (a body with no candidateFountain must carry both) — the assertions
+    // record that contract rather than re-checking it at runtime.
+    const result = await withAiBudget(FIX_BUDGET, () => fixAndVerify(fountain, span!, issues!));
     // Shape-&-rhythm delta (2026-09-04, advisory only): when the fix produced
     // a verified candidate, compute the two ordered structural-signal
     // aggregates (docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md §4) on both
@@ -1092,26 +1234,15 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
     // field, never folded into FixVerifyResult itself — types.ts is the
     // receipt-gated scoring-path contract this task does not touch, so a
     // client reading only FixVerifyResult's documented shape sees no change.
-    // computeStructuralSignals is pure/cheap (no LLM, no doctor re-run), so
-    // this costs nothing beyond fixAndVerify's own work.
-    let structuralSignals: FixResponseStructuralSignals | undefined;
-    if (result.usedLLM && result.candidateFountain) {
-      const { computeStructuralSignals } = await import('../nvm/analyze/structural-signals.ts');
-      const before = computeStructuralSignals(fountain);
-      const after = computeStructuralSignals(result.candidateFountain);
-      if (before.scored && after.scored) {
-        structuralSignals = {
-          before: {
-            meanAbsDialogueShareDelta: before.meanAbsDialogueShareDelta,
-            actionSentenceCvOverall: before.actionSentenceCvOverall,
-          },
-          after: {
-            meanAbsDialogueShareDelta: after.meanAbsDialogueShareDelta,
-            actionSentenceCvOverall: after.actionSentenceCvOverall,
-          },
-        };
-      }
-    }
+    //
+    // Attached whenever ANY candidate exists — the gate used to be
+    // `result.usedLLM && result.candidateFountain`, which is the same set
+    // today but says the wrong thing, since `usedLLM` is about GENERATION and
+    // this field is about the two documents. And when NO candidate was
+    // produced at all (keyless, or a guard rejection), the baseline reading
+    // alone still goes out: the writer learns where the draft they are
+    // looking at stands instead of getting an empty card (audit, 2026-09-04).
+    const structuralSignals = await fixStructuralSignals(fountain, result.candidateFountain);
     res.json(structuralSignals ? { ...result, structuralSignals } : result);
   } catch (err) {
     if (isAiBudgetExceededError(err)) {

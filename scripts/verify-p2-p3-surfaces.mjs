@@ -747,6 +747,103 @@ async function main() {
     `contributing-note disclosures=${rootCauseHeadingOff}`,
   );
 
+
+  // ── "Verify my rewrite" (2026-09-04) — the DETERMINISTIC half of
+  // fix-and-verify, which must survive the Labs gate that hides the
+  // generative half. Decision #3's own rationale is about unevaluated LLM
+  // OUTPUT sitting next to a measured score; this control produces none (see
+  // that decision's 2026-09-04 amendment). The adversarial audit that
+  // prompted it found the fix receipt's entire render path unreachable on a
+  // keyless deploy — which is every deploy this suite boots — so the proof
+  // has to be an end-to-end one: edit the draft, click, get a receipt with
+  // real numbers in it. Same page, same complete sample report, Labs OFF. ──
+  const verifyBtn = pageA.getByRole('button', { name: 'Verify my rewrite', exact: true }).first();
+  const verifyVisibleOff = await verifyBtn.isVisible().catch(() => false);
+  record(
+    'P2-generative',
+    '"Verify my rewrite" (deterministic, no LLM) IS present on a complete report with Labs OFF',
+    verifyVisibleOff,
+    `visible=${verifyVisibleOff}`,
+  );
+
+  if (verifyVisibleOff) {
+    // Edit the draft the way a writer would — in the editor, which sits to
+    // the left of the Script Doctor drawer and stays interactive while it is
+    // open (the same editor the Shape & Rhythm scene-bar click above drives).
+    // A whole new scene is a change the deterministic doctor is guaranteed to
+    // read differently: scene count is the dominant term in the health
+    // formula (CLAUDE.md's AUC note), so this cannot produce a coincidental
+    // zero delta the way a cosmetic word swap might.
+    const editorForVerify = pageA.locator('.cm-content').first();
+    await editorForVerify.focus();
+    await pageA.keyboard.press('Control+End');
+    await pageA.keyboard.type('\n\nINT. UNUSED STOREROOM - NIGHT\n\nA single chair faces a wall.\n');
+
+    // The caption that says the draft is unchanged must be gone now — proof
+    // the panel is reading LIVE editor text, not the report's frozen copy.
+    const unchangedCaptionCount = await pageA.getByText(/Your draft is unchanged since this report/i).count();
+    record(
+      'P2-generative',
+      'the verify affordance reads LIVE editor text (the "draft is unchanged" caption clears after an edit)',
+      unchangedCaptionCount === 0,
+      `captions=${unchangedCaptionCount}`,
+    );
+
+    await verifyBtn.click({ timeout: timing.ms(15000) });
+
+    // Two full 14-pass analyses server-side (baseline + candidate), on the
+    // pooled doctor — generous, and scaled by the suite's load policy.
+    const receipt = pageA.locator('[data-fix-receipt="writer"]').first();
+    const receiptRendered = await receipt
+      .waitFor({ state: 'visible', timeout: timing.ms(60000) })
+      .then(() => true)
+      .catch(() => false);
+    record(
+      'P2-generative',
+      'clicking "Verify my rewrite" renders a writer-verified receipt (POST /api/scriptide/fix, usedLLM false)',
+      receiptRendered,
+      receiptRendered ? '' : 'no [data-fix-receipt="writer"] card appeared',
+    );
+
+    if (receiptRendered) {
+      const receiptText = await receipt.innerText();
+      const healthPair = /Health\s+(\d+)\s*→\s*(\d+)/.exec(receiptText);
+      const movedHealth = !!healthPair && healthPair[1] !== healthPair[2];
+      record(
+        'P2-generative',
+        'the receipt reports a real measured health delta (before → after, and they differ)',
+        movedHealth,
+        healthPair ? `${healthPair[1]} -> ${healthPair[2]}` : 'no "Health N → M" line in the receipt',
+      );
+
+      // Case-insensitive: both headings render through a text-transform:
+      // uppercase class, and innerText honours that.
+      const hasDeltaLists = /Cleared \(\d+\)/i.test(receiptText) && /Introduced \(\d+\)/i.test(receiptText);
+      record(
+        'P2-generative',
+        'the receipt shows cleared AND introduced findings at equal prominence',
+        hasDeltaLists,
+        hasDeltaLists ? '' : receiptText.replace(/\s+/g, ' ').slice(0, 400),
+      );
+
+      const labelsDescriptive = /not part of the score/i.test(receiptText);
+      record(
+        'P2-generative',
+        'the receipt\'s shape-&-rhythm aggregates carry the same "not part of the score" label used elsewhere',
+        labelsDescriptive,
+        labelsDescriptive ? '' : 'no descriptive-aggregate label in the receipt',
+      );
+
+      const noAiClaim = /No AI was used/i.test(receiptText);
+      record(
+        'P2-generative',
+        'the receipt says plainly that no AI produced it',
+        noAiClaim,
+        noAiClaim ? '' : 'missing the "No AI was used" attribution',
+      );
+    }
+  }
+
   await returnDoctorPanelToIdle(pageA);
   const deepReadCountOff = await pageA.getByText(/Deep read \(AI reads each scene/i).count();
   record(

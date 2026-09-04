@@ -66,8 +66,8 @@ import { generateContent, modelForTask } from '../../engine/ai.ts';
 import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { parseFountain } from '../../../src/lib/fountain.ts';
-import type { FixVerifyResult, ScriptDoctorReport } from './types.ts';
-import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
+import { buildVerifyReceipt } from './fix-delta.ts';
+import type { FixVerifyResult } from './types.ts';
 
 /** One issue the caller wants this span fix to address. Structurally the same
  *  as the `fixAndVerify` signature's inline `issues` parameter type — named
@@ -85,8 +85,6 @@ export interface FixIssueInput {
 export interface FixAndVerifyDependencies {
   runDoctor?: typeof runScriptDoctor;
 }
-
-type TaggedIssue = RevisionIssue & { pass: PassName };
 
 // ── Tunables ─────────────────────────────────────────────────────────────
 /** Lines of read-only context shown on each side of the rewritable span —
@@ -244,62 +242,14 @@ export function evaluateSpanRewrite(
   return { accept: true, text };
 }
 
-// ── Whole-document delta (multiset, matched by (rule, location) identity) ──
-
-function flattenIssues(report: ScriptDoctorReport): TaggedIssue[] {
-  return report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-}
-
-/** #5: prefer the STABLE id doctor.ts's aggregation assigns to every issue
- *  (a hash of pass + rule + a NORMALIZED scene span — immune to a
- *  location-text reword, e.g. a slugline edit between the baseline and
- *  candidate run). Falls back to the legacy (rule, location) STRING identity
- *  — deliberately NOT including `pass`, so two issues with the same rule and
- *  location are the same finding for delta purposes even if a future rename
- *  ever moved a rule between passes — only when `id` is absent (a report
- *  built before this field existed, or hand-constructed by a test). Matches
- *  types.ts's FixVerifyResult.cleared/introduced doc comment verbatim.
- *
- *  (This function's fallback branch used to carry a stray literal NUL byte
- *  between `issue.rule` and `issue.location` instead of a space — harmless
- *  as a Map key since JS strings tolerate embedded NULs, but clearly
- *  unintentional corruption; fixed while this function was touched anyway.) */
-function issueKey(issue: RevisionIssue): string {
-  return issue.id ?? `${issue.rule} ${issue.location}`;
-}
-
-/** Multiset diff: an issue present N times in baseline and M times in
- *  candidate contributes max(0, N-M) entries to `cleared` and max(0, M-N) to
- *  `introduced` — so fixing one of two identical (rule, location) issues
- *  reports exactly one cleared, not zero and not both. */
-function multisetDiff(
-  baseline: TaggedIssue[],
-  candidate: TaggedIssue[],
-): { cleared: TaggedIssue[]; introduced: TaggedIssue[] } {
-  const bucket = (issues: TaggedIssue[]): Map<string, TaggedIssue[]> => {
-    const map = new Map<string, TaggedIssue[]>();
-    for (const issue of issues) {
-      const key = issueKey(issue);
-      const arr = map.get(key);
-      if (arr) arr.push(issue); else map.set(key, [issue]);
-    }
-    return map;
-  };
-
-  const baseByKey = bucket(baseline);
-  const candByKey = bucket(candidate);
-  const allKeys = new Set<string>([...baseByKey.keys(), ...candByKey.keys()]);
-
-  const cleared: TaggedIssue[] = [];
-  const introduced: TaggedIssue[] = [];
-  for (const key of allKeys) {
-    const baseArr = baseByKey.get(key) ?? [];
-    const candArr = candByKey.get(key) ?? [];
-    if (baseArr.length > candArr.length) cleared.push(...baseArr.slice(candArr.length));
-    else if (candArr.length > baseArr.length) introduced.push(...candArr.slice(baseArr.length));
-  }
-  return { cleared, introduced };
-}
+// ── Whole-document delta ───────────────────────────────────────────────────
+// The delta itself (issue identity, the multiset diff, and the assembled
+// before/after receipt) lives in ./fix-delta.ts, imported at the top of this
+// file. It moved there on 2026-09-04 when POST /api/scriptide/fix gained a
+// second, keyless producer of the same receipt — a WRITER-SUPPLIED candidate
+// draft, verified with no model in the loop at all. Both producers now call
+// one implementation, so "what changed" cannot drift between them; see that
+// file's header for the full reasoning.
 
 // ── Entry point ───────────────────────────────────────────────────────────
 
@@ -392,19 +342,14 @@ export async function fixAndVerify(
   }
 
   // ── 6. Delta (whole document, not just the span) ─────────────────────
-  const { cleared, introduced } = multisetDiff(flattenIssues(baseline), flattenIssues(candidateReport));
-
+  // The SAME builder the writer-supplied-candidate path in
+  // server/routes/scriptide.ts calls — see ./fix-delta.ts. Generation is what
+  // differs between the two paths; verification deliberately does not.
   return {
     usedLLM: true,
     candidateFountain,
     spanReplacement,
     span,
-    // runScriptDoctor always populates contentHash on every non-degenerate
-    // AND degenerate report path (doctor.ts) — safe non-null reads, not an
-    // optimistic guess, matching the same pattern the /diagnose route uses.
-    before: { health: baseline.health, verdict: baseline.verdict, contentHash: baseline.contentHash! },
-    after: { health: candidateReport.health, verdict: candidateReport.verdict, contentHash: candidateReport.contentHash! },
-    cleared,
-    introduced,
+    ...buildVerifyReceipt(baseline, candidateReport),
   };
 }

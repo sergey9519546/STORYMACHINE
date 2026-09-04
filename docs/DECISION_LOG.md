@@ -219,8 +219,59 @@ Labs ON from the same starting points), both in CI.
 
 **Status**: Active.
 
-**Revision History**: Revisit when a graded generative benchmark exists; that
-is the condition for re-promoting any of this to the default surface.
+**Amendment (2026-09-04) — the gate covers GENERATION, not verification.**
+This decision's scope was tested by a concrete case and found not to reach it,
+so the deterministic half of fix-and-verify ships on the default surface. The
+reasoning, from this decision's own wording:
+
+- What it names is the generative surface. Every bullet under "What changed"
+  is a control that produces or consumes MODEL OUTPUT — "Fix with AI", the
+  deep-read toggle, the auto-analysis POST, the live-intent copilot, the
+  AI-provider tabs. The Script Doctor bullet gates *"every 'Fix & verify'
+  button"* because that button POSTs a span to `/api/scriptide/fix` and gets
+  an LLM rewrite back, which is exactly the thing being deferred.
+- What it gives as the reason is that *"shipping unevaluated generation on the
+  default surface"* was not an option, and that the liability is *"shipping
+  unevaluated output next to a score that is measured."* A writer-supplied
+  candidate produces no output to evaluate. The writer wrote the text; the
+  server runs the same deterministic 14-pass doctor the report above it
+  already is, and every number in the receipt — health, verdict,
+  cleared/introduced, the descriptive aggregates — is that measured half.
+  There is nothing here that a graded generative benchmark could ever grade.
+- What it says it does not decide is also on point: *"the flag decides whether
+  a control renders, never whether the readiness answer is honest,"* and
+  *"nothing is deleted."* Hiding a deterministic control because a generative
+  sibling is hidden would be the flag deciding something else — and it would
+  hide the measured half of a feature on the grounds that the unmeasured half
+  is gated.
+
+So: **"Verify my rewrite" renders on the default surface, with Labs off and no
+key.** "Fix & verify" (generation) stays behind the flag exactly as decided,
+with the same hide-don't-disable behaviour and the same browser assertions in
+both flag states. `POST /api/scriptide/fix` gains a `candidateFountain` body
+shape that skips generation entirely; the route, its limiter and its schema are
+otherwise unchanged, consistent with this decision's "the server is untouched".
+
+Why it needed saying at all: the 2026-09-04 adversarial audit found the fix
+receipt's whole render path unreachable on a keyless deploy — the route
+answered `{usedLLM:false, note}` with no candidate, so the card, its unit tests
+and its route test all existed and could never be seen by a writer on the
+deploy this project calls its front door. The gate was one of two reasons; the
+missing keyless path was the other. Both are addressed rather than documented.
+
+Evidence for the amendment: `tests/routes/scriptide-fix.test.ts` (the
+writer-supplied-candidate block: receipt present with `usedLLM:false`, receipt
+field-for-field identical to the generated path's for the same candidate,
+identical candidate yields zero deltas, pathological candidate rejected 400)
+and the `P2-generative` phase of `scripts/verify-p2-p3-surfaces.mjs`, which now
+also drives the whole flow with Labs OFF on a keyless server: edit the draft in
+the editor, click "Verify my rewrite", assert the receipt renders with a
+measured health delta.
+
+**Revision History**: Amended 2026-09-04 (scope clarification above; no
+decision reversed, no new decision number). Revisit when a graded generative
+benchmark exists; that is the condition for re-promoting any of the GENERATIVE
+surface to the default surface.
 
 ---
 

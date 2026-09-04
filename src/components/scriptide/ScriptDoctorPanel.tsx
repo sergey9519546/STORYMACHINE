@@ -1776,13 +1776,54 @@ function RootCauseCard({
 // candidate whole-document text scored (>= 2 scenes) on structural signals.
 interface FixStructuralSignalsDelta {
   before: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
-  after: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+  /** Absent when no candidate exists to compare against (a keyless or
+   *  guard-rejected generation attempt), or when the candidate is too short
+   *  to score. The route still sends `before` in that case, so even a "no
+   *  candidate" receipt tells the writer where the draft they are looking at
+   *  stands rather than nothing at all. */
+  after?: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
+}
+
+/** The descriptive shape-&-rhythm strip: a before→after pair when the server
+ *  sent both readings, the baseline reading alone when it sent one. Never
+ *  part of the score, and says so — the same wording ShapeRhythmSection,
+ *  SnapshotManager's trend line and the coverage letter use, so a writer sees
+ *  one claim about these two numbers everywhere they appear. */
+function FixStructuralSignalsStrip({ signals }: { signals: FixStructuralSignalsDelta }) {
+  const pair = (before: number, after: number | undefined) =>
+    after === undefined ? before.toFixed(2) : `${before.toFixed(2)} → ${after.toFixed(2)}`;
+  return (
+    <div className="text-[10px] font-mono text-[var(--sm-ink-mute)] flex items-center gap-3 flex-wrap">
+      <span className="uppercase tracking-widest font-bold">Shape &amp; rhythm (descriptive, not part of the score)</span>
+      <span>
+        Talk/action swing{" "}
+        {pair(signals.before.meanAbsDialogueShareDelta, signals.after?.meanAbsDialogueShareDelta)}
+      </span>
+      <span>
+        Action-prose variation{" "}
+        {pair(signals.before.actionSentenceCvOverall, signals.after?.actionSentenceCvOverall)}
+      </span>
+    </div>
+  );
 }
 
 type FixVerifyResultWithSignals = FixVerifyResult & { structuralSignals?: FixStructuralSignalsDelta };
 
+/** The receipt as the CLIENT reads it. `source: 'writer'` (2026-09-04) marks
+ *  the DETERMINISTIC path: the writer rewrote the draft themselves and POSTed
+ *  it to /api/scriptide/fix as `candidateFountain`, so no model was consulted
+ *  and `usedLLM` is honestly false even though a real candidate is present.
+ *  It is a separate alias rather than another `&` clause on the line above
+ *  because that line is the shape-&-rhythm contract asserted verbatim by
+ *  tests/core/shape-rhythm-panel-copy.test.ts. */
+type FixVerifyReceipt = FixVerifyResultWithSignals & { source?: "writer" };
+
 interface FixRunState {
-  result: FixVerifyResultWithSignals;
+  result: FixVerifyReceipt;
+  /** For a GENERATED fix: the exact original lines of the rewritten span, so
+   *  the card can diff them against `spanReplacement`. For a WRITER-supplied
+   *  candidate (which has no span): the whole base document the report was
+   *  computed on, diffed against the candidate and reduced to changed lines. */
   originalSpanText: string;
 }
 
@@ -1857,15 +1898,27 @@ function FixDeltaList({
   );
 }
 
-/** The fix-and-verify receipt card, rendered inline under a root-cause card
- *  once POST /api/scriptide/fix returns. Two shapes, matching
- *  FixVerifyResult's honesty contract exactly: a keyless/failed run
- *  (usedLLM false, or a candidate that didn't survive validation) renders
- *  `note` verbatim with no fabricated health/verdict numbers; a real
- *  candidate renders the full receipt — health X → Y with a colored arrow,
- *  a verdict change if any, the cleared/introduced lists at equal
- *  prominence, the span diff collapsed behind "View change", and Accept/
- *  Discard actions. */
+/** How many changed lines a writer-supplied candidate's diff renders before
+ *  it stops. A whole-document compare of two feature-length drafts can
+ *  legitimately differ in thousands of lines (a global reformat, say); the
+ *  card says how many it is not showing rather than building that DOM. */
+const VERIFY_CHANGED_LINE_CAP = 200;
+
+/** The fix-and-verify receipt card, rendered once POST /api/scriptide/fix
+ *  returns. THREE shapes, matching FixVerifyResult's honesty contract
+ *  exactly:
+ *   - no candidate (keyless generation, or a rewrite that failed a
+ *     validation guard) — renders `note` verbatim, no fabricated numbers.
+ *   - a GENERATED candidate (usedLLM true) — the full receipt plus the span
+ *     diff behind "View change" and Accept/Discard actions.
+ *   - a WRITER-SUPPLIED candidate (source 'writer', usedLLM honestly false —
+ *     nothing was generated) — the same full receipt, with the whole-document
+ *     changed-line diff instead of a span diff and no Accept, because the
+ *     writer's text is already in the editor; there is nothing to apply.
+ *  The verified half — health/verdict movement, cleared/introduced, the
+ *  descriptive shape-&-rhythm strip — is byte-identically the same in the
+ *  last two: the server computes both with one builder
+ *  (server/nvm/analyze/fix-delta.ts). */
 function FixReceiptCard({
   run,
   isSample,
@@ -1884,22 +1937,34 @@ function FixReceiptCard({
   onDiscard: () => void;
 }) {
   const { result, originalSpanText } = run;
-  const hasCandidate =
+  // Which of the two candidate shapes is this? The difference is WHO wrote
+  // the candidate, never who verified it.
+  const isWriterCandidate = result.source === "writer" && !!result.candidateFountain;
+  const hasSpanCandidate =
     result.usedLLM &&
     !!result.candidateFountain &&
     typeof result.spanReplacement === "string" &&
-    !!result.span &&
-    !!result.before &&
-    !!result.after;
+    !!result.span;
+  const hasCandidate = (hasSpanCandidate || isWriterCandidate) && !!result.before && !!result.after;
 
   // Memoized purely so re-renders triggered by sibling state (e.g. another
-  // card's fix running) don't re-run the LCS diff on an unchanged span —
-  // same idiom as RevisionPanel's PassDiffView.
-  const diff = useMemo(
-    () =>
-      hasCandidate ? diffLines(originalSpanText, result.spanReplacement as string) : [],
-    [hasCandidate, originalSpanText, result.spanReplacement]
-  );
+  // card's fix running) don't re-run the LCS diff on unchanged text —
+  // same idiom as RevisionPanel's PassDiffView. For the writer path this
+  // diffs the WHOLE base document against the whole candidate and keeps only
+  // the lines that actually moved: the writer's draft is open in the editor
+  // beside this card, so echoing every unchanged line back would be noise.
+  const { diff, changedTotal } = useMemo(() => {
+    if (hasSpanCandidate) {
+      return { diff: diffLines(originalSpanText, result.spanReplacement as string), changedTotal: 0 };
+    }
+    if (isWriterCandidate) {
+      const changed = diffLines(originalSpanText, result.candidateFountain as string).filter(
+        (d) => d.type !== "same"
+      );
+      return { diff: changed.slice(0, VERIFY_CHANGED_LINE_CAP), changedTotal: changed.length };
+    }
+    return { diff: [] as ReturnType<typeof diffLines>, changedTotal: 0 };
+  }, [hasSpanCandidate, isWriterCandidate, originalSpanText, result.spanReplacement, result.candidateFountain]);
 
   if (!hasCandidate) {
     return (
@@ -1919,6 +1984,10 @@ function FixReceiptCard({
         <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
           {result.note ?? "No fix could be generated for this finding."}
         </p>
+        {/* No candidate means no DELTA, but the baseline reading of the draft
+            on screen is still a true thing to report — the server sends
+            `before` alone here (2026-09-04 audit). */}
+        {result.structuralSignals && <FixStructuralSignalsStrip signals={result.structuralSignals} />}
       </div>
     );
   }
@@ -1926,18 +1995,29 @@ function FixReceiptCard({
   // Narrowed by hasCandidate above — non-null assertions below are safe.
   const before = result.before!;
   const after = result.after!;
-  const span = result.span!;
   const healthDelta = Math.round((after.health - before.health) * 10) / 10;
   const verdictChanged = !!before.verdict && !!after.verdict && before.verdict !== after.verdict;
   const cleared = result.cleared ?? [];
   const introduced = result.introduced ?? [];
 
   return (
-    <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-3">
+    <div
+      // Which producer wrote the candidate this receipt verifies. A stable
+      // hook for scripts/verify-p2-p3-surfaces.mjs, which has to tell a
+      // writer-verified receipt from a generated one without matching on
+      // prose that copy edits will move.
+      data-fix-receipt={isWriterCandidate ? "writer" : "generated"}
+      className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-3"
+    >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
-          Fix &amp; verify receipt
+          {isWriterCandidate ? "Verified — your rewrite" : "Fix & verify receipt"}
         </p>
+        {isWriterCandidate && (
+          <span className="text-[9px] font-mono text-[var(--sm-ink-mute)] normal-case tracking-normal">
+            Measured by the Script Doctor. No AI was used.
+          </span>
+        )}
         {applied && (
           <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)] dark:!text-green-400 flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Applied to editor
@@ -1960,23 +2040,10 @@ function FixReceiptCard({
       {/* Shape & rhythm delta (2026-09-04) — descriptive only, next to the
           health delta above but never merged into it: these two aggregates
           are not part of the score (docs/scoring/
-          STRUCTURAL_SIGNALS_2026-09-04.md). Renders only when the server
-          attached it (both whole-document texts scored). */}
-      {result.structuralSignals && (
-        <div className="text-[10px] font-mono text-[var(--sm-ink-mute)] flex items-center gap-3 flex-wrap">
-          <span className="uppercase tracking-widest font-bold">Shape &amp; rhythm (descriptive, not part of the score)</span>
-          <span>
-            Talk/action swing {result.structuralSignals.before.meanAbsDialogueShareDelta.toFixed(2)}
-            {" → "}
-            {result.structuralSignals.after.meanAbsDialogueShareDelta.toFixed(2)}
-          </span>
-          <span>
-            Action-prose variation {result.structuralSignals.before.actionSentenceCvOverall.toFixed(2)}
-            {" → "}
-            {result.structuralSignals.after.actionSentenceCvOverall.toFixed(2)}
-          </span>
-        </div>
-      )}
+          STRUCTURAL_SIGNALS_2026-09-04.md). Renders whenever the server
+          attached a reading — a before→after pair when both whole-document
+          texts scored, the baseline alone otherwise. */}
+      {result.structuralSignals && <FixStructuralSignalsStrip signals={result.structuralSignals} />}
 
       {/* Cleared / introduced — same prominence, always both mounted (never
           one collapsed while the other is open); only the span diff below
@@ -1997,7 +2064,9 @@ function FixReceiptCard({
           ) : (
             <ChevronRight className="w-3 h-3 shrink-0" aria-hidden="true" />
           )}
-          View change (lines {span.startLine}&ndash;{span.endLine})
+          {isWriterCandidate
+            ? `View changed lines (${changedTotal})`
+            : `View change (lines ${result.span!.startLine}\u2013${result.span!.endLine})`}
         </button>
         {diffOpen && (
           <div className="mt-1.5 border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 font-mono text-[10px] overflow-x-auto">
@@ -2020,11 +2089,29 @@ function FixReceiptCard({
                 </span>
               </div>
             ))}
+            {changedTotal > diff.length && (
+              <div className="px-2 py-1 text-[var(--sm-ink-mute)]">
+                &hellip; and {changedTotal - diff.length} more changed line(s) not shown.
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {applied ? (
+      {isWriterCandidate ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] flex-1 min-w-[12rem]">
+            This rewrite is your own editor text &mdash; there is nothing to apply. Re-run diagnosis to
+            make it the report on screen.
+          </p>
+          <button
+            onClick={onDiscard}
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden="true" /> Dismiss
+          </button>
+        </div>
+      ) : applied ? (
         <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
           Re-run diagnosis to see the new report.
         </p>
@@ -2330,6 +2417,20 @@ export default function ScriptDoctorPanel({
   // abortRef/generationRef above.
   const fixAbortRef = useRef<AbortController | null>(null);
   const fixGenerationRef = useRef(0);
+
+  // ── Verify my rewrite (2026-09-04) ─────────────────────────────────────
+  // The DETERMINISTIC half of fix-and-verify, on the default surface: the
+  // writer rewrites the draft themselves and this measures it against the
+  // report on screen. It is document-level (one action per report, not one
+  // per finding), so it gets single state slots rather than the id-keyed
+  // maps above. Same abort/generation backstop as runFix for a superseded
+  // response.
+  const [verifyRun, setVerifyRun] = useState<FixRunState | null>(null);
+  const [verifyPending, setVerifyPending] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifyDiffOpen, setVerifyDiffOpen] = useState(false);
+  const verifyAbortRef = useRef<AbortController | null>(null);
+  const verifyGenerationRef = useRef(0);
 
   const isPdfUpload = uploadedFile?.format === "pdf";
   // The uploaded file's content, once present, IS the thing being diagnosed —
@@ -3167,6 +3268,83 @@ export default function ScriptDoctorPanel({
       .finally(() => clearTimeout(timeoutId));
   };
 
+  /** The candidate "Verify my rewrite" measures: whatever text the panel
+   *  would diagnose RIGHT NOW (the live editor draft, or an active non-PDF
+   *  upload). Null for a PDF upload — the browser never holds that file's
+   *  text, the server converts it, so there is no client-side "my rewrite"
+   *  to send and the affordance is withheld rather than sending the wrong
+   *  document. */
+  const verifyCandidateText: string | null =
+    isPdfUpload ? null : (activeText.trim() === "" ? null : activeText);
+
+  /** True when the candidate is byte-identical to the text the displayed
+   *  report was computed on. Verification still runs (an identical candidate
+   *  is an honest zero-delta receipt with matching contentHashes, which is
+   *  itself a useful answer) — this only drives the caption. */
+  const verifyCandidateUnchanged =
+    !!fixSourceText && !!verifyCandidateText && verifyCandidateText === fixSourceText;
+
+  /** Sends the writer's OWN rewrite to POST /api/scriptide/fix as
+   *  `candidateFountain`, against `fixSourceText` — the exact text the
+   *  displayed report was computed on. No model is involved on either side of
+   *  the wire: the route skips generation entirely for this body shape and
+   *  answers with the same receipt the generated path returns (server/nvm/
+   *  analyze/fix-delta.ts builds both). That is why this is NOT Labs-gated —
+   *  see the render site below and docs/DECISION_LOG.md Decision #3's
+   *  2026-09-04 amendment. */
+  const runVerifyRewrite = () => {
+    if (!reportIsComplete) return;
+    if (verifyPending) return;
+    if (!fixSourceText || !verifyCandidateText) return;
+
+    verifyAbortRef.current?.abort();
+    const controller = new AbortController();
+    verifyAbortRef.current = controller;
+    const myGeneration = ++verifyGenerationRef.current;
+    // Two full 14-pass analyses server-side (baseline + candidate), the same
+    // budget runFix allows for generation plus verification.
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+    setVerifyPending(true);
+    setVerifyError(null);
+
+    fetch("/api/scriptide/fix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fountain: fixSourceText, candidateFountain: verifyCandidateText }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          const fallback =
+            res.status === 404
+              ? "Verify isn't live yet — the /api/scriptide/fix route hasn't been deployed."
+              : `Verification failed (${res.status})`;
+          throw new Error(body?.error ?? fallback);
+        }
+        return (await res.json()) as FixVerifyReceipt;
+      })
+      .then((data) => {
+        if (myGeneration !== verifyGenerationRef.current) return; // superseded — ignore
+        setVerifyRun({ result: data, originalSpanText: fixSourceText });
+        setVerifyDiffOpen(false);
+        setVerifyPending(false);
+      })
+      .catch((err: unknown) => {
+        if (myGeneration !== verifyGenerationRef.current) return; // superseded — ignore
+        const message =
+          err instanceof DOMException && err.name === "AbortError"
+            ? "Verification timed out (120s) or was cancelled — try again."
+            : err instanceof Error
+            ? err.message
+            : "Verification failed";
+        setVerifyError(message);
+        setVerifyPending(false);
+      })
+      .finally(() => clearTimeout(timeoutId));
+  };
+
   const toggleFixDiff = (findingId: string) => {
     setFixDiffOpenIds((prev) => {
       const next = new Set(prev);
@@ -3264,6 +3442,7 @@ export default function ScriptDoctorPanel({
       pitchkitAbortRef.current?.abort();
       coverageLetterAbortRef.current?.abort();
       fixAbortRef.current?.abort();
+      verifyAbortRef.current?.abort();
       if (loadedNoticeTimerRef.current) clearTimeout(loadedNoticeTimerRef.current);
       if (fixToastTimerRef.current) clearTimeout(fixToastTimerRef.current);
     };
@@ -4121,6 +4300,109 @@ export default function ScriptDoctorPanel({
                 {report.plainSummary}
               </p>
             )}
+
+            {/* Verify my rewrite (2026-09-04) — the DETERMINISTIC half of
+                fix-and-verify, and the only half a keyless deploy can reach.
+                The writer edits their draft in the editor, clicks this, and
+                POST /api/scriptide/fix re-runs the whole 14-pass doctor on
+                both documents and reports the difference: health/verdict
+                movement, findings cleared, findings introduced. No model is
+                consulted on either side of the wire.
+
+                NOT Labs-gated, deliberately. Decision #3 (docs/DECISION_LOG.md,
+                amended 2026-09-04) demoted the GENERATIVE surface — its
+                rationale is that unevaluated LLM OUTPUT must not sit next to a
+                measured score. This control produces no LLM output; every
+                number it renders is the same deterministic doctor the report
+                above already is. Gating it would hide the measured half of a
+                feature because the generated half is gated. "Fix & verify"
+                (generation) stays behind the flag, one section below.
+
+                Placed here — after the plain-language summary, immediately
+                before Root Causes — so it sits with the other act-on-the-
+                report affordances, but OUTSIDE the rootCauses conditional:
+                a draft with nothing to cluster can still be rewritten and
+                re-measured. */}
+            {reportIsComplete && (() => {
+              const disabledReason = !fixSourceText
+                ? "No analyzable script text is available for this report."
+                : !verifyCandidateText
+                ? isPdfUpload
+                  ? "This report came from a PDF — load the converted Fountain into the editor to verify a rewrite of it."
+                  : "The editor is empty — write or paste a draft to verify."
+                : null;
+              return (
+                <div className="border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+                    Verify my rewrite
+                  </h3>
+                  {/* --sm-ink-mute, not text-gray-600/dark:text-gray-300: the
+                      latter pair fails axe colour-contrast on this panel's dark
+                      background (caught by verify:a11y's dark-full-report-dialog
+                      scan, not by review), and this token is the muted text
+                      colour the rest of the panel already uses in both themes. */}
+                  {/* The lead-in NAMES the text that will actually be sent.
+                      `verifyCandidateText` is the panel's active text, which is
+                      the uploaded file whenever an upload chip is showing — so
+                      a fixed "in the editor" sentence would be false in that
+                      state, which is exactly the kind of copy this project
+                      does not ship. The second sentence (the empirical one,
+                      registered in docs/CLAIMS_REGISTER.md) is the same either
+                      way. */}
+                  <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug">
+                    {uploadedFile && !isPdfUpload
+                      ? "Revise the script and upload it again, then measure it against this report."
+                      : "Rewrite the draft yourself in the editor, then measure it against this report."}{" "}
+                    The Script Doctor re-reads both drafts and shows exactly what moved &mdash; no AI,
+                    no key needed.
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={runVerifyRewrite}
+                      disabled={verifyPending || disabledReason !== null}
+                      title={disabledReason ?? undefined}
+                      className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5"
+                    >
+                      {verifyPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      )}
+                      {verifyPending ? "Verifying\u2026" : "Verify my rewrite"}
+                    </button>
+                    {disabledReason ? (
+                      <p className="text-[10px] font-mono text-[var(--sm-ink-mute)]">{disabledReason}</p>
+                    ) : verifyCandidateUnchanged && !verifyPending ? (
+                      <p className="text-[10px] font-mono text-[var(--sm-ink-mute)]">
+                        Your draft is unchanged since this report &mdash; verifying now reports a zero delta.
+                      </p>
+                    ) : null}
+                  </div>
+                  {verifyError && (
+                    <p role="alert" className="text-[10px] font-mono text-[var(--sm-stamp-on-light)] dark:!text-red-400">
+                      {verifyError}
+                    </p>
+                  )}
+                  {verifyRun && (
+                    <FixReceiptCard
+                      run={verifyRun}
+                      isSample={analyzedIsSample}
+                      applied={false}
+                      diffOpen={verifyDiffOpen}
+                      onToggleDiff={() => setVerifyDiffOpen((prev) => !prev)}
+                      onAccept={() => {
+                        /* unreachable: a writer-supplied candidate renders no
+                           Accept button — the text is already in the editor. */
+                      }}
+                      onDiscard={() => {
+                        setVerifyRun(null);
+                        setVerifyDiffOpen(false);
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Root causes — co-firing issues clustered into named diagnoses.
                 Placed high in the reading order (right after the verdict/

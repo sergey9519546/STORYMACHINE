@@ -910,11 +910,28 @@ const FixIssueItemSchema = z.object({
   suggestedFix: z.string().max(500).optional(),
 });
 
+// `candidateFountain` (2026-09-04) — the WRITER-SUPPLIED candidate. When it
+// is present the route skips generation entirely and verifies the writer's
+// own rewrite against `fountain`, which is why `span` and `issues` become
+// optional: there is no span to rewrite and no issue list to hand a model.
+// The refinement below keeps each of the two shapes complete — a generated
+// fix still REQUIRES both, so no existing caller loosens.
+//
+// It reuses fountainField() rather than a plain bounded string on purpose:
+// the candidate goes to the same analyzer the `fountain` field does, so it
+// must clear the same pathological-shape guard (fountainShapeRejectionReason
+// — a single huge unbroken token, or thousands of all-caps cue-shaped lines,
+// both O(n^2) in the parser). A candidate exempt from that guard would be a
+// straight bypass of it.
 export const FixBodySchema = z.object({
   fountain: fountainField(),
-  span: FixSpanSchema,
-  issues: z.array(FixIssueItemSchema).min(1).max(10),
-});
+  candidateFountain: fountainField().optional(),
+  span: FixSpanSchema.optional(),
+  issues: z.array(FixIssueItemSchema).min(1).max(10).optional(),
+}).refine(
+  (body) => body.candidateFountain !== undefined || (body.span !== undefined && body.issues !== undefined),
+  'provide either candidateFountain (verify a rewrite you wrote) or both span and issues (generate a fix)',
+);
 
 // POST /api/export/slate — Run 14 producer-tier slate triage (append-only;
 // this run does not touch any schema above). Each script's `fountain` shares
