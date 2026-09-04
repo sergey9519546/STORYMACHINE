@@ -31,6 +31,16 @@ const MESSAGE_AWARENESS = 1;
 // Local in-process memory ceiling only; this does not advertise hosted
 // collaboration capacity or enable the gated collaboration UI.
 export const COLLAB_MAX_ROOMS = boundedIntegerEnv('COLLAB_MAX_ROOMS', 200, 1, 1000);
+// ws's own default (unset) is 100MiB (104,857,600 bytes) PER FRAME, with no
+// separate per-connection accounting — attack-lane audit finding: a single
+// authenticated collaborator (or 200 concurrent ones) could each hold up to
+// 100MiB in flight per message with nothing here to stop them, dwarfing any
+// real y-protocol sync/awareness frame a legitimate CodeMirror client ever
+// sends (a full-document sync step for MAX_FOUNTAIN_CHARS's 900,000-char
+// ceiling, Y.Doc-encoded, is on the order of tens of KB, not tens of MB).
+// 2MiB leaves generous headroom over that while capping the per-connection
+// worst case at a sane multiple of a real payload instead of the ws default.
+export const COLLAB_MAX_FRAME_BYTES = boundedIntegerEnv('COLLAB_MAX_FRAME_BYTES', 2 * 1024 * 1024, 1024, 100 * 1024 * 1024);
 // A room id must be a safe, bounded token (it comes from the URL). Exported so
 // the token-issuing route (server/routes/collab.ts) validates against the
 // exact same pattern rather than a hand-duplicated copy that could drift.
@@ -286,7 +296,7 @@ export function destroyAllRoomsForTesting(): void {
  * WebSocket upgrade for /collab/<room> paths and leaves all other upgrades alone.
  */
 export function attachCollabServer(server: HttpServer): WebSocketServer {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: COLLAB_MAX_FRAME_BYTES });
 
   wss.on('connection', (conn: WebSocket, _req: IncomingMessage, room: Room) => {
     setupConnection(conn, room);

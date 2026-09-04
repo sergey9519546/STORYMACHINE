@@ -169,6 +169,51 @@ describe('routes/scriptide/doctor — HTTP behavior', async () => {
     assert.equal(body.sceneCount, 4);
   });
 
+  // ── Pathological-shape guard (attack-lane audit) ──────────────────────────
+  // Direct fuzzing found two script shapes that, despite sitting comfortably
+  // under DoctorBodySchema's 900_000-char ceiling, drive the analyzer
+  // (server/nvm/analyze/fountain-analyzer.ts, on the scoring path and out of
+  // scope to touch directly) into O(n²) time: a single very long
+  // whitespace-delimited token measured at ~4s for 100,000 chars and ~37s for
+  // 300,000 (extrapolating to CPU-minutes at the char ceiling), and a large
+  // number of DISTINCT all-caps character-cue-shaped lines measured at ~61s
+  // for 8,000 distinct one-off names (versus ~0.7s for 8,000 dialogue
+  // exchanges between only two names). server/lib/validation.ts's
+  // fountainShapeRejectionReason() rejects both shapes in a single O(length)
+  // pass before the request ever reaches the analyzer — these assert it does
+  // so quickly (never anywhere near the multi-second/-minute cost the
+  // unguarded shape would otherwise impose) rather than merely asserting 400.
+  it('POST a single huge unbroken token (no real screenplay word) is rejected fast, not analyzed', async () => {
+    const start = Date.now();
+    const res = await post({ fountain: 'INT. ROOM - DAY ' + 'X'.repeat(900_000 - 20) });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /unbroken run of more than 2000 non-whitespace characters/);
+    assert.ok(ms < 2000, `expected a fast rejection, took ${ms}ms — the pathological-shape guard may not be firing`);
+  });
+
+  it('POST thousands of distinct all-caps character-cue-shaped lines is rejected fast, not analyzed', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 2000; i++) fountain += `CHARACTER${i}\nLine.\n`;
+    const start = Date.now();
+    const res = await post({ fountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
+    assert.ok(ms < 2000, `expected a fast rejection, took ${ms}ms — the pathological-shape guard may not be firing`);
+  });
+
+  it('POST a realistic script with a long but ordinary (whitespace-broken) monologue still analyzes normally', async () => {
+    // Guards against the shape check being too aggressive: a real, very long
+    // single LINE of dialogue (ordinary short words, just a lot of them) must
+    // not be mistaken for the pathological one-giant-token shape.
+    const monologue = 'ALEX\n' + 'This is a perfectly ordinary sentence with normal short words repeated many times. '.repeat(500) + '\n';
+    const res = await post({ fountain: 'INT. ROOM - DAY\n\n' + monologue });
+    assert.equal(res.status, 200);
+  });
+
   it('is deterministic through HTTP: the same script POSTed twice yields deep-equal reports', async () => {
     const [res1, res2] = await Promise.all([post({ fountain: MULTI_SCENE_FOUNTAIN }), post({ fountain: MULTI_SCENE_FOUNTAIN })]);
     assert.equal(res1.status, 200);

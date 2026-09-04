@@ -187,6 +187,79 @@ function ssrfSafeUrlField() {
   });
 }
 
+// ── Fountain pathological-shape guard (defense-in-depth against O(n²) analyzer
+// cost, not a content-correctness check) ────────────────────────────────────
+// Direct fuzzing of POST /api/scriptide/doctor (attack-lane audit) found two
+// independent script shapes that drive the analyzer into quadratic time
+// despite sitting comfortably under MAX_FOUNTAIN_CHARS:
+//   1. A single very long whitespace-delimited TOKEN. Measured directly
+//      against runScriptDoctor: a lone 100,000-char token costs ~4s, a
+//      300,000-char token ~37s (~9x for 3x input — clean O(n²)), extrapolating
+//      to several CPU-minutes at the 900,000-char ceiling. The SAME total
+//      character count broken into ordinary short words costs ~0.1s even at
+//      500,000 chars — the cost is specifically the absence of whitespace
+//      breaks, not the character count.
+//   2. A large number of DISTINCT all-caps character-cue-shaped lines.
+//      Measured: 8,000 distinct one-off character names costs ~61s, versus
+//      ~0.7s for 8,000 dialogue EXCHANGES between only two distinct names —
+//      the cost is driven by distinct-name count, not total dialogue volume.
+// Both land inside server/nvm/analyze/fountain-analyzer.ts's tokenizer /
+// character-extraction — CLAUDE.md's scoring path (doctor.ts's import graph),
+// frozen for this lane. This file is not on that path (no import edge either
+// direction), so the smallest correct place is a cheap, single-pass,
+// pre-analysis shape check here: reject only shapes no real screenplay could
+// ever produce, with orders of magnitude of headroom over legitimate
+// content — a real English/hyphenated word is never within three orders of
+// magnitude of MAX_FOUNTAIN_TOKEN_CHARS, and a real cast is never within two
+// orders of magnitude of MAX_FOUNTAIN_DISTINCT_CUE_LINES — before the request
+// ever reaches the analyzer.
+export const MAX_FOUNTAIN_TOKEN_CHARS = 2_000;
+export const MAX_FOUNTAIN_DISTINCT_CUE_LINES = 1_500;
+// Bounded quantifier on a single character class — not nested/overlapping
+// quantifiers, so this cannot itself become a catastrophic-backtracking
+// pattern regardless of input length.
+const HUGE_TOKEN_RE = new RegExp(`\\S{${MAX_FOUNTAIN_TOKEN_CHARS + 1},}`);
+// A deliberately loose, cheap proxy for "looks like a character cue": a
+// short, entirely-uppercase-ish trimmed line that isn't a scene heading. It
+// only needs to OVER-count real character cues, never under-count the
+// pathological case — a slug line or transition ("CUT TO:") occasionally
+// counting toward the budget costs a real script nothing it would ever
+// notice at a 1,500-distinct-line ceiling.
+const CUE_LIKE_LINE_RE = /^[A-Z0-9 .,'()&\-]{1,40}$/;
+const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
+
+/** Returns null when `text` has no known pathological-cost shape, else a
+ *  human-readable rejection reason. O(length) single pass; safe to run on
+ *  the full MAX_FOUNTAIN_CHARS ceiling. */
+export function fountainShapeRejectionReason(text: string): string | null {
+  if (HUGE_TOKEN_RE.test(text)) {
+    return `must not contain a single unbroken run of more than ${MAX_FOUNTAIN_TOKEN_CHARS} non-whitespace characters`;
+  }
+  const distinctCueLines = new Set<string>();
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (line.length === 0 || SCENE_HEADING_PREFIX_RE.test(line)) continue;
+    if (CUE_LIKE_LINE_RE.test(line)) {
+      distinctCueLines.add(line);
+      if (distinctCueLines.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
+        return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
+      }
+    }
+  }
+  return null;
+}
+
+/** z.string().min(1).max(MAX_FOUNTAIN_CHARS) plus the pathological-shape guard
+ *  above — shared by every route that hands raw Fountain text to the
+ *  analyzer. `min`/`max` mirror the exact bounds each call site used before
+ *  (all currently min(1).max(MAX_FOUNTAIN_CHARS)), so this is a drop-in. */
+function fountainField() {
+  return z.string().min(1).max(MAX_FOUNTAIN_CHARS).superRefine((v: string, ctx: z.RefinementCtx) => {
+    const reason = fountainShapeRejectionReason(v);
+    if (reason) ctx.addIssue({ code: 'custom', message: reason });
+  });
+}
+
 // ── Re-usable leaf schemas ───────────────────────────────────────────────────
 
 const sessionIdField = z
@@ -667,7 +740,7 @@ export const ReviseBodySchema = z.object({
 // otherwise be rejected by the body parser with a less specific 413 instead
 // of this schema's message.
 export const DoctorBodySchema = z.object({
-  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  fountain: fountainField().optional(),
   fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
   title: z.string().max(300).optional(),
 }).refine(
@@ -696,7 +769,7 @@ export const DeepDoctorBodySchema = DoctorBodySchema;
 // DoctorBodySchema so `author` doesn't leak into every other doctor-shaped
 // route's accepted body.
 export const CoverageLetterBodySchema = z.object({
-  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  fountain: fountainField().optional(),
   fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
   title: z.string().max(300).optional(),
   author: z.string().max(300).optional(),
@@ -716,7 +789,7 @@ export const CoverageLetterBodySchema = z.object({
 // max-length check is the one that actually fires and returns a clean,
 // specific 400 instead of the body parser's generic 413.
 export const DiagnoseBodySchema = z.object({
-  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
+  fountain: fountainField(),
 });
 
 // POST /api/game/interview — character-interview feature. History entries are
@@ -767,7 +840,7 @@ const FixIssueItemSchema = z.object({
 });
 
 export const FixBodySchema = z.object({
-  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
+  fountain: fountainField(),
   span: FixSpanSchema,
   issues: z.array(FixIssueItemSchema).min(1).max(10),
 });
@@ -787,7 +860,7 @@ export const FixBodySchema = z.object({
 // actually fires for an oversized slate instead of a less-specific 413.
 const SlateScriptItemSchema = z.object({
   title: z.string().min(1).max(200),
-  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
+  fountain: fountainField(),
 }).passthrough();
 
 export const SlateBodySchema = z.object({
@@ -830,7 +903,7 @@ const VerifyExpectedSchema = z.object({
 });
 
 export const VerifyBodySchema = z.object({
-  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  fountain: fountainField().optional(),
   fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
   expected: VerifyExpectedSchema,
 }).refine(
@@ -934,7 +1007,7 @@ export const NcpStoryformBodySchema = z.object({
 // the one that fires with a clean, specific 400 instead of the body
 // parser's generic 413.
 export const StoryVectorCompareBodySchema = z.object({
-  scriptText: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
+  scriptText: fountainField(),
 });
 
 // GODMODE L38 craft-comparison body: 2–5 labeled fountain scripts. Bound each
@@ -943,7 +1016,7 @@ export const StoryVectorCompareBodySchema = z.object({
 export const CraftCompareBodySchema = z.object({
   scripts: z.array(z.object({
     label: z.string().min(1).max(128),
-    fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
+    fountain: fountainField(),
   })).min(2).max(5),
 });
 
@@ -1187,7 +1260,7 @@ export const AiProviderSwitchSchema = z.object({
 // silently truncating) plus a free-text optional title, sanitized by the
 // route's own sanitizeForPrompt call exactly as before.
 export const FountainTitleBodySchema = z.object({
-  fountain: z.string().min(1).max(MAX_FOUNTAIN_CHARS),
+  fountain: fountainField(),
   title: z.string().max(2000).optional(),
 }).passthrough();
 

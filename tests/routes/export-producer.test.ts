@@ -162,7 +162,13 @@ describe('routes/export/slate — HTTP behavior', async () => {
   });
 
   it('returns 400 when the combined fountain length exceeds the 900,000-char cap', async () => {
-    const big = 'A'.repeat(500_000);
+    // Whitespace-broken filler (not one giant unbroken token): a single
+    // >2,000-char run of non-whitespace now 400s on its own, earlier and
+    // with a different message, via validation.ts's fountainShapeRejectionReason
+    // pathological-shape guard (attack-lane audit) — this fixture exists to
+    // exercise the COMBINED-length refine specifically, so it must stay
+    // under that guard's per-token ceiling while still reaching 500,000 chars.
+    const big = 'A '.repeat(250_000);
     const res = await post({
       scripts: [
         { title: 'Big One', fountain: big },
