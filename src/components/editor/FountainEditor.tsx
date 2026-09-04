@@ -16,13 +16,15 @@ import { EditorState, Compartment, StateEffect, StateField } from '@codemirror/s
 import { history, defaultKeymap, historyKeymap, standardKeymap } from '@codemirror/commands';
 import { highlightActiveLine, lineNumbers, drawSelection } from '@codemirror/view';
 import { closeBrackets, autocompletion } from '@codemirror/autocomplete';
+import { search, searchKeymap } from '@codemirror/search';
 
 import { fountainHighlight, fountainTheme } from './fountain-highlight.ts';
 import { screenplayFormat, screenplayFormatTheme } from './screenplay-format.ts';
-import { fountainKeymap } from './fountain-keymap.ts';
+import { fountainKeymap, fountainKeymapExtensions } from './fountain-keymap.ts';
 import { screenplayComplete } from './screenplay-complete.ts';
 import { createCollabSession, CollabSession } from './collab.ts';
 import { scriptDiagnostics } from './diagnostics.ts';
+import { searchPanelTheme } from './search-panel-theme.ts';
 
 export interface FountainEditorHandle {
   /** Navigate to a specific 1-indexed line number */
@@ -401,12 +403,24 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           // Place fountain-specific bindings BEFORE default so our handlers run first.
           keymap.of([
             ...fountainKm,
+            ...searchKeymap,
             ...defaultKeymap,
             ...historyKeymap,
             ...standardKeymap,
           ]),
+          // ── Tab element-cycling state (fountain-keymap.ts's Tab handler
+          // reads these fields — see that file's header) ──────────────────────
+          fountainKeymapExtensions,
           // ── Screenplay element autocomplete (Enter/click accept) ─────────────
           screenplayCompletion,
+          // ── Find/replace (item 4) — CodeMirror's own search panel (case-
+          // sensitivity, whole-word, regexp, replace/replace-all all built
+          // in), Mod-f to open (searchKeymap above), styled to match this
+          // app's chrome (search-panel-theme.ts) instead of the stock
+          // colors. `top: true` keeps the panel near the toolbar rather than
+          // the bottom of a long, scrolled page. ─────────────────────────────
+          search({ top: true }),
+          searchPanelTheme,
           // ── Live Notes: in-editor narrative diagnostics (squiggles + hover) ──
           diagnosticsCompartment.current.of(
             liveDiagnostics ? scriptDiagnostics({ generative: generativeFixes }) : [],

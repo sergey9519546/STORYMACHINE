@@ -22,13 +22,11 @@ interface ShortcutGroup {
 // of this pass:
 //   - "Global" rows: ScriptIDE.tsx's Ctrl+/ effect and its consolidated
 //     Cmd/Ctrl+K · Cmd/Ctrl+S · Alt+Shift+D · Ctrl+Shift+F effect.
-//   - "Editor" rows: fountain-keymap.ts's Enter-commit binding, CM6's
-//     autocompletion() extension's own Enter/click acceptance, and the plain
-//     fact that Tab is NOT intercepted anywhere in FountainEditor.tsx's
-//     keymap (defaultKeymap/historyKeymap/standardKeymap/fountainKeymap
-//     between them bind no Tab handler) — worth stating explicitly rather
-//     than silently, since "does this trap keyboard focus" is exactly the
-//     kind of thing an a11y-conscious writer might want confirmed.
+//   - "Editor" rows: fountain-keymap.ts's Enter-commit, Tab/Shift-Tab
+//     element-cycling, and Escape/Ctrl-m bindings (see that file's header
+//     for the full reasoning); CM6's autocompletion() extension's own
+//     Enter/click acceptance; and @codemirror/search's searchKeymap
+//     (FountainEditor.tsx), styled in search-panel-theme.ts.
 //   - "Script Doctor" row: ScriptDoctorPanel.tsx's Cmd/Ctrl+Enter effect.
 //   - "Command palette" rows: CommandPalette.tsx's own input onKeyDown.
 // Three earlier rows here (Ctrl+S as a manual-save no-op, "Ctrl+Shift+F —
@@ -42,7 +40,10 @@ interface ShortcutGroup {
 // a (narrower, honestly-described) Typewriter Focus, and Alt+Shift+D now
 // really does toggle dark/light mode — see FountainEditor.tsx's
 // isTypewriterFocus prop doc comment for exactly what shipped vs. what the
-// old claim overstated.
+// old claim overstated. A LATER pass (item 3/4, upgrade-exports-editor) bound
+// Tab and Cmd/Ctrl+F, which the "Tab is never intercepted" / no find-replace
+// rows here used to correctly (at the time) describe — those rows are
+// updated below to match, not deleted, for the same reason.
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'Global',
@@ -57,7 +58,12 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: 'Editor',
     rows: [
       { key: 'Enter', action: "Commit auto-uppercase (scene headings, transitions, character cues) — or accept an open autocomplete suggestion" },
-      { key: 'Tab', action: 'Moves focus to the next control, same as anywhere else — the editor never traps it' },
+      { key: 'Tab', action: 'On an empty new-paragraph line: cycle action → character → parenthetical → dialogue → transition (previewed live). Elsewhere: insert a normal indent' },
+      { key: 'Shift + Tab', action: 'Cycle the element type backward, or outdent — the reverse of Tab' },
+      { key: 'Escape, then Tab', action: 'Leave the editor and move focus to the next control (Tab is otherwise captured — see above)' },
+      { key: 'Ctrl + M', action: 'Toggle whether Tab is captured for element-cycling at all, vs. always moving focus' },
+      { key: 'Cmd/Ctrl + F', action: 'Open find/replace (case-sensitive, whole-word, and regexp toggles; replace and replace all)' },
+      { key: 'F3 / Cmd/Ctrl + G', action: 'Find next match (Shift for previous) — while find/replace is open' },
       { key: 'Alt + Shift + D', action: 'Toggle dark / light mode' },
       { key: 'Cmd/Ctrl + Shift + F', action: "Typewriter Focus — keep the cursor's line centered as you type" },
     ],
