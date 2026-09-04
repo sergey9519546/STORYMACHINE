@@ -58,6 +58,7 @@
 
 import { Worker } from 'node:worker_threads';
 import os from 'node:os';
+import { logger } from '../../lib/logger.ts';
 import type { StoryContext } from '../revision/passes/types.ts';
 import type { ScriptDoctorReport, DoctorProgressEvent } from './types.ts';
 import type { DoctorWorkerRequest, DoctorWorkerResponse } from './doctor-worker.ts';
@@ -435,4 +436,90 @@ export function purgeDoctorWorkers(): number {
  *  has fallen back to in-process execution. */
 export function doctorPoolStatus(): { enabled: boolean; disabled: boolean; workers: number; queued: number } {
   return { enabled: poolEnabled(), disabled: poolDisabled, workers: slots.length, queued: queue.length };
+}
+
+/**
+ * Boot-time pre-warm (2026-09-04 re-verification: the first
+ * POST /api/scriptide/doctor after a fresh boot measured ~460-540ms of
+ * worker-pool cold start — spawning the thread, having it load doctor.ts's
+ * whole module graph (calibration corpus, the revision pipeline, every
+ * pass) inside the worker realm for the first time — versus 6-26ms once a
+ * worker is warm. That cost is paid once per worker's lifetime, not per
+ * request, so paying it eagerly at boot instead of on the first real user's
+ * request is a pure win with no behavior change: `runScriptDoctorOffThread`
+ * is contract-identical either way (this file's own doc comment on it).
+ *
+ * Dispatches one tiny, disposable analysis per configured pool slot so each
+ * worker thread actually gets spawned and proves it can load doctor.ts,
+ * exactly the same path `pump()` takes for a real request. Each call uses
+ * distinct throwaway content (index baked into the slugline) so the
+ * coordinator-side cache (property 1 in this file's header) can't collapse
+ * N warm-up calls into one dispatch — a cache hit never reaches a worker at
+ * all, which would leave every slot past the first cold.
+ *
+ * Never thrown from, never slow to call: every job's own rejection is
+ * caught and logged individually (a worker that can't start is exactly the
+ * "environment can't host the pool" case doctor-pool.ts already treats as
+ * permanent, harmless fallback — see spawnSlot()'s doc comment), and the
+ * function returns a Promise the caller is expected to let run in the
+ * background rather than await — see server.ts's call site. Guarded to a
+ * no-op under `NODE_ENV=test` (a test run should never spend wall-clock time
+ * or spawn threads warming a pool nobody in the test is about to measure)
+ * and under `DOCTOR_POOL_PREWARM=0` (an explicit opt-out for a deployment
+ * that wants zero extra boot-time work, e.g. a constrained environment where
+ * even a handful of throwaway analyses matters).
+ *
+ * `runJob` is injectable for tests only — production callers always take the
+ * default, which is the same `runScriptDoctorOffThread` every real request
+ * goes through.
+ */
+const WARM_UP_FOUNTAIN = (index: number): string =>
+  `INT. PRE-WARM ROOM ${index} - DAY\n\nA figure stands, waiting for nothing in particular.\n\nWARMUP\nHello.\n`;
+
+export async function warmDoctorPool(
+  opts: { runJob?: (fountain: string) => Promise<unknown> } = {},
+): Promise<void> {
+  if (process.env.NODE_ENV === 'test') return;
+  if (process.env.DOCTOR_POOL_PREWARM === '0') return;
+
+  const runJob = opts.runJob ?? ((fountain: string) => runScriptDoctorOffThread(fountain));
+  const startedAt = Date.now();
+  let failures = 0;
+
+  try {
+    // Running in-process (pool off, or already latched disabled) buys nothing
+    // by repeating the throwaway analysis more than once — there is only one
+    // thread to warm, the main one, and it's already loading doctor.ts as
+    // part of this very call.
+    const count = poolEnabled() && !poolDisabled ? configuredPoolSize() : 1;
+
+    await Promise.all(
+      Array.from({ length: count }, (_, index) =>
+        runJob(WARM_UP_FOUNTAIN(index)).catch((err: unknown) => {
+          failures++;
+          logger.warn('doctor_pool_prewarm_job_failed', {
+            index,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        })),
+    );
+
+    logger.info('doctor_pool_prewarmed', {
+      requested: count,
+      failures,
+      workers: doctorPoolStatus().workers,
+      ms: Date.now() - startedAt,
+    });
+  } catch (err) {
+    // Belt-and-braces: every per-job failure is already caught above, so
+    // this only fires on something outside that loop (e.g. configuredPoolSize
+    // itself throwing on a corrupt env value). A boot-time perf optimization
+    // must never be able to take the process down or surface as an unhandled
+    // rejection — see this file's property (4) for the same guarantee applied
+    // to the pool itself.
+    logger.warn('doctor_pool_prewarm_failed', {
+      error: err instanceof Error ? err.message : String(err),
+      ms: Date.now() - startedAt,
+    });
+  }
 }

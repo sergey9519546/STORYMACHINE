@@ -9,6 +9,7 @@ import { sessions, PERSIST_SESSIONS, SESSION_DB_DIR } from './server/lib/session
 import { backupSessions } from './server/lib/backup.ts';
 import { createApp } from './server/app.ts';
 import { attachCollabServer } from './server/collab/yjs-server.ts';
+import { warmDoctorPool } from './server/nvm/analyze/doctor-pool.ts';
 
 // A missing AI key is NOT fatal: the deterministic half of the product —
 // Script Doctor, live diagnostics, coverage export, What-If exploration,
@@ -159,6 +160,14 @@ async function startServer() {
   }
   const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info('server_started', { port: PORT });
+    // Fire-and-forget: spawns the Script Doctor worker pool's threads and
+    // runs one throwaway analysis through each so the first REAL analysis
+    // request doesn't pay the ~460-540ms worker-pool cold start (2026-09-04
+    // re-verification). warmDoctorPool() itself is a no-op under
+    // NODE_ENV=test / DOCTOR_POOL_PREWARM=0 and never throws or rejects —
+    // see its doc comment — so this deliberately isn't awaited and needs no
+    // .catch here.
+    void warmDoctorPool();
   });
 
   // P4: real-time collaboration — Yjs sync over WebSocket on /collab/:room.
