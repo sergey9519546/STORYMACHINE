@@ -1,8 +1,10 @@
-// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
-// consistency mechanism material, 2026-08-03). Parallel-action structure:
-// two friends crosscut across a phone call using MEANWHILE / SIMULTANEOUSLY
-// heading markers, per the markers extractTemporalConstraints() actually
-// parses. Temporally clean as written -- 0 expected contradictions.
+/*
+Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+consistency mechanism material, 2026-08-03). Parallel-action structure:
+two friends crosscut across a phone call using MEANWHILE / SIMULTANEOUSLY
+heading markers, per the markers extractTemporalConstraints() actually
+parses. Temporally clean as written -- 0 expected contradictions.
+*/
 
 INT. CALLIE'S APARTMENT - KITCHEN - NIGHT
 

@@ -1,12 +1,14 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: hotel mystery. Troubled-band craft calibration.
-// Per band design, richness is held constant (clock, clue, relationship beat all
-// present); craft fails pervasively: the clock is stated then flatly contradicted
-// when the deadline passes with no consequence, the clue is seeded and genuinely
-// orphaned, four consecutive scenes recycle the same beat, there is no revelation,
-// the two voices stay interchangeable, and the dialogue leans on the on-the-nose
-// cliche lexicon the engine flags.
-// Author: STORYMACHINE benchmark contributor, 2026.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: hotel mystery. Troubled-band craft calibration.
+Per band design, richness is held constant (clock, clue, relationship beat all
+present); craft fails pervasively: the clock is stated then flatly contradicted
+when the deadline passes with no consequence, the clue is seeded and genuinely
+orphaned, four consecutive scenes recycle the same beat, there is no revelation,
+the two voices stay interchangeable, and the dialogue leans on the on-the-nose
+cliche lexicon the engine flags.
+Author: STORYMACHINE benchmark contributor, 2026.
+*/
 
 INT. HOTEL CORRIDOR - NIGHT
 

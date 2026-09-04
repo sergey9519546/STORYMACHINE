@@ -1,13 +1,15 @@
-// Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
-// Three-act CONTROL, Pair 2 (n=16 scenes), matched to
-// pair2-kishotenketsu.fountain: same protagonist, setting, scene count, and
-// prose register — restructured around structure-presets.ts's three_act
-// template (Act One 0-22%, Inciting 22-28%, Act Two 28-72%, Climax 72-86%,
-// Act Three 86-100%). Scenes 1-3 are textually identical to the
-// kishotenketsu arm; the antagonist and escalating conflict enter at scene 4,
-// exactly where the beat maps diverge, and the story resolves with a public
-// confrontation and a clear winner and loser, unlike the kishotenketsu arm's
-// synthesis ending.
+/*
+Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
+Three-act CONTROL, Pair 2 (n=16 scenes), matched to
+pair2-kishotenketsu.fountain: same protagonist, setting, scene count, and
+prose register — restructured around structure-presets.ts's three_act
+template (Act One 0-22%, Inciting 22-28%, Act Two 28-72%, Climax 72-86%,
+Act Three 86-100%). Scenes 1-3 are textually identical to the
+kishotenketsu arm; the antagonist and escalating conflict enter at scene 4,
+exactly where the beat maps diverge, and the story resolves with a public
+confrontation and a clear winner and loser, unlike the kishotenketsu arm's
+synthesis ending.
+*/
 
 INT. AMARO CONSERVATION STUDIO - MORNING
 

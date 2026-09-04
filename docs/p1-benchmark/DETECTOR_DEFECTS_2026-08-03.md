@@ -1,5 +1,15 @@
 # Detector defects — adversarially verified, 2026-08-03
 
+> **⚠ 2026-09-04 — one measurement in this file is corrected, in place, below.**
+> The D1/D2 addendum's "Measured on the 20 tracked CC0 scripts" figures were
+> taken over `data/screenplays/*.fountain` while every one of those files was
+> being contaminated by its own `//` provenance header (parsed as ACTION, not as
+> a comment — Fountain's comment is `/* */`). The original numbers are left
+> unedited; a dated correction block immediately after them gives the recomputed
+> figures and the evidence. Nothing else in this file is derived from that
+> corpus. See `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` (2026-09-04) for the
+> full receipt, and for what the owner must check on the private corpus.
+
 Findings from a claim-by-claim truth audit of the sample coverage report
 (`docs/user-validation/sample-coverage-report.html`, "The Second Key", 14
 scenes / 665 words) against the script text and the engine's own records.
@@ -131,6 +141,74 @@ disagreement (legacy-passive-but-detector-finds-agency) on 1/20
 passing tests (positive/negative fixtures, near-miss negatives including a
 documented residual false-positive case, both channels, all edge cases,
 falsifiability-verified) in `tests/core/agency-signal.test.ts`.
+
+> ### ⚠ CORRECTION 2026-09-04 — the paragraph immediately above measured a CONTAMINATED corpus
+>
+> The 2026-08-04 figures in "Measured on the 20 tracked CC0 scripts" and the
+> per-script table they summarise were produced over `data/screenplays/*.fountain`
+> files whose provenance headers were being **scored as screenplay text**. They are
+> left in place above, unedited, because the record of what was measured is part of
+> the audit — but the peak-scene figures in them are wrong, and this note says by
+> how much.
+>
+> **What was contaminated.** Every one of the 20 files opened with a `//`-prefixed
+> provenance/licence header. `//` is not Fountain comment syntax — the boneyard,
+> `/* */`, is (`src/lib/fountain.ts:110`) — so `parseFountain` typed those lines
+> `action` and `segmentScenes` folded them into scene 0. Header phrases such as
+> "DEATH-RECALL TAG", "stabs NAME to death" and "kills NAME" are
+> `DANGER_TENSION_WORDS` hits, so the repository's own filing metadata raised
+> scene 1's `suspenseDelta`.
+>
+> **Corrected in-repo figures** (recomputed on the fixed corpus, same code, same
+> command — `tests/core/agency-signal.test.ts` now pins them):
+>
+> | statistic | 2026-08-04 (contaminated) | 2026-09-04 (corrected) |
+> |---|---|---|
+> | `anyAgencyAtPeak` | 4/20 | 4/20 (different four: `mise`, `quiet-season`, `the-defense-rests`, `the-detour`) |
+> | `allSpectatorAtPeak` | 8/20 | **6/20** |
+> | D1 disagreement | 1/20 (`mise`) | 1/20 (`mise`) — unchanged |
+> | D2 disagreement | 3/20 (`quiet-season`, `the-detour`, `undertow`) | 3/20 — unchanged |
+> | rows of the per-script table that moved | — | **12 of 20** |
+> | scripts whose SOLE peak-suspense scene was scene 1 | 9/20 | **0/20** |
+> | scripts whose peak set includes scene 1 | 15/20 | **8/20** |
+>
+> **Why the corrected numbers are believable and the old ones were not.** Across
+> all 20 scripts the per-scene `suspenseDelta` series changed **at scene index 0
+> and nowhere else** — 13 files moved there, 7 were already 0 there and did not
+> move at all. Scene-0 suspense before → after: `chain-of-custody` 3→1,
+> `close-quarters` 4→0, `code-blue` 3→−1, `high-voltage` 3→1, `mise` 1→0,
+> `quiet-season` 1→0, `red-line` 3→0, `same-page` 1→0, `soft-launch` 2→1,
+> `the-defense-rests` 1→−1, `the-key-under-the-mat` 1→0, `two-lane` 1→0,
+> `undertow` 3→0. Nothing downstream of scene 1 was touched, which is exactly what
+> a metadata-only contamination predicts and what a code regression would not.
+>
+> **The D1/D2 conclusion of this addendum survives.** The selectivity claim the
+> addendum rests on — the detector fires on some real scripts and not others, and
+> disagrees with the legacy predicate rarely — is unchanged: 1/20 and 3/20 on the
+> same three files. What was wrong was *which scene* the detector was pointed at on
+> 12 scripts, not whether the detector is alive.
+>
+> **Two things this correction did NOT do.**
+> 1. It did not re-measure anything on the private 761-script corpus. That corpus
+>    is local-only; no AUC was recomputed. **If those files carry similar `//` or
+>    plain-text provenance headers, every measurement over them — including the
+>    AUC-24 ratchet — has the same defect, and the owner must check before trusting
+>    them.** See `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, 2026-09-04.
+> 2. It did not fix the *residual* metadata in the health denominator.
+>    `fountain-analyzer.ts`'s `wordCount` is `fastWordCount(fountain)` over the RAW
+>    text, which counts boneyard words too — no Fountain comment syntax hides text
+>    from it, only deletion would. `wordCount^0.7` is the health density
+>    denominator, so the licence text still inflates health slightly (e.g.
+>    `undertow` counts 884 words against an 826-word screenplay; `the-key-under-the-mat`
+>    890 against 739). Fixing that changes health for every script, which is a
+>    scoring change needing a real-corpus measurement this correction did not run.
+>
+> **A third, separate defect this work surfaced and did not fix.**
+> `parseFountain` has no title-page handling at all, so `Title:` / `Credit:` /
+> `Author:` / `Draft date:` lines are typed `action` and scored exactly the way the
+> `//` headers were. That one reaches real user drafts, not just fixtures —
+> title pages are ordinary in submitted screenplays. Open finding; same
+> scoring-change caveat.
 
 **Maintainer command to measure on the real corpus** (761-script corpus,
 local-only, never uploaded — see CLAUDE.md's "Which floor, exactly"

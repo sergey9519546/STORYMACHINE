@@ -1,10 +1,12 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: road-trip dramedy. AGENT-AUTHORED (Claude, 2026-08-04)
-// as clean-negative-material corpus contribution for
-// server/nvm/analyze/truth-extraction.ts's false-positive testbed — see
-// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
-// professionally-authored "real writing" in P1's validation sense.
-// No character death; competent band, clean negative material.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: road-trip dramedy. AGENT-AUTHORED (Claude, 2026-08-04)
+as clean-negative-material corpus contribution for
+server/nvm/analyze/truth-extraction.ts's false-positive testbed — see
+docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+professionally-authored "real writing" in P1's validation sense.
+No character death; competent band, clean negative material.
+*/
 
 EXT. CORA'S APARTMENT - DRIVEWAY - MORNING
 

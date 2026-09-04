@@ -1,17 +1,19 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: outdoors/friendship drama. AGENT-AUTHORED (Claude,
-// 2026-08-04) as a DELIBERATELY WEAK contrast-band script for
-// server/nvm/analyze/truth-extraction.ts / P1 craft-discrimination testing —
-// see docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute
-// for professionally-authored "real writing" in P1's validation sense.
-// LABELED WEAKNESS: a midsection that wanders. The inciting incident (a
-// missed trail fork) and the resolution (finding the trail again) are both
-// clear and functional. Scenes 3 through 8, however, are functionally
-// interchangeable — rest stop, minor bicker, small discovery, repeat — with
-// no rising stakes, no new information, and no scene that could not be
-// deleted or reordered without changing the story. Meant to read as a
-// plausible early-career draft: competent hiking-trip dialogue, just no
-// forward motion across six scenes in the middle.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: outdoors/friendship drama. AGENT-AUTHORED (Claude,
+2026-08-04) as a DELIBERATELY WEAK contrast-band script for
+server/nvm/analyze/truth-extraction.ts / P1 craft-discrimination testing —
+see docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute
+for professionally-authored "real writing" in P1's validation sense.
+LABELED WEAKNESS: a midsection that wanders. The inciting incident (a
+missed trail fork) and the resolution (finding the trail again) are both
+clear and functional. Scenes 3 through 8, however, are functionally
+interchangeable — rest stop, minor bicker, small discovery, repeat — with
+no rising stakes, no new information, and no scene that could not be
+deleted or reordered without changing the story. Meant to read as a
+plausible early-career draft: competent hiking-trip dialogue, just no
+forward motion across six scenes in the middle.
+*/
 
 EXT. TRAILHEAD - MORNING
 

@@ -1,10 +1,12 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: domestic-thriller. AGENT-AUTHORED (Claude, 2026-08-04)
-// as recall-testbed material for server/nvm/analyze/truth-extraction.ts — see
-// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
-// professionally-authored "real writing" in P1's validation sense.
-// DEATH-RECALL TAG: stabbing, phrased via the "stabs NAME to death" cue.
-// Expected: HIT.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: domestic-thriller. AGENT-AUTHORED (Claude, 2026-08-04)
+as recall-testbed material for server/nvm/analyze/truth-extraction.ts — see
+docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+professionally-authored "real writing" in P1's validation sense.
+DEATH-RECALL TAG: stabbing, phrased via the "stabs NAME to death" cue.
+Expected: HIT.
+*/
 
 INT. KANE APARTMENT - LIVING ROOM - NIGHT
 

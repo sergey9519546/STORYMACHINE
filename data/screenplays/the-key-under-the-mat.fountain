@@ -1,18 +1,20 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: family inheritance drama. AGENT-AUTHORED (Claude,
-// 2026-08-04) as a DELIBERATELY WEAK contrast-band script for
-// server/nvm/analyze/truth-extraction.ts / P1 craft-discrimination testing —
-// see docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute
-// for professionally-authored "real writing" in P1's validation sense.
-// LABELED WEAKNESS: setup promised and never paid off. Scene 1 plants a
-// loaded mystery (a cryptic note: "the key is under the mat, don't wait too
-// long") with real fanfare, scene 3 explicitly checks under the mat and
-// finds nothing, and then the note is never mentioned again by the plot —
-// only referenced once late, by a side character, as something the
-// protagonist admits she forgot about. The actual ending resolves an
-// unrelated, unforeshadowed question (whether to sell the cabin). Meant to
-// read as a plausible early-career draft: the writer clearly knows how to
-// plant a hook, just never circles back to spend it.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: family inheritance drama. AGENT-AUTHORED (Claude,
+2026-08-04) as a DELIBERATELY WEAK contrast-band script for
+server/nvm/analyze/truth-extraction.ts / P1 craft-discrimination testing —
+see docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute
+for professionally-authored "real writing" in P1's validation sense.
+LABELED WEAKNESS: setup promised and never paid off. Scene 1 plants a
+loaded mystery (a cryptic note: "the key is under the mat, don't wait too
+long") with real fanfare, scene 3 explicitly checks under the mat and
+finds nothing, and then the note is never mentioned again by the plot —
+only referenced once late, by a side character, as something the
+protagonist admits she forgot about. The actual ending resolves an
+unrelated, unforeshadowed question (whether to sell the cabin). Meant to
+read as a plausible early-career draft: the writer clearly knows how to
+plant a hook, just never circles back to spend it.
+*/
 
 INT. LAKESIDE CABIN - LIVING ROOM - DAY
 

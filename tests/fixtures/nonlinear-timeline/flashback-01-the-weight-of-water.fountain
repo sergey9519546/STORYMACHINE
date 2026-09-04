@@ -1,10 +1,12 @@
-// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
-// consistency mechanism material, 2026-08-03). Flashback-framed structure:
-// an interrogation-room present tense frame with two FLASHBACK insertions,
-// each returning via a CONTINUOUS-marked scene, per the markers
-// extractTemporalConstraints() in server/nvm/analyze/temporal-consistency.ts
-// actually parses (heading-only FLASHBACK / CONTINUOUS). Temporally clean
-// as written -- 0 expected contradictions.
+/*
+Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+consistency mechanism material, 2026-08-03). Flashback-framed structure:
+an interrogation-room present tense frame with two FLASHBACK insertions,
+each returning via a CONTINUOUS-marked scene, per the markers
+extractTemporalConstraints() in server/nvm/analyze/temporal-consistency.ts
+actually parses (heading-only FLASHBACK / CONTINUOUS). Temporally clean
+as written -- 0 expected contradictions.
+*/
 
 INT. HARBOR PRECINCT - INTERROGATION ROOM - NIGHT
 

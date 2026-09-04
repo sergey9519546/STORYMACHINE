@@ -69,15 +69,44 @@ confirmed to parse cleanly with `sceneCount >= 5` and no truncation.
 
 ## In-file marking
 
-Each screenplay's first line is a Fountain preamble comment marking its
-provenance and license, e.g.:
+Each screenplay opens with a Fountain **boneyard** comment carrying its
+provenance and license:
 
 ```
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+...
+*/
 ```
 
-This preamble is folded into scene 0 by the fountain parser and does not affect
-scene detection or analysis.
+`parseFountain` types every line between `/*` and `*/` as `boneyard`, and
+`fountain-analyzer.ts` skips boneyard blocks, so the licence text is preserved
+in the file and invisible to the analysis.
+
+> **CORRECTED 2026-09-04.** This section previously described the marking as a
+> `//`-prefixed "Fountain preamble comment" and asserted that it "is folded into
+> scene 0 by the fountain parser and does not affect scene detection or
+> analysis." **That was wrong, and it is the belief that caused the defect.**
+> `//` is not Fountain comment syntax — the boneyard `/* */` is
+> (`src/lib/fountain.ts:110`) — so `parseFountain` typed those header lines
+> `action`, `segmentScenes` folded them into scene 0 *as screenplay text*, and
+> they were scored. Measured consequences: 10 of these 20 headers contained
+> danger-lexicon words, which raised scene 1's `suspenseDelta` on 13 of 20
+> scripts and made scene 1 the sole peak-suspense scene of 9 of them; 106 of the
+> corpus's 237 detected clue "seeds" (44.7%) were header tokens. The headers were
+> converted to real boneyards on 2026-09-04 with the text preserved verbatim.
+> Full measurement and the reports that moved:
+> `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, 2026-09-04.
+> `tests/core/fixture-provenance-comment-guard.test.ts` now enforces both halves
+> of the rule — no `//` line in any fixture, and the CC0 declaration still
+> present inside the boneyard.
+>
+> The `Words` column above is unchanged and remains approximate. Note that
+> `fountain-analyzer.ts`'s `wordCount` counts the RAW file, boneyard included —
+> no Fountain comment syntax hides text from it — so those figures still include
+> the licence text (e.g. `the-key-under-the-mat` counts 890 words against a
+> 739-word screenplay). That residual is recorded as an open finding in the same
+> receipt.
 
 ## 2026-08-04 expansion — truth-extraction recall testbed + weak-band contrast material
 

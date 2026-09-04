@@ -61,9 +61,11 @@
 
 export const title = "Dead Frequency";
 
-export const fountain = `// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: radio-noir thriller. Strong-band craft calibration.
-// Author: STORYMACHINE benchmark contributor, 2026.
+export const fountain = `/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: radio-noir thriller. Strong-band craft calibration.
+Author: STORYMACHINE benchmark contributor, 2026.
+*/
 
 INT. KQRS RADIO STUDIO - NIGHT
 

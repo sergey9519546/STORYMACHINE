@@ -1,11 +1,19 @@
 {
-  "version": 2,
+  "version": 3,
   "title": "Dead Frequency",
   "file": "sample-script.fountain",
-  "sha256": "9e8a715208da015211ab180535728b967a379bb289c5b9b9591c26612472f4ad",
-  "frozen": "2026-08-04",
+  "sha256": "9fca286f16dd562ecda63f32476bb60f7d9a9bde396f883cde12cd94aceffa99",
+  "frozen": "2026-09-04",
   "note": "Immutable moderator demo corpus. Any change to the live sample requires a new version entry here — tests/core/demo-corpus-freeze.test.ts enforces the match.",
   "history": [
+    {
+      "version": 2,
+      "title": "Dead Frequency",
+      "sha256": "9e8a715208da015211ab180535728b967a379bb289c5b9b9591c26612472f4ad",
+      "frozen": "2026-08-04",
+      "retired": "2026-09-04",
+      "retiredReason": "Corpus-integrity correction: the frozen text opened with a three-line `//` provenance header. `//` is NOT Fountain comment syntax (the boneyard is `/* */`, src/lib/fountain.ts:110), so the parser read those lines as ACTION and the metadata was scored as screenplay. v3 is the SAME screenplay with that header moved into a real `/* */` boneyard — not one word of the drama changed. See docs/p1-benchmark/MEASUREMENT_RECEIPTS.md (2026-09-04 corpus-integrity correction) and docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md's dated correction note."
+    },
     {
       "version": 1,
       "title": "The Second Key",

@@ -1,10 +1,12 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: lake-house thriller. AGENT-AUTHORED (Claude, 2026-08-04)
-// as recall-testbed material for server/nvm/analyze/truth-extraction.ts — see
-// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
-// professionally-authored "real writing" in P1's validation sense.
-// DEATH-RECALL TAG: drowning, phrased naturally (no lexicon trigger words —
-// "drowns" itself is not in the death-cue lexicon). Expected: MISS.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: lake-house thriller. AGENT-AUTHORED (Claude, 2026-08-04)
+as recall-testbed material for server/nvm/analyze/truth-extraction.ts — see
+docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+professionally-authored "real writing" in P1's validation sense.
+DEATH-RECALL TAG: drowning, phrased naturally (no lexicon trigger words —
+"drowns" itself is not in the death-cue lexicon). Expected: MISS.
+*/
 
 EXT. LAKE DOCK - MORNING
 

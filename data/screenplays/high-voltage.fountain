@@ -1,11 +1,13 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: industrial-sabotage thriller. AGENT-AUTHORED (Claude,
-// 2026-08-04) as recall-testbed material for
-// server/nvm/analyze/truth-extraction.ts — see
-// docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
-// professionally-authored "real writing" in P1's validation sense.
-// DEATH-RECALL TAG: electrocution, phrased naturally (no lexicon trigger
-// words). Expected: MISS.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: industrial-sabotage thriller. AGENT-AUTHORED (Claude,
+2026-08-04) as recall-testbed material for
+server/nvm/analyze/truth-extraction.ts — see
+docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute for
+professionally-authored "real writing" in P1's validation sense.
+DEATH-RECALL TAG: electrocution, phrased naturally (no lexicon trigger
+words). Expected: MISS.
+*/
 
 INT. RIVERSIDE POWER STATION - CONTROL ROOM - NIGHT
 

@@ -1,5 +1,27 @@
 # CC0 Corpus Expansion — 2026-08-04: truth-extraction recall testbed + weak-band contrast material
 
+> **⚠ 2026-09-04 — every `health` and `wordCount` figure in this document was
+> measured over a contaminated corpus.** All 20 files (the 14 added here and the
+> 6 before them) opened with a `//`-prefixed provenance header, which is NOT
+> Fountain comment syntax — the boneyard `/* */` is (`src/lib/fountain.ts:110`)
+> — so `parseFountain` typed those lines `action` and the analyzer scored the
+> repository's own filing metadata as screenplay. Header phrases written by THIS
+> document's own convention ("DEATH-RECALL TAG: drowning", "stabs NAME to death",
+> "kills NAME") are `DANGER_TENSION_WORDS` hits; they raised scene 1's suspense
+> on 13 of the 20 scripts and produced 106 of the corpus's 237 detected clue
+> "seeds". The headers were converted to real boneyards on 2026-09-04. The
+> figures below are left unedited — the record of what was measured is part of
+> the audit — but treat every per-script number here as superseded, and re-run
+> before citing one. Corrected values, the full per-script movement table, and
+> what the correction did NOT fix:
+> `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, 2026-09-04.
+>
+> The document's **qualitative** conclusions are unaffected and were spot-checked:
+> the 4-HIT/2-MISS death-cue recall table in §2a is derived from on-page death
+> phrasing in the drama, not from the headers, and `npm test` (including
+> `tests/core/truth-extraction.test.ts` and `page-estimate-realism.test.ts`)
+> passes with 0 failures on the corrected corpus.
+
 **Status:** Complete. 14 new original screenplays added to `data/screenplays/`,
 force-tracked under the same CC0-original mechanism as the six files added
 2026-07-29. `scripts/probe-truth-order-sensitivity.mjs` run unmodified
@@ -155,6 +177,26 @@ Run directly (not assumed) via
 | `the-key-under-the-mat.fountain` | 11 | 903 | 10–14 (weak) | yes |
 | `same-page.fountain` | 11 | 814 | 10–14 (weak) | yes |
 | `the-detour.fountain` | 11 | 759 | 10–14 (weak) | yes |
+
+> **⚠ 2026-09-04 — every `wordCount` above counts this repository's own
+> provenance metadata as screenplay.** These files opened with a `//`-prefixed
+> provenance header. `//` is not Fountain comment syntax (the boneyard `/* */`
+> is — `src/lib/fountain.ts:110`), so `parseFountain` typed those lines `action`
+> and the analyzer scored them. The headers are now real boneyards, which takes
+> the metadata out of the *drama* — but NOT out of `wordCount`, which is
+> `fastWordCount()` over the raw file and counts boneyard text too. Corrected
+> counts after the fix (the delta is only the `//` tokens becoming `/*`+`*/`,
+> which is why it is small — the header WORDS are still in there):
+> red-line 988→982, undertow 889→884, chain-of-custody 830→824, code-blue
+> 958→951, close-quarters 845→840, high-voltage 940→934, soft-launch 972→967,
+> mise 922→917, the-defense-rests 963→958, two-lane 1011→1006, quiet-season
+> 679→668, the-key-under-the-mat 903→890, same-page 814→803, the-detour 759→747.
+> The true screenplay body is smaller still — `the-key-under-the-mat` is 739
+> body words against the 890 counted (17% metadata), `quiet-season` 544 against
+> 668. `sceneCount` is unaffected in every case, and all 20 files still clear the
+> band requirement and `tests/core/page-estimate-realism.test.ts`'s density
+> bands. Full measurement: `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`,
+> 2026-09-04.
 
 `tests/core/page-estimate-realism.test.ts` (part of the standard `npm test`
 run, §6) independently confirms every file in `data/screenplays/` —

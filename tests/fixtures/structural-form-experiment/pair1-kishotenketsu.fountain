@@ -1,13 +1,15 @@
-// Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
-// Kishotenketsu arm, Pair 1 (n=12 scenes). Follows server/lib/structure-presets.ts
-// kishotenketsu beat template exactly: Ki 0-25% (scenes 1-3, no antagonism),
-// Sho 25-50% (scenes 4-6, discovery not confrontation), Ten 50-75% (scenes 7-9,
-// twist from outside the conflict axis), Ketsu 75-100% (scenes 10-12, synthesis,
-// no winners/losers). Scenes 1-2 are textually identical to the matched
-// three-act control (pair1-three-act-control.fountain) — both templates call
-// for pure, conflict-free establishment at that point, so craft is held
-// constant exactly where the beat maps agree, and diverges only where they
-// diverge (scene 3 onward).
+/*
+Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
+Kishotenketsu arm, Pair 1 (n=12 scenes). Follows server/lib/structure-presets.ts
+kishotenketsu beat template exactly: Ki 0-25% (scenes 1-3, no antagonism),
+Sho 25-50% (scenes 4-6, discovery not confrontation), Ten 50-75% (scenes 7-9,
+twist from outside the conflict axis), Ketsu 75-100% (scenes 10-12, synthesis,
+no winners/losers). Scenes 1-2 are textually identical to the matched
+three-act control (pair1-three-act-control.fountain) — both templates call
+for pure, conflict-free establishment at that point, so craft is held
+constant exactly where the beat maps agree, and diverges only where they
+diverge (scene 3 onward).
+*/
 
 INT. CAPE HALLOW LIGHTHOUSE - SPIRAL STAIR - DAWN
 

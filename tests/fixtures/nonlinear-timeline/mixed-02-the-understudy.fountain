@@ -1,9 +1,11 @@
-// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
-// consistency mechanism material, 2026-08-03). Mixed structure: a
-// FLASHBACK bracket (returning via CONTINUOUS) plus a separate forward
-// time-jump using a LATER heading modifier, per the markers
-// extractTemporalConstraints() actually parses. Temporally clean as
-// written -- 0 expected contradictions.
+/*
+Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+consistency mechanism material, 2026-08-03). Mixed structure: a
+FLASHBACK bracket (returning via CONTINUOUS) plus a separate forward
+time-jump using a LATER heading modifier, per the markers
+extractTemporalConstraints() actually parses. Temporally clean as
+written -- 0 expected contradictions.
+*/
 
 INT. REGIONAL PLAYHOUSE - BACKSTAGE - NIGHT
 

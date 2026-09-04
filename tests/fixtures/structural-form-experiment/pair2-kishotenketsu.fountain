@@ -1,15 +1,17 @@
-// Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
-// Kishotenketsu arm, Pair 2 (n=16 scenes — at/above doctor.ts's
-// ARC_DED_MIN_SCENES=15, so this pair, unlike Pair 1, exercises the
-// continuous arcIncoherenceDeduction). Follows structure-presets.ts's
-// kishotenketsu template: Ki 0-25% (scenes 1-4, no antagonism), Sho 25-50%
-// (scenes 5-8, discovery not confrontation), Ten 50-75% (scenes 9-12, twist
-// from outside the conflict axis — here, a historical-society letter, a third
-// perspective), Ketsu 75-100% (scenes 13-16, synthesis, no winners/losers).
-// Scenes 1-3 are textually identical to the matched control
-// (pair2-three-act-control.fountain) — both templates want pure
-// establishment before any conflict signal; divergence begins at scene 4,
-// exactly where the beat maps split (Ki still running vs. Inciting Incident).
+/*
+Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
+Kishotenketsu arm, Pair 2 (n=16 scenes — at/above doctor.ts's
+ARC_DED_MIN_SCENES=15, so this pair, unlike Pair 1, exercises the
+continuous arcIncoherenceDeduction). Follows structure-presets.ts's
+kishotenketsu template: Ki 0-25% (scenes 1-4, no antagonism), Sho 25-50%
+(scenes 5-8, discovery not confrontation), Ten 50-75% (scenes 9-12, twist
+from outside the conflict axis — here, a historical-society letter, a third
+perspective), Ketsu 75-100% (scenes 13-16, synthesis, no winners/losers).
+Scenes 1-3 are textually identical to the matched control
+(pair2-three-act-control.fountain) — both templates want pure
+establishment before any conflict signal; divergence begins at scene 4,
+exactly where the beat maps split (Ki still running vs. Inciting Incident).
+*/
 
 INT. AMARO CONSERVATION STUDIO - MORNING
 

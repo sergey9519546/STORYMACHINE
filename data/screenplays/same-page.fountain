@@ -1,16 +1,18 @@
-// Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
-// Live-action genre: workplace comedy. AGENT-AUTHORED (Claude, 2026-08-04) as
-// a DELIBERATELY WEAK contrast-band script for
-// server/nvm/analyze/truth-extraction.ts / P1 craft-discrimination testing —
-// see docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute
-// for professionally-authored "real writing" in P1's validation sense.
-// LABELED WEAKNESS: interchangeable character voices. Alex, Jordan, and
-// Casey are given different jobs and different opinions on paper, but all
-// three share the same clipped hedging cadence ("I mean," "Honestly,"
-// "Kind of," short sentences, no distinct vocabulary or rhythm) — cover the
-// character names and the lines are not attributable to a specific speaker.
-// Meant to read as a plausible early-career draft: the PLOT is coherent and
-// the jokes land at a competent level, the voices just never differentiate.
+/*
+Original work contributed to STORYMACHINE benchmark, CC0 (public domain dedication).
+Live-action genre: workplace comedy. AGENT-AUTHORED (Claude, 2026-08-04) as
+a DELIBERATELY WEAK contrast-band script for
+server/nvm/analyze/truth-extraction.ts / P1 craft-discrimination testing —
+see docs/p1-benchmark/CC0_CORPUS_EXPANSION_2026-08-04.md. Not a substitute
+for professionally-authored "real writing" in P1's validation sense.
+LABELED WEAKNESS: interchangeable character voices. Alex, Jordan, and
+Casey are given different jobs and different opinions on paper, but all
+three share the same clipped hedging cadence ("I mean," "Honestly,"
+"Kind of," short sentences, no distinct vocabulary or rhythm) — cover the
+character names and the lines are not attributable to a specific speaker.
+Meant to read as a plausible early-career draft: the PLOT is coherent and
+the jokes land at a competent level, the voices just never differentiate.
+*/
 
 INT. BRIGHTLEAF MARKETING - OPEN OFFICE - MORNING
 

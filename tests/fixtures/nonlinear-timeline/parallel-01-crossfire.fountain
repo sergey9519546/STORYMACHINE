@@ -1,9 +1,11 @@
-// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
-// consistency mechanism material, 2026-08-03). Parallel-action structure:
-// a heist crosscut between two threads using MEANWHILE / SIMULTANEOUSLY
-// heading markers, per the markers extractTemporalConstraints() actually
-// parses (checked against heading + extracted narrative fields). Temporally
-// clean as written -- 0 expected contradictions.
+/*
+Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+consistency mechanism material, 2026-08-03). Parallel-action structure:
+a heist crosscut between two threads using MEANWHILE / SIMULTANEOUSLY
+heading markers, per the markers extractTemporalConstraints() actually
+parses (checked against heading + extracted narrative fields). Temporally
+clean as written -- 0 expected contradictions.
+*/
 
 INT. MERIDIAN MUSEUM - EAST GALLERY - NIGHT
 

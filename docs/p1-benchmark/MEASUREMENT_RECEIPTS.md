@@ -1348,3 +1348,211 @@ holds (full suite green at the commit carrying this note).
   in-repo fixtures for a change that relocates where analysis executes, and it
   proves nothing at all about the real corpus, which this change does not
   touch."
+
+### 2026-09-04 — CORPUS-INTEGRITY CORRECTION: the in-repo fixtures were being scored with their own provenance headers (no real-corpus measurement run, and none claimed)
+
+This entry is **not** a scoring measurement and does not claim one. It records
+a change to the DATA every in-repo measurement is taken over, and states
+exactly which committed numbers moved as a result. The correct instrument here
+is the output-identity harness — but unlike every other output-identity receipt
+in this ledger, this one is a deliberate **FAIL**: the whole point of the change
+is that reports over these fixtures were wrong and had to move.
+
+- **Date:** 2026-09-04
+- **Baseline used:** `git archive main` at
+  `26b828f4428fd7ee9b2431735e4ba5bef773714a` — the tip of the branch being
+  merged into, extracted into a scratch tree with `node_modules` symlinked so
+  both trees resolved identical dependency versions. This branch's own commit
+  hashes are deliberately not cited: they change on every rebase, and a receipt
+  has to name something a reviewer can still resolve.
+  The figures below were first measured against `fbd8ee15`, which was the tip at
+  the time; `main` then advanced by one commit (a11y token work in
+  `src/components/**` plus `scripts/verify-a11y.mjs`) while this work was in
+  flight. Rather than assume that commit could not move a report, the whole
+  snapshot was re-taken at the new tip and the two baselines compared directly:
+  **all 45 baseline reports are byte-identical between `fbd8ee15` and
+  `26b828f4`**, so every number in this entry is unchanged by the rebase and the
+  compare below is against the current tip.
+
+- **The defect.** Every `data/screenplays/*.fountain` file, the built-in sample
+  screenplay the product ships to visitors (`src/lib/sample-script.ts`'s
+  `fountain` export and its frozen twin `demo/corpus/sample-script.fountain`),
+  and 10 fixtures under `tests/fixtures/` opened with a `//`-prefixed
+  provenance/licence header. **`//` is not Fountain comment syntax.** Fountain's
+  comment is the boneyard, `/* */` (`src/lib/fountain.ts:110`); everything that
+  is not a slugline, cue, section, synopsis, note, lyric or transition is
+  ACTION. So `parseFountain` typed those header lines `action`, `segmentScenes`
+  folded them into scene 0, and the repository's own filing metadata was scored
+  as though the author had written it. The fix moves the identical text into a
+  real `/* */` boneyard — nothing is deleted, the CC0 licensing record is intact,
+  and not one word of any screenplay changed.
+
+- **Command — measuring the contamination** (both trees, 20 CC0 fixtures, with
+  and without the header, via `analyzeFountainText` + `runScriptDoctor`):
+  a scratch harness importing the tree's own
+  `server/nvm/analyze/fountain-analyzer.ts` and `server/nvm/analyze/doctor.ts`.
+  Measured, over the 20 tracked CC0 scripts:
+  - **20 of 20** files carried a header (3–15 lines, 22–149 words of metadata).
+  - **10 of 20** headers contained `DANGER_TENSION_WORDS` — `death` (×10),
+    `dead`, `kills`, `stabs` — from phrases like "DEATH-RECALL TAG",
+    "stabs NAME to death", "kills NAME".
+  - **106 of the corpus's 237 detected clue seeds (44.7%)** existed only because
+    of the header: `storymachine` (all 20 files), `real-writing`, `agent`,
+    `authored`, `recall-tag`, `labeled-weakness`, `deliberately-weak`, `miss`,
+    `flashback`, `drowns`, `i-mean`, `honestly`. On
+    `the-key-under-the-mat.fountain` the header even pre-seeded the fixture's own
+    planted clue (`the-key-is-under-the-mat-dont-wait-too-long`) — the exact
+    thing that fixture exists to test as *unpaid-off*.
+  - `undertow.fountain` reproduces the reported case exactly: header removal
+    drops scene 1's `suspenseDelta` from **3 to 0** and removes both
+    `CLIMAX_TOO_EARLY @ Scene 1` and `FALSE_CLIMAX @ Scene 1` from the top ten.
+
+- **Command — establishing what moved** (the 45-fixture output-identity set):
+  ```
+  node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>
+  node scripts/check-doctor-output-identity.mjs --tree .          --out <after>
+  node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  ```
+  Exit codes 0 / 0 / **1**, captured by redirecting each run to a log file and
+  reading `$?`. Result, verbatim:
+  ```
+  OUTPUT IDENTITY: FAIL — 25 fixture(s) differ.
+  ```
+  **This failure is the finding, not a problem to be flagged away.** The 25 are
+  the 20 `data/screenplays` fixtures, the P0 sample script, and the 4 synthetic
+  concatenations built from those same screenplays. The **20 calibration
+  `REFERENCE_CORPUS` samples are byte-identical**, which is the control that
+  says the code did not change: they carry no `//` headers, and nothing moved
+  for them.
+
+  Per-fixture movement (health · findings · verdict · sceneCount):
+
+  | fixture | health | findings | verdict | scenes |
+  |---|---|---|---|---|
+  | chain-of-custody | 74.6 → 76.3 | 195 → 178 | CONSIDER (same) | 13 (same) |
+  | close-quarters | 72.5 → 75.6 | 208 → 191 | CONSIDER | 13 |
+  | code-blue | 76.1 → 78.0 | 219 → 194 | CONSIDER | 14 |
+  | counter-offer | 76.0 → 76.0 | 193 → 191 | CONSIDER | 10 |
+  | dead-frequency | 78.3 → 78.3 | 174 → 173 | CONSIDER | 12 |
+  | high-voltage | 76.1 → 75.4 | 200 → 213 | CONSIDER | 13 |
+  | mise | 72.9 → 74.2 | 222 → 208 | CONSIDER | 12 |
+  | off-season | 71.2 → 71.2 | 171 → 171 | CONSIDER | 9 |
+  | quiet-season | 71.7 → 73.2 | 143 → 138 | CONSIDER | 10 |
+  | red-line | 73.1 → 73.7 | 249 → 246 | CONSIDER | 14 |
+  | room-12 | 30.9 → 33.5 | 207 → 197 | PASS | 10 |
+  | runoff | 74.6 → 74.6 | 145 → 142 | CONSIDER | 9 |
+  | same-page | 75.4 → 75.8 | 166 → 166 | CONSIDER | 11 |
+  | soft-launch | 76.4 → 77.3 | 176 → 162 | CONSIDER | 12 |
+  | the-defense-rests | 76.2 → 77.0 | 194 → 187 | CONSIDER | 12 |
+  | the-detour | 72.7 → 74.0 | 166 → 155 | CONSIDER | 11 |
+  | the-key-under-the-mat | 73.6 → 74.2 | 200 → 189 | CONSIDER | 11 |
+  | transfer-window | 31.6 → 31.9 | 215 → 218 | PASS | 10 |
+  | two-lane | 76.6 → 79.0 | 215 → 174 | CONSIDER | 13 |
+  | undertow | 76.7 → 77.1 | 161 → 159 | CONSIDER | 12 |
+  | p0/sample-script | 78.3 → 78.3 | 174 → 173 | CONSIDER | 12 |
+  | synthetic 60/120/240/300 | unchanged | 565→578 / 738→758 / 918→908 / 968→957 | RECOMMEND | unchanged |
+
+  **No verdict changed and no scene count changed anywhere.** Health moved
+  −0.7 to +3.1 (18 of 21 non-synthetic fixtures up, 1 down, 2 flat).
+
+- **Why the new numbers are right, checked rather than assumed.** Across all 20
+  scripts the per-scene `suspenseDelta` series changed **at scene index 0 and
+  nowhere else** — 13 files moved there, 7 were already 0 there and did not move
+  at all. Scene-0 suspense before → after: chain-of-custody 3→1,
+  close-quarters 4→0, code-blue 3→−1, high-voltage 3→1, mise 1→0,
+  quiet-season 1→0, red-line 3→0, same-page 1→0, soft-launch 2→1,
+  the-defense-rests 1→−1, the-key-under-the-mat 1→0, two-lane 1→0, undertow 3→0.
+  A metadata-only contamination predicts exactly that shape; a code regression
+  would not produce it.
+
+- **Expectations re-locked, and why each new value is right.**
+  1. `tests/core/agency-signal.test.ts`'s 20-row `LOCKED_CORPUS_TABLE` — **12 of
+     20 rows moved**, all through `peakSceneIdxs`, which is downstream of the
+     scene-0 suspense figures above. The number of scripts whose SOLE
+     peak-suspense scene was scene 1 went **9 → 0**; whose peak set merely
+     includes scene 1, **15 → 8**. The table's own aggregate honesty assertions
+     did NOT move — D1 disagreement still 1/20 (`mise`), D2 still 3/20
+     (`quiet-season`, `the-detour`, `undertow`) — so the detector's selectivity
+     claim survives the correction, which is the useful thing to know about it.
+     `allSpectatorAtPeak` moved 8/20 → 6/20; `anyAgencyAtPeak` stayed 4/20 on a
+     different four scripts. Re-measured by running the detector, not hand-tuned.
+  2. `demo/corpus/MANIFEST.json` — bumped v2 → v3 with the new sha256 and a
+     `retiredReason` naming this correction. The frozen file and the live
+     `src/lib/sample-script.ts` export are byte-identical to each other after the
+     change (`tests/core/demo-corpus-freeze.test.ts` re-passes), so this is a
+     deliberate version bump, not a drift.
+  - **Not re-locked, and cannot be from here:**
+    `tests/fixtures/real-corpus-manifest.json`. It pins the private, local-only
+    corpus, which this container has no copy of. Nothing in this range changes
+    any code that could move a produced script's health, verdict or scene count,
+    so no re-lock is owed *by the code* — but see the attestation below for the
+    separate reason the owner may owe one anyway.
+
+- **What this correction did NOT fix (stated so nobody reads it as complete).**
+  1. **The metadata is still in the health denominator.**
+     `fountain-analyzer.ts` computes `wordCount` as `fastWordCount(fountain)`
+     over the RAW text, which counts boneyard words too. No Fountain comment
+     syntax hides text from that — only deletion would. `wordCount^0.7` is the
+     health density denominator, so the licence text still inflates health
+     slightly: `undertow` now counts 884 words against an 826-word screenplay,
+     `the-key-under-the-mat` 890 against 739 (≈7–17% metadata). Deleting the
+     header entirely rather than boneyarding it would take undertow's findings
+     to 154 instead of the 159 measured here — that 5-finding gap is exactly
+     this residual. Fixing it changes health for every script anyone analyses,
+     which is a scoring change needing a real-corpus measurement this correction
+     did not run.
+  2. **`parseFountain` has no title-page handling at all.** `Title:` /
+     `Credit:` / `Author:` / `Draft date:` lines are typed `action` and scored
+     the same way the `//` headers were. That one reaches real user drafts —
+     title pages are ordinary in submitted screenplays — and it is visible in
+     this repo on `tests/fixtures/feature-scale-discrimination/*` and
+     `tests/fixtures/unicode-cues/*`. Open finding, same scoring-change caveat;
+     recorded at the guard test's marker list and in
+     `docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md`'s correction note.
+
+- **Guard added so it cannot recur:**
+  `tests/core/fixture-provenance-comment-guard.test.ts` (105 assertions). It
+  scans every `*.fountain` under `data/screenplays/`, `demo/`, `tests/fixtures/`
+  and `evals/`, plus the sample script's embedded Fountain string, and asserts
+  (a) no line begins with `//`, (b) parsed through the real `parseFountain`, no
+  non-boneyard block carries a provenance marker, and (c) the CC0 declaration is
+  still present INSIDE the boneyard — so a future "fix" that deletes the
+  licensing record fails too. Both failure directions were verified by
+  deliberately reintroducing each defect and watching the guard fail (2 failures
+  for a re-added `//` header, 1 for a removed CC0 line), then restoring.
+
+- **Corpus fingerprint:** no real-corpus text was read; this container has no
+  copy of it. The input is the 20 tracked CC0 fixtures, whose concatenated
+  content digest (`cat data/screenplays/*.fountain | sha256sum`, files in shell
+  glob order) moved from
+  `4a7db54fa724b3cbc4937f66bf83f9577961a7b368da82d4b9574c2eec74e058` (main) to
+  `1f967ce496be043d50c72fef29f0b6ac675388d6c1488f1b91f71a9025f0702c` (this
+  range). `tests/fixtures/real-corpus-manifest.json` is unchanged by this range.
+
+- **Runner attestation:** "I, the Claude Code session working in an isolated
+  worktree (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the
+  baseline tree myself, wrote and ran the contamination harness myself, and ran
+  the three output-identity commands myself on 2026-09-04, reading each result
+  and exit code out of its own log file. Every figure above is copied from those
+  runs. **I did not run any real-corpus measurement.** No AUC was computed, no
+  `npm run measure-real`, no `measure-auc-split.mjs` — the 761-script corpus is
+  local-only and this container has no copy of it, so I could not have. I am
+  making no claim about AUC-24 or any P1 statistic. I want the sharpest
+  consequence of this finding on the record plainly, because it is the part I
+  cannot check and the owner can: **the private corpus may carry the same
+  defect.** If those script files begin with `//` lines, or with any plain-text
+  provenance, licence or filing header, then every measurement ever taken over
+  them — the AUC-24 ratchet at 0.622 (last measured 0.731), the 761-script
+  discrimination baseline, and `tests/fixtures/real-corpus-manifest.json`'s
+  locked health/verdict/sceneCount values — inherits exactly the contamination
+  corrected here. One grep settles it: `grep -c '^//' <corpus>/*` and a look at
+  the first non-blank lines of a handful of files. Until that check is run, I
+  would treat those numbers as unverified rather than wrong; I have no evidence
+  either way, and saying otherwise would be inventing it. One in-repo document
+  gives the check some urgency:
+  `docs/p1-benchmark/SUSPENSE_DELTA_DEGENERACY_2026-08-05.md` measured the
+  `suspenseDelta` peak at 0–1% of the script on 27 of 27 produced features and
+  attributed it to action-heavy cold opens — which is precisely the signature a
+  provenance header produces, and precisely the pattern the 20 in-repo fixtures
+  showed before this fix (9 of 20 peaking at scene 1 alone, 0 of 20 after).
+  That competing explanation has never been ruled out."

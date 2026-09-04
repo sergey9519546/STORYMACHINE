@@ -1,14 +1,16 @@
-// Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
-// Three-act CONTROL, Pair 1 (n=12 scenes), matched to
-// pair1-kishotenketsu.fountain: same protagonist, setting, scene count, and
-// prose register — restructured around server/lib/structure-presets.ts's
-// three_act template (Act One 0-22%, Inciting 22-28%, Act Two 28-72%, Climax
-// 72-86%, Act Three 86-100%). Scenes 1-2 are textually identical to the
-// kishotenketsu arm (both templates want conflict-free establishment there);
-// the antagonist and escalating conflict enter at scene 3, exactly where the
-// beat maps diverge, and the story resolves with a clear winner and loser
-// (the three-act template's own design), unlike the kishotenketsu arm's
-// synthesis ending.
+/*
+Original work, written for STORYMACHINE_STRUCTURAL_FORM_EXPERIMENT_2026-08-03.
+Three-act CONTROL, Pair 1 (n=12 scenes), matched to
+pair1-kishotenketsu.fountain: same protagonist, setting, scene count, and
+prose register — restructured around server/lib/structure-presets.ts's
+three_act template (Act One 0-22%, Inciting 22-28%, Act Two 28-72%, Climax
+72-86%, Act Three 86-100%). Scenes 1-2 are textually identical to the
+kishotenketsu arm (both templates want conflict-free establishment there);
+the antagonist and escalating conflict enter at scene 3, exactly where the
+beat maps diverge, and the story resolves with a clear winner and loser
+(the three-act template's own design), unlike the kishotenketsu arm's
+synthesis ending.
+*/
 
 INT. CAPE HALLOW LIGHTHOUSE - SPIRAL STAIR - DAWN
 

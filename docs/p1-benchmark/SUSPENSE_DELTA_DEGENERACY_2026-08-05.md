@@ -38,6 +38,27 @@ the `structuralDeduction`'s peak-finding all consume as "the climax"):
 - The peak value is **5 on all 27** (the clamp ceiling in
   `detectSuspenseDelta`).
 
+> **⚠ 2026-09-04 — a competing explanation for this table has never been ruled
+> out, and it is cheap to rule out.** The "Why" section below attributes the
+> 0–1% median peak to action-heavy cold opens. That may well be right. But on
+> 2026-09-04 the 20 tracked in-repo CC0 fixtures were found to be scoring their
+> own `//` provenance headers as ACTION (`//` is not Fountain comment syntax —
+> the boneyard `/* */` is, `src/lib/fountain.ts:110`), and the resulting shape
+> was *this* shape: 9 of 20 scripts had scene 1 as their SOLE peak-suspense
+> scene, 15 of 20 had it in the peak set. After the headers were moved into real
+> boneyards: **0 of 20 and 8 of 20**, with the per-scene `suspenseDelta` series
+> changing at scene index 0 and nowhere else. See
+> `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, 2026-09-04.
+>
+> The 27 files measured here are `*.fountain.txt` produced features from the
+> **private, local-only** corpus, which the 2026-09-04 correction could not
+> reach. So this note claims nothing about them — only that the finding above
+> has two candidate mechanisms, one of which is a data defect that has now been
+> confirmed in the sibling corpus, and the doc currently reports only the other.
+> The check costs one command on the owner's machine: `grep -c '^//' <corpus>/*`
+> plus a look at the first non-blank lines of a few files. Until it is run, this
+> table's mechanism is unresolved, not established.
+
 ## Why (source-level, `fountain-analyzer.ts:581-592`)
 
 ```js

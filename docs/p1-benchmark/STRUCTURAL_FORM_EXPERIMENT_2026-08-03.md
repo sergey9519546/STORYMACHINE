@@ -95,7 +95,20 @@ three-act script against a deliberately weak or strawman Kishōtenketsu one
    place.
 3. **Matched scene count exactly** (12/12, 16/16) and **matched word count
    closely**: Pair 1, 945 vs. 952 words (0.7% apart); Pair 2, 1,161 vs.
-   1,073 words (7.6% apart, control shorter). Matched dialogue ratio by a
+   1,073 words (7.6% apart, control shorter).
+   > **⚠ 2026-09-04 — those word counts included unequal metadata.** All four
+   > fixtures carried a `//`-prefixed provenance header that the parser read as
+   > ACTION (`//` is not Fountain comment syntax — the boneyard `/* */` is,
+   > `src/lib/fountain.ts:110`), and the two arms of each pair carried headers of
+   > DIFFERENT lengths: Pair 1, 88 vs. 91 header words; Pair 2, 101 vs. 84. So 3
+   > of Pair 1's disclosed 7-word gap and 17 of Pair 2's disclosed 88-word gap
+   > were repository filing metadata, not screenplay — in a design whose whole
+   > premise is holding everything but structural form constant. The headers are
+   > now real boneyards. Post-fix counts: Pair 1, 937 vs. 943; Pair 2, 1,151 vs.
+   > 1,065. (`wordCount` still counts boneyard text — see
+   > `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, 2026-09-04, for that residual —
+   > so these are still not pure body counts; the *unequal* part is what the fix
+   > removed.) Matched dialogue ratio by a
    simple lexical count (dialogue words / total words): Pair 1, 0.40 vs.
    0.42; Pair 2, 0.30 vs. 0.37 — the control runs a bit more dialogue-heavy
    in Pair 2, which is disclosed rather than smoothed over, since
@@ -132,6 +145,32 @@ docs/p1-benchmark/probe-structural-form-bias.mjs`):
 | 1 | Three-act control ("The Last Watch") | 12 | 952 | 78.3 | strong | CONSIDER | 2 / 32 / 116 (150) |
 | 2 | Kishōtenketsu ("The Restorer's Hand") | 16 | 1,161 | 81.0 | strong | CONSIDER | 1 / 40 / 158 (199) |
 | 2 | Three-act control ("Border of Lies") | 16 | 1,073 | 81.3 | strong | CONSIDER | 1 / 40 / 128 (169) |
+
+> **⚠ 2026-09-04 — re-measured after the corpus-integrity correction, and the
+> conclusion holds.** The four fixtures' `//` provenance headers were converted
+> to real boneyards (see the note under "Matched scene count" above). The table
+> was then re-run on `main` (at `fbd8ee15`, whose doctor reports are
+> byte-identical to the current tip `26b828f4428fd7ee9b2431735e4ba5bef773714a`
+> across all 45 in-repo fixtures) and on
+> the corrected tree, same code both times:
+>
+> | Pair / form | health (main, contaminated) | health (corrected) | issues (main) | issues (corrected) |
+> |---|---|---|---|---|
+> | 1 Kishōtenketsu | 78.3 | **78.3** | 1/32/100 (133) | 1/32/100 (133) |
+> | 1 three-act control | 78.3 | **78.3** | 2/32/110 (144) | 2/32/98 (132) |
+> | 2 Kishōtenketsu | 81.3 | **81.3** | 1/39/119 (159) | 1/35/123 (159) |
+> | 2 three-act control | 81.3 | **81.3** | 1/38/128 (167) | 1/36/127 (164) |
+>
+> **The health deltas are 0.0 and 0.0 after the correction** — the experiment's
+> finding (no structural-form bias in health) is unaffected. Two caveats worth
+> stating rather than burying. First, the issue counts moved, so any conclusion
+> drawn from issue COUNTS in this doc rather than from health should be re-run.
+> Second, the table above already differed from `main` BEFORE this correction —
+> the doc records Pair 2 Kishōtenketsu at health 81.0 and issue totals of
+> 145/150/199/169, while `main` itself now produces 81.3 and 133/144/159/167.
+> That drift is from later engine changes, not from this correction, and it means
+> the printed table is stale on its own terms: re-run the probe before citing any
+> single number from it.
 
 **Health delta (Kishōtenketsu − control): Pair 1 = 0.0, Pair 2 = −0.3.**
 Both deltas are far inside rounding/formatting noise, not a directional

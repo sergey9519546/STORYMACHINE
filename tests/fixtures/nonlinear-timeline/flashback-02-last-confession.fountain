@@ -1,10 +1,12 @@
-// Original work, written for tests/fixtures/nonlinear-timeline (temporal-
-// consistency mechanism material, 2026-08-03). Flashback-framed structure:
-// a deathbed present tense frame with two FLASHBACK insertions (one a
-// longer multi-scene continuous run, one a short single scene), each
-// returning via a CONTINUOUS-marked scene, per the markers
-// extractTemporalConstraints() actually parses (heading-only FLASHBACK /
-// CONTINUOUS). Temporally clean as written -- 0 expected contradictions.
+/*
+Original work, written for tests/fixtures/nonlinear-timeline (temporal-
+consistency mechanism material, 2026-08-03). Flashback-framed structure:
+a deathbed present tense frame with two FLASHBACK insertions (one a
+longer multi-scene continuous run, one a short single scene), each
+returning via a CONTINUOUS-marked scene, per the markers
+extractTemporalConstraints() actually parses (heading-only FLASHBACK /
+CONTINUOUS). Temporally clean as written -- 0 expected contradictions.
+*/
 
 INT. RIVERBEND HOSPICE - ROOM FOUR - DAY
 

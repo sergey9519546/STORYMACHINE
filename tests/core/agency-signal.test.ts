@@ -361,6 +361,39 @@ describe('agency-signal — determinism', () => {
 // ever needs to change, it must be because a detection RULE changed (the
 // falsifiability property this module's own header claims) — re-measure,
 // don't hand-tune the table to match a broken run.
+//
+// RE-LOCKED 2026-09-04 — CORPUS-INTEGRITY CORRECTION, not a rule change.
+// The 2026-08-04 lock measured a CONTAMINATED corpus. Every
+// data/screenplays/*.fountain file opened with a `//`-prefixed provenance
+// header, and `//` is not Fountain comment syntax (the boneyard is `/* */` —
+// src/lib/fountain.ts:110), so parseFountain typed those lines `action` and
+// segmentScenes folded them into scene 0. Header phrases like "DEATH-RECALL
+// TAG", "stabs NAME to death" and "kills NAME" are DANGER_TENSION_WORDS hits,
+// so the metadata raised scene 0's suspenseDelta and made scene 0 the
+// peak-suspense scene of scripts whose drama peaks elsewhere. The headers are
+// now real `/* */` boneyards (same words, same licence record, invisible to
+// the parser) and this table is a fresh measurement of the clean corpus.
+//
+// The correction is falsifiable and was checked, not assumed: across all 20
+// scripts the per-scene suspenseDelta series changed AT SCENE INDEX 0 AND
+// NOWHERE ELSE (13 of 20 files moved at index 0; 7 were already 0 there and
+// did not move at all). Scene-0 suspense before -> after:
+//   chain-of-custody 3->1  close-quarters 4->0  code-blue 3->-1
+//   high-voltage 3->1      mise 1->0            quiet-season 1->0
+//   red-line 3->0          same-page 1->0       soft-launch 2->1
+//   the-defense-rests 1->-1  the-key-under-the-mat 1->0  two-lane 1->0
+//   undertow 3->0
+// 12 of the 20 rows below therefore moved. The headline shift: the number of
+// scripts whose SOLE peak-suspense scene was scene 1 went 9 -> 0, and the
+// number whose peak set merely INCLUDES scene 1 went 15 -> 8. Where a script
+// now shows every scene as a peak (quiet-season, room-12, same-page) that is
+// the honest reading — with the metadata gone those drafts carry no danger
+// signal anywhere, so every scene ties at 0.
+//
+// The aggregate honesty assertions at the bottom of this file did NOT move:
+// d1Disagreement is still 1 (mise) and d2Disagreement still 3 (quiet-season,
+// the-detour, undertow) — the detector's selectivity claim survives the
+// correction, which is the useful thing to know about it.
 interface CorpusRow {
   file: string;
   protagonist: string;
@@ -375,26 +408,26 @@ interface CorpusRow {
 }
 
 const LOCKED_CORPUS_TABLE: CorpusRow[] = [
-  { file: 'chain-of-custody.fountain', protagonist: 'NELL', sceneCount: 13, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
-  { file: 'close-quarters.fountain', protagonist: 'ROSALIND', sceneCount: 13, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
-  { file: 'code-blue.fountain', protagonist: 'RIVA', sceneCount: 14, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
+  { file: 'chain-of-custody.fountain', protagonist: 'NELL', sceneCount: 13, peakSceneIdxs: [0, 1, 3, 7], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
+  { file: 'close-quarters.fountain', protagonist: 'ROSALIND', sceneCount: 13, peakSceneIdxs: [5], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
+  { file: 'code-blue.fountain', protagonist: 'RIVA', sceneCount: 14, peakSceneIdxs: [5], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
   { file: 'counter-offer.fountain', protagonist: 'WREN', sceneCount: 10, peakSceneIdxs: [0, 2], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'dead-frequency.fountain', protagonist: 'MAYA', sceneCount: 12, peakSceneIdxs: [4, 8], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 3, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'high-voltage.fountain', protagonist: 'JUNE', sceneCount: 13, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
+  { file: 'high-voltage.fountain', protagonist: 'JUNE', sceneCount: 13, peakSceneIdxs: [0, 1, 2, 5, 9], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
   { file: 'mise.fountain', protagonist: 'LUCIA', sceneCount: 12, peakSceneIdxs: [4], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: true, d2Disagreement: false },
   { file: 'off-season.fountain', protagonist: 'GRETA', sceneCount: 9, peakSceneIdxs: [8], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'quiet-season.fountain', protagonist: 'MARJORIE', sceneCount: 10, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: true },
-  { file: 'red-line.fountain', protagonist: 'MARCUS', sceneCount: 14, peakSceneIdxs: [0, 5], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
+  { file: 'quiet-season.fountain', protagonist: 'MARJORIE', sceneCount: 10, peakSceneIdxs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: true },
+  { file: 'red-line.fountain', protagonist: 'MARCUS', sceneCount: 14, peakSceneIdxs: [5], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
   { file: 'room-12.fountain', protagonist: 'NORA', sceneCount: 10, peakSceneIdxs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'runoff.fountain', protagonist: 'SARA', sceneCount: 9, peakSceneIdxs: [8], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'same-page.fountain', protagonist: 'ALEX', sceneCount: 11, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'soft-launch.fountain', protagonist: 'NADIA', sceneCount: 12, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'the-defense-rests.fountain', protagonist: 'DESI', sceneCount: 12, peakSceneIdxs: [0], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
+  { file: 'same-page.fountain', protagonist: 'ALEX', sceneCount: 11, peakSceneIdxs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
+  { file: 'soft-launch.fountain', protagonist: 'NADIA', sceneCount: 12, peakSceneIdxs: [0, 2], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
+  { file: 'the-defense-rests.fountain', protagonist: 'DESI', sceneCount: 12, peakSceneIdxs: [1, 3, 4, 5, 6, 7, 9, 10, 11], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'the-detour.fountain', protagonist: 'MAYA', sceneCount: 11, peakSceneIdxs: [0, 1, 2, 3, 4, 5, 8, 9], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: true },
-  { file: 'the-key-under-the-mat.fountain', protagonist: 'NORA', sceneCount: 11, peakSceneIdxs: [0, 2], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
+  { file: 'the-key-under-the-mat.fountain', protagonist: 'NORA', sceneCount: 11, peakSceneIdxs: [2], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'transfer-window.fountain', protagonist: 'DEV', sceneCount: 10, peakSceneIdxs: [1, 4], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'two-lane.fountain', protagonist: 'CORA', sceneCount: 13, peakSceneIdxs: [0, 1, 9], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
-  { file: 'undertow.fountain', protagonist: 'KAT', sceneCount: 12, peakSceneIdxs: [0], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: true },
+  { file: 'two-lane.fountain', protagonist: 'CORA', sceneCount: 13, peakSceneIdxs: [1, 9], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
+  { file: 'undertow.fountain', protagonist: 'KAT', sceneCount: 12, peakSceneIdxs: [5, 7], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: true },
 ];
 
 describe('agency-signal — measured evidence table over the 20 tracked CC0 scripts (data/screenplays/*.fountain)', () => {
