@@ -34,7 +34,7 @@ import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { logger } from '../lib/logger.ts';
 import { isWholeDraftAnalysisComplete } from '../lib/analysis-completeness.ts';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
-import { validate, CoverageLetterBodySchema } from '../lib/validation.ts';
+import { validate, CoverageLetterBodySchema, rejectPathologicalConvertedFountain } from '../lib/validation.ts';
 import type { ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
@@ -73,6 +73,9 @@ router.post('/api/export/coverage-letter', gameLimiter, validate(CoverageLetterB
       res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
       return;
     }
+    // Attack-lane audit follow-up: the fdx-conversion bypass — see
+    // rejectPathologicalConvertedFountain's header (server/lib/validation.ts).
+    if (rejectPathologicalConvertedFountain(res, converted.fountain)) return;
     fountain = converted.fountain;
   } else {
     fountain = fountainBody as string;

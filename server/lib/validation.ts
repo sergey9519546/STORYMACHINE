@@ -260,6 +260,39 @@ function fountainField() {
   });
 }
 
+// ── Post-conversion pathological-shape guard (the fdx/pdf-upload bypass) ────
+// fountainField()'s superRefine above only ever sees the RAW `fountain` field
+// a caller POSTs directly — validate() runs it against req.body BEFORE the
+// route handler exists, so it structurally cannot see text that a route
+// produces afterward by converting an uploaded `fdx` (server/lib/fdx-import.ts's
+// fdxToFountain) or PDF (server/lib/pdf-import.ts's pdfToFountain) into
+// Fountain. Every one of those conversions used to hand its output straight
+// to the analyzer with NO shape check at all — the exact two O(n²) shapes
+// fountainField() blocks on the raw-fountain path (a single huge unbroken
+// token; thousands of distinct all-caps character-cue-shaped lines — see
+// fountainShapeRejectionReason's header) reach the analyzer completely
+// unguarded from an uploaded .fdx or .pdf, because an attacker types the
+// pathological shape into the SOURCE document and the converter just relays
+// it through as Fountain. This is the single shared implementation every
+// conversion call site (server/routes/scriptide.ts, coverage-letter.ts,
+// export.ts) uses — see each call site's own comment for why it belongs
+// there and not inside doctor.ts (scoring path, out of scope for this lane).
+//
+// Returns true (and has already written the 400) when `fountain` must be
+// rejected, so a call site can `if (rejectPathologicalConvertedFountain(res, converted.fountain)) return;`
+// immediately after its existing "conversion produced an empty script" check.
+// The response body matches validate()'s own shape exactly (`{ error:
+// 'fountain: <reason>' }`) so a caller cannot tell whether the raw-fountain
+// zod path or this post-conversion path caught the same shape.
+export function rejectPathologicalConvertedFountain(res: Response, fountain: string): boolean {
+  const reason = fountainShapeRejectionReason(fountain);
+  if (reason) {
+    res.status(400).json({ error: `fountain: ${reason}` });
+    return true;
+  }
+  return false;
+}
+
 // ── Re-usable leaf schemas ───────────────────────────────────────────────────
 
 const sessionIdField = z

@@ -119,6 +119,24 @@ function nestedArrayJson(depth) {
   return '['.repeat(depth) + '1' + ']'.repeat(depth);
 }
 
+// Minimal, valid Final Draft (.fdx) XML whose converted Fountain text has `n`
+// distinct all-caps character-cue-shaped lines — the fdx-conversion-bypass
+// shape (attack-lane audit follow-up). fdxToFountain (server/lib/fdx-import.ts)
+// reads <Paragraph Type="Character"><Text>...</Text></Paragraph> /
+// Type="Dialogue" pairs; see server/lib/validation.ts's
+// rejectPathologicalConvertedFountain for the guard this is meant to trip.
+function pathologicalFdx(n) {
+  let body = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n'
+    + '<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n'
+    + '<Paragraph Type="Scene Heading"><Text>INT. ROOM - DAY</Text></Paragraph>\n';
+  for (let i = 0; i < n; i++) {
+    body += `<Paragraph Type="Character"><Text>CHARACTER${i}</Text></Paragraph>\n`;
+    body += '<Paragraph Type="Dialogue"><Text>Line.</Text></Paragraph>\n';
+  }
+  body += '</Content>\n</FinalDraft>';
+  return body;
+}
+
 // ── Payload families ─────────────────────────────────────────────────────────
 
 const POST_ROUTES = [
@@ -215,6 +233,47 @@ async function fountainPathologyFuzz(base) {
 
   const pageBreaks = '===\n'.repeat(QUICK ? 2000 : 20_000) + 'INT. ROOM - DAY\n\nHi.\n';
   await attack(base, 'page-breaks-every-line', '/api/scriptide/doctor', jsonPost({ fountain: pageBreaks.slice(0, 899_000) }));
+
+  // ── fdx-conversion bypass (attack-lane audit follow-up) ────────────────────
+  // fountainField()'s zod guard only ever sees a caller's RAW `fountain`
+  // field — every route below converts an uploaded .fdx into Fountain text
+  // INSIDE the handler, after validate() has already run, so this shape must
+  // be independently guarded on that path too (rejectPathologicalConvertedFountain,
+  // server/lib/validation.ts). Every one of these must reject fast, not hang
+  // analyzing the converted text.
+  const fdxCueCount = QUICK ? 1600 : 1600; // over the 1,500 ceiling either way; kept small since fdx parsing itself is cheap
+  const fdx = pathologicalFdx(fdxCueCount);
+  const fdxRoutes = [
+    '/api/scriptide/doctor',
+    '/api/scriptide/doctor/deep',
+    '/api/export/coverage-letter',
+    '/api/export/coverage',
+    '/api/export/breakdown',
+    '/api/export/pitchkit',
+  ];
+  for (const path of fdxRoutes) {
+    await attack(base, `fdx-conversion-bypass ${path}`, path, jsonPost({ fdx }),
+      'must reject fast via the post-conversion shape guard, not hang analyzing it');
+  }
+  await attack(base, 'fdx-conversion-bypass /api/export/verify', '/api/export/verify', jsonPost({ fdx, expected: { contentHash: 'a'.repeat(64) } }),
+    'must reject fast via the post-conversion shape guard, not hang analyzing it');
+  // SSE route: a 200 with a doctor_error frame is this route's honest shape
+  // (see server/routes/scriptide.ts's own comment) — record it as ok as long
+  // as it's fast and the body actually carries the rejection, not a report.
+  {
+    const start = Date.now();
+    try {
+      const r = await fetch(base + '/api/scriptide/doctor/stream', { ...jsonPost({ fdx }), signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      const text = await r.text();
+      const rejected = text.includes('doctor_error') && text.includes('distinct all-caps character-cue-shaped lines');
+      record('fdx-conversion-bypass /api/scriptide/doctor/stream (SSE)', {
+        status: rejected ? 200 : 500, ms: Date.now() - start,
+        note: rejected ? 'rejected via doctor_error frame' : 'FINDING: did not emit the expected doctor_error rejection',
+      });
+    } catch (e) {
+      record('fdx-conversion-bypass /api/scriptide/doctor/stream (SSE)', { status: null, ms: Date.now() - start, err: String(e?.message || e) });
+    }
+  }
 }
 
 async function pathParamFuzz(base) {

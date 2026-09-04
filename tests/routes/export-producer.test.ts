@@ -290,6 +290,27 @@ Someone's here.
     const body = await res.json();
     assert.match(body.error, /exactly one of fountain or fdx/);
   });
+
+  // Attack-lane audit follow-up (fdx-conversion bypass) — this route shares
+  // export.ts's resolveFountainOrRespond() helper with pitchkit and verify,
+  // so this is the shared implementation's regression coverage for THIS
+  // route; see tests/routes/scriptide-doctor.test.ts's own copy of this
+  // test for the full rationale.
+  it('POST an fdx whose converted Fountain has 1,600 distinct character cues is rejected fast, not analyzed', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 1600; i++) fountain += `CHARACTER${i}\nLine.\n\n`;
+    const fdx = fountainToFdx(fountain, 'Pathological');
+
+    const start = Date.now();
+    const res = await post({ fdx });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
+    // 1000ms, not 100ms — see tests/routes/scriptide-doctor.test.ts's own
+    // copy of this test for why (measured `npm test` full-suite contention).
+    assert.ok(ms < 1000, `expected a fast rejection (<1000ms), took ${ms}ms — the fdx-path guard may not be firing`);
+  });
 });
 
 describe('routes/export/pitchkit — HTTP behavior', async () => {
@@ -328,6 +349,26 @@ describe('routes/export/pitchkit — HTTP behavior', async () => {
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /<svg/);
+  });
+
+  // Attack-lane audit follow-up (fdx-conversion bypass) — this route shares
+  // export.ts's resolveFountainOrRespond() helper with breakdown and verify;
+  // see tests/routes/scriptide-doctor.test.ts's own copy of this test for
+  // the full rationale.
+  it('POST an fdx whose converted Fountain has 1,600 distinct character cues is rejected fast, not analyzed', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 1600; i++) fountain += `CHARACTER${i}\nLine.\n\n`;
+    const fdx = fountainToFdx(fountain, 'Pathological');
+
+    const start = Date.now();
+    const res = await post({ fdx });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
+    // 1000ms, not 100ms — see tests/routes/scriptide-doctor.test.ts's own
+    // copy of this test for why (measured `npm test` full-suite contention).
+    assert.ok(ms < 1000, `expected a fast rejection (<1000ms), took ${ms}ms — the fdx-path guard may not be firing`);
   });
 
   it('refuses to export a pitch kit from a scene-truncated partial analysis', async () => {

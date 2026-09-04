@@ -197,6 +197,24 @@ describe('routes/scriptide/doctor/deep — HTTP behavior', async () => {
     assert.ok(typeof body.error === 'string' && body.error.length > 0);
   });
 
+  // Attack-lane audit follow-up (fdx-conversion bypass) — see
+  // scriptide-doctor.test.ts's own copy of this test for the full rationale.
+  it('POST an fdx whose converted Fountain has 1,600 distinct character cues is rejected fast, not analyzed', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 1600; i++) fountain += `CHARACTER${i}\nLine.\n\n`;
+    const fdx = fountainToFdx(fountain, 'Pathological');
+
+    const start = Date.now();
+    const res = await postDeep({ fdx });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
+    // 1000ms, not 100ms — see tests/routes/scriptide-doctor.test.ts's own
+    // copy of this test for why (measured `npm test` full-suite contention).
+    assert.ok(ms < 1000, `expected a fast rejection (<1000ms), took ${ms}ms — the fdx-path guard may not be firing`);
+  });
+
   it('regression: quick /doctor still never carries a deepRead field', async () => {
     const res = await postDoctor({ fountain: MULTI_SCENE_FOUNTAIN });
     assert.equal(res.status, 200);

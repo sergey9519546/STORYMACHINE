@@ -295,6 +295,30 @@ describe('routes/export/verify — HTTP behavior', async () => {
     assert.match(body.error, /exactly one of fountain or fdx/);
   });
 
+  // Attack-lane audit follow-up (fdx-conversion bypass) — this route shares
+  // export.ts's resolveFountainOrRespond() helper with breakdown and
+  // pitchkit; see tests/routes/scriptide-doctor.test.ts's own copy of this
+  // test for the full rationale. The shape guard must fire BEFORE the
+  // contentHash comparison, so any well-formed (if wrong) hash proves the
+  // point — this deliberately does not reuse the real `contentHash` fixture
+  // above, since a real match would let the route reach its normal
+  // doctor-verification path instead of the guard this test targets.
+  it('POST an fdx whose converted Fountain has 1,600 distinct character cues is rejected fast, not analyzed', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 1600; i++) fountain += `CHARACTER${i}\nLine.\n\n`;
+    const fdx = fountainToFdx(fountain, 'Pathological');
+
+    const start = Date.now();
+    const res = await post({ fdx, expected: { contentHash: 'a'.repeat(64) } });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
+    // 1000ms, not 100ms — see tests/routes/scriptide-doctor.test.ts's own
+    // copy of this test for why (measured `npm test` full-suite contention).
+    assert.ok(ms < 1000, `expected a fast rejection (<1000ms), took ${ms}ms — the fdx-path guard may not be firing`);
+  });
+
   it('is deterministic: verifying twice yields identical bodies apart from verifiedAt', async () => {
     const expected = { contentHash, health: report.health, verdict: report.verdict, totalIssues: report.totalIssues };
 

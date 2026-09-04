@@ -190,6 +190,32 @@ describe('routes/scriptide/doctor/stream — SSE behavior', async () => {
     }
   });
 
+  // Attack-lane audit follow-up (fdx-conversion bypass) — see
+  // scriptide-doctor.test.ts's own copy of this test for the full rationale.
+  // This route answers with an SSE doctor_error frame rather than a plain
+  // 400 (rejectPathologicalConvertedFountain writes a real HTTP 400, which
+  // this route never sends once the SSE stream has opened — see the route's
+  // own comment in server/routes/scriptide.ts), so this asserts that frame
+  // shape instead of res.status.
+  it('emits a doctor_error frame fast, not analyzed, for an fdx whose converted Fountain has 1,600 distinct character cues', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 1600; i++) fountain += `CHARACTER${i}\nLine.\n\n`;
+    const fdx = fountainToFdx(fountain, 'Pathological');
+
+    const start = Date.now();
+    const res = await postStream({ fdx });
+    const frames = await collectSSE(res);
+    const ms = Date.now() - start;
+
+    const errorFrame = frames.find(f => f.type === 'doctor_error') as { error: string } | undefined;
+    assert.ok(errorFrame, 'expected a doctor_error frame');
+    assert.match(errorFrame.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
+    assert.equal(frames.some(f => f.type === 'doctor_result'), false, 'must not have gone on to analyze it');
+    // 1000ms, not 100ms — see tests/routes/scriptide-doctor.test.ts's own
+    // copy of this test for why (measured `npm test` full-suite contention).
+    assert.ok(ms < 1000, `expected a fast rejection (<1000ms), took ${ms}ms — the fdx-path guard may not be firing`);
+  });
+
   it('really cancels the server-side analysis on client abort, and the server stays healthy immediately after', async () => {
     const controller = new AbortController();
     const res = await postStream({ fountain: bigScript(220) }, controller.signal);

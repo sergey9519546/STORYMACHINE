@@ -15,6 +15,8 @@ import {
   FIXTURE_PDF,
   FIXTURE_SLUGLINE,
   X_ACTION,
+  X_CHARACTER,
+  X_DIALOGUE,
   type Line,
   type Page,
 } from './pdf-fixture.ts';
@@ -124,6 +126,32 @@ describe('routes/scriptide/doctor/pdf — HTTP behavior', async () => {
     assert.deepEqual(await res.json(), {
       error: 'This PDF contains more than 900,000 extractable text characters. Split it into smaller files and try again.',
     });
+  });
+
+  // Attack-lane audit follow-up (fdx-conversion bypass, "or any other
+  // format"): this route has no zod schema at all (raw PDF body), so
+  // rejectPathologicalConvertedFountain (server/lib/validation.ts) is the
+  // ONLY guard standing between an extracted-from-PDF pathological shape and
+  // the analyzer — see the route's own comment in server/routes/scriptide.ts.
+  // A single tall synthetic page (same technique the 900,001-char test above
+  // uses) with 1,600 distinct Character-column cues, each followed by a
+  // Dialogue line, converts to Fountain text with 1,600 distinct all-caps
+  // character-cue-shaped lines — over fountainShapeRejectionReason's 1,500
+  // ceiling. No <100ms budget here (unlike the fdx-path tests): a real
+  // pdfjs-dist parse of ~3,200 positioned text runs is the dominant, and
+  // legitimate, cost — this test's point is that the ANALYZER never runs on
+  // top of that parse, not that PDF extraction itself is free.
+  it('POST a PDF whose extracted Fountain has 1,600 distinct character cues is rejected, not analyzed', async () => {
+    const lines: Line[] = [{ y: 100_000, runs: [{ x: X_ACTION, text: 'INT. ROOM - DAY' }] }];
+    for (let i = 0; i < 1600; i++) {
+      lines.push({ y: 100_000 - (2 * i + 1) * 12, runs: [{ x: X_CHARACTER, text: `CHARACTER${i}` }] });
+      lines.push({ y: 100_000 - (2 * i + 2) * 12, runs: [{ x: X_DIALOGUE, text: 'Line.' }] });
+    }
+    const pathologicalPdf = buildScreenplayPdf([lines], 110_000);
+    const res = await postPdf(pathologicalPdf);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
   });
 
   it('a GET request to the PDF doctor route is not allowed (POST-only)', async () => {

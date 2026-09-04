@@ -19,6 +19,7 @@ import {
   ScriptideSaveBodySchema, WorldBuildBodySchema, RefineDialogueBodySchema,
   AnalyzeTensionBodySchema, CleanActionBodySchema, CharacterProfileBodySchema, AnalyzeScriptBodySchema,
   CharactersExportBodySchema, CharactersImportBodySchema,
+  rejectPathologicalConvertedFountain, fountainShapeRejectionReason,
 } from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues, sceneLineSpans } from '../nvm/analyze/locate.ts';
@@ -433,6 +434,13 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
       res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
       return;
     }
+    // Attack-lane audit follow-up: the fdx-conversion bypass. fountainField()'s
+    // zod guard only ever sees a caller's RAW `fountain` field — it never sees
+    // text produced by converting an uploaded .fdx, so the same O(n²)
+    // pathological shapes it blocks there reached the analyzer completely
+    // unguarded from this path. See rejectPathologicalConvertedFountain's
+    // header (server/lib/validation.ts) for the shared implementation.
+    if (rejectPathologicalConvertedFountain(res, converted.fountain)) return;
     fountain = converted.fountain;
     source = {
       format: 'fdx',
@@ -593,6 +601,19 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
       ensureEnded();
       return;
     }
+    // Attack-lane audit follow-up: same fdx-conversion bypass guard as
+    // /doctor's plain-JSON branch above, adapted to this route's SSE error
+    // shape (`rejectPathologicalConvertedFountain` writes a real HTTP 400,
+    // which this route never sends after the SSE stream has opened — so this
+    // calls the shared reason function directly instead of that JSON helper).
+    {
+      const shapeReason = fountainShapeRejectionReason(converted.fountain);
+      if (shapeReason) {
+        emitSSE({ type: 'doctor_error', error: `fountain: ${shapeReason}` });
+        ensureEnded();
+        return;
+      }
+    }
     fountain = converted.fountain;
     source = {
       format: 'fdx',
@@ -703,6 +724,13 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
       res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
       return;
     }
+    // Attack-lane audit follow-up: the fdx-conversion bypass. fountainField()'s
+    // zod guard only ever sees a caller's RAW `fountain` field — it never sees
+    // text produced by converting an uploaded .fdx, so the same O(n²)
+    // pathological shapes it blocks there reached the analyzer completely
+    // unguarded from this path. See rejectPathologicalConvertedFountain's
+    // header (server/lib/validation.ts) for the shared implementation.
+    if (rejectPathologicalConvertedFountain(res, converted.fountain)) return;
     fountain = converted.fountain;
     source = {
       format: 'fdx',
@@ -842,6 +870,11 @@ router.post(
       res.status(400).json({ error: 'The PDF converted to an empty script — nothing to analyze.' });
       return;
     }
+    // Attack-lane audit follow-up: same fdx-conversion bypass, "or any other
+    // format" — a PDF's extracted text is exactly as attacker-controlled as
+    // an .fdx's, and this route has no zod schema at all (raw body), so
+    // nothing upstream of this line has ever run the shape guard.
+    if (rejectPathologicalConvertedFountain(res, converted.fountain)) return;
 
     // Off-thread, exactly like /doctor and /doctor/stream (lane W1; see
     // server/nvm/analyze/doctor-pool.ts). This route was the last quick-read

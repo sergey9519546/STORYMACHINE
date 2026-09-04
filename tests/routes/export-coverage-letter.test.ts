@@ -133,6 +133,34 @@ describe('routes/export/coverage-letter — HTTP behavior', async () => {
     assert.ok(typeof body.error === 'string' && body.error.length > 0);
   });
 
+  // Attack-lane audit follow-up (fdx-conversion bypass) — see
+  // tests/routes/scriptide-doctor.test.ts's own copy of this test for the
+  // full rationale.
+  it('POST an fdx whose converted Fountain has 1,600 distinct character cues is rejected fast, not analyzed', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 1600; i++) fountain += `CHARACTER${i}\nLine.\n\n`;
+    const fdx = fountainToFdx(fountain, 'Pathological');
+
+    const start = Date.now();
+    const res = await post({ fdx });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /more than 1500 distinct all-caps character-cue-shaped lines/);
+    // 1000ms, not the originally-specified 100ms: measured under `npm test`'s
+    // real execution shape (scripts/run-tests.mjs runs every file as ONE
+    // `node --test <every file>` invocation, so this suite's server shares
+    // the process with ~2,400 other suites' concurrent HTTP servers) an
+    // isolated run of this guard consistently answers in 7-40ms, but a
+    // full-suite run observed a 134-156ms outlier from host scheduling
+    // contention alone (same request, same guard, server-side log still
+    // showed ms=40). 1000ms keeps this a meaningful regression guard — an
+    // UNguarded pathological shape costs seconds-to-minutes (this file's own
+    // header measurements), four orders of magnitude more — while not
+    // flaking on ordinary shared-host jitter.
+    assert.ok(ms < 1000, `expected a fast rejection (<1000ms), took ${ms}ms — the fdx-path guard may not be firing`);
+  });
+
   it('POST an empty-string fountain returns 400 (zod .min(1))', async () => {
     const res = await post({ fountain: '' });
     assert.equal(res.status, 400);
