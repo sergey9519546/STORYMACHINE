@@ -8393,10 +8393,13 @@ describe('Wave 123 — dialoguePass: ON_THE_NOSE_RE false-positive fix + TRAIT_L
   });
 
   it('ON_THE_NOSE fires correctly for "I feel so angry" when density is present (Wave 18α gate)', async () => {
-    // Wave 18α gates ON_THE_NOSE on ≥2 matches per scene (see below) — a lone match is normal
-    // dramatic writing. This regression test keeps the original word-list match alive by
-    // pairing it with a second on-the-nose line in the same scene.
-    const fountain = 'INT. OFFICE - DAY\n\nALICE\nI feel so angry right now.\n\nBOB\nI am so anxious about this too.\n';
+    // Wave 18α gated ON_THE_NOSE on >=2 matches PER SCENE; since 2026-09-04 the gate is
+    // >=3 SCRIPT-WIDE (see dialogue.ts — a script written on the nose throughout spreads its
+    // stated feelings one per scene and defeated the per-scene form). A lone match is still
+    // normal dramatic writing. This regression test keeps the original word-list match alive
+    // by pairing it with two further on-the-nose lines, which is what the current gate asks
+    // for; the subject under test is unchanged — that "I feel so angry" matches at all.
+    const fountain = 'INT. OFFICE - DAY\n\nALICE\nI feel so angry right now.\n\nBOB\nI am so anxious about this too.\n\nCARA\nI am terrified of what comes next.\n';
     const result = await dialoguePass(makePassInput(fountain));
     const onNose = result.issues.find(i => i.rule === 'ON_THE_NOSE');
     assert.ok(onNose, 'ON_THE_NOSE fires for direct emotion statement once density guard is satisfied');
@@ -8427,6 +8430,9 @@ describe('Run 18-α — dialoguePass: ON_THE_NOSE lexicon/template broadening + 
       'BOB',
       "I'm worried I'm going to lose my job today. It's really scary.",
       '',
+      'CARA',
+      'I am ashamed that I said nothing at the meeting.',
+      '',
     ].join('\n');
     const result = await dialoguePass(makePassInput(fountain));
     const hits = result.issues.filter(i => i.rule === 'ON_THE_NOSE');
@@ -8442,6 +8448,9 @@ describe('Run 18-α — dialoguePass: ON_THE_NOSE lexicon/template broadening + 
       '',
       'BOB',
       'That makes me furious, honestly.',
+      '',
+      'CARA',
+      "I have been overwhelmed since the merger.",
       '',
     ].join('\n');
     const result = await dialoguePass(makePassInput(fountain));
@@ -8810,7 +8819,7 @@ Absolutely.
     const hits = result.issues.filter(i => i.rule === 'SYCOPHANTIC_AGREEMENT');
     assert.ok(hits.length >= 1, `Should detect SYCOPHANTIC_AGREEMENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
     assert.equal(hits[0].severity, 'minor');
-    assert.match(hits[0].description, /BOB simply agrees with ALICE/);
+    assert.match(hits[0].description, /BOB closes the scene by simply agreeing with ALICE/);
   });
 
   it('dialoguePass does NOT fire SYCOPHANTIC_AGREEMENT when the reply pushes back instead of agreeing', async () => {
@@ -8827,6 +8836,36 @@ I don't think that's a good idea at all.
     assert.ok(
       !result.issues.some(i => i.rule === 'SYCOPHANTIC_AGREEMENT'),
       'Should NOT fire when the reply is not a bare agreement',
+    );
+  });
+
+  // 2026-09-04 — the rule is gated on the agreement being the scene's LAST dialogue beat.
+  // Measured motivation: ungated, its ENTIRE output across the 42 scripts this repository
+  // ships was one finding, and that finding was a false positive on the deliberately-excellent
+  // audit fixture's most loaded line (NOOR's "Yes." — an admission that ends her career —
+  // reported as "no conflict or subtext"). An agreement that is immediately pressed or
+  // contradicted has demonstrably produced more exchange, so the rule's own claim is false
+  // on the page.
+  it('dialoguePass does NOT fire SYCOPHANTIC_AGREEMENT when the exchange continues after the agreement', async () => {
+    const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+    const fountain = `INT. ROOM - DAY
+
+ALICE
+You signed it yourself.
+
+BOB
+Yes.
+
+ALICE
+You could have told me on Monday.
+
+BOB
+I know what I could have done.
+`;
+    const result = await dialoguePass(makeInputR6(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'SYCOPHANTIC_AGREEMENT'),
+      'Should NOT fire when the scene keeps going after the bare agreement — the exchange did not end on capitulation',
     );
   });
 

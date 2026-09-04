@@ -7083,7 +7083,11 @@ describe('structurePass — NO_REVERSALS honesty hedge (pilot session 2026-08-07
     });
     const noReversals = result.issues.filter(i => i.rule === 'NO_REVERSALS');
     assert.ok(noReversals.length >= 1, 'NO_REVERSALS must still fire when reversalCount is 0 on a 5+ scene story');
-    assert.match(noReversals[0].description, /suspenseDelta < -1/, 'must name the exact signal being measured');
+    // 2026-09-04: the threshold itself changed (screenplay/suspense-dip.ts — `< -1` is
+    // `<= -2` on an integer channel and was reached by 0 of the 42 scripts this repo
+    // ships). The assertion's subject is unchanged — the finding must disclose the EXACT
+    // predicate it measured — so it now asserts the exact predicate the rule now uses.
+    assert.match(noReversals[0].description, /suspenseDelta ≤ -1/, 'must name the exact signal being measured');
     assert.match(noReversals[0].description, /betrayal|broken deal|backfir/i, 'must name what the signal cannot see');
     assert.ok(
       !/^No dramatic reversals detected — the story progresses in a single direction without opposition$/.test(noReversals[0].description),

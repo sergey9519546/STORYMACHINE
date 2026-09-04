@@ -219,11 +219,51 @@ const NEGATIVE_VALENCE_WORDS = [
 // (a stabbing, a chokehold, an ambush) rather than the generic aftermath
 // (blood, dead) or generic pursuit (chase, run) the original list already
 // covers, so overlap with existing entries was checked term-by-term.
+// ── Six terms removed 2026-09-04: run/runs/running, shot/shots, dark ───────
+// The list's own contract (above) is PHYSICAL PERIL. These six read peril off
+// words that in a screenplay almost never carry it, and because suspenseDelta
+// is what names a script's peak-suspense scene, a couple of them are enough to
+// relocate the peak and manufacture a whole family of structural findings from
+// the wrong scene.
+//
+// MEASURED over the 42 scripts the repository ships (20 data/screenplays CC0
+// fixtures + 20 calibration REFERENCE_CORPUS samples + the two matched
+// advice-audit fixtures), boneyard excluded:
+//
+//   dark          15 hits, and 0 of them peril — "headlights ... go dark",
+//                 "a city skyline gone dark", "the lobby is dark", "glow amber
+//                 in the dark", "after dark", "the phone bank is dark". `dark`
+//                 was the single MOST FREQUENT danger token in the corpus.
+//   run/runs/
+//   running       27 hits combined, of which exactly ONE reads as peril ("She's
+//                 already running for the door"). The other 26 are "a smuggling
+//                 run", "the van runs the empty interstate", "the creek runs
+//                 clear", "whoever runs this network", "records running back
+//                 twenty years", "the ferry's running lights", "running the
+//                 metals panel", "running a script".
+//   shot/shots     6 hits; 4 genuine gunshots (all in one script, all in scenes
+//                 that also carry `kills`/`gunfire`, so nothing is lost), plus
+//                 "a second title shot" (boxing) and "the drone shot" (a CAMERA
+//                 shot — the term of art of the very medium being analysed, and
+//                 the worst possible word to read as danger in a screenplay).
+//
+// The two hits worth keeping are recoverable without these words, because every
+// danger AXIS they nominally covered already has an unambiguous sibling in the
+// list: pursuit is carried by chase/chases/chasing, flee/flees/fleeing,
+// pursuit/pursued; firearms by gun/guns/gunfire/shoot/shoots/rifle/pistol/
+// weapon; concealment and entrapment by hide/hides/hiding/trapped/cornered.
+// `dark` carried no axis of its own at all — it is atmosphere, not peril.
+// Removal therefore costs coverage of a danger CONCEPT nowhere; it costs only
+// the false readings.
+//
+// `darkness` is deliberately RETAINED: it takes 0 hits across all 42 scripts,
+// so there is no measurement to act on, and unlike `dark` it cannot appear as
+// an adjective on hair, coffee, or humour.
 const DANGER_TENSION_WORDS = [
   'gun', 'guns', 'knife', 'blade', 'blood', 'scream', 'screams', 'screaming', 'kill', 'kills',
-  'killed', 'dead', 'death', 'danger', 'dangerous', 'run', 'runs', 'running', 'chase', 'chases',
-  'chasing', 'trapped', 'dark', 'darkness', 'fire', 'explosion', 'attack', 'attacks', 'attacked',
-  'hide', 'hides', 'hiding', 'gunfire', 'shot', 'shots', 'shoot', 'shoots', 'panic', 'panicked',
+  'killed', 'dead', 'death', 'danger', 'dangerous', 'chase', 'chases',
+  'chasing', 'trapped', 'darkness', 'fire', 'explosion', 'attack', 'attacks', 'attacked',
+  'hide', 'hides', 'hiding', 'gunfire', 'shoot', 'shoots', 'panic', 'panicked',
   // Weapon/pursuit/injury families (Wave E1-c):
   'rifle', 'pistol', 'weapon', 'weapons', 'stab', 'stabs', 'stabbed', 'strangle', 'strangled',
   'choke', 'choked', 'wound', 'wounded', 'bleeding', 'ambush', 'ambushed', 'pursuit', 'pursued',
@@ -2457,14 +2497,38 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   const dialogueLineCount = blocks.filter(b => b.type === 'dialogue' && b.text.trim() !== '').length;
   const actionLineCount = blocks.filter(b => b.type === 'action' && b.text.trim() !== '').length;
   // P0.2: score denominator must never count text the analyzer did not
-  // diagnose. For scripts at/under the scene ceiling, keep the historical
-  // full-fountain word count so calibration remains byte-compatible. For
-  // truncated scripts, count only the analyzed scene blocks — otherwise
-  // post-ceiling padding can inflate the denominator and improve health.
-  const fullWordCount = fastWordCount(fountain);
+  // diagnose. For truncated scripts, count only the analyzed scene blocks —
+  // otherwise post-ceiling padding can inflate the denominator and improve
+  // health.
+  //
+  // 2026-09-04 — the untruncated branch no longer counts NON-SCREENPLAY blocks
+  // either. It was `fastWordCount(fountain)` over the raw source, which is the
+  // same defect one layer up: the health formula's density denominator is
+  // `wordCount ^ 0.7`, so every word of metadata in the file made the script
+  // look longer and therefore healthier for the same number of issues. The two
+  // block types excluded here are exactly the ones that are provably not
+  // screenplay text and that the analyzer already refuses to diagnose:
+  //
+  //   boneyard   — Fountain's `/* */` comment. MEASURED: all 20 shipped
+  //                data/screenplays fixtures carry one, worth 24–151 words
+  //                each (undertow: 884 counted vs 826 real; room-12: 427 vs
+  //                338, a 21% inflation of the denominator).
+  //   title_page — `Title:`/`Author:`/`Draft date:` (src/lib/fountain.ts,
+  //                same date). Ordinary in a real user's draft.
+  //
+  // Nothing else changes: scene headings, cues, parentheticals, transitions,
+  // sections, synopses and notes are all still counted exactly as before, so
+  // this is a removal of non-screenplay text from the denominator, not a
+  // redefinition of what "a word of screenplay" means.
+  const isScoredWordBlock = (b: FountainBlock) =>
+    b.type !== 'boneyard' && b.type !== 'title_page' && b.text.trim() !== '';
+  const fullWordCount = blocks.reduce(
+    (n, b) => (isScoredWordBlock(b) ? n + fastWordCount(b.text) : n),
+    0,
+  );
   const analyzedWordCount = rawScenes.reduce((n, s) => {
     for (const b of s.blocks) {
-      if (b.text.trim()) n += fastWordCount(b.text);
+      if (isScoredWordBlock(b)) n += fastWordCount(b.text);
     }
     return n;
   }, 0);

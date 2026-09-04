@@ -1,0 +1,224 @@
+Title: The Load Path
+Author: Audit Fixture
+
+/*
+PROVENANCE. Original work written for this repository as a test fixture, 2026-09-04,
+during the advice-quality audit (docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md). Not
+derived from any published screenplay. Dedicated to the public domain under CC0 1.0.
+
+ROLE. The NEGATIVE fixture of a matched pair. Deliberately well-made at 10 scenes /
+~1,139 words: a real midpoint reversal (the weld is fine, the bearing pad is not), an
+active protagonist who chooses the costly option on the page, planted objects that pay
+off (the green folder, the fatigue page, the red tag), and dialogue that works by
+refusal and subtext rather than statement. Its partner bad.fountain is matched to it on
+scene count and length so that anything that separates them is craft, not size.
+
+Lines this pair exists to protect, each the site of a measured false positive:
+  * TESS: "You're asking me a question you already know the answer to."  -- a REFUSAL
+    of exposition, once reported as AS_YOU_KNOW_BOB (major).
+  * NOOR: "Yes."  -- an admission that ends her career, once reported as
+    SYCOPHANTIC_AGREEMENT, "no conflict or subtext".
+  * "She runs a thumbnail along it" / "the drone shot before the light goes flat"  --
+    a thumbnail and a CAMERA shot, once the two danger-lexicon hits that made scene 1
+    the peak-suspense scene of a script that climaxes at scene 9.
+  * "Checks the time: 8:52."  -- once reported as a colon used as a dramatic-reveal
+    device.
+Do not "improve" any of those lines; each is load-bearing for a specific regression.
+*/
+
+EXT. HARBOR FOOTBRIDGE - CONSTRUCTION SITE - DAWN
+
+A new pedestrian span, seventy meters of white steel, still wearing its scaffold like a coat it hasn't taken off. Bunting is being strung at the east abutment.
+
+NOOR HAMDAN, 31, hard hat under her arm, crouches at a weld seam with a pocket light. She runs a thumbnail along it.
+
+GIL ABARA, 60s, watches her from the ramp with a thermos he isn't drinking from.
+
+GIL
+Ribbon's at eleven. The mayor's people want the drone shot before the light goes flat.
+
+NOOR
+There's a hairline at the third splice.
+
+GIL
+There's a hairline at every third splice on every bridge in this city. You are the most careful engineer I have ever trained.
+
+NOOR
+You say that the way other people say slow.
+
+GIL
+I say it the way people say expensive.
+
+He sets the thermos down on the green folder tucked under his arm, and picks the folder back up before she can look at it.
+
+INT. SITE TRAILER - MORNING
+
+Drawings papered over the windows. Noor pulls the green folder from the shelf and opens it to the fatigue-check page.
+
+Her own signature sits at the bottom of it. Dated Friday.
+
+She holds the page up to the window light, then photographs it with her phone. Then she photographs the sign-in sheet on the wall beside it: Friday, one name, one time out. GIL ABARA, 9:40 PM.
+
+INT. SITE TRAILER - CORRIDOR - CONTINUOUS
+
+TESS OKONJO, 40s, foreman, is filling a jug at the cooler. Noor stops beside her and does not show her the phone.
+
+NOOR
+Friday night. Who locked up?
+
+TESS
+You're asking me a question you already know the answer to.
+
+NOOR
+I'm asking you whether you want to be the one who said it.
+
+Tess screws the cap on slowly.
+
+TESS
+He was here till ten. He had the folder open on the table and he had a pen in his hand and I walked past twice and both times I decided I was thirsty.
+
+She lifts the jug.
+
+TESS (CONT'D)
+I'm still thirsty.
+
+INT. GIL'S OFFICE - SITE TRAILER - DAY
+
+Noor puts the fatigue page on the desk between them, face up. Gil does not pick it up.
+
+GIL
+It's a good signature. I've watched you make it four hundred times.
+
+NOOR
+That's not a denial.
+
+GIL
+No.
+
+NOOR
+Say the rest of it.
+
+GIL
+You would have signed it. Monday, Tuesday, whenever you got to it. All I did was move the date.
+
+NOOR
+You moved my name.
+
+GIL
+I moved a date.
+
+NOOR
+Then it won't bother you when the city inspector reads it at eleven.
+
+She takes the page back. Gil finally looks up, and what's in his face isn't fear. It's something closer to disappointment that she's making him watch.
+
+EXT. SITE - EMPLOYEE LOT - DAY
+
+Noor, phone to her ear, walking fast between pickups.
+
+NOOR
+(into phone)
+This is Noor Hamdan, HB Structural, for Inspector Reyes. It's about the harbor span sign-off. I need him before the ceremony, not after.
+
+She hangs up. Checks the time: 8:52. Looks at the bridge. Then opens the truck's tailgate, drags out a strain gauge kit, and slings it over her shoulder.
+
+EXT. HARBOR FOOTBRIDGE - UNDERSIDE - DAY
+
+Noor, harnessed, working out along the beam soffit in the dark under the deck. She clamps the gauge at the third splice, the one she flagged.
+
+The readout settles. She stares at it.
+
+NOOR
+(to herself)
+No.
+
+She unclamps, moves two meters east, reclamps. Same number. Good number. The weld is fine. The weld was always fine.
+
+She lets her light drift down, off the splice, onto the bearing pad at the pier head. Neoprene, seated, ordinary.
+
+She goes very still.
+
+She pulls her phone, opens a photo of a calc sheet in her own handwriting, and holds it up beside the pad. Her lips move through the arithmetic once. Twice.
+
+NOOR (CONT'D)
+(quietly)
+That's mine.
+
+INT. SITE TRAILER - DAY
+
+Gil is at the window with his back to the door when she comes in. She doesn't sit.
+
+NOOR
+The bearing pad at pier two is sized for a service load I got wrong in March. You caught it.
+
+GIL
+I caught it.
+
+NOOR
+And instead of telling me, you signed the fatigue page yourself so the packet that goes in the city file has my name on the part I got right and your handwriting on nothing.
+
+GIL
+The pad will hold. Twenty years, thirty. It'll be replaced in a maintenance cycle by someone who never knows.
+
+NOOR
+That isn't what I asked.
+
+Gil turns around.
+
+GIL
+I have eleven months left on my license and a granddaughter who thinks I build things. I wanted to hand you a practice with no mistake in it.
+
+NOOR
+You wanted to hand me a practice with your mistake in it instead of mine. That's not a gift, Gil. That's a mortgage.
+
+EXT. EAST ABUTMENT - RIBBON PLATFORM - DAY
+
+Folding chairs. A ribbon. A press photographer testing the light. INSPECTOR REYES, 50s, arrives with a clipboard and shakes hands he doesn't care about.
+
+Tess stands at the rail with the crowd, watching Noor come up the ramp with the green folder under her arm.
+
+Noor stops. Looks at the ribbon. Looks at the span, which is beautiful, and which will hold, probably, for thirty years.
+
+She keeps walking.
+
+EXT. HARBOR FOOTBRIDGE - MIDSPAN - DAY
+
+Noor steps over the ribbon, out onto the deck, and turns to face the chairs. The photographer, delighted, starts shooting.
+
+NOOR
+The load rating on this span is provisional. Pier two's bearing is undersized against the design service load, by my calculation, in March, with my name on it.
+
+A ripple through the chairs. Reyes lowers the clipboard.
+
+NOOR (CONT'D)
+It'll open. It'll open in six weeks with a pad that's right.
+
+She takes out the red tag from her back pocket, hangs it on the rail, and signs it — slowly, all the way through, the way you sign something you intend to be found.
+
+INT. SITE TRAILER - LATE AFTERNOON
+
+Empty chairs visible through the window. Gil is packing a box, badly.
+
+GIL
+Reyes will pull the fatigue page. Handwriting people will look at it.
+
+NOOR
+Yes.
+
+GIL
+You could have let it go until Monday and then quietly fixed the pad.
+
+NOOR
+I know.
+
+GIL
+Why didn't you?
+
+Noor opens the green folder on the desk, turns to the fatigue page, and draws a single line through the signature at the bottom.
+
+Then she signs it again underneath, today's date, her own hand.
+
+NOOR
+Because I want the file to say what happened.
+
+She closes the folder and leaves it on his desk, open, facing him.

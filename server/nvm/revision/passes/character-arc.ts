@@ -716,18 +716,41 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
   // We count fountain character-cue appearances as a proxy for character prominence,
   // then check whether each character appears in any relationshipShifts pairKey.
   if (records.length >= 5) {
-    // Build character appearance count from fountain (ALL-CAPS character cues)
+    // Build character appearance count from fountain (ALL-CAPS character cues).
+    //
+    // 2026-09-04 — the SCENE count is now tracked alongside the CUE count.
+    // These two numbers are not interchangeable and were being conflated in
+    // the finding text below: a cue is one speech, and a character speaking
+    // twice in a scene contributes two cues to it. Reporting the cue count as
+    // a scene count produced literally impossible claims — measured on the
+    // matched advice-audit fixture, "KAREN appears in 21 scenes" on a
+    // TEN-scene script (21 cues, spoken across 5 scenes). A writer who checks
+    // one number in a report and finds it impossible has no reason to trust
+    // the other two hundred. The cue count remains the PROMINENCE gate (the
+    // >= 4 / >= 6 thresholds below were calibrated against it, and swapping
+    // the gate to scene counts would silently change which characters the
+    // rules fire on); only the reported prose changes, and it now names each
+    // number as what it is.
     const fountainCueCounts = new Map<string, number>();
+    const fountainSceneSets = new Map<string, Set<number>>();
+    let cueSceneIdx = 0;
     for (const line of fountain.split('\n')) {
       const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { cueSceneIdx++; continue; }
       if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(t) &&
           !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
         const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
         if (charName !== 'narrator' && charName !== 'v.o.' && charName !== 'o.s.') {
           fountainCueCounts.set(charName, (fountainCueCounts.get(charName) ?? 0) + 1);
+          let set = fountainSceneSets.get(charName);
+          if (!set) { set = new Set<number>(); fountainSceneSets.set(charName, set); }
+          set.add(Math.max(1, cueSceneIdx));
         }
       }
     }
+    /** Scenes the character actually speaks in — never larger than the script's
+     *  scene count, unlike the cue count it used to be confused with. */
+    const speakingSceneCount = (id: string) => fountainSceneSets.get(id)?.size ?? 0;
 
     // Build set of characters who have at least one relationship shift in the records
     const charsWithRelArc = new Set<string>();
@@ -755,8 +778,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           location: `Character: ${displayName}`,
           rule: 'CHARACTER_ARC_PROTAGONIST_PASSIVE',
           description:
-            `${displayName} appears in ${protagonistCues} scenes (most of any character) ` +
-            `but is never part of a relationship shift — the protagonist has no relational arc`,
+            `${displayName} speaks in ${speakingSceneCount(protagonistId)} scene` +
+            `${speakingSceneCount(protagonistId) === 1 ? '' : 's'} across ${protagonistCues} ` +
+            `dialogue cues (more than any other character) but is never part of a relationship ` +
+            `shift — the protagonist has no relational arc`,
           severity: 'major',
           suggestedFix:
             `The protagonist must have at least one relationship that fundamentally changes. ` +
@@ -777,8 +802,10 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           location: `Character: ${displayName}`,
           rule: 'CHARACTER_ARC_RELATIONAL_STASIS',
           description:
-            `${displayName} appears in ${inertCues} scenes but their relationships never shift — ` +
-            `they are a narrative fixture, not an agent in the story`,
+            `${displayName} speaks in ${speakingSceneCount(inertId)} scene` +
+            `${speakingSceneCount(inertId) === 1 ? '' : 's'} across ${inertCues} dialogue cues, ` +
+            `but their relationships never shift — they are a narrative fixture, not an agent ` +
+            `in the story`,
           severity: 'minor',
           suggestedFix:
             `Give ${displayName} at least one relationship that moves: trust gained or lost, ` +
