@@ -1666,13 +1666,18 @@ is that reports over these fixtures were wrong and had to move.
   health/verdict/grade/sceneCount movement; an identity-modulo-listed-keys
   proof is the correct and stronger receipt for that claim, same reasoning as
   the 2026-08-21, 2026-09-03 LANE R6, and 2026-09-04 entries above.
-- **Baseline used:** `git archive main` at `0a0edcc9`. The extracted tree's
-  `node_modules` was symlinked to the repository's own so both trees resolved
-  identical dependency versions; the comparison tree was this branch's working
-  tree, rebased onto that same `0a0edcc9` tip before the harness was run, so
-  the baseline is the branch being merged into and not a stale fork point.
-  This branch's own commit hashes are deliberately not cited — they change on
-  every rebase, and a receipt has to name something a reviewer can resolve.
+- **Baseline used:** `git archive main` at `975eada2` — RE-MEASURED after a
+  second rebase. `main` moved twice while this work was in flight (first to
+  `0a0edcc9`, then to `975eada2` when the blind-matched-pair lane landed), and
+  the whole three-command harness was re-run from scratch against each new tip
+  rather than reusing an earlier snapshot pair: a baseline taken at a stale
+  fork point mixes another lane's report changes into the diff and looks like
+  proof while proving nothing. The extracted tree's `node_modules` was
+  symlinked to the repository's own so both trees resolved identical
+  dependency versions; the comparison tree was this branch's working tree,
+  rebased onto that same `975eada2` tip before the harness ran. This branch's
+  own commit hashes are deliberately not cited — they change on every rebase,
+  and a receipt has to name something a reviewer can resolve.
 - **What was run — output identity, modulo the one key this range adds, over
   all 45 in-repo fixtures** (20 `data/screenplays/*.fountain`, 20 calibration
   `REFERENCE_CORPUS` samples, the P0 sample script, 4 synthetic concatenations
@@ -1720,14 +1725,23 @@ is that reports over these fixtures were wrong and had to move.
   `node --experimental-strip-types scripts/measure-structural-signals.ts`.
   Ten of twelve per-scene channels are non-zero on 75–100% of scenes against
   6.8–7.3% for the lexicon channels they answer. Separation was measured on
-  two small in-repo sets only (a 1-pair audit fixture and a 25-pair
-  calibration band comparison), both of which that document states the
-  limitations of; the real-writing question is untouched by this range and is
-  explicitly left open.
+  three small in-repo sets only — a 1-pair audit fixture, a 25-pair
+  calibration band comparison, and the 6 blind matched pairs landed by a
+  parallel lane at `975eada2` (`tests/fixtures/blind-pairs/`) — with one
+  statistic (rank-ordering count = Mann-Whitney AUC) and directions registered
+  before measuring. Two channels order all three sets or both real-prose sets
+  perfectly; one registered prior orders the blind pairs 6/6 and the
+  calibration bands 0/25 in the same direction, which that document reports as
+  a reversal rather than re-registering. **None of this is a real-corpus
+  discrimination result**: the real-writing question is untouched by this
+  range and is explicitly left open.
 - **Runner attestation:** "I, the orchestrating Claude Code session
   (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the baseline
-  tree from `git archive main` at `0a0edcc9` myself, rebased this branch onto
-  that same tip, ran the three harness commands above myself on 2026-09-04,
+  tree from `git archive main` myself — first at `0a0edcc9` and then again,
+  from scratch, at `975eada2` after `main` moved and this branch was rebased
+  onto it — rebased this branch onto that tip each time, ran the three harness
+  commands above myself on 2026-09-04 against each baseline in turn and read
+  an identical PASS line and identical per-key differ count from both,
   and read the PASS line, the per-key differ count, and the require-added
   confirmation directly out of the compare run's own log file along with its
   exit code. I separately ran the same compare with no flags as a negative

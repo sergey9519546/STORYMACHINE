@@ -5,6 +5,9 @@
 **Measurement:** `node --experimental-strip-types scripts/measure-structural-signals.ts`
 · **Report field:** `ScriptDoctorReport.structuralSignals` (additive, optional)
 
+Set D below is the six blind matched pairs landed by a parallel lane
+(`tests/fixtures/blind-pairs/`, `docs/p1-benchmark/BLIND_PAIRS_2026-09-04.md`).
+
 **Nothing in this document changes a score.** The block is diagnostic only: no
 `health`, `grade`, `verdict`, `dimension`, `topPriorities` entry, or revision
 pass reads any number in it. §6 states the one path by which any of these could
@@ -131,36 +134,37 @@ count 0.5). Divided by N that number is the Mann-Whitney AUC, so both forms
 appear and no second statistic is introduced between sets.
 
 **Pre-registration.** Each channel's direction was written into
-`STRUCTURAL_SIGNAL_SPECS` before any of these numbers existed. Five channels
-carry a craft prior (`higher` / `lower`); the other eight carry `none` — there
+`STRUCTURAL_SIGNAL_SPECS` before any of these numbers existed. Seven of the
+thirteen carry a craft prior (six `higher`, one `lower`); the other six carry
+`none` — there
 is no defensible a-priori direction for them, so their AUC is printed in the
 arbitrary `higher` direction and marked DESCRIPTIVE, and it counts neither for
-nor against. **No direction below was changed after seeing a result**, and two
-priors are recorded as REFUTED rather than flipped.
+nor against. **No direction below was changed after seeing a result.**
 
-**Set B** — the audit's matched pair (`tests/fixtures/advice-quality/`,
-copied verbatim from the audit), N = 1.
-**Set C** — calibration corpus, 5 `strong` vs 5 `troubled`, N = 25.
-**Set D** — `tests/fixtures/blind-pairs/`: **absent from the tree at the time
-of this measurement**, so Part D was skipped, printed as skipped, and is not
-reported. The measurement script picks the directory up automatically if a
-later lane lands it.
+* **Set B** — the audit's matched pair (`tests/fixtures/advice-quality/`,
+  copied verbatim from the 2026-09-04 advice-quality audit), N = 1.
+* **Set C** — calibration corpus, 5 `strong` vs 5 `troubled`, N = 25.
+* **Set D** — `tests/fixtures/blind-pairs/`: six matched pairs written on
+  2026-09-04 by an author who had read none of the engine before writing them
+  (that directory's README.md carries the order of operations and the git
+  history that backs it), N = 6. This is the only set here whose stimulus was
+  authored without knowledge of the rules.
 
-| channel | direction | B: audit pair (N=1) | C: calib strong>troubled (N=25) | read |
-|---|---|---|---|---|
-| `meanAbsDialogueShareDelta` | higher | 1/1 = 1.000 ✓ | 24/25 = **0.960** ✓ | orders both sets, the one channel that does |
-| `dialogueShareRange` | higher | 1/1 = 1.000 ✓ | 18/25 = 0.720 ✓ | orders both sets, weaker |
-| `sceneLengthCv` | higher | 1/1 = 1.000 ✓ | 14/25 = 0.560 ✓ | orders both sets, near chance on C |
-| `actionSentenceCvOverall` | higher | 1/1 = 1.000 ✓ | 4/25 = 0.160 ✗ | **inconsistent** — inverts on C |
-| `newPairSceneRate` | higher | 0/1 = 0.000 ✗ | 6.5/25 = 0.260 ✗ | prior REFUTED on both sets |
-| `meanTurnWords` | lower | 0/1 = 0.000 ✗ | 0/25 = 0.000 ✗ | prior REFUTED on both sets, perfectly |
-| `meanOpenCloseShift` | higher | 0/1 = 0.000 ✗ | 0/25 = 0.000 ✗ | prior REFUTED on both sets, perfectly |
-| `lastNewPairPosition` | none | 0.000 desc | 0.840 desc | descriptive |
-| `meanSpeakersPerScene` | none | 0.000 desc | 0.000 desc | descriptive |
-| `meanLeadShare` | none | 1.000 desc | 0.240 desc | descriptive |
-| `leadShareSlope` | none | 1.000 desc | 0.200 desc | descriptive |
-| `speakerEntropy` | none | 1.000 desc | 0.040 desc | descriptive |
-| `openCloseModeFlipRate` | none | 0.000 desc | 0.500 desc | descriptive |
+| channel | direction | B: audit pair (N=1) | C: calib strong>troubled (N=25) | D: blind pairs (N=6) | read |
+|---|---|---|---|---|---|
+| `meanAbsDialogueShareDelta` | higher | 1/1 = 1.000 ✓ | 24/25 = **0.960** ✓ | 5/6 = **0.833** ✓ | orders all three sets |
+| `actionSentenceCvOverall` | higher | 1/1 = 1.000 ✓ | 4/25 = 0.160 ✗ | 6/6 = **1.000** ✓ | orders both real-prose sets perfectly; inverts only where it has nothing to read |
+| `dialogueShareRange` | higher | 1/1 = 1.000 ✓ | 18/25 = 0.720 ✓ | 4/6 = 0.667 ✓ | orders all three, weakly |
+| `sceneLengthCv` | higher | 1/1 = 1.000 ✓ | 14/25 = 0.560 ✓ | 2/6 = 0.333 ✗ | inconsistent |
+| `meanTurnWords` | lower | 0/1 = 0.000 ✗ | 0/25 = 0.000 ✗ | 6/6 = **1.000** ✓ | direction reverses BETWEEN sets — see below |
+| `newPairSceneRate` | higher | 0/1 = 0.000 ✗ | 6.5/25 = 0.260 ✗ | 3/6 = 0.500 = | prior REFUTED |
+| `meanOpenCloseShift` | higher | 0/1 = 0.000 ✗ | 0/25 = 0.000 ✗ | 4/6 = 0.667 ✓ | inconsistent |
+| `meanSpeakersPerScene` | none | 0.000 desc | 0.000 desc | 0.000 desc | **0/32 pairs — the most consistent column in the table, and unregistered** |
+| `leadShareSlope` | none | 1.000 desc | 0.200 desc | 0.833 desc | descriptive |
+| `lastNewPairPosition` | none | 0.000 desc | 0.840 desc | 0.417 desc | descriptive |
+| `meanLeadShare` | none | 1.000 desc | 0.240 desc | 0.333 desc | descriptive |
+| `speakerEntropy` | none | 1.000 desc | 0.040 desc | 0.333 desc | descriptive |
+| `openCloseModeFlipRate` | none | 0.000 desc | 0.500 desc | 0.750 desc | descriptive |
 
 Raw values on set B (excellent / bad):
 
@@ -180,54 +184,85 @@ Raw values on set B (excellent / bad):
 | `meanOpenCloseShift` | 0.5378 | 0.5903 |
 | `openCloseModeFlipRate` | 0.3000 | 0.4000 |
 
+Raw values on set D for the four channels the discussion below turns on
+(excellent / bad per pair):
+
+| pair | `actionSentenceCvOverall` | `meanAbsDialogueShareDelta` | `meanTurnWords` | `meanSpeakersPerScene` |
+|---|---|---|---|---|
+| `fence-line` | 0.6231 / 0.4822 | 0.2862 / 0.2441 | 7.86 / 14.43 | 1.1 / 1.6 |
+| `low-tide` | 0.5696 / 0.4017 | 0.3235 / 0.2161 | 5.98 / 10.39 | 1.6 / 1.9 |
+| `night-shift` | 0.8383 / 0.4710 | 0.3911 / 0.2994 | 6.94 / 14.92 | 1.2 / 1.8 |
+| `signal-drift` | 0.6851 / 0.4260 | 0.3402 / 0.3502 | 6.24 / 17.41 | 1.3 / 1.5 |
+| `the-deposit` | 0.8185 / 0.5194 | 0.3038 / 0.1546 | 5.65 / 10.07 | 2.1 / 2.3 |
+| `the-ledger` | 0.7394 / 0.4261 | 0.4513 / 0.1781 | 6.94 / 14.53 | 1.3 / 1.8 |
+
 ### What separates, what is noise, what inverts
 
-* **Separates on both sets:** `meanAbsDialogueShareDelta` (1.000 / 0.960),
-  `dialogueShareRange` (1.000 / 0.720), `sceneLengthCv` (1.000 / 0.560, which
-  on set C is barely better than a coin). One channel — the scene-to-scene
-  swing in the talk/action mix — is the only genuinely strong result here.
-* **Inconsistent:** `actionSentenceCvOverall` orders the audit pair perfectly
-  and inverts on the calibration bands (0.160). §3 explains why: that channel
-  has almost nothing to read on the calibration corpus (non-zero on 1.0% of its
-  scenes), so its set-C number is close to meaningless rather than contrary
-  evidence. It is reported as inconsistent, not as a win.
-* **Priors refuted:** `meanTurnWords` ("clipped turns read as better craft")
-  and `meanOpenCloseShift` ("a scene that ends in a different register moved")
-  both score 0.000 on BOTH sets — meaning their inverses order every pair
-  perfectly. That is an interesting result and it is **not** re-registered
-  here: flipping a direction after seeing 0.000 is exactly the fishing this
-  pre-registration exists to prevent. Anyone who wants to claim the inverse
-  must register it and measure on a set that was not used to find it.
-* **Noise:** the eight `none`-direction channels swing between 0.000 and 1.000
-  across the two sets with no consistent story. They are kept in the report as
-  descriptive readings a human can look at, not as evidence of anything.
+* **Orders every set:** `meanAbsDialogueShareDelta` (1.000 / 0.960 / 0.833) —
+  the scene-to-scene swing in how much of a scene is talk versus action. It is
+  the only channel here that orders all three sets in its registered direction,
+  and its one miss on set D (`signal-drift`, 0.3402 vs 0.3502) is a hair.
+* **Orders both real-prose sets perfectly:** `actionSentenceCvOverall`
+  (1/1 and 6/6, with no overlap at all between the excellent and bad ranges on
+  set D: 0.57–0.84 against 0.40–0.52). It inverts on the calibration corpus,
+  and §3 says why: that corpus writes one action sentence per scene, so a
+  within-scene action-prose variance channel is non-zero on 1.0% of its scenes.
+  Its set-C number measures nothing rather than contradicting sets B and D. On
+  this evidence it is the second candidate worth a real-corpus run.
+* **`dialogueShareRange`** orders all three but weakly (0.720 / 0.667), and it
+  is partly a coarser restatement of `meanAbsDialogueShareDelta`.
+* **Direction reverses between sets:** `meanTurnWords` scores 0.000 on B and C
+  and 1.000 on D, with wide margins in both directions — the blind set's bad
+  drafts run 10–17 words per speech against the good drafts' 5.6–7.9, while the
+  calibration corpus's troubled band runs SHORTER speeches (6.1–7.9) than its
+  strong band (8.7–11.0). The channel is not measuring craft; it is measuring
+  how each author chose to write badness. This is the single most useful
+  negative result in this table, and it is the reason the registered `lower`
+  prior is **not** being re-registered as `higher` on the strength of set D.
+* **Refuted:** `newPairSceneRate` (0.000 / 0.260 / 0.500) — new speaker
+  pairings do not order craft on any set here. `meanOpenCloseShift` and
+  `sceneLengthCv` are inconsistent across sets and are not candidates.
+* **The unregistered column worth flagging:** `meanSpeakersPerScene` scores
+  0.000 on all three sets — **0 of 32 pairs**, i.e. in every single comparison
+  the better script has fewer speaking characters per scene. That is the most
+  consistent ordering anywhere in this table and it carries **no registered
+  direction**, so it is stated here as a HYPOTHESIS for a future pre-registered
+  measurement and is claimed as nothing else. Two reasons for caution beyond
+  the pre-registration rule: it is a plausible artifact of how three different
+  authors reached for "bad" (more people talking), and it is the same variable
+  the collinearity attack below implicates in the channels that do separate.
 
 ### Attacks run on the result, and what they found
 
 1. **Collinearity with cast size.** Spearman rho against
-   `meanSpeakersPerScene`, over 40 scripts / over the 20 CC0 fixtures alone:
-   `meanAbsDialogueShareDelta` −0.392 / −0.677, `dialogueShareRange` −0.363 /
-   −0.539, `sceneLengthCv` −0.434 / −0.679, `meanSpeakerTurns` **+0.870 /
-   +0.832** (dropped for it, §3). The three channels that separate are
-   moderately anti-correlated with cast size on real screenplays — enough that
-   part of what they order may be "fewer people per scene", not craft. That is
-   an open confound, not a settled one, and any wiring attempt has to control
-   for it.
+   `meanSpeakersPerScene`: over 40 CC0+calibration scripts / over the 20 CC0
+   fixtures alone / over the 12 blind scripts —
+   `meanAbsDialogueShareDelta` −0.392 / −0.677 / **−0.643**;
+   `actionSentenceCvOverall` +0.085 / −0.379 / −0.408;
+   `dialogueShareRange` −0.363 / −0.539 / −0.366;
+   `meanSpeakerTurns` +0.870 / +0.832 (dropped for it, §3).
+   The strongest channel is moderately-to-substantially anti-correlated with
+   cast size on every set, and cast size is itself the perfect 0/32 orderer
+   above. **A meaningful part of what `meanAbsDialogueShareDelta` orders may be
+   "fewer people per scene", not craft.** That confound is open, not settled,
+   and any wiring attempt has to control for it — which is the first thing §6's
+   real-corpus run should do.
 2. **Corpus circularity on set C.** The calibration corpus is a
-   controlled-richness design: 20 samples with matched scene and word budgets,
-   and the audit's own R9 already showed its troubled band is written in the
-   exact phrasings the dialogue and originality rules flag. Its scenes carry
-   one action line and one or two single-line speeches, which is why
-   `meanSpeakerTurns` equals `meanSpeakersPerScene` on all 20 samples. Set C
-   therefore measures how the corpus's four bands were authored at least as
-   much as it measures craft, and the perfect 0.000 / 1.000 columns should be
-   read in that light.
-3. **Band ordering is not monotone.** On `meanAbsDialogueShareDelta` the band
-   means run competent > strong > weak > troubled, not strong > competent >
-   weak > troubled. A channel that orders the extremes but scrambles the middle
-   is not yet a scoring input.
-4. **Set B is one pair.** A 1/1 result is a direction, not a measurement.
-   Every "1.000" in the B column carries that caveat.
+   controlled-richness design, and the audit's R9 already showed its troubled
+   band is written in the exact phrasings the dialogue and originality rules
+   flag. Its scenes carry one action line and one or two single-line speeches,
+   which is why `meanSpeakerTurns` equals `meanSpeakersPerScene` on all 20
+   samples and why `actionSentenceCv` fires on 1.0% of its scenes. Set C
+   measures how the corpus's bands were authored at least as much as craft.
+3. **Set B is one pair; set D is one author.** A 1/1 result is a direction, not
+   a measurement, and set D's own README says it plainly: twelve short scripts
+   by a single author, not blind-labelled by independent readers, no held-out
+   split. Set D is by some distance the best evidence here — it is the only
+   stimulus written without knowledge of the engine — and it is still evidence,
+   not a benchmark.
+4. **Band ordering is not monotone on set C.** On `meanAbsDialogueShareDelta`
+   the band means run competent > strong > weak > troubled. A channel that
+   orders the extremes but scrambles the middle is not yet a scoring input.
 
 ---
 
@@ -263,24 +298,38 @@ channel:
 5. Merge.
 
 Not before, and not by adding a rule that reads this block without steps 2–4.
-On the evidence above, the only channel worth spending that run on is
-`meanAbsDialogueShareDelta`, and it should be measured with the cast-size
-confound in attack 1 controlled for.
+On the evidence above, two channels are worth spending that run on:
+`meanAbsDialogueShareDelta` (orders all three sets) and
+`actionSentenceCvOverall` (orders both real-prose sets perfectly, with
+non-overlapping ranges on the blind pairs). Both should be measured with the
+cast-size confound from §4's attack 1 controlled for, because
+`meanSpeakersPerScene` orders 32 of 32 pairs on its own and may be doing the
+work.
 
 ---
 
 ## 7. Honest summary
 
 Twelve dense, lexicon-free per-scene channels now exist and are exposed, and
-the density claim is real: 10 of 12 are non-zero on 75–100% of scenes where the
-channels driving today's advice are absent on 93%. Density was the stated
+the density claim is real: 10 of 12 are non-zero on 75-100% of scenes, where
+the channels driving today's advice are absent on 93%. Density was the stated
 problem, and density is solved.
 
-Separation is a much weaker result. Exactly one channel orders both available
-sets convincingly, one of those sets is a one-pair fixture and the other is a
-corpus with known circularity, and the strongest channels carry a moderate
-anti-correlation with cast size that nobody has controlled for yet. Nothing
-here has been measured on real writing at scale, and until it is, the honest
-claim is: **these channels are dense and cheap and one of them looks
-promising**, not that any of them would move discrimination on real
+Separation is the weaker half, and the honest version of it is this. Two
+channels look genuinely promising: `meanAbsDialogueShareDelta` orders all three
+available sets (1.000 / 0.960 / 0.833), and `actionSentenceCvOverall` orders
+both real-prose sets perfectly with non-overlapping ranges on the blind pairs,
+inverting only on the one corpus where it has nothing to read. The best set
+here is set D, the six blind pairs, because it is the only stimulus written
+without knowledge of the engine — and it is still six pairs by one author.
+Against that, `meanTurnWords` orders set D perfectly and set C perfectly
+BACKWARDS, which is a standing warning that a matched pair measures how its
+author writes badness; and the strongest channel is anti-correlated with cast
+size on every set, while cast size alone orders 32 of 32 pairs. Nobody has
+controlled for that yet.
+
+Nothing here has been measured on real writing at scale. Until it has, the
+honest claim is: **these channels are dense and cheap, two of them survive
+three sets including one written blind, and one open confound could account for
+part of that** — not that any of them would move discrimination on real
 screenplays.

@@ -335,6 +335,56 @@ test('the two event-shaped channels are honestly SPARSE, and stay labelled that 
   assert.ok(actionCvRate > 0.05, 'actionSentenceCv fires somewhere — a dead channel would be a bug');
 });
 
+// ── The separation result on the blind pairs, locked ────────────────────────
+// tests/fixtures/blind-pairs/ is the only stimulus in this repository written
+// by an author who had read none of the engine (see that directory's
+// README.md). The numbers asserted here are the ones recorded in
+// docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md §4 — including the REVERSAL,
+// which is the most useful negative result in that table and is locked here
+// so it cannot quietly disappear.
+
+function blindPairs(): Array<{ good: string; bad: string }> {
+  const dir = path.join(REPO_ROOT, 'tests/fixtures/blind-pairs');
+  if (!existsSync(dir)) return [];
+  const files = readdirSync(dir).filter(f => f.endsWith('.fountain')).sort();
+  const pairs: Array<{ good: string; bad: string }> = [];
+  for (const goodFile of files.filter(f => f.endsWith('-excellent.fountain'))) {
+    const badFile = goodFile.replace(/-excellent\.fountain$/, '-bad.fountain');
+    if (!files.includes(badFile)) continue;
+    pairs.push({
+      good: readFileSync(path.join(dir, goodFile), 'utf8'),
+      bad: readFileSync(path.join(dir, badFile), 'utf8'),
+    });
+  }
+  return pairs;
+}
+
+test('the two candidate channels order the blind matched pairs', { skip: blindPairs().length === 0 }, () => {
+  const pairs = blindPairs().map(p => ({
+    good: computeStructuralSignals(p.good),
+    bad: computeStructuralSignals(p.bad),
+  }));
+  assert.equal(pairs.length, 6);
+
+  const higher = (key: 'meanAbsDialogueShareDelta' | 'actionSentenceCvOverall' | 'meanTurnWords'): number =>
+    pairs.filter(p => p.good[key] > p.bad[key]).length;
+
+  // Recorded: 5/6 and 6/6. Asserted at the recorded value, not below it, so a
+  // change in either direction has to be looked at rather than absorbed.
+  assert.equal(higher('meanAbsDialogueShareDelta'), 5);
+  assert.equal(higher('actionSentenceCvOverall'), 6);
+
+  // The reversal: `meanTurnWords` was registered 'lower' and orders this set
+  // 6/6 in that direction, while ordering the calibration bands 0/25 in it.
+  // The channel measures how an author writes badness, not craft.
+  assert.equal(pairs.filter(p => p.good.meanTurnWords < p.bad.meanTurnWords).length, 6);
+  const strong = REFERENCE_CORPUS.filter(s => s.band === 'strong').map(s => computeStructuralSignals(s.fountain));
+  const troubled = REFERENCE_CORPUS.filter(s => s.band === 'troubled').map(s => computeStructuralSignals(s.fountain));
+  let lowerOnCalib = 0;
+  for (const a of strong) for (const b of troubled) if (a.meanTurnWords < b.meanTurnWords) lowerOnCalib++;
+  assert.equal(lowerOnCalib, 0, 'the meanTurnWords reversal between the blind pairs and the calibration bands has changed');
+});
+
 // ── The unwired guarantee, enforced structurally ─────────────────────────────
 
 test('nothing on the scoring path reads structuralSignals', () => {

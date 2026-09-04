@@ -6,8 +6,10 @@
 // 76.0, sharing 7 of 10 top notes. The mechanism it proved is not "not enough
 // rules" — it is that nearly every note derives from four SPARSE LEXICON
 // channels that read "absent" on the overwhelming majority of scenes:
-// across the repository's own 42 scripts / 447 scenes, `emotionalShift` is
-// 'neutral' on 92.8%, `clockRaised` fires on 7.4%, `revelation` on 6.9%. A
+// on the audit's own count over 42 scripts / 447 scenes, `emotionalShift` is
+// 'neutral' on 92.8%, `clockRaised` fires on 7.4%, `revelation` on 6.9% (this
+// module's own re-measurement over the 40 git-tracked scripts / 427 scenes
+// reproduces that: 92.7%, 7.0%, 6.8%). A
 // channel that is absent almost everywhere produces notes of the form "X is
 // missing", and those notes fire on the excellent draft and the bad draft
 // alike. Good writing carries reversal and urgency in BEHAVIOUR and FORM,
@@ -24,6 +26,15 @@
 // calibration samples (427 scenes), the channels kept below are non-zero on
 // 75-100% of scenes, against 6.8-7.3% for `revelation`/`emotionalShift` and
 // 7.0% for `clockRaised` on those same scenes.
+//
+// Separation was measured on three sets with one statistic (rank-ordering
+// count over cross-group pairs = Mann-Whitney AUC): the audit's own matched
+// pair, the calibration corpus's strong-vs-troubled bands, and the six blind
+// matched pairs in tests/fixtures/blind-pairs/ written by an author who had
+// read none of this engine. Two channels order all three (or both real-prose
+// sets perfectly); several registered priors are refuted, one channel reverses
+// direction between sets, and the strongest channel carries an uncontrolled
+// cast-size confound. That table, with its caveats, is the doc below.
 //
 // Two candidate channels were MEASURED AND DROPPED rather than shipped: a
 // per-scene dialogue question-density channel (present on 14.7% of CC0 and

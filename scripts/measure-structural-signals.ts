@@ -24,8 +24,9 @@
 //   reported both ways and no second statistic is smuggled in.
 //     B: the advice-quality audit's matched excellent/bad pair (N = 1).
 //     C: calibration corpus, 5 'strong' vs 5 'troubled' (N = 25).
-//     D: tests/fixtures/blind-pairs/, if that directory exists (another lane
-//        may add it); skipped with a printed notice when it does not.
+//     D: tests/fixtures/blind-pairs/ - six matched pairs written blind by an
+//        author who had read none of the engine (see that directory's
+//        README.md), N = 6. Skipped with a printed notice if absent.
 //
 //   The direction each channel is scored in is PRE-REGISTERED in
 //   STRUCTURAL_SIGNAL_SPECS (structural-signals.ts) and was written before any
@@ -71,24 +72,20 @@ function loadScreenplayFixtures(): Script[] {
 function loadBlindPairs(): Array<{ label: string; good: Script; bad: Script }> {
   const dir = path.join(REPO_ROOT, 'tests/fixtures/blind-pairs');
   if (!existsSync(dir)) return [];
-  // Convention-tolerant: pair files whose basenames differ only by a
-  // good/strong/excellent vs bad/weak/troubled marker, or that sit in a
-  // per-pair subdirectory. Anything unpaired is reported, never guessed at.
+  // The lane that landed this set names its files
+  // `<pair>-excellent.fountain` / `<pair>-bad.fountain`, flat in one
+  // directory (see that directory's README.md). Anything that does not pair
+  // cleanly is skipped rather than guessed at.
+  const files = readdirSync(dir).filter(f => f.endsWith('.fountain')).sort();
   const out: Array<{ label: string; good: Script; bad: Script }> = [];
-  const entries = readdirSync(dir, { withFileTypes: true });
-  const GOOD = /(good|strong|excellent|better|a)\b/i;
-  const BAD = /(bad|weak|troubled|worse|b)\b/i;
-  for (const e of entries) {
-    if (!e.isDirectory()) continue;
-    const sub = path.join(dir, e.name);
-    const files = readdirSync(sub).filter(f => f.endsWith('.fountain')).sort();
-    const goodFile = files.find(f => GOOD.test(path.basename(f, '.fountain')));
-    const badFile = files.find(f => BAD.test(path.basename(f, '.fountain')) && f !== goodFile);
-    if (!goodFile || !badFile) continue;
+  for (const goodFile of files.filter(f => f.endsWith('-excellent.fountain'))) {
+    const stem = goodFile.replace(/-excellent\.fountain$/, '');
+    const badFile = `${stem}-bad.fountain`;
+    if (!files.includes(badFile)) continue;
     out.push({
-      label: e.name,
-      good: { label: `${e.name}/${goodFile}`, fountain: readFileSync(path.join(sub, goodFile), 'utf8') },
-      bad: { label: `${e.name}/${badFile}`, fountain: readFileSync(path.join(sub, badFile), 'utf8') },
+      label: stem,
+      good: { label: goodFile, fountain: readFileSync(path.join(dir, goodFile), 'utf8') },
+      bad: { label: badFile, fountain: readFileSync(path.join(dir, badFile), 'utf8') },
     });
   }
   return out;
@@ -277,8 +274,8 @@ function spearman(a: number[], b: number[]): number {
   return da > 0 && db > 0 ? num / Math.sqrt(da * db) : 0;
 }
 
-function reportCollinearity(blocks: StructuralSignalsReport[]): void {
-  console.log(`\n## COLLINEARITY — Spearman rho vs meanSpeakersPerScene (${blocks.length} scripts)\n`);
+function reportCollinearity(label: string, blocks: StructuralSignalsReport[]): void {
+  console.log(`\n## COLLINEARITY — Spearman rho vs meanSpeakersPerScene — ${label} (${blocks.length} scripts)\n`);
   const cast = blocks.map(b => b.meanSpeakersPerScene);
   console.log('| channel | rho |');
   console.log('|---|---|');
@@ -322,7 +319,7 @@ function main(): void {
   // Part D — blind pairs, if another lane has landed them.
   const blind = loadBlindPairs();
   if (blind.length === 0) {
-    console.log('\n(Part D skipped: tests/fixtures/blind-pairs/ is absent or contains no recognizable pair directories.)');
+    console.log('\n(Part D skipped: tests/fixtures/blind-pairs/ is absent or contains no recognizable pairs.)');
   } else {
     sets.push({
       name: 'D: blind pairs',
@@ -335,8 +332,14 @@ function main(): void {
   }
 
   reportSeparation(sets);
-  reportCollinearity([...cc0, ...calibration].map(sc => computeStructuralSignals(sc.fountain)));
-  reportCollinearity(cc0.map(sc => computeStructuralSignals(sc.fountain)));
+  reportCollinearity('CC0 + calibration', [...cc0, ...calibration].map(sc => computeStructuralSignals(sc.fountain)));
+  reportCollinearity('CC0 only', cc0.map(sc => computeStructuralSignals(sc.fountain)));
+  if (blind.length > 0) {
+    reportCollinearity(
+      'blind pairs',
+      blind.flatMap(pr => [computeStructuralSignals(pr.good.fountain), computeStructuralSignals(pr.bad.fountain)]),
+    );
+  }
 }
 
 main();
