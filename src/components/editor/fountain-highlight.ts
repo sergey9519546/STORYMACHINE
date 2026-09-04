@@ -1,14 +1,19 @@
 // Fountain syntax highlighting for CodeMirror 6.
 // Re-uses parseFountain() from src/lib/fountain.ts so block-type detection
-// stays in one place. The plugin runs on every doc change and replaces the
-// old line-decoration set with a fresh one.
+// stays in one place. The plugin recomputes decorations incrementally (see
+// incremental-decorator.ts) — only the changed + visible line ranges on
+// every keystroke, with a full reparse on idle — rather than re-parsing the
+// whole document on every doc change.
 
-import { EditorView, ViewPlugin, Decoration, DecorationSet } from '@codemirror/view';
-import { EditorState, RangeSetBuilder } from '@codemirror/state';
-import { parseFountain, FountainBlockType } from '../../lib/fountain.ts';
+import { EditorView } from '@codemirror/view';
+import { FountainBlockType } from '../../lib/fountain.ts';
+import { incrementalFountainDecorator } from './incremental-decorator.ts';
 
 // ── Tailwind-equivalent class names for each block type ──────────────────────
-const BLOCK_CLASSES: Partial<Record<FountainBlockType, string>> = {
+// Exported so fountain-keymap.ts's Tab element-cycling preview (an ephemeral
+// decoration on an as-yet-untyped line — see that file) can reuse the SAME
+// color classes real content gets, instead of a second, drifting copy.
+export const BLOCK_CLASSES: Partial<Record<FountainBlockType, string>> = {
   scene_heading: 'cm-fountain-scene',
   character:     'cm-fountain-character',
   dual_dialogue: 'cm-fountain-character',
@@ -21,48 +26,9 @@ const BLOCK_CLASSES: Partial<Record<FountainBlockType, string>> = {
   note:          'cm-fountain-note',
 };
 
-// ── Line-level decoration builder ────────────────────────────────────────────
-function buildDecorations(state: EditorState): DecorationSet {
-  const doc = state.doc.toString();
-  const blocks = parseFountain(doc);
-  const builder = new RangeSetBuilder<Decoration>();
-
-  // parseFountain gives us blocks with line-accurate offsets via lineNumber (1-indexed).
-  // Walk the blocks and mark each line with its decoration class.
-  for (const block of blocks) {
-    const cls = BLOCK_CLASSES[block.type];
-    if (!cls) continue;
-
-    // parseFountain (src/lib/fountain.ts) splits the doc on '\n', so every
-    // block.text is exactly one line — no embedded newlines to walk.
-    const lineNo = block.lineNumber;
-    if (lineNo < 1 || lineNo > state.doc.lines) continue;
-
-    const line = state.doc.line(lineNo);
-    try {
-      builder.add(line.from, line.from, Decoration.line({ class: cls }));
-    } catch {
-      // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
-    }
-  }
-
-  return builder.finish();
-}
-
-export const fountainHighlight = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) {
-      this.decorations = buildDecorations(view.state);
-    }
-    update(update: { docChanged: boolean; state: EditorState }) {
-      if (update.docChanged) {
-        this.decorations = buildDecorations(update.state);
-      }
-    }
-  },
-  { decorations: (v) => v.decorations },
-);
+// ── Incremental line-level decoration plugin ─────────────────────────────────
+// See incremental-decorator.ts for the strategy and correctness reasoning.
+export const fountainHighlight = incrementalFountainDecorator((type) => BLOCK_CLASSES[type]);
 
 // ── Base theme (applied via EditorView.baseTheme) ────────────────────────────
 // Light and dark variants use .cm-fountain-* classes defined here.

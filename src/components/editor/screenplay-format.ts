@@ -18,10 +18,10 @@
 // proportional to SPEC regardless of the editor's chosen font-size — no
 // pixel value is invented independently of SPEC.
 
-import { EditorView, ViewPlugin, Decoration, DecorationSet } from '@codemirror/view';
-import { EditorState, RangeSetBuilder } from '@codemirror/state';
-import { parseFountain, FountainBlockType } from '../../lib/fountain.ts';
+import { EditorView } from '@codemirror/view';
+import { FountainBlockType } from '../../lib/fountain.ts';
 import { SPEC, type ElementSpec } from '../../lib/screenplay-layout.ts';
+import { incrementalFountainDecorator } from './incremental-decorator.ts';
 
 // Courier 12pt is fixed-pitch 10 characters-per-inch — the same "10cpi"
 // assumption baked into screenplay-layout.ts's CHAR_WIDTH constant
@@ -101,48 +101,8 @@ function buildThemeRules(): Record<string, StyleRule> {
 
 export const screenplayFormatTheme = EditorView.baseTheme(buildThemeRules());
 
-// ── Line-level decoration builder (structure mirrors fountain-highlight.ts) ──
-function buildDecorations(state: EditorState): DecorationSet {
-  const doc = state.doc.toString();
-  const blocks = parseFountain(doc);
-  const builder = new RangeSetBuilder<Decoration>();
-
-  // parseFountain gives line-accurate offsets via lineNumber (1-indexed);
-  // walk the blocks and mark each line with its indentation class.
-  for (const block of blocks) {
-    const indent = INDENTS[block.type];
-    if (!indent) continue;
-
-    // parseFountain (src/lib/fountain.ts) splits the doc on '\n', so every
-    // block.text is exactly one line — no embedded newlines to walk.
-    const lineNo = block.lineNumber;
-    if (lineNo < 1 || lineNo > state.doc.lines) continue;
-
-    const line = state.doc.line(lineNo);
-    try {
-      builder.add(line.from, line.from, Decoration.line({ class: indent.cls }));
-    } catch {
-      // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
-    }
-  }
-
-  return builder.finish();
-}
-
-// Matches fountain-highlight.ts's pattern: rebuild only on doc change, not
-// on every view update (selection moves, etc.) — parseFountain runs once
-// per edit, not per keystroke-adjacent render.
-export const screenplayFormat = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) {
-      this.decorations = buildDecorations(view.state);
-    }
-    update(update: { docChanged: boolean; state: EditorState }) {
-      if (update.docChanged) {
-        this.decorations = buildDecorations(update.state);
-      }
-    }
-  },
-  { decorations: (v) => v.decorations },
-);
+// ── Incremental line-level decoration plugin ─────────────────────────────────
+// See incremental-decorator.ts for the strategy and correctness reasoning
+// (shared verbatim with fountain-highlight.ts's color-class plugin — only
+// the class-map function differs).
+export const screenplayFormat = incrementalFountainDecorator((type) => INDENTS[type]?.cls);
