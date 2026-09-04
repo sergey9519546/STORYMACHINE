@@ -162,14 +162,31 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
   const { scriptText } = req.body as { scriptText: string };
 
   // Vectorize the input script
-  const { vectorizeScript, findNearestNeighbors, clusterCorpus } = await import('../../nvm/analyze/story-vector.ts');
+  const { vectorizeFromReport, findNearestNeighbors, clusterCorpus } = await import('../../nvm/analyze/story-vector.ts');
   const { loadCorpusVectors } = await import('../../lib/corpus-loader.ts');
-  const { runScriptDoctor } = await import('../../nvm/analyze/doctor.ts');
+  const { runScriptDoctorForRequest } = await import('../../lib/doctor-request.ts');
 
+  // OFF THE MAIN THREAD (2026-09-04). This route used to run TWO in-process
+  // analyses of the submitted draft — this one, and a second one inside
+  // vectorizeScript a few lines down — and then, on a cold vector cache,
+  // twenty more inside loadCorpusVectors. All of it held Node's event loop,
+  // so every other user's request queued behind it: GET /health p95 was
+  // 2,420 ms while this route was under load, against 20 ms for the
+  // already-pooled /api/scriptide/doctor under the identical load.
+  //
+  // Now there is exactly ONE analysis of the submitted draft, it runs on a
+  // worker thread, and the vector is derived from its report rather than by
+  // re-running the doctor (server/nvm/analyze/story-vector.ts's
+  // vectorizeFromReport — the counting arithmetic is ~1 ms and stays on the
+  // coordinator, where the rule index lives; only the analysis moves).
+  //
   // A similarity/health comparison over a scene-truncated prefix would look
   // like a claim about the whole draft. Refuse it before corpus I/O or vector
   // work so partial input cannot acquire a polished comparative result.
-  const queryReport = await runScriptDoctor(scriptText);
+  const queryReport = await runScriptDoctorForRequest(scriptText, res);
+  // The client hung up mid-analysis: the work was cancelled and there is
+  // nobody left to answer — see runScriptDoctorForRequest's contract.
+  if (!queryReport) return;
   if (!isWholeDraftAnalysisComplete(queryReport)) {
     res.status(422).json({
       error: 'analysis_incomplete',
@@ -183,8 +200,15 @@ router.post('/api/nvm/analyze/compare', gameLimiter, validate(StoryVectorCompare
   }
   
   logger.info('story_vector_vectorizing_input', {});
-  const queryVector = await vectorizeScript(scriptText, 'User Draft', 'generated');
+  const queryVector = await vectorizeFromReport(queryReport, scriptText, 'User Draft', 'generated');
 
+  // loadCorpusVectors vectorizes off-thread too (see its own comment): on a
+  // cold cache this line is up to twenty more Script Doctor runs, and every
+  // one of them used to be an event-loop stall. It deliberately does NOT take
+  // this request's abort signal — the vectors it builds are written to
+  // data/screenplays/.vectors and serve every later request, so a writer who
+  // cancels should not also throw away the corpus build everyone benefits
+  // from. It is off-thread either way, so nobody is blocked by it.
   logger.info('story_vector_loading_corpus', {});
   const corpus = await loadCorpusVectors(undefined, (current, total, slug) => {
     logger.debug('story_vector_loading_corpus_progress', { current, total, slug });

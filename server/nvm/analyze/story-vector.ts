@@ -24,6 +24,7 @@
 
 import crypto from 'node:crypto';
 import type { RevisionIssue, PassName } from '../revision/passes/types.ts';
+import type { ScriptDoctorReport } from './types.ts';
 import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
 
 /** RevisionIssue doesn't carry its own pass name (that's tracked one level up,
@@ -183,7 +184,12 @@ export let vectorizeFromIssues: VectorizeFromIssuesFn = vectorizeFromIssuesCore;
 
 /** Convenience wrapper: vectorize directly from Fountain text by running
  *  Script Doctor first. This is the high-level entry point for most callers.
- * 
+ *
+ *  IN-PROCESS. The doctor runs on the calling thread, which is right for a
+ *  test or a CLI script and wrong for an Express route: one such call holds
+ *  Node's event loop for the whole analysis and every other user's request
+ *  waits behind it. Server callers want vectorizeScriptOffThread below.
+ *
  *  @param fountainText - Raw Fountain screenplay text
  *  @param title - Human-readable title for this screenplay
  *  @param source - Provenance tag ('generated' | 'corpus' | 'synthetic')
@@ -194,18 +200,96 @@ export async function vectorizeScript(
   title: string,
   source: 'generated' | 'corpus' | 'synthetic' = 'generated'
 ): Promise<StoryVector> {
-  const { runScriptDoctor, computeContentHash } = await import('./doctor.ts');
-  
-  // Run Script Doctor to get rule-firing pattern
+  const { runScriptDoctor } = await import('./doctor.ts');
   const report = await runScriptDoctor(fountainText);
+  return vectorizeFromReport(report, fountainText, title, source);
+}
+
+/** The off-thread twin of vectorizeScript: the identical vector, but the
+ *  Script Doctor half runs on a worker thread (doctor-pool.ts) instead of
+ *  holding Node's event loop for the whole analysis.
+ *
+ *  This is the entry point every SERVER caller should use. Two of them exist,
+ *  and the second is why this matters more than it looks: the route
+ *  (POST /api/nvm/analyze/compare) vectorizes ONE draft, but the corpus loader
+ *  (server/lib/corpus-loader.ts) vectorizes all 20 tracked reference
+ *  screenplays whenever data/screenplays/.vectors is cold — which it is in
+ *  every fresh checkout, because data/ is gitignored. That made the first
+ *  compare request after any install run twenty consecutive full analyses
+ *  on the main thread, with every other request in the server queued behind
+ *  them.
+ *
+ *  vectorizeScript above stays in-process for tests, CLI scripts and anything
+ *  that would rather not spawn a thread; doctor-pool.ts falls back to exactly
+ *  that path by itself whenever workers cannot run in an environment, so this
+ *  function is never WORSE than the in-process one.
+ *
+ *  Only the doctor call moves. The counting arithmetic stays on the
+ *  coordinator, for the reason vectorizeFromReport's comment gives.
+ *
+ *  @param opts.signal - cancels the analysis outright when the caller has gone
+ *         away. doctor-pool.ts terminates the worker to do it: the doctor is a
+ *         synchronous CPU loop with no await point at which a cooperative flag
+ *         could be observed.
+ *  @throws when the doctor could not analyze the complete submitted draft */
+export async function vectorizeScriptOffThread(
+  fountainText: string,
+  title: string,
+  source: 'generated' | 'corpus' | 'synthetic' = 'generated',
+  opts?: { signal?: AbortSignal }
+): Promise<StoryVector> {
+  const { runScriptDoctorOffThread } = await import('./doctor-pool.ts');
+  const report = await runScriptDoctorOffThread(
+    fountainText,
+    undefined,
+    opts?.signal ? { signal: opts.signal } : undefined,
+  );
+  return vectorizeFromReport(report, fountainText, title, source);
+}
+
+/** Build the vector for a Script Doctor report that has ALREADY been produced
+ *  — the half of vectorizeScript that is not analysis.
+ *
+ *  ── WHY THE SPLIT EXISTS (2026-09-04) ─────────────────────────────────────
+ *  vectorizeScript is two very different things welded together: a
+ *  runScriptDoctor call, and about a millisecond of counting arithmetic.
+ *  Measured on a 150-scene synthetic draft in this container: 613 ms inside
+ *  the doctor, 1.35 ms in everything below it (707 issues → 464 dimensions).
+ *  Only the first half is the event-loop hazard doctor-pool.ts exists for.
+ *
+ *  And only the first half can move off-thread without a consequence. The
+ *  arithmetic reads and EXTENDS RULE_INDEX — per-process, append-only,
+ *  encounter-ordered module state (see its comment at the bottom of this
+ *  file). Run it in a worker and a vector's axis space becomes a function of
+ *  WHICH of the pool's workers served the request, so `dimensions.length` —
+ *  which POST /api/nvm/analyze/compare reports back to the caller — would
+ *  start varying between two identical submissions to the same server.
+ *  Correctness would survive that (every vector carries its own `ruleKeys`
+ *  and alignVectors reconciles by NAME before any distance math, which is
+ *  exactly what the 2026-08-24 fix built), but a shipped number would start
+ *  moving for a reason no reader could reconstruct. Keeping the index on the
+ *  coordinator keeps that number exactly what it was before the doctor moved:
+ *  this change is meant to move no number at all.
+ *
+ *  @param report - a whole-draft report for `fountainText`
+ *  @param fountainText - the text that produced it, hashed here for the
+ *         vector's determinism receipt exactly as vectorizeScript always did
+ *  @throws when the doctor could not analyze the complete submitted draft */
+export async function vectorizeFromReport(
+  report: ScriptDoctorReport,
+  fountainText: string,
+  title: string,
+  source: 'generated' | 'corpus' | 'synthetic' = 'generated'
+): Promise<StoryVector> {
   if (!isWholeDraftAnalysisComplete(report)) {
     throw new Error('Story vector requires a complete whole-draft analysis.');
   }
-  
+  const { computeContentHash } = await import('./doctor.ts');
+
   // Flatten all issues from all 14 passes, tagging each with its pass name
   // (RevisionIssue itself doesn't carry it — see TaggedIssue above).
   const allIssues = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-  
+
   const vector = vectorizeFromIssues(allIssues, {
     title,
     source,

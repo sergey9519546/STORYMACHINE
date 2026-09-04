@@ -48,13 +48,18 @@ const ALLOWED: Record<string, string> = {
     + 'machinery (withAiBudget\'s AsyncLocalStorage scope) is main-thread state, and it is '
     + 'I/O-bound rather than CPU-bound, so doctor-pool.ts deliberately does NOT carry it — see '
     + 'that file\'s header. Every other doctor call in this file goes through the pool.',
-  'nvm/analysis.ts':
-    'POST /api/nvm/analyze/compare. Its runScriptDoctor call is only HALF this route\'s '
-    + 'main-thread cost: vectorizeScript (server/nvm/analyze/story-vector.ts) runs a SECOND '
-    + 'in-process analysis of the same text a few lines later. Pooling only the route\'s own '
-    + 'call would satisfy this test while leaving the route just as blocking, so the honest '
-    + 'state is to record it as a known remaining main-thread analysis path (research/Labs '
-    + 'surface, not a shipped writer route) rather than to half-fix it.',
+  // nvm/analysis.ts was the second entry here until 2026-09-04. It is gone
+  // because the route was actually fixed, not because the list was tidied: it
+  // ran TWO in-process analyses of the submitted draft (its own
+  // runScriptDoctor, then a second one inside vectorizeScript) plus up to
+  // twenty more inside loadCorpusVectors on a cold vector cache. Pooling
+  // only the first would have satisfied this test while leaving the route just
+  // as blocking, which is why the previous lane recorded the reason instead of
+  // taking the pass. All of it is off-thread now — story-vector.ts's
+  // vectorizeFromReport derives the vector from the report the pool already
+  // produced, and corpus-loader.ts vectorizes through the pool as well.
+  // GET /health p95 under load on this route: 2,420 ms before, see
+  // scripts/load-test-doctor.mjs's results block for the after.
 };
 
 /** Every .ts file under server/routes/**, repo-relative to that directory. */
@@ -107,9 +112,11 @@ describe('doctor call sites — every route analyses off the main thread', () =>
   });
 
   it('the export routes and the live-diagnosis route are on the pooled path', () => {
-    // Named explicitly, because these are the five that were NOT pooled when
+    // Named explicitly, because these are the ones that were NOT pooled when
     // the review ran and the ones a careless revert would take back out.
-    const expectPooled = ['export.ts', 'coverage-letter.ts', 'scriptide.ts'];
+    // nvm/analysis.ts joined them on 2026-09-04, when the comparative-analysis
+    // route stopped analysing on the main thread and left the allow-list.
+    const expectPooled = ['export.ts', 'coverage-letter.ts', 'scriptide.ts', 'nvm/analysis.ts'];
     for (const file of expectPooled) {
       const source = readFileSync(path.join(ROUTES_DIR, file), 'utf8');
       assert.ok(

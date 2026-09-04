@@ -1249,3 +1249,102 @@ holds (full suite green at the commit carrying this note).
   unaffected; a real-corpus script with a non-ASCII character cue scores
   differently on this branch, deliberately, and the owner's `measure-real` run
   plus a manifest re-lock is the step that closes that gap."
+
+### 2026-09-04 — COMPARATIVE-ANALYSIS ROUTE OFF-THREAD: `POST /api/nvm/analyze/compare` and the corpus loader stopped analysing on the main thread — output-identity receipt (no real-corpus measurement run, and none claimed)
+
+- **What changed, and why it is on this ledger at all:** the receipt guard
+  classifies NO file in this range as scoring-path — `node
+  scripts/check-scoring-receipt.mjs main..HEAD` prints `no scoring-path files
+  changed. OK.`, because `story-vector.ts`, `doctor-pool.ts`,
+  `corpus-loader.ts` and `server/routes/nvm/analysis.ts` are all consumers of
+  `doctor.ts` rather than files reachable from it. The entry is written anyway
+  because the change touches `server/nvm/analyze/**` and the claim it makes is
+  the same one the guard exists to make checkable: that a performance change
+  moved no number. An unenforced claim is exactly the kind that later turns
+  out to be false, so it gets the same instrument as an enforced one.
+  Concretely: the route ran the Script Doctor over the submitted draft TWICE
+  (its own call, plus a second one inside `vectorizeScript`) and, on a cold
+  `data/screenplays/.vectors`, up to twenty more times inside
+  `loadCorpusVectors` — all on Node's event loop. Now there is one analysis of
+  the draft, it runs on a `doctor-pool.ts` worker, the vector is derived from
+  that report by the new `vectorizeFromReport`, and `corpus-loader.ts`
+  vectorizes through the pool as well. No formula, threshold, weight,
+  deduction, cache key, verdict band or rule name was touched; the counting
+  arithmetic that builds a vector was moved into its own function and is
+  called with the same inputs, in the same order, on the same thread as
+  before.
+- **Command:** `node scripts/check-doctor-output-identity.mjs` — NOT
+  `npm run measure-real`, for the reason the 2026-08-21 W1/E1 entries give:
+  this change claims to move zero reports, and a byte-level identity proof is
+  the stronger and more falsifiable receipt for that claim than a
+  discrimination statistic, which can stay put while individual reports drift.
+- **Baseline used:** `git archive main` at `63e156db` — the tip of the branch
+  being merged into at measurement time, not the fork point. `node_modules`
+  was symlinked into the extracted tree so both trees resolved the same
+  dependency versions. The comparison tree was this branch's own working tree.
+  This branch's commit hashes are deliberately not cited: they change on every
+  rebase, and a receipt has to name something a reviewer can still resolve.
+- **What was run — output identity over all 45 in-repo fixtures** (20
+  `data/screenplays/*.fountain`, 20 calibration `REFERENCE_CORPUS` samples, the
+  P0 sample script, 4 synthetic concatenations at 60/120/240/300 scenes):
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then `--compare <before> <after>`, with no
+  `--ignore-keys` and no `--require-added` — this range adds no report key, so
+  a plain, unflagged comparison is the honest instrument. Result, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  Exit codes 0 / 0 / 0, captured by redirecting each run to a log file and
+  reading `$?`.
+- **Second instrument — the vector itself, which the harness above does NOT
+  cover.** The identity harness compares `ScriptDoctorReport`s; this change
+  also puts a structured-clone hop between the analysis and the `StoryVector`
+  derived from it, and a vector is floating-point arithmetic over the report's
+  issue arrays. `tests/core/story-vector-offthread.test.ts` pins that
+  separately: the off-thread vector must equal the in-process vector by
+  `Object.is` element by element (so `0` and `-0` are different values there),
+  with the same container constructor (a `Float64Array` of the same numbers
+  would pass a shallow check and is exactly what a clone hop can introduce),
+  the same `ruleKeys`, a whole-object `deepStrictEqual`, and an identical
+  `JSON.stringify`. It also asserts the same equality for the
+  `DOCTOR_WORKER_POOL=off` fallback path, and that the dispatch really reached
+  a worker rather than quietly running in-process.
+  `tests/routes/compare-offthread.test.ts` repeats the comparison at the level
+  a caller sees — the whole route response, pooled vs. `DOCTOR_WORKER_POOL=off`
+  — and watches `doctorPoolStatus()` to prove the dispatch happened. 9
+  assertions across the two files, all passing.
+- **What this receipt does NOT say.** It does not claim anything about the
+  real corpus. It says that over the 45 in-repo fixtures every doctor report is
+  byte-identical, and that the vector built from such a report is identical
+  whether the analysis ran on the main thread or a worker. It makes no claim
+  about AUC, and this range changes nothing that AUC is computed from.
+- **The performance claim, measured rather than asserted:**
+  `scripts/load-test-doctor.mjs` gained the compare route and was run with the
+  identical invocation before and after, from the identical cold state
+  (`rm -rf data/screenplays/.vectors` first, since that cache never ships):
+  `--routes=/api/nvm/analyze/compare,/api/scriptide/doctor --concurrency=4
+  --rounds=2 --scenes=150 --health-interval=100`. GET `/health` p95 while the
+  compare route was under load: **2,420 ms → 51 ms** (probes answered in the
+  phase: 19 → 43). The already-pooled `/api/scriptide/doctor` control moved
+  20 ms → 21 ms in the same two runs, which is what says the compare figure is
+  the change and not the machine. The full block, including the p99 of 460 ms
+  that remains (k-means over the fixed 20-screenplay corpus, bounded by the
+  corpus and not by user input), is recorded in that script's header.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the 45
+  in-repo fixtures plus the tracked `data/screenplays/*.fountain` files the
+  route tests post are the whole input. `tests/fixtures/real-corpus-manifest.json`
+  is unchanged by this range, and nothing in this range can change a produced
+  script's health, verdict or scene count, so no re-lock is owed.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the baseline
+  tree myself, ran the three harness commands above myself on 2026-09-04 after
+  rebasing onto that tip, and read the PASS line out of the compare run's own
+  log file along with its exit code. I ran the two load tests myself, from the
+  same cold cache state, and the p95 figures above are read from those two
+  runs' output rather than inferred from them. No real-corpus AUC measurement
+  was run against this range and none is claimed: the corpus is local-only and
+  this container has no copy of it. I want the limit of this receipt on the
+  record plainly — it proves report-level and vector-level identity over the
+  in-repo fixtures for a change that relocates where analysis executes, and it
+  proves nothing at all about the real corpus, which this change does not
+  touch."

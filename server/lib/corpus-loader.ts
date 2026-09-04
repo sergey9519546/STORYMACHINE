@@ -224,7 +224,17 @@ export async function loadCorpusVectors(
   const validEntries = await resolveCorpusEntries();
 
   const vectors: StoryVector[] = [];
-  const { vectorizeScript } = await import('../nvm/analyze/story-vector.ts');
+  // OFF-THREAD, and this is the call site that made it matter (2026-09-04).
+  // On a cold cache this loop vectorizes EVERY corpus screenplay, and
+  // vectorizing runs the Script Doctor — so the loop below is not one analysis
+  // but up to twenty, back to back. Run in-process, that is twenty
+  // consecutive full-stops for every other request the server is serving, and
+  // it happens on the FIRST POST /api/nvm/analyze/compare after any fresh
+  // checkout (data/ is gitignored, so data/screenplays/.vectors never ships).
+  // Measured on the live keyless server before this change: GET /health p95
+  // 2,420 ms while the compare route was under load, with only 19 probes
+  // answered in the whole phase. See server/nvm/analyze/doctor-pool.ts.
+  const { vectorizeScriptOffThread } = await import('../nvm/analyze/story-vector.ts');
   const { computeContentHash } = await import('../nvm/analyze/doctor.ts');
   
   for (let i = 0; i < validEntries.length; i++) {
@@ -259,7 +269,7 @@ export async function loadCorpusVectors(
     // Cache miss: vectorize from scratch
     logger.info('corpus_loader_cache_miss', { slug, note: 'vectorizing (this may take 30-60s)' });
     try {
-      const vector = await vectorizeScript(fountainText, entry.slug, 'corpus');
+      const vector = await vectorizeScriptOffThread(fountainText, entry.slug, 'corpus');
 
       // Enhance metadata with manifest info WHEN THERE IS ANY. Guarded because
       // directory-scan entries carry no counts: an unconditional assignment
@@ -308,9 +318,9 @@ export async function loadSingleVector(slug: string): Promise<StoryVector | null
     return cached;
   }
   
-  // Vectorize
-  const { vectorizeScript } = await import('../nvm/analyze/story-vector.ts');
-  const vector = await vectorizeScript(fountainText, entry.slug, 'corpus');
+  // Vectorize — off-thread, for the reason loadCorpusVectors gives above.
+  const { vectorizeScriptOffThread } = await import('../nvm/analyze/story-vector.ts');
+  const vector = await vectorizeScriptOffThread(fountainText, entry.slug, 'corpus');
   // Guarded for the same reason as loadCorpusVectors above: a directory-scan
   // entry has no manifest counts, and must not blank out the measured ones.
   if (entry.sceneCount !== undefined) vector.metadata.sceneCount = entry.sceneCount;

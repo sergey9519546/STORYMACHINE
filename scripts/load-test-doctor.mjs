@@ -103,6 +103,43 @@
 //   the best after, which is exactly right — it analyses every script in the
 //   slate, so it held the loop the longest.
 //
+// ── RESULTS (2026-09-04, the SECOND half of security review finding #1: the
+//    comparative-analysis route) — same container (4 CPUs, 2 workers),
+//    keyless, PERSIST_SESSIONS disabled. data/screenplays/.vectors was DELETED
+//    before each of the two runs, so both start from the identical cold state
+//    a fresh checkout is always in (data/ is gitignored, so that cache never
+//    ships) and both therefore include the corpus build. Identical invocation
+//    both times:
+//
+//   rm -rf data/screenplays/.vectors
+//   node scripts/load-test-doctor.mjs \
+//        --routes=/api/nvm/analyze/compare,/api/scriptide/doctor \
+//        --concurrency=4 --rounds=2 --scenes=150 --health-interval=100
+//
+//     route                        /health p95   probes answered
+//     /api/nvm/analyze/compare     2,420 → 51 ms      19 → 43
+//     /api/scriptide/doctor           20 → 21 ms      39 → 18   (control)
+//
+//   The control moved by 1 ms, which is what says the compare-route number is
+//   the change and not the weather. (Its probe COUNT fell only because the
+//   phase itself got shorter: the same 8 requests finished in 706 ms mean
+//   instead of 1,734 ms, so there was less wall-clock to probe during.)
+//
+//   The compare route's own latency improved too — mean 3,509 → 2,461 ms —
+//   because the fix removed a whole analysis rather than merely relocating
+//   one: the route used to run the doctor over the submitted draft twice, once
+//   itself and once inside vectorizeScript.
+//
+//   WHAT IS STILL ON THE MAIN THREAD HERE, stated plainly because a p95 alone
+//   would hide it: /health p99 in the compare phase is 460 ms. That is
+//   clusterCorpus + alignVectors + findNearestNeighbors — k-means over the
+//   corpus plus the query, four requests deep. It is bounded by the CORPUS
+//   (20 tracked screenplays) and by the rule-index size, NOT by the submitted
+//   script, so it cannot be grown by a user: the unbounded-in-user-input work
+//   is what moved off-thread. Measured directly on this container at 464
+//   dimensions: clusterCorpus(21 vectors, k=5) = 10.0 ms, findNearestNeighbors
+//   = 1.4 ms, against 613 ms for one doctor run on the same draft.
+//
 // Re-run and update this block (and docs/PATH_TO_EXCELLENCE.md's Phase S
 // notes, if present) after any change to doctor-pool.ts, doctor.ts's
 // aggregation path, the pool sizing env vars (DOCTOR_WORKER_POOL /
@@ -160,6 +197,16 @@ const ROUTE_BODIES = {
       expected: { contentHash: createHash('sha256').update(fountain.trim()).digest('hex') },
     }),
   },
+  // The comparative-analysis route. It is not an export, but it belongs in this
+  // list for the same reason the exports do: it analyses the submitted script.
+  // It is also the HEAVIEST entry here, because one request can run the doctor
+  // over more than the submitted draft — on a cold vector cache
+  // (data/screenplays/.vectors, absent in every fresh checkout because data/ is
+  // gitignored) loadCorpusVectors vectorizes all 20 tracked corpus screenplays,
+  // and vectorizing runs the doctor. Delete that directory before a run to
+  // measure the cold path a fresh install actually takes; leave it to measure
+  // the warm steady state.
+  '/api/nvm/analyze/compare': { body: (fountain) => ({ scriptText: fountain }) },
 };
 
 // ── CLI args ─────────────────────────────────────────────────────────────
