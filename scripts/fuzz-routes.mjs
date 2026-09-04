@@ -119,18 +119,51 @@ function nestedArrayJson(depth) {
   return '['.repeat(depth) + '1' + ']'.repeat(depth);
 }
 
+function escapeXmlText(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Cue-name generators for the fdx-conversion-bypass shape (attack-lane audit
+// follow-up, extended 2026-09-04 for the cue-DEFINITION bypass families):
+// `ascii` is the original all-caps `CHARACTER<i>` shape; the other three are
+// the shapes the 2026-09-04 adversarial audit found invisible to the old
+// ASCII-only, 40-char-capped guard proxy — a non-ASCII cased-script capital
+// (Cyrillic), a cue containing `#`, and a cue at least 60 characters wide.
+// Shared by both the raw-fountain path (buildFountainWithCues) and the
+// fdx-conversion path (pathologicalFdx) below, so the same line shape is
+// exercised on both.
+const CUE_NAME_GENERATORS = {
+  ascii: (i) => `CHARACTER${i}`,
+  cyrillic: (i) => `ПЕРСОНАЖ${i}`,
+  hash: (i) => `CHARACTER #${i}`,
+  // 'A VERY LONG CHARACTER NAME AT LEAST SIXTY CHARACTERS WIDE NUMBER ' is 65
+  // chars on its own (well past the old 40-char cap, and past the "60
+  // characters" the audit named), before the distinguishing index is even
+  // appended.
+  long60: (i) => `A VERY LONG CHARACTER NAME AT LEAST SIXTY CHARACTERS WIDE NUMBER ${i}`,
+};
+
+function buildFountainWithCues(n, cueOf) {
+  let text = 'INT. ROOM - DAY\n\n';
+  for (let i = 0; i < n; i++) text += `${cueOf(i)}\nLine.\n`;
+  return text;
+}
+
 // Minimal, valid Final Draft (.fdx) XML whose converted Fountain text has `n`
-// distinct all-caps character-cue-shaped lines — the fdx-conversion-bypass
-// shape (attack-lane audit follow-up). fdxToFountain (server/lib/fdx-import.ts)
-// reads <Paragraph Type="Character"><Text>...</Text></Paragraph> /
-// Type="Dialogue" pairs; see server/lib/validation.ts's
-// rejectPathologicalConvertedFountain for the guard this is meant to trip.
-function pathologicalFdx(n) {
+// distinct character-cue-shaped lines from the given family (default
+// `ascii`, matching the shape this helper originally always produced) — the
+// fdx-conversion-bypass shape (attack-lane audit follow-up).
+// fdxToFountain (server/lib/fdx-import.ts) reads
+// <Paragraph Type="Character"><Text>...</Text></Paragraph> / Type="Dialogue"
+// pairs; see server/lib/validation.ts's rejectPathologicalConvertedFountain
+// for the guard this is meant to trip.
+function pathologicalFdx(n, family = 'ascii') {
+  const cueOf = CUE_NAME_GENERATORS[family];
   let body = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n'
     + '<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n'
     + '<Paragraph Type="Scene Heading"><Text>INT. ROOM - DAY</Text></Paragraph>\n';
   for (let i = 0; i < n; i++) {
-    body += `<Paragraph Type="Character"><Text>CHARACTER${i}</Text></Paragraph>\n`;
+    body += `<Paragraph Type="Character"><Text>${escapeXmlText(cueOf(i))}</Text></Paragraph>\n`;
     body += '<Paragraph Type="Dialogue"><Text>Line.</Text></Paragraph>\n';
   }
   body += '</Content>\n</FinalDraft>';
@@ -257,6 +290,41 @@ async function fountainPathologyFuzz(base) {
   }
   await attack(base, 'fdx-conversion-bypass /api/export/verify', '/api/export/verify', jsonPost({ fdx, expected: { contentHash: 'a'.repeat(64) } }),
     'must reject fast via the post-conversion shape guard, not hang analyzing it');
+
+  // ── cue-definition bypass families (2026-09-04 adversarial audit) ─────────
+  // fountainShapeRejectionReason's distinct-cue-line detector used to test
+  // each line against a local ASCII-only, 40-char-capped proxy instead of
+  // being composed from the analyzer's own cue alphabet (src/lib/fountain.ts's
+  // CUE_INITIAL_CLASS/CUE_LETTER_CLASS, Unicode via `\p{Lu}\p{Lt}`, no length
+  // cap). Line shapes the analyzer treats as ordinary character cues were
+  // invisible to the old guard and reached the analyzer's O(n²) cost
+  // undiminished: a non-ASCII cased-script capital (Cyrillic), a cue
+  // containing `#`, and a cue well past the old 40-char cap. Measured against
+  // the unfixed guard, raw fountain / 2,000 cues: ascii 400/96ms (control:
+  // already caught before this fix), cyrillic 200/6,345ms, hash 200/2,131ms,
+  // long60 200/6,386ms — all three non-ascii/hash/long families sailed
+  // through as 200s. fdx-converted: ascii 400/19ms, cyrillic/hash/long60 all
+  // 200. See tests/security/fountain-shape-guard-cue-parity.test.ts and
+  // tests/routes/fountain-shape-guard-cue-bypass.test.ts for the fixed
+  // guard's committed regression coverage (which also covers Greek and
+  // accented Latin, additional cased scripts the same alphabet fix closes).
+  // Fixed by composing the guard's own line-shape test from
+  // CUE_INITIAL_CLASS/CUE_LETTER_CLASS in server/lib/validation.ts.
+  const cueBypassCount = QUICK ? 2000 : 2000; // audit's own measured payload size
+  for (const family of Object.keys(CUE_NAME_GENERATORS)) {
+    const cueOf = CUE_NAME_GENERATORS[family];
+    const familyFountain = buildFountainWithCues(cueBypassCount, cueOf);
+    await attack(base, `cue-bypass ${family} (raw) /api/scriptide/doctor`, '/api/scriptide/doctor', jsonPost({ fountain: familyFountain }),
+      'must reject fast via the shape guard, not hang analyzing it');
+    await attack(base, `cue-bypass ${family} (raw) /api/export/verify`, '/api/export/verify', jsonPost({ fountain: familyFountain, expected: { contentHash: 'a'.repeat(64) } }),
+      'must reject fast via the shape guard, not hang analyzing it');
+
+    const familyFdx = pathologicalFdx(cueBypassCount, family);
+    await attack(base, `cue-bypass ${family} (fdx) /api/scriptide/doctor`, '/api/scriptide/doctor', jsonPost({ fdx: familyFdx }),
+      'must reject fast via the post-conversion shape guard, not hang analyzing it');
+    await attack(base, `cue-bypass ${family} (fdx) /api/export/verify`, '/api/export/verify', jsonPost({ fdx: familyFdx, expected: { contentHash: 'a'.repeat(64) } }),
+      'must reject fast via the post-conversion shape guard, not hang analyzing it');
+  }
   // SSE route: a 200 with a doctor_error frame is this route's honest shape
   // (see server/routes/scriptide.ts's own comment) — record it as ok as long
   // as it's fast and the body actually carries the rejection, not a report.

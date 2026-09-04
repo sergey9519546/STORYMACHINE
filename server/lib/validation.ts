@@ -11,6 +11,30 @@ import { STORY_OP_KINDS } from '../nvm/ops/StoryOp.ts';
 import { TONE_NAME_LIST, GENRE_NAMES } from './genre-router.ts';
 import { ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES, STRUCTURE_NAMES } from './structure-presets.ts';
 import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
+// One definition of "what is a character cue" (2026-09-04, guard/analyzer cue
+// parity fix). CUE_INITIAL_CLASS / CUE_LETTER_CLASS are src/lib/fountain.ts's
+// OWN cue-alphabet class bodies — the single definition CHARACTER_CUE_RE
+// itself is built from and that every other cue test in the repository
+// (server/nvm/analyze/screenplay-normalizer.ts) composes rather than
+// re-deriving. Unicode-aware (`\p{Lu}\p{Lt}`, the 2026-09-03 Unicode-cue fix)
+// and with no length cap. Composing the guard's own line-shape test from
+// these exported classes — rather than importing CHARACTER_CUE_RE verbatim —
+// keeps this guard's existing, deliberately LOOSER design (see
+// CUE_LIKE_LINE_RE's own comment below: over-count real cues, never
+// under-count the pathological case) while still sharing the one alphabet
+// definition, exactly as screenplay-normalizer.ts's CUE_BODY_RE already does.
+// Importing the classes closes the gap an adversarial audit reproduced
+// 2026-09-04: the old local `CUE_LIKE_LINE_RE = /^[A-Z0-9 .,'()&\-]{1,40}$/`
+// was invisible to non-ASCII capitals (Cyrillic, Greek, accented Latin),
+// cues containing `#`, and cues over 40 chars — all four are ordinary
+// character cues to the analyzer and were completely uncounted by this
+// guard, so a script built entirely from one of those shapes sailed past the
+// distinct-cue budget below and reached the analyzer's O(n²) cost undiminished.
+// server/lib/validation.ts sits outside doctor.ts's import graph (verified by
+// `node scripts/check-scoring-receipt.mjs` on this range), so importing FROM
+// the scoring-reachable src/lib/fountain.ts does not itself touch a
+// scoring-path file — fountain.ts is not edited by this change.
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../src/lib/fountain.ts';
 
 // ── SSRF-safe outbound URL guard (audit finding S1-a-1, BLOCKER) ────────────
 // POST /api/ai-config lets an ANONYMOUS caller set baseUrl/imgBaseUrl/
@@ -213,6 +237,20 @@ function ssrfSafeUrlField() {
 // magnitude of MAX_FOUNTAIN_TOKEN_CHARS, and a real cast is never within two
 // orders of magnitude of MAX_FOUNTAIN_DISTINCT_CUE_LINES — before the request
 // ever reaches the analyzer.
+//
+// 2026-09-04 UPDATE (adversarial audit, reproduced): the DISTINCT-CUE-LINES
+// check above originally used its own ASCII-only, 40-char-capped proxy for
+// "looks like a cue" (`/^[A-Z0-9 .,'()&\-]{1,40}$/`) instead of the analyzer's
+// real cue ALPHABET (CUE_INITIAL_CLASS/CUE_LETTER_CLASS, src/lib/fountain.ts,
+// Unicode via `\p{Lu}\p{Lt}`, no length cap). Four shapes the analyzer treats
+// as ordinary character cues were therefore invisible to this guard —
+// non-ASCII capitals (Cyrillic, Greek, accented Latin), cues containing `#`,
+// and cues over 40 chars — and sailed past the 1,500-distinct-cue budget
+// straight into the analyzer's O(n²) cost (measured: 2,000 Cyrillic cues,
+// HTTP 200 in several seconds, raw and via .fdx). Fixed by composing this
+// guard's own (deliberately loose) line-shape test from the shared alphabet
+// classes rather than maintaining a second, independently-derived alphabet
+// that can drift from it — see the import's own comment above.
 export const MAX_FOUNTAIN_TOKEN_CHARS = 2_000;
 export const MAX_FOUNTAIN_DISTINCT_CUE_LINES = 1_500;
 // Bounded quantifier on a single character class — not nested/overlapping
@@ -220,12 +258,24 @@ export const MAX_FOUNTAIN_DISTINCT_CUE_LINES = 1_500;
 // pattern regardless of input length.
 const HUGE_TOKEN_RE = new RegExp(`\\S{${MAX_FOUNTAIN_TOKEN_CHARS + 1},}`);
 // A deliberately loose, cheap proxy for "looks like a character cue": a
-// short, entirely-uppercase-ish trimmed line that isn't a scene heading. It
-// only needs to OVER-count real character cues, never under-count the
-// pathological case — a slug line or transition ("CUT TO:") occasionally
-// counting toward the budget costs a real script nothing it would ever
-// notice at a 1,500-distinct-line ceiling.
-const CUE_LIKE_LINE_RE = /^[A-Z0-9 .,'()&\-]{1,40}$/;
+// trimmed line beginning with a cased-script capital (CUE_INITIAL_CLASS) and
+// continuing with cue letters/marks, digits, or a small set of punctuation a
+// real cue line can carry (space/tab, `.` `,` `'` `(` `)` `&` `/` `#` `-`) —
+// deliberately WIDER than the analyzer's own CHARACTER_CUE_RE (which permits
+// none of `,` `(` `)` `&` `/` in its continuation class and additionally
+// requires the next line to be non-empty dialogue), because this guard only
+// needs to OVER-count real character cues, never under-count the
+// pathological case — a slug line, transition, or a (V.O.)/(CONT'D)-suffixed
+// cue occasionally counting toward the budget costs a real script nothing it
+// would ever notice at a 1,500-distinct-line ceiling, but a real cue shape
+// this proxy fails to recognize is exactly how the 2026-09-04 audit's four
+// bypass families slipped through the old ASCII/40-char version. No length
+// cap: the analyzer's own cue alphabet has none, and a capped proxy is
+// exactly what let the "cues over 40 chars" bypass family through before.
+const CUE_LIKE_LINE_RE = new RegExp(
+  `^[${CUE_INITIAL_CLASS}][${CUE_LETTER_CLASS}0-9 \\t.,'()&/#\\-]*$`,
+  'u',
+);
 const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
 
 /** Returns null when `text` has no known pathological-cost shape, else a
