@@ -5,7 +5,9 @@ branch/PR/stash/orphan — start here for "where is everything?") ·
 `docs/PATH_TO_EXCELLENCE.md` (current lane sequence and live
 status — start here for "what do I do next?") · `ROADMAP.md` (canonical
 demand-driven phase semantics) · `NORTH_STAR.md` (product constitution) ·
-`ARCHITECTURE.md` (system map) · `README.md` (setup, env vars) ·
+`ARCHITECTURE.md` (system map) · `docs/LANE_STANDARD.md` (what "the best
+version of the work" means for any delegated lane, and the review that
+precedes every merge) · `README.md` (setup, env vars) ·
 `ULTRAPLAN.md` (superseded 2026-08-24; still the shortest statement of the
 P0–P4 briefs and gates). Research and retired wave material is filed
 backlog, not active direction; see ROADMAP §8.

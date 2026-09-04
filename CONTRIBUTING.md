@@ -58,6 +58,8 @@ Run the file(s) you touched, then the full `npm test`, before pushing.
 These are project invariants. Breaking them fails CI or violates the
 constitution — see AGENTS.md "Security constraints" for the authoritative list.
 
+- **Delegated work is held to `docs/LANE_STANDARD.md`** — understand first, build the strongest version, prove it with before/after numbers, run the gates in the foreground, and pass an independent review before merge.
+
 - **Keyless boot posture.** The server deliberately boots **without**
   `GEMINI_API_KEY` into analysis-only mode (the deterministic surface —
   doctor, diagnose, coverage, what-if, room, interview receipts). Do **not**
