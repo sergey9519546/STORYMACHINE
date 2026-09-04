@@ -47,7 +47,8 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 import {
   bootKeylessServer,
   createRecorder,
@@ -155,7 +156,24 @@ execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: 'inherit' });
 const buildMs = Date.now() - buildStart;
 console.log(`[verify:production] build finished in ${buildMs}ms`);
 
-const TSX_BIN = join(REPO, 'node_modules', '.bin', 'tsx');
+// Resolve the tsx binary the way Node resolves any package — walking up from
+// this repo through parent node_modules directories — rather than assuming
+// `<repo>/node_modules/.bin/tsx`. Git worktrees under .claude/worktrees/ have
+// no install of their own and rely on the parent checkout's node_modules for
+// every other script; two lanes on 2026-09-04 hit a FATAL here for that reason
+// alone. The Dockerfile CMD still runs the same local `tsx` (its "deps" stage
+// installs it), so production behaviour is unchanged.
+function resolveTsxBin() {
+  const direct = join(REPO, 'node_modules', '.bin', 'tsx');
+  if (existsSync(direct)) return direct;
+  try {
+    const pkgJson = createRequire(join(REPO, 'package.json')).resolve('tsx/package.json');
+    const cli = join(dirname(pkgJson), 'dist', 'cli.mjs');
+    if (existsSync(cli)) return cli;
+  } catch { /* fall through to the FATAL below */ }
+  return direct;
+}
+const TSX_BIN = resolveTsxBin();
 if (!existsSync(TSX_BIN)) {
   console.error(`[verify:production] FATAL: ${TSX_BIN} not found — \`npm ci\` should have installed it (tsx is a devDependency; the Dockerfile's own CMD depends on the same local install, see its "deps" stage comment).`);
   process.exit(1);
@@ -185,7 +203,9 @@ async function bootProduction() {
     VERSION: FAKE_VERSION,
     GIT_SHA: gitSha,
   };
-  const proc = spawn(TSX_BIN, ['server.ts'], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'], env });
+  const proc = TSX_BIN.endsWith('.mjs')
+    ? spawn(process.execPath, [TSX_BIN, 'server.ts'], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'], env })
+    : spawn(TSX_BIN, ['server.ts'], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'], env });
   let booted = false;
   const bootReady = new Promise((resolve) => {
     let buf = '';
