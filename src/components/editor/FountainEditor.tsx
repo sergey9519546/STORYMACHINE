@@ -471,37 +471,31 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         parent: containerRef.current,
       });
 
-      // a11y pass (2026-09-04): axe's scrollable-region-focusable rule
-      // flags `.cm-scroller` (overflow:auto) as not independently
-      // keyboard-focusable. The textbook fix — `tabIndex = 0` on the
-      // scroller — was tried here and reverted: `.cm-content` (its child)
-      // is ALREADY focusable and reachable by Tab, so the extra stop was
-      // redundant, and testing it live surfaced a SEPARATE, real,
-      // pre-existing keyboard trap this pass found but did not cause (see
-      // KNOWN ISSUE below) that a stray tabIndex here made slightly easier
-      // to hit by accident, not the cause of. Left unset; the residual gap
-      // against the rule's own letter (a screen reader's browse/
-      // virtual-cursor mode, not Tab) is real but narrower than the rule
-      // implies, since `.cm-content` already covers every keyboard/Tab
-      // user this suite could verify.
+      // a11y pass (2026-09-04, re-evaluated): axe's scrollable-region-
+      // focusable rule flags `.cm-scroller` (overflow:auto) as not
+      // independently keyboard-focusable. The textbook fix — `tabIndex = 0`
+      // on the scroller — was tried once before (see git blame / the prior
+      // a11y pass) and reverted, because at the time landing on
+      // `.cm-content` via ANY Tab route (including the extra hop this
+      // fix adds) was a real keyboard trap: tab-escape only armed after the
+      // writer had already pressed Escape once, which a first-time
+      // keyboard arrival had no reason to know.
       //
-      // KNOWN ISSUE (found live via scripts/verify-a11y.mjs, filed not
-      // fixed — see that file's header and the a11y pass's final report):
-      // once focus lands on `.cm-content` by ANY route (Tab-walking into
-      // it with no prior click/typing here included) while the writer has
-      // never pressed Escape in this editor session, fountain-keymap.ts's
-      // Tab handler captures every further Tab press (cycleElement/
-      // insertTab) with tab-escape never armed — so Tab alone cannot
-      // leave. This is the exact scenario "Escape, then Tab" (documented
-      // in the shortcuts panel) exists to solve, and Escape-then-Tab DOES
-      // recover it (verified) — but a keyboard user who tabs into the
-      // editor incidentally, with no reason yet to know that idiom, gets
-      // stuck with no visible hint why. A real fix belongs in
-      // fountain-keymap.ts (auto-arm tab-escape the first time focus
-      // arrives via keyboard navigation rather than a deliberate click/
-      // keystroke) and needs care not to regress the deliberate-typing
-      // case that idiom already serves correctly — out of scope for a
-      // same-pass fix; flagged for dedicated follow-up.
+      // fountain-keymap.ts (autoArmTabEscapeOnKeyboardArrival) since fixed
+      // that trap directly: any focus arrival on `.cm-content` whose
+      // immediately-preceding keydown was a bare Tab/Shift-Tab — tracked
+      // globally via installGlobalTabTracking, independent of which
+      // element the Tab was pressed FROM — auto-arms tab-escape, so the
+      // very next Tab leaves normally with no Escape press first. That
+      // removes the reason tabIndex=0 was unsafe here: a scroller stop
+      // just adds one extra, harmless hop (scroller -> content, both bare
+      // Tab keydowns, so content's arrival still auto-arms) before the
+      // existing fix takes over. Re-enabled below; proven safe (both the
+      // scroller is independently reachable AND a raw-Tab user can still
+      // Tab straight through with no Escape) by scripts/verify-a11y.mjs's
+      // "editor keyboard journey" section — see its comments for the two
+      // assertions.
+      view.scrollDOM.tabIndex = 0;
 
       viewRef.current = view;
 

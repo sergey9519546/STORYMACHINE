@@ -83,19 +83,19 @@ const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
 const GATED_IMPACTS = new Set(['serious', 'critical']);
 
 // scrollable-region-focusable on `.cm-scroller` (CodeMirror's own scroll
-// container): the textbook fix — tabIndex=0 on the scroller — was tried,
-// verified live, and REVERTED (see FountainEditor.tsx's matching comment)
-// because it made a separate, real, pre-existing keyboard trap easier to
-// hit: focus can land on the scroller without the writer ever having
-// typed into (or armed the Escape-then-Tab exit for) `.cm-content`, its
-// child, and the very next Tab press then gets captured there with no way
-// out. `.cm-content` is already a real, reachable, contenteditable
-// focusable descendant — every Tab/click user this suite could verify
-// reaches it — so the remaining gap against this rule's literal text (a
-// screen reader's own browse/virtual-cursor mode landing on the scroller
-// specifically) is real but narrower than "serious" implies. Excluded
-// here, deliberately and by name, rather than silently passed.
-const KNOWN_UNFIXED_RULE_IDS = new Set(['scrollable-region-focusable']);
+// container) was previously excluded here: the textbook fix — tabIndex=0 on
+// the scroller — had been tried, verified live, and REVERTED because it
+// made a separate, real, pre-existing keyboard trap easier to hit (focus
+// could land on `.cm-content` with tab-escape never armed and no way out
+// via Tab alone). That trap is fixed now — fountain-keymap.ts auto-arms
+// tab-escape on ANY bare-Tab arrival at `.cm-content`, regardless of which
+// element the Tab was pressed from — so `view.scrollDOM.tabIndex = 0` was
+// re-enabled (FountainEditor.tsx) and this exclusion is gone. Section 2's
+// keyboard journey and section 8's editor-tab-trap checks below prove both
+// halves live: the scroller is independently Tab-reachable, and a raw-Tab
+// user can still Tab straight through scroller -> content -> out with no
+// Escape press.
+const KNOWN_UNFIXED_RULE_IDS = new Set([]);
 
 /** Runs axe against the current DOM and records one PASS/FAIL per surface:
  *  fails the surface if any serious/critical violation is found OUTSIDE
@@ -165,12 +165,27 @@ async function main() {
   // KEYBOARD JOURNEY step 2: reach the editor via Tab alone, then type
   // (paste stands in for real Fountain text — Enter on "Write" isn't
   // needed, Write is the default task).
+  //
+  // item 5 (scroller re-enable): FountainEditor.tsx now sets
+  // `view.scrollDOM.tabIndex = 0`, so `.cm-scroller` is a real Tab stop
+  // ahead of `.cm-content` in DOM order — this walk targets `.cm-content`
+  // specifically via classList (not the old broad "cm-" substring, which
+  // would now stop one hop early on the scroller and find nothing to type
+  // into) and separately records whether the scroller hop was actually
+  // visited, proving it is independently reachable (the axe
+  // scrollable-region-focusable fix itself).
+  let reachedScroller = false;
   let reachedEditor = false;
   for (let i = 0; i < 15; i++) {
-    const isCm = await page2.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false);
-    if (isCm) { reachedEditor = true; break; }
+    const at = await page2.evaluate(() => ({
+      scroller: document.activeElement?.classList?.contains?.('cm-scroller') ?? false,
+      content: document.activeElement?.classList?.contains?.('cm-content') ?? false,
+    }));
+    if (at.scroller) reachedScroller = true;
+    if (at.content) { reachedEditor = true; break; }
     await page2.keyboard.press('Tab');
   }
+  record('keyboard-journey', 'paste: the editor\'s scrollable region (.cm-scroller) is independently Tab-reachable (scrollable-region-focusable)', reachedScroller);
   record('keyboard-journey', 'paste: editor reachable via Tab alone (15 presses)', reachedEditor);
   await page2.keyboard.type('INT. VERIFY ROOM - DAY\n\nA11y suite keyboard-only journey line.\n', { delay: 2 });
   await auditSurface(page2, 'editor-with-real-script');
@@ -661,23 +676,49 @@ async function main() {
 
   /** Lands on "Start fresh" and walks forward by REAL Tab presses only
    *  (no .click(), no .focus()) until `.cm-content` has focus — the exact
-   *  arrival fountain-keymap.ts's auto-arm targets. */
+   *  arrival fountain-keymap.ts's auto-arm targets. Checks `.cm-content`
+   *  specifically (classList, not a broad "cm-" substring): `.cm-scroller`
+   *  is ALSO a real Tab stop now (item 5 — view.scrollDOM.tabIndex = 0,
+   *  FountainEditor.tsx), one hop before content in DOM order, and a broad
+   *  match would stop the walk there instead. Also records whether the
+   *  element visited on the immediately PRECEDING press was `.cm-scroller`
+   *  — proving the scroller sits right before content in Tab order, not
+   *  just "reachable" — without hardcoding the total press count (the walk
+   *  starts from "Start fresh", so it varies with however many toolbar
+   *  controls precede the editor). */
   async function tabIntoEditorByRawKeyboard(page) {
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
     await page.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
     let reached = false;
+    let arrivedViaScroller = false;
+    let wasOnScroller = false;
     for (let i = 0; i < 20; i++) {
       await page.keyboard.press('Tab');
-      const isCm = await page.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false);
-      if (isCm) { reached = true; break; }
+      const at = await page.evaluate(() => ({
+        scroller: document.activeElement?.classList?.contains?.('cm-scroller') ?? false,
+        content: document.activeElement?.classList?.contains?.('cm-content') ?? false,
+      }));
+      if (at.content) { reached = true; arrivedViaScroller = wasOnScroller; break; }
+      wasOnScroller = at.scroller;
     }
-    return reached;
+    return { reached, arrivedViaScroller };
   }
 
   // (A) Raw-Tab arrival: the very next Tab exits, no Escape needed first.
-  const reachedRaw1 = await tabIntoEditorByRawKeyboard(page8);
+  // item 5: this arrival now passes THROUGH `.cm-scroller` (a real,
+  // independently-focusable Tab stop, immediately before `.cm-content` in
+  // Tab order) on its way in — proving that hop doesn't strand the writer
+  // is exactly what re-enabling it needed to prove safe: the scroller's own
+  // Tab keydown is a bare Tab like any other, so `.cm-content`'s arrival
+  // right after it still auto-arms.
+  const { reached: reachedRaw1, arrivedViaScroller: arrivedViaScroller1 } = await tabIntoEditorByRawKeyboard(page8);
   record('editor-tab-trap', 'raw-Tab journey reaches the editor (.cm-content) via Tab alone', reachedRaw1);
+  record(
+    'editor-tab-trap',
+    'item 5: that journey visits the now-focusable .cm-scroller immediately before .cm-content (scroller -> content, both bare Tab keydowns)',
+    arrivedViaScroller1,
+  );
   await page8.keyboard.press('Tab');
   const exitedWithoutEscape = (await page8.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false)) === false;
   record(
@@ -689,7 +730,7 @@ async function main() {
   // (B) Raw-Tab arrival, then the writer types: the writing aid (Tab-cycling)
   // must still work on the NEXT Tab after that — auto-arm must not regress
   // the deliberate-editing case. Fresh reload for a clean arrival.
-  const reachedRaw2 = await tabIntoEditorByRawKeyboard(page8);
+  const { reached: reachedRaw2 } = await tabIntoEditorByRawKeyboard(page8);
   record('editor-tab-trap', 'raw-Tab journey reaches the editor a second time (fresh reload)', reachedRaw2);
   await page8.keyboard.type('x', { delay: 5 }); // commits to editing — disarms the auto-arm (tabEscapeArmedField's own docChanged rule)
   await page8.keyboard.press('Backspace'); // back to an empty, cycle-eligible line — the disarm itself already happened on the keystroke above
@@ -721,6 +762,100 @@ async function main() {
   record('editor-tab-trap', 'Escape-then-Tab idiom still exits the editor (unchanged pre-existing manual path)', escapeThenTabStillWorks);
 
   await context8.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 9) Labs panels that predate the design system — AnalysisPanel (a Studio
+  //    tab) and DirectorPanel (the "Director HUD" tool slot) — audited in
+  //    both themes for the first time. Neither had ever been rendered by
+  //    this suite before this a11y follow-up: AnalysisPanel is a tab on the
+  //    SAME Studio surface section 7 already opens (just a different tab
+  //    button), and DirectorPanel sits next to "open-studio" in the same
+  //    Labs command-palette group ("open-director") — reached the same way.
+  //    This is the surface both panels' bg-white/border-black/text-black
+  //    -> bg-[var(--sm-panel)]/border/text-[var(--sm-ink)] token pass (this
+  //    follow-up) lives on; see the session report for the full contrast
+  //    table (several colors — text-red-600/green-600/yellow-600 as TEXT,
+  //    and the orange-500/green-500 defense-level pill fills — were failing
+  //    WCAG even in light mode, independent of the dark toggle).
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== 9) Labs panels — AnalysisPanel (Studio tab) + DirectorPanel (Director HUD) ===');
+  const context9 = await browser.newContext();
+  const page9 = await context9.newPage();
+  wireConsoleCapture(page9, genuineConsoleErrors);
+  await page9.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch {} });
+  await page9.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page9.getByRole('button', { name: /start fresh/i }).first().click({ timeout: 15000 });
+  await page9.locator('header.sm-pagetop').waitFor({ timeout: 15000 });
+
+  // ── 9a) AnalysisPanel — Studio's "Analysis" tab. ──
+  await page9.keyboard.press(`${MOD}+k`);
+  const palette9 = page9.getByRole('dialog', { name: 'Command palette' });
+  await palette9.waitFor({ timeout: 5000 }).catch(() => {});
+  await page9.keyboard.type('studio', { delay: 15 });
+  const studioOption9 = page9.getByRole('option', { name: /open studio/i }).first();
+  const studioOpened = await studioOption9.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  record('labs-panels', 'AnalysisPanel: "Open Studio" is reachable via the command palette', studioOpened);
+  if (studioOpened) {
+    await page9.keyboard.press('Enter');
+    const analysisTabBtn = page9.getByRole('button', { name: 'Analysis', exact: true }).first();
+    const analysisTabVisible = await analysisTabBtn.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    record('labs-panels', 'Studio panel opens with an "Analysis" tab', analysisTabVisible);
+    if (analysisTabVisible) {
+      await analysisTabBtn.click();
+      await page9.waitForTimeout(200);
+      await auditSurface(page9, 'labs-analysis-panel');
+      await page9.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+      await page9.waitForTimeout(300);
+      await auditSurface(page9, 'labs-analysis-panel-dark');
+      await page9.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D'); // back to light for 9b
+      await page9.waitForTimeout(300);
+    }
+  }
+
+  // ── 9b) DirectorPanel — the "Director HUD" tool slot, next to
+  //    "open-studio" in the same Labs command-palette group. ──
+  await page9.keyboard.press(`${MOD}+k`);
+  await palette9.waitFor({ timeout: 5000 }).catch(() => {});
+  await page9.keyboard.type('director', { delay: 15 });
+  const directorOption = page9.getByRole('option', { name: /director hud/i }).first();
+  const directorOpened = await directorOption.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  record('labs-panels', 'DirectorPanel: "Director HUD" is reachable via the command palette', directorOpened);
+  if (directorOpened) {
+    await page9.keyboard.press('Enter');
+    const directorDialog = page9.getByRole('dialog', { name: 'AI Director State' });
+    const directorVisible = await directorDialog.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    record('labs-panels', 'Director HUD opens as a real dialog (role="dialog", labelled)', directorVisible);
+    if (directorVisible) {
+      await auditSurface(page9, 'labs-director-panel-scene-tab');
+      // A couple of the other 12 tabs — Psychology (dark-triad meters,
+      // defense-mechanism/level pills) and Outline (the empty-state cards,
+      // nested beat cards) — cover the panel's other color families the
+      // default "Scene" tab doesn't exercise.
+      const psychTabBtn = page9.getByRole('button', { name: 'Psychology', exact: true }).first();
+      if (await psychTabBtn.count()) {
+        await psychTabBtn.click();
+        await page9.waitForTimeout(150);
+        await auditSurface(page9, 'labs-director-panel-psychology-tab');
+      }
+      const outlineTabBtn = page9.getByRole('button', { name: 'Outline', exact: true }).first();
+      if (await outlineTabBtn.count()) {
+        await outlineTabBtn.click();
+        await page9.waitForTimeout(150);
+        await auditSurface(page9, 'labs-director-panel-outline-tab');
+      }
+      // Same surfaces again in dark mode.
+      await page9.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+      await page9.waitForTimeout(300);
+      await auditSurface(page9, 'labs-director-panel-outline-tab-dark');
+      const sceneTabBtn = page9.getByRole('button', { name: 'Scene', exact: true }).first();
+      if (await sceneTabBtn.count()) {
+        await sceneTabBtn.click();
+        await page9.waitForTimeout(150);
+        await auditSurface(page9, 'labs-director-panel-scene-tab-dark');
+      }
+    }
+  }
+  await context9.close();
 
   // ── Console errors, same convention as the rest of the browser battery. ─
   if (genuineConsoleErrors.length > 0) {
