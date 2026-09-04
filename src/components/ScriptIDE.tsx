@@ -1126,6 +1126,12 @@ export default function ScriptIDE({
         meanAbsDialogueShareDelta: previousSignals.meanAbsDialogueShareDelta,
         actionSentenceCvOverall: previousSignals.actionSentenceCvOverall,
       } : {}),
+      // REVIEW FIX (round 2, 2026-09-05) — same additive determinism receipt
+      // confirmSnapshot stamps (see its own comment above): without it, this
+      // undo snapshot could only ever dedupe against its own Draft History
+      // row via computeDraftRank's approximate health+timestamp fallback,
+      // never the exact hash match.
+      ...(previousReport?.contentHash ? { contentHash: previousReport.contentHash } : {}),
     };
 
     const promotedSnapshot: Snapshot = {
@@ -1147,6 +1153,11 @@ export default function ScriptIDE({
         ? { meanAbsDialogueShareDelta: promotedBranch.meanAbsDialogueShareDelta } : {}),
       ...(promotedBranch.actionSentenceCvOverall !== undefined
         ? { actionSentenceCvOverall: promotedBranch.actionSentenceCvOverall } : {}),
+      // REVIEW FIX (round 2, 2026-09-05) — WhatIfPanel.tsx's promoteBranch
+      // forwards the branch's own contentHash (server/routes/nvm/
+      // twin-whatif.ts's presentReport); same additive rule as every other
+      // field here.
+      ...(promotedBranch.contentHash !== undefined ? { contentHash: promotedBranch.contentHash } : {}),
     };
 
     setSnapshots((prev) => [promotedSnapshot, undoSnapshot, ...prev].slice(0, 20));
@@ -2100,6 +2111,12 @@ export default function ScriptIDE({
         // fresh report matched this text" rule as health/verdict above.
         ...(typeof freshReport?.healthPercentile === 'number'
           ? { healthPercentile: freshReport.healthPercentile } : {}),
+        // 2026-09-04 — additive determinism receipt, present only when the
+        // freshReport itself carries one (older/degraded report shapes may
+        // not). Lets computeDraftRank (src/lib/snapshot-trend.ts) dedupe
+        // this snapshot exactly against the same run in Draft History
+        // instead of an approximate health+timestamp match.
+        ...(freshReport?.contentHash ? { contentHash: freshReport.contentHash } : {}),
         ...(signals?.scored ? {
           meanAbsDialogueShareDelta: signals.meanAbsDialogueShareDelta,
           actionSentenceCvOverall: signals.actionSentenceCvOverall,

@@ -76,6 +76,21 @@ describe('SnapshotSchema — old and new snapshot shapes', () => {
     assert.equal(SnapshotSchema.safeParse({ id: 's1', sceneCount: -1 }).success, false);
     assert.equal(SnapshotSchema.safeParse({ id: 's1', sceneCount: 1.5 }).success, false);
   });
+
+  // 2026-09-04 — draft-rank union fix: contentHash is stamped additively
+  // (src/components/ScriptIDE.tsx's confirmSnapshot) so the client's
+  // computeDraftRank can dedupe a snapshot exactly against the same run in
+  // ScriptDoctorPanel's Draft History, instead of an approximate
+  // health+timestamp match.
+  it('accepts a snapshot carrying the new contentHash field', () => {
+    const result = SnapshotSchema.safeParse({ id: 's1', health: 60, contentHash: 'a'.repeat(64) });
+    assert.equal(result.success, true);
+  });
+
+  it('rejects a malformed contentHash (wrong type) rather than silently coercing it', () => {
+    const result = SnapshotSchema.safeParse({ id: 's1', contentHash: 12345 });
+    assert.equal(result.success, false);
+  });
 });
 
 describe('ScriptideSaveBodySchema — snapshots array end to end', () => {

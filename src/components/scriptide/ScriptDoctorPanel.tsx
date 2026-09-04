@@ -53,6 +53,9 @@ import { computeDraftRank, type DraftRank } from "../../lib/snapshot-trend.ts";
 import {
   ordinal, percentileBand, exactRankTooltip, healthPercentileSentence,
 } from "../../lib/percentile-copy.ts";
+import {
+  draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
+} from "../../lib/draft-rank-copy.ts";
 import type { Snapshot } from "./SnapshotManager.tsx";
 import {
   DOCTOR_STREAM_TOTAL_PASSES,
@@ -348,18 +351,47 @@ const PERCENTILE_BADGE_CLASS =
 
 /** 2026-09-04 — second, honest denominator beside the calibration
  *  reference-set percentile line above: rank among the writer's OWN saved
- *  drafts of this script (../../lib/snapshot-trend.ts's computeDraftRank),
- *  never a comparison to any other writer's work. `of <= 1` (no saved draft
- *  carries a health value yet) renders "first saved draft" copy rather than
- *  a fabricated "1st of 1", matching the same rule the coverage letter's
- *  server-side rendering of this same field follows
- *  (server/lib/coverage-letter.ts's buildCaveats). */
+ *  drafts of this script — the deduped UNION of ScriptIDE `snapshots` and
+ *  ScriptDoctorPanel's own Draft History (../../lib/snapshot-trend.ts's
+ *  computeDraftRank), never a comparison to any other writer's work. Three
+ *  distinct, honest states (audit fix, 2026-09-04 — the previous version
+ *  conflated the last two into one fabricated "1st of 1" that never became
+ *  true for the second):
+ *    - `rank === null`: nothing scored yet, but N saved runs/drafts DO
+ *      exist (unset since the last diagnosis, or pre-scoring history) —
+ *      never renders "first saved draft" for this, since the next save
+ *      alone won't fix it; the writer needs to re-run the doctor.
+ *    - `of <= 1` (rank is a number): genuinely nothing else saved yet —
+ *      the only historically-accurate use of "first saved draft" copy,
+ *      matching the same rule the coverage letter's server-side rendering
+ *      of this same field follows (server/lib/coverage-letter.ts's
+ *      buildCaveats).
+ *    - otherwise: the real ranked line, with an honest denominator label
+ *      ("N runs and saved drafts of this script") rather than implying
+ *      every one of them was a saved Version — prefixed "tied" when
+ *      `draftRank.tied` (audit round 2, 2026-09-04): several byte-identical
+ *      drafts sharing a health value all rendered a plain ordinal like
+ *      "1st of 6" before this, which reads as clean separation from the
+ *      rest of the field when it is actually a dead heat. */
 function DraftRankLine({ draftRank, className }: { draftRank: DraftRank; className: string }) {
+  const text =
+    draftRank.rank === null
+      ? `${draftRank.unscored} saved draft${draftRank.unscored === 1 ? "" : "s"} `
+        + `${draftRank.unscored === 1 ? "has" : "have"} no score yet — run the doctor before saving to rank them`
+      : draftRank.of <= 1
+      ? `First saved draft — rank among your drafts appears after ${draftRankNextOpportunityLabel()}`
+      : `Rank among your drafts: ${draftRank.tied ? "tied " : ""}${ordinal(draftRank.rank)} of ${draftRank.of} ${draftRankDenominatorLabel()} (by health)`;
+  // REVIEW FIX (round 2, 2026-09-05) — the "N of M ... are unranked" clause:
+  // a bare `of` figure silently drops any saved record that has no health at
+  // all (edited-since-last-diagnosis, or saved before scoring existed) from
+  // the count entirely. Only meaningful in the ranked branch — the
+  // rank === null branch already IS that same information as its own
+  // dedicated copy.
+  const unrankedNote = draftRank.rank !== null ? unrankedDraftsNote(draftRank.unscored, draftRank.of) : null;
   return (
     <div className={`text-[10px] font-mono mt-0.5 ${className}`}>
-      {draftRank.of <= 1
-        ? "First saved draft — rank among your drafts appears after your next save"
-        : `Rank among your drafts: ${ordinal(draftRank.rank)} of ${draftRank.of} (by health, your own saved drafts of this script)`}
+      {text}
+      {unrankedNote && <> — {unrankedNote}</>}
     </div>
   );
 }
@@ -442,7 +474,13 @@ function MetricStatRow({ label, value, caption }: { label: string; value: number
       >
         <div className="h-full bg-zinc-500 dark:bg-zinc-400" style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-1">{caption}</p>
+      {/* REVIEW FIX (round 2, 2026-09-05): this caption carried the exact
+          same `dark:text-gray-300`-on-theme-invariant-panel defect the
+          comment above already names for `dark:text-white` — axe measured
+          1.28:1. `--sm-ink-mute` (5.29:1 on --sm-panel, the same token the
+          adjacent section headings already use) replaces it; no `dark:`
+          pairing needed since the surface never actually darkens. */}
+      <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-1">{caption}</p>
     </div>
   );
 }
@@ -568,13 +606,36 @@ function ShapeRhythmSection({
   };
 
   return (
-    <div>
+    // data-a11y-section: a stable hook for scripts/verify-a11y.mjs to scope
+    // an axe run to exactly this section (see its scrollShapeRhythmIntoView
+    // usage) — this section's own bugs must be measured on their own,
+    // without also catching or being masked by unrelated pre-existing a11y
+    // issues elsewhere in this ~52,000px-tall dialog that scrolling to a
+    // different position would otherwise pull into (or out of) a
+    // document-wide axe run.
+    <div data-a11y-section="shape-rhythm">
+      {/* a11y root-cause fix (2026-09-04): this section used to carry
+          `bg-white dark:bg-zinc-900` (copied from the Draft History
+          collapsible further down) — a REAL dark surface — while its own
+          text followed MetricStatRow's bare-`text-black` convention (valid
+          only on the theme-invariant --sm-panel chrome most of this file
+          sits on; see that function's own comment above). Two conventions
+          collided: axe measured 1.06:1 on this row's own label ("Shape &
+          Rhythm" has no color class at all, so it inherited the dialog's
+          --sm-ink text on a now-dark card) and 1.19:1 on the two document-
+          aggregate rows below. Rather than patch every text node with a
+          `dark:` pair, this now uses the SAME theme-invariant chrome
+          MetricStatRow already relies on — `bg-[var(--sm-panel)]` never
+          actually darkens, so bare `text-black` (used throughout this
+          section) is correct in both states, and the section reads as one
+          surface with the rest of the panel instead of a card that only
+          sometimes goes dark. */}
       <button
         onClick={toggle}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-2 p-3 text-left border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+        className="w-full flex items-center justify-between gap-2 p-3 text-left border-2 border-[var(--sm-ink)] bg-[var(--sm-panel)] hover:bg-black/5 transition-colors"
       >
-        <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest">
+        <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest text-black">
           {open ? (
             <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           ) : (
@@ -587,8 +648,19 @@ function ShapeRhythmSection({
         </span>
       </button>
       {open && (
-        <div className="p-3 border-2 border-t-0 border-black dark:border-white/20 bg-white dark:bg-zinc-900 space-y-3">
-          <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug">
+        <div className="p-3 border-2 border-t-0 border-[var(--sm-ink)] bg-[var(--sm-panel)] space-y-3">
+          {/* REVIEW FIX (round 2, 2026-09-05): this caption (and the two
+              document-aggregate captions, and the scene-axis labels below)
+              were CORRECT on the section's old `bg-white dark:bg-zinc-900`
+              card — a real dark surface `dark:text-gray-300`/`dark:text-*`
+              was meant for — and became a REGRESSION once the container was
+              switched to the theme-invariant `--sm-panel` (round 1's dark-
+              mode fix): axe measured 1.28:1 on this exact node afterward.
+              `--sm-ink-mute` (5.29:1 on --sm-panel) matches every other
+              caption/label already living directly on this chrome (the
+              section header's own "Descriptive — not part of the score"
+              label a few lines up, the Root Causes caption). */}
+          <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug">
             Read from the shape of the document — word, line, sentence, turn and speaker counts — with no
             word list involved. Diagnostic only: nothing here feeds health, grade, verdict, or any priority
             above.
@@ -639,7 +711,10 @@ function ShapeRhythmSection({
                 );
               })}
             </div>
-            <div className="flex justify-between text-[9px] font-mono text-gray-400 mt-1 uppercase">
+            {/* REVIEW FIX: text-gray-400 measured 2.26:1 on --sm-panel in
+                BOTH themes (pre-existing, not merely a dark-mode regression)
+                — --sm-ink-mute clears 4.5:1 in both. */}
+            <div className="flex justify-between text-[9px] font-mono text-[var(--sm-ink-mute)] mt-1 uppercase">
               <span>Scene 1</span>
               <span>Scene {signals.scenes.length}</span>
             </div>
@@ -658,7 +733,7 @@ function ShapeRhythmSection({
                   {signals.meanAbsDialogueShareDelta.toFixed(2)}
                 </span>
               </div>
-              <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-0.5">
+              <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
                 Mean scene-to-scene change in the dialogue/action word mix — descriptive only, not part of
                 the score.
               </p>
@@ -672,7 +747,7 @@ function ShapeRhythmSection({
                   {signals.actionSentenceCvOverall.toFixed(2)}
                 </span>
               </div>
-              <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-0.5">
+              <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
                 Sentence-length variation across the draft&rsquo;s action lines — descriptive only, not part
                 of the score.
               </p>
@@ -2129,14 +2204,33 @@ export default function ScriptDoctorPanel({
   // shown here as if it were current.
   const [handoffOutdated, setHandoffOutdated] = useState(false);
   const reportIsComplete = report !== null && isWholeDraftAnalysisComplete(report);
+  // Draft-over-draft history (localStorage-backed; see recordDoctorHistory).
+  // Declared here (ahead of its original spot further down, alongside
+  // previousEntry/historyOpen/confirmingClearHistory) because draftRank
+  // below now reads it too — a plain hook-ordering move, no behavior change
+  // for the delta-strip machinery that already used it.
+  const [history, setHistory] = useState<DoctorHistoryEntry[]>(() => loadDoctorHistory());
   // 2026-09-04 — second, honest denominator beside the calibration
   // reference-set percentile: rank among the writer's OWN saved drafts of
-  // this script. Gated on reportIsComplete the same way healthPercentile
-  // display is below — an incomplete analysis's `health` is a sentinel (0),
-  // never a real score, so it must never enter a rank.
+  // this script — the deduped UNION of ScriptIDE `snapshots` (Versions tab)
+  // and this panel's own Draft History (audit fix, 2026-09-04: history used
+  // to be invisible to this ranking entirely, so a writer who only ever used
+  // the doctor — never Versions — was permanently told "first saved draft").
+  // Gated on reportIsComplete the same way healthPercentile display is
+  // below — an incomplete analysis's `health` is a sentinel (0), never a
+  // real score, so it must never enter a rank.
+  //
+  // REVIEW FIX (round 2): pass the ON-SCREEN report's own contentHash/
+  // analyzedAt through so computeDraftRank can exclude ITS OWN Draft History
+  // row (recordDoctorHistory already wrote one for this exact report by the
+  // time this runs) from the union — without this, every real run counted
+  // itself a second time ("tied 1st of 2" for one run and zero saved
+  // Versions).
   const draftRank: DraftRank | null = useMemo(
-    () => (reportIsComplete && report ? computeDraftRank(snapshots ?? [], report.health) : null),
-    [reportIsComplete, report, snapshots],
+    () => (reportIsComplete && report
+      ? computeDraftRank(snapshots ?? [], history, report.health, report.contentHash, report.analyzedAt)
+      : null),
+    [reportIsComplete, report, snapshots, history],
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Upgrade item #3: set instead of (never alongside) errorMessage when the
@@ -2183,8 +2277,6 @@ export default function ScriptDoctorPanel({
   // not whatever source happens to be active right now.
   const [analyzedIsSample, setAnalyzedIsSample] = useState(false);
 
-  // Draft-over-draft history (localStorage-backed; see recordDoctorHistory).
-  const [history, setHistory] = useState<DoctorHistoryEntry[]>(() => loadDoctorHistory());
   // The entry to compare the current report against: null on the very first
   // diagnosis ever recorded (nothing to compare to), or an entry whose
   // contentHash may equal the current report's (render the "identical
@@ -3079,7 +3171,7 @@ export default function ScriptDoctorPanel({
     setCoverageLetterError(null);
 
     const exportTitle = activeReportTitle ?? title;
-    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: DraftRank };
+    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: { rank: number; of: number; tied?: boolean; unscored?: number } };
     if (report.source?.format === "pdf") {
       const converted = report.source.convertedFountain;
       if (!converted) {
@@ -3095,12 +3187,31 @@ export default function ScriptDoctorPanel({
       // handleExportReport's identical fallback above.
       payload = { fountain: activeText, title: exportTitle };
     }
-    // 2026-09-04 — pass the already-computed "rank among your own saved
-    // drafts" through so the server-rendered letter can state it alongside
-    // the reference-set percentile (server/lib/coverage-letter.ts's
-    // buildCaveats). Purely additive: absent when snapshots weren't wired up
-    // or there's nothing yet to rank, same as the in-panel line above.
-    if (draftRank) payload.draftRank = draftRank;
+    // 2026-09-04 — pass the SAME already-computed draftRank the in-panel
+    // DraftRankLine above renders through, so the server-rendered letter can
+    // state it alongside the reference-set percentile (server/lib/
+    // coverage-letter.ts's buildCaveats) — one computeDraftRank call feeds
+    // both, never a second computation that could drift from what's on
+    // screen. Only the ranked shape (`rank` is a real number — covers both
+    // the ordinary ranked state and the genuine "1st of 1" first-draft
+    // state) is forwarded: DraftRankSchema (server/lib/validation.ts)
+    // accepts `{ rank, of, tied? }`, and the `rank: null, unscored` state
+    // has nothing numeric to send — the letter simply omits the line for
+    // that case, same as when snapshots/history weren't wired up at all.
+    // `tied` (audit round 2) rides along whenever true, same "tied 1st of
+    // 6" honesty the in-panel line renders — omitted (not sent as `false`)
+    // when there's no tie, keeping the common case's payload unchanged.
+    // `unscored` (review round 2) rides along whenever > 0, so the letter's
+    // "N of M ... are unranked" clause can never disagree with the in-panel
+    // one — both read it off this SAME draftRank object.
+    if (draftRank && draftRank.rank !== null) {
+      payload.draftRank = {
+        rank: draftRank.rank,
+        of: draftRank.of,
+        ...(draftRank.tied ? { tied: true } : {}),
+        ...(draftRank.unscored > 0 ? { unscored: draftRank.unscored } : {}),
+      };
+    }
 
     fetch("/api/export/coverage-letter", {
       method: "POST",
@@ -4426,7 +4537,16 @@ export default function ScriptDoctorPanel({
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
                   Root Causes
                 </h3>
-                <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
+                {/* a11y fix (2026-09-04) — found by the new Shape & Rhythm
+                    dark-mode gate step (scripts/verify-a11y.mjs), which is
+                    the first run to ever open "Full report" on a report with
+                    both Root Causes AND dark mode active: `dark:text-gray-300`
+                    on this panel's theme-invariant --sm-panel background
+                    (never actually darkens — same root cause as
+                    ShapeRhythmSection's fix above) measured 1.28:1. Swapped
+                    for `var(--sm-ink-mute)`, the same theme-invariant token
+                    the heading directly above already uses. */}
+                <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mb-2">
                   {reportIsComplete
                     ? "Several notes often share one underlying problem. Fixing these first clears the most issues at once."
                     : "These are partial findings from the analyzed portion. Re-run a complete analysis before treating them as whole-draft priorities."}

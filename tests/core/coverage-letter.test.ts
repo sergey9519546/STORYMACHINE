@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderCoverageLetter } from '../../server/lib/coverage-letter.ts';
+import { draftRankDenominatorLabel } from '../../src/lib/draft-rank-copy.ts';
 import type {
   ScriptDoctorReport, CoverageVerdict, DoctorGrade, RootCauseFinding, ReportProvenance,
 } from '../../server/nvm/analyze/types.ts';
@@ -301,7 +302,12 @@ describe('renderCoverageLetter — shape and wording', () => {
       { title: 'X', draftRank: { rank: 1, of: 1 } },
     );
     assert.match(markdown, /first saved draft of this script/i);
-    assert.match(markdown, /rank among your own drafts will appear after your next save/i);
+    // REVIEW FIX (round 2 re-review, 2026-09-05): "your next run or save" —
+    // a rank can also become available after simply running the doctor
+    // again, not only after explicitly saving a Version; "next save" alone
+    // understated it.
+    assert.match(markdown, /rank among your own drafts will appear after your next run or save/i);
+    assert.doesNotMatch(markdown, /appear after your next save\./i);
     assert.doesNotMatch(markdown, /ranks 1st of 1 by health/);
   });
 
@@ -312,6 +318,72 @@ describe('renderCoverageLetter — shape and wording', () => {
     );
     assert.ok(!markdown.includes('percentile'));
     assert.match(markdown, /ranks 3rd of 4 by health/);
+  });
+
+  // 2026-09-04 (audit round 2) — several byte-identical drafts sharing a
+  // health value: a plain ordinal ("ranks 1st of 6") reads as clean
+  // separation from the rest of the field, which is false for a dead heat.
+  it('draftRank.tied renders "ties for" instead of "ranks"', () => {
+    const { markdown } = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 1, of: 6, tied: true } },
+    );
+    assert.match(markdown, /ties for 1st of 6 by health/);
+    assert.doesNotMatch(markdown, /ranks 1st of 6 by health/);
+  });
+
+  it('draftRank.tied: false (or omitted) renders the ordinary "ranks" wording', () => {
+    const explicitFalse = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 2, of: 5, tied: false } },
+    ).markdown;
+    assert.match(explicitFalse, /ranks 2nd of 5 by health/);
+    assert.doesNotMatch(explicitFalse, /ties for/);
+  });
+
+  // REVIEW FIX (round 2, 2026-09-05) — the letter used to call this number
+  // "your own saved drafts", while ScriptDoctorPanel.tsx's DraftRankLine
+  // calls the SAME number "runs and saved drafts of this script" right next
+  // to it: same number, two different claims about what it is (most of the
+  // union is Draft History runs, not saved Versions). Both surfaces now
+  // import the SAME src/lib/draft-rank-copy.ts constant — asserted here by
+  // reading the actual shared function's return value, not a hardcoded
+  // literal, so this test fails if either surface stops using it.
+  it('the denominator noun phrase is draftRankDenominatorLabel() verbatim — the SAME shared constant ScriptDoctorPanel.tsx\'s DraftRankLine reads', () => {
+    const { markdown } = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 2, of: 5 } },
+    );
+    assert.match(markdown, new RegExp(draftRankDenominatorLabel()));
+    assert.doesNotMatch(markdown, /your own saved drafts of this script/);
+  });
+
+  // REVIEW FIX (round 2 re-review, 2026-09-05, "return the reason, not just
+  // the number") — a bare `of` figure silently drops any saved record with
+  // no health at all from the count. When some drafts are ranked and OTHERS
+  // are unscored, the letter must say so, the same "N of M ... are
+  // unranked" clause the in-panel DraftRankLine renders (both read it off
+  // the SAME draftRank object the panel computed).
+  it('draftRank.unscored > 0 (mixed ranked + unscored) adds the "N of M ... are unranked" clause', () => {
+    const { markdown } = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 1, of: 3, unscored: 2 } },
+    );
+    assert.match(markdown, /ranks 1st of 3 by health/);
+    assert.match(markdown, /2 of 5 runs and saved drafts of this script are unranked \(saved without a fresh diagnosis\)/);
+  });
+
+  it('draftRank.unscored omitted or 0 adds no unranked clause', () => {
+    const omitted = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 1, of: 3 } },
+    ).markdown;
+    assert.doesNotMatch(omitted, /unranked/);
+    const explicitZero = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 1, of: 3, unscored: 0 } },
+    ).markdown;
+    assert.doesNotMatch(explicitZero, /unranked/);
   });
 
   it('states the >40-scene structural-reliability caveat only above the threshold', () => {

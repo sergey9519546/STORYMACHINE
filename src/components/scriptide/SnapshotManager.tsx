@@ -42,6 +42,14 @@ export interface Snapshot {
   // for the exact text being snapshotted; never fabricated, never
   // re-derived. Purely additive.
   healthPercentile?: number;
+  // 2026-09-04 — the determinism receipt from the freshReport this snapshot
+  // was captured from (server/nvm/analyze/types.ts's contentHash), stamped
+  // the same additive, present-only-when-a-fresh-report-matched way as
+  // health/verdict/sceneCount above. Lets src/lib/snapshot-trend.ts's
+  // computeDraftRank dedupe this snapshot exactly against the SAME run
+  // recorded in ScriptDoctorPanel's own Draft History, instead of falling
+  // back to its health+timestamp approximation.
+  contentHash?: string;
 }
 
 // ── Score-over-revisions trend (writer #9) ──────────────────────────────────
@@ -173,7 +181,13 @@ function SnapshotPercentileAndRankLine({
       )}
       {draftRank && (
         <span>
-          {draftRank.of <= 1
+          {/* `rank === null` checked first (not just `of <= 1`) so TypeScript
+              narrows `draftRank.rank` to `number` in the ordinal() branch —
+              the DraftRank union's real discriminant is `rank`, not `of`.
+              Also correctly covers the "nothing else is scored, though other
+              unscored snapshots may exist" case (rank: null), which reads
+              the same as "only saved draft with a health score so far". */}
+          {draftRank.rank === null || draftRank.of <= 1
             ? "Only saved draft with a health score so far"
             : `Ranks ${ordinal(draftRank.rank)} of ${draftRank.of} by health among your saved drafts`}
         </span>

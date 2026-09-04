@@ -85,12 +85,87 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
     assert.match(saveFnMatch![0], /catch/);
   });
 
-  it('dark-mode classes use the panel\'s existing design tokens/dark: variants, not bare colors', () => {
+  // a11y ROOT-CAUSE fix (2026-09-04, audit round 2): the collapsible's own
+  // container used to carry `bg-white dark:bg-zinc-900` (copied from the
+  // Draft History collapsible further down this file) — a REAL dark
+  // surface — while its text followed MetricStatRow's bare-`text-black`
+  // convention, which is only valid on the theme-invariant --sm-panel
+  // chrome most of this file sits on (see that function's own comment).
+  // Two conventions collided: axe measured 1.06:1 on the section's own
+  // header label ("Shape & Rhythm" had no color class at all, so it
+  // inherited --sm-ink text onto a now-dark card) and 1.19:1 on the two
+  // document-aggregate rows below. The fix removes the real dark switch
+  // entirely — same theme-invariant --sm-panel/--sm-ink chrome
+  // MetricStatRow already relies on — rather than patch every text node
+  // with a `dark:` pair.
+  it('the collapsible container uses the theme-invariant --sm-panel/--sm-ink chrome, not a real dark-mode background switch', () => {
     const sectionMatch = panel.match(/function ShapeRhythmSection[\s\S]*?\n}\n/);
     assert.ok(sectionMatch, 'ShapeRhythmSection must exist');
-    assert.match(sectionMatch![0], /dark:border-white\/20/);
-    assert.match(sectionMatch![0], /dark:bg-zinc-900/);
-    assert.match(sectionMatch![0], /var\(--sm-ink-mute\)/);
+    const body = sectionMatch![0];
+    assert.match(body, /bg-\[var\(--sm-panel\)\]/, 'container must use the theme-invariant --sm-panel background');
+    assert.match(body, /border-\[var\(--sm-ink\)\]/, 'container must use the theme-invariant --sm-ink border');
+    // Matched only inside actual className attributes (not this file's own
+    // doc comments, which name the OLD class for posterity).
+    assert.doesNotMatch(body, /className="[^"]*dark:bg-zinc-900[^"]*"/, 'must not carry a real dark-mode background switch — mixing that with bare text-black is the root cause this fix removes');
+    assert.match(body, /var\(--sm-ink-mute\)/);
+  });
+
+  it('text-black inside ShapeRhythmSection carries no dark: text override — correct once the container never actually darkens', () => {
+    const sectionMatch = panel.match(/function ShapeRhythmSection[\s\S]*?\n}\n/);
+    assert.ok(sectionMatch, 'ShapeRhythmSection must exist');
+    const body = sectionMatch![0];
+    const blackClassAttrs = body.match(/className="[^"]*\btext-black\b[^"]*"/g) ?? [];
+    // Header label ("Shape & Rhythm") + 2 aggregate labels + 2 aggregate
+    // numbers = 5, the same 5 text nodes axe flagged before this fix.
+    assert.ok(blackClassAttrs.length >= 5, `expected >= 5 text-black class attributes in ShapeRhythmSection, found ${blackClassAttrs.length}`);
+    for (const attr of blackClassAttrs) {
+      assert.doesNotMatch(attr, /dark:text-/, `text-black should carry no dark: text override once its container is theme-invariant: ${attr}`);
+    }
+  });
+
+  // REVIEW FIX (round 2, 2026-09-05) — the round-1 fix above made the
+  // container theme-invariant but left 4 OTHER text nodes inside the same
+  // section still carrying `dark:text-gray-300`/bare `text-gray-400` — these
+  // were CORRECT on the section's old real-dark card and became a
+  // REGRESSION (1.28:1 / 2.26:1) the moment the container stopped
+  // darkening. Every caption/label inside this section must now use the
+  // same theme-invariant `--sm-ink-mute` token as the rest of it — none of
+  // Tailwind's gray-* palette, in either theme.
+  it('no text-gray-* class survives anywhere inside ShapeRhythmSection — every caption/label uses --sm-ink-mute like the rest of the theme-invariant section', () => {
+    const sectionMatch = panel.match(/function ShapeRhythmSection[\s\S]*?\n}\n/);
+    assert.ok(sectionMatch, 'ShapeRhythmSection must exist');
+    const body = sectionMatch![0];
+    const grayClassAttrs = body.match(/className="[^"]*\btext-gray-\d+\b[^"]*"/g) ?? [];
+    assert.deepEqual(grayClassAttrs, [], `no text-gray-* class should remain in ShapeRhythmSection, found: ${JSON.stringify(grayClassAttrs)}`);
+    // The 4 nodes the regression hit: the intro paragraph, the scene-axis
+    // "Scene 1"/"Scene N" row, and the two document-aggregate captions.
+    const inkMuteCount = (body.match(/text-\[var\(--sm-ink-mute\)\]/g) ?? []).length;
+    assert.ok(inkMuteCount >= 4, `expected >= 4 text-[var(--sm-ink-mute)] class usages in ShapeRhythmSection, found ${inkMuteCount}`);
+  });
+
+  // REVIEW FIX (round 2) — MetricStatRow's own caption (used throughout
+  // StoryMetricsSection, which sits on the SAME theme-invariant --sm-panel
+  // chrome) had the identical 1.28:1 defect the "root cause" fix above
+  // claims to have addressed — that claim is only true once this is fixed
+  // too.
+  it('MetricStatRow\'s own caption has no text-gray-* class either — the same root-cause fix applied where the pattern was copied from', () => {
+    const fnMatch = panel.match(/function MetricStatRow[\s\S]*?\n}\n/);
+    assert.ok(fnMatch, 'MetricStatRow must exist');
+    const body = fnMatch![0];
+    const grayClassAttrs = body.match(/className="[^"]*\btext-gray-\d+\b[^"]*"/g) ?? [];
+    assert.deepEqual(grayClassAttrs, [], `no text-gray-* class should remain in MetricStatRow, found: ${JSON.stringify(grayClassAttrs)}`);
+    assert.match(body, /text-\[var\(--sm-ink-mute\)\]/);
+  });
+
+  // REVIEW FIX (round 2 re-review, 2026-09-05) — this attribute is the ONLY
+  // way scripts/verify-a11y.mjs's Shape & Rhythm gate step can scope an axe
+  // run to this section specifically; a rebase silently dropped it once
+  // already (this exact test file's history). Pinned so a future merge that
+  // loses it fails a test instead of quietly reopening the gate hole.
+  it('the section carries data-a11y-section="shape-rhythm" — the hook scripts/verify-a11y.mjs scopes its axe run to', () => {
+    const sectionMatch = panel.match(/function ShapeRhythmSection[\s\S]*?\n}\n/);
+    assert.ok(sectionMatch, 'ShapeRhythmSection must exist');
+    assert.match(sectionMatch![0], /data-a11y-section="shape-rhythm"/);
   });
 });
 

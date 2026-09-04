@@ -74,6 +74,15 @@ import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 // an established pattern, not a new one; it does not touch the scoring path
 // (no import edge to/from doctor.ts either direction).
 import { ordinal, REFERENCE_SET_SIZE, REFERENCE_SET_LABEL } from '../../src/lib/percentile-copy.ts';
+// Shared draft-rank denominator copy (2026-09-05 review round 2) — same
+// established cross-import pattern as percentile-copy.ts above, fixing the
+// same class of bug: this file used to hand-write "your own saved drafts of
+// this script" while ScriptDoctorPanel.tsx's DraftRankLine said "runs and
+// saved drafts of this script" for the identical number. One phrase now,
+// imported by both; see draft-rank-copy.ts's own header.
+import {
+  draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
+} from '../../src/lib/draft-rank-copy.ts';
 
 export interface CoverageLetterOptions {
   title?: string;
@@ -87,8 +96,14 @@ export interface CoverageLetterOptions {
    *  the same way `title`/`author` are: display copy the caller attests to,
    *  not a value this module recomputes or verifies. Optional and additive
    *  — a call that omits it renders byte-identical output to before this
-   *  field existed. */
-  draftRank?: { rank: number; of: number };
+   *  field existed. `tied` (2026-09-04, audit round 2) is true when >= 1
+   *  OTHER counted draft shares the exact same health — an exact tie
+   *  already shares the better rank, but stating a plain ordinal alone
+   *  reads as clean separation from the rest of the field when it is
+   *  actually a dead heat. `unscored` (2026-09-05, review round 2) is how
+   *  many OTHER saved records exist with no health at all — a bare `of`
+   *  figure silently drops them from the count entirely. */
+  draftRank?: { rank: number; of: number; tied?: boolean; unscored?: number };
 }
 
 export interface CoverageLetterResult {
@@ -244,14 +259,34 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
   // a caller that omits opts.draftRank gets byte-identical output to before
   // this field existed.
   if (opts.draftRank) {
-    const { rank, of } = opts.draftRank;
+    const { rank, of, tied, unscored } = opts.draftRank;
     caveats.push(
       of <= 1
-        ? 'This is your first saved draft of this script — a rank among your own drafts will appear '
-          + 'after your next save.'
-        : `Among your own saved drafts of this script, this one ranks ${ordinal(rank)} of ${formatNumber(of)} `
+        // REVIEW FIX (round 2): "your next run or save" — a rank can also
+        // become available after simply running the doctor again
+        // (recordDoctorHistory), not only after explicitly saving a
+        // Version; "next save" alone understated it. Shared with
+        // ScriptDoctorPanel.tsx's DraftRankLine via draft-rank-copy.ts.
+        ? `This is your first saved draft of this script — a rank among your own drafts will appear `
+          + `after ${draftRankNextOpportunityLabel()}.`
+        // 2026-09-04 (audit round 2): "ties for" instead of "ranks" when
+        // another counted draft shares the exact same health — a plain
+        // ordinal alone would read as clean separation from the rest of
+        // the field, which is false for a dead heat.
+        //
+        // REVIEW FIX (round 2): the denominator noun now comes from
+        // draftRankDenominatorLabel() (src/lib/draft-rank-copy.ts) — the
+        // SAME shared constant ScriptDoctorPanel.tsx's DraftRankLine reads
+        // — instead of a hand-matched literal that had already drifted once
+        // ("your own saved drafts" vs. the panel's "runs and saved drafts").
+        // Pinned by tests/core/coverage-letter.test.ts and
+        // tests/core/percentile-copy-consistency.test.ts.
+        : `Among your own ${draftRankDenominatorLabel()}, this one ${tied ? 'ties for' : 'ranks'} ${ordinal(rank)} of ${formatNumber(of)} `
           + 'by health — a comparison to your own history, not to the reference set above or to any '
-          + 'other writer’s work.',
+          + `other writer’s work.${(() => {
+            const note = unrankedDraftsNote(unscored ?? 0, of);
+            return note ? ` ${note.charAt(0).toUpperCase()}${note.slice(1)}.` : '';
+          })()}`,
     );
   }
 

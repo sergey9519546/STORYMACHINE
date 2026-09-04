@@ -197,6 +197,40 @@ describe('routes/export/coverage-letter — HTTP behavior', async () => {
     assert.equal(res.status, 400);
   });
 
+  // 2026-09-04 — draft-rank union fix: computeDraftRank now ranks among
+  // snapshots (20-entry cap) UNION Draft History (50-entry cap), raising the
+  // plausible ceiling from 21 (20 + 1 current) to 71 (20 + 50 + 1) — see
+  // server/lib/validation.ts's DraftRankSchema comment for the exact math.
+  it('POST a draftRank above the old 21 ceiling but within the new 71 union ceiling is accepted', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, draftRank: { rank: 40, of: 65 } });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.match(body.markdown, /ranks 40th of 65 by health/);
+  });
+
+  it('POST a draftRank of 71 (the exact new ceiling) is accepted; 72 is rejected', async () => {
+    const atCeiling = await post({ fountain: MULTI_SCENE_FOUNTAIN, draftRank: { rank: 71, of: 71 } });
+    assert.equal(atCeiling.status, 200);
+    const overCeiling = await post({ fountain: MULTI_SCENE_FOUNTAIN, draftRank: { rank: 72, of: 72 } });
+    assert.equal(overCeiling.status, 400);
+  });
+
+  // 2026-09-04 (audit round 2) — draftRank.tied: several drafts sharing the
+  // exact same health as the current one.
+  it('POST a draftRank with tied: true renders "ties for" instead of "ranks"', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait', draftRank: { rank: 1, of: 6, tied: true } });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.match(body.markdown, /ties for 1st of 6 by health/);
+  });
+
+  it('POST a draftRank with no tied field renders the ordinary "ranks" wording', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait', draftRank: { rank: 2, of: 5 } });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.match(body.markdown, /ranks 2nd of 5 by health/);
+  });
+
   it('refuses to export a letter from a scene-truncated partial analysis', async () => {
     const res = await post({ fountain: buildSceneTruncatedFountain(), title: 'Partial Draft' });
     assert.equal(res.status, 422);

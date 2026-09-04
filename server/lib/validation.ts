@@ -823,19 +823,34 @@ export const DeepDoctorBodySchema = DoctorBodySchema;
 // this script" (src/lib/snapshot-trend.ts's computeDraftRank), the second,
 // honest denominator alongside the calibration reference-set percentile.
 // Computed CLIENT-SIDE (the client already holds the ScriptIDE editor's
-// `snapshots` array — this stateless route has no sessionId and never sees
-// them) and passed through here so the server can render it into the letter
-// additively; the server never recomputes or trusts it as a score claim,
-// only as display copy the writer's own client attests to about their own
-// saved history — same trust posture as the `title`/`author` fields already
-// on this schema. Bounded to plausible values (both positive integers,
-// rank <= of, of capped at the snapshot array's own 20-entry cap plus one
-// for the current draft — server/lib/validation.ts's ScriptideSaveBodySchema
-// `snapshots` cap) so a malformed or hostile body 400s rather than rendering
-// a nonsensical rank.
+// `snapshots` array AND ScriptDoctorPanel's own Draft History — this
+// stateless route has no sessionId and never sees either) and passed
+// through here so the server can render it into the letter additively; the
+// server never recomputes or trusts it as a score claim, only as display
+// copy the writer's own client attests to about their own saved history —
+// same trust posture as the `title`/`author` fields already on this schema.
+// Bounded to plausible values (both positive integers, rank <= of). The
+// audit fix that made computeDraftRank rank the UNION of snapshots (20-entry
+// cap, ScriptideSaveBodySchema's `snapshots` cap below) and Draft History
+// (50-entry cap, ScriptDoctorPanel.tsx's DOCTOR_HISTORY_MAX_ENTRIES) raised
+// the plausible ceiling from 21 (20 snapshots + 1 current) to 71 (20 + 50 +
+// 1) — deduped counts are usually well under that, but the cap must cover
+// the union's own worst case, not the smaller pre-fix one.
 const DraftRankSchema = z.object({
-  rank: z.number().int().min(1).max(21),
-  of: z.number().int().min(1).max(21),
+  rank: z.number().int().min(1).max(71),
+  of: z.number().int().min(1).max(71),
+  // 2026-09-04 (audit round 2) — true when >= 1 OTHER counted draft shares
+  // the EXACT same health as this one: an exact tie already shares the
+  // better rank (src/lib/snapshot-trend.ts's computeDraftRank), but a plain
+  // ordinal alone ("1st of 6") reads as clean separation when it's actually
+  // a dead heat. Optional and omitted (never sent as literal `false`) in
+  // the common untied case, so the payload shape is unchanged there.
+  tied: z.boolean().optional(),
+  // 2026-09-05 (review round 2) — how many OTHER saved records exist with no
+  // health at all (excluded from `of`/`rank` entirely). Same union ceiling
+  // as `of`/`rank` above (70 possible records + 1 current, though
+  // `unscored` itself is never the current draft — see computeDraftRank).
+  unscored: z.number().int().min(0).max(70).optional(),
 }).refine((v) => v.rank <= v.of, 'rank must not exceed of');
 
 export const CoverageLetterBodySchema = z.object({
@@ -1234,6 +1249,13 @@ export const SnapshotSchema = z.object({
   // snapshot-trend.ts.
   meanAbsDialogueShareDelta: z.number().optional(),
   actionSentenceCvOverall: z.number().optional(),
+  // 2026-09-04 — the source report's determinism receipt (server/nvm/
+  // analyze/types.ts's contentHash), stamped additively the same way as the
+  // fields above. Lets the client's computeDraftRank (src/lib/snapshot-
+  // trend.ts) dedupe this snapshot exactly against the same run recorded in
+  // ScriptDoctorPanel's own Draft History (localStorage, never sent to the
+  // server) instead of an approximate health+timestamp match.
+  contentHash: z.string().optional(),
 }).passthrough();
 
 // POST /api/scriptide/save — persists the ScriptIDE editor's full working

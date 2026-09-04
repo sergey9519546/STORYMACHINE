@@ -52,8 +52,10 @@ router.post('/api/export/coverage-letter', gameLimiter, validate(CoverageLetterB
     // (src/lib/snapshot-trend.ts's computeDraftRank) and passes it through
     // exactly like title/author: caller-attested display copy this
     // stateless route neither recomputes nor verifies. Shape validated by
-    // CoverageLetterBodySchema's DraftRankSchema.
-    draftRank?: { rank: number; of: number };
+    // CoverageLetterBodySchema's DraftRankSchema. `tied` (2026-09-04, audit
+    // round 2) rides along the same way when the client's computeDraftRank
+    // found >= 1 other counted draft at the exact same health.
+    draftRank?: { rank: number; of: number; tied?: boolean; unscored?: number };
   };
 
   // Same fdx->Fountain resolution as POST /api/export/coverage: convert here

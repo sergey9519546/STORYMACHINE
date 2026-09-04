@@ -83,6 +83,13 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
     // presentReport must carry healthPercentile alongside health/grade —
     // gated on the SAME `complete` flag, never a second condition.
     assert.equal(typeof body.base.healthPercentile, 'number');
+    // REVIEW FIX (round 2, 2026-09-05) — the determinism receipt, forwarded
+    // so a promoted/undo snapshot (src/components/ScriptIDE.tsx) can
+    // dedupe exactly against this run in computeDraftRank instead of only
+    // the approximate health+timestamp fallback (src/lib/
+    // snapshot-trend.ts).
+    assert.equal(typeof body.base.contentHash, 'string');
+    assert.match(body.base.contentHash, /^[0-9a-f]{64}$/);
 
     assert.ok(Array.isArray(body.branches) && body.branches.length > 0, 'at least one scored branch');
     assert.ok(body.branches.length <= 2, 'branchLimit is honoured');
@@ -109,6 +116,10 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
       // >= 2 scenes, so structuralSignals.scored is true.
       assert.equal(typeof branch.meanAbsDialogueShareDelta, 'number');
       assert.equal(typeof branch.actionSentenceCvOverall, 'number');
+      // REVIEW FIX (round 2, 2026-09-05) — same determinism receipt as
+      // body.base.contentHash above, per branch.
+      assert.equal(typeof branch.contentHash, 'string');
+      assert.match(branch.contentHash, /^[0-9a-f]{64}$/, 'contentHash is a real sha256 hex digest, not a placeholder');
     }
   });
 
@@ -149,11 +160,13 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
     assert.equal(first.base.fountain, second.base.fountain);
     assert.equal(first.intervened, second.intervened);
     assert.equal(first.branches.length, second.branches.length);
+    assert.equal(first.base.contentHash, second.base.contentHash, 'identical text must hash identically');
     for (let i = 0; i < first.branches.length; i++) {
       assert.equal(first.branches[i].branchId, second.branches[i].branchId);
       assert.equal(first.branches[i].fountain, second.branches[i].fountain);
       assert.equal(first.branches[i].health, second.branches[i].health);
       assert.equal(first.branches[i].verdict, second.branches[i].verdict);
+      assert.equal(first.branches[i].contentHash, second.branches[i].contentHash);
     }
   });
 

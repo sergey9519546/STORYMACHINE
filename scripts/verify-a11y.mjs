@@ -139,6 +139,67 @@ async function auditSurface(page, surfaceName) {
 }
 
 /**
+ * Runs axe scoped to ONE element (a Playwright Locator, already resolved to
+ * exactly one match) rather than the whole document, and records one
+ * PASS/FAIL the same way `auditSurface` does.
+ *
+ * REVIEW FIX (round 2, 2026-09-05): the Shape & Rhythm gate step needs to
+ * scroll deep into a ~52,000px-tall dialog to bring its own section into
+ * axe's visibility-dependent color-contrast check (see
+ * `scrollShapeRhythmIntoView`'s header) — but a document-wide `auditSurface`
+ * call at THAT scroll position also sweeps in whatever ELSE happens to be
+ * in the viewport there, which is a moving target as unrelated content
+ * above/below the section changes across reports; proven live: it caught a
+ * pre-existing, out-of-this-lane's-scope caption bug in a neighboring
+ * section purely because scrolling to Shape & Rhythm's position happened to
+ * bring it into view too. Scoping the axe run to the section's own DOM
+ * subtree (`[data-a11y-section="shape-rhythm"]`, ScriptDoctorPanel.tsx)
+ * measures exactly what this gate exists to measure — this section's own
+ * bugs — regardless of what else is or isn't in the surrounding viewport. */
+async function auditElement(page, locator, surfaceName) {
+  await waitForDomQuiet(page);
+  await page.addScriptTag({ path: AXE_PATH });
+  const violations = await locator.evaluate(async (el, tags) => {
+    // @ts-ignore — axe is attached to window by the injected script above.
+    const results = await window.axe.run(el, { runOnly: { type: 'tag', values: tags } });
+    return results.violations;
+  }, AXE_TAGS);
+  const gated = gatedOf(violations);
+  record(surfaceName, 'axe: zero serious/critical violations', gated.length === 0, detailOf(violations) || 'clean');
+  return violations;
+}
+
+/**
+ * Scrolls the "Full report" dialog's own scroll container until the Shape &
+ * Rhythm section is actually in view, and returns a Locator scoped to the
+ * section's own DOM subtree (for `auditElement` above) — not the whole
+ * document.
+ *
+ * REVIEW FIX (round 2, 2026-09-05): axe-core's color-contrast rule (like
+ * most of its rules) only evaluates nodes it considers visible, and a node
+ * that is off-screen inside a scrolled container — not merely `hidden` or
+ * zero-size — is one of the cases it skips. This section sits roughly
+ * 5,258px into the dialog's ~52,000px-tall scroll container on the rich
+ * sample report; proven live (independent review, 2026-09-05): with the
+ * unfixed classes restored, `axe.run(document)` at the dialog's default
+ * (top-of-scroll) position reported 0 gated violations for this section,
+ * and 13 once scrolled into view. Calling `auditElement`/`auditSurface`
+ * without this first cannot fail on the bug the whole step exists to catch
+ * — it would pass silently regardless of what the section's classes are.
+ *
+ * `scrollIntoViewIfNeeded` (not `scrollIntoView`) is used because it is a
+ * no-op when the element is already visible, so this is safe to call
+ * whether or not a given report happens to be short enough not to need it.
+ */
+async function scrollShapeRhythmIntoView(page) {
+  const section = page.locator('[data-a11y-section="shape-rhythm"]').first();
+  await section.waitFor({ timeout: timing.ms(15000) });
+  await section.scrollIntoViewIfNeeded({ timeout: timing.ms(10000) });
+  await waitForDomQuiet(page, { quietMs: 200, timeoutMs: 2000 });
+  return section;
+}
+
+/**
  * The landing surface, specifically: audited at >=2 moments and the WORSE
  * one is what's recorded, per the 2026-09-04 correction (see
  * `waitForDomQuiet`'s header for why this exists at all).
@@ -638,6 +699,44 @@ async function main() {
   const reportBody6 = await waitForRenderedText(page6, 'CONSIDER', { timeoutMs: 45000 });
   record('dark-theme-rich', 'rich report: a report renders from "Try sample coverage"', /CONSIDER|RECOMMEND|PASS/.test(reportBody6));
 
+  // ── Shape & Rhythm gate (audit fix, 2026-09-04) ─────────────────────────
+  // Neither existing dark-theme step ever actually measured this section:
+  // section 5's "Full report" click lands on a hand-typed script with too
+  // few scenes for the structural engine to score at all (below
+  // MIN_SCENES_TO_SCORE — server/nvm/analyze/structural-signals.ts — so
+  // ShapeRhythmSection is simply ABSENT there, not merely unaudited), and
+  // section 6 here never clicked "Full report" in the first place —
+  // StoryGraphSection was this section's only target. That gap is exactly
+  // how ScriptDoctorPanel.tsx's ShapeRhythmSection text-black/no-dark:-pair
+  // bug (1.19:1 in dark mode) shipped invisibly. This sample script has
+  // enough scenes for the section to render and be OPEN by default
+  // (loadShapeRhythmOpenPref's default), so opening Full report here and
+  // waiting for its heading closes the hole: audited in LIGHT theme now,
+  // then again in DARK theme after the toggle below.
+  const fullReportBtn6 = page6.getByRole('button', { name: 'Full report', exact: true }).first();
+  const fullReportReachable6 = (await fullReportBtn6.count()) > 0;
+  record('shape-rhythm-gate', '"Full report" is reachable from the rich sample report', fullReportReachable6);
+  if (fullReportReachable6) {
+    await fullReportBtn6.click();
+    await page6.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) }).catch(() => {});
+    const lightDialogBody = await waitForRenderedText(page6, 'Shape & Rhythm', { timeoutMs: 15000 });
+    record('shape-rhythm-gate', 'light theme: "Shape & Rhythm" heading renders in the Full report dialog', lightDialogBody.includes('Shape & Rhythm'));
+    // REVIEW FIX (round 2, 2026-09-05) — `waitForRenderedText` only checks
+    // `document.body.textContent`, which is true whether or not the section
+    // is actually scrolled into view. Proven live: this section sits
+    // ~5,258px into a ~52,000px scroll container, and axe reported 0 gated
+    // violations at the dialog's default (top-of-scroll) position against
+    // the SAME unfixed classes that reported 13 once scrolled — the step
+    // could never have failed on the bug it exists to catch. Scroll the
+    // section into view and scope the axe run to it (auditElement) so this
+    // gate measures exactly this section — not whatever else scrolling
+    // there happens to also bring into the viewport.
+    const lightSection = await scrollShapeRhythmIntoView(page6);
+    await auditElement(page6, lightSection, 'light-full-report-shape-rhythm');
+    await page6.keyboard.press('Escape');
+    await page6.waitForTimeout(timing.ms(300));
+  }
+
   // Toggle dark mode AFTER the report exists (Alt+Shift+D is wired on
   // ScriptIDE's own global keydown listener, so any focus inside it works —
   // the editor is the reliable, always-present target).
@@ -648,6 +747,24 @@ async function main() {
   await page6.waitForTimeout(timing.ms(300));
   const isDark6 = await page6.evaluate(() => document.documentElement.classList.contains('dark'));
   record('dark-theme-rich', 'Alt+Shift+D toggles dark mode on the rich-report view', isDark6);
+
+  // Shape & Rhythm gate, dark theme — the pairing this whole step exists to
+  // catch: the container this section renders in (`bg-white
+  // dark:bg-zinc-900`) is one of the few in this panel that actually goes
+  // dark, unlike the theme-invariant --sm-panel chrome most of the rest of
+  // the dialog sits on.
+  if (fullReportReachable6) {
+    await fullReportBtn6.click();
+    await page6.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) }).catch(() => {});
+    const darkDialogBody = await waitForRenderedText(page6, 'Shape & Rhythm', { timeoutMs: 15000 });
+    record('shape-rhythm-gate', 'dark theme: "Shape & Rhythm" heading renders in the Full report dialog', darkDialogBody.includes('Shape & Rhythm'));
+    // Same scroll-into-view + scoped-audit fix as the light-theme pass
+    // above — see its comment for why both are required.
+    const darkSection = await scrollShapeRhythmIntoView(page6);
+    await auditElement(page6, darkSection, 'dark-full-report-shape-rhythm');
+    await page6.keyboard.press('Escape');
+    await page6.waitForTimeout(timing.ms(300));
+  }
 
   // Confirm StoryGraphSection's severity groups actually rendered — this is
   // exactly the "the panels were never rendered in the audited states" gap

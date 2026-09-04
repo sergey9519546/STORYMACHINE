@@ -165,6 +165,13 @@ interface WhatIfDoctorDraft {
   // same wording, as ScriptDoctorPanel's "Shape & Rhythm" section.
   meanAbsDialogueShareDelta?: number;
   actionSentenceCvOverall?: number;
+  // REVIEW FIX (round 2, 2026-09-05) — the determinism receipt for this
+  // exact scored draft (server/routes/nvm/twin-whatif.ts's presentReport).
+  // Forwarded so a promoted/undo snapshot built from this branch can dedupe
+  // exactly against the same run in computeDraftRank (src/lib/
+  // snapshot-trend.ts), instead of only the approximate health+timestamp
+  // fallback.
+  contentHash?: string;
 }
 
 interface WhatIfBranchDoctor extends WhatIfDoctorDraft {
@@ -235,6 +242,8 @@ export interface BranchPromotion {
   healthPercentile?: number;
   meanAbsDialogueShareDelta?: number;
   actionSentenceCvOverall?: number;
+  /** REVIEW FIX (round 2, 2026-09-05) — see WhatIfDoctorDraft.contentHash. */
+  contentHash?: string;
 }
 
 // ── Intervention-target vocabulary ───────────────────────────────────────────
@@ -869,6 +878,7 @@ export default function WhatIfPanel({ onClose, onCommitted, onPromoteToEditor }:
       healthPercentile: branch.healthPercentile,
       meanAbsDialogueShareDelta: branch.meanAbsDialogueShareDelta,
       actionSentenceCvOverall: branch.actionSentenceCvOverall,
+      contentHash: branch.contentHash,
     });
     setPromoteFlows(f => ({ ...f, [branch.branchId]: { confirming: false, promoted: true } }));
   }, [onPromoteToEditor]);

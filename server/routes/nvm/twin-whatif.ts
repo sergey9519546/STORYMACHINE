@@ -167,6 +167,15 @@ router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySche
       analysisComplete: complete,
       sceneCount: report.sceneCount,
       analyzedAt: report.analyzedAt,
+      // REVIEW FIX (round 2, 2026-09-05) — runScriptDoctor always populates
+      // contentHash (server/routes/scriptide.ts's own doctor route exposes
+      // it unconditionally the same way, `contentHash: report.contentHash!`)
+      // regardless of whether the analysis completed. Forwarded so a
+      // promoted/undo What-If snapshot (src/components/ScriptIDE.tsx's
+      // promotedBranch effect) can dedupe exactly against this same run in
+      // computeDraftRank/Draft History, instead of only ever landing on the
+      // approximate health+timestamp fallback.
+      contentHash: report.contentHash,
       ...(complete ? { health: report.health, grade: report.grade } : {}),
       // `verdict` is already optional on the report and is only meaningful
       // alongside a real score — gated on the same flag for the same reason.
