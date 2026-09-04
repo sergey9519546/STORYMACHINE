@@ -2871,7 +2871,15 @@ export default function ScriptIDE({
 
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <h3 className="text-[10px] font-bold uppercase opacity-50">
+                      {/* a11y pass follow-up: opacity-50 on a bare (inherited-
+                          color) heading halves whatever contrast the inherited
+                          color had — this section had never been reached by
+                          any audited surface (it's a Labs-gated tab behind
+                          "Open Studio" -> "Engine") until this pass's new
+                          coverage found it. --sm-ink-mute is the same
+                          de-emphasized-label role used everywhere else in
+                          this app, already verified >=4.5:1. */}
+                      <h3 className="text-[10px] font-bold uppercase text-[var(--sm-ink-mute)]">
                         Narrative Tension
                       </h3>
                       <div className="h-40 flex items-end gap-1 bg-zinc-50 dark:bg-zinc-950 p-2 sm-btn">
@@ -2886,7 +2894,7 @@ export default function ScriptIDE({
                     </div>
 
                     <div className="space-y-4">
-                      <h3 className="text-[10px] font-bold uppercase opacity-50">
+                      <h3 className="text-[10px] font-bold uppercase text-[var(--sm-ink-mute)]">
                         Structural Integrity
                       </h3>
                       <div className="space-y-2">
@@ -2901,8 +2909,26 @@ export default function ScriptIDE({
                             key={beat}
                             className="flex items-center justify-between text-[10px] font-mono p-2 bg-zinc-100 dark:bg-zinc-800 border border-[var(--sm-ink)]"
                           >
-                            <span>{beat}</span>
-                            <span className="text-green-600 font-bold">
+                            {/* a11y pass follow-up: this span had NO color
+                                class at all, inheriting the page's default
+                                ink-dark text — invisible-adjacent against
+                                dark:bg-zinc-800, a real dark surface (unlike
+                                the theme-invariant --sm-panel elsewhere).
+                                text-black dark:text-gray-100 is the same
+                                pairing this app already uses for body text
+                                on this exact zinc-100/zinc-800 card style. */}
+                            <span className="text-black dark:text-gray-100">{beat}</span>
+                            {/* plain text-green-600 (no dark: variant)
+                                measured under 4.5:1 against dark:bg-zinc-800.
+                                Full responsive pair (!-forced: this is a
+                                Tailwind arbitrary-value/utility specificity
+                                tie, same class as dark:!text-green-400
+                                elsewhere in this pass — @custom-variant
+                                dark's :where() selector carries zero
+                                specificity, so ties are resolved by
+                                generated source order, not visual intent;
+                                !important makes the win deterministic). */}
+                            <span className="text-[var(--sm-ok-on-light)] dark:!text-green-400 font-bold">
                               LOCKED
                             </span>
                           </div>

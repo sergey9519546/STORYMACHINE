@@ -1102,7 +1102,7 @@ function DeltaGlyph({ delta, invert = false }: { delta: number; invert?: boolean
   // measured under 4.5:1 against bg-gray-50 in light mode. Full responsive
   // pair: -on-light against the light card, the *-400 shade (already proven
   // >=8:1 against zinc-800/900 elsewhere in this file) for dark.
-  const color = flat ? "text-gray-400" : improved ? "text-[var(--sm-ok-on-light)] dark:text-green-400" : "text-[var(--sm-stamp-on-light)] dark:text-red-400";
+  const color = flat ? "text-gray-400" : improved ? "text-[var(--sm-ok-on-light)] dark:!text-green-400" : "text-[var(--sm-stamp-on-light)] dark:!text-red-400";
   const Icon = flat ? Minus : delta > 0 ? ArrowUp : ArrowDown;
   return (
     <span className={`inline-flex items-center gap-0.5 font-bold ${color}`}>
@@ -1367,7 +1367,7 @@ function IssueCard({
         {issue.description}
       </p>
       {issue.suggestedFix && (
-        <p className="text-[10px] font-mono text-[var(--sm-ok-on-light)] dark:text-green-400 mt-2 pl-2 border-l-2 border-green-500">
+        <p className="text-[10px] font-mono text-[var(--sm-ok-on-light)] dark:!text-green-400 mt-2 pl-2 border-l-2 border-green-500">
           Fix: {issue.suggestedFix}
         </p>
       )}
@@ -1519,7 +1519,7 @@ function RootCauseCard({
             );
           })()}
           {fixState.error && (
-            <p role="alert" className="text-[10px] font-mono text-[var(--sm-stamp-on-light)] dark:text-red-400">
+            <p role="alert" className="text-[10px] font-mono text-[var(--sm-stamp-on-light)] dark:!text-red-400">
               {fixState.error}
             </p>
           )}
@@ -1596,7 +1596,7 @@ function FixDeltaList({
     <div>
       <p
         className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${
-          isCleared ? "text-[var(--sm-ok-on-light)] dark:text-[var(--sm-ok-on-dark)]" : "text-[var(--sm-stamp-on-light)] dark:text-[var(--sm-stamp-on-dark)]"
+          isCleared ? "text-[var(--sm-ok-on-light)] dark:!text-[var(--sm-ok-on-dark)]" : "text-[var(--sm-stamp-on-light)] dark:!text-[var(--sm-stamp-on-dark)]"
         }`}
       >
         {isCleared ? "Cleared" : "Introduced"} ({items.length})
@@ -1610,8 +1610,8 @@ function FixDeltaList({
               key={i}
               className={`text-[10px] font-mono leading-snug ${
                 isCleared
-                  ? "text-[var(--sm-ok-on-light)] dark:text-green-400"
-                  : "text-[var(--sm-stamp-on-light)] dark:text-red-400"
+                  ? "text-[var(--sm-ok-on-light)] dark:!text-green-400"
+                  : "text-[var(--sm-stamp-on-light)] dark:!text-red-400"
               }`}
             >
               <span className="font-bold uppercase">{humanizeRule(issue.rule)}</span>
@@ -1707,7 +1707,7 @@ function FixReceiptCard({
           Fix &amp; verify receipt
         </p>
         {applied && (
-          <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)] dark:text-green-400 flex items-center gap-1">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)] dark:!text-green-400 flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Applied to editor
           </span>
         )}
@@ -1753,9 +1753,9 @@ function FixReceiptCard({
                 key={i}
                 className={`flex px-2 ${
                   d.type === "added"
-                    ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400"
+                    ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:!text-green-400"
                     : d.type === "removed"
-                    ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                    ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:!text-red-400"
                     : "text-[var(--sm-ink-mute)]"
                 }`}
               >
@@ -3824,11 +3824,11 @@ export default function ScriptDoctorPanel({
                     "No change in findings since your last run."
                   ) : (
                     <>
-                      <span className="text-[var(--sm-ok-on-light)] dark:text-green-400 font-bold">
+                      <span className="text-[var(--sm-ok-on-light)] dark:!text-green-400 font-bold">
                         {findingsDelta.cleared} finding{findingsDelta.cleared === 1 ? "" : "s"} cleared
                       </span>
                       {" · "}
-                      <span className="text-[var(--sm-warn-on-light)] dark:text-amber-400 font-bold">
+                      <span className="text-[var(--sm-warn-on-light)] dark:!text-amber-400 font-bold">
                         {findingsDelta.added} new
                       </span>
                       {" since your last run"}
@@ -4052,7 +4052,7 @@ export default function ScriptDoctorPanel({
                         {source.warnings.map((w, i) => (
                           <li
                             key={i}
-                            className="text-[10px] font-mono text-[var(--sm-warn-on-light)] dark:text-amber-400 flex items-start gap-1.5"
+                            className="text-[10px] font-mono text-[var(--sm-warn-on-light)] dark:!text-amber-400 flex items-start gap-1.5"
                           >
                             <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" aria-hidden="true" />
                             <span>{w}</span>
@@ -4083,7 +4083,7 @@ export default function ScriptDoctorPanel({
                           Fountain into editor
                         </button>
                         {loadedNotice && (
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)] dark:text-green-400 flex items-center gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ok-on-light)] dark:!text-green-400 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Loaded into editor
                           </span>
                         )}
@@ -4146,7 +4146,7 @@ export default function ScriptDoctorPanel({
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold">Graph Health</span>
-                        <span className="text-xs font-mono">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-[var(--sm-stamp-on-light)] dark:text-red-400">−{report.graphHealth.graphDeduction}hp</span>}</span>
+                        <span className="text-xs font-mono">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-[var(--sm-stamp-on-light)] dark:!text-red-400">−{report.graphHealth.graphDeduction}hp</span>}</span>
                       </div>
                       {report.graphHealth.findings.length > 0 && (
                         <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
@@ -4267,7 +4267,7 @@ export default function ScriptDoctorPanel({
                         </span>
                         <span className="flex items-center gap-1.5 flex-wrap justify-end">
                           {p.issues.length === 0 ? (
-                            <span className="text-[9px] font-mono text-[var(--sm-ok-on-light)] dark:text-green-400 uppercase font-bold">
+                            <span className="text-[9px] font-mono text-[var(--sm-ok-on-light)] dark:!text-green-400 uppercase font-bold">
                               Clean
                             </span>
                           ) : (
