@@ -31,6 +31,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, type TestServer } from './helpers.ts';
 import { createShutdownHandler, installCrashHandlers } from '../../server.ts';
+import { isDraining, resetDrainingForTests } from '../../server/lib/readiness.ts';
 
 // A minimal buffer that passes the route's fast magic-byte guard
 // (body.subarray(0,5) === '%PDF-', server/routes/scriptide.ts) but is not a
@@ -293,6 +294,104 @@ describe('hardening — process-level crash handlers (server.ts)', () => {
       }
     };
   }
+
+  // 2026-09-04 follow-up review item 6 (owner rule: finish it) —
+  // createShutdownHandler() must flip GET /ready's draining flag
+  // (server/lib/readiness.ts) BEFORE server.close() ever runs, so a load
+  // balancer polling /ready sees 503 and stops routing new traffic before
+  // the socket itself starts refusing connections. Tested here with an
+  // injected fake server/signal, same pattern as the two tests above —
+  // isDraining() is asserted true synchronously, before the close callback
+  // even fires, which is exactly the ordering that matters.
+  it('createShutdownHandler() flips isDraining() to true synchronously, before server.close()\'s callback fires', withStubbedExit((exitCalls) => {
+    resetDrainingForTests();
+    assert.equal(isDraining(), false, 'precondition: not draining before shutdown begins');
+
+    let closeCallback: (() => void) | undefined;
+    const fakeServer = { close: (cb: () => void) => { closeCallback = cb; } } as unknown as import('http').Server;
+    const shutdown = createShutdownHandler(fakeServer);
+
+    shutdown('SIGTERM');
+    assert.equal(isDraining(), true, 'draining must be set before/independent of server.close()\'s callback');
+    assert.equal(exitCalls.length, 0, 'server.close() has not called back yet');
+    closeCallback?.();
+    assert.deepEqual(exitCalls, [0]);
+
+    resetDrainingForTests();
+  }));
+
+  it('createShutdownHandler() sets draining for a crash-driven shutdown too (uncaughtException)', withStubbedExit((exitCalls) => {
+    resetDrainingForTests();
+    let closeCallback: (() => void) | undefined;
+    const fakeServer = { close: (cb: () => void) => { closeCallback = cb; } } as unknown as import('http').Server;
+    const shutdown = createShutdownHandler(fakeServer);
+
+    shutdown('uncaughtException', 1);
+    assert.equal(isDraining(), true);
+    closeCallback?.();
+    assert.deepEqual(exitCalls, [1]);
+
+    resetDrainingForTests();
+  }));
+
+  // 2026-09-04 second follow-up review — the first draining fix flipped
+  // isDraining() and called server.close() in the SAME synchronous tick,
+  // which a fresh-connection prober (most healthchecks — this repo's own
+  // Dockerfile/docker-compose wget included) can lose entirely: measured
+  // directly, a brand-new connection attempted ~6ms after the signal
+  // already got ECONNREFUSED, since close() had already stopped accepting.
+  // SHUTDOWN_DRAIN_MS (server.ts's shutdownDrainMs()) delays server.close()
+  // by that many ms after setDraining() so such a prober gets a real chance
+  // to land inside the window and see 503 first. Tested here with an
+  // injected `scheduleClose` (mirrors doctor-pool.ts's `runJob` override
+  // pattern) so nothing here waits on a real timer: proves server.close()
+  // does NOT run until the injected scheduler's callback is invoked, and
+  // that isDraining() — the exact flag GET /ready reads (see
+  // tests/routes/ready.test.ts's own draining test for the live-route
+  // proof) — is already true throughout that whole window.
+  it('createShutdownHandler({drainMs}) delays server.close() until the injected timer fires; isDraining() (what GET /ready reads) is true throughout', withStubbedExit((exitCalls) => {
+    resetDrainingForTests();
+    let closeCalled = false;
+    const fakeServer = { close: (cb: () => void) => { closeCalled = true; cb(); } } as unknown as import('http').Server;
+
+    let scheduledFn: (() => void) | undefined;
+    let scheduledMs: number | undefined;
+    const scheduleClose = (fn: () => void, ms: number) => { scheduledFn = fn; scheduledMs = ms; };
+
+    const shutdown = createShutdownHandler(fakeServer, { drainMs: 5000, scheduleClose });
+    shutdown('SIGTERM');
+
+    assert.equal(isDraining(), true, 'draining flips synchronously, same as before this fix');
+    assert.equal(closeCalled, false, 'server.close() must NOT run before the drain window elapses');
+    assert.equal(scheduledMs, 5000, 'the injected scheduler must receive the configured drainMs');
+    assert.equal(exitCalls.length, 0);
+
+    // Simulate the drain window elapsing (a real boot would wait 5000ms of
+    // wall-clock time here — the injected scheduler lets this test not).
+    scheduledFn?.();
+
+    assert.equal(closeCalled, true, 'server.close() runs once the drain window elapses');
+    assert.deepEqual(exitCalls, [0]);
+
+    resetDrainingForTests();
+  }));
+
+  it('createShutdownHandler() with drainMs:0 (the default) calls server.close() immediately — unchanged from before this fix', withStubbedExit((exitCalls) => {
+    resetDrainingForTests();
+    let closeCalled = false;
+    const fakeServer = { close: (cb: () => void) => { closeCalled = true; cb(); } } as unknown as import('http').Server;
+    let scheduleCloseCalled = false;
+    const scheduleClose = () => { scheduleCloseCalled = true; };
+
+    const shutdown = createShutdownHandler(fakeServer, { drainMs: 0, scheduleClose });
+    shutdown('SIGTERM');
+
+    assert.equal(scheduleCloseCalled, false, 'the injected scheduler must never be consulted when drainMs is 0');
+    assert.equal(closeCalled, true, 'server.close() must run in the same tick, exactly as before this fix');
+    assert.deepEqual(exitCalls, [0]);
+
+    resetDrainingForTests();
+  }));
 
   it('createShutdownHandler() closes the server, then exits 0 for a signal-driven shutdown', withStubbedExit((exitCalls) => {
     let closeCallback: (() => void) | undefined;

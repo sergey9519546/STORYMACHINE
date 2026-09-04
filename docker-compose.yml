@@ -33,6 +33,20 @@ services:
     #     VERSION: dev
     #     GIT_SHA: dev
     restart: unless-stopped
+    # Compose's own SIGKILL deadline for `docker compose stop`/`down` —
+    # default 10s if unset. Third follow-up review, 2026-09-04: SHUTDOWN_DRAIN_MS
+    # below is set to 35s (a deliberate wait BEFORE server.close() even
+    # runs), plus the app's own 10s hard-kill timer for in-flight requests
+    # AFTER close() starts — 45s of graceful-shutdown time the app itself
+    # asks for. Compose's default 10s grace period would SIGKILL the
+    # container 25s before server.close() ever ran: the SQLite WAL flush in
+    # its close callback never happens, in-flight requests get cut instead
+    # of finishing, and the exit code is always 137 (128+SIGKILL) instead of
+    # the app's own 0/1. 50s = 35s drain + 10s hard-kill + 5s margin. RAISE
+    # BOTH TOGETHER: if you change SHUTDOWN_DRAIN_MS below, this must stay
+    # comfortably above (drain-ms/1000 + 10 + margin), or Compose's own
+    # deadline silently reintroduces the same defect.
+    stop_grace_period: 50s
     ports:
       - "${PORT:-3000}:3000"
     # Loads every variable in .env into the container as-is (AI provider
@@ -63,6 +77,24 @@ services:
       # ── Concurrency / session limits ──
       MAX_SESSIONS: ${MAX_SESSIONS:-100}
       MAX_ROOMS: ${MAX_ROOMS:-50}
+
+      # ── Graceful-shutdown drain window (server.ts's shutdownDrainMs(), GET
+      # /ready's draining state) — second follow-up review, 2026-09-04.
+      # Delays server.close() by this many ms AFTER GET /ready has already
+      # flipped to 503 {reason:"draining"} on SIGTERM/SIGINT, so a prober
+      # that opens a FRESH connection per check — exactly what the
+      # healthcheck below does, `wget` makes a new connection every time —
+      # gets a real chance to land inside the window and see the 503, rather
+      # than the port simply refusing it the instant close() runs (measured:
+      # with this at 0, that happens within single-digit ms of the signal).
+      # Set comfortably ABOVE this healthcheck's own `interval` below (30s)
+      # so at least one check cycle falls inside the window; 35000 here is
+      # 30s + 5s of margin. Bump both together if you widen `interval`.
+      # ALSO stays below this service's own `stop_grace_period` above (50s =
+      # this 35s + the app's own 10s hard-kill + margin) — raise both
+      # together, since Compose SIGKILLs at its own deadline regardless of
+      # what this app is still waiting on.
+      SHUTDOWN_DRAIN_MS: ${SHUTDOWN_DRAIN_MS:-35000}
 
       # ── Session backups (server/lib/backup.ts, `npm run backup`) ──
       # Off by default (no BACKUP_INTERVAL_HOURS = no in-process timer, no
@@ -105,10 +137,29 @@ services:
       # Same check as the image's own Dockerfile HEALTHCHECK — restated here
       # so `docker compose ps` reports health without relying on the image
       # having one baked in (e.g. when building locally from an older tag).
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      # /ready, not /health (2026-09-04 ops audit finding A): /health answers
+      # 200 unconditionally from the moment the port accepts connections, so
+      # it never told `docker compose ps` (or a load balancer reading the
+      # same signal) about the ~2.1-2.7s window where the Script Doctor
+      # worker pool is still pre-warming and a request would pay the full
+      # cold-start cost. /ready answers 503 until that pre-warm settles, then
+      # 200 until this process begins shutting down — NOT rate limited, so
+      # ordinary application load can never make this healthcheck itself
+      # read as unhealthy. SIGTERM/SIGINT flip /ready back to 503 first
+      # (draining), but since THIS probe opens a fresh connection every
+      # check, it only actually observes that 503 because SHUTDOWN_DRAIN_MS
+      # above is set well past this healthcheck's own interval — with it at
+      # 0 (the bare-image default), draining and the socket closing happen
+      # in the same tick and a fresh-connection probe like this one gets
+      # refused instead of ever seeing 503. See server.ts's
+      # shutdownDrainMs() and GET /ready's comment in
+      # server/routes/config.ts for the measured timeline. start_period
+      # widened to 15s (from 10s) to comfortably cover the measured
+      # ~2.1-3.9s warm-up with headroom.
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/ready"]
       interval: 30s
       timeout: 5s
-      start_period: 10s
+      start_period: 15s
       retries: 3
 
 volumes:

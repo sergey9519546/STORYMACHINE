@@ -134,6 +134,10 @@ const exemptRoutes: ReadonlyArray<{ method: string; path: string; reason: string
     method: 'GET', path: '/metrics',
     reason: 'Has its own auth gate (server/routes/config.ts): loopback-only by default, or a constant-time Bearer-token check when METRICS_TOKEN is set (404 on any miss) — an unauthenticated caller cannot reach it at all, so a request-volume limiter adds nothing a 404-on-mismatch gate does not already provide.',
   },
+  {
+    method: 'GET', path: '/ready',
+    reason: '2026-09-04 ops audit finding A, revised by the same day\'s follow-up review: an earlier revision carried gameLimiter here, reproduced as a defect — 130 ordinary /api requests from one IP made this route answer 429 on a warm, healthy server, which made the Dockerfile HEALTHCHECK / docker-compose healthcheck / any orchestrator readiness probe read a busy-but-healthy container as unhealthy and drain it. Exempt for the same reason /health is: an O(1) in-memory read (server/nvm/analyze/doctor-pool.ts\'s getDoctorPoolWarmState() plus server/lib/readiness.ts\'s isDraining()) with no rate-limitable cost, and a readiness/availability primitive must not itself be able to fail for availability reasons.',
+  },
 ];
 
 // ── LLM-reaching classification ─────────────────────────────────────────────
@@ -202,6 +206,9 @@ const llmRoutes: ReadonlySet<string> = new Set([
 // source rather than trusting those comments alone.
 const deterministicRoutes: ReadonlySet<string> = new Set([
   // server/routes/config.ts
+  // GET /ready lives in exemptRoutes above (no rate limiter) — still
+  // deterministic (no generateContent call on any path through it), but
+  // membership in exemptRoutes is what totality below checks against.
   'GET /api/ai-config', 'POST /api/ai-config',
   'GET /api/pacing-target', 'POST /api/pacing-target',
   'GET /api/story-config',

@@ -476,14 +476,94 @@ export function doctorPoolStatus(): { enabled: boolean; disabled: boolean; worke
 const WARM_UP_FOUNTAIN = (index: number): string =>
   `INT. PRE-WARM ROOM ${index} - DAY\n\nA figure stands, waiting for nothing in particular.\n\nWARMUP\nHello.\n`;
 
+/**
+ * Observable warm state for the pre-warm above — the piece the 2026-09-04
+ * ops audit found missing entirely: a request landing in the ~2.1-2.7s
+ * window between "port is accepting connections" (server.ts's app.listen
+ * callback) and "pool is warm" pays the full cold-start cost with nothing —
+ * a load balancer, a health check, a test — able to tell the two states
+ * apart. GET /ready (server/routes/config.ts) reads this via
+ * `getDoctorPoolWarmState()` to gate traffic on it.
+ *
+ * `finished` is the field that matters for readiness: it becomes true both
+ * on a real warm-up completing (success or partial failure — see `failed`)
+ * AND on every no-op branch below (NODE_ENV=test, DOCTOR_POOL_PREWARM=0) —
+ * a run that will never pre-warm has nothing to wait for, so treating that
+ * as "warm" immediately is correct, not a lie: the pool's steady-state
+ * behavior (fall back in-process, or cold-start the first real request) is
+ * unaffected either way.
+ */
+export interface DoctorPoolWarmState {
+  /** True once warmDoctorPool() has begun running (a no-op run included). */
+  started: boolean;
+  /** True once warmDoctorPool() has settled — as warm as it will get. */
+  finished: boolean;
+  /** Wall-clock duration of the warm-up in ms, or null before it finishes. */
+  ms: number | null;
+  /** Worker slots that warmed successfully (0 for a no-op run, or a timeout). */
+  slotsWarmed: number;
+  /** Warm-up jobs that failed (each already logged individually; never fatal). */
+  failed: number;
+  /** Date.now() epoch ms when `finished` flipped to true, or null before then. */
+  finishedAt: number | null;
+  /** True when the deadline (see prewarmDeadlineMs()) fired before every
+   *  warm-up job settled — `finished` is still true (see warmDoctorPool()'s
+   *  doc comment), but slotsWarmed/failed did not get a final tally because
+   *  the still-pending jobs were abandoned, not awaited. Follow-up review
+   *  finding (2026-09-04): a wedged worker previously left `finished` false
+   *  forever, which meant GET /ready 503'd forever for a process that was in
+   *  fact serving every request correctly (the pool falls back in-process). */
+  timedOut: boolean;
+}
+
+const initialWarmState = (): DoctorPoolWarmState =>
+  ({ started: false, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false });
+
+/** How long warmDoctorPool() waits for every warm-up job to settle before
+ *  giving up and reporting `finished:true, timedOut:true` anyway. 30s is
+ *  generous against the measured ~2.1-3.9s real-world warm-up (this file's
+ *  own doc comments) while still bounding the worst case: without a
+ *  deadline, an unresponsive worker (accepts a job, never replies — the one
+ *  case runScriptDoctorOffThread has no per-job timeout for) would leave
+ *  `finished` false, and therefore GET /ready 503, forever. Overridable via
+ *  DOCTOR_POOL_PREWARM_TIMEOUT_MS for tests (which use a short override) and
+ *  for an operator who has measured a different real-world ceiling. */
+function prewarmDeadlineMs(): number {
+  const raw = Number(process.env.DOCTOR_POOL_PREWARM_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 30_000;
+}
+
+let warmState: DoctorPoolWarmState = initialWarmState();
+
+/** Read-only snapshot of the pre-warm's current state — safe to call at any
+ *  time, including before warmDoctorPool() has ever run. Returns a copy so a
+ *  caller can never mutate this module's own tracking state. */
+export function getDoctorPoolWarmState(): DoctorPoolWarmState {
+  return { ...warmState };
+}
+
+/** Test-only reset, mirroring shutdownDoctorPool()'s role for pool slots —
+ *  lets a test start from a known "never warmed" state without restarting
+ *  the process. */
+export function resetDoctorPoolWarmStateForTests(): void {
+  warmState = initialWarmState();
+}
+
 export async function warmDoctorPool(
   opts: { runJob?: (fountain: string) => Promise<unknown> } = {},
 ): Promise<void> {
-  if (process.env.NODE_ENV === 'test') return;
-  if (process.env.DOCTOR_POOL_PREWARM === '0') return;
+  if (process.env.NODE_ENV === 'test') {
+    warmState = { started: true, finished: true, ms: 0, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: false };
+    return;
+  }
+  if (process.env.DOCTOR_POOL_PREWARM === '0') {
+    warmState = { started: true, finished: true, ms: 0, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: false };
+    return;
+  }
 
   const runJob = opts.runJob ?? ((fountain: string) => runScriptDoctorOffThread(fountain));
   const startedAt = Date.now();
+  warmState = { started: true, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false };
   let failures = 0;
 
   try {
@@ -493,7 +573,7 @@ export async function warmDoctorPool(
     // part of this very call.
     const count = poolEnabled() && !poolDisabled ? configuredPoolSize() : 1;
 
-    await Promise.all(
+    const jobsSettled = Promise.all(
       Array.from({ length: count }, (_, index) =>
         runJob(WARM_UP_FOUNTAIN(index)).catch((err: unknown) => {
           failures++;
@@ -504,11 +584,59 @@ export async function warmDoctorPool(
         })),
     );
 
+    // Deadline race (follow-up review finding, 2026-09-04): a worker that
+    // accepts a job and never replies would otherwise leave jobsSettled
+    // pending forever — runScriptDoctorOffThread has no per-job timeout of
+    // its own (only the pool's idle-shutdown timer). Whichever settles
+    // first wins; the timer is cleared either way so it never lingers.
+    //
+    // Deliberately NOT `.unref()`'d, unlike this file's other timers
+    // (IDLE_SHUTDOWN_MS): those exist to stop a timer from holding a
+    // short-lived process open on its own account, with nothing else
+    // depending on it. This one backs a guarantee an active caller is
+    // ALREADY awaiting ("warmDoctorPool() resolves within deadlineMs, no
+    // matter what") — unref'd, it can lose the race against the event loop
+    // draining before it ever fires (confirmed: with nothing else scheduled,
+    // an unref'd version of this timer never fires at all, so the very
+    // deadline it exists to guarantee silently stops applying). Ref'd is
+    // safe here specifically because the promise chain already holding the
+    // process open is the caller's own `await warmDoctorPool()` — this timer
+    // adds no new process-lifetime hazard beyond what that await already is.
+    const deadlineMs = prewarmDeadlineMs();
+    let deadlineTimer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<'timeout'>((resolve) => {
+      deadlineTimer = setTimeout(() => resolve('timeout'), deadlineMs);
+    });
+
+    const outcome = await Promise.race([jobsSettled.then((): 'settled' => 'settled'), deadline]);
+    if (deadlineTimer) clearTimeout(deadlineTimer);
+
+    const elapsed = Date.now() - startedAt;
+
+    if (outcome === 'timeout') {
+      logger.warn('doctor_pool_prewarm_timed_out', { requested: count, deadlineMs, ms: elapsed });
+      warmState = {
+        started: true, finished: true, ms: elapsed, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: true,
+      };
+      // The still-pending jobs may resolve or reject later; each already
+      // catches its own rejection above (the .catch in the Array.from
+      // callback), so letting jobsSettled keep running in the background
+      // after we've moved on can never surface as an unhandled rejection —
+      // GET /ready and /health must not wait on a worker that may never
+      // answer.
+      void jobsSettled;
+      return;
+    }
+
+    warmState = {
+      started: true, finished: true, ms: elapsed, slotsWarmed: count - failures, failed: failures, finishedAt: Date.now(), timedOut: false,
+    };
+
     logger.info('doctor_pool_prewarmed', {
       requested: count,
       failures,
       workers: doctorPoolStatus().workers,
-      ms: Date.now() - startedAt,
+      ms: elapsed,
     });
   } catch (err) {
     // Belt-and-braces: every per-job failure is already caught above, so
@@ -516,10 +644,13 @@ export async function warmDoctorPool(
     // itself throwing on a corrupt env value). A boot-time perf optimization
     // must never be able to take the process down or surface as an unhandled
     // rejection — see this file's property (4) for the same guarantee applied
-    // to the pool itself.
+    // to the pool itself. `finished` still flips to true here: a /ready
+    // gate must never wait forever on a warm-up that has already given up.
+    const elapsed = Date.now() - startedAt;
+    warmState = { started: true, finished: true, ms: elapsed, slotsWarmed: 0, failed: failures, finishedAt: Date.now(), timedOut: false };
     logger.warn('doctor_pool_prewarm_failed', {
       error: err instanceof Error ? err.message : String(err),
-      ms: Date.now() - startedAt,
+      ms: elapsed,
     });
   }
 }

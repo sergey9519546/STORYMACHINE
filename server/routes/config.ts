@@ -7,6 +7,8 @@ import { checkAdminAuth, isLoopbackAddress, timingSafeStringEqual } from '../lib
 import { instantiatePreset } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { version as buildVersion, commit as buildCommit } from '../lib/build-info.ts';
+import { getDoctorPoolWarmState } from '../nvm/analyze/doctor-pool.ts';
+import { isDraining } from '../lib/readiness.ts';
 import {
   validate as validateOutline, OutlineBodySchema, ImportBodySchema,
   PacingTargetBodySchema, EmotionalArcBodySchema, DirectorStyleBodySchema,
@@ -85,13 +87,97 @@ const SIMULATION_OBSERVATION_NOTABLE_EXCLUSIONS = [
 // "dev") — see server/lib/build-info.ts. Neither can throw, so this endpoint
 // keeps responding even when Gemini/keys/everything else is down.
 router.get('/health', (_req, res) => {
+  const warm = getDoctorPoolWarmState();
   res.json({
     status: 'ok',
     uptime: Math.round(process.uptime()),
     sessions: sessions.size,
     version: buildVersion,
     commit: buildCommit,
+    // 2026-09-04 ops audit finding A: additive field — every prior key above
+    // is unchanged — surfacing the Script Doctor worker pool's boot-time
+    // pre-warm state (server/nvm/analyze/doctor-pool.ts's warmDoctorPool())
+    // so a caller watching /health can see the same transition GET /ready
+    // gates traffic on, without switching endpoints. `warmedAt` is an ISO
+    // timestamp of the moment the pre-warm settled; null before that, in
+    // step with `warm: false`.
+    doctorPool: {
+      warm: warm.finished,
+      warmedAt: warm.finishedAt !== null ? new Date(warm.finishedAt).toISOString() : null,
+      ms: warm.ms,
+      // Follow-up review finding (2026-09-04): true only if the warm-up hit
+      // its deadline before every job settled — see doctor-pool.ts's
+      // prewarmDeadlineMs(). `warm` is still true in that case (a wedged
+      // worker must not leave /ready 503 forever), this just says how it
+      // got there.
+      timedOut: warm.timedOut,
+    },
   });
+});
+
+// Readiness — distinct from /health's unconditional liveness. NOT rate
+// limited: an earlier revision carried gameLimiter here, which the 2026-09-04
+// follow-up review reproduced as a defect — 130 ordinary /api requests from
+// one IP (gameLimiter's own module-level, IP-keyed bucket, shared with the
+// rest of /api — server/lib/session-store.ts) made THIS route answer 429 on
+// a warm, healthy server, which is precisely the failure a readiness
+// endpoint must never have: it made a busy container read as unhealthy to
+// the Dockerfile HEALTHCHECK / docker-compose healthcheck / any orchestrator
+// probe pointed here, draining a healthy instance under load. /ready is now
+// exempt from rate limiting for the same reason /health always has been
+// (tests/routes/route-capabilities.test.ts's exemptRoutes carries the
+// written justification for both): it is an O(1) in-memory read with no
+// rate-limitable cost, and an availability primitive must not itself be able
+// to fail for availability reasons.
+//
+// Two independent 503 sources, checked in order:
+//   1. DRAINING (server/lib/readiness.ts) — set the instant
+//      createShutdownHandler() (server.ts) begins a graceful shutdown, BEFORE
+//      server.close() ever runs (owner follow-up, 2026-09-04). Checked first
+//      and unconditionally: a draining process must answer 503 even if the
+//      doctor pool is warm — the point is "stop sending me new work," not
+//      "am I ready." WHO ACTUALLY SEES THIS (second follow-up review, same
+//      day, measured directly): with the default SHUTDOWN_DRAIN_MS=0,
+//      setDraining() and server.close() run in the same synchronous tick, so
+//      only a caller already holding an open, keep-alive connection can land
+//      a request on this branch before the socket stops accepting new ones —
+//      a fresh connection opened moments after the signal was observed to
+//      get ECONNREFUSED instead, never seeing this response at all.
+//      SHUTDOWN_DRAIN_MS (server.ts's shutdownDrainMs()) widens that window
+//      so a fresh-connection-per-poll prober (most load balancer/orchestrator
+//      healthchecks, including this repo's own Dockerfile/docker-compose
+//      wget) gets a real chance to observe it too — see server.ts's and
+//      README's docs on that variable for the measured timeline.
+//   2. NOT YET WARM — the Script Doctor worker pool's boot-time pre-warm
+//      (server/nvm/analyze/doctor-pool.ts's warmDoctorPool() and
+//      getDoctorPoolWarmState()) has not settled. The pre-warm runs for
+//      ~2.1-3.9s AFTER the port already accepts connections (server.ts
+//      dispatches it fire-and-forget from the app.listen callback), so a
+//      request landing in that window would otherwise silently pay the
+//      cold-start cost with no way for an orchestrator to know to hold
+//      traffic back. Once warm, this route answers 200 until draining
+//      begins (see (1)) — immediately 200 when pre-warm is disabled or a
+//      no-op (NODE_ENV=test, DOCTOR_POOL_PREWARM=0): getDoctorPoolWarmState()
+//      .finished is set true by warmDoctorPool() itself on those branches so
+//      this route never blocks traffic on a warm-up that will never happen,
+//      and never blocks forever on one that hangs (doctor-pool.ts's deadline).
+//
+// Point a load balancer's / orchestrator's readiness probe here — not
+// /health, which must keep answering even when nothing is warm and even
+// while draining — with a start period covering the warm-up; see the
+// Dockerfile HEALTHCHECK and docker-compose.yml healthcheck, both pointed
+// at /ready, and README's deployment section.
+router.get('/ready', (_req, res) => {
+  if (isDraining()) {
+    res.status(503).json({ ready: false, reason: 'draining' });
+    return;
+  }
+  const warm = getDoctorPoolWarmState();
+  if (warm.finished) {
+    res.json({ ready: true });
+    return;
+  }
+  res.status(503).json({ ready: false, reason: 'doctor_pool_warming' });
 });
 
 // Session Rotation — rotates a bearer session ID safely (Docs/AUTH.md recommendation)

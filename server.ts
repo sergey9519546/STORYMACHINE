@@ -10,6 +10,7 @@ import { backupSessions } from './server/lib/backup.ts';
 import { createApp } from './server/app.ts';
 import { attachCollabServer } from './server/collab/yjs-server.ts';
 import { warmDoctorPool } from './server/nvm/analyze/doctor-pool.ts';
+import { setDraining } from './server/lib/readiness.ts';
 
 // A missing AI key is NOT fatal: the deterministic half of the product —
 // Script Doctor, live diagnostics, coverage export, What-If exploration,
@@ -36,6 +37,44 @@ if (AI_PROVIDER === 'openai-compat' && (!process.env.AI_BASE_URL || !process.env
 
 initFromEnv();
 
+/**
+ * SHUTDOWN_DRAIN_MS (2026-09-04, second follow-up review) — default `0`,
+ * today's timing unchanged. Read once, at createShutdownHandler() construction
+ * time (i.e. once per process, at boot), not per-signal.
+ *
+ * WHY THIS EXISTS. setDraining() and server.close() previously ran in the
+ * SAME synchronous tick (see createShutdownHandler()'s own doc comment
+ * below). That is enough for a caller already holding an open, keep-alive
+ * connection to see the 503 on its next request over that connection — but
+ * a prober that opens a FRESH connection per poll (a `wget`-style
+ * healthcheck, most load balancers) can lose the race entirely: measured
+ * directly, a brand-new connection attempted ~6ms after SIGTERM already got
+ * ECONNREFUSED, because `server.close()` had already stopped accepting new
+ * connections by then. That prober never observes `{ready:false,
+ * reason:"draining"}` at all — it just sees the port go away. Documented
+ * bluntly rather than smoothed over: with `SHUTDOWN_DRAIN_MS=0` (the
+ * default), the draining response is a REAL but NARROW signal — visible to
+ * a keep-alive poller sharing an already-open connection, invisible to a
+ * new-connection-per-poll prober, which instead just experiences the port
+ * closing slightly sooner than it otherwise would have.
+ *
+ * Setting this to a positive value delays `server.close()` (and the 10s
+ * hard-kill timer below, which now counts from when close() actually
+ * starts, not from the original signal) by that many ms AFTER setDraining()
+ * has already run — during that window the listener is still open and
+ * still accepting new connections (this process just answers 503 on
+ * /ready for every one of them), so a fresh-connection-per-poll prober
+ * that lands inside the window DOES see the 503 before the socket ever
+ * refuses it. See README's Deployment section and docker-compose.yml's own
+ * SHUTDOWN_DRAIN_MS, which sets it comfortably above the HEALTHCHECK
+ * interval specifically so that healthcheck (a fresh `wget` connection each
+ * time) gets at least one cycle inside the window.
+ */
+function shutdownDrainMs(): number {
+  const raw = Number(process.env.SHUTDOWN_DRAIN_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 0;
+}
+
 /** Builds the graceful-shutdown function for a given HTTP server: closes the
  *  listener, flushes every open session's SQLite handle (so WAL files land
  *  cleanly), then exits with `exitCode`. Extracted (rather than inlined in
@@ -44,22 +83,68 @@ initFromEnv();
  *  shutdown (uncaughtException, exit 1 — the process asked for this, because
  *  continuing after an uncaught exception runs on undefined state) instead of
  *  two divergent copies of the same cleanup, and so it's unit-testable
- *  without binding a real port (see tests/routes/hardening.test.ts). */
-export function createShutdownHandler(server: Server): (signal: string, exitCode?: number) => void {
+ *  without binding a real port (see tests/routes/hardening.test.ts).
+ *
+ *  DRAINING (2026-09-04 ops audit follow-up, owner rule): the very first
+ *  thing this does — synchronously, before `server.close()` even runs — is
+ *  flip GET /ready's draining flag (server/lib/readiness.ts) to true. A
+ *  load balancer polling /ready then sees 503 and stops routing NEW traffic
+ *  to this instance before the socket itself starts refusing connections
+ *  (`server.close()` stops accepting new connections but lets in-flight ones
+ *  finish), which is the other half of what a readiness endpoint exists
+ *  for: not just "not ready yet" at boot, but "not anymore" at shutdown.
+ *  There is no un-draining in production — once a shutdown has begun, /ready
+ *  never returns 200 again for the rest of this process's life — so
+ *  `setDraining()` here is unconditional and never paired with a reset.
+ *
+ *  DRAIN WINDOW (second follow-up review, same day): `server.close()` — and
+ *  the hard-kill timer that used to run alongside it — now fire after a
+ *  `shutdownDrainMs()` delay from setDraining(), not in the same tick. See
+ *  that function's own doc comment for why this exists and what it does and
+ *  does not fix.
+ *
+ *  `scheduleClose` is injectable for tests only (mirrors the `warmFn`/
+ *  `runJob` override pattern used elsewhere in this codebase — see
+ *  doctor-pool.ts) — production always takes the default, a plain
+ *  `setTimeout`. Deliberately NOT unref'd: the listening server itself is
+ *  an active, ref'd handle for the whole drain window (we haven't called
+ *  close() yet), so nothing here can starve the event loop the way
+ *  doctor-pool.ts's own unref'd-timer bug did — but ref'd is still the
+ *  correct choice on its own merits: this timer backs a guarantee ("close
+ *  begins within drainMs of the signal") the same way that one does. */
+export function createShutdownHandler(
+  server: Server,
+  opts: { drainMs?: number; scheduleClose?: (fn: () => void, ms: number) => void } = {},
+): (signal: string, exitCode?: number) => void {
+  const drainMs = opts.drainMs ?? shutdownDrainMs();
+  const scheduleClose = opts.scheduleClose ?? ((fn: () => void, ms: number) => { setTimeout(fn, ms); });
+
   return (signal: string, exitCode = 0) => {
-    logger.info('server_shutdown', { signal, exitCode });
-    server.close(() => {
-      // Close all SQLite handles before exiting so WAL files are flushed cleanly.
-      for (const { stage } of sessions.values()) {
-        try { stage.close(); } catch { /* already closed */ }
-      }
-      process.exit(exitCode);
-    });
-    // Hard-kill after 10s if in-flight requests haven't drained. A crash-driven
-    // shutdown keeps its own (non-zero) exit code even on the hard-kill path —
-    // an orchestrator distinguishing "drained cleanly" from "had to be killed"
-    // shouldn't also lose the signal that this exit was crash-triggered.
-    setTimeout(() => process.exit(exitCode === 0 ? 1 : exitCode), 10_000).unref();
+    setDraining();
+    logger.info('server_shutdown', { signal, exitCode, drainMs });
+
+    const beginClose = (): void => {
+      server.close(() => {
+        // Close all SQLite handles before exiting so WAL files are flushed cleanly.
+        for (const { stage } of sessions.values()) {
+          try { stage.close(); } catch { /* already closed */ }
+        }
+        process.exit(exitCode);
+      });
+      // Hard-kill after 10s (from when close() actually starts, i.e. AFTER
+      // the drain window above) if in-flight requests haven't drained. A
+      // crash-driven shutdown keeps its own (non-zero) exit code even on
+      // the hard-kill path — an orchestrator distinguishing "drained
+      // cleanly" from "had to be killed" shouldn't also lose the signal
+      // that this exit was crash-triggered.
+      setTimeout(() => process.exit(exitCode === 0 ? 1 : exitCode), 10_000).unref();
+    };
+
+    if (drainMs > 0) {
+      scheduleClose(beginClose, drainMs);
+    } else {
+      beginClose();
+    }
   };
 }
 
@@ -144,6 +229,50 @@ export function startBackupSchedule(): NodeJS.Timeout | undefined {
   return timer;
 }
 
+/**
+ * DOCTOR_POOL_PREWARM_BEFORE_LISTEN=1 (2026-09-04 ops audit finding A,
+ * follow-up) — off by default. The default boot fires warmDoctorPool()
+ * fire-and-forget from the listen callback below, so the port accepts
+ * connections ~2.1-2.7s before the pool finishes warming; GET /ready exists
+ * so an orchestrator can hold traffic back for exactly that window without
+ * this process itself booting any slower. Some single-process deployments
+ * have no such orchestrator in front of them — a bare `docker run` with no
+ * readiness-aware load balancer, or a local `npm start` — and would rather
+ * the process take ~2-3s longer to become reachable AT ALL than ever risk
+ * serving one slow first request to a caller that never checked /ready. This
+ * flag is that trade, made explicit and opt-in: when set, the pre-warm is
+ * AWAITED before `app.listen()` is ever called, so the port does not open
+ * until the pool is warm.
+ *
+ * `warmFn` is injectable for tests only (see tests/core/
+ * server-prewarm-before-listen.test.ts) — production always takes the
+ * default, which is the very same warmDoctorPool() the listen callback below
+ * would otherwise call fire-and-forget. Never awaits/calls `warmFn` at all
+ * when the flag is unset — the default boot path is byte-identical to
+ * before this flag existed.
+ *
+ * Deliberately PROPAGATES a rejection from `warmFn` rather than swallowing
+ * it (see this function's own test asserting that) — production's real
+ * `warmDoctorPool()` never throws (its own doc comment states the
+ * guarantee), so this is defense for an injected/future `warmFn` that
+ * might. Because it can reject, `startServer()`'s call site below wraps the
+ * await in a try/catch rather than letting a pre-warm failure take the
+ * process down before it ever binds the port — the same "a boot-time perf
+ * optimization must never be able to take the process down" guarantee
+ * doctor-pool.ts's own header states, made to hold on this path too.
+ */
+export function prewarmBeforeListenEnabled(): boolean {
+  const raw = process.env.DOCTOR_POOL_PREWARM_BEFORE_LISTEN;
+  return raw === '1' || raw === 'true';
+}
+
+export async function awaitPrewarmBeforeListenIfConfigured(
+  warmFn: () => Promise<void> = () => warmDoctorPool(),
+): Promise<void> {
+  if (!prewarmBeforeListenEnabled()) return;
+  await warmFn();
+}
+
 async function startServer() {
   if (PERSIST_SESSIONS) {
     fs.mkdirSync(SESSION_DB_DIR, { recursive: true });
@@ -158,6 +287,26 @@ async function startServer() {
     console.error(`FATAL: Invalid PORT value "${process.env.PORT}". Must be 1–65535.`);
     process.exit(1);
   }
+
+  // See awaitPrewarmBeforeListenIfConfigured()'s doc comment above: a no-op
+  // unless DOCTOR_POOL_PREWARM_BEFORE_LISTEN is set, in which case the port
+  // does not open until this resolves. Wrapped in try/catch, not left to
+  // propagate: production's warmDoctorPool() never throws, but
+  // awaitPrewarmBeforeListenIfConfigured() deliberately CAN reject (its own
+  // doc comment) for an injected/future warmFn, and this is the one boot
+  // path where that could otherwise take the whole process down before it
+  // ever binds the port — logging and continuing to `listen` below keeps the
+  // "a boot-time perf optimization must never be able to take the process
+  // down" guarantee (doctor-pool.ts's header) intact on this path too.
+  try {
+    await awaitPrewarmBeforeListenIfConfigured();
+  } catch (err) {
+    logger.error('prewarm_before_listen_failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  const prewarmedBeforeListen = prewarmBeforeListenEnabled();
+
   const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info('server_started', { port: PORT });
     // Fire-and-forget: spawns the Script Doctor worker pool's threads and
@@ -166,8 +315,10 @@ async function startServer() {
     // re-verification). warmDoctorPool() itself is a no-op under
     // NODE_ENV=test / DOCTOR_POOL_PREWARM=0 and never throws or rejects —
     // see its doc comment — so this deliberately isn't awaited and needs no
-    // .catch here.
-    void warmDoctorPool();
+    // .catch here. Skipped entirely when DOCTOR_POOL_PREWARM_BEFORE_LISTEN
+    // already ran (and awaited) the exact same warm-up above, before this
+    // callback could ever fire — calling it again here would double-warm.
+    if (!prewarmedBeforeListen) void warmDoctorPool();
   });
 
   // P4: real-time collaboration — Yjs sync over WebSocket on /collab/:room.

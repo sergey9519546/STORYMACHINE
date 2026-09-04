@@ -73,24 +73,52 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   }
 
   app.use(express.json({ limit: '1mb' }));
-  // requestLogger() (server/lib/logger.ts) logs { method, path, status, ms }
-  // per request, where `path` is Express's `req.path` — the parsed URL
-  // *pathname only*; per Express/Node's `url.parse` semantics, `req.path`
-  // never includes the query string (that's `req.url` / `req.originalUrl`,
-  // neither of which this logger reads). This is deliberate and load-bearing,
-  // not incidental: SSE call sites (e.g. GET /api/run-room-stream) can't
-  // set the X-Session-Id header the way fetch()-based callers do, so
+  // requestLogger() (server/lib/request-logger.ts) logs { method, path,
+  // status, ms } per request. `path` is `req.baseUrl + req.path`, NOT
+  // Express's `req.path` alone — that changed 2026-09-04 (ops audit finding
+  // B, then revised the same day by the follow-up review): `req.path` alone
+  // is re-derived at whichever router is currently handling the request, so
+  // by the time this middleware's res.on('finish') fired, a later mount's
+  // own prefix (`app.use('/assets', ...)`, `app.use('/api', ...)`, both
+  // below) had already been stripped off it — `/assets/does-not-exist.js`
+  // logged as `/does-not-exist.js`, `/api/nope` as `/nope`, both
+  // indistinguishable from a request at the site root and both invisible as
+  // the asset/api 404 guards they actually were. The audit's first fix read
+  // `req.originalUrl` (query stripped) instead, which restored the prefix
+  // but introduced a different problem the follow-up review found: for an
+  // absolute-form request line (RFC 9112 §3.2.2 — legal, and both Node and
+  // Express accept and serve it), `req.originalUrl` includes the raw,
+  // client-chosen scheme and host, which then reached the logged `path`
+  // verbatim. `req.baseUrl + req.path` fixes both: Express sets `baseUrl`
+  // and trims `path` as it descends into each mounted prefix and never
+  // restores either once the terminal handler ends the request without
+  // calling `next()` (none of ours do), so by 'finish' time the two fields
+  // are frozen at the deepest layer that actually ran — reconstructing the
+  // real, full, prefix-included path Express itself parsed, never the
+  // client's raw request-target string. Both fields are always parsed
+  // relative paths (Express strips scheme/authority before either is ever
+  // set), so this expression cannot carry a host regardless of request-line
+  // form, and neither field carries a query string, so no stripping helper
+  // is needed at all — see requestLogger()'s own comment for the full
+  // derivation.
+  //
+  // Query-string exclusion is still deliberate and load-bearing, not
+  // incidental: SSE call sites (e.g. GET /api/run-room-stream) can't set the
+  // X-Session-Id header the way fetch()-based callers do, so
   // src/lib/session.ts's withSession() instead appends the session id as a
   // `?sessionId=...` query param (see server/lib/session-store.ts's
   // sessionId() precedence-1 comment). A session id is a per-user isolation
   // capability — logging it verbatim, request after request, would let
-  // anyone with log access impersonate that session's Stage. Because
-  // `req.path` structurally excludes the query string, that capability never
-  // reaches a log line today, on this route or any other.
+  // anyone with log access impersonate that session's Stage. Because the
+  // logged `path` structurally excludes the query string, that capability
+  // never reaches a log line today, on this route or any other.
   //
   // Verified with certainty this is the ONLY place in server/** that logs
   // per-request path/URL data: the global error handler below (`path:
-  // req.path`) uses the same pathname-only field, and a repo-wide grep of
+  // req.path`) uses the pathname-only field — deliberately unchanged by this
+  // fix, since it runs after Express has already finished routing (so
+  // req.path there is the top-level, unstripped path in practice) and
+  // touching it is outside this fix's scope — and a repo-wide grep of
   // server/** for `req.url` / `req.originalUrl` turns up exactly one other
   // hit (server/collab/yjs-server.ts, parsing a WS upgrade request's room id
   // and auth token — never logged raw; only the parsed `room` value is
