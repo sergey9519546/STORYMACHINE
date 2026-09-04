@@ -140,6 +140,46 @@
 //   dimensions: clusterCorpus(21 vectors, k=5) = 10.0 ms, findNearestNeighbors
 //   = 1.4 ms, against 613 ms for one doctor run on the same draft.
 //
+// ── CORRECTION (independent re-verification, 2026-09-04) — the block above
+//    is left unedited; this re-runs the same invocation on the same container
+//    and reports what changed. Full report:
+//    docs/audits/2026-09-04-reverification/REVERIFICATION.md.
+//
+//   The AFTER value reproduces (51 vs 60 ms); the BEFORE value does not — the
+//   verifier measured pre-fix /health p95 at 734 ms, not 2,420 ms, so the
+//   improvement is ~12x on this re-run, not ~47x. p95 over ~20 probes is a
+//   single order statistic on a shared, variably-loaded box; reporting it to
+//   four significant figures overstates what one run can support. Read every
+//   figure in the block above as directional, not exact.
+//
+//   The "control moved by 1 ms, which is what says the compare-route number
+//   is the change and not the weather" claim does not survive a second run:
+//   the verifier's own control (/api/scriptide/doctor) moved 42 → 101 ms on
+//   the same container. The weather here is worth tens of ms, not 1 ms — the
+//   1 ms was luck, not a property of the method.
+//
+//   The "compare route's own latency improved too — mean 3,509 → 2,461 ms"
+//   claim is NOT reproduced: the verifier measured it getting SLOWER (mean
+//   3,590 → 4,565 ms) on the same invocation. The event-loop-unblocking claim
+//   (health stops stalling under load) is real and reproduces cleanly; the
+//   route-latency-improved claim does not, and should be treated as false
+//   until re-measured with a design built for it (multiple rounds, reported
+//   with a confidence interval, not a single before/after pair).
+//
+//   The "clusterCorpus + alignVectors" attribution for the residual ~460 ms
+//   /health stall is WRONG. The verifier isolated it with a single-request
+//   probe (no concurrency): the same ~540 ms stall appears, uniformly, on the
+//   FIRST request to a fresh server against /api/export/verify and
+//   /api/export/slate too — neither route touches the vector/cluster path at
+//   all. With the worker pool already warmed by one prior request (payload
+//   still cache-missing), the same routes hold the loop for 6-26 ms. The
+//   residual is worker-pool COLD START on the first request, not
+//   per-request clusterCorpus/alignVectors work — which makes the off-thread
+//   fix better than claimed (the vector work really is cheap, as measured
+//   above) and the stated cause of the residual wrong. Pre-warming the pool
+//   at server boot is the actual fix for the residual; a task exists for it
+//   and is intentionally not implemented as part of this correction.
+//
 // Re-run and update this block (and docs/PATH_TO_EXCELLENCE.md's Phase S
 // notes, if present) after any change to doctor-pool.ts, doctor.ts's
 // aggregation path, the pool sizing env vars (DOCTOR_WORKER_POOL /

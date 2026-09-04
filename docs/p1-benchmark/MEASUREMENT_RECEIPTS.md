@@ -1465,6 +1465,29 @@ is that reports over these fixtures were wrong and had to move.
   A metadata-only contamination predicts exactly that shape; a code regression
   would not produce it.
 
+  > **⚠ Correction (independent re-verification, 2026-09-04) — the summary line
+  > above and this "7 were already 0" clause do not match the table and series
+  > directly above them.** The original text is left unedited; recomputed here.
+  > 1. **"18 of 21 non-synthetic fixtures up, 1 down, 2 flat" is wrong — the
+  >    table above shows 15 up, 1 down, 5 flat.** The five flat rows, already
+  >    in the table above, are `counter-offer` (76.0 → 76.0), `dead-frequency`
+  >    (78.3 → 78.3), `off-season` (71.2 → 71.2), `runoff` (74.6 → 74.6), and
+  >    `p0/sample-script` (78.3 → 78.3). The one down row is `high-voltage`
+  >    (76.1 → 75.4). 21 non-synthetic rows − 1 down − 5 flat = **15 up**, not 18.
+  > 2. **"7 were already 0 there and did not move at all" overstates how many
+  >    of those 7 sat at 0.** The 7 CC0 fixtures with no scene-0 value in the
+  >    before→after series above (`counter-offer`, `dead-frequency`,
+  >    `off-season`, `room-12`, `runoff`, `the-detour`, `transfer-window`) — only
+  >    4 of them (`room-12`, `runoff`, `the-detour`, `transfer-window`) were
+  >    actually at 0. `counter-offer` and `off-season` sat at 1; `dead-frequency`
+  >    sat at 3. The shape claim these two sentences were supporting — the
+  >    series changed at scene index 0 and nowhere else, for exactly the 13
+  >    files listed — is unaffected and still holds.
+  >
+  > Found by an independent re-verification agent re-running this entry's own
+  > commands and re-deriving the table's counts by hand; full report at
+  > `docs/audits/2026-09-04-reverification/REVERIFICATION.md`.
+
 - **Expectations re-locked, and why each new value is right.**
   1. `tests/core/agency-signal.test.ts`'s 20-row `LOCKED_CORPUS_TABLE` — **12 of
      20 rows moved**, all through `peakSceneIdxs`, which is downstream of the

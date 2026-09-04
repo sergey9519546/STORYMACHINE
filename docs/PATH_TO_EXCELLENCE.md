@@ -53,7 +53,15 @@ not the promise that was made.
   deliberately left alone — the app must not reach into an operator's offline
   backups. The E4 safety net went from 8 assertions to 23, enumerating
   IndexedDB instead of assuming its names and byte-searching both on-disk
-  roots.
+  roots. *(Correction, independent re-verification, 2026-09-04: three of the
+  four named survivors — the reset-backup SQLite copy, the collab room/token,
+  and the doctor report cache — were directly confirmed pre-fix and confirmed
+  cleared post-fix by a live rerun. The fourth, "the worker realms," is not
+  separable from the main-thread cache by any observation available from
+  outside the process — a worker-held copy and the main-thread cache both
+  present as the same fast post-delete response time — so it stands as
+  inferred, not independently verified. Full report:
+  `docs/audits/2026-09-04-reverification/REVERIFICATION.md`.)*
 - **One unauthenticated request froze the whole server.** The worker pool
   exists so that a long analysis cannot stall everyone; five export routes —
   including the coverage-letter route added hours earlier — called the doctor
@@ -74,6 +82,16 @@ not the promise that was made.
   are. The raw text lives behind `STORYMACHINE_LOG_WRITER_CONTENT`, off by
   default, documented as unsafe on a deployment holding other people's
   scripts — and the test proves both states, not just the safe one.
+  *(Correction, independent re-verification, 2026-09-04: the fix is right,
+  but the cause is over-attributed to V8 here. V8's own `SyntaxError` snippet
+  is bounded to exactly 10 characters, and only fires when the response does
+  not begin with valid JSON. The verbatim, unbounded leak the audit actually
+  found — a 120-character excerpt of the model's raw output, confirmed
+  reproduced verbatim — came from this codebase's own hand-written `preview:`
+  field in the fallback log line, not from V8's parser. Both leaks are closed
+  by the same fix; the severity described here belongs mostly to the
+  hand-written field. Full report:
+  `docs/audits/2026-09-04-reverification/REVERIFICATION.md`.)*
 - **Some text was invisible, and no one had measured.** The first systematic
   accessibility pass found that `design-system.css` loads after Tailwind, so
   colour utilities meant to override `.sm-title` silently lost — rendering
@@ -97,6 +115,20 @@ Then the follow-ups, and the audits kept earning their keep:
   with a reason: moving the rule index into the workers would have made a
   reported field vary by which worker served the request, to save 1.35 ms.
   The pool guard's allow-list is down to its one permanent exception.
+  *(Correction, independent re-verification, 2026-09-04: the after value
+  reproduces (51 vs. a re-measured 60 ms); the before value and the "control
+  moved 1 ms" precision claim do not. The re-run measured pre-fix `/health`
+  p95 at 734 ms, not 2,420 ms (a ~12x improvement on that run, not ~47x), and
+  its own control moved 42 → 101 ms on the same container — the weather here
+  is worth tens of ms, not 1 ms, so the original 1 ms reading was luck, not a
+  property of the method. p95 over ~20 probes on a shared, variably-loaded
+  box is a single order statistic and does not support four-significant-figure
+  precision; treat every number in this bullet as directional. The
+  event-loop-unblocking effect itself is real and reproduces cleanly; a
+  separate claim that the compare route's own mean latency improved
+  (3,509 → 2,461 ms) is NOT reproduced — the re-run measured it getting
+  slower (mean 3,590 → 4,565 ms). Full report:
+  `docs/audits/2026-09-04-reverification/REVERIFICATION.md`.)*
 - **The keyboard trap is closed at the arrival, not the exit.** Tab-escape now
   arms automatically when focus lands on the editor from a bare Tab keypress
   elsewhere on the page, and never for a click, a jump-to-line, or the
@@ -121,6 +153,33 @@ directory and so died before its first assertion in any git worktree, and the
 privacy sweep asserted that no saved row existed while the editor it had just
 driven was autosaving into that row — a correct 409 failing a wrong
 assertion, visible only under load.
+
+**Independent re-verification, 2026-09-04.** A separate read-only agent
+re-derived every checkable claim in the hardening record above (and in the
+corpus-contamination and advice-audit records elsewhere in this doc set)
+from scratch, on its own pinned `git archive` snapshots of each cited SHA,
+with its own independent harnesses rather than re-running the original
+scripts. Tally: **7 reproduced, 2 partially reproduced, 1 not reproduced**
+(plus one sub-claim — the "worker realms" survivor above — that is not
+observable from outside the process at all). The five dated identity
+receipts checked (compare-route off-thread, Unicode character cues, the R6
+engine-version surface plus its negative control, and both corpus-integrity
+identity checks) **all reproduced verbatim**, byte-identical output and exit
+codes included, with every cited baseline SHA resolving. The corrections
+above (Delete Everything's fourth survivor, the JSON.parse leak's real
+source, and the compare-route latency figures) and in
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`'s 2026-09-04 corpus-integrity
+entry come from this pass; one claim it could not reproduce at all —
+`verify-a11y.mjs`'s "zero serious/critical violations on the audited
+surfaces in both themes" — is not a hardening-record item and is left to the
+agent already correcting that sentence. The verifier's own conclusion, in
+one sentence: the machinery this project built for checkable claims —
+identity receipts, byte-for-byte comparisons, cited SHAs — held up perfectly
+under adversarial re-derivation; every failure it found clusters in two
+places, single-run latency percentiles quoted past the precision a shared,
+variably-loaded box can support, and one accessibility gate that audits a
+surface before its content has finished settling. Full report:
+`docs/audits/2026-09-04-reverification/REVERIFICATION.md`.
 
 **2026-09-04 session — from fixing what was wrong to building what was
 missing.** With the retrospective's twelve findings closed, the owner's brief
