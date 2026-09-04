@@ -60,6 +60,7 @@ The server deliberately boots **without any key** into analysis-only mode (the d
 | `DOCTOR_WORKER_POOL`, `DOCTOR_WORKER_POOL_SIZE` | Optional | Script Doctor worker pool: set `DOCTOR_WORKER_POOL=off` to force the in-process fallback; `DOCTOR_WORKER_POOL_SIZE` overrides the auto-sized 1–2 threads (capped at 4). Defaults are correct for normal deployments. |
 | `COLLAB_MAX_ROOMS` | Optional | Max concurrent Yjs collab rooms (default `200`). |
 | `PORT` | Optional | HTTP port (default `3000`). |
+| `STORYMACHINE_LOG_WRITER_CONTENT` | Optional | Default OFF. On a parse failure or AI error, the generative simulation surface (`server/engine/**`, Labs-only) logs non-reversible descriptors — length, a hash prefix, the parser's own error — never the writer's text or a character's name. Set to `1` to have this deployment's own logs additionally carry the raw text on those branches, for debugging. **Logs writer content — do not enable on a deployment holding other people's scripts.** |
 
 > **Security note:** `.env` is gitignored via `.env*` in `.gitignore`. Only `.env.example` is tracked. Never commit real keys. API keys live only in `.env` and are never serialized to clients — `getPublicConfig()` exposes boolean flags only.
 

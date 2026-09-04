@@ -6,6 +6,7 @@ import { DirectorNode } from './DirectorNode.ts';
 import { CausalSpine } from './CausalSpine.ts';
 import { AppraisalEngine } from './AppraisalEngine.ts';
 import { logger } from '../lib/logger.ts';
+import { idRef } from '../lib/log-redact.ts';
 // Wave 32 — Action↔StoryOp Bridge: unify the live sim with the canon ledger.
 import { buildTurnCommit } from '../nvm/bridge/action-to-ops.ts';
 import type { RelationshipDeltaInput, EmotionAppraisalInput } from '../nvm/bridge/action-to-ops.ts';
@@ -267,7 +268,7 @@ export class Orchestrator {
     const currentLoc = this.locationMap.get(agent.current_location_id);
     if (!currentLoc) return null;
     if (!currentLoc.adjacent_locations.includes(targetLoc.location_id)) {
-      logger.warn('relocation_blocked', { agent: agent.name, target: targetLoc.name });
+      logger.warn('relocation_blocked', { agent: idRef(agent.char_id), target: idRef(targetLoc.location_id) });
       return null;
     }
     return targetLoc;
@@ -603,12 +604,12 @@ export class Orchestrator {
         if (currentSheet?.current_location_id !== location_id) continue;
         if (currentSheet?.is_alive === false) continue;
 
-        logger.debug('agent_turn', { agent: currentSheet.name, location_id });
+        logger.debug('agent_turn', { agent: idRef(currentSheet.char_id), location_id });
         let action: import('./types.ts').NarrativeAction;
         try {
           action = await agent.takeTurn();
         } catch (takeTurnErr) {
-          logger.warn('agent_take_turn_failed', { agent: currentSheet.name, error: (takeTurnErr as Error).message });
+          logger.warn('agent_take_turn_failed', { agent: idRef(currentSheet.char_id), error: (takeTurnErr as Error).message });
           action = { action_type: 'WAIT', content: '(waits)', target: null };
         }
         onProgress?.({ type: 'agent_action', agentId: agentSheet.char_id, agentName: currentSheet.name, action, turnIndex: this.stage.getTurnCount() });
@@ -629,7 +630,7 @@ export class Orchestrator {
             action.target = null;
             const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
             lastActionId = action_id;
-            logger.info('agent_relocated', { agent: currentSheet.name, to: targetLoc.name, fled: action.action_type === 'FLEE' });
+            logger.info('agent_relocated', { agent: idRef(currentSheet.char_id), to: idRef(targetLoc.location_id), fled: action.action_type === 'FLEE' });
             turnCount++;
             break;
           } else if (action.action_type === 'FLEE') {
@@ -776,7 +777,7 @@ export class Orchestrator {
           try {
             epistemicUpdates.push(await agent.updateEpistemics(recentActions));
           } catch (epistemicsErr) {
-            logger.warn('agent_epistemics_failed', { agent: sheet.char_id, error: (epistemicsErr as Error).message });
+            logger.warn('agent_epistemics_failed', { agent: idRef(sheet.char_id), error: (epistemicsErr as Error).message });
           }
         }
         const roundTurnIndexForDeltas = this.stage.getTurnCount();
@@ -1393,6 +1394,12 @@ export class Orchestrator {
     if (mutations.length > 0 || pressures.length > 0) {
       try {
         const agent = this.stage.getAgent(update.char_id);
+        // agentName carries the writer's character name into the beat
+        // trace's narrativeSummary/fountainHint — that's in-game narrative
+        // state (read back by the UI), not a log line, so it stays a name.
+        // The log line below is the one place this must not leak, so it logs
+        // update.char_id (already a technical id, not a display name) rather
+        // than agentName.
         const agentName = agent?.name ?? update.char_id;
         this.spine.createBeatTrace({
           triggerEventId,
@@ -1408,7 +1415,7 @@ export class Orchestrator {
           fountainHint: `${agentName.toUpperCase()} pauses — something doesn't add up. The air between them changes.`,
         });
 
-        logger.info('contradiction_processed', { agent: agentName, edges: edges.length, mutations: mutations.length, pressures: pressures.length });
+        logger.info('contradiction_processed', { agent: idRef(update.char_id), edges: edges.length, mutations: mutations.length, pressures: pressures.length });
       } catch (err) {
         logger.warn('spine_beat_trace_error', { char_id: update.char_id, error: (err as Error).message });
       }

@@ -14,6 +14,7 @@ import type {
   Schema,
 } from '@google/genai';
 import { logger } from '../lib/logger.ts';
+import { describeContent } from '../lib/log-redact.ts';
 // SECURITY (audit H1): the OpenRouter calls in this provider used to hit the
 // GLOBAL fetch() directly, bypassing server/lib/ai-providers/openai-compat.ts's
 // fetchOpenAICompat guard — i.e. they skipped the per-hop SSRF revalidation,
@@ -38,6 +39,22 @@ import { geminiSchemaToJsonSchema } from '../lib/ai-providers/schema.ts';
 // can be swapped for a deterministic fake in tests (the production default is
 // fetchOpenAICompat itself; the test seam is the constructor's optional 2nd arg).
 export type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
+
+// The `.message` deliberately carries only the status, not the response
+// body — see the throw site's comment. `body` is a separate property so a
+// caller that wants to log it must go through describeContent() rather than
+// through the Error's own .message (the field logger.error() would reach
+// for by habit).
+class OpenRouterHttpError extends Error {
+  status: number;
+  body: string;
+  constructor(status: number, body: string) {
+    super(`OpenRouter API error (${status})`);
+    this.name = 'OpenRouterHttpError';
+    this.status = status;
+    this.body = body;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Provider Interfaces (compatible with existing ai.ts)
@@ -256,7 +273,13 @@ export class FreeRideProvider implements AIProvider {
             logger.warn('openrouter_rate_limit', { model, status: response.status });
             continue;
           }
-          throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
+          // PRIVACY: errorText is OpenRouter's own response body — on a
+          // content-policy rejection some providers echo a fragment of the
+          // request (the writer's prompt) back in it. Never let it reach a
+          // thrown Error's .message, which the catch block below logs
+          // directly; carry it on a typed error instead so the log line can
+          // describe it through the sanctioned content-logging seam.
+          throw new OpenRouterHttpError(response.status, errorText);
         }
         
         const data = await response.json();
@@ -288,7 +311,10 @@ export class FreeRideProvider implements AIProvider {
         if (signal?.aborted || (error as Error)?.name === 'AbortError') throw error;
         logger.error('openrouter_model_error', {
           model,
-          error: (error as Error).message
+          error: (error as Error).message,
+          ...(error instanceof OpenRouterHttpError
+            ? { status: error.status, body: describeContent(error.body) }
+            : {}),
         });
         // Try next fallback
         continue;

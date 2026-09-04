@@ -9,6 +9,7 @@ import type { Stage } from '../Stage.ts';
 import type { Belief, BeliefSource, Goal, GoalStack, GoalMutation } from '../types.ts';
 import { safeJsonParse } from '../../lib/json.ts';
 import { logger } from '../../lib/logger.ts';
+import { describeContent, idRef } from '../../lib/log-redact.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { getReadyGoals } from './psychology.ts';
 
@@ -58,8 +59,9 @@ export async function synthesizeReflectionsFor(charId: string, stage: Stage): Pr
         required: ['reflections'],
       },
     },
-  }, { label: `synthesizeReflections:${sheet.name}`, timeoutMs: 20_000 }).catch(err => {
-    logger.error('agent_ai_error', { agent: sheet.name, method: 'synthesizeReflections', message: (err as Error).message });
+  // PRIVACY: label is a debug correlator, not a display string.
+  }, { label: `synthesizeReflections:${idRef(charId)}`, timeoutMs: 20_000 }).catch(err => {
+    logger.error('agent_ai_error', { agent: idRef(charId), method: 'synthesizeReflections', message: (err as Error).message });
     return null;
   });
 
@@ -70,7 +72,7 @@ export async function synthesizeReflectionsFor(charId: string, stage: Stage): Pr
     { reflections: [] },
   );
   if (!parsed.reflections?.length && reflRaw.length > 10) {
-    logger.warn('agent_parse_fallback', { agent: sheet.name, method: 'synthesizeReflections', preview: reflRaw.substring(0, 120) });
+    logger.warn('agent_parse_fallback', { agent: idRef(charId), method: 'synthesizeReflections', preview: describeContent(reflRaw) });
   }
 
   // Re-read the sheet after the async LLM call — beliefs may have been updated
@@ -93,7 +95,7 @@ export async function synthesizeReflectionsFor(charId: string, stage: Stage): Pr
 
   if (reflectionBeliefs.length > 0) {
     stage.addBeliefs(charId, reflectionBeliefs);
-    logger.info('agent_reflection', { agent: sheet.name, new_insights: reflectionBeliefs.length });
+    logger.info('agent_reflection', { agent: idRef(charId), new_insights: reflectionBeliefs.length });
   }
 }
 
@@ -153,8 +155,8 @@ export async function replanGoalsFor(
         required: ['new_subgoals'],
       },
     },
-  }, { label: `replanGoals:${sheet.name}`, timeoutMs: 20_000 }).catch(err => {
-    logger.warn('goal_replan_error', { agent: sheet.name, message: (err as Error).message });
+  }, { label: `replanGoals:${idRef(charId)}`, timeoutMs: 20_000 }).catch(err => {
+    logger.warn('goal_replan_error', { agent: idRef(charId), message: (err as Error).message });
     return null;
   });
 
@@ -193,5 +195,5 @@ export async function replanGoalsFor(
   }
   gsCopy.last_planned_at = turnIndex;
   stage.updateGoalStack(charId, gsCopy);
-  logger.info('goal_replan', { agent: sheet.name, newGoals: raw.new_subgoals?.length ?? 0 });
+  logger.info('goal_replan', { agent: idRef(charId), newGoals: raw.new_subgoals?.length ?? 0 });
 }

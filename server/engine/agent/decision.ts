@@ -20,6 +20,7 @@ import type {
 import type { Stage } from '../Stage.ts';
 import { safeJsonParse } from '../../lib/json.ts';
 import { logger } from '../../lib/logger.ts';
+import { describeContent, idRef } from '../../lib/log-redact.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { retrieveBeliefs } from '../../lib/memory.ts';
 import { buildStoryBibleSummary } from '../../nvm/bible/index.ts';
@@ -345,10 +346,11 @@ export async function selectBestAction(
         required: ['candidates'],
       },
     },
-  }, { label: `takeTurn:${sheet.name}`, timeoutMs: 30_000 }).catch(err => {
+  // PRIVACY: label is a debug correlator, not a display string.
+  }, { label: `takeTurn:${idRef(sheet.char_id)}`, timeoutMs: 30_000 }).catch(err => {
     const e = err as Error;
     logger.error('agent_ai_error', {
-      agent: sheet.name,
+      agent: idRef(sheet.char_id),
       method: 'takeTurn',
       error_type: e.message.includes('timeout') ? 'timeout' : 'upstream',
       message: e.message,
@@ -365,11 +367,11 @@ export async function selectBestAction(
     { candidates: [{ action_type: 'SPEAK', content: '', target: null }] },
   );
   if (!raw.candidates?.length) {
-    logger.error('agent_empty_candidates', { agent: sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
+    logger.error('agent_empty_candidates', { agent: idRef(sheet.char_id), method: 'takeTurn', preview: describeContent(rawText) });
     return null;
   }
   if (!raw.candidates[0]?.content) {
-    logger.warn('agent_parse_fallback', { agent: sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
+    logger.warn('agent_parse_fallback', { agent: idRef(sheet.char_id), method: 'takeTurn', preview: describeContent(rawText) });
   }
 
   const dt = sheet.darkTriad ?? { machiavellianism: 50, narcissism: 50, psychopathy: 50 };

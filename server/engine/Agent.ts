@@ -18,6 +18,7 @@ import type {
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
+import { describeContent, idRef } from '../lib/log-redact.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { consolidateBeliefs, decayBeliefConfidence } from '../lib/memory.ts';
 import { detectSemanticContradictions } from '../lib/embeddings.ts';
@@ -249,10 +250,12 @@ Based on what you just witnessed:
           required: ['newSuspicionScore', 'newBeliefs', 'updatedTheoryOfMind', 'contradiction_detected', 'contradicted_propositions'],
         },
       },
-    }, { label: `updateEpistemics:${this.sheet.name}`, timeoutMs: 30_000 }).catch(err => {
+    // PRIVACY: the label is a debug correlator, not a display string — it
+    // must never carry the writer's character name (see idRef()'s doc).
+    }, { label: `updateEpistemics:${idRef(this.sheet.char_id)}`, timeoutMs: 30_000 }).catch(err => {
       const e = err as Error;
       logger.error('agent_ai_error', {
-        agent: this.sheet.name,
+        agent: idRef(this.sheet.char_id),
         method: 'updateEpistemics',
         error_type: e.message.includes('timeout') ? 'timeout' : 'upstream',
         message: e.message,
@@ -282,7 +285,7 @@ Based on what you just witnessed:
       : buildDeterministicEpistemics(this.sheet, observableActions, otherAgentsInRoom);
     const usedDeterministicFallback = !response;
     if (response && !result.newBeliefs?.length && epistemicsRawText.length > 10) {
-      logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'updateEpistemics', preview: epistemicsRawText.substring(0, 120) });
+      logger.warn('agent_parse_fallback', { agent: idRef(this.sheet.char_id), method: 'updateEpistemics', preview: describeContent(epistemicsRawText) });
     }
 
     // ── Update suspicion ──
@@ -348,7 +351,7 @@ Based on what you just witnessed:
           }
         }
       } catch (embedErr) {
-        logger.warn('semantic_contradiction_skipped', { agent: this.sheet.name, reason: (embedErr as Error).message });
+        logger.warn('semantic_contradiction_skipped', { agent: idRef(this.sheet.char_id), reason: (embedErr as Error).message });
         // Continue with undetected semantic contradictions — Jaccard-based detection still ran above.
       }
     }
@@ -538,7 +541,7 @@ Based on what you just witnessed:
             });
           }
           this._replanAttempts = 0;
-          logger.warn('goal_deadlock_force_clear', { agent: this.sheet.name });
+          logger.warn('goal_deadlock_force_clear', { agent: idRef(this.sheet.char_id) });
         }
       } else {
         this._replanAttempts = 0;  // reset counter when goals are not blocked
@@ -550,7 +553,7 @@ Based on what you just witnessed:
     if (turnCount > 0 && turnCount % 5 === 0 && !this._reflectionInFlight) {
       this._reflectionInFlight = true;
       this.synthesizeReflections()
-        .catch(e => logger.warn('agent_reflection_error', { agent: this.sheet.name, message: (e as Error).message }))
+        .catch(e => logger.warn('agent_reflection_error', { agent: idRef(this.sheet.char_id), message: (e as Error).message }))
         .finally(() => { this._reflectionInFlight = false; });
     }
 

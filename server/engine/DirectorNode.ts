@@ -4,6 +4,7 @@ import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpda
 import { safeJsonParse } from '../lib/json.ts';
 import { randomUUID } from 'crypto';
 import { logger } from '../lib/logger.ts';
+import { describeContent, idRef } from '../lib/log-redact.ts';
 import { getModel, generateContent } from './ai.ts';
 import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import { analyzeSubtext } from '../lib/subtext-meter.ts';
@@ -69,7 +70,11 @@ export class DirectorNode {
         if (!target) continue;
         const newScore = Math.max(0, Math.min(100, target.suspicion_score + update.delta));
         this.stage.updateAgentSuspicion(update.char_id, newScore);
-        logger.info('suspicion_update', { agent: target.name, delta: update.delta, score: newScore, reason: update.reason });
+        // `reason` is the Director LLM's own sentence about WHY suspicion
+        // moved — generated text that paraphrases this specific scene (e.g.
+        // "lied about being in the vault"), so it is exactly the "LLM output
+        // about the writer's story" this module exists to keep out of logs.
+        logger.info('suspicion_update', { agent: idRef(target.char_id), delta: update.delta, score: newScore, reason: describeContent(update.reason) });
       }
     }
 
@@ -558,7 +563,10 @@ From ${sObserverName}'s perspective only:
         expires_at_turn: totalTurns + 2,
         applied: false,
       });
-      logger.info('stuck_pressure_emitted', { agent: agent.name, location_id, exits: exitNames });
+      // exitNames are location display names (writer content) — reduce to a
+      // count plus per-name refs so the same exit set still correlates
+      // across log lines without revealing what any location is called.
+      logger.info('stuck_pressure_emitted', { agent: idRef(agent.char_id), location_id, exitCount: exitNames.length, exits: exitNames.map(idRef) });
     }
   }
 
@@ -681,7 +689,7 @@ From ${sObserverName}'s perspective only:
           expires_at_turn: totalTurns + 4,
           applied: false,
         });
-        logger.info('consistency_contradiction', { agent: agent.name, count: contradicted.length });
+        logger.info('consistency_contradiction', { agent: idRef(agent.char_id), count: contradicted.length });
       }
 
       // ── Goal/personality coherence ──
@@ -702,7 +710,7 @@ From ${sObserverName}'s perspective only:
             expires_at_turn: totalTurns + 3,
             applied: false,
           });
-          logger.info('conscience_pressure', { agent: agent.name, deceptionGoals: deceptionGoals.length });
+          logger.info('conscience_pressure', { agent: idRef(agent.char_id), deceptionGoals: deceptionGoals.length });
         }
       }
 
@@ -719,7 +727,7 @@ From ${sObserverName}'s perspective only:
           expires_at_turn: totalTurns + 2,
           applied: false,
         });
-        logger.info('goal_overload', { agent: agent.name, activeCount });
+        logger.info('goal_overload', { agent: idRef(agent.char_id), activeCount });
       }
     }
   }
@@ -761,7 +769,7 @@ From ${sObserverName}'s perspective only:
         applied: false,
       });
 
-      logger.info('belief_edge_confront', { agent: agent.name, severity: worst.severity, style: state.director_style ?? 'none' });
+      logger.info('belief_edge_confront', { agent: idRef(agent.char_id), severity: worst.severity, style: state.director_style ?? 'none' });
     }
   }
 
@@ -820,7 +828,9 @@ From ${sObserverName}'s perspective only:
         const activeStakes = this.stage.getActiveStakes(charId);
         for (const s of activeStakes) {
           this.stage.resolveStakes(s.id, 'won', currentTurn);
-          logger.info('stakes_resolved', { agent: agent.name, stakes: s.description, outcome: 'won' });
+          // Stakes.description is writer- or Director-authored narrative
+          // prose (types.ts: "e.g. 'Will lose custody of her daughter'").
+          logger.info('stakes_resolved', { agent: idRef(agent.char_id), stakes: describeContent(s.description), outcome: 'won' });
         }
         continue;
       }
@@ -844,7 +854,7 @@ From ${sObserverName}'s perspective only:
           expires_at_turn: currentTurn + 3,
           applied: false,
         });
-        logger.info('stakes_pressure', { agent: agent.name, stakes: s.description, pressureType, magnitude: s.magnitude });
+        logger.info('stakes_pressure', { agent: idRef(agent.char_id), stakes: describeContent(s.description), pressureType, magnitude: s.magnitude });
       }
     }
   }
@@ -904,7 +914,9 @@ From ${sObserverName}'s perspective only:
         applied: false,
       });
     }
-    logger.info('beat_compliance_redirect', { phase, avoid: activeBeat.avoid.slice(0, 60), violations: violations.length, turn: turnIndex });
+    // activeBeat.avoid is a writer-authored outline beat field
+    // (types.ts OutlineBeat: "Writer-authored beat sheet").
+    logger.info('beat_compliance_redirect', { phase, avoid: describeContent(activeBeat.avoid), violations: violations.length, turn: turnIndex });
   }
 
   // Resolves the actual origin turn of each unexposed lie via its EventCard —
