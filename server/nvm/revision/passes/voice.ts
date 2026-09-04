@@ -525,11 +525,14 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { fastWordCount } from '../../../lib/string-utils.ts';
+// Title page and boneyard comments are masked to blank lines in every raw-line
+// scanner below (line numbers preserved) — see maskNonScreenplayLines.
+import { maskNonScreenplayLines } from '../../../../src/lib/fountain.ts';
 import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action line word frequency per scene */
 function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>> {
-  const lines = fountain.split('\n');
+  const lines = maskNonScreenplayLines(fountain);
   const sceneFreqs = new Map<number, Map<string, number>>();
   let sceneIdx = -1;
   let isDialogue = false;
@@ -580,7 +583,7 @@ interface CharacterVoiceProfile {
 
 /** Build per-character dialogue vocabulary profiles from fountain text. */
 function buildCharacterVoiceProfiles(fountain: string): Map<string, CharacterVoiceProfile> {
-  const lines = fountain.split('\n');
+  const lines = maskNonScreenplayLines(fountain);
   const profiles = new Map<string, CharacterVoiceProfile>();
   let currentChar: string | null = null;
   let inDialogue = false;
@@ -861,7 +864,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
   // ── Wave 160: Passive voice, interior leak, qualifier overload ──────────────
 
   // Scan action lines from the fountain (separate from dialogue).
-  const allLines = fountain.split('\n');
+  const allLines = maskNonScreenplayLines(fountain);
   const actionOnlyLines: string[] = [];
   let inDialogueBlock = false;
   for (const line of allLines) {
@@ -1227,7 +1230,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
   // and makes the read feel mechanically assembled. Requires 8+ scenes.
   if (records.length >= 8) {
     const openerLines224: string[] = [];
-    const fountainLines224 = fountain.split('\n');
+    const fountainLines224 = maskNonScreenplayLines(fountain);
     let inSceneOpener224 = false;
     for (const line of fountainLines224) {
       const t224 = line.trim();

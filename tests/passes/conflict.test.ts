@@ -7397,7 +7397,10 @@ describe('conflictPass — NO_REVERSALS_LONG_STORY honesty hedge (pilot session 
     const longStory = result.issues.filter(i => i.rule === 'NO_REVERSALS_LONG_STORY');
     assert.ok(longStory.length >= 1, 'NO_REVERSALS_LONG_STORY must still fire when reversalDensity is 0 on an 8+ scene story');
     assert.equal(longStory[0].severity, 'critical', 'severity must stay critical — only the wording changed');
-    assert.match(longStory[0].description, /suspenseDelta < -1/, 'must name the exact signal being measured');
+    // 2026-09-04: see the sibling assertion in tests/passes/structure.test.ts — the
+    // disclosed predicate moved to `<= -1`; what must hold (that the finding names the
+    // exact signal it measured, rather than making a flat craft claim) is unchanged.
+    assert.match(longStory[0].description, /suspenseDelta ≤ -1/, 'must name the exact signal being measured');
     assert.match(longStory[0].description, /betrayal|broken deal|backfir/i, 'must name what the signal cannot see');
     assert.ok(
       !/^An 8\+ scene story with zero dramatic reversals lacks conflict texture$/.test(longStory[0].description),

@@ -3,7 +3,8 @@
 // ── What this is ─────────────────────────────────────────────────────────
 // docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md D3: `structure.reversalCount`
 // (server/nvm/screenplay/structure.ts) is defined ONLY as scenes with
-// `suspenseDelta < -1` — a magnitude dip in the danger/relief lexicon. A
+// a suspense dip (screenplay/suspense-dip.ts) — a magnitude dip in the
+// danger/relief lexicon. A
 // revelation-type reversal (the detective is the mole; the ally was the
 // betrayer) never registers on that channel, so NO_REVERSALS_LONG_STORY
 // (server/nvm/revision/passes/conflict.ts) and NO_REVERSALS
@@ -134,6 +135,7 @@
 // and structure.ts before it, never performs that conversion itself.
 
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
+import { countSuspenseDips } from '../screenplay/suspense-dip.ts';
 
 export type ReversalKind = 'revelation_allegiance' | 'relationship_swing';
 
@@ -161,10 +163,10 @@ export interface ReversalDetectionResult {
 
 export interface ReversalDeltaResult {
   /** Reproduces structure.ts's reversalCountEarly / conflict.ts's
-   *  reversalCount210 definition EXACTLY: `suspenseDelta < -1`, one count per
-   *  scene, no allegiance/identity awareness. This is the CURRENT production
-   *  definition (structure.reversalCount) — see legacySuspenseDipCount below
-   *  for why it is reproduced rather than imported. */
+   *  reversalCount210 definition EXACTLY (both now read the shared predicate
+   *  in screenplay/suspense-dip.ts), one count per scene, no allegiance/
+   *  identity awareness. This is the CURRENT production definition
+   *  (structure.reversalCount). */
   legacyCount: number;
   /** detectReversals(records).reversalCount — see that function. */
   detectedCount: number;
@@ -436,19 +438,20 @@ export function detectReversals(
 }
 
 /** Reproduces structure.ts's `reversalCountEarly` / conflict.ts's
- *  `reversalCount210` definition exactly (`suspenseDelta < -1`, one count per
- *  scene). Deliberately duplicated here rather than imported from
- *  structure.ts: that module doesn't export a standalone function for this
- *  one-line predicate (it's inlined at both call sites), and importing
- *  structure.ts here for a single filter predicate would create a needless
- *  coupling from an unwired diagnostic module into the live scoring path
- *  this module explicitly does not touch. If the legacy definition ever
- *  changes, this line and both structure.ts/conflict.ts call sites must
- *  change together — there is no single source of truth for it today, which
- *  is a pre-existing property of the codebase this module inherits rather
- *  than introduces. */
+ *  `reversalCount210` definition, one count per scene.
+ *
+ *  2026-09-04: the single source of truth this comment used to say did not
+ *  exist now does — `screenplay/suspense-dip.ts` — and all three call sites
+ *  (structure.ts, conflict.ts, this one) read it instead of each re-spelling
+ *  the predicate. That module also carries the measurement that fixed the
+ *  threshold: the old `suspenseDelta < -1` spelling is `<= -2` on an integer
+ *  channel and was reached by 0 of the 42 scripts the repository ships, so
+ *  every rule built on it was a constant. Importing a 30-line leaf module
+ *  with no dependencies of its own does not create the coupling the previous
+ *  comment (correctly) refused: this file stays unwired from the scoring
+ *  path, it just no longer owns a duplicate of the definition. */
 function legacySuspenseDipCount(records: ScreenplaySceneRecord[]): number {
-  return records.filter(r => r.suspenseDelta < -1).length;
+  return countSuspenseDips(records);
 }
 
 /**

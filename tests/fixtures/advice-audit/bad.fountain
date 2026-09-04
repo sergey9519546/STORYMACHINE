@@ -1,0 +1,253 @@
+Title: The Big Account
+Author: Audit Fixture
+
+/*
+PROVENANCE. Original work written for this repository as a test fixture, 2026-09-04,
+during the advice-quality audit (docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md). Not
+derived from any published screenplay. Dedicated to the public domain under CC0 1.0.
+
+ROLE. The POSITIVE fixture of a matched pair. Deliberately badly made at 10 scenes /
+~1,053 words, matched to excellent.fountain on scene count and length: every character
+states their feeling outright, the protagonist is passive throughout, scene 2 repeats
+scene 1's conversation, nothing turns, and the problem resolves offstage.
+
+Written in ORDINARY BAD ENGLISH on purpose. The calibration corpus's troubled band is
+authored in the exact phrasings dialogue.ts and originality.ts already flag ("I feel so
+X, honestly", "Trust me on this"), so band-ordering tests there confirm the rules
+against text written from the rules. This fixture trips none of those set phrases, which
+is why it went undetected: it produced ZERO ON_THE_NOSE findings until the density gate
+moved script-wide and the filler slot widened past a five-adverb whitelist.
+
+Lines this fixture exists to protect:
+  * "I am worried about the big presentation today, Karen."
+  * "Yes, I am still worried about the presentation."   (`still` -- the whitelist miss)
+  * "I am very relieved."   /   "I am glad it all worked out."
+Do not "improve" any of those lines; each is load-bearing for a specific regression.
+*/
+
+INT. OFFICE - MORNING
+
+A big modern office with many desks. DAN MERCER, 31, sits at his desk looking worried. His coworker KAREN LOWE, 40s, walks up to him holding a coffee.
+
+KAREN
+Good morning, Dan. You look worried about the big presentation today.
+
+DAN
+I am worried about the big presentation today, Karen. If we lose the Halloran account, the company could be in serious trouble and I could lose my job.
+
+KAREN
+That is true. The presentation is at four o'clock this afternoon. That gives us plenty of time to get ready.
+
+DAN
+I hope so. I have been working at this company for nine years and I have never felt this nervous.
+
+KAREN
+You will be fine, Dan. You always are.
+
+INT. OFFICE - BREAK ROOM - MORNING
+
+Dan pours a cup of coffee sadly. Karen comes in behind him.
+
+KAREN
+Are you still worried about the presentation?
+
+DAN
+Yes, I am still worried about the presentation. I think we might lose the Halloran account.
+
+KAREN
+Try not to worry so much. Worrying does not help anybody.
+
+DAN
+You are probably right. But I cannot help it. I am a worrier. My father was a worrier too.
+
+KAREN
+Family is complicated.
+
+DAN
+Yes. Family is complicated.
+
+INT. OFFICE - MR. HALL'S OFFICE - MORNING
+
+MR. HALL, 60s, the boss, sits behind a large desk. Dan stands in front of it nervously.
+
+MR. HALL
+Dan, I called you in here because I want to talk to you about the Halloran account. It is the most important account this company has ever had.
+
+DAN
+I understand, sir.
+
+MR. HALL
+If we lose it, we will have to make cuts. I do not want to make cuts. Nobody wants to make cuts.
+
+DAN
+I will do my best, sir.
+
+MR. HALL
+That is all I ask. Do your best.
+
+Dan nods and leaves the office quietly.
+
+INT. OFFICE - DAN'S DESK - MIDDAY
+
+Dan sits at his desk and stares at his computer screen. He opens the presentation file and looks at the slides. There are twelve slides. He reads all of them.
+
+Karen walks by again.
+
+KAREN
+How are the slides?
+
+DAN
+The slides are fine. I think the slides are good.
+
+KAREN
+Good.
+
+DAN
+I added a chart to slide six. It shows the revenue over the last three years.
+
+KAREN
+A chart is a good idea. People like charts.
+
+DAN
+I hope Ms. Halloran likes charts. I have never met her before today.
+
+KAREN
+She is supposed to be very direct. That is what everyone says about her.
+
+DAN
+Direct is fine. I would rather have direct than the other thing.
+
+KAREN
+I agree with you about that.
+
+INT. OFFICE - CONFERENCE ROOM - AFTERNOON
+
+Dan practices the presentation alone in the empty conference room. He clicks through the slides one at a time and says the words out loud.
+
+DAN
+Thank you all for coming. Halloran Industries has been a leader in its field for thirty years. We believe our proposal will help you grow.
+
+He stops and shakes his head.
+
+DAN (CONT'D)
+That was not very good. I need to practice more.
+
+He starts again from the beginning.
+
+INT. OFFICE - HALLWAY - AFTERNOON
+
+Karen finds Dan in the hallway. He looks tired.
+
+KAREN
+There you are. I have been looking for you everywhere. It is almost time.
+
+DAN
+I know. I am not ready.
+
+KAREN
+Nobody is ever ready. That is just how it is.
+
+DAN
+I suppose that is true.
+
+KAREN
+Come on. Let us go.
+
+DAN
+Do you think Mr. Hall is going to be in the room?
+
+KAREN
+He said he would be. He wants to show his support for the team.
+
+DAN
+That will make me more nervous, honestly.
+
+KAREN
+Try to think of it as a good thing. He believes in you.
+
+DAN
+I will try to think of it that way. I do not know if it will work.
+
+KAREN
+It is worth a try either way.
+
+They walk down the hallway together.
+
+INT. OFFICE - CONFERENCE ROOM - AFTERNOON
+
+The room is full now. MS. HALLORAN, 50s, sits at the head of the table with two ASSISTANTS. Mr. Hall sits beside her. Dan stands at the front and begins the presentation.
+
+DAN
+Thank you all for coming. Halloran Industries has been a leader in its field for thirty years. We believe our proposal will help you grow.
+
+MS. HALLORAN
+Go on.
+
+DAN
+Our team has prepared a full plan covering the first three quarters. We are confident in it.
+
+Ms. Halloran writes something on her notepad. Dan keeps going through the slides. The presentation takes forty minutes.
+
+INT. OFFICE - CONFERENCE ROOM - LATER
+
+The presentation is over. Everyone is quiet. Ms. Halloran closes her notepad.
+
+MS. HALLORAN
+That was a very thorough presentation. I appreciate the effort your team put into it.
+
+MR. HALL
+We appreciate you giving us the opportunity.
+
+MS. HALLORAN
+We will be in touch soon with our decision.
+
+She stands up and shakes hands with everybody. Then she leaves with her assistants.
+
+INT. OFFICE - DAN'S DESK - EVENING
+
+Dan sits at his desk. The office is mostly empty. Karen comes over with her coat on.
+
+KAREN
+You did a good job in there.
+
+DAN
+Thank you. I still do not know if we got the account.
+
+KAREN
+We will find out eventually. There is nothing more we can do tonight.
+
+DAN
+That is true. There is nothing more we can do tonight.
+
+KAREN
+Go home, Dan. Get some sleep.
+
+DAN
+I will. Good night, Karen.
+
+KAREN
+Good night, Dan.
+
+INT. OFFICE - MORNING
+
+The next morning. Dan comes in and sits at his desk. Mr. Hall walks over with a piece of paper in his hand.
+
+MR. HALL
+Dan, I have news about the Halloran account.
+
+DAN
+What is the news, sir?
+
+MR. HALL
+They have decided to go with us. We got the account.
+
+DAN
+That is wonderful news, sir. I am very relieved.
+
+MR. HALL
+You should be proud of yourself, Dan. You did well.
+
+DAN
+Thank you, sir. I am glad it all worked out.
+
+Mr. Hall walks away. Dan smiles and goes back to work. Karen looks over at him and smiles too.

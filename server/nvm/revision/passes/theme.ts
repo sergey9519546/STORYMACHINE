@@ -534,6 +534,7 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkDroughtRun, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { isSuspenseDip } from '../../screenplay/suspense-dip.ts';
 
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -738,7 +739,8 @@ export async function themePass(input: PassInput): Promise<PassResult> {
     // THEME_NO_DIALECTIC — the theme is echoed throughout but never CHALLENGED.
     // A theme without a counterargument is propaganda. We approximate the presence
     // of a counterargument by checking whether any thematic scene also carries a
-    // negative emotional shift or a reversal (suspenseDelta < -1) — i.e. a moment
+    // negative emotional shift or a reversal (a suspense dip, see screenplay/suspense-dip.ts)
+    // — i.e. a moment
     // where the theme's value is questioned or fails the character. If every
     // theme-resonant scene is emotionally neutral/positive, the theme is unchallenged.
     const resonantScenes = records.filter(r =>
@@ -746,7 +748,7 @@ export async function themePass(input: PassInput): Promise<PassResult> {
     );
     if (resonantScenes.length >= 3) {
       const hasChallenge = resonantScenes.some(r =>
-        r.emotionalShift === 'negative' || r.suspenseDelta < -1,
+        r.emotionalShift === 'negative' || isSuspenseDip(r.suspenseDelta),
       );
       if (!hasChallenge) {
         issues.push({
@@ -848,10 +850,10 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       const act3Resonant = resonantScenes.filter(r => r.sceneIdx >= act3ZoneStart);
 
       const act2HasChallenge = act2Resonant.some(r =>
-        r.emotionalShift === 'negative' || r.suspenseDelta < -1,
+        r.emotionalShift === 'negative' || isSuspenseDip(r.suspenseDelta),
       );
       const act3HasChallenge = act3Resonant.some(r =>
-        r.emotionalShift === 'negative' || r.suspenseDelta < -1,
+        r.emotionalShift === 'negative' || isSuspenseDip(r.suspenseDelta),
       );
 
       if (act2HasChallenge && !act3HasChallenge && act3Resonant.length >= 1) {

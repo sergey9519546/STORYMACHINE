@@ -1556,3 +1556,117 @@ is that reports over these fixtures were wrong and had to move.
   provenance header produces, and precisely the pattern the 20 in-repo fixtures
   showed before this fix (9 of 20 peaking at scene 1 alone, 0 of 20 after).
   That competing explanation has never been ruled out."
+
+---
+
+### 2026-09-04 — advice-rule fixes (six measured detector defects) — **PENDING OWNER MEASUREMENT**
+
+- **What this entry is.** An honest ledger row for a scoring change whose
+  real-corpus measurement has NOT been run. It is a promise, not a receipt.
+  `scripts/check-scoring-receipt.mjs` is built to refuse a PENDING entry as
+  satisfying a range's requirement, and it refuses this one: running
+  `node scripts/check-scoring-receipt.mjs main..HEAD` on this branch exits
+  non-zero and names this entry. That is the intended state. The branch is
+  not mergeable until the owner measures and files a superseding entry.
+
+- **What changed, and why it is a scoring change.** Six defects from the
+  2026-09-04 advice-quality audit, written up in full with before/after
+  evidence in `docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md`:
+  1. the suspense-dip reversal predicate was `< -1` on an integer channel,
+     i.e. `<= -2`, reached by **0 of the 42 scripts this repository ships** —
+     `NO_REVERSALS` (major) and `NO_REVERSALS_LONG_STORY` (critical, 4x
+     health weight) were constants. Corrected to `<= -1` across 29 executable
+     call sites behind one new definition, `server/nvm/screenplay/suspense-dip.ts`;
+  2. `ON_THE_NOSE` could not fire on a script written entirely on the nose
+     (five-adverb filler whitelist + per-scene density gate);
+  3. `AS_YOU_KNOW_BOB` fired on a line REFUSING exposition, and
+     `SYCOPHANTIC_AGREEMENT`'s entire measured output across 42 scripts was
+     one false positive on the deliberately-excellent fixture;
+  4. `DANGER_TENSION_WORDS` read `run/runs/running`, `shot/shots` and `dark`
+     as physical peril (measured: `dark` 0/15 peril readings, `run*` 1/27,
+     and one of the six `shot` hits is a CAMERA shot);
+  5. three findings printed facts the script contradicts (a dialogue-cue
+     count rendered as a scene count, a dialogue line cited as an action
+     line, a timestamp cited as a dramatic-reveal colon);
+  6. `wordCount` — the health density denominator — counted boneyard words,
+     and `parseFountain` had no title-page handling at all. Both were named
+     as unfixed residuals by the 2026-09-04 corpus-contamination correction
+     above; this range fixes them, and also fixes the raw-line scanners in
+     `voice.ts` and `originality.ts` that were still reading the boneyard as
+     prose (measured: 23 distinct rules changed count when the boneyard was
+     removed; after the fix, zero).
+
+- **Date:** 2026-09-04 (the code change; **no measurement was run on this
+  date or any other**).
+- **Git SHA:** the branch tip of `worktree-agent-a37bc80df64444bd7`, rebased
+  on `main` at `c21fdc5b494e6431c679763e525fc12e759183d8`.
+- **Command:** none. No real-corpus command was run. `npm run measure-real`
+  was NOT executed; `measure-auc-split.mjs` was NOT executed;
+  `REAL_SCRIPT_CORPUS_DIR` was never set in this session and appears nowhere
+  in this range.
+- **Measured AUC-24:** **PENDING** — not measured. No AUC number is claimed,
+  estimated, or carried forward from a prior entry.
+- **Flag-run AUCs:** **PENDING** — none.
+- **Corpus fingerprint:** no real-corpus text was read; this container has no
+  copy of it. The inputs actually measured are the 20 tracked CC0 fixtures
+  (`cat data/screenplays/*.fountain | sha256sum` =
+  `1f967ce496be043d50c72fef29f0b6ac675388d6c1488f1b91f71a9025f0702c`,
+  unchanged by this range), the 20 calibration `REFERENCE_CORPUS` samples,
+  and two new matched fixtures added by this range
+  (`cat tests/fixtures/advice-audit/bad.fountain tests/fixtures/advice-audit/excellent.fountain | sha256sum`
+  = `c5477655be77a37972801944e6f7764ca837c07421d422ab5246ce4f6315c55b`).
+  `tests/fixtures/real-corpus-manifest.json` is **unchanged by this range and
+  is owed a re-lock** — this change moves health on 38 of the 45 in-repo
+  report fixtures, so it will move produced scripts too, and only the owner
+  can re-measure it.
+
+- **What WAS measured here, in-repo, and can be re-derived by anyone.**
+  - `check-doctor-output-identity.mjs` against `git archive main`:
+    `OUTPUT IDENTITY: FAIL — 45 fixture(s) differ`. 38 moved on
+    health/verdict/sceneCount/issue count, **3 changed verdict** (calibration
+    `Reasonable Doubt` 53.2 -> 60.6, `Second Wind` 58.2 -> 63.1, `The Visit`
+    55.0 -> 61.2, all PASS -> CONSIDER), **0 changed sceneCount**. Largest
+    moves: `room-12` 33.5 -> 0.0 and `transfer-window` 31.9 -> 15.4 (both
+    denominator-only: 21% and 17% of their word counts were licence text),
+    `Adrift` 31.8 -> 44.7, `Merge` 20.9 -> 31.5, `The Grift` 17.6 -> 12.4.
+  - Calibration band averages: strong 62.4 -> 65.6, competent 52.5 -> 58.2,
+    weak 42.1 -> 45.5, troubled 37.1 -> 40.3. Strict band monotonicity holds
+    and `tests/core/calibration.test.ts` passes unchanged, but the
+    strong-to-competent gap NARROWED from 9.9 to 7.4 — recorded because it is
+    a mild degradation of the calibration corpus's separation and nothing was
+    retuned to hide it.
+  - `npm run test:metamorphic`: 6/7 raw, 6 hard passes, the one documented
+    known-failing witness (`empty_verbosity`, delta 5.60) unchanged from
+    baseline. Hard invariants hold.
+  - `npm test`: 11767 tests, 0 failures, 91 skipped (baseline before the
+    change: 11736 / 0 / 91). `npm run lint`, `npm run build`,
+    `npm run check-no-console`, `npm run check-server-reachability`,
+    `npm run check-docs` and `npm run honesty-audit` all exit 0.
+
+- **What this change makes WORSE, stated because it is a cost of the fix.**
+  `RELIEF_WORDS` has the same word-sense defect that this range fixed on the
+  danger side (`quiet` in "a quiet gallery" describes a location, not a
+  de-escalation). Under the unreachable `< -1` threshold nothing noticed;
+  under `<= -1` an incidental relief word now reads as a reversal. Measured
+  consequences: `GOAL_WITHOUT_OPPOSITION` is still suppressed on the
+  deliberately-bad fixture (the one audit-named defect of seventeen that
+  survives), and `NO_REVERSALS`/`NO_REVERSALS_LONG_STORY` now FAIL to fire on
+  that same fixture, which genuinely has no reversals — a false negative this
+  change created. Auditing the relief lexicon is separate scoring work with
+  its own measurement.
+
+- **Runner attestation:** "I, the Claude Code session working in an isolated
+  worktree (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), wrote every
+  probe cited above myself and read every figure out of its own log file with
+  its own exit code. **I did not run any real-corpus measurement, and I am
+  making no claim whatsoever about AUC-24 or any P1 statistic.** The
+  761-script corpus is local-only and this container has no copy of it, so I
+  could not have. This entry exists to record real work honestly while the
+  measurement it needs is still outstanding, and to be REFUSED by the guard
+  until that measurement happens. The specific thing I most want on the
+  record for the owner: this range changes the health denominator for every
+  script anyone analyses and widens a predicate that was previously dead, so
+  a re-measurement is not a formality here. Treat any fall in AUC-24 as a real
+  finding about these six fixes, and do not answer it by moving the floor in
+  `scripts/lib/auc.ts`. Discharge path is
+  `docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md` section 7."

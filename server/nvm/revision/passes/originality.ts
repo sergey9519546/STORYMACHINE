@@ -580,6 +580,8 @@ import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, check
 import { GENRE_MODIFIERS } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
+import { maskNonScreenplayLines } from '../../../../src/lib/fountain.ts';
+import { isSuspenseDip } from '../../screenplay/suspense-dip.ts';
 
 // D2-c (subtext-aware movement guard): emotionalShift is a whole-scene valence-lexicon
 // count — it sees explicit feeling-naming but is blind to arcs conveyed through subtext.
@@ -647,7 +649,10 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, approvedSpans } = input;
   const issues: RevisionIssue[] = [];
 
-  const lines = fountain.split('\n');
+  // Title page and boneyard comments are masked to blank lines (line numbers
+  // preserved) so no rule in this pass measures a licence header as prose —
+  // see maskNonScreenplayLines for the measurement that motivated it.
+  const lines = maskNonScreenplayLines(fountain);
 
   // ── Cliché phrases ────────────────────────────────────────────────────────
   const foundCliches = new Set<string>();
@@ -1316,7 +1321,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       const sig217 = [
         r.emotionalShift ?? 'neutral',
         (r.dialogueHighlights?.length ?? 0) > 0 ? 'D' : '-',
-        r.suspenseDelta < -1 ? 'R' : '-',
+        isSuspenseDip(r.suspenseDelta) ? 'R' : '-',
         (r.relationshipShifts?.length ?? 0) > 0 ? 'S' : '-',
       ].join('|');
       shapeCounts217.set(sig217, (shapeCounts217.get(sig217) ?? 0) + 1);

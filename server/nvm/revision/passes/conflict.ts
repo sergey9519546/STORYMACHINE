@@ -590,6 +590,7 @@
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { isSuspenseDip, countSuspenseDips } from '../../screenplay/suspense-dip.ts';
 import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function conflictPass(input: PassInput): Promise<PassResult> {
@@ -611,7 +612,8 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   // Honesty hedge (pilot session 2026-08-07, PILOT_SESSION_REPORT.md §6.1) —
   // same underlying blind spot as structure.ts's NO_REVERSALS sibling rule:
   // `structure.reversalDensity` is derived from `reversalCount`, itself only
-  // scenes with `suspenseDelta < -1` (a tension-lexicon magnitude dip). It
+  // scenes whose `suspenseDelta` reaches the suspense-dip threshold
+  // (screenplay/suspense-dip.ts) — a tension-lexicon magnitude dip. It
   // cannot see a betrayal, broken deal, or backfire that doesn't also read as
   // a tension-language drop — this rule fired CRITICAL on the pilot draft
   // even though its climax (a trade Barrow reneges on, then a MacGuffin he
@@ -623,7 +625,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     issues.push({
       location: 'Conflict layer',
       rule: 'NO_REVERSALS_LONG_STORY',
-      description: 'An 8+ scene story with zero suspense-dip reversals detected — this reads only for a sharp scene-level drop in the engine\'s danger/tension language (suspenseDelta < -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as "no conflict texture."',
+      description: 'An 8+ scene story with zero suspense-dip reversals detected — this reads only for a scene-level drop in the engine\'s danger/tension language (suspenseDelta ≤ -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as "no conflict texture."',
       severity: 'critical',
       suggestedFix: 'If a reread confirms no plan ever fails or backfires anywhere in the story, add one. If a reversal already exists on the page but isn\'t registering here, that\'s a gap in this detector\'s tension-language coverage, not necessarily a craft problem.',
     });
@@ -643,7 +645,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   // ── Clock pressure without confrontation ─────────────────────────────────
   // Only count scenes with meaningful clock pressure (delta > 1) to avoid flagging minor raises.
   const clockRaisedScenes = records.filter(r => (r.clockDelta ?? (r.clockRaised ? 1.1 : 0)) > 1).length;
-  const reversalScenes = records.filter(r => r.suspenseDelta < -1).length;
+  const reversalScenes = countSuspenseDips(records);
   if (clockRaisedScenes >= 3 && reversalScenes === 0) {
     issues.push({
       location: 'Conflict escalation',
@@ -734,7 +736,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     let streakStart = -1;
     for (let i = 0; i < records.length; i++) {
       const r = records[i];
-      const isReversal = r.suspenseDelta < -1;
+      const isReversal = isSuspenseDip(r.suspenseDelta);
       if (isReversal) {
         if (reversalStreak === 0) streakStart = i;
         reversalStreak++;
@@ -779,14 +781,14 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  // ANTAGONIST_VANISH: All reversals (suspenseDelta < -1) occur before the 60%
+  // ANTAGONIST_VANISH: All reversals (a suspense dip) occur before the 60%
   // mark, with none after. The antagonistic force is active in the first half but
   // passive or absent as the story approaches the climax — the protagonist faces
   // a depleted opposition in the final act.
   if (records.length >= 8) {
     const splitPoint = Math.floor(records.length * 0.6);
-    const reversalsInFirst = records.slice(0, splitPoint).filter(r => r.suspenseDelta < -1).length;
-    const reversalsInLast = records.slice(splitPoint).filter(r => r.suspenseDelta < -1).length;
+    const reversalsInFirst = countSuspenseDips(records.slice(0, splitPoint));
+    const reversalsInLast = countSuspenseDips(records.slice(splitPoint));
 
     if (reversalsInFirst >= 2 && reversalsInLast === 0) {
       issues.push({
@@ -828,7 +830,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   if (records.length >= 6) {
     const conflictSceneCount = records.filter(r => {
       const hasNegShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.3);
-      const isReversal = r.suspenseDelta < -1;
+      const isReversal = isSuspenseDip(r.suspenseDelta);
       return hasNegShift || isReversal;
     }).length;
     const hasAnyClockRaised = records.some(r => r.clockRaised);
@@ -890,7 +892,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
 
   // ── Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent ──
 
-  // REVERSAL_WITHOUT_CONSEQUENCE: A reversal (suspenseDelta < -1) is followed by
+  // REVERSAL_WITHOUT_CONSEQUENCE: A reversal (a suspense dip) is followed by
   // two consecutive flat scenes — no emotional reaction, no clock, no relational
   // movement. The blow lands in a dramatic vacuum and the story absorbs it without
   // ripple, making the reversal feel inert rather than pivotal.
@@ -984,7 +986,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     const midpointWindow = records.slice(windowLow, windowHigh + 1);
     const hasMidpointConflict = midpointWindow.some(r =>
       r.clockRaised ||
-      r.suspenseDelta < -1 ||
+      isSuspenseDip(r.suspenseDelta) ||
       (r.relationshipShifts ?? []).some((s: any) => s.amount < -0.3),
     );
     if (!hasMidpointConflict) {
@@ -1028,7 +1030,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   if (records.length >= 9) {
     const confThird = Math.floor(records.length / 3);
     const isConflictEvent = (r: any) =>
-      r.suspenseDelta < -1 || (r.relationshipShifts ?? []).some((s: any) => s.amount < -0.3);
+      isSuspenseDip(r.suspenseDelta) || (r.relationshipShifts ?? []).some((s: any) => s.amount < -0.3);
     const firstThirdFreq = records.slice(0, confThird).filter(isConflictEvent).length / confThird;
     const lastThirdFreq = records.slice(records.length - confThird).filter(isConflictEvent).length / confThird;
     if (firstThirdFreq > lastThirdFreq && firstThirdFreq >= 0.4) {
@@ -1084,8 +1086,8 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     const act2aStart210 = Math.floor(records.length * 0.25);
     const act2Split210  = Math.floor(records.length * 0.5);
     const act2bEnd210   = Math.floor(records.length * 0.75);
-    const reversalsAct2a = records.slice(act2aStart210, act2Split210).filter(r => r.suspenseDelta < -1).length;
-    const reversalsAct2b = records.slice(act2Split210, act2bEnd210).filter(r => r.suspenseDelta < -1).length;
+    const reversalsAct2a = countSuspenseDips(records.slice(act2aStart210, act2Split210));
+    const reversalsAct2b = countSuspenseDips(records.slice(act2Split210, act2bEnd210));
     if (reversalsAct2a >= 2 && reversalsAct2b === 0) {
       issues.push({
         location: `Act 2 (Scenes ${act2aStart210 + 1}–${act2bEnd210})`,
@@ -1103,7 +1105,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   // each other. Conflict that operates only through external force, with no
   // interpersonal friction, produces thriller plotting without emotional dimension.
   if (records.length >= 8) {
-    const reversalCount210 = records.filter(r => r.suspenseDelta < -1).length;
+    const reversalCount210 = countSuspenseDips(records);
     const negRelShiftScenes210 = records.filter(r =>
       (r.relationshipShifts ?? []).some(s => s.amount < 0),
     ).length;
@@ -1208,7 +1210,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     const conflictEventIdxs229: number[] = [];
     for (let i = 0; i < records.length; i++) {
       const r = records[i];
-      if (r.suspenseDelta < -1 ||
+      if (isSuspenseDip(r.suspenseDelta) ||
           (r.relationshipShifts ?? []).some((s: any) => s.amount < -0.4)) {
         conflictEventIdxs229.push(i);
       }
@@ -1345,7 +1347,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   }
 
   // CONFLICT_PURPOSE_MONOTONE (minor, n≥8): All scenes carrying strong conflict
-  // signals (suspenseDelta < -1 OR any relationship shift ≤ -0.3) share the same
+  // signals (a suspense dip OR any relationship shift ≤ -0.3) share the same
   // purpose label — the story can only deliver antagonistic pressure in one
   // structural mode. Three or more such scenes all labelled "confrontation" (or
   // any single label) suggests the conflict register is locked: every crisis looks
@@ -1353,7 +1355,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   if (records.length >= 8) {
     const conflictScenePurposes243 = records
       .filter(r =>
-        r.suspenseDelta < -1 ||
+        isSuspenseDip(r.suspenseDelta) ||
         (r.relationshipShifts ?? []).some((s: any) => s.amount <= -0.3),
       )
       .map(r => r.purpose);
@@ -1368,7 +1370,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           location: 'Conflict scene purpose register',
           rule: 'CONFLICT_PURPOSE_MONOTONE',
           severity: 'minor',
-          description: `All ${domCount243} conflict scenes (suspenseDelta < -1 or strong negative shift) share the same purpose label ("${domPurpose243}") — the story delivers antagonistic pressure in only one structural mode. Every conflict scene looks the same at the functional level.`,
+          description: `All ${domCount243} conflict scenes (suspenseDelta ≤ -1 or strong negative shift) share the same purpose label ("${domPurpose243}") — the story delivers antagonistic pressure in only one structural mode. Every conflict scene looks the same at the functional level.`,
           suggestedFix: `Vary the structural vessel for conflict: not every crisis needs to be a "${domPurpose243}". A revelation scene can carry as much antagonistic load as a confrontation; a character-development scene can contain the story's sharpest friction. Varied conflict modes keep the audience from predicting the next crisis shape.`,
         });
       }
@@ -1383,7 +1385,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   // A scene carries a conflict signal when it has deep negative tension OR any
   // strong negative relationship shift. Shared by the three Wave 257 checks.
   const isConflictScene257 = (r: any): boolean =>
-    (r.suspenseDelta ?? 0) < -1 ||
+    isSuspenseDip(r.suspenseDelta) ||
     (r.relationshipShifts ?? []).some((s: any) => s.amount <= -0.3);
 
   // CONFLICT_ACT3_ABSENT (major, n≥8): The story carries conflict in its first
@@ -1495,7 +1497,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
 
   // ── Wave 271: INTERPERSONAL_CONFLICT_ONLY ─────────────────────────────────
   // The story carries 3+ scenes with negative relationship shifts but no scene
-  // delivers an atmospheric tension reversal (suspenseDelta < -1). All conflict
+  // delivers an atmospheric tension reversal (a suspense dip). All conflict
   // is interpersonal — characters wound each other — but nothing external
   // threatens them: no plot reversals, no danger, no external pressure. The
   // mirror of ANTAGONIST_FORCE_ONLY (which fires when all conflict is external
@@ -1507,13 +1509,13 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       ((r.relationshipShifts as any[] ?? [])).some((s: any) => s.amount <= -0.3),
     );
     if (negRelShiftScenes271.length >= 3) {
-      const hasSuspenseReversal271 = records.some(r => (r.suspenseDelta ?? 0) < -1);
+      const hasSuspenseReversal271 = records.some(r => isSuspenseDip(r.suspenseDelta));
       if (!hasSuspenseReversal271) {
         issues.push({
           location: 'Conflict architecture',
           rule: 'INTERPERSONAL_CONFLICT_ONLY',
           severity: 'minor',
-          description: `${negRelShiftScenes271.length} scenes carry negative relationship shifts but no scene delivers a tension reversal (suspenseDelta < -1) — all conflict is interpersonal with zero external plot pressure. Characters wound each other but nothing external threatens them; the story has friction without danger.`,
+          description: `${negRelShiftScenes271.length} scenes carry negative relationship shifts but no scene delivers a tension reversal (suspenseDelta ≤ -1) — all conflict is interpersonal with zero external plot pressure. Characters wound each other but nothing external threatens them; the story has friction without danger.`,
           suggestedFix: 'Add at least one scene where external circumstances create a reversal: a plan that fails, a threat that arrives unexpectedly, a deadline that bites. External pressure transforms interpersonal friction from a slow burn into unavoidable confrontation with genuine stakes.',
         });
       }
@@ -2508,7 +2510,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   // ── Wave 450: CONFLICT_CLOCK_AFTERMATH_VOID, CONFLICT_POSITIVE_EMOTION_RUPTURE, CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID ──
 
   // CONFLICT_CLOCK_AFTERMATH_VOID (minor, n≥8, ≥2 clock scenes): Every clock-raised scene is
-  // followed by 2 scenes with no escalating conflict signal — no reversal (suspenseDelta < -1)
+  // followed by 2 scenes with no escalating conflict signal — no reversal (a suspense dip)
   // and no negative relationship shift (≤ -0.3) in either aftermath scene. The deadline is
   // raised but never detonates: after each clock tick the story returns to calm without the
   // crisis the deadline was supposed to force. When every clock raise is absorbed into silence,
@@ -2522,7 +2524,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     const clockRecs450a = (records as any[]).filter(r => r.clockRaised === true);
     if (clockRecs450a.length >= 2) {
       const isConflictSignal450a = (r: any): boolean =>
-        (r.suspenseDelta ?? 0) < -1 ||
+        isSuspenseDip(r.suspenseDelta) ||
         ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3);
       const allSilentAftermath450a = clockRecs450a.every((r: any) => {
         const idx = (records as any[]).indexOf(r);
@@ -2944,7 +2946,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   }
 
   // CONFLICT_CALM_STRETCH (minor, n≥10, ≥4 conflict scenes): The longest consecutive run of
-  // non-conflict scenes (no rupture, no suspenseDelta < -1) reaches ≥5 scenes while the story
+  // non-conflict scenes (no rupture, no suspense dip) reaches ≥5 scenes while the story
   // carries ≥4 overall conflict scenes. A sustained lull of 5+ scenes breaks the dramatic rhythm —
   // the audience loses the sense of accumulating pressure and the story feels like it has entered a
   // plateau. Run-based × non-conflict gap channel. Distinctness: CONFLICT_BREATHING_ROOM_ABSENT
@@ -2959,7 +2961,7 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     if (n492c >= 10) {
       const isConflict492c = (r: any): boolean =>
         ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3) ||
-        (r.suspenseDelta ?? 0) < -1;
+        isSuspenseDip(r.suspenseDelta);
       const totalConflict492c = (records as any[]).filter(isConflict492c).length;
       if (totalConflict492c >= 4) {
         let maxGap492c = 0;
@@ -7188,7 +7190,7 @@ interface SceneConflictSignal {
   interpersonal: number;
   /** Total conflict magnitude concentrated in this scene */
   mass: number;
-  /** Whether this scene is a genuine reversal (suspense drops by more than 1) */
+  /** Whether this scene is a genuine reversal (a suspense dip, screenplay/suspense-dip.ts) */
   isReversal: boolean;
   /** Magnitude of the reversal (|suspenseDelta|) when this scene is a reversal, else 0 */
   reversalMag: number;
@@ -7205,7 +7207,7 @@ function computeConflictDynamics(records: PassInput['records']): SceneConflictSi
     const release = Math.max(-sd, 0);
     const interpersonal = negRel;
     const mass = escalation + 2 * interpersonal;
-    const isReversal = sd < -1;
+    const isReversal = isSuspenseDip(sd);
     const reversalMag = isReversal ? Math.abs(sd) : 0;
     return { escalation, release, interpersonal, mass, isReversal, reversalMag };
   });

@@ -6,6 +6,7 @@
 
 import type { StoryCommit } from '../state/StoryCommit.ts';
 import type { ScreenplaySceneRecord } from './memory.ts';
+import { isSuspenseDip } from './suspense-dip.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ export function analyzeStructure(
   // raised an explicit clock. Computing these first lets act position blend them
   // with raw clock pressure rather than relying on clocks alone.
   const revelationCountEarly = records.filter(r => r.revelation !== null).length;
-  const reversalCountEarly = suspenseValues.filter(v => v < -1).length;
+  const reversalCountEarly = suspenseValues.filter(v => isSuspenseDip(v)).length;
 
   // ── Act position ──────────────────────────────────────────────────────────
   // Rough 3-act model. In a live story we don't know the total length, so we use
