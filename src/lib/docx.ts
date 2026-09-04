@@ -7,6 +7,9 @@
 
 import { parseFountain, type FountainBlock, type FountainBlockType } from './fountain.ts';
 import { buildZip, type ZipEntry } from './zip.ts';
+// Shared with fdx.ts — the same function was duplicated in both files, and
+// both copies let XML-illegal control characters through (see xml-escape.ts).
+import { escapeXml } from './xml-escape.ts';
 import { resolveExportTitlePage, type TitlePageInput, type ExportTitlePage } from './export-title-page.ts';
 
 // Twips = 1/1440 inch. Word measures indents in twips.
@@ -42,15 +45,6 @@ const STYLES: Partial<Record<FountainBlockType, DocxStyle>> = {
   section:       { styleId: 'Action',       name: 'Action',       leftIndent: ind(1.5), uppercase: true, spaceBefore: 240 },
   synopsis:      { styleId: 'Action',       name: 'Action',       leftIndent: ind(1.5), spaceBefore: 240 },
 };
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 function cleanText(block: FountainBlock): string {
   let t = block.text.trim();

@@ -28,27 +28,15 @@ import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
 import { sanitizeExternalError } from '../lib/safe-error.ts';
+import { requestAbortSignal, runScriptDoctorForRequest } from '../lib/doctor-request.ts';
 
-/**
- * An AbortSignal that fires when the CLIENT gives up on this request — used
- * to cancel off-thread Script Doctor work that nobody is waiting for any more
- * (lane W1; see server/nvm/analyze/doctor-pool.ts).
- *
- * Listens on the RESPONSE, not the request. Since Node 16, `req` emits
- * 'close' as soon as the request stream completes — which, for a POST whose
- * body express already parsed, is immediately — so a req-based signal would
- * abort every analysis the instant it started. `res` emits 'close' exactly
- * once, either after a completed response (writableEnded true, nothing to
- * cancel) or on a genuine disconnect (writableEnded false, cancel), which is
- * the distinction that actually matters.
- */
-function requestAbortSignal(res: express.Response): AbortSignal {
-  const controller = new AbortController();
-  res.on('close', () => {
-    if (!res.writableEnded) controller.abort();
-  });
-  return controller.signal;
-}
+// requestAbortSignal (the res-'close'-based client-disconnect signal every
+// off-thread analysis in this file threads through) and
+// runScriptDoctorForRequest (pool call + that signal + the "client is gone,
+// do not answer" branch, in one function) moved to server/lib/doctor-request.ts
+// on 2026-09-04 so the export routes could adopt the SAME handling instead of
+// each re-deriving it — the security review found the newest export route had
+// copied the unfixed in-process pattern instead. See that file's header.
 
 // ── AI provider fan-out budgets (2026-08-03 audit, Task 1) ─────────────────
 // See server/lib/ai-budget.ts's header for the full design. Every route
@@ -925,9 +913,16 @@ router.post(
 router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema), asyncHandler(async (req, res) => {
   const { fountain } = req.body as { fountain: string };
 
-  // Dynamic import — same lazy-load convention as the /doctor route above.
-  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-  const report = await runScriptDoctor(fountain);
+  // Off-thread, same as /doctor above (server/lib/doctor-request.ts). This
+  // route is the one the editor calls on every keystroke pause, over the WHOLE
+  // document — so leaving it in-process meant the most frequently fired
+  // analysis in the product was also the one holding the event loop against
+  // every other user. The report is identical either way; only who waits
+  // changes. `undefined` means the typist's own client already aborted this
+  // tick (the panel supersedes in-flight diagnoses), so there is nothing left
+  // to answer.
+  const report = await runScriptDoctorForRequest(fountain, res);
+  if (!report) return;
 
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   const locatedIssues = locateIssues(issuesWithPass, fountain);

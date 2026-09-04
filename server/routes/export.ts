@@ -22,6 +22,7 @@ import { renderPitchKitHtml } from '../lib/pitchkit-html.ts';
 import { extractTitlePage, buildLogline, buildPitchContent } from '../lib/logline.ts';
 import { buildSlateEntry, rankSlate, renderSlateHtml, type SlateEntry } from '../lib/slate.ts';
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
+import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
 
 const router = express.Router();
 export default router;
@@ -345,12 +346,16 @@ router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asy
   const title = sanitizeForPrompt(rawTitle, 256) || 'Untitled';
 
   try {
-    // Dynamic import: doctor.ts pulls in the full analyzer + all 14 revision
-    // passes, matching this router's convention elsewhere in this file (and
-    // scriptide.ts's doctor route) of lazily loading heavy analysis modules
-    // so routes that never call the doctor don't pay for it at startup.
-    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-    const report = await runScriptDoctor(fountain);
+    // Off the main thread, via server/lib/doctor-request.ts — see its header.
+    // This route used to call runScriptDoctor in-process, which held the event
+    // loop (and therefore every other user's request, /health included) for the
+    // full analysis: the 2026-09-04 security review measured a ~2.6-2.8s stall
+    // on a single large-but-legal unauthenticated POST. The report is
+    // byte-identical either way; only who is blocked while it is produced
+    // changes. `undefined` means the client hung up mid-analysis — nothing
+    // left to answer.
+    const report = await runScriptDoctorForRequest(fountain, res);
+    if (!report) return;
     if (respondIncompleteAnalysis(res, report, 'Coverage export')) return;
 
     // The doctor normally supplies the deterministic receipt itself. Retain a
@@ -454,12 +459,18 @@ router.post('/api/export/slate', gameLimiter, validate(SlateBodySchema), asyncHa
   const wantsHtml = req.query.format === 'html' || (req.body as { format?: string }).format === 'html';
 
   try {
-    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-
     const entries: SlateEntry[] = [];
     for (const script of scripts) {
       const title = sanitizeForPrompt(script.title, 200) || 'Untitled';
-      const report = await runScriptDoctor(script.fountain);
+      // Off the main thread, same as the coverage route above — and this is
+      // the route where it matters most: a slate runs the doctor once PER
+      // SUBMITTED SCRIPT (up to 20), so in-process it was the single longest
+      // uninterrupted block of the event loop any request in this codebase
+      // could buy. The scripts are still analysed one after another, exactly
+      // as before (the pool preserves FIFO order and the doctor is not
+      // parallelizable within one script), so the ranking is unchanged.
+      const report = await runScriptDoctorForRequest(script.fountain, res);
+      if (!report) return;
       const contentHash = report.contentHash ?? createHash('sha256').update(script.fountain.trim()).digest('hex');
       entries.push(buildSlateEntry(title, report, contentHash));
     }
@@ -531,11 +542,10 @@ router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asy
   const title = sanitizeForPrompt(rawTitle, 256) || 'Untitled';
 
   try {
-    // Dynamic import: same rationale as the coverage route above — doctor.ts
-    // pulls in the full analyzer + all 14 revision passes, so routes that
-    // never call the doctor shouldn't pay for it at startup.
-    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-    const report = await runScriptDoctor(fountain);
+    // Off the main thread, same as the coverage route above (server/lib/
+    // doctor-request.ts).
+    const report = await runScriptDoctorForRequest(fountain, res);
+    if (!report) return;
     if (respondIncompleteAnalysis(res, report, 'Pitch kit export')) return;
     const { records } = analyzeFountainText(fountain);
     const sceneCharacters = analyzeSceneCharacters(fountain);
@@ -652,13 +662,14 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
       return;
     }
 
-    // Dynamic import: same rationale as every other doctor-consuming route in
-    // this file — doctor.ts pulls in the full analyzer + all 14 revision
-    // passes, so routes that never call the doctor shouldn't pay for it at
-    // startup. Diagnose-only, no LLM, no randomness: same input always
-    // produces the same report (doctor.ts's own header comment).
-    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-    const report = await runScriptDoctor(fountain);
+    // Off the main thread, same as every other doctor-consuming route in this
+    // file (server/lib/doctor-request.ts). Diagnose-only, no LLM, no
+    // randomness: the same input still always produces the same report
+    // (doctor.ts's own header comment), which is the whole basis of this
+    // route's re-attestation claim — the pool changes nothing about what is
+    // computed, only which thread computes it.
+    const report = await runScriptDoctorForRequest(fountain, res);
+    if (!report) return;
     if (!isWholeDraftAnalysisComplete(report)) {
       res.status(422).json({
         verified: false,

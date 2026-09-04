@@ -38,6 +38,15 @@
 //                          ANALYZER_SCENE_CEILING's 400).
 //   --health-interval=<ms> GET /health probe interval while the load runs
 //                          (default 200).
+//   --routes=<a,b,...>     Which doctor-consuming POST routes to load, as a
+//                          comma-separated list of paths (default
+//                          /api/scriptide/doctor). Every route in ROUTE_BODIES
+//                          below re-runs the doctor on the submitted script,
+//                          so every one of them is a candidate event-loop
+//                          hog; each named route gets its OWN load phase and
+//                          its OWN /health summary, which is what makes a
+//                          per-route before/after comparison possible.
+//                          `--routes=all` selects every entry.
 //
 // Exit codes: 0 = every doctor request AND every health probe succeeded.
 // 1 = at least one failed, or the server could not be reached at all.
@@ -68,14 +77,41 @@
 //   before W1 moved doctor execution off the main thread and W2 fixed its
 //   O(n^3) scaling.
 //
+// ── RESULTS (2026-09-04, security review finding #1: the export routes were
+//    analysing on the MAIN thread) — same container (4 CPUs, 2 workers),
+//    keyless, PERSIST_SESSIONS disabled, measured BEFORE and AFTER routing
+//    server/routes/export.ts and server/routes/coverage-letter.ts through the
+//    pool. Identical invocation both times:
+//
+//   node scripts/load-test-doctor.mjs --routes=all --concurrency=4 --rounds=2 \
+//        --scenes=150 --health-interval=100
+//
+//   GET /health p95 (ms) WHILE the route is under load — the number that says
+//   what every OTHER user experiences:
+//
+//     route                        before    after
+//     /api/scriptide/doctor           218      165   (control: already pooled)
+//     /api/export/coverage-letter   1,794       15
+//     /api/export/coverage          1,875      122
+//     /api/export/pitchkit          1,749      104
+//     /api/export/slate             3,939       11
+//     /api/export/verify            1,567        7
+//
+//   The probe COUNTS tell the same story from the other side: /health answered
+//   3-5 times during a pre-fix export phase (each probe was stuck waiting) and
+//   23-58 times during the same phase after. Slate was the worst before and is
+//   the best after, which is exactly right — it analyses every script in the
+//   slate, so it held the loop the longest.
+//
 // Re-run and update this block (and docs/PATH_TO_EXCELLENCE.md's Phase S
 // notes, if present) after any change to doctor-pool.ts, doctor.ts's
-// aggregation path, or the pool sizing env vars (DOCTOR_WORKER_POOL /
-// DOCTOR_WORKER_POOL_SIZE).
+// aggregation path, the pool sizing env vars (DOCTOR_WORKER_POOL /
+// DOCTOR_WORKER_POOL_SIZE), or which routes analyse off-thread.
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { keylessBrowserServerEnv, assertKeylessAiConfig } from './lib/keyless-browser-certification.mjs';
@@ -84,9 +120,54 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
 const SCREENPLAY_DIR = path.join(REPO, 'data', 'screenplays');
 
+// ── The doctor-consuming routes this script can load ─────────────────────
+// Every entry here re-runs runScriptDoctor on the submitted script, so every
+// entry is a candidate for the failure mode this script measures: a route that
+// analyses on the MAIN thread holds the event loop for the whole run and
+// stalls every other user's request, /health included. The 2026-09-04 security
+// review found exactly that on the export routes (coverage-letter, coverage,
+// pitchkit, slate, verify) while /api/scriptide/doctor — already pool-backed —
+// stayed responsive throughout. They are all listed side by side here for that
+// reason: the same load against the same server, one route at a time, is what
+// makes the difference measurable instead of arguable.
+//
+// `body` builds the request payload for one script; `expectJson: false` only
+// says how to drain the response (several of these return HTML, not JSON).
+const ROUTE_BODIES = {
+  '/api/scriptide/doctor': { body: (fountain) => ({ fountain }) },
+  '/api/export/coverage-letter': { body: (fountain) => ({ fountain, title: 'Load Test' }) },
+  '/api/export/coverage': { body: (fountain) => ({ fountain, title: 'Load Test' }), expectJson: false },
+  '/api/export/pitchkit': { body: (fountain) => ({ fountain, title: 'Load Test' }), expectJson: false },
+  // SlateBodySchema requires at least 2 scripts, and a slate analyses every
+  // one of them — so a slate request is deliberately ~2x the compute of the
+  // single-script routes above. The second entry gets its own boneyard note
+  // so it cannot be answered from the first one's cache entry.
+  '/api/export/slate': {
+    body: (fountain) => ({
+      scripts: [
+        { title: 'Load Test A', fountain },
+        { title: 'Load Test B', fountain: `${fountain}\n\n/* slate second entry */` },
+      ],
+    }),
+  },
+  // /verify exits cheaply — before the doctor ever runs — on a content-hash
+  // mismatch, so the expected hash has to be the REAL one. Otherwise this
+  // would time the early-return path and report a reassuring number about a
+  // route it never actually exercised.
+  '/api/export/verify': {
+    body: (fountain) => ({
+      fountain,
+      expected: { contentHash: createHash('sha256').update(fountain.trim()).digest('hex') },
+    }),
+  },
+};
+
 // ── CLI args ─────────────────────────────────────────────────────────────
 function parseArgs(argv) {
-  const opts = { concurrency: 10, rounds: 3, scenes: 250, healthIntervalMs: 200, base: null };
+  const opts = {
+    concurrency: 10, rounds: 3, scenes: 250, healthIntervalMs: 200, base: null,
+    routes: ['/api/scriptide/doctor'],
+  };
   for (const arg of argv) {
     const m = /^--([a-z-]+)=(.+)$/.exec(arg);
     if (!m) continue;
@@ -96,6 +177,16 @@ function parseArgs(argv) {
     else if (key === 'rounds') opts.rounds = Math.max(1, parseInt(value, 10));
     else if (key === 'scenes') opts.scenes = Math.max(10, parseInt(value, 10));
     else if (key === 'health-interval') opts.healthIntervalMs = Math.max(50, parseInt(value, 10));
+    else if (key === 'routes') {
+      opts.routes = value === 'all'
+        ? Object.keys(ROUTE_BODIES)
+        : value.split(',').map((r) => r.trim()).filter(Boolean);
+      for (const route of opts.routes) {
+        if (!ROUTE_BODIES[route]) {
+          throw new Error(`unknown --routes entry "${route}" — known routes: ${Object.keys(ROUTE_BODIES).join(', ')}`);
+        }
+      }
+    }
   }
   return opts;
 }
@@ -204,21 +295,24 @@ function summarize(label, latenciesMs, failures) {
 }
 
 // ── Load-generation ──────────────────────────────────────────────────────
-async function fireDoctorRequest(base, fountain, label) {
+async function fireDoctorRequest(base, route, fountain, label) {
+  const spec = ROUTE_BODIES[route];
   const started = performance.now();
   try {
-    const res = await fetch(new URL('/api/scriptide/doctor', base), {
+    const res = await fetch(new URL(route, base), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fountain }),
+      body: JSON.stringify(spec.body(fountain)),
     });
     const elapsed = performance.now() - started;
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       return { ok: false, elapsed, error: `${label}: HTTP ${res.status} ${text.slice(0, 200)}` };
     }
-    const body = await res.json();
-    return { ok: true, elapsed, sceneCount: body?.sceneCount };
+    // Drain the body either way: an undrained response can hold the socket
+    // and skew the next request's timing.
+    const body = spec.expectJson === false ? await res.text() : await res.json();
+    return { ok: true, elapsed, sceneCount: typeof body === 'object' ? body?.sceneCount : undefined };
   } catch (err) {
     return { ok: false, elapsed: performance.now() - started, error: `${label}: ${err.message}` };
   }
@@ -255,55 +349,66 @@ async function main() {
     const baseScript = buildSyntheticScript(opts.scenes, bodies);
     console.log(`[load-test] synthetic script targets ${opts.scenes} scenes, ${baseScript.length} chars.`);
 
-    // Health probing runs continuously in the background for the whole load
-    // run, independent of the doctor request rounds below.
-    let probing = true;
-    const healthResults = [];
-    const healthLoop = (async () => {
-      while (probing) {
-        healthResults.push(await probeHealth(base));
-        await new Promise((r) => setTimeout(r, opts.healthIntervalMs));
-      }
-    })();
-
-    const doctorLatencies = [];
-    const doctorFailures = [];
     let requestSeq = 0;
+    let allPassed = true;
 
-    for (let round = 0; round < opts.rounds; round++) {
-      console.log(`[load-test] round ${round + 1}/${opts.rounds}: firing ${opts.concurrency} concurrent doctor requests...`);
-      const requests = Array.from({ length: opts.concurrency }, () => {
-        requestSeq += 1;
-        // Unique boneyard note per request so the doctor's LRU cache
-        // (server/nvm/analyze/doctor.ts) can never turn a later round into a
-        // free cache hit and understate real concurrent compute cost.
-        const fountain = `${baseScript}\n\n/* load-test request ${requestSeq} */`;
-        return fireDoctorRequest(base, fountain, `round ${round + 1} request ${requestSeq}`);
-      });
-      const results = await Promise.all(requests);
-      for (const r of results) {
-        if (r.ok) doctorLatencies.push(r.elapsed);
-        else doctorFailures.push(r.error);
+    // One load phase PER ROUTE, never interleaved: /health latency is the
+    // measurement, and a probe stalled by route A while route B is also in
+    // flight would be attributable to neither.
+    for (const route of opts.routes) {
+      console.log(`\n[load-test] ══ ${route} ══`);
+
+      // Health probing runs continuously in the background for this route's
+      // whole load phase, independent of the request rounds below.
+      let probing = true;
+      const healthResults = [];
+      const healthLoop = (async () => {
+        while (probing) {
+          healthResults.push(await probeHealth(base));
+          await new Promise((r) => setTimeout(r, opts.healthIntervalMs));
+        }
+      })();
+
+      const doctorLatencies = [];
+      const doctorFailures = [];
+
+      for (let round = 0; round < opts.rounds; round++) {
+        console.log(`[load-test] round ${round + 1}/${opts.rounds}: firing ${opts.concurrency} concurrent requests...`);
+        const requests = Array.from({ length: opts.concurrency }, () => {
+          requestSeq += 1;
+          // Unique boneyard note per request so the doctor's LRU cache
+          // (server/nvm/analyze/doctor.ts) can never turn a later round — or a
+          // later ROUTE — into a free cache hit and understate real concurrent
+          // compute cost.
+          const fountain = `${baseScript}\n\n/* load-test request ${requestSeq} */`;
+          return fireDoctorRequest(base, route, fountain, `round ${round + 1} request ${requestSeq}`);
+        });
+        const results = await Promise.all(requests);
+        for (const r of results) {
+          if (r.ok) doctorLatencies.push(r.elapsed);
+          else doctorFailures.push(r.error);
+        }
       }
+
+      probing = false;
+      await healthLoop;
+
+      const healthLatencies = healthResults.filter((r) => r.ok).map((r) => r.elapsed);
+      const healthFailures = healthResults.filter((r) => !r.ok).map((r) => r.error ?? `HTTP ${r.status}`);
+
+      const doctorSummary = summarize(`Doctor requests (POST ${route})`, doctorLatencies, doctorFailures);
+      const healthSummary = summarize('Health probes (GET /health, concurrent with the load above)', healthLatencies, healthFailures);
+
+      if (!(doctorSummary.failures === 0 && healthSummary.failures === 0 && doctorSummary.count > 0)) allPassed = false;
     }
 
-    probing = false;
-    await healthLoop;
-
-    const healthLatencies = healthResults.filter((r) => r.ok).map((r) => r.elapsed);
-    const healthFailures = healthResults.filter((r) => !r.ok).map((r) => r.error ?? `HTTP ${r.status}`);
-
-    const doctorSummary = summarize('Doctor requests (POST /api/scriptide/doctor)', doctorLatencies, doctorFailures);
-    const healthSummary = summarize('Health probes (GET /health, concurrent with the load above)', healthLatencies, healthFailures);
-
-    const pass = doctorSummary.failures === 0 && healthSummary.failures === 0 && doctorSummary.count > 0;
-    console.log(`\nVERDICT: ${pass ? 'PASS' : 'FAIL'} — ${
-      pass
-        ? 'every doctor request and every health probe succeeded; the server stayed responsive throughout.'
-        : 'at least one doctor request or health probe failed — see the failures above.'
+    console.log(`\nVERDICT: ${allPassed ? 'PASS' : 'FAIL'} — ${
+      allPassed
+        ? 'every request and every health probe succeeded; the server stayed responsive throughout.'
+        : 'at least one request or health probe failed — see the failures above.'
     }`);
 
-    process.exitCode = pass ? 0 : 1;
+    process.exitCode = allPassed ? 0 : 1;
   } finally {
     stopServer();
   }

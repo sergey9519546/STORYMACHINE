@@ -27,8 +27,25 @@
 // doctor — untrusted input. This module emits Markdown and plain text, not
 // HTML, so there is no injection surface the way coverage-html.ts has; no
 // escaping is needed here because nothing is ever interpreted as markup by
-// this module itself. (A route that re-embeds this output into an HTML page
-// must go through coverage-html.ts's own escaping — none does today.)
+// this module itself.
+//
+// ── THE CONTRACT THAT MAKES THAT TRUE, AND WHAT NOW ENFORCES IT ─────────────
+// The output of this module is UNESCAPED text. A title of
+// `Hamlet</p><script>alert(1)</script>` comes back verbatim as the letter's
+// H1 (verified live, 2026-09-04 security review finding #4), which is
+// harmless in a .md file the client only ever downloads — and live HTML/script
+// injection the moment anything renders it through a Markdown pipeline with
+// raw-HTML passthrough. In a collab room the person who plants that title is
+// not the person who exports and shares the letter, so "the writer wrote it
+// themselves" is not a defence.
+//
+// So the invariant is: NOTHING in src/ renders a coverage letter as HTML.
+// That used to be a comment deferring the question to future consumers, with
+// nothing checking it. tests/core/coverage-letter-no-renderer.test.ts now
+// fails the build if a Markdown renderer or dangerouslySetInnerHTML appears in
+// src/ while this module still emits unescaped text. If you are the change
+// that introduces one: escape here (or route the letter through
+// coverage-html.ts's escapeHtml) BEFORE landing it — do not relax that test.
 
 import type {
   ScriptDoctorReport, CoverageVerdict, RootCauseFinding,

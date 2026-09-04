@@ -37,6 +37,7 @@ import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
 import { validate, CoverageLetterBodySchema } from '../lib/validation.ts';
 import type { ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
+import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
 import { renderCoverageLetter } from '../lib/coverage-letter.ts';
 import { extractTitlePage } from '../lib/logline.ts';
 
@@ -74,12 +75,18 @@ router.post('/api/export/coverage-letter', gameLimiter, validate(CoverageLetterB
   const sanitizedTitle = sanitizeForPrompt(rawTitle, 256) || 'Untitled';
 
   try {
-    // Dynamic import: doctor.ts pulls in the full analyzer + all 14 revision
-    // passes, matching this file's sibling routes' convention of lazily
-    // loading heavy analysis modules so routes that never call the doctor
-    // don't pay for it at startup.
-    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
-    const report: ScriptDoctorReport = await runScriptDoctor(fountain);
+    // Off the main thread (server/lib/doctor-request.ts). This route was
+    // written by copying the then-unfixed in-process pattern from
+    // server/routes/export.ts rather than the pool-backed one from
+    // server/routes/scriptide.ts, and the 2026-09-04 security review measured
+    // the cost: one unauthenticated POST of a ~720KB / 1200-scene
+    // schema-legal script stalled a concurrent GET /health for 2.6s. The
+    // letter is byte-identical either way — the pool runs the same
+    // runScriptDoctor on a worker thread — so nothing about the exported
+    // document's authenticity claim changes. `undefined` means the client hung
+    // up mid-analysis; there is nobody left to send a letter to.
+    const report: ScriptDoctorReport | undefined = await runScriptDoctorForRequest(fountain, res);
+    if (!report) return;
 
     if (!isWholeDraftAnalysisComplete(report)) {
       res.status(422).json({

@@ -6,6 +6,9 @@
 
 import { parseFountain, type FountainBlock, type FountainBlockType } from './fountain.ts';
 import { resolveExportTitlePage, type TitlePageInput, type ExportTitlePage } from './export-title-page.ts';
+// The escaper is shared with docx.ts (it used to be copy-pasted into both, and
+// both copies let XML-illegal control characters through — see xml-escape.ts).
+import { escapeXml } from './xml-escape.ts';
 
 // Fountain block type → FDX paragraph Type attribute.
 // FDX recognises: Scene Heading, Action, Character, Dialogue, Parenthetical,
@@ -38,16 +41,6 @@ interface FdxEntry {
   blockType: FountainBlockType;
   fdxType: string;
   text: string;
-}
-
-// XML-escape text content for safe embedding in an FDX <Text> node.
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 
 // Strip Fountain's leading force/markup characters from a block's display text

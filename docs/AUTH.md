@@ -102,6 +102,24 @@ no account record, no way to prove "this session belongs to user X" beyond
     under an active mutation; the caller retries once idle. This narrows what
     a leaked id can be *aimed* at, not what it grants: the holder of a leaked
     id is the caller, and can delete with it.
+  - **Griefing another session's collab budgets — no other capability
+    required.** The per-session collaboration budgets in
+    `server/lib/collab-rooms.ts` (10 room creations/min, 30 token mints/min)
+    are keyed on the caller's self-supplied `X-Session-Id`, so anyone who
+    merely *knows* a session id string can spend that session's budget by
+    sending refused requests with it in the header. Verified 2026-09-04: 31
+    bogus token-mint requests under a victim's id (each correctly 404-ing)
+    left the victim's own next mint — for a room they really own — also
+    refused with `404`, indistinguishable from "no such room", because the
+    budget was already spent. This is the cheapest thing a leaked id buys: it
+    needs no read or write of the victim's data, leaves no visible trace on
+    their session, and surfaces to them as a confusing missing room rather
+    than as a compromise. It stays a documented consequence rather than a
+    code fix because the budgets are explicitly a partitioning measure, not
+    an access check, `gameLimiter`'s per-IP 120/min ceiling already caps the
+    blast radius, and every alternative key considered would either weaken
+    the deliberately timing-uniform "same refusal, same work" property of
+    `POST /api/collab/token` or partition legitimate collaborators apart.
 - **No user-level accountability.** Nothing distinguishes "this session's
   legitimate owner" from "whoever currently holds the id" — no audit trail
   of which human performed an action, no per-account rate limits or
