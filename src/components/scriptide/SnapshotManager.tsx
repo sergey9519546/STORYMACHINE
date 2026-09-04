@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Save, Trash2, History } from "lucide-react";
 import type { CoverageVerdict } from "../../../server/nvm/analyze/types.ts";
 import { snapshotTrend, type SnapshotTrendEntry } from "../../lib/snapshot-trend.ts";
+import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 
 // writer #9 (upgrade-writer-experience discovery) — "score over revisions".
 // The four score fields are ALL optional: a snapshot only carries them when
@@ -154,6 +155,99 @@ function SnapshotTrendBadge({ entry }: { entry: SnapshotTrendEntry }) {
   );
 }
 
+// 2026-09-04 a11y fix (docs/audits/2026-09-04-evening-batch/AUDIT.md, "the
+// snapshot save modal has no dialog semantics"): this used to be inline JSX
+// rendered from the parent's `{snapshotModal.open && (...)}` block. That
+// shape cannot host `useModalFocusTrap` correctly — the hook's effect runs
+// once per mount of whatever COMPONENT calls it (its dependency is the ref
+// object's own stable identity, not `snapshotModal.open`), so calling it
+// from SnapshotManager's top level — which is mounted the whole time the
+// Versions tab or Ship panel is open, closed dialog included — would run the
+// trap's initial-focus effect on SnapshotManager's OWN mount, almost always
+// while `containerRef.current` is still null. Every other dialog in this app
+// (ShortcutModal, WhatIfPanel, RoomPanel, …) is its own component that only
+// exists in the tree while open, for exactly this reason. Splitting the
+// modal out here gives it the same shape: a fresh mount every time
+// `snapshotModal.open` flips true, so the hook's mount-time effect actually
+// runs against a real, attached container.
+function SaveSnapshotModal({
+  snapshotModal,
+  onSetSnapshotModal,
+  onConfirmSnapshot,
+}: {
+  snapshotModal: SnapshotManagerProps["snapshotModal"];
+  onSetSnapshotModal: SnapshotManagerProps["onSetSnapshotModal"];
+  onConfirmSnapshot: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useModalFocusTrap(dialogRef);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+    >
+      <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="save-snapshot-modal-title"
+        // Escape on the container catches the key regardless of which
+        // focusable descendant currently has it (input, Cancel, or Save) —
+        // attached here rather than only on the input, and scoped to this
+        // container (not document) for the same reason use-modal-focus-
+        // trap.ts's own Tab handler is: it can never fire while this dialog
+        // isn't open, and never interferes with unrelated document-level
+        // Escape handlers (e.g. ScriptIDE's palette/prefs/shortcuts ladder).
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            onSetSnapshotModal({ open: false, name: "" });
+          }
+        }}
+        initial={{ scale: 0.9 }}
+        animate={{ scale: 1 }}
+        exit={{ scale: 0.9 }}
+        className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
+      >
+        <h3 id="save-snapshot-modal-title" className="font-bold uppercase text-xs tracking-widest">
+          Save Snapshot
+        </h3>
+        <input
+          type="text"
+          value={snapshotModal.name}
+          onChange={(e) =>
+            onSetSnapshotModal({ ...snapshotModal, name: e.target.value })
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onConfirmSnapshot();
+          }}
+          aria-label="Snapshot version name"
+          className="w-full border-2 border-black px-3 py-2 font-mono text-sm dark:bg-zinc-700 dark:text-white"
+          placeholder="Version name…"
+        />
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={() => onSetSnapshotModal({ open: false, name: "" })}
+            className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirmSnapshot}
+            className="px-4 py-2 text-xs font-bold uppercase sm-btn--ink hover:bg-gray-800"
+          >
+            Save
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 interface SnapshotManagerProps {
   snapshots: Snapshot[];
   snapshotModal: { open: boolean; name: string };
@@ -265,53 +359,11 @@ export default function SnapshotManager({
       {/* Snapshot name modal */}
       <AnimatePresence>
         {snapshotModal.open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
-            >
-              <h3 className="font-bold uppercase text-xs tracking-widest">
-                Save Snapshot
-              </h3>
-              <input
-                type="text"
-                value={snapshotModal.name}
-                onChange={(e) =>
-                  onSetSnapshotModal({ ...snapshotModal, name: e.target.value })
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onConfirmSnapshot();
-                  if (e.key === "Escape")
-                    onSetSnapshotModal({ open: false, name: "" });
-                }}
-                autoFocus
-                aria-label="Snapshot version name"
-                className="w-full border-2 border-black px-3 py-2 font-mono text-sm dark:bg-zinc-700 dark:text-white"
-                placeholder="Version name…"
-              />
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => onSetSnapshotModal({ open: false, name: "" })}
-                  className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={onConfirmSnapshot}
-                  className="px-4 py-2 text-xs font-bold uppercase sm-btn--ink hover:bg-gray-800"
-                >
-                  Save
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <SaveSnapshotModal
+            snapshotModal={snapshotModal}
+            onSetSnapshotModal={onSetSnapshotModal}
+            onConfirmSnapshot={onConfirmSnapshot}
+          />
         )}
       </AnimatePresence>
 

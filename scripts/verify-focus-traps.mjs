@@ -7,9 +7,10 @@
 // installed in node_modules. This script drives a real headless browser
 // through the exact keyboard interactions a screen-reader/keyboard-only user
 // would perform, against dialogs wired with `src/lib/use-modal-focus-trap.ts`
-// (ScriptDoctorPanel, WhatIfPanel, RoomPanel) — and it is what actually found
-// two real, live bugs that every prior source-read review missed (see the
-// commit history / doc comments in use-modal-focus-trap.ts and App.tsx).
+// (ScriptDoctorPanel, WhatIfPanel, RoomPanel, SnapshotManager's Save Snapshot
+// modal) — and it is what actually found real, live bugs that every prior
+// source-read review missed (see the commit history / doc comments in
+// use-modal-focus-trap.ts, App.tsx, and SnapshotManager.tsx).
 //
 // THIS RUNS IN CI (2026-09-02). It used to say the opposite — "not a CI test,
 // CI has no browser provisioned" — and that was a self-imposed limitation, not
@@ -249,6 +250,43 @@ async function main() {
         closeDialog: async () => page.keyboard.press('Escape'),
       });
     }
+
+    await context.close();
+  }
+
+  // ── Context 3: SnapshotManager's "Save Snapshot" modal. ──────────────────
+  // 2026-09-04 a11y fix (docs/audits/2026-09-04-evening-batch/AUDIT.md, "the
+  // snapshot save modal has no dialog semantics"): before this pass the
+  // modal was a bare `motion.div` — no role="dialog", no aria-modal, no
+  // accessible name, and no useModalFocusTrap — so `page.getByRole('dialog')`
+  // found nothing and Tab could walk straight out of it. Reached the same
+  // way a real writer does: StartScreen -> "Try sample coverage" (installs a
+  // non-empty sample script, so the Snapshot button isn't disabled) -> the
+  // "Ship" task tab -> "Snapshot".
+  {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    wireConsoleCapture(page, genuineConsoleErrors);
+
+    console.log('\n=== SnapshotManager Save modal (StartScreen -> Try sample coverage -> Ship -> Snapshot) ===');
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+
+    const sampleCta = page.getByRole('button', { name: /try sample coverage/i }).first();
+    await sampleCta.click({ timeout: timing.ms(15000) });
+    await waitForRenderedText(page, 'CONSIDER');
+
+    const shipTab = page.getByRole('button', { name: 'Ship', exact: true }).first();
+    await shipTab.click({ timeout: timing.ms(15000) });
+
+    const snapshotBtn = page.getByRole('button', { name: 'Snapshot', exact: true }).first();
+    const triggerHandle = await snapshotBtn.elementHandle();
+    await snapshotBtn.click({ timeout: timing.ms(15000) });
+
+    await verifyDialog(page, {
+      name: 'SnapshotManager (Save Snapshot)',
+      restoreTriggerHandle: triggerHandle,
+      closeDialog: async () => page.keyboard.press('Escape'),
+    });
 
     await context.close();
   }

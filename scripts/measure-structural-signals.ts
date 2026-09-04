@@ -284,6 +284,21 @@ function reportCollinearity(label: string, blocks: StructuralSignalsReport[]): v
     const rho = spearman(blocks.map(b => value(b, spec.key)), cast);
     console.log(`| ${String(spec.key)} | ${rho.toFixed(3)} |`);
   }
+  // DROPPED CANDIDATE, kept measured (§3's "Still measured ... so the number
+  // stays reproducible" standard — docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md
+  // §3's dropped-channel row names this exact rho and this exact command as
+  // its reproduction; before this row existed here that claim did not hold —
+  // see docs/audits/2026-09-04-evening-batch/AUDIT.md, "dropped-channel rho
+  // 0.870"). `meanSpeakerTurns` is not a `StructuralSignalsReport` field (it
+  // was dropped before ever being added as a report aggregate — see §3); it
+  // is the mean of the per-scene `speakerTurns` channel, computed the same
+  // way every other "mean*PerScene" aggregate in structural-signals.ts is.
+  const meanSpeakerTurns = blocks.map(b => {
+    const turns = b.scenes.map(s => s.speakerTurns);
+    return turns.length === 0 ? 0 : turns.reduce((x, y) => x + y, 0) / turns.length;
+  });
+  const droppedRho = spearman(meanSpeakerTurns, cast);
+  console.log(`| meanSpeakerTurns (dropped candidate, report aggregate) | ${droppedRho.toFixed(3)} |`);
 }
 
 // ── main ────────────────────────────────────────────────────────────────────
