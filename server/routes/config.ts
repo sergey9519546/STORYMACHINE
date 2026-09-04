@@ -114,10 +114,62 @@ router.post('/api/session/rotate', gameLimiter, validate(RotateSessionBodySchema
 // with. A SessionBusyError (an in-flight command on this session) surfaces
 // as its own 409 via app.ts's global error handler rather than deleting out
 // from under an active mutation — the caller can retry once idle.
+//
+// THREE STORES, NOT ONE (2026-09-04 privacy re-verification). destroySession()
+// covers the durable ones: the in-memory Stage, the session's SQLite artifacts,
+// and — added by the same pass — its automatic reset-backup directory. Two
+// process-memory stores learned about the writer's draft after E4 was verified
+// and are cleared here, in the route, because neither belongs to
+// session-store.ts's dependency surface:
+//
+//   1. COLLABORATION. A room minted by this session outlives its SQLite file
+//      by up to COLLAB_ROOM_TTL_MS (24h default) and its Y.Doc holds the draft
+//      text in RAM for as long as the room lives. Measured before the fix:
+//      POST /api/collab/token still answered 200 for a room the writer had
+//      just deleted everything for. Docs are destroyed FIRST, while the
+//      registry can still answer "who created this room?".
+//
+//   2. THE DOCTOR'S REPORT CACHE. A cached ScriptDoctorReport is derived, not
+//      raw, but its findings carry `location` strings built from the writer's
+//      own sluglines ("Scene 3 (INT. THE BAR)"), so a report for a deleted
+//      draft is writer-identifiable content sitting in process memory. The
+//      cache is a PURE memoization keyed by content hash and is shared across
+//      sessions, so clearing it is always safe for correctness and costs only
+//      a recompute — and clearing it globally is the honest reading of
+//      "delete everything" on a local-first, single-writer deployment, which
+//      is the shape this product actually ships in (NORTH_STAR: multi-tenant
+//      SaaS is a non-goal). gameLimiter bounds how often an anonymous caller
+//      can force that recompute.
+//
+// Each purge is independently best-effort and runs AFTER the durable delete
+// has already succeeded: a failure to drop an in-memory copy must not turn a
+// completed wipe into a 500 the writer reads as "nothing was deleted".
 router.post('/api/session/delete', gameLimiter, validate(DeleteSessionBodySchema), asyncHandler(async (req, res) => {
   const id = sessionId(req);
   destroySession(id);
-  res.json({ status: 'deleted', sessionId: id });
+
+  let collabRoomsPurged = 0;
+  try {
+    const { collabRoomCreator, forgetCollabRoomsForSession } = await import('../lib/collab-rooms.ts');
+    const { destroyCollabRoomsWhere } = await import('../collab/yjs-server.ts');
+    destroyCollabRoomsWhere(roomId => collabRoomCreator(roomId) === id);
+    collabRoomsPurged = forgetCollabRoomsForSession(id);
+  } catch (error) {
+    logger.warn('session_delete_collab_purge_failed', { error: (error as Error).message });
+  }
+
+  let doctorCacheCleared = false;
+  try {
+    const { clearDoctorCache } = await import('../nvm/analyze/doctor.ts');
+    clearDoctorCache();
+    const { purgeDoctorWorkers } = await import('../nvm/analyze/doctor-pool.ts');
+    purgeDoctorWorkers();
+    doctorCacheCleared = true;
+  } catch (error) {
+    logger.warn('session_delete_doctor_cache_purge_failed', { error: (error as Error).message });
+  }
+
+  res.json({ status: 'deleted', sessionId: id, collabRoomsPurged, doctorCacheCleared });
 }));
 
 // Metrics — Gemini call volume, latency, retries and failures per category

@@ -72,6 +72,13 @@ This file is enforced by `scripts/honesty-audit.mjs`'s claims lane (see its
 | 22 | The rulebook's 3,217 pass-scoped constants are a maintained conceptual set, not a quality claim; the weighted-rule channel contributes AUC ~0.076 to discrimination while scene-count scarcity carries AUC ~0.938. | CLAUDE.md "Standing task" section; NORTH_STAR.md | measured-in-repo | server/nvm/analyze/doctor.ts:1892-1898 | supported |
 | 23 | Live Notes squiggles — Always available (deterministic) | src/components/SettingsPanel.tsx:853 | measured-in-repo | tests/routes/keyless-smoke.test.ts:92 (`/api/scriptide/diagnose` on a keyless server); tests/core/generative-surface-labs-gate.test.ts | supported |
 | 24 | Cost: free to self-host — no account, no subscription, no per-report fee. The deterministic analysis surface … needs no API key at all; a key only unlocks optional generation features. | README.md (top section) | measured-in-repo | tests/routes/keyless-smoke.test.ts (no-API-key operation); package.json (no billing/payment/account dependency anywhere in the tree) | supported |
+| 25 | There is no server-side backup of this by default. | src/components/PrivacyPage.tsx (wording removed 2026-09-04) | measured-in-repo | NONE — POST /api/reset takes an automatic verified SQLite copy of the whole session into data/backups/session-resets/, so "no server-side backup" was false for any writer who had ever used Reset | retired |
+| 26 | On the server that same click also removes the reset-recovery copies described above, closes and drops any share-link rooms this session created, and clears the analysis this server had cached in memory for your script. | src/components/PrivacyPage.tsx (Deleting it) | measured-in-repo | tests/core/session-delete-reset-backups.test.ts; tests/routes/session-delete-memory-stores.test.ts; tests/collab/room-purge.test.ts; scripts/verify-e4-local-safety-net.mjs §4 | supported |
+| 27 | Those copies are capped (five per session, a week each) and Delete Everything removes them along with the live file. | src/components/PrivacyPage.tsx (What the server stores) | measured-in-repo | tests/core/session-delete-reset-backups.test.ts; server/lib/session-store.ts (SESSION_RESET_BACKUP_KEEP / SESSION_RESET_BACKUP_TTL_HOURS defaults) | supported |
+| 28 | If you open a share link, the server also holds the shared copy of that document in memory for as long as the room lives (a day at most, sooner if the server restarts). | src/components/PrivacyPage.tsx (What the server stores) | measured-in-repo | tests/collab/room-purge.test.ts; server/lib/collab-rooms.ts (COLLAB_ROOM_TTL_MS default 24h); server/collab/yjs-server.ts (in-memory only, no persistence) | supported |
+| 29 | no route logs your script text, your title, or a character's name. A test asserts that by running the whole surface with a marker string and failing if it ever appears in the process output. | src/components/PrivacyPage.tsx (What leaves this deployment) | measured-in-repo | tests/routes/no-writer-content-in-logs.test.ts | supported |
+| 30 | Each snapshot also carries the score it had when you took it — health, verdict, scene count, and when it was analyzed … deleted with it. | src/components/PrivacyPage.tsx (What stays in this browser) | measured-in-repo | server/lib/validation.ts (SnapshotSchema's health/verdict/sceneCount/analyzedAt); scripts/verify-e4-local-safety-net.mjs §4 (two marked snapshots saved, then byte-searched for after the delete) | supported |
+| 31 | What it cannot reach, stated plainly: files you exported yourself; copies a collaborator you shared a link with has already taken; and, if your operator ran the backup script by hand, the archive they made. | src/components/PrivacyPage.tsx (Deleting it) | measured-in-repo | scripts/backup-sessions.ts (operator-run, writes under BACKUP_DIR — a root destroySession deliberately does not touch); server/lib/session-store.ts (destroySession's scope) | supported |
 
 ### Notes on rows 1–2 (the fix)
 
@@ -83,6 +90,27 @@ describe what the product actually does — run a deterministic analysis and
 hand back a verdict, a craft score, and a next fix — without the human
 comparison. Tone and information content (verdict, craft score, next fix)
 are preserved; only the unsupported comparison is gone.
+
+### Note on row 25 (the privacy claim that was false)
+
+Row 25 is the one privacy sentence the 2026-09-04 store re-verification found
+untrue rather than merely incomplete. `POST /api/reset` publishes a verified
+SQLite online backup of the WHOLE session — script, title page, snapshots,
+characters, research notes — into `data/backups/session-resets/<sessionId>/`
+before it clears the simulation aggregate, and keeps up to five copies for a
+week. So "there is no server-side backup of this by default" was false for any
+writer who had ever pressed Reset, and worse, `destroySession()` did not remove
+those copies, so they outlived "Delete Everything" by the rest of the retention
+window. Reproduced in a live browser run: a 249KB `.db` under the backup root
+still contained the marker string, the title page and both snapshots after the
+deletion reported success.
+
+Both halves were fixed rather than merely disclosed — `destroySession()` now
+removes the directory, and the page describes the recovery copies plainly
+instead of denying they exist (rows 26–27). Rows 28–29 cover the two stores
+that were previously undescribed rather than misdescribed; row 31 states what
+the control genuinely cannot reach, which is the part of an honest deletion
+promise that is easiest to leave out.
 
 ### What this register deliberately does not do
 

@@ -324,8 +324,20 @@ Growth is bounded automatically, in two independent ways:
 simulation/screenplay session state (agents, locations, action log, editor
 content held server-side). Losing it loses that session's continuity —
 draft text a writer had in flight, in-progress interviews, etc. There is no
-server-side backup by default; if you need durability, back the directory up
-yourself.
+scheduled server-side backup by default; if you need durability, back the
+directory up yourself.
+
+**One automatic copy, and where it goes.** `POST /api/reset` ("Reset
+simulation") publishes a verified SQLite online backup of the *whole* session
+to `data/backups/session-resets/<sessionId>/` before it clears the simulation
+aggregate, so a reset a writer did not mean can be undone. Retention is
+bounded and mandatory — `SESSION_RESET_BACKUP_KEEP` copies (5) for
+`SESSION_RESET_BACKUP_TTL_HOURS` (168) — and `destroySession()` removes the
+whole directory, so "Delete Everything" takes these copies with it rather than
+leaving a readable draft on disk for the rest of the retention window (it did
+until 2026-09-04; see `docs/CLAIMS_REGISTER.md` row 25). This root is
+deliberately separate from `BACKUP_DIR` below: that one is operator-run and
+this app never deletes from it.
 
 **Backing it up safely:** SQLite files must not be copied while a writer
 (WAL/journal) is mid-transaction, so a raw `cp -r data/sessions/ backup/` is

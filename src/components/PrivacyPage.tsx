@@ -21,6 +21,23 @@ import { ChevronLeft, HardDrive, Server, Wifi, Trash2 } from "lucide-react";
 //   - the delete-everything description matches
 //     src/components/SettingsPanel.tsx's SessionTab copy and
 //     server/routes/config.ts's POST /api/session/delete handler exactly.
+//
+// RE-VERIFIED 2026-09-04 against the stores that appeared after E4 was
+// written: the ScriptIDE_State title_page_json column, per-snapshot
+// health/verdict/sceneCount/analyzedAt, the automatic reset-backup copies
+// under data/backups/session-resets/, the in-memory collaboration registry
+// and its Y.Doc, and the doctor's in-process report cache. Two sentences on
+// this page were false before that pass and are now true of the code rather
+// than of the intention: the reset backups survived "Delete Everything" for
+// their whole retention window, and a collaboration room minted by the
+// session stayed joinable (with the draft still in the server's memory) for
+// its whole 24h TTL. Every claim below is asserted by
+// tests/routes/session-delete-memory-stores.test.ts,
+// tests/core/session-delete-reset-backups.test.ts,
+// tests/collab/room-purge.test.ts,
+// tests/routes/no-writer-content-in-logs.test.ts, and section 4 of
+// scripts/verify-e4-local-safety-net.mjs (a live browser run that byte-
+// searches every store for a marker string after the delete).
 const FOCUS_RING =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-stamp focus-visible:outline-offset-4";
 
@@ -90,11 +107,19 @@ export default function PrivacyPage() {
               itself; both live only on this device, in this browser.
             </p>
             <p className="text-sm leading-relaxed text-ink/80">
+              Each snapshot also carries the score it had when you took it —
+              health, verdict, scene count, and when it was analyzed — so the
+              editor can show your score moving across revisions. That is a
+              number about your draft, kept in the same two browser stores as
+              the draft itself and deleted with it.
+            </p>
+            <p className="text-sm leading-relaxed text-ink/80">
               A handful of small preferences also live in localStorage: theme,
               whether Live Notes / auto-analysis / typewriter sound are on, the
-              Labs flag, and this browser's session ID (the opaque identifier that
-              ties it to its server-side session below — not a login, not
-              personally identifying on its own).
+              Labs flag, which screen you were last on, and this browser's
+              session ID (the opaque identifier that ties it to its server-side
+              session below — not a login, not personally identifying on its
+              own).
             </p>
           </div>
         </section>
@@ -108,13 +133,31 @@ export default function PrivacyPage() {
             <p className="text-sm leading-relaxed text-ink/80">
               Unless this deployment's operator has configured otherwise, each
               browser's session gets its own SQLite file on the server, keyed by
-              that opaque session ID — your script draft, snapshots, characters,
-              research notes, and any simulation state, and nothing from any other
-              visitor's session. There is no server-side backup of this by
-              default; a session your operator's server-side cleanup has not
-              touched can sit indefinitely, but an <em>orphaned</em> file (not
-              currently open, per this server's own retention window) is deleted
-              automatically after a week of inactivity.
+              that opaque session ID — your script draft, title page, snapshots,
+              characters, research notes, and any simulation state, and nothing
+              from any other visitor's session. A session your operator's
+              server-side cleanup has not touched can sit indefinitely, but an{" "}
+              <em>orphaned</em> file (not currently open, per this server's own
+              retention window) is deleted automatically after a week of
+              inactivity.
+            </p>
+            <p className="text-sm leading-relaxed text-ink/80">
+              One thing does get copied automatically: if you use{" "}
+              <strong>Reset simulation</strong>, the server first takes a
+              verified snapshot of your whole session to a recovery folder, so a
+              reset you did not mean can be undone. Those copies are capped (five
+              per session, a week each) and Delete Everything removes them along
+              with the live file. Nothing else is backed up unless your operator
+              runs the backup script themselves — those copies live outside this
+              app and only they can remove them.
+            </p>
+            <p className="text-sm leading-relaxed text-ink/80">
+              If you open a <strong>share link</strong>, the server also holds
+              the shared copy of that document in memory for as long as the room
+              lives (a day at most, sooner if the server restarts). Anyone with
+              the link can read and write it — that is what the link is for — and
+              Delete Everything closes the rooms you created and drops their
+              copies.
             </p>
           </div>
         </section>
@@ -133,6 +176,16 @@ export default function PrivacyPage() {
               off unless this deployment has an AI provider key configured, and
               even then every call is made server-side — your script text never
               ships from the browser straight to a third party.
+            </p>
+            <p className="text-sm leading-relaxed text-ink/80">
+              The coverage letter is the same story: your script is posted to
+              this server, analyzed here, and the letter comes back. Nor does
+              your script end up in this server's own logs. The request log
+              records the method, path and status of a request — not its body,
+              and not the query string — and no route logs your script text,
+              your title, or a character's name. A test asserts that by running
+              the whole surface with a marker string and failing if it ever
+              appears in the process output.
             </p>
             <p className="text-xs font-mono uppercase tracking-wide text-ink/50">
               {llmReady === null
@@ -160,6 +213,20 @@ export default function PrivacyPage() {
               its SQLite file from disk. Not a soft reset. It does not touch
               files you already exported to your computer, and it cannot recover
               anything once it runs.
+            </p>
+            <p className="text-sm leading-relaxed text-ink/80">
+              On the server that same click also removes the reset-recovery
+              copies described above, closes and drops any share-link rooms this
+              session created, and clears the analysis this server had cached in
+              memory for your script. The page then reloads without the share
+              link, so it does not rejoin a room you just deleted.
+            </p>
+            <p className="text-sm leading-relaxed text-ink/80">
+              What it cannot reach, stated plainly: files you exported yourself;
+              copies a collaborator you shared a link with has already taken;
+              and, if your operator ran the backup script by hand, the archive
+              they made — that lives outside this app, and only they can delete
+              it.
             </p>
           </div>
         </section>

@@ -332,7 +332,19 @@ Based on what you just witnessed:
           if (eb && nb) {
             eb.contradicts = [...new Set([...(eb.contradicts ?? []), new_id])];
             nb.contradicts = [...new Set([...(nb.contradicts ?? []), existing_id])];
-            logger.info('semantic_contradiction', { agent: this.sheet.name, similarity: similarity.toFixed(2), a: eb.proposition.slice(0, 60), b: nb.proposition.slice(0, 60) });
+            // Belief ids and the similarity score, never the propositions
+            // themselves: a proposition is the writer's own story content
+            // ("MARLA knows the vault code"), and this is an INFO line on the
+            // happy path, so on a busy simulation it would stream the story
+            // into stdout — and into whatever ships stdout off the box —
+            // for a routine, non-error event. The ids are enough to find the
+            // pair in Stage; the text is not needed to act on this log.
+            logger.info('semantic_contradiction', {
+              agent: this.sheet.char_id,
+              similarity: similarity.toFixed(2),
+              existingBeliefId: existing_id,
+              newBeliefId: new_id,
+            });
           }
         }
       } catch (embedErr) {

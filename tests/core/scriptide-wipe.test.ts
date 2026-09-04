@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { wipeAllScriptIDEData, type ScriptIDEWipeDeps } from '../../src/lib/scriptide-wipe.ts';
+import { wipeAllScriptIDEData, postWipeUrl, type ScriptIDEWipeDeps } from '../../src/lib/scriptide-wipe.ts';
 
 function callLog() {
   const calls: string[] = [];
@@ -112,5 +112,44 @@ describe('wipeAllScriptIDEData', () => {
       localStorageCleared: false,
       sessionStorageCleared: false,
     });
+  });
+});
+
+describe('postWipeUrl — the URL the app must land on after a wipe', () => {
+  // A collaboration room id lives in the URL (?collab=<id>) because the share
+  // LINK is the capability (src/components/editor/collab.ts). Reloading the
+  // current URL after a wipe therefore re-enters the room the writer just
+  // deleted everything for — and since the local draft is now empty while the
+  // shared Y.Doc is not, a surviving participant's copy would sync the
+  // supposedly deleted text straight back into the editor.
+  it('strips the collaboration share parameter', () => {
+    assert.equal(
+      postWipeUrl('https://example.test/app?collab=AbC-123_xyz'),
+      'https://example.test/app',
+    );
+  });
+
+  it('keeps every other query parameter — this is not a URL reset', () => {
+    const out = new URL(postWipeUrl('https://example.test/app?keep=1&collab=room9&also=2'));
+    assert.equal(out.searchParams.get('collab'), null);
+    assert.equal(out.searchParams.get('keep'), '1');
+    assert.equal(out.searchParams.get('also'), '2');
+  });
+
+  it('drops the hash route so a wipe lands on the entrance, not #privacy', () => {
+    assert.equal(postWipeUrl('https://example.test/#privacy'), 'https://example.test/');
+    assert.equal(postWipeUrl('https://example.test/?collab=r#verify'), 'https://example.test/');
+  });
+
+  it('is a no-op on a URL that carries neither', () => {
+    assert.equal(postWipeUrl('http://127.0.0.1:5173/'), 'http://127.0.0.1:5173/');
+  });
+
+  it('returns the input unchanged rather than throwing on something unparseable', () => {
+    // The caller uses this as the final step of the wipe. Throwing there would
+    // leave the writer looking at a panel that says the delete succeeded on a
+    // page that never reloads; a reload to an unchanged URL is strictly better.
+    assert.equal(postWipeUrl('not a url'), 'not a url');
+    assert.equal(postWipeUrl(''), '');
   });
 });

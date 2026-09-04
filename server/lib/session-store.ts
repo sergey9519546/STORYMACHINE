@@ -289,6 +289,22 @@ export function getOrCreateSession(sessionId: string): Session {
 }
 
 // Evict a session from memory AND delete its persisted DB file — a true wipe.
+//
+// "Its persisted DB file" is TWO places on disk, not one. POST /api/reset
+// (server/routes/game.ts) takes a verified SQLite online backup of the WHOLE
+// session — draft, snapshots, characters, research notes, title page — into
+// SESSION_BACKUP_DIR/<sessionId>/ before it clears the simulation aggregate,
+// and keeps up to SESSION_RESET_BACKUP_KEEP of them for
+// SESSION_RESET_BACKUP_TTL_HOURS. Until 2026-09-04 this function unlinked only
+// the live database, so a writer who had ever hit Reset and then hit "Delete
+// Everything" left a complete, readable copy of their script on the server's
+// disk for up to a week — measured directly in a live browser run: a 249KB
+// .db under data/backups/session-resets/<sid>/ still contained the marker
+// string, the title page and both snapshots after the deletion reported
+// success. The recovery artifact exists to protect a writer from an
+// accidental Reset; it must not outlive the writer explicitly asking for
+// everything to be gone. PrivacyPage.tsx's delete copy and docs/CLAIMS_REGISTER
+// row 8 are written against this function doing both.
 export function destroySession(sessionId: string): void {
   const session = sessions.get(sessionId);
   if (session && !session.commands.isIdle) throw new SessionBusyError();
@@ -298,6 +314,30 @@ export function destroySession(sessionId: string): void {
     for (const suffix of SQLITE_ARTIFACT_SUFFIXES) {
       try { fs.unlinkSync(base + suffix); } catch { /* file absent — fine */ }
     }
+    destroySessionResetBackups(sessionId);
+  }
+}
+
+/**
+ * Remove this session's entire reset-backup directory. Best-effort by the same
+ * contract as the unlinks above: a delete that cannot complete (a permission
+ * problem, a directory that was never created) must not turn the writer's
+ * successful wipe into a 500 — the live database is already gone by then.
+ *
+ * `sessionId` is joined and then re-checked against SESSION_BACKUP_DIR rather
+ * than trusted: it reaches here from sessionId(req), which validates the id's
+ * shape, but a recursive rm is the one operation in this file where a traversal
+ * would be catastrophic rather than merely wrong, so the containment check is
+ * local and unconditional.
+ */
+function destroySessionResetBackups(sessionId: string): void {
+  const root = path.resolve(SESSION_BACKUP_DIR);
+  const target = path.resolve(root, sessionId);
+  if (target === root || !target.startsWith(root + path.sep)) return;
+  try {
+    fs.rmSync(target, { recursive: true, force: true });
+  } catch (error) {
+    logger.warn('session_reset_backup_purge_failed', { error: (error as Error).message });
   }
 }
 

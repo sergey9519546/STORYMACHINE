@@ -167,6 +167,44 @@ export function collabRegistrySize(): number {
   return rooms.size;
 }
 
+/**
+ * Forget every room this session created, plus its per-session budget entries.
+ * The registry half of "delete everything" (server/routes/config.ts's POST
+ * /api/session/delete).
+ *
+ * WHY THIS EXISTS. Before it, "Delete Everything" wiped the browser stores and
+ * the session's SQLite file but left this registry untouched, so a room the
+ * writer minted stayed joinable for its full 24h TTL — POST /api/collab/token
+ * still answered 200 for it — and the in-memory Y.Doc behind it still held the
+ * draft the writer had just asked the server to forget. Two things have to go:
+ * the capability (here) and the document (server/collab/yjs-server.ts's
+ * destroyCollabRoomsWhere). The route does the doc purge FIRST, while these
+ * entries still exist, because the only way to ask "who created this room?" is
+ * collabRoomCreator() below.
+ *
+ * Deliberately returns a COUNT, not the ids. This module stores sha256(roomId)
+ * and never the id itself, precisely so a heap dump or an accidental log of
+ * this Map is not a set of working join credentials; handing raw ids back out
+ * of here to make the purge addressable would undo that. yjs-server.ts already
+ * holds the raw ids it routes by, so it filters its own map instead.
+ *
+ * Scoped to the CREATOR. A room whose id the writer shared with a collaborator
+ * is still destroyed — the creator asked for their draft to be gone, and a
+ * share link is not a co-ownership claim — but a room another session created
+ * is never touched by this session's delete.
+ */
+export function forgetCollabRoomsForSession(sessionId: string): number {
+  let forgotten = 0;
+  for (const [key, rec] of rooms) {
+    if (rec.creatorSessionId !== sessionId) continue;
+    rooms.delete(key);
+    forgotten++;
+  }
+  roomBudget.delete(sessionId);
+  tokenBudget.delete(sessionId);
+  return forgotten;
+}
+
 /** Test-only: drop every registered room and every rate-limit budget. */
 export function resetCollabRoomsForTesting(): void {
   rooms.clear();

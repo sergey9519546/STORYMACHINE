@@ -180,9 +180,22 @@ working join credentials.
   a pasted Slack message, browser history, a referrer header — has full read
   and write access to that draft. There is no per-collaborator identity, no
   invitation, no revocation of one participant.
-- **No revocation at all, in fact.** A room ends by expiring (TTL), by being
-  evicted at the registry ceiling, or by the process restarting. There is no
-  "remove this collaborator" or "rotate this room's id" control.
+- **No per-collaborator revocation.** There is no "remove this collaborator"
+  or "rotate this room's id" control. A room ends by expiring (TTL), by being
+  evicted at the registry ceiling, by the process restarting — or, since
+  2026-09-04, by its CREATOR deleting their session.
+
+  `POST /api/session/delete` ("Delete Everything") now purges both halves of a
+  room the calling session created: `forgetCollabRoomsForSession` drops the
+  registry entry, so no further token mints and every existing token stops
+  opening the socket, and `destroyCollabRoomsWhere` closes any live connection
+  (1001 "going away") and destroys the Y.Doc, so the draft text leaves process
+  memory instead of waiting out the 24h TTL. That is an all-or-nothing exit for
+  the creator, not per-collaborator revocation: everyone is disconnected, and a
+  collaborator who already has a copy of the text still has it. Rooms created by
+  a DIFFERENT session are never touched. Covered by `tests/collab/room-purge.test.ts`
+  and `tests/routes/session-delete-memory-stores.test.ts`; asserted end to end in
+  a live browser by `scripts/verify-e4-local-safety-net.mjs` §4.
 - **In-memory and process-local.** The registry, like the Y.Docs themselves,
   lives in one process's memory. A restart drops every room, and a
   multi-process deployment behind a load balancer does not share rooms even

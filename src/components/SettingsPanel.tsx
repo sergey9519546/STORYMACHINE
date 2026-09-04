@@ -13,7 +13,7 @@ import {
 import { AIProviderSettings } from "./AIProviderSettings";
 import { getLabsEnabled, setLabsEnabled } from "../lib/feature-flags";
 import { getSessionId, setSessionId } from "../lib/session";
-import { wipeAllScriptIDEData, type ScriptIDEWipeResult } from "../lib/scriptide-wipe";
+import { wipeAllScriptIDEData, postWipeUrl, type ScriptIDEWipeResult } from "../lib/scriptide-wipe";
 import { wipeScriptIDEIDB } from "../lib/scriptide-idb-store";
 
 type AiProviderName  = "gemini" | "openai-compat";
@@ -655,7 +655,12 @@ function SessionTab({ onBeginDataWipe }: { onBeginDataWipe?: () => void }) {
     // left sitting in component state the writer can no longer act on. A
     // brief pause lets the result line below actually be read before the
     // page goes away.
-    setTimeout(() => window.location.reload(), 1200);
+    //
+    // A REPLACE, not a reload: the URL can carry a collaboration room id
+    // (`?collab=<id>`) that a plain reload would rejoin — see postWipeUrl's
+    // doc comment. `replace` rather than `assign` so the collab-scoped URL
+    // does not stay one Back press away.
+    setTimeout(() => window.location.replace(postWipeUrl(window.location.href)), 1200);
   };
 
   const handleRotate = async () => {

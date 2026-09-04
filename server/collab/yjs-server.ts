@@ -228,6 +228,46 @@ export function collabRoomCount(): number {
 }
 
 /**
+ * Destroy every live room whose id satisfies `predicate`, closing any open
+ * connections to it first. Returns how many rooms were destroyed.
+ *
+ * This is the DOCUMENT half of "delete everything" (server/routes/config.ts's
+ * POST /api/session/delete). A room's Y.Doc holds the writer's draft in
+ * process memory for as long as the room lives, so dropping the registry
+ * capability alone (server/lib/collab-rooms.ts's forgetCollabRoomsForSession)
+ * would leave the text itself sitting in RAM until the room was lazily evicted
+ * under capacity pressure — which on a quiet single-writer deployment is
+ * never.
+ *
+ * Connections are closed explicitly (1001 "going away"), unlike
+ * destroyAllRoomsForTesting's teardown: a live collaborator's socket bound to
+ * a destroyed doc would otherwise keep receiving nothing and sending updates
+ * into a dead Y.Doc. Closing is also the honest signal — the document they
+ * were editing no longer exists.
+ *
+ * The predicate takes the raw room id, which never leaves this module: the
+ * caller passes a closure over server/lib/collab-rooms.ts's collabRoomCreator
+ * so ownership is decided there without either module handing ids to the
+ * other. Nothing here logs an id, for the same reason the upgrade handler's
+ * `collab_auth_rejected` does not.
+ */
+export function destroyCollabRoomsWhere(predicate: (roomId: string) => boolean): number {
+  let destroyed = 0;
+  for (const name of [...rooms.keys()]) {
+    if (!predicate(name)) continue;
+    const room = rooms.get(name);
+    if (room) {
+      for (const conn of [...room.conns]) {
+        try { conn.close(1001, 'Room deleted'); } catch { /* already closing */ }
+      }
+    }
+    destroyRoom(name);
+    destroyed++;
+  }
+  return destroyed;
+}
+
+/**
  * Destroy every live room. Production code never calls this — rooms are kept
  * alive across disconnects by design ("evicted lazily under load") so quick
  * reconnects don't lose in-memory state. But each room's y-protocols Awareness

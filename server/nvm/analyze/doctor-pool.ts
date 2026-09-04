@@ -103,6 +103,11 @@ interface WorkerSlot {
   idleTimer?: NodeJS.Timeout;
   /** Set once the worker has confirmed it can load doctor.ts. */
   ready: boolean;
+  /** purgeDoctorWorkers() marked this worker's realm as holding a report
+   *  someone asked to be forgotten, but it was mid-job at the time. It is
+   *  terminated the moment that job settles rather than being killed under a
+   *  caller who is still waiting for a legitimate answer. */
+  retireWhenIdle?: boolean;
 }
 
 const queue: PendingJob[] = [];
@@ -190,6 +195,15 @@ function finishJob(slot: WorkerSlot, settle: () => void): void {
   slot.active = undefined;
   setBusy(slot, false);
   settle();
+  if (slot.retireWhenIdle) {
+    // A wipe landed while this worker was busy. Its realm still holds the
+    // in-worker cache copy of whatever it analysed, so drop it before it can
+    // take another job — pump() below re-spawns as needed.
+    dropSlot(slot);
+    void slot.worker.terminate();
+    pump();
+    return;
+  }
   pump();
   if (!slot.active) armIdleTimer(slot);
 }
@@ -381,6 +395,40 @@ export async function shutdownDoctorPool(): Promise<void> {
     return slot.worker.terminate().catch(() => undefined);
   });
   await Promise.all(terminating);
+}
+
+/**
+ * Drop every worker realm's in-worker report cache — the pool half of "delete
+ * everything" (server/routes/config.ts's POST /api/session/delete).
+ *
+ * WHY A TERMINATION AND NOT A MESSAGE. doctor.ts's LRU lives on the MAIN
+ * thread and is what this pool consults and populates (property 1 in this
+ * file's header), but a worker is a separate realm running its own module
+ * instance, so runScriptDoctor's own doctorCacheSet ALSO fills a second,
+ * per-worker copy — doctor.ts calls that out as "a harmless side effect", and
+ * it is harmless for correctness. It is not harmless for a deletion promise:
+ * that copy holds report findings whose `location` strings are built from the
+ * writer's sluglines. A worker exposes no cache-clearing message and adding
+ * one would put a privacy-critical operation behind the same postMessage
+ * queue a long analysis is already occupying. Terminating is exact, cannot be
+ * starved, and is already this pool's cancellation primitive (property 2) —
+ * workers hold no state anyone else can observe, and the next request spawns
+ * a fresh one.
+ *
+ * Idle workers go immediately; a busy worker is flagged and terminated the
+ * instant its job settles, so an unrelated caller's in-flight analysis is
+ * never killed to satisfy someone else's wipe. Returns how many were
+ * terminated outright.
+ */
+export function purgeDoctorWorkers(): number {
+  let terminated = 0;
+  for (const slot of [...slots]) {
+    if (slot.active) { slot.retireWhenIdle = true; continue; }
+    dropSlot(slot);
+    void slot.worker.terminate();
+    terminated++;
+  }
+  return terminated;
 }
 
 /** Introspection for tests: whether the pool is actually carrying work, or

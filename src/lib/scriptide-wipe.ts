@@ -66,6 +66,43 @@ async function safeAsync(fn: () => Promise<boolean>): Promise<boolean> {
  * skip the others, since each is a genuinely separate store with its own
  * failure modes (quota, private browsing, browser policy).
  */
+/**
+ * The URL the app must land on after a wipe — the current one with the
+ * collaboration share parameter and any hash route stripped.
+ *
+ * WHY THIS IS NOT JUST `location.reload()`. A collaboration room id lives in
+ * the URL (`?collab=<id>`, src/components/editor/collab.ts's
+ * COLLAB_QUERY_PARAM) because the share LINK is the capability. A plain
+ * reload therefore re-enters the room the writer just deleted everything for:
+ * the client re-fetches a join token, reconnects, and — since the wiped local
+ * draft is now empty while the shared Y.Doc is not — pulls the supposedly
+ * deleted text straight back into the editor from another participant's copy.
+ * The server-side room and its Y.Doc are destroyed by POST
+ * /api/session/delete, so the rejoin would fail today; keeping the id in the
+ * URL would still leave a dead capability in history and in the address bar,
+ * and would silently re-arm the whole path the moment a share link were ever
+ * re-mintable. Leaving the room is part of leaving the data.
+ *
+ * The hash goes too: `#privacy` / `#verify` are the app's routes (App.tsx),
+ * and a wipe should land on the entrance, not on whatever sub-view the
+ * Settings panel happened to be opened over.
+ *
+ * Pure and string-in/string-out so it is testable without a DOM. Returns the
+ * input unchanged if it cannot be parsed as a URL — a reload to a
+ * still-collab-scoped URL is strictly better than throwing inside the wipe's
+ * final step.
+ */
+export function postWipeUrl(href: string): string {
+  try {
+    const url = new URL(href);
+    url.searchParams.delete('collab');
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return href;
+  }
+}
+
 export async function wipeAllScriptIDEData(deps: ScriptIDEWipeDeps): Promise<ScriptIDEWipeResult> {
   const serverDeleted = await safeAsync(deps.deleteServerSession);
   const indexedDBWiped = await safeAsync(deps.wipeIndexedDB);
