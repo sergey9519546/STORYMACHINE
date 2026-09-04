@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import path from 'path';
 import { logger } from './lib/logger.ts';
 import { requestLogger } from './lib/request-logger.ts';
@@ -170,6 +171,36 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
     next();
   });
 
+  // ── Response compression (production only) ─────────────────────────────────
+  // Gated to NODE_ENV==='production' for the same reason the CSP block above
+  // is: dev serves through Vite's own middleware (which does its own asset
+  // handling), so this only needs to cover the built `dist/` static files and
+  // the JSON API responses below, both of which are production-only code
+  // paths here. `compression` picks br (Node >=11 has native zlib brotli) or
+  // gzip per the request's Accept-Encoding, negotiates via a `Vary` header,
+  // and leaves anything under its size threshold (1kb default) uncompressed.
+  //
+  // filter EXCLUDES text/event-stream: mime-db marks it compressible (verified
+  // — `compressible('text/event-stream')` returns true), but every SSE route
+  // in server/routes/** (game.ts, scriptide.ts, nvm/revision.ts,
+  // nvm/converge.ts — grepped exhaustively) depends on each `data: ...\n\n`
+  // frame reaching the client as soon as it's written for live progress; the
+  // default compressor buffers output before flushing, which would turn a
+  // live-progress stream into one delayed burst at the end. Those routes all
+  // call `res.setHeader('Content-Type', 'text/event-stream')` before their
+  // first write, so it's already on `res` by the time `filter` runs (compression
+  // calls its filter lazily, on the first write/end) — checking it here is a
+  // response-shape check, not a route allowlist that could quietly drift.
+  if (process.env.NODE_ENV === 'production') {
+    app.use(compression({
+      filter: (req, res) => {
+        const contentType = res.getHeader('Content-Type');
+        if (typeof contentType === 'string' && contentType.startsWith('text/event-stream')) return false;
+        return compression.filter(req, res);
+      },
+    }));
+  }
+
   app.use(configRouter);
   app.use(aiProvidersRouter);
   app.use(gameRouter);
@@ -210,8 +241,48 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
       app.use(vite.middlewares);
     } else {
       const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+      // dist/assets/ is Vite's content-hashed build output (e.g.
+      // index-B3kjzYWS.js) — any change to a file's content changes its
+      // filename, so a stale cached copy can only ever be replaced by a new
+      // URL, never silently served past a real change. That's what makes a
+      // year-long `immutable` cache safe here specifically, unlike the rest
+      // of dist/ (favicon.svg, fonts/*) which ship under their bare,
+      // unhashed names and must keep revalidating instead.
+      app.use('/assets', express.static(path.join(distPath, 'assets'), {
+        maxAge: '1y',
+        immutable: true,
+      }));
+      // A request under /assets/ that didn't match a real file must never
+      // fall through to the SPA catch-all below — without this guard, a
+      // typo'd asset URL, a bad CDN purge, or a path-traversal probe
+      // (/assets/../../.env, percent-encoded variants — express.static's
+      // underlying `send` already normalizes and refuses to serve outside
+      // its root, so these just miss like any other 404 here) all got a 200
+      // + index.html, which looks like a successful load right up until the
+      // browser tries to execute HTML as the JS it asked for. Anything
+      // reaching this point already missed the static mount above.
+      app.use('/assets', (_req, res) => {
+        res.status(404).json({ error: 'Not found' });
+      });
+      // `index: false`: express.static's own directory-index behavior would
+      // otherwise serve dist/index.html directly for GET / with ITS default
+      // cache headers, bypassing the explicit `no-cache` the catch-all below
+      // sets — the exact inconsistency this option exists to prevent (verified:
+      // without it, `/` and a deep link like `/some/route` disagreed on
+      // Cache-Control even though both serve the identical file). Turning it
+      // off routes every path, `/` included, through the one catch-all below,
+      // so index.html gets the same explicit header no matter which URL asked
+      // for it.
+      app.use(express.static(distPath, { index: false }));
+      app.get('*', (_req, res) => {
+        // index.html must NOT share the long, immutable cache above: it is
+        // the one file whose content legitimately changes on every deploy
+        // (it's what points the browser at the current build's hashed asset
+        // URLs), so it needs to be revalidated on every request rather than
+        // served stale from a cache that thinks it's still the old build.
+        res.setHeader('Cache-Control', 'no-cache');
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
     }
   }
 

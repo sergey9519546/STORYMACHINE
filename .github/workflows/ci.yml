@@ -172,10 +172,10 @@ jobs:
           GEMINI_API_KEY: "test-key-ci"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # The browser battery. Seven live-Chromium suites (smoke-p0-live-flow,
+  # The browser battery. Eight live-Chromium suites (smoke-p0-live-flow,
   # verify-focus-traps, verify-p2-p3-surfaces, verify-ui-polish-affordances,
-  # verify-e4-local-safety-net, verify-e5-command-palette, verify-a11y) that
-  # boot the real keyless server and drive the real UI.
+  # verify-e4-local-safety-net, verify-e5-command-palette, verify-a11y,
+  # verify-production-build) that boot the real server and drive the real UI.
   #
   # verify-a11y is the systematic accessibility pass (2026-09-04): an
   # axe-core sweep of every primary surface in both themes, plus a fully
@@ -184,6 +184,20 @@ jobs:
   # real bugs the other five suites' spot-checks never exercised — see its
   # own header for the full account, including one KNOWN, filed-not-fixed
   # issue it deliberately still asserts rather than hides.
+  #
+  # verify-production-build is the odd one out among the eight: every OTHER
+  # suite boots with NODE_ENV unset, so all of them exercise server/app.ts's
+  # Vite-dev-middleware branch — never the branch the Dockerfile, compose
+  # file, and this repo's own published image actually run (`npm run build`
+  # then serve `dist/` with NODE_ENV=production: different static serving,
+  # Cache-Control, compression, and a CSP header that plain doesn't exist in
+  # dev). This suite runs `npm run build` itself and boots the SAME command
+  # the Dockerfile's CMD does, so the browser job now also proves the
+  # production path — not just dev — works end to end. See the suite's own
+  # header for what it found and fixed (2026-09-04): the static server had no
+  # response compression, no cache-header differentiation between hashed
+  # assets and index.html, and a miss under /assets/ silently 200'd the SPA
+  # shell instead of 404ing.
   #
   # These used to run on exactly ONE machine. Three of their own headers
   # asserted they "must not be wired into CI" because "CI has no browser

@@ -49,16 +49,23 @@ export function pickFreePort() {
  * Boot the real server keyless on `port`, waiting for its `server_started`
  * line, then assert /api/ai-config really reports llmReady:false.
  *
+ * `extraEnv` is merged in AFTER the keyless overrides — the one intended use
+ * is verify-production-build.mjs setting `NODE_ENV: 'production'` (and its
+ * own SESSION_DB_DIR) to boot the SAME server this helper already knows how
+ * to launch, but through app.ts's production static/CSP/compression branch
+ * instead of Vite dev middleware. Every other caller omits it and keeps
+ * today's dev-mode boot unchanged.
+ *
  * Returns the ChildProcess. Callers keep it so they can hand it to
  * `shutdown()`.
  */
-export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'verify' } = {}) {
+export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'verify', extraEnv } = {}) {
   const cwd = repo ?? process.cwd();
   const base = baseUrl ?? `http://127.0.0.1:${port}`;
   console.log(`[${logPrefix}] booting keyless server on port ${port}...`);
   const serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd,
-    env: keylessBrowserServerEnv(process.env, port),
+    env: { ...keylessBrowserServerEnv(process.env, port), ...(extraEnv ?? {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;

@@ -156,10 +156,13 @@ jobs:
           GEMINI_API_KEY: "test-key-ci"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # The browser battery. Seven live-Chromium suites (smoke-p0-live-flow,
+  # The browser battery. Eight live-Chromium suites (smoke-p0-live-flow,
   # verify-focus-traps, verify-p2-p3-surfaces, verify-ui-polish-affordances,
-  # verify-e4-local-safety-net, verify-e5-command-palette, verify-a11y) that
-  # boot the real keyless server and drive the real UI.
+  # verify-e4-local-safety-net, verify-e5-command-palette, verify-a11y,
+  # verify-production-build) that boot the real server and drive the real UI —
+  # see ci.yml's copy of this comment for what verify-production-build adds
+  # (the one suite in the battery that boots NODE_ENV=production, i.e. the
+  # Dockerfile's actual path, instead of dev).
   #
   # These used to run on exactly ONE machine. Three of their own headers
   # asserted they "must not be wired into CI" because "CI has no browser

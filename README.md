@@ -101,16 +101,25 @@ look:
   writer flows end to end. CI sets `RUN_E2E=1`; a local `npm test` does not,
   so it silently reports `# SKIP RUN_E2E not set` for that file instead of
   running it.
-- **`npm run verify:browser`** runs the seven live-Chromium suites
+- **`npm run verify:browser`** runs the eight live-Chromium suites
   (`verify:p0-flow`, `verify:focus-traps`, `verify:surfaces`,
   `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`,
-  `verify:a11y`) — it is a separate command, not part of `npm test` at all.
-  `verify:a11y` is the systematic accessibility pass: an axe-core sweep of
-  every primary surface in both themes, plus a fully keyboard-only run of
-  the primary journey (land → paste → analyze → read a finding → jump to
-  it → export). Measured directly: about **three minutes** wall clock with
-  Chromium pre-cached, all seven green. CI runs it as its own blocking
-  `browser` job.
+  `verify:a11y`, `verify:production`) — it is a separate command, not part
+  of `npm test` at all. `verify:a11y` is the systematic accessibility pass:
+  an axe-core sweep of every primary surface in both themes, plus a fully
+  keyboard-only run of the primary journey (land → paste → analyze → read a
+  finding → jump to it → export). `verify:production` is the odd one out:
+  every other suite boots with `NODE_ENV` unset, so they all exercise
+  `server/app.ts`'s Vite-dev-middleware branch — never the one the
+  Dockerfile, `docker-compose.yml`, and the published image actually run
+  (`npm run build` then serve `dist/` with `NODE_ENV=production`, its own
+  CSP, compression, and cache headers). It runs that build and boots the
+  Dockerfile's own `CMD` before driving the same writer journey against it,
+  plus a battery of production-only checks — see
+  `scripts/verify-production-build.mjs`'s header
+  (`verify:production` alone measures ~25s, build included). Measured
+  directly: **just over three minutes** wall clock with Chromium pre-cached,
+  all eight green. CI runs it as its own blocking `browser` job.
 
 For local UI/manual-testing iteration, set `SESSION_DB_DIR=:memory:` before
 `npm run dev` (or export it for the session). Without it, every `npm run dev`
@@ -128,7 +137,8 @@ local poking accumulates real `.db` files there over time.
 
 **Testing & Quality:**
 - `npm test` - Run full test suite (skips `tests/e2e/journeys.test.ts` unless `RUN_E2E=1` — see "Running Tests" above)
-- `npm run verify:browser` - Run the seven live-Chromium suites (~3 min), including `verify:a11y` (axe-core + keyboard-only journey); not part of `npm test`, but a blocking CI job
+- `npm run verify:browser` - Run the eight live-Chromium suites (~3 min), including `verify:a11y` (axe-core + keyboard-only journey) and `verify:production` (builds and boots the app the way the Dockerfile does, then verifies it); not part of `npm test`, but a blocking CI job
+- `npm run verify:production` - Build, boot the app exactly like the Dockerfile's `CMD`, and verify the production path specifically (headers, compression, caching, the `/assets/` 404 boundary, attacks, bundle sizes, dev-vs-prod scoring identity, and the full writer journey against it) — ~25s alone; also runs as part of `verify:browser`
 - `npm run lint` - Type check with TypeScript (no emit)
 - `npm run check-docs` - Scan documentation for AI writing patterns
 - `npm run check-docs:strict` - Same as check-docs but fails on high-severity patterns
