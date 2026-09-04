@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-04, main @ bee9310e (three session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-04, main @ 13a5ee12 (four session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,118 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-04, evening — build, attack, repair, deploy, verify.** The owner's
+brief tightened twice during this batch: *"do not merely audit, recommend,
+or preserve — inspect, understand, decide, implement, test, attack, repair,
+build, deploy, verify, repeat"*, and then *"we are not simplifying; anything
+half-done gets built and wired in, never removed."* One lane was turned
+around mid-flight by the second rule (below). What landed, each behind the
+full gate set and the browser battery:
+
+- **A dense, lexicon-free signal channel exists.** `structural-signals.ts`
+  computes twelve per-scene channels and thirteen document aggregates from
+  counts alone (words, lines, sentences, speech turns, speakers). Ten of the
+  twelve fire on 75–100% of scenes; the lexicon channels driving today's
+  advice fire on 7%. Direction was pre-registered before measuring:
+  `meanAbsDialogueShareDelta` orders all three separation sets (audit pair,
+  calibration bands 0.960, blind pairs 0.833) and `actionSentenceCvOverall`
+  orders both real-prose sets. The honest counter-evidence is in the same
+  file: `meanSpeakersPerScene`, registered with NO direction, orders 32 of
+  32 pairs, and the winners anti-correlate with it — "fewer people talking"
+  may be what separates. Exposed on the report, in the HTML strip and the
+  letter; wired into nothing that scores (a test asserts doctor.ts names
+  the field exactly once). Identity modulo the new key: 45/45, negative
+  control fails as it should. Owner path in
+  `docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md` §6.
+- **The two pending scoring branches were scored on the blind pairs before
+  the owner spends a corpus run on them.** R5 un-pins the nine scripts tied
+  at one health value (3 of 6 ordered, none tied) — but only by exposing raw
+  weighted-issue order, which is itself at chance here; advice-rule-fixes
+  changes nothing (1 of 6). The stack could not be built: the branches
+  conflict on five files including `character-arc.ts`, `rhythm.ts` and
+  `fountain.ts`, so the second measurement needs a manual merge, not the
+  clean rebase the earlier guidance assumed.
+  `docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md`.
+- **The record was corrected where re-verification disagreed** — annotated
+  in place, never rewritten: the corpus receipt's own table reads 15 up / 1
+  down / 5 flat, not 18/1/2; the JSON.parse leak was the hand-written
+  120-character preview, not V8's 10-character snippet; the compare-route
+  before value and its "control moved 1 ms" precision are directional only,
+  and the residual stall was worker cold start, not vector clustering. The
+  full report is committed under `docs/audits/2026-09-04-reverification/`.
+- **Every route was attacked with real payloads, then repaired.** Two
+  denial-of-service shapes survived the earlier hardening rounds: one
+  unbroken 900,000-character token and 10,000 distinct one-off character
+  cues both drove the analyzer quadratic (37 s at 300k characters; a minute
+  at 8,000 names). Both are now refused in under 25 ms by a single shape
+  guard in `validation.ts` shared by every fountain-accepting route — placed
+  outside the scoring path, so no receipt was needed. The collab WebSocket
+  had no frame cap at all (the library default is 100 MiB); a 10 MB frame
+  now closes with code 1009. 200 concurrent doctor requests from 200
+  fabricated sessions were a pass, not a finding: the limiter and the pool
+  held `/health` under a second. `scripts/fuzz-routes.mjs` re-runs all of
+  it in ten seconds. A follow-up closed the one bypass the lane reported:
+  an `.fdx` upload whose converted Fountain is pathological now meets the
+  same guard after conversion.
+- **The production build was actually deployed and walked.** Booting under
+  `NODE_ENV=production` for the first time in this project's verification
+  history found three gaps: no response compression at all (the 198 KB
+  bundle went out as 198 KB), no cache differentiation (hashed assets and
+  `index.html` both `max-age=0`, so nothing was ever cached), and a miss
+  under `/assets/` returned the SPA shell with a 200 — HTML served as the JS
+  the browser asked for. Fixed, with SSE explicitly excluded from
+  compression so live progress still streams. `verify-production-build.mjs`
+  is the eighth browser suite: 71 assertions including five path-traversal
+  variants sent as raw HTTP, a byte-identical dev-vs-prod report check, and
+  the full writer journey against the built bundle.
+- **The percentile was upgraded, not withdrawn.** The lane began by removing
+  the reference-set percentile the blind-pairs experiment had shown pins
+  every short script at 100; the no-subtraction rule reversed it. The
+  reference-set line stays, denominator and all, and gains a second honest
+  denominator beside it: *"Rank among your drafts: 2nd of 5"*, computed
+  client-side from the writer's own saved snapshots, carried into the
+  coverage letter, and rendered as "first saved draft" copy rather than a
+  fabricated "1st of 1". Slate Triage was deliberately left alone — it
+  compares different scripts, and there is no draft history to rank there.
+- **First-request cold start is gone.** The pool now warms one throwaway
+  analysis per worker after `listen` (no-op under test or
+  `DOCTOR_POOL_PREWARM=0`); the first real request drops from ~2.7 s to
+  ~120 ms in this sandbox, warm requests unchanged.
+- **The landing contrast gate was blind, then fixed, then the colours.**
+  The re-verifier's "not reproduced" was reproduced first: the a11y suite
+  audited the landing mid-animation (0 violations at T0, 4 serious at rest).
+  The gate now waits for the DOM to go quiet and for the entrance animation's
+  own completion signal, audits twice, and keeps the worse; verified to FAIL
+  on the unfixed landing before the four contrast fixes (and a fifth, the
+  wizard step header) took it back to 69/69 in both themes.
+- **The structural signals are now in the product, not just on the
+  report.** The Doctor panel has a collapsible "Shape & Rhythm" section (a
+  per-scene strip with the coverage-HTML tooltips, click a scene to jump to
+  it, the two ordering aggregates each with a plain sentence and a "not
+  part of the score" label); the coverage letter's one line became a
+  paragraph with the real values; the fix receipt shows the aggregate deltas
+  beside the health delta; and saved snapshots carry the two aggregates so
+  the trend draws a second line under health. Reports without the field
+  render byte-identically (the two committed letter fixtures did not move; a
+  third fixture carries it). Old snapshots render unchanged.
+- **The browser battery stopped flaking under load instead of being
+  re-run until it passed.** One shared timing policy reads the load per CPU
+  at suite start and scales every Playwright wait (1.0x at or below one per
+  CPU, capped at 4.0x, base values unchanged); a refuse-above-threshold
+  switch exits 3 without launching Chromium; and a `--retry-flaky` option in
+  the new shared runner reports a retried pass as `flaky-pass`, never as a
+  pass (CI keeps retries at zero). Eight suites, run alone and under four
+  CPU hogs at load up to 11 on four CPUs: 16 of 16 pass with no base timeout
+  raised and no suite needing a real fix.
+
+Main moved from 975eada2 to 13a5ee12 over this batch: 21 commits, all
+gated, all pushed. Still running when this was written: a code-split of the
+632 KB ScriptIDE chunk and the What-If Lab getting the Doctor wired in
+(score each branch, promote a branch to a snapshot). The owner-only list is
+unchanged from the record below, with one correction already noted above:
+the second corpus measurement needs a manual merge of the two pending
+branches, not a rebase.
 
 **2026-09-04, later — the hardening batch.** Three read-only audits aimed at
 what the day's own changes had added, then four fix lanes. The audits were
