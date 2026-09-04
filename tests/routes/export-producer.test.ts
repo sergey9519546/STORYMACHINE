@@ -131,6 +131,44 @@ describe('routes/export/slate — HTTP behavior', async () => {
     );
   });
 
+  // 2026-09-04 (honesty-audit matrix fix) — the same two Shape & Rhythm
+  // aggregates every other surface (panel, both coverage exports, snapshot
+  // trend, verify) now carries, present per row when that script's own
+  // report scored the block (>= 2 scenes) — descriptive only, never part of
+  // the ranking (still sorted by health alone; see the ordering assertion
+  // in the test above).
+  it('a script with >= 2 scenes carries the two Shape & Rhythm aggregates; THIN_FOUNTAIN\'s single scene does not (structural-signals.ts abstains below MIN_SCENES_TO_SCORE)', async () => {
+    const res = await post({
+      scripts: [
+        { title: 'Thin Draft', fountain: THIN_FOUNTAIN },
+        { title: 'The Long Wait', fountain: MULTI_SCENE_FOUNTAIN },
+      ],
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    const long = body.slate.find((entry: { title: string }) => entry.title === 'The Long Wait');
+    const thin = body.slate.find((entry: { title: string }) => entry.title === 'Thin Draft');
+    assert.ok(typeof long.meanAbsDialogueShareDelta === 'number');
+    assert.ok(typeof long.actionSentenceCvOverall === 'number');
+    assert.equal(thin.meanAbsDialogueShareDelta, undefined);
+    assert.equal(thin.actionSentenceCvOverall, undefined);
+  });
+
+  it('the HTML variant renders a Shape & Rhythm column labeled descriptive-only', async () => {
+    const res = await post({
+      scripts: [
+        { title: 'Thin Draft', fountain: THIN_FOUNTAIN },
+        { title: 'The Long Wait', fountain: MULTI_SCENE_FOUNTAIN },
+      ],
+      format: 'html',
+    });
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /Shape &amp; Rhythm/);
+    assert.match(html, /not part of the score/);
+    assert.match(html, /swing \d+\.\d\d &middot; cv \d+\.\d\d/);
+  });
+
   it('holds a scene-truncated draft out of the ranked slate and discloses its scope', async () => {
     const res = await post({
       scripts: [

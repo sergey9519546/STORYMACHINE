@@ -849,6 +849,30 @@ export const CoverageLetterBodySchema = z.object({
   'provide exactly one of fountain or fdx',
 );
 
+// POST /api/export/coverage (server/routes/export.ts, server/lib/
+// coverage-html.ts) — the dashboard-style HTML sibling of the coverage
+// LETTER above. Same DoctorBodySchema-shaped body (exactly one of
+// fountain/fdx, optional title) plus the SAME `draftRank` field, same
+// DraftRankSchema, same trust posture: computed client-side from the
+// ScriptIDE editor's own `snapshots` array (this stateless route has no
+// sessionId and never sees them) and passed through so the exported HTML can
+// render "rank among your own saved drafts" beside report.healthPercentile,
+// the same second denominator the letter and the in-app panel already show
+// (2026-09-04 honesty-audit matrix — coverage-html.ts previously had no
+// draft-rank or percentile line at all). Kept as its own schema, not a reuse
+// of DoctorBodySchema, for the same reason CoverageLetterBodySchema is its
+// own schema above: draftRank shouldn't leak into every other doctor-shaped
+// route's accepted body.
+export const CoverageBodySchema = z.object({
+  fountain: fountainField().optional(),
+  fdx: z.string().min(1).max(MAX_FOUNTAIN_CHARS).optional(),
+  title: z.string().max(300).optional(),
+  draftRank: DraftRankSchema.optional(),
+}).refine(
+  (body) => (body.fountain !== undefined) !== (body.fdx !== undefined),
+  'provide exactly one of fountain or fdx',
+);
+
 // POST /api/scriptide/diagnose — stateless (no sessionId), fountain-only. This
 // is the debounce-friendly "diagnostics as you type" sibling of /doctor: it
 // has no fdx/pdf variant because it runs on every keystroke-pause tick against

@@ -620,6 +620,52 @@ describe('renderCoverageHtml — Top Priorities contradiction suppression', () =
   });
 });
 
+// ── Health percentile + draft rank (2026-09-04 honesty-matrix fix) ─────────
+// Before this fix, coverage-html.ts carried no `percentile` token at all
+// (P3's shareable artifact — the one a reader outside the app ever sees —
+// was missing both the reference-set percentile and the draft-rank sibling
+// surfaces already showed). Both lines are purely additive: absent inputs
+// must render byte-identical output to the pre-fix document.
+describe('renderCoverageHtml — health percentile and draft rank', () => {
+  it('renders the health-percentile line with the exact panel copy when healthPercentile is present', () => {
+    const report = buildReport({ healthPercentile: 82 });
+    const html = renderCoverageHtml(report, 'The Long Wait');
+    assert.match(html, /Health percentile: top 20% within a 20-sample, hand-authored synthetic reference set/);
+  });
+
+  it('omits the health-percentile line entirely when the report carries no healthPercentile', () => {
+    const report = buildReport({ healthPercentile: undefined });
+    const html = renderCoverageHtml(report, 'The Long Wait');
+    assert.ok(!html.includes('Health percentile:'));
+  });
+
+  it('renders the draft-rank line when opts.draftRank is provided', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait', { draftRank: { rank: 2, of: 5 } });
+    assert.match(html, /Rank among your drafts: 2nd of 5 \(by health, your own saved drafts of this script\)/);
+  });
+
+  it('renders the "first saved draft" copy when draftRank.of <= 1', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait', { draftRank: { rank: 1, of: 1 } });
+    assert.match(html, /First saved draft — rank among your drafts appears after your next save/);
+  });
+
+  it('omits the draft-rank line entirely when opts carries no draftRank', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait', {});
+    assert.ok(!html.includes('Rank among your drafts'));
+    assert.ok(!html.includes('First saved draft'));
+  });
+
+  it('renders byte-identical output to a report/opts with neither field, when both are absent', () => {
+    const report = buildReport({ healthPercentile: undefined });
+    const withNoOpts = renderCoverageHtml(report, 'The Long Wait');
+    const withEmptyOpts = renderCoverageHtml(report, 'The Long Wait', {});
+    assert.equal(withNoOpts, withEmptyOpts);
+  });
+});
+
 // ── Structural reliability note (#8 provenance) ─────────────────────────────
 // server/lib/structural-reliability.ts is now the SINGLE source of truth for
 // this caveat: doctor.ts's aggregation populates it onto

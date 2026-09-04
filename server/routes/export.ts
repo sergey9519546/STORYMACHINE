@@ -14,7 +14,7 @@ import { logger } from '../lib/logger.ts';
 import { isWholeDraftAnalysisComplete } from '../lib/analysis-completeness.ts';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
 import {
-  validate, DoctorBodySchema, SlateBodySchema, VerifyBodySchema, FountainTitleBodySchema,
+  validate, DoctorBodySchema, CoverageBodySchema, SlateBodySchema, VerifyBodySchema, FountainTitleBodySchema,
   rejectPathologicalConvertedFountain,
 } from '../lib/validation.ts';
 import type { CoverageVerdict, ScriptDoctorReport } from '../nvm/analyze/types.ts';
@@ -320,8 +320,10 @@ router.post('/api/export/print-html', gameLimiter, validate(FountainTitleBodySch
 // before asking the server to wrap it in a nice PDF-ready shell. A producer
 // reading a coverage report should never have to wonder whether the numbers
 // on the page are the numbers the tool actually computed.
-router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
-  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string; title?: string };
+router.post('/api/export/coverage', gameLimiter, validate(CoverageBodySchema), asyncHandler(async (req, res) => {
+  const { fountain: fountainBody, fdx, draftRank } = req.body as {
+    fountain?: string; fdx?: string; title?: string; draftRank?: { rank: number; of: number };
+  };
 
   // Same fdx->Fountain resolution as POST /api/scriptide/doctor: convert here
   // (fdxToFountain is small/pure/dependency-free, so — like that route —
@@ -397,6 +399,7 @@ router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asy
       titlePageTitle: titlePage.title,
       titlePageAuthor: titlePage.author,
       logline,
+      draftRank,
     });
 
     const filename = `${encodeURIComponent(title)}-coverage.html`;
@@ -768,6 +771,23 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
         healthPercentile: report.healthPercentile,
         engineCommit: report.provenance?.engineCommit,
         rulebookCount: report.provenance?.rulebookCount,
+        // 2026-09-04 (honesty-audit matrix fix) — the same two document
+        // aggregates ScriptDoctorPanel.tsx's "Shape & Rhythm" section and
+        // both coverage exports already show, recomputed here for parity
+        // with every other surface. PURELY INFORMATIONAL: there is no
+        // `expected.structuralSignals` field on VerifyBodySchema, so this
+        // block can never be `checked` and can never produce a mismatch or
+        // move `verified` — see tests/routes/export-verify.test.ts's
+        // "an edited structuralSignals aggregate does not affect verified"
+        // for the assertion that proves it. Omitted entirely when the report
+        // carries no scored structuralSignals block, matching every other
+        // optional field's presence-gated render on this route.
+        ...(report.structuralSignals?.scored ? {
+          structuralSignals: {
+            meanAbsDialogueShareDelta: report.structuralSignals.meanAbsDialogueShareDelta,
+            actionSentenceCvOverall: report.structuralSignals.actionSentenceCvOverall,
+          },
+        } : {}),
       },
       verifiedAt,
     });

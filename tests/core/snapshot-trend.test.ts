@@ -6,7 +6,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { snapshotTrend, computeDraftRank } from '../../src/lib/snapshot-trend.ts';
+import { snapshotTrend, computeDraftRank, snapshotDraftRanks } from '../../src/lib/snapshot-trend.ts';
 import type { Snapshot } from '../../src/components/scriptide/SnapshotManager.tsx';
 
 function snap(overrides: Partial<Snapshot> & { id: string }): Snapshot {
@@ -166,6 +166,34 @@ describe('snapshotTrend — Shape & Rhythm aggregates', () => {
   });
 });
 
+// ── healthPercentile (2026-09-04 honesty-audit matrix fix) — same
+//    missing-is-honest rule as every other snapshot field above. ──────────
+
+describe('snapshotTrend — healthPercentile', () => {
+  it('carries healthPercentile through as-is when present', () => {
+    const [entry] = snapshotTrend([snap({ id: 's1', healthPercentile: 82 })]);
+    assert.equal(entry.healthPercentile, 82);
+  });
+
+  it('resolves to null (not undefined, not 0) when absent', () => {
+    const [entry] = snapshotTrend([snap({ id: 's1' })]);
+    assert.equal(entry.healthPercentile, null);
+  });
+
+  it('a legacy snapshot with health but no healthPercentile still resolves it to null', () => {
+    const [entry] = snapshotTrend([snap({ id: 's1', health: 72, verdict: 'CONSIDER', sceneCount: 6 })]);
+    assert.equal(entry.health, 72);
+    assert.equal(entry.healthPercentile, null);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [snap({ id: 'a', healthPercentile: 40 })];
+    const copy = JSON.parse(JSON.stringify(input));
+    snapshotTrend(input);
+    assert.deepEqual(input, copy);
+  });
+});
+
 // ── computeDraftRank — "rank among your own saved drafts" ──────────────────
 // The second, honest denominator alongside the calibration reference-set
 // percentile (2026-09-04): where does the current draft's health land
@@ -216,6 +244,82 @@ describe('computeDraftRank', () => {
     const input = [snap({ id: 'a', health: 10 }), snap({ id: 'b', health: 20 })];
     const copy = JSON.parse(JSON.stringify(input));
     computeDraftRank(input, 50);
+    assert.deepEqual(input, copy);
+  });
+});
+
+// ── snapshotDraftRanks — the same rank, per saved snapshot ──────────────────
+// The Versions list honesty-audit fix (2026-09-04): each SAVED snapshot now
+// shows where it ranks among the OTHER saved snapshots, using the exact same
+// computeDraftRank the current-draft rank already uses — never a second
+// ranking implementation. These tests prove the per-snapshot rank agrees
+// EXACTLY with what computeDraftRank(others, thisHealth) would say directly.
+
+describe('snapshotDraftRanks', () => {
+  it('returns an empty array for no snapshots', () => {
+    assert.deepEqual(snapshotDraftRanks([]), []);
+  });
+
+  it('returns null for a snapshot with no health value', () => {
+    const [rank] = snapshotDraftRanks([snap({ id: 'a' })]);
+    assert.equal(rank, null);
+  });
+
+  it('a lone scored snapshot is "1st of 1" — nothing else to rank against', () => {
+    const [rank] = snapshotDraftRanks([snap({ id: 'a', health: 70 })]);
+    assert.deepEqual(rank, { rank: 1, of: 1 });
+  });
+
+  it('ranks each snapshot against every OTHER snapshot in the array, by health', () => {
+    const snapshots = [
+      snap({ id: 'a', health: 90 }),
+      snap({ id: 'b', health: 60 }),
+      snap({ id: 'c', health: 40 }),
+    ];
+    const ranks = snapshotDraftRanks(snapshots);
+    assert.deepEqual(ranks[0], { rank: 1, of: 3 }, 'the 90 is ahead of both others');
+    assert.deepEqual(ranks[1], { rank: 2, of: 3 }, 'the 60 is behind 90, ahead of 40');
+    assert.deepEqual(ranks[2], { rank: 3, of: 3 }, 'the 40 is behind both others');
+  });
+
+  it('agrees exactly with computeDraftRank(others, thisHealth) called directly — same source, never a second implementation', () => {
+    const snapshots = [
+      snap({ id: 'a', health: 90 }),
+      snap({ id: 'b', health: 60 }),
+      snap({ id: 'c', health: 75 }),
+    ];
+    const ranks = snapshotDraftRanks(snapshots);
+    snapshots.forEach((s, i) => {
+      const others = snapshots.filter((_, j) => j !== i);
+      assert.deepEqual(ranks[i], computeDraftRank(others, s.health));
+    });
+  });
+
+  it('a snapshot with no health value is excluded when ranking its siblings, but still gets null itself', () => {
+    const snapshots = [
+      snap({ id: 'scored-high', health: 90 }),
+      snap({ id: 'unscored' }),
+      snap({ id: 'scored-low', health: 40 }),
+    ];
+    const ranks = snapshotDraftRanks(snapshots);
+    assert.deepEqual(ranks[0], { rank: 1, of: 2 }, 'the unscored sibling does not count toward "of"');
+    assert.equal(ranks[1], null);
+    assert.deepEqual(ranks[2], { rank: 2, of: 2 });
+  });
+
+  it('preserves input order and length 1:1 with the input snapshots array', () => {
+    const input = [snap({ id: 'a', health: 10 }), snap({ id: 'b' }), snap({ id: 'c', health: 20 })];
+    const ranks = snapshotDraftRanks(input);
+    assert.equal(ranks.length, 3);
+    assert.notEqual(ranks[0], null);
+    assert.equal(ranks[1], null);
+    assert.notEqual(ranks[2], null);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [snap({ id: 'a', health: 10 }), snap({ id: 'b', health: 20 })];
+    const copy = JSON.parse(JSON.stringify(input));
+    snapshotDraftRanks(input);
     assert.deepEqual(input, copy);
   });
 });

@@ -95,6 +95,71 @@ function severityChip(sev: RevisionIssue['severity']): string {
   return `<span class="chip chip-${sev}">${label}</span>`;
 }
 
+// ── Percentile / draft-rank copy (2026-09-04 honesty-matrix fix) ────────────
+// ScriptDoctorPanel.tsx and this module are now the SAME two lines, worded
+// identically: "Health percentile: <band> within a 20-sample, hand-authored
+// synthetic reference set" and the draft-rank line beneath it
+// (ScriptDoctorPanel.tsx's DraftRankLine). Duplicated here rather than
+// imported — same rationale coverage-letter.ts's header already states for
+// its own duplicated formatters: this module must stay an independently
+// pure, dependency-free renderer, and the panel's helpers are not exported.
+// ordinal()/percentileBand() are exact copies of ScriptDoctorPanel.tsx's; any
+// wording change there needs the identical change made here (no shared
+// import exists to enforce it, so tests/core/coverage-html.test.ts pins the
+// literal strings).
+function ordinal(n: number): string {
+  const rounded = Math.round(n);
+  const mod100 = rounded % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${rounded}th`;
+  switch (rounded % 10) {
+    case 1: return `${rounded}st`;
+    case 2: return `${rounded}nd`;
+    case 3: return `${rounded}rd`;
+    default: return `${rounded}th`;
+  }
+}
+
+/** D5 false-precision bucketing (docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md)
+ *  — identical to ScriptDoctorPanel.tsx's percentileBand: the 20-sample
+ *  reference set is worth 5 raw points of resolution per sample, so the
+ *  glanceable text buckets to the nearest 10 while the exact ordinal stays
+ *  available in the element's title attribute. */
+function percentileBand(pct: number): string {
+  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  if (clamped >= 90) return 'top 10%';
+  if (clamped <= 10) return 'bottom 10%';
+  const topShare = Math.ceil((100 - clamped) / 10) * 10;
+  return `top ${topShare}%`;
+}
+
+/** Health-percentile line — omitted entirely when the report carries no
+ *  healthPercentile (older/reconstructed report shapes), matching the
+ *  panel's own conditional render. */
+function buildHealthPercentileLine(report: ScriptDoctorReport): string {
+  if (typeof report.healthPercentile !== 'number') return '';
+  const tooltip = escapeHtml(`Exact rank: ${ordinal(report.healthPercentile)} of 20 reference samples`);
+  return `<div class="health-percentile" title="${tooltip}">Health percentile: ${percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set</div>`;
+}
+
+/** Draft-rank line — "rank among the writer's OWN saved drafts of this
+ *  script" (src/lib/snapshot-trend.ts's computeDraftRank), the same second,
+ *  honest denominator the coverage LETTER's opts.draftRank already renders
+ *  (coverage-letter.ts's buildCaveats) and ScriptDoctorPanel.tsx's
+ *  DraftRankLine already shows in-app. Computed CLIENT-SIDE and passed
+ *  through CoverageHtmlOptions.draftRank exactly like that letter option —
+ *  this module never recomputes or trusts it as a score claim, only as
+ *  display copy the writer's own client attests to about their own saved
+ *  history. Omitted entirely when opts carries no draftRank (older callers,
+ *  or nothing yet to rank), same "purely additive" contract every other
+ *  optional CoverageHtmlOptions field already follows. */
+function buildDraftRankLine(draftRank: { rank: number; of: number } | undefined): string {
+  if (!draftRank) return '';
+  const body = draftRank.of <= 1
+    ? 'First saved draft — rank among your drafts appears after your next save'
+    : `Rank among your drafts: ${ordinal(draftRank.rank)} of ${formatNumber(draftRank.of)} (by health, your own saved drafts of this script)`;
+  return `<div class="health-percentile">${body}</div>`;
+}
+
 // ── Section builders ──────────────────────────────────────────────────────────
 
 function buildHeaderSection(
@@ -128,12 +193,14 @@ function buildHeaderSection(
   </header>`;
 }
 
-function buildHealthSection(report: ScriptDoctorReport): string {
+function buildHealthSection(report: ScriptDoctorReport, draftRank?: { rank: number; of: number }): string {
   const band = healthBandColor(report.health);
   const gradeLabel = report.grade ? titleCase(report.grade) : 'Unknown';
   const summary = report.plainSummary
     ? escapeHtml(report.plainSummary)
     : 'No summary is available for this report.';
+  const percentileLine = buildHealthPercentileLine(report);
+  const draftRankLine = buildDraftRankLine(draftRank);
 
   return `
   <section class="section health-section">
@@ -142,7 +209,11 @@ function buildHealthSection(report: ScriptDoctorReport): string {
       <div class="health-outof">/ 100</div>
       <div class="health-grade" style="background:${band.bg}; color:#fff;">${escapeHtml(gradeLabel)}</div>
     </div>
-    <p class="plain-summary">${summary}</p>
+    <div class="health-text-block">
+      <p class="plain-summary">${summary}</p>
+      ${percentileLine}
+      ${draftRankLine}
+    </div>
   </section>`;
 }
 
@@ -625,9 +696,19 @@ const STYLES = `
       padding: 3px 10px;
       border-radius: 999px;
     }
+    .health-text-block {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
     .plain-summary {
       margin: 0;
       font-size: 15px;
+    }
+    .health-percentile {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10.5px;
+      color: #52525b;
+      margin-top: 6px;
     }
     /* ── Dimensions ── */
     .dim-list { display: flex; flex-direction: column; gap: 14px; }
@@ -848,6 +929,14 @@ export interface CoverageHtmlOptions {
    *  one-line pitch the coverage report's header carries alongside the
    *  title. null when the builder degraded (no speaking character etc.). */
   logline?: string | null;
+  /** 2026-09-04 — "rank among the writer's own saved drafts of this script"
+   *  (src/lib/snapshot-trend.ts's computeDraftRank), the same client-computed
+   *  value already threaded through the coverage LETTER export
+   *  (coverage-letter.ts's CoverageLetterOptions.draftRank). See
+   *  buildDraftRankLine's header for the trust posture. Purely additive —
+   *  omitted, this renders byte-identical output to before this field
+   *  existed. */
+  draftRank?: { rank: number; of: number };
 }
 
 /** GODMODE analysis section — surfaces the new structural analysis layers
@@ -1000,7 +1089,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
 
   const body = [
     buildHeaderSection(report, safeTitle, safeAuthor, safeLogline),
-    buildHealthSection(report),
+    buildHealthSection(report, opts.draftRank),
     buildDimensionsSection(dimensions),
     buildStrengthsSection(strengths),
     buildGodmodeSection(report),

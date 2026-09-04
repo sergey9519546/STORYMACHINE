@@ -185,6 +185,32 @@ deep-read and PDF routes are deliberately one-shot.
 | Human agreement / PMF | Unknown — not validated |
 | `draftRank` (2026-09-04) ranks against the reference set | No — it ranks against the writer's OWN saved snapshots of this one script (`src/lib/snapshot-trend.ts`'s `computeDraftRank`); an additive field alongside `healthPercentile`, computed client-side and passed through `POST /api/export/coverage-letter` as display copy, never recomputed by `doctor.ts` |
 
+### Cross-surface consistency (honesty-audit matrix, 2026-09-04)
+
+An adversarial audit drove every surface that shows `health`/`healthPercentile`/
+`structuralSignals` and found the numbers that WERE shown agreed everywhere,
+but three surfaces were missing readings a sibling already showed. Fixed
+additively — no surface lost a reading, and every number still traces to
+exactly one computation (`doctor.ts` for health/percentile,
+`src/lib/snapshot-trend.ts`'s `computeDraftRank` for draft rank, never a
+second implementation):
+
+| Surface | Shape signals (`structuralSignals`) | Draft rank | Health percentile |
+|---|---|---|---|
+| `ScriptDoctorPanel.tsx` (in-app) | yes | yes | yes |
+| Exported coverage HTML (`POST /api/export/coverage`, `server/lib/coverage-html.ts`) | yes (strip + aggregates) | yes (`CoverageHtmlOptions.draftRank`, 2026-09-04) | yes (`buildHealthPercentileLine`, 2026-09-04) |
+| Coverage letter (`POST /api/export/coverage-letter`, `server/lib/coverage-letter.ts`) | yes | yes | yes |
+| Snapshot trend (Versions, `SnapshotManager.tsx` + `snapshot-trend.ts`) | yes (2 aggregates) | yes (`snapshotDraftRanks`, 2026-09-04) | yes (`Snapshot.healthPercentile`, 2026-09-04) |
+| `POST /api/export/verify` | yes (`recomputed.structuralSignals`, 2026-09-04 — informational only, never part of the match/mismatch decision) | n/a (no snapshot history at this stateless route) | yes (`recomputed.healthPercentile`) |
+| `POST /api/export/slate` (`server/lib/slate.ts`, `SlatePanel.tsx`) | yes (per row, 2026-09-04) | n/a (ranking is cross-script by health, not cross-draft) | yes |
+
+`draftRank` is computed exactly once per surface invocation, client-side, by
+`computeDraftRank`/`snapshotDraftRanks` — every server-rendered surface
+(coverage HTML, coverage letter) receives it as caller-supplied display copy
+in the request body (bounds-checked by `DraftRankSchema` in
+`server/lib/validation.ts`), the same trust posture as `title`/`author`; the
+server never recomputes or verifies it as a score claim.
+
 ### Incomplete analysis (P0.3)
 
 If any revision pass throws:

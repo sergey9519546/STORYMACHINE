@@ -42,6 +42,14 @@ export interface SnapshotTrendEntry {
   // block, simply has no reading here. Purely descriptive, never scored. */
   meanAbsDialogueShareDelta: number | null;
   actionSentenceCvOverall: number | null;
+  // 2026-09-04 (honesty-audit matrix fix) — the same calibration
+  // reference-set percentile ScriptDoctorPanel.tsx and the exported coverage
+  // report already carry (report.healthPercentile), captured at snapshot
+  // time exactly like `health` itself — see SnapshotManager.tsx's Snapshot
+  // doc comment. null under the same missing-data rule as every other field
+  // above: a snapshot saved before this field existed, or saved without a
+  // matching fresh report, simply has no reading here.
+  healthPercentile: number | null;
 }
 
 function round1(n: number): number {
@@ -120,6 +128,31 @@ export function snapshotTrend(snapshots: readonly Snapshot[]): SnapshotTrendEntr
       sceneCountDelta: sceneCount !== null && prevSceneCount !== null ? sceneCount - prevSceneCount : null,
       meanAbsDialogueShareDelta: numberOrNull(snap.meanAbsDialogueShareDelta),
       actionSentenceCvOverall: numberOrNull(snap.actionSentenceCvOverall),
+      healthPercentile: numberOrNull(snap.healthPercentile),
     };
+  });
+}
+
+// ── Per-snapshot draft rank (honesty-audit matrix fix, 2026-09-04) ─────────
+// The Versions list previously showed health/verdict/sceneCount for each
+// saved version but never where that version ranked among the writer's OTHER
+// saved drafts — the same "rank among your drafts" line ScriptDoctorPanel.tsx
+// and both coverage exports already show for the CURRENT draft
+// (computeDraftRank above). This is the identical rule applied per snapshot,
+// reusing computeDraftRank itself rather than a second ranking
+// implementation: for snapshot i, every OTHER snapshot in the array is the
+// "saved history" and snapshot i's own health is the "current" draft being
+// ranked against it.
+
+/** Draft rank for EVERY entry in `snapshots`, in the same (newest-first)
+ *  order as the input. Reuses computeDraftRank per entry — never
+ *  reimplements the ranking rule, so a snapshot's rank here can never
+ *  disagree with what computeDraftRank would say if that exact snapshot were
+ *  the live draft. null for a snapshot with no health value, matching
+ *  computeDraftRank's own null contract exactly. */
+export function snapshotDraftRanks(snapshots: readonly Snapshot[]): (DraftRank | null)[] {
+  return snapshots.map((snap, i) => {
+    const others = snapshots.filter((_, j) => j !== i);
+    return computeDraftRank(others, numberOrNull(snap.health));
   });
 }

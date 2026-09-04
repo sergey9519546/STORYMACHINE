@@ -2,8 +2,11 @@ import React, { useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Save, Trash2, History } from "lucide-react";
 import type { CoverageVerdict } from "../../../server/nvm/analyze/types.ts";
-import { snapshotTrend, type SnapshotTrendEntry } from "../../lib/snapshot-trend.ts";
+import {
+  snapshotTrend, snapshotDraftRanks, type SnapshotTrendEntry, type DraftRank,
+} from "../../lib/snapshot-trend.ts";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
+import { ordinal, exactRankTooltip, compactPercentileNote } from "../../lib/percentile-copy.ts";
 
 // writer #9 (upgrade-writer-experience discovery) — "score over revisions".
 // The four score fields are ALL optional: a snapshot only carries them when
@@ -32,6 +35,13 @@ export interface Snapshot {
   // descriptive numbers, not part of the score.
   meanAbsDialogueShareDelta?: number;
   actionSentenceCvOverall?: number;
+  // 2026-09-04 (honesty-audit matrix fix) — the calibration reference-set
+  // percentile ScriptDoctorPanel.tsx and both coverage exports already show
+  // (report.healthPercentile), captured at snapshot time under the SAME rule
+  // as `health` above: present only when a fresh, complete report existed
+  // for the exact text being snapshotted; never fabricated, never
+  // re-derived. Purely additive.
+  healthPercentile?: number;
 }
 
 // ── Score-over-revisions trend (writer #9) ──────────────────────────────────
@@ -127,10 +137,55 @@ function ShapeRhythmTrendLine({ entries }: { entries: SnapshotTrendEntry[] }) {
   );
 }
 
+// ── Percentile / draft-rank copy (2026-09-04 honesty-matrix fix) ───────────
+// Same two lines ScriptDoctorPanel.tsx and both coverage exports
+// (coverage-html.ts, coverage-letter.ts) already show for the CURRENT
+// draft, now shown per SAVED snapshot in the Versions list.
+// ordinal()/compactPercentileNote() are the ONE shared implementation
+// (src/lib/percentile-copy.ts) every percentile-showing surface now imports
+// — 2026-09-04 review finding: this file's PREVIOUS local copy had already
+// silently dropped "hand-authored synthetic" from its sentence (the
+// qualifier that stops a reader assuming the percentile is a comparison
+// against real scripts), proving why a fourth independent hand-copy with no
+// cross-surface test was a real defect, not a harmless convenience. The
+// ranking ITSELF is never reimplemented either: computeDraftRank
+// (src/lib/snapshot-trend.ts) is the one and only place a rank number gets
+// computed anywhere in this codebase — this file only formats a DraftRank
+// it received.
+
+/** Second line under a scored snapshot's trend badge: the reference-set
+ *  percentile (when this snapshot carries one) and its rank among the
+ *  writer's OTHER saved drafts of this script (when computeDraftRank found
+ *  one). Renders nothing when neither is available. */
+function SnapshotPercentileAndRankLine({
+  healthPercentile, draftRank,
+}: {
+  healthPercentile: number | null;
+  draftRank: DraftRank | null;
+}) {
+  if (healthPercentile === null && draftRank === null) return null;
+  return (
+    <div className="text-[10px] font-mono text-[var(--sm-ink-mute)] mt-0.5 flex flex-wrap gap-x-3">
+      {healthPercentile !== null && (
+        <span title={exactRankTooltip(healthPercentile)}>
+          {compactPercentileNote(healthPercentile)}
+        </span>
+      )}
+      {draftRank && (
+        <span>
+          {draftRank.of <= 1
+            ? "Only saved draft with a health score so far"
+            : `Ranks ${ordinal(draftRank.rank)} of ${draftRank.of} by health among your saved drafts`}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** One snapshot row's compact health/verdict + delta-vs-previous readout.
  *  Renders nothing when this snapshot has no health value at all (saved
  *  before this feature, or saved with no fresh report for that text). */
-function SnapshotTrendBadge({ entry }: { entry: SnapshotTrendEntry }) {
+function SnapshotTrendBadge({ entry, draftRank }: { entry: SnapshotTrendEntry; draftRank: DraftRank | null }) {
   if (entry.health === null) return null;
   const delta = entry.healthDelta;
   const deltaLabel = delta === null ? null : delta === 0 ? "±0.0" : delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
@@ -138,19 +193,22 @@ function SnapshotTrendBadge({ entry }: { entry: SnapshotTrendEntry }) {
   const deltaArrow = delta === null || delta === 0 ? "→" : delta > 0 ? "▲" : "▼";
 
   return (
-    <div className="flex items-center gap-2 text-[10px] font-mono mt-1 flex-wrap">
-      <span style={{ color: verdictColor(entry.verdict) }} className="font-bold uppercase">
-        {entry.verdict ?? "—"}
-      </span>
-      <span className="opacity-80">{entry.health.toFixed(1)}/100</span>
-      {deltaLabel && (
-        <span
-          style={{ color: deltaColor }}
-          aria-label={`Health change vs. the previous saved version: ${deltaLabel}`}
-        >
-          {deltaArrow} {deltaLabel}
+    <div className="mt-1">
+      <div className="flex items-center gap-2 text-[10px] font-mono flex-wrap">
+        <span style={{ color: verdictColor(entry.verdict) }} className="font-bold uppercase">
+          {entry.verdict ?? "—"}
         </span>
-      )}
+        <span className="opacity-80">{entry.health.toFixed(1)}/100</span>
+        {deltaLabel && (
+          <span
+            style={{ color: deltaColor }}
+            aria-label={`Health change vs. the previous saved version: ${deltaLabel}`}
+          >
+            {deltaArrow} {deltaLabel}
+          </span>
+        )}
+      </div>
+      <SnapshotPercentileAndRankLine healthPercentile={entry.healthPercentile} draftRank={draftRank} />
     </div>
   );
 }
@@ -343,6 +401,10 @@ export default function SnapshotManager({
   hideList = false,
 }: SnapshotManagerProps) {
   const trend = React.useMemo(() => snapshotTrend(snapshots), [snapshots]);
+  // 2026-09-04 — same computeDraftRank the current draft's rank already
+  // reuses (ScriptDoctorPanel.tsx, coverage exports), applied per snapshot;
+  // see snapshot-trend.ts's snapshotDraftRanks header.
+  const draftRanks = React.useMemo(() => snapshotDraftRanks(snapshots), [snapshots]);
   const hasAnyScore = trend.some((t) => t.health !== null);
 
   return (
@@ -388,7 +450,7 @@ export default function SnapshotManager({
                     measured 4.45:1 on this card's white background — just
                     under 4.5:1. --sm-ink-mute clears it (6.07:1). */}
                 <div className="text-[10px] font-mono text-[var(--sm-ink-mute)]">{s.date}</div>
-                <SnapshotTrendBadge entry={trend[i]} />
+                <SnapshotTrendBadge entry={trend[i]} draftRank={draftRanks[i]} />
               </div>
               <div className="flex gap-2">
                 <button

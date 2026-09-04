@@ -666,6 +666,28 @@ async function main() {
   const exportedHtml = downloadPath ? readFileSync(downloadPath, 'utf8') : '';
   record('P3', 'Export coverage report downloads an HTML file', exportedHtml.length > 0, `${exportedHtml.length} bytes, filename=${download.suggestedFilename()}`);
 
+  // 2026-09-04 (honesty-audit matrix fix) — the exported coverage HTML
+  // (server/lib/coverage-html.ts) previously carried NO percentile or
+  // draft-rank line at all (no `percentile` token anywhere in that file).
+  // Both are additive and gated on data being present; a fresh sample report
+  // always carries a healthPercentile, and ScriptDoctorPanel.tsx always
+  // computes a draftRank (computeDraftRank returns {rank:1,of:1} even with
+  // zero saved snapshots — never null for a finite health), so both must
+  // render on this exact download.
+  const exportedHtmlHasPercentileLine = /Health percentile: [a-z0-9% ]+ within a 20-sample, hand-authored synthetic reference set/i.test(exportedHtml);
+  record(
+    'P3',
+    'Exported coverage HTML carries the health-percentile line (same denominator copy as the panel)',
+    exportedHtmlHasPercentileLine,
+  );
+  const exportedHtmlHasDraftRankLine = /Rank among your drafts: \w+ of \d+ \(by health, your own saved drafts of this script\)/.test(exportedHtml)
+    || /First saved draft — rank among your drafts appears after your next save/.test(exportedHtml);
+  record(
+    'P3',
+    'Exported coverage HTML carries the draft-rank line (rank among the writer\'s own saved drafts)',
+    exportedHtmlHasDraftRankLine,
+  );
+
   // "Coverage letter" (POST /api/export/coverage-letter) — the connected-
   // prose sibling of Export report above, added to ScriptDoctorPanel.tsx
   // beside Export report / Breakdown CSV / Pitch kit. Same toolbar, same
@@ -1489,6 +1511,21 @@ async function main() {
         const nameVisible = await pageB.getByText(/What-If branch #1/).first()
           .waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
         record('P2-whatif', 'The promoted snapshot is listed in Ship -> Versions', nameVisible, nameVisible ? '' : 'promoted snapshot name not visible in the Ship panel');
+
+        // 2026-09-04 (honesty-audit matrix fix) — the Versions list previously
+        // showed health/verdict/delta per snapshot but never a RANK among the
+        // writer's own OTHER saved drafts (snapshotDraftRanks, reusing the
+        // same computeDraftRank the panel/exports already use). The promote
+        // flow just created two snapshots (promoted + undo), but the undo
+        // snapshot only carries a health value when a fresh report already
+        // matched the PRE-promotion text (ScriptIDE.tsx's own "never
+        // fabricated" rule) — so either a real cross-snapshot rank ("1st of
+        // 2") or the honest single-scored-snapshot copy ("Only saved draft
+        // with a health score so far") is a correct outcome here; either one
+        // proves the SAME computeDraftRank-backed line reached this panel.
+        const rankVisible = await pageB.getByText(/Ranks (1st|2nd|3rd|\d+th) of \d+ by health among your saved drafts|Only saved draft with a health score so far/)
+          .first().waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+        record('P2-whatif', 'Ship -> Versions shows each snapshot\'s rank among the writer\'s other saved drafts', rankVisible, rankVisible ? '' : 'no "Ranks N of M by health" / "Only saved draft" text found');
       }
     }
   }

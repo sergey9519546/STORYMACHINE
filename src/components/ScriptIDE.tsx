@@ -1118,6 +1118,10 @@ export default function ScriptIDE({
         sceneCount: previousReport.sceneCount,
         analyzedAt: previousReport.analyzedAt,
       } : {}),
+      // 2026-09-04 (honesty-audit matrix fix) — same rule as confirmSnapshot
+      // above: only when previousReport itself carries a percentile.
+      ...(typeof previousReport?.healthPercentile === 'number'
+        ? { healthPercentile: previousReport.healthPercentile } : {}),
       ...(previousSignals?.scored ? {
         meanAbsDialogueShareDelta: previousSignals.meanAbsDialogueShareDelta,
         actionSentenceCvOverall: previousSignals.actionSentenceCvOverall,
@@ -2084,6 +2088,12 @@ export default function ScriptIDE({
           sceneCount: freshReport.sceneCount,
           analyzedAt: freshReport.analyzedAt,
         } : {}),
+        // 2026-09-04 (honesty-audit matrix fix) — the same calibration
+        // reference-set percentile ScriptDoctorPanel.tsx and both coverage
+        // exports already show, captured under the exact same "only when a
+        // fresh report matched this text" rule as health/verdict above.
+        ...(typeof freshReport?.healthPercentile === 'number'
+          ? { healthPercentile: freshReport.healthPercentile } : {}),
         ...(signals?.scored ? {
           meanAbsDialogueShareDelta: signals.meanAbsDialogueShareDelta,
           actionSentenceCvOverall: signals.actionSentenceCvOverall,

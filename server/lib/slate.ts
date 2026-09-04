@@ -30,6 +30,14 @@ export interface SlateEntry {
   topDimension?: string;
   /** Label of the dimension with the lowest score. */
   weakestDimension?: string;
+  // 2026-09-04 (honesty-audit matrix fix) — the same two document
+  // aggregates ScriptDoctorPanel.tsx's "Shape & Rhythm" section and both
+  // coverage exports already show (report.structuralSignals), present only
+  // when that block is scored (>= 2 scenes). DESCRIPTIVE ONLY, exactly like
+  // every other surface: never part of health, rank, or this slate's
+  // ordering (rankSlate below sorts by health alone, unchanged).
+  meanAbsDialogueShareDelta?: number;
+  actionSentenceCvOverall?: number;
   contentHash: string;
   /** G0-05: false when the underlying report does not cover a complete whole
    *  draft (failed pass or scene truncation). Its `health` is a sentinel (0)
@@ -75,6 +83,10 @@ export function buildSlateEntry(title: string, report: ScriptDoctorReport, conte
     ...(report.truncatedForAnalysis ? { totalSceneCount: report.totalSceneCount } : {}),
     wordCount: report.wordCount,
     ...(dimensions ? { topDimension: dimensions.top, weakestDimension: dimensions.weakest } : {}),
+    ...(report.structuralSignals?.scored ? {
+      meanAbsDialogueShareDelta: report.structuralSignals.meanAbsDialogueShareDelta,
+      actionSentenceCvOverall: report.structuralSignals.actionSentenceCvOverall,
+    } : {}),
     contentHash,
     analysisComplete,
   };
@@ -238,6 +250,7 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
       <td colspan="2">${scope}</td>
       <td>&mdash;</td>
       <td>&mdash;</td>
+      <td>&mdash;</td>
       <td class="hash-cell">${escapeHtml(entry.contentHash.slice(0, 10))}</td>
     </tr>`;
     }
@@ -245,6 +258,13 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
     const verdictColor = entry.verdict ? VERDICT_COLOR[entry.verdict] ?? '#334155' : '#64748b';
     const percentile = typeof entry.healthPercentile === 'number'
       ? `${Math.round(entry.healthPercentile)}th pct`
+      : '&mdash;';
+    // 2026-09-04 — same two Shape & Rhythm aggregates every other surface
+    // shows, marked descriptive here too. '&mdash;' when this row's report
+    // never scored the block (fewer than 2 scenes) — never a fabricated 0.
+    const shapeRhythm = (typeof entry.meanAbsDialogueShareDelta === 'number'
+      && typeof entry.actionSentenceCvOverall === 'number')
+      ? `swing ${entry.meanAbsDialogueShareDelta.toFixed(2)} &middot; cv ${entry.actionSentenceCvOverall.toFixed(2)}`
       : '&mdash;';
     return `
     <tr>
@@ -257,6 +277,7 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
       <td>${entry.wordCount.toLocaleString('en-US')}</td>
       <td>${escapeHtml(entry.topDimension ?? 'N/A')}</td>
       <td>${escapeHtml(entry.weakestDimension ?? 'N/A')}</td>
+      <td title="Descriptive only — not part of the score or this ranking">${shapeRhythm}</td>
       <td class="hash-cell">${escapeHtml(entry.contentHash.slice(0, 10))}</td>
     </tr>`;
   }).join('\n');
@@ -290,6 +311,7 @@ ${STYLES}
           <th>Words</th>
           <th>Top Dimension</th>
           <th>Weakest Dimension</th>
+          <th title="Descriptive only — not part of the score or this ranking">Shape &amp; Rhythm</th>
           <th>Verification Hash</th>
         </tr>
       </thead>
@@ -301,6 +323,8 @@ ${STYLES}
       Deterministic analysis &mdash; no generative AI read or scored any of these scripts. Ranked by health, descending.
       Percentile ranks each script's health against a fixed, 20-sample, hand-authored synthetic reference set
       (server/nvm/analyze/calibration/corpus.ts) &mdash; not against the other scripts in this slate.
+      Shape &amp; Rhythm (talk/action swing &middot; action-prose variation) is read from document structure alone
+      and is descriptive only &mdash; not part of the score, verdict, or this ranking.
     </footer>
   </div>
 </body>

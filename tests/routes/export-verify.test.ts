@@ -319,6 +319,55 @@ describe('routes/export/verify — HTTP behavior', async () => {
     assert.ok(ms < 1000, `expected a fast rejection (<1000ms), took ${ms}ms — the fdx-path guard may not be firing`);
   });
 
+  // ── Structural signals in `recomputed` (2026-09-04 honesty-matrix fix) ────
+  // Same two document aggregates ScriptDoctorPanel.tsx's "Shape & Rhythm"
+  // section and both coverage exports already show — recomputed here for
+  // parity, but PURELY INFORMATIONAL: VerifyBodySchema carries no
+  // `expected.structuralSignals` field at all, so a caller cannot even name
+  // an expectation for it, and it can never enter `checked`/`mismatches` or
+  // move `verified`.
+  it('recomputed.structuralSignals mirrors report.structuralSignals exactly when the report carries a scored block', async () => {
+    assert.ok(report.structuralSignals?.scored, 'sanity: the fixture must be non-degenerate enough to score structural signals');
+
+    const res = await post({
+      fountain: MULTI_SCENE_FOUNTAIN,
+      expected: { contentHash, health: report.health, verdict: report.verdict, totalIssues: report.totalIssues },
+    });
+    const body = await res.json();
+
+    assert.deepEqual(body.recomputed.structuralSignals, {
+      meanAbsDialogueShareDelta: report.structuralSignals!.meanAbsDialogueShareDelta,
+      actionSentenceCvOverall: report.structuralSignals!.actionSentenceCvOverall,
+    });
+  });
+
+  it('an edited/tampered structuralSignals aggregate in `expected` does not affect verified, checked, or mismatches — the field cannot even be named', async () => {
+    const res = await post({
+      fountain: MULTI_SCENE_FOUNTAIN,
+      expected: {
+        contentHash,
+        health: report.health,
+        verdict: report.verdict,
+        totalIssues: report.totalIssues,
+        // Not part of VerifyExpectedSchema — zod strips it silently rather
+        // than erroring, proving this can never become a checked field.
+        structuralSignals: { meanAbsDialogueShareDelta: 999, actionSentenceCvOverall: -999 },
+      },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    assert.equal(body.verified, true);
+    assert.deepEqual(body.mismatches, []);
+    assert.ok(!body.checked.includes('structuralSignals'), 'structuralSignals must never be a checked field');
+    // recomputed still carries the ROUTE's own true reading, unaffected by
+    // whatever bogus value was sent in `expected`.
+    assert.deepEqual(body.recomputed.structuralSignals, {
+      meanAbsDialogueShareDelta: report.structuralSignals!.meanAbsDialogueShareDelta,
+      actionSentenceCvOverall: report.structuralSignals!.actionSentenceCvOverall,
+    });
+  });
+
   it('is deterministic: verifying twice yields identical bodies apart from verifiedAt', async () => {
     const expected = { contentHash, health: report.health, verdict: report.verdict, totalIssues: report.totalIssues };
 

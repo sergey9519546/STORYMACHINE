@@ -2934,7 +2934,7 @@ export default function ScriptDoctorPanel({
     // two can differ (the host project's title vs. the sample's own), and
     // exporting under the wrong one would mislabel a demo as the user's work.
     const exportTitle = activeReportTitle ?? title;
-    let payload: { fountain?: string; fdx?: string; title?: string };
+    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: DraftRank };
     if (report.source?.format === "pdf") {
       const converted = report.source.convertedFountain;
       if (!converted) {
@@ -2950,6 +2950,11 @@ export default function ScriptDoctorPanel({
       // is set in lockstep with the report itself for every non-pdf source.
       payload = { fountain: activeText, title: exportTitle };
     }
+    // 2026-09-04 — same "rank among your own saved drafts" pass-through the
+    // coverage LETTER export already does (handleExportCoverageLetter below,
+    // server/lib/coverage-letter.ts's buildCaveats): purely additive, absent
+    // when there's nothing yet to rank.
+    if (draftRank) payload.draftRank = draftRank;
 
     fetch("/api/export/coverage", {
       method: "POST",

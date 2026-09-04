@@ -77,6 +77,12 @@ interface SlateEntry {
   wordCount: number;
   topDimension?: string;
   weakestDimension?: string;
+  // 2026-09-04 (honesty-audit matrix fix) — the same two Shape & Rhythm
+  // aggregates ScriptDoctorPanel.tsx and both coverage exports already show,
+  // present per row only when that script's report scored the block (>= 2
+  // scenes). Descriptive only — never part of health or this slate's rank.
+  meanAbsDialogueShareDelta?: number;
+  actionSentenceCvOverall?: number;
   contentHash?: string;
   /** G0-05: only explicit true may render a score. Anything else is an
    * incomplete-analysis badge, never a fail-open health value. */
@@ -657,6 +663,12 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Scenes/Words</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Top</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Weakest</th>
+                    <th
+                      className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]"
+                      title="Descriptive only — not part of the score or this ranking"
+                    >
+                      Shape &amp; Rhythm
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -690,6 +702,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                               ? `${entry.sceneCount.toLocaleString()} of ${entry.totalSceneCount.toLocaleString()} scenes analyzed`
                               : `${entry.sceneCount.toLocaleString()} scenes analyzed before analysis became incomplete`}
                           </td>
+                          <td className="px-2 py-2 text-gray-400">—</td>
                           <td className="px-2 py-2 text-gray-400">—</td>
                           <td className="px-2 py-2 text-gray-400">—</td>
                         </tr>
@@ -744,6 +757,15 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                         </td>
                         <td className="px-2 py-2 text-red-700 dark:text-red-400">
                           {entry.weakestDimension ?? "—"}
+                        </td>
+                        <td
+                          className="px-2 py-2 text-gray-500 dark:text-gray-400"
+                          title="Descriptive only — not part of the score or this ranking"
+                        >
+                          {typeof entry.meanAbsDialogueShareDelta === "number"
+                            && typeof entry.actionSentenceCvOverall === "number"
+                            ? `swing ${entry.meanAbsDialogueShareDelta.toFixed(2)} · cv ${entry.actionSentenceCvOverall.toFixed(2)}`
+                            : "—"}
                         </td>
                       </tr>
                     );
