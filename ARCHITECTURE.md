@@ -183,7 +183,7 @@ deep-read and PDF routes are deliberately one-shot.
 | Health density penalty is continuous and monotonic | Supported (P0.1 continuous join at density=1) |
 | Percentiles are industry-representative | No — internal calibration corpus only |
 | Human agreement / PMF | Unknown — not validated |
-| `draftRank` (2026-09-04) ranks against the reference set | No — it ranks against the writer's OWN saved snapshots of this one script (`src/lib/snapshot-trend.ts`'s `computeDraftRank`); an additive field alongside `healthPercentile`, computed client-side and passed through `POST /api/export/coverage-letter` as display copy, never recomputed by `doctor.ts` |
+| `draftRank` (2026-09-04) ranks against the reference set | No — it ranks against the writer's OWN saved snapshots of this one script (`src/lib/snapshot-trend.ts`'s `computeDraftRank`); an additive field alongside `healthPercentile`, computed client-side and passed through `POST /api/export/coverage-letter` and `POST /api/export/coverage` as display copy, never recomputed by `doctor.ts` |
 
 ### Cross-surface consistency (honesty-audit matrix, 2026-09-04)
 

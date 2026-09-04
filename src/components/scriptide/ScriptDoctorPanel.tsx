@@ -50,6 +50,9 @@ import { trackDoctorRun, trackEvent } from "../../lib/analytics";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 import { getLabsEnabled } from "../../lib/feature-flags.ts";
 import { computeDraftRank, type DraftRank } from "../../lib/snapshot-trend.ts";
+import {
+  ordinal, percentileBand, exactRankTooltip, healthPercentileSentence,
+} from "../../lib/percentile-copy.ts";
 import type { Snapshot } from "./SnapshotManager.tsx";
 import {
   DOCTOR_STREAM_TOTAL_PASSES,
@@ -342,42 +345,6 @@ const ROOT_CAUSE_SEVERITY_BORDER: Record<RevisionIssue["severity"], string> = {
  *  text color correctly covers both — no dark: text variant needed. */
 const PERCENTILE_BADGE_CLASS =
   "inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 border border-indigo-300 dark:border-indigo-500/40";
-
-/** Ordinal suffix ("1st", "2nd", "3rd", "4th"…) for a percentile badge —
- *  handles the 11–13 teens exception (11th/12th/13th, not 11st/12nd/13rd). */
-function ordinal(n: number): string {
-  const rounded = Math.round(n);
-  const mod100 = rounded % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${rounded}th`;
-  switch (rounded % 10) {
-    case 1:
-      return `${rounded}st`;
-    case 2:
-      return `${rounded}nd`;
-    case 3:
-      return `${rounded}rd`;
-    default:
-      return `${rounded}th`;
-  }
-}
-
-/** D5 (docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md) — false-precision
- *  presentation fix. The calibration reference set backing every percentile
- *  is 20 hand-authored synthetic scripts (server/nvm/analyze/calibration/
- *  corpus.ts) — each sample is worth 5 raw points of resolution, so an exact
- *  ordinal ("100th") reads as far more precise than 20 data points can
- *  support, and is the same tell as a one-decimal sub-score on thin
- *  evidence. This buckets to the nearest 10 for the glanceable text; the
- *  exact ordinal stays available in the element's `title` tooltip, so
- *  nothing is deleted — only the headline precision is scoped down to what
- *  the sample size actually backs. */
-function percentileBand(pct: number): string {
-  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-  if (clamped >= 90) return 'top 10%';
-  if (clamped <= 10) return 'bottom 10%';
-  const topShare = Math.ceil((100 - clamped) / 10) * 10;
-  return `top ${topShare}%`;
-}
 
 /** 2026-09-04 — second, honest denominator beside the calibration
  *  reference-set percentile line above: rank among the writer's OWN saved
@@ -4205,9 +4172,9 @@ export default function ScriptDoctorPanel({
                 {typeof report.healthPercentile === "number" && (
                   <div
                     className="text-[10px] font-mono text-ink/60 mt-0.5"
-                    title={`Exact rank: ${ordinal(report.healthPercentile)} of 20 reference samples`}
+                    title={exactRankTooltip(report.healthPercentile)}
                   >
-                    Health percentile: {percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
+                    {healthPercentileSentence(report.healthPercentile)}
                   </div>
                 )}
                 {draftRank && <DraftRankLine draftRank={draftRank} className="text-ink/60" />}
@@ -4254,9 +4221,9 @@ export default function ScriptDoctorPanel({
                     {typeof report.healthPercentile === "number" && (
                       <div
                         className="text-[10px] font-mono opacity-70 mt-0.5"
-                        title={`Exact rank: ${ordinal(report.healthPercentile)} of 20 reference samples`}
+                        title={exactRankTooltip(report.healthPercentile)}
                       >
-                        Health percentile: {percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set
+                        {healthPercentileSentence(report.healthPercentile)}
                       </div>
                     )}
                     {draftRank && <DraftRankLine draftRank={draftRank} className="opacity-70" />}

@@ -1137,6 +1137,12 @@ export default function ScriptIDE({
       ...(promotedBranch.verdict !== undefined ? { verdict: promotedBranch.verdict } : {}),
       ...(promotedBranch.sceneCount !== undefined ? { sceneCount: promotedBranch.sceneCount } : {}),
       ...(promotedBranch.analyzedAt !== undefined ? { analyzedAt: promotedBranch.analyzedAt } : {}),
+      // 2026-09-04 review (REVISE item 5) — carried through so a promoted
+      // snapshot is not the one row in Versions that can never show a
+      // percentile; same never-fabricated, present-only-when-sent contract
+      // as every other field here.
+      ...(promotedBranch.healthPercentile !== undefined
+        ? { healthPercentile: promotedBranch.healthPercentile } : {}),
       ...(promotedBranch.meanAbsDialogueShareDelta !== undefined
         ? { meanAbsDialogueShareDelta: promotedBranch.meanAbsDialogueShareDelta } : {}),
       ...(promotedBranch.actionSentenceCvOverall !== undefined

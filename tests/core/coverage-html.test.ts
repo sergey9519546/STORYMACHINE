@@ -13,6 +13,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
 import { computeStructuralReliabilityNote } from '../../server/lib/structural-reliability.ts';
 import type {
@@ -658,11 +661,44 @@ describe('renderCoverageHtml — health percentile and draft rank', () => {
     assert.ok(!html.includes('First saved draft'));
   });
 
-  it('renders byte-identical output to a report/opts with neither field, when both are absent', () => {
+  // 2026-09-04 review (REVISE item 1): the original version of this test
+  // compared renderCoverageHtml(r,t) with renderCoverageHtml(r,t,{}) — but
+  // `opts: CoverageHtmlOptions = {}` already defaults the third argument, so
+  // those two calls are THE SAME CALL and the assertion could never fail
+  // (the reviewer proved this by injecting an unconditional junk `<div>`
+  // into the health section and watching all 41 tests, including this one,
+  // still pass). A real byte-identity claim needs an INDEPENDENT reference:
+  // this compares against `no-percentile-no-draftrank.html`, a fixture
+  // captured by running the pre-this-feature renderer
+  // (`git show 1e170831:server/lib/coverage-html.ts`, the commit this lane
+  // branched from) against the IDENTICAL buildReport()/title pair used here
+  // — so any markup or CSS this lane's health-percentile/draft-rank feature
+  // adds unconditionally (the exact defect the review found: an always-on
+  // `health-text-block` wrapper + two CSS rules, +279 bytes measured on a
+  // real export) now fails this test instead of passing silently.
+  const FIXTURE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'coverage-html');
+
+  it('renders byte-identical output to the pre-feature (main) renderer when the report/opts carry neither healthPercentile nor draftRank', () => {
+    const fixture = readFileSync(join(FIXTURE_DIR, 'no-percentile-no-draftrank.html'), 'utf8');
     const report = buildReport({ healthPercentile: undefined });
+
     const withNoOpts = renderCoverageHtml(report, 'The Long Wait');
+    assert.equal(withNoOpts, fixture, 'no-opts call must match the pre-feature renderer\'s output byte-for-byte');
+
+    // Still worth asserting: the explicit `{}` form (a caller who spells out
+    // "no options") must produce the exact same output as omitting the
+    // argument — this is a real, non-tautological check now that both sides
+    // are ALSO pinned against the independent fixture above, not just each
+    // other.
     const withEmptyOpts = renderCoverageHtml(report, 'The Long Wait', {});
-    assert.equal(withNoOpts, withEmptyOpts);
+    assert.equal(withEmptyOpts, fixture, '{} call must also match the pre-feature renderer\'s output byte-for-byte');
+  });
+
+  it('the health section renders NO health-text-block wrapper and NO .health-percentile/.health-text-block CSS when neither field is present', () => {
+    const report = buildReport({ healthPercentile: undefined });
+    const html = renderCoverageHtml(report, 'The Long Wait');
+    assert.ok(!html.includes('health-text-block'), 'the wrapper div must not exist at all, not merely be empty');
+    assert.ok(!html.includes('.health-percentile {'), 'the CSS rule must not exist at all when nothing on the page uses it');
   });
 });
 

@@ -79,6 +79,10 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
     assert.equal(body.base.analysisComplete, true);
     assert.equal(typeof body.base.health, 'number');
     assert.equal(body.base.sceneCount, 2, 'two seeded commits project to two scenes');
+    // 2026-09-04 review (REVISE item 5): the base report is complete, so
+    // presentReport must carry healthPercentile alongside health/grade —
+    // gated on the SAME `complete` flag, never a second condition.
+    assert.equal(typeof body.base.healthPercentile, 'number');
 
     assert.ok(Array.isArray(body.branches) && body.branches.length > 0, 'at least one scored branch');
     assert.ok(body.branches.length <= 2, 'branchLimit is honoured');
@@ -96,6 +100,11 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
         Math.round((branch.health - body.base.health) * 10) / 10,
         'healthDelta is the branch health minus the base health, nothing else',
       );
+      // 2026-09-04 review (REVISE item 5) — closes the "promoted snapshot can
+      // never show a percentile" asymmetry the review found: every complete
+      // branch report must carry healthPercentile, the same field a manually
+      // saved snapshot already gets from confirmSnapshot.
+      assert.equal(typeof branch.healthPercentile, 'number');
       // Descriptive structural aggregates — present because the variant has
       // >= 2 scenes, so structuralSignals.scored is true.
       assert.equal(typeof branch.meanAbsDialogueShareDelta, 'number');

@@ -155,6 +155,11 @@ interface WhatIfDoctorDraft {
   health?: number;
   grade?: string;
   verdict?: CoverageVerdict;
+  // 2026-09-04 review (REVISE item 5) — the same calibration reference-set
+  // percentile every other scored surface shows, gated by the server on the
+  // same "complete" flag health/grade/verdict already use
+  // (server/routes/nvm/twin-whatif.ts's presentReport).
+  healthPercentile?: number;
   // Descriptive document aggregates — NEVER part of health. Same two channels,
   // same wording, as ScriptDoctorPanel's "Shape & Rhythm" section.
   meanAbsDialogueShareDelta?: number;
@@ -222,6 +227,11 @@ export interface BranchPromotion {
   verdict?: CoverageVerdict;
   sceneCount?: number;
   analyzedAt?: number;
+  // 2026-09-04 review (REVISE item 5) — carried through so a promoted
+  // snapshot is not the one row in Versions that can never show a
+  // percentile; same optional/never-fabricated contract as every other
+  // field here.
+  healthPercentile?: number;
   meanAbsDialogueShareDelta?: number;
   actionSentenceCvOverall?: number;
 }
@@ -839,6 +849,7 @@ export default function WhatIfPanel({ onClose, onCommitted, onPromoteToEditor }:
       verdict: branch.verdict,
       sceneCount: branch.sceneCount,
       analyzedAt: branch.analyzedAt,
+      healthPercentile: branch.healthPercentile,
       meanAbsDialogueShareDelta: branch.meanAbsDialogueShareDelta,
       actionSentenceCvOverall: branch.actionSentenceCvOverall,
     });

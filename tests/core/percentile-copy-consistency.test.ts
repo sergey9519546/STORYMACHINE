@@ -1,0 +1,146 @@
+// src/lib/percentile-copy.ts — the ONE shared implementation of the
+// calibration reference-set percentile copy (ordinal suffixing, the D5
+// false-precision band, and the sentences built from them).
+//
+// 2026-09-04 review finding: after the first pass of the cross-surface
+// parity lane, ordinal()/percentileBand() existed as FOUR independent
+// hand-copies (ScriptDoctorPanel.tsx, server/lib/coverage-html.ts,
+// SnapshotManager.tsx, SlatePanel.tsx) with no test comparing any two of
+// them, and one of the four had already silently drifted — SnapshotManager
+// dropped "hand-authored synthetic" from its sentence. This file has two
+// halves: (1) direct unit tests on the shared module's pure functions, and
+// (2) source-text checks (the g0-06/g0-07/g0-09/shape-rhythm-panel-copy
+// convention — no React render harness exists in this repo, see
+// tests/core/shape-rhythm-panel-copy.test.ts's own header) proving all four
+// surfaces import from this module rather than re-implementing it. Since a
+// surface's JSX only ever interpolates this module's return value, "imports
+// the shared function, does not define a local one" is the strongest
+// available proof (short of a browser render) that they can never disagree.
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import {
+  ordinal, percentileBand, exactRankTooltip, healthPercentileSentence, compactPercentileNote,
+  REFERENCE_SET_SIZE, REFERENCE_SET_LABEL,
+} from '../../src/lib/percentile-copy.ts';
+import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
+import type { ScriptDoctorReport, DoctorGrade, CoverageVerdict } from '../../server/nvm/analyze/types.ts';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8');
+
+describe('percentile-copy.ts — pure functions', () => {
+  it('ordinal() handles the 11-13 teens exception', () => {
+    assert.equal(ordinal(1), '1st');
+    assert.equal(ordinal(2), '2nd');
+    assert.equal(ordinal(3), '3rd');
+    assert.equal(ordinal(4), '4th');
+    assert.equal(ordinal(11), '11th');
+    assert.equal(ordinal(12), '12th');
+    assert.equal(ordinal(13), '13th');
+    assert.equal(ordinal(21), '21st');
+    assert.equal(ordinal(100), '100th');
+  });
+
+  it('percentileBand() buckets to the nearest 10, with a top/bottom 10% floor', () => {
+    assert.equal(percentileBand(100), 'top 10%');
+    assert.equal(percentileBand(95), 'top 10%');
+    assert.equal(percentileBand(82), 'top 20%');
+    assert.equal(percentileBand(50), 'top 50%');
+    assert.equal(percentileBand(10), 'bottom 10%');
+    assert.equal(percentileBand(0), 'bottom 10%');
+  });
+
+  it('exactRankTooltip() names the reference-set size', () => {
+    assert.equal(exactRankTooltip(82), `Exact rank: 82nd of ${REFERENCE_SET_SIZE} reference samples`);
+  });
+
+  it('healthPercentileSentence() carries the "hand-authored synthetic" qualifier', () => {
+    const sentence = healthPercentileSentence(82);
+    assert.equal(sentence, `Health percentile: top 20% within a ${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL}`);
+    assert.match(sentence, /hand-authored synthetic/);
+  });
+
+  it('compactPercentileNote() ALSO carries the "hand-authored synthetic" qualifier — the exact bug this module fixes', () => {
+    const note = compactPercentileNote(82);
+    assert.equal(note, `top 20% of a ${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL}`);
+    assert.match(note, /hand-authored synthetic/, 'the compact form must not drop the qualifier that stops the percentile reading as a comparison against real scripts');
+  });
+});
+
+describe('percentile-copy.ts — no surface re-implements it', () => {
+  const panel = read('../../src/components/scriptide/ScriptDoctorPanel.tsx');
+  const coverageHtml = read('../../server/lib/coverage-html.ts');
+  const snapshotManager = read('../../src/components/scriptide/SnapshotManager.tsx');
+  const slatePanel = read('../../src/components/SlatePanel.tsx');
+
+  const NO_LOCAL_ORDINAL = /function ordinal\s*\(/;
+  const NO_LOCAL_PERCENTILE_BAND = /function percentileBand\s*\(/;
+
+  for (const [name, src, importPath] of [
+    ['ScriptDoctorPanel.tsx', panel, '../../lib/percentile-copy.ts'],
+    ['coverage-html.ts', coverageHtml, '../../src/lib/percentile-copy.ts'],
+    ['SnapshotManager.tsx', snapshotManager, '../../lib/percentile-copy.ts'],
+    ['SlatePanel.tsx', slatePanel, '../lib/percentile-copy.ts'],
+  ] as const) {
+    it(`${name} imports from percentile-copy.ts rather than defining its own ordinal()/percentileBand()`, () => {
+      assert.ok(src.includes(importPath), `${name} must import from ${importPath}`);
+      assert.ok(!NO_LOCAL_ORDINAL.test(src), `${name} must not define a local ordinal() — that is exactly how the previous drift happened`);
+      assert.ok(!NO_LOCAL_PERCENTILE_BAND.test(src), `${name} must not define a local percentileBand()`);
+    });
+  }
+
+  it('ScriptDoctorPanel.tsx renders the sentence via the shared healthPercentileSentence(), not a hand-built string', () => {
+    assert.match(panel, /\{healthPercentileSentence\(report\.healthPercentile\)\}/);
+    assert.ok(!panel.includes('Health percentile: {percentileBand'), 'the old hand-built JSX interpolation must be gone');
+  });
+
+  it('SnapshotManager.tsx renders the compact note via the shared compactPercentileNote(), and the sentence still contains "hand-authored synthetic"', () => {
+    assert.match(snapshotManager, /\{compactPercentileNote\(healthPercentile\)\}/);
+  });
+});
+
+describe('percentile-copy.ts — end-to-end: the exported coverage HTML actually contains the shared sentence', () => {
+  // Pure Node-side proof (no DOM needed) that coverage-html.ts's rendered
+  // OUTPUT — not just its source text — contains exactly what
+  // healthPercentileSentence() produces for the same input, closing the
+  // loop the source-text checks above cannot reach on their own.
+  function minimalReport(healthPercentile: number): ScriptDoctorReport {
+    return {
+      health: 78.3,
+      grade: 'strong' as DoctorGrade,
+      totalIssues: 0,
+      bySeverity: { critical: 0, major: 0, minor: 0 },
+      passes: [],
+      sceneHeatmap: [],
+      topPriorities: [],
+      structure: {
+        actPosition: 'act2b', completionPercent: 50, avgSuspensePerScene: 3,
+        escalating: true, reversalCount: 0, reversalDensity: 0, approachingClimax: false,
+        openClues: 0, revelationCount: 0, midpointPressure: 0, tightestScene: 0,
+      },
+      characters: [],
+      sceneCount: 3,
+      wordCount: 100,
+      analyzedAt: Date.UTC(2026, 8, 4),
+      verdict: 'RECOMMEND' as CoverageVerdict,
+      dimensions: [],
+      strengths: [],
+      plainSummary: 'A clean report.',
+      healthPercentile,
+    };
+  }
+
+  it('the rendered HTML contains healthPercentileSentence(pct) verbatim, for several inputs', () => {
+    for (const pct of [0, 10, 42, 82, 100]) {
+      const html = renderCoverageHtml(minimalReport(pct), 'Consistency Check');
+      assert.ok(
+        html.includes(healthPercentileSentence(pct)),
+        `expected the exported HTML to contain "${healthPercentileSentence(pct)}" for healthPercentile=${pct}`,
+      );
+    }
+  });
+});

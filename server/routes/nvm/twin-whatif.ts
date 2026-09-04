@@ -171,6 +171,13 @@ router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySche
       // `verdict` is already optional on the report and is only meaningful
       // alongside a real score — gated on the same flag for the same reason.
       ...(complete && report.verdict !== undefined ? { verdict: report.verdict } : {}),
+      // 2026-09-04 review (REVISE item 5): the same calibration reference-set
+      // percentile every other scored-snapshot writer (confirmSnapshot, the
+      // undo path) already carries — `report.healthPercentile` is only ever
+      // populated for a complete analysis (doctor.ts), so this is gated on
+      // the same `complete` flag health/grade/verdict already use, never a
+      // second condition that could disagree with them.
+      ...(complete && typeof report.healthPercentile === 'number' ? { healthPercentile: report.healthPercentile } : {}),
       ...(signals?.scored ? {
         meanAbsDialogueShareDelta: signals.meanAbsDialogueShareDelta,
         actionSentenceCvOverall: signals.actionSentenceCvOverall,

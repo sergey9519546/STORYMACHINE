@@ -1050,6 +1050,60 @@ async function main() {
   const claimedVerdict = verdictMatch?.[1];
   const claimedIssues = issuesMatch?.[1];
 
+  // 2026-09-04 review (REVISE item 4): the earlier "Ship -> Versions shows
+  // each snapshot's rank" assertion (P2-whatif, further below) is reachable
+  // ONLY through the What-If promote flow, whose undo snapshot is always
+  // unscored — so that assertion always hits the `of <= 1` branch and can
+  // never distinguish a real cross-snapshot rank from a degenerate
+  // always-{rank:1,of:1} implementation. This is the STRICT counterpart,
+  // reachable from the sample-coverage context this dialog is already open
+  // in: close the report dialog, open Ship -> Versions, save the SAME
+  // script twice (no edits between saves, so both snapshots share the exact
+  // same health — a genuine tie), and assert the exact "Ranks 1st of 2 by
+  // health among your saved drafts" text renders (computeDraftRank's
+  // documented tie rule: an exact tie shares the better rank).
+  await pageA.keyboard.press('Escape');
+  await pageA.waitForTimeout(timing.ms(200));
+
+  const shipTabP3 = pageA.getByRole('button', { name: /^Ship$/ }).first();
+  const shipReachableP3 = await shipTabP3.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+  if (shipReachableP3) {
+    await shipTabP3.click();
+    const saveVersionBtn = pageA.getByRole('button', { name: 'Save new script version snapshot', exact: true }).first();
+    for (let i = 0; i < 2; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      const saveBtnVisible = await saveVersionBtn.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+      if (!saveBtnVisible) break;
+      // eslint-disable-next-line no-await-in-loop
+      await saveVersionBtn.click();
+      const nameInput = pageA.getByLabel('Snapshot version name', { exact: true }).first();
+      // eslint-disable-next-line no-await-in-loop
+      await nameInput.waitFor({ state: 'visible', timeout: timing.ms(5000) });
+      // Enter confirms the snapshot (SnapshotManager.tsx's onKeyDown), same
+      // as clicking the modal's own "Save" button — avoids an ambiguous
+      // "Save" text-selector elsewhere on the page.
+      // eslint-disable-next-line no-await-in-loop
+      await nameInput.press('Enter');
+      // eslint-disable-next-line no-await-in-loop
+      await nameInput.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
+    }
+    const strictRankVisible = await pageA.getByText('Ranks 1st of 2 by health among your saved drafts')
+      .first().waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+    record(
+      'P3',
+      'Ship -> Versions shows a REAL cross-snapshot rank ("Ranks 1st of 2 by health among your saved drafts") after saving two versions of the same script',
+      strictRankVisible,
+      strictRankVisible ? '' : 'expected exact "Ranks 1st of 2 by health among your saved drafts" text not found after saving two versions',
+    );
+  } else {
+    record(
+      'P3',
+      'Ship -> Versions shows a REAL cross-snapshot rank after saving two versions of the same script',
+      false,
+      'Ship tab not reachable in the sample-coverage context',
+    );
+  }
+
   // Close the dialog, navigate to #verify.
   await pageA.keyboard.press('Escape');
   await pageA.waitForTimeout(timing.ms(200));
@@ -1498,6 +1552,18 @@ async function main() {
         && typeof promotedSnapshot.meanAbsDialogueShareDelta === 'number'
         && typeof promotedSnapshot.actionSentenceCvOverall === 'number';
       record('P2-whatif', 'The promoted snapshot carries health + the two descriptive aggregates, like every other scored snapshot', !!carriesScore, `snapshot=${JSON.stringify(promotedSnapshot ?? null)}`);
+
+      // 2026-09-04 review (REVISE item 5) — the promoted snapshot must ALSO
+      // carry healthPercentile now, closing the asymmetry the review found:
+      // before this, a manually saved snapshot showed a percentile line in
+      // the SAME Versions list a promoted one never could.
+      const promotedCarriesPercentile = promotedSnapshot && typeof promotedSnapshot.healthPercentile === 'number';
+      record(
+        'P2-whatif',
+        'The promoted snapshot ALSO carries healthPercentile — no asymmetry with manually saved snapshots in the same Versions list',
+        !!promotedCarriesPercentile,
+        `healthPercentile=${promotedSnapshot?.healthPercentile}`,
+      );
 
       editorHoldsPromotedText = typeof draftState?.scriptText === 'string'
         && draftState.scriptText === promotedSnapshot?.text;

@@ -20,6 +20,7 @@ const snapshotManager = read('../../src/components/scriptide/SnapshotManager.tsx
 const scriptIde = read('../../src/components/ScriptIDE.tsx');
 const doctorStream = read('../../src/lib/doctor-stream.ts');
 const whatIfPanel = read('../../src/components/WhatIfPanel.tsx');
+const slatePanel = read('../../src/components/SlatePanel.tsx');
 
 describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
   it('renders a "Shape & Rhythm" heading', () => {
@@ -164,5 +165,26 @@ describe("WhatIfPanel — the Lab's Script Doctor readout (2026-09-04)", () => {
   it('never computes a score in the bundle — it only POSTs to the server route', () => {
     assert.match(whatIfPanel, /'\/api\/nvm\/whatif\/doctor'/);
     assert.doesNotMatch(whatIfPanel, /runScriptDoctor/);
+  });
+});
+
+// 2026-09-04 review (REVISE item 3): SlatePanel.tsx's Shape & Rhythm column
+// used to state "not part of the score or this ranking" ONLY in a `title=`
+// tooltip on the column header — invisible to keyboard and touch readers,
+// unlike every other surface's visible label (ScriptDoctorPanel.tsx's
+// "Descriptive — not part of the score" badge, SnapshotManager.tsx's
+// visible trend-line heading, and the exported slate HTML's visible footer
+// sentence, server/lib/slate.ts). This asserts the copy is now ALSO visible
+// text, not merely a tooltip.
+describe('SlatePanel.tsx — Shape & Rhythm column labelling is visible, not tooltip-only', () => {
+  it('renders "not part of the score" as plain text content, not only inside a title= attribute', () => {
+    // Strip every title="..." attribute value before checking — a match that
+    // survives this strip can only be visible JSX text content.
+    const withoutTooltips = slatePanel.replace(/title="[^"]*"/g, 'title=""');
+    assert.match(withoutTooltips, /not part of the score/);
+  });
+
+  it('the tooltip on the column header still carries the same wording too (belt-and-suspenders, not a replacement)', () => {
+    assert.match(slatePanel, /title="Descriptive only — not part of the score or this ranking"/);
   });
 });

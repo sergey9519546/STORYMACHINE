@@ -12,14 +12,17 @@
 // Idioms: right-side drawer shell, export/download-blob mechanics, and the
 // 404-as-"not deployed yet" feature detection all mirror
 // scriptide/ScriptDoctorPanel.tsx (none of its helpers are exported, so the
-// small ones used here — downloadBlob, filename parsing, ordinal — are
-// duplicated rather than imported). Request lifecycle (abort refs, a
-// mounted-guard ref, aborting in-flight work on unmount) mirrors
-// InterviewPanel.tsx's send().
+// small ones used here — downloadBlob, filename parsing — are duplicated
+// rather than imported; the percentile copy is NOT duplicated — see
+// src/lib/percentile-copy.ts, the single shared implementation ordinal()/
+// percentileBand() now live in, 2026-09-04 review). Request lifecycle
+// (abort refs, a mounted-guard ref, aborting in-flight work on unmount)
+// mirrors InterviewPanel.tsx's send().
 
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap.ts";
+import { percentileBand, exactRankTooltip } from "../lib/percentile-copy.ts";
 import {
   Layers3,
   X,
@@ -140,36 +143,6 @@ const VERDICT_CHIP: Record<
     title: "In coverage, “pass” means decline — not the opposite of a school-test “fail.” The engine placed this draft in its decline tier.",
   },
 };
-
-/** Ordinal suffix for a percentile badge — same 11–13 teens exception as
- *  ScriptDoctorPanel's ordinal(), duplicated for the same reason as above. */
-function ordinal(n: number): string {
-  const rounded = Math.round(n);
-  const mod100 = rounded % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${rounded}th`;
-  switch (rounded % 10) {
-    case 1:
-      return `${rounded}st`;
-    case 2:
-      return `${rounded}nd`;
-    case 3:
-      return `${rounded}rd`;
-    default:
-      return `${rounded}th`;
-  }
-}
-
-/** Coarse percentile band for the slate table — same D5 false-precision fix
- *  as ScriptDoctorPanel.tsx's percentileBand(), duplicated for the same
- *  reason ordinal() above is: the 20-sample synthetic reference set backing
- *  this number has ~5-point resolution, so an exact ordinal overstates it. */
-function percentileBand(pct: number): string {
-  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-  if (clamped >= 90) return "top 10%";
-  if (clamped <= 10) return "bottom 10%";
-  const topShare = Math.ceil((100 - clamped) / 10) * 10;
-  return `top ${topShare}%`;
-}
 
 function parseFilenameFromContentDisposition(header: string | null): string | null {
   if (!header) return null;
@@ -650,6 +623,15 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
           <div className="space-y-2">
             <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
               Ranked {new Date(result.rankedAt).toLocaleString()}
+              {/* 2026-09-04 review (REVISE item 3): the "not part of the
+                  score" caveat used to live ONLY in a title= tooltip on the
+                  Shape & Rhythm column header — invisible to keyboard and
+                  touch readers. Rendered here as visible copy too, matching
+                  the visible label ScriptDoctorPanel.tsx's Shape & Rhythm
+                  section and SnapshotManager.tsx's trend line already use,
+                  and the visible footer sentence the exported slate HTML
+                  (server/lib/slate.ts) already carries. */}
+              <span className="normal-case tracking-normal"> &middot; Shape &amp; Rhythm column is descriptive only — not part of the score or this ranking</span>
             </p>
             <div className="overflow-x-auto sm-btn">
               <table className="w-full text-xs font-mono border-collapse">
@@ -741,7 +723,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                           className="px-2 py-2 text-gray-500 dark:text-gray-400"
                           title={
                             typeof entry.healthPercentile === "number"
-                              ? `Exact rank: ${ordinal(entry.healthPercentile)} of 20 reference samples`
+                              ? exactRankTooltip(entry.healthPercentile)
                               : undefined
                           }
                         >

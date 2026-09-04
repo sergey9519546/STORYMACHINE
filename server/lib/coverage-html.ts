@@ -25,6 +25,15 @@ import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 import { isNamedRootCause } from '../nvm/analyze/cluster.ts';
 import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
+// Shared percentile copy (2026-09-04 review — consolidates what used to be
+// four independent hand-copies of ordinal()/percentileBand() across the
+// panel, this file, SnapshotManager.tsx and SlatePanel.tsx into one
+// implementation; see src/lib/percentile-copy.ts's own header). Server files
+// in this codebase already import directly from src/lib — see
+// server/routes/export.ts's imports of fountain.ts/fdx.ts/docx.ts — so this
+// is an established pattern, not a new one; it does not touch the scoring
+// path (no import edge to/from doctor.ts either direction).
+import { ordinal, healthPercentileSentence, exactRankTooltip } from '../../src/lib/percentile-copy.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the
@@ -96,49 +105,16 @@ function severityChip(sev: RevisionIssue['severity']): string {
 }
 
 // ── Percentile / draft-rank copy (2026-09-04 honesty-matrix fix) ────────────
-// ScriptDoctorPanel.tsx and this module are now the SAME two lines, worded
-// identically: "Health percentile: <band> within a 20-sample, hand-authored
-// synthetic reference set" and the draft-rank line beneath it
-// (ScriptDoctorPanel.tsx's DraftRankLine). Duplicated here rather than
-// imported — same rationale coverage-letter.ts's header already states for
-// its own duplicated formatters: this module must stay an independently
-// pure, dependency-free renderer, and the panel's helpers are not exported.
-// ordinal()/percentileBand() are exact copies of ScriptDoctorPanel.tsx's; any
-// wording change there needs the identical change made here (no shared
-// import exists to enforce it, so tests/core/coverage-html.test.ts pins the
-// literal strings).
-function ordinal(n: number): string {
-  const rounded = Math.round(n);
-  const mod100 = rounded % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${rounded}th`;
-  switch (rounded % 10) {
-    case 1: return `${rounded}st`;
-    case 2: return `${rounded}nd`;
-    case 3: return `${rounded}rd`;
-    default: return `${rounded}th`;
-  }
-}
-
-/** D5 false-precision bucketing (docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md)
- *  — identical to ScriptDoctorPanel.tsx's percentileBand: the 20-sample
- *  reference set is worth 5 raw points of resolution per sample, so the
- *  glanceable text buckets to the nearest 10 while the exact ordinal stays
- *  available in the element's title attribute. */
-function percentileBand(pct: number): string {
-  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-  if (clamped >= 90) return 'top 10%';
-  if (clamped <= 10) return 'bottom 10%';
-  const topShare = Math.ceil((100 - clamped) / 10) * 10;
-  return `top ${topShare}%`;
-}
-
-/** Health-percentile line — omitted entirely when the report carries no
- *  healthPercentile (older/reconstructed report shapes), matching the
- *  panel's own conditional render. */
+// ScriptDoctorPanel.tsx and this module render the SAME sentence because
+// both call the SAME function — src/lib/percentile-copy.ts's
+// healthPercentileSentence/exactRankTooltip (imported above), not two
+// independent hand-copies. See that module's header for why four
+// independent copies existed before this and why that was a defect, not a
+// convenience.
 function buildHealthPercentileLine(report: ScriptDoctorReport): string {
   if (typeof report.healthPercentile !== 'number') return '';
-  const tooltip = escapeHtml(`Exact rank: ${ordinal(report.healthPercentile)} of 20 reference samples`);
-  return `<div class="health-percentile" title="${tooltip}">Health percentile: ${percentileBand(report.healthPercentile)} within a 20-sample, hand-authored synthetic reference set</div>`;
+  const tooltip = escapeHtml(exactRankTooltip(report.healthPercentile));
+  return `<div class="health-percentile" title="${tooltip}">${healthPercentileSentence(report.healthPercentile)}</div>`;
 }
 
 /** Draft-rank line — "rank among the writer's OWN saved drafts of this
@@ -193,14 +169,37 @@ function buildHeaderSection(
   </header>`;
 }
 
-function buildHealthSection(report: ScriptDoctorReport, draftRank?: { rank: number; of: number }): string {
+/** `percentileLine`/`draftRankLine` are already-built (possibly empty)
+ *  strings — see buildHealthPercentileLine/buildDraftRankLine — passed in
+ *  rather than recomputed here so renderCoverageHtml's `needsHealthTextBlock`
+ *  decision (which also gates the CSS block, in <style>) can never drift
+ *  from what this function actually renders: ONE boolean, computed once,
+ *  drives both the markup and the styles. */
+function buildHealthSection(report: ScriptDoctorReport, percentileLine: string, draftRankLine: string): string {
   const band = healthBandColor(report.health);
   const gradeLabel = report.grade ? titleCase(report.grade) : 'Unknown';
   const summary = report.plainSummary
     ? escapeHtml(report.plainSummary)
     : 'No summary is available for this report.';
-  const percentileLine = buildHealthPercentileLine(report);
-  const draftRankLine = buildDraftRankLine(draftRank);
+
+  // Byte-identity fix (2026-09-04 review): a report/opts pair that carries
+  // NEITHER field must render EXACTLY what this section rendered before
+  // percentile/draftRank existed — no wrapper div, no extra blank
+  // interpolation lines. The `health-text-block` wrapper (needed so the two
+  // new lines sit under `.plain-summary` instead of becoming siblings of
+  // `.health-score-block` in the flex row) is therefore emitted ONLY when at
+  // least one of the two lines actually has content — never unconditionally.
+  // tests/core/coverage-html.test.ts pins this against a committed fixture
+  // string captured from the pre-this-change renderer, so a probe that
+  // injects markup into this section (as the review's REVIEWER-PROBE did)
+  // fails that comparison instead of passing silently.
+  const textBlock = (percentileLine || draftRankLine)
+    ? `<div class="health-text-block">
+      <p class="plain-summary">${summary}</p>
+      ${percentileLine}
+      ${draftRankLine}
+    </div>`
+    : `<p class="plain-summary">${summary}</p>`;
 
   return `
   <section class="section health-section">
@@ -209,11 +208,7 @@ function buildHealthSection(report: ScriptDoctorReport, draftRank?: { rank: numb
       <div class="health-outof">/ 100</div>
       <div class="health-grade" style="background:${band.bg}; color:#fff;">${escapeHtml(gradeLabel)}</div>
     </div>
-    <div class="health-text-block">
-      <p class="plain-summary">${summary}</p>
-      ${percentileLine}
-      ${draftRankLine}
-    </div>
+    ${textBlock}
   </section>`;
 }
 
@@ -696,19 +691,9 @@ const STYLES = `
       padding: 3px 10px;
       border-radius: 999px;
     }
-    .health-text-block {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
     .plain-summary {
       margin: 0;
       font-size: 15px;
-    }
-    .health-percentile {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 10.5px;
-      color: #52525b;
-      margin-top: 6px;
     }
     /* ── Dimensions ── */
     .dim-list { display: flex; flex-direction: column; gap: 14px; }
@@ -917,6 +902,30 @@ const STYLES = `
     }
 `;
 
+// Byte-identity fix (2026-09-04 review): these two rules back the
+// `.health-text-block`/`.health-percentile` markup buildHealthSection emits
+// ONLY when the report carries a healthPercentile or the caller passed a
+// draftRank (see its own comment). Kept OUT of the static STYLES block above
+// and appended to the document's <style> tag only in that same case, so a
+// report/opts pair with neither field produces a <style> tag with exactly
+// the same bytes STYLES alone always had — no unused CSS rules, no
+// unconditional growth. tests/core/coverage-html.test.ts pins the
+// no-fields case against a committed fixture captured from the pre-this-
+// feature renderer; this const existing at all is what makes that pin
+// possible without also asserting on unrelated future STYLES edits.
+const HEALTH_TEXT_BLOCK_STYLES = `
+    .health-text-block {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .health-percentile {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10.5px;
+      color: #52525b;
+      margin-top: 6px;
+    }
+`;
+
 export interface CoverageHtmlOptions {
   /** Title parsed from the Fountain title page (server/lib/logline.ts's
    *  extractTitlePage), if any. Used ONLY when `title` is empty or the
@@ -1087,9 +1096,18 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
   const dimensions = report.dimensions ?? [];
   const strengths = report.strengths ?? [];
 
+  // Computed ONCE here (see buildHealthSection's own header comment): the
+  // same two strings drive the health-text-block markup below AND the
+  // needsHealthTextBlockStyles decision for the <style> tag, so the two can
+  // never disagree about whether the wrapper/CSS should exist for this
+  // report/opts pair.
+  const healthPercentileLine = buildHealthPercentileLine(report);
+  const draftRankLine = buildDraftRankLine(opts.draftRank);
+  const needsHealthTextBlockStyles = Boolean(healthPercentileLine || draftRankLine);
+
   const body = [
     buildHeaderSection(report, safeTitle, safeAuthor, safeLogline),
-    buildHealthSection(report, opts.draftRank),
+    buildHealthSection(report, healthPercentileLine, draftRankLine),
     buildDimensionsSection(dimensions),
     buildStrengthsSection(strengths),
     buildGodmodeSection(report),
@@ -1109,7 +1127,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${safeTitle} &mdash; Script Coverage</title>
 <style>
-${STYLES}
+${STYLES}${needsHealthTextBlockStyles ? HEALTH_TEXT_BLOCK_STYLES : ''}
 </style>
 </head>
 <body>
