@@ -866,8 +866,10 @@ function buildStructuralSignalsSection(report: ScriptDoctorReport): string {
 
   const cells = block.scenes.map(scene => {
     const talkPct = Math.max(0, Math.min(100, Math.round(scene.dialogueShare * 100)));
+    // Collapse whitespace: a slugline that wrapped in the source would
+    // otherwise put a raw newline inside a title attribute.
     const tooltip = escapeHtml(
-      `${scene.slug} — ${scene.words} words (z ${scene.lengthZ.toFixed(2)}) · `
+      `${scene.slug.replace(/\s+/g, ' ')} — ${scene.words} words (z ${scene.lengthZ.toFixed(2)}) · `
       + `dialogue ${talkPct}% (Δ ${scene.dialogueShareDelta >= 0 ? '+' : ''}${scene.dialogueShareDelta.toFixed(2)}) · `
       + `${scene.speakers} speaker(s), ${scene.speakerTurns} turn(s), ${scene.meanTurnWords.toFixed(1)} words/turn · `
       + `lead share ${Math.round(scene.leadShare * 100)}% · new pairings ${scene.newPairs} · `
