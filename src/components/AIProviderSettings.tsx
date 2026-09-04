@@ -136,7 +136,7 @@ export function AIProviderSettings({ onProviderChange }: AIProviderSettingsProps
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-sm font-mono text-gray-500">Loading providers…</div>
+        <div className="text-sm font-mono text-[var(--sm-ink-mute)]">Loading providers…</div>
       </div>
     );
   }
@@ -146,7 +146,7 @@ export function AIProviderSettings({ onProviderChange }: AIProviderSettingsProps
       {/* Header */}
       <div className="flex flex-col gap-2">
         <h3 className="text-sm font-bold uppercase tracking-widest">AI Provider Selection</h3>
-        <p className="text-xs text-gray-500 font-mono leading-relaxed">
+        <p className="text-xs text-[var(--sm-ink-mute)] font-mono leading-relaxed">
           Choose between free models (OpenRouter) or premium providers (Gemini, OpenAI, Claude).
           Free tier is perfect for getting started with no API key required.
         </p>

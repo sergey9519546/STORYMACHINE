@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, ChevronRight, X } from 'lucide-react';
 import { FountainBlock } from '../lib/fountain';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { nextRovingIndex } from '../lib/roving-tabindex';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -87,11 +88,22 @@ function CharacterNameField({
           errorMsg ? "border-[var(--sm-stamp)]" : "border-[var(--sm-ink)]"
         )}
         placeholder="CHARACTER NAME"
+        // a11y pass: this field had no real accessible name at all —
+        // placeholder text doesn't count as a label (a well-known
+        // anti-pattern axe's label-title-only rule flags), and it
+        // disappears the moment the writer types anyway. aria-label is
+        // the field's own permanent name.
+        aria-label="Character name"
         aria-invalid={!!errorMsg}
         aria-describedby={errorMsg ? `name-error-${charId}` : undefined}
       />
       {errorMsg && (
-        <p id={`name-error-${charId}`} className="text-red-600 dark:text-red-400 text-[10px] font-mono mt-1" role="alert">
+        // a11y pass: text-red-600 measured 3.59:1 on this panel's paper
+        // background — under 4.5:1. --sm-stamp-on-light is this app's own
+        // error/alert accent (already used for this same field's border
+        // above) re-tuned to clear it (4.96-5.73:1); using it here also
+        // matches the border instead of mixing in unrelated Tailwind red.
+        <p id={`name-error-${charId}`} className="text-[var(--sm-stamp-on-light)] text-[10px] font-mono mt-1" role="alert">
           {errorMsg}
         </p>
       )}
@@ -149,9 +161,29 @@ function LongTextField({
   );
 }
 
+const SIDEBAR_TABS = ['scenes', 'characters'] as const;
+
 function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate, currentLine = 1, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'scenes' | 'characters'>('scenes');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // a11y pass: this pair of buttons carried `aria-selected` with no `role`
+  // at all — a critical axe violation (aria-allowed-attr: aria-selected is
+  // only valid on role="tab"/"option"/"row"/"gridcell" etc, never plain
+  // role="button"), present on every editor surface since this rail is
+  // always mounted. Now a real ARIA tab pattern: role="tablist"/"tab" +
+  // roving tabindex + arrow-key navigation, mirroring the exact pattern
+  // SettingsPanel.tsx already uses for its own tab strip (same
+  // nextRovingIndex helper) rather than inventing a second one.
+  const tabRefs = useRef<Partial<Record<typeof SIDEBAR_TABS[number], HTMLButtonElement | null>>>({});
+  const handleSidebarTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = nextRovingIndex(e.key, index, SIDEBAR_TABS.length);
+    if (next === null) return;
+    e.preventDefault();
+    const target = SIDEBAR_TABS[next];
+    setActiveTab(target);
+    tabRefs.current[target]?.focus();
+  };
 
   const scenes = useMemo(() => {
     const blocks = parsedBlocks;
@@ -235,10 +267,16 @@ function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, pa
         aria-hidden={drawerHidden || undefined}
         inert={drawerHidden || undefined}
       >
-      <div role="navigation" className="sm-pagetop shrink-0 gap-0 p-0">
+      <div role="tablist" aria-label="Sidebar sections" className="sm-pagetop shrink-0 gap-0 p-0">
         <button
+          id="sidebar-tab-scenes"
+          ref={(el) => { tabRefs.current.scenes = el; }}
+          role="tab"
           onClick={() => setActiveTab('scenes')}
+          onKeyDown={(e) => handleSidebarTabKeyDown(e, 0)}
           aria-selected={activeTab === 'scenes'}
+          aria-controls="sidebar-panel-scenes"
+          tabIndex={activeTab === 'scenes' ? 0 : -1}
           className={cn(
             "flex flex-1 items-center justify-center gap-2 px-3 py-3 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.14em] transition-colors",
             activeTab === 'scenes'
@@ -249,8 +287,14 @@ function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, pa
           <List className="w-3 h-3" /> Scenes
         </button>
         <button
+          id="sidebar-tab-characters"
+          ref={(el) => { tabRefs.current.characters = el; }}
+          role="tab"
           onClick={() => setActiveTab('characters')}
+          onKeyDown={(e) => handleSidebarTabKeyDown(e, 1)}
           aria-selected={activeTab === 'characters'}
+          aria-controls="sidebar-panel-characters"
+          tabIndex={activeTab === 'characters' ? 0 : -1}
           className={cn(
             "flex flex-1 items-center justify-center gap-2 px-3 py-3 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.14em] transition-colors",
             activeTab === 'characters'
@@ -285,7 +329,7 @@ function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, pa
 
       <div className="flex-1 overflow-y-auto bg-[var(--sm-paper)]">
         {activeTab === 'scenes' ? (
-          <div>
+          <div id="sidebar-panel-scenes" role="tabpanel" aria-labelledby="sidebar-tab-scenes" tabIndex={0}>
             <div className="flex items-center justify-between border-b border-[var(--sm-hair)] px-3 py-2">
               <span className="font-[family-name:var(--sm-font-mono)] text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--sm-ink-faint)]">
                 Scene Index
@@ -313,7 +357,7 @@ function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, pa
                       }`}
                     />
                     <span className={`mt-0.5 w-5 shrink-0 font-[family-name:var(--sm-font-mono)] text-[10px] tabular-nums ${
-                      idx === activeSceneIdx ? "text-[var(--sm-stamp)]" : "text-[var(--sm-ink-faint)]"
+                      idx === activeSceneIdx ? "text-[var(--sm-stamp-on-light)]" : "text-[var(--sm-ink-faint)]"
                     }`}>
                       {String(scene.sceneNumber).padStart(2, '0')}
                     </span>
@@ -352,7 +396,7 @@ function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, pa
             )}
           </div>
         ) : (
-          <div className="space-y-4 p-3">
+          <div id="sidebar-panel-characters" role="tabpanel" aria-labelledby="sidebar-tab-characters" tabIndex={0} className="space-y-4 p-3">
             <button
               onClick={onAddCharacter}
               className="sm-btn sm-btn--ink w-full"

@@ -102,7 +102,15 @@ export default function CommandPalette({ actions, onClose }: CommandPaletteProps
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Run a command, jump to a scene…"
-            className="flex-1 bg-transparent outline-none text-sm placeholder:text-[var(--sm-ink-faint)]"
+            // a11y pass: outline-none with no replacement — the blinking
+            // text cursor alone is a weak focus indicator for a low-vision
+            // user, and this input holds focus for the palette's entire
+            // lifetime (arrow-key highlight moves aria-activedescendant,
+            // never actual DOM focus), so it never gets a ring any other
+            // way. focus-visible avoids one on the autoFocus mount itself
+            // (not a real keyboard-navigation event) while still showing on
+            // any later Tab back into it.
+            className="flex-1 bg-transparent outline-none text-sm placeholder:text-[var(--sm-ink-faint)] focus-visible:ring-2 focus-visible:ring-[var(--sm-stamp)] rounded-sm"
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();

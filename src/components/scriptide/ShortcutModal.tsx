@@ -102,10 +102,16 @@ export default function ShortcutModal({ onClose }: Props) {
         className="w-full max-w-lg bg-[var(--sm-panel)] border-2 border-[var(--sm-ink)] shadow-[var(--sm-shadow-lg)] font-mono text-[var(--sm-ink)] p-5 rounded max-h-[85vh] flex flex-col"
       >
         <div className="flex justify-between items-center border-b border-[var(--sm-hair)] pb-3 shrink-0">
-          <div id="shortcut-modal-title" className="flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
+          {/* a11y pass: this was a plain <div> — not a heading at all — so
+              axe's heading-order rule saw the group labels below (<h3>) as
+              the first heading inside this dialog, skipping straight past
+              h2 from whatever h1 preceded it in the document (Toolbar's
+              title). A real <h2>, same visual styling, is both the correct
+              dialog-title semantics and the fix for the skipped level. */}
+          <h2 id="shortcut-modal-title" className="flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
             <Keyboard className="w-4 h-4 text-[var(--sm-ink-mute)]" aria-hidden="true" />
             <span>Keyboard Shortcuts</span>
-          </div>
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -116,7 +122,11 @@ export default function ShortcutModal({ onClose }: Props) {
           </button>
         </div>
 
-        <div className="mt-4 flex flex-col gap-4 overflow-y-auto">
+        {/* a11y pass: a scrollable region (overflow-y-auto, real overflow
+            once every group renders) with no other way to receive focus —
+            tabIndex=0 is the standard fix so a screen-reader/keyboard user
+            can actually reach and scroll it. */}
+        <div className="mt-4 flex flex-col gap-4 overflow-y-auto" tabIndex={0}>
           {SHORTCUT_GROUPS.map((group) => (
             <div key={group.title} className="flex flex-col gap-2">
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-faint)]">

@@ -217,8 +217,14 @@ try {
   await tablist.waitFor({ timeout: 15000 });
   await page.screenshot({ path: join(SHOTS, 'B1-settings-open.png'), fullPage: false });
 
+  // Scoped to the Settings tablist specifically: Sidebar.tsx's own
+  // Scenes/Characters switcher (2026-09-04 a11y pass) is now ALSO a real
+  // role="tab" pair (one active, roving-tabindex=0, aria-selected="true"
+  // by default) — an unscoped querySelectorAll would double-count both
+  // the "exactly one" roving-tabindex and "exactly one" aria-selected
+  // checks below.
   const tabState = () => page.evaluate(() => {
-    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+    const tabs = Array.from(document.querySelectorAll('[role="tablist"][aria-label="Settings sections"] [role="tab"]'));
     return {
       active: document.activeElement?.id ?? null,
       tabIndexes: tabs.map((t) => `${t.id}:${t.getAttribute('tabindex')}`),
@@ -281,9 +287,15 @@ try {
   record('B', 'End jumps to the last tab', end.active === 'settings-tab-labs', JSON.stringify(end.active));
   await page.screenshot({ path: join(SHOTS, 'B3-end-key.png'), fullPage: false });
 
+  // Scoped to the Settings dialog specifically: Sidebar.tsx's own
+  // Scenes/Characters switcher (2026-09-04 a11y pass) is now ALSO a real
+  // role="tablist"/"tab"/"tabpanel" set (Scenes starts aria-selected="true"
+  // by default), so an unscoped querySelector can resolve to Sidebar's
+  // (which sits earlier in the DOM) instead of Settings' own.
   const panelShown = await page.evaluate(() => {
-    const active = document.querySelector('[role="tab"][aria-selected="true"]');
-    const panel = document.querySelector('[role="tabpanel"]');
+    const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+    const active = dialog?.querySelector('[role="tab"][aria-selected="true"]');
+    const panel = dialog?.querySelector('[role="tabpanel"]');
     return { activeTab: active?.id ?? null, panelId: panel?.id ?? null };
   });
   record('B', 'the visible tabpanel follows the selected tab',

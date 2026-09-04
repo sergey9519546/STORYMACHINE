@@ -168,11 +168,18 @@ type ExportStatus = "idle" | "loading" | "error";
 // ─── Presentation tables ─────────────────────────────────────────────────────
 // health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled
 // (thresholds owned by the backend contract — this table is display-only.)
+// a11y pass (2026-09-04): `text` is bare (no local background — this is
+// the health-score grade label, read directly against this theme-invariant
+// panel). text-green-600/text-amber-500/text-red-500 measured 2.80:1 /
+// 1.86:1 / 3.32:1 there — all under 4.5:1 (only text-red-700, "troubled",
+// already cleared it at 5.59:1). The --sm-*-on-light tokens are the same
+// semantic colors already verified >=4.5:1 on this exact background;
+// `ring` (a border, the 3:1 non-text minimum) is unchanged.
 const GRADE_META: Record<DoctorGrade, { label: string; text: string; ring: string }> = {
-  excellent: { label: "Excellent", text: "text-green-600", ring: "border-green-600" },
-  strong: { label: "Strong", text: "text-green-600", ring: "border-green-600" },
-  solid: { label: "Solid", text: "text-amber-500", ring: "border-amber-500" },
-  uneven: { label: "Uneven", text: "text-red-500", ring: "border-red-500" },
+  excellent: { label: "Excellent", text: "text-[var(--sm-ok-on-light)]", ring: "border-green-600" },
+  strong: { label: "Strong", text: "text-[var(--sm-ok-on-light)]", ring: "border-green-600" },
+  solid: { label: "Solid", text: "text-[var(--sm-warn-on-light)]", ring: "border-amber-500" },
+  uneven: { label: "Uneven", text: "text-[var(--sm-stamp-on-light)]", ring: "border-red-500" },
   troubled: { label: "Troubled", text: "text-red-700", ring: "border-red-700" },
 };
 
@@ -197,7 +204,9 @@ const VERDICT_META: Record<
     label: "Recommend",
     explainer:
       "The deterministic engine placed this draft in its top verdict tier. That reflects the engine's measurements, not a human-reader endorsement.",
-    bg: "bg-green-600",
+    // a11y pass: white-on-bg-green-600 measured 3.22:1 — under 4.5:1;
+    // green-700 clears it (4.95:1) while staying the same hue family.
+    bg: "bg-green-700",
     text: "text-white",
   },
   CONSIDER: {
@@ -218,11 +227,17 @@ const VERDICT_META: Record<
 
 /** Same green/amber/red banding the panel already uses for grade and severity,
  *  applied to a 0–100 dimension score: >=75 mirrors excellent/strong (green),
- *  >=55 mirrors solid (amber), below that mirrors uneven/troubled (red). */
+ *  >=55 mirrors solid (amber), below that mirrors uneven/troubled (red).
+ *
+ *  a11y pass (2026-09-04): `text-green-600`/`text-amber-500`/`text-red-600`
+ *  measured 2.80:1 / (below 4.5:1) / 3.59-4.15:1 on this theme-invariant
+ *  panel — the `bar` fill colors (backgrounds, non-text — the 3:1 minimum)
+ *  are untouched, but `text` now uses this app's own --sm-ok/warn/stamp
+ *  -on-light tokens, already verified >=4.5:1 on this exact background. */
 function dimensionBand(score: number): { text: string; bar: string } {
-  if (score >= 75) return { text: "text-green-600", bar: "bg-green-600" };
-  if (score >= 55) return { text: "text-amber-500", bar: "bg-amber-500" };
-  return { text: "text-red-600", bar: "bg-red-600" };
+  if (score >= 75) return { text: "text-[var(--sm-ok-on-light)]", bar: "bg-green-600" };
+  if (score >= 55) return { text: "text-[var(--sm-warn-on-light)]", bar: "bg-amber-500" };
+  return { text: "text-[var(--sm-stamp-on-light)]", bar: "bg-red-600" };
 }
 
 function formatPassName(pass: PassName): string {
@@ -305,9 +320,18 @@ const ROOT_CAUSE_SEVERITY_BORDER: Record<RevisionIssue["severity"], string> = {
 
 /** Neutral/accent styling for percentile badges — deliberately NOT the
  *  green/amber/red severity palette used everywhere else in this file, since
- *  a percentile is descriptive context ("how this compares"), not a grade. */
+ *  a percentile is descriptive context ("how this compares"), not a grade.
+ *
+ *  a11y pass (2026-09-04): this panel's own chrome (bg-[var(--sm-panel)])
+ *  is theme-invariant — the dark-mode toggle never actually darkens it — so
+ *  the light-badge-on-dark-canvas pair this originally used
+ *  (dark:bg-indigo-500/20 dark:text-indigo-300) rendered light-purple text
+ *  on a still-light, indigo-tinted background: 1.36:1, nearly invisible.
+ *  text-indigo-700 alone measures 5.37-6.41:1 against BOTH the light
+ *  bg-indigo-100 and the dark-mode indigo-500/20-over-panel blend, so one
+ *  text color correctly covers both — no dark: text variant needed. */
 const PERCENTILE_BADGE_CLASS =
-  "inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/40";
+  "inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 border border-indigo-300 dark:border-indigo-500/40";
 
 /** Ordinal suffix ("1st", "2nd", "3rd", "4th"…) for a percentile badge —
  *  handles the 11–13 teens exception (11th/12th/13th, not 11st/12nd/13rd). */
@@ -402,9 +426,16 @@ function MetricStatRow({ label, value, caption }: { label: string; value: number
   const pct = Math.max(0, Math.min(100, Math.round(value)));
   return (
     <div>
+      {/* a11y pass (2026-09-04): this panel's own chrome
+          (bg-[var(--sm-panel)]) is theme-invariant — the dark-mode toggle
+          never actually darkens it — so `dark:text-white` (used bare,
+          10 places in this file) rendered white text on a still-light
+          panel: axe measured 1.14:1. text-black alone is correct in both
+          states; the redundant dark: override is dropped everywhere it
+          appeared with no accompanying dark: background switch. */}
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">{label}</span>
-        <span className="text-xs font-bold text-black dark:text-white">{pct}</span>
+        <span className="text-xs font-bold uppercase tracking-widest text-black">{label}</span>
+        <span className="text-xs font-bold text-black">{pct}</span>
       </div>
       <div
         className="h-1.5 w-full bg-gray-200 dark:bg-zinc-700 border border-black/10 dark:border-white/10 overflow-hidden mt-1"
@@ -437,8 +468,8 @@ function MetricSparkline({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-black dark:text-white">{label}</span>
-        <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">{caption}</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-black">{label}</span>
+        <span className="text-[10px] font-mono text-[var(--sm-ink-mute)]">{caption}</span>
       </div>
       <div
         className="flex items-end gap-0.5 h-10 mt-1 overflow-x-auto pb-0.5"
@@ -478,7 +509,7 @@ function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
   const { script, perScene } = metrics;
   return (
     <div>
-      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
         Story Metrics
       </h3>
       <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
@@ -504,7 +535,7 @@ function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
             them are visible (that disagreement IS the insight). */}
         <div>
           <div className="flex items-baseline justify-between gap-2 mb-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">
+            <span className="text-xs font-bold uppercase tracking-widest text-black">
               Tension, four ways
             </span>
           </div>
@@ -519,11 +550,11 @@ function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
                   title={m.caption}
                   className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-2"
                 >
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
                     {m.label}
                   </p>
-                  <p className="text-lg font-bold text-black dark:text-white leading-tight">{display}</p>
-                  <p className="text-[9px] font-mono text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
+                  <p className="text-lg font-bold text-black leading-tight">{display}</p>
+                  <p className="text-[9px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
                     {m.caption}
                   </p>
                 </div>
@@ -578,7 +609,7 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
 
   return (
     <div>
-      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
         Story Structure Analysis
       </h3>
       <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-3">
@@ -600,7 +631,7 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
           <span>·</span>
           <span>{summary.strengthCount} strengths</span>
         </div>
-        <div className="mt-2 text-[10px] font-mono text-gray-500 dark:text-gray-400">
+        <div className="mt-2 text-[10px] font-mono text-[var(--sm-ink-mute)]">
           Health score: {storyGraph.graphHealth}/100 · 
           Promise closure: {Math.round(graph.promisePaymentRatio * 100)}% · 
           Forward flow: {Math.round(graph.forwardEdgeRatio * 100)}%
@@ -806,7 +837,7 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
 
       {/* Empty state */}
       {summary.totalIssues === 0 && diagnostics.strengths.length === 0 && (
-        <div className="text-center py-4 text-[10px] font-mono text-gray-500 dark:text-gray-400">
+        <div className="text-center py-4 text-[10px] font-mono text-[var(--sm-ink-mute)]">
           No structural issues detected. Graph analysis found clean causal flow.
         </div>
       )}
@@ -1090,7 +1121,7 @@ function DraftDeltaStrip({
 
   return (
     <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
         vs. previous draft ({relativeTimeFrom(previous.at)})
       </p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-mono text-black dark:text-gray-100">
@@ -1271,7 +1302,7 @@ function IssueCard({
           {meta.label}
         </span>
         {pass && (
-          <span className="text-[9px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-[var(--sm-ink-mute)]">
             {formatPassName(pass)}
           </span>
         )}
@@ -1290,7 +1321,7 @@ function IssueCard({
           </button>
         )}
       </div>
-      <p className="text-[10px] font-bold uppercase text-black dark:text-white mb-1 flex items-center gap-1.5 flex-wrap">
+      <p className="text-[10px] font-bold uppercase text-black mb-1 flex items-center gap-1.5 flex-wrap">
         {issue.rule}
         {/* Upgrade item #12: links straight to this rule's rulebook entry
             (docs/rulebook/<pass>.md#rule-<rule>) — undefined only when no
@@ -1302,7 +1333,7 @@ function IssueCard({
             target="_blank"
             rel="noreferrer noopener"
             title={`Why this matters — rulebook entry for ${issue.rule}`}
-            className="inline-flex items-center gap-0.5 normal-case font-mono text-[9px] font-normal text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white underline decoration-dotted"
+            className="inline-flex items-center gap-0.5 normal-case font-mono text-[9px] font-normal text-[var(--sm-ink-mute)] hover:text-black dark:hover:text-white underline decoration-dotted"
           >
             <Info className="w-2.5 h-2.5" aria-hidden="true" /> Why this matters
           </a>
@@ -1364,7 +1395,7 @@ function RootCauseCard({
         >
           <Icon className="w-3 h-3" aria-hidden="true" /> {meta.label}
         </span>
-        <span className="text-xs font-bold uppercase tracking-wide text-black dark:text-white">
+        <span className="text-xs font-bold uppercase tracking-wide text-black">
           {finding.title}
         </span>
         {onNavigate && (
@@ -1382,7 +1413,7 @@ function RootCauseCard({
       <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
         {finding.explanation}
       </p>
-      <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+      <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
         {finding.memberCount} issue{finding.memberCount === 1 ? "" : "s"}
         {sceneLabel ? ` • ${sceneLabel}` : ""}
       </p>
@@ -1392,7 +1423,7 @@ function RootCauseCard({
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
             aria-controls={notesId}
-            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black dark:text-white hover:underline"
+            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black hover:underline"
           >
             {open ? (
               <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -1456,7 +1487,7 @@ function RootCauseCard({
                   {fixState.pending ? "Fixing & verifying…" : "Fix & verify"}
                 </button>
                 {disabledReason && !fixState.pending && (
-                  <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] font-mono text-[var(--sm-ink-mute)]">
                     {disabledReason}
                   </p>
                 )}
@@ -1618,7 +1649,7 @@ function FixReceiptCard({
     return (
       <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
             Fix &amp; verify — no candidate
           </p>
           <button
@@ -1648,7 +1679,7 @@ function FixReceiptCard({
   return (
     <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
           Fix &amp; verify receipt
         </p>
         {applied && (
@@ -1682,7 +1713,7 @@ function FixReceiptCard({
         <button
           onClick={onToggleDiff}
           aria-expanded={diffOpen}
-          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black dark:text-white hover:underline"
+          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black hover:underline"
         >
           {diffOpen ? (
             <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -1701,7 +1732,7 @@ function FixReceiptCard({
                     ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400"
                     : d.type === "removed"
                     ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400"
-                    : "text-gray-500 dark:text-gray-400"
+                    : "text-[var(--sm-ink-mute)]"
                 }`}
               >
                 <span className="w-3 shrink-0 select-none">
@@ -1717,7 +1748,7 @@ function FixReceiptCard({
       </div>
 
       {applied ? (
-        <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+        <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
           Re-run diagnosis to see the new report.
         </p>
       ) : (
@@ -3477,7 +3508,7 @@ export default function ScriptDoctorPanel({
                 that plainly beats an animated bar that would be inventing
                 its own numbers. */}
             {lastRunRoute === "deep" && (
-              <p className="mt-2 text-[10px] font-mono text-gray-500 dark:text-gray-400 leading-snug max-w-xs mx-auto">
+              <p className="mt-2 text-[10px] font-mono text-[var(--sm-ink-mute)] leading-snug max-w-xs mx-auto">
                 One request per scene, then the 14 passes. This route answers once, at the
                 end — there are no progress updates to show along the way.
               </p>
@@ -3500,7 +3531,7 @@ export default function ScriptDoctorPanel({
                     style={{ width: `${Math.round((streamProgress.passesDone / streamProgress.totalPasses) * 100)}%` }}
                   />
                 </div>
-                <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] mt-1">
                   {streamProgress.passesDone} / {streamProgress.totalPasses} passes
                 </p>
               </div>
@@ -3634,7 +3665,10 @@ export default function ScriptDoctorPanel({
                     <div className="sm-sub">Health</div>
                     <div className="font-mono font-bold leading-none text-ink" style={{ fontSize: 40 }}>
                       {Math.round(report.health)}
-                      <span className="text-[15px] text-ink/50">/100</span>
+                      {/* a11y pass: text-ink/50 measured 3.42:1 on this
+                          card's background — under 4.5:1; /65 clears it
+                          (same fix as StartScreen's text-ink/45→/65). */}
+                      <span className="text-[15px] text-ink/65">/100</span>
                     </div>
                   </div>
                 </div>
@@ -3777,7 +3811,7 @@ export default function ScriptDoctorPanel({
                     </>
                   )}
                 </p>
-                <p className="mt-1 text-[10px] normal-case tracking-normal text-gray-500 dark:text-gray-400 leading-snug">
+                <p className="mt-1 text-[10px] normal-case tracking-normal text-[var(--sm-ink-mute)] leading-snug">
                   Notes are matched by rule and by the scene they fall in, not by line
                   number — so editing one scene doesn&rsquo;t churn the count for the rest
                   of the draft.
@@ -3801,7 +3835,7 @@ export default function ScriptDoctorPanel({
                 script with nothing to cluster) fall through with no gap. */}
             {report.rootCauses && report.rootCauses.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
                   Root Causes
                 </h3>
                 <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
@@ -3897,10 +3931,10 @@ export default function ScriptDoctorPanel({
             {/* Craft dimensions — 14 passes rolled up into 5 writer-facing scores. */}
             {reportIsComplete && report.dimensions && report.dimensions.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                   Craft Dimensions
                 </h3>
-                <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 mb-2">
+                <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] mb-2">
                   Percentile badges compare against the same 20-sample, hand-authored synthetic reference set.
                 </p>
                 <div className="space-y-3">
@@ -3910,7 +3944,7 @@ export default function ScriptDoctorPanel({
                     return (
                       <div key={dim.key}>
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">
+                          <span className="text-xs font-bold uppercase tracking-widest text-black">
                             {dim.label}
                           </span>
                           <span className="flex items-center gap-1.5">
@@ -3957,7 +3991,7 @@ export default function ScriptDoctorPanel({
                 so this only renders when there's something real to say. */}
             {reportIsComplete && report.strengths && report.strengths.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                   What&rsquo;s Working
                 </h3>
                 <ul className="space-y-1.5">
@@ -4038,7 +4072,7 @@ export default function ScriptDoctorPanel({
             {/* Scene heatmap */}
             {report.sceneHeatmap.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                   Scene Heatmap
                 </h3>
                 <div className="flex gap-0.5 overflow-x-auto pb-1" role="list" aria-label="Per-scene issue heatmap">
@@ -4080,7 +4114,7 @@ export default function ScriptDoctorPanel({
                 functions, subplots, graph health. Each renders only when present. */}
             {reportIsComplete && (report.graphHealth || report.disclosureAnalysis?.scored || (report.characterFunctions?.length ?? 0) > 0 || (report.subplots?.totalSubplots ?? 0) > 0 || (report.ruleBreaking?.findings?.length ?? 0) > 0) && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                   Structural Analysis
                 </h3>
                 <div className="space-y-2">
@@ -4158,7 +4192,7 @@ export default function ScriptDoctorPanel({
             {/* Top priorities */}
             {report.topPriorities.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                   Top Priorities
                 </h3>
                 <div className="space-y-2">
@@ -4183,7 +4217,7 @@ export default function ScriptDoctorPanel({
 
             {/* Per-pass breakdown — all 14 passes, in pipeline order */}
             <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-gray-500 dark:text-gray-400">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                 Per-Pass Breakdown
               </h3>
               <div className="space-y-2">
@@ -4269,7 +4303,7 @@ export default function ScriptDoctorPanel({
                     )}
                     <HistoryIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Draft History
                   </span>
-                  <span className="text-[9px] font-mono text-gray-500 dark:text-gray-400 uppercase">
+                  <span className="text-[9px] font-mono text-[var(--sm-ink-mute)] uppercase">
                     {history.length} draft{history.length === 1 ? "" : "s"}
                   </span>
                 </button>
@@ -4284,7 +4318,7 @@ export default function ScriptDoctorPanel({
                             key={`${entry.at}-${entry.contentHash}`}
                             className="flex items-center justify-between gap-2 text-[10px] font-mono text-black dark:text-gray-100 border-b border-black/10 dark:border-white/10 pb-1.5 last:border-b-0 last:pb-0"
                           >
-                            <span className="text-gray-500 dark:text-gray-400 shrink-0">
+                            <span className="text-[var(--sm-ink-mute)] shrink-0">
                               {new Date(entry.at).toLocaleString()}
                             </span>
                             <span className="font-bold shrink-0">{Math.round(entry.health)}</span>

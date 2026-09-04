@@ -101,8 +101,14 @@ async function openSettingsTabLabels(page) {
   const menu = page.getByRole('menu').first();
   await menu.waitFor({ timeout: 10000 });
   await menu.getByRole('menuitem', { name: /labs/i }).first().click();
-  await page.locator('[role="tablist"][aria-label="Settings sections"]').waitFor({ timeout: 15000 });
-  const labels = await page.getByRole('tab').allTextContents();
+  const tablist = page.locator('[role="tablist"][aria-label="Settings sections"]');
+  await tablist.waitFor({ timeout: 15000 });
+  // Scoped to this tablist specifically: Sidebar.tsx's own Scenes/
+  // Characters switcher (2026-09-04 a11y pass) is now ALSO a real
+  // role="tab" pair, always present underneath this dialog — an unscoped
+  // getByRole('tab') would mix its labels in too (harmless for the
+  // .includes() checks this feeds today, but scoped is still correct).
+  const labels = await tablist.getByRole('tab').allTextContents();
   return labels.map((t) => t.trim());
 }
 
@@ -529,7 +535,12 @@ async function main() {
   );
   await pageA.getByRole('tab', { name: 'Labs', exact: true }).click();
   await pageA.waitForTimeout(200);
-  const labsPanelTextOff = await pageA.locator('[role="tabpanel"]').first().innerText();
+  // Scoped to the Settings dialog specifically: Sidebar.tsx's own
+  // Scenes/Characters switcher (2026-09-04 a11y pass) is now ALSO a real
+  // role="tablist"/tab"/"tabpanel" set, so an unscoped `[role="tabpanel"]`
+  // match can resolve to Sidebar's (which sits earlier in the DOM) instead
+  // of Settings' own.
+  const labsPanelTextOff = await pageA.getByRole('dialog', { name: /settings/i }).locator('[role="tabpanel"]').first().innerText();
   record(
     'P2-generative',
     'Settings -> Labs says, in one line, where the generative features went',

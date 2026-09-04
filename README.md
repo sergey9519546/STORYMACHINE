@@ -101,12 +101,16 @@ look:
   writer flows end to end. CI sets `RUN_E2E=1`; a local `npm test` does not,
   so it silently reports `# SKIP RUN_E2E not set` for that file instead of
   running it.
-- **`npm run verify:browser`** runs the six live-Chromium suites
+- **`npm run verify:browser`** runs the seven live-Chromium suites
   (`verify:p0-flow`, `verify:focus-traps`, `verify:surfaces`,
-  `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`) —
-  it is a separate command, not part of `npm test` at all. Measured directly:
-  about **three minutes** wall clock with Chromium pre-cached, all six green.
-  CI runs it as its own blocking `browser` job.
+  `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`,
+  `verify:a11y`) — it is a separate command, not part of `npm test` at all.
+  `verify:a11y` is the systematic accessibility pass: an axe-core sweep of
+  every primary surface in both themes, plus a fully keyboard-only run of
+  the primary journey (land → paste → analyze → read a finding → jump to
+  it → export). Measured directly: about **three minutes** wall clock with
+  Chromium pre-cached, all seven green. CI runs it as its own blocking
+  `browser` job.
 
 For local UI/manual-testing iteration, set `SESSION_DB_DIR=:memory:` before
 `npm run dev` (or export it for the session). Without it, every `npm run dev`
@@ -124,7 +128,7 @@ local poking accumulates real `.db` files there over time.
 
 **Testing & Quality:**
 - `npm test` - Run full test suite (skips `tests/e2e/journeys.test.ts` unless `RUN_E2E=1` — see "Running Tests" above)
-- `npm run verify:browser` - Run the six live-Chromium suites (~3 min); not part of `npm test`, but a blocking CI job
+- `npm run verify:browser` - Run the seven live-Chromium suites (~3 min), including `verify:a11y` (axe-core + keyboard-only journey); not part of `npm test`, but a blocking CI job
 - `npm run lint` - Type check with TypeScript (no emit)
 - `npm run check-docs` - Scan documentation for AI writing patterns
 - `npm run check-docs:strict` - Same as check-docs but fails on high-severity patterns

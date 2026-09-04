@@ -141,9 +141,15 @@ function Field({
   // label-derived id risks a silent duplicate-id collision; useId()
   // guarantees uniqueness regardless of what any two labels happen to say.
   const id = useId();
+  // a11y pass (2026-09-04): this file used bare Tailwind text-gray-500/400
+  // throughout — 4.21:1 / 2.26:1 on this dialog's --sm-panel background,
+  // both under the 4.5:1 AA text minimum. --sm-ink-mute / --sm-ink-faint
+  // are this app's own design-system tokens for the same secondary/faint
+  // roles, re-tuned to clear it (5.3-5.6:1 / 4.8-5.6:1) — replaced
+  // throughout the file, not just here.
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+      <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
         {label}
       </label>
       <input
@@ -172,7 +178,7 @@ function ProviderRadio<T extends string>({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">{label}</span>
       {/* role="radiogroup" + aria-pressed-as-checked on each button:
           these are plain <button>s (not native radio inputs) so a screen
           reader has no other way to know they're a mutually-exclusive set
@@ -256,12 +262,12 @@ function LLMTab({
       )}
 
       {cfg.provider === "gemini" && (
-        <p className="text-xs text-gray-500 font-mono">
+        <p className="text-xs text-[var(--sm-ink-mute)] font-mono">
           Using Gemini. Set <code>GEMINI_API_KEY</code> in your environment to configure the key.
           <br />
           {/* Live provider-aware readiness from the server, never a browser
               guess based on whether an unrelated credential happens to exist. */}
-          <span className={cfg.llmReady ? "text-green-700 font-bold" : "text-red-600 font-bold"}>
+          <span className={cfg.llmReady ? "text-green-800 font-bold" : "text-red-700 font-bold"}>
             Detected: {cfg.llmReady ? "ready" : "no key detected"}
           </span>
         </p>
@@ -338,12 +344,12 @@ function MediaTab({
       )}
 
       {provider === "none" && (
-        <p className="text-xs text-gray-500 font-mono">
+        <p className="text-xs text-[var(--sm-ink-mute)] font-mono">
           This capability is disabled. Scenes will have no generated media.
         </p>
       )}
       {provider === "gemini" && (
-        <p className="text-xs text-gray-500 font-mono">
+        <p className="text-xs text-[var(--sm-ink-mute)] font-mono">
           Using Gemini for this capability.
         </p>
       )}
@@ -382,11 +388,11 @@ function AxisSelect({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between">
-        <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-          {label} <span className="text-gray-400 normal-case tracking-normal">({options.length})</span>
+        <label htmlFor={id} className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+          {label} <span className="text-[var(--sm-ink-faint)] normal-case tracking-normal">({options.length})</span>
         </label>
         {status && (
-          <span className={`text-[10px] font-bold ${status.ok ? "text-green-700" : "text-red-600"}`} role="status">
+          <span className={`text-[10px] font-bold ${status.ok ? "text-green-800" : "text-red-700"}`} role="status">
             {status.msg}
           </span>
         )}
@@ -404,7 +410,7 @@ function AxisSelect({
           </option>
         ))}
       </select>
-      {hint && <p className="text-[10px] text-gray-400 font-mono">{hint}</p>}
+      {hint && <p className="text-[10px] text-[var(--sm-ink-faint)] font-mono">{hint}</p>}
     </div>
   );
 }
@@ -487,15 +493,15 @@ function StoryTab() {
   };
 
   if (loading) {
-    return <div className="p-4 text-sm font-mono text-gray-500">Loading story config…</div>;
+    return <div className="p-4 text-sm font-mono text-[var(--sm-ink-mute)]">Loading story config…</div>;
   }
   if (failed || !story) {
-    return <div className="p-4 text-sm font-mono text-red-600">Failed to load story config.</div>;
+    return <div className="p-4 text-sm font-mono text-red-700">Failed to load story config.</div>;
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+      <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase leading-relaxed">
         Story axes are deterministic engine config — no AI key required. Every
         change saves immediately to the current session.
       </p>
@@ -577,7 +583,7 @@ function StoryTab() {
         />
         <div className="flex items-end gap-2">
           <div className="flex flex-col gap-1 flex-1">
-            <label htmlFor="story-expected-turns" className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            <label htmlFor="story-expected-turns" className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
               Expected Total Turns
             </label>
             <input
@@ -691,7 +697,7 @@ function SessionTab({ onBeginDataWipe }: { onBeginDataWipe?: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
           Current Session ID
         </label>
         <div className="p-3 border-2 border-black bg-gray-50 font-mono text-xs break-all select-all">
@@ -715,12 +721,12 @@ function SessionTab({ onBeginDataWipe }: { onBeginDataWipe?: () => void }) {
             {rotating ? "Rotating…" : "Rotate Session ID"}
           </button>
           {rotated && (
-            <span className="text-xs font-mono font-bold text-green-700 uppercase">
+            <span className="text-xs font-mono font-bold text-green-800 uppercase">
               Session Rotated and Verified ✓
             </span>
           )}
           {error && (
-            <span className="text-xs font-mono text-red-600 truncate">
+            <span className="text-xs font-mono text-red-700 truncate">
               {error}
             </span>
           )}
@@ -809,7 +815,7 @@ function LabsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+      <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase leading-relaxed">
         Labs features are experimental research surfaces. Default experience is
         Doctor + Editor only (ROADMAP P2). Changes take effect immediately.
       </p>
@@ -836,7 +842,7 @@ function LabsTab({
         </label>
       </div>
       
-      <div className="text-xs font-mono text-gray-500 border-l-4 border-black pl-3">
+      <div className="text-xs font-mono text-[var(--sm-ink-mute)] border-l-4 border-black pl-3">
         <p className="font-bold mb-1">What's behind Labs:</p>
         <ul className="list-disc list-inside space-y-1">
           <li>OASIS Story Machine — Multi-agent narrative simulation</li>
@@ -849,7 +855,7 @@ function LabsTab({
         </ul>
       </div>
       
-      <div className="text-xs font-mono text-gray-500 border-l-4 border-gray-300 pl-3">
+      <div className="text-xs font-mono text-[var(--sm-ink-mute)] border-l-4 border-gray-300 pl-3">
         <p className="font-bold mb-1">Not affected by Labs:</p>
         <ul className="list-disc list-inside space-y-1">
           <li>Script Doctor — Always available</li>
@@ -1029,11 +1035,11 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
         </div>
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center p-8 text-sm font-mono text-gray-500">
+          <div className="flex-1 flex items-center justify-center p-8 text-sm font-mono text-[var(--sm-ink-mute)]">
             Loading…
           </div>
         ) : !cfg ? (
-          <div className="flex-1 flex items-center justify-center p-8 text-sm font-mono text-red-600">
+          <div className="flex-1 flex items-center justify-center p-8 text-sm font-mono text-red-700">
             Failed to load config.
           </div>
         ) : (
@@ -1169,15 +1175,15 @@ export default function SettingsPanel({ onClose, onBeginDataWipe }: SettingsPane
               {/* Status messages */}
               <div className="flex items-center min-h-[20px]">
                 {error && (
-                  <span className="text-xs text-red-600 font-mono truncate">{error}</span>
+                  <span className="text-xs text-red-700 font-mono truncate">{error}</span>
                 )}
                 {!error && saved && (
-                  <span className="text-xs text-green-700 font-bold uppercase tracking-wider">
+                  <span className="text-xs text-green-800 font-bold uppercase tracking-wider">
                     Saved ✓
                   </span>
                 )}
                 {!error && !saved && testResult && (
-                  <span className={`text-xs font-mono truncate ${testResult.ok ? "text-green-700" : "text-red-600"}`}>
+                  <span className={`text-xs font-mono truncate ${testResult.ok ? "text-green-800" : "text-red-700"}`}>
                     {testResult.msg}
                   </span>
                 )}

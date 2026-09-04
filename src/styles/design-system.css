@@ -23,19 +23,45 @@
   --sm-ink:        #211d15;  /* primary ink / borders */
   --sm-ink-soft:   #4a4436;  /* body ink */
   --sm-ink-mute:   #6b6152;  /* secondary text */
-  --sm-ink-faint:  #6f6553;  /* labels / captions — nudged from #857c68 for WCAG AA on paper (~4.6:1) */
+  /* a11y pass (2026-09-04): re-measured against every background it
+     actually sits on (design-system.css never had a runnable contrast
+     check before — the "~4.6:1" comment above was aspirational, not
+     verified; axe-core measured 4.31-4.37:1 on --sm-paper/--sm-bar, both
+     under the 4.5:1 AA text minimum). Darkened one notch — same hue,
+     4.82-5.57:1 on every surface it's used on (paper/bar/panel). See
+     scripts/verify-a11y.mjs for the runnable proof. */
+  --sm-ink-faint:  #675e4d;  /* labels / captions */
   --sm-hair:       #d3cab3;  /* hairline borders on cards */
   --sm-line:       #d6cdb7;  /* skeleton line fill */
-  --sm-stamp:      #c1301c;  /* the one accent — verdicts, live, alerts */
+  --sm-stamp:      #c1301c;  /* the one accent — verdicts, live, alerts (backgrounds/borders/badges — NOT for text on --sm-paper or --sm-night, see -on-light/-on-dark below) */
   --sm-stamp-dk:   #a0281a;
   --sm-cream:      #f2ecdd;  /* text on ink */
   --sm-night:      #1a1712;  /* dark chrome (page tops, cinematic) */
-  --sm-ok:         #4b7a4e;  /* pass / clean */
+  --sm-ok:         #4b7a4e;  /* pass / clean (backgrounds/borders — NOT for text, see -on-light/-on-dark below) */
   --sm-warn:       #b58a2e;  /* major */
   --sm-cool:       #3f5c86;  /* voice / cool accent */
   --sm-night-2:    #2a241c;  /* inset surface on night chrome */
   --sm-night-line: #3f382c;  /* borders / hairlines on night */
-  --sm-cream-mute: #a89e85;  /* secondary text on night */
+  --sm-cream-mute: #a89e85;  /* secondary text on night — 6.3-6.7:1 on --sm-ink/--sm-night */
+  /* a11y pass (2026-09-04): --sm-stamp (#c1301c) and --sm-ok (#4b7a4e) are
+     the brand accent and the pass/clean accent — fine as a background,
+     border, or badge fill, but NEITHER clears 4.5:1 as TEXT against both
+     the light "paper" chrome and the dark "night" chrome this app uses
+     side by side on the same screen (Toolbar's dark header sits directly
+     above a light document page) — and no single hex can, since one
+     needs a background-relative luminance under ~0.13 and the other needs
+     one over ~0.21. These four are that color used as readable TEXT,
+     split by which chrome it sits on; the base tokens above stay
+     untouched for every non-text use. */
+  --sm-stamp-on-light: #b02a19;  /* 4.96-5.73:1 on paper/bar/panel/panel-2 */
+  --sm-stamp-on-dark:  #d7786b;  /* 5.78:1 on night, 4.96:1 on night-2 */
+  --sm-ok-on-light:    #3f6842;  /* 4.84-5.59:1 on paper/bar/panel/panel-2 */
+  --sm-ok-on-dark:     #7c9e7e;  /* 6.00:1 on night, 5.15:1 on night-2 */
+  --sm-warn-on-light:  #765a1e;  /* --sm-warn's raw text measured 2.41:1 on --sm-bar; this is
+                                    4.87-5.63:1 on paper/bar/panel/panel-2. --sm-warn itself
+                                    already clears 4.5:1 as text on --sm-night (5.65:1), so no
+                                    -on-dark variant is needed for it. */
+  --sm-cream-faint:    #918c82;  /* faintest text-on-night tier (replaces raw --sm-cream/30, which measured 2.48:1) — 5.34:1 on night */
 
   /* ---- type roles ---- */
   --sm-font-display: 'Anton', system-ui, sans-serif;
@@ -88,7 +114,13 @@
 .sm-chip--warn{border-color:var(--sm-warn);color:var(--sm-warn)}
 
 /* verdict stamp */
-.sm-stamp{font:700 16px var(--sm-font-mono);letter-spacing:.13em;text-transform:uppercase;border:2.5px solid currentColor;padding:8px 16px;display:inline-block;transform:rotate(-5deg);color:var(--sm-stamp)}
+/* a11y pass: every real call site (verdict badges in CoverageSummary,
+   ScriptDoctorPanel, StartScreen, DesignPreview) renders this on a light
+   "paper" surface, where the raw --sm-stamp text measured 4.27:1 —
+   under the 4.5:1 AA minimum. --sm-stamp-on-light is the same hue at
+   4.96-5.73:1; the border (currentColor) clears the 3:1 non-text minimum
+   at either color, so this stays a single declaration. */
+.sm-stamp{font:700 16px var(--sm-font-mono);letter-spacing:.13em;text-transform:uppercase;border:2.5px solid currentColor;padding:8px 16px;display:inline-block;transform:rotate(-5deg);color:var(--sm-stamp-on-light)}
 
 /* card / option */
 .sm-card{border:1.5px solid var(--sm-hair);background:var(--sm-panel-2);padding:12px}

@@ -318,13 +318,18 @@ backs up a real session, destroys it, restores it, and asserts the round trip.
 Browser-level proof runs **in CI** as of 2026-09-02 (`playwright` is a pinned
 devDependency; the `browser` job in `.github/workflows/ci.yml` installs
 Chromium and runs `npm run verify:browser`, and `publish` in `release.yml`
-blocks on the same job). The six suites are `scripts/smoke-p0-live-flow.mjs`,
+blocks on the same job). The seven suites are `scripts/smoke-p0-live-flow.mjs`,
 `verify-p2-p3-surfaces.mjs` (surface/Labs gating + a static dead-UI tripwire),
 `verify-focus-traps.mjs`, `verify-ui-polish-affordances.mjs`,
-`verify-e4-local-safety-net.mjs`, and `verify-e5-command-palette.mjs`; their
-shared boot/launch/console-capture/report-wait machinery lives once in
-`scripts/lib/browser-verify.mjs`. `scripts/load-test-doctor.mjs` (concurrent
-doctor load) stays on demand — it is a measurement, not a pass/fail gate.
+`verify-e4-local-safety-net.mjs`, `verify-e5-command-palette.mjs`, and
+`verify-a11y.mjs` (2026-09-04 — the systematic accessibility pass: an
+axe-core sweep of every primary surface in both themes, gated on zero
+serious/critical violations outside one named, deliberately-unfixed
+exception, plus an explicitly-asserted keyboard-only run of the primary
+journey); their shared boot/launch/console-capture/report-wait machinery
+lives once in `scripts/lib/browser-verify.mjs`. `scripts/load-test-doctor.mjs`
+(concurrent doctor load) stays on demand — it is a measurement, not a
+pass/fail gate.
 
 Until 2026-09-02 those suites ran on exactly one developer's machine, and this
 section said so. That was a self-imposed limitation, not a fact about CI, and

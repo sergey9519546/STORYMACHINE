@@ -182,7 +182,9 @@ function ActionRequiredModal({
         </h2>
         <p className="text-sm font-mono mb-4">
           What is{" "}
-          <span className="font-bold text-red-600">{charName}</span>{" "}
+          {/* a11y pass: text-red-600 measured 3.59-4.15:1 on this panel's
+              paper background — under 4.5:1; --sm-stamp-on-light clears it. */}
+          <span className="font-bold text-[var(--sm-stamp-on-light)]">{charName}</span>{" "}
           doing right now?
         </p>
 
@@ -2317,7 +2319,7 @@ export default function ScriptIDE({
           >
             <AlertCircle className="h-5 w-5 shrink-0 text-[var(--sm-stamp)]" aria-hidden="true" />
             <div className="mr-auto flex flex-col gap-1">
-              <span className="font-bold uppercase tracking-wider text-[var(--sm-stamp)]">
+              <span className="font-bold uppercase tracking-wider text-[var(--sm-stamp-on-light)]">
                 {saveConflictReason === 'server-rolled-back' ? 'Server Copy Is Older' : 'Save Conflict Detected'}
               </span>
               {saveConflictReason === 'server-rolled-back' ? (
@@ -2419,17 +2421,31 @@ export default function ScriptIDE({
           onOpenSettings={openSettingsPanel}
         />
 
+        {/* a11y pass: axe's landmark-one-main/region rules — this document
+            had no <main> at all, so everything below the toolbar (the
+            task-action strip, the collab/settings overlays, and the editor
+            itself — `.cm-content`) was flagged as content outside any
+            landmark, on every surface that reaches ScriptIDE. Toolbar
+            already renders its own <header> (see Toolbar.tsx) — that's the
+            page's one banner landmark — so <main> starts right after it
+            and runs through the page stage below. Purely a semantic wrap;
+            no layout/behavior change. */}
+        <main className="contents">
         {/* Action strip — director's slate: one context, one dominant CTA, right-aligned */}
         <div className="flex min-h-[44px] items-center gap-3 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-bar)] px-4 py-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]">
           {simulateStatus ? (
             <>
               <span
                 className={
+                  // a11y pass: this strip sits on --sm-bar (light chrome) —
+                  // --sm-stamp/--sm-ok/--sm-warn's raw text color all fail
+                  // 4.5:1 there (4.27:1 / 3.77:1 / 2.41:1); the -on-light
+                  // variants are the same hues re-tuned to clear it.
                   simulateStatus.type === "error"
-                    ? "text-[var(--sm-stamp)]"
+                    ? "text-[var(--sm-stamp-on-light)]"
                     : simulateStatus.type === "warning"
-                      ? "text-[var(--sm-warn)]"
-                      : "text-[var(--sm-ok)]"
+                      ? "text-[var(--sm-warn-on-light)]"
+                      : "text-[var(--sm-ok-on-light)]"
                 }
               >
                 {simulateStatus.message}
@@ -2560,6 +2576,11 @@ export default function ScriptIDE({
         </div>
 
         {/* Progressive depth: collaboration and settings only when requested from overflow. */}
+        {/* a11y pass: these three inputs carried focus:outline-none with no
+            replacement at all — invisible focus for a keyboard user. A
+            focus-visible ring (this file's own convention, see the "New
+            Story" title input above) restores a real indicator without
+            adding one on mouse-click focus. */}
         {prefsOpen === "collab" && !collabRoom && (
           <div className="flex flex-col gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -2568,14 +2589,14 @@ export default function ScriptIDE({
                 onChange={(e) => setCollabNameInput(e.target.value)}
                 placeholder="Your name"
                 aria-label="Collaborator name"
-                className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+                className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sm-stamp)]"
               />
               <input
                 value={collabLabelInput}
                 onChange={(e) => setCollabLabelInput(e.target.value)}
                 placeholder="Label (only on this computer)"
                 aria-label="Collaboration label"
-                className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+                className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sm-stamp)]"
               />
               <button
                 type="button"
@@ -2593,7 +2614,7 @@ export default function ScriptIDE({
                 onKeyDown={(e) => { if (e.key === "Enter") joinCollabRoom(); }}
                 placeholder="…or paste a share link"
                 aria-label="Collaboration share link"
-                className="min-w-[16rem] flex-1 border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+                className="min-w-[16rem] flex-1 border border-black px-2 py-1 font-mono text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sm-stamp)]"
               />
               <button
                 type="button"
@@ -2618,7 +2639,7 @@ export default function ScriptIDE({
               want in the script. The label stays on this computer; it is never sent to the server.
             </p>
             {collabError && (
-              <p role="alert" className="font-mono text-[10px] text-[var(--sm-stamp)]">{collabError}</p>
+              <p role="alert" className="font-mono text-[10px] text-[var(--sm-stamp-on-light)]">{collabError}</p>
             )}
           </div>
         )}
@@ -2748,6 +2769,7 @@ export default function ScriptIDE({
             )}
           </AnimatePresence>
         </div>
+        </main>
       </div>
 
       {/* Keyboard Shortcut Cheat Sheet Modal */}

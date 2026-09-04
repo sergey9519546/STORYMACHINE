@@ -93,7 +93,10 @@ export function SlugLineIntro({ onComplete }: SlugLineIntroProps) {
 
   const lineClass = (idx: number) => {
     if (idx === 0) {
-      return "text-xs sm:text-sm uppercase tracking-[0.35em] text-ink/55";
+      // a11y pass: text-ink/55 measured 4.02:1 on this cream background —
+      // under the 4.5:1 AA text minimum; /65 clears it (matches the same
+      // fix applied to StartScreen's own text-ink/45|50 instances).
+      return "text-xs sm:text-sm uppercase tracking-[0.35em] text-ink/65";
     }
     if (idx === 1) {
       return "mt-2 text-sm sm:text-base uppercase tracking-[0.2em] text-ink/80";

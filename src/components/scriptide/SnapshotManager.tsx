@@ -24,10 +24,17 @@ export interface Snapshot {
 }
 
 // ── Score-over-revisions trend (writer #9) ──────────────────────────────────
+// a11y pass (2026-09-04): --sm-ok/--sm-warn/--sm-stamp measured 3.77:1 /
+// 2.41:1 / 4.27:1 as bare TEXT on this panel (--sm-panel-2, light) — all
+// under 4.5:1 (that's why these live as separate -on-light/-on-dark tokens
+// now — see design-system.css's header comment on them). The sparkline's
+// own path/dots stay decorative (non-text, no contrast requirement); this
+// function's callers are both real text (the verdict label, the delta
+// figure), so both now resolve to the -on-light variants.
 function verdictColor(v: CoverageVerdict | null): string {
-  if (v === "RECOMMEND") return "var(--sm-ok)";
-  if (v === "CONSIDER") return "var(--sm-warn)";
-  if (v === "PASS") return "var(--sm-stamp)";
+  if (v === "RECOMMEND") return "var(--sm-ok-on-light)";
+  if (v === "CONSIDER") return "var(--sm-warn-on-light)";
+  if (v === "PASS") return "var(--sm-stamp-on-light)";
   return "var(--sm-ink-mute)";
 }
 
@@ -81,7 +88,7 @@ function SnapshotTrendBadge({ entry }: { entry: SnapshotTrendEntry }) {
   if (entry.health === null) return null;
   const delta = entry.healthDelta;
   const deltaLabel = delta === null ? null : delta === 0 ? "±0.0" : delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
-  const deltaColor = delta === null || delta === 0 ? "var(--sm-ink-mute)" : delta > 0 ? "var(--sm-ok)" : "var(--sm-stamp)";
+  const deltaColor = delta === null || delta === 0 ? "var(--sm-ink-mute)" : delta > 0 ? "var(--sm-ok-on-light)" : "var(--sm-stamp-on-light)";
   const deltaArrow = delta === null || delta === 0 ? "→" : delta > 0 ? "▲" : "▼";
 
   return (
@@ -152,7 +159,9 @@ export default function SnapshotManager({
         {hasAnyScore && (
           <div className="flex items-center gap-3 px-1">
             <HealthSparkline entries={trend} />
-            <span className="text-[10px] font-mono opacity-60 uppercase tracking-widest">
+            {/* a11y pass: same opacity-60-on-inherited-color pattern as the
+                snapshot date caption below — replaced for the same reason. */}
+            <span className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
               Health trend across scored versions
             </span>
           </div>
@@ -165,7 +174,10 @@ export default function SnapshotManager({
             >
               <div>
                 <div className="font-bold uppercase text-xs">{s.name}</div>
-                <div className="text-[10px] font-mono opacity-60">{s.date}</div>
+                {/* a11y pass: opacity-60 on inherited black-ish text
+                    measured 4.45:1 on this card's white background — just
+                    under 4.5:1. --sm-ink-mute clears it (6.07:1). */}
+                <div className="text-[10px] font-mono text-[var(--sm-ink-mute)]">{s.date}</div>
                 <SnapshotTrendBadge entry={trend[i]} />
               </div>
               <div className="flex gap-2">
@@ -187,7 +199,12 @@ export default function SnapshotManager({
             </div>
           ))}
           {snapshots.length === 0 && (
-            <div className="text-center p-8 border-2 border-dashed border-gray-300 text-gray-400 font-mono text-xs">
+            // a11y pass: text-gray-400 measured 2.26:1 on this panel's
+            // background — under the 4.5:1 AA minimum. --sm-ink-mute is
+            // this app's own design-system token for secondary text and
+            // clears it (5.29:1) — border-gray-300 is decorative only
+            // (non-text, already >=3:1), left as-is.
+            <div className="text-center p-8 border-2 border-dashed border-gray-300 text-[var(--sm-ink-mute)] font-mono text-xs">
               No snapshots saved yet.
             </div>
           )}

@@ -631,7 +631,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       <header className="sm-pagetop mb-8 flex-wrap gap-y-3">
         <div className="flex w-full flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="sm-h text-[var(--sm-cream)]/50">Simulate</p>
+            <p className="sm-h !text-[var(--sm-cream)]/50">Simulate</p>
             <h1 className="font-[family-name:var(--sm-font-display)] text-3xl uppercase tracking-widest text-[var(--sm-cream)]">
               Story Machine
             </h1>

@@ -245,15 +245,26 @@ const typewriterFocusListener = EditorView.updateListener.of((update) => {
 // centering behavior, not a general editor change.
 const typewriterFocusExtensions = [typewriterFocusListener, scrollPastEnd()];
 
+// a11y pass (2026-09-04): the flash animated a `background-color` behind
+// the flashed text — first --sm-stamp red (a flashed scene heading, same
+// red, measured 3.03:1), then a re-tuned amber (still only 4.35:1 once
+// stacked with .cm-activeLine's own faint tint — close enough that
+// getting real margin meant an alpha low enough to make the "flash"
+// barely visible, defeating its own point). ANY background fill behind
+// bold red text on this cream paper is fighting the same tight margin,
+// so this switches mechanism entirely: an animated `boxShadow` inset
+// ring, which sits on top of (not behind) the text and therefore never
+// touches its contrast against the page at all, while still reading
+// clearly as "this line was just highlighted."
 const findingHighlightTheme = EditorView.baseTheme({
   '.cm-sm-finding-flash': {
     animation: 'sm-finding-fade 2.2s ease-out forwards',
     borderRadius: '2px',
   },
   '@keyframes sm-finding-fade': {
-    '0%': { backgroundColor: 'rgba(193,48,28,0.32)' },
-    '65%': { backgroundColor: 'rgba(193,48,28,0.32)' },
-    '100%': { backgroundColor: 'rgba(193,48,28,0)' },
+    '0%': { boxShadow: 'inset 0 0 0 2px rgba(255,193,7,0.9)' },
+    '65%': { boxShadow: 'inset 0 0 0 2px rgba(255,193,7,0.9)' },
+    '100%': { boxShadow: 'inset 0 0 0 2px rgba(255,193,7,0)' },
   },
 });
 
@@ -459,6 +470,38 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         state,
         parent: containerRef.current,
       });
+
+      // a11y pass (2026-09-04): axe's scrollable-region-focusable rule
+      // flags `.cm-scroller` (overflow:auto) as not independently
+      // keyboard-focusable. The textbook fix — `tabIndex = 0` on the
+      // scroller — was tried here and reverted: `.cm-content` (its child)
+      // is ALREADY focusable and reachable by Tab, so the extra stop was
+      // redundant, and testing it live surfaced a SEPARATE, real,
+      // pre-existing keyboard trap this pass found but did not cause (see
+      // KNOWN ISSUE below) that a stray tabIndex here made slightly easier
+      // to hit by accident, not the cause of. Left unset; the residual gap
+      // against the rule's own letter (a screen reader's browse/
+      // virtual-cursor mode, not Tab) is real but narrower than the rule
+      // implies, since `.cm-content` already covers every keyboard/Tab
+      // user this suite could verify.
+      //
+      // KNOWN ISSUE (found live via scripts/verify-a11y.mjs, filed not
+      // fixed — see that file's header and the a11y pass's final report):
+      // once focus lands on `.cm-content` by ANY route (Tab-walking into
+      // it with no prior click/typing here included) while the writer has
+      // never pressed Escape in this editor session, fountain-keymap.ts's
+      // Tab handler captures every further Tab press (cycleElement/
+      // insertTab) with tab-escape never armed — so Tab alone cannot
+      // leave. This is the exact scenario "Escape, then Tab" (documented
+      // in the shortcuts panel) exists to solve, and Escape-then-Tab DOES
+      // recover it (verified) — but a keyboard user who tabs into the
+      // editor incidentally, with no reason yet to know that idiom, gets
+      // stuck with no visible hint why. A real fix belongs in
+      // fountain-keymap.ts (auto-arm tab-escape the first time focus
+      // arrives via keyboard navigation rather than a deliberate click/
+      // keystroke) and needs care not to regress the deliberate-typing
+      // case that idiom already serves correctly — out of scope for a
+      // same-pass fix; flagged for dedicated follow-up.
 
       viewRef.current = view;
 

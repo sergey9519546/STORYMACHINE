@@ -403,10 +403,13 @@ export default function CoverageSummary({
       <div className="sm-pagetop shrink-0">
         <Stethoscope className="h-4 w-4 shrink-0 text-[var(--sm-cream)]" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <h2 id="coverage-summary-title" className="sm-title text-[var(--sm-cream)]">
+          <h2 id="coverage-summary-title" className="sm-title !text-[var(--sm-cream)]">
             Coverage
           </h2>
-          <p className="truncate font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-[0.14em] text-[var(--sm-cream)]/45">
+          {/* a11y pass: raw --sm-cream/45 measured 4.00:1 on this dark
+              header bar — under the 4.5:1 AA text minimum; --sm-cream-mute
+              is the same tone tuned to 6.3-6.7:1. */}
+          <p className="truncate font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-[0.14em] text-[var(--sm-cream-mute)]">
             {usingSample ? "Sample" : title || "Draft"} · next fix
           </p>
         </div>
@@ -508,7 +511,12 @@ export default function CoverageSummary({
             /* P0: a failed pass or scene-truncated prefix makes health/grade
                sentinels (0 / troubled) unsafe to display as real scores. */
             <div className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)]">
-              <p className="sm-h text-[var(--sm-stamp)]">Analysis incomplete</p>
+              {/* a11y pass: `.sm-h` bakes in its own `color` and loads after
+                  Tailwind in the cascade — a same-specificity utility color
+                  here silently loses to it without `!`, rendering
+                  --sm-ink-faint (the light-context default) instead of the
+                  intended stamp color. */}
+              <p className="sm-h !text-[var(--sm-stamp-on-light)]">Analysis incomplete</p>
               <p className="mt-2 font-[family-name:var(--sm-font-display)] text-2xl uppercase leading-none text-[var(--sm-ink)]">
                 Score withheld
               </p>
@@ -563,7 +571,7 @@ export default function CoverageSummary({
                 id="tile-critical"
                 label="Critical"
                 description={STAT_DEFINITIONS.critical}
-                valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-stamp)]"
+                valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-stamp-on-light)]"
               >
                 {report.bySeverity.critical}
               </StatTile>

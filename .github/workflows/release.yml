@@ -156,10 +156,10 @@ jobs:
           GEMINI_API_KEY: "test-key-ci"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # The browser battery. Six live-Chromium suites (smoke-p0-live-flow,
+  # The browser battery. Seven live-Chromium suites (smoke-p0-live-flow,
   # verify-focus-traps, verify-p2-p3-surfaces, verify-ui-polish-affordances,
-  # verify-e4-local-safety-net, verify-e5-command-palette) that boot the real
-  # keyless server and drive the real UI.
+  # verify-e4-local-safety-net, verify-e5-command-palette, verify-a11y) that
+  # boot the real keyless server and drive the real UI.
   #
   # These used to run on exactly ONE machine. Three of their own headers
   # asserted they "must not be wired into CI" because "CI has no browser

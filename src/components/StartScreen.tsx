@@ -298,7 +298,11 @@ export default function StartScreen({
             {/* ── Hero: wordmark + bring a script (primary task) ── */}
             <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-8 px-6 py-8 sm:gap-16 sm:px-10 sm:py-20">
               <header className="flex flex-col gap-4 sm:gap-8">
-                <p className="hidden font-mono text-[11px] uppercase tracking-[0.4em] text-ink/50 sm:block">
+                {/* a11y pass: text-ink/50 measured 3.45:1 on this cream
+                    background — under the 4.5:1 AA text minimum for
+                    11px type; /65 clears it (4.7-5.6:1 across the paper
+                    family) while staying visually secondary. */}
+                <p className="hidden font-mono text-[11px] uppercase tracking-[0.4em] text-ink/65 sm:block">
                   Coverage Report — Reader&rsquo;s Copy
                 </p>
                 <h1
@@ -476,7 +480,7 @@ export default function StartScreen({
                           type="button"
                           onClick={() => setOpenFileError(null)}
                           aria-label="Dismiss error"
-                          className={`min-h-[44px] min-w-[44px] leading-none transition-colors hover:text-[var(--sm-stamp)] ${FOCUS_RING}`}
+                          className={`min-h-[44px] min-w-[44px] leading-none transition-colors hover:text-[var(--sm-stamp-on-light)] ${FOCUS_RING}`}
                         >
                           <X className="mx-auto h-4 w-4" aria-hidden="true" />
                         </button>
@@ -490,7 +494,7 @@ export default function StartScreen({
                   <div className="flex flex-wrap items-center gap-4">
                     <a
                       href="#how-it-works"
-                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
+                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/65 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
                     >
                       How it works
                     </a>
@@ -500,7 +504,7 @@ export default function StartScreen({
                         lives on the entrance, not behind the editor. */}
                     <a
                       href="#verify"
-                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
+                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/65 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
                     >
                       <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
                       Verify a report
@@ -543,7 +547,7 @@ export default function StartScreen({
 
                 {/* L1 — path map */}
                 <section id="how-it-works" aria-labelledby="desk-heading" className="scroll-mt-10">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/45">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/65">
                     Where you are
                   </p>
                   <h2
@@ -561,7 +565,7 @@ export default function StartScreen({
                       { n: "4", t: "Ship", d: "Export · simulate" },
                     ].map((step) => (
                       <li key={step.n} className="sm-card flex items-start gap-3">
-                        <span className="font-[family-name:var(--sm-font-display)] text-3xl leading-none text-[var(--sm-stamp)]">
+                        <span className="font-[family-name:var(--sm-font-display)] text-3xl leading-none text-[var(--sm-stamp-on-light)]">
                           {step.n}
                         </span>
                         <div>
@@ -611,7 +615,7 @@ export default function StartScreen({
                       <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="sm-card py-3 text-center">
                           <dt className="sm-h">Next</dt>
-                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-stamp)]">
+                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-stamp-on-light)]">
                             Climax engagement
                           </dd>
                         </div>
@@ -632,7 +636,11 @@ export default function StartScreen({
                 <section aria-labelledby="oasis-heading" className="sm-panel sm-panel--ink">
                   <div className="grid grid-cols-1 lg:grid-cols-12">
                     <div className="sm-panel-body lg:col-span-7">
-                      <p className="sm-h text-[var(--sm-cream)]/45">When you need pressure</p>
+                      {/* a11y pass: --sm-cream/45 measured 4.00:1 even with
+                          the `!` override winning — the opacity itself was
+                          still the problem, not just the cascade. Swapped
+                          for --sm-cream-mute (6.3-6.7:1). */}
+                      <p className="sm-h !text-[var(--sm-cream-mute)]">When you need pressure</p>
                       <h2
                         id="oasis-heading"
                         className="mt-2 font-[family-name:var(--sm-font-display)] text-3xl uppercase leading-none text-[var(--sm-cream)] sm:text-4xl"
@@ -647,18 +655,27 @@ export default function StartScreen({
                           ["Return", "Back to page"],
                         ].map(([k, v]) => (
                           <div key={k} className="border border-[var(--sm-cream)]/15 p-3">
-                            <p className="sm-h text-[var(--sm-stamp)]">{k}</p>
-                            <p className="sm-slug mt-1 text-[var(--sm-cream)]/70">{v}</p>
+                            {/* a11y pass: `.sm-h`/`.sm-slug` (design-system.css)
+                                each bake in their own `color` and load AFTER
+                                Tailwind in the cascade, so a same-specificity
+                                utility color class here silently loses —
+                                these two measured 2.79:1 / 1.84:1 (still
+                                --sm-ink-faint / --sm-ink-soft, the *light*-
+                                context defaults, rendering on this dark
+                                panel) even though the intended color was
+                                already contrast-safe. `!` forces the win. */}
+                            <p className="sm-h !text-[var(--sm-stamp-on-dark)]">{k}</p>
+                            <p className="sm-slug mt-1 !text-[var(--sm-cream)]/70">{v}</p>
                           </div>
                         ))}
                       </div>
                     </div>
                     <div className="flex flex-col justify-between gap-6 border-t border-[var(--sm-cream)]/15 p-6 sm:p-8 lg:col-span-5 lg:border-l lg:border-t-0">
                       <ol className="space-y-2 font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--sm-cream)]/80">
-                        <li><span className="text-[var(--sm-stamp)]">1</span> · Draft or import</li>
-                        <li><span className="text-[var(--sm-stamp)]">2</span> · Coverage · pick a fix</li>
-                        <li><span className="text-[var(--sm-stamp)]">3</span> · Simulate if needed</li>
-                        <li><span className="text-[var(--sm-stamp)]">4</span> · Export / return</li>
+                        <li><span className="text-[var(--sm-stamp-on-dark)]">1</span> · Draft or import</li>
+                        <li><span className="text-[var(--sm-stamp-on-dark)]">2</span> · Coverage · pick a fix</li>
+                        <li><span className="text-[var(--sm-stamp-on-dark)]">3</span> · Simulate if needed</li>
+                        <li><span className="text-[var(--sm-stamp-on-dark)]">4</span> · Export / return</li>
                       </ol>
                       <button
                         type="button"

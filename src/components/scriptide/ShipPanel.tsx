@@ -79,10 +79,12 @@ export default function ShipPanel(props: ShipPanelProps) {
       <div className="sm-pagetop shrink-0">
         <Download className="h-4 w-4 shrink-0 text-[var(--sm-cream)]" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <h2 id="ship-panel-title" className="sm-title text-[var(--sm-cream)]">
+          <h2 id="ship-panel-title" className="sm-title !text-[var(--sm-cream)]">
             Ship
           </h2>
-          <p className="truncate font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-[0.14em] text-[var(--sm-cream)]/45">
+          {/* a11y pass: raw --sm-cream/45 measured 4.00:1 on this dark
+              header bar — under the 4.5:1 AA text minimum. */}
+          <p className="truncate font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-[0.14em] text-[var(--sm-cream-mute)]">
             {title || "Draft"} · export &amp; version
           </p>
         </div>

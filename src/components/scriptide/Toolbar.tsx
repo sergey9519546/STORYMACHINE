@@ -203,7 +203,13 @@ export default function Toolbar({
       title: "Saving changes…",
     },
     "saved-local": {
-      border: "border-[var(--sm-ok)] text-[var(--sm-ok)]",
+      // a11y pass: --sm-ok/--sm-stamp/--sm-warn measure fine as a BORDER
+      // here (>=3:1, the non-text UI-component minimum) but --sm-ok and
+      // --sm-stamp's raw TEXT color fails the 4.5:1 text minimum on this
+      // dark header (3.15-3.57:1) — the *-on-dark variants are the same
+      // hue re-tuned to clear it; --sm-warn's own text already clears
+      // 4.5:1 here (5.65:1) so it's untouched.
+      border: "border-[var(--sm-ok)] text-[var(--sm-ok-on-dark)]",
       icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />,
       label: "Saved",
       title: "Saved on this device",
@@ -215,19 +221,19 @@ export default function Toolbar({
       title: "Saving to server…",
     },
     "saved-server": {
-      border: "border-[var(--sm-ok)] text-[var(--sm-ok)]",
+      border: "border-[var(--sm-ok)] text-[var(--sm-ok-on-dark)]",
       icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />,
       label: "Saved",
       title: "All changes saved to server",
     },
     "save-conflict": {
-      border: "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]",
+      border: "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp-on-dark)]",
       icon: <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />,
       label: "Conflict",
       title: "Conflict detected - resolve below",
     },
     "save-failed": {
-      border: "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]",
+      border: "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp-on-dark)]",
       icon: <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />,
       // Finding 2: a 4xx validation rejection (the draft itself is too big —
       // retrying the same bytes can never succeed) reads distinctly from a
@@ -243,8 +249,8 @@ export default function Toolbar({
   const statusClass = isAnalyzing
     ? "text-[var(--sm-warn)]"
     : coverageStale
-      ? "text-[var(--sm-stamp)]"
-      : "text-[var(--sm-ok)]";
+      ? "text-[var(--sm-stamp-on-dark)]"
+      : "text-[var(--sm-ok-on-dark)]";
 
   // Phase E exit-gate punch list, P1: mirrors CoverageSummary.tsx's own
   // `sm:` breakpoint (Tailwind's default 640px) for when its 380px aside
@@ -318,9 +324,14 @@ export default function Toolbar({
               {title}
             </h1>
           </div>
-          <p className="hidden truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--sm-cream)]/45 sm:block">
+          {/* a11y pass: raw --sm-cream/45 and /30 opacity measured 4.00:1 and
+              2.48:1 on this dark header — both under the 4.5:1 AA text
+              minimum. --sm-cream-mute (6.3-6.7:1) and the new
+              --sm-cream-faint (5.3:1+) are the same visual hierarchy
+              (full cream > mute > faint) at real contrast. */}
+          <p className="hidden truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--sm-cream-mute)] sm:block">
             {provenance !== "user" ? provenance : "desk"}
-            <span className="text-[var(--sm-cream)]/30">
+            <span className="text-[var(--sm-cream-faint)]">
               {" "}
               · {wordCount}w · {pageCount}pp
             </span>
@@ -380,8 +391,8 @@ export default function Toolbar({
             isAnalyzing
               ? "border-[var(--sm-warn)] text-[var(--sm-warn)]"
               : coverageStale
-                ? "border-[var(--sm-stamp)] text-[var(--sm-stamp)]"
-                : "border-[var(--sm-ok)] text-[var(--sm-ok)]"
+                ? "border-[var(--sm-stamp)] text-[var(--sm-stamp-on-dark)]"
+                : "border-[var(--sm-ok)] text-[var(--sm-ok-on-dark)]"
           }`}
           role="status"
           aria-live="polite"
