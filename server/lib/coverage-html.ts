@@ -686,6 +686,23 @@ const STYLES = `
       font-size: 11px;
       font-weight: 700;
     }
+    /* ── Structural-signal strip (unwired diagnostics) ── */
+    .sig-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; }
+    .sig-cell {
+      width: 26px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      color: #57606a;
+    }
+    .sig-bar { height: 40px; display: flex; flex-direction: column; justify-content: flex-end; border: 1px solid #d0d7de; border-radius: 3px; overflow: hidden; }
+    .sig-talk { background: #6e7781; }
+    .sig-act { background: #d8dee4; flex: 1 1 auto; }
+    .sig-idx { text-align: center; padding-top: 2px; }
+    .sig-note { font-size: 11px; color: #57606a; margin: 8px 0 0; }
+    .sig-legend { font-size: 11px; color: #57606a; margin: 0 0 10px; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
@@ -837,6 +854,53 @@ export interface CoverageHtmlOptions {
  *  (disclosure/epistemic, character functions, subplots, graph health) in
  *  the exported coverage report. Each subsection renders only when data
  *  is present, so reports from older runs don't break. */
+/** Compact per-scene strip for the additive, UNWIRED structural-signal block
+ *  (ScriptDoctorReport.structuralSignals). Each bar is one scene: its filled
+ *  lower portion is the scene's dialogue-word share, the pale remainder is
+ *  action. The hover title carries that scene's full row. Rendered as a
+ *  clearly-labelled diagnostic, never as part of the verdict — nothing in
+ *  this block feeds health, grade, or any priority. */
+function buildStructuralSignalsSection(report: ScriptDoctorReport): string {
+  const block = report.structuralSignals;
+  if (!block || !block.scored || block.scenes.length === 0) return '';
+
+  const cells = block.scenes.map(scene => {
+    const talkPct = Math.max(0, Math.min(100, Math.round(scene.dialogueShare * 100)));
+    const tooltip = escapeHtml(
+      `${scene.slug} — ${scene.words} words (z ${scene.lengthZ.toFixed(2)}) · `
+      + `dialogue ${talkPct}% (Δ ${scene.dialogueShareDelta >= 0 ? '+' : ''}${scene.dialogueShareDelta.toFixed(2)}) · `
+      + `${scene.speakers} speaker(s), ${scene.speakerTurns} turn(s), ${scene.meanTurnWords.toFixed(1)} words/turn · `
+      + `lead share ${Math.round(scene.leadShare * 100)}% · new pairings ${scene.newPairs} · `
+      + `open/close shift ${scene.openCloseShift.toFixed(2)}`,
+    );
+    return `<div class="sig-cell" title="${tooltip}">`
+      + `<div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:${talkPct}%;"></div></div>`
+      + `<div class="sig-idx">${scene.sceneIdx + 1}</div>`
+      + '</div>';
+  }).join('\n');
+
+  const summary = [
+    `scene-length variation ${block.sceneLengthCv.toFixed(2)}`,
+    `mean talk/action swing ${block.meanAbsDialogueShareDelta.toFixed(2)}`,
+    `talk/action range ${block.dialogueShareRange.toFixed(2)}`,
+    `new-pairing scenes ${Math.round(block.newPairSceneRate * 100)}%`,
+    `mean words/turn ${block.meanTurnWords.toFixed(1)}`,
+    `lead share ${Math.round(block.meanLeadShare * 100)}% (trend ${block.leadShareSlope >= 0 ? '+' : ''}${block.leadShareSlope.toFixed(2)})`,
+    `action-sentence variation ${block.actionSentenceCvOverall.toFixed(2)}`,
+  ].map(escapeHtml).join(' &middot; ');
+
+  return `
+  <section class="section">
+    <h2>Structural Signals (new, unwired diagnostics)</h2>
+    <p class="sig-legend">One bar per scene. The filled lower portion is that scene&rsquo;s share of dialogue words; the pale remainder is action. Hover a bar for that scene&rsquo;s full reading.</p>
+    <div class="sig-row">
+${cells}
+    </div>
+    <p class="sig-note">${summary}</p>
+    <p class="sig-note">These readings are computed from document structure alone &mdash; word, line, sentence, turn and speaker counts &mdash; with no word list involved. They are <strong>diagnostic only and are not part of the score</strong>: no health, grade, verdict, dimension or priority above is derived from any number in this section.</p>
+  </section>`;
+}
+
 function buildGodmodeSection(report: ScriptDoctorReport): string {
   const parts: string[] = [];
 
@@ -939,6 +1003,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildStrengthsSection(strengths),
     buildGodmodeSection(report),
     buildHeatmapSection(report.sceneHeatmap ?? []),
+    buildStructuralSignalsSection(report),
     buildNamedRootCausesSection(report.rootCauses),
     buildTopPrioritiesSection(report.topPriorities ?? []),
     buildClusterFindingsSection(report.rootCauses),

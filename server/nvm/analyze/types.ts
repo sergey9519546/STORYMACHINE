@@ -351,6 +351,24 @@ export interface ScriptDoctorReport {
   bonding?: import('./bonding-signal.ts').BondingReport;
   coldOpenPromise?: import('./cold-open-promise.ts').ColdOpenReport;
   patternEstablishment?: import('./pattern-establishment.ts').PatternReport;
+  /** Dense, LEXICON-FREE structural readings — per scene and per document —
+   *  computed from counts of words, lines, sentences, speech turns and
+   *  speakers alone. Added 2026-09-04 in response to the advice-quality
+   *  audit's measured finding that the four channels most of the advice
+   *  derives from (`suspenseDelta`, `emotionalShift`, `clockRaised`,
+   *  `revelation`) read "absent" on ~93% of scenes, so "X is missing" notes
+   *  fire on an excellent draft and a bad one alike. These channels are dense
+   *  by construction and cannot be defeated by vocabulary.
+   *  DIAGNOSTIC ONLY — deliberately NOT wired into health, verdict, grade,
+   *  dimensions, topPriorities, or any of the 14 passes. Wiring any channel
+   *  into the score is an owner decision with one stated path: wire the
+   *  candidate, run `npm run measure-real` on the local real corpus, compare
+   *  AUC-24 against the >= 0.622 floor in `scripts/lib/auc.ts`, write the
+   *  MEASUREMENT_RECEIPTS.md entry, then merge. See
+   *  docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md for each channel's
+   *  measured density and separation, including the two that came out
+   *  degenerate. */
+  structuralSignals?: import('./structural-signals.ts').StructuralSignalsReport;
   /** TRACE §13: Allen's Interval Algebra temporal-consistency audit (built,
    *  tested, and wired 2026-08-03 — see temporal-consistency.ts's header for
    *  the false-positive bug found and fixed during wiring, and the

@@ -218,6 +218,20 @@ function buildCaveats(report: ScriptDoctorReport): string[] {
     ?? computeStructuralReliabilityNote(report.sceneCount);
   if (structuralNote) caveats.push(structuralNote);
 
+  // Additive, 2026-09-04. Gated on the field's PRESENCE so a report
+  // serialized before the structural-signal block existed renders exactly the
+  // letter it always did — the two committed fixtures under
+  // tests/fixtures/coverage-letter/ are such reports, and stay byte-identical.
+  if (report.structuralSignals?.scored) {
+    caveats.push(
+      'The exported HTML report carries a new “Structural Signals” strip — scene length, '
+      + 'talk-versus-action mix, speech turns, speaker pairings and action-prose variation, '
+      + 'read from the shape of the document rather than from any word list. Those readings '
+      + 'are new and deliberately unwired: they are shown as diagnostics and no part of the '
+      + 'score, grade, or verdict above is derived from them.',
+    );
+  }
+
   caveats.push(
     'It does not read for market fit, casting, or budget — those require a human reader’s '
     + 'judgment this engine has no basis for.',

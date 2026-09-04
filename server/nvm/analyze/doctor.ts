@@ -48,6 +48,7 @@ import { detectSilence } from './silence-signal.ts';
 import { detectBonding } from './bonding-signal.ts';
 import { detectColdOpenPromise } from './cold-open-promise.ts';
 import { detectPatternEstablishment } from './pattern-establishment.ts';
+import { computeStructuralSignals } from './structural-signals.ts';
 import { analyzeStoryGraph } from './story-graph.ts';
 import { auditTemporalConsistencyReport } from './temporal-consistency.ts';
 import { analyzeDisclosureAndEpistemics } from '../quality/disclosure-analysis.ts';
@@ -2314,6 +2315,11 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     bonding: detectBonding(fountain),
     coldOpenPromise: detectColdOpenPromise(fountain),
     patternEstablishment: detectPatternEstablishment(fountain),
+    // Dense, lexicon-free structural readings (2026-09-04). Additive and
+    // diagnostic ONLY: no health, verdict, grade, dimension, priority or pass
+    // reads this block. Computed unconditionally like the other per-document
+    // signal blocks above — its own `scored` flag carries the abstain.
+    structuralSignals: computeStructuralSignals(fountain),
     storyGraph: analysisComplete && analysis.sceneCount > 0 ? storyGraphResult : undefined,
     graphHealth: analysisComplete ? graphHealthContribution : undefined,
     // ── GODMODE integration: 4 new analysis layers ────────────────────────
