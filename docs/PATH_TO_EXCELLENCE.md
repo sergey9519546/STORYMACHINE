@@ -80,7 +80,13 @@ full gate set and the browser battery:
   cues both drove the analyzer quadratic (37 s at 300k characters; a minute
   at 8,000 names). Both are now refused in under 25 ms by a single shape
   guard in `validation.ts` shared by every fountain-accepting route — placed
-  outside the scoring path, so no receipt was needed. The collab WebSocket
+  outside the scoring path, so no receipt was needed. *(Correction,
+  independent audit, 2026-09-04 evening: the token half reproduces; the cue
+  half holds only for ASCII cues of at most 40 characters — the guard's own
+  alphabet, not the parser's. 2,000 Cyrillic, Greek, `#`-bearing or 41+
+  character cues still reach the analyzer: HTTP 200 in 2.1–6.4 s, quadratic.
+  A lane is rebuilding the guard on the parser's exported cue classes. Full
+  report: `docs/audits/2026-09-04-evening-batch/AUDIT.md`.)* The collab WebSocket
   had no frame cap at all (the library default is 100 MiB); a 10 MB frame
   now closes with code 1009. 200 concurrent doctor requests from 200
   fabricated sessions were a pass, not a finding: the limiter and the pool
@@ -111,7 +117,12 @@ full gate set and the browser battery:
 - **First-request cold start is gone.** The pool now warms one throwaway
   analysis per worker after `listen` (no-op under test or
   `DOCTOR_POOL_PREWARM=0`); the first real request drops from ~2.7 s to
-  ~120 ms in this sandbox, warm requests unchanged.
+  ~120 ms in this sandbox, warm requests unchanged. *(Correction,
+  independent audit, 2026-09-04 evening: true only for a request that arrives
+  after the ~2.1–2.7 s warm-up; the port accepts connections for that whole
+  window and a request landing inside it measured 2,432 ms against 2,886 ms
+  unwarmed. A lane is adding a readiness signal so traffic can be held until
+  the pool is warm. Same report.)*
 - **The landing contrast gate was blind, then fixed, then the colours.**
   The re-verifier's "not reproduced" was reproduced first: the a11y suite
   audited the landing mid-animation (0 violations at T0, 4 serious at rest).
@@ -137,7 +148,13 @@ full gate set and the browser battery:
   the new shared runner reports a retried pass as `flaky-pass`, never as a
   pass (CI keeps retries at zero). Eight suites, run alone and under four
   CPU hogs at load up to 11 on four CPUs: 16 of 16 pass with no base timeout
-  raised and no suite needing a real fix.
+  raised and no suite needing a real fix. *(Correction, independent audit,
+  2026-09-04 evening: the policy reads `os.loadavg()` over `os.cpus().length`,
+  so it is silently a 1.0x no-op on Windows, where loadavg is always zero,
+  and inside a CPU-quota-limited container, where cpus() reports the host's
+  cores; the "under load" half of this sentence is machine-specific. A lane
+  is adding the cgroup quota and an explicit "policy inactive" log line. Same
+  report.)*
 
 - **The editor bundle was split without changing when anything loads.**
   The 634 KB ScriptIDE chunk was carrying the collab CRDT stack for every
