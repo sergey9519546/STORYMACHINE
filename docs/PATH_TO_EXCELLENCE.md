@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-04, main @ 13a5ee12 (four session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-04, main @ f7b64e9b (four session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -139,13 +139,31 @@ full gate set and the browser battery:
   CPU hogs at load up to 11 on four CPUs: 16 of 16 pass with no base timeout
   raised and no suite needing a real fix.
 
-Main moved from 975eada2 to 13a5ee12 over this batch: 21 commits, all
-gated, all pushed. Still running when this was written: a code-split of the
-632 KB ScriptIDE chunk and the What-If Lab getting the Doctor wired in
-(score each branch, promote a branch to a snapshot). The owner-only list is
-unchanged from the record below, with one correction already noted above:
-the second corpus measurement needs a manual merge of the two pending
-branches, not a rebase.
+- **The editor bundle was split without changing when anything loads.**
+  The 634 KB ScriptIDE chunk was carrying the collab CRDT stack for every
+  writer, whether or not they ever opened a room; it now loads on first use.
+  ScriptIDE is 183 KB, the largest chunk (CodeMirror, kept eager for typing
+  latency) is 341 KB, and the production suite fails hard above 500 KB from
+  now on. A Tailwind warning turned out to be a class-shaped token name in a
+  comment.
+- **The What-If Lab is scored by the Doctor now.** A branch was a list of
+  story operations with no text at all; the repo's own deterministic
+  operations-to-Fountain compiler materialises each branch as a variant of
+  the current draft (no model, no invented phrasing), the pooled doctor
+  route scores it with the same content-hash cache the editor uses, and
+  the panel shows health, verdict, grade and the delta against the base
+  draft beside the two descriptive aggregates. "Promote this branch" writes
+  it into the editor as a scored snapshot, after snapshotting the previous
+  text as the undo path. Two real bugs surfaced on the way: a title-page-only
+  variant came back as a fake health-0 PASS until scene count was checked,
+  and React strict mode promoted every branch twice until the effect was
+  made one-shot. Note for the record: the Lab is behind the Labs flag, not in
+  the default surface; the focus-trap suite reaches it by enabling Labs.
+
+Main moved from 975eada2 to f7b64e9b over this batch: 23 commits, all
+gated, all pushed. The owner-only list is unchanged from the record below,
+with one correction already noted above: the second corpus measurement
+needs a manual merge of the two pending branches, not a rebase.
 
 **2026-09-04, later — the hardening batch.** Three read-only audits aimed at
 what the day's own changes had added, then four fix lanes. The audits were
