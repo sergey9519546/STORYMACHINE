@@ -47,6 +47,18 @@ export interface VerifyReceipt {
   after: VerifySide;
   cleared: TaggedIssue[];
   introduced: TaggedIssue[];
+  /** 2026-09-05 review finding D4 — `contentHash` is a whole-document
+   *  `trim()`-only digest (doctor.ts's computeContentHash), while
+   *  normalizeScreenplay strips PER-LINE trailing whitespace before anything
+   *  reads the text. An edit that only adds trailing spaces to lines
+   *  therefore changes `contentHash` (the LRU misses, a full second analysis
+   *  runs) while producing a byte-identical analysis — same health, same
+   *  verdict, same issue set. Presenting `before.contentHash !==
+   *  after.contentHash` alone reads as "these documents differ" when
+   *  analytically they do not. True whenever there is no MEASURED
+   *  difference: either the hashes already agree, or (independently of the
+   *  hash) health matches and no issue moved in either direction. */
+  identicalAnalysis: boolean;
 }
 
 /** Every diagnosable issue in a report, tagged with the pass that raised it. */
@@ -118,10 +130,13 @@ export function buildVerifyReceipt(
   candidate: ScriptDoctorReport,
 ): VerifyReceipt {
   const { cleared, introduced } = multisetDiff(flattenIssues(baseline), flattenIssues(candidate));
+  const identicalAnalysis = baseline.contentHash === candidate.contentHash
+    || (cleared.length === 0 && introduced.length === 0 && baseline.health === candidate.health);
   return {
     before: { health: baseline.health, verdict: baseline.verdict, contentHash: baseline.contentHash! },
     after: { health: candidate.health, verdict: candidate.verdict, contentHash: candidate.contentHash! },
     cleared,
     introduced,
+    identicalAnalysis,
   };
 }

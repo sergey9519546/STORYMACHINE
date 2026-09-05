@@ -261,6 +261,20 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
   // this field existed.
   if (opts.draftRank) {
     const { rank, of, tied, unscored } = opts.draftRank;
+    // 2026-09-05 review finding E1 — the `of <= 1` arm below used to
+    // hand-write its sentence and return early, never calling
+    // unrankedDraftsNote() the way the `else` arm two lines down already
+    // did. draft-rank-copy.ts's own header calls appending that note in
+    // BOTH arms "a correctness-by-construction guarantee, not dead code" —
+    // this was the one branch that skipped it, so a first saved draft with
+    // e.g. 5 other unscored records silently dropped "5 of 6 runs and saved
+    // drafts of this script are unranked" from the LETTER while the
+    // coverage HTML and the in-app panel (both driven by the same
+    // `unrankedDraftsNote` call) kept showing it — the exact drift
+    // draft-rank-copy.ts exists to end. Both arms now append the note the
+    // same way.
+    const note = unrankedDraftsNote(unscored ?? 0, of);
+    const appendedNote = note ? ` ${note.charAt(0).toUpperCase()}${note.slice(1)}.` : '';
     caveats.push(
       of <= 1
         // REVIEW FIX (round 2): "your next run or save" — a rank can also
@@ -269,7 +283,7 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
         // Version; "next save" alone understated it. Shared with
         // ScriptDoctorPanel.tsx's DraftRankLine via draft-rank-copy.ts.
         ? `This is your first saved draft of this script — a rank among your own drafts will appear `
-          + `after ${draftRankNextOpportunityLabel()}.`
+          + `after ${draftRankNextOpportunityLabel()}.${appendedNote}`
         // 2026-09-04 (audit round 2): "ties for" instead of "ranks" when
         // another counted draft shares the exact same health — a plain
         // ordinal alone would read as clean separation from the rest of
@@ -284,10 +298,7 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
         // tests/core/percentile-copy-consistency.test.ts.
         : `Among your own ${draftRankDenominatorLabel()}, this one ${tied ? 'ties for' : 'ranks'} ${ordinal(rank)} of ${formatNumber(of)} `
           + 'by health — a comparison to your own history, not to the reference set above or to any '
-          + `other writer’s work.${(() => {
-            const note = unrankedDraftsNote(unscored ?? 0, of);
-            return note ? ` ${note.charAt(0).toUpperCase()}${note.slice(1)}.` : '';
-          })()}`,
+          + `other writer’s work.${appendedNote}`,
     );
   }
 

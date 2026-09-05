@@ -1164,6 +1164,42 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
   // analysis free here — the writer just ran /doctor on that exact text to
   // GET the report they are now improving on.
   if (candidateFountain !== undefined) {
+    // ── Format short-circuit (2026-09-05 review finding D1) ────────────────
+    // /api/scriptide/doctor and /doctor/stream both refuse non-screenplay
+    // prose with `formatUnrecognized` BEFORE the doctor ever runs (the
+    // `hasSceneHeading` guard above) — this writer path ran the doctor on
+    // BOTH fields unconditionally, so text `/doctor` answers
+    // `formatUnrecognized` for instead silently scored `health: 0,
+    // verdict: 'PASS'` here, on either side. fix-delta.ts's own header
+    // states the receipt's whole warrant as "POST either text to /doctor and
+    // the numbers must match byte for byte" — a candidate with no scene
+    // heading was a two-request falsification of that sentence, and when
+    // BOTH sides were unscorable the receipt read as "your rewrite changed
+    // nothing" when in fact nothing was ever analyzed. Checked on both
+    // fields, in POST order, before either baseline or candidate analysis
+    // runs, so the writer is never shown a number derived from an unscorable
+    // document (and never pays for the doctor run that would have produced
+    // one). Same shape /doctor returns (`formatUnrecognized`/`reason`/
+    // `hint`), plus `comparable: false` — the receipt-level signal that this
+    // JSON is not a real before/after delta even though it carries
+    // `formatUnrecognized` like /doctor's own response — for a panel to
+    // render distinctly from a genuine health/verdict movement.
+    for (const [field, text] of [['fountain', fountain], ['candidateFountain', candidateFountain]] as const) {
+      if (text.trim() !== '' && !hasSceneHeading(text)) {
+        res.json({
+          usedLLM: false,
+          source: 'writer',
+          comparable: false,
+          formatUnrecognized: true,
+          field,
+          reason: FORMAT_UNRECOGNIZED_REASON,
+          hint: FORMAT_UNRECOGNIZED_HINT,
+          ...await baselineOnlySignals(fountain),
+        });
+        return;
+      }
+    }
+
     const baseline = await runScriptDoctorForRequest(fountain, res);
     if (!baseline) return; // client disconnected mid-analysis
     if (!isWholeDraftAnalysisComplete(baseline)) {
@@ -1179,10 +1215,24 @@ router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandl
     const candidateReport = await runScriptDoctorForRequest(candidateFountain, res);
     if (!candidateReport) return; // client disconnected mid-analysis
     if (!isWholeDraftAnalysisComplete(candidateReport)) {
+      // 2026-09-05 review finding D2 — "Check the draft and try again" is
+      // the right message for a genuinely malformed candidate
+      // (failedPasses non-empty — something in the pipeline actually broke
+      // on this text), but it was ALSO the message shown when the candidate
+      // simply exceeded the analyzer's scene budget and was truncated
+      // (truncatedForAnalysis) — measured at the 900,000-char ceiling: a
+      // 864,889-char candidate takes exactly this branch with
+      // truncatedForAnalysis:true and no failed pass at all. That candidate
+      // is not malformed; it is longer than one analysis pass scores, and
+      // "check the draft" sends the writer looking for a mistake that is not
+      // there. Branch on *why* completeness failed instead.
+      const note = candidateReport.truncatedForAnalysis
+        ? `Your rewrite is longer than the analyzer scores in one pass (${candidateReport.sceneCount} of ${candidateReport.totalSceneCount ?? '?'} scenes analyzed), so there is no honest whole-draft score to compare it against.`
+        : 'Your rewrite could not be fully analyzed, so there is no honest score to compare it against. Check the draft and try again.';
       res.json({
         usedLLM: false,
         source: 'writer',
-        note: 'Your rewrite could not be fully analyzed, so there is no honest score to compare it against. Check the draft and try again.',
+        note,
         ...await baselineOnlySignals(fountain),
       });
       return;

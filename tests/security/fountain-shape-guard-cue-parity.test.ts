@@ -93,6 +93,7 @@ import { fileURLToPath } from 'node:url';
 import {
   fountainShapeRejectionReason,
   isCueLikeLine,
+  guardCueOccurrences,
   CUE_LIKE_LINE_RE,
   MAX_FOUNTAIN_DISTINCT_CUE_LINES,
   MAX_FOUNTAIN_CUE_WEIGHT,
@@ -103,7 +104,7 @@ import {
   MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
-import { normalizeScreenplay } from '../../server/nvm/analyze/screenplay-normalizer.ts';
+import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/screenplay-normalizer.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -857,5 +858,285 @@ describe('A3: boneyard-aware cue counting', () => {
     // A small, ordinary real cast outside the boneyard.
     p.push('ALEX', 'Hello.', '', 'SAM', 'Hi back.', '');
     assert.equal(fountainShapeRejectionReason(p.join('\n')), null);
+  });
+});
+
+// ── ROUND 8 (2026-09-05 review finding A1-R8, BLOCKER): the guard's OUTER
+// gate (isCueLikeLine) rejected a lowercase parenthetical tail even though
+// isCharacterCue accepts it and normalizeScreenplay's reflow UPPERCASES it
+// into a real cue CHARACTER_CUE_RE then accepts. Round 7 put isCharacterCue
+// INSIDE the blank-gap branch's decision but left the OUTER gate at two of
+// the three cue predicates — a lowercase-tailed cue never reached that
+// branch at all, because the loop `continue`d at the gate first. Fixed by
+// making isCueLikeLine the union of all three predicates (see its own
+// comment in validation.ts for the full trace and the exact measured
+// numbers this reproduces below).
+describe('ROUND 8 (finding A1-R8): the lowercase-parenthetical-tail bypass — isCueLikeLine\'s gate must be a superset of isCharacterCue too', () => {
+  const LOWER_TAIL = "PERSON1 (cont'd)";
+  const UPPER_TAIL = "PERSON1 (CONT'D)";
+
+  it('sanity: the lowercase-tail cue is cue-shaped to isCharacterCue (the normalizer\'s own test) but was NOT cue-shaped to CHARACTER_CUE_RE or CUE_LIKE_LINE_RE alone (the gap the round-8 fix closes)', () => {
+    assert.equal(isCharacterCue(LOWER_TAIL), true);
+    assert.doesNotMatch(LOWER_TAIL, CHARACTER_CUE_RE, 'CHARACTER_CUE_RE requires an exact-case (CONT\'D)/(V.O.)/(O.S.) tail');
+    assert.doesNotMatch(LOWER_TAIL, CUE_LIKE_LINE_RE, 'CUE_LIKE_LINE_RE\'s letter class is uppercase-only');
+  });
+
+  it('isCueLikeLine now accepts the lowercase-tail cue (the union fix)', () => {
+    assert.equal(isCueLikeLine(LOWER_TAIL), true, 'BYPASS STILL OPEN: isCueLikeLine must be true whenever isCharacterCue is true');
+  });
+
+  it('normalizeScreenplay really does uppercase the lowercase tail into the exact shape CHARACTER_CUE_RE accepts (the mechanism, not an assumption)', () => {
+    // Built directly (not via the ASCII-cue helper, which assumes an
+    // adjacent, not double-spaced, layout) — the exploit needs the
+    // blank-gap reflow to be in play.
+    const text = ['INT. ROOM - DAY', '', LOWER_TAIL, '', 'Line.', ''].join('\n');
+    const normalized = normalizeScreenplay(text);
+    assert.ok(normalized.includes(UPPER_TAIL), `expected normalizeScreenplay to reflow "${LOWER_TAIL}" into "${UPPER_TAIL}", got: ${normalized}`);
+    assert.match(UPPER_TAIL, CHARACTER_CUE_RE);
+  });
+
+  it('the A1-R8 payload (distinct=200, occurrences=6,000, lowercase-(cont\'d)-tailed cues, blank-gapped from their dialogue) IS rejected — the guard fired blind before this fix', () => {
+    const distinct = 200, occurrences = 6000;
+    const parts: string[] = ['INT. ROOM - DAY', ''];
+    for (let k = 0; k < occurrences; k++) parts.push(`PERSON${k % distinct} (cont'd)`, '', 'Line.', '');
+    const text = parts.join('\n');
+
+    // Prove this is not a synthetic worry: the REAL pipeline really does turn
+    // every one of these into a `character` block.
+    const blocks = parseFountain(normalizeScreenplay(text));
+    const characterBlocks = blocks.filter((b) => b.type === 'character').length;
+    assert.equal(characterBlocks, occurrences, 'sanity: the real pipeline must produce one character block per occurrence for this to be a real bypass');
+
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the A1-R8 payload to be rejected — the guard must not be blind to it');
+    assert.ok(ms < 100, `expected the guard to reject in well under 100ms (single O(n) pass), took ${ms}ms`);
+  });
+
+  it('the general invariant: the guard\'s verdict must not depend on the CASE of the extension tail', () => {
+    const distinct = 200, occurrences = 6000;
+    function build(tail: string): string {
+      const parts: string[] = ['INT. ROOM - DAY', ''];
+      for (let k = 0; k < occurrences; k++) parts.push(`PERSON${k % distinct}${tail}`, '', 'Line.', '');
+      return parts.join('\n');
+    }
+    const lowerReason = fountainShapeRejectionReason(build(" (cont'd)"));
+    const upperReason = fountainShapeRejectionReason(build(" (CONT'D)"));
+    assert.ok(lowerReason, 'the lowercase-tail variant must be rejected (this was the A1-R8 bypass)');
+    assert.ok(upperReason, 'the uppercase-tail variant must be rejected (this was already true before the fix)');
+    assert.equal(lowerReason, upperReason);
+  });
+
+  it('a legitimate small double-spaced two-hander with an occasional (cont\'d) tail is still NOT rejected', () => {
+    let text = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 30; i++) {
+      const tail = i % 5 === 0 ? " (cont'd)" : '';
+      text += `${i % 2 === 0 ? 'PAUL' : 'JUNE'}${tail}\n\nSomething ordinary gets said here, line ${i}.\n\n`;
+    }
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  // R4/R7 must still hold after this widening — the whole point of a union
+  // fix is that it only ADDS acceptance for shapes a downstream predicate
+  // actually treats as a cue; it must not start rejecting the caps-heavy
+  // action fixture or excluding the caps-heavy "dialogue" bypass fixture
+  // differently.
+  it('the R4 caps-heavy-action fixture is STILL accepted after the ROUND 8 fix', () => {
+    const SCENES = 200;
+    const CAPS_LINES_PER_SCENE = 8;
+    let text = '';
+    for (let s = 0; s < SCENES; s++) {
+      text += `INT. LOCATION ${s} - DAY\n\n`;
+      text += 'A person moves through the room, quiet, deliberate, careful not to make a sound.\n\n';
+      for (let c = 0; c < CAPS_LINES_PER_SCENE; c++) {
+        text += `THE DOOR SLAMS SHUT WITH A DEAFENING CRACK THAT ECHOES SCENE ${s} LINE ${c}\n\n`;
+      }
+    }
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+});
+
+// ── ROUND 8 oracle (2026-09-05 review finding A1-R8): the direct, pipeline-
+// derived invariant that would have caught rounds 4-8 in one test instead of
+// one review round per spelling. `guardCueOccurrences` (validation.ts, "one
+// walk, two consumers" with fountainShapeRejectionReason — see its own
+// comment) must never be smaller than the number of `character` blocks the
+// REAL pipeline (normalizeScreenplay then parseFountain — the exact order
+// every real request runs) produces for the same raw text. Any violation
+// means the guard is blind to a shape the pipeline will happily turn into
+// real analyzer cost, regardless of whether anyone has thought to name that
+// shape yet.
+//
+// The corpus below is a grammar PRODUCT over every family the eight rounds
+// used: script (ASCII/Cyrillic/Greek/accented Latin), a `#` in the name, a
+// 41+-char name, the dual-dialogue caret, all three extension tails in BOTH
+// cases (V.O./O.S./CONT'D and v.o./o.s./cont'd — the round-8 family), each
+// crossed with a cue-to-dialogue gap of 0 (adjacent) through 5 blank lines,
+// plus whitespace-only "blank" lines, a boneyard-wrapped variant (A3's own
+// merge mechanism), a caps-heavy-action-only document (must stay 0 >= 0, not
+// a false positive), and one document mixing several families together.
+function pipelineCharacterBlockCount(text: string): number {
+  return parseFountain(normalizeScreenplay(text)).filter((b) => b.type === 'character').length;
+}
+
+const ORACLE_CUE_FAMILIES: Record<string, (i: number) => string> = {
+  ASCII: (i) => `CHARACTER${i}`,
+  Cyrillic: (i) => `ПЕРСОНАЖ${i}`,
+  Greek: (i) => `ΧΑΡΑΚΤΗΡΑΣ${i}`,
+  'accented Latin': (i) => `MARÍA${i}`,
+  '# in the cue': (i) => `CHARACTER #${i}`,
+  '41+ char cue': (i) => `A VERY LONG CHARACTER NAME OVER FORTY CHARACTERS ${i}`,
+  'caret (tight)': (i) => `PERSON${i}^`,
+  'caret (spaced)': (i) => `PERSON${i} ^`,
+  'extension upper (V.O.)': (i) => `PERSON${i} (V.O.)`,
+  'extension upper (O.S.)': (i) => `PERSON${i} (O.S.)`,
+  "extension upper (CONT'D)": (i) => `PERSON${i} (CONT'D)`,
+  'extension lower (v.o.)': (i) => `PERSON${i} (v.o.)`,
+  'extension lower (o.s.)': (i) => `PERSON${i} (o.s.)`,
+  "extension lower (cont'd) [A1-R8]": (i) => `PERSON${i} (cont'd)`,
+};
+
+function buildGapDoc(
+  cueOf: (i: number) => string,
+  distinct: number,
+  occurrences: number,
+  gap: number,
+  gapLine = '',
+): string {
+  const parts: string[] = ['INT. ROOM - DAY', ''];
+  for (let k = 0; k < occurrences; k++) {
+    parts.push(cueOf(k % distinct));
+    for (let g = 0; g < gap; g++) parts.push(gapLine);
+    parts.push('Ordinary dialogue line here.', '');
+  }
+  return parts.join('\n');
+}
+
+describe('ROUND 8 oracle: guardCueOccurrences(text) >= pipeline character-block count, over the full rounds-1-8 grammar product', () => {
+  const DISTINCT = 4;
+  const OCCURRENCES = 12; // small — this proves CORRECTNESS of the shape recognition, not cost; the attack-scale numbers are proven above and in the HTTP bypass file.
+
+  for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+    for (let gap = 0; gap <= 5; gap++) {
+      it(`"${family}", gap=${gap}: guardCueOccurrences >= pipeline character-block count`, () => {
+        const text = buildGapDoc(cueOf, DISTINCT, OCCURRENCES, gap);
+        const guardCount = guardCueOccurrences(text);
+        const pipelineCount = pipelineCharacterBlockCount(text);
+        assert.ok(
+          guardCount >= pipelineCount,
+          `ORACLE VIOLATION "${family}" gap=${gap}: guard counted ${guardCount} but the pipeline produced ${pipelineCount} character blocks`,
+        );
+      });
+    }
+
+    it(`"${family}", whitespace-only gap lines (gap=1 and gap=2): guardCueOccurrences >= pipeline character-block count`, () => {
+      for (const gap of [1, 2]) {
+        const text = buildGapDoc(cueOf, DISTINCT, OCCURRENCES, gap, '   \t  ');
+        const guardCount = guardCueOccurrences(text);
+        const pipelineCount = pipelineCharacterBlockCount(text);
+        assert.ok(
+          guardCount >= pipelineCount,
+          `ORACLE VIOLATION "${family}" whitespace-gap=${gap}: guard counted ${guardCount} but the pipeline produced ${pipelineCount} character blocks`,
+        );
+      }
+    });
+  }
+
+  it('boneyard-wrapped (A3\'s own merge mechanism): every family, gap=0 and gap=2, guardCueOccurrences >= pipeline character-block count', () => {
+    // Mirrors buildBoneyardWrappedA1 above: opens the boneyard right after an
+    // established dialogue buffer so normalizeScreenplay's reflow merges the
+    // `/*` marker onto the preceding line instead of leaving it standalone —
+    // the exact mechanism that lets boneyard-wrapped content still reflow
+    // into real character blocks despite looking boneyard-safe to a naive
+    // guard. See A3's own describe block above for the full mechanism trace.
+    for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+      for (const gap of [0, 2]) {
+        const p: string[] = ['INT. ROOM - DAY', '', 'SETUP', '', 'Some setup dialogue line here.', '', '/*'];
+        for (let k = 0; k < 6; k++) {
+          p.push(cueOf(k % 3));
+          for (let g = 0; g < gap; g++) p.push('');
+          p.push('Ordinary dialogue line here.', '');
+        }
+        p.push('*/');
+        const text = p.join('\n');
+        const guardCount = guardCueOccurrences(text);
+        const pipelineCount = pipelineCharacterBlockCount(text);
+        assert.ok(
+          guardCount >= pipelineCount,
+          `ORACLE VIOLATION boneyard-wrapped "${family}" gap=${gap}: guard counted ${guardCount} but the pipeline produced ${pipelineCount} character blocks`,
+        );
+      }
+    }
+  });
+
+  it('caps-heavy action (no real dialogue anywhere): guard and pipeline both count zero — the invariant must not be satisfied merely by over-rejecting', () => {
+    const SCENES = 20;
+    const CAPS_LINES_PER_SCENE = 8;
+    let text = '';
+    for (let s = 0; s < SCENES; s++) {
+      text += `INT. LOCATION ${s} - DAY\n\n`;
+      text += 'A person moves through the room, quiet, deliberate, careful not to make a sound.\n\n';
+      for (let c = 0; c < CAPS_LINES_PER_SCENE; c++) {
+        text += `THE DOOR SLAMS SHUT WITH A DEAFENING CRACK THAT ECHOES SCENE ${s} LINE ${c}\n\n`;
+      }
+    }
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.equal(pipelineCount, 0, 'sanity: this fixture must have zero real character blocks');
+    assert.equal(guardCount, 0, 'the guard must not count any of these caps-heavy action lines as cues');
+    assert.ok(guardCount >= pipelineCount);
+  });
+
+  it('mixed families and gaps in one document: guardCueOccurrences >= pipeline character-block count', () => {
+    const parts: string[] = ['INT. ROOM - DAY', ''];
+    let k = 0;
+    for (const [, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+      for (let gap = 0; gap <= 3; gap++) {
+        parts.push(cueOf(k++));
+        for (let g = 0; g < gap; g++) parts.push('');
+        parts.push('Ordinary dialogue line here.', '');
+      }
+    }
+    const text = parts.join('\n');
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.ok(
+      guardCount >= pipelineCount,
+      `ORACLE VIOLATION mixed document: guard counted ${guardCount} but the pipeline produced ${pipelineCount} character blocks`,
+    );
+  });
+
+  // Belt-and-suspenders: re-run the oracle over the EXACT attack-scale
+  // payloads rounds 5/6/7/8 measured (not just the small correctness-proof
+  // corpus above), so the invariant is proven at the scale that actually
+  // mattered, not only at unit-test scale.
+  it('oracle holds at attack scale for the ROUND 8 payload (distinct=200, occurrences=6,000)', () => {
+    const text = buildGapDoc(ORACLE_CUE_FAMILIES["extension lower (cont'd) [A1-R8]"]!, 200, 6000, 1);
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.equal(pipelineCount, 6000);
+    assert.ok(guardCount >= pipelineCount);
+  });
+
+  it('oracle holds at attack scale for the ROUND 7 caps-heavy-"dialogue" payload (distinct=200, occurrences=6,000)', () => {
+    const distinct = 200, occurrences = 6000;
+    const parts: string[] = ['INT. ROOM - DAY', ''];
+    for (let k = 0; k < occurrences; k++) {
+      parts.push(`PERSON${k % distinct}`, '', 'THIS IS AN ALL CAPITALS SPEECH LINE OF SUBSTANTIAL LENGTH INDEED', '');
+    }
+    const text = parts.join('\n');
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.equal(pipelineCount, occurrences);
+    assert.ok(guardCount >= pipelineCount);
+  });
+
+  it('oracle holds at attack scale for the ROUND 5/6 double-spaced payload (distinct=600, occurrences=12,000, gap=3)', () => {
+    const text = buildGapDoc(ORACLE_CUE_FAMILIES.ASCII!, 600, 12_000, 3);
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.equal(pipelineCount, 12_000);
+    assert.ok(guardCount >= pipelineCount);
   });
 });

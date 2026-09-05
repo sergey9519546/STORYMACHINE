@@ -506,44 +506,79 @@ export const CUE_LIKE_LINE_RE = new RegExp(
   `^[${CUE_INITIAL_CLASS}][${CUE_LETTER_CLASS}0-9 \\t.,'()&/#\\-]*$`,
   'u',
 );
-// The guard's actual line-shape predicate: a PROVABLE superset of
-// CHARACTER_CUE_RE (src/lib/fountain.ts) by construction (the `||` includes
-// it as a full disjunct), so this guard structurally cannot under-count
-// anything the PARSER's own cue test (CHARACTER_CUE_RE) accepts as a cue —
-// independent of whether CUE_LIKE_LINE_RE's own hand-picked class happens to
-// cover the same shape. (Two OTHER cue predicates exist in this repo —
-// server/nvm/analyze/screenplay-normalizer.ts's isCharacterCue and
-// server/nvm/analyze/fountain-analyzer.ts's CUE_LINE_RE — and both also
-// accept a lowercase parenthetical tail, e.g. "NAME (cont'd)", that this
-// guard does not count. Measured (2026-09-05 review): that shape is NOT a
-// cost vector — 1,000/2,000/4,000 such lines cost a flat ~0.4-1.9s, nowhere
-// near quadratic — so CHARACTER_CUE_RE, the one predicate that DOES carry
-// the O(n²) cost this guard exists to block, is the correct disjunct to be a
-// superset of.) CUE_LIKE_LINE_RE still does useful work here — its wider
-// punctuation class and lack of the next-line-is-dialogue context check mean
-// it over-counts MORE than CHARACTER_CUE_RE alone would (e.g. a lone
-// `(CONT'D)`-suffixed line with no following dialogue), which is the guard's
-// own deliberately conservative direction.
+// The guard's actual line-shape predicate: a PROVABLE superset of every cue
+// test this repository runs downstream, by construction (each is a full `||`
+// disjunct), so this guard structurally cannot under-count anything ANY
+// downstream consumer would treat as a cue — independent of whether any one
+// disjunct's own hand-picked class happens to cover the same shape.
+//
+// ROUND 8 (2026-09-05 review finding A1-R8, BLOCKER — the SAME finding
+// pattern as rounds 1/2/4/5/6/7 above: a grammar hand-composed to match a
+// downstream predicate, independently reviewed into one more bypass each
+// time). Before this round, isCueLikeLine was ONLY `CHARACTER_CUE_RE.test ||
+// CUE_LIKE_LINE_RE.test`, on the theory — measured, but incomplete — that
+// isCharacterCue's one point of disagreement with CHARACTER_CUE_RE (a
+// lowercase parenthetical tail, e.g. "NAME (cont'd)") was "NOT a cost
+// vector", because 1,000-4,000 such lines cost a flat ~0.4-1.9s on the
+// ADJACENT (single-spaced) shape, where CHARACTER_CUE_RE never matches the
+// lowercase tail and no character block ever forms. That measurement did not
+// generalize: put the SAME cue in the DOUBLE-SPACED shape (a cue, a
+// blank-line gap, then dialogue — the exact shape server/nvm/analyze/
+// screenplay-normalizer.ts's normalizeScreenplay() exists to reflow) and the
+// reflow UPPERCASES it — `PERSON1 (cont'd)` becomes `PERSON1 (CONT'D)` —
+// which CHARACTER_CUE_RE then accepts downstream, producing a real
+// `character` block this guard's OUTER gate never saw: round 7's fix put
+// isCharacterCue(line) INSIDE the blank-gap branch's decision (see that
+// branch's own comment below), but a line isCueLikeLine rejects never
+// REACHES that branch — the loop `continue`s at the gate first. Measured: a
+// 326,716-char payload (distinct=200, occurrences=6,000 lowercase-`(cont'd)`
+// -tailed cues, each followed by a blank line then dialogue) was
+// guard-ACCEPTED while normalizeScreenplay + parseFountain produced 6,000
+// real `character` blocks; runScriptDoctor took 82,401 ms.
+//
+// The structural fix for the PATTERN, not just this shape: isCueLikeLine is
+// now the union of ALL THREE cue predicates this repository maintains —
+// CHARACTER_CUE_RE (the parser's own test), CUE_LIKE_LINE_RE (the
+// deliberately loose over-counting proxy), and isCharacterCue (the
+// normalizer's own test, which is what actually decides whether a raw line
+// becomes a cue during reflow) — so a future reviewer does not need to find
+// the NEXT shape one of these three accepts and the guard's gate does not;
+// the gate is now provably a superset of every one of them, not two of
+// three. isCharacterCue also closes a wider bypass than just "(cont'd)":
+// its PAREN_TAIL_RE strips ANY parenthetical tail regardless of case or
+// content before testing the bare name, so lowercase "(mumbling)",
+// "(o.s.)", "(v.o.)" are the same shape and are now all counted too.
+// tests/security/fountain-shape-guard-cue-parity.test.ts's "ROUND 8" describe
+// block proves this reproduces and stays fixed; its "oracle" describe block
+// proves the PATTERN — guardCueOccurrences(text) (below) must never be
+// smaller than the pipeline's own `character`-block count, over a generated
+// grammar-product corpus spanning every family rounds 1-8 used — so the next
+// shape variance in ANY of these three predicates is caught by that
+// invariant directly, rather than needing a ninth review round to notice it.
 export function isCueLikeLine(line: string): boolean {
-  return CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line);
+  return CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line) || isCharacterCue(line);
 }
 const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
 
-/** Returns null when `text` has no known pathological-cost shape, else a
- *  human-readable rejection reason. O(length) single pass; safe to run on
- *  the full MAX_FOUNTAIN_CHARS ceiling. */
-export function fountainShapeRejectionReason(text: string): string | null {
-  if (HUGE_TOKEN_RE.test(text)) {
-    return `must not contain a single unbroken run of more than ${MAX_FOUNTAIN_TOKEN_CHARS} non-whitespace characters`;
-  }
+/** One occurrence the guard counts against ITS OWN bounds — either a
+ *  real-script cue+dialogue candidate or one found inside a `/* boneyard *\/`
+ *  comment (tracked separately; see MAX_FOUNTAIN_BONEYARD_*'s own comment). */
+interface GuardCueOccurrence {
+  line: string;
+  boneyard: boolean;
+}
+
+/** The single walk both fountainShapeRejectionReason (which applies the cost
+ *  bounds below and can return early the moment one is crossed) and
+ *  guardCueOccurrences (which drains every occurrence, unconditionally, for
+ *  the pipeline-parity oracle test) run — one implementation of "what counts
+ *  as a countable cue occurrence", so the two can never quietly drift apart
+ *  on that question the way isCueLikeLine's OWN definition drifted from the
+ *  downstream predicates across rounds 1-8. Yields in document order; the
+ *  caller decides what to do with each occurrence (apply a bound, or just
+ *  count it). */
+function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
   const lines = text.split('\n');
-  // Maps each distinct cue-shaped line to how many times it has occurred so
-  // far -- the Map's size is the same "distinct vocabulary" count the old
-  // Set gave, and each value is what MAX_FOUNTAIN_FREQUENT_CUE_LINES below
-  // counts against its own threshold.
-  const cueLineCounts = new Map<string, number>();
-  let cueLineOccurrences = 0;
-  let frequentCueLineCount = 0;
   // Boneyard tracking (2026-09-05 review finding A3) — mirrors src/lib/
   // fountain.ts's parseFountain `inBoneyard` toggle EXACTLY: a trimmed line
   // starting with '/*' opens it; it closes on a line containing '*/' unless
@@ -556,9 +591,6 @@ export function fountainShapeRejectionReason(text: string): string | null {
   // thinks it's IN a boneyard the parser is already OUT of). Matching the
   // parser exactly avoids both failure directions rather than picking one.
   let inBoneyard = false;
-  const boneyardCueLineCounts = new Map<string, number>();
-  let boneyardCueOccurrences = 0;
-  let boneyardFrequentCueLineCount = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!.trim();
     if (line.length === 0) continue;
@@ -570,25 +602,7 @@ export function fountainShapeRejectionReason(text: string): string | null {
       // bounds rather than either being ignored outright or folded into the
       // real-script bounds above.
       if (!SCENE_HEADING_PREFIX_RE.test(line) && isCueLikeLine(line)) {
-        const boneyardOccurrencesOfThisLine = (boneyardCueLineCounts.get(line) ?? 0) + 1;
-        boneyardCueLineCounts.set(line, boneyardOccurrencesOfThisLine);
-        boneyardCueOccurrences++;
-        if (boneyardCueLineCounts.size > MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES) {
-          return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES`;
-        }
-        if (boneyardCueLineCounts.size * boneyardCueOccurrences > MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT) {
-          return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines × total occurrences of one) inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT`;
-        }
-        // Third bound, mirroring MAX_FOUNTAIN_FREQUENT_CUE_LINES on the
-        // real-script path above — see MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES's
-        // own comment (2026-09-05 review, "A1 invariant inside a boneyard")
-        // for why the distinct/weight pair alone is insufficient here too.
-        if (boneyardOccurrencesOfThisLine === FREQUENT_CUE_OCCURRENCE_THRESHOLD + 1) {
-          boneyardFrequentCueLineCount++;
-          if (boneyardFrequentCueLineCount > MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES) {
-            return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES`;
-          }
-        }
+        yield { line, boneyard: true };
       }
       if (line.includes('*/') && !(line.startsWith('/*') && !line.includes('*/'))) {
         inBoneyard = false;
@@ -702,8 +716,54 @@ export function fountainShapeRejectionReason(text: string): string | null {
       nextLineIsDialogue = j < lines.length && isCharacterCue(line);
     }
     if (!nextLineIsDialogue) continue;
-    const occurrencesOfThisLine = (cueLineCounts.get(line) ?? 0) + 1;
-    cueLineCounts.set(line, occurrencesOfThisLine);
+    yield { line, boneyard: false };
+  }
+}
+
+/** Returns null when `text` has no known pathological-cost shape, else a
+ *  human-readable rejection reason. O(length) single pass (walkGuardCueOccurrences
+ *  above is the O(length) walk; every check here is O(1) per yielded
+ *  occurrence); safe to run on the full MAX_FOUNTAIN_CHARS ceiling. */
+export function fountainShapeRejectionReason(text: string): string | null {
+  if (HUGE_TOKEN_RE.test(text)) {
+    return `must not contain a single unbroken run of more than ${MAX_FOUNTAIN_TOKEN_CHARS} non-whitespace characters`;
+  }
+  // Maps each distinct cue-shaped line to how many times it has occurred so
+  // far -- the Map's size is the same "distinct vocabulary" count the old
+  // Set gave, and each value is what MAX_FOUNTAIN_FREQUENT_CUE_LINES below
+  // counts against its own threshold.
+  const cueLineCounts = new Map<string, number>();
+  let cueLineOccurrences = 0;
+  let frequentCueLineCount = 0;
+  const boneyardCueLineCounts = new Map<string, number>();
+  let boneyardCueOccurrences = 0;
+  let boneyardFrequentCueLineCount = 0;
+
+  for (const occ of walkGuardCueOccurrences(text)) {
+    if (occ.boneyard) {
+      const boneyardOccurrencesOfThisLine = (boneyardCueLineCounts.get(occ.line) ?? 0) + 1;
+      boneyardCueLineCounts.set(occ.line, boneyardOccurrencesOfThisLine);
+      boneyardCueOccurrences++;
+      if (boneyardCueLineCounts.size > MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES) {
+        return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines inside a /* boneyard */ comment \u2014 bound MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES`;
+      }
+      if (boneyardCueLineCounts.size * boneyardCueOccurrences > MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT) {
+        return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines \u00d7 total occurrences of one) inside a /* boneyard */ comment \u2014 bound MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT`;
+      }
+      // Third bound, mirroring MAX_FOUNTAIN_FREQUENT_CUE_LINES on the
+      // real-script path below \u2014 see MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES's
+      // own comment (2026-09-05 review, "A1 invariant inside a boneyard")
+      // for why the distinct/weight pair alone is insufficient here too.
+      if (boneyardOccurrencesOfThisLine === FREQUENT_CUE_OCCURRENCE_THRESHOLD + 1) {
+        boneyardFrequentCueLineCount++;
+        if (boneyardFrequentCueLineCount > MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES) {
+          return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times inside a /* boneyard */ comment \u2014 bound MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES`;
+        }
+      }
+      continue;
+    }
+    const occurrencesOfThisLine = (cueLineCounts.get(occ.line) ?? 0) + 1;
+    cueLineCounts.set(occ.line, occurrencesOfThisLine);
     cueLineOccurrences++;
     if (cueLineCounts.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
       return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
@@ -722,6 +782,29 @@ export function fountainShapeRejectionReason(text: string): string | null {
     }
   }
   return null;
+}
+
+// \u2500\u2500 ROUND 8 oracle (2026-09-05 review finding A1-R8) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Exported ONLY for tests/security/fountain-shape-guard-cue-parity.test.ts's
+// oracle property: `guardCueOccurrences(text) >= (character blocks in
+// parseFountain(normalizeScreenplay(text)))` over a generated corpus
+// spanning every family rounds 1-8 used. That is a direct, two-line
+// statement of the invariant that kept failing across eight review rounds \u2014
+// "the guard must count every line the PIPELINE will turn into a character
+// block" \u2014 checked against the pipeline itself rather than re-derived by
+// hand each time a reviewer finds the next shape. Drains
+// walkGuardCueOccurrences() UNCONDITIONALLY (real-script and boneyard
+// occurrences both included, and with no early return on any bound), so it
+// reports a true total even for a payload so large fountainShapeRejectionReason
+// would have already rejected it after the first few hundred lines. Never
+// call this from route/validation code \u2014 it does the same O(length) walk as
+// fountainShapeRejectionReason but throws away the early-exit that makes
+// that function safe to run unconditionally on untrusted input; call
+// fountainShapeRejectionReason for that.
+export function guardCueOccurrences(text: string): number {
+  let total = 0;
+  for (const _occ of walkGuardCueOccurrences(text)) total++;
+  return total;
 }
 
 /** z.string().min(1).max(MAX_FOUNTAIN_CHARS) plus the pathological-shape guard
@@ -1110,9 +1193,25 @@ const StoryOpItemSchema = z
   .object({ op: z.string().refine(k => k in STORY_OP_KINDS, { message: 'unknown StoryOp kind' }) })
   .passthrough();
 
+// 2026-09-05 review finding F1 — every OTHER array field this file bounds
+// with both a `.min()` and a `.max()` (FixBodySchema.issues .min(1).max(10),
+// SlateBodySchema.scripts .min(2).max(20)); this one had only the `.min(1)`,
+// so nothing stopped a single commit from carrying an unbounded number of
+// ops. That mattered downstream: server/nvm/whatif/materialize.ts's
+// projected Fountain (the base the What-If Lab scores) is the one analyzer
+// entry point with NEITHER a size guard (fountainField()'s
+// MAX_FOUNTAIN_CHARS) NOR a shape guard (fountainShapeRejectionReason) in
+// front of it — see twin-whatif.ts's scoreDraft for the other half of this
+// fix. Measured: six ordinary inject-ops calls (500 ops each, all
+// individually legal under the old unbounded schema) grew a session's
+// projected draft to 1,246,983 chars (138.6% of MAX_FOUNTAIN_CHARS),
+// scored in 26.5s. 500 is generous for one commit (a real revision session
+// commits a handful to a few dozen ops at a time) while still bounding the
+// per-request growth this schema alone can cause.
+export const MAX_INJECT_OPS_PER_COMMIT = 500;
 export const InjectOpsBodySchema = z.object({
   sessionId: sessionIdField,
-  ops: z.array(StoryOpItemSchema).min(1),
+  ops: z.array(StoryOpItemSchema).min(1).max(MAX_INJECT_OPS_PER_COMMIT),
   sceneIdx: z.number().optional(),
   label: z.string().max(256).optional(),
 });
@@ -1326,7 +1425,17 @@ const DraftRankSchema = z.object({
   // as `of`/`rank` above (70 possible records + 1 current, though
   // `unscored` itself is never the current draft — see computeDraftRank).
   unscored: z.number().int().min(0).max(70).optional(),
-}).refine((v) => v.rank <= v.of, 'rank must not exceed of');
+}).refine((v) => v.rank <= v.of, 'rank must not exceed of')
+  // 2026-09-05 review finding E2 — a tie needs another draft sharing the
+  // exact same health; `of: 1` means this is the only counted draft, so
+  // `tied: true` alongside it is meaningless. Both renderers (coverage.ts
+  // and coverage-letter.ts) already drop `tied` silently in the `of <= 1`
+  // arm, which is the accept-and-silently-drop shape that lets a client bug
+  // (a stale `tied` flag left set from a previous, genuinely-tied report)
+  // live forever with no signal. Reject it at the boundary instead, the same
+  // way the `rank <= of` refinement above already does for its own
+  // cross-field invariant.
+  .refine((v) => !(v.tied && v.of <= 1), 'tied requires of >= 2');
 
 export const CoverageLetterBodySchema = z.object({
   fountain: fountainField().optional(),
@@ -1437,14 +1546,26 @@ const FixIssueItemSchema = z.object({
 // — a single huge unbroken token, or thousands of all-caps cue-shaped lines,
 // both O(n^2) in the parser). A candidate exempt from that guard would be a
 // straight bypass of it.
+// 2026-09-05 review finding D3 — the refinement below USED TO accept
+// "at least one complete shape", so a body carrying BOTH a writer's
+// `candidateFountain` AND a generation request's `span`/`issues` (a stale
+// field left on a shared request object is the obvious way this happens)
+// silently took the writer path with no signal at all: the route checks
+// `candidateFountain !== undefined` first, so `span`/`issues` were dropped
+// on the floor and the caller got a verification instead of the generation
+// it asked for, with `usedLLM:false` reading like a keyless failure rather
+// than a client bug. Made exclusive: exactly one shape, never both, with a
+// message naming both.
 export const FixBodySchema = z.object({
   fountain: fountainField(),
   candidateFountain: fountainField().optional(),
   span: FixSpanSchema.optional(),
   issues: z.array(FixIssueItemSchema).min(1).max(10).optional(),
 }).refine(
-  (body) => body.candidateFountain !== undefined || (body.span !== undefined && body.issues !== undefined),
-  'provide either candidateFountain (verify a rewrite you wrote) or both span and issues (generate a fix)',
+  (body) => body.candidateFountain !== undefined
+    ? body.span === undefined && body.issues === undefined
+    : body.span !== undefined && body.issues !== undefined,
+  'provide either candidateFountain (verify a rewrite you wrote) or both span and issues (generate a fix) — not both shapes in the same request',
 );
 
 // POST /api/export/slate — Run 14 producer-tier slate triage (append-only;

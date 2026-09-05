@@ -231,6 +231,36 @@ describe('routes/export/coverage-letter — HTTP behavior', async () => {
     assert.match(body.markdown, /ranks 2nd of 5 by health/);
   });
 
+  // 2026-09-05 review finding E2 — a tie needs another draft sharing the
+  // exact same health; `of: 1` means this is the only counted draft, so
+  // `tied: true` alongside it was wire-legal and silently dropped by every
+  // surface (the accept-and-drop shape that lets a stale client `tied` flag
+  // live forever with no signal). DraftRankSchema now rejects it at the
+  // boundary — see server/lib/validation.ts's DraftRankSchema comment.
+  it('POST a draftRank with tied: true and of: 1 is rejected (a tie needs at least 2 counted drafts)', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, draftRank: { rank: 1, of: 1, tied: true } });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /tied requires of >= 2/);
+  });
+
+  // 2026-09-05 review finding E1 — the `of <= 1` arm used to hand-write its
+  // sentence and never call unrankedDraftsNote(), the exact drift
+  // draft-rank-copy.ts exists to end (both the coverage HTML and the panel
+  // already carried this note for every state). Both arms now append it the
+  // same way.
+  it('POST a first-saved-draft draftRank WITH unscored siblings still discloses them in the letter', async () => {
+    const res = await post({
+      fountain: MULTI_SCENE_FOUNTAIN,
+      title: 'The Long Wait',
+      draftRank: { rank: 1, of: 1, unscored: 5 },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.match(body.markdown, /first saved draft of this script/i);
+    assert.match(body.markdown, /5 of 6 runs and saved drafts of this script are unranked/);
+  });
+
   it('refuses to export a letter from a scene-truncated partial analysis', async () => {
     const res = await post({ fountain: buildSceneTruncatedFountain(), title: 'Partial Draft' });
     assert.equal(res.status, 422);

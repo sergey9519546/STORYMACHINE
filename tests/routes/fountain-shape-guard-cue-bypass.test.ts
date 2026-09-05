@@ -476,3 +476,84 @@ describe('ROUND 7 bypass (caps-heavy-"dialogue", finding A1) — POST /api/scrip
     assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
   });
 });
+
+// ── ROUND 8 bypass (finding A1-R8, BLOCKER, 2026-09-05): the lowercase-
+// parenthetical-tail shape — `NAME (cont'd)`, blank-gapped from its dialogue
+// — was a COMPLETE bypass of the guard's OUTER gate (isCueLikeLine), which
+// rejected the lowercase tail even though isCharacterCue (the predicate
+// normalizeScreenplay's reflow actually uses) accepts it and uppercases it
+// into a shape CHARACTER_CUE_RE then accepts. See
+// tests/security/fountain-shape-guard-cue-parity.test.ts's own "ROUND 8"
+// and "ROUND 8 oracle" describe blocks for the pure-function proof; this is
+// the HTTP-level regression, mirroring ROUND 7's shape exactly but with the
+// A1-R8 cue family.
+function buildLowercaseTailBypass(distinct: number, occurrences: number): string {
+  const parts: string[] = ['INT. ROOM - DAY', ''];
+  for (let k = 0; k < occurrences; k++) {
+    parts.push(`PERSON${k % distinct} (cont'd)`, '', 'Line.', '');
+  }
+  return parts.join('\n');
+}
+
+describe('ROUND 8 bypass (lowercase-parenthetical-tail, finding A1-R8) — POST /api/scriptide/doctor', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  it('the A1-R8 payload (distinct=200, occurrences=6,000 lowercase-(cont\'d)-tailed cues) is rejected fast, not analyzed', async () => {
+    const fountain = buildLowercaseTailBypass(200, 6000);
+    const start = Date.now();
+    const res = await post({ fountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+
+  it('a legitimate small double-spaced two-hander with an occasional (cont\'d) tail is NOT rejected', async () => {
+    let fountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 30; i++) {
+      const tail = i % 5 === 0 ? " (cont'd)" : '';
+      fountain += `${i % 2 === 0 ? 'PAUL' : 'JUNE'}${tail}\n\nSomething ordinary gets said here, line ${i}.\n\n`;
+    }
+    const res = await post({ fountain });
+    assert.equal(res.status, 200);
+  });
+});
+
+// ── POST /api/scriptide/fix's candidateFountain inherits the ROUND 8 fix
+// too, the same way it already inherited every earlier round (see the
+// "cue-definition bypass families — POST /api/scriptide/fix (candidateFountain)"
+// describe block above) — fountainField() is the one shared implementation
+// both fields go through.
+describe('ROUND 8 bypass (lowercase-parenthetical-tail) — POST /api/scriptide/fix (candidateFountain)', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/scriptide/fix`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const VALID_FOUNTAIN = 'INT. ROOM - DAY\n\nA quiet room.\n\nALEX\nHello there.\n';
+
+  it('lowercase-(cont\'d)-tail bypass — candidateFountain is rejected fast, not analyzed', async () => {
+    const candidateFountain = buildLowercaseTailBypass(200, 6000);
+    const start = Date.now();
+    const res = await post({ fountain: VALID_FOUNTAIN, candidateFountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+});

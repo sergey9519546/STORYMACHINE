@@ -16,10 +16,43 @@ import {
 } from '../../lib/validation.ts';
 import { requestAbortSignal } from '../../lib/doctor-request.ts';
 import { isWholeDraftAnalysisComplete } from '../../lib/analysis-completeness.ts';
+import { fountainShapeRejectionReason } from '../../lib/validation.ts';
+import { MAX_FOUNTAIN_CHARS } from '../../lib/runtime-limits.ts';
 import type { ScriptDoctorReport } from '../../nvm/analyze/types.ts';
+import type { StructuralCausalModel } from '../../nvm/twin/scm.ts';
 
 const router = express.Router();
 export default router;
+
+// ── opId existence guard (2026-09-05 review finding F2) ─────────────────────
+// /whatif/doctor takes an `opId` naming a node in the session's OWN causal
+// model (buildSCM(stage)) — a caller-supplied string, never validated
+// against the model itself before this fix. A nonexistent opId (a stale id
+// from a since-reverted commit, a typo, a probe) reached materializeWhatIf
+// anyway: server/nvm/twin/counterfactual.ts's doIntervention does not itself
+// refuse a target absent from the graph — its own `target` lookup falls back
+// to a "not found in SCM" summary with no numbers attached — but
+// /whatif/doctor still ran materialization and the doctor pool on whatever
+// ops fell out of that missing-target path, and returned a real
+// `healthDelta` (measured: +23.3, byte-identical to a real intervention's)
+// for an op the session never contained. `scm.nodes` is keyed by opId
+// (server/nvm/twin/scm.ts), so this is an O(1) lookup, not a scan.
+//
+// Deliberately NOT applied to /whatif/explore below: that route's own
+// nonexistent-opId answer is doIntervention's fallback rendered HONESTLY —
+// baseline === intervened, one `no_effect` consequence, no scores derived
+// from the missing op — and is itself a tested, documented contract (see
+// tests/routes/nvm-whatif-room.test.ts's "an unknown opId ... returns 200
+// with an honest no-op answer"). /explore's branches carry no health/doctor
+// numbers at all (tension/quality/composite come from generateBranchField's
+// own heuristics, independent of the intervention's validity), so there is
+// no fabricated-number shape here for this guard to close — adding it would
+// only turn an honest "nothing happened" answer into a 404 for no safety
+// gain. /whatif/doctor is the one route where a missing target's fallout
+// still produces a REAL score, which is the exact shape F2 closes.
+function opIdExists(scm: StructuralCausalModel, opId: string): boolean {
+  return scm.nodes.has(opId);
+}
 
 // POST /api/nvm/redteam — red-team a RevealPlan against current audience state
 router.post('/api/nvm/redteam', gameLimiter, validate(RedteamBodySchema), asyncHandler(async (req, res) => {
@@ -91,6 +124,9 @@ router.post('/api/nvm/whatif/explore', gameLimiter, validate(WhatIfExploreBodySc
   const commits = stage.getLiveCommits();
   const scm = buildSCM(stage);
 
+  // No opIdExists() check here — see that function's own comment (finding
+  // F2) for why this route's existing nonexistent-opId behavior (an honest
+  // no-op answer, not a fabricated score) is the correct contract to keep.
   const result = exploreWhatIf({
     state,
     commits,
@@ -135,6 +171,11 @@ router.post('/api/nvm/whatif/explore', gameLimiter, validate(WhatIfExploreBodySc
 router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { buildSCM } = await import('../../nvm/twin/scm.ts');
+  // Lazy-loaded like every doctor-adjacent import in this file (materializeWhatIf,
+  // runScriptDoctorOffThread below) — computeContentHash lives in doctor.ts,
+  // and a static top-level import would pull the whole analyzer pipeline into
+  // every route this file exports, including the ones that never touch it.
+  const { computeContentHash } = await import('../../nvm/analyze/doctor.ts');
   const { exploreWhatIf } = await import('../../nvm/whatif/explore.ts');
   const { materializeWhatIf } = await import('../../nvm/whatif/materialize.ts');
   const { runScriptDoctorOffThread } = await import('../../nvm/analyze/doctor-pool.ts');
@@ -146,6 +187,15 @@ router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySche
   const state = buildEnrichedState(stage);
   const commits = stage.getLiveCommits();
   const scm = buildSCM(stage);
+
+  // See opIdExists's own comment (finding F2) — without this, a nonexistent
+  // opId reached materializeWhatIf + the doctor pool and came back with a
+  // real healthDelta, indistinguishable from a genuine intervention.
+  if (!opIdExists(scm, opId)) {
+    res.status(404).json({ error: `opId "${opId}" not found in this session's causal model` });
+    return;
+  }
+
   const intervention = { opId, replacement: replacement ?? null };
 
   const explored = exploreWhatIf({ state, commits, scm, intervention, branchLimit });
@@ -195,23 +245,83 @@ router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySche
   }
 
   // A projected draft with zero commits is a bare title page — no slugline
-  // anywhere. Scoring it is the EXACT trap POST /api/scriptide/doctor's
+  // at all. Scoring it is the EXACT trap POST /api/scriptide/doctor's
   // hasSceneHeading short-circuit exists to close: the doctor reads such a
   // document as a fully-analyzed health-0 / verdict PASS report rather than an
   // honestly incomplete one (measured, not assumed — see this route's test
   // "withholds health and grade ... rather than inventing a score"). Same
   // answer as that route gives, reached without running the doctor at all.
-  const unscorable = { formatUnrecognized: true, analysisComplete: false, sceneCount: 0 } as const;
-  const scoreDraft = async (draft: { fountain: string; sceneCount: number }) =>
-    draft.sceneCount === 0
-      ? unscorable
-      : presentReport(await runScriptDoctorOffThread(draft.fountain, undefined, { signal }));
+  //
+  // 2026-09-05 review finding F3: this is the "no slugline anywhere" boundary
+  // specifically, not "not enough script to score" generally — a ONE-scene
+  // projected draft still reaches runScriptDoctorOffThread below and comes
+  // back `analysisComplete: true, health: 0` the same way a genuine one-scene
+  // /api/scriptide/doctor submission would (structuralSignals' own >= 2-scene
+  // floor is correctly absent there, via `signals?.scored` above — this is a
+  // shared threshold with that route, not a divergence introduced here).
+  //
+  // 2026-09-05 review finding F4: this shape used to omit `contentHash` and
+  // `analyzedAt`, which every OTHER branch shape (scored or the incomplete
+  // report presentReport returns) carries — the one field the round-2 review
+  // added specifically so "a promoted/undo What-If snapshot can dedupe
+  // exactly against this same run" was absent on exactly the branch with no
+  // other identity to fall back on. Fixed by computing the deterministic
+  // contentHash directly (materialize.ts's header guarantees the same
+  // {commits, intervention, branches} always compiles to byte-identical
+  // Fountain, so this hash is stable the same way a scored report's is) and
+  // stamping `analyzedAt` the same way runScriptDoctor does — without paying
+  // for the pool call the doctor's own zero-scene degenerate-report path
+  // exists to avoid.
+  const unscorableDraft = (fountain: string) => ({
+    formatUnrecognized: true,
+    analysisComplete: false,
+    sceneCount: 0,
+    contentHash: computeContentHash(fountain),
+    analyzedAt: Date.now(),
+  });
+
+  // 2026-09-05 review finding F1 — the projected Fountain is the one analyzer
+  // entry point with neither a size guard (fountainField()'s MAX_FOUNTAIN_CHARS)
+  // nor a shape guard (fountainShapeRejectionReason) in front of it; every
+  // OTHER call site into the doctor applies one or both (raw fountain fields
+  // via fountainField(), converted fdx/pdf fountain via
+  // rejectPathologicalConvertedFountain). Measured: six ordinary inject-ops
+  // calls (legal individually, InjectOpsBodySchema.ops now bounded per call —
+  // see validation.ts's MAX_INJECT_OPS_PER_COMMIT) grew a session's projected
+  // draft to 1,246,983 chars (138.6% of MAX_FOUNTAIN_CHARS), scored in 26.5s
+  // with a 3.85MB response. Guarded here the same honest-incomplete way the
+  // zero-scene case above already is — `tooLarge` names WHY, so a client can
+  // tell this apart from an ordinary incomplete analysis — rather than paying
+  // for (or returning the full text of) a draft no other entry point would
+  // ever accept.
+  const tooLargeDraft = (fountain: string) => ({
+    formatUnrecognized: false,
+    analysisComplete: false,
+    tooLarge: true,
+    contentHash: computeContentHash(fountain),
+    analyzedAt: Date.now(),
+  });
+  const exceedsGuard = (fountain: string): boolean =>
+    fountain.length > MAX_FOUNTAIN_CHARS || fountainShapeRejectionReason(fountain) !== null;
+
+  const scoreDraft = async (draft: { fountain: string; sceneCount: number }) => {
+    if (draft.sceneCount === 0) return { ...unscorableDraft(draft.fountain), sceneCount: 0 };
+    if (exceedsGuard(draft.fountain)) return { ...tooLargeDraft(draft.fountain), sceneCount: draft.sceneCount };
+    return presentReport(await runScriptDoctorOffThread(draft.fountain, undefined, { signal }));
+  };
 
   // Sequential, not Promise.all: the pool queues anyway, and a serial walk lets
   // an aborted request (client navigated away) stop before paying for variants
   // nobody will read.
   const baseReport = await scoreDraft(materialized.base);
   const baseHealth = 'health' in baseReport ? baseReport.health : undefined;
+  // Bounds the RESPONSE, not just the analysis cost (finding F1's third
+  // wiring): a draft this route refused to score is also not one any client
+  // surface (Promote-to-editor included) can do anything useful with, so its
+  // multi-hundred-KB-to-multi-MB Fountain text is withheld from the payload
+  // rather than shipped anyway once size alone answered the question.
+  const responseFountainOf = (fountain: string): string | undefined =>
+    exceedsGuard(fountain) ? undefined : fountain;
 
   const branchById = new Map(explored.branches.map(b => [b.branchId, b]));
   const branches = [];
@@ -219,11 +329,12 @@ router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySche
     const branch = branchById.get(variant.branchId);
     const scored = await scoreDraft(variant);
     const health = 'health' in scored ? scored.health : undefined;
+    const responseFountain = responseFountainOf(variant.fountain);
     branches.push({
       branchId: variant.branchId,
       summary: branch?.summary ?? '',
       scores: branch?.scores ?? null,
-      fountain: variant.fountain,
+      ...(responseFountain !== undefined ? { fountain: responseFountain } : {}),
       ...scored,
       // Only a real number minus a real number. Absent whenever either side was
       // not analyzed whole — never a delta against a withheld score.
@@ -233,9 +344,16 @@ router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySche
     });
   }
 
+  const baseResponseFountain = responseFountainOf(materialized.base.fountain);
   res.json({
-    base: { fountain: materialized.base.fountain, ...baseReport },
-    intervened: materialized.intervened.fountain,
+    base: { ...(baseResponseFountain !== undefined ? { fountain: baseResponseFountain } : {}), ...baseReport },
+    // Not scored above (never analyzed, never asserted to be), but still
+    // bounded the same way — a caller-grown draft that blew the size guard
+    // must not ship its full text here either. Nothing in the client reads
+    // this field today (WhatIfPanel.tsx only renders /explore's own
+    // `intervened` snapshot object, a different shape), so '' is a safe,
+    // type-stable placeholder rather than a value anyone depends on.
+    intervened: responseFountainOf(materialized.intervened.fountain) ?? '',
     consequences: explored.consequences,
     branches,
   });

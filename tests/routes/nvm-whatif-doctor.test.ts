@@ -172,20 +172,83 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
     }
   });
 
-  it('withholds health and grade — and the delta — on a session with nothing to analyze, rather than inventing a score', async () => {
+  // 2026-09-05 review finding F2 (superseding the pre-F2 version of this
+  // test): a session with NOTHING committed has an EMPTY causal model
+  // (buildSCM's nodes are built 1:1 from stage.getLiveCommits() — see
+  // scm.ts's own first pass), so ANY opId — 'no-such-op:0' included — is now
+  // rejected by opIdExists() BEFORE materialization ever runs, rather than
+  // reaching materializeWhatIf and coming back with a withheld-score-but-200
+  // report the way it used to. This is a STRICTLY STRONGER honesty
+  // guarantee than the one this test used to check (no response describing
+  // a hypothetical at all, rather than a response that honestly declines to
+  // score one) — and it means the base-sceneCount-0 shape `unscorableDraft`
+  // exists for is now UNREACHABLE through this route specifically: base is
+  // always `stage.getLiveCommits()` projected directly (materialize.ts), so
+  // base has >= 1 scene whenever `scm` has >= 1 node, i.e. whenever any opId
+  // can be valid at all. `unscorableDraft`'s contentHash/analyzedAt fields
+  // (finding F4) remain in place as defense-in-depth against a future change
+  // that decouples "scm has a node" from "commits is non-empty" — verified
+  // by reading server/routes/nvm/twin-whatif.ts directly, not exercisable
+  // end-to-end today.
+  it('a session with nothing committed has an empty causal model, so even a plausible-looking opId 404s before any materialization runs (finding F2)', async () => {
     const sid = freshSessionId();
-    // No inject-ops: no commits, so the projected draft is a title page with no
-    // scenes and the doctor's own degenerate path marks it incomplete.
     const res = await postDoctor(sid, { opId: 'no-such-op:0', replacement: null });
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 404);
     const body = await res.json();
+    assert.match(body.error, /not found in this session's causal model/);
+  });
 
-    assert.equal(body.base.analysisComplete, false);
-    assert.equal(body.base.health, undefined, 'no health on an unanalysable draft');
-    assert.equal(body.base.grade, undefined, 'no grade on an unanalysable draft');
-    for (const branch of body.branches) {
-      assert.equal(branch.healthDelta, undefined, 'never a delta against a withheld score');
-    }
+  // 2026-09-05 review finding F2 — MEDIUM: a nonexistent opId used to return
+  // 200 with a real healthDelta (measured: +23.3, byte-identical to a real
+  // intervention's), because materializeWhatIf does not itself refuse a
+  // target absent from the graph the way counterfactual.ts's doIntervention
+  // does internally (a "not found in SCM" summary with no numbers attached).
+  // /whatif/doctor now checks the opId against the session's OWN SCM before
+  // doing anything else, so a stale, typo'd, or probed-for opId can never
+  // produce a scored response. (/whatif/explore is deliberately UNCHANGED —
+  // see twin-whatif.ts's opIdExists() comment: its own nonexistent-opId
+  // answer was already honest, not fabricated, and stays covered by
+  // tests/routes/nvm-whatif-room.test.ts's own "honest no-op answer" test.)
+  it('a nonexistent opId against a session that DOES have real ops still 404s on /whatif/doctor (finding F2)', async () => {
+    const sid = freshSessionId();
+    await seedTwoSceneSession(sid); // real ops exist in the SCM, just not this id
+    const staleOpId = 'whatif-scene-0:999';
+
+    const doctorRes = await postDoctor(sid, { opId: staleOpId, replacement: null });
+    assert.equal(doctorRes.status, 404);
+    const doctorBody = await doctorRes.json();
+    assert.match(doctorBody.error, new RegExp(`opId "${staleOpId}".*not found`));
+  });
+
+  // 2026-09-05 review finding F3 — the comment above the zero-scene
+  // short-circuit in twin-whatif.ts was narrowed to say the boundary is "no
+  // slugline at all", not "not enough script to score": a ONE-scene
+  // projected draft (below structuralSignals' own >= 2-scene floor) still
+  // reaches the doctor and comes back analysisComplete:true, health:0 — the
+  // SAME shared threshold /api/scriptide/doctor uses for a genuine one-scene
+  // submission, not a divergence introduced by this route. Pinned here so a
+  // future change to that shared threshold shows up as an intentional diff
+  // in this test, not a silent behavior change.
+  it('a one-scene session is scored (analysisComplete:true, health a number) — the zero-scene short-circuit boundary is "no slugline anywhere", not "not enough script" (finding F3)', async () => {
+    const sid = freshSessionId();
+    const res = await fetch(`${server.baseUrl}/api/nvm/inject-ops`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        sceneIdx: 0,
+        ops: [{ op: 'RAISE_CLOCK', clockId: 'bomb', amount: 40 }],
+      }),
+    });
+    assert.equal(res.status, 200);
+    const scmRes = await fetch(`${server.baseUrl}/api/nvm/twin/scm?sessionId=${sid}`);
+    const scmBody = await scmRes.json();
+    const opId = scmBody.nodes[0].opId as string;
+
+    const body = await (await postDoctor(sid, { opId, replacement: null, branchLimit: 1 })).json();
+    assert.equal(body.base.sceneCount, 1);
+    assert.equal(body.base.analysisComplete, true);
+    assert.equal(typeof body.base.health, 'number');
   });
 
   it('rejects a malformed body through the shared zod validator', async () => {
@@ -196,5 +259,117 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
     const opId = await seedTwoSceneSession(sid);
     const badLimit = await postDoctor(sid, { opId, branchLimit: 99 });
     assert.equal(badLimit.status, 400, 'branchLimit is clamped by the schema, not silently accepted');
+  });
+});
+
+// ── F1 (2026-09-05 review finding F1, MEDIUM-HIGH): the projected fountain
+// (materialize.ts's base/branch text) was the one analyzer entry point with
+// neither a size guard (fountainField()'s MAX_FOUNTAIN_CHARS) nor a shape
+// guard (fountainShapeRejectionReason) in front of it. Two parts, tested
+// separately: (a) InjectOpsBodySchema.ops now caps at
+// MAX_INJECT_OPS_PER_COMMIT (500) per call — the schema-level bound that
+// stops one commit from carrying an unbounded number of ops; (b) even with
+// that cap, a session grown across MULTIPLE legal calls can still reach a
+// projected draft over MAX_FOUNTAIN_CHARS, so the route also runs the SAME
+// guard the raw-fountain fields use before ever handing the text to the
+// doctor pool.
+describe('routes/nvm — What-If Lab size guard (finding F1)', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  function postDoctor(sid: string, body: Record<string, unknown>) {
+    return fetch(`${server.baseUrl}/api/nvm/whatif/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, ...body }),
+    });
+  }
+
+  it('InjectOpsBodySchema rejects more than 500 ops in a single commit', async () => {
+    const sid = freshSessionId();
+    const tooMany = Array.from({ length: 501 }, (_, i) => ({
+      op: 'ADD_FACT',
+      fact: { factId: `f${i}`, subject: `s${i}`, predicate: 'is', object: 'true', addedAtTurn: 0, validFrom: 0, validTo: null },
+    }));
+    const res = await fetch(`${server.baseUrl}/api/nvm/inject-ops`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, sceneIdx: 0, ops: tooMany }),
+    });
+    assert.equal(res.status, 400);
+
+    const atLimit = tooMany.slice(0, 500);
+    const okRes = await fetch(`${server.baseUrl}/api/nvm/inject-ops`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, sceneIdx: 0, ops: atLimit }),
+    });
+    assert.equal(okRes.status, 200, 'exactly 500 ops (the new ceiling) is still legal');
+  });
+
+  // Builds a session across TWO separate, individually-legal inject-ops
+  // calls (500 UPDATE_BELIEF ops each, the schema's own per-commit ceiling)
+  // whose combined projected draft exceeds MAX_FOUNTAIN_CHARS (900,000) —
+  // proving the guard is needed even after (a) above, since nothing stops a
+  // caller from accumulating many separate legal commits. A long-but-
+  // ordinary belief proposition (a writer's paragraph, not a pathological
+  // token) keeps this an "ordinary inject-ops calls" reproduction, matching
+  // the finding — repeated inject-ops's own quadratic per-call cost
+  // (unrelated to this guard) is why this uses 2 heavier calls rather than
+  // 7 lighter ones like the original finding's repro.
+  it('a session grown past MAX_FOUNTAIN_CHARS across several legal inject-ops calls is not scored, and its oversized text is withheld from the response', async () => {
+    const sid = freshSessionId();
+    // ~500 chars — long enough that 4 calls of 500 ops each (2,000 ops,
+    // ~300KB request body per call, comfortably under express.json's 1mb
+    // cap) compiles to just over MAX_FOUNTAIN_CHARS.
+    const longProposition = 'The key that used to sit under the mat by the back door is gone, and everyone in '
+      + 'the house who might have taken it has a reason to lie about where they were that night, which makes '
+      + 'the question of who moved it the same question as who is lying now, and nobody in this house has ever '
+      + 'been good at telling the truth when the truth costs them something they actually want to keep. Still, '
+      + 'someone has to say it out loud before morning, or the silence itself becomes the lie everyone agrees to '
+      + 'live inside.';
+    let opId: string | undefined;
+    for (let c = 0; c < 4; c++) {
+      const ops = Array.from({ length: 500 }, (_, i) => ({
+        op: 'UPDATE_BELIEF',
+        charId: `char${c}_${i}`,
+        belief: { proposition: longProposition, confidence: 0.8 },
+      }));
+      const res = await fetch(`${server.baseUrl}/api/nvm/inject-ops`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid, sceneIdx: c, ops }),
+      });
+      assert.equal(res.status, 200, `seeding commit ${c} must succeed`);
+      if (opId === undefined) {
+        const scmRes = await fetch(`${server.baseUrl}/api/nvm/twin/scm?sessionId=${sid}`);
+        const scmBody = await scmRes.json();
+        opId = scmBody.nodes[0].opId as string;
+      }
+    }
+
+    const start = Date.now();
+    const res = await postDoctor(sid, { opId: opId!, replacement: null, branchLimit: 1 });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    assert.equal(body.base.sceneCount, 4, 'sanity: the 4 seeded commits must all be live scenes');
+    assert.equal(body.base.analysisComplete, false, 'a too-large draft must not be presented as a complete analysis');
+    assert.equal(body.base.health, undefined, 'no fabricated health for a draft this guard refused to score');
+    assert.equal(body.base.tooLarge, true, 'the reason must be nameable — distinct from the zero-scene formatUnrecognized shape');
+    assert.equal('fountain' in body.base, false, 'the oversized base text must not ship in the response either');
+    assert.equal(typeof body.base.contentHash, 'string', 'F4-style identity is still attached even on the refused-to-score shape');
+    assert.match(body.base.contentHash, /^[0-9a-f]{64}$/);
+    assert.equal(typeof body.base.analyzedAt, 'number');
+    // Bounding COST is the point: never actually pay for a 14-pass analysis
+    // of a >900k-char document. The pre-fix repro measured 26.5s for this
+    // shape; well under 1s here proves runScriptDoctorOffThread never ran.
+    assert.ok(ms < 5000, `expected the too-large guard to short-circuit fast (<5000ms), took ${ms}ms`);
+
+    for (const branch of body.branches) {
+      assert.equal(branch.healthDelta, undefined, 'never a delta against a withheld score');
+    }
   });
 });

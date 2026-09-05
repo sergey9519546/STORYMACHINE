@@ -2071,7 +2071,23 @@ type FixVerifyResultWithSignals = FixVerifyResult & { structuralSignals?: FixStr
  *  It is a separate alias rather than another `&` clause on the line above
  *  because that line is the shape-&-rhythm contract asserted verbatim by
  *  tests/core/shape-rhythm-panel-copy.test.ts. */
-type FixVerifyReceipt = FixVerifyResultWithSignals & { source?: "writer" };
+// 2026-09-05 review finding D1's panel side — the writer path's format
+// short-circuit (server/routes/scriptide.ts) answers `formatUnrecognized`
+// plus `comparable: false` for text /doctor itself refuses to score (either
+// side), so this shape can reach the client the same way a genuine
+// no-candidate receipt (a keyless or guard-rejected GENERATED attempt) does.
+// `comparable: false` is the field that tells the two apart: the no-candidate
+// branch below must render THIS reason/hint, not the generic "no fix could
+// be generated" text, and must never render as though a real health/verdict
+// delta were withheld silently.
+type FixVerifyReceipt = FixVerifyResultWithSignals & {
+  source?: "writer";
+  comparable?: boolean;
+  formatUnrecognized?: boolean;
+  field?: "fountain" | "candidateFountain";
+  reason?: string;
+  hint?: string;
+};
 
 interface FixRunState {
   result: FixVerifyReceipt;
@@ -2222,6 +2238,39 @@ function FixReceiptCard({
   }, [hasSpanCandidate, isWriterCandidate, originalSpanText, result.spanReplacement, result.candidateFountain]);
 
   if (!hasCandidate) {
+    // 2026-09-05 review finding D1 (panel side) — `comparable: false` marks
+    // the format short-circuit's receipt: neither side of the comparison
+    // was ever analyzed, so this is not an ordinary "no fix could be
+    // generated" outcome (a keyless or guard-rejected GENERATION attempt,
+    // which still has a real `before` baseline to report). Rendered
+    // distinctly — its own heading, the server's exact reason/hint, and
+    // never the generic fallback copy — so a writer never reads "no fix
+    // could be generated" for text that was never scorable in the first
+    // place.
+    if (result.comparable === false && result.formatUnrecognized) {
+      return (
+        <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+              Not comparable — format unrecognized
+            </p>
+            <button
+              onClick={onDiscard}
+              aria-label="Dismiss"
+              className="p-1 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
+            >
+              <X className="w-3 h-3" aria-hidden="true" />
+            </button>
+          </div>
+          <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
+            {result.reason ?? "This draft could not be analyzed as a screenplay."}
+          </p>
+          {result.hint && (
+            <p className="text-[10px] font-mono leading-relaxed text-[var(--sm-ink-mute)]">{result.hint}</p>
+          )}
+        </div>
+      );
+    }
     return (
       <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
         <div className="flex items-center justify-between gap-2">

@@ -94,6 +94,14 @@ const UNION_WIRE_CASES: Array<{ name: string; draftRank: DraftRankWireInput }> =
   { name: 'tied', draftRank: { rank: 1, of: 6, tied: true } },
   { name: 'ranked + unscored', draftRank: { rank: 1, of: 3, unscored: 2 } },
   { name: 'first draft', draftRank: { rank: 1, of: 1 } },
+  // 2026-09-05 review finding E1 — the state that exposed the letter's
+  // first-draft arm as a hand-copy that never called unrankedDraftsNote():
+  // a first saved draft with other, unscored saved records sitting
+  // alongside it. draftRankSentence() (the panel/HTML path) already
+  // appended this note correctly in its own `of <= 1` branch; the letter's
+  // bespoke `of <= 1` sentence silently dropped it. See the letter-specific
+  // describe block below for the assertion this state exists to drive.
+  { name: 'first draft + unscored siblings', draftRank: { rank: 1, of: 1, unscored: 5 } },
 ];
 
 describe('draftRankSentence() — union scope, every DraftRank state', () => {
@@ -229,6 +237,20 @@ describe('draft-rank-copy.ts — coverage LETTER shares the same core fragments 
       const { markdown } = renderCoverageLetter(minimalReport(), { title: 'Consistency Check', draftRank });
       if (draftRank.of <= 1) {
         assert.match(markdown, new RegExp(`rank among your own drafts will appear after ${draftRankNextOpportunityLabel()}`, 'i'));
+        // 2026-09-05 review finding E1 — the of<=1 arm used to return its
+        // sentence without ever calling unrankedDraftsNote(), so "N of M
+        // ... are/is unranked" silently vanished from the LETTER specifically
+        // (the coverage HTML and the in-app panel, both built on
+        // draftRankSentence(), already carried it). Assert the note is
+        // present here whenever this state's `unscored` is > 0, the same way
+        // the `of > 1` branch below already requires it.
+        const firstDraftNote = unrankedDraftsNote(draftRank.unscored ?? 0, draftRank.of);
+        if (firstDraftNote) {
+          assert.ok(
+            markdown.includes(firstDraftNote),
+            `expected the letter's first-draft arm to contain the unranked-drafts note "${firstDraftNote}" — got: ${markdown}`,
+          );
+        }
         return;
       }
       const verb = draftRank.tied ? 'ties for' : 'ranks';
