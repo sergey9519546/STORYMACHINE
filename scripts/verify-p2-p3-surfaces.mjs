@@ -55,6 +55,15 @@ import {
   shutdown,
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
+// Shared draft-rank copy (src/lib/draft-rank-copy.ts) — imported here so this
+// browser gate's expected text is DERIVED from the same helpers the panel,
+// the coverage letter, and the exported coverage HTML all call, not a
+// hand-typed literal of its own. This is exactly the gap the 2026-09-05
+// migration closed in coverage-html.ts itself: a hardcoded regex here would
+// happily keep matching the OLD "your own saved drafts of this script" /
+// "your next save" wording forever, even after every renderer moved on —
+// this gate would never notice the drift it exists to catch.
+import { draftRankDenominatorLabel, draftRankNextOpportunityLabel } from '../src/lib/draft-rank-copy.ts';
 
 const REPO = process.cwd();
 
@@ -680,8 +689,14 @@ async function main() {
     'Exported coverage HTML carries the health-percentile line (same denominator copy as the panel)',
     exportedHtmlHasPercentileLine,
   );
-  const exportedHtmlHasDraftRankLine = /Rank among your drafts: \w+ of \d+ \(by health, your own saved drafts of this script\)/.test(exportedHtml)
-    || /First saved draft — rank among your drafts appears after your next save/.test(exportedHtml);
+  const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rankedDraftRankLineRe = new RegExp(
+    `Rank among your drafts: (?:tied )?\\w+ of \\d+ ${reEscape(draftRankDenominatorLabel())} \\(by health\\)`,
+  );
+  const firstDraftRankLineRe = new RegExp(
+    `First saved draft — rank among your drafts appears after ${reEscape(draftRankNextOpportunityLabel())}`,
+  );
+  const exportedHtmlHasDraftRankLine = rankedDraftRankLineRe.test(exportedHtml) || firstDraftRankLineRe.test(exportedHtml);
   record(
     'P3',
     'Exported coverage HTML carries the draft-rank line (rank among the writer\'s own saved drafts)',

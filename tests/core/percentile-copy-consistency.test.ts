@@ -236,6 +236,45 @@ describe('percentile-copy.ts — end-to-end: the exported slate HTML actually co
   });
 });
 
+// 2026-09-05 migration — the SAME class of bug this whole file exists to
+// catch, but for the draft-rank denominator instead of the percentile: the
+// cross-surface-parity lane added coverage-html.ts's buildDraftRankLine
+// BEFORE src/lib/draft-rank-copy.ts existed, so it was never migrated once
+// the panel and the letter moved onto the shared helpers — see that
+// module's own header for the drift story and tests/core/
+// draft-rank-copy-consistency.test.ts for the full ranked/tied/unscored/
+// first-draft end-to-end proof. This block is the draft-rank counterpart to
+// the percentile surface scan above: same convention, same three surfaces.
+describe('draft-rank-copy.ts — no surface re-implements it', () => {
+  const panel = read('../../src/components/scriptide/ScriptDoctorPanel.tsx');
+  const coverageHtml = read('../../server/lib/coverage-html.ts');
+  const coverageLetter = read('../../server/lib/coverage-letter.ts');
+
+  const NO_LOCAL_DENOMINATOR = /\bfunction\s+draftRankDenominatorLabel\s*\(|\b(?:const|let|var)\s+draftRankDenominatorLabel\s*=/;
+  const NO_LOCAL_NEXT_OPPORTUNITY = /\bfunction\s+draftRankNextOpportunityLabel\s*\(|\b(?:const|let|var)\s+draftRankNextOpportunityLabel\s*=/;
+  const NO_LOCAL_UNRANKED_NOTE = /\bfunction\s+unrankedDraftsNote\s*\(|\b(?:const|let|var)\s+unrankedDraftsNote\s*=/;
+
+  for (const [name, src, importPath] of [
+    ['ScriptDoctorPanel.tsx', panel, '../../lib/draft-rank-copy.ts'],
+    ['coverage-html.ts', coverageHtml, '../../src/lib/draft-rank-copy.ts'],
+    ['coverage-letter.ts', coverageLetter, '../../src/lib/draft-rank-copy.ts'],
+  ] as const) {
+    it(`${name} imports the draft-rank denominator/next-opportunity/unranked-note copy from draft-rank-copy.ts rather than hand-writing it`, () => {
+      assert.ok(src.includes(importPath), `${name} must import from ${importPath}`);
+      assert.ok(src.includes('draftRankDenominatorLabel'), `${name} must call draftRankDenominatorLabel()`);
+      assert.ok(src.includes('draftRankNextOpportunityLabel'), `${name} must call draftRankNextOpportunityLabel()`);
+      assert.ok(!NO_LOCAL_DENOMINATOR.test(src), `${name} must not define a local draftRankDenominatorLabel()`);
+      assert.ok(!NO_LOCAL_NEXT_OPPORTUNITY.test(src), `${name} must not define a local draftRankNextOpportunityLabel()`);
+      assert.ok(!NO_LOCAL_UNRANKED_NOTE.test(src), `${name} must not define a local unrankedDraftsNote()`);
+    });
+  }
+
+  it('coverage-html.ts no longer hand-writes the pre-migration "your own saved drafts of this script" / "your next save" literals', () => {
+    assert.ok(!coverageHtml.includes('your own saved drafts of this script'));
+    assert.ok(!/appears? after your next save\b/.test(coverageHtml));
+  });
+});
+
 describe('percentile-copy.ts — end-to-end: the exported coverage LETTER uses the shared ordinal() and "hand-authored synthetic" wording', () => {
   function letterReport(healthPercentile: number): ScriptDoctorReport {
     return {

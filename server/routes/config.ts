@@ -151,7 +151,7 @@ router.get('/health', (_req, res) => {
 //   2. NOT YET WARM — the Script Doctor worker pool's boot-time pre-warm
 //      (server/nvm/analyze/doctor-pool.ts's warmDoctorPool() and
 //      getDoctorPoolWarmState()) has not settled. The pre-warm runs for
-//      ~2.1-3.9s AFTER the port already accepts connections (server.ts
+//      ~2.1-2.7s (idle) to up to ~3.9s (this box, under load) AFTER the port already accepts connections (server.ts
 //      dispatches it fire-and-forget from the app.listen callback), so a
 //      request landing in that window would otherwise silently pay the
 //      cold-start cost with no way for an orchestrator to know to hold

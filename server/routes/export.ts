@@ -321,8 +321,15 @@ router.post('/api/export/print-html', gameLimiter, validate(FountainTitleBodySch
 // reading a coverage report should never have to wonder whether the numbers
 // on the page are the numbers the tool actually computed.
 router.post('/api/export/coverage', gameLimiter, validate(CoverageBodySchema), asyncHandler(async (req, res) => {
+  // Widened to the full CoverageBodySchema-validated shape (2026-09-05
+  // migration, see coverage-html.ts's buildDraftRankLine header) — the
+  // narrower `{ rank; of }` annotation this cast used to carry was silently
+  // discarding `tied`/`unscored` at the type level even though
+  // CoverageBodySchema has validated them on the wire since the round that
+  // added them, so they never reached renderCoverageHtml.
   const { fountain: fountainBody, fdx, draftRank } = req.body as {
-    fountain?: string; fdx?: string; title?: string; draftRank?: { rank: number; of: number };
+    fountain?: string; fdx?: string; title?: string;
+    draftRank?: { rank: number; of: number; tied?: boolean; unscored?: number };
   };
 
   // Same fdx->Fountain resolution as POST /api/scriptide/doctor: convert here

@@ -80,7 +80,8 @@ EXPOSE 3000
 # it must keep responding even when Gemini/keys/everything else is down, see
 # server/routes/config.ts's own comment), which is exactly why it is the
 # wrong signal for a container orchestrator's health/readiness gate — a
-# container reported "healthy" the instant it starts still needs ~2.1-2.7s to
+# container reported "healthy" the instant it starts still needs a measured
+# ~2.1-2.7s (idle) to up to ~3.9s (under load) to
 # finish pre-warming the Script Doctor worker pool (warmDoctorPool(),
 # server/nvm/analyze/doctor-pool.ts), and traffic routed to it in that window
 # pays the full ~460-540ms-per-worker cold start. /ready answers 503 until
@@ -97,9 +98,10 @@ EXPOSE 3000
 # probe shape to observe the drain — see server.ts's shutdownDrainMs() and
 # GET /ready's own comment in server/routes/config.ts for the full measured
 # timeline of both probe shapes.
-# start-period=15s comfortably covers the measured ~2.1-2.7s warm-up with
-# headroom for a slower/loaded host, while staying well under the 30s poll
-# interval below.
+# start-period=15s comfortably covers the measured warm-up (~2.1-2.7s idle,
+# up to ~3.9s under load — see server/routes/config.ts's GET /ready comment
+# for the full measured range) with headroom for a slower/loaded host, while
+# staying well under the 30s poll interval below.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/ready || exit 1
 

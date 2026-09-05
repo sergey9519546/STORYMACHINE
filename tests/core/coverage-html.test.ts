@@ -642,16 +642,41 @@ describe('renderCoverageHtml — health percentile and draft rank', () => {
     assert.ok(!html.includes('Health percentile:'));
   });
 
-  it('renders the draft-rank line when opts.draftRank is provided', () => {
+  // 2026-09-05 migration: buildDraftRankLine used to hand-write "your own
+  // saved drafts of this script" / "your next save" — the exact wording the
+  // panel and the letter drifted away from once src/lib/draft-rank-copy.ts's
+  // shared helpers landed (that module's own header tells the drift story).
+  // These four cases (ranked, tied, unranked-drafts note, first-draft) match
+  // ScriptDoctorPanel.tsx's DraftRankLine `text` computation byte-for-byte —
+  // see tests/core/draft-rank-copy-consistency.test.ts for the direct
+  // cross-surface proof against the panel and the letter.
+  it('renders the draft-rank line via the shared draftRankDenominatorLabel(), not the old stale copy', () => {
     const report = buildReport();
     const html = renderCoverageHtml(report, 'The Long Wait', { draftRank: { rank: 2, of: 5 } });
-    assert.match(html, /Rank among your drafts: 2nd of 5 \(by health, your own saved drafts of this script\)/);
+    assert.match(html, /Rank among your drafts: 2nd of 5 runs and saved drafts of this script \(by health\)/);
+    assert.ok(!html.includes('your own saved drafts of this script'), 'the pre-migration hand-written denominator must be gone');
   });
 
-  it('renders the "first saved draft" copy when draftRank.of <= 1', () => {
+  it('prefixes "tied" when opts.draftRank.tied is true', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait', { draftRank: { rank: 1, of: 6, tied: true } });
+    assert.match(html, /Rank among your drafts: tied 1st of 6 runs and saved drafts of this script \(by health\)/);
+  });
+
+  it('appends the unranked-drafts note when opts.draftRank.unscored > 0', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait', { draftRank: { rank: 2, of: 5, unscored: 3 } });
+    assert.match(
+      html,
+      /Rank among your drafts: 2nd of 5 runs and saved drafts of this script \(by health\) — 3 of 8 runs and saved drafts of this script are unranked \(saved without a fresh diagnosis\)/,
+    );
+  });
+
+  it('renders the "first saved draft" copy via the shared draftRankNextOpportunityLabel() when draftRank.of <= 1', () => {
     const report = buildReport();
     const html = renderCoverageHtml(report, 'The Long Wait', { draftRank: { rank: 1, of: 1 } });
-    assert.match(html, /First saved draft — rank among your drafts appears after your next save/);
+    assert.match(html, /First saved draft — rank among your drafts appears after your next run or save/);
+    assert.ok(!html.includes('after your next save'), 'the pre-migration "next save"-only phrasing must be gone');
   });
 
   it('omits the draft-rank line entirely when opts carries no draftRank', () => {

@@ -34,6 +34,21 @@ import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 // is an established pattern, not a new one; it does not touch the scoring
 // path (no import edge to/from doctor.ts either direction).
 import { ordinal, healthPercentileSentence, exactRankTooltip } from '../../src/lib/percentile-copy.ts';
+// Shared draft-rank copy (2026-09-05 migration — this file's buildDraftRankLine
+// was added by the cross-surface-parity lane BEFORE src/lib/draft-rank-copy.ts
+// existed (see that module's own header: the panel and the coverage LETTER
+// drifted on this exact denominator noun, "your own saved drafts of this
+// script" vs. "runs and saved drafts of this script") and was never migrated
+// once the shared helpers landed, so this export quietly kept rendering the
+// pre-fix wording while the panel and the letter moved on — a live
+// cross-surface-parity regression between two lanes that landed the same day.
+// Importing the same three helpers coverage-letter.ts and ScriptDoctorPanel.tsx
+// already use closes that gap; see tests/core/percentile-copy-consistency.test.ts
+// and tests/core/draft-rank-copy-consistency.test.ts for the cross-surface proof.
+import {
+  draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
+  type DraftRankExportPayload,
+} from '../../src/lib/draft-rank-copy.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the
@@ -127,12 +142,27 @@ function buildHealthPercentileLine(report: ScriptDoctorReport): string {
  *  display copy the writer's own client attests to about their own saved
  *  history. Omitted entirely when opts carries no draftRank (older callers,
  *  or nothing yet to rank), same "purely additive" contract every other
- *  optional CoverageHtmlOptions field already follows. */
-function buildDraftRankLine(draftRank: { rank: number; of: number } | undefined): string {
+ *  optional CoverageHtmlOptions field already follows.
+ *
+ *  2026-09-05 migration: this used to hand-write its own "your own saved
+ *  drafts of this script" / "your next save" copy, which drifted from the
+ *  panel and the letter once those two moved to the shared
+ *  draft-rank-copy.ts helpers (that module's own header tells the drift
+ *  story). Now byte-identical to ScriptDoctorPanel.tsx's DraftRankLine `text`
+ *  computation for every DraftRank state this schema can carry (ranked,
+ *  tied, with an unranked-drafts note, or first-draft) — see
+ *  tests/core/draft-rank-copy-consistency.test.ts. */
+function buildDraftRankLine(draftRank: DraftRankExportPayload | undefined): string {
   if (!draftRank) return '';
-  const body = draftRank.of <= 1
-    ? 'First saved draft — rank among your drafts appears after your next save'
-    : `Rank among your drafts: ${ordinal(draftRank.rank)} of ${formatNumber(draftRank.of)} (by health, your own saved drafts of this script)`;
+  const { rank, of, tied, unscored } = draftRank;
+  const text = of <= 1
+    ? `First saved draft — rank among your drafts appears after ${draftRankNextOpportunityLabel()}`
+    : `Rank among your drafts: ${tied ? 'tied ' : ''}${ordinal(rank)} of ${of} ${draftRankDenominatorLabel()} (by health)`;
+  // Same "N of M ... are unranked" clause and " — " join ScriptDoctorPanel.tsx's
+  // DraftRankLine appends (only meaningful in the ranked branch — a
+  // first-saved-draft script has nothing else to be unranked among).
+  const unrankedNote = of > 1 ? unrankedDraftsNote(unscored ?? 0, of) : null;
+  const body = unrankedNote ? `${text} — ${unrankedNote}` : text;
   return `<div class="health-percentile">${body}</div>`;
 }
 
@@ -944,8 +974,16 @@ export interface CoverageHtmlOptions {
    *  (coverage-letter.ts's CoverageLetterOptions.draftRank). See
    *  buildDraftRankLine's header for the trust posture. Purely additive —
    *  omitted, this renders byte-identical output to before this field
-   *  existed. */
-  draftRank?: { rank: number; of: number };
+   *  existed.
+   *
+   *  2026-09-05 migration: widened from `{ rank; of }` to the full
+   *  DraftRankExportPayload shape (adds optional `tied`/`unscored`) so this
+   *  export can render the SAME tie-breaker and unranked-drafts note the
+   *  panel and the letter already do for the same field — the narrower type
+   *  was silently dropping both at the type level even though
+   *  CoverageBodySchema (server/lib/validation.ts) has accepted them on the
+   *  wire since the same round that added them there. */
+  draftRank?: DraftRankExportPayload;
 }
 
 /** GODMODE analysis section — surfaces the new structural analysis layers
