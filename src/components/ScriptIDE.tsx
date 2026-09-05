@@ -2816,12 +2816,24 @@ export default function ScriptIDE({
                   `button[aria-label="Close studio panel"]` in the very same
                   lane: remove a control from BOTH the
                   pointer and the keyboard path once the surface it would
-                  open is already open and visually covering it — the
-                  panel's own controls (Run coverage / Cancel / the
-                  sticky-footer Full report / Retry-Use sample) are the real
-                  route in every one of those states, exactly as
-                  `coverageFullReportToggleState`'s own comment already says.
-                  Applies only to the `!coverageFull` half of this branch —
+                  open is already open and visually covering it. Round-3
+                  review follow-up (2026-09-05): this used to claim the
+                  panel's own controls are "the real route in every one of
+                  those states" — measured false for one of them. Stated
+                  honestly instead: once a run has produced a report, the
+                  panel's own sticky-footer "Full report" button (and Tab)
+                  IS that route; but below 640px, in the cancelled/idle
+                  state, there is no route to the full report at all — no
+                  footer button (CoverageSummary only renders it once
+                  `status === "success" && report`), no Tab stop offering
+                  it. That is a deliberate rule, not an oversight: the only
+                  thing this toggle would open in that state is a
+                  report-less, cold ScriptDoctorPanel — precisely the dead
+                  end round-1 item 2 (the golden-path cold-open race fix)
+                  spent a round preventing on the golden path. Below 640px
+                  the full report is reachable only once a run has actually
+                  produced one, by design. Applies only to the
+                  `!coverageFull` half of this branch —
                   once `coverageFull` is true the writer is inside
                   ScriptDoctorPanel's real modal dialog (it declares the
                   ARIA dialog role itself) with its own focus trap, so Tab

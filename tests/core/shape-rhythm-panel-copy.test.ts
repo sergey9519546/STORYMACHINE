@@ -18,6 +18,7 @@ import { spawnSync } from 'node:child_process';
 // panel and WhatIfPanel.tsx render THIS value rather than a fourth
 // hand-typed wording that happens to match it today.
 import { ACTION_PROSE_VARIATION_LABEL } from '../../src/lib/structural-signals-copy.ts';
+import { stripComments } from '../helpers/strip-comments.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8');
@@ -115,16 +116,53 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
     // RENDERED occurrences remain anywhere in src/ or server/ — comments
     // documenting the retired wording's history (this file's own header,
     // coverage-letter.ts's own comment) are fine and expected, so the check
-    // is scoped to non-comment lines.
+    // is scoped to non-comment content.
+    //
+    // Round-3 review follow-up (2026-09-05, non-blocking item 2, second
+    // pass): the original version of this check filtered `grep -n` output
+    // by whether each matched LINE's own trimmed prefix looked like a
+    // comment marker — the exact same blind spot that broke
+    // modal-focus-trap-wirings.test.ts in the same round: a continuation
+    // line of a multi-line `{/* ... */}` JSX comment starts mid-sentence
+    // with no such prefix. `grep -l` still finds the CANDIDATE files
+    // cheaply, but each candidate is now re-checked against
+    // `stripComments(source)` — which removes comments structurally, via a
+    // real TypeScript parse, rather than by guessing from line shape — so
+    // a hit surviving into the stripped text is a genuine live occurrence.
     it('the retired third wording ("sentence-length variation across the draft") renders nowhere in src/ or server/ — only in historical comments', () => {
-      const rg = spawnSync('grep', ['-rn', '-i', 'sentence-length variation', resolve(__dirname, '../../src'), resolve(__dirname, '../../server')], { encoding: 'utf8' });
-      const hits = (rg.stdout ?? '').split('\n').filter((l) => l.trim().length > 0);
-      const nonCommentHits = hits.filter((l) => {
-        const afterPath = l.slice(l.indexOf(':', l.indexOf(':') + 1) + 1);
-        const trimmed = afterPath.trim();
-        return !trimmed.startsWith('//') && !trimmed.startsWith('*') && !trimmed.startsWith('/*');
-      });
-      assert.deepEqual(nonCommentHits, [], `retired wording still rendered:\n${nonCommentHits.join('\n')}`);
+      const phrase = /sentence-length variation/i;
+      const rg = spawnSync('grep', ['-rli', 'sentence-length variation', resolve(__dirname, '../../src'), resolve(__dirname, '../../server')], { encoding: 'utf8' });
+      const candidateFiles = (rg.stdout ?? '').split('\n').filter((l) => l.trim().length > 0);
+      const liveHits = candidateFiles.filter((file) => phrase.test(stripComments(readFileSync(file, 'utf8'))));
+      assert.deepEqual(liveHits, [], `retired wording still rendered (outside comments) in:\n${liveHits.join('\n')}`);
+    });
+
+    // Fixture proving the stripComments-based check above does what it
+    // claims: the retired wording quoted mid-sentence on a {/* ... */}
+    // JSX comment continuation line (no comment-marker prefix of its own)
+    // must NOT be flagged as a live occurrence, while the same phrase
+    // sitting in real rendered prose still IS.
+    it('stripComments: a continuation-line JSX comment mentioning the retired wording is not a live hit, but real prose is', () => {
+      const phrase = /sentence-length variation/i;
+      const commentOnly = [
+        'function Fixture() {',
+        '  return (',
+        '    <div>',
+        '      {/* This gloss used to say "the sentence-length variation',
+        '         across the draft\'s action lines" — retired, see the',
+        '         shared label instead. */}',
+        '      <p>How much action-sentence length varies across the draft.</p>',
+        '    </div>',
+        '  );',
+        '}',
+      ].join('\n');
+      assert.equal(phrase.test(stripComments(commentOnly)), false, 'a comment-only mention must not count as a live hit');
+
+      const liveProse = commentOnly.replace(
+        'How much action-sentence length varies across the draft.',
+        "Sentence-length variation across the draft's action lines.",
+      );
+      assert.equal(phrase.test(stripComments(liveProse)), true, 'real rendered prose using the retired wording must still be caught');
     });
   });
 

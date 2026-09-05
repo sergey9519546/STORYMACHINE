@@ -19,6 +19,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { stripComments } from "../helpers/strip-comments.ts";
 
 const COMPONENTS_DIR = path.resolve(import.meta.dirname, "../../src/components");
 
@@ -37,16 +38,22 @@ function assertDialogRootsWired(source: string, refName: string, expectedCount: 
   // `role="dialog"` inline while explaining the wiring — a plain
   // whole-file regex scan would double-count those, the same trap
   // use-modal-focus-trap.test.ts's ScriptDoctorPanel check documents).
-  // Attribute position on the line varies across these files (some put it
-  // first on its own line, others inline after ref/tabIndex on the same
-  // line), so — unlike that anchor — this filters by whether the line
-  // itself is a `//` comment, not by column position.
-  const real = [...source.matchAll(/role="dialog"/g)].filter((m) => {
-    const idx = m.index ?? 0;
-    const lineStart = source.lastIndexOf("\n", idx) + 1;
-    const linePrefix = source.slice(lineStart, idx).trim();
-    return !linePrefix.startsWith("//");
-  });
+  //
+  // Round-3 review follow-up (2026-09-05, non-blocking item 2): a line-prefix
+  // filter ("does THIS line start with //") correctly excludes a single-line
+  // comment but not a continuation line of a multi-line `{/* ... */}` JSX
+  // block comment, which quotes `role="dialog"` in prose starting mid-line
+  // with no `//` prefix of its own — exactly what broke this test in round
+  // 3. Matching against `stripComments(source)` instead removes the whole
+  // class: it blanks every comment (line, block, and JSX brace-wrapped)
+  // using the TypeScript lexer itself, the same "let the compiler find the
+  // comments" idea theme-convention.test.ts already uses via the AST, so no
+  // comment text of any shape can be miscounted as a live attribute again.
+  // `stripComments` preserves every character's original position, so
+  // `m.index` below still indexes correctly into the ORIGINAL `source` used
+  // for the `around` context window a few lines down.
+  const stripped = stripComments(source);
+  const real = [...stripped.matchAll(/role="dialog"/g)];
   assert.equal(
     real.length,
     expectedCount,
@@ -139,5 +146,35 @@ describe("ScriptIDE.tsx — inline dialogs wired via local components", () => {
   it("ScriptIDE itself renders the extracted components rather than the old inline JSX", () => {
     assert.match(source, /<ActionRequiredModal/);
     assert.match(source, /<ChangeSetupConfirmModal/);
+  });
+});
+
+// Round-3 review follow-up (2026-09-05, non-blocking item 2): a fixture
+// proving assertDialogRootsWired's stripComments-based filter does what it
+// claims — a role="dialog" quoted on a {/* ... */} JSX comment's
+// continuation line (no "//" prefix of its own) is NOT counted, while a
+// real role="dialog" JSX attribute still IS. This is the exact shape that
+// broke this test in round 3 (a comment in ScriptIDE.tsx describing
+// ScriptDoctorPanel's dialog role tripped the line-prefix filter this
+// round replaced).
+describe("assertDialogRootsWired — comment-continuation-line fixture", () => {
+  it('a role="dialog" mentioned mid-sentence on a JSX block comment continuation line is not counted, but a real attribute is', () => {
+    const fixture = [
+      "function Fixture() {",
+      "  return (",
+      "    <div>",
+      "      {/* This paragraph explains that the sibling panel is a real",
+      '         role="dialog" (ScriptDoctorPanel) with its own focus trap,',
+      "         so no extra wiring is needed here. */}",
+      '      <div ref={fixtureRef} tabIndex={-1} role="dialog">real dialog</div>',
+      "    </div>",
+      "  );",
+      "}",
+    ].join("\n");
+    // The one-line "// role=..." shape from the older filter's own blind
+    // spot check, kept alongside for completeness: still correctly excluded.
+    const fixtureWithLineComment = `${fixture}\n// role="dialog" aria-modal="true" — historical note, single-line comment\n`;
+
+    assertDialogRootsWired(fixtureWithLineComment, "fixtureRef", 1);
   });
 });
