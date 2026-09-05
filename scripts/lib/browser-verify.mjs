@@ -177,6 +177,20 @@ function joinCgroupPath(root, cgPath) {
  *  process that IS namespaced (root and process path coincide) and for
  *  platforms where `/proc/self/cgroup` itself does not exist.
  *
+ *  TWO v2 MOUNT ROOTS ARE TRIED (independent review 2026-09-04, second
+ *  pass): a pure-v2 host mounts the unified hierarchy at `/sys/fs/cgroup`
+ *  itself, but a HYBRID host (v1 controllers plus a v2 "unified" mount
+ *  alongside them, a real and still-common layout) puts it at
+ *  `/sys/fs/cgroup/unified` instead — `/sys/fs/cgroup/cpu.max` does not
+ *  exist there at all. Both roots are tried, deduped through the `Set`
+ *  below (harmless when they'd resolve to the same path, e.g. `v2Path` is
+ *  `/`). This is still not the fully general answer: the only way to know
+ *  for certain which controllers are mounted where, on every possible
+ *  layout, is to parse `/proc/self/mountinfo` for the actual `cgroup`/
+ *  `cgroup2` mount points rather than guessing at well-known ones — that is
+ *  the complete version of this function, left as a known gap rather than
+ *  built speculatively here.
+ *
  *  `readFile` defaults to the real filesystem and is used for every path
  *  read here, `/proc/self/cgroup` included; tests inject a stub so both the
  *  parsing AND the path resolution are provable without a real cgroup v1
@@ -189,9 +203,10 @@ export function readCgroupCpuQuota(readFile = readFileSync) {
     ({ v2Path, v1Path } = parseSelfCgroupPaths(readFile('/proc/self/cgroup', 'utf8')));
   } catch { /* no /proc/self/cgroup (non-Linux, or cgroups unavailable here) */ }
 
+  const V2_MOUNT_ROOTS = ['/sys/fs/cgroup', '/sys/fs/cgroup/unified'];
   const v2Candidates = new Set([
-    ...(v2Path ? [joinCgroupPath('/sys/fs/cgroup', v2Path)] : []),
-    '/sys/fs/cgroup',
+    ...(v2Path ? V2_MOUNT_ROOTS.map((root) => joinCgroupPath(root, v2Path)) : []),
+    ...V2_MOUNT_ROOTS,
   ]);
   for (const root of v2Candidates) {
     try {

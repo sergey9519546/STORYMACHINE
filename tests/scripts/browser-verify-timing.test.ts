@@ -130,6 +130,19 @@ describe('getTiming — cgroup CPU quota RESOLVES THE PROCESS\'S OWN PATH before
     assert.equal(quota, 4);
   });
 
+  it('hybrid host: v2 mounted at /sys/fs/cgroup/unified (alongside v1 controllers), not the plain root — the second v2 candidate root resolves it', () => {
+    // Independent review 2026-09-04, second pass: a hybrid host (v1
+    // controllers plus a separate v2 "unified" mount) does not expose
+    // cpu.max at /sys/fs/cgroup at all.
+    const quota = readCgroupCpuQuota((p) => {
+      if (p === '/proc/self/cgroup') return '1:cpu:/\n'; // no v2 line — hybrid host, process at the v1 root
+      if (p === '/sys/fs/cgroup/cpu.max') return enoent(); // the plain root has no v2 mount on this host
+      if (p === '/sys/fs/cgroup/unified/cpu.max') return '500000 100000\n';
+      return enoent();
+    });
+    assert.equal(quota, 5, 'a 500000/100000 quota at the hybrid host\'s unified v2 mount is 5 whole CPUs');
+  });
+
   it('an unparseable /proc/self/cgroup (no matching v1/v2 line) falls back to the mount root exactly as if the file were absent', () => {
     const quota = readCgroupCpuQuota((p) => {
       if (p === '/proc/self/cgroup') return '4:memory:/only-memory-here\n';

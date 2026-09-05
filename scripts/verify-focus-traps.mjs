@@ -123,6 +123,12 @@ async function activeElementInfo(page) {
  * that makes it load-bearing, for every dialog this suite drives.
  */
 async function verifyDialog(page, { name, accessibleName, restoreTriggerHandle, closeDialog }) {
+  // A future context that forgets `accessibleName` would otherwise call
+  // getByRole('dialog', { name: undefined }) below — Playwright treats
+  // `undefined` as "don't filter by name", so that assertion would PASS
+  // VACUOUSLY (any dialog, named or not, satisfies it) instead of catching
+  // the omission. Fail loudly here instead of silently degrading the gate.
+  if (!accessibleName) throw new Error(`verifyDialog("${name}") called with no accessibleName — every dialog context must name its expected accessible name`);
   await page.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) });
   // Let framer-motion enter animations and the hook's own effect settle —
   // ScriptDoctorPanel's spring exit alone takes ~600ms; give entry the same
