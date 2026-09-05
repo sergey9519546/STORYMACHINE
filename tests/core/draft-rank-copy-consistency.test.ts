@@ -27,6 +27,18 @@
 // (so a future edit to the panel's wording fails THIS test, not silently
 // drifts past it). The letter and the HTML export are pure functions, so
 // their sides are proven by actually calling them.
+//
+// 2026-09-05 (owner rule: one wording per concept) — a FIFTH surface,
+// SnapshotManager.tsx's per-snapshot badge, ranks against a NARROWER
+// denominator than the other four (saved Versions only, never Draft History
+// runs — snapshotDraftRanks calls computeDraftRank with an empty history
+// array). draftRankDenominatorLabel(scope) exists so that narrower noun is
+// still ONE shared implementation, not a second hand-copy: this file's last
+// describe block proves the 'saved' scope is (a) what SnapshotManager.tsx
+// actually calls and (b) genuinely a suffix of the 'union' scope's phrase
+// ("runs and saved drafts of this script" ends with "saved drafts of this
+// script"), so the two scopes can never silently diverge on the words they
+// share.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,6 +56,7 @@ import type { ScriptDoctorReport, DoctorGrade, CoverageVerdict } from '../../ser
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8');
 const panelSrc = read('../../src/components/scriptide/ScriptDoctorPanel.tsx');
+const snapshotManagerSrc = read('../../src/components/scriptide/SnapshotManager.tsx');
 
 type DraftRankInput = { rank: number; of: number; tied?: boolean; unscored?: number };
 
@@ -152,4 +165,45 @@ describe('draft-rank-copy.ts — coverage LETTER shares the same core fragments 
       }
     });
   }
+});
+
+/** SnapshotManager.tsx's SnapshotPercentileAndRankLine `text` computation,
+ *  reproduced exactly — mirrors expectedPanelLine() above but for the
+ *  'saved' scope (see draft-rank-copy.ts's DraftRankDenominatorScope
+ *  header): SnapshotManager has no first-draft/tied/unranked-note branches
+ *  of its own (that null-rank case renders its own distinct sentence, "Only
+ *  saved draft with a health score so far", not owned by draft-rank-copy.ts). */
+function expectedSnapshotManagerLine(draftRank: { rank: number | null; of: number }): string {
+  if (draftRank.rank === null || draftRank.of <= 1) return 'Only saved draft with a health score so far';
+  return `Ranks ${ordinal(draftRank.rank)} of ${draftRank.of} by health among your ${draftRankDenominatorLabel('saved')}`;
+}
+
+describe("draft-rank-copy.ts — the 'saved' scope: SnapshotManager.tsx's per-snapshot badge", () => {
+  it("draftRankDenominatorLabel('union') ends with draftRankDenominatorLabel('saved') — the two scopes share every word except \"runs and\", proven structurally rather than by two independent literals", () => {
+    const union = draftRankDenominatorLabel('union');
+    const saved = draftRankDenominatorLabel('saved');
+    assert.notEqual(union, saved, "the two scopes must actually differ — otherwise 'saved' is pointless");
+    assert.ok(union.endsWith(saved), `expected "${union}" to end with "${saved}"`);
+  });
+
+  it("SnapshotManager.tsx's source contains the exact formula this reproduction uses (fails if the component's wording changes without this test changing too)", () => {
+    assert.match(
+      snapshotManagerSrc,
+      /`Ranks \$\{ordinal\(draftRank\.rank\)\} of \$\{draftRank\.of\} by health among your \$\{draftRankDenominatorLabel\('saved'\)\}`/,
+    );
+    assert.ok(snapshotManagerSrc.includes('"Only saved draft with a health score so far"'));
+  });
+
+  it('ranked (saved scope): the reproduction differs from the union-scope panel line for the identical rank/of, proving the two surfaces are not silently sharing one denominator', () => {
+    const draftRank = { rank: 1, of: 2 };
+    const savedLine = expectedSnapshotManagerLine(draftRank);
+    const unionLine = expectedPanelLine(draftRank);
+    assert.equal(savedLine, 'Ranks 1st of 2 by health among your saved drafts of this script');
+    assert.notEqual(savedLine, unionLine, 'the "saved" and "union" scoped sentences must not collide for the same input');
+  });
+
+  it('"only saved draft" (rank null or of <= 1): renders its own sentence, not a mis-scoped draft-rank-copy.ts phrase', () => {
+    assert.equal(expectedSnapshotManagerLine({ rank: null, of: 0 }), 'Only saved draft with a health score so far');
+    assert.equal(expectedSnapshotManagerLine({ rank: 1, of: 1 }), 'Only saved draft with a health score so far');
+  });
 });

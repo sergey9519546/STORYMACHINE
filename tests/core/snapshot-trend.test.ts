@@ -526,8 +526,9 @@ describe('snapshotDraftRanks', () => {
   // which then matched and dropped a SIBLING snapshot that merely shared
   // the same content — silently shrinking "of" for two real, distinct
   // Save-Version clicks. scripts/verify-p2-p3-surfaces.mjs's own product
-  // test ("Ranks 1st of 2 by health among your saved drafts") saves the
-  // same script twice on purpose and requires BOTH to count; this test
+  // test ("Ranks 1st of 2 by health among your saved drafts of this
+  // script") saves the same script twice on purpose and requires BOTH to
+  // count; this test
   // pins the same contract at the unit level, plus the real self-count
   // guard (an N-snapshot array must never read as "of N+1").
   it('two snapshots that are genuine duplicates (same contentHash, same health, different array index — Save Version clicked twice with no edit) each count as a SEPARATE draft, tied for 1st', () => {

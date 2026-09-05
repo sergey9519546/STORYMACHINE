@@ -273,6 +273,26 @@ describe('draft-rank-copy.ts — no surface re-implements it', () => {
     assert.ok(!coverageHtml.includes('your own saved drafts of this script'));
     assert.ok(!/appears? after your next save\b/.test(coverageHtml));
   });
+
+  // 2026-09-05 (owner rule: one wording per concept) — the last draft-rank
+  // sentence off the shared helpers: SnapshotManager.tsx's per-snapshot
+  // badge ranks against a NARROWER set (saved Versions only — see
+  // draft-rank-copy.ts's DraftRankDenominatorScope header) than the three
+  // surfaces above, so it calls draftRankDenominatorLabel('saved') rather
+  // than the union default — never draftRankNextOpportunityLabel(), since
+  // this badge has no "first draft" branch of its own (a snapshot with
+  // nothing else scored renders "Only saved draft with a health score so
+  // far" instead, a distinct sentence this module does not own).
+  const snapshotManager = read('../../src/components/scriptide/SnapshotManager.tsx');
+  it('SnapshotManager.tsx imports draftRankDenominatorLabel(\'saved\') from draft-rank-copy.ts rather than hand-writing "your saved drafts"', () => {
+    assert.ok(snapshotManager.includes('../../lib/draft-rank-copy.ts'), 'SnapshotManager.tsx must import from ../../lib/draft-rank-copy.ts');
+    assert.match(snapshotManager, /draftRankDenominatorLabel\(\s*['"]saved['"]\s*\)/);
+    assert.ok(!NO_LOCAL_DENOMINATOR.test(snapshotManager), 'SnapshotManager.tsx must not define a local draftRankDenominatorLabel()');
+  });
+
+  it('SnapshotManager.tsx no longer hand-writes the pre-migration "among your saved drafts" literal (missing "of this script")', () => {
+    assert.ok(!/among your saved drafts`/.test(snapshotManager), 'the old bare "among your saved drafts" template-literal ending must be gone');
+  });
 });
 
 describe('percentile-copy.ts — end-to-end: the exported coverage LETTER uses the shared ordinal() and "hand-authored synthetic" wording', () => {

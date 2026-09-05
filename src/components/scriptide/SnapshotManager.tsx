@@ -7,6 +7,7 @@ import {
 } from "../../lib/snapshot-trend.ts";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 import { ordinal, exactRankTooltip, compactPercentileNote } from "../../lib/percentile-copy.ts";
+import { draftRankDenominatorLabel } from "../../lib/draft-rank-copy.ts";
 
 // writer #9 (upgrade-writer-experience discovery) — "score over revisions".
 // The four score fields are ALL optional: a snapshot only carries them when
@@ -189,7 +190,14 @@ function SnapshotPercentileAndRankLine({
               the same as "only saved draft with a health score so far". */}
           {draftRank.rank === null || draftRank.of <= 1
             ? "Only saved draft with a health score so far"
-            : `Ranks ${ordinal(draftRank.rank)} of ${draftRank.of} by health among your saved drafts`}
+            // 2026-09-05 (owner rule: one wording per concept) — routed
+            // through the shared draftRankDenominatorLabel('saved') instead
+            // of this component's own "your saved drafts" literal. The
+            // narrower 'saved' scope is deliberate, not a drift: this badge
+            // ranks against snapshotDraftRanks' empty-history call
+            // (src/lib/snapshot-trend.ts), never Draft History runs, so it
+            // must not read "runs and saved drafts" like the union scope.
+            : `Ranks ${ordinal(draftRank.rank)} of ${draftRank.of} by health among your ${draftRankDenominatorLabel('saved')}`}
         </span>
       )}
     </div>

@@ -64,6 +64,11 @@ import {
 // "your next save" wording forever, even after every renderer moved on —
 // this gate would never notice the drift it exists to catch.
 import { draftRankDenominatorLabel, draftRankNextOpportunityLabel } from '../src/lib/draft-rank-copy.ts';
+// SnapshotManager.tsx's per-snapshot badge ranks against a NARROWER set than
+// the panel/letter/HTML above (snapshotDraftRanks calls computeDraftRank with
+// an empty history array — saved Versions only, never Draft History runs),
+// hence the 'saved' scope rather than the default 'union' one.
+const savedScopeDraftRankNoun = draftRankDenominatorLabel('saved');
 
 const REPO = process.cwd();
 
@@ -1075,8 +1080,9 @@ async function main() {
   // in: close the report dialog, open Ship -> Versions, save the SAME
   // script twice (no edits between saves, so both snapshots share the exact
   // same health — a genuine tie), and assert the exact "Ranks 1st of 2 by
-  // health among your saved drafts" text renders (computeDraftRank's
-  // documented tie rule: an exact tie shares the better rank).
+  // health among your saved drafts of this script" text renders
+  // (computeDraftRank's documented tie rule: an exact tie shares the better
+  // rank).
   await pageA.keyboard.press('Escape');
   await pageA.waitForTimeout(timing.ms(200));
 
@@ -1102,13 +1108,14 @@ async function main() {
       // eslint-disable-next-line no-await-in-loop
       await nameInput.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
     }
-    const strictRankVisible = await pageA.getByText('Ranks 1st of 2 by health among your saved drafts')
+    const expectedStrictRankText = `Ranks 1st of 2 by health among your ${savedScopeDraftRankNoun}`;
+    const strictRankVisible = await pageA.getByText(expectedStrictRankText)
       .first().waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
     record(
       'P3',
-      'Ship -> Versions shows a REAL cross-snapshot rank ("Ranks 1st of 2 by health among your saved drafts") after saving two versions of the same script',
+      `Ship -> Versions shows a REAL cross-snapshot rank ("${expectedStrictRankText}") after saving two versions of the same script`,
       strictRankVisible,
-      strictRankVisible ? '' : 'expected exact "Ranks 1st of 2 by health among your saved drafts" text not found after saving two versions',
+      strictRankVisible ? '' : `expected exact "${expectedStrictRankText}" text not found after saving two versions`,
     );
   } else {
     record(
@@ -1664,8 +1671,9 @@ async function main() {
         // 2") or the honest single-scored-snapshot copy ("Only saved draft
         // with a health score so far") is a correct outcome here; either one
         // proves the SAME computeDraftRank-backed line reached this panel.
-        const rankVisible = await pageB.getByText(/Ranks (1st|2nd|3rd|\d+th) of \d+ by health among your saved drafts|Only saved draft with a health score so far/)
-          .first().waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+        const rankVisible = await pageB.getByText(new RegExp(
+          `Ranks (1st|2nd|3rd|\\d+th) of \\d+ by health among your ${reEscape(savedScopeDraftRankNoun)}|Only saved draft with a health score so far`,
+        )).first().waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
         record('P2-whatif', 'Ship -> Versions shows each snapshot\'s rank among the writer\'s other saved drafts', rankVisible, rankVisible ? '' : 'no "Ranks N of M by health" / "Only saved draft" text found');
       }
     }

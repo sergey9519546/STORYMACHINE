@@ -53,12 +53,26 @@ export function draftRankExportPayload(draftRank: DraftRank | null): DraftRankEx
   };
 }
 
-/** The denominator noun phrase for "rank among your drafts" — the deduped
- *  UNION of ScriptDoctorPanel's own Draft History runs and ScriptIDE
- *  Version snapshots (computeDraftRank). Every surface that states this
- *  number must call THIS, not write its own noun for it. */
-export function draftRankDenominatorLabel(): string {
-  return 'runs and saved drafts of this script';
+/** What a DraftRank's denominator counts. 'union' (default) is the deduped
+ *  UNION of Draft History runs and ScriptIDE Version snapshots
+ *  (computeDraftRank) — what ScriptDoctorPanel.tsx's DraftRankLine and
+ *  coverage-letter.ts/coverage-html.ts's exports all rank against. 'saved'
+ *  is the NARROWER set SnapshotManager.tsx's per-snapshot badge ranks
+ *  against: `snapshotDraftRanks` (src/lib/snapshot-trend.ts) deliberately
+ *  calls `computeDraftRank(others, [])` with an EMPTY history array, so a
+ *  snapshot's badge ranks it only among the writer's other saved Versions
+ *  of this script, never Draft History runs that were never saved. */
+export type DraftRankDenominatorScope = 'union' | 'saved';
+
+/** The denominator noun phrase for "rank among your drafts". Every surface
+ *  that states this number must call THIS with the scope that actually
+ *  matches what it ranked against — not write its own noun for it (2026-09-05
+ *  owner rule: one wording per concept — a 'saved'-scope caller writing its
+ *  own literal ("among your saved drafts") is exactly the kind of second
+ *  copy this function exists to prevent, EVEN THOUGH the underlying set is
+ *  genuinely narrower and deserves its own noun rather than the union's). */
+export function draftRankDenominatorLabel(scope: DraftRankDenominatorScope = 'union'): string {
+  return scope === 'saved' ? 'saved drafts of this script' : 'runs and saved drafts of this script';
 }
 
 /** The clause naming when a rank next becomes available for a script with
