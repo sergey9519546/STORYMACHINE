@@ -85,6 +85,10 @@ A reviewer who did not build the change reads the brief and the diff, then:
 
 The orchestrator merges only on MERGE. On REVISE the lane agent gets the list
 and the SAME reviewer re-checks its own items against the new diff (a few
-tool calls with warm context, not a fresh read). The review verdict is
+tool calls with warm context, not a fresh read). Before a reviewed lane is rebased for merge, the
+orchestrator tags the commit each review round examined
+(`git tag audit/<date>/<lane>-round<N> <sha>`) so the reviewed object stays
+resolvable after the rebase rewrites it; the 2026-09-05 batch did not, and
+21 of its cited round commits are unreachable. The review verdict is
 recorded with the merge. Concurrency is capped at three live agents (lanes
 plus reviewers) so that one failed suite under load is not everyone's.
