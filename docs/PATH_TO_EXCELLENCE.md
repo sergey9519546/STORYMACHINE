@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-04, main @ f7b64e9b (four session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-05, main @ 5d2b2638 (five session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,65 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-05, overnight — the review batch.** The owner asked for a system
+that makes the subagents do the best version of the work, and for the usage
+limit to stop moving so fast. Both are written down now: `docs/LANE_STANDARD.md`
+says what "the best version" means and requires an independent reviewer to
+read every lane's diff against its brief, drive the change, reproduce a
+number, hunt the shortcut, and return MERGE or a numbered REVISE list before
+anything merges; a later amendment moved the full test suite and the browser
+battery to one run per merge by the orchestrator, because six lanes and six
+reviewers each re-running both was most of the cost. Six lanes built from the
+evening audit went through it. **None passed review on the first pass, and
+every review found something the gates had passed:**
+
+- **Readiness and logs** (three rounds): `/ready` shared the per-IP limiter
+  bucket with the whole API, so a busy, healthy container answered 429 to its
+  own health check; the log fix let an absolute-form request line inject a
+  hostname into the path field; the warm-up deadline timer was unref'd and
+  could never fire; the drain promise was false for any probe that opens a
+  new connection, so a real drain window (`SHUTDOWN_DRAIN_MS`) was built with
+  a matching `stop_grace_period`.
+- **Timing and dialogs** (two rounds): the cgroup reader read the hierarchy
+  root, not the process's own cgroup, so the audit's silent-1.0x bug survived
+  on exactly the Docker-on-v1 layout this sandbox uses; the dialog
+  accessible names the brief required had no gate at all; the sibling Restore
+  modal had the same defect and was finished rather than scoped around.
+- **Cross-surface parity** (two rounds): the "byte-identical when absent"
+  claim was false by 279 bytes and its test compared a call to itself (the
+  reviewer injected junk into every report and all 41 tests passed); four
+  copies of the percentile copy had drifted, one dropping "hand-authored
+  synthetic"; a real bug surfaced on the way — Slate's file picker read a
+  live FileList and then reset it, so it had never accepted a file.
+- **Draft rank, dark mode, the a11y gate** (three rounds): the current run
+  was counted against itself, so "tied" was true on every run and the new
+  honest copy could never render; the container fix regressed three captions
+  to 1.28:1; the new a11y step audited five thousand pixels below the fold
+  where axe never looks; the rebase then forwarded the unscored shape to an
+  export whose schema rejects it.
+- **Keyless Fix & verify** (two rounds): an FDX upload verified the raw XML
+  as the writer's rewrite ("Health 64 → 0" for a rewrite nobody made); the
+  "no model was called" test used a throwing provider and could not see a
+  swallowed call — a counting spy fails on the planted probe; the withheld
+  reason was then wrong for the sample-script state, the same class one axis
+  over.
+- **The shape guard** (four rounds): the rebuilt guard missed the dual-
+  dialogue caret; the fixture sweep walked the disk and failed from the repo
+  root; the fuzz cases could not fail; the weight bound was not a cost bound
+  (a 216-second legal request at the same weight as a rejected 31-second
+  one); the structural bound that replaced it was defeated by double-spaced
+  input, which is what PDF and FDX imports produce; and that fix was off by
+  one blank line. The worst legal cue-shaped request is now measured in
+  seconds, not minutes, and every bypass has a pinned fixture.
+
+The pattern the audit named — proving a property with the one example that
+motivated it — held through the reviews too: each lane fixed the example the
+reviewer gave and the reviewer found the next member of the class. The
+standard now says so in §3, and every review is committed under
+`docs/audits/2026-09-05-review-batch/` so the next round starts from them. Main moved from 1e170831
+to 5d2b2638: 6 lanes, 15 review rounds, every merge behind one full suite and
+one battery on the rebased branch.
 
 **2026-09-04, evening — build, attack, repair, deploy, verify.** The owner's
 brief tightened twice during this batch: *"do not merely audit, recommend,
