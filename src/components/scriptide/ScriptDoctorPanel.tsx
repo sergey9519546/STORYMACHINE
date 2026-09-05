@@ -3268,14 +3268,51 @@ export default function ScriptDoctorPanel({
       .finally(() => clearTimeout(timeoutId));
   };
 
-  /** The candidate "Verify my rewrite" measures: whatever text the panel
-   *  would diagnose RIGHT NOW (the live editor draft, or an active non-PDF
-   *  upload). Null for a PDF upload — the browser never holds that file's
-   *  text, the server converts it, so there is no client-side "my rewrite"
-   *  to send and the affordance is withheld rather than sending the wrong
-   *  document. */
-  const verifyCandidateText: string | null =
-    isPdfUpload ? null : (activeText.trim() === "" ? null : activeText);
+  /** Why "Verify my rewrite" cannot run right now, or null when it can.
+   *
+   *  THE PREDICATE, stated once (review finding, 2026-09-04): a candidate is
+   *  only comparable to `fixSourceText` when it is Fountain the CLIENT holds,
+   *  in the SAME representation as the text the displayed report was computed
+   *  on. That is a question about representation, not about any one file
+   *  format, and answering it per-format is how the first version of this
+   *  shipped an `.fdx` hole behind a PDF-shaped guard:
+   *
+   *   - PDF upload — the browser never holds the file's text at all (the
+   *     server converts it), so there is no client-side "my rewrite" to send.
+   *   - FDX upload — `activeText` is the raw Final Draft XML, while
+   *     `fixSourceText` is the CONVERTED Fountain the server analysed. Sending
+   *     the XML produced a full, confident receipt for a rewrite the writer
+   *     never made (measured: health 22 → 0, "Cleared 141 / Introduced 10").
+   *   - Fountain/plain-text upload — the representation matches, but the
+   *     candidate is necessarily byte-identical to the base: `handleFileSelected`
+   *     calls setReport(null) on every upload, so the only upload that can be
+   *     on screen beside a complete report is the one that produced it. The
+   *     writer's editor edits are ignored while the chip is up, so offering
+   *     "verify your rewrite" here would promise something the state cannot do.
+   *
+   *  So the candidate is the EDITOR's own draft, and any active upload
+   *  withholds the control with a reason naming the way back. That way back
+   *  costs a re-diagnosis and the copy says so: `clearUpload` calls
+   *  setReport(null) exactly as `handleFileSelected` does, so dismissing the
+   *  chip ends the report this would have measured against. The true sequence
+   *  — driven end to end, not reasoned about — is "Load converted Fountain
+   *  into editor" (for a converted source), then ✕, then Run Diagnosis, which
+   *  produces an editor-sourced report on which the control is live. A reason
+   *  that said merely "clear the upload" would repeat the same class of
+   *  falsehood this revision exists to remove. */
+  const verifyBlockedReason: string | null =
+    !fixSourceText
+      ? "No analyzable script text is available for this report."
+      : uploadedFile
+      ? uploadedFile.format === "fountain"
+        ? "This report came from an uploaded file. Verification compares your editor draft, so clear the upload (✕ above) and run the diagnosis again to verify a rewrite here."
+        : `This report came from an uploaded ${uploadedFile.format === "pdf" ? "PDF" : "Final Draft"} file, and the browser holds no Fountain version of it to compare. Use "Load converted Fountain into editor" below, then clear the upload (✕ above) and run the diagnosis again.`
+      : fountain.trim() === ""
+      ? "The editor is empty — write or paste a draft to verify."
+      : null;
+
+  /** The candidate itself: the live editor draft, and only ever that. */
+  const verifyCandidateText: string | null = verifyBlockedReason === null ? fountain : null;
 
   /** True when the candidate is byte-identical to the text the displayed
    *  report was computed on. Verification still runs (an identical candidate
@@ -4324,13 +4361,7 @@ export default function ScriptDoctorPanel({
                 a draft with nothing to cluster can still be rewritten and
                 re-measured. */}
             {reportIsComplete && (() => {
-              const disabledReason = !fixSourceText
-                ? "No analyzable script text is available for this report."
-                : !verifyCandidateText
-                ? isPdfUpload
-                  ? "This report came from a PDF — load the converted Fountain into the editor to verify a rewrite of it."
-                  : "The editor is empty — write or paste a draft to verify."
-                : null;
+              const disabledReason = verifyBlockedReason;
               return (
                 <div className="border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
@@ -4341,18 +4372,16 @@ export default function ScriptDoctorPanel({
                       background (caught by verify:a11y's dark-full-report-dialog
                       scan, not by review), and this token is the muted text
                       colour the rest of the panel already uses in both themes. */}
-                  {/* The lead-in NAMES the text that will actually be sent.
-                      `verifyCandidateText` is the panel's active text, which is
-                      the uploaded file whenever an upload chip is showing — so
-                      a fixed "in the editor" sentence would be false in that
-                      state, which is exactly the kind of copy this project
-                      does not ship. The second sentence (the empirical one,
-                      registered in docs/CLAIMS_REGISTER.md) is the same either
-                      way. */}
+                  {/* One unconditional sentence, because there is now exactly
+                      one state in which this block renders an enabled control:
+                      the candidate is the editor's draft (see
+                      verifyBlockedReason). The earlier upload-state variant
+                      ("revise the script and upload it again") described a flow
+                      the app does not have — every upload calls setReport(null),
+                      so uploading again destroys the report this promises to
+                      measure against, and the control with it. */}
                   <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug">
-                    {uploadedFile && !isPdfUpload
-                      ? "Revise the script and upload it again, then measure it against this report."
-                      : "Rewrite the draft yourself in the editor, then measure it against this report."}{" "}
+                    Rewrite the draft yourself in the editor, then measure it against this report.
                     The Script Doctor re-reads both drafts and shows exactly what moved &mdash; no AI,
                     no key needed.
                   </p>

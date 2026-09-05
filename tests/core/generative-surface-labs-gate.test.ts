@@ -2,7 +2,21 @@
 // the GENERATIVE surface is demoted to Labs alongside OASIS. Nothing was
 // deleted — the code, the server routes, and their plumbing tests all still
 // run — but with Labs OFF no control that reaches an LLM may render, and no
-// LLM-adjacent request may fire from the default Doctor + Editor surface.
+// request that CAN REACH A MODEL may fire from the default Doctor + Editor
+// surface.
+//
+// That wording is deliberate, and narrower than this header used to claim
+// ("no LLM-adjacent request may fire"). Since 2026-09-04 the default surface
+// does POST to /api/scriptide/fix — a route tests/routes/route-capabilities.
+// test.ts lists as LLM-reaching — but only in the WRITER-SUPPLIED
+// `candidateFountain` shape, which returns from that route's own early branch
+// before server/nvm/analyze/fix.ts is imported, so no code path leads from it
+// to generateContent (asserted with a counting provider spy in
+// tests/routes/scriptide-fix.test.ts, and argued in docs/DECISION_LOG.md
+// Decision #3's 2026-09-04 amendment). The invariant the landing page's
+// keyless claim actually depends on — the default surface sends nothing to a
+// model — is unchanged; it is now a property of the request shape rather than
+// of the URL, and this header says which.
 //
 // Two layers, matching this repo's established split (see
 // tests/core/use-modal-focus-trap.test.ts's header and

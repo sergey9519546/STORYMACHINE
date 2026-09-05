@@ -257,9 +257,14 @@ rewrite straight out of the editor, reaches no model at all, and answers
 `usedLLM: false, source: 'writer'`; it is the version a keyless deploy has, and
 it is NOT Labs-gated (see `docs/DECISION_LOG.md` Decision #3's 2026-09-04
 amendment — that decision gates unevaluated generation, and this path generates
-nothing). Both run the whole 14-pass doctor on both documents through the same
-pooled path `/api/scriptide/doctor` uses, and both build their receipt with
-`server/nvm/analyze/fix-delta.ts` — one implementation of health/verdict
+nothing). The writer path runs both whole-document analyses through the same
+pooled path `/api/scriptide/doctor` uses (`runScriptDoctorForRequest`:
+off-thread, client-disconnect aware, sharing the coordinator's content-hash
+LRU, so the baseline the panel just paid for is free); the generated path still
+analyses in process inside `fixAndVerify` (`server/nvm/analyze/fix.ts`) — legal
+there, since `tests/core/doctor-pool-call-sites.test.ts` polices route files,
+but not the same execution path and not described as one. Both build their
+receipt with `server/nvm/analyze/fix-delta.ts` — one implementation of health/verdict
 movement, whole-document `cleared`/`introduced` (multiset, matched by stable
 issue id), and dual `contentHash`es so anyone can re-POST either text to
 `/doctor` and get the same numbers. The descriptive shape-&-rhythm aggregates

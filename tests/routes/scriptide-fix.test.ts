@@ -319,14 +319,35 @@ describe('routes/scriptide/fix — HTTP behavior', async () => {
   const WRITER_CANDIDATE = spliceSpan(FOUNTAIN, SPAN, VALID_REPLACEMENT);
 
   it('writer-supplied candidate: 200 with the full receipt, usedLLM:false, source:"writer"', async () => {
-    // A provider that THROWS if it is ever called — the assertion that this
-    // path reaches no model is behavioural, not a comment.
-    setLLMProvider({ generate: async () => { throw new Error('the writer path must never call the model'); } });
+    // A COUNTING provider, not a throwing one (review finding, 2026-09-04).
+    // A throwing provider proves only that this path does not DEPEND on model
+    // output — it cannot see a call whose failure is swallowed, which is
+    // exactly the shape fixAndVerify has (its catch turns any provider failure
+    // into the keyless result). Planting a real `await fixAndVerify(...)`
+    // inside a try/catch at the top of the route's candidate branch left every
+    // assertion here green. A counter sees that call, so this guard can now
+    // fail on the input it exists to catch — and it is what
+    // docs/CLAIMS_REGISTER.md rows 46/47 ("no AI, no key needed", "No AI was
+    // used") actually rest on.
+    let modelCalls = 0;
+    setLLMProvider({
+      generate: async () => {
+        modelCalls += 1;
+        // Return successfully rather than throwing: a swallowed rejection is
+        // indistinguishable from no call at all, which is the hole.
+        return { text: 'A MODEL REPLY THE WRITER PATH MUST NEVER ASK FOR.' } as never;
+      },
+    });
     try {
       const res = await post({ fountain: FOUNTAIN, candidateFountain: WRITER_CANDIDATE });
       assert.equal(res.status, 200);
       const body = await res.json();
 
+      assert.equal(
+        modelCalls,
+        0,
+        `the writer path must reach no model at all, but the provider was invoked ${modelCalls} time(s)`,
+      );
       assert.equal(body.usedLLM, false, 'nothing was generated, so usedLLM stays honestly false');
       assert.equal(body.source, 'writer');
       assert.equal('note' in body, false, 'a real candidate carries no "no candidate" note');

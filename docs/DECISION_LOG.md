@@ -245,6 +245,28 @@ reasoning, from this decision's own wording:
   hide the measured half of a feature on the grounds that the unmeasured half
   is gated.
 
+The one passage that cuts the other way, addressed rather than skipped: this
+decision's second Rationale bullet says *"with Labs off, the default surface
+makes no LLM-adjacent call at all — which is what the landing page's keyless
+claim has always implied,"* and
+`tests/core/generative-surface-labs-gate.test.ts`'s header restated it as "no
+LLM-adjacent request may fire from the default Doctor + Editor surface". After
+this change the default surface does POST to `/api/scriptide/fix`, which
+`tests/routes/route-capabilities.test.ts` lists among the routes that can reach
+an LLM. That sentence is therefore no longer literally true and is corrected
+here and in that test's header, in this precise form: **the default surface
+makes no call that can reach a model.** The distinction is the REQUEST SHAPE,
+not the route — a body carrying `candidateFountain` returns from the route's
+own early branch before `fix.ts` is even imported, so there is no code path
+from it to `generateContent`, and a counting provider spy in
+`tests/routes/scriptide-fix.test.ts` asserts the invocation count is zero (the
+guard fails when a model call is planted into that branch). The route also
+keeps the stricter `aiLimiter` rather than being relaxed to `gameLimiter`, so
+nothing about its budget posture loosened. What the landing page's keyless
+claim implies — that the default surface sends nothing to a model — is exactly
+as true as it was; what changed is that "reaches no model" is now a property of
+the request rather than of the URL, and the repository says so.
+
 So: **"Verify my rewrite" renders on the default surface, with Labs off and no
 key.** "Fix & verify" (generation) stays behind the flag exactly as decided,
 with the same hide-don't-disable behaviour and the same browser assertions in

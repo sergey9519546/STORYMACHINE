@@ -58,6 +58,26 @@ import {
 
 const REPO = process.cwd();
 
+// A 12-scene Final Draft export, used only to put ScriptDoctorPanel into an
+// FDX-SOURCED report state — the one state in which the panel's base text
+// (report.source.convertedFountain) and the browser's own copy of the upload
+// (raw XML) are different representations of the same script. Built here
+// rather than read from disk so the suite stays self-contained, and shaped
+// like a real export (XML prolog + <FinalDraft> root) because that is what
+// ScriptDoctorPanel's handleFileSelected sniffs on.
+const FDX_PROBE_XML = (() => {
+  const paras = [];
+  for (let i = 1; i <= 12; i++) {
+    paras.push(`  <Paragraph Type="Scene Heading"><Text>INT. ROOM ${i} - DAY</Text></Paragraph>`);
+    paras.push('  <Paragraph Type="Action"><Text>MARA crosses to the window and looks out at the rain for a long moment.</Text></Paragraph>');
+    paras.push('  <Paragraph Type="Character"><Text>MARA</Text></Paragraph>');
+    paras.push('  <Paragraph Type="Dialogue"><Text>We are running out of time, and everyone in this building knows it.</Text></Paragraph>');
+    paras.push('  <Paragraph Type="Character"><Text>IVO</Text></Paragraph>');
+    paras.push('  <Paragraph Type="Dialogue"><Text>Then we move tonight, before the shift changes over.</Text></Paragraph>');
+  }
+  return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n${paras.join('\n')}\n</Content>\n</FinalDraft>\n`;
+})();
+
 // Cmd on macOS, Ctrl elsewhere — same convention as
 // scripts/verify-e5-command-palette.mjs, which owns the palette's own proof.
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -843,6 +863,77 @@ async function main() {
       );
     }
   }
+
+
+  // ── The FDX hole, as a standing guard (review finding, 2026-09-04). The
+  // first version of "Verify my rewrite" took its candidate from the panel's
+  // ACTIVE text, which for a non-PDF upload is the file's own content — so an
+  // .fdx-sourced report sent raw Final Draft XML as `candidateFountain` and
+  // got back a full, confident receipt ("Health 64 → 0 · Cleared 120 ·
+  // Introduced 6") for a rewrite the writer never made. The base is the
+  // CONVERTED Fountain, so the two sides had no representation in common. The
+  // predicate is now "the candidate is the editor's own draft", which is why
+  // this asserts BOTH halves: the control is still visible (it explains
+  // itself rather than vanishing) and it is disabled, and nothing is POSTed.
+  // Source-level review missed this once already; only driving an upload
+  // catches it. ────────────────────────────────────────────────────────────
+  const fdxFixPosts = [];
+  const onFdxFixPost = (req) => {
+    if (req.method() === 'POST' && /\/api\/scriptide\/fix$/.test(req.url())) fdxFixPosts.push(req.url());
+  };
+  pageA.on('request', onFdxFixPost);
+  await pageA.setInputFiles('input[aria-label^="Upload script file"]', {
+    name: 'twelve-scenes.fdx',
+    mimeType: 'application/xml',
+    buffer: Buffer.from(FDX_PROBE_XML, 'utf8'),
+  });
+  const fdxRunBtn = pageA.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
+  await fdxRunBtn.waitFor({ state: 'visible', timeout: timing.ms(15000) });
+  await fdxRunBtn.click();
+  // Wait for the REPORT, not for a verdict word — "Running 14 passes…" contains
+  // "PASS". The Export button only renders once a real report is on screen.
+  const fdxReportRendered = await pageA
+    .getByRole('button', { name: 'Export coverage report as an HTML document', exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: timing.ms(60000) })
+    .then(() => true)
+    .catch(() => false);
+  record('P2-generative', 'an uploaded .fdx produces a complete report (the state the hole lived in)', fdxReportRendered);
+
+  if (fdxReportRendered) {
+    const fdxVerifyBtn = pageA.getByRole('button', { name: 'Verify my rewrite', exact: true }).first();
+    const fdxVerifyPresent = (await fdxVerifyBtn.count()) > 0;
+    const fdxVerifyEnabled = fdxVerifyPresent && (await fdxVerifyBtn.isEnabled().catch(() => false));
+    record(
+      'P2-generative',
+      'on an FDX-sourced report "Verify my rewrite" is WITHHELD (present, disabled) — the browser holds no Fountain rewrite to compare',
+      fdxVerifyPresent && !fdxVerifyEnabled,
+      `present=${fdxVerifyPresent} enabled=${fdxVerifyEnabled}`,
+    );
+
+    // The disabled state must explain itself and name the way back — the
+    // "Load converted Fountain into editor" control that is on this very
+    // screen. A withheld control with no reason is the failure mode this
+    // project's own hide-don't-disable rule exists to avoid.
+    const fdxReasonShown = await pageA.getByText(/Load converted Fountain into editor.*run the diagnosis again/i).count();
+    const loadConvertedPresent = await pageA
+      .getByRole('button', { name: 'Load the converted Fountain text into the script editor', exact: true })
+      .count();
+    record(
+      'P2-generative',
+      'the withheld state names the recovery path, and that control is actually on screen',
+      fdxReasonShown >= 1 && loadConvertedPresent >= 1,
+      `reason=${fdxReasonShown} loadConvertedButtons=${loadConvertedPresent}`,
+    );
+
+    record(
+      'P2-generative',
+      'no POST /api/scriptide/fix is attempted from the FDX state',
+      fdxFixPosts.length === 0,
+      `posts=${fdxFixPosts.length}`,
+    );
+  }
+  pageA.off('request', onFdxFixPost);
 
   await returnDoctorPanelToIdle(pageA);
   const deepReadCountOff = await pageA.getByText(/Deep read \(AI reads each scene/i).count();
