@@ -73,6 +73,54 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
     assert.match(panel, /onNavigateToFinding!\(span!\.startLine, span!\.endLine\)/);
   });
 
+  // B-9 (2026-09-05 mistake hunt): the bars were 21x40px at 375px (below
+  // WCAG 2.2 2.5.8's 24x24 CSS-px AA target-size minimum) and their full
+  // 163-char reading existed ONLY in `title` — unreachable on touch (no
+  // hover) and overridden by aria-label as the accessible name.
+  // ShapeRhythmSection's own function body, isolated so these assertions
+  // check ONLY this component's bars — a DIFFERENT, unrelated heatmap strip
+  // elsewhere in this file (the per-pass issue heatmap) legitimately keeps
+  // its own `min-w-[10px]` and is not part of this fix.
+  const shapeRhythmStart = panel.indexOf('function ShapeRhythmSection(');
+  const shapeRhythmEnd = panel.indexOf('function ShapeRhythmUnscored(');
+  const shapeRhythmFn =
+    shapeRhythmStart !== -1 && shapeRhythmEnd !== -1 ? panel.slice(shapeRhythmStart, shapeRhythmEnd) : '';
+
+  describe('B-9: scene bars meet the 24px target size and their reading is reachable off hover', () => {
+    it('ShapeRhythmSection was found (sanity check for the scoped regex above)', () => {
+      assert.ok(shapeRhythmFn.length > 0, 'ShapeRhythmSection function body must be extractable');
+    });
+
+    it('the bar\'s CSS class carries a 24px minimum width, not the old 10px floor', () => {
+      // The fix's own doc comment mentions the OLD `min-w-[10px]` value by
+      // name (historical context) — check the actual button className,
+      // not a bare substring search that would false-positive on that
+      // comment.
+      assert.match(shapeRhythmFn, /className=\{`flex-1 min-w-\[24px\][^`]*`\}/);
+    });
+
+    it('a bar is never `disabled` — a disabled element cannot receive focus or a click, and both are now how its reading reaches a touch or keyboard-only user', () => {
+      assert.ok(!shapeRhythmFn.includes('disabled={!clickable}'), 'the bar button must not be unconditionally disabled when not clickable');
+    });
+
+    it('a selected-scene detail line renders the SAME sentence as visible text, in a live region', () => {
+      assert.match(panel, /role="status"[\s\S]{0,40}aria-live="polite"[\s\S]{0,200}structuralSceneTooltip\(signals\.scenes\[selectedSceneIdx\]\)/);
+    });
+
+    it('the detail line renders on mount (scene 0), not only after an interaction', () => {
+      assert.match(panel, /useState<number>\(0\)/);
+    });
+
+    it('clicking OR focusing a bar updates which scene the detail line shows', () => {
+      assert.match(panel, /onClick=\{\(\) => \{\s*setSelectedSceneIdx\(scene\.sceneIdx\);/);
+      assert.match(panel, /onFocus=\{\(\) => setSelectedSceneIdx\(scene\.sceneIdx\)\}/);
+    });
+
+    it('the hover tooltip (title=) is unchanged, for mouse users', () => {
+      assert.match(panel, /title=\{structuralSceneTooltip\(scene\)\}/);
+    });
+  });
+
   it('the collapse state persists via localStorage, wrapped in try/catch (degrades, never throws)', () => {
     assert.match(panel, /SHAPE_RHYTHM_OPEN_KEY/);
     const loadFnMatch = panel.match(/function loadShapeRhythmOpenPref[\s\S]{0,300}?\n}/);

@@ -628,6 +628,15 @@ function ShapeRhythmSection({
   onNavigateToFinding?: (startLine: number, endLine: number) => void;
 }) {
   const [open, setOpen] = useState<boolean>(loadShapeRhythmOpenPref);
+  // B-9 fix (2026-09-05 mistake hunt): each bar's full 163-char reading used
+  // to exist ONLY in its `title` attribute — unreachable on touch (no
+  // hover) and overridden by `aria-label` as the screen-reader accessible
+  // name, so the data these bars encode could not be read at all on the
+  // exact viewport (375px) where the bars are smallest. Defaults to the
+  // first scene so there is something to read with zero interaction, not
+  // only after a click/focus a touch or keyboard-only user might not know
+  // to make.
+  const [selectedSceneIdx, setSelectedSceneIdx] = useState<number>(0);
 
   const toggle = () => {
     setOpen((prev) => {
@@ -717,22 +726,38 @@ function ShapeRhythmSection({
                 const talkPct = Math.max(0, Math.min(100, Math.round(scene.dialogueShare * 100)));
                 const span = sceneLineSpans?.[scene.sceneIdx];
                 const clickable = !!span && !!onNavigateToFinding;
+                const selected = selectedSceneIdx === scene.sceneIdx;
                 return (
                   <button
                     key={scene.sceneIdx}
                     type="button"
                     title={structuralSceneTooltip(scene)}
-                    disabled={!clickable}
-                    onClick={
-                      clickable ? () => onNavigateToFinding!(span!.startLine, span!.endLine) : undefined
-                    }
+                    // B-9 fix: never disabled, even when this scene has no
+                    // resolvable jump target — a disabled element cannot
+                    // receive focus OR a click, and both are now how this
+                    // bar's reading reaches a touch or keyboard-only user
+                    // (see selectedSceneIdx/onFocus below). Only the JUMP
+                    // half of the click handler is conditional on
+                    // `clickable`; selecting the bar to show its reading
+                    // never is.
+                    onClick={() => {
+                      setSelectedSceneIdx(scene.sceneIdx);
+                      if (clickable) onNavigateToFinding!(span!.startLine, span!.endLine);
+                    }}
+                    onFocus={() => setSelectedSceneIdx(scene.sceneIdx)}
                     aria-label={`Scene ${scene.sceneIdx + 1}: ${scene.slug}${
                       clickable ? " — jump to this scene" : ""
                     }`}
-                    className={`flex-1 min-w-[10px] h-10 flex flex-col justify-end border border-black/20 dark:border-white/20 bg-gray-100 dark:bg-zinc-800 ${
-                      clickable
-                        ? "cursor-pointer hover:ring-2 hover:ring-black/40 dark:hover:ring-white/40"
-                        : "cursor-default"
+                    aria-pressed={selected}
+                    // B-9 fix: 24px minimum CSS-px width (WCAG 2.2 2.5.8's AA
+                    // target-size minimum) — was `min-w-[10px]`, which on a
+                    // feature-length draft (60+ scenes) hit that floor,
+                    // measuring 21×40px at 375px. The strip's existing
+                    // `overflow-x-auto` (unchanged) absorbs the extra width
+                    // by scrolling, exactly as it already does for scene
+                    // counts that overflow the panel.
+                    className={`flex-1 min-w-[24px] h-10 flex flex-col justify-end border bg-gray-100 dark:bg-zinc-800 cursor-pointer hover:ring-2 hover:ring-black/40 dark:hover:ring-white/40 ${
+                      selected ? "border-black dark:border-white border-2" : "border-black/20 dark:border-white/20"
                     }`}
                   >
                     <div
@@ -750,6 +775,24 @@ function ShapeRhythmSection({
               <span>Scene 1</span>
               <span>Scene {signals.scenes.length}</span>
             </div>
+            {/* B-9 fix (2026-09-05 mistake hunt): the selected bar's full
+                reading, as VISIBLE TEXT in a live region — reachable on
+                touch (no hover needed) and announced to screen readers on
+                change (aria-live="polite"), matching exactly the sentence
+                `title` above carries for mouse users (structuralSceneTooltip
+                is the single shared string builder — both call sites read
+                the same function, so they cannot drift). The tooltip stays,
+                for mouse users who prefer hover; this is the reachable path
+                for everyone else. */}
+            {signals.scenes[selectedSceneIdx] && (
+              <p
+                role="status"
+                aria-live="polite"
+                className="mt-1.5 text-[10px] font-mono text-[var(--sm-ink-mute)] leading-snug"
+              >
+                {structuralSceneTooltip(signals.scenes[selectedSceneIdx])}
+              </p>
+            )}
           </div>
 
           {/* Document aggregates — the two channels docs/scoring/
