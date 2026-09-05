@@ -74,8 +74,21 @@ import { logger } from './logger.ts';
 // `/` when baseUrl already supplies the full path; every other shape
 // (`req.path` empty, or a real sub-path like `/does-not-exist.js`) is
 // unchanged.
-function loggedPath(req: { baseUrl: string; path: string }): string {
-  return req.path === '/' && req.baseUrl ? req.baseUrl : req.baseUrl + req.path;
+//
+// 2026-09-05 review (second pass, pre-existing). In dev mode, a request
+// whose error is raised before Express ever enters a mounted router (e.g.
+// `GET /%zz`'s malformed-percent-encoding URIError, thrown during the very
+// first route-matching attempt at the top level) reaches this middleware's
+// `res.on('finish')` with `req.baseUrl` still `undefined`, not `''` — the
+// two are NOT the same value here despite both meaning "no mount prefix":
+// string concatenation coerces `undefined` to the four-character literal
+// `"undefined"`, so the plain `req.baseUrl + req.path` expression logged
+// `"undefined/%zz"` — a real path that never existed, not the pathname
+// Express actually parsed. Fixed by normalizing a nullish baseUrl to `''`
+// before either branch runs.
+function loggedPath(req: { baseUrl?: string; path: string }): string {
+  const baseUrl = req.baseUrl ?? '';
+  return req.path === '/' && baseUrl ? baseUrl : baseUrl + req.path;
 }
 
 export function requestLogger(): import('express').RequestHandler {

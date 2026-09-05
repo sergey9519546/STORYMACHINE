@@ -100,6 +100,7 @@ import {
   FREQUENT_CUE_OCCURRENCE_THRESHOLD,
   MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES,
   MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT,
+  MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
 import { normalizeScreenplay } from '../../server/nvm/analyze/screenplay-normalizer.ts';
@@ -784,6 +785,66 @@ describe('A3: boneyard-aware cue counting', () => {
     const reason = fountainShapeRejectionReason(text);
     assert.ok(reason);
     assert.match(reason!, /MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES/);
+  });
+
+  // 2026-09-05 review, second pass ("A1 invariant inside a boneyard").
+  // normalizeScreenplay has NO boneyard awareness at all — it does not know
+  // `/* … */` exists — so a double-spaced-shaped payload wrapped in a
+  // boneyard reflows exactly like the unwrapped A1 shape: the boneyard
+  // delimiter lines get swept into ordinary action/dialogue text by the
+  // reflow, same as any other non-cue line, and the wrapped cues still
+  // become real `character` blocks. The distinct/weight pair above sat
+  // under both bounds for this shape (low distinct, high per-line
+  // occurrence — the exact corner MAX_FOUNTAIN_FREQUENT_CUE_LINES exists to
+  // close on the real-script path), so this needed the SAME third bound
+  // mirrored onto the boneyard branch.
+  // The boneyard-wrapped A1 payload needs one more ingredient than "wrap the
+  // A1 shape in /* … */": normalizeScreenplay's reflow only destroys the
+  // `/*` marker's line-leading position when it lands INSIDE an
+  // already-open dialogue buffer (mode==='dialogue' with pending text) —
+  // the plain-text branch then does `buf[last] += ' ' + t`, merging `/*`
+  // onto the END of the preceding dialogue line rather than emitting it as
+  // its own line. A `/*` that opens right after a scene heading (mode
+  // 'action', empty buffer) gets flushed as its own standalone line instead
+  // — parseFountain then correctly recognizes it and boneyards the rest,
+  // no bypass. `buildBoneyardWrappedA1` below opens the boneyard right
+  // after an ordinary cue+dialogue pair (mode already 'dialogue', buffer
+  // non-empty) to reproduce the merge.
+  function buildBoneyardWrappedA1(distinct: number, occurrences: number): string {
+    const capsLine = 'THIS IS AN ALL CAPITALS SPEECH LINE OF SUBSTANTIAL LENGTH INDEED';
+    const p: string[] = ['INT. ROOM - DAY', '', 'SETUP', '', 'Some setup dialogue line here.', '', '/*'];
+    for (let k = 0; k < occurrences; k++) p.push(`PERSON${k % distinct}`, '', capsLine, '');
+    p.push('*/');
+    return p.join('\n');
+  }
+
+  it('sanity: the boneyard-wrapped A1 payload still reflows to real character blocks (normalizeScreenplay has no boneyard awareness, and merges the `/*` marker onto the preceding dialogue line)', () => {
+    const text = buildBoneyardWrappedA1(200, 6000);
+    const normalized = normalizeScreenplay(text);
+    assert.notEqual(normalized, text, 'sanity: the payload must actually trigger the double-spaced reflow');
+    assert.ok(!normalized.split('\n').some((l) => l.trim() === '/*'), 'the `/*` marker must be merged onto the preceding line, not standing alone (that IS the mechanism this bypass exploits)');
+    const blocks = parseFountain(normalized);
+    const characterBlocks = blocks.filter((b) => b.type === 'character').length;
+    assert.ok(characterBlocks > 5000, `expected the boneyard-wrapped payload to reflow to thousands of real character blocks, got ${characterBlocks}`);
+  });
+
+  it('the boneyard-wrapped A1 payload (distinct=200, occurrences=6,000) IS rejected via the boneyard frequent-cue-line bound', () => {
+    const text = buildBoneyardWrappedA1(200, 6000);
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the boneyard-wrapped A1 payload to be rejected');
+    assert.match(reason!, /MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES/);
+    assert.ok(ms < 100, `expected a fast rejection (well under 100ms), took ${ms}ms`);
+  });
+
+  it('a boneyard frequent-line-bound corner (49 distinct lines each occurring 20 times, under the distinct and weight caps) is NOT rejected', () => {
+    const p: string[] = ['INT. ROOM - DAY', '', '/*'];
+    for (let occ = 0; occ < 20; occ++) {
+      for (let d = 0; d < MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES - 1; d++) p.push(`PERSON${d}`, 'ordinary dialogue line here.', '');
+    }
+    p.push('*/');
+    assert.equal(fountainShapeRejectionReason(p.join('\n')), null);
   });
 
   it('a legitimate small real cast outside a boneyard is not affected by a large legitimate boneyard nearby', () => {

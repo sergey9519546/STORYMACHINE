@@ -460,8 +460,26 @@ export const MAX_FOUNTAIN_FREQUENT_CUE_LINES = 50;
 // reject a legitimate commented-out cast list" fixture in
 // tests/security/fountain-shape-guard-cue-parity.test.ts) while the measured
 // cost shape does not.
+// 2026-09-05 review (second pass, "A1 invariant inside a boneyard"): the
+// distinct/weight pair above is the SAME shape as the two bounds that were
+// already proven, on the real-script path, to be insufficient alone
+// (round 3/4's own history) -- the low-distinct/high-occurrence corner
+// (MAX_FOUNTAIN_FREQUENT_CUE_LINES exists specifically to close it) applies
+// to boneyard content too. normalizeScreenplay has NO boneyard awareness at
+// all -- it is not merely "conservative" inside a boneyard, it does not know
+// one exists -- so a double-spaced-shaped payload wrapped in /* ... */
+// reflows exactly like the unwrapped A1 shape (the boneyard delimiter lines
+// get swept into ordinary action/dialogue text by the reflow, same as any
+// other non-cue line), producing real character blocks despite looking
+// boneyard-safe to this guard. Measured: a boneyard-wrapped A1 payload sat
+// under both bounds below (low distinct, high per-line occurrence) and
+// reflowed to 6,002 real character blocks -- not exploitable today (well
+// inside legal-request cost at these payload sizes), but the same missing
+// third bound that made the real-script pair insufficient makes this pair
+// insufficient too, for the identical reason.
 export const MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES = 1_500;
 export const MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT = 10_000_000;
+export const MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES = 50;
 // Bounded quantifier on a single character class — not nested/overlapping
 // quantifiers, so this cannot itself become a catastrophic-backtracking
 // pattern regardless of input length.
@@ -540,6 +558,7 @@ export function fountainShapeRejectionReason(text: string): string | null {
   let inBoneyard = false;
   const boneyardCueLineCounts = new Map<string, number>();
   let boneyardCueOccurrences = 0;
+  let boneyardFrequentCueLineCount = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!.trim();
     if (line.length === 0) continue;
@@ -559,6 +578,16 @@ export function fountainShapeRejectionReason(text: string): string | null {
         }
         if (boneyardCueLineCounts.size * boneyardCueOccurrences > MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT) {
           return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines × total occurrences of one) inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT`;
+        }
+        // Third bound, mirroring MAX_FOUNTAIN_FREQUENT_CUE_LINES on the
+        // real-script path above — see MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES's
+        // own comment (2026-09-05 review, "A1 invariant inside a boneyard")
+        // for why the distinct/weight pair alone is insufficient here too.
+        if (boneyardOccurrencesOfThisLine === FREQUENT_CUE_OCCURRENCE_THRESHOLD + 1) {
+          boneyardFrequentCueLineCount++;
+          if (boneyardFrequentCueLineCount > MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES) {
+            return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES`;
+          }
         }
       }
       if (line.includes('*/') && !(line.startsWith('/*') && !line.includes('*/'))) {

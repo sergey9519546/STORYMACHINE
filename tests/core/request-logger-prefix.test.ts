@@ -173,6 +173,55 @@ describe('requestLogger — a bare mount root does not log an invented trailing 
   });
 });
 
+// 2026-09-05 review (second pass, pre-existing finding). In dev mode, an
+// error raised before Express's own router has assigned req.baseUrl a
+// string value (observed for GET /%zz's malformed-percent-encoding
+// URIError, thrown during route matching) reaches this middleware's
+// `res.on('finish')` with req.baseUrl still `undefined`, not `''` — string
+// concatenation coerces that to the literal 4-character text "undefined",
+// so the plain `req.baseUrl + req.path` expression logged
+// `"undefined/%zz"`, a path that never existed. This test forces the exact
+// condition directly (a downstream middleware clears req.baseUrl before the
+// response finishes) rather than depending on which internal Express code
+// path leaves it unset, since `res.on('finish')` reads req.baseUrl at
+// FINISH time, whatever a later handler left it as.
+describe('requestLogger — an undefined req.baseUrl never becomes the literal string "undefined" (pre-existing, second review pass)', () => {
+  it('logs the bare path, not "undefined" + path, when req.baseUrl is undefined at response-finish time', async () => {
+    const app = express();
+    app.use(requestLogger());
+    app.use((req, res, _next) => {
+      // Simulates the real trigger: an error path that runs before any
+      // Express layer has assigned req.baseUrl a string ('' or a mount
+      // prefix) — deleting it here reproduces exactly what
+      // res.on('finish') then observes, regardless of which internal
+      // Express code path leaves it that way in practice.
+      delete (req as { baseUrl?: string }).baseUrl;
+      res.status(400).json({ error: 'Malformed request' });
+    });
+
+    const server = await new Promise<import('http').Server>((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const { port } = server.address() as AddressInfo;
+
+    try {
+      const lines = await withCapturedStdout(async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/%zz`);
+        assert.equal(res.status, 400);
+      });
+
+      const requests = requestLogLines(lines);
+      assert.equal(requests.length, 1, `expected exactly one request log line, got: ${lines.join('\n')}`);
+      assert.equal(requests[0]!.path, '/%zz', 'must log the bare path, never "undefined" prefixed onto it');
+      assert.ok(!String(requests[0]!.path).includes('undefined'), `logged path must never contain the literal text "undefined", got: ${requests[0]!.path}`);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
+  });
+});
+
 describe('requestLogger — proved against the live app.ts /api 404 guard', () => {
   it('GET /api/definitely-not-a-route logs path "/api/definitely-not-a-route", not "/definitely-not-a-route"', async () => {
     process.env.SESSION_DB_DIR = ':memory:';
