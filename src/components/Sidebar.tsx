@@ -154,11 +154,21 @@ function LongTextField({
           // this field's whole surface (the panel it sits in, the textarea
           // above) is theme-invariant — so `dark:text-red-400`/`dark:text-
           // yellow-400` were an orphaned themed half with no dark ambient
-          // to ever pair with. Dropped; the light-mode colour is already
-          // what renders in both themes.
+          // to ever pair with. Dropped.
+          //
+          // a11y fix (2026-09-05, round 4 — independent review round 3,
+          // BLOCKING item 1): dropping the `dark:` half fixed the
+          // CONVENTION but not the CONTRAST — `text-red-500`/`text-
+          // yellow-600` alone measured 3.32:1 / 2.56:1 on `--sm-panel`,
+          // both under 4.5:1 at 9px, in BOTH themes (identical, since the
+          // surface is now invariant). `text-red-700`/`text-amber-800`
+          // clear it (5.59:1 / 6.17:1, measured on the same `--sm-panel`
+          // background — see the round-4 report). `text-amber-800` is the
+          // same token round 1 already uses for SlatePanel's "solid"
+          // health band, so this adds no new colour to the system.
           className={cn(
             "text-[9px] font-mono text-right mt-0.5",
-            count >= LONG_FIELD_MAX ? "text-red-500" : "text-yellow-600"
+            count >= LONG_FIELD_MAX ? "text-red-700" : "text-amber-800"
           )}
         >
           {count}/{LONG_FIELD_MAX}

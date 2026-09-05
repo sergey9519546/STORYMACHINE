@@ -78,9 +78,15 @@ export function StateDeltaCard({ card, onConfirm, onEdit, onReject, disabled }: 
         // reverse rule): this file carries no `dark:bg-*` anywhere — this
         // card's whole surface is theme-invariant (`--sm-panel-2` cards
         // throughout) — so `dark:text-amber-300` was an orphaned themed
-        // half with nothing dark to pair against. Dropped; `text-amber-700`
-        // alone is what already renders in both themes.
-        <div className="text-[11px] bg-amber-500/10 text-amber-700 p-2 border border-amber-500/30 rounded flex items-center gap-2">
+        // half with nothing dark to pair against. Dropped.
+        //
+        // a11y fix (2026-09-05, round 4 — independent review round 3,
+        // BLOCKING item 1): `text-amber-700` alone measured 4.08:1 on this
+        // element's own `bg-amber-500/10` tint, still under 4.5:1, in both
+        // themes (the tint never changes either). `text-amber-800` clears
+        // it (5.75:1 on the same tint) — the same token round 1 already
+        // uses for SlatePanel's "solid" health band.
+        <div className="text-[11px] bg-amber-500/10 text-amber-800 p-2 border border-amber-500/30 rounded flex items-center gap-2">
           <span className="font-bold">🎭 Dramatic Irony:</span> Audience holds secret state unknown to in-scene characters.
         </div>
       )}

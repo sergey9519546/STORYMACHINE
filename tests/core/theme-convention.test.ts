@@ -243,7 +243,21 @@ type TextMode = 'inherit' | 'safe' | 'invariant' | 'themed';
 // and not a partial match inside those `--suffix` variants) is anchored on
 // both sides so it can't fire inside an unrelated class.
 const SMBTN_FAMILY_RE = /(^|[\s"'`{])sm-btn(--ink|--stamp)?(?=[\s"'`}]|$)/;
-const DARK_BG_TOKEN_SRC = '(^|[\\s"\'`{])dark:bg-[\\w.\\[\\]#()-]+(\\/\\d{1,3})?';
+// Round 4 (independent review round 3, item 3): `dark:bg-[var(--sm-panel)]`
+// / `dark:bg-[var(--sm-panel-2)]` PAINT LIGHT (both are the design system's
+// invariant light panel tokens — design-system.css:49-50) even though the
+// token starts with `dark:bg-`. The base pattern below would otherwise
+// classify them as a dark background, propagating `bg: 'dark'` into a
+// subtree that is actually rendered on a light surface — the exact
+// opposite of what the class paints. The negative lookahead excludes them
+// from EITHER dark-bg regex entirely (solid or fractional); such a token
+// then falls through to `ANY_BG_RE` / `hasOwnSolidBg` like any other
+// non-dark background declaration — see INVARIANT_BG_VAR_RE's own fixture
+// proof below. Live shape: ScriptIDE.tsx:3035's
+// `bg-black dark:bg-[var(--sm-panel)]` (reserved, carries no text, so this
+// was a latent false-positive shape rather than a live one — but a
+// scanner whose value is not crying wolf should not carry it forward).
+const DARK_BG_TOKEN_SRC = '(^|[\\s"\'`{])dark:bg-(?!\\[var\\(--sm-panel)[\\w.\\[\\]#()-]+(\\/\\d{1,3})?';
 const ANY_BG_RE = /(^|[\s"'`{])bg-[\w./\[\]#%()-]+/;
 const TEXT_TOKEN_RE = /(^|[\s"'`{])(dark:)?text-(\[[^\]]*\]|[\w./%-]+)/g;
 
@@ -266,11 +280,33 @@ function classifyTextBody(body: string): 'size' | 'invariant-ink' | 'color' {
   return 'color';
 }
 
-/** A solid `dark:bg-*` token (no fractional-opacity suffix) — see this
- *  file's header for why fractional opacity is excluded. */
+// Round 4 (independent review round 3, item 2): the fractional-opacity
+// carve-out (see hasFractionalDarkBg below) was previously unbounded in
+// alpha — ANY `dark:bg-*/N` fell through to `inherit`, so a future
+// `dark:bg-zinc-900/95` (effectively opaque) would have been wrongly
+// exempted from the forward rule. 60 is the threshold: at or above it, a
+// dark tint is confidently dark regardless of what's behind it (verified
+// against every fractional dark:bg-* actually in `src` today — all are
+// /10, /20, or /40, all safely below this line, so nothing live crosses
+// it; see the fixture proof below for both directions). Below 60, the
+// composited result depends too much on the ambient to call it — that
+// stays `inherit`, per hasFractionalDarkBg's own reasoning.
+const FRACTIONAL_DARK_BG_SOLID_THRESHOLD = 60;
+
+/** A `dark:bg-[var(--sm-panel)]` / `dark:bg-[var(--sm-panel-2)]` token —
+ *  see DARK_BG_TOKEN_SRC's comment for why these are excluded from the
+ *  dark-bg regexes despite the `dark:bg-` prefix: they paint the
+ *  invariant LIGHT panel, not a dark surface. */
+const INVARIANT_BG_VAR_RE = /(^|[\s"'`{])dark:bg-\[var\(--sm-panel(-2)?\)\](?=[\s"'`}]|$)/;
+
+/** A confidently dark `dark:bg-*` token: no opacity suffix at all, or one
+ *  at/above FRACTIONAL_DARK_BG_SOLID_THRESHOLD — see this file's header
+ *  for why fractional opacity below that line is excluded. */
 function hasSolidDarkBg(raw: string): boolean {
   for (const m of raw.matchAll(new RegExp(DARK_BG_TOKEN_SRC, 'g'))) {
-    if (!m[2]) return true;
+    if (!m[2]) return true; // no opacity suffix — fully solid
+    const alpha = Number.parseInt(m[2].slice(1), 10); // strip the leading "/"
+    if (alpha >= FRACTIONAL_DARK_BG_SOLID_THRESHOLD) return true;
   }
   return false;
 }
@@ -342,7 +378,7 @@ function classify(
   // real fractional-tint cards, this file's other fractional-opacity proof
   // fixture, unaffected by this change).
   const hasFractionalDarkBg = hasAnyDarkBgToken(raw) && !hasDarkBg;
-  const hasOwnSolidBg = hasDarkBg || ANY_BG_RE.test(raw) || isSmBtnFamily;
+  const hasOwnSolidBg = hasDarkBg || ANY_BG_RE.test(raw) || isSmBtnFamily || INVARIANT_BG_VAR_RE.test(raw);
 
   let hasAnyTextColor = false;
   let hasDarkTextColor = false;
@@ -584,6 +620,60 @@ describe('theme-convention scanner — proof it can actually fail (LANE_STANDARD
     assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
   });
 
+  // ── Bounded fractional-opacity threshold (round 4, independent review
+  //    round 3, item 2): a HIGH-alpha "fractional" dark:bg (/60 and above)
+  //    is confidently dark, not ambiguous — see
+  //    FRACTIONAL_DARK_BG_SOLID_THRESHOLD's comment. ─────────────────────
+
+  it('a HIGH-opacity dark:bg-*/95 (effectively opaque) IS caught by the forward rule, unlike a genuinely low-opacity one', () => {
+    const fixture = [
+      '<div className="bg-white dark:bg-zinc-900/95 p-4">',
+      '  <span className="text-[var(--sm-ink)]">{"caught"}</span>',
+      '</div>',
+    ].join('\n');
+    const violations = findThemeConventionViolations(fixture, 'fixture.tsx');
+    assert.equal(violations.length, 1);
+  });
+
+  it('a LOW-opacity dark:bg-*/40 (below the threshold) is still NOT confidently dark — the AnalysisPanel/alert-box shape stays exempt', () => {
+    const fixture = [
+      '<div className="bg-white dark:bg-zinc-900/40 p-4">',
+      '  <span className="text-[var(--sm-ink)]">{"not caught"}</span>',
+      '</div>',
+    ].join('\n');
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  // ── dark:bg-[var(--sm-panel*)] is LIGHT, not dark (round 4, independent
+  //    review round 3, item 3) ─────────────────────────────────────────
+
+  it('does NOT treat dark:bg-[var(--sm-panel)] as a dark background — it paints the invariant light panel', () => {
+    // Live shape: ScriptIDE.tsx's `bg-black dark:bg-[var(--sm-panel)]` — in
+    // .dark this token actually SWITCHES this element to the light panel
+    // colour. Before this fix, the naive token regex classified it as
+    // 'dark', which would have propagated a wrong `bg: 'dark'` into any
+    // text this element or its descendants carry.
+    const fixture = '<div className="bg-black dark:bg-[var(--sm-panel)] p-4"><span className="text-[var(--sm-ink)]">{"fine"}</span></div>';
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  it('does NOT treat dark:bg-[var(--sm-panel-2)] as a dark background either', () => {
+    const fixture = '<div className="bg-black dark:bg-[var(--sm-panel-2)] p-4"><span className="text-[var(--sm-ink)]">{"fine"}</span></div>';
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  it('a REAL dark:bg-zinc-* still IS caught even when it sits next to an unrelated dark:bg-[var(--sm-panel)] token', () => {
+    // Guards against an over-broad exclusion swallowing genuine dark
+    // tokens elsewhere in the same className.
+    const fixture = [
+      '<div className="dark:bg-[var(--sm-panel)] dark:bg-zinc-900 p-4">',
+      '  <span className="text-[var(--sm-ink)]">{"caught"}</span>',
+      '</div>',
+    ].join('\n');
+    const violations = findThemeConventionViolations(fixture, 'fixture.tsx');
+    assert.equal(violations.length, 1);
+  });
+
   // ── REVERSE rule (round 3, independent review round 2, item 1) ──────────
 
   it('REVERSE: flags an invariant background whose descendant text carries an orphaned dark:text-* — this round\'s own regression', () => {
@@ -742,48 +832,50 @@ describe('theme-convention scanner — the actual regression gate over src/compo
     );
   });
 
-  it('the reserved ScriptDoctorPanel.tsx exclusion is a pinned LOWER BOUND, not a claimed total count', () => {
-    // Round 3 (independent review round 2, item 2): this was originally
-    // `assert.equal(violations.length, 36)` (the forward rule only). Given
-    // the disclosed third scope limit (composition across function/
-    // component boundaries is not walked — this file's header), that
-    // number was already only what THIS walk could see in a 5,000+ line
-    // file full of extracted sub-components, never a claimed total — a
-    // component-boundary-aware walk could find more. Adding the REVERSE
-    // rule this same round raised it further, for real: hand-checked, the
-    // new hits are genuine orphaned `dark:text-*` pairs in this file too
-    // (e.g. `:807`'s `text-gray-600 dark:text-gray-300` on an invariant
-    // ancestor), the same shape as the ones this round fixed in
-    // Sidebar.tsx and StateDeltaCard.tsx — not a scanner false-positive
-    // regression. Re-pinned at the new measured floor. `assert.ok(>= N)`
-    // still catches a REGRESSION (a fix there dropping the count, or this
-    // scanner's own logic drifting) without asserting a completeness this
-    // walk cannot back up — it fails loudly if the count ever drops below
-    // what was last confirmed, and a human should look at (not silently
-    // re-pin) a count that goes UP, since it could be this walk finding
-    // more real bugs OR a false-positive regression in the walk itself.
+  it('the reserved ScriptDoctorPanel.tsx exclusion is a pinned, exact MEASURED FLOOR — re-pin by hand', () => {
+    // Round 4 (independent review round 3, item 4): round 3 loosened this
+    // to `assert.ok(violations.length >= 65)`, reasoning that the
+    // detector's own third scope limit (composition across function/
+    // component boundaries — this file's header) means the true count
+    // could always be higher, so asserting a specific total would claim a
+    // completeness this walk cannot back up. That reasoning is right about
+    // the NUMBER but wrong about the OPERATOR: `>=` catches a fix in this
+    // file dropping the count (confirmed by construction: 65 -> 0 fails),
+    // but it lets a NEW violation added to this reserved file — by the
+    // concurrently-running lane that owns it — pass silently, which is
+    // exactly the case that matters most while that lane is actively
+    // editing it. `assert.equal` keeps the same honesty (the comment says
+    // plainly this is a measured floor on what THIS walk sees today, not a
+    // claim about the file's true violation count) while restoring BOTH
+    // directions of the signal: re-run this walk and update the number by
+    // hand — never loosen back to `>=` — if a legitimate change to that
+    // file moves the count either way.
     const file = join(COMPONENTS_DIR, 'scriptide', 'ScriptDoctorPanel.tsx');
     const source = readFileSync(file, 'utf8');
     const violations = findThemeConventionViolations(source, relative(REPO_ROOT, file));
-    assert.ok(
-      violations.length >= 65,
-      `expected at least 65 (previously confirmed, forward + reverse) violations in the reserved file, found ${violations.length} — `
-      + 'if this DROPPED, something in that file or this scanner regressed; if it ROSE, check by hand before re-pinning',
+    assert.equal(
+      violations.length,
+      65,
+      `measured floor: this walk saw exactly 65 forward+reverse violations in the reserved file last time it was `
+      + `hand-checked; found ${violations.length} now — re-measure by hand and re-pin, do not loosen this back to >=`,
     );
   });
 
-  it('the reserved ScriptIDE.tsx exclusion is also a pinned lower bound', () => {
+  it('the reserved ScriptIDE.tsx exclusion is also a pinned, exact measured floor', () => {
     // Round 3: ScriptIDE.tsx joined RESERVED_FILES this round because the
     // new reverse rule found one real, live bug there (renderTitlePage's
     // `bg-[var(--sm-panel)] dark:text-white` — see RESERVED_FILES's own
-    // comment above). Same lower-bound shape as ScriptDoctorPanel.tsx's
-    // test above, for the same reason.
+    // comment above; still 1.15:1 in dark mode, still not fixed here,
+    // another lane owns this file). Round 4: same exact-floor treatment as
+    // ScriptDoctorPanel.tsx's test above, for the same reason.
     const file = join(COMPONENTS_DIR, 'ScriptIDE.tsx');
     const source = readFileSync(file, 'utf8');
     const violations = findThemeConventionViolations(source, relative(REPO_ROOT, file));
-    assert.ok(
-      violations.length >= 1,
-      `expected at least 1 (previously confirmed) violation in the reserved file, found ${violations.length}`,
+    assert.equal(
+      violations.length,
+      1,
+      `measured floor: this walk saw exactly 1 violation in the reserved file last time it was hand-checked; `
+      + `found ${violations.length} now — re-measure by hand and re-pin, do not loosen this back to >=`,
     );
   });
 });
