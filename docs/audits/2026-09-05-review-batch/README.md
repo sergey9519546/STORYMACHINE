@@ -84,5 +84,7 @@ lane is fully contained in that lane's own merge commit(s) below, which
 A future review batch that wants per-round commits to stay independently
 resolvable should tag them (`git tag audit/<date>/<lane>-round<N> <sha>` and
 push the tag) before rebasing the lane's working branch away — this batch
-did not, so its intermediate rounds are traceable only through the prose in
-each review file, not through `git show`.
+did not, so the 21 unreachable rounds listed above are traceable only through
+the prose in each review file, not through `git show`; the three reachable
+exceptions and the content-identical twin noted above remain addressable.
+`docs/LANE_STANDARD.md` §6 now requires the tag.
