@@ -1260,6 +1260,58 @@ async function main() {
   record('P2', 'Toolbar overflow: "Slate compare" APPEARS with Labs ON', hasSlateOn, `items=${JSON.stringify(overflowLabelsOn)}`);
   record('P2', 'Toolbar overflow: "Open Simulate" APPEARS with Labs ON', hasSimulateOn, `items=${JSON.stringify(overflowLabelsOn)}`);
 
+  // 2026-09-05 (owner-rule follow-up) — SlatePanel's Percentile column used
+  // to state its "20-sample, hand-authored synthetic reference set"
+  // denominator ONLY in a title= tooltip. Drive the panel end to end (open
+  // it, add two tiny scripts, rank) and assert the shared
+  // slatePercentileCaption() (src/lib/percentile-copy.ts) now renders as
+  // VISIBLE text, not just a tooltip.
+  if (hasSlateOn) {
+    await pageB.getByRole('button', { name: 'More tools' }).first().click();
+    const overflowMenu = pageB.getByRole('menu').first();
+    await overflowMenu.waitFor({ timeout: timing.ms(5000) });
+    await overflowMenu.getByRole('menuitem', { name: /slate/i }).first().click();
+
+    const slateDialog = pageB.getByRole('dialog', { name: /slate/i }).first();
+    const slateDialogVisible = await slateDialog.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+
+    let slateCaptionVisible = false;
+    if (slateDialogVisible) {
+      const fileInput = pageB.getByLabel('Add scripts to the slate (.fountain or .txt)', { exact: true });
+      await fileInput.setInputFiles([
+        { name: 'script-a.fountain', mimeType: 'text/plain', buffer: Buffer.from('INT. ROOM - DAY\n\nA person waits.\n\nBOB\nHello.\n') },
+        { name: 'script-b.fountain', mimeType: 'text/plain', buffer: Buffer.from('INT. OFFICE - NIGHT\n\nA desk. A phone rings.\n\nALICE\nHi.\n') },
+      ]);
+      // handleFilesSelected reads each File asynchronously (file.text()) before
+      // setFiles runs, so the "Rank slate" button stays disabled for a beat
+      // after setInputFiles resolves — wait for the file-count heading to show
+      // both accepted files rather than racing the button's enabled state.
+      await pageB.getByText('Scripts (2/20)', { exact: true }).first().waitFor({ timeout: timing.ms(10000) });
+      const rankBtn = slateDialog.getByRole('button', { name: 'Rank slate', exact: true }).first();
+      await rankBtn.waitFor({ state: 'visible', timeout: timing.ms(5000) });
+      await rankBtn.click();
+      slateCaptionVisible = await slateDialog
+        .getByText(/Percentile ranks each script's health against a 20-sample, hand-authored synthetic reference set/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: timing.ms(20000) })
+        .then(() => true)
+        .catch(() => false);
+      // Close via the panel's own visible "X" button rather than Escape —
+      // measured live: the drawer stayed mounted and kept intercepting
+      // pointer events for the section below (the "Ship" click) even after
+      // pressing Escape and waiting for a hidden state, so the explicit
+      // close control is the reliable path.
+      await pageB.getByRole('button', { name: 'Close Slate panel', exact: true }).first().click();
+      await slateDialog.waitFor({ state: 'hidden', timeout: timing.ms(10000) }).catch(() => {});
+    }
+    record(
+      'P2-slate',
+      'SlatePanel renders the Percentile column\'s denominator as visible caption text (not tooltip-only) after ranking',
+      slateCaptionVisible,
+      slateCaptionVisible ? '' : (slateDialogVisible ? 'caption text not found after ranking' : 'Slate panel dialog did not open'),
+    );
+  }
+
   // Decision #3, mirrored: the generative controls must come BACK with Labs
   // ON. This is the half that proves the change is a gate and not a deletion.
   const hasAutoAnalysisOn = overflowLabelsOn.some((l) => /auto-analysis/i.test(l));
@@ -1513,6 +1565,14 @@ async function main() {
       && /Talk\/action swing/i.test(postScoreText)
       && /Action-prose variation/i.test(postScoreText);
     record('P2-whatif', 'The two structural aggregates carry the Shape & Rhythm "descriptive, not part of the score" labelling', descriptiveLabelShown, descriptiveLabelShown ? '' : 'aggregate labels missing from the scored dialog');
+
+    // 2026-09-05 (owner-rule follow-up) — the What-If Lab used to be the one
+    // scored surface with no percentile reading at all. DoctorReadout now
+    // renders it beside health via the SAME shared compactPercentileNote()
+    // every other surface uses (src/lib/percentile-copy.ts), so this must
+    // appear in the scored dialog's text alongside the verdict.
+    const whatIfPercentileShown = /hand-authored synthetic reference set/i.test(postScoreText);
+    record('P2-whatif', 'A scored branch shows its health percentile beside health, via the shared compactPercentileNote()', whatIfPercentileShown, whatIfPercentileShown ? '' : 'no "hand-authored synthetic reference set" text found in the scored dialog');
 
     deltaShown = /vs base/.test(postScoreText);
     record('P2-whatif', 'A scored branch shows its health delta against the base draft', deltaShown, deltaShown ? '' : 'no "vs base" delta rendered');

@@ -22,7 +22,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap.ts";
-import { percentileBand, exactRankTooltip } from "../lib/percentile-copy.ts";
+import {
+  percentileBand, exactRankTooltip, percentileColumnHeaderTooltip, slatePercentileCaption,
+} from "../lib/percentile-copy.ts";
 import {
   Layers3,
   X,
@@ -228,9 +230,9 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
 
   const combinedChars = files.reduce((sum, f) => sum + f.chars, 0);
 
-  const handleFilesSelected = async (fileList: FileList) => {
+  const handleFilesSelected = async (fileList: File[]) => {
     setFileError(null);
-    const incoming = Array.from(fileList);
+    const incoming = fileList;
     const accepted: SlateFile[] = [];
     const problems: string[] = [];
 
@@ -429,10 +431,17 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
           className="hidden"
           aria-label="Add scripts to the slate (.fountain or .txt)"
           onChange={(e) => {
-            const list = e.target.files;
-            // Reset so re-selecting the same filename still fires onChange.
+            // Real bug found while adding a live browser check for this
+            // panel (2026-09-05): `e.target.files` is a LIVE FileList tied
+            // to the input element, not a snapshot — resetting
+            // `e.target.value` below (needed so re-selecting the same
+            // filename still fires onChange) synchronously empties that
+            // SAME FileList in Chromium, so a caller that reads it
+            // afterward sees zero files. Copying into a real array FIRST
+            // is what makes the reset safe.
+            const files = e.target.files ? Array.from(e.target.files) : [];
             e.target.value = "";
-            if (list && list.length > 0) void handleFilesSelected(list);
+            if (files.length > 0) void handleFilesSelected(files);
           }}
         />
         <button
@@ -641,7 +650,12 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Title</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Health</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Verdict</th>
-                    <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Percentile</th>
+                    <th
+                      className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]"
+                      title={percentileColumnHeaderTooltip()}
+                    >
+                      Percentile
+                    </th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Scenes/Words</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Top</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Weakest</th>
@@ -755,6 +769,17 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                 </tbody>
               </table>
             </div>
+            {/* 2026-09-05 (owner-rule follow-up) — the Percentile column's
+                denominator used to be visible ONLY as a title= tooltip on
+                the header cell, same gap the review found and fixed for
+                the Shape & Rhythm column above. Rendered here as visible
+                text too, from the SAME shared sentence
+                (src/lib/percentile-copy.ts's slatePercentileCaption) the
+                exported slate HTML's footer already carries, so the two
+                can never disagree on wording. */}
+            <p className="text-[10px] font-mono text-gray-400 normal-case tracking-normal">
+              {slatePercentileCaption()}
+            </p>
           </div>
         )}
       </div>

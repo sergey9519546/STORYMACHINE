@@ -17,6 +17,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
 import type { CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
+import { compactPercentileNote, exactRankTooltip } from '../lib/percentile-copy.ts';
 import {
   GitBranch, Eye, Zap, X, Check, AlertTriangle, FlaskConical, Play, Ban, Link2, Clock3,
   Stethoscope, FileDown,
@@ -463,6 +464,22 @@ function DoctorReadout({ label, draft, delta }: {
               </span>
             )}
           </div>
+          {/* 2026-09-04 (owner-rule follow-up) — the same calibration
+              reference-set percentile every other scored surface shows
+              (ScriptDoctorPanel.tsx, both coverage exports, Versions, the
+              Slate table), via the SAME shared src/lib/percentile-copy.ts
+              functions — so the What-If Lab is not the one place this
+              number goes silent. Gated on presence: a branch the server
+              declined to score (or scored before healthPercentile was
+              wired through the promotion path) simply omits this line. */}
+          {typeof draft.healthPercentile === 'number' && (
+            <div
+              className="text-[10px] font-mono opacity-75 mt-0.5"
+              title={exactRankTooltip(draft.healthPercentile)}
+            >
+              {compactPercentileNote(draft.healthPercentile)}
+            </div>
+          )}
           {draft.meanAbsDialogueShareDelta !== undefined && draft.actionSentenceCvOverall !== undefined && (
             <div className="text-[10px] font-mono opacity-75 flex items-center gap-2 flex-wrap mt-1">
               <span className="uppercase tracking-widest font-bold">

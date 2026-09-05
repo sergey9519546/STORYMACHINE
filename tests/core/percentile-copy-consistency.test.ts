@@ -24,9 +24,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
   ordinal, percentileBand, exactRankTooltip, healthPercentileSentence, compactPercentileNote,
+  percentileColumnHeaderTooltip, slatePercentileCaption,
   REFERENCE_SET_SIZE, REFERENCE_SET_LABEL,
 } from '../../src/lib/percentile-copy.ts';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
+import { buildSlateEntry, rankSlate, renderSlateHtml } from '../../server/lib/slate.ts';
 import type { ScriptDoctorReport, DoctorGrade, CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -69,6 +71,13 @@ describe('percentile-copy.ts — pure functions', () => {
     assert.equal(note, `top 20% of a ${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL}`);
     assert.match(note, /hand-authored synthetic/, 'the compact form must not drop the qualifier that stops the percentile reading as a comparison against real scripts');
   });
+
+  it('percentileColumnHeaderTooltip()/slatePercentileCaption() carry the "hand-authored synthetic" qualifier too — the Slate table\'s bare "Percentile" column had the same silent-denominator gap the compact note had', () => {
+    assert.match(percentileColumnHeaderTooltip(), /hand-authored synthetic/);
+    assert.match(percentileColumnHeaderTooltip(), /not the other scripts in this slate/);
+    assert.match(slatePercentileCaption(), /hand-authored synthetic/);
+    assert.match(slatePercentileCaption(), /not the other scripts in this slate/);
+  });
 });
 
 describe('percentile-copy.ts — no surface re-implements it', () => {
@@ -76,6 +85,8 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
   const coverageHtml = read('../../server/lib/coverage-html.ts');
   const snapshotManager = read('../../src/components/scriptide/SnapshotManager.tsx');
   const slatePanel = read('../../src/components/SlatePanel.tsx');
+  const slateHtml = read('../../server/lib/slate.ts');
+  const whatIfPanel = read('../../src/components/WhatIfPanel.tsx');
 
   const NO_LOCAL_ORDINAL = /function ordinal\s*\(/;
   const NO_LOCAL_PERCENTILE_BAND = /function percentileBand\s*\(/;
@@ -85,6 +96,8 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
     ['coverage-html.ts', coverageHtml, '../../src/lib/percentile-copy.ts'],
     ['SnapshotManager.tsx', snapshotManager, '../../lib/percentile-copy.ts'],
     ['SlatePanel.tsx', slatePanel, '../lib/percentile-copy.ts'],
+    ['slate.ts', slateHtml, '../../src/lib/percentile-copy.ts'],
+    ['WhatIfPanel.tsx', whatIfPanel, '../lib/percentile-copy.ts'],
   ] as const) {
     it(`${name} imports from percentile-copy.ts rather than defining its own ordinal()/percentileBand()`, () => {
       assert.ok(src.includes(importPath), `${name} must import from ${importPath}`);
@@ -100,6 +113,25 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
 
   it('SnapshotManager.tsx renders the compact note via the shared compactPercentileNote(), and the sentence still contains "hand-authored synthetic"', () => {
     assert.match(snapshotManager, /\{compactPercentileNote\(healthPercentile\)\}/);
+  });
+
+  // Owner-rule follow-up (2026-09-05): the Slate table's Percentile column
+  // was the last surface whose denominator qualifier was tooltip-only (in
+  // both the in-app panel and the exported HTML). Both now render the SAME
+  // shared sentence, visibly, not just in a title= attribute.
+  it('SlatePanel.tsx renders the Percentile column\'s denominator as VISIBLE text via slatePercentileCaption(), not only a tooltip', () => {
+    assert.match(slatePanel, /\{slatePercentileCaption\(\)\}/);
+    assert.match(slatePanel, /title=\{percentileColumnHeaderTooltip\(\)\}/);
+  });
+
+  it('slate.ts (the exported HTML) renders the SAME shared column-header tooltip and visible footer caption', () => {
+    assert.match(slateHtml, /\$\{percentileColumnHeaderTooltip\(\)\}/);
+    assert.match(slateHtml, /\$\{slatePercentileCaption\(\)\}/);
+  });
+
+  it('WhatIfPanel.tsx\'s DoctorReadout renders the percentile beside health via the shared compactPercentileNote(), so the What-If Lab is not the one place this number is silent', () => {
+    assert.match(whatIfPanel, /\{compactPercentileNote\(draft\.healthPercentile\)\}/);
+    assert.match(whatIfPanel, /typeof draft\.healthPercentile === ['"]number['"]/);
   });
 });
 
@@ -142,5 +174,39 @@ describe('percentile-copy.ts — end-to-end: the exported coverage HTML actually
         `expected the exported HTML to contain "${healthPercentileSentence(pct)}" for healthPercentile=${pct}`,
       );
     }
+  });
+});
+
+describe('percentile-copy.ts — end-to-end: the exported slate HTML actually contains the shared column tooltip and caption', () => {
+  function slateReport(healthPercentile: number): ScriptDoctorReport {
+    return {
+      health: 65,
+      grade: 'solid' as DoctorGrade,
+      totalIssues: 0,
+      bySeverity: { critical: 0, major: 0, minor: 0 },
+      passes: [],
+      sceneHeatmap: [],
+      topPriorities: [],
+      structure: {} as ScriptDoctorReport['structure'],
+      characters: [],
+      sceneCount: 8,
+      wordCount: 4000,
+      dimensions: [],
+      analysisComplete: true,
+      healthPercentile,
+    } as unknown as ScriptDoctorReport;
+  }
+
+  it('renders the shared percentileColumnHeaderTooltip() and slatePercentileCaption() verbatim', () => {
+    const entry = buildSlateEntry('Consistency Check', slateReport(82), 'hash-consistency');
+    const html = renderSlateHtml(rankSlate([entry]), 0);
+    assert.ok(
+      html.includes(percentileColumnHeaderTooltip()),
+      `expected the exported slate HTML's column header tooltip to be "${percentileColumnHeaderTooltip()}"`,
+    );
+    assert.ok(
+      html.includes(slatePercentileCaption()),
+      `expected the exported slate HTML's footer to contain "${slatePercentileCaption()}"`,
+    );
   });
 });

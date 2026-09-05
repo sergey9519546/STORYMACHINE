@@ -16,6 +16,13 @@
 
 import type { ScriptDoctorReport, DimensionScore } from '../nvm/analyze/types.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
+// Shared percentile copy (owner-rule follow-up, 2026-09-05) — the exported
+// slate HTML's Percentile column header tooltip and footer caption now come
+// from the SAME src/lib/percentile-copy.ts every other percentile-showing
+// surface uses (see that module's header), instead of a hand-typed sentence
+// that had already drifted from the panel's own wording ("a fixed 20-sample
+// reference set" vs. the qualified "hand-authored synthetic" phrasing).
+import { percentileColumnHeaderTooltip, slatePercentileCaption } from '../../src/lib/percentile-copy.ts';
 
 export interface SlateEntry {
   title: string;
@@ -305,7 +312,7 @@ ${STYLES}
           <th>#</th>
           <th>Title</th>
           <th>Health</th>
-          <th title="Rank against a fixed 20-sample reference set, not the other scripts in this slate">Percentile</th>
+          <th title="${percentileColumnHeaderTooltip()}">Percentile</th>
           <th>Verdict</th>
           <th>Scenes</th>
           <th>Words</th>
@@ -321,8 +328,7 @@ ${STYLES}
     </table>
     <footer>
       Deterministic analysis &mdash; no generative AI read or scored any of these scripts. Ranked by health, descending.
-      Percentile ranks each script's health against a fixed, 20-sample, hand-authored synthetic reference set
-      (server/nvm/analyze/calibration/corpus.ts) &mdash; not against the other scripts in this slate.
+      ${slatePercentileCaption()} (server/nvm/analyze/calibration/corpus.ts)
       Shape &amp; Rhythm (talk/action swing &middot; action-prose variation) is read from document structure alone
       and is descriptive only &mdash; not part of the score, verdict, or this ranking.
     </footer>

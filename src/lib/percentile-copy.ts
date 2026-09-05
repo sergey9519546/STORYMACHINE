@@ -76,3 +76,30 @@ export function healthPercentileSentence(pct: number): string {
 export function compactPercentileNote(pct: number): string {
   return `${percentileBand(pct)} of a ${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL}`;
 }
+
+/** The denominator described with NO specific percentile value attached —
+ *  for a column header/caption that describes a whole table column (each
+ *  row shows a DIFFERENT number, e.g. the Slate table's Percentile column)
+ *  rather than one reading. Every other function above always names a
+ *  number; this is the one that doesn't, so a caller composing its own
+ *  sentence around it still carries the "hand-authored synthetic"
+ *  qualifier verbatim. */
+export function referenceSetDescription(): string {
+  return `a ${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL}`;
+}
+
+/** Shared column-header tooltip for a table whose Percentile column ranks
+ *  EACH ROW against the reference set, not against the other rows in the
+ *  same table (the Slate triage table, in-app and exported) — used so the
+ *  in-app SlatePanel.tsx and the exported slate HTML (server/lib/slate.ts)
+ *  can never state this denominator two different ways. */
+export function percentileColumnHeaderTooltip(): string {
+  return `Rank against ${referenceSetDescription()}, not the other scripts in this slate`;
+}
+
+/** Shared visible caption sentence for the same Slate percentile column —
+ *  rendered as actual page text (not merely a tooltip) beside the table on
+ *  both the in-app SlatePanel.tsx and the exported slate HTML. */
+export function slatePercentileCaption(): string {
+  return `Percentile ranks each script's health against ${referenceSetDescription()} — not the other scripts in this slate.`;
+}
