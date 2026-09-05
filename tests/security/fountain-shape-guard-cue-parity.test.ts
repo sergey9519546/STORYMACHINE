@@ -107,6 +107,10 @@ import {
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
 import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/screenplay-normalizer.ts';
+// 2026-09-05 review round 4 — imported (not replicated) so this test file's
+// own oracle truncates its pipeline model at the SAME scene the guard and
+// the real analyzer do; see validation.ts's own comment on this same import.
+import { ANALYZER_SCENE_CEILING } from '../../server/nvm/analyze/fountain-analyzer.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -943,7 +947,23 @@ describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word c
     const blocks = parseFountain(normalizeScreenplay(text));
     const counts = new Map<string, number>();
     let cur: string | null = null;
+    // 2026-09-05 review round 4, BLOCKER — fountain-analyzer.ts's own
+    // dialogueByCharacter is built ONLY from the document's first
+    // ANALYZER_SCENE_CEILING scene groups (allRawScenes.slice(0,
+    // ANALYZER_SCENE_CEILING)), with sceneIndex 0 being every block AHEAD of
+    // the first scene heading (the "preamble" slice element). Without this
+    // truncation the oracle's pipeline model saw a walk-on placed past the
+    // ceiling as a real (if ineligible) character, which the real analyzer
+    // never sees at all — exactly the R4-2 bypass this round's review found.
+    // Mirrors validation.ts's own sceneIndex tracking on GuardCueOccurrence.
+    let sceneIndex = 0;
     for (const b of blocks) {
+      if (b.type === 'scene_heading') {
+        sceneIndex++;
+        cur = null;
+        continue;
+      }
+      if (sceneIndex > ANALYZER_SCENE_CEILING) continue;
       if (b.type === 'character' || b.type === 'dual_dialogue') {
         cur = b.text.trim().replace(/\^\s*$/, '').replace(/\(\s*(V\.O\.|O\.S\.|CONT'?D)\s*\)/gi, '').trim();
         continue;
@@ -953,7 +973,7 @@ describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word c
         counts.set(cur, (counts.get(cur) ?? 0) + words);
         continue;
       }
-      if (b.type === 'scene_heading' || b.type === 'action') cur = null;
+      if (b.type === 'action') cur = null;
     }
     return counts;
   }
@@ -992,6 +1012,25 @@ describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word c
     }
   });
 
+  // 2026-09-05 review round 4, BLOCKER — this whole oracle (like the ROUND 8
+  // cue oracle below) was LF-only. walkGuardCueOccurrences split on '\n'
+  // BEFORE normalizing \r\n? -> \n, so a CR-only document was one line to the
+  // entire guard walk while normalizeScreenplay (which DOES normalize first)
+  // reflowed and parsed it in full — the same oracle-holds-on-LF-only gap
+  // that let both round-3 bypasses (parenthetical-only, double-spaced-wrap)
+  // hide from THIS oracle's own LF-only corpus, applied to a third axis (line
+  // ending) instead of cue shape or spacing. Re-runs the plain-adjacent
+  // corpus under CR-only and CRLF line endings.
+  it('plain adjacent cue+dialogue under CR-only and CRLF line endings — the word oracle must hold regardless of line-ending style', () => {
+    for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+      for (const gap of [0, 1, 3]) {
+        const lf = buildGapDoc(cueOf, 4, 12, gap);
+        assertWordOracle(`${family} gap=${gap} CR-only`, lf.replace(/\n/g, '\r'));
+        assertWordOracle(`${family} gap=${gap} CRLF`, lf.replace(/\n/g, '\r\n'));
+      }
+    }
+  });
+
   it('parenthetical-only walk-ons (bypass A\'s exact shape) — a cue followed by nothing but a parenthetical must read as 0 words on both sides, and one placed among an otherwise-uniform eligible cast must not defeat the oracle', () => {
     // Bare: a single parenthetical-only cue, nothing else in the document.
     assertWordOracle('bare parenthetical-only', 'INT. HALL - DAY\n\nWALKON\n(beat)\n\n');
@@ -1003,6 +1042,41 @@ describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word c
     for (let occ = 0; occ < 2000; occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
     t += 'INT. HALL - DAY\n\nWALKON\n(beat)\n\n';
     assertWordOracle('bypass-A payload (200x2000 + parenthetical walk-on)', t);
+  });
+
+  // 2026-09-05 review round 4, BLOCKER — a walk-on placed past
+  // ANALYZER_SCENE_CEILING scene headings is exactly as invisible to the
+  // real analyzer's dialogueByCharacter as a parenthetical-only walk-on is
+  // (bypass A above): both never enter the map at all. Note this is a
+  // property of the PIPELINE model (pipelineWordsByBaseName, fixed above to
+  // truncate at the same ceiling) and of fountainShapeRejectionReason's own
+  // internal accumulation (see its sceneIndex filter and the dedicated
+  // "ROUND 4 regressions" describe block below for the end-to-end REJECT
+  // proof) — NOT of guardVoiceWordCounts itself, which is documented to
+  // return the RAW, unbounded per-name sum regardless of scene position (so
+  // that its `>=` oracle property holds trivially against ANY truncated
+  // pipeline view, never less safely). The 411th-scene placement, and the
+  // scene-1 control, are the exact shapes this round's review found
+  // (R4-2/R4-2b).
+  it('a walk-on placed past ANALYZER_SCENE_CEILING scene headings reads as absent (0 words) in the pipeline model, matching the real analyzer, even though the guard\'s own raw total (safely) does not truncate', () => {
+    let t = '';
+    for (let s = 0; s <= ANALYZER_SCENE_CEILING + 20; s++) {
+      t += `INT. LOCATION ${s} - DAY\n\nSomething happens.\n\n`;
+    }
+    t += 'WALKON\nhi\n\n';
+    assertWordOracle('walk-on past the scene ceiling', t);
+    assert.equal(pipelineWordsByBaseName(t).get('WALKON') ?? 0, 0, 'sanity: the pipeline model must truncate this walk-on away entirely, matching the real analyzer\'s ANALYZER_SCENE_CEILING');
+  });
+
+  it('the SAME walk-on placed in scene 1 (control, well inside the ceiling) reads as its true word count on both sides', () => {
+    const t = 'WALKON\nhi\n\n' + (() => {
+      let s2 = '';
+      for (let s = 1; s <= ANALYZER_SCENE_CEILING + 20; s++) s2 += `INT. LOCATION ${s} - DAY\n\nSomething happens.\n\n`;
+      return s2;
+    })();
+    assertWordOracle('walk-on in scene 1 (control)', t);
+    assert.equal(pipelineWordsByBaseName(t).get('WALKON') ?? 0, 1, 'sanity: a scene-1 walk-on must still be credited its one real word in the pipeline model');
+    assert.equal(guardVoiceWordCounts(t).get('WALKON') ?? 0, 1, 'sanity: a scene-1 walk-on must still be credited its one real word by the guard too');
   });
 
   it('a parenthetical THEN real dialogue for the SAME cue — the parenthetical itself must not be credited, but the dialogue after it must still be', () => {
@@ -1035,6 +1109,32 @@ describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word c
       // total of wrapLines*5 words must show up pooled across occ/char=4.
       const g = guardVoiceWordCounts(text).get('CHAR0') ?? 0;
       assert.ok(g >= wrapLines * 5 * 4 - 5, `expected the guard to pool ~${wrapLines * 5 * 4} words for CHAR0, got ${g}`);
+    }
+  });
+
+  // 2026-09-05 review round 4, BLOCKER — the EXACT shape r3cr.mjs's payload
+  // used (a double-spaced, hard-wrapped, uniform-cast document), replayed
+  // under CR-only and CRLF line endings. Before the fix this was invisible
+  // to the whole walk (guardVoiceWordCounts read every name as absent, 0
+  // words, since the document was one giant "line"), not merely mis-counted
+  // — the strongest form of the oracle violation this file checks for.
+  it('double-spaced hard-wrapped dialogue under CR-only and CRLF line endings, wrap lengths 2-6', () => {
+    function dsWrapped(distinct: number, occPerChar: number, wrapLines: number): string {
+      let t = '', scene = 0, occ = 0;
+      const total = distinct * occPerChar;
+      while (occ < total) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 40 && occ < total; i++, occ++) {
+          t += `CHAR${occ % distinct}\n\n`;
+          for (let w = 0; w < wrapLines; w++) t += `line ${w} has five words\n\n`;
+        }
+      }
+      return t;
+    }
+    for (const wrapLines of [2, 3, 4, 5, 6]) {
+      const lf = dsWrapped(30, 4, wrapLines);
+      assertWordOracle(`double-spaced wrap=${wrapLines} CR-only`, lf.replace(/\n/g, '\r'));
+      assertWordOracle(`double-spaced wrap=${wrapLines} CRLF`, lf.replace(/\n/g, '\r\n'));
     }
   });
 
@@ -1181,6 +1281,85 @@ describe('ROUND 3 regressions: bypass A/B payloads reject, the legit set still a
     }
     const reason = fountainShapeRejectionReason(t);
     assert.equal(reason, null, `expected an ordinary double-spaced two-hander to be accepted, got: ${reason}`);
+  });
+});
+
+// ── ROUND 4 regressions (2026-09-05 review round 4, both BLOCKER, of the
+// round-3 fix `e074328f`): two more ways the guard's model of the real
+// analyzer disagreed with it — see validation.ts's own comments on
+// walkGuardCueOccurrences's line-ending normalization and the
+// ANALYZER_SCENE_CEILING import for the full mechanism. Timed with
+// fountainShapeRejectionReason directly, the same way the ROUND 3
+// regressions above are — the point is that a rejected payload never pays
+// for analysis at all.
+describe('ROUND 4 regressions: CR-only line endings and the 400-scene eligibility ceiling both reject fast', () => {
+  const DLG = 'this is ordinary lowercase dialogue here.';
+
+  it('CR-only line endings: a double-spaced 200x2,000 payload converted to CR-only (\\r, no \\n at all) (measured pre-fix: guardCueOccurrences=0, HTTP 200 in 43,148ms) now rejects fast', () => {
+    // Deliberately no leading scene heading before the loop — this pins
+    // r3cr.mjs's own `ds()` generator byte-for-byte (it has none either),
+    // which is what the payload size below is measured against.
+    let lf = '';
+    let occ = 0, scene = 0;
+    while (occ < 2000) {
+      lf += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 40 && occ < 2000; i++, occ++) lf += `CHAR${occ % 200}\n\n${DLG}\n\n`;
+    }
+    const crOnly = lf.replace(/\n/g, '\r');
+    assert.equal(crOnly.length, 105_690, 'payload size must match the measured r3cr.mjs shape exactly');
+    assert.equal(guardCueOccurrences(crOnly), 2000, 'the guard must see all 2,000 cue occurrences under CR-only line endings, not treat the whole document as one line');
+
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(crOnly);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the CR-only double-spaced payload to be rejected — it was silently accepted before this fix');
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('CRLF line endings: the same payload with CRLF endings still rejects (sanity — CRLF was never the broken shape, but must not regress alongside the CR-only fix)', () => {
+    let lf = '';
+    let occ = 0, scene = 0;
+    while (occ < 2000) {
+      lf += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 40 && occ < 2000; i++, occ++) lf += `CHAR${occ % 200}\n\n${DLG}\n\n`;
+    }
+    const crlf = lf.replace(/\n/g, '\r\n');
+    assert.equal(guardCueOccurrences(crlf), 2000);
+    const reason = fountainShapeRejectionReason(crlf);
+    assert.ok(reason, 'expected the CRLF double-spaced payload to be rejected');
+  });
+
+  it('a walk-on past the ANALYZER_SCENE_CEILING-th scene (R4-2: 200 uniform eligible names x 2,050 occurrences at 5/scene, plus a 1-word walk-on past scene 400) now rejects (measured pre-fix: ACCEPT, HTTP 200 in 43,485ms)', () => {
+    function uniform(distinct: number, occurrences: number, perScene: number, tail: string): string {
+      let t = '', occ = 0, scene = 0;
+      while (occ < occurrences) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < perScene && occ < occurrences; i++, occ++) t += `CHAR${occ % distinct}\n${DLG}\n\n`;
+      }
+      return t + tail;
+    }
+    const text = uniform(200, 2050, 5, 'INT. HALL - DAY\n\nWALKON\nhi\n\n');
+    assert.equal(text.length, 126_678, 'payload size must match the measured R4-2 shape exactly');
+
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the past-ceiling walk-on to no longer defeat the voice-eligible-weight bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('R4-2b control: the SAME walk-on moved to scene 1 (well inside the ceiling) keeps its current, correct verdict — accepted, because it genuinely IS a one-word walk-on to both the guard and the real analyzer', () => {
+    function uniform(distinct: number, occurrences: number, perScene: number): string {
+      let t = '', occ = 0, scene = 0;
+      while (occ < occurrences) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < perScene && occ < occurrences; i++, occ++) t += `CHAR${occ % distinct}\n${DLG}\n\n`;
+      }
+      return t;
+    }
+    const text = 'INT. HALL - DAY\n\nWALKON\nhi\n\n' + uniform(200, 2050, 5);
+    assert.equal(fountainShapeRejectionReason(text), null, 'expected the scene-1 walk-on control to stay accepted — the fix must not turn EVERY walk-on into a rejection, only ones the real analyzer would truncate away');
   });
 });
 
@@ -1697,5 +1876,79 @@ describe('ROUND 8 oracle: guardCueOccurrences(text) >= pipeline character-block 
     const pipelineCount = pipelineCharacterBlockCount(text);
     assert.equal(pipelineCount, 12_000);
     assert.ok(guardCount >= pipelineCount);
+  });
+});
+
+// ── ROUND 4 oracle (2026-09-05 review round 4, BLOCKER, second finding of
+// that round): CR-only and CRLF line endings. walkGuardCueOccurrences split
+// on '\n' alone, BEFORE normalizeScreenplay's own \r\n? -> \n normalization
+// ever ran — so a CR-only document was ONE line to the entire guard walk
+// (every bound in this file, including the ROUND 8 cue-count oracle above)
+// while the real pipeline reflowed and parsed it in full. Measured: a
+// 105,690-char double-spaced CR-only payload was guard-ACCEPTED with
+// guardCueOccurrences reading 0 against 2,000 real pipeline character
+// blocks; HTTP 200 in 43,148ms. Fixed by normalizing \r\n? -> \n once, at
+// the top of the walk (validation.ts), before it is ever split on '\n' —
+// this re-runs the SAME ROUND 8 grammar product under CR-only and CRLF line
+// endings so a future regression on either line-ending style fails here,
+// not only on LF.
+describe('ROUND 4 oracle: CR-only and CRLF line endings — guardCueOccurrences(text) >= pipeline character-block count', () => {
+  const DISTINCT = 4;
+  const OCCURRENCES = 12;
+  const EOL_VARIANTS: Record<string, (s: string) => string> = {
+    'CR-only': (s) => s.replace(/\n/g, '\r'),
+    'CRLF': (s) => s.replace(/\n/g, '\r\n'),
+  };
+
+  for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+    for (const [eolName, toEol] of Object.entries(EOL_VARIANTS)) {
+      for (const gap of [0, 1, 3, 5]) {
+        it(`"${family}", ${eolName}, gap=${gap}: guardCueOccurrences >= pipeline character-block count`, () => {
+          const text = toEol(buildGapDoc(cueOf, DISTINCT, OCCURRENCES, gap));
+          const guardCount = guardCueOccurrences(text);
+          const pipelineCount = pipelineCharacterBlockCount(text);
+          assert.ok(
+            guardCount >= pipelineCount,
+            `ORACLE VIOLATION "${family}" ${eolName} gap=${gap}: guard counted ${guardCount} but the pipeline produced ${pipelineCount} character blocks`,
+          );
+        });
+      }
+    }
+  }
+
+  it('caps-heavy action (no real dialogue anywhere) under CR-only line endings: guard and pipeline both still count zero', () => {
+    const SCENES = 20;
+    const CAPS_LINES_PER_SCENE = 8;
+    let text = '';
+    for (let s = 0; s < SCENES; s++) {
+      text += `INT. LOCATION ${s} - DAY\n\n`;
+      text += 'A person moves through the room, quiet, deliberate, careful not to make a sound.\n\n';
+      for (let c = 0; c < CAPS_LINES_PER_SCENE; c++) {
+        text += `THE DOOR SLAMS SHUT WITH A DEAFENING CRACK THAT ECHOES SCENE ${s} LINE ${c}\n\n`;
+      }
+    }
+    const crOnly = text.replace(/\n/g, '\r');
+    const guardCount = guardCueOccurrences(crOnly);
+    const pipelineCount = pipelineCharacterBlockCount(crOnly);
+    assert.equal(pipelineCount, 0, 'sanity: this fixture must have zero real character blocks under CR-only endings too');
+    assert.equal(guardCount, 0, 'the guard must not count any of these caps-heavy action lines as cues under CR-only endings');
+  });
+
+  // Belt-and-suspenders: the exact r3cr.mjs attack-scale shape (200 distinct
+  // uniform names, 2,000 double-spaced occurrences), at both line endings.
+  it('oracle holds at attack scale for CR-only line endings (distinct=200, occurrences=2,000, gap=1 — pins r3cr.mjs\'s exact shape)', () => {
+    const text = buildGapDoc(ORACLE_CUE_FAMILIES.ASCII!, 200, 2000, 1).replace(/\n/g, '\r');
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.equal(pipelineCount, 2000);
+    assert.ok(guardCount >= pipelineCount, `guard=${guardCount} pipeline=${pipelineCount}`);
+  });
+
+  it('oracle holds at attack scale for CRLF line endings (distinct=600, occurrences=12,000, gap=3)', () => {
+    const text = buildGapDoc(ORACLE_CUE_FAMILIES.ASCII!, 600, 12_000, 3).replace(/\n/g, '\r\n');
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.equal(pipelineCount, 12_000);
+    assert.ok(guardCount >= pipelineCount, `guard=${guardCount} pipeline=${pipelineCount}`);
   });
 });

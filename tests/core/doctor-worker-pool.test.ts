@@ -122,7 +122,9 @@ describe('doctor worker pool — cache, cancellation, errors', () => {
     const fountain = REFERENCE_CORPUS[1].fountain;
     clearDoctorCache();
 
+    const beforeFirst = performance.now();
     const first = await runScriptDoctorOffThread(fountain);
+    const firstMs = performance.now() - beforeFirst;
     const beforeSecond = performance.now();
     const second = await runScriptDoctorOffThread(fountain);
     const secondMs = performance.now() - beforeSecond;
@@ -131,8 +133,20 @@ describe('doctor worker pool — cache, cancellation, errors', () => {
     const { analyzedAt: _b, ...secondStable } = second;
     assert.deepEqual(secondStable, firstStable);
     // A cache hit costs one sha256; a re-run costs a thread hop plus the
-    // whole pipeline. Anything under 50ms can only be the cache.
-    assert.ok(secondMs < 50, `repeat submission took ${Math.round(secondMs)}ms — the LRU was not consulted`);
+    // whole pipeline — so a cache hit must be meaningfully faster than the
+    // REAL run it should have skipped, relative to that run's own cost, the
+    // same way the clearDoctorCache() check just below this is relative to
+    // `secondMs` rather than a fixed wall-clock budget. 2026-09-05 review
+    // round 4 follow-up: a fixed `secondMs < 50` budget flaked under
+    // full-suite CPU contention (this file's other tests run concurrently
+    // and legitimately slow every wall-clock measurement down), even though
+    // 3 isolated re-runs and an empty `git diff main..HEAD` on this whole
+    // area (doctor.ts/doctor-pool.ts/this file) confirmed the cache itself
+    // was never actually skipped — only the absolute-ms assertion was thin.
+    assert.ok(
+      secondMs < firstMs / 2,
+      `repeat submission (${Math.round(secondMs)}ms) was not meaningfully faster than the real run it should have skipped (${Math.round(firstMs)}ms) — the LRU was not consulted`,
+    );
 
     // And the cache genuinely lives on the coordinator: clearing it there
     // must make the next call do real work again.

@@ -43,6 +43,15 @@ import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../src
 // above), so importing its predicate — without editing the file — does not
 // touch a scoring-path file.
 import { isCharacterCue } from '../nvm/analyze/screenplay-normalizer.ts';
+// 2026-09-05 review round 4, BLOCKER — imported (not replicated) so the
+// guard's own scene-truncation view can never silently drift from the
+// analyzer's: `dialogueByCharacter` (fountain-analyzer.ts) is built ONLY
+// from `allRawScenes.slice(0, ANALYZER_SCENE_CEILING)` — a plain exported
+// constant, not a scoring formula, so importing it here creates no new
+// coupling risk beyond what isCharacterCue above already establishes. See
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment for why the guard's
+// eligibility scan needs to know it.
+import { ANALYZER_SCENE_CEILING } from '../nvm/analyze/fountain-analyzer.ts';
 
 // ── SSRF-safe outbound URL guard (audit finding S1-a-1, BLOCKER) ────────────
 // POST /api/ai-config lets an ANONYMOUS caller set baseUrl/imgBaseUrl/
@@ -713,6 +722,20 @@ interface GuardCueOccurrence {
    *  wrong direction for a cost-safety bound to be wrong in. '' for a
    *  boneyard occurrence. */
   voiceKey: string;
+  /** 1-based index of the scene heading this occurrence falls under (0 for
+   *  an occurrence before any scene heading at all) — 2026-09-05 review
+   *  round 4, BLOCKER. `fountain-analyzer.ts`'s `dialogueByCharacter` is
+   *  built ONLY from the document's first `ANALYZER_SCENE_CEILING` (400)
+   *  scene groups (`allRawScenes.slice(0, ANALYZER_SCENE_CEILING)`) — a
+   *  cue past that ceiling does not exist to the analyzer at all, the same
+   *  way a parenthetical-only walk-on does not. Without this field the
+   *  guard's eligibility scan spanned the WHOLE document regardless of
+   *  length, so a single one-line walk-on placed in scene 411 registered
+   *  as a real "ineligible" character and defeated `allEligible` for a
+   *  document the analyzer truncates to 400 scenes before it ever reaches
+   *  that walk-on. 0 for a boneyard occurrence (never counted toward
+   *  eligibility regardless). */
+  sceneIndex: number;
 }
 
 /** Strips (V.O.)/(O.S.)/(CONT'D) and a trailing caret — mirrors
@@ -830,7 +853,26 @@ function accumulateDialogueWords(lines: string[], startIdx: number, joinAcrossGa
  *  caller decides what to do with each occurrence (apply a bound, or just
  *  count it). */
 function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
-  const lines = text.split('\n');
+  // 2026-09-05 review round 4, BLOCKER — mirrors screenplay-normalizer.ts's
+  // OWN line-ending normalization EXACTLY (`normalizeScreenplay`'s first
+  // line, `raw.replace(/\r\n?/g, '\n')`) before this walk ever splits on
+  // '\n'. Without this, a CR-only document (`\r`, no `\n` at all — a
+  // classic-Mac or mangled-export line ending) is ONE line to this entire
+  // walk: every bound in this file (distinct/weight/frequent-cue-lines,
+  // AND the voice-eligible-weight bound, since isDoubleSpacedForVoiceGrouping
+  // below reads the SAME `lines` array) goes vacuous, while
+  // normalizeScreenplay still normalizes the line endings first and reflows
+  // the double-spaced document into a full script parseFountain reads as
+  // real character blocks — measured: a 105,690-char double-spaced CR-only
+  // payload was guard-ACCEPTED with `guardCueOccurrences` reading 0 against
+  // 2,000 real pipeline character blocks (violating the ROUND 1 cue oracle
+  // too, not just the voice bound), and cost 42,910ms/HTTP 43,148ms. A
+  // single-spaced CR-only document is inert either way (normalizeScreenplay
+  // returns non-double-spaced text unreflowed), which is why the original
+  // A2 "line endings are clean" finding held — it was measured on that
+  // shape only. One normalization, at the one place every downstream split
+  // in this walk reads from, closes it for every bound at once.
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
   // 2026-09-05 review round 3 — computed ONCE, document-wide, matching
   // normalizeScreenplay's own document-wide reflow decision (see
   // isDoubleSpacedForVoiceGrouping's own comment). Drives whether
@@ -850,9 +892,16 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
   // thinks it's IN a boneyard the parser is already OUT of). Matching the
   // parser exactly avoids both failure directions rather than picking one.
   let inBoneyard = false;
+  // 2026-09-05 review round 4, BLOCKER — 1-based count of scene headings
+  // seen so far, incremented unconditionally (boneyard or not) so it tracks
+  // the same "which scene is this" fountain-analyzer.ts's own raw-scene
+  // splitter would compute — see sceneIndex's own comment on
+  // GuardCueOccurrence for why the voice-eligibility bound needs it.
+  let sceneIndex = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!.trim();
     if (line.length === 0) continue;
+    if (SCENE_HEADING_PREFIX_RE.test(line)) sceneIndex++;
 
     if (line.startsWith('/*')) inBoneyard = true;
     if (inBoneyard) {
@@ -861,7 +910,7 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
       // bounds rather than either being ignored outright or folded into the
       // real-script bounds above.
       if (!SCENE_HEADING_PREFIX_RE.test(line) && isCueLikeLine(line)) {
-        yield { line, boneyard: true, dialogueWords: 0, voiceKey: '' };
+        yield { line, boneyard: true, dialogueWords: 0, voiceKey: '', sceneIndex: 0 };
       }
       if (line.includes('*/') && !(line.startsWith('/*') && !line.includes('*/'))) {
         inBoneyard = false;
@@ -987,6 +1036,7 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
       boneyard: false,
       dialogueWords: dialogueLineIdx < lines.length ? accumulateDialogueWords(lines, dialogueLineIdx, docIsDoubleSpaced) : 0,
       voiceKey: stripCueExtensionForVoiceGrouping(line),
+      sceneIndex,
     };
   }
 }
@@ -1046,7 +1096,19 @@ export function fountainShapeRejectionReason(text: string): string | null {
     const occurrencesOfThisLine = (cueLineCounts.get(occ.line) ?? 0) + 1;
     cueLineCounts.set(occ.line, occurrencesOfThisLine);
     cueLineOccurrences++;
-    voiceWordCounts.set(occ.voiceKey, (voiceWordCounts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
+    // 2026-09-05 review round 4, BLOCKER — an occurrence past
+    // ANALYZER_SCENE_CEILING contributes NOTHING to voiceWordCounts, the
+    // same way a parenthetical-only occurrence contributes nothing: the
+    // real analyzer's dialogueByCharacter is built only from the first
+    // ANALYZER_SCENE_CEILING scene groups, so a character existing ONLY
+    // past the ceiling is exactly as invisible to voice-delta.ts as one
+    // with zero real dialogue. sceneIndex 0 (before any scene heading at
+    // all) is <= the ceiling and still counted — matches allRawScenes
+    // including any content ahead of the first heading in its own first
+    // slice element.
+    if (occ.sceneIndex <= ANALYZER_SCENE_CEILING) {
+      voiceWordCounts.set(occ.voiceKey, (voiceWordCounts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
+    }
     if (cueLineCounts.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
       return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
     }
