@@ -2260,7 +2260,15 @@ function FixReceiptCard({
       return (
         <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+            {/* 2026-09-05 review round 3 (theme-convention gate) — this card's
+                background is a REAL dark:bg-zinc-800 surface, not the
+                theme-invariant --sm-panel one, so its text must be FULLY
+                THEMED (a dark: variant of its own) rather than an invariant
+                --sm-ink token calibrated against --sm-panel's own contrast —
+                same pairing already used on this exact background elsewhere
+                in this file (e.g. the uppercase-label style below matches
+                the "Confidence & Risk" card's own heading). */}
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
               Not comparable — format unrecognized
             </p>
             <button
@@ -2275,7 +2283,7 @@ function FixReceiptCard({
             {result.reason ?? "This draft could not be analyzed as a screenplay."}
           </p>
           {result.hint && (
-            <p className="text-[10px] font-mono leading-relaxed text-[var(--sm-ink-mute)]">{result.hint}</p>
+            <p className="text-[10px] font-mono leading-relaxed text-gray-600 dark:text-gray-300">{result.hint}</p>
           )}
         </div>
       );

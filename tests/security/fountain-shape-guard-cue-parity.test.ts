@@ -103,6 +103,7 @@ import {
   MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT,
   MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES,
   MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+  guardVoiceWordCounts,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
 import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/screenplay-normalizer.ts';
@@ -873,6 +874,313 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
         ? 'voice-eligible-weight headroom: no tracked fixture ever reaches full eligibility (every one has a sub-30-word character) — infinite margin by construction'
         : `voice-eligible-weight headroom: worst tracked fixture is "${worstName}" at ${worstMargin.toFixed(1)}x`,
     );
+  });
+});
+
+// ── ROUND 3 (2026-09-05 independent review round 2 of the round-1/2 lane,
+// BLOCKER, reopened): the voice-eligible-weight bound's diagnosis was right,
+// but the guard's per-base-name word map disagreed with the analyzer's own
+// in two ways, both letting a payload the bound should have caught slip
+// through by making the guard believe a real, eligible character was
+// ineligible (or did not exist):
+//
+//   (a) a parenthetical-only walk-on (`WALKON\n(beat)\n`) — the OLD guard
+//       credited the cue with the next line's word count whatever that line
+//       was, so a lone parenthetical registered as a 1-word (therefore
+//       "ineligible") character and knocked the whole bound out, while
+//       fountain-analyzer.ts's extractSceneContent skips parenthetical
+//       blocks entirely — that name never enters dialogueByCharacter at
+//       all, so analyzeVoices never abstains on it and runs the real
+//       O(distinct²) pass regardless. Measured (pre-fix): 103,722 chars →
+//       HTTP 200 in 42,749ms.
+//   (b) double-spaced, hard-wrapped dialogue (the ordinary imported-PDF
+//       shape screenplay-normalizer.ts's own header names) — the OLD guard
+//       counted only the FIRST line found after a cue's blank-line gap,
+//       while normalizeScreenplay's reflow JOINS every wrapped fragment
+//       into ONE pooled dialogue block before parseFountain ever runs.
+//       Measured (pre-fix): guard-words 20 < analyzer-words 60 for the same
+//       occurrence; 63,070 chars → HTTP 200 in 33,193ms.
+//
+// FIXED (see accumulateDialogueWords/isDoubleSpacedForVoiceGrouping's own
+// comments in validation.ts): the guard now (1) walks forward from a cue
+// joining every subsequent non-blank, non-parenthetical, non-heading,
+// non-cue line into one pooled total WHEN the document is double-spaced
+// (matching normalizeScreenplay's own document-wide reflow decision,
+// replicated not imported), and only the first such line otherwise
+// (matching parseFountain's own single-spaced rule); and (2) a base name
+// whose ACCUMULATED total across every occurrence is exactly zero is
+// excluded from the eligibility check entirely, rather than counted as a
+// 1-word (or 0-word) "ineligible" character — mirroring that such a name
+// never enters dialogueByCharacter at all.
+//
+// The oracle below is round 1's oracle pattern applied to this SECOND
+// hand-built model (round 1's own oracle only covers "what is a cue" — this
+// one covers "what counts as a character's dialogue", which is the model
+// both round-3 bypasses broke): for every base character name over a
+// generated corpus, `guardVoiceWordCounts(text).get(name) ?? 0` must be
+// `>=` the real pipeline's word total for that name
+// (`parseFountain(normalizeScreenplay(text))`'s own `dialogue` blocks,
+// pooled by base name the same way fountain-analyzer.ts's
+// normalizeCharacterName does), and the guard's "ineligible" set (absent,
+// i.e. zero, OR under VOICE_ELIGIBLE_MIN_WORDS) must be a SUBSET of the
+// pipeline's own ineligible set (same two conditions, computed for real).
+// Any violation of either property is exactly the shape of bypass A or B.
+describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word count(name), and guard-ineligible ⊆ pipeline-ineligible', () => {
+  const VOICE_ELIGIBLE_MIN_WORDS = 30; // mirrors validation.ts's own (private) constant — see that file's comment
+
+  /** Mirrors fountain-analyzer.ts's extractSceneContent + normalizeCharacterName
+   *  closely enough to be a faithful oracle reference: walks the REAL parsed
+   *  blocks, tracks the current speaker across character/dual_dialogue
+   *  blocks (extension tags stripped, matching normalizeCharacterName), and
+   *  pools every `dialogue` block's word count under that speaker.
+   *  Deliberately resets on `scene_heading`/`action` (the reviewer's own
+   *  independent verification script used the same reset, and it is the
+   *  conservative direction for an oracle: it can only make a name's
+   *  pipeline total SMALLER, which makes the `guardWords >= pipelineWords`
+   *  inequality easier to satisfy, never harder — so it cannot hide a real
+   *  under-count). */
+  function pipelineWordsByBaseName(text: string): Map<string, number> {
+    const blocks = parseFountain(normalizeScreenplay(text));
+    const counts = new Map<string, number>();
+    let cur: string | null = null;
+    for (const b of blocks) {
+      if (b.type === 'character' || b.type === 'dual_dialogue') {
+        cur = b.text.trim().replace(/\^\s*$/, '').replace(/\(\s*(V\.O\.|O\.S\.|CONT'?D)\s*\)/gi, '').trim();
+        continue;
+      }
+      if (b.type === 'dialogue' && cur) {
+        const words = b.text.trim().split(/\s+/).filter(Boolean).length;
+        counts.set(cur, (counts.get(cur) ?? 0) + words);
+        continue;
+      }
+      if (b.type === 'scene_heading' || b.type === 'action') cur = null;
+    }
+    return counts;
+  }
+
+  /** Runs the guardWords >= pipelineWords and ineligible-subset checks for
+   *  one generated document, over the UNION of every base name either side
+   *  recognizes (a name absent from one side reads as 0 for that side). */
+  function assertWordOracle(label: string, text: string): void {
+    const guardCounts = guardVoiceWordCounts(text);
+    const pipelineCounts = pipelineWordsByBaseName(text);
+    const allNames = new Set<string>([...guardCounts.keys(), ...pipelineCounts.keys()]);
+    for (const name of allNames) {
+      const g = guardCounts.get(name) ?? 0;
+      const p = pipelineCounts.get(name) ?? 0;
+      assert.ok(
+        g >= p,
+        `ORACLE VIOLATION "${label}" name="${name}": guardWords=${g} < pipelineWords=${p}`,
+      );
+      const guardIneligible = g < VOICE_ELIGIBLE_MIN_WORDS;
+      const pipelineIneligible = p < VOICE_ELIGIBLE_MIN_WORDS;
+      assert.ok(
+        !guardIneligible || pipelineIneligible,
+        `ORACLE VIOLATION "${label}" name="${name}": guard treats it ineligible (${g} words) but the pipeline finds it ELIGIBLE (${p} words) — this is bypass A/B's exact shape`,
+      );
+    }
+  }
+
+  const DLG = 'this is ordinary lowercase dialogue here.'; // 6 words
+
+  it('plain adjacent cue+dialogue, every cue-oracle family, gaps 0-3 — sanity that the word oracle holds on round-1\'s own corpus too', () => {
+    for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+      for (let gap = 0; gap <= 3; gap++) {
+        const text = buildGapDoc(cueOf, 4, 12, gap);
+        assertWordOracle(`${family} gap=${gap}`, text);
+      }
+    }
+  });
+
+  it('parenthetical-only walk-ons (bypass A\'s exact shape) — a cue followed by nothing but a parenthetical must read as 0 words on both sides, and one placed among an otherwise-uniform eligible cast must not defeat the oracle', () => {
+    // Bare: a single parenthetical-only cue, nothing else in the document.
+    assertWordOracle('bare parenthetical-only', 'INT. HALL - DAY\n\nWALKON\n(beat)\n\n');
+    // Two consecutive parentheticals, still nothing real.
+    assertWordOracle('double parenthetical-only', 'INT. HALL - DAY\n\nWALKON\n(beat)\n(a pause)\n\n');
+    // The exact bypass-A payload: 200 uniform eligible names, plus one
+    // parenthetical-only walk-on appended.
+    let t = 'INT. ROOM - DAY\n\n';
+    for (let occ = 0; occ < 2000; occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+    t += 'INT. HALL - DAY\n\nWALKON\n(beat)\n\n';
+    assertWordOracle('bypass-A payload (200x2000 + parenthetical walk-on)', t);
+  });
+
+  it('a parenthetical THEN real dialogue for the SAME cue — the parenthetical itself must not be credited, but the dialogue after it must still be', () => {
+    const text = 'INT. ROOM - DAY\n\nJUDGE\n(sternly)\nOrder in this court, or I will clear the room myself.\n\n';
+    assertWordOracle('parenthetical then real dialogue', text);
+    // Sanity: the guard must still count the REAL dialogue words, not
+    // silently zero the whole occurrence because a parenthetical came first.
+    const g = guardVoiceWordCounts(text).get('JUDGE') ?? 0;
+    assert.ok(g >= 9, `expected the guard to credit the real dialogue after the parenthetical, got ${g} words`);
+  });
+
+  it('double-spaced hard-wrapped dialogue, wrap lengths 2-6 (bypass B\'s exact shape and its neighbors)', () => {
+    function dsWrapped(distinct: number, occPerChar: number, wrapLines: number): string {
+      let t = '', scene = 0, occ = 0;
+      const total = distinct * occPerChar;
+      while (occ < total) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 40 && occ < total; i++, occ++) {
+          t += `CHAR${occ % distinct}\n\n`;
+          for (let w = 0; w < wrapLines; w++) t += `line ${w} has five words\n\n`;
+        }
+      }
+      return t;
+    }
+    for (const wrapLines of [2, 3, 4, 5, 6]) {
+      const text = dsWrapped(30, 4, wrapLines);
+      assertWordOracle(`double-spaced wrap=${wrapLines}`, text);
+      // Sanity the guard actually JOINS across the gaps here, not just
+      // "happens to pass" by both sides reading 0 — a real per-occurrence
+      // total of wrapLines*5 words must show up pooled across occ/char=4.
+      const g = guardVoiceWordCounts(text).get('CHAR0') ?? 0;
+      assert.ok(g >= wrapLines * 5 * 4 - 5, `expected the guard to pool ~${wrapLines * 5 * 4} words for CHAR0, got ${g}`);
+    }
+  });
+
+  it('single-spaced wrapped dialogue — only the FIRST line counts on both sides (parseFountain\'s own rule for non-double-spaced text), so the oracle holds without the guard over-joining', () => {
+    const P = 'line one has five words\nline two has five words\nline three has five words';
+    let t = 'INT. ROOM - DAY\n\n';
+    for (let occ = 0; occ < 800; occ++) t += `CHAR${occ % 200}\n${P}\n\n`;
+    assertWordOracle('single-spaced wrapped 200x4', t);
+    // The guard must not join here — normalizeScreenplay returns single-
+    // spaced text UNCHANGED, so only "line one has five words" (5 words) is
+    // real dialogue; the guard reading more per occurrence would still
+    // satisfy `guardWords >= pipelineWords` (safe direction) but a huge
+    // over-read would be worth flagging as a design regression, not just a
+    // silent pass — assert it stays close to the true 5-word single line
+    // per occurrence (4 occurrences => ~20, generous upper bound 40).
+    const g = guardVoiceWordCounts(t).get('CHAR0') ?? 0;
+    assert.ok(g <= 40, `expected the guard to read only the first wrapped line per occurrence here (~20 words for 4 occurrences), got ${g} — an unbounded over-join would defeat legitimate large-cast scripts`);
+  });
+
+  it('(V.O.)/(O.S.)/(CONT\'D) suffix variants pool into the SAME base name on both sides', () => {
+    let t = 'INT. ROOM - DAY\n\n';
+    t += `LEAD (V.O.)\n${DLG}\n\n`;
+    t += `LEAD\n${DLG}\n\n`;
+    t += `LEAD (CONT'D)\n${DLG}\n\n`;
+    t += `LEAD (O.S.)\n${DLG}\n\n`;
+    assertWordOracle('extension-suffix pooling', t);
+    const g = guardVoiceWordCounts(t).get('LEAD') ?? 0;
+    const p = pipelineWordsByBaseName(t).get('LEAD') ?? 0;
+    assert.equal(p, 24, `sanity: the pipeline must pool all four variants (4 x DLG's 6 words) into one 24-word LEAD entry, got ${p}`);
+    assert.ok(g >= p, `guard must pool at least as many words as the pipeline for the extension-suffix case, got guard=${g} pipeline=${p}`);
+  });
+
+  it('a boneyard wrapping a parenthetical-only walk-on and a double-spaced wrapped shape — neither reaches dialogueByCharacter on either side', () => {
+    const text = [
+      'INT. ROOM - DAY', '', 'SETUP', '', 'Some setup dialogue line here.', '', '/*',
+      'WALKON', '(beat)', '',
+      'CHAR0', '', 'line 0 has five words', '', 'line 1 has five words', '',
+      '*/',
+    ].join('\n');
+    assertWordOracle('boneyard-wrapped parenthetical + double-spaced-shaped', text);
+  });
+
+  it('mixed: every family above combined into one document', () => {
+    let t = 'INT. ROOM - DAY\n\n';
+    for (let occ = 0; occ < 600; occ++) t += `UNIFORM${occ % 60}\n${DLG}\n\n`;
+    t += 'INT. HALL - DAY\n\nWALKON1\n(beat)\n\n';
+    t += 'INT. HALL - DAY\n\nWALKON2\n(a pause)\n(still nothing)\n\n';
+    t += `INT. COURT - DAY\n\nJUDGE (V.O.)\n(sternly)\nOrder in this court, or I will clear the room myself.\n\n`;
+    t += `INT. COURT - DAY\n\nJUDGE\n${DLG}\n\n`;
+    {
+      let scene = 0, occ = 0;
+      while (occ < 4 * 3) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 40 && occ < 4 * 3; i++, occ++) {
+          t += `WRAPPED0\n\n`;
+          for (let w = 0; w < 3; w++) t += `line ${w} has five words\n\n`;
+        }
+      }
+    }
+    const P = 'line one has five words\nline two has five words';
+    for (let occ = 0; occ < 4; occ++) t += `SINGLESPACED0\n${P}\n\n`;
+    assertWordOracle('mixed document', t);
+  });
+});
+
+// ── ROUND 3 regressions: the reviewer's two exact payloads reject, and the
+// legit set (54 fixtures, 20 calibration samples, P0 sample, the round-2
+// skewed feature, a real-shaped script with genuine parenthetical-only bit
+// parts, and a normal-length double-spaced imported-PDF-shaped script) still
+// accepts. Timed with `fountainShapeRejectionReason` directly (not
+// `runScriptDoctor` — the whole point is that a rejected payload never pays
+// for the analysis at all; the review's own `runScriptDoctor` numbers, cited
+// in each test's comment, are what these reject-fast timings replace).
+describe('ROUND 3 regressions: bypass A/B payloads reject, the legit set still accepts', () => {
+  it('bypass A: 200 uniform eligible names x 2,000 occurrences + one parenthetical-only walk-on (measured pre-fix: HTTP 200 in 42,749ms, runScriptDoctor 43,600ms) now rejects fast', () => {
+    const DLG = 'this is ordinary lowercase dialogue here.';
+    let t = 'INT. ROOM - DAY\n\n';
+    for (let occ = 0; occ < 2000; occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+    t += 'INT. HALL - DAY\n\nWALKON\n(beat)\n\n';
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(t);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the parenthetical-only walk-on to no longer bypass the voice-eligible-weight bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('bypass B: double-spaced hard-wrapped dialogue, D=200 occ/char=4 wrap=3 (measured pre-fix: HTTP 200 in 33,193ms, runScriptDoctor 33,869ms) now rejects fast', () => {
+    function dsWrapped(distinct: number, occPerChar: number, wrapLines: number): string {
+      let t = '', scene = 0, occ = 0;
+      const total = distinct * occPerChar;
+      while (occ < total) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 40 && occ < total; i++, occ++) {
+          t += `CHAR${occ % distinct}\n\n`;
+          for (let w = 0; w < wrapLines; w++) t += `line ${w} has five words\n\n`;
+        }
+      }
+      return t;
+    }
+    const t = dsWrapped(200, 4, 3);
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(t);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the double-spaced wrapped-dialogue shape to no longer bypass the voice-eligible-weight bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('the legit set still accepts: 54 tracked .fountain fixtures, 20 calibration samples, the P0 sample, and the round-2 skewed feature', async () => {
+    const { REFERENCE_CORPUS } = await import('../../server/nvm/analyze/calibration/corpus.ts');
+    const { fountain: p0SampleFountain } = await import('../../src/lib/sample-script.ts');
+    for (const file of trackedFountainFiles()) {
+      const rel = path.relative(REPO_ROOT, file);
+      const reason = fountainShapeRejectionReason(readFileSync(file, 'utf8'));
+      assert.equal(reason, null, `${rel} was rejected: ${reason}`);
+    }
+    for (const sample of REFERENCE_CORPUS) {
+      assert.equal(fountainShapeRejectionReason(sample.fountain), null, `calibration sample "${sample.label}" was rejected`);
+    }
+    assert.equal(fountainShapeRejectionReason(p0SampleFountain), null, 'P0 sample was rejected');
+  });
+
+  it('a real-shaped script with genuine parenthetical-only bit parts stays accepted — the fix must not merely reject bypass A\'s exact shape while still under-serving an ordinary script that happens to have walk-ons', () => {
+    const DLG = 'this is ordinary lowercase dialogue here.';
+    let t = 'INT. ROOM - DAY\n\n';
+    // A small cast of real, talkative speaking characters...
+    for (let occ = 0; occ < 300; occ++) t += `LEAD${occ % 5}\n${DLG}\n\n`;
+    // ...plus several genuine one-scene walk-ons whose only line is a
+    // parenthetical stage direction (a bartender's nod, a cop's shrug) —
+    // an entirely ordinary shape in a real screenplay.
+    const walkOns = ['BARTENDER', 'COP', 'WAITER', 'NURSE', 'CLERK'];
+    for (const w of walkOns) t += `INT. LOCATION - DAY\n\n${w}\n(a small gesture)\n\n`;
+    const reason = fountainShapeRejectionReason(t);
+    assert.equal(reason, null, `expected a real-shaped script with parenthetical-only bit parts to be accepted, got: ${reason}`);
+  });
+
+  it('a normal-length double-spaced imported-PDF-shaped script (a real two-hander, not an attack scale) stays accepted', () => {
+    const DLG_LINES = ['Where were you last night?', 'I already told the others, I was at the docks the whole time.', 'That is not what I heard.'];
+    let t = 'INT. WAREHOUSE - NIGHT\n\n';
+    for (let i = 0; i < 40; i++) {
+      const speaker = i % 2 === 0 ? 'DETECTIVE' : 'SUSPECT';
+      t += `${speaker}\n\n${DLG_LINES[i % DLG_LINES.length]}\n\n`;
+    }
+    const reason = fountainShapeRejectionReason(t);
+    assert.equal(reason, null, `expected an ordinary double-spaced two-hander to be accepted, got: ${reason}`);
   });
 });
 

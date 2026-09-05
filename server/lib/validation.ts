@@ -746,6 +746,80 @@ function countWords(text: string): number {
   return trimmed === '' ? 0 : trimmed.split(/\s+/).length;
 }
 
+/** Mirrors screenplay-normalizer.ts's own isDoubleSpaced EXACTLY (replicated,
+ *  not imported — read 2026-09-05 review round 3 to find the second
+ *  divergence between the guard's word model and the pipeline's, never
+ *  edited): the primary signal is what fraction of character cues are
+ *  immediately followed by a blank line (a genuine double-spaced import
+ *  blanks after every physical line, ordinary Fountain never blanks after a
+ *  cue), falling back to a document-wide ratio only when there is no cue
+ *  evidence at all. A DOCUMENT-WIDE decision, computed once — not per
+ *  occurrence — because normalizeScreenplay's own reflow decision is
+ *  document-wide too (`if (!isDoubleSpaced(allLines)) return raw;`), and the
+ *  word-accumulation mode below has to agree with the SAME decision the real
+ *  pipeline made for this exact text. */
+function isDoubleSpacedForVoiceGrouping(lines: string[]): boolean {
+  let cueCount = 0, cueFollowedByBlank = 0;
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (!isCharacterCue(lines[i]!)) continue;
+    cueCount++;
+    if (lines[i + 1]!.trim() === '') cueFollowedByBlank++;
+  }
+  if (cueCount > 0) return cueFollowedByBlank / cueCount >= 0.5;
+  let nonBlank = 0, followedByBlank = 0;
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (lines[i]!.trim() === '') continue;
+    nonBlank++;
+    if (lines[i + 1]!.trim() === '') followedByBlank++;
+  }
+  return nonBlank > 0 && followedByBlank / nonBlank >= 0.9;
+}
+
+/** How many words of THIS cue occurrence's dialogue the real pipeline would
+ *  attribute to this character — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's
+ *  own comment for the two divergences this closes (2026-09-05 review round
+ *  3). Walks forward from `startIdx` (the line the existing cue-detection
+ *  context check already located as "the dialogue"), skipping blank lines
+ *  and PARENTHETICAL lines (`(beat)` — contribute 0 words, mirroring
+ *  fountain-analyzer.ts's extractSceneContent, which drops parenthetical
+ *  blocks entirely rather than crediting them to the speaker), and stopping
+ *  at a scene heading or the NEXT character cue — the same two events that
+ *  end normalizeScreenplay's `mode = 'dialogue'` run. When `joinAcrossGaps`
+ *  is true (this DOCUMENT is double-spaced — see
+ *  isDoubleSpacedForVoiceGrouping) every content line found this way is
+ *  summed, mirroring normalizeScreenplay's own paragraph-join
+ *  (screenplay-normalizer.ts's `flush()`/`buf` mechanism folds every
+ *  non-cue/non-heading/non-transition/non-parenthetical line between one cue
+ *  and the next into ONE pooled dialogue block, even across what were
+ *  originally several separate blank-line-gapped fragments — the exact
+ *  shape a hard-wrapped, double-spaced PDF/FDX import produces). When false
+ *  (single-spaced), parseFountain's OWN rule only ever types the FIRST
+ *  post-cue content line as `dialogue` — a second physically-adjacent line
+ *  falls through to its `action`-by-default case, since its rule requires
+ *  the PRECEDING block to be character/dual_dialogue/parenthetical, never
+ *  `dialogue` itself — so only that first line is summed. Bounded at 200
+ *  lines scanned so one pathological occurrence cannot turn this per-cue
+ *  lookup into its own O(document length) cost; no legitimate dialogue turn
+ *  in the calibrated corpus below comes close to that. */
+function accumulateDialogueWords(lines: string[], startIdx: number, joinAcrossGaps: boolean): number {
+  const MAX_LINES_SCANNED = 200;
+  let total = 0;
+  let scanned = 0;
+  let i = startIdx;
+  while (i < lines.length && scanned < MAX_LINES_SCANNED) {
+    const t = lines[i]!.trim();
+    scanned++;
+    if (t === '') { i++; continue; }
+    if (SCENE_HEADING_PREFIX_RE.test(t)) break;
+    if (isCharacterCue(lines[i]!)) break;
+    if (t.startsWith('(') && t.endsWith(')')) { i++; continue; }
+    total += countWords(t);
+    if (!joinAcrossGaps) break;
+    i++;
+  }
+  return total;
+}
+
 /** The single walk both fountainShapeRejectionReason (which applies the cost
  *  bounds below and can return early the moment one is crossed) and
  *  guardCueOccurrences (which drains every occurrence, unconditionally, for
@@ -757,6 +831,13 @@ function countWords(text: string): number {
  *  count it). */
 function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
   const lines = text.split('\n');
+  // 2026-09-05 review round 3 — computed ONCE, document-wide, matching
+  // normalizeScreenplay's own document-wide reflow decision (see
+  // isDoubleSpacedForVoiceGrouping's own comment). Drives whether
+  // dialogueWords below joins a wrapped paragraph's fragments or counts
+  // only the first, the same choice the real pipeline already made for
+  // this exact text.
+  const docIsDoubleSpaced = isDoubleSpacedForVoiceGrouping(lines);
   // Boneyard tracking (2026-09-05 review finding A3) — mirrors src/lib/
   // fountain.ts's parseFountain `inBoneyard` toggle EXACTLY: a trimmed line
   // starting with '/*' opens it; it closes on a line containing '*/' unless
@@ -904,7 +985,7 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
     yield {
       line,
       boneyard: false,
-      dialogueWords: dialogueLineIdx < lines.length ? countWords(lines[dialogueLineIdx]!) : 0,
+      dialogueWords: dialogueLineIdx < lines.length ? accumulateDialogueWords(lines, dialogueLineIdx, docIsDoubleSpaced) : 0,
       voiceKey: stripCueExtensionForVoiceGrouping(line),
     };
   }
@@ -995,17 +1076,41 @@ export function fountainShapeRejectionReason(text: string): string | null {
   // ELIGIBLE_WEIGHT's own comment) \u2014 so a script with even one real
   // one-line walk-on character, which is nearly every real script, never
   // reaches this check at all.
-  if (voiceWordCounts.size >= 2) {
+  // 2026-09-05 review round 3 \u2014 a voiceKey with an EXACT-ZERO accumulated
+  // total is excluded here rather than treated as "ineligible with 0
+  // words". The two are not the same thing: fountain-analyzer.ts's
+  // extractSceneContent only ever adds a speaker to `dialogueByCharacter`
+  // when it has at least one real `dialogue`-typed line \u2014 a cue whose only
+  // followers are parentheticals (`(beat)`, or its every occurrence
+  // followed by nothing else before the next cue/heading) NEVER enters
+  // dialogueByCharacter at all, so it cannot be the reason analyzeVoices
+  // abstains. Before this exclusion, such a name registered as
+  // "ineligible" here exactly the way a genuinely short real character
+  // does, and either one alone was enough to defeat `allEligible` below \u2014
+  // that was round 3's finding A (a 35-character `WALKON\n(beat)\n` suffix
+  // flipped a rejected payload to accepted while analyzeVoices, seeing no
+  // such character at all, ran the full O(distinct\u00b2) pass anyway). A
+  // genuinely short character (1+ real words, still under
+  // VOICE_ELIGIBLE_MIN_WORDS) is UNCHANGED by this \u2014 it stays in the map
+  // and still correctly defeats allEligible, matching that it DOES enter
+  // dialogueByCharacter and DOES cause abstention for real.
+  const nonZeroVoiceWordCounts = [...voiceWordCounts.values()].filter((words) => words > 0);
+  if (nonZeroVoiceWordCounts.length >= 2) {
     let allEligible = true;
     let totalEligibleWords = 0;
-    for (const words of voiceWordCounts.values()) {
+    for (const words of nonZeroVoiceWordCounts) {
       if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
       totalEligibleWords += words;
     }
     if (allEligible) {
-      const voiceEligibleWeight = voiceWordCounts.size * totalEligibleWords;
+      const voiceEligibleWeight = nonZeroVoiceWordCounts.length * totalEligibleWords;
       if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
-        return `must not contain more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in (distinct speaking characters \u00d7 their total pooled dialogue words) once every character has enough dialogue to be individually voice-scored \u2014 bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
+        // 2026-09-05 review round 3, LOW item \u2014 this state is a legitimate
+        // large fully-speaking ensemble, not malformed input (measured: the
+        // pre-round-2 buildPlausibleFeature() fixture, a genuine 72s
+        // payload, trips exactly this branch) \u2014 say so, not just the bound
+        // name.
+        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters \u00d7 their total pooled dialogue words) \u2014 this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft \u2014 bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
       }
     }
   }
@@ -1033,6 +1138,37 @@ export function guardCueOccurrences(text: string): number {
   let total = 0;
   for (const _occ of walkGuardCueOccurrences(text)) total++;
   return total;
+}
+
+// ── Round-3 oracle (2026-09-05 review round 3) ──────────────────────────────
+// Exported ONLY for tests/security/fountain-shape-guard-cue-parity.test.ts's
+// oracle property: for every base character name,
+// `guardVoiceWordCounts(text).get(name) >= pipelineWords(name)` where
+// `pipelineWords` is built from `parseFountain(normalizeScreenplay(text))`'s
+// real `dialogue` blocks — the round-1 oracle's exact shape, applied to the
+// SECOND hand-built model the guard maintains (round 1's oracle covers "what
+// is a cue"; this one covers "what counts as a character's dialogue", the
+// model that round 3's two bypasses (a parenthetical-only walk-on the guard
+// credited 1 word for something the analyzer never sees at all; a
+// double-spaced wrapped paragraph the guard undercounted by only reading its
+// first line) both broke). Drains walkGuardCueOccurrences UNCONDITIONALLY,
+// same rationale as guardCueOccurrences — a true total even for a payload
+// fountainShapeRejectionReason would already have rejected. Returns the RAW
+// per-voiceKey sums, ZERO entries included (a name with a zero total here
+// and a zero — i.e. absent — pipeline count is not a violation; that is
+// exactly the parenthetical-only-walk-on state working correctly, which is
+// why the oracle test compares raw totals rather than the bound's own
+// post-exclusion view). Never call this from route/validation code — same
+// caveat as guardCueOccurrences: it throws away the early-exit that makes
+// fountainShapeRejectionReason safe to run unconditionally on untrusted
+// input.
+export function guardVoiceWordCounts(text: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const occ of walkGuardCueOccurrences(text)) {
+    if (occ.boneyard) continue;
+    counts.set(occ.voiceKey, (counts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
+  }
+  return counts;
 }
 
 /** z.string().min(1).max(MAX_FOUNTAIN_CHARS) plus the pathological-shape guard
