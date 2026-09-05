@@ -2822,10 +2822,11 @@ export default function ScriptIDE({
                   route in every one of those states, exactly as
                   `coverageFullReportToggleState`'s own comment already says.
                   Applies only to the `!coverageFull` half of this branch —
-                  once `coverageFull` is true the writer is inside a REAL
-                  `role="dialog"` (ScriptDoctorPanel) with its own focus
-                  trap, so Tab genuinely cannot reach this button there
-                  either, and no such inconsistency exists to fix. */}
+                  once `coverageFull` is true the writer is inside
+                  ScriptDoctorPanel's real modal dialog (it declares the
+                  ARIA dialog role itself) with its own focus trap, so Tab
+                  genuinely cannot reach this button there either, and no
+                  such inconsistency exists to fix. */}
               <button
                 type="button"
                 onClick={() =>
