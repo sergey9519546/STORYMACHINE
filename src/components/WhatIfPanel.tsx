@@ -149,8 +149,24 @@ interface WhatIfExploreResult {
 // predicate the editor's own surfaces use), and formatUnrecognized marks the
 // one case it never even runs the doctor on: a projected draft with no scenes.
 interface WhatIfDoctorDraft {
-  fountain: string;
+  // 2026-09-05 review round 2, finding "F1's withheld fountain is a new
+  // response state the client does not know about" — server/routes/nvm/
+  // twin-whatif.ts's F1 size/shape guard (finding F1) withholds `fountain`
+  // entirely on a draft it refused to score (`tooLarge`, below), the same
+  // way `formatUnrecognized` already withholds it for a zero-scene draft.
+  // This field MUST be optional here — the withheld state is real and this
+  // interface has to say so, not paper over it with a cast at the call
+  // site.
+  fountain?: string;
   formatUnrecognized?: boolean;
+  // Present (true) when the projected draft exceeded MAX_FOUNTAIN_CHARS or
+  // the same fountainShapeRejectionReason guard every raw-fountain field
+  // uses — see twin-whatif.ts's tooLargeDraft. A THIRD honest-incomplete
+  // shape alongside formatUnrecognized (no scenes at all) and a normal
+  // scored draft: `fountain` and `health` are both absent, `analyzedAt`/
+  // `contentHash` are still present (the draft's identity is known even
+  // though its text and score are withheld).
+  tooLarge?: boolean;
   analysisComplete?: boolean;
   sceneCount?: number;
   analyzedAt?: number;
@@ -504,6 +520,16 @@ function DoctorReadout({ label, draft, delta }: {
         <p className="text-[11px] mt-1">
           {draft.formatUnrecognized
             ? 'Nothing to score yet — this timeline has no scenes.'
+            : draft.tooLarge
+            // 2026-09-05 review round 2, finding F1's client wiring — the
+            // server withholds BOTH the score and the full script text once
+            // a projected draft exceeds the same size/shape guard every raw
+            // Fountain field enforces (server/routes/nvm/twin-whatif.ts's
+            // tooLargeDraft). Named honestly so a writer sees WHY the
+            // number is missing here, rather than reading it as the same
+            // generic "could not be analyzed" the failed-pass branch below
+            // uses for an unrelated reason.
+            ? 'This branch grew too large to analyze or promote — the projected script exceeded the size this tool scores.'
             : 'The whole draft could not be analyzed, so no health, grade or verdict is shown.'}
         </p>
       )}
@@ -583,8 +609,13 @@ function BranchCard({
 
         {/* Promote is offered only once the branch HAS a materialised script to
             promote — before the doctor run there is no text, so the control is
-            absent rather than disabled-and-confusing. */}
-        {doctor && onRequestPromote && !promoteFlow?.promoted && !promoteFlow?.confirming && (
+            absent rather than disabled-and-confusing. 2026-09-05 review round
+            2 (F1 client wiring): `doctor.fountain` is ALSO absent for a branch
+            the server refused to score for being too large (tooLarge) — same
+            "no text, so no control" reasoning applies there, not just to the
+            pre-doctor-run state, since promoting would otherwise hand the
+            editor `undefined` text. */}
+        {doctor && doctor.fountain && onRequestPromote && !promoteFlow?.promoted && !promoteFlow?.confirming && (
           <button
             onClick={() => onRequestPromote(branch.branchId)}
             className="flex items-center gap-1 bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 text-[11px] px-2 py-1 rounded font-medium transition-colors"
@@ -594,7 +625,7 @@ function BranchCard({
         )}
       </div>
 
-      {doctor && promoteFlow?.confirming && onPromote && onCancelPromote && (
+      {doctor && doctor.fountain && promoteFlow?.confirming && onPromote && onCancelPromote && (
         <div className="mt-2 bg-purple-900/20 border border-purple-700 rounded p-2">
           <p className="text-purple-200 text-[11px] mb-2 flex items-start gap-1">
             <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
@@ -868,6 +899,15 @@ export default function WhatIfPanel({ onClose, onCommitted, onPromoteToEditor }:
   // only when present — a variant the server declined to score promotes as an
   // unscored snapshot rather than one carrying an invented health.
   const promoteBranch = useCallback((branch: WhatIfBranchDoctor, rank: number) => {
+    // 2026-09-05 review round 2 (F1 client wiring) — `fountain` is now
+    // optional (withheld for a `tooLarge` branch the server refused to
+    // score); the render-site gates already keep this from firing for such
+    // a branch, but this guard is the one place that actually TYPE-NARROWS
+    // it to a string before BranchPromotion.text (which stays required —
+    // there is no honest "promote no text" action), so a future render-site
+    // regression fails closed here instead of handing the editor
+    // `undefined`.
+    if (!branch.fountain) return;
     onPromoteToEditor?.({
       branchId: branch.branchId,
       label: `What-If branch #${rank}`,

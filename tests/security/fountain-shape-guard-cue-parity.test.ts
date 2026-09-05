@@ -102,6 +102,7 @@ import {
   MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES,
   MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT,
   MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES,
+  MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
 import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/screenplay-normalizer.ts';
@@ -388,11 +389,25 @@ function buildPlausibleFeature(): { text: string; wordCount: number; sceneCount:
     const plainCue = name;
     for (let k = 0; k < 700 - taggedTotal; k++) majorLines.push(plainCue);
   }
-  // Each minor speaks 6 times total, split across its own 4 variants
-  // (round-robin) -> 122 x 4 = 488 distinct lines, 122 x 6 = 732 occurrences.
+  // Each minor speaks 2 times total (the "one-or-two-line MINOR/background
+  // names" this function's own header already promises), split across its
+  // own 4 variants (round-robin) -> 122 x 2 = 244 distinct lines, 122 x 2 =
+  // 244 occurrences. 2026-09-05 review round 2: this used to be 6 — at
+  // dialogueLine()'s own 6 words/line, that pools to 36 words per BASE NAME
+  // once voice-delta.ts's normalizeCharacterName groups a minor's variants
+  // back together (36 >= its own MIN_WORDS=30), making every one of the 130
+  // distinct names in this fixture individually "voice-eligible" and
+  // reproducing the review's own O(distinct²) Burrows's-Delta cost — the
+  // fixture's CODE drifted from its own documented intent. At 2 occurrences
+  // (12 words), every minor stays under MIN_WORDS=30, so the analyzer
+  // ABSTAINS from voice analysis entirely the moment even one is checked —
+  // exactly how a real feature's one-or-two-line walk-on characters behave,
+  // and exactly why this shape is safe while a UNIFORM cast of equally
+  // talkative names is not (see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own
+  // comment).
   const minorLines: string[] = [];
   for (const name of minors) {
-    for (let k = 0; k < 6; k++) minorLines.push(`${name}${EXTENSIONS[k % EXTENSIONS.length]}`);
+    for (let k = 0; k < 2; k++) minorLines.push(`${name}${EXTENSIONS[k % EXTENSIONS.length]}`);
   }
 
   const allDialogueCues = [...majorLines, ...minorLines];
@@ -622,6 +637,242 @@ describe('MAX_FOUNTAIN_CUE_WEIGHT / MAX_FOUNTAIN_FREQUENT_CUE_LINES — cost bou
       }
     }
     assert.equal(fountainShapeRejectionReason(text), null);
+  });
+});
+
+// ── ROUND 2 (2026-09-05 independent review of the round-1 lane, BLOCKER):
+// the union predicate and the oracle are correct — the ACCEPTED region
+// contained requests costing 22s-5m44s. See validation.ts's own long
+// comment above MAX_FOUNTAIN_TOKEN_CHARS for the full measurement, the
+// driver (voice-delta.ts's analyzeVoices, O(distinct²) Burrows's-Delta
+// pairs, all-or-nothing on whether every character clears MIN_WORDS=30),
+// and the cost grid this fix is calibrated from.
+describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer payloads are rejected, a realistic feature is not', () => {
+  const DLG = 'this is ordinary lowercase dialogue here.'; // 7 words
+
+  // Same generator shape the review's own dsweep.mjs/http9b.mjs probes used:
+  // uniform cast, one ordinary lowercase dialogue line per cue, 40 cues per
+  // scene heading.
+  function uniformCast(distinct: number, occurrences: number): string {
+    let t = 'INT. ROOM - DAY\n\n', occ = 0, scene = 0;
+    while (occ < occurrences) {
+      t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room, quietly and without much fuss.\n\n`;
+      for (let i = 0; i < 40 && occ < occurrences; i++, occ++) t += `CHAR${occ % distinct}\n${DLG}\n\n`;
+    }
+    return t;
+  }
+
+  it('reviewer payload 1: 50 distinct ALL-CAPS names x 18,000 ordinary cue+dialogue pairs (measured: ACCEPT, runScriptDoctor 71,880ms over HTTP) is now rejected', () => {
+    const text = uniformCast(50, 18_000);
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the voice-eligible-weight bound to reject this payload');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  it('reviewer payload 2: 520 distinct x 6,000 (measured: ACCEPT, runScriptDoctor 322,435ms) is now rejected', () => {
+    const text = uniformCast(520, 6_000);
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the voice-eligible-weight bound to reject this payload');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  // The review's own "plausible feature" cue metrics (distinct=520,
+  // occurrences~6,300, frequentCount=8): 8 leads carrying most of the
+  // dialogue plus 512 "minors" who each speak often enough (via modulo
+  // cycling across a long document) to individually clear MIN_WORDS=30 —
+  // measured ACCEPT, runScriptDoctor 343,598ms (5m44s).
+  function plausibleShapeCueMetrics(): string {
+    const leads = Array.from({ length: 8 }, (_, i) => `LEAD${i}`);
+    const others = Array.from({ length: 512 }, (_, i) => `MINOR ${i}`);
+    let t = '', occ = 0, scene = 0, oi = 0;
+    while (occ < 6300) {
+      t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room, quietly and without much fuss.\n\n`;
+      for (let i = 0; i < 20 && occ < 6300; i++, occ++) { t += `${leads[occ % 8]}\n${DLG}\n\n`; }
+      for (let i = 0; i < 33 && occ < 6300; i++, occ++) { t += `${others[(oi++) % 512]}\n${DLG}\n\n`; }
+    }
+    return t;
+  }
+
+  it('reviewer payload 3: the repo\'s own "plausible feature" cue metrics (distinct=520 occurrences~6,300 frequentCount=8, measured ACCEPT, runScriptDoctor 343,598ms) is now rejected', () => {
+    const text = plausibleShapeCueMetrics();
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the voice-eligible-weight bound to reject this payload');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  // The realistic-feature counterpart: 150 distinct names, a REALISTIC
+  // skew (a handful of majors carrying most of the ~25,000 words, a long
+  // tail of minors kept to one-or-two short lines each — real screenplays
+  // are built this way; a uniform cast where every name is equally
+  // talkative, which IS what the three payloads above are, is not), ~3,000
+  // dialogue blocks total. Every minor stays under MIN_WORDS=30, so the
+  // eligibility check never fires at all — the same mechanism that keeps
+  // buildPlausibleFeature() above safe.
+  function realisticSkewedFeature(): { text: string; distinctNames: number; occurrences: number; wordCount: number } {
+    const MAJOR_COUNT = 12;
+    const MINOR_COUNT = 138; // 12 + 138 = 150 distinct names
+    const majors = Array.from({ length: MAJOR_COUNT }, (_, i) => `PROTAGONIST${i}`);
+    const minors = Array.from({ length: MINOR_COUNT }, (_, i) => `EXTRA${i}`);
+    const words = ['the', 'plan', 'was', 'never', 'going', 'to', 'work', 'like', 'this', 'again', 'tonight', 'trust', 'me', 'now', 'wait', 'listen'];
+    let seed = 0;
+    const line = (n: number): string => {
+      const ws = Array.from({ length: n }, () => words[seed++ % words.length]);
+      return `${ws[0]![0]!.toUpperCase()}${ws[0]!.slice(1)} ${ws.slice(1).join(' ')}.`;
+    };
+    // Majors: ~200 occurrences each x 12 = 2,400 dialogue blocks, ~9 words
+    // per line -> the bulk of the script's ~25,000 words.
+    const majorBlocks: string[] = [];
+    for (const name of majors) for (let k = 0; k < 200; k++) majorBlocks.push(name);
+    // Minors: exactly 2 short (4-word) lines each -> 138 x 2 = 276 blocks,
+    // ~8 words per minor, comfortably under MIN_WORDS=30.
+    const minorBlocks: string[] = [];
+    for (const name of minors) for (let k = 0; k < 2; k++) minorBlocks.push(name);
+    const allBlocks = [...majorBlocks, ...minorBlocks];
+    for (let i = allBlocks.length - 1; i > 0; i--) {
+      const j = (i * 2654435761) % (i + 1);
+      [allBlocks[i], allBlocks[j]] = [allBlocks[j]!, allBlocks[i]!];
+    }
+    let text = '', idx = 0;
+    const perScene = 30;
+    let scene = 0;
+    while (idx < allBlocks.length) {
+      text += `INT. LOCATION ${scene++} - DAY\n\nA moment passes before anyone speaks.\n\n`;
+      for (let k = 0; k < perScene && idx < allBlocks.length; k++, idx++) {
+        const name = allBlocks[idx]!;
+        const isMajor = name.startsWith('PROTAGONIST');
+        text += `${name}\n${line(isMajor ? 9 : 4)}\n\n`;
+      }
+    }
+    const wordCount = text.split(/\s+/).filter(Boolean).length;
+    return { text, distinctNames: MAJOR_COUNT + MINOR_COUNT, occurrences: allBlocks.length, wordCount };
+  }
+
+  it('a realistic 150-name skewed feature (~3,000 dialogue blocks, ~25,000 words) is ACCEPTED, with >= 3x headroom on every OTHER bound', () => {
+    const { text, distinctNames, occurrences, wordCount } = realisticSkewedFeature();
+    assert.equal(distinctNames, 150);
+    assert.ok(occurrences >= 2_600 && occurrences <= 3_400, `expected ~3,000 dialogue blocks, got ${occurrences}`);
+    assert.ok(wordCount >= 20_000, `expected a realistic word count, got ${wordCount}`);
+
+    const reason = fountainShapeRejectionReason(text);
+    assert.equal(reason, null, `expected this realistic feature to be accepted, got: ${reason}`);
+
+    // Headroom proof (brief item (d)) on the three PRE-EXISTING bounds, the
+    // same way buildPlausibleFeature()'s own margin-proof test above does —
+    // this fixture is deliberately built with 150 distinct names and ~3,000
+    // occurrences, so it exercises them for real.
+    const { distinct, weight, frequentCount } = cueMetricsOf(text);
+    const vocabMargin = MAX_FOUNTAIN_DISTINCT_CUE_LINES / distinct;
+    const weightMargin = MAX_FOUNTAIN_CUE_WEIGHT / weight;
+    const frequentMargin = MAX_FOUNTAIN_FREQUENT_CUE_LINES / Math.max(1, frequentCount);
+    assert.ok(vocabMargin >= 3, `vocabulary margin too thin: ${vocabMargin.toFixed(2)}x (distinct=${distinct})`);
+    assert.ok(weightMargin >= 3, `weight margin too thin: ${weightMargin.toFixed(2)}x (weight=${weight})`);
+    assert.ok(frequentMargin >= 3, `frequent-line margin too thin: ${frequentMargin.toFixed(2)}x (frequentCount=${frequentCount})`);
+
+    // The NEW bound (MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) needs a DIFFERENT
+    // honesty statement than a plain ratio: it is all-or-nothing (see its
+    // own comment) — it evaluates a weight AT ALL only once every distinct
+    // character clears MIN_WORDS=30, which this fixture's minors (2 short
+    // lines each) deliberately do not. So the guard never reaches this
+    // bound for this fixture — a stronger guarantee than any finite margin
+    // ("never at risk" rather than "currently under the line"), which is
+    // also exactly the mechanism that makes a REAL 150-named-character
+    // feature (which always has some genuine one-off walk-on parts) safe in
+    // production. Reported here as the hypothetical margin IF every
+    // character were eligible, purely to show the raw numbers, followed by
+    // the honest statement of why that hypothetical does not apply.
+    const wordsByBaseName = new Map<string, number>();
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i]!.trim();
+      if (/^(PROTAGONIST|EXTRA)\d+$/.test(t) && i + 1 < lines.length) {
+        const dialogueWordCount = lines[i + 1]!.trim().split(/\s+/).filter(Boolean).length;
+        wordsByBaseName.set(t, (wordsByBaseName.get(t) ?? 0) + dialogueWordCount);
+      }
+    }
+    const eligibleCount = [...wordsByBaseName.values()].filter((w) => w >= 30).length;
+    const totalWordsIfAllEligible = [...wordsByBaseName.values()].reduce((a, b) => a + b, 0);
+    const hypotheticalWeight = wordsByBaseName.size * totalWordsIfAllEligible;
+    console.log(
+      `realistic feature: distinct=${distinct} occurrences=${occurrences} words=${wordCount} `
+      + `vocabMargin=${vocabMargin.toFixed(1)}x weightMargin=${weightMargin.toFixed(1)}x frequentMargin=${frequentMargin.toFixed(1)}x | `
+      + `voice-eligible-weight: ${eligibleCount} of ${wordsByBaseName.size} base names individually clear MIN_WORDS=30 `
+      + `(NOT all of them, by design — the ${wordsByBaseName.size - eligibleCount} minors under the floor keep the `
+      + `all-or-nothing bound from ever evaluating a weight for this fixture at all — the hypothetical `
+      + `weight IF every one of them were eligible would be ${hypotheticalWeight} against a ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} `
+      + `bound, i.e. this fixture works BECAUSE it does not try to clear that hypothetical, the same way a real script would)`,
+    );
+    assert.ok(eligibleCount < wordsByBaseName.size, 'sanity: this fixture must have at least one under-threshold minor, or it is not testing the mechanism it claims to');
+  });
+
+  // Bound-headroom test (brief item (d)): every already-tracked fixture the
+  // repo relies on staying accepted, checked directly against the NEW
+  // bound with an explicit >= 3x margin assertion — so a future
+  // recalibration that erodes this margin shows up here as a failing
+  // number, not a silent behavior change.
+  it('every legitimate fixture measured against MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT clears it with >= 3x headroom', async () => {
+    async function voiceEligibleWeightOf(text: string): Promise<number | null> {
+      // Recomputes the SAME metric the guard's own final check uses,
+      // against the SAME walk (via the exported guardCueOccurrences'
+      // sibling concept) — but since dialogueWords/voiceKey are internal to
+      // walkGuardCueOccurrences, this recomputes them the same way
+      // fountainShapeRejectionReason's own header documents: per-base-name
+      // (extension-stripped) pooled word count, product of distinct-count x
+      // total-pooled-words, ONLY when every distinct name individually
+      // clears 30 words (mirrors voice-delta.ts's own MIN_WORDS). Returns
+      // null when not every name is eligible (the bound would not even be
+      // evaluated on this text) — a null margin is the SAFEST outcome, not
+      // a gap in the proof.
+      const lines = text.split('\n');
+      const CUE_RE = /^[A-Z][A-Z0-9 '.\-#]*$/;
+      const wordsByName = new Map<string, number>();
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]!.trim();
+        if (line.length === 0 || !CUE_RE.test(line) || line.length > 40) continue;
+        const next = i + 1 < lines.length ? lines[i + 1]!.trim() : '';
+        if (next === '' || CUE_RE.test(next)) continue;
+        const baseName = line
+          .replace(/\^\s*$/, '')
+          .replace(/\(\s*V\.O\.\s*\)/gi, '')
+          .replace(/\(\s*O\.S\.\s*\)/gi, '')
+          .replace(/\(\s*CONT'?D\s*\)/gi, '')
+          .trim();
+        const words = next.split(/\s+/).filter(Boolean).length;
+        wordsByName.set(baseName, (wordsByName.get(baseName) ?? 0) + words);
+      }
+      if (wordsByName.size < 2) return 0;
+      let total = 0;
+      for (const w of wordsByName.values()) {
+        if (w < 30) return null; // not every name eligible — bound never fires
+        total += w;
+      }
+      return wordsByName.size * total;
+    }
+
+    const { REFERENCE_CORPUS } = await import('../../server/nvm/analyze/calibration/corpus.ts');
+    const { fountain: p0SampleFountain } = await import('../../src/lib/sample-script.ts');
+    const texts: Array<{ name: string; text: string }> = [
+      { name: 'P0 sample', text: p0SampleFountain },
+      ...REFERENCE_CORPUS.map((s: { label: string; fountain: string }) => ({ name: `calibration/${s.label}`, text: s.fountain })),
+      ...trackedFountainFiles().map((f) => ({ name: path.relative(REPO_ROOT, f), text: readFileSync(f, 'utf8') })),
+    ];
+
+    let worstMargin = Infinity;
+    let worstName = '';
+    for (const { name, text } of texts) {
+      const weight = await voiceEligibleWeightOf(text);
+      if (weight === null || weight === 0) continue; // never reaches the bound at all — infinite margin
+      const margin = MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT / weight;
+      assert.ok(
+        margin >= 3,
+        `${name}: voice-eligible weight ${weight} clears the ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} bound with only ${margin.toFixed(2)}x headroom (< 3x)`,
+      );
+      if (margin < worstMargin) { worstMargin = margin; worstName = name; }
+    }
+    console.log(
+      worstMargin === Infinity
+        ? 'voice-eligible-weight headroom: no tracked fixture ever reaches full eligibility (every one has a sub-30-word character) — infinite margin by construction'
+        : `voice-eligible-weight headroom: worst tracked fixture is "${worstName}" at ${worstMargin.toFixed(1)}x`,
+    );
   });
 });
 

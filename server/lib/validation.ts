@@ -385,7 +385,13 @@ function ssrfSafeUrlField() {
 //
 // Original distinct x repeat-count grid (kept for the record — it is what
 // this file's weight bound was originally, and still is partly, calibrated
-// against; it just never sampled the corners above):
+// against; it just never sampled the corners above). CORRECTION (2026-09-05
+// review round 2): the "ms" column below times fountainShapeRejectionReason
+// ITSELF (a single O(length) scan) — every row past distinct=50/repeats=20
+// is REJECTED by the bounds these numbers calibrate, so the doctor never
+// ran on any of them. This grid answers "is the GUARD fast", never "is a
+// payload the guard ACCEPTS safe to score" — see the round-2 grid below for
+// that question, which this one never asked:
 //   distinct repeats occurrences  chars     ms   distinct*occurrences
 //         50       1          50    957     34                  2,500
 //         50       5         250  4,717     46                 12,500
@@ -400,12 +406,105 @@ function ssrfSafeUrlField() {
 //      1,500       5       7,500 151,967 9,431             11,250,000
 //      1,500      20      30,000 607,817 32,684             45,000,000
 //
-// Measured (tests/security/fountain-shape-guard-cue-parity.test.ts's own
-// "margin proof" describe block, numbers logged on every run, against the
-// FINAL three-bound design): a synthesized PLAUSIBLE feature-length script —
-// majors and minors in a realistic skewed distribution, (V.O.)/(O.S.)/
-// (CONT'D) extension variants, caps-heavy action — clears all three bounds;
-// see that test's own log line for the exact numbers.
+// ── 2026-09-05 review, round 2 (BLOCKER): the ACCEPTED region contained
+// requests costing 22s-5m44s ────────────────────────────────────────────────
+// The round-1 union-predicate fix (isCueLikeLine above) is correct — an
+// independent review's own 40-shape sweep found zero oracle violations. The
+// round-1 REVIEW then broke the guard on the one axis the oracle cannot
+// see: it counts every cue correctly and still ACCEPTS a request expensive
+// enough to matter. Reproduced on this tree, `runScriptDoctor` timed
+// directly (not HTTP, not the guard): 50 distinct ALL-CAPS names x 18,000
+// ordinary cue+dialogue pairs (860,417 chars) -> ACCEPT, 71,880ms; 520
+// distinct x 6,000 (317,770 chars) -> ACCEPT, 322,435ms; the repo's own
+// "plausible feature" cue metrics (distinct=520 occurrences=6,300
+// frequentCount=8) -> ACCEPT, 343,598ms. `MAX_FOUNTAIN_FREQUENT_CUE_LINES`
+// (below) fires only once a line occurs MORE than 15 times and only once
+// MORE than 50 such lines exist, so a 50-name cast at exactly 360 lines
+// each (50 frequent lines, not "more than" 50) and a 520-name cast at 11
+// lines each (11 < 15, zero frequent lines) are BOTH invisible to it, while
+// `MAX_FOUNTAIN_CUE_WEIGHT = 10,000,000` sits 3-11x above the weights that
+// actually cost minutes.
+//
+// THE DRIVER (found by profiling `runScriptDoctor` with `node --prof`, the
+// same method the boneyard bounds above were calibrated with — read, never
+// edited): `server/nvm/analyze/voice-delta.ts`'s `analyzeVoices` computes
+// Burrows's Delta for EVERY PAIR of named characters — O(distinct²) pairs,
+// each re-tokenizing both characters' full pooled dialogue once per
+// function word (~50), so cost per pair scales with how much each character
+// says. Critically, `analyzeVoices` ABSTAINS ENTIRELY — zero pairs, near-
+// zero cost — the moment ANY one character's pooled dialogue is under
+// MIN_WORDS=30 (voice-delta.ts's own constant). This is a binary switch:
+// once every distinct character clears 30 words, cost is driven by
+// (eligible-character-count) x (their total pooled words); the instant even
+// ONE character stays under it, the whole computation is skipped. That
+// explains everything the flat "weight" bound could not: a 40-major/
+// 480-minor cast at the SAME nominal weight as the dangerous 520-uniform
+// cast costs 4.0s, not 322s, because its one-line minors sit under 30 words
+// and knock the whole analysis out before it starts. Measured directly
+// (`runScriptDoctor`, this tree, same generator, only the per-character line
+// count varies): distinct=50, 4 lines/character (28 words) -> 50ms;
+// 5 lines/character (35 words, crossing MIN_WORDS) -> 1,835ms — the switch
+// flips in exactly the one-line gap the theory predicts.
+//
+// ROUND-2 COST GRID (uniform cast — every character speaks the SAME number
+// of times, the shape that stays voice-eligible longest and is therefore
+// the one that finds the ceiling; `runScriptDoctor` timed directly, this
+// tree, one run each, box load 2-3 from concurrent lanes so these are
+// pessimistic, not optimistic):
+//   distinct occurrences words/char  chars    ms       verdict
+//          5        300         2.8   15,388     187    accept (not eligible)
+//          5      1,500        14.0   76,796     763    accept (not eligible)
+//          5      6,000        56.0  307,090   3,183    accept (eligible, tiny N)
+//          5     18,000       168.0  921,490   7,952    accept (eligible, tiny N)
+//         20      6,000        14.0  310,090   9,730    accept (borderline)
+//         20     18,000        42.0  930,490  26,696    accept (eligible)
+//         50        100         1.4       —        54    accept (not eligible)
+//         50        250         4.9       —     1,835    accept (JUST eligible)
+//         50        300         6.0   15,628   2,313    accept (eligible)
+//         50      1,500        30.0   77,996   6,641    accept (eligible)
+//         50      6,000       120.0  311,890  23,583    accept (eligible)
+//         50     18,000       360.0  935,890  62,764    accept (eligible) <- 71,880ms over HTTP
+//        150        300         2.0   15,768     151    accept (not eligible)
+//        150      1,500        10.0   78,696  23,909    accept (eligible)
+//        150      3,000+       20.0+     —        —     REJECTED (frequent-cue-lines, pre-existing)
+//        520      1,500         2.9   79,466     983    accept (NOT eligible — under 30 words/char)
+//        520      3,000         5.8  158,855 221,466    accept (eligible)      <- crosses 30 words/char
+//        520      6,000        11.5  317,770 322,435    accept (eligible)      <- the review's own number
+// Fitting cost ~= C x (eligible-distinct-count) x (total pooled words among
+// eligible characters) against the four ACCEPTED-and-eligible extremes above
+// (distinct=50@6,000/18,000, distinct=520@3,000/6,000) gives C in
+// 0.01-0.022 ms per unit — noisy (concurrent load, GC), but consistently
+// the right ORDER of magnitude across a 60x span of that product, and it is
+// the only single quantity that explains why distinct=520@1,500 (983ms) and
+// distinct=520@6,000 (322,435ms) — same distinct count, same nominal
+// "weight" shape, 4x the occurrences — differ by 328x: the first is under
+// MIN_WORDS, the second is not.
+//
+// THE FIX (MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT below): track, per distinct
+// character (grouped by BASE NAME — stripping (V.O.)/(O.S.)/(CONT'D) the
+// same way fountain-analyzer.ts's normalizeCharacterName does before
+// voice-delta.ts ever sees the pooled dialogue, so "JOX" and "JOX (V.O.)"
+// count as the one character they are to the real cost, not two cheaper
+// halves), the accumulated word count of the dialogue following each of its
+// occurrences. If — and only if — EVERY distinct character in the document
+// clears VOICE_ELIGIBLE_MIN_WORDS (mirroring analyzeVoices's own
+// abstention floor: the one condition under which the expensive path can
+// run at all), reject once (eligible-character-count) x (their total
+// pooled words) crosses MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT. A script with
+// ANY one-line walk-on character — the overwhelming norm; real scripts
+// almost always have at least one — never reaches this check at all,
+// matching why every legitimate fixture measured below (54 tracked
+// fixtures, the CC0 corpus, a realistic 150-name skewed feature) clears it
+// with room to spare, while a cast where every single name is uniformly
+// talkative — a shape no real 120-page script has — does not.
+//
+// CORRECTION to this file's own prior claim: the round-1 oracle
+// (guardCueOccurrences >= pipeline character-block count, proven below) is
+// real and holds on every payload in both grids above — it proves the guard
+// SEES every character block the pipeline will produce. It says nothing
+// about whether the guard REJECTS a seen-and-expensive shape in time; that
+// is what MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT closes, and it is a genuinely
+// separate property from the oracle, not a corollary of it.
 export const MAX_FOUNTAIN_TOKEN_CHARS = 2_000;
 export const MAX_FOUNTAIN_DISTINCT_CUE_LINES = 1_500;
 // Cost bound, not a vocabulary bound: distinct cue-shaped lines multiplied by
@@ -437,6 +536,33 @@ export const FREQUENT_CUE_OCCURRENCE_THRESHOLD = 15;
 // un-fire once it has fired), so a pathological payload is rejected as soon
 // as it crosses this budget, not only after the full document is scanned.
 export const MAX_FOUNTAIN_FREQUENT_CUE_LINES = 50;
+// ── Voice-eligibility cost bound (2026-09-05 review round 2) ────────────────
+// See the long comment above MAX_FOUNTAIN_TOKEN_CHARS for the full
+// measurement, the driver (voice-delta.ts's analyzeVoices, O(distinct²)
+// Burrows's-Delta pairs, all-or-nothing on whether every character clears
+// this many words), and the cost grid. Mirrors voice-delta.ts's own
+// MIN_WORDS constant (not imported — see stripCueExtensionForVoiceGrouping's
+// own comment for why this file replicates rather than couples to a
+// scoring-path module) — kept at the SAME value deliberately, because
+// countWords() below OVER-counts relative to voice-delta's own
+// letter-only tokenizer (see that function's own comment), so matching
+// the real threshold rather than shading it down stays on the safe side
+// without giving up any real script's legitimate short-dialogue characters
+// to a stricter-than-necessary floor.
+const VOICE_ELIGIBLE_MIN_WORDS = 30;
+// Cost bound: once every distinct character in the document (grouped by
+// base name — see voiceKey's own comment) individually clears
+// VOICE_ELIGIBLE_MIN_WORDS — the one condition under which voice-delta.ts's
+// O(distinct²) Burrows's-Delta pass actually runs instead of abstaining —
+// (eligible character count) x (their total pooled dialogue words) must not
+// exceed this. Calibrated from the round-2 cost grid: the four measured
+// ACCEPTED-and-eligible extremes cost 0.01-0.022ms per unit of this
+// product; 300,000 x the worst observed rate (0.022ms/unit) predicts a
+// ~6.6s ceiling, comfortably under the review's ~10s target with margin for
+// a slower box. Every legitimate fixture measured against this bound (the
+// 54 tracked fixtures, the CC0 corpus, a realistic 150-name skewed feature)
+// clears it by at least 3x — see this file's own margin-proof test.
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 300_000;
 // ── Boneyard bounds (2026-09-05 review finding A3) ──────────────────────────
 // A `/* … */` boneyard is never a `character`/`dialogue` block to the
 // analyzer's own scene-content extraction (extractSceneContent,
@@ -562,10 +688,62 @@ const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
 
 /** One occurrence the guard counts against ITS OWN bounds — either a
  *  real-script cue+dialogue candidate or one found inside a `/* boneyard *\/`
- *  comment (tracked separately; see MAX_FOUNTAIN_BONEYARD_*'s own comment). */
+ *  comment (tracked separately; see MAX_FOUNTAIN_BONEYARD_*'s own comment).
+ *  `dialogueWords`/`voiceKey` (2026-09-05 review round 2, finding "the cost
+ *  bounds are miscalibrated") are populated ONLY for a real-script (non-
+ *  boneyard) occurrence — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own
+ *  comment for what they drive and why. */
 interface GuardCueOccurrence {
   line: string;
   boneyard: boolean;
+  /** Word count of the dialogue text this cue occurrence introduces (the
+   *  immediate next line, or the first non-blank line past a blank-line
+   *  gap — the same line the R7/UPDATE-3 context check above already
+   *  located). 0 for a boneyard occurrence. */
+  dialogueWords: number;
+  /** `line` with any (V.O.)/(O.S.)/(CONT'D) tail and trailing caret
+   *  stripped — the SAME base-name grouping fountain-analyzer.ts's
+   *  normalizeCharacterName performs before voice-delta.ts ever sees a
+   *  character's dialogue (see that function's own comment). Two distinct
+   *  GUARD cue lines ("JOX" and "JOX (V.O.)") are two different vocabulary
+   *  entries for the bounds above, but ONE character's pooled dialogue to
+   *  voice-delta.ts's analyzeVoices — grouping by `line` instead of this key
+   *  would UNDER-count a character's true accumulated word total by
+   *  splitting it across its extension variants, which is exactly the
+   *  wrong direction for a cost-safety bound to be wrong in. '' for a
+   *  boneyard occurrence. */
+  voiceKey: string;
+}
+
+/** Strips (V.O.)/(O.S.)/(CONT'D) and a trailing caret — mirrors
+ *  server/nvm/analyze/fountain-analyzer.ts's normalizeCharacterName (a
+ *  scoring-path function, replicated rather than imported — the same
+ *  established pattern this file already uses for src/lib/fountain.ts's
+ *  parseFountain `inBoneyard` toggle and CHARACTER_CUE_RE's own shape,
+ *  documented rather than coupled by an import edge into the scoring path).
+ *  Read 2026-09-05 to find the driver behind the round-2 review's cost-bound
+ *  finding; NOT edited. */
+function stripCueExtensionForVoiceGrouping(line: string): string {
+  return line
+    .replace(/\^\s*$/, '')
+    .replace(/\(\s*V\.O\.\s*\)/gi, '')
+    .replace(/\(\s*O\.S\.\s*\)/gi, '')
+    .replace(/\(\s*CONT'?D\s*\)/gi, '')
+    .trim();
+}
+
+/** Cheap word-count proxy: every whitespace-delimited token counts, unlike
+ *  voice-delta.ts's own tokenize() (server/nvm/analyze/voice-delta.ts),
+ *  which keeps only `[a-z']+` runs after lowercasing — so this OVER-counts
+ *  relative to the real function-word tokenizer for text containing bare
+ *  numbers or punctuation-only tokens. That is the safe direction for a
+ *  guard whose job is to never UNDER-estimate how close a character is to
+ *  voice-delta's own MIN_WORDS floor (VOICE_ELIGIBLE_MIN_WORDS below) —
+ *  under-counting could let a genuinely eligible (and therefore expensive)
+ *  character read as ineligible and skip the bound entirely. */
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed === '' ? 0 : trimmed.split(/\s+/).length;
 }
 
 /** The single walk both fountainShapeRejectionReason (which applies the cost
@@ -602,7 +780,7 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
       // bounds rather than either being ignored outright or folded into the
       // real-script bounds above.
       if (!SCENE_HEADING_PREFIX_RE.test(line) && isCueLikeLine(line)) {
-        yield { line, boneyard: true };
+        yield { line, boneyard: true, dialogueWords: 0, voiceKey: '' };
       }
       if (line.includes('*/') && !(line.startsWith('/*') && !line.includes('*/'))) {
         inBoneyard = false;
@@ -701,6 +879,12 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
     // normalizeScreenplay's reflow regardless of what comes after the gap.
     const immediateDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
     let nextLineIsDialogue = immediateDialogue;
+    // Index of the dialogue line this cue occurrence introduces — captured
+    // alongside nextLineIsDialogue's own decision (2026-09-05 review round
+    // 2) so the word-count tracking below reads exactly the line the
+    // decision above already located, never a second, possibly-different
+    // guess at "which line is the dialogue".
+    let dialogueLineIdx = i + 1;
     if (!nextLineIsDialogue) {
       // lines[i+1] is blank (or i is the last line) — scan past every
       // consecutive blank line to confirm there IS a next non-blank line at
@@ -714,9 +898,15 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
       let j = i + 1;
       while (j < lines.length && lines[j]!.trim() === '') j++;
       nextLineIsDialogue = j < lines.length && isCharacterCue(line);
+      dialogueLineIdx = j;
     }
     if (!nextLineIsDialogue) continue;
-    yield { line, boneyard: false };
+    yield {
+      line,
+      boneyard: false,
+      dialogueWords: dialogueLineIdx < lines.length ? countWords(lines[dialogueLineIdx]!) : 0,
+      voiceKey: stripCueExtensionForVoiceGrouping(line),
+    };
   }
 }
 
@@ -738,6 +928,16 @@ export function fountainShapeRejectionReason(text: string): string | null {
   const boneyardCueLineCounts = new Map<string, number>();
   let boneyardCueOccurrences = 0;
   let boneyardFrequentCueLineCount = 0;
+  // Voice-eligibility cost bound (2026-09-05 review round 2) — see
+  // MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment. Keyed by voiceKey
+  // (base name, extension tags stripped), NOT `occ.line` — the same
+  // grouping voice-delta.ts's analyzeVoices actually pools dialogue by, so
+  // "JOX" and "JOX (V.O.)" accumulate into ONE running total, matching the
+  // real character's true word count rather than splitting it across
+  // cheaper-looking halves. Boneyard occurrences never touch this map
+  // (dialogueWords/voiceKey are 0/'' for them — see GuardCueOccurrence's own
+  // comment) since boneyard content never reaches voiceAnalysis either.
+  const voiceWordCounts = new Map<string, number>();
 
   for (const occ of walkGuardCueOccurrences(text)) {
     if (occ.boneyard) {
@@ -765,6 +965,7 @@ export function fountainShapeRejectionReason(text: string): string | null {
     const occurrencesOfThisLine = (cueLineCounts.get(occ.line) ?? 0) + 1;
     cueLineCounts.set(occ.line, occurrencesOfThisLine);
     cueLineOccurrences++;
+    voiceWordCounts.set(occ.voiceKey, (voiceWordCounts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
     if (cueLineCounts.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
       return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
     }
@@ -778,6 +979,33 @@ export function fountainShapeRejectionReason(text: string): string | null {
       frequentCueLineCount++;
       if (frequentCueLineCount > MAX_FOUNTAIN_FREQUENT_CUE_LINES) {
         return `must not contain more than ${MAX_FOUNTAIN_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times \u2014 bound MAX_FOUNTAIN_FREQUENT_CUE_LINES, a cost bound on how many DIFFERENT cue-shaped lines repeat often, distinct from the vocabulary and product bounds above`;
+      }
+    }
+  }
+  // Voice-eligibility cost bound (2026-09-05 review round 2) \u2014 deferred to
+  // the END of the scan, unlike the three incremental bounds above, because
+  // a character's TOTAL word count (and therefore whether it clears
+  // VOICE_ELIGIBLE_MIN_WORDS) is not known until every one of its
+  // occurrences, wherever they fall in the document, has been seen. Still
+  // one O(length) pass overall \u2014 this is an O(distinct-character-count)
+  // reduction afterward, bounded by MAX_FOUNTAIN_DISTINCT_CUE_LINES already
+  // enforced above. Fires ONLY when every distinct character clears the
+  // floor \u2014 the one condition under which voice-delta.ts's O(distinct\u00b2)
+  // pass actually runs instead of abstaining (see MAX_FOUNTAIN_VOICE_
+  // ELIGIBLE_WEIGHT's own comment) \u2014 so a script with even one real
+  // one-line walk-on character, which is nearly every real script, never
+  // reaches this check at all.
+  if (voiceWordCounts.size >= 2) {
+    let allEligible = true;
+    let totalEligibleWords = 0;
+    for (const words of voiceWordCounts.values()) {
+      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
+      totalEligibleWords += words;
+    }
+    if (allEligible) {
+      const voiceEligibleWeight = voiceWordCounts.size * totalEligibleWords;
+      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
+        return `must not contain more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in (distinct speaking characters \u00d7 their total pooled dialogue words) once every character has enough dialogue to be individually voice-scored \u2014 bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
       }
     }
   }

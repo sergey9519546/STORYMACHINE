@@ -2087,6 +2087,15 @@ type FixVerifyReceipt = FixVerifyResultWithSignals & {
   field?: "fountain" | "candidateFountain";
   reason?: string;
   hint?: string;
+  // 2026-09-05 review round 2, finding D4 stops at the wire — fix-delta.ts's
+  // buildVerifyReceipt has shipped this since round 1, but nothing in src/
+  // read it, so a whitespace-only edit (different contentHash, byte-
+  // identical analysis) still rendered as two bare hashes with no sentence
+  // explaining they measure the same thing. True whenever there is no
+  // MEASURED difference — either the hashes already agree, or health and
+  // every issue match despite the hashes disagreeing (see fix-delta.ts's
+  // own comment).
+  identicalAnalysis?: boolean;
 };
 
 interface FixRunState {
@@ -2344,6 +2353,19 @@ function FixReceiptCard({
         {verdictChanged && (
           <span className="uppercase font-bold flex items-center gap-1">
             {before.verdict} &rarr; {after.verdict}
+          </span>
+        )}
+        {/* 2026-09-05 review round 2, finding D4 — normalizeScreenplay strips
+            PER-LINE trailing whitespace before anything reads the text, but
+            computeContentHash is a whole-document trim() only, so an edit
+            that only adds trailing spaces changes the hash while producing a
+            byte-identical analysis. Rendered ONLY when the hashes actually
+            disagree (before.contentHash !== after.contentHash) — when they
+            already match, the health/verdict readout above already says
+            "nothing changed" and a second sentence would be noise. */}
+        {result.identicalAnalysis && before.contentHash !== after.contentHash && (
+          <span className="text-[10px] font-mono opacity-75 normal-case tracking-normal">
+            No measured difference — the two versions analyze identically despite differing only in whitespace the analyzer already ignores.
           </span>
         )}
       </div>
