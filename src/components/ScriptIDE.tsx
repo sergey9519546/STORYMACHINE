@@ -2316,8 +2316,9 @@ export default function ScriptIDE({
   // run is in flight or about to start on this very commit" is a fact this
   // parent already holds, not one it has to wait to be told. `doctorAutoSample`
   // is cleared back to false only once the sample text is actually installed
-  // into the draft (ScriptIDE's own `onLoadSampleIntoEditor`), which happens
-  // in the SAME call as `onReportComputed` — so `coverageReport` is already
+  // into the draft (this component's own sample-install prop, wired to
+  // CoverageSummary below), which happens in the SAME call as
+  // `onReportComputed` — so `coverageReport` is already
   // set by the time this clause's contribution would otherwise go stale.
   const coverageSummaryLoadingCold =
     !coverageReport && (coverageSummaryStatus === "loading" || (toolSlot === "coverage" && doctorAutoSample));
