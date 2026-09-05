@@ -509,24 +509,46 @@ export function fountainShapeRejectionReason(text: string): string | null {
     // ("all have real dialogue immediately following" was therefore a false
     // claim about the double-spaced shape specifically — it does not.)
     //
-    // Fixed by admitting ONE more shape: a cue immediately followed by
-    // exactly one blank line and then non-blank content — but ONLY when
+    // Fixed by admitting a second shape: a cue followed by ANY number of
+    // consecutive blank lines and then non-blank content — but ONLY when
     // that content does not ITSELF look cue-shaped. That second clause is
     // what keeps this from re-opening the R4 hole: a double-spaced cue's
     // dialogue is ordinary mixed-case prose (never matches isCueLikeLine),
     // while the R4 caps-heavy-action fixture's shape is a chain of
-    // ALL-CAPS emphasis lines each separated by one blank line — i.e. the
-    // "content" after the blank is ANOTHER cue-shaped line, not dialogue,
-    // so it is correctly excluded by this same clause. Verified against
-    // both fixtures below (this file's own committed tests): the
-    // double-spaced fixture now counts every cue and is rejected; the R4
-    // caps-heavy-action fixture still counts zero and is accepted.
+    // ALL-CAPS emphasis lines each separated by blank lines — i.e. the
+    // "content" after the blank run is ANOTHER cue-shaped line, not
+    // dialogue, so it is correctly excluded by this same clause.
+    //
+    // 2026-09-05 UPDATE (third independent review, same day): the FIRST
+    // version of this fix probed only lines[i+1]/lines[i+2] — i.e. it
+    // re-admitted a gap of EXACTLY one blank line. isDoubleSpaced
+    // (server/nvm/analyze/screenplay-normalizer.ts) fires on ANY gap >= 1
+    // and normalizeScreenplay's reflow FILTERS OUT EVERY BLANK LINE before
+    // re-blocking the script (`lines = allLines.filter(l => l.trim() !==
+    // '')`) — so a cue separated from its dialogue by 2, 3, or more blank
+    // lines is reflowed and parsed as a real cue by the actual pipeline
+    // exactly the same as a 1-blank-line gap, and was STILL invisible to
+    // the fixed-offset probe. Measured: a 2-blank-line-gap payload
+    // (distinct=600, occurrences=12,000, 203 KB) was guard-accepted;
+    // POST /api/scriptide/doctor answered 200 in 85,388 ms. Fixed by
+    // replacing the fixed i+1/i+2 probe with a forward scan over every
+    // consecutive blank line to the next non-blank one, at whatever
+    // distance that turns out to be — the exclusion clause (target line
+    // must not itself be cue-shaped) is unchanged and still does the same
+    // job for any gap width.
     const immediateDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
-    const oneBlankThenDialogue = i < lines.length - 2
-      && lines[i + 1]!.trim() === ''
-      && lines[i + 2]!.trim() !== ''
-      && !isCueLikeLine(lines[i + 2]!.trim());
-    const nextLineIsDialogue = immediateDialogue || oneBlankThenDialogue;
+    let nextLineIsDialogue = immediateDialogue;
+    if (!nextLineIsDialogue) {
+      // lines[i+1] is blank (or i is the last line) — scan past every
+      // consecutive blank line to the first non-blank one, at whatever
+      // distance that is. Only THIS blank-gap path applies the
+      // not-cue-shaped exclusion; the immediate (gap=0) case above matches
+      // the real parser's own condition exactly (any non-blank line, no
+      // content test), so it is never narrowed by this heuristic.
+      let j = i + 1;
+      while (j < lines.length && lines[j]!.trim() === '') j++;
+      nextLineIsDialogue = j < lines.length && !isCueLikeLine(lines[j]!.trim());
+    }
     if (!nextLineIsDialogue) continue;
     const occurrencesOfThisLine = (cueLineCounts.get(line) ?? 0) + 1;
     cueLineCounts.set(line, occurrencesOfThisLine);

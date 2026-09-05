@@ -69,6 +69,21 @@
 // not (real double-spaced dialogue, which is ordinary mixed-case prose).
 // The double-spaced fixture and the R4 fixture below are the parity proof:
 // the former is now rejected, the latter is still accepted.
+//
+// ROUND 6 (third independent review, same day, of the round-5 fix). The
+// round-5 fix probed only lines[i+1]/lines[i+2] — i.e. it re-admitted a gap
+// of EXACTLY one blank line. isDoubleSpaced (screenplay-normalizer.ts)
+// fires on ANY gap >= 1, and normalizeScreenplay's reflow filters out
+// EVERY blank line before re-blocking the script — so a 2-, 3-, 4-, or
+// 5-blank-line gap is reflowed and parsed as a real cue exactly like a
+// 1-blank-line gap, and was still invisible to the fixed-offset probe.
+// Measured: a 2-blank-line-gap payload (distinct=600, occurrences=12,000,
+// 203 KB) was guard-ACCEPTED; POST /api/scriptide/doctor answered 200 in
+// 85,388 ms. Fixed by replacing the fixed-offset probe with a forward scan
+// over every consecutive blank line to the next non-blank one, at whatever
+// distance that is — the not-cue-shaped exclusion is unchanged. The
+// property test below (gap in 1..5) is the parity proof this cannot
+// silently regress to "works for gap=1 only" again.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -299,11 +314,13 @@ function cueMetricsOf(text: string): { distinct: number; occurrences: number; we
     if (line.length === 0 || SCENE_HEADING_RE.test(line)) continue;
     if (!isCueLikeLine(line)) continue;
     const immediateDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
-    const oneBlankThenDialogue = i < lines.length - 2
-      && lines[i + 1]!.trim() === ''
-      && lines[i + 2]!.trim() !== ''
-      && !isCueLikeLine(lines[i + 2]!.trim());
-    if (!immediateDialogue && !oneBlankThenDialogue) continue;
+    let nextLineIsDialogue = immediateDialogue;
+    if (!nextLineIsDialogue) {
+      let j = i + 1;
+      while (j < lines.length && lines[j]!.trim() === '') j++;
+      nextLineIsDialogue = j < lines.length && !isCueLikeLine(lines[j]!.trim());
+    }
+    if (!nextLineIsDialogue) continue;
     counts.set(line, (counts.get(line) ?? 0) + 1);
     occurrences++;
   }
@@ -544,6 +561,61 @@ describe('MAX_FOUNTAIN_CUE_WEIGHT / MAX_FOUNTAIN_FREQUENT_CUE_LINES — cost bou
     const { distinct, occurrences } = cueMetricsOf(text);
     assert.equal(distinct, 2);
     assert.equal(occurrences, 30);
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  // ── ROUND 6 regression: the fix above only re-admitted a gap of EXACTLY
+  // one blank line (a fixed lines[i+1]/lines[i+2] probe) — a third
+  // independent review found isDoubleSpaced (screenplay-normalizer.ts)
+  // fires on ANY gap >= 1, and normalizeScreenplay's reflow FILTERS OUT
+  // EVERY BLANK LINE before re-blocking the script, so a 2-, 3-, 4-, or
+  // 5-blank-line gap is reflowed and parsed as a real cue by the actual
+  // pipeline exactly like a 1-blank-line gap — and was still invisible to
+  // the fixed-offset probe. Property test: for every gap in 1..5, the same
+  // double-spaced-shaped payload must be rejected, with the exact same
+  // 12,000/600 counts cueMetricsOf reports for a gap of 1.
+  for (let gap = 1; gap <= 5; gap++) {
+    it(`a script with a ${gap}-blank-line gap between cue and dialogue (600 distinct x 12,000 occurrences) IS rejected`, () => {
+      const DISTINCT = 600;
+      const OCCURRENCES = 12_000;
+      const cues = Array.from({ length: DISTINCT }, (_, i) => `CHARACTER${i}`);
+      const blanks = '\n'.repeat(gap);
+      let text = 'INT. ROOM - DAY\n\n';
+      for (let i = 0; i < OCCURRENCES; i++) text += `${cues[i % DISTINCT]}${blanks}Line.\n\n`;
+
+      const { distinct, occurrences } = cueMetricsOf(text);
+      assert.equal(distinct, DISTINCT, `gap=${gap}: expected all ${DISTINCT} cue lines counted, got ${distinct}`);
+      assert.equal(occurrences, OCCURRENCES, `gap=${gap}: expected all ${OCCURRENCES} occurrences counted, got ${occurrences}`);
+
+      const reason = fountainShapeRejectionReason(text);
+      assert.ok(reason, `gap=${gap}: expected the payload to be rejected — the guard did not fire`);
+      assert.match(reason!, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    });
+
+    it(`a legitimate ${gap}-blank-line-gap two-hander (2 distinct cues) is NOT rejected`, () => {
+      const blanks = '\n'.repeat(gap);
+      let text = 'INT. ROOM - DAY\n\n';
+      for (let i = 0; i < 30; i++) {
+        text += `${i % 2 === 0 ? 'PAUL' : 'JUNE'}${blanks}Something ordinary gets said here, line ${i}.\n\n`;
+      }
+      const { distinct, occurrences } = cueMetricsOf(text);
+      assert.equal(distinct, 2);
+      assert.equal(occurrences, 30);
+      assert.equal(fountainShapeRejectionReason(text), null);
+    });
+  }
+
+  it('the caps-heavy action fixture (R4) is still accepted regardless of the multi-blank-gap fix', () => {
+    const SCENES = 200;
+    const CAPS_LINES_PER_SCENE = 8;
+    let text = '';
+    for (let s = 0; s < SCENES; s++) {
+      text += `INT. LOCATION ${s} - DAY\n\n`;
+      text += 'A person moves through the room, quiet, deliberate, careful not to make a sound.\n\n';
+      for (let c = 0; c < CAPS_LINES_PER_SCENE; c++) {
+        text += `THE DOOR SLAMS SHUT WITH A DEAFENING CRACK THAT ECHOES SCENE ${s} LINE ${c}\n\n`;
+      }
+    }
     assert.equal(fountainShapeRejectionReason(text), null);
   });
 });

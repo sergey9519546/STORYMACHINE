@@ -354,46 +354,52 @@ async function fountainPathologyFuzz(base) {
       'must reject fast via the post-conversion shape guard, not hang analyzing it', 400);
   }
 
-  // ── ROUND 5 bypass: double-spaced Fountain (second independent review,
-  // 2026-09-05, of the round-4 context check) ───────────────────────────────
+  // ── ROUND 5/6 bypass: double-spaced Fountain, any blank-line gap (second
+  // and third independent reviews, 2026-09-05) ──────────────────────────────
   // `NAME\n\nline\n\n` is the shape real PDF/FDX imports produce
   // (server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay()
-  // exists to reflow it before the analyzer parses the script). The round-4
-  // context check only looked at the IMMEDIATE next line, so a
-  // double-spaced cue's blank next line counted as zero cues — measured: a
-  // 154,954-byte double-spaced payload (distinct=600, occurrences=12,000)
-  // answered HTTP 200 in 90,575 ms. See
+  // exists to reflow it before the analyzer parses the script). Round 5's
+  // context check only looked at the IMMEDIATE next line (gap=0 case
+  // missed). The round-5 FIX only re-admitted a gap of EXACTLY one blank
+  // line — round 6 found isDoubleSpaced fires on ANY gap >= 1 and
+  // normalizeScreenplay's reflow filters out every blank line regardless of
+  // count, so gap=2 (and wider) was still invisible: a 203 KB gap=2 payload
+  // answered HTTP 200 in 85,388 ms. `gap: 1` is the round-5 shape; `gap: 2`
+  // is round 6's own reproduction point. See
   // tests/routes/fountain-shape-guard-cue-bypass.test.ts's own copy of this
   // family (including why the .fdx variant needs an embedded-newline
-  // <Text> trick rather than ordinary Character/Dialogue paragraphs) for
-  // the full rationale.
+  // <Text> trick, and its gap-1..5 property sweep) for the full rationale.
   const doubleSpaceDistinct = 600;
   const doubleSpaceRepeats = 20; // 12,000 occurrences, matching the review's own measurement
-  let doubleSpacedFountain = 'INT. ROOM - DAY\n\n';
-  for (let r = 0; r < doubleSpaceRepeats; r++) {
-    for (let i = 0; i < doubleSpaceDistinct; i++) doubleSpacedFountain += `CHARACTER${i}\n\nLine.\n\n`;
-  }
-  await attack(base, 'double-spaced-bypass (raw) /api/scriptide/doctor', '/api/scriptide/doctor', jsonPost({ fountain: doubleSpacedFountain }),
-    'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
-  await attack(base, 'double-spaced-bypass (raw) /api/export/verify', '/api/export/verify', jsonPost({ fountain: doubleSpacedFountain, expected: { contentHash: 'a'.repeat(64) } }),
-    'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
-
-  let doubleSpacedFdxBody = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n'
-    + '<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n'
-    + '<Paragraph Type="Scene Heading"><Text>INT. ROOM - DAY</Text></Paragraph>\n';
-  for (let r = 0; r < doubleSpaceRepeats; r++) {
-    for (let i = 0; i < doubleSpaceDistinct; i++) {
-      // Embedded blank line inside ONE Character paragraph's <Text> — FDX's
-      // <Text> extraction only trims leading/trailing whitespace, not
-      // internal, so this round-trips as literal double-spaced text.
-      doubleSpacedFdxBody += `<Paragraph Type="Character"><Text>CHARACTER${i}\n\nLine!</Text></Paragraph>\n`;
+  for (const gap of [1, 2]) {
+    const blanks = '\n'.repeat(gap);
+    let doubleSpacedFountain = 'INT. ROOM - DAY\n\n';
+    for (let r = 0; r < doubleSpaceRepeats; r++) {
+      for (let i = 0; i < doubleSpaceDistinct; i++) doubleSpacedFountain += `CHARACTER${i}${blanks}Line.\n\n`;
     }
+    await attack(base, `double-spaced-bypass gap=${gap} (raw) /api/scriptide/doctor`, '/api/scriptide/doctor', jsonPost({ fountain: doubleSpacedFountain }),
+      'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
+    await attack(base, `double-spaced-bypass gap=${gap} (raw) /api/export/verify`, '/api/export/verify', jsonPost({ fountain: doubleSpacedFountain, expected: { contentHash: 'a'.repeat(64) } }),
+      'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
+
+    const fdxBlanks = '\n'.repeat(gap + 1); // gap blank lines needs gap+1 literal newlines embedded in <Text>
+    let doubleSpacedFdxBody = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n'
+      + '<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n'
+      + '<Paragraph Type="Scene Heading"><Text>INT. ROOM - DAY</Text></Paragraph>\n';
+    for (let r = 0; r < doubleSpaceRepeats; r++) {
+      for (let i = 0; i < doubleSpaceDistinct; i++) {
+        // Embedded blank-line run inside ONE Character paragraph's <Text> —
+        // FDX's <Text> extraction only trims leading/trailing whitespace,
+        // not internal, so this round-trips as literal double-spaced text.
+        doubleSpacedFdxBody += `<Paragraph Type="Character"><Text>CHARACTER${i}${fdxBlanks}Line!</Text></Paragraph>\n`;
+      }
+    }
+    doubleSpacedFdxBody += '</Content>\n</FinalDraft>';
+    await attack(base, `double-spaced-bypass gap=${gap} (fdx) /api/scriptide/doctor`, '/api/scriptide/doctor', jsonPost({ fdx: doubleSpacedFdxBody }),
+      'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
+    await attack(base, `double-spaced-bypass gap=${gap} (fdx) /api/export/verify`, '/api/export/verify', jsonPost({ fdx: doubleSpacedFdxBody, expected: { contentHash: 'a'.repeat(64) } }),
+      'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
   }
-  doubleSpacedFdxBody += '</Content>\n</FinalDraft>';
-  await attack(base, 'double-spaced-bypass (fdx) /api/scriptide/doctor', '/api/scriptide/doctor', jsonPost({ fdx: doubleSpacedFdxBody }),
-    'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
-  await attack(base, 'double-spaced-bypass (fdx) /api/export/verify', '/api/export/verify', jsonPost({ fdx: doubleSpacedFdxBody, expected: { contentHash: 'a'.repeat(64) } }),
-    'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
 
   // SSE route: a 200 with a doctor_error frame is this route's honest shape
   // (see server/routes/scriptide.ts's own comment) — record it as ok as long

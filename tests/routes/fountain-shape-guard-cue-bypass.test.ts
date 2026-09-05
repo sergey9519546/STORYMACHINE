@@ -33,6 +33,22 @@
 // The describe block at the end of this file reproduces the review's own
 // two attack points over HTTP.
 //
+// ROUND 5 (second independent review, same day, of the round-4 context
+// check). "Followed by dialogue" is not just "immediately followed by
+// non-blank" — DOUBLE-SPACED Fountain (`NAME\n\nline\n\n`, the shape real
+// PDF/FDX imports produce) is reflowed into an adjacent cue+dialogue pair by
+// server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay() before
+// the analyzer ever parses the script, but the round-4 check only looked at
+// the immediate next line. Fixed by also admitting a blank-line run then
+// non-cue-shaped content.
+//
+// ROUND 6 (third independent review, same day, of the round-5 fix). The
+// round-5 fix probed only a FIXED one-blank-line gap; isDoubleSpaced fires
+// on ANY gap >= 1 and normalizeScreenplay's reflow filters out every blank
+// line regardless of count, so a 2+-blank-line gap was still invisible.
+// Fixed with a forward scan over every consecutive blank line. The
+// describe blocks below sweep gap in 1..5 (raw) and 1-2 (.fdx).
+//
 // The .fdx payloads below are hand-built XML (not produced via
 // src/lib/fdx.ts's fountainToFdx), deliberately — fountainToFdx treats a
 // trailing `^` as a dual-dialogue FORMATTING marker and strips it from the
@@ -283,12 +299,21 @@ describe('cue-definition bypass families — POST /api/scriptide/fix (candidateF
 // check only looked at the IMMEDIATE next line, so a double-spaced cue's
 // blank next line made it count as zero cues — measured: a 154,954-byte
 // double-spaced payload (distinct=600, occurrences=12,000) answered HTTP 200
-// in 90,575 ms. Fixed in validation.ts by also admitting "one blank line,
+// in 90,575 ms. Fixed in validation.ts by also admitting "a blank-line run,
 // then non-cue-shaped content" as a valid dialogue-following shape.
-function buildDoubleSpacedFountain(distinct: number, occurrences: number): string {
+//
+// ROUND 6 (third independent review, same day): the round-5 fix probed only
+// a FIXED one-blank-line gap; isDoubleSpaced fires on ANY gap >= 1 and
+// normalizeScreenplay's reflow filters out every blank line regardless of
+// count, so a 2-, 3-, 4-, or 5-blank-line gap was STILL invisible to the
+// fixed-offset probe — measured: a 2-blank-line-gap payload (203 KB)
+// answered HTTP 200 in 85,388 ms. `gap` below defaults to 1 (the original
+// shape) but every describe block sweeps gap in 1..5.
+function buildDoubleSpacedFountain(distinct: number, occurrences: number, gap = 1): string {
   const cues = Array.from({ length: distinct }, (_, i) => `CHARACTER${i}`);
+  const blanks = '\n'.repeat(gap);
   let text = 'INT. ROOM - DAY\n\n';
-  for (let i = 0; i < occurrences; i++) text += `${cues[i % distinct]}\n\nLine.\n\n`;
+  for (let i = 0; i < occurrences; i++) text += `${cues[i % distinct]}${blanks}Line.\n\n`;
   return text;
 }
 
@@ -297,22 +322,25 @@ function buildDoubleSpacedFountain(distinct: number, occurrences: number): strin
 // and Dialogue paragraph pair — a normal FDX export structurally cannot
 // reproduce double-spacing that way. What CAN: FDX's <Text> extraction only
 // trims LEADING/TRAILING whitespace (`.trim()`), not internal, so a
-// Character paragraph whose <Text> itself CONTAINS an embedded blank line
-// (`NAME\n\nfakeDialogue`) round-trips as literal double-spaced text in the
-// converted Fountain — a real hazard for any FDX producer/exporter that
-// doesn't split paragraphs as cleanly as this repo's own src/lib/fdx.ts
-// does. `fakeDialogue` ends in `!` (not in either cue class's continuation
-// alphabet) specifically because fdxToFountain uppercases the WHOLE
-// Character paragraph text, embedded dialogue included — without the `!`,
-// the uppercased "fake dialogue" would itself look cue-shaped and the guard
-// would (correctly, conservatively) still exclude it.
-function buildDoubleSpacedFdx(distinct: number, repeats: number): string {
+// Character paragraph whose <Text> itself CONTAINS an embedded blank-line
+// run (`NAME\n\nfakeDialogue`, or more `\n`s for a wider gap) round-trips as
+// literal double-spaced text in the converted Fountain — a real hazard for
+// any FDX producer/exporter that doesn't split paragraphs as cleanly as this
+// repo's own src/lib/fdx.ts does. `fakeDialogue` ends in `!` (not in either
+// cue class's continuation alphabet) specifically because fdxToFountain
+// uppercases the WHOLE Character paragraph text, embedded dialogue
+// included — without the `!`, the uppercased "fake dialogue" would itself
+// look cue-shaped and the guard would (correctly, conservatively) still
+// exclude it. `gap` blank lines needs `gap + 1` literal newlines between the
+// name and the fake dialogue.
+function buildDoubleSpacedFdx(distinct: number, repeats: number, gap = 1): string {
   let body = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n'
     + '<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n'
     + '<Paragraph Type="Scene Heading"><Text>INT. ROOM - DAY</Text></Paragraph>\n';
+  const blanks = '\n'.repeat(gap + 1);
   for (let r = 0; r < repeats; r++) {
     for (let i = 0; i < distinct; i++) {
-      const embedded = `CHARACTER${i}\n\nLine!`;
+      const embedded = `CHARACTER${i}${blanks}Line!`;
       body += `<Paragraph Type="Character"><Text>${embedded}</Text></Paragraph>\n`;
     }
   }
@@ -331,34 +359,43 @@ describe('double-spaced bypass (ROUND 5) — POST /api/scriptide/doctor', async 
     body: JSON.stringify(body),
   });
 
-  it('raw double-spaced fountain (distinct=600, occurrences=12,000) is rejected fast, not analyzed', async () => {
-    const fountain = buildDoubleSpacedFountain(600, 12_000);
-    assert.ok(fountain.length < 900_000, `test payload (${fountain.length} chars) must stay under MAX_FOUNTAIN_CHARS`);
-    const start = Date.now();
-    const res = await post({ fountain });
-    const ms = Date.now() - start;
-    assert.equal(res.status, 400);
-    const body = await res.json();
-    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
-    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
-  });
+  // ROUND 6 property sweep: gap in 1..5 must all reject (raw fountain).
+  for (let gap = 1; gap <= 5; gap++) {
+    it(`raw double-spaced fountain, gap=${gap} (distinct=600, occurrences=12,000) is rejected fast, not analyzed`, async () => {
+      const fountain = buildDoubleSpacedFountain(600, 12_000, gap);
+      assert.ok(fountain.length < 900_000, `test payload (${fountain.length} chars) must stay under MAX_FOUNTAIN_CHARS`);
+      const start = Date.now();
+      const res = await post({ fountain });
+      const ms = Date.now() - start;
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+      assert.ok(ms < FAST_REJECTION_MS, `gap=${gap}: expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+    });
+  }
 
-  it('.fdx-converted double-spaced text (distinct=600 x 20 repeats) is rejected fast, not analyzed', async () => {
-    const fdx = buildDoubleSpacedFdx(600, 20);
-    const start = Date.now();
-    const res = await post({ fdx });
-    const ms = Date.now() - start;
-    assert.equal(res.status, 400);
-    const body = await res.json();
-    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
-    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
-  });
+  // Round-6 finding's own reproduction point (gap=2), plus the original
+  // round-5 shape (gap=1), via the .fdx-conversion path.
+  for (const gap of [1, 2]) {
+    it(`.fdx-converted double-spaced text, gap=${gap} (distinct=600 x 20 repeats) is rejected fast, not analyzed`, async () => {
+      const fdx = buildDoubleSpacedFdx(600, 20, gap);
+      const start = Date.now();
+      const res = await post({ fdx });
+      const ms = Date.now() - start;
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+      assert.ok(ms < FAST_REJECTION_MS, `gap=${gap}: expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+    });
+  }
 
-  it('a legitimate small double-spaced cast (2 distinct cues) is NOT rejected', async () => {
-    const fountain = buildDoubleSpacedFountain(2, 30);
-    const res = await post({ fountain });
-    assert.equal(res.status, 200);
-  });
+  for (const gap of [1, 2, 3]) {
+    it(`a legitimate small double-spaced cast (2 distinct cues), gap=${gap}, is NOT rejected`, async () => {
+      const fountain = buildDoubleSpacedFountain(2, 30, gap);
+      const res = await post({ fountain });
+      assert.equal(res.status, 200);
+    });
+  }
 });
 
 describe('double-spaced bypass (ROUND 5) — POST /api/export/verify', async () => {
@@ -374,25 +411,30 @@ describe('double-spaced bypass (ROUND 5) — POST /api/export/verify', async () 
 
   const expected = { contentHash: 'a'.repeat(64) };
 
-  it('raw double-spaced fountain is rejected fast, not analyzed', async () => {
-    const fountain = buildDoubleSpacedFountain(600, 12_000);
-    const start = Date.now();
-    const res = await post({ fountain, expected });
-    const ms = Date.now() - start;
-    assert.equal(res.status, 400);
-    const body = await res.json();
-    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
-    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
-  });
+  // ROUND 6 property sweep: gap in 1..5 must all reject (raw fountain).
+  for (let gap = 1; gap <= 5; gap++) {
+    it(`raw double-spaced fountain, gap=${gap}, is rejected fast, not analyzed`, async () => {
+      const fountain = buildDoubleSpacedFountain(600, 12_000, gap);
+      const start = Date.now();
+      const res = await post({ fountain, expected });
+      const ms = Date.now() - start;
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+      assert.ok(ms < FAST_REJECTION_MS, `gap=${gap}: expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+    });
+  }
 
-  it('.fdx-converted double-spaced text is rejected fast, not analyzed', async () => {
-    const fdx = buildDoubleSpacedFdx(600, 20);
-    const start = Date.now();
-    const res = await post({ fdx, expected });
-    const ms = Date.now() - start;
-    assert.equal(res.status, 400);
-    const body = await res.json();
-    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
-    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
-  });
+  for (const gap of [1, 2]) {
+    it(`.fdx-converted double-spaced text, gap=${gap}, is rejected fast, not analyzed`, async () => {
+      const fdx = buildDoubleSpacedFdx(600, 20, gap);
+      const start = Date.now();
+      const res = await post({ fdx, expected });
+      const ms = Date.now() - start;
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+      assert.ok(ms < FAST_REJECTION_MS, `gap=${gap}: expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+    });
+  }
 });
