@@ -104,6 +104,8 @@ import {
   MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES,
   MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
   guardVoiceWordCounts,
+  guardEligibleVoiceWordCounts,
+  isSceneSegmentHeading,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
 import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/screenplay-normalizer.ts';
@@ -929,54 +931,56 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
 // i.e. zero, OR under VOICE_ELIGIBLE_MIN_WORDS) must be a SUBSET of the
 // pipeline's own ineligible set (same two conditions, computed for real).
 // Any violation of either property is exactly the shape of bypass A or B.
+/** Mirrors fountain-analyzer.ts's extractSceneContent + normalizeCharacterName
+ *  closely enough to be a faithful oracle reference: walks the REAL parsed
+ *  blocks, tracks the current speaker across character/dual_dialogue
+ *  blocks (extension tags stripped, matching normalizeCharacterName), and
+ *  pools every `dialogue` block's word count under that speaker.
+ *  Deliberately resets on `scene_heading`/`action` (the reviewer's own
+ *  independent verification script used the same reset, and it is the
+ *  conservative direction for an oracle: it can only make a name's
+ *  pipeline total SMALLER, which makes the `guardWords >= pipelineWords`
+ *  inequality easier to satisfy, never harder — so it cannot hide a real
+ *  under-count). Module-scoped (2026-09-05 review round 5) rather than
+ *  nested inside the "ROUND 3 oracle" describe block below, since the
+ *  round-5 decision-set property needs it too. */
+function pipelineWordsByBaseName(text: string): Map<string, number> {
+  const blocks = parseFountain(normalizeScreenplay(text));
+  const counts = new Map<string, number>();
+  let cur: string | null = null;
+  // 2026-09-05 review round 4, BLOCKER — fountain-analyzer.ts's own
+  // dialogueByCharacter is built ONLY from the document's first
+  // ANALYZER_SCENE_CEILING scene groups (allRawScenes.slice(0,
+  // ANALYZER_SCENE_CEILING)), with sceneIndex 0 being every block AHEAD of
+  // the first scene heading (the "preamble" slice element). Without this
+  // truncation the oracle's pipeline model saw a walk-on placed past the
+  // ceiling as a real (if ineligible) character, which the real analyzer
+  // never sees at all — exactly the R4-2 bypass this round's review found.
+  // Mirrors validation.ts's own sceneIndex tracking on GuardCueOccurrence.
+  let sceneIndex = 0;
+  for (const b of blocks) {
+    if (b.type === 'scene_heading') {
+      sceneIndex++;
+      cur = null;
+      continue;
+    }
+    if (sceneIndex > ANALYZER_SCENE_CEILING) continue;
+    if (b.type === 'character' || b.type === 'dual_dialogue') {
+      cur = b.text.trim().replace(/\^\s*$/, '').replace(/\(\s*(V\.O\.|O\.S\.|CONT'?D)\s*\)/gi, '').trim();
+      continue;
+    }
+    if (b.type === 'dialogue' && cur) {
+      const words = b.text.trim().split(/\s+/).filter(Boolean).length;
+      counts.set(cur, (counts.get(cur) ?? 0) + words);
+      continue;
+    }
+    if (b.type === 'action') cur = null;
+  }
+  return counts;
+}
+
 describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word count(name), and guard-ineligible ⊆ pipeline-ineligible', () => {
   const VOICE_ELIGIBLE_MIN_WORDS = 30; // mirrors validation.ts's own (private) constant — see that file's comment
-
-  /** Mirrors fountain-analyzer.ts's extractSceneContent + normalizeCharacterName
-   *  closely enough to be a faithful oracle reference: walks the REAL parsed
-   *  blocks, tracks the current speaker across character/dual_dialogue
-   *  blocks (extension tags stripped, matching normalizeCharacterName), and
-   *  pools every `dialogue` block's word count under that speaker.
-   *  Deliberately resets on `scene_heading`/`action` (the reviewer's own
-   *  independent verification script used the same reset, and it is the
-   *  conservative direction for an oracle: it can only make a name's
-   *  pipeline total SMALLER, which makes the `guardWords >= pipelineWords`
-   *  inequality easier to satisfy, never harder — so it cannot hide a real
-   *  under-count). */
-  function pipelineWordsByBaseName(text: string): Map<string, number> {
-    const blocks = parseFountain(normalizeScreenplay(text));
-    const counts = new Map<string, number>();
-    let cur: string | null = null;
-    // 2026-09-05 review round 4, BLOCKER — fountain-analyzer.ts's own
-    // dialogueByCharacter is built ONLY from the document's first
-    // ANALYZER_SCENE_CEILING scene groups (allRawScenes.slice(0,
-    // ANALYZER_SCENE_CEILING)), with sceneIndex 0 being every block AHEAD of
-    // the first scene heading (the "preamble" slice element). Without this
-    // truncation the oracle's pipeline model saw a walk-on placed past the
-    // ceiling as a real (if ineligible) character, which the real analyzer
-    // never sees at all — exactly the R4-2 bypass this round's review found.
-    // Mirrors validation.ts's own sceneIndex tracking on GuardCueOccurrence.
-    let sceneIndex = 0;
-    for (const b of blocks) {
-      if (b.type === 'scene_heading') {
-        sceneIndex++;
-        cur = null;
-        continue;
-      }
-      if (sceneIndex > ANALYZER_SCENE_CEILING) continue;
-      if (b.type === 'character' || b.type === 'dual_dialogue') {
-        cur = b.text.trim().replace(/\^\s*$/, '').replace(/\(\s*(V\.O\.|O\.S\.|CONT'?D)\s*\)/gi, '').trim();
-        continue;
-      }
-      if (b.type === 'dialogue' && cur) {
-        const words = b.text.trim().split(/\s+/).filter(Boolean).length;
-        counts.set(cur, (counts.get(cur) ?? 0) + words);
-        continue;
-      }
-      if (b.type === 'action') cur = null;
-    }
-    return counts;
-  }
 
   /** Runs the guardWords >= pipelineWords and ineligible-subset checks for
    *  one generated document, over the UNION of every base name either side
@@ -1197,6 +1201,263 @@ describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word c
     const P = 'line one has five words\nline two has five words';
     for (let occ = 0; occ < 4; occ++) t += `SINGLESPACED0\n${P}\n\n`;
     assertWordOracle('mixed document', t);
+  });
+});
+
+// ── ROUND 5 (2026-09-05 review round 5, BLOCKER, of the round-4 fix
+// `f25e4cd3`): the guard's sceneIndex counter incremented on
+// SCENE_HEADING_PREFIX_RE (four ASCII prefixes, case-sensitive) while the
+// real analyzer segments scenes on parseFountain's own, much wider heading
+// test (src/lib/fountain.ts:127 — nine more prefixes, case-insensitive,
+// plus the Fountain `.`-forced form). The guard's scene count was therefore
+// <= the analyzer's for any document using a heading spelling the narrow
+// regex does not recognize, letting a past-ANALYZER_SCENE_CEILING walk-on
+// back into the eligibility set — the round-3/round-4 bypass reopened one
+// prefix spelling later. Fixed with a dedicated, wider predicate
+// (isSceneSegmentHeading, validation.ts) that mirrors fountain.ts:127
+// exactly, used ONLY for the sceneIndex counter — SCENE_HEADING_PREFIX_RE
+// itself is untouched and still governs cue-line skipping, per the review's
+// own instruction not to widen it in place.
+describe('ROUND 5 (finding 1, BLOCKER): scene-segmentation predicate parity with parseFountain\'s own scene_heading test', () => {
+  const PREFIXES = ['INT', 'EXT', 'EST', 'I/E', 'INTERIOR', 'EXTERIOR', 'ESTABLECIENDO', 'INT/EXT', 'INTÉRIEUR', 'EXTÉRIEUR', 'INTERIEUR', 'EXTERIEUR', 'INNEN', 'AUSSEN'];
+  const CASE_FNS: Record<string, (s: string) => string> = {
+    upper: (s) => s.toUpperCase(),
+    lower: (s) => s.toLowerCase(),
+    mixed: (s) => s.split('').map((c, i) => (i % 2 === 0 ? c.toUpperCase() : c.toLowerCase())).join(''),
+  };
+  const SEPARATORS = ['.', ' '];
+
+  function realIsSceneHeading(line: string): boolean {
+    const blocks = parseFountain(line);
+    return blocks.length > 0 && blocks[0]!.type === 'scene_heading';
+  }
+
+  let productSize = 0;
+  for (const prefix of PREFIXES) {
+    for (const [caseName, toCase] of Object.entries(CASE_FNS)) {
+      for (const sep of SEPARATORS) {
+        const line = `${toCase(prefix)}${sep}LOCATION - DAY`;
+        productSize++;
+        it(`"${line}" (${caseName}, sep=${JSON.stringify(sep)}): isSceneSegmentHeading agrees with parseFountain`, () => {
+          const real = realIsSceneHeading(line);
+          const guard = isSceneSegmentHeading(line);
+          assert.equal(real, true, `generator sanity: "${line}" must actually be a real scene heading, or this row proves nothing`);
+          assert.equal(guard, real, `PARITY VIOLATION: "${line}" — guard=${guard} real=${real}`);
+        });
+      }
+    }
+  }
+
+  it(`covered the full heading-spelling product (${PREFIXES.length} prefixes x ${Object.keys(CASE_FNS).length} cases x ${SEPARATORS.length} separators)`, () => {
+    assert.equal(productSize, PREFIXES.length * Object.keys(CASE_FNS).length * SEPARATORS.length);
+    assert.equal(productSize, 84);
+  });
+
+  // Non-prefix edge cases: the Fountain forced '.' heading form, forced '!'
+  // action (must NOT be a heading on either side), a prefix-shaped word with
+  // no `[. ]` boundary (must NOT match either — "INTERPOL" starts with
+  // "INT" but is not followed by '.'/' ', and is not itself one of the
+  // full-word alternatives), trailing spaces, and ordinary action.
+  const EDGE_CASES: Array<[string, string, boolean]> = [
+    ['.FORCED SCENE HEADING', 'Fountain forced-heading form', true],
+    ['.', 'a bare period alone (fountain.ts applies no further exclusion on the forced form)', true],
+    ['!This is forced action, not a heading.', 'forced action (!) must NOT be a heading', false],
+    ['INTERPOL AGENTS STORM THE ROOM', 'a prefix-shaped word with no [. ] boundary must NOT match', false],
+    ['INT.LOCATION - DAY', 'no space after the period — the period alone satisfies [. ]', true],
+    ['int.    location, trailing spaces   ', 'lowercase with trailing spaces (trimmed first, same as both real sides)', true],
+    ['Some ordinary action line.', 'ordinary action must NOT be a heading', false],
+  ];
+  for (const [line, label, expected] of EDGE_CASES) {
+    it(`"${line}" (${label}): isSceneSegmentHeading agrees with parseFountain (expected=${expected})`, () => {
+      const trimmed = line.trim();
+      const real = realIsSceneHeading(trimmed);
+      const guard = isSceneSegmentHeading(trimmed);
+      assert.equal(real, expected, `generator sanity: "${line}" — expected parseFountain to say ${expected}, got ${real}`);
+      assert.equal(guard, real, `PARITY VIOLATION: "${line}" — guard=${guard} real=${real}`);
+    });
+  }
+
+  // CR-only / CRLF: isSceneSegmentHeading itself operates on an
+  // already-trimmed, already-normalized single line, so this proves the
+  // DOCUMENT-LEVEL plumbing (line-ending normalization feeding it the same
+  // scene count the real pipeline computes) holds for every recognized
+  // heading style, not only the round-4 INT.-only sweep. `guardSceneSegmentCount`
+  // replicates validation.ts's own walk structure exactly (same normalize,
+  // same boneyard-toggle order, same predicate) rather than reusing an
+  // export, so this test independently proves the WALK wiring, not just the
+  // predicate function in isolation.
+  function guardSceneSegmentCount(text: string): number {
+    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    let inBoneyard = false;
+    let count = 0;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (line.length === 0) continue;
+      if (line.startsWith('/*')) inBoneyard = true;
+      if (inBoneyard) {
+        if (line.includes('*/') && !(line.startsWith('/*') && !line.includes('*/'))) inBoneyard = false;
+        continue;
+      }
+      if (isSceneSegmentHeading(line)) count++;
+    }
+    return count;
+  }
+  function realSceneSegmentCount(text: string): number {
+    return parseFountain(normalizeScreenplay(text)).filter((b) => b.type === 'scene_heading').length;
+  }
+  const mixedHeadingDoc = '.FORCED ONE\n\nAction line one.\n\nint. two - day\n\nAction line two.\n\nINTERIOR THREE - NIGHT\n\nAction line three.\n\nINT/EXT FOUR - DAY\n\nAction line four.\n\n';
+  const EOL_VARIANTS: Record<string, (s: string) => string> = {
+    LF: (s) => s,
+    'CR-only': (s) => s.replace(/\n/g, '\r'),
+    CRLF: (s) => s.replace(/\n/g, '\r\n'),
+  };
+  for (const [eolName, toEol] of Object.entries(EOL_VARIANTS)) {
+    it(`a document mixing forced/lowercase/INTERIOR/INT-EXT-style headings under ${eolName} line endings: guard and real pipeline both count 4 scenes`, () => {
+      const text = toEol(mixedHeadingDoc);
+      const real = realSceneSegmentCount(text);
+      const guard = guardSceneSegmentCount(text);
+      assert.equal(real, 4, `sanity: expected 4 real scene_heading blocks under ${eolName}`);
+      assert.equal(guard, real, `PARITY VIOLATION under ${eolName}: guard counted ${guard} scenes, real pipeline counted ${real}`);
+    });
+  }
+});
+
+// ── ROUND 5 (finding 2, oracle gap): the round-3/round-4 oracle properties
+// (guardWords >= pipelineWords; guard-ineligible ⊆ pipeline-ineligible)
+// cannot see this bypass class — a ghost past-ceiling walk-on's guard total
+// (1 word, raw) still satisfies `1 >= 0` and `1 < 30 ⇒ 0 < 30` against the
+// ceiling-aware pipeline's total (0 words) even when the guard's OWN
+// internal scene-counting is wrong. The property that actually catches it
+// is the guard's ceiling-aware DECISION SET (base names with > 0 counted
+// words, from guardEligibleVoiceWordCounts — the ceiling-aware mirror of
+// fountainShapeRejectionReason's own accumulation, not the raw
+// guardVoiceWordCounts) must be a SUBSET of the ceiling-aware pipeline's own
+// decision set. Verified (manually, via a temporary revert of validation.ts
+// to the round-4 commit `f25e4cd3`) that this exact property FAILS on the
+// round-4 tree for the `.FORCED`/lowercase/INTERIOR heading documents below
+// — WALKON appeared in the round-4 guard's decision set while absent from
+// the ceiling-aware pipeline's — and PASSES on this round's fix.
+describe('ROUND 5 (finding 2, oracle gap): the guard\'s ceiling-aware decision set must be a subset of the ceiling-aware pipeline\'s', () => {
+  const DLG = 'this is ordinary lowercase dialogue here.';
+
+  // 200 uniform eligible names spread across `scenes` scene groups (5 cues
+  // each), then a 1-word walk-on in one more scene headed by `tailHeading`.
+  // Mirrors r4attack.mjs's own `build()` generator exactly (byte-for-byte,
+  // per the R5-1 length sanity check in the regressions block below) rather
+  // than approximating it, so this corpus is the reviewer's own repro
+  // shape, committed.
+  function buildCeilingCrossingDoc(headingOf: (s: number) => string, scenes: number, tailHeading: string): string {
+    let t = '', occ = 0;
+    for (let s = 0; s < scenes; s++) {
+      t += `${headingOf(s)}\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+    }
+    return t + `${tailHeading}\n\nWALKON\nhi\n\n`;
+  }
+
+  function assertDecisionSetSubset(label: string, text: string): void {
+    const guardEligible = guardEligibleVoiceWordCounts(text);
+    const pipelineEligible = pipelineWordsByBaseName(text);
+    for (const [name, words] of guardEligible) {
+      if (words <= 0) continue;
+      const p = pipelineEligible.get(name) ?? 0;
+      assert.ok(
+        p > 0,
+        `ORACLE VIOLATION "${label}" name="${name}": the guard's ceiling-aware decision set includes it (${words} words) but the ceiling-aware pipeline's does not (${p} words) — this is the round-5 heading-spelling bypass's exact shape`,
+      );
+    }
+  }
+
+  // `.`-forced, lowercase, and INTERIOR-style heading documents — the corpus
+  // this property was missing before round 5 (it was INT.-only).
+  const HEADING_STYLES: Record<string, (s: number) => string> = {
+    '.FORCED': (s) => `.SCENE ${s}`,
+    'lowercase int.': (s) => `int. location ${s} - day`,
+    'INTERIOR': (s) => `INTERIOR LOCATION ${s} - DAY`,
+    'INT. control': (s) => `INT. LOCATION ${s} - DAY`,
+  };
+  for (const [styleName, headingOf] of Object.entries(HEADING_STYLES)) {
+    it(`${styleName} headings, walk-on past the scene ceiling: decision-set subset property holds`, () => {
+      const text = buildCeilingCrossingDoc(headingOf, 410, styleName === 'INT. control' ? 'INT. HALL - DAY' : headingOf(410));
+      assertDecisionSetSubset(`${styleName} past ceiling`, text);
+      // Sanity: WALKON must genuinely be excluded from the ceiling-aware
+      // pipeline's decision set for this to be testing the real mechanism,
+      // not passing vacuously.
+      assert.equal(pipelineWordsByBaseName(text).get('WALKON') ?? 0, 0, `sanity: WALKON must be truncated away by the real pipeline under ${styleName} headings`);
+    });
+  }
+
+  it('the scene-1 control (walk-on well inside the ceiling) still satisfies the decision-set property, with WALKON genuinely present on both sides', () => {
+    const text = 'INT. HALL - DAY\n\nWALKON\nhi\n\n' + (() => {
+      let t = '', occ = 0;
+      for (let s = 1; s <= 410; s++) {
+        t += `INT. LOCATION ${s} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+      }
+      return t;
+    })();
+    assertDecisionSetSubset('scene-1 control', text);
+    assert.equal(pipelineWordsByBaseName(text).get('WALKON') ?? 0, 1, 'sanity: WALKON must be present (1 word) in the pipeline model for scene 1');
+  });
+});
+
+// ── ROUND 5 regressions: the three heading-spelling bypass payloads reject,
+// and both controls (the INT.-only round-3/4 shape, and the exactly-at-the-
+// ceiling boundary) keep their current, unchanged verdicts. Timed with
+// `fountainShapeRejectionReason` directly, the same way every prior round's
+// regression block is.
+describe('ROUND 5 regressions: three heading-spelling bypass payloads reject fast, both controls are unchanged', () => {
+  const DLG = 'this is ordinary lowercase dialogue here.';
+  function buildCeilingCrossingDoc(headingOf: (s: number) => string, scenes: number, tailHeading: string): string {
+    let t = '', occ = 0;
+    for (let s = 0; s < scenes; s++) {
+      t += `${headingOf(s)}\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+    }
+    return t + `${tailHeading}\n\nWALKON\nhi\n\n`;
+  }
+
+  it('R5-1: all 410 headings ".SCENE n" (Fountain forced form), plus a past-ceiling walk-on (measured pre-fix: ACCEPT, runScriptDoctor 42,697ms; HTTP 200 in 42,575ms) now rejects fast', () => {
+    const text = buildCeilingCrossingDoc((s) => `.SCENE ${s}`, 410, '.SCENE FINAL');
+    assert.equal(text.length, 121_345, 'payload size must match the measured R5-1 shape exactly');
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the .FORCED-heading past-ceiling walk-on to no longer bypass the voice-eligible-weight bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('R5-3: all 410 headings lowercase "int. location n - day", plus a past-ceiling walk-on (measured pre-fix: ACCEPT, runScriptDoctor 43,646ms) now rejects fast', () => {
+    const text = buildCeilingCrossingDoc((s) => `int. location ${s} - day`, 410, 'int. hall - day');
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the lowercase-heading past-ceiling walk-on to no longer bypass the voice-eligible-weight bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('R5-4: all 410 headings "INTERIOR LOCATION n - DAY", plus a past-ceiling walk-on (measured pre-fix: ACCEPT, runScriptDoctor 42,364ms) now rejects fast', () => {
+    const text = buildCeilingCrossingDoc((s) => `INTERIOR LOCATION ${s} - DAY`, 410, 'INTERIOR HALL - DAY');
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the INTERIOR-heading past-ceiling walk-on to no longer bypass the voice-eligible-weight bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('R5-5 control: plain "INT." headings, past-ceiling walk-on (the round-3/round-4 R4-2 shape) is unchanged — still rejects', () => {
+    const text = buildCeilingCrossingDoc((s) => `INT. LOCATION ${s} - DAY`, 410, 'INT. HALL - DAY');
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the INT.-only control to keep rejecting (unchanged from round 4)');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  it('R5-6 control: a walk-on placed exactly at scene 400 (the ceiling boundary, still eligible) is unchanged — still accepts', () => {
+    const text = buildCeilingCrossingDoc((s) => `INT. LOCATION ${s} - DAY`, 399, 'INT. HALL - DAY');
+    assert.equal(fountainShapeRejectionReason(text), null, 'expected the at-the-ceiling walk-on control to keep accepting (unchanged from round 4)');
   });
 });
 

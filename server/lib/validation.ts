@@ -694,6 +694,64 @@ export function isCueLikeLine(line: string): boolean {
   return CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line) || isCharacterCue(line);
 }
 const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
+// 2026-09-05 review round 5, BLOCKER — a SEPARATE, WIDER predicate from
+// SCENE_HEADING_PREFIX_RE just above. That regex is deliberately narrow and
+// used ONLY for cue-line skipping (its two call sites inside
+// walkGuardCueOccurrences below, and accumulateDialogueWords' own
+// scene-heading break) — DO NOT widen it in place, and do not repoint those
+// call sites at this one; the round-5 review named this explicitly as the
+// wrong fix shape. This predicate exists for exactly one purpose: counting
+// "which scene group is this occurrence in" the SAME way src/lib/
+// fountain.ts's parseFountain (line ~127) decides a line is a
+// `scene_heading` block, since ANALYZER_SCENE_CEILING truncates on THAT
+// segmentation, not on SCENE_HEADING_PREFIX_RE's. Mirrors fountain.ts's own
+// test exactly (case-insensitive, the full prefix list including
+// INTERIOR/EXTERIOR/ESTABLECIENDO/INT\/EXT and the four non-English
+// alternates, OR the Fountain forced-heading form — any line starting with
+// '.', unconditionally, since fountain.ts applies no further exclusion
+// there either) rather than replicating only the four-prefix ASCII subset
+// SCENE_HEADING_PREFIX_RE covers. Deliberately NOT imported from
+// src/lib/fountain.ts even though that file is already an import source
+// for CHARACTER_CUE_RE above (see that import's own comment) — the
+// analyzer has no exported constant for this specific test (it is inline
+// at the point of use), and adding one would mean EDITING a scoring-path
+// file for this fix, which the round-5 review explicitly ruled out;
+// replicated instead, the same as stripCueExtensionForVoiceGrouping's own
+// mirror of normalizeCharacterName below.
+//
+// Before this predicate existed, sceneIndex (GuardCueOccurrence's own field)
+// incremented on SCENE_HEADING_PREFIX_RE alone, so ANY heading form that
+// narrower regex does not recognize — a `.`-forced heading, lowercase
+// `int.`, or the full-word `INTERIOR`/`EXTERIOR` spellings — was invisible
+// to the scene COUNTER even though parseFountain segments a real scene
+// there. That silently under-counted scenes and let a past-
+// ANALYZER_SCENE_CEILING walk-on back into the eligibility set exactly the
+// way the round-3 bypass worked, just one prefix spelling later. Measured:
+// 200 uniform eligible names spread over 410 real scene groups plus a
+// 1-word walk-on in the last one, guard-ACCEPTED at 42,364-43,646ms across
+// three ordinary heading spellings (`.SCENE n` forced, lowercase `int. …`,
+// `INTERIOR … - DAY`) while the `INT.`-only control correctly REJECTs. See
+// tests/security/fountain-shape-guard-cue-parity.test.ts's "ROUND 5"
+// describe block for the parity proof against parseFountain itself over a
+// generated heading-spelling corpus, and its regression tests pinning all
+// three payloads to REJECT.
+//
+// Note the direction trap the round-5 review named explicitly: for THIS
+// counter, neither approximation is safe. Counting too FEW scenes (the
+// round-4 bug) lets a ghost ineligible name back in and the bound is
+// skipped; counting too MANY would truncate a real character's words away,
+// drop it under VOICE_ELIGIBLE_MIN_WORDS, and skip the bound just the
+// same. The predicate has to MATCH parseFountain's, not merely
+// approximate it in either direction.
+const SCENE_SEGMENT_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
+/** True exactly when src/lib/fountain.ts's parseFountain would classify a
+ *  pre-trimmed line as a `scene_heading` block. Exported for
+ *  tests/security/fountain-shape-guard-cue-parity.test.ts's "ROUND 5"
+ *  parity proof only — every real call site inside this file passes an
+ *  already-`.trim()`-ed line, matching parseFountain's own `trimmed`. */
+export function isSceneSegmentHeading(trimmedLine: string): boolean {
+  return SCENE_SEGMENT_RE.test(trimmedLine) || trimmedLine.startsWith('.');
+}
 
 /** One occurrence the guard counts against ITS OWN bounds — either a
  *  real-script cue+dialogue candidate or one found inside a `/* boneyard *\/`
@@ -742,10 +800,25 @@ interface GuardCueOccurrence {
  *  server/nvm/analyze/fountain-analyzer.ts's normalizeCharacterName (a
  *  scoring-path function, replicated rather than imported — the same
  *  established pattern this file already uses for src/lib/fountain.ts's
- *  parseFountain `inBoneyard` toggle and CHARACTER_CUE_RE's own shape,
- *  documented rather than coupled by an import edge into the scoring path).
- *  Read 2026-09-05 to find the driver behind the round-2 review's cost-bound
- *  finding; NOT edited. */
+ *  parseFountain `inBoneyard` toggle and isSceneSegmentHeading's own mirror
+ *  of its scene-heading test, documented rather than coupled by an import
+ *  edge into the scoring path). 2026-09-05 review round 5, non-blocking —
+ *  reconciling this with the file's OTHER two scoring-path imports
+ *  (CHARACTER_CUE_RE/CUE_INITIAL_CLASS/CUE_LETTER_CLASS near the top,
+ *  ANALYZER_SCENE_CEILING further up): the rule this file actually follows
+ *  is import vs. replicate by KIND, not a blanket policy either way. A
+ *  plain, already-exported CONSTANT with no internal logic of its own
+ *  (CHARACTER_CUE_RE, ANALYZER_SCENE_CEILING) is imported — it cannot
+ *  silently drift in a way replication would have to keep re-checking for,
+ *  and importing it removes exactly that maintenance burden with no new
+ *  coupling risk (verified per-import: no cycle, receipt gate unaffected).
+ *  An internal ALGORITHM that is not exported as one clean symbol
+ *  (normalizeCharacterName here, isDoubleSpaced below, the boneyard toggle,
+ *  and now the scene-heading test parseFountain applies inline) is
+ *  replicated with its own pinning/oracle tests instead — importing THOSE
+ *  would couple this guard's evaluation to the scoring path's own internal
+ *  shape rather than to a stable public constant. Read 2026-09-05 to find
+ *  the driver behind the round-2 review's cost-bound finding; NOT edited. */
 function stripCueExtensionForVoiceGrouping(line: string): string {
   return line
     .replace(/\^\s*$/, '')
@@ -892,16 +965,14 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
   // thinks it's IN a boneyard the parser is already OUT of). Matching the
   // parser exactly avoids both failure directions rather than picking one.
   let inBoneyard = false;
-  // 2026-09-05 review round 4, BLOCKER — 1-based count of scene headings
-  // seen so far, incremented unconditionally (boneyard or not) so it tracks
-  // the same "which scene is this" fountain-analyzer.ts's own raw-scene
-  // splitter would compute — see sceneIndex's own comment on
-  // GuardCueOccurrence for why the voice-eligibility bound needs it.
+  // 2026-09-05 review round 4, BLOCKER (predicate corrected round 5 — see
+  // isSceneSegmentHeading's own comment for the full mechanism and the
+  // measured bypass) — 1-based count of REAL scene headings seen so far,
+  // matching fountain-analyzer.ts's own raw-scene splitter.
   let sceneIndex = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!.trim();
     if (line.length === 0) continue;
-    if (SCENE_HEADING_PREFIX_RE.test(line)) sceneIndex++;
 
     if (line.startsWith('/*')) inBoneyard = true;
     if (inBoneyard) {
@@ -917,6 +988,21 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
       }
       continue;
     }
+
+    // 2026-09-05 review round 5 — moved to AFTER the boneyard branch's own
+    // `continue` (and switched from SCENE_HEADING_PREFIX_RE to
+    // isSceneSegmentHeading — see that function's comment for why these are
+    // now two deliberately different predicates): a heading-shaped line
+    // INSIDE a /* boneyard */ comment is `boneyard` content to
+    // parseFountain, never `scene_heading` — its own boneyard check runs
+    // before its heading test, so a boneyard-quoted "INT. …" line never
+    // advances scene segmentation for the real analyzer either. Counting it
+    // here (the round-4 shape, which ran this check before the boneyard
+    // branch) would over-count scenes for a script with a heading-shaped
+    // line quoted inside a boneyard comment — over-counting is exactly as
+    // unsafe as under-counting for this bound (see isSceneSegmentHeading's
+    // own "direction trap" paragraph).
+    if (isSceneSegmentHeading(line)) sceneIndex++;
 
     if (SCENE_HEADING_PREFIX_RE.test(line)) continue;
     if (!isCueLikeLine(line)) continue;
@@ -1231,6 +1317,50 @@ export function guardVoiceWordCounts(text: string): Map<string, number> {
     counts.set(occ.voiceKey, (counts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
   }
   return counts;
+}
+
+// ── Round-5 oracle export (2026-09-05 review round 5, oracle gap) ──────────
+// Exported ONLY for tests/security/fountain-shape-guard-cue-parity.test.ts's
+// "ROUND 5" decision-set property. `guardVoiceWordCounts` above is
+// DELIBERATELY scene-oblivious (a raw, unbounded per-name sum — see its own
+// comment) precisely so its `>=`/ineligible-subset oracle properties hold
+// safely against ANY truncated pipeline view. That safety is also why it
+// CANNOT catch a scene-segmentation predicate bug on its own: the round-5
+// review found that `guardWords >= pipelineWords` and
+// `guard-ineligible ⊆ pipeline-ineligible` both stayed true for a ghost
+// past-ceiling walk-on even while the guard's REAL internal decision (inside
+// fountainShapeRejectionReason, which DOES apply the ANALYZER_SCENE_CEILING
+// gate via each occurrence's sceneIndex) was wrong under a heading spelling
+// its scene counter did not recognize. The property that catches THAT class
+// needs the guard's actual ceiling-aware accumulation, not the raw one — so
+// this function is an INDEPENDENT implementation of fountainShapeRejectionReason's
+// own per-name accumulation rule: the SAME `if (occ.sceneIndex <=
+// ANALYZER_SCENE_CEILING)` gate, verified line-for-line equivalent (grep
+// both). Deliberately NOT a literal code-sharing refactor: the production
+// function keeps its accumulation INLINE inside the single early-exit-
+// capable pass that also evaluates the distinct/weight/frequent-line
+// bounds, so a payload that trips one of those earlier never pays for a
+// second walk; this export does a full, unconditional second walk purely so
+// a ceiling-aware view is available to TESTS without forcing the production
+// path to do that extra pass merely to expose it (the same "full drain for
+// tests, early-exit for production" split guardVoiceWordCounts/
+// guardCueOccurrences already established above).
+function computeEligibleVoiceWordCounts(text: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const occ of walkGuardCueOccurrences(text)) {
+    if (occ.boneyard) continue;
+    if (occ.sceneIndex > ANALYZER_SCENE_CEILING) continue;
+    counts.set(occ.voiceKey, (counts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
+  }
+  return counts;
+}
+
+/** Test-only view of fountainShapeRejectionReason's OWN ceiling-aware
+ *  per-name word accumulation (see computeEligibleVoiceWordCounts's own
+ *  comment) — the decision-set property compares THIS against the
+ *  ceiling-aware pipeline model, not guardVoiceWordCounts' raw one. */
+export function guardEligibleVoiceWordCounts(text: string): Map<string, number> {
+  return computeEligibleVoiceWordCounts(text);
 }
 
 /** z.string().min(1).max(MAX_FOUNTAIN_CHARS) plus the pathological-shape guard
