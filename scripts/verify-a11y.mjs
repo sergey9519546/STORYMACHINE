@@ -40,6 +40,7 @@
 // the CI path.) Exit codes: 0 = every assertion passed, 1 = at least one failed.
 
 import { mkdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import {
   bootKeylessServer,
   createRecorder,
@@ -1102,6 +1103,21 @@ async function main() {
       const nameInput10a = page10a.getByLabel('Snapshot version name', { exact: true }).first();
       // eslint-disable-next-line no-await-in-loop
       await nameInput10a.waitFor({ state: 'visible', timeout: timing.ms(5000) });
+      // Round 2 fix (independent review, 2026-09-05): this loop opens the
+      // Save Snapshot modal to PRODUCE the very cards `light-/dark-ship-
+      // versions` below audits, but never audited the modal itself — which
+      // carried the exact same 1.13:1 B-11 defect two functions up in
+      // SnapshotManager.tsx, in the flow a writer must pass through to get
+      // here. Audit it once, on the first open (light theme; the dark pass
+      // gets its own re-open after the theme toggle below).
+      if (i === 0) {
+        // eslint-disable-next-line no-await-in-loop
+        await auditElement(
+          page10a,
+          page10a.locator('[role="dialog"][aria-labelledby="save-snapshot-modal-title"]').first(),
+          'light-save-snapshot-modal',
+        );
+      }
       // Enter confirms the snapshot, same as verify-p2-p3-surfaces.mjs's
       // identical two-saves-of-the-same-script flow (a genuine tie).
       // eslint-disable-next-line no-await-in-loop
@@ -1126,6 +1142,27 @@ async function main() {
   await page10a.waitForTimeout(timing.ms(300));
   const isDark10a = await page10a.evaluate(() => document.documentElement.classList.contains('dark'));
   record('ship-versions-gate', 'Alt+Shift+D toggles dark mode with the Ship panel open', isDark10a);
+
+  // Dark-theme pass of the same modal audit added above: re-open the Save
+  // Snapshot modal now that the toggle is dark, audit it, then Escape
+  // without saving a third snapshot (versionsSection10a's own dark audit
+  // right below still expects exactly the two already on screen).
+  if (isDark10a) {
+    const saveVersionBtnDark10a = page10a.getByRole('button', { name: 'Save new script version snapshot', exact: true }).first();
+    const reopened = await saveVersionBtnDark10a.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+    if (reopened) {
+      await saveVersionBtnDark10a.click();
+      const modalDark10a = page10a.locator('[role="dialog"][aria-labelledby="save-snapshot-modal-title"]').first();
+      const modalDarkVisible = await modalDark10a.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+      record('ship-versions-gate', 'save-snapshot-modal reopens in dark mode', modalDarkVisible);
+      if (modalDarkVisible) {
+        await auditElement(page10a, modalDark10a, 'dark-save-snapshot-modal');
+        await page10a.keyboard.press('Escape');
+        await modalDark10a.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
+      }
+    }
+  }
+
   if (versionsSection10a) {
     const sectionVisibleDark10a = await versionsSection10a.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
     record('ship-versions-gate', 'section[aria-labelledby="ship-versions-heading"] still renders in dark mode', sectionVisibleDark10a);
@@ -1224,7 +1261,15 @@ async function main() {
     // the actual markup this gate exists to audit. Measured live during
     // development: without this, axe/overflow both silently no-op on an
     // escaped-text <pre> block instead of the real document.
-    exportedPath10c = `${OUT_DIR}/verify-a11y-exported-coverage.html`;
+    //
+    // Round 2 fix (independent review, 2026-09-05): this used to save into
+    // the TRACKED scripts/output/ directory, so every `verify:a11y` run
+    // left the worktree dirty with a fresh 200+KB HTML file. Unlike the
+    // JSON/CSV evidence artifacts that directory legitimately holds, this
+    // is a one-off browser download this gate reads once and discards —
+    // os.tmpdir() is the correct home, matching every other scratch file
+    // this suite writes (see the a11y-review probes' own convention).
+    exportedPath10c = `${tmpdir()}/verify-a11y-exported-coverage.html`;
     await download10c.saveAs(exportedPath10c);
   }
   await context10c.close();

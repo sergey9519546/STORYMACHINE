@@ -290,7 +290,18 @@ function SaveSnapshotModal({
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0.9 }}
-        className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
+        // a11y fix (2026-09-05, round 2 — client-hunter B-11 was still live
+        // here two functions up in the same file: this modal used to be
+        // `bg-white dark:bg-zinc-800`, a REAL dark background, while its
+        // heading and Cancel button carry no text-color class at all and so
+        // inherit the app's default ink color (`body { color: var(--color-
+        // ink) }`, src/index.css) — a fixed, theme-invariant value. Measured
+        // live (⌥⇧D) at 1.13:1 in dark, same shape and same number as the
+        // cards this file's OTHER fix (below) already corrected.
+        // `--sm-panel-2` is the same theme-invariant token that fix and
+        // `.sm-card` use — never dark, so the inherited ink is already
+        // correct in both themes with no new classes needed.
+        className="bg-[var(--sm-panel-2)] p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
       >
         <h3 id="save-snapshot-modal-title" className="font-bold uppercase text-xs tracking-widest">
           Save Snapshot
@@ -305,13 +316,24 @@ function SaveSnapshotModal({
             if (e.key === "Enter") onConfirmSnapshot();
           }}
           aria-label="Snapshot version name"
-          className="w-full border-2 border-black px-3 py-2 font-mono text-sm dark:bg-zinc-700 dark:text-white"
+          // a11y fix (2026-09-05, round 2): dropped `dark:bg-zinc-700
+          // dark:text-white` — a themed pair that popped this field to a
+          // real dark grey inside the now-theme-invariant modal above.
+          // Unstyled, it inherits the invariant panel/ink pair like the
+          // rest of the modal.
+          className="w-full border-2 border-black px-3 py-2 font-mono text-sm"
           placeholder="Version name…"
         />
         <div className="flex gap-2 justify-end">
           <button
             onClick={() => onSetSnapshotModal({ open: false, name: "" })}
-            className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700"
+            // a11y fix (2026-09-05, round 2): `hover:bg-gray-100
+            // dark:hover:bg-zinc-700` was a themed hover pair on an
+            // otherwise theme-invariant button; `--sm-hair` is the
+            // design system's own invariant hairline shade, so the hover
+            // highlight now matches in both themes instead of drifting
+            // with the toggle.
+            className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-[var(--sm-hair)]"
           >
             Cancel
           </button>
@@ -366,18 +388,29 @@ function RestoreSnapshotModal({
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0.9 }}
-        className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
+        // a11y fix (2026-09-05, round 2) — same defect and same fix as
+        // SaveSnapshotModal above: see its className comment.
+        className="bg-[var(--sm-panel-2)] p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
       >
         <h3 id="restore-snapshot-modal-title" className="font-bold uppercase text-xs tracking-widest">
           Restore Snapshot?
         </h3>
-        <p className="text-xs text-gray-600 dark:text-gray-400">
+        {/* a11y fix (2026-09-05, round 2): `text-gray-600 dark:text-gray-400`
+            was a themed pair sized for the old real-dark modal — once the
+            modal above became theme-invariant, this text's OWN dark:
+            override kept firing against the now-light `--sm-panel-2`
+            background (2.13:1, found auditing this exact fix). The reverse
+            of B-11: themed text on an invariant background. --sm-ink-mute
+            matches the modal's convention and clears 4.5:1 in both. */}
+        <p className="text-xs text-[var(--sm-ink-mute)]">
           Current unsaved changes will be lost.
         </p>
         <div className="flex gap-2 justify-end">
           <button
             onClick={() => onSetRestoreModal({ open: false, text: "" })}
-            className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700"
+            // a11y fix (2026-09-05, round 2): see SaveSnapshotModal's
+            // Cancel button comment above — same fix, same reason.
+            className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-[var(--sm-hair)]"
           >
             Cancel
           </button>

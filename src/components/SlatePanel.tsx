@@ -435,7 +435,15 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-white dark:bg-zinc-900 dark:text-white border-[2px] border-[var(--sm-ink)] text-black p-0 overflow-y-auto z-50 shadow-[var(--sm-shadow)] flex flex-col"
+      // a11y fix (2026-09-05, round 2 — independent review item 5): the
+      // drawer root used to be `bg-white dark:bg-zinc-900 dark:text-white
+      // text-black` (fully themed) while the ranked table's rows are the
+      // theme-invariant `--sm-panel`/`--sm-panel-2` this same fix put them
+      // on — a real dark drawer with a cream table island floating inside
+      // it. `--sm-panel`/`--sm-ink` bring the whole drawer to the SAME
+      // invariant convention as the table (measured below: every node in
+      // the drawer still clears 4.5:1 in both themes with this change).
+      className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-[var(--sm-panel)] text-[var(--sm-ink)] border-[2px] border-[var(--sm-ink)] p-0 overflow-y-auto z-50 shadow-[var(--sm-shadow)] flex flex-col"
     >
       {/* Chrome header */}
       <div className="flex items-center gap-3 p-6 pb-4 border-b-[8px] border-black shrink-0">
@@ -490,26 +498,52 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
       {fileError && (
         <div
           role="alert"
-          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0"
+          // a11y fix (2026-09-05, round 2 item 5): dropped the `dark:`
+          // half of this pair — the drawer root is now theme-invariant, so
+          // this box always sits on the same light `--sm-panel` ambient and
+          // never needs a second, darker set of colours.
+          className="px-6 py-2 bg-red-50 border-b-2 border-red-300 text-[10px] font-mono text-red-700 shrink-0"
         >
           {fileError}
         </div>
       )}
 
-      <div className="p-6 space-y-6 flex-1">
+      {/* a11y fix (2026-09-05, round 2 — independent review item 4):
+          data-a11y-section used to sit only on the ranked table's own
+          wrapper below, so scripts/verify-a11y.mjs's scoped axe.run only
+          ever saw the table — not the surrounding panel chrome (the file
+          count/char count line, the empty-state dropzone, the per-file
+          name/size chips, the "Ranked at…"/Shape & Rhythm caption, the
+          percentile explainer) that measured 2.49-2.60:1 in light
+          (bare `text-gray-400`, no dark: pairing). Widened to this
+          container — everything from the file list through the ranked
+          result — so the gate covers the chrome a writer actually reads,
+          not just the table cells.
+
+          Item 5 (below, and everywhere in this file) then brought the whole
+          drawer to the theme-invariant convention, which is why this chrome
+          no longer carries `dark:` pairs at all: once the ambient panel
+          never goes dark, a themed pair whose `dark:` half was tuned for a
+          real dark background (e.g. the `text-gray-400` this item first
+          reached for) actively FAILS against the now-permanent light one —
+          measured live at 2.26:1 fixing this item, the mirror image of
+          B-11. `--sm-ink-mute` (already this file's own convention for
+          descriptive captions, see ShapeRhythmTrendLine-equivalent copy
+          elsewhere in the app) replaces it everywhere in this panel. */}
+      <div className="p-6 space-y-6 flex-1" data-a11y-section="slate-table">
         {/* ── File list ───────────────────────────────────────────────── */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
               Scripts ({files.length}/{MAX_SCRIPTS})
             </h3>
-            <span className="text-[10px] font-mono text-gray-400">
+            <span className="text-[10px] font-mono text-[var(--sm-ink-mute)]">
               {formatChars(combinedChars)} / {formatChars(MAX_COMBINED_CHARS)} chars
             </span>
           </div>
 
           {files.length === 0 ? (
-            <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-700 text-gray-400 font-mono text-xs uppercase">
+            <div className="p-8 text-center border-4 border-dashed border-[var(--sm-hair)] text-[var(--sm-ink-mute)] font-mono text-xs uppercase">
               No scripts yet — add at least {MIN_SCRIPTS} .fountain/.txt files to build a slate.
             </div>
           ) : (
@@ -517,27 +551,27 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
               {files.map((f) => (
                 <li
                   key={f.id}
-                  className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 px-3 py-2"
+                  className="flex items-center gap-2 bg-[var(--sm-panel-2)] border-2 border-black/10 px-3 py-2"
                 >
                   <input
                     value={f.title}
                     onChange={(e) => updateTitle(f.id, e.target.value)}
                     aria-label={`Title for ${f.fileName}`}
-                    className="flex-1 min-w-0 bg-white dark:bg-zinc-900 border-2 border-black/20 dark:border-white/20 px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="flex-1 min-w-0 bg-[var(--sm-panel)] border-2 border-black/20 px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <span
-                    className="text-[10px] font-mono text-gray-400 truncate max-w-[160px]"
+                    className="text-[10px] font-mono text-[var(--sm-ink-mute)] truncate max-w-[160px]"
                     title={f.fileName}
                   >
                     {f.fileName}
                   </span>
-                  <span className="text-[10px] font-mono text-gray-400 shrink-0">
+                  <span className="text-[10px] font-mono text-[var(--sm-ink-mute)] shrink-0">
                     {formatChars(f.chars)} ch
                   </span>
                   <button
                     onClick={() => removeFile(f.id)}
                     aria-label={`Remove ${f.title}`}
-                    className="p-1 sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
+                    className="p-1 sm-btn hover:bg-black hover:text-white transition-colors shrink-0"
                   >
                     <Trash2 className="w-3 h-3" aria-hidden="true" />
                   </button>
@@ -586,7 +620,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
 
         {/* ── Status: idle / deploying / error ───────────────────────── */}
         {rankStatus === "idle" && !result && (
-          <p className="text-[11px] font-mono text-gray-500 dark:text-gray-400 italic">
+          <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] italic">
             Deterministic ranking — same slate, same order, every time.
           </p>
         )}
@@ -594,7 +628,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
         {rankStatus === "deploying" && (
           <div
             role="status"
-            className="p-4 bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-800 text-[11px] font-mono text-amber-900 dark:text-amber-200 flex items-center gap-2"
+            className="p-4 bg-amber-50 border-2 border-amber-300 text-[11px] font-mono text-amber-900 flex items-center gap-2"
           >
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
             Slate ranking isn't live yet — the /api/export/slate route hasn't been deployed. Try
@@ -605,7 +639,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
         {rankStatus === "error" && rankError && (
           <div
             role="alert"
-            className="p-4 bg-red-50 dark:bg-red-950/40 border-2 border-red-300 dark:border-red-800 text-[11px] font-mono text-red-700 dark:text-red-300 flex items-center justify-between gap-3"
+            className="p-4 bg-red-50 border-2 border-red-300 text-[11px] font-mono text-red-700 flex items-center justify-between gap-3"
           >
             <span className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" /> {rankError}
@@ -613,7 +647,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
             <button
               onClick={() => setRankError(null)}
               aria-label="Dismiss ranking error"
-              className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+              className="shrink-0 hover:text-red-900"
             >
               <X className="w-3 h-3" aria-hidden="true" />
             </button>
@@ -623,7 +657,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
         {downloadStatus === "deploying" && (
           <div
             role="status"
-            className="p-3 bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-800 text-[11px] font-mono text-amber-900 dark:text-amber-200 flex items-center gap-2"
+            className="p-3 bg-amber-50 border-2 border-amber-300 text-[11px] font-mono text-amber-900 flex items-center gap-2"
           >
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
             The comparison download isn't live yet — the /api/export/slate route hasn't been
@@ -634,13 +668,13 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
         {downloadStatus === "error" && downloadError && (
           <div
             role="alert"
-            className="p-3 bg-red-50 dark:bg-red-950/40 border-2 border-red-300 dark:border-red-800 text-[11px] font-mono text-red-700 dark:text-red-300 flex items-center justify-between gap-3"
+            className="p-3 bg-red-50 border-2 border-red-300 text-[11px] font-mono text-red-700 flex items-center justify-between gap-3"
           >
             <span>Download failed: {downloadError}</span>
             <button
               onClick={() => setDownloadError(null)}
               aria-label="Dismiss download error"
-              className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+              className="shrink-0 hover:text-red-900"
             >
               <X className="w-3 h-3" aria-hidden="true" />
             </button>
@@ -650,7 +684,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
         {/* ── Ranked comparison table ─────────────────────────────────── */}
         {result && (
           <div className="space-y-2">
-            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
+            <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
               Ranked {new Date(result.rankedAt).toLocaleString()}
               {/* 2026-09-04 review (REVISE item 3): the "not part of the
                   score" caveat used to live ONLY in a title= tooltip on the
@@ -662,13 +696,15 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                   (server/lib/slate.ts) already carries. */}
               <span className="normal-case tracking-normal"> &middot; Shape &amp; Rhythm column is descriptive only — not part of the score or this ranking</span>
             </p>
-            {/* a11y fix (2026-09-05, client-hunter B-14): data-a11y-section
-                is a scoping hook for scripts/verify-a11y.mjs, matching the
-                convention ScriptDoctorPanel.tsx's
-                data-a11y-section="shape-rhythm" already established — axe's
-                color-contrast rule needs a scoped subtree, not the whole
-                document, to measure exactly this table's own bugs. */}
-            <div className="overflow-x-auto sm-btn" data-a11y-section="slate-table">
+            {/* a11y fix (2026-09-05, client-hunter B-14): this used to carry
+                its own data-a11y-section="slate-table" scoping hook for
+                scripts/verify-a11y.mjs, matching the convention
+                ScriptDoctorPanel.tsx's data-a11y-section="shape-rhythm"
+                already established. Round 2 (independent review item 4)
+                widened that hook to the panel's whole content container
+                above, which already covers this subtree — kept unscoped
+                here to avoid two overlapping axe scopes on the same audit. */}
+            <div className="overflow-x-auto sm-btn">
               <table className="w-full text-xs font-mono border-collapse">
                 <thead>
                   <tr className="sm-btn--ink">
@@ -820,7 +856,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                 (src/lib/percentile-copy.ts's slatePercentileCaption) the
                 exported slate HTML's footer already carries, so the two
                 can never disagree on wording. */}
-            <p className="text-[10px] font-mono text-gray-400 normal-case tracking-normal">
+            <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] normal-case tracking-normal">
               {slatePercentileCaption()}
             </p>
           </div>

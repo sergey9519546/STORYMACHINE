@@ -797,17 +797,19 @@ describe('renderCoverageHtml — structural reliability note stays in sync with 
 // this is a Node-side WCAG 2 relative-luminance/contrast computation over
 // the exact colour literals this renderer emits, checked against the exact
 // background each one is actually painted on. The three pairs below are
-// documented explicitly rather than swept generically because they are the
-// ones B-15 measured as failing (2.48-3.19:1) before this fix:
+// documented explicitly rather than swept generically:
 //   1. `.dim-basis` (the "Based on N issues across M passes…" / "The N
 //      findings below…" provenance lines) on `.page`'s background — the
 //      lines the report's third-party-verifiability claim (ROADMAP P3)
-//      rests on.
-//   2. The same `.dim-basis` colour on `body`'s background, in case a
-//      future change ever renders it outside `.page` (defensive — today it
-//      never does, but the colour itself must hold on both).
+//      rests on. MEASURED as failing (2.48:1) before this fix.
+//   2. The same `.dim-basis` colour on `body`'s background — NOT one of
+//      B-15's measured failures (the rendered report always sits inside
+//      `.page`, so this pairing was never actually on screen); it is
+//      included defensively, inferred rather than measured, in case a
+//      future change ever renders `.dim-basis` outside `.page`, so the
+//      colour itself is required to hold on both backgrounds regardless.
 //   3. A scene heatmap cell with a MAJOR (not critical/minor) issue — its
-//      white text measured 3.19:1 on the pre-fix `#d97706`; this is the
+//      white text MEASURED 3.19:1 on the pre-fix `#d97706`; this is the
 //      literal, driven "11" figure the finding named.
 // A failure here means the SOURCE LITERAL regressed, not a rendering fluke.
 describe('renderCoverageHtml — rendered contrast (WCAG AA, client-hunter B-15)', () => {
