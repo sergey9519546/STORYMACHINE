@@ -7,7 +7,7 @@ status: active
 
 # Audit — 2026-07-14 High-End Audit
 
-**Directory:** `docs/audits/2026-07-14-high-end-audit/` (19 files: baseline
+**Directory:** `docs/audits/2026-07-14-high-end-audit/` (26 files: baseline
 verification, five phases of scope/bibliography/competitive-industry/UX/
 security-privacy/repository-reconstruction findings, gap and truth
 registries, devil's-advocate checkpoints, a synthesis, and a coverage

@@ -11,10 +11,14 @@ status: active
 stays pure. Until 2026-09-03, `ARCHITECTURE.md` §1's "the analysis core is
 pure and keyless" was prose, not an enforced boundary — the 2026-09-02
 retrospective (finding #5) found `server/nvm/analyze/doctor.ts` reachable
-from an AI transport (`engine/ai.ts` → `engine/ai-provider.ts` → an HTTP
-client) and a native SQLite binding (`screenplay/compile.ts` →
-`state/NarrativeState.ts` → `engine/Stage.ts`), meaning every doctor worker
-thread loaded both to compute a deterministic score — and had a daily cost:
+from an AI transport (the retrospective's own shorthand: `engine/ai.ts` →
+`engine/ai-provider.ts` → an HTTP client; repo paths are
+`server/engine/ai.ts` → `server/engine/ai-provider.ts`) and a native
+SQLite binding (shorthand `screenplay/compile.ts` → `state/NarrativeState.ts`
+→ `engine/Stage.ts`; repo paths `server/nvm/screenplay/compile.ts` →
+`server/nvm/state/NarrativeState.ts` → `server/engine/Stage.ts`), meaning
+every doctor worker thread loaded both to compute a deterministic score —
+and had a daily cost:
 it made [[Gate - Receipt Gate]] classify a routine edit to
 `server/lib/validation.ts` as scoring-path.
 

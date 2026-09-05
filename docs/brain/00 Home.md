@@ -30,7 +30,7 @@ generation. See `NORTH_STAR.md` §0 and [[Glossary]] ("keyless boot").
 The project's central, unresolved wager, per `ROADMAP.md` §3 and
 `CLAUDE.md`'s standing task: **make the score provably discriminate on real
 writing (P1)**, because by the doctor's own measurement
-(`server/nvm/analyze/doctor.ts:1892-1898`) the entire weighted-rule channel
+(`server/nvm/analyze/doctor.ts:2092-2093`) the entire weighted-rule channel
 carries AUC ~0.076 (worse than random) while scene-count scarcity alone
 carries AUC ~0.938 — more generated rules stopped adding signal a long time
 ago. The rule catalog (3,217 pass-scoped constants,
@@ -54,7 +54,7 @@ reconciliation, the whole project — see `docs/UNIFIED_STATE_2026-09-02.md`.
 
 ## Owner-only list
 
-Five to ten items in this repository can only be actioned by the project
+Nine items in this repository can only be actioned by the project
 owner — a local corpus run, a GitHub Actions billing fix, a license
 decision, repo visibility. Each has its own note under `Owner/`; start at
 [[Owner - Index]].

@@ -103,10 +103,22 @@
       "path": "docs/brain/Gates/Gate - Claims Register Lane.md"
     },
     {
+      "id": "docs/brain/Gates/Gate - Corpus Layout Verification.md",
+      "type": "gate",
+      "title": "Gate — Corpus Layout Verification",
+      "path": "docs/brain/Gates/Gate - Corpus Layout Verification.md"
+    },
+    {
       "id": "docs/brain/Gates/Gate - Honesty Audit.md",
       "type": "gate",
       "title": "Gate — Honesty Audit",
       "path": "docs/brain/Gates/Gate - Honesty Audit.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - LLM Provider Smoke Test.md",
+      "type": "gate",
+      "title": "Gate — LLM Provider Smoke Test",
+      "path": "docs/brain/Gates/Gate - LLM Provider Smoke Test.md"
     },
     {
       "id": "docs/brain/Gates/Gate - Output-Identity Harness.md",
@@ -662,6 +674,10 @@
     },
     {
       "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
@@ -682,6 +698,10 @@
     },
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
@@ -697,12 +717,24 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - Corpus Layout Verification.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Corpus Layout Verification.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Honesty Audit.md",
       "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Honesty Audit.md",
       "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - LLM Provider Smoke Test.md",
+      "to": "docs/brain/Glossary.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Pure-Core Boundary.md",
@@ -715,6 +747,10 @@
     {
       "from": "docs/brain/Glossary.md",
       "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
     },
     {
       "from": "docs/brain/Glossary.md",
@@ -751,6 +787,10 @@
     {
       "from": "docs/brain/Glossary.md",
       "to": "docs/brain/Audits/Audit - 2026-07-14 High-End Audit.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Gates/Gate - LLM Provider Smoke Test.md"
     },
     {
       "from": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md",
@@ -1177,6 +1217,10 @@
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
+      "from": "docs/brain/Owner/Owner - Run Measure Real.md",
+      "to": "docs/brain/Gates/Gate - Corpus Layout Verification.md"
+    },
+    {
       "from": "docs/brain/Patterns.md",
       "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
     },
@@ -1411,6 +1455,10 @@
     {
       "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Slate.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Versions and Snapshots.md",

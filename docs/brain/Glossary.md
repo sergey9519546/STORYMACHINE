@@ -1,16 +1,28 @@
 ---
 type: glossary
 updated: 2026-09-05
-sources: [CLAUDE.md, ROADMAP.md, NORTH_STAR.md, docs/CLAIMS_REGISTER.md, docs/p1-benchmark/README.md]
+sources: [CLAUDE.md, ROADMAP.md, NORTH_STAR.md, docs/CLAIMS_REGISTER.md, docs/p1-benchmark/README.md, server/nvm/analyze/doctor.ts]
 status: active
 ---
 
 # Glossary
 
 **Health** — the deterministic 0-100 score `server/nvm/analyze/doctor.ts`
-computes for a screenplay: `health = 100 − densityPenalty − scarcityPenalty`
+computes for a screenplay. The base term is
+`baseHealth = 100 − densityPenalty − scarcityPenalty`
 (pre-[[Branch - R5 Verbosity Bias]] formula; R5 proposes a scene-opportunity
-renormalization, unmerged). Fully LLM-free — see [[Surface - Script Doctor Panel]].
+renormalization, unmerged). The **displayed, final** score subtracts three
+more bounded deduction terms on top of that base:
+`health = baseHealth − structuralDeduction − arcIncoherenceDeduction − dialogueDeduction`
+(`doctor.ts:2144`) — `structuralDeduction` is the bounded feature-scale
+structural-finding deduction (see the CLAUDE.md gotcha: structural findings
+at feature scale must go through this path, never raw issue-count density);
+`arcIncoherenceDeduction` fires only at feature scale (≥15 scenes,
+`ARC_DED_MIN_SCENES`, `doctor.ts:2104`) off the emotional-arc trajectory;
+`dialogueDeduction` is the 2026-07-29 dialogue-diversity term that took
+DIALOGUE_FLATTEN from AUC 0.54 (chance) to 0.990 — see
+[[Measurement - DISCRIMINATION_BASELINE_2026-07-29]]. Fully LLM-free — see
+[[Surface - Script Doctor Panel]].
 
 **Verdict band** — the tier `verdictFor()` (`doctor.ts`) maps a health value
 into (e.g. "recommend," "consider," "decline"); `docs/scoring/VERBOSITY_BIAS_2026-07-11.md`
@@ -84,8 +96,13 @@ experiments. The wave program that grew it is retired; do not resume it.
 **Keyless boot** — the server deliberately boots without `GEMINI_API_KEY`
 into full analysis-only mode (doctor, diagnose, coverage, what-if, room,
 interview receipts) — see `docs/CLAIMS_REGISTER.md` rows 5-6, 15-16, 18-19,
-23-24. Never reintroduce a fatal key check in `server.ts`.
+23-24. Never reintroduce a fatal key check in `server.ts`. See
+[[Gate - LLM Provider Smoke Test]] for the maintainer check that a
+configured key actually round-trips against a live provider.
 
 ## Sources
 
 - `CLAUDE.md`; `ROADMAP.md`; `NORTH_STAR.md`; `docs/CLAIMS_REGISTER.md`
+- `server/nvm/analyze/doctor.ts:2144` (final health formula), `:679-692`
+  (baseHealth/craftPenalty), `:2104` (arcIncoherenceDeduction feature-scale
+  gate)

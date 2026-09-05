@@ -106,7 +106,7 @@ INVERSE_CHEKHOV_GUN in `33a2ee48`; `docs/rulebook/README.md` is the
 machine-counted authority — the earlier "~8,917 rules, ~5,701
 from a bulk Wave 1191" story was shown to be inaccurate by the 2026-07-14
 audit — `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
-R2-C01), and by the doctor's own measurement (`doctor.ts:1892-1898`) the
+R2-C01), and by the doctor's own measurement (`doctor.ts:2092-2093`) the
 entire weighted-rule channel contributes AUC ~0.076 to discrimination while
 scene-count scarcity carries AUC ~0.938. More rules stopped adding signal a
 long time ago; they add maintenance cost and undercut the trust story. Do not

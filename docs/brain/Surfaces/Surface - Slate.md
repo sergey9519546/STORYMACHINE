@@ -20,9 +20,11 @@ measurement, not a human-reader endorsement" (row 12), plus (added
 "Descriptive only — not part of the score or this ranking" carrying the
 same two structural-signal aggregates every other surface shows.
 
-**Browser suite:** `tests/routes/export-producer.test.ts` (the "renders a
-Shape & Rhythm column" and "carries the two Shape & Rhythm aggregates"
-tests, and the deterministic-ordering assertion at line 96).
+**Route test (not [[Gate - Browser Battery Suites|browser battery]]):**
+`tests/routes/export-producer.test.ts` is a Node route test (`npm test`,
+no Chromium) — the "renders a Shape & Rhythm column" and "carries the two
+Shape & Rhythm aggregates" tests, and the deterministic-ordering assertion
+at line 96. No browser suite drives this surface directly.
 
 ## Sources
 

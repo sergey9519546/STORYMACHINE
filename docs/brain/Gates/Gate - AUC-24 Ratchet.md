@@ -1,7 +1,7 @@
 ---
 type: gate
 updated: 2026-09-05
-sources: [CLAUDE.md, tests/core/real-script-corpus.test.ts, tests/core/auc24-table.test.ts, scripts/lib/auc.ts, tests/fixtures/auc24-table.json]
+sources: [CLAUDE.md, tests/core/real-script-corpus.test.ts, tests/core/auc24-table.test.ts, scripts/lib/auc.ts, tests/fixtures/real-corpus-manifest.json]
 status: active
 ---
 
@@ -11,8 +11,11 @@ status: active
 degradation (shuffle scenes AND drop every third) over a 24-script subset;
 last measured **0.731**. It is asserted two ways: (1) live, in
 `tests/core/real-script-corpus.test.ts` (env-gated on
-`REAL_SCRIPT_CORPUS_DIR`), which also locks 71 per-script health/verdict
-values; (2) since 2026-09-03, on every CI run with no corpus, by
+`REAL_SCRIPT_CORPUS_DIR`), which also locks 72 per-script health/verdict
+values (`tests/fixtures/real-corpus-manifest.json`; 71 is an older figure
+that appears in a `doctor.ts` comment and should not be trusted over the
+manifest itself — see [[Branch - R5 Verbosity Bias]]'s "72-row" wording);
+(2) since 2026-09-03, on every CI run with no corpus, by
 `tests/core/auc24-table.test.ts`, which recomputes the AUC from a committed
 table of 24 intact/degraded health pairs (`tests/fixtures/auc24-table.json`)
 — but only once that table exists (produced by `npm run lock-auc24` on the

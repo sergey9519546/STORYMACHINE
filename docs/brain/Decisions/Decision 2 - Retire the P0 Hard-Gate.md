@@ -19,8 +19,11 @@ Changed as part of this decision: `NORTH_STAR.md` §1's "demand before
 rigor" law moved from gate to principle; `AGENTS.md`'s "What's Gated"
 section became "Standing constraints" with P0-dependent gates removed;
 `CLAUDE.md` and `ROADMAP.md`'s P0 sections were reframed. **Not changed:**
-P0 is still worth pursuing, the rule-count freeze (3,217 constants) and
-wave-program retirement stand independent of P0, and the 2026-08-04
+P0 is still worth pursuing, the rule-count freeze and wave-program
+retirement stand independent of P0 (`docs/DECISION_LOG.md:124` says 3,216
+constants — that was the count at the time of this decision; PR #257
+(`33a2ee48`) later added INVERSE_CHEKHOV_GUN, so the count is 3,217 as of
+this note's own `updated` date — see [[Glossary]]), and the 2026-08-04
 machine-checked evidence gates ([[Gate - Receipt Gate]], [[Gate - AUC-24 Ratchet]])
 for scoring-path changes remain in force.
 

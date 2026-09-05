@@ -72,20 +72,48 @@ function someNoteContainsLoosely(notes: { path: string; text: string }[], needle
   return notes.some((n) => collapseWhitespace(n.text).includes(target));
 }
 
+/**
+ * Every path listed in a note's own frontmatter `sources: [a, b, c]` array,
+ * repo-relative, trimmed. Returns [] if the note has no frontmatter or no
+ * `sources:` line — those cases are already covered by (f)'s frontmatter
+ * check, so this helper does not itself assert presence.
+ */
+function frontmatterSources(text: string): string[] {
+  if (!text.startsWith('---\n') && !text.startsWith('---\r\n')) return [];
+  const end = text.indexOf('\n---', 3);
+  if (end === -1) return [];
+  const block = text.slice(0, end);
+  const m = /^sources:\s*\[([^\]]*)\]\s*$/m.exec(block);
+  if (!m) return [];
+  return m[1]
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 test('(a) every Decision Log entry has a brain note', () => {
   const log = read('docs/DECISION_LOG.md');
-  const notes = listVaultNotes();
   const decisionNumbers = [...log.matchAll(/^## Decision #(\d+):/gm)].map((m) => m[1]);
   assert.ok(decisionNumbers.length > 0, 'DECISION_LOG.md must contain at least one "## Decision #N:" heading');
 
+  // Scoped to Decisions notes specifically (path under docs/brain/Decisions/),
+  // not any note that happens to mention "Decision #N" — e.g. an Owner note
+  // that references a decision in passing must not satisfy "has a brain
+  // note" for that decision. Same reasoning as (d) below, which scopes to
+  // Gates/ for the identical reason (round-1 review finding: deleting
+  // Decisions/Decision 6 - License the Repository.md stayed green here
+  // because Owner/Owner - License Decision.md also says "Decision #6").
+  const decisionNotes = listVaultNotes().filter((n) => n.path.includes(`${path.sep}Decisions${path.sep}`));
+  assert.ok(decisionNotes.length > 0, 'docs/brain/Decisions must contain at least one note');
+
   const missing: string[] = [];
   for (const n of decisionNumbers) {
-    if (!someNoteContains(notes, `Decision #${n}`)) missing.push(n);
+    if (!someNoteContains(decisionNotes, `Decision #${n}`)) missing.push(n);
   }
   assert.deepEqual(
     missing,
     [],
-    `docs/DECISION_LOG.md has decisions with no brain note mentioning "Decision #N": ${missing.join(', ')}`,
+    `docs/DECISION_LOG.md has decisions with no note in docs/brain/Decisions/ mentioning "Decision #N": ${missing.join(', ')}`,
   );
 });
 
@@ -154,15 +182,17 @@ test('(c) every session-record heading in PATH_TO_EXCELLENCE.md has a brain note
   );
 });
 
-test('(d) every verify:* suite the browser battery composes appears in a Gate note', () => {
+test('(d) every npm run verify:* script in package.json appears in a Gate note', () => {
+  // Originally scoped to only the eight suites verify:browser composes.
+  // Widened (round 2) to every `verify:*` key package.json defines — that
+  // included verify:corpus-layout and verify:llm-providers, which are real
+  // maintainer gates (pre-flight corpus checking; a live-provider smoke
+  // test) that are not part of the browser battery and had no Gate note.
+  // Both now have one: [[Gate - Corpus Layout Verification]] and
+  // [[Gate - LLM Provider Smoke Test]].
   const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
-  const battery = pkg.scripts['verify:browser'];
-  assert.ok(battery, 'package.json must define a verify:browser script');
-
-  const suites = [...battery.matchAll(/verify:[\w-]+/g)]
-    .map((m) => m[0])
-    .filter((s) => s !== 'verify:browser');
-  assert.ok(suites.length > 0, 'verify:browser must compose at least one verify:* suite');
+  const suites = Object.keys(pkg.scripts).filter((s) => s.startsWith('verify:'));
+  assert.ok(suites.length > 0, 'package.json must define at least one verify:* script');
 
   // Scoped to Gate notes specifically (path under docs/brain/Gates/), not any
   // note that happens to mention the suite name — a session record naming a
@@ -214,5 +244,27 @@ test('(f) no unresolved wikilinks and every note has YAML frontmatter', async ()
     errors,
     [],
     `brain-graph found unresolved wikilinks or notes missing frontmatter:\n${errors.join('\n')}`,
+  );
+});
+
+test('(g) every note\'s frontmatter sources: path resolves against the repo', () => {
+  // The vault's central promise is "this note links to and summarizes real
+  // source files." (a)-(f) check the notes themselves are complete and
+  // internally consistent; this is the one check that the citations they
+  // point OUT of the vault are real, so a renamed or deleted source file
+  // cannot silently sit uncaught in a note's own frontmatter forever.
+  const notes = listVaultNotes();
+  const missing: string[] = [];
+  for (const note of notes) {
+    for (const source of frontmatterSources(note.text)) {
+      if (!existsSync(path.join(ROOT, source))) {
+        missing.push(`${path.relative(ROOT, note.path)} -> ${source}`);
+      }
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    `notes whose frontmatter sources: path does not resolve against the repo:\n${missing.join('\n')}`,
   );
 });

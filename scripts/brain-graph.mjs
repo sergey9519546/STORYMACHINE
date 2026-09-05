@@ -42,7 +42,7 @@
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const VAULT_ROOT = path.join(REPO_ROOT, 'docs', 'brain');
@@ -249,6 +249,14 @@ function main() {
 
 // Run only when invoked directly (`node scripts/brain-graph.mjs`), not when
 // imported by tests/core/brain-coverage.test.ts for buildGraph()/renderGraphMd().
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compares resolved file URLs rather than a raw string join against
+// process.argv[1] — import.meta.url percent-encodes (e.g. spaces as %20)
+// while process.argv[1] does not, so a repo checked out under a path
+// containing a space made the naive comparison always false and both
+// `npm run brain` and `npm run check-brain` silently no-op. Same idiom as
+// scripts/check-scoring-receipt.mjs:832-833.
+const invokedDirectly = Boolean(process.argv[1])
+  && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+if (invokedDirectly) {
   main();
 }

@@ -18,7 +18,10 @@ act-swap degradation twins (the engine's own recipes) as the negative
 class.
 
 **Status:** frozen — "do not tune against this file's held-out portion."
-Machine-readable dump in `outputs/gap_analysis.json` (derived, rights-safe).
+Machine-readable dump in `outputs/gap_analysis.json` (derived, rights-safe;
+not committed to the repo — this path does not resolve from the repo root,
+it names a local output artifact the source doc describes, per its own
+wording).
 
 ## Sources
 
