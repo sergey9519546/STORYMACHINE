@@ -29,6 +29,7 @@ import {
 } from '../../src/lib/percentile-copy.ts';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
 import { buildSlateEntry, rankSlate, renderSlateHtml } from '../../server/lib/slate.ts';
+import { renderCoverageLetter } from '../../server/lib/coverage-letter.ts';
 import type { ScriptDoctorReport, DoctorGrade, CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -87,9 +88,19 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
   const slatePanel = read('../../src/components/SlatePanel.tsx');
   const slateHtml = read('../../server/lib/slate.ts');
   const whatIfPanel = read('../../src/components/WhatIfPanel.tsx');
+  const coverageLetter = read('../../server/lib/coverage-letter.ts');
 
-  const NO_LOCAL_ORDINAL = /function ordinal\s*\(/;
-  const NO_LOCAL_PERCENTILE_BAND = /function percentileBand\s*\(/;
+  // 2026-09-05 review tightening: the original regexes only caught a
+  // `function ordinal(...)`/`function percentileBand(...)` DECLARATION —
+  // coverage-letter.ts's own drift (found in the same review) was exactly
+  // that shape, but an arrow-function re-implementation
+  // (`const ordinal = (n) => {...}`) would have slipped past both the old
+  // regex AND the "must import from percentile-copy.ts" check below (a file
+  // can do both: import the module for something else, and STILL shadow
+  // `ordinal` with a local const). Matches any declaration form —
+  // `function`, `const`/`let`/`var` bound to a function or arrow expression.
+  const NO_LOCAL_ORDINAL = /\bfunction\s+ordinal\s*\(|\b(?:const|let|var)\s+ordinal\s*=\s*(?:function\b|\()/;
+  const NO_LOCAL_PERCENTILE_BAND = /\bfunction\s+percentileBand\s*\(|\b(?:const|let|var)\s+percentileBand\s*=\s*(?:function\b|\()/;
 
   for (const [name, src, importPath] of [
     ['ScriptDoctorPanel.tsx', panel, '../../lib/percentile-copy.ts'],
@@ -98,6 +109,7 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
     ['SlatePanel.tsx', slatePanel, '../lib/percentile-copy.ts'],
     ['slate.ts', slateHtml, '../../src/lib/percentile-copy.ts'],
     ['WhatIfPanel.tsx', whatIfPanel, '../lib/percentile-copy.ts'],
+    ['coverage-letter.ts', coverageLetter, '../../src/lib/percentile-copy.ts'],
   ] as const) {
     it(`${name} imports from percentile-copy.ts rather than defining its own ordinal()/percentileBand()`, () => {
       assert.ok(src.includes(importPath), `${name} must import from ${importPath}`);
@@ -132,6 +144,19 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
   it('WhatIfPanel.tsx\'s DoctorReadout renders the percentile beside health via the shared compactPercentileNote(), so the What-If Lab is not the one place this number is silent', () => {
     assert.match(whatIfPanel, /\{compactPercentileNote\(draft\.healthPercentile\)\}/);
     assert.match(whatIfPanel, /typeof draft\.healthPercentile === ['"]number['"]/);
+  });
+
+  // 2026-09-05 review — coverage-letter.ts was the LAST percentile surface
+  // off the shared module: a local `function ordinal(...)` (used for the
+  // draftRank line) and a hardcoded "Nth percentile"/"hand-authored
+  // reference set" for the healthPercentile line — the exact "th" suffix on
+  // every number (wrong for e.g. 82, which reads "82nd") and the exact
+  // "synthetic" drop the review flagged. Now uses the shared ordinal() plus
+  // REFERENCE_SET_SIZE/REFERENCE_SET_LABEL for both lines.
+  it('coverage-letter.ts renders its percentile line via the shared ordinal()/REFERENCE_SET_SIZE/REFERENCE_SET_LABEL, not a hand-built "Nth percentile" string', () => {
+    assert.match(coverageLetter, /\$\{ordinal\(Math\.round\(report\.healthPercentile\)\)\}\s*percentile/);
+    assert.match(coverageLetter, /\$\{REFERENCE_SET_SIZE\}-sample, \$\{REFERENCE_SET_LABEL\}/);
+    assert.ok(!/\$\{Math\.round\(report\.healthPercentile\)\}th percentile/.test(coverageLetter), 'the old hardcoded "th" suffix must be gone');
   });
 });
 
@@ -208,5 +233,46 @@ describe('percentile-copy.ts — end-to-end: the exported slate HTML actually co
       html.includes(slatePercentileCaption()),
       `expected the exported slate HTML's footer to contain "${slatePercentileCaption()}"`,
     );
+  });
+});
+
+describe('percentile-copy.ts — end-to-end: the exported coverage LETTER uses the shared ordinal() and "hand-authored synthetic" wording', () => {
+  function letterReport(healthPercentile: number): ScriptDoctorReport {
+    return {
+      health: 78.3,
+      grade: 'strong' as DoctorGrade,
+      totalIssues: 0,
+      bySeverity: { critical: 0, major: 0, minor: 0 },
+      passes: [],
+      sceneHeatmap: [],
+      topPriorities: [],
+      structure: {
+        actPosition: 'act2b', completionPercent: 50, avgSuspensePerScene: 3,
+        escalating: true, reversalCount: 0, reversalDensity: 0, approachingClimax: false,
+        openClues: 0, revelationCount: 0, midpointPressure: 0, tightestScene: 0,
+      },
+      characters: [],
+      sceneCount: 3,
+      wordCount: 100,
+      analyzedAt: Date.UTC(2026, 8, 4),
+      verdict: 'RECOMMEND' as CoverageVerdict,
+      dimensions: [],
+      strengths: [],
+      plainSummary: 'A clean report.',
+      healthPercentile,
+    };
+  }
+
+  it('carries the shared REFERENCE_SET_LABEL ("hand-authored synthetic reference set") and the correct ordinal suffix, for several inputs', () => {
+    // 82 is the case that would have exposed the old hardcoded-"th" bug
+    // ("82th" instead of "82nd") had this test existed before the fix.
+    for (const pct of [1, 2, 3, 11, 12, 13, 82, 90, 100]) {
+      const { markdown } = renderCoverageLetter(letterReport(pct), { title: 'Consistency Check' });
+      const expectedFragment = `ranks in the ${ordinal(pct)} percentile against a fixed, ${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL}`;
+      assert.ok(
+        markdown.includes(expectedFragment),
+        `expected the coverage letter to contain "${expectedFragment}" for healthPercentile=${pct} — got: ${markdown}`,
+      );
+    }
   });
 });

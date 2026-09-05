@@ -56,6 +56,24 @@ import type {
 import type { RevisionIssue, PassName } from '../nvm/revision/passes/types.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 import { computeStructuralReliabilityNote } from './structural-reliability.ts';
+// Shared percentile copy (2026-09-05 review follow-up) — this module was the
+// LAST percentile-showing surface with its own hand-copy: a local ordinal()
+// (used for the draftRank line) and a hardcoded "Nth percentile" for the
+// healthPercentile line that always appended the literal suffix "th"
+// (wrong for anything not ending in a "th" ordinal, e.g. "82th" instead of
+// "82nd") — and, separately, that line had already dropped "synthetic" from
+// "hand-authored ... reference set", the exact qualifier that keeps the
+// percentile from reading as a comparison against real scripts (the same
+// drift SnapshotManager.tsx's compact note was found to have, 2026-09-04
+// review). Importing the shared ordinal()/REFERENCE_SET_SIZE/
+// REFERENCE_SET_LABEL fixes both: one ordinal implementation everywhere, and
+// the reference-set description worded identically to every other surface.
+// Server files in this codebase already import directly from src/lib — see
+// server/routes/export.ts's imports of fountain.ts/fdx.ts/docx.ts, and
+// coverage-html.ts's/slate.ts's own percentile-copy.ts imports — so this is
+// an established pattern, not a new one; it does not touch the scoring path
+// (no import edge to/from doctor.ts either direction).
+import { ordinal, REFERENCE_SET_SIZE, REFERENCE_SET_LABEL } from '../../src/lib/percentile-copy.ts';
 
 export interface CoverageLetterOptions {
   title?: string;
@@ -111,19 +129,6 @@ const VERDICT_LABEL: Record<CoverageVerdict, string> = {
 // generality like "Overall structure". Matches "Scene 4", "Scenes 1-3",
 // "Scene ~5", and "Lines 40-42".
 const ANCHORED_LOCATION_RE = /\b(scenes?|lines?)\s*~?\d/i;
-
-/** Ordinal suffix ("1st", "2nd", "3rd", "4th"…) for the draftRank line —
- *  handles the 11-13 teens exception (11th/12th/13th, not 11st/12nd/13rd). */
-function ordinal(n: number): string {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1: return `${n}st`;
-    case 2: return `${n}nd`;
-    case 3: return `${n}rd`;
-    default: return `${n}th`;
-  }
-}
 
 function severityWord(sev: RevisionIssue['severity']): string {
   return sev.toUpperCase();
@@ -227,8 +232,8 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
 
   if (typeof report.healthPercentile === 'number') {
     caveats.push(
-      `Health ranks in the ${Math.round(report.healthPercentile)}th percentile against a fixed, `
-      + '20-sample, hand-authored reference set — not against other scripts you might send it, '
+      `Health ranks in the ${ordinal(Math.round(report.healthPercentile))} percentile against a fixed, `
+      + `${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL} — not against other scripts you might send it, `
       + 'and not a market comparison.',
     );
   }

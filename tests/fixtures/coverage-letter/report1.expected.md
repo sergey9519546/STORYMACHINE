@@ -29,7 +29,7 @@ CONSIDER — scored in the middle band, above the decline line but short of what
 ## How to Read This Report
 
 This is a deterministic read: the engine scored this draft using rule-based analysis alone — no generative AI wrote or judged any part of it. Running the identical script text through the engine again reproduces the same score and verdict.
-Health ranks in the 90th percentile against a fixed, 20-sample, hand-authored reference set — not against other scripts you might send it, and not a market comparison.
+Health ranks in the 90th percentile against a fixed, 20-sample, hand-authored synthetic reference set — not against other scripts you might send it, and not a market comparison.
 It does not read for market fit, casting, or budget — those require a human reader’s judgment this engine has no basis for.
 
 ---

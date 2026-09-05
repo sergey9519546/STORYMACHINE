@@ -203,6 +203,7 @@ second implementation):
 | Snapshot trend (Versions, `SnapshotManager.tsx` + `snapshot-trend.ts`) | yes (2 aggregates) | yes (`snapshotDraftRanks`, 2026-09-04) | yes (`Snapshot.healthPercentile`, 2026-09-04) |
 | `POST /api/export/verify` | yes (`recomputed.structuralSignals`, 2026-09-04 — informational only, never part of the match/mismatch decision) | n/a (no snapshot history at this stateless route) | yes (`recomputed.healthPercentile`) |
 | `POST /api/export/slate` (`server/lib/slate.ts`, `SlatePanel.tsx`) | yes (per row, 2026-09-04) | n/a (ranking is cross-script by health, not cross-draft) | yes |
+| What-If Lab (`src/components/WhatIfPanel.tsx`'s `DoctorReadout`, `POST /api/nvm/whatif/doctor`) | yes (per branch) | n/a (a branch is a projected variant, not a saved draft to rank against others — but its `healthPercentile` DOES flow into the promoted snapshot, so Versions shows no asymmetry once a branch is promoted) | yes (2026-09-05, `compactPercentileNote`, gated on `draft.healthPercentile`) |
 
 `draftRank` is computed exactly once per surface invocation, client-side, by
 `computeDraftRank`/`snapshotDraftRanks` — every server-rendered surface

@@ -29,7 +29,7 @@ CONSIDER — scored in the middle band, above the decline line but short of what
 ## How to Read This Report
 
 This is a deterministic read: the engine scored this draft using rule-based analysis alone — no generative AI wrote or judged any part of it. Running the identical script text through the engine again reproduces the same score and verdict.
-Health ranks in the 90th percentile against a fixed, 20-sample, hand-authored reference set — not against other scripts you might send it, and not a market comparison.
+Health ranks in the 90th percentile against a fixed, 20-sample, hand-authored synthetic reference set — not against other scripts you might send it, and not a market comparison.
 Shape and rhythm: the exported HTML report carries a new "Structural Signals" strip — scene length, talk-versus-action mix, speech turns, speaker pairings and action-prose variation, read from the shape of the document rather than from any word list. Two readings from it: the mean scene-to-scene change in the dialogue/action word mix is 0.04, and the sentence-length variation across the draft's action lines is 0.55. Both are descriptive only — new and deliberately unwired: they are shown as diagnostics and no part of the score, grade, or verdict above is derived from them.
 It does not read for market fit, casting, or budget — those require a human reader’s judgment this engine has no basis for.
 
