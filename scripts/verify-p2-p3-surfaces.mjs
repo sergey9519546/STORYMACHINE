@@ -951,6 +951,64 @@ async function main() {
     `found ${runDiagnosisIdleOff} button(s)`,
   );
 
+  // ── The SAMPLE state, beside the FDX guard above and for the same reason
+  // one axis over (review finding, 2026-09-05). The built-in sample is stored
+  // as an uploadedFile with format "fountain" and provenance "sample", so a
+  // format-only reason told the writer to "clear the upload" while the chip
+  // above said "Sample script" — withholding correct, sentence wrong. The
+  // panel is idle here with the probe upload active, which is the state whose
+  // "Try a sample" button loads the sample and diagnoses it in one click.
+  // ──────────────────────────────────────────────────────────────────────
+  const sampleFixPosts = [];
+  const onSampleFixPost = (req) => {
+    if (req.method() === 'POST' && /\/api\/scriptide\/fix$/.test(req.url())) sampleFixPosts.push(req.url());
+  };
+  pageA.on('request', onSampleFixPost);
+  await pageA
+    .getByRole('button', { name: /Load a built-in sample screenplay and run a diagnosis/i })
+    .first()
+    .click({ timeout: timing.ms(15000) });
+  const sampleReportRendered = await pageA
+    .getByRole('button', { name: 'Export coverage report as an HTML document', exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: timing.ms(60000) })
+    .then(() => true)
+    .catch(() => false);
+  record('P2-generative', '"Try a sample" produces a complete, sample-provenance report', sampleReportRendered);
+
+  if (sampleReportRendered) {
+    const sampleVerifyBtn = pageA.getByRole('button', { name: 'Verify my rewrite', exact: true }).first();
+    const samplePresent = (await sampleVerifyBtn.count()) > 0;
+    const sampleEnabled = samplePresent && (await sampleVerifyBtn.isEnabled().catch(() => false));
+    record(
+      'P2-generative',
+      'on the SAMPLE report "Verify my rewrite" is WITHHELD (present, disabled) — the report is not the writer\'s draft',
+      samplePresent && !sampleEnabled,
+      `present=${samplePresent} enabled=${sampleEnabled}`,
+    );
+
+    // The reason must name the SAMPLE, matching the chip above it — not call
+    // it "an uploaded file" and send the writer looking for an upload to clear.
+    const sampleReasonNamesSample = await pageA
+      .getByText(/built-in sample script, not your draft.*Dismiss the sample/i)
+      .count();
+    const uploadWordingLeaked = await pageA.getByText(/This report came from an uploaded file/i).count();
+    record(
+      'P2-generative',
+      'the withheld reason names the sample (and does not call it an uploaded file)',
+      sampleReasonNamesSample >= 1 && uploadWordingLeaked === 0,
+      `namesSample=${sampleReasonNamesSample} uploadWordingLeaked=${uploadWordingLeaked}`,
+    );
+
+    record(
+      'P2-generative',
+      'no POST /api/scriptide/fix is attempted from the sample state',
+      sampleFixPosts.length === 0,
+      `posts=${sampleFixPosts.length}`,
+    );
+  }
+  pageA.off('request', onSampleFixPost);
+
   const hashMatch = exportedHtml.match(/Script-text hash \(SHA-256, full\)<\/dt><dd><code>([0-9a-f]{64})<\/code>/);
   const healthMatch = exportedHtml.match(/<dt>Health<\/dt><dd><code>([\d.]+)<\/code>/);
   const verdictMatch = exportedHtml.match(/<dt>Verdict<\/dt><dd><code>([A-Z]+)<\/code>/);

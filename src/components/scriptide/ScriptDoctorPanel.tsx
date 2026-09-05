@@ -3304,7 +3304,17 @@ export default function ScriptDoctorPanel({
     !fixSourceText
       ? "No analyzable script text is available for this report."
       : uploadedFile
-      ? uploadedFile.format === "fountain"
+      ? // PROVENANCE BEFORE FORMAT (review finding, 2026-09-05). The built-in
+        // sample is stored as an `uploadedFile` with format "fountain" and
+        // provenance "sample" (see loadSample), so a format-only branch called
+        // it "an uploaded file" and told the writer to "clear the upload" while
+        // the chip directly above said "Sample script: …" and its ✕ was named
+        // "Stop analyzing the sample script". Withholding was right; the
+        // sentence was not. The chip's own two provenances are the first split
+        // here, exactly as they are in the chip itself.
+        uploadedFile.provenance === "sample"
+        ? "This report is the built-in sample script, not your draft. Dismiss the sample (✕ above) and run the diagnosis again to verify a rewrite of your own draft."
+        : uploadedFile.format === "fountain"
         ? "This report came from an uploaded file. Verification compares your editor draft, so clear the upload (✕ above) and run the diagnosis again to verify a rewrite here."
         : `This report came from an uploaded ${uploadedFile.format === "pdf" ? "PDF" : "Final Draft"} file, and the browser holds no Fountain version of it to compare. Use "Load converted Fountain into editor" below, then clear the upload (✕ above) and run the diagnosis again.`
       : fountain.trim() === ""
