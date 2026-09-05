@@ -12,29 +12,21 @@ import { TONE_NAME_LIST, GENRE_NAMES } from './genre-router.ts';
 import { ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES, STRUCTURE_NAMES } from './structure-presets.ts';
 import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
 // One definition of "what is a character cue" (2026-09-04, guard/analyzer cue
-// parity fix). CUE_INITIAL_CLASS / CUE_LETTER_CLASS are src/lib/fountain.ts's
-// OWN cue-alphabet class bodies — the single definition CHARACTER_CUE_RE
-// itself is built from and that every other cue test in the repository
+// parity fix; revised same day after independent review found a second gap).
+// CUE_INITIAL_CLASS / CUE_LETTER_CLASS are src/lib/fountain.ts's OWN
+// cue-alphabet class bodies — the single definition CHARACTER_CUE_RE itself
+// is built from and that every other cue test in the repository
 // (server/nvm/analyze/screenplay-normalizer.ts) composes rather than
 // re-deriving. Unicode-aware (`\p{Lu}\p{Lt}`, the 2026-09-03 Unicode-cue fix)
-// and with no length cap. Composing the guard's own line-shape test from
-// these exported classes — rather than importing CHARACTER_CUE_RE verbatim —
-// keeps this guard's existing, deliberately LOOSER design (see
-// CUE_LIKE_LINE_RE's own comment below: over-count real cues, never
-// under-count the pathological case) while still sharing the one alphabet
-// definition, exactly as screenplay-normalizer.ts's CUE_BODY_RE already does.
-// Importing the classes closes the gap an adversarial audit reproduced
-// 2026-09-04: the old local `CUE_LIKE_LINE_RE = /^[A-Z0-9 .,'()&\-]{1,40}$/`
-// was invisible to non-ASCII capitals (Cyrillic, Greek, accented Latin),
-// cues containing `#`, and cues over 40 chars — all four are ordinary
-// character cues to the analyzer and were completely uncounted by this
-// guard, so a script built entirely from one of those shapes sailed past the
-// distinct-cue budget below and reached the analyzer's O(n²) cost undiminished.
+// and with no length cap. CHARACTER_CUE_RE itself is also imported now — see
+// isCueLikeLine's own comment below for why the guard's predicate is
+// `CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line)` rather than
+// either regex alone.
 // server/lib/validation.ts sits outside doctor.ts's import graph (verified by
 // `node scripts/check-scoring-receipt.mjs` on this range), so importing FROM
 // the scoring-reachable src/lib/fountain.ts does not itself touch a
 // scoring-path file — fountain.ts is not edited by this change.
-import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../src/lib/fountain.ts';
+import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../src/lib/fountain.ts';
 
 // ── SSRF-safe outbound URL guard (audit finding S1-a-1, BLOCKER) ────────────
 // POST /api/ai-config lets an ANONYMOUS caller set baseUrl/imgBaseUrl/
@@ -247,12 +239,87 @@ function ssrfSafeUrlField() {
 // non-ASCII capitals (Cyrillic, Greek, accented Latin), cues containing `#`,
 // and cues over 40 chars — and sailed past the 1,500-distinct-cue budget
 // straight into the analyzer's O(n²) cost (measured: 2,000 Cyrillic cues,
-// HTTP 200 in several seconds, raw and via .fdx). Fixed by composing this
+// HTTP 200 in several seconds, raw and via .fdx). First fix: compose this
 // guard's own (deliberately loose) line-shape test from the shared alphabet
-// classes rather than maintaining a second, independently-derived alphabet
-// that can drift from it — see the import's own comment above.
+// classes rather than maintaining a second, independently-derived alphabet.
+//
+// 2026-09-04 UPDATE 2 (independent review, same day): the hand-composed class
+// above was STILL an independently-derived grammar, and it under-counted a
+// real cue shape — it omitted the dual-dialogue `^` marker (`\s*\^?\s*`) that
+// CHARACTER_CUE_RE itself accepts (src/lib/fountain.ts:139 — "Character names
+// are all caps, optionally ending with ^ for dual dialogue"). 2,000 distinct
+// `PERSON<i>^` cues reached the analyzer unrejected (HTTP 200 in several
+// seconds). The lesson: widening the alphabet and then hand-writing the rest
+// of the grammar again is the same mistake one level up — a second,
+// independently-maintained cue grammar can ALWAYS drift from the first one,
+// no matter how carefully it is composed. Fixed by making the guard's
+// predicate a PROVABLE superset of the analyzer's own test by construction —
+// `isCueLikeLine` below is `CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line)`,
+// so anything the real analyzer parser calls a cue is a cue to the guard by
+// definition, regardless of what CUE_LIKE_LINE_RE's own hand-picked class
+// does or doesn't cover — CUE_LIKE_LINE_RE only widens beyond
+// CHARACTER_CUE_RE (Unicode capitals no length cap, plus the extra
+// punctuation below), it is never relied on to narrow it.
+// tests/security/fountain-shape-guard-cue-parity.test.ts's implication test
+// enumerates the analyzer's grammar as a product (script × caret spelling ×
+// (V.O.)/(O.S.)/(CONT'D) tail × length) and asserts
+// CHARACTER_CUE_RE.test(line) ⇒ isCueLikeLine(line) over the whole product,
+// so this guarantee is checked, not merely asserted by the `||`.
+//
+// 2026-09-04 UPDATE 3 (independent review, same day): MAX_FOUNTAIN_DISTINCT_CUE_LINES
+// bounds distinct cue VOCABULARY, not analyzer COST — the analyzer's cost is
+// driven by cue-shaped-line volume (distinct lines × how often each repeats),
+// so 1,500 distinct cues repeated many times is legal under that bound alone
+// and was measured, unchanged by this file, to cost 39s at 20 repeats
+// (517,817 chars) and to not return at all at 34 repeats (778,277 chars, 87%
+// of MAX_FOUNTAIN_CHARS). Measured directly against runScriptDoctor (in
+// process, no HTTP/worker-pool overhead), a distinct-count x repeat-count
+// grid:
+//
+//   distinct repeats occurrences  chars     ms   distinct*occurrences
+//         50       1          50    957     34                  2,500
+//         50       5         250  4,717     46                 12,500
+//         50      20       1,000 18,817    217                 50,000
+//        200       1         200  3,907     76                 40,000
+//        200       5       1,000 19,467    284                200,000
+//        200      20       4,000 77,817    772                800,000
+//        800       1         800 15,907    651                640,000
+//        800       5       4,000 79,467  1,994              3,200,000
+//        800      20      16,000 317,817 8,858             12,800,000
+//      1,500       1       1,500 30,407  2,669              2,250,000
+//      1,500       5       7,500 151,967 9,431             11,250,000
+//      1,500      20      30,000 607,817 32,684             45,000,000
+//
+// distinct*occurrences tracks cost far more tightly than either distinct
+// alone, occurrences alone, or character count alone (e.g. chars 317,817 ->
+// 8,858ms vs chars 607,817 -> 32,684ms is not a clean function of chars, but
+// 12.8M -> 8,858ms and 45M -> 32,684ms both sit close to the same
+// ~0.0007-0.001 ms-per-unit band the whole table clusters around at scale).
+// MAX_FOUNTAIN_CUE_WEIGHT below (10,000,000) sits between the two largest
+// values that stayed under ~10s (12.8M at 8.9s is just OVER the new bound —
+// deliberately conservative, since this box ran at load average 10.7-13.5
+// throughout measurement) and the 45M value that took 32.7s, so the worst
+// LEGAL request under the new bound stays comfortably under ~10s on this
+// box. Measured (tests/security/fountain-shape-guard-cue-parity.test.ts's
+// own "margin proof" describe block, numbers logged on every run): a
+// synthesized realistic feature-length script (80 distinct names, 4,000 cue
+// occurrences, 120 scenes, ~29,900 words) scores distinct*occurrences =
+// 80 * 4,000 = 320,000, a 31.3x margin under the new bound; the worst of
+// every committed *.fountain fixture plus the 20 calibration samples
+// (`tests/fixtures/blind-pairs/the-deposit-excellent.fountain`, 7 distinct x
+// 51 occurrences = 357) is a 28,011x margin.
 export const MAX_FOUNTAIN_TOKEN_CHARS = 2_000;
 export const MAX_FOUNTAIN_DISTINCT_CUE_LINES = 1_500;
+// Cost bound, not a vocabulary bound: distinct cue-shaped lines multiplied by
+// TOTAL cue-shaped line occurrences (every matching line counts, not just
+// first-seen ones) must not exceed this. See the grid above for how this
+// value was chosen. Checked incrementally in the same single pass as
+// MAX_FOUNTAIN_DISTINCT_CUE_LINES, so a payload that would blow this budget
+// is rejected as soon as the running product crosses it — for the exploit
+// shape (few thousand distinct cues repeated many times), that is almost
+// always long before the scan reaches the end of the document, so the guard
+// itself never pays for the full pathological length either.
+export const MAX_FOUNTAIN_CUE_WEIGHT = 10_000_000;
 // Bounded quantifier on a single character class — not nested/overlapping
 // quantifiers, so this cannot itself become a catastrophic-backtracking
 // pattern regardless of input length.
@@ -261,21 +328,37 @@ const HUGE_TOKEN_RE = new RegExp(`\\S{${MAX_FOUNTAIN_TOKEN_CHARS + 1},}`);
 // trimmed line beginning with a cased-script capital (CUE_INITIAL_CLASS) and
 // continuing with cue letters/marks, digits, or a small set of punctuation a
 // real cue line can carry (space/tab, `.` `,` `'` `(` `)` `&` `/` `#` `-`) —
-// deliberately WIDER than the analyzer's own CHARACTER_CUE_RE (which permits
-// none of `,` `(` `)` `&` `/` in its continuation class and additionally
-// requires the next line to be non-empty dialogue), because this guard only
-// needs to OVER-count real character cues, never under-count the
-// pathological case — a slug line, transition, or a (V.O.)/(CONT'D)-suffixed
-// cue occasionally counting toward the budget costs a real script nothing it
-// would ever notice at a 1,500-distinct-line ceiling, but a real cue shape
-// this proxy fails to recognize is exactly how the 2026-09-04 audit's four
-// bypass families slipped through the old ASCII/40-char version. No length
-// cap: the analyzer's own cue alphabet has none, and a capped proxy is
-// exactly what let the "cues over 40 chars" bypass family through before.
-const CUE_LIKE_LINE_RE = new RegExp(
+// deliberately WIDER than the analyzer's own CHARACTER_CUE_RE in punctuation
+// (which permits none of `,` `(` `)` `&` `/` in its continuation class) and
+// with no length cap, because on its own this guard only needs to OVER-count
+// real character cues, never under-count the pathological case. It is NOT,
+// on its own, a superset of CHARACTER_CUE_RE — it is missing the caret
+// (`\s*\^?\s*`) and the (V.O.)/(O.S.)/(CONT'D) tail CHARACTER_CUE_RE
+// explicitly admits, which is exactly the gap the 2026-09-04 independent
+// review found (see UPDATE 2 above). isCueLikeLine below is what closes that
+// gap, by construction rather than by trying to enumerate every optional
+// tail by hand a second time.
+// Exported (only) so tests can prove the `||` in isCueLikeLine below is load-
+// bearing — i.e. that CUE_LIKE_LINE_RE alone is NOT already a superset of
+// CHARACTER_CUE_RE (the caret shape is the proof) — never call this directly
+// from route/validation code; call isCueLikeLine.
+export const CUE_LIKE_LINE_RE = new RegExp(
   `^[${CUE_INITIAL_CLASS}][${CUE_LETTER_CLASS}0-9 \\t.,'()&/#\\-]*$`,
   'u',
 );
+// The guard's actual line-shape predicate: a PROVABLE superset of
+// CHARACTER_CUE_RE by construction (the `||` includes it as a full
+// disjunct), so this guard structurally cannot under-count anything the real
+// analyzer parses as a cue, independent of whether CUE_LIKE_LINE_RE's own
+// hand-picked class happens to cover the same shape. CUE_LIKE_LINE_RE still
+// does useful work here — its wider punctuation class and lack of the
+// next-line-is-dialogue context check mean it over-counts MORE than
+// CHARACTER_CUE_RE alone would (e.g. a lone `(CONT'D)`-suffixed line with no
+// following dialogue), which is the guard's own deliberately conservative
+// direction.
+export function isCueLikeLine(line: string): boolean {
+  return CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line);
+}
 const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
 
 /** Returns null when `text` has no known pathological-cost shape, else a
@@ -286,13 +369,18 @@ export function fountainShapeRejectionReason(text: string): string | null {
     return `must not contain a single unbroken run of more than ${MAX_FOUNTAIN_TOKEN_CHARS} non-whitespace characters`;
   }
   const distinctCueLines = new Set<string>();
+  let cueLineOccurrences = 0;
   for (const rawLine of text.split('\n')) {
     const line = rawLine.trim();
     if (line.length === 0 || SCENE_HEADING_PREFIX_RE.test(line)) continue;
-    if (CUE_LIKE_LINE_RE.test(line)) {
+    if (isCueLikeLine(line)) {
       distinctCueLines.add(line);
+      cueLineOccurrences++;
       if (distinctCueLines.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
         return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
+      }
+      if (distinctCueLines.size * cueLineOccurrences > MAX_FOUNTAIN_CUE_WEIGHT) {
+        return `must not contain more than ${MAX_FOUNTAIN_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines \u00d7 total occurrences of one) — bound MAX_FOUNTAIN_CUE_WEIGHT, a cost bound distinct from the ${MAX_FOUNTAIN_DISTINCT_CUE_LINES}-line vocabulary bound above`;
       }
     }
   }

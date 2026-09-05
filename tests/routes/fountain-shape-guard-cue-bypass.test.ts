@@ -1,30 +1,43 @@
-// Cue-definition bypass families (2026-09-04 adversarial audit) — HTTP-level
-// regression coverage. server/lib/validation.ts's fountainShapeRejectionReason()
-// distinct-cue-line guard used to test each line against a local ASCII-only,
-// 40-char-capped proxy instead of being composed from the analyzer's own cue
-// ALPHABET (src/lib/fountain.ts's CUE_INITIAL_CLASS/CUE_LETTER_CLASS, Unicode
-// `\p{Lu}\p{Lt}`, no length cap). Families of line were therefore invisible
-// to the guard and reached the analyzer's O(n²) tokenizer/character-
-// extraction cost undiminished: non-ASCII capitals (Cyrillic, Greek, accented
-// Latin), cues containing `#`, and cues over 40 characters. Measured against
-// the unfixed guard: 2,000 distinct Cyrillic cues -> HTTP 200 in several
-// seconds through POST /api/scriptide/doctor, both raw and via a converted
-// .fdx.
+// Cue-definition bypass families — HTTP-level regression coverage.
 //
-// server/lib/validation.ts now composes its own line-shape proxy from the
-// shared CUE_INITIAL_CLASS/CUE_LETTER_CLASS classes (see that composition's
-// own comment) rather than maintaining a second, driftable alphabet — see
+// ROUND 1 (2026-09-04 adversarial audit). server/lib/validation.ts's
+// fountainShapeRejectionReason() distinct-cue-line guard tested each line
+// against a local ASCII-only, 40-char-capped proxy instead of being composed
+// from the analyzer's own cue ALPHABET (src/lib/fountain.ts's
+// CUE_INITIAL_CLASS/CUE_LETTER_CLASS, Unicode `\p{Lu}\p{Lt}`, no length cap).
+// Non-ASCII capitals (Cyrillic, Greek, accented Latin), cues containing `#`,
+// and cues over 40 characters were invisible to the guard and reached the
+// analyzer's O(n²) tokenizer/character-extraction cost undiminished.
+// Measured against the unfixed guard: 2,000 distinct Cyrillic cues -> HTTP
+// 200 in several seconds through POST /api/scriptide/doctor, raw and fdx.
+//
+// ROUND 2 (independent review, same day). The round-1 fix — composing a new
+// CUE_LIKE_LINE_RE from the shared alphabet classes — was STILL an
+// independently hand-derived grammar, and it missed the dual-dialogue `^`
+// marker CHARACTER_CUE_RE accepts (`\s*\^?\s*`). 2,000 distinct `PERSON<i>^`
+// cues reached the analyzer unrejected. Fixed by making the guard's
+// predicate (isCueLikeLine, exported from validation.ts) a provable superset
+// of CHARACTER_CUE_RE by construction; see
 // tests/security/fountain-shape-guard-cue-parity.test.ts for the pure,
-// non-HTTP proof that every family is now caught and every committed fixture
-// still passes. This file is the end-to-end proof: each family, submitted
-// both as raw fountain and as a converted .fdx, against both a route with no
-// post-conversion guard call path issue (/api/scriptide/doctor) and the one
-// route this class of bug was found on first (/api/export/verify's fdx
-// branch), rejects fast rather than reaching the analyzer.
+// non-HTTP proof (including a grammar-product implication test) that this
+// cannot silently regress. This file is the end-to-end proof for both
+// rounds: each family, submitted both as raw fountain and as a converted
+// .fdx, against both POST /api/scriptide/doctor and POST /api/export/verify,
+// rejects fast rather than reaching the analyzer.
+//
+// The .fdx payloads below are hand-built XML (not produced via
+// src/lib/fdx.ts's fountainToFdx), deliberately — fountainToFdx treats a
+// trailing `^` as a dual-dialogue FORMATTING marker and strips it from the
+// exported Character paragraph's literal text (correct behavior for a
+// well-formed exporter). An attacker uploading a hand-crafted .fdx has no
+// reason to go through that exporter at all; the literal text inside
+// <Paragraph Type="Character"><Text>...</Text></Paragraph> is whatever they
+// put there. Hand-building the fdx for every family (not just caret) keeps
+// the raw and fdx payloads exactly text-identical, rather than relying on
+// fountainToFdx happening to pass the other five families through unchanged.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, type TestServer } from './helpers.ts';
-import { fountainToFdx } from '../../src/lib/fdx.ts';
 
 const CUE_COUNT = 2000; // matches the audit's measured payload size exactly
 
@@ -34,12 +47,32 @@ const CUE_LINE_BUILDERS: Record<string, (i: number) => string> = {
   'accented Latin': (i) => `JOSÉ MARÍA ZOË${i}`,
   '# in the cue': (i) => `CHARACTER #${i}`,
   '41+ char cue': (i) => `A VERY LONG CHARACTER NAME OVER FORTY CHARACTERS ${i}`,
+  // Round-2 (independent review) bypass family: the dual-dialogue caret.
+  'caret (tight)': (i) => `PERSON${i}^`,
+  'caret (spaced)': (i) => `PERSON${i} ^`,
+  'caret + (V.O.) tail': (i) => `PERSON${i} ^ (V.O.)`,
 };
 
 function buildFountain(cueOf: (i: number) => string): string {
   let text = 'INT. ROOM - DAY\n\n';
   for (let i = 0; i < CUE_COUNT; i++) text += `${cueOf(i)}\nLine.\n\n`;
   return text;
+}
+
+function escapeXmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function buildFdx(cueOf: (i: number) => string): string {
+  let body = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n'
+    + '<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n'
+    + '<Paragraph Type="Scene Heading"><Text>INT. ROOM - DAY</Text></Paragraph>\n';
+  for (let i = 0; i < CUE_COUNT; i++) {
+    body += `<Paragraph Type="Character"><Text>${escapeXmlText(cueOf(i))}</Text></Paragraph>\n`;
+    body += '<Paragraph Type="Dialogue"><Text>Line.</Text></Paragraph>\n';
+  }
+  body += '</Content>\n</FinalDraft>';
+  return body;
 }
 
 const REJECTION_RE = /more than 1500 distinct all-caps character-cue-shaped lines/;
@@ -59,11 +92,9 @@ describe('cue-definition bypass families — POST /api/scriptide/doctor', async 
   });
 
   for (const [family, cueOf] of Object.entries(CUE_LINE_BUILDERS)) {
-    const fountain = buildFountain(cueOf);
-
     it(`raw fountain — ${family} — rejected fast, not analyzed`, async () => {
       const start = Date.now();
-      const res = await post({ fountain });
+      const res = await post({ fountain: buildFountain(cueOf) });
       const ms = Date.now() - start;
       assert.equal(res.status, 400);
       const body = await res.json();
@@ -72,9 +103,8 @@ describe('cue-definition bypass families — POST /api/scriptide/doctor', async 
     });
 
     it(`.fdx-converted — ${family} — rejected fast, not analyzed`, async () => {
-      const fdx = fountainToFdx(fountain, { title: `Pathological ${family}` });
       const start = Date.now();
-      const res = await post({ fdx });
+      const res = await post({ fdx: buildFdx(cueOf) });
       const ms = Date.now() - start;
       assert.equal(res.status, 400);
       const body = await res.json();
@@ -101,11 +131,9 @@ describe('cue-definition bypass families — POST /api/export/verify', async () 
   const expected = { contentHash: 'a'.repeat(64) };
 
   for (const [family, cueOf] of Object.entries(CUE_LINE_BUILDERS)) {
-    const fountain = buildFountain(cueOf);
-
     it(`raw fountain — ${family} — rejected fast, not analyzed`, async () => {
       const start = Date.now();
-      const res = await post({ fountain, expected });
+      const res = await post({ fountain: buildFountain(cueOf), expected });
       const ms = Date.now() - start;
       assert.equal(res.status, 400);
       const body = await res.json();
@@ -114,9 +142,8 @@ describe('cue-definition bypass families — POST /api/export/verify', async () 
     });
 
     it(`.fdx-converted — ${family} — rejected fast, not analyzed`, async () => {
-      const fdx = fountainToFdx(fountain, { title: `Pathological ${family}` });
       const start = Date.now();
-      const res = await post({ fdx, expected });
+      const res = await post({ fdx: buildFdx(cueOf), expected });
       const ms = Date.now() - start;
       assert.equal(res.status, 400);
       const body = await res.json();

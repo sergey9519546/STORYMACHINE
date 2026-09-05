@@ -86,13 +86,23 @@ const results = [];
 let crashed = false;
 
 function record(label, extra) {
+  // expectStatus (independent review finding #3): a caller that knows the
+  // route MUST answer a specific status (e.g. a guard's own 400) passes it
+  // through `attack`'s expectStatus argument; a status mismatch flags here as
+  // UNEXPECTED-STATUS regardless of latency. Without this, a payload the
+  // guard was supposed to reject but instead accepted (a 200) prints `[ok]`
+  // and the run exits 0 — exactly how 13 of the 16 cue-bypass cases added
+  // 2026-09-04 could not have caught the bug they were added for: err/5xx/
+  // SLOW alone never flag a fast 200.
   const flagged = extra.err
     ? 'ERROR'
     : extra.status >= 500
       ? '5XX'
-      : extra.ms > SLOW_THRESHOLD_MS
-        ? 'SLOW'
-        : null;
+      : extra.expectStatus !== undefined && extra.status !== extra.expectStatus
+        ? 'UNEXPECTED-STATUS'
+        : extra.ms > SLOW_THRESHOLD_MS
+          ? 'SLOW'
+          : null;
   const rec = { label, flagged, ...extra };
   results.push(rec);
   const tag = flagged ? `[${flagged}]` : '[ok] ';
@@ -100,14 +110,14 @@ function record(label, extra) {
   return rec;
 }
 
-async function attack(base, label, path, opts = {}, note) {
+async function attack(base, label, path, opts = {}, note, expectStatus) {
   const start = Date.now();
   try {
     const r = await fetch(base + path, { ...opts, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     const text = await r.text();
-    return record(label, { status: r.status, ms: Date.now() - start, len: text.length, note });
+    return record(label, { status: r.status, ms: Date.now() - start, len: text.length, note, expectStatus });
   } catch (e) {
-    return record(label, { status: null, ms: Date.now() - start, err: String(e?.message || e), note });
+    return record(label, { status: null, ms: Date.now() - start, err: String(e?.message || e), note, expectStatus });
   }
 }
 
@@ -125,13 +135,16 @@ function escapeXmlText(text) {
 
 // Cue-name generators for the fdx-conversion-bypass shape (attack-lane audit
 // follow-up, extended 2026-09-04 for the cue-DEFINITION bypass families):
-// `ascii` is the original all-caps `CHARACTER<i>` shape; the other three are
-// the shapes the 2026-09-04 adversarial audit found invisible to the old
-// ASCII-only, 40-char-capped guard proxy — a non-ASCII cased-script capital
-// (Cyrillic), a cue containing `#`, and a cue at least 60 characters wide.
-// Shared by both the raw-fountain path (buildFountainWithCues) and the
-// fdx-conversion path (pathologicalFdx) below, so the same line shape is
-// exercised on both.
+// `ascii` is the original all-caps `CHARACTER<i>` shape; `cyrillic`/`hash`/
+// `long60` are the shapes the 2026-09-04 adversarial audit found invisible to
+// the old ASCII-only, 40-char-capped guard proxy — a non-ASCII cased-script
+// capital, a cue containing `#`, and a cue at least 60 characters wide.
+// `caret` is the ROUND-2 bypass an independent review found the SAME day in
+// the audit's own fix: the dual-dialogue `^` marker CHARACTER_CUE_RE accepts
+// (src/lib/fountain.ts's `\s*\^?\s*`) was missing from the guard's
+// hand-composed replacement class. Shared by both the raw-fountain path
+// (buildFountainWithCues) and the fdx-conversion path (pathologicalFdx)
+// below, so the same line shape is exercised on both.
 const CUE_NAME_GENERATORS = {
   ascii: (i) => `CHARACTER${i}`,
   cyrillic: (i) => `ПЕРСОНАЖ${i}`,
@@ -141,6 +154,7 @@ const CUE_NAME_GENERATORS = {
   // characters" the audit named), before the distinguishing index is even
   // appended.
   long60: (i) => `A VERY LONG CHARACTER NAME AT LEAST SIXTY CHARACTERS WIDE NUMBER ${i}`,
+  caret: (i) => `PERSON${i}^`,
 };
 
 function buildFountainWithCues(n, cueOf) {
@@ -291,7 +305,8 @@ async function fountainPathologyFuzz(base) {
   await attack(base, 'fdx-conversion-bypass /api/export/verify', '/api/export/verify', jsonPost({ fdx, expected: { contentHash: 'a'.repeat(64) } }),
     'must reject fast via the post-conversion shape guard, not hang analyzing it');
 
-  // ── cue-definition bypass families (2026-09-04 adversarial audit) ─────────
+  // ── cue-definition bypass families (2026-09-04 adversarial audit, extended
+  // the same day by independent review) ─────────────────────────────────────
   // fountainShapeRejectionReason's distinct-cue-line detector used to test
   // each line against a local ASCII-only, 40-char-capped proxy instead of
   // being composed from the analyzer's own cue alphabet (src/lib/fountain.ts's
@@ -299,31 +314,44 @@ async function fountainPathologyFuzz(base) {
   // cap). Line shapes the analyzer treats as ordinary character cues were
   // invisible to the old guard and reached the analyzer's O(n²) cost
   // undiminished: a non-ASCII cased-script capital (Cyrillic), a cue
-  // containing `#`, and a cue well past the old 40-char cap. Measured against
-  // the unfixed guard, raw fountain / 2,000 cues: ascii 400/96ms (control:
-  // already caught before this fix), cyrillic 200/6,345ms, hash 200/2,131ms,
-  // long60 200/6,386ms — all three non-ascii/hash/long families sailed
-  // through as 200s. fdx-converted: ascii 400/19ms, cyrillic/hash/long60 all
-  // 200. See tests/security/fountain-shape-guard-cue-parity.test.ts and
-  // tests/routes/fountain-shape-guard-cue-bypass.test.ts for the fixed
+  // containing `#`, a cue well past the old 40-char cap, and — the round-2
+  // finding, in the audit's OWN fix — the dual-dialogue `^` marker. Measured
+  // against the unfixed guard, raw fountain / 2,000 cues: ascii 400/96ms
+  // (control: already caught), cyrillic 200/6,345ms, hash 200/2,131ms,
+  // long60 200/6,386ms, caret 200/2,894-5,161ms — every non-ascii family
+  // sailed through as a 200. fdx-converted: ascii 400/19ms, every other
+  // family 200. See tests/security/fountain-shape-guard-cue-parity.test.ts
+  // and tests/routes/fountain-shape-guard-cue-bypass.test.ts for the fixed
   // guard's committed regression coverage (which also covers Greek and
-  // accented Latin, additional cased scripts the same alphabet fix closes).
-  // Fixed by composing the guard's own line-shape test from
-  // CUE_INITIAL_CLASS/CUE_LETTER_CLASS in server/lib/validation.ts.
-  const cueBypassCount = QUICK ? 2000 : 2000; // audit's own measured payload size
+  // accented Latin, additional cased scripts the same alphabet fix closes,
+  // plus a spaced-caret and caret+(V.O.) spelling). Fixed by composing the
+  // guard's own line-shape test from CUE_INITIAL_CLASS/CUE_LETTER_CLASS AND
+  // making it a provable superset of CHARACTER_CUE_RE by construction
+  // (isCueLikeLine, server/lib/validation.ts).
+  //
+  // Every attack() call below passes expectStatus=400 (independent review
+  // finding #3): record()'s default flagging (err/5xx/slow only) never flags
+  // a fast 200, so before expectStatus existed 13 of these 16 cases would
+  // have printed `[ok]` against the UNFIXED guard and the run would have
+  // exited 0 — a fuzz sweep that cannot fail proves nothing.
+  const cueBypassCount = QUICK ? 1600 : 2000; // over the 1,500 vocabulary
+  // bound either way (QUICK reuses the same 1,600 the fdx-conversion-bypass
+  // block above already uses, keeping --quick's payload smaller without
+  // dropping below the threshold every case needs to trip); full mode keeps
+  // the audit's own exact 2,000-cue measurement.
   for (const family of Object.keys(CUE_NAME_GENERATORS)) {
     const cueOf = CUE_NAME_GENERATORS[family];
     const familyFountain = buildFountainWithCues(cueBypassCount, cueOf);
     await attack(base, `cue-bypass ${family} (raw) /api/scriptide/doctor`, '/api/scriptide/doctor', jsonPost({ fountain: familyFountain }),
-      'must reject fast via the shape guard, not hang analyzing it');
+      'must reject fast via the shape guard, not hang analyzing it', 400);
     await attack(base, `cue-bypass ${family} (raw) /api/export/verify`, '/api/export/verify', jsonPost({ fountain: familyFountain, expected: { contentHash: 'a'.repeat(64) } }),
-      'must reject fast via the shape guard, not hang analyzing it');
+      'must reject fast via the shape guard, not hang analyzing it', 400);
 
     const familyFdx = pathologicalFdx(cueBypassCount, family);
     await attack(base, `cue-bypass ${family} (fdx) /api/scriptide/doctor`, '/api/scriptide/doctor', jsonPost({ fdx: familyFdx }),
-      'must reject fast via the post-conversion shape guard, not hang analyzing it');
+      'must reject fast via the post-conversion shape guard, not hang analyzing it', 400);
     await attack(base, `cue-bypass ${family} (fdx) /api/export/verify`, '/api/export/verify', jsonPost({ fdx: familyFdx, expected: { contentHash: 'a'.repeat(64) } }),
-      'must reject fast via the post-conversion shape guard, not hang analyzing it');
+      'must reject fast via the post-conversion shape guard, not hang analyzing it', 400);
   }
   // SSE route: a 200 with a doctor_error frame is this route's honest shape
   // (see server/routes/scriptide.ts's own comment) — record it as ok as long
