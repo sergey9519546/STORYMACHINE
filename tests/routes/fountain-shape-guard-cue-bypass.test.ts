@@ -273,3 +273,126 @@ describe('cue-definition bypass families — POST /api/scriptide/fix (candidateF
     assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
   });
 });
+
+// ── ROUND 5 bypass: double-spaced Fountain (second independent review,
+// 2026-09-05, of the round-4 context check) ─────────────────────────────────
+// `NAME\n\nline\n\n` — a blank line between every block — is the shape real
+// PDF/FDX imports actually produce (server/nvm/analyze/
+// screenplay-normalizer.ts's normalizeScreenplay() exists specifically to
+// reflow it before the analyzer ever parses the script). The round-4 context
+// check only looked at the IMMEDIATE next line, so a double-spaced cue's
+// blank next line made it count as zero cues — measured: a 154,954-byte
+// double-spaced payload (distinct=600, occurrences=12,000) answered HTTP 200
+// in 90,575 ms. Fixed in validation.ts by also admitting "one blank line,
+// then non-cue-shaped content" as a valid dialogue-following shape.
+function buildDoubleSpacedFountain(distinct: number, occurrences: number): string {
+  const cues = Array.from({ length: distinct }, (_, i) => `CHARACTER${i}`);
+  let text = 'INT. ROOM - DAY\n\n';
+  for (let i = 0; i < occurrences; i++) text += `${cues[i % distinct]}\n\nLine.\n\n`;
+  return text;
+}
+
+// The .fdx variant: fdxToFountain (server/lib/fdx-import.ts) always writes a
+// SINGLE blank line as a plain block separator between an ordinary Character
+// and Dialogue paragraph pair — a normal FDX export structurally cannot
+// reproduce double-spacing that way. What CAN: FDX's <Text> extraction only
+// trims LEADING/TRAILING whitespace (`.trim()`), not internal, so a
+// Character paragraph whose <Text> itself CONTAINS an embedded blank line
+// (`NAME\n\nfakeDialogue`) round-trips as literal double-spaced text in the
+// converted Fountain — a real hazard for any FDX producer/exporter that
+// doesn't split paragraphs as cleanly as this repo's own src/lib/fdx.ts
+// does. `fakeDialogue` ends in `!` (not in either cue class's continuation
+// alphabet) specifically because fdxToFountain uppercases the WHOLE
+// Character paragraph text, embedded dialogue included — without the `!`,
+// the uppercased "fake dialogue" would itself look cue-shaped and the guard
+// would (correctly, conservatively) still exclude it.
+function buildDoubleSpacedFdx(distinct: number, repeats: number): string {
+  let body = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n'
+    + '<FinalDraft DocumentType="Script" Template="No" Version="1">\n<Content>\n'
+    + '<Paragraph Type="Scene Heading"><Text>INT. ROOM - DAY</Text></Paragraph>\n';
+  for (let r = 0; r < repeats; r++) {
+    for (let i = 0; i < distinct; i++) {
+      const embedded = `CHARACTER${i}\n\nLine!`;
+      body += `<Paragraph Type="Character"><Text>${embedded}</Text></Paragraph>\n`;
+    }
+  }
+  body += '</Content>\n</FinalDraft>';
+  return body;
+}
+
+describe('double-spaced bypass (ROUND 5) — POST /api/scriptide/doctor', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  it('raw double-spaced fountain (distinct=600, occurrences=12,000) is rejected fast, not analyzed', async () => {
+    const fountain = buildDoubleSpacedFountain(600, 12_000);
+    assert.ok(fountain.length < 900_000, `test payload (${fountain.length} chars) must stay under MAX_FOUNTAIN_CHARS`);
+    const start = Date.now();
+    const res = await post({ fountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+
+  it('.fdx-converted double-spaced text (distinct=600 x 20 repeats) is rejected fast, not analyzed', async () => {
+    const fdx = buildDoubleSpacedFdx(600, 20);
+    const start = Date.now();
+    const res = await post({ fdx });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+
+  it('a legitimate small double-spaced cast (2 distinct cues) is NOT rejected', async () => {
+    const fountain = buildDoubleSpacedFountain(2, 30);
+    const res = await post({ fountain });
+    assert.equal(res.status, 200);
+  });
+});
+
+describe('double-spaced bypass (ROUND 5) — POST /api/export/verify', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/export/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const expected = { contentHash: 'a'.repeat(64) };
+
+  it('raw double-spaced fountain is rejected fast, not analyzed', async () => {
+    const fountain = buildDoubleSpacedFountain(600, 12_000);
+    const start = Date.now();
+    const res = await post({ fountain, expected });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+
+  it('.fdx-converted double-spaced text is rejected fast, not analyzed', async () => {
+    const fdx = buildDoubleSpacedFdx(600, 20);
+    const start = Date.now();
+    const res = await post({ fdx, expected });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+});

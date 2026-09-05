@@ -489,27 +489,44 @@ export function fountainShapeRejectionReason(text: string): string | null {
     const line = lines[i]!.trim();
     if (line.length === 0 || SCENE_HEADING_PREFIX_RE.test(line)) continue;
     if (!isCueLikeLine(line)) continue;
-    // Context check (2026-09-05 review finding R4): mirrors src/lib/
-    // fountain.ts's OWN cue-block condition -- a line is only a 'character'
-    // block to the real parser if it is IMMEDIATELY followed by a non-blank
-    // line (its dialogue). Dropping the old 40-char cap (this file's earlier
-    // revision) made every long ALL-CAPS action-emphasis line cue-SHAPED,
-    // and without this check those lines counted toward every bound below
-    // even though the parser treats them as `action`, not `character` -- a
-    // real caps-heavy action feature (200 scenes, 8 long ALL-CAPS emphasis
-    // lines each, each followed by a blank line per ordinary action-
-    // paragraph formatting) was measured rejected by the OLD (context-free)
-    // version of this loop at 1,660 "distinct cue" lines, over the
-    // 1,500 vocabulary bound, even though every one of those lines is action
-    // to the parser and could never drive the O(n^2) character-extraction
-    // cost this guard exists to prevent. Adding the SAME condition here can
-    // only REDUCE the count relative to skipping it -- the pathological
-    // shapes this guard targets (`CUE\nLine.\n`, `CUE\n\nLine.\n\n`, and
-    // their Unicode/caret/tail variants used throughout this file's own
-    // tests) all have real dialogue immediately following, so this never
-    // under-counts the actual attack surface, only excludes lines the real
-    // parser would never call a cue in the first place.
-    const nextLineIsDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
+    // Context check (2026-09-05 review finding R4, widened same day for a
+    // second review's DOUBLE-SPACED bypass): a line only becomes a
+    // 'character' block to the ANALYZER if it is followed by dialogue —
+    // but "followed by" is not just "immediately followed by non-blank".
+    // server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay()
+    // runs BEFORE the analyzer's own parseFountain on every request (it is
+    // idempotent on already-clean input), and it REFLOWS a double-spaced
+    // script — `NAME\n\nline\n\n`, the exact shape real PDF/FDX imports
+    // produce, which is the whole reason isDoubleSpaced/normalizeScreenplay
+    // exist — into a normal adjacent cue+dialogue pair before the parser
+    // ever sees it. The FIRST version of this check tested only the
+    // immediately-next line, so a double-spaced pathological payload
+    // (thousands of distinct double-spaced cue names) counted ZERO cues
+    // here (guard: ACCEPT) while normalizeScreenplay + parseFountain saw
+    // every one of them as a real 'character' block downstream — measured:
+    // a 154,954-byte double-spaced payload (distinct=600, occurrences=
+    // 12,000, 15% of MAX_FOUNTAIN_CHARS) answered HTTP 200 in 90,575 ms.
+    // ("all have real dialogue immediately following" was therefore a false
+    // claim about the double-spaced shape specifically — it does not.)
+    //
+    // Fixed by admitting ONE more shape: a cue immediately followed by
+    // exactly one blank line and then non-blank content — but ONLY when
+    // that content does not ITSELF look cue-shaped. That second clause is
+    // what keeps this from re-opening the R4 hole: a double-spaced cue's
+    // dialogue is ordinary mixed-case prose (never matches isCueLikeLine),
+    // while the R4 caps-heavy-action fixture's shape is a chain of
+    // ALL-CAPS emphasis lines each separated by one blank line — i.e. the
+    // "content" after the blank is ANOTHER cue-shaped line, not dialogue,
+    // so it is correctly excluded by this same clause. Verified against
+    // both fixtures below (this file's own committed tests): the
+    // double-spaced fixture now counts every cue and is rejected; the R4
+    // caps-heavy-action fixture still counts zero and is accepted.
+    const immediateDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
+    const oneBlankThenDialogue = i < lines.length - 2
+      && lines[i + 1]!.trim() === ''
+      && lines[i + 2]!.trim() !== ''
+      && !isCueLikeLine(lines[i + 2]!.trim());
+    const nextLineIsDialogue = immediateDialogue || oneBlankThenDialogue;
     if (!nextLineIsDialogue) continue;
     const occurrencesOfThisLine = (cueLineCounts.get(line) ?? 0) + 1;
     cueLineCounts.set(line, occurrencesOfThisLine);

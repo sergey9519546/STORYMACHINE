@@ -45,6 +45,30 @@
 // proves a REALISTIC (skewed majors/minors, extension variants, caps
 // action) feature-length script, every committed fixture, and the round-4
 // false-rejection fixture (R4) all clear every bound with a stated margin.
+//
+// ROUND 5 (second independent review, same day, of the round-4 context
+// check). The round-4 fix's own comment claimed every pathological shape
+// this guard targets "has real dialogue immediately following" — false for
+// the shape real PDF/FDX imports actually produce: DOUBLE-SPACED Fountain
+// (`NAME\n\nline\n\n`, a blank line between EVERY block, the exact reason
+// server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay()
+// exists). normalizeScreenplay() runs before the analyzer's own
+// parseFountain on every real request and reflows a double-spaced cue into
+// an adjacent cue+dialogue pair, but the guard's context check only looked
+// at the IMMEDIATE next line — a double-spaced cue's immediate next line is
+// blank, so it counted as zero cues. Measured: a double-spaced payload
+// (distinct=600, occurrences=12,000, 154,954 bytes, 15% of
+// MAX_FOUNTAIN_CHARS) was guard-ACCEPTED while normalizeScreenplay +
+// parseFountain produced 12,000 real 'character' blocks downstream;
+// POST /api/scriptide/doctor answered HTTP 200 in 90,575 ms. Fixed by
+// admitting a SECOND context shape — a cue followed by exactly one blank
+// line and then non-cue-shaped content — alongside the immediate-dialogue
+// shape, WITHOUT reopening R4: the distinguishing test is whether the
+// content after that one blank line is itself cue-shaped (an R4 caps-heavy
+// action chain, where every line is followed by another ALL-CAPS line) or
+// not (real double-spaced dialogue, which is ordinary mixed-case prose).
+// The double-spaced fixture and the R4 fixture below are the parity proof:
+// the former is now rejected, the latter is still accepted.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -274,8 +298,12 @@ function cueMetricsOf(text: string): { distinct: number; occurrences: number; we
     const line = lines[i]!.trim();
     if (line.length === 0 || SCENE_HEADING_RE.test(line)) continue;
     if (!isCueLikeLine(line)) continue;
-    const nextIsDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
-    if (!nextIsDialogue) continue;
+    const immediateDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
+    const oneBlankThenDialogue = i < lines.length - 2
+      && lines[i + 1]!.trim() === ''
+      && lines[i + 2]!.trim() !== ''
+      && !isCueLikeLine(lines[i + 2]!.trim());
+    if (!immediateDialogue && !oneBlankThenDialogue) continue;
     counts.set(line, (counts.get(line) ?? 0) + 1);
     occurrences++;
   }
@@ -481,6 +509,41 @@ describe('MAX_FOUNTAIN_CUE_WEIGHT / MAX_FOUNTAIN_FREQUENT_CUE_LINES — cost bou
     // that they were never shaped like cues.
     assert.ok(distinct === 0, `expected the context check to exclude every caps-heavy action line from the cue vocabulary, but ${distinct} were counted`);
     assert.equal(frequentCount, 0);
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  // ── ROUND 5 regression: the double-spaced bypass the R4 context check
+  // opened. `NAME\n\nline\n\n` — a blank line between every block, the exact
+  // shape real PDF/FDX imports produce (server/nvm/analyze/
+  // screenplay-normalizer.ts's normalizeScreenplay() exists specifically to
+  // reflow it before the analyzer ever parses the script) — must be counted
+  // as a real cue chain, not skipped because its IMMEDIATE next line is
+  // blank. Before this fix, the guard counted zero cues here while
+  // normalizeScreenplay + parseFountain saw every one downstream.
+  it('a double-spaced script with 12,000 distinct cue occurrences IS rejected (ROUND 5 regression: the double-spacing bypass)', () => {
+    const DISTINCT = 600;
+    const OCCURRENCES = 12_000;
+    const cues = Array.from({ length: DISTINCT }, (_, i) => `CHARACTER${i}`);
+    let text = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < OCCURRENCES; i++) text += `${cues[i % DISTINCT]}\n\nLine.\n\n`;
+
+    const { distinct, occurrences } = cueMetricsOf(text);
+    assert.equal(distinct, DISTINCT, `expected all ${DISTINCT} double-spaced cue lines to be counted, got ${distinct}`);
+    assert.equal(occurrences, OCCURRENCES, `expected all ${OCCURRENCES} double-spaced cue occurrences to be counted, got ${occurrences}`);
+
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the double-spaced payload to be rejected — the guard did not fire');
+    assert.match(reason!, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+  });
+
+  it('a legitimate double-spaced two-hander (2 distinct cues) is NOT rejected', () => {
+    let text = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 30; i++) {
+      text += `${i % 2 === 0 ? 'PAUL' : 'JUNE'}\n\nSomething ordinary gets said here, line ${i}.\n\n`;
+    }
+    const { distinct, occurrences } = cueMetricsOf(text);
+    assert.equal(distinct, 2);
+    assert.equal(occurrences, 30);
     assert.equal(fountainShapeRejectionReason(text), null);
   });
 });
