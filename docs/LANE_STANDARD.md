@@ -47,13 +47,19 @@ back with the specific revisions, not merged.
 
 ## 4. Gates, in the foreground, with exit codes
 
-`npm run lint` · full `npm test` (0 failures) · `check-no-console` ·
-`check-server-reachability` · `build` · `check-docs` · `honesty-audit` ·
-`check-scoring-receipt main..HEAD` · the browser battery when `src/` or
-`server/` changed (`PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm run
-verify:browser`) · `test:metamorphic` and the output-identity harness when
-scoring-adjacent. Every wait in a browser suite goes through `timing.ms()`.
-Rebase onto `main` before the final run; re-run lint and the full suite after.
+The lane runs: the tests for every file it touched · `npm run lint` ·
+`check-no-console` · `check-server-reachability` · `build` · `check-docs` ·
+`honesty-audit` · `check-scoring-receipt main..HEAD` · the browser suite(s)
+that drive the surfaces it changed · `test:metamorphic` and the
+output-identity harness when scoring-adjacent · and the full `npm test`
+ONCE, on the final rebased tree. Every wait in a browser suite goes through
+`timing.ms()`.
+
+The orchestrator runs the full `npm test` and the whole eight-suite battery
+once per merge, on the rebased branch. Repeating either inside a revision
+round, or inside a review, costs more than it catches: a revision re-runs
+only what it touched, and a reviewer reproduces one reported number and
+drives the surface rather than re-running the battery.
 
 ## 5. The report
 
@@ -70,12 +76,15 @@ A reviewer who did not build the change reads the brief and the diff, then:
 1. checks every numbered item of the brief against the diff — done, narrowed,
    skipped, or silently changed;
 2. drives the change as a writer would (browser or route) and reproduces at
-   least one of the report's numbers;
+   least one of the report's numbers — one number, driven, not the whole
+   battery re-run;
 3. looks for the shortcut: a copied implementation, a widened tolerance, a
    surface left out, a test that cannot fail, copy that overclaims;
 4. names what a stronger version would have done, and whether it is in scope;
 5. returns MERGE, or REVISE with a numbered list the lane can act on.
 
 The orchestrator merges only on MERGE. On REVISE the lane agent gets the list
-and the reviewer re-reads the revision. The review verdict is recorded with
-the merge.
+and the SAME reviewer re-checks its own items against the new diff (a few
+tool calls with warm context, not a fresh read). The review verdict is
+recorded with the merge. Concurrency is capped at three live agents (lanes
+plus reviewers) so that one failed suite under load is not everyone's.
