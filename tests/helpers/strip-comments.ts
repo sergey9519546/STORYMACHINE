@@ -40,10 +40,23 @@
 // `getStart()` is GUARANTEED to contain nothing but whitespace and
 // comments — no string/template/regex content can appear there, so a
 // plain manual scan of just that substring for `//` and `/* */` is
-// unambiguous and complete, with none of either prior approach's blind
-// spots. Walking `getChildren()` (not `forEachChild`) to reach every leaf
-// token, including punctuation like `{`/`}`, ensures no trivia region in
-// the file is skipped.
+// unambiguous. Walking `getChildren()` (not `forEachChild`) to reach every
+// leaf token, including punctuation like `{`/`}`, ensures no trivia region
+// in the file is skipped BY THE WALK — but that alone was not enough: a
+// round-4 review caught a further hole. An EMPTY `SyntaxList` is itself a
+// leaf whose `getFullStart()` equals its own `getStart()` (it consumes no
+// trivia), and de-duplicating visited nodes by `getFullStart()` alone made
+// that empty node's offset shadow the very next real token — `)`, `]`,
+// `}`, or the end-of-file token — which shares that same start position
+// and whose trivia is where the comment actually lives. That silently
+// leaked `function f(/* … */) {}`, `f(/* … */)`, `[/* … */]`,
+// `{/* … */}`, `function f() {/* … */}`, and a whole comment-only file.
+// Fixed by de-duplicating on the full node identity
+// (`fullStart:end:kind`), not the start offset alone, so the empty list
+// and the token after it are both visited even when they share a
+// position — see tests/core/strip-comments.test.ts's own dedicated
+// regression fixtures covering each of those five shapes plus a
+// comment-only file.
 import ts from "typescript";
 
 function blankTriviaComments(chars: string[], text: string, offset: number): void {
@@ -88,12 +101,25 @@ export function stripComments(source: string): string {
     /* setParentNodes */ true,
     ts.ScriptKind.TSX,
   );
-  const seen = new Set<number>();
+  // Round-4 review fix (2026-09-05): keying this on `getFullStart()` alone
+  // is wrong — an EMPTY SyntaxList is a leaf whose getFullStart() equals
+  // its own getStart() (it consumes no trivia), so visiting it recorded
+  // that offset as "seen" and blanked nothing, then the NEXT token sharing
+  // the same fullStart — `)`, `]`, `}`, or the EOF token, whose trivia is
+  // where the comment actually lives — was skipped by the guard before its
+  // own trivia was ever scanned. `function f(/* … */) {}`, `f(/* … */)`,
+  // `[/* … */]`, `{/* … */}`, `function f() {/* … */}`, and a whole
+  // comment-only file with no other tokens all leaked through this hole.
+  // Keying on the full node identity (fullStart + end + kind), not just
+  // fullStart, distinguishes the empty SyntaxList from the real token that
+  // follows it even when they share a start offset, so both get visited.
+  const seen = new Set<string>();
 
   const stripTriviaBefore = (node: ts.Node): void => {
     const fullStart = node.getFullStart();
-    if (seen.has(fullStart)) return;
-    seen.add(fullStart);
+    const key = `${fullStart}:${node.end}:${node.kind}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     const start = node.getStart(sourceFile, /* includeJsDoc */ false);
     if (start > fullStart) {
       blankTriviaComments(chars, source.slice(fullStart, start), fullStart);
