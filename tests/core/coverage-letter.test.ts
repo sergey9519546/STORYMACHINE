@@ -547,10 +547,28 @@ describe('renderCoverageLetter — shape and rhythm caveat', () => {
     assert.ok(!markdown.includes('Shape and rhythm'));
   });
 
-  it('states neither when structuralSignals is present but unscored (fewer than 2 scenes)', () => {
+  it('B-10 (2026-09-05): states an honest one-scene notice, with the one aggregate that IS meaningful, when structuralSignals is present but unscored (fewer than 2 scenes) — never silently drops the whole paragraph', () => {
     const { markdown } = renderCoverageLetter(buildReport({
       structuralSignals: {
         scored: false, sceneCount: 1, scenes: [], sceneLengthCv: 0, meanAbsDialogueShareDelta: 0,
+        dialogueShareRange: 0, newPairSceneRate: 0, lastNewPairPosition: 0, meanSpeakersPerScene: 0,
+        meanTurnWords: 0, meanLeadShare: 0, leadShareSlope: 0, speakerEntropy: 0,
+        actionSentenceCvOverall: 0.9994, meanOpenCloseShift: 0, openCloseModeFlipRate: 0,
+      },
+    }));
+    assert.match(markdown, /Shape and rhythm:/);
+    assert.match(markdown, /needs at least two scenes.*this draft has 1/);
+    // meanAbsDialogueShareDelta is 0 by construction with one scene (no
+    // scene-to-scene delta exists) — never named, since it is not a genuine
+    // reading. actionSentenceCvOverall IS genuinely computed and must appear.
+    assert.match(markdown, /action lines is 1\.00/);
+    assert.ok(!markdown.includes('scene-to-scene change in the dialogue/action word mix'));
+  });
+
+  it('B-10 (2026-09-05): states neither the notice nor "Shape and rhythm" when structuralSignals is present but sceneCount is 0 (empty draft, nothing to report)', () => {
+    const { markdown } = renderCoverageLetter(buildReport({
+      structuralSignals: {
+        scored: false, sceneCount: 0, scenes: [], sceneLengthCv: 0, meanAbsDialogueShareDelta: 0,
         dialogueShareRange: 0, newPairSceneRate: 0, lastNewPairPosition: 0, meanSpeakersPerScene: 0,
         meanTurnWords: 0, meanLeadShare: 0, leadShareSlope: 0, speakerEntropy: 0,
         actionSentenceCvOverall: 0, meanOpenCloseShift: 0, openCloseModeFlipRate: 0,

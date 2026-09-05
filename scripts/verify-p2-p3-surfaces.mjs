@@ -695,6 +695,55 @@ async function main() {
   const exportedHtml = downloadPath ? readFileSync(downloadPath, 'utf8') : '';
   record('P3', 'Export coverage report downloads an HTML file', exportedHtml.length > 0, `${exportedHtml.length} bytes, filename=${download.suggestedFilename()}`);
 
+  // ══════════════════════════════════════════════════════════════════════
+  // B-8 (2026-09-05, docs/audits mistake hunt) — a real 375px pointer click
+  // on "Full report" used to have no guarantee of landing on the button at
+  // all: at 375px the panel's content can exceed the viewport, and nothing
+  // kept the button from ending up past the fold or behind whatever the
+  // scrollable body's last-painted content was — a plain `visible`/`enabled`
+  // assertion (which every other "Full report" check in this suite makes,
+  // at desktop width) can never catch that, only a REAL click through the
+  // real pointer path, with no `force`, at the narrow viewport can. Own
+  // browser context + fresh profile so pageA's already-hydrated Doctor
+  // panel above is untouched.
+  const context375 = await browser.newContext({ viewport: { width: 375, height: 720 } });
+  const page375 = await context375.newPage();
+  wireConsoleCapture(page375, genuineConsoleErrors);
+  await page375.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page375.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
+  const summaryPanel375 = page375.locator('aside[role="region"]');
+  const fullReportBtn375 = summaryPanel375.getByRole('button', { name: 'Full report', exact: true }).first();
+  await fullReportBtn375.waitFor({ state: 'visible', timeout: timing.ms(30000) });
+  // The hit-test itself: what a real tap at the button's own center actually
+  // lands on, BEFORE Playwright's own click() does anything (no scrollIntoView,
+  // no actionability wait) — this is the exact measurement the mistake hunt
+  // made (`document.elementFromPoint`), reproduced live rather than inferred
+  // from visibility.
+  const rect375 = await fullReportBtn375.boundingBox();
+  const hit375 = rect375
+    ? await page375.evaluate(
+        ([x, y]) => {
+          const el = document.elementFromPoint(x, y);
+          return el ? { tag: el.tagName, isFullReportBtn: el.textContent?.trim() === 'Full report' && el.tagName === 'BUTTON' } : null;
+        },
+        [rect375.x + rect375.width / 2, rect375.y + rect375.height / 2],
+      )
+    : null;
+  record(
+    'P3-mobile',
+    'at 375px, a real tap at the "Full report" button\'s own center hits the button itself (not overlapping content)',
+    !!hit375?.isFullReportBtn,
+    `rect=${JSON.stringify(rect375)} hit=${JSON.stringify(hit375)}`,
+  );
+  let dialog375Opened = false;
+  try {
+    await fullReportBtn375.click({ timeout: timing.ms(10000) });
+    await page375.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) });
+    dialog375Opened = true;
+  } catch { /* recorded as false below */ }
+  record('P3-mobile', 'at 375px, a real (non-force) pointer click on "Full report" opens the full Doctor report', dialog375Opened);
+  await context375.close();
+
   // 2026-09-04 (honesty-audit matrix fix) — the exported coverage HTML
   // (server/lib/coverage-html.ts) previously carried NO percentile or
   // draft-rank line at all (no `percentile` token anywhere in that file).
@@ -1436,6 +1485,35 @@ async function main() {
       // after setInputFiles resolves — wait for the file-count heading to show
       // both accepted files rather than racing the button's enabled state.
       await pageB.getByText('Scripts (2/20)', { exact: true }).first().waitFor({ timeout: timing.ms(10000) });
+
+      // B-13 (2026-09-05 mistake hunt): adding the SAME script content again
+      // (ac3ec262's file-input fix means a repeat filename is no longer
+      // silently a no-op) used to add a second row sharing the first's
+      // contentHash, producing four genuine React "two children with the
+      // same key" console errors and a duplicated ranked row. Dedupe at the
+      // door with a visible note is the fix — assert BOTH halves: the
+      // script count does NOT grow, and the note appears.
+      await fileInput.setInputFiles([
+        { name: 'script-a-again.fountain', mimeType: 'text/plain', buffer: Buffer.from('INT. ROOM - DAY\n\nA person waits.\n\nBOB\nHello.\n') },
+      ]);
+      const dedupeNoteVisible = await slateDialog
+        .getByText(/already in this slate/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: timing.ms(5000) })
+        .then(() => true)
+        .catch(() => false);
+      const scriptCountStayedAtTwo = await pageB
+        .getByText('Scripts (2/20)', { exact: true })
+        .first()
+        .isVisible()
+        .catch(() => false);
+      record(
+        'P2-slate',
+        'B-13: submitting a byte-identical script again is dedup\'d with a visible "already in this slate" note, not silently ranked twice',
+        dedupeNoteVisible && scriptCountStayedAtTwo,
+        `dedupeNoteVisible=${dedupeNoteVisible} scriptCountStayedAtTwo=${scriptCountStayedAtTwo}`,
+      );
+
       const rankBtn = slateDialog.getByRole('button', { name: 'Rank slate', exact: true }).first();
       await rankBtn.waitFor({ state: 'visible', timeout: timing.ms(5000) });
       await rankBtn.click();
@@ -1445,6 +1523,15 @@ async function main() {
         .waitFor({ state: 'visible', timeout: timing.ms(20000) })
         .then(() => true)
         .catch(() => false);
+      // B-13: exactly 2 ranked rows, never 3 — the dedup'd resubmission
+      // above must never reach the ranking request at all.
+      const rankedRowCount = await slateDialog.locator('tbody tr').count();
+      record(
+        'P2-slate',
+        'B-13: the ranked table has exactly 2 rows after the dedup\'d resubmission (never 3)',
+        rankedRowCount === 2,
+        `rankedRowCount=${rankedRowCount}`,
+      );
       // Close via the panel's own visible "X" button rather than Escape —
       // measured live: the drawer stayed mounted and kept intercepting
       // pointer events for the section below (the "Ship" click) even after
@@ -1534,6 +1621,49 @@ async function main() {
         ? 'Production/Analysis/Codex tab-bar text found after clicking "Open Studio"'
         : 'research-shell tab-bar text NOT found after clicking "Open Studio" — the shell may have been deleted rather than gated',
     );
+
+    // Area-6 note (2026-09-05 mistake hunt): the mobile-only close button
+    // (`button[aria-label="Close studio panel"]`, `md:hidden` in
+    // ScriptIDE.tsx) was hit-testing OVER the rightmost group tabs at this
+    // page's own default 1280px viewport — `.sm-btn` (design-system.css)
+    // sets `display: inline-flex` UNLAYERED, which beats a plain `md:hidden`
+    // (layered, inside Tailwind's `utilities` @layer) regardless of source
+    // order or specificity, so the "mobile-only" button never actually
+    // hid above the `md` breakpoint. Drive every group tab with a REAL
+    // click (no `force`) — a `visible`/`enabled` assertion cannot catch an
+    // overlapping sibling stealing the pointer event; only a real click's
+    // own actionability check can.
+    if (studioShellReachable) {
+      const groupTabLabels = ['Production', 'Analysis', 'Engine', 'Codex', 'Research', 'Title', 'Versions'];
+      const tabResults = [];
+      for (const label of groupTabLabels) {
+        const tab = pageB.getByRole('button', { name: label, exact: true }).first();
+        if ((await tab.count()) === 0) { tabResults.push(`${label}: NOT FOUND`); continue; }
+        try {
+          await tab.click({ timeout: timing.ms(5000) });
+          tabResults.push(`${label}: ok`);
+        } catch (e) {
+          tabResults.push(`${label}: FAILED (${e.message.split('\n')[0]})`);
+        }
+      }
+      const allTabsClicked = tabResults.every((r) => r.endsWith(': ok'));
+      record(
+        'P2-W6',
+        'every Studio group tab accepts a real (non-force) pointer click at this browser\'s default 1280px viewport — none is covered by the mobile-only "Close studio panel" button',
+        allTabsClicked,
+        tabResults.join('; '),
+      );
+      const closeStudioBtnDisplay = await pageB.evaluate(() => {
+        const el = document.querySelector('button[aria-label="Close studio panel"]');
+        return el ? getComputedStyle(el).display : null;
+      });
+      record(
+        'P2-W6',
+        '"Close studio panel" (mobile-only) computes display:none at this desktop viewport',
+        closeStudioBtnDisplay === 'none',
+        `computed display=${closeStudioBtnDisplay}`,
+      );
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════

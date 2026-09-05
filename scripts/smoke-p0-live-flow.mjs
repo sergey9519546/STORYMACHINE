@@ -124,6 +124,48 @@ async function main() {
   if (!okHealth) throw new Error(`report did not render health ~${EXPECT.health}`);
   console.log(`[smoke] report rendered: verdict=${EXPECT.verdict}, health~${EXPECT.health}.`);
 
+  // 3b. The golden-path COLD-PANEL hole (2026-09-05, docs/audits mistake
+  // hunt + provenance-review.md's "pre-existing hole"): clicking "Full
+  // report" at the EARLIEST instant it exists in the DOM — while the
+  // sample run kicked off by "Try sample coverage" is still in flight —
+  // used to unmount CoverageSummary mid-flight before the sample was ever
+  // installed, so ScriptDoctorPanel opened cold ("write some script
+  // content"/"Try a sample script") with ZERO doctor POSTs ever
+  // completing. Proven live to fail on the pre-fix tree
+  // (/tmp/claude-0/.../scratchpad/reviews/provenance-review.md's prov4.mjs,
+  // and this lane's own probe-earliest-click2.mjs before the fix: toggle
+  // `disabled` read `false` at its earliest `attached` instant and the
+  // click that followed opened a cold dialog with "Try a sample script").
+  // Own page/context — must not share `page`'s doctorStreamPosts count or
+  // Draft History checks below, which are about the ONE real run.
+  const earlyContext = await browser.newContext();
+  const earlyPage = await earlyContext.newPage();
+  wireConsoleCapture(earlyPage, genuineErrors);
+  await earlyPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await earlyPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
+  // The toolbar toggle specifically — CoverageSummary's OWN "Full report"
+  // (inside the aside) can carry the identical visible text once its run
+  // finishes, so disambiguate by DOM ancestry rather than risk clicking
+  // the wrong one.
+  const earlyToggle = earlyPage.locator('xpath=//button[normalize-space(text())="Full report" and not(ancestor::aside)]').first();
+  await earlyToggle.waitFor({ state: 'attached', timeout: timing.ms(15000) });
+  // `force: true`: the point of this assertion is that the toggle must be
+  // DISABLED (or otherwise a no-op) at this instant — proven directly below
+  // via the disabled check — not that Playwright's own actionability wait
+  // happens to stall long enough for the run to finish first.
+  await earlyToggle.click({ force: true, timeout: timing.ms(5000) }).catch(() => { /* a genuinely disabled button can refuse the dispatch itself */ });
+  await earlyPage.waitForTimeout(timing.ms(300));
+  const earlyDialogCount = await earlyPage.locator('[role="dialog"]').count();
+  if (earlyDialogCount > 0) {
+    const earlyDialogText = (await earlyPage.locator('[role="dialog"]').first().innerText().catch(() => '')) ?? '';
+    throw new Error(
+      'golden-path cold-panel regression: clicking "Full report" at the earliest instant it exists opened '
+      + `a dialog before the sample run resolved (text starts: ${JSON.stringify(earlyDialogText.slice(0, 120))})`,
+    );
+  }
+  console.log('[smoke] earliest-instant "Full report" click did not cold-open the full report.');
+  await earlyContext.close();
+
   // 4. The golden path continues into the full report — the door 100% of
   // first-time writers use. Everything below is asserted on THAT panel.
   const fullReport = page.getByRole('button', { name: 'Full report', exact: true }).first();

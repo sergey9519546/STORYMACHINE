@@ -322,6 +322,23 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
       + 'Both are descriptive only — new and deliberately unwired: they are shown as diagnostics and no '
       + 'part of the score, grade, or verdict above is derived from them.',
     );
+  } else if (report.structuralSignals && !report.structuralSignals.scored && report.structuralSignals.sceneCount > 0) {
+    // B-10 fix (2026-09-05 mistake hunt): a one-scene draft has `scored:
+    // false` (needs >= 2 scenes for the cross-scene aggregates above to mean
+    // anything) but the doctor still computes actionSentenceCvOverall — a
+    // document-wide reading that needs no second scene. Say so, honestly,
+    // rather than silently dropping the whole paragraph the way this branch
+    // used to. meanAbsDialogueShareDelta is NOT named here: with one scene
+    // it is 0 by construction (no scene-to-scene delta exists to average),
+    // not a genuine reading — naming it would imply a measurement that
+    // never happened.
+    caveats.push(
+      'Shape and rhythm: needs at least two scenes to read scene-to-scene change — this draft has '
+      + `${report.structuralSignals.sceneCount}. One document-wide reading is still meaningful with a `
+      + `single scene: the sentence-length variation across the draft's action lines is `
+      + `${report.structuralSignals.actionSentenceCvOverall.toFixed(2)}. Descriptive only — no part of `
+      + 'the score, grade, or verdict above is derived from it.',
+    );
   }
 
   caveats.push(

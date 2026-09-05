@@ -791,6 +791,58 @@ function ShapeRhythmSection({
   );
 }
 
+/** B-10 fix (2026-09-05 mistake hunt): the honest stand-in for
+ *  ShapeRhythmSection when `structuralSignals.scored` is false — a draft
+ *  with fewer than two scenes. Driven live (`p3e-edge.mjs`): a one-scene,
+ *  10,000-word draft has `analysisComplete: true`, a real health and
+ *  verdict, `structuralSignals.scored: false` — AND a genuinely computed
+ *  `actionSentenceCvOverall: 0.9994` that the section used to just throw
+ *  away with no line saying why (`sceneCount 1`, `sectionPresent: false`,
+ *  `anyShapeText: false`, `bars: 0`). `meanAbsDialogueShareDelta` is
+ *  deliberately NOT named here: with one scene it is 0 BY CONSTRUCTION (mean
+ *  of an empty scene-to-scene-delta array — structural-signals.ts's own
+ *  `sceneRows.slice(1)`), not a genuine reading; naming it next to a real
+ *  number would imply a measurement that never happened. Same "an empty
+ *  state is a known fact, not an unknown" convention as everywhere else in
+ *  this panel, and the SAME two facts (the honest reason, and the one
+ *  aggregate that IS meaningful with a single scene) server/lib/
+ *  coverage-html.ts and coverage-letter.ts render for the identical gate —
+ *  see their own B-10 comments; the three surfaces are checked against each
+ *  other by tests/core/shape-rhythm-panel-copy.test.ts. */
+function ShapeRhythmUnscored({ signals }: { signals: StructuralSignalsReport }) {
+  return (
+    <div data-a11y-section="shape-rhythm">
+      <div className="w-full flex items-center justify-between gap-2 p-3 border-2 border-[var(--sm-ink)] bg-[var(--sm-panel)]">
+        <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest text-black">
+          Shape &amp; Rhythm
+        </span>
+        <span className="text-[9px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
+          Descriptive — not part of the score
+        </span>
+      </div>
+      <div className="p-3 border-2 border-t-0 border-[var(--sm-ink)] bg-[var(--sm-panel)] space-y-2">
+        <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug">
+          Shape &amp; Rhythm needs at least two scenes; this draft has {signals.sceneCount}.
+        </p>
+        <div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-black">
+              Action-prose variation
+            </span>
+            <span className="text-xs font-bold text-black">
+              {signals.actionSentenceCvOverall.toFixed(2)}
+            </span>
+          </div>
+          <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
+            Sentence-length variation across the draft&rsquo;s action lines — the one document-wide
+            reading that needs no second scene. Descriptive only, not part of the score.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** The "Story Metrics" report section — script-level stat rows, the 4-way
  *  tension readout, emotional range, and per-scene sparklines for pivot and
  *  cliffhanger strength. pacingFit is deliberately not rendered: on doctor
@@ -5058,16 +5110,23 @@ export default function ScriptDoctorPanel({
 
             {/* Shape & rhythm — advisory-only structural-signal strip
                 (report.structuralSignals). Rendered only when the field is
-                present and scored (>= 2 scenes) — reports produced/cached
-                before it existed, or with too few scenes, degrade gracefully
-                with no gap, same optional-field convention as
-                report.metrics/storyGraph below. */}
-            {reportIsComplete && report.structuralSignals?.scored && (
+                present — reports produced/cached before it existed degrade
+                gracefully with no gap, same optional-field convention as
+                report.metrics/storyGraph below. When the field IS present
+                but `scored` is false (fewer than two scenes), B-10's fix
+                (2026-09-05 mistake hunt) renders an honest one-line notice
+                instead of silently vanishing — see ShapeRhythmUnscored's own
+                comment for why. */}
+            {reportIsComplete && report.structuralSignals?.scored ? (
               <ShapeRhythmSection
                 signals={report.structuralSignals}
                 sceneLineSpans={report.sceneLineSpans}
                 onNavigateToFinding={onNavigateToFinding}
               />
+            ) : (
+              reportIsComplete && report.structuralSignals && (
+                <ShapeRhythmUnscored signals={report.structuralSignals} />
+              )
             )}
 
             {/* Story metrics — deterministic narrative-shape readings from

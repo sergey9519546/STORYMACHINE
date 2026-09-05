@@ -259,6 +259,26 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
     let runningCombined = combinedChars;
     let runningCount = files.length;
 
+    // B-13 fix (2026-09-05 mistake hunt): dedupe identical submissions here,
+    // at the door, rather than let two byte-identical scripts both reach the
+    // ranking request. Driven live: adding the same .fountain file twice
+    // (the exact flow ac3ec262's file-input fix enabled — selecting the same
+    // filename a second time used to silently do nothing) produced four
+    // genuine React "two children with the same key" console errors AND a
+    // duplicated ranked row, because two scripts with identical text share a
+    // `contentHash` — a VALUE, not an IDENTITY — and the table rows were
+    // keyed by it. Deduping here is the stronger of the two choices the
+    // review named (dedupe with a visible note vs. keep both rows and label
+    // them): it also means every `contentHash` `runRank` can ever receive is
+    // now unique by construction, so the render-side key fix below (array
+    // index) can never collide for a reason a writer would find surprising.
+    // Checked against BOTH already-added files and anything already queued
+    // in this same batch (a multi-select or a second drag can carry the
+    // exact same bytes twice in one call), by exact text — the same
+    // byte-identity the server's contentHash (sha256 of the trimmed text)
+    // already treats as "the same script".
+    const seenTexts = new Map<string, string>(files.map((f) => [f.fountain, f.title]));
+
     for (const file of incoming) {
       const lowerName = file.name.toLowerCase();
       if (!lowerName.endsWith(".fountain") && !lowerName.endsWith(".txt")) {
@@ -282,6 +302,11 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
         problems.push(`"${file.name}" skipped — empty file.`);
         continue;
       }
+      const existingTitle = seenTexts.get(text);
+      if (existingTitle !== undefined) {
+        problems.push(`"${file.name}" skipped — already in this slate (identical to "${existingTitle}").`);
+        continue;
+      }
       if (text.length > MAX_FILE_CHARS) {
         problems.push(
           `"${file.name}" skipped — ${formatChars(text.length)} chars is over the ${formatChars(MAX_FILE_CHARS)}-char single-script limit.`
@@ -296,10 +321,12 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
       }
       runningCombined += text.length;
       runningCount += 1;
+      const title = titleFromFileName(file.name);
+      seenTexts.set(text, title);
       accepted.push({
         id: uid(),
         fileName: file.name,
-        title: titleFromFileName(file.name),
+        title,
         fountain: text,
         chars: text.length,
       });
@@ -744,6 +771,21 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* B-13 fix (2026-09-05 mistake hunt): rows used to be
+                      keyed by `entry.contentHash` — a VALUE, not an
+                      identity. Two scripts with identical text share a
+                      contentHash, so adding the same script twice (the
+                      exact flow ac3ec262's file-input fix enabled) produced
+                      four genuine React "two children with the same key"
+                      console errors on this table. `handleFilesSelected`
+                      above now dedupes identical submissions before they
+                      ever reach `runRank`, so a `contentHash` collision can
+                      no longer occur here at all — but the array index is
+                      the correct key regardless of that upstream guarantee:
+                      `result.slate` is a fresh, atomically-replaced array on
+                      every successful rank (never independently reordered,
+                      filtered, or spliced in place after it renders), which
+                      is exactly the case where an index key is safe. */}
                   {result.slate.map((entry, i) => {
                     // G0-05: incomplete analyses carry a sentinel health (0)
                     // that is not a real score. Badge them "incomplete" and
@@ -769,7 +811,16 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                     if (incomplete) {
                       return (
                         <tr
-                          key={entry.contentHash ?? `${entry.title}-${i}`}
+                          // Rebase merge (2026-09-05): key from the layout
+                          // lane's B-13 fix (a contentHash is a VALUE, not a
+                          // row identity — two identical scripts collide on
+                          // it; the array index is unique by construction
+                          // and safe here since `result.slate` is only ever
+                          // replaced wholesale, never spliced/filtered in
+                          // place — see the round-1 report's own comment on
+                          // this two paragraphs below); className from the
+                          // a11y-dark lane's theme-invariant token fix.
+                          key={i}
                           className={rowBg}
                         >
                           <td className="px-2 py-2 font-bold text-[var(--sm-ink-mute)]">—</td>
@@ -801,7 +852,10 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                     const verdictMeta = entry.verdict ? VERDICT_CHIP[entry.verdict] : undefined;
                     return (
                       <tr
-                        key={entry.contentHash ?? `${entry.title}-${i}`}
+                        // See the incomplete-row `<tr>` above for why this
+                        // key/className pairing is the deliberate merge of
+                        // both lanes' fixes, not a leftover conflict marker.
+                        key={i}
                         className={rowBg}
                       >
                         <td className="px-2 py-2 font-bold">{i + 1}</td>

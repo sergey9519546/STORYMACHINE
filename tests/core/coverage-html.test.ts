@@ -895,3 +895,88 @@ describe('renderCoverageHtml — rendered contrast (WCAG AA, client-hunter B-15)
     );
   });
 });
+
+// ── B-10 (2026-09-05 mistake hunt): the one-scene Shape & Rhythm notice ─────
+// Driven live (scratchpad/mistakes-2026-09-05/p3e-edge.mjs): a one-scene,
+// 10,000-word draft has `analysisComplete: true` and a real health/verdict,
+// but `structuralSignals.scored: false` — and the section used to vanish
+// with no line saying why, discarding a genuinely computed
+// `actionSentenceCvOverall`. server/lib/coverage-letter.ts and
+// src/components/scriptide/ScriptDoctorPanel.tsx gate identically and are
+// checked against each other by tests/core/coverage-letter.test.ts and
+// tests/core/shape-rhythm-panel-copy.test.ts respectively.
+function structuralSignalsFixture(overrides: Partial<ScriptDoctorReport['structuralSignals']> = {}): NonNullable<ScriptDoctorReport['structuralSignals']> {
+  return {
+    scored: false, sceneCount: 1, scenes: [], sceneLengthCv: 0, meanAbsDialogueShareDelta: 0,
+    dialogueShareRange: 0, newPairSceneRate: 0, lastNewPairPosition: 0, meanSpeakersPerScene: 0,
+    meanTurnWords: 0, meanLeadShare: 0, leadShareSlope: 0, speakerEntropy: 0,
+    actionSentenceCvOverall: 0.9994, meanOpenCloseShift: 0, openCloseModeFlipRate: 0,
+    ...overrides,
+  };
+}
+
+describe('renderCoverageHtml — Shape & Rhythm section, unscored (fewer than 2 scenes)', () => {
+  it('renders the section entirely when the field is absent (pre-existing-field convention)', () => {
+    const html = renderCoverageHtml(buildReport({ structuralSignals: undefined }), 'No Field');
+    assert.ok(!html.includes('Structural Signals'));
+  });
+
+  it('renders nothing when structuralSignals is present but sceneCount is 0 (nothing to report)', () => {
+    const html = renderCoverageHtml(
+      buildReport({ structuralSignals: structuralSignalsFixture({ sceneCount: 0, actionSentenceCvOverall: 0 }) }),
+      'Empty Draft',
+    );
+    assert.ok(!html.includes('Structural Signals'));
+  });
+
+  it('renders an honest one-scene notice, with the aggregate that IS meaningful, when unscored with sceneCount 1', () => {
+    const html = renderCoverageHtml(
+      buildReport({ structuralSignals: structuralSignalsFixture() }),
+      'One Scene Draft',
+    );
+    assert.ok(html.includes('Structural Signals'));
+    assert.match(html, /Shape &amp; Rhythm needs at least two scenes; this draft has 1\./);
+    assert.match(html, /action-sentence variation 1\.00/);
+    // meanAbsDialogueShareDelta is 0 by construction with one scene — never
+    // named next to a genuine reading.
+    assert.ok(!html.includes('mean talk/action swing'));
+    // No per-scene bars: `scenes` is empty in the unscored fixture (the
+    // `.sig-cell` CSS rule itself is always present in the stylesheet — see
+    // the scored-section test below for the actual rendered `<div>`).
+    assert.ok(!html.includes('class="sig-cell"'));
+    assert.match(html, /diagnostic only and are not part of the score/);
+  });
+
+  it('renders the full scored section (bars + all seven aggregates) unchanged when scored is true', () => {
+    const html = renderCoverageHtml(
+      buildReport({
+        structuralSignals: {
+          scored: true,
+          sceneCount: 2,
+          scenes: [
+            {
+              sceneIdx: 0, slug: 'INT. HOME - DAY', words: 40, dialogueShare: 0.5, dialogueShareDelta: 0,
+              speakers: 1, speakerTurns: 2, meanTurnWords: 10, leadShare: 1, newPairs: 0,
+              lengthZ: 0, openCloseShift: 0.1, actionSentenceCv: 0, openCloseModeFlip: false,
+            },
+            {
+              sceneIdx: 1, slug: 'EXT. STREET - NIGHT', words: 60, dialogueShare: 0.7, dialogueShareDelta: 0.2,
+              speakers: 2, speakerTurns: 3, meanTurnWords: 12, leadShare: 0.6, newPairs: 1,
+              lengthZ: 0.5, openCloseShift: 0.2, actionSentenceCv: 0.3, openCloseModeFlip: true,
+            },
+          ],
+          sceneLengthCv: 0.2, meanAbsDialogueShareDelta: 0.2, dialogueShareRange: 0.2,
+          newPairSceneRate: 0.5, lastNewPairPosition: 1, meanSpeakersPerScene: 1.5,
+          meanTurnWords: 11, meanLeadShare: 0.8, leadShareSlope: -0.4, speakerEntropy: 0.5,
+          actionSentenceCvOverall: 0.55, meanOpenCloseShift: 0.15, openCloseModeFlipRate: 0.5,
+        },
+      }),
+      'Two Scene Draft',
+    );
+    assert.ok(html.includes('Structural Signals'));
+    assert.ok(html.includes('sig-cell'), 'must render one bar per scene');
+    assert.match(html, /mean talk\/action swing 0\.20/);
+    assert.match(html, /action-sentence variation 0\.55/);
+    assert.ok(!html.includes('needs at least two scenes'));
+  });
+});

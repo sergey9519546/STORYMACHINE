@@ -1041,7 +1041,28 @@ export interface CoverageHtmlOptions {
  *  this block feeds health, grade, or any priority. */
 function buildStructuralSignalsSection(report: ScriptDoctorReport): string {
   const block = report.structuralSignals;
-  if (!block || !block.scored || block.scenes.length === 0) return '';
+  if (!block) return '';
+  // B-10 fix (2026-09-05 mistake hunt): a one-scene draft has `scored: false`
+  // (structural-signals.ts's own MIN_SCENES_TO_SCORE — the cross-scene
+  // aggregates below genuinely need >= 2 scenes to mean anything) but STILL
+  // computes `actionSentenceCvOverall`, a document-wide reading that needs no
+  // second scene at all. The section used to just vanish with no line saying
+  // why, silently discarding a real computed value — say so instead, and
+  // show the one aggregate that IS defined, the same honest-about-a-missing-
+  // value convention this codebase uses everywhere else (an empty state is a
+  // known fact, not an unknown). Never touches the scored/multi-scene render
+  // path below, and never the STYLES block.
+  if (!block.scored) {
+    if (block.sceneCount === 0) return '';
+    return `
+  <section class="section">
+    <h2>Structural Signals (new, unwired diagnostics)</h2>
+    <p class="sig-note">Shape &amp; Rhythm needs at least two scenes; this draft has ${block.sceneCount}.</p>
+    <p class="sig-note">action-sentence variation ${escapeHtml(block.actionSentenceCvOverall.toFixed(2))}</p>
+    <p class="sig-note">These readings are computed from document structure alone &mdash; word, line, sentence, turn and speaker counts &mdash; with no word list involved. They are <strong>diagnostic only and are not part of the score</strong>: no health, grade, verdict, dimension or priority above is derived from any number in this section.</p>
+  </section>`;
+  }
+  if (block.scenes.length === 0) return '';
 
   const cells = block.scenes.map(scene => {
     const talkPct = Math.max(0, Math.min(100, Math.round(scene.dialogueShare * 100)));

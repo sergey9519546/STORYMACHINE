@@ -462,6 +462,17 @@ export default function ScriptIDE({
   // ScriptDoctorPanel as initial state when "Full report" is clicked — see
   // that panel's initialReport prop doc comment for the freshness contract.
   const [coverageReport, setCoverageReport] = useState<ThreadedCoverageReport | null>(null);
+  /** Golden-path fix (2026-09-05): CoverageSummary's own run status, lifted
+   *  via its onStatusChange prop. Lets the "Full report" toolbar toggle below
+   *  (rendered unconditionally the instant task === "coverage" — see its own
+   *  comment) tell a run that has not produced a report yet apart from one
+   *  that has, so switching to ScriptDoctorPanel can wait for the in-flight
+   *  run instead of unmounting CoverageSummary mid-flight and losing it —
+   *  the exact race that used to leave the golden path (StartScreen -> "Try
+   *  sample coverage" -> "Full report" clicked before the sample run
+   *  resolves) on a cold "write some script content" dead end with zero
+   *  doctor POSTs ever completing. */
+  const [coverageSummaryStatus, setCoverageSummaryStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   /** Progressive depth: summary first; full Script Doctor is opt-in. */
   const [coverageFull, setCoverageFull] = useState(false);
   /** Current cursor line (1-based) for sidebar scene highlighting. */
@@ -2271,6 +2282,46 @@ export default function ScriptIDE({
 
   const isEmptyDraft = scriptText.trim().length === 0;
 
+  // Golden-path fix (2026-09-05): true exactly while CoverageSummary has a
+  // run in flight (including the very first, StartScreen-triggered sample
+  // run) that has not yet produced ANY report to hand up. See the "Full
+  // report" toolbar button's own comment below for what this guards against.
+  //
+  // Driven proof this needed the second clause (not just
+  // `coverageSummaryStatus === "loading"`): CoverageSummary's OWN
+  // `onStatusChange` effect reports its FIRST render's status — "idle" — the
+  // instant it mounts, and only reports "loading" after the sample-install
+  // effect's `run()` call has updated its state and a SECOND render has
+  // committed and flushed effects. That is a genuine, if narrow, window
+  // between mount and the "loading" status reaching this parent, and this
+  // toggle attaches to the DOM in the very same commit CoverageSummary does
+  // — so a click landing in that window (a fast real tap, or exactly the
+  // "earliest instant" scenario this fix exists for) still read
+  // `coverageSummaryStatus === "idle"`, saw `coverageSummaryLoadingCold ===
+  // false`, and unmounted CoverageSummary before it ever reported "loading"
+  // at all — the golden-path cold-open, reproduced live even with the
+  // status-lifting fix alone (`disabled` measured `false` at the toggle's
+  // earliest `attached` instant, and the click that followed opened
+  // ScriptDoctorPanel cold — "Try a sample script" / "Upload script", no
+  // hydrated report, no additional doctor POST — because there was nothing
+  // installed yet for it to hydrate from).
+  //
+  // `doctorAutoSample` closes that window without depending on the child's
+  // own propagation timing at all: it is THIS component's own state, true
+  // synchronously the instant a sample handoff is armed (StartScreen's "Try
+  // sample coverage" or the empty-draft "Sample coverage" button, both
+  // straight into the SAME render that first mounts CoverageSummary with
+  // `autoLoadSample` true) — and CoverageSummary's mount effect unconditionally
+  // fires `run({sample: true})` when `autoLoadSample` is true, so "a sample
+  // run is in flight or about to start on this very commit" is a fact this
+  // parent already holds, not one it has to wait to be told. `doctorAutoSample`
+  // is cleared back to false only once the sample text is actually installed
+  // into the draft (ScriptIDE's own `onLoadSampleIntoEditor`), which happens
+  // in the SAME call as `onReportComputed` — so `coverageReport` is already
+  // set by the time this clause's contribution would otherwise go stale.
+  const coverageSummaryLoadingCold =
+    !coverageReport && (coverageSummaryStatus === "loading" || (toolSlot === "coverage" && doctorAutoSample));
+
   // ── E5: command palette action registry ─────────────────────────────────
   // Every `run` below calls the SAME named function a visible button
   // already calls (handleTaskChange, openToolSlot, exportFountain, the
@@ -2658,11 +2709,37 @@ export default function ScriptIDE({
                   which synchronously blurs focus to <body> before that dialog's
                   useModalFocusTrap can ever see this element as "previously
                   focused" — breaking focus-restore-on-close for the P0 coverage
-                  dialog. Found live with scripts/verify-focus-traps.mjs. */}
+                  dialog. Found live with scripts/verify-focus-traps.mjs.
+                  Golden-path fix (2026-09-05): the mini -> full transition
+                  ALONE is held while CoverageSummary has a run in flight and
+                  no report yet (coverageSummaryLoadingCold) — switching to
+                  ScriptDoctorPanel here unmounts CoverageSummary, and its own
+                  `aliveRef` guard then correctly refuses to hand up a report
+                  that arrives after that, so clicking through at the earliest
+                  possible instant used to cold-open ScriptDoctorPanel on
+                  "write some script content" with zero doctor POSTs ever
+                  completing. Full -> mini (closing back to the summary) is
+                  never blocked — there's nothing to lose there. */}
               <button
                 type="button"
-                onClick={() => (toolSlot !== "coverage" ? openToolSlot("coverage") : setCoverageFull(!coverageFull))}
-                className={toolSlot !== "coverage" ? "sm-btn sm-btn--ink py-1.5" : "sm-btn py-1.5"}
+                onClick={() =>
+                  toolSlot !== "coverage"
+                    ? openToolSlot("coverage")
+                    : coverageFull || !coverageSummaryLoadingCold
+                      ? setCoverageFull(!coverageFull)
+                      : undefined
+                }
+                disabled={toolSlot === "coverage" && !coverageFull && coverageSummaryLoadingCold}
+                title={
+                  toolSlot === "coverage" && !coverageFull && coverageSummaryLoadingCold
+                    ? "Coverage is still running — the full report opens as soon as it finishes."
+                    : undefined
+                }
+                className={
+                  toolSlot !== "coverage"
+                    ? "sm-btn sm-btn--ink py-1.5"
+                    : "sm-btn py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                }
               >
                 {toolSlot !== "coverage" ? "Open coverage" : coverageFull ? "Summary" : "Full report"}
               </button>
@@ -2957,11 +3034,28 @@ export default function ScriptIDE({
               becomes a right-side overlay drawer so it doesn't consume the
               whole narrow viewport alongside the editor. */}
           <div className="w-full md:w-[400px] md:shrink-0 h-full flex flex-col bg-[#e8e8e3] overflow-y-auto fixed md:static top-0 right-0 z-50 md:z-auto">
-            {/* Mobile-only close for the panels drawer. */}
+            {/* Mobile-only close for the panels drawer. `md:!hidden`, not
+                plain `md:hidden` (found live, area-6 note in the 2026-09-05
+                mistake hunt): `.sm-btn` (src/styles/design-system.css) sets
+                `display: inline-flex` UNLAYERED — design-system.css loads
+                after `@import "tailwindcss"` in src/index.css but is never
+                itself wrapped in `@layer`, and per the CSS cascade spec an
+                unlayered NORMAL declaration always beats a LAYERED normal
+                declaration (Tailwind's own utilities live in its
+                `utilities` layer) regardless of source order or specificity
+                — so plain `md:hidden`'s `display:none` never won here at
+                any width, and this button sat at a fixed `top-2 right-2`
+                over the group-tab strip on desktop, silently eating clicks
+                on whichever tab ended up under it (confirmed: "Versions"
+                timed out on a real, non-force click at 1280px). The `!`
+                important-modifier makes Tailwind emit `display:none
+                !important` — important declarations beat normal ones
+                categorically, layer or not, so this now actually hides
+                above the `md` breakpoint. */}
             <button
               onClick={() => openToolSlot("studio")}
               aria-label="Close studio panel"
-              className="md:hidden absolute top-2 right-2 z-10 p-2 sm-btn bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-black hover:text-white transition-colors"
+              className="md:!hidden absolute top-2 right-2 z-10 p-2 sm-btn bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-black hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -3426,6 +3520,7 @@ export default function ScriptIDE({
               getDraftGeneration={getDraftGeneration}
               onFreshReport={() => setCoverageStale(false)}
               onReportComputed={setCoverageReport}
+              onStatusChange={setCoverageSummaryStatus}
               onLoadSampleIntoEditor={(text) => {
                 // G0-01 defense in depth: refuse a non-empty, differing
                 // draft. Retrospective #2: also refuse an empty draft the

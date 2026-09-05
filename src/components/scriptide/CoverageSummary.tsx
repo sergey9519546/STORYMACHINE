@@ -50,6 +50,19 @@ interface CoverageSummaryProps {
    *  response this component itself treats as stale must never be handed up
    *  as if it were current. */
   onReportComputed?: (payload: ThreadedCoverageReport) => void;
+  /** Golden-path fix (2026-09-05): the host's "Full report" toolbar toggle
+   *  lives OUTSIDE this component (ScriptIDE.tsx) and used to have no way to
+   *  know a run was still in flight — so clicking it at the earliest instant
+   *  it existed in the DOM (while the very first sample run was still
+   *  running) unmounted this component mid-flight. The unmount's own
+   *  `aliveRef` guard then correctly refused to install the sample or hand
+   *  the report up, so ScriptDoctorPanel opened with no initialReport and no
+   *  editor content — a cold "write some script content" dead end on the
+   *  product's own golden path, with zero doctor POSTs ever completing.
+   *  Reporting every status transition lets the host hold the toggle until a
+   *  report actually exists (see ScriptIDE.tsx's `coverageSummaryStatus`),
+   *  which "waits for the in-flight run" rather than papering over the race. */
+  onStatusChange?: (status: Status) => void;
 }
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -164,6 +177,7 @@ export default function CoverageSummary({
   onClose,
   onFreshReport,
   onReportComputed,
+  onStatusChange,
 }: CoverageSummaryProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +224,15 @@ export default function CoverageSummary({
       aliveRef.current = false;
     };
   }, []);
+  // Golden-path fix (2026-09-05): tell the host every time `status` changes,
+  // including the very first "idle" on mount — that lets ScriptIDE hold the
+  // "Full report" toggle disabled for exactly as long as a run that has not
+  // yet produced a report is in flight, and never longer (see onStatusChange
+  // doc comment on the prop above).
+  useEffect(() => {
+    onStatusChange?.(status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
   // Live AbortController for the in-flight streamed run, so Cancel can stop
   // it server-side the same way ScriptDoctorPanel's cancelDiagnosis does —
   // aborting the fetch closes the connection, which frees the doctor-pool
@@ -587,11 +610,15 @@ export default function CoverageSummary({
                   </>
                 )}
               </p>
-              <div className="mt-4">
-                <button type="button" onClick={onOpenFullReport} className="sm-btn">
-                  Full report
-                </button>
-              </div>
+              {/* B-8 fix (2026-09-05): "Full report" moved OUT of normal
+                  scroll flow — see the sticky action bar below the scroll
+                  region, past the closing </div> of sm-panel-body. This
+                  branch used to render its own copy of the button inline,
+                  which at 375px could end up past the fold of a panel whose
+                  content (this incomplete-analysis card plus everything
+                  above it) already exceeds the viewport, with nothing
+                  guaranteeing it stayed reachable without a scroll a writer
+                  had no cue to make. */}
             </div>
           ) : (
           <>
@@ -675,8 +702,24 @@ export default function CoverageSummary({
                   {top.severity ? ` · ${top.severity}` : ""}
                 </p>
               )}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {jumpSpan && (onNavigateToFinding || onJumpToLine) && (
+              {/* B-8 fix (2026-09-05): this row used to also carry "Full
+                  report" — the panel's only route to the full Doctor
+                  view — as one more `flex-wrap` item at the END of
+                  in-scroll content. At 375px, with the plainSummary
+                  paragraph and stat tiles above it, that put "Full
+                  report" at or past the bottom of the viewport with no
+                  affordance telling a writer to scroll for it, and a
+                  real (non-`force`) pointer click there could land on
+                  whatever the scrollable body's last-painted content was
+                  instead — see scripts/verify-p2-p3-surfaces.mjs's
+                  "coverage375FullReportRealClick" step, which fails on
+                  the pre-fix tree. "Full report" now lives in the sticky
+                  action bar below the scroll region (past
+                  sm-panel-body's closing tag) — its own stacking context,
+                  never competing with in-flow content for a pixel — so
+                  only the contextual "Jump to line" stays here. */}
+              {jumpSpan && (onNavigateToFinding || onJumpToLine) && (
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -689,11 +732,8 @@ export default function CoverageSummary({
                     Jump to line {jumpSpan.startLine}
                     <ArrowRight className="h-3 w-3" aria-hidden="true" />
                   </button>
-                )}
-                <button type="button" onClick={onOpenFullReport} className="sm-btn">
-                  Full report
-                </button>
-              </div>
+                </div>
+              )}
             </div>
 
             {report.strengths && report.strengths.length > 0 && (
@@ -721,6 +761,30 @@ export default function CoverageSummary({
           </button>
         )}
       </div>
+
+      {/* B-8 fix (2026-09-05): "Full report" as a sticky footer bar OUTSIDE
+          `sm-panel-body`'s `overflow-y-auto` region — a `shrink-0` flex item
+          of the aside itself, never inside the scrolling content, so it
+          cannot end up past the fold or behind whatever the scroll
+          container's last painted content is at 375px. It is the ONLY route
+          from Coverage into the full Script Doctor view (ScriptIDE.tsx's own
+          "Full report"/"Open coverage" toolbar toggle opens THIS panel, not
+          the reverse), so it stays reachable by a real pointer click
+          regardless of report length — the failure mode this fixes
+          (`document.elementFromPoint` at the button's own centre resolving
+          to something else entirely) cannot occur once the button is not
+          competing with in-flow content for a stacking position. Rendered
+          for every state that has something to open a full report on
+          (a completed report, an incomplete one, or a failure with a report
+          shape at all) — never for "idle"/"loading"/"error", which have no
+          report to open. */}
+      {status === "success" && report && (
+        <div className="shrink-0 border-t-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] p-3">
+          <button type="button" onClick={onOpenFullReport} className="sm-btn sm-btn--ink w-full">
+            Full report
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
