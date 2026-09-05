@@ -170,9 +170,25 @@
       color: #3f3f46;
     }
     .dim-summary { grid-area: summary; font-size: 13px; color: #3f3f46; }
-    .dim-basis { grid-area: basis; font-size: 11px; color: #a3a3a3; }
+    /* a11y fix (2026-09-05, client-hunter B-15): #a3a3a3 measured 2.25-2.48:1
+       against every background this class actually renders on in this
+       document (page #fffdf9, body #f4f2ec) — the WCAG AA text minimum is
+       4.5:1. This class carries the report's provenance sentences ("Based
+       on N issues across M passes…", "The N findings below…") — the exact
+       lines ROADMAP P3's third-party-verifiability claim rests on, so an
+       unreadable provenance line undercuts the whole point of a shareable
+       report. #6b6b6b clears 4.5:1 on both backgrounds (4.76-5.25:1) while
+       staying visually muted/secondary next to the primary #1a1a1a/#3f3f46
+       ink this document uses for body text. */
+    .dim-basis { grid-area: basis; font-size: 11px; color: #6b6b6b; }
     /* ── Checklist ── */
     .checklist { margin: 0; padding-left: 0; list-style: none; }
+    /* a11y fix (2026-09-05): buildGodmodeSection's .issue-minor <li> rows
+       now sit inside a real <ul> (axe's listitem rule); this only resets
+       the default UA list margin/padding to sit flush with the
+       .metric-row divs alongside it, since neither carried any spacing
+       styling before. */
+    .issue-minor-list { margin: 4px 0 8px; padding-left: 20px; }
     .checklist li {
       position: relative;
       padding-left: 26px;
@@ -188,7 +204,14 @@
       font-family: 'Courier New', Courier, monospace;
     }
     /* ── Heatmap ── */
-    .heat-row { display: flex; flex-wrap: wrap; gap: 5px; }
+    /* a11y/overflow fix (2026-09-05, client-hunter B-15): flex-wrap already
+       keeps individual cells from forcing this row wider than its column —
+       measured with 42 scenes, it never was the export's overflow source
+       (see the .issue-fix fix below for what actually was). overflow-x:auto
+       is added anyway as a defensive floor: if a future change ever grows
+       .heat-cell past its column width, this row scrolls internally
+       instead of taking the whole exported page sideways with it. */
+    .heat-row { display: flex; flex-wrap: wrap; gap: 5px; overflow-x: auto; }
     .heat-cell {
       width: 30px;
       height: 30px;
@@ -201,7 +224,8 @@
       font-weight: 700;
     }
     /* ── Structural-signal strip (unwired diagnostics) ── */
-    .sig-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; }
+    /* Same defensive overflow-x:auto floor as .heat-row above, same reason. */
+    .sig-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; overflow-x: auto; }
     .sig-cell {
       width: 26px;
       display: flex;
@@ -245,10 +269,23 @@
       letter-spacing: 0.04em;
     }
     .issue-description { font-size: 13.5px; }
+    /* overflow fix (2026-09-05, client-hunter B-15): this class also carries
+       the root-cause member-count / member-rules line, where each rule constant
+       (ARC_REVELATION_RELATIONAL_AFTERMATH_VOID and friends) is one
+       unbroken 30-45 character token with no space or hyphen for the
+       browser to wrap on. Measured live on a real "Try sample coverage"
+       report: one of these tokens alone forced this div — and every
+       ancestor up through <body>/<html> — 91px wider than its column,
+       which is the exact mechanism behind the exported report's 375px
+       horizontal overflow (documentElement.scrollWidth 418 vs clientWidth
+       375). overflow-wrap:anywhere lets a token break mid-word ONLY when it
+       has nowhere else to break, so normal prose (the OTHER use of this
+       class, suggested-fix text) is unaffected. */
     .issue-fix {
       font-size: 13px;
       color: #3f3f46;
       margin-top: 2px;
+      overflow-wrap: anywhere;
     }
     .pass-block { margin-bottom: 20px; }
     .pass-block h3 {

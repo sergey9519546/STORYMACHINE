@@ -299,9 +299,16 @@ function buildStrengthsSection(strengths: string[]): string {
   </section>`;
 }
 
+// a11y fix (2026-09-05, client-hunter B-15): the major-severity cell's white
+// scene-number text measured 3.19:1 on #d97706 — under the 4.5:1 AA text
+// minimum (the cell's own font-size is 11px, not the large-text exception).
+// #b45309 is the same amber semantic this file already uses for CONSIDER
+// (VERDICT_STYLE) and the "solid" health band (healthBandColor) — reusing it
+// here keeps one amber across the document instead of adding a second, and
+// white-on-it measures 5.02:1.
 function heatmapCellColor(cell: SceneDiagnostics): { bg: string; fg: string } {
   if (cell.critical > 0) return { bg: '#b91c1c', fg: '#fff' };
-  if (cell.major > 0) return { bg: '#d97706', fg: '#fff' };
+  if (cell.major > 0) return { bg: '#b45309', fg: '#fff' };
   if (cell.minor > 0) return { bg: '#fde68a', fg: '#78350f' };
   return { bg: '#1a7f37', fg: '#fff' };
 }
@@ -751,9 +758,25 @@ const STYLES = `
       color: #3f3f46;
     }
     .dim-summary { grid-area: summary; font-size: 13px; color: #3f3f46; }
-    .dim-basis { grid-area: basis; font-size: 11px; color: #a3a3a3; }
+    /* a11y fix (2026-09-05, client-hunter B-15): #a3a3a3 measured 2.25-2.48:1
+       against every background this class actually renders on in this
+       document (page #fffdf9, body #f4f2ec) — the WCAG AA text minimum is
+       4.5:1. This class carries the report's provenance sentences ("Based
+       on N issues across M passes…", "The N findings below…") — the exact
+       lines ROADMAP P3's third-party-verifiability claim rests on, so an
+       unreadable provenance line undercuts the whole point of a shareable
+       report. #6b6b6b clears 4.5:1 on both backgrounds (4.76-5.25:1) while
+       staying visually muted/secondary next to the primary #1a1a1a/#3f3f46
+       ink this document uses for body text. */
+    .dim-basis { grid-area: basis; font-size: 11px; color: #6b6b6b; }
     /* ── Checklist ── */
     .checklist { margin: 0; padding-left: 0; list-style: none; }
+    /* a11y fix (2026-09-05): buildGodmodeSection's .issue-minor <li> rows
+       now sit inside a real <ul> (axe's listitem rule); this only resets
+       the default UA list margin/padding to sit flush with the
+       .metric-row divs alongside it, since neither carried any spacing
+       styling before. */
+    .issue-minor-list { margin: 4px 0 8px; padding-left: 20px; }
     .checklist li {
       position: relative;
       padding-left: 26px;
@@ -769,7 +792,14 @@ const STYLES = `
       font-family: 'Courier New', Courier, monospace;
     }
     /* ── Heatmap ── */
-    .heat-row { display: flex; flex-wrap: wrap; gap: 5px; }
+    /* a11y/overflow fix (2026-09-05, client-hunter B-15): flex-wrap already
+       keeps individual cells from forcing this row wider than its column —
+       measured with 42 scenes, it never was the export's overflow source
+       (see the .issue-fix fix below for what actually was). overflow-x:auto
+       is added anyway as a defensive floor: if a future change ever grows
+       .heat-cell past its column width, this row scrolls internally
+       instead of taking the whole exported page sideways with it. */
+    .heat-row { display: flex; flex-wrap: wrap; gap: 5px; overflow-x: auto; }
     .heat-cell {
       width: 30px;
       height: 30px;
@@ -782,7 +812,8 @@ const STYLES = `
       font-weight: 700;
     }
     /* ── Structural-signal strip (unwired diagnostics) ── */
-    .sig-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; }
+    /* Same defensive overflow-x:auto floor as .heat-row above, same reason. */
+    .sig-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; overflow-x: auto; }
     .sig-cell {
       width: 26px;
       display: flex;
@@ -826,10 +857,23 @@ const STYLES = `
       letter-spacing: 0.04em;
     }
     .issue-description { font-size: 13.5px; }
+    /* overflow fix (2026-09-05, client-hunter B-15): this class also carries
+       the root-cause member-count / member-rules line, where each rule constant
+       (ARC_REVELATION_RELATIONAL_AFTERMATH_VOID and friends) is one
+       unbroken 30-45 character token with no space or hyphen for the
+       browser to wrap on. Measured live on a real "Try sample coverage"
+       report: one of these tokens alone forced this div — and every
+       ancestor up through <body>/<html> — 91px wider than its column,
+       which is the exact mechanism behind the exported report's 375px
+       horizontal overflow (documentElement.scrollWidth 418 vs clientWidth
+       375). overflow-wrap:anywhere lets a token break mid-word ONLY when it
+       has nowhere else to break, so normal prose (the OTHER use of this
+       class, suggested-fix text) is unaffected. */
     .issue-fix {
       font-size: 13px;
       color: #3f3f46;
       margin-top: 2px;
+      overflow-wrap: anywhere;
     }
     .pass-block { margin-bottom: 20px; }
     .pass-block h3 {
@@ -1041,6 +1085,17 @@ ${cells}
 function buildGodmodeSection(report: ScriptDoctorReport): string {
   const parts: string[] = [];
 
+  // a11y fix (2026-09-05, found auditing this export for client-hunter
+  // B-15 — pre-existing, not one of B-11/B-14/B-15's own findings, but
+  // real and in this same file): every `<li class="issue-minor">` below
+  // used to be pushed bare into `parts`, a sibling of plain `<div>` rows
+  // inside `.metrics-grid` — never inside a `<ul>`/`<ol>`. axe's `listitem`
+  // rule (serious) correctly flags an `<li>` with no list-container parent;
+  // this is the FIRST audit this exported document has ever had
+  // (scripts/verify-a11y.mjs's "10c" step, added alongside the B-15 fix),
+  // which is why it was never caught before. Each finding loop below now
+  // wraps its own `<li>` run in one `<ul>` — no other markup changes.
+
   // Graph Health (L5)
   if (report.graphHealth) {
     const gh = report.graphHealth;
@@ -1049,8 +1104,12 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
     if (gh.graphDeduction > 0) {
       parts.push(`<div class="metric-row sub"><span class="metric-label">→ Health deduction</span><span class="metric-value">−${gh.graphDeduction}</span></div>`);
     }
-    for (const finding of gh.findings) {
-      parts.push(`<li class="issue-minor">${escapeHtml(finding)}</li>`);
+    if (gh.findings.length > 0) {
+      parts.push('<ul class="issue-minor-list">');
+      for (const finding of gh.findings) {
+        parts.push(`<li class="issue-minor">${escapeHtml(finding)}</li>`);
+      }
+      parts.push('</ul>');
     }
   }
 
@@ -1060,9 +1119,11 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
     parts.push(`<div class="metric-row"><span class="metric-label">Disclosure Violations</span><span class="metric-value">${da.violationCount}</span></div>`);
     if (da.epistemicGaps.length > 0) {
       parts.push(`<div class="metric-row sub"><span class="metric-label">Epistemic gaps</span><span class="metric-value">${da.epistemicGaps.length}</span></div>`);
+      parts.push('<ul class="issue-minor-list">');
       for (const gap of da.epistemicGaps.slice(0, 3)) {
         parts.push(`<li class="issue-minor">${escapeHtml(gap.description)}</li>`);
       }
+      parts.push('</ul>');
     }
   }
 
@@ -1078,8 +1139,12 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
   if (report.subplots && report.subplots.totalSubplots > 0) {
     const sp = report.subplots;
     parts.push(`<div class="metric-row"><span class="metric-label">Subplots</span><span class="metric-value">${sp.totalSubplots} (${sp.unresolvedSubplots} unresolved, ${sp.intersectionCount} intersections)</span></div>`);
-    for (const subplot of sp.subplots.slice(0, 5)) {
-      parts.push(`<li class="issue-minor">${escapeHtml(subplot.description)}</li>`);
+    if (sp.subplots.length > 0) {
+      parts.push('<ul class="issue-minor-list">');
+      for (const subplot of sp.subplots.slice(0, 5)) {
+        parts.push(`<li class="issue-minor">${escapeHtml(subplot.description)}</li>`);
+      }
+      parts.push('</ul>');
     }
   }
 
@@ -1088,6 +1153,7 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
     const rb = report.ruleBreaking;
     const deliberate = rb.findings.filter(f => f.readsAsDeliberate).length;
     parts.push(`<div class="metric-row"><span class="metric-label">Rule-Breaking</span><span class="metric-value">${rb.findings.length} findings (${deliberate} deliberate)</span></div>`);
+    parts.push('<ul class="issue-minor-list">');
     for (const finding of rb.findings.slice(0, 4)) {
       const tag = finding.readsAsDeliberate ? 'PRESERVE' : 'CHECK';
       parts.push(
@@ -1097,6 +1163,7 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
         parts.push(`<li class="issue-minor sub">${escapeHtml(c)}</li>`);
       }
     }
+    parts.push('</ul>');
   }
 
   if (parts.length === 0) return '';

@@ -39,7 +39,7 @@
 // (PW_CHROMIUM_PATH is optional — omit it for Playwright's own resolution,
 // the CI path.) Exit codes: 0 = every assertion passed, 1 = at least one failed.
 
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import {
   bootKeylessServer,
   createRecorder,
@@ -1057,6 +1057,210 @@ async function main() {
     }
   }
   await context9.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 10) Gate extension (client-hunter B-11/B-14/B-15, 2026-09-05): the
+  //     shape-rhythm gate above (5/6) proved a scoped, both-themes,
+  //     at-rest audit catches bugs a whole-document sweep misses — these
+  //     three surfaces never got that treatment and each shipped a real
+  //     contrast (or, for 10c, contrast + overflow) bug: B-11 (Ship's
+  //     Versions cards, 1.13-2.45:1 in dark), B-14 (the Slate table's
+  //     health number in light, rows in dark), B-15 (the exported coverage
+  //     HTML's provenance lines at 2.48-3.19:1, and 375px overflow). Each
+  //     step is scoped to the surface's own DOM subtree (auditElement, the
+  //     same convention scrollShapeRhythmIntoView's caller uses above) so
+  //     it measures exactly this surface, not whatever else the viewport
+  //     happens to also contain.
+  // ══════════════════════════════════════════════════════════════════════
+
+  // ── 10a) Ship -> Versions list, two saved versions ──────────────────────
+  console.log('\n=== 10a) Ship panel — Versions list, two saved versions, both themes ===');
+  const context10a = await browser.newContext();
+  const page10a = await context10a.newPage();
+  wireConsoleCapture(page10a, genuineConsoleErrors);
+  await page10a.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  const sampleCta10a = page10a.getByRole('button', { name: /try sample coverage/i }).first();
+  await sampleCta10a.waitFor({ timeout: timing.ms(15000) });
+  await sampleCta10a.click();
+  await waitForRenderedText(page10a, 'CONSIDER', { timeoutMs: 45000 }).catch(() => {});
+  await page10a.waitForTimeout(timing.ms(300));
+
+  const shipBtn10a = page10a.getByRole('button', { name: 'Ship', exact: true }).first();
+  const shipReachable10a = await shipBtn10a.waitFor({ timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+  record('ship-versions-gate', '"Ship" task tab is reachable from the rich sample report', shipReachable10a);
+
+  let versionsSection10a = null;
+  if (shipReachable10a) {
+    await shipBtn10a.click();
+    const saveVersionBtn10a = page10a.getByRole('button', { name: 'Save new script version snapshot', exact: true }).first();
+    for (let i = 0; i < 2; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      const visible = await saveVersionBtn10a.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+      if (!visible) break;
+      // eslint-disable-next-line no-await-in-loop
+      await saveVersionBtn10a.click();
+      const nameInput10a = page10a.getByLabel('Snapshot version name', { exact: true }).first();
+      // eslint-disable-next-line no-await-in-loop
+      await nameInput10a.waitFor({ state: 'visible', timeout: timing.ms(5000) });
+      // Enter confirms the snapshot, same as verify-p2-p3-surfaces.mjs's
+      // identical two-saves-of-the-same-script flow (a genuine tie).
+      // eslint-disable-next-line no-await-in-loop
+      await nameInput10a.press('Enter');
+      // eslint-disable-next-line no-await-in-loop
+      await nameInput10a.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
+    }
+    versionsSection10a = page10a.locator('section[aria-labelledby="ship-versions-heading"]').first();
+    const sectionVisible10a = await versionsSection10a.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+    record('ship-versions-gate', 'section[aria-labelledby="ship-versions-heading"] renders with two saved versions', sectionVisible10a);
+    if (sectionVisible10a) {
+      await auditElement(page10a, versionsSection10a, 'light-ship-versions');
+    }
+  }
+
+  // Dark theme, same section, same two saved versions already on screen —
+  // toggling is a pure .dark class flip (same convention as the
+  // shape-rhythm gate's dark pass), so no re-save is needed.
+  const editor10a = page10a.locator('.cm-content').first();
+  if (await editor10a.count()) await editor10a.focus().catch(() => {});
+  await page10a.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+  await page10a.waitForTimeout(timing.ms(300));
+  const isDark10a = await page10a.evaluate(() => document.documentElement.classList.contains('dark'));
+  record('ship-versions-gate', 'Alt+Shift+D toggles dark mode with the Ship panel open', isDark10a);
+  if (versionsSection10a) {
+    const sectionVisibleDark10a = await versionsSection10a.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+    record('ship-versions-gate', 'section[aria-labelledby="ship-versions-heading"] still renders in dark mode', sectionVisibleDark10a);
+    if (sectionVisibleDark10a) {
+      await auditElement(page10a, versionsSection10a, 'dark-ship-versions');
+    }
+  }
+  await context10a.close();
+
+  // ── 10b) Slate table after a rank (Labs on) ──────────────────────────────
+  console.log('\n=== 10b) Slate table — after ranking two scripts, both themes ===');
+  const context10b = await browser.newContext();
+  const page10b = await context10b.newPage();
+  wireConsoleCapture(page10b, genuineConsoleErrors);
+  await page10b.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch {} });
+  await page10b.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page10b.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page10b.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
+
+  await page10b.getByRole('button', { name: 'More tools' }).first().click();
+  const overflowMenu10b = page10b.getByRole('menu').first();
+  await overflowMenu10b.waitFor({ timeout: timing.ms(5000) });
+  await overflowMenu10b.getByRole('menuitem', { name: /slate/i }).first().click();
+  const slateDialog10b = page10b.getByRole('dialog', { name: /slate/i }).first();
+  const slateOpen10b = await slateDialog10b.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+  record('slate-table-gate', 'Slate panel opens (Labs on)', slateOpen10b);
+
+  let slateTable10b = null;
+  if (slateOpen10b) {
+    // Same real hidden-<input type="file"> drive as
+    // verify-p2-p3-surfaces.mjs's Slate flow — two distinct tiny scripts,
+    // so ranking actually has two rows to show.
+    const fileInput10b = page10b.getByLabel('Add scripts to the slate (.fountain or .txt)', { exact: true });
+    await fileInput10b.setInputFiles([
+      { name: 'gate-a.fountain', mimeType: 'text/plain', buffer: Buffer.from('INT. ROOM - DAY\n\nA person waits.\n\nBOB\nHello.\n') },
+      { name: 'gate-b.fountain', mimeType: 'text/plain', buffer: Buffer.from('INT. OFFICE - NIGHT\n\nA desk. A phone rings.\n\nALICE\nHi.\n') },
+    ]);
+    await page10b.getByText('Scripts (2/20)', { exact: true }).first().waitFor({ timeout: timing.ms(10000) });
+    const rankBtn10b = slateDialog10b.getByRole('button', { name: 'Rank slate', exact: true }).first();
+    await rankBtn10b.waitFor({ state: 'visible', timeout: timing.ms(5000) });
+    await rankBtn10b.click();
+    slateTable10b = page10b.locator('[data-a11y-section="slate-table"]').first();
+    const tableVisible10b = await slateTable10b.waitFor({ state: 'visible', timeout: timing.ms(20000) }).then(() => true).catch(() => false);
+    record('slate-table-gate', '[data-a11y-section="slate-table"] renders after ranking two scripts', tableVisible10b);
+    if (tableVisible10b) {
+      await auditElement(page10b, slateTable10b, 'light-slate-table');
+    }
+  }
+
+  await page10b.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+  await page10b.waitForTimeout(timing.ms(300));
+  const isDark10b = await page10b.evaluate(() => document.documentElement.classList.contains('dark'));
+  record('slate-table-gate', 'Alt+Shift+D toggles dark mode with the Slate panel open', isDark10b);
+  if (slateTable10b) {
+    const tableVisibleDark10b = await slateTable10b.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+    record('slate-table-gate', '[data-a11y-section="slate-table"] still renders in dark mode', tableVisibleDark10b);
+    if (tableVisibleDark10b) {
+      await auditElement(page10b, slateTable10b, 'dark-slate-table');
+    }
+  }
+  await context10b.close();
+
+  // ── 10c) Exported coverage HTML, opened from file://, both themes ───────
+  console.log('\n=== 10c) Exported coverage HTML — file://, light + dark, at rest, 375px overflow ===');
+  const context10c = await browser.newContext();
+  const page10c = await context10c.newPage();
+  wireConsoleCapture(page10c, genuineConsoleErrors);
+  await page10c.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  const sampleCta10c = page10c.getByRole('button', { name: /try sample coverage/i }).first();
+  await sampleCta10c.waitFor({ timeout: timing.ms(15000) });
+  await sampleCta10c.click();
+  await waitForRenderedText(page10c, 'CONSIDER', { timeoutMs: 45000 }).catch(() => {});
+  await page10c.waitForTimeout(timing.ms(300));
+  const fullReportBtn10c = page10c.getByRole('button', { name: 'Full report', exact: true }).first();
+  if (await fullReportBtn10c.count()) {
+    await fullReportBtn10c.click();
+    await page10c.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) }).catch(() => {});
+  }
+  await page10c.waitForTimeout(timing.ms(500));
+  // The accessible name is the aria-label ("Export coverage report as an
+  // HTML document"), not the visible "Export report" text — aria-label
+  // overrides the computed accessible name (ScriptDoctorPanel.tsx).
+  const exportBtn10c = page10c.getByRole('button', { name: 'Export coverage report as an HTML document', exact: true }).first();
+  const exportReachable10c = (await exportBtn10c.count()) > 0;
+  record('coverage-html-gate', 'Export coverage report button is reachable from the rich sample report', exportReachable10c);
+
+  let exportedPath10c = null;
+  if (exportReachable10c) {
+    const [download10c] = await Promise.all([
+      page10c.waitForEvent('download', { timeout: timing.ms(20000) }),
+      exportBtn10c.click(),
+    ]);
+    // saveAs to a real .html path — Playwright's own download tmp file has
+    // no extension, so file:// navigation to it renders as plain text
+    // (Chromium sniffs content type from the extension), never reaching
+    // the actual markup this gate exists to audit. Measured live during
+    // development: without this, axe/overflow both silently no-op on an
+    // escaped-text <pre> block instead of the real document.
+    exportedPath10c = `${OUT_DIR}/verify-a11y-exported-coverage.html`;
+    await download10c.saveAs(exportedPath10c);
+  }
+  await context10c.close();
+
+  if (exportedPath10c) {
+    const exportedBytes = readFileSync(exportedPath10c, 'utf8').length;
+    record('coverage-html-gate', 'the exported HTML file is non-empty', exportedBytes > 0, `${exportedBytes} bytes`);
+
+    // Light theme, at rest — 375px viewport (the finding's own overflow
+    // check width) so the horizontal-overflow assertion below means what
+    // it says. axe's color-contrast rule is viewport-size-independent.
+    const context10cLight = await browser.newContext({ viewport: { width: 375, height: 800 } });
+    const pageLight10c = await context10cLight.newPage();
+    wireConsoleCapture(pageLight10c, genuineConsoleErrors);
+    await pageLight10c.goto(`file://${exportedPath10c}`, { waitUntil: 'load', timeout: timing.ms(15000) });
+    await waitForDomQuiet(pageLight10c, { quietMs: 150, timeoutMs: 2000 });
+    await auditSurface(pageLight10c, 'light-exported-coverage-html');
+    const overflowLight10c = await pageLight10c.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    record('coverage-html-gate', 'light theme: no horizontal overflow at 375px (documentElement.scrollWidth <= clientWidth)', !overflowLight10c);
+    await context10cLight.close();
+
+    // Dark — this export deliberately has no prefers-color-scheme rules (a
+    // fixed-palette, print-like document — see coverage-html.ts's STYLES
+    // header), so rendering is expected to be identical to light; asserted
+    // anyway so a future dark-mode addition to this template is covered
+    // from day one instead of shipping un-audited the way this surface did.
+    const context10cDark = await browser.newContext({ viewport: { width: 375, height: 800 }, colorScheme: 'dark' });
+    const pageDark10c = await context10cDark.newPage();
+    wireConsoleCapture(pageDark10c, genuineConsoleErrors);
+    await pageDark10c.goto(`file://${exportedPath10c}`, { waitUntil: 'load', timeout: timing.ms(15000) });
+    await waitForDomQuiet(pageDark10c, { quietMs: 150, timeoutMs: 2000 });
+    await auditSurface(pageDark10c, 'dark-exported-coverage-html');
+    const overflowDark10c = await pageDark10c.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    record('coverage-html-gate', 'dark (prefers-color-scheme): no horizontal overflow at 375px', !overflowDark10c);
+    await context10cDark.close();
+  }
 
   // ── Console errors, same convention as the rest of the browser battery. ─
   if (genuineConsoleErrors.length > 0) {

@@ -430,10 +430,22 @@ export default function SnapshotManager({
 
   return (
     <>
+      {/* a11y fix (2026-09-05, client-hunter follow-up, item 4a): ShipPanel.tsx
+          already wraps this whole component in
+          `<section aria-labelledby="ship-versions-heading">` — but nothing in
+          the tree carried that id, so the reference resolved to nothing (a
+          dangling aria-labelledby gives the region NO accessible name at
+          all, silently — worse than omitting aria-labelledby, since a
+          screen reader can't fall back to anything). This heading is the
+          section's only heading, so it takes the id ShipPanel.tsx already
+          expects, closing that gap. A second, nested `<section>` here (this
+          used to have one) would just duplicate ShipPanel's landmark with
+          the identical name — a plain `<div>` is correct once the outer
+          section already exists. */}
       {!hideList && (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-sm font-bold uppercase tracking-widest">
+          <h2 id="ship-versions-heading" className="text-sm font-bold uppercase tracking-widest">
             Script Snapshots
           </h2>
           <button
@@ -463,7 +475,21 @@ export default function SnapshotManager({
           {snapshots.map((s, i) => (
             <div
               key={s.id}
-              className="bg-white dark:bg-zinc-800 p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] flex justify-between items-center"
+              // a11y fix (2026-09-05, client-hunter B-11): this card used to
+              // be `bg-white dark:bg-zinc-800` — a REAL dark background in
+              // dark mode — while every text node inside it (the version
+              // name, the health/verdict badge, the date, the percentile
+              // and draft-rank lines) is a light-theme `--sm-ink`/
+              // `--sm-ink-mute` design-system token, which never changes
+              // for the dark toggle. Measured live (⌥⇧D): 13 of 13 text
+              // nodes on this card fell to 1.13-2.45:1 in dark mode against
+              // 6.07-16.78:1 in light. `--sm-panel-2` is the SAME
+              // theme-invariant token `.sm-card` (design-system.css) uses —
+              // it never goes dark, so the light-theme ink tokens already
+              // used throughout this card are correct in BOTH themes. See
+              // design-system.css's header for the write-up of this
+              // convention (theme-invariant OR fully-themed, never mixed).
+              className="bg-[var(--sm-panel-2)] p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] flex justify-between items-center"
             >
               <div>
                 <div className="font-bold uppercase text-xs">{s.name}</div>

@@ -791,3 +791,105 @@ describe('renderCoverageHtml — structural reliability note stays in sync with 
     assert.ok(!html.includes('<div class="footer-caveat">'));
   });
 });
+
+// ── Rendered contrast (client-hunter B-15, 2026-09-05) ─────────────────────
+// This module has no DOM/browser access (it is pure string templating), so
+// this is a Node-side WCAG 2 relative-luminance/contrast computation over
+// the exact colour literals this renderer emits, checked against the exact
+// background each one is actually painted on. The three pairs below are
+// documented explicitly rather than swept generically because they are the
+// ones B-15 measured as failing (2.48-3.19:1) before this fix:
+//   1. `.dim-basis` (the "Based on N issues across M passes…" / "The N
+//      findings below…" provenance lines) on `.page`'s background — the
+//      lines the report's third-party-verifiability claim (ROADMAP P3)
+//      rests on.
+//   2. The same `.dim-basis` colour on `body`'s background, in case a
+//      future change ever renders it outside `.page` (defensive — today it
+//      never does, but the colour itself must hold on both).
+//   3. A scene heatmap cell with a MAJOR (not critical/minor) issue — its
+//      white text measured 3.19:1 on the pre-fix `#d97706`; this is the
+//      literal, driven "11" figure the finding named.
+// A failure here means the SOURCE LITERAL regressed, not a rendering fluke.
+describe('renderCoverageHtml — rendered contrast (WCAG AA, client-hunter B-15)', () => {
+  function hexToRgb(hex: string): [number, number, number] {
+    const clean = hex.replace('#', '');
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16),
+    ];
+  }
+
+  function relativeLuminance([r, g, b]: [number, number, number]): number {
+    const chan = (c: number) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    const [R, G, B] = [chan(r), chan(g), chan(b)];
+    return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  }
+
+  function contrastRatio(hexA: string, hexB: string): number {
+    const lA = relativeLuminance(hexToRgb(hexA));
+    const lB = relativeLuminance(hexToRgb(hexB));
+    const [hi, lo] = lA > lB ? [lA, lB] : [lB, lA];
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  const AA_TEXT_MINIMUM = 4.5;
+
+  it('the .dim-basis provenance colour clears 4.5:1 on .page (#fffdf9) and body (#f4f2ec)', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait');
+
+    const dimBasisMatch = html.match(/\.dim-basis\s*\{[^}]*color:\s*(#[0-9a-fA-F]{6})/);
+    assert.ok(dimBasisMatch, 'expected a .dim-basis { ... color: #xxxxxx ... } rule in the emitted <style>');
+    const dimBasisColor = dimBasisMatch![1];
+
+    const pageMatch = html.match(/\.page\s*\{[^}]*background:\s*(#[0-9a-fA-F]{6})/);
+    assert.ok(pageMatch, 'expected a .page { ... background: #xxxxxx ... } rule');
+    const pageBg = pageMatch![1];
+
+    const bodyMatch = html.match(/\bbody\s*\{[^}]*background:\s*(#[0-9a-fA-F]{6})/);
+    assert.ok(bodyMatch, 'expected a body { ... background: #xxxxxx ... } rule');
+    const bodyBg = bodyMatch![1];
+
+    // Sanity: this must actually be the .dim-basis line found "Based on …"
+    // is genuinely painted with — confirm the report renders at least one.
+    assert.match(html, /Based on \d+ issues? across \d+ pass/);
+
+    const onPage = contrastRatio(dimBasisColor, pageBg);
+    const onBody = contrastRatio(dimBasisColor, bodyBg);
+    assert.ok(
+      onPage >= AA_TEXT_MINIMUM,
+      `.dim-basis ${dimBasisColor} on .page ${pageBg} measured ${onPage.toFixed(2)}:1, below the ${AA_TEXT_MINIMUM}:1 AA text minimum`,
+    );
+    assert.ok(
+      onBody >= AA_TEXT_MINIMUM,
+      `.dim-basis ${dimBasisColor} on body ${bodyBg} measured ${onBody.toFixed(2)}:1, below the ${AA_TEXT_MINIMUM}:1 AA text minimum`,
+    );
+  });
+
+  it('a MAJOR-severity scene heatmap cell\'s white number clears 4.5:1 on its own background', () => {
+    const report = buildReport({
+      sceneHeatmap: [
+        { sceneIdx: 0, slug: 'INT. MAJOR ONLY - DAY', issueCount: 1, critical: 0, major: 1, minor: 0 },
+      ],
+    });
+    const html = renderCoverageHtml(report, 'The Long Wait');
+
+    const heatCellMatch = html.match(
+      /<div class="heat-cell" style="background:(#[0-9a-fA-F]{6}); color:(#[0-9a-fA-F]{3,6}|#fff);"[^>]*>1<\/div>/,
+    );
+    assert.ok(heatCellMatch, 'expected exactly one heat-cell rendering "1" (sceneIdx 0 + 1) for the major-only scene');
+    const [, cellBg, cellFgRaw] = heatCellMatch!;
+    // '#fff' is valid CSS but not a 6-digit hex my helper parses — expand it.
+    const cellFg = cellFgRaw === '#fff' ? '#ffffff' : cellFgRaw;
+
+    const ratio = contrastRatio(cellFg, cellBg);
+    assert.ok(
+      ratio >= AA_TEXT_MINIMUM,
+      `major heat-cell text ${cellFg} on ${cellBg} measured ${ratio.toFixed(2)}:1, below the ${AA_TEXT_MINIMUM}:1 AA text minimum`,
+    );
+  });
+});

@@ -114,12 +114,25 @@ function gradeFromHealth(health: number): DoctorGrade {
   return "troubled";
 }
 
+// a11y fix (2026-09-05, client-hunter B-14): the ranked table's rows are now
+// theme-invariant (--sm-panel/--sm-panel-2, see the table markup below), so
+// every band colour here only ever needs to clear 4.5:1 against those two
+// LIGHT backgrounds — never against a dark row, because there no longer is
+// one. The previous ramp (green-600/amber-500/red-500/red-700) was picked
+// for a WHITE background and measured 1.86-3.32:1 against panel/panel2 —
+// amber-500 (the "solid" band, i.e. the health NUMBER itself) was the
+// specific 2.04-2.13:1 failure this fix closes. Each replacement below
+// clears both panel (#f4efe2) and panel2 (#efe8d7) at 5.80:1 or better
+// (measured via the OKLCH->sRGB conversion in
+// /tmp/.../scratchpad/contrast/check.mjs, reproducible from Tailwind's own
+// theme.css color stops) while keeping the same green/amber/red semantic
+// per band, just darkened.
 const GRADE_TEXT_CLASS: Record<DoctorGrade, string> = {
-  excellent: "text-green-600",
-  strong: "text-green-600",
-  solid: "text-amber-500",
-  uneven: "text-red-500",
-  troubled: "text-red-700",
+  excellent: "text-green-800",
+  strong: "text-green-800",
+  solid: "text-amber-800",
+  uneven: "text-red-700",
+  troubled: "text-red-800",
 };
 
 const VERDICT_CHIP: Record<
@@ -128,7 +141,14 @@ const VERDICT_CHIP: Record<
 > = {
   RECOMMEND: {
     label: "Recommend",
-    bg: "bg-green-600",
+    // a11y fix (2026-09-05, B-14 follow-on): white text on bg-green-600
+    // measured 3.22:1 — found auditing this table's other health-band
+    // colours, not itself named in the original finding, but the same
+    // class of bug on the same table. bg-green-700 clears 4.5:1 (4.95:1)
+    // with the identical white label text; this chip's own background
+    // travels with it regardless of the row's theme, so this is
+    // independent of the row-background fix above.
+    bg: "bg-green-700",
     text: "text-white",
     title: "The deterministic engine placed this draft in its top verdict tier — a measurement, not a human-reader endorsement.",
   },
@@ -642,7 +662,13 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                   (server/lib/slate.ts) already carries. */}
               <span className="normal-case tracking-normal"> &middot; Shape &amp; Rhythm column is descriptive only — not part of the score or this ranking</span>
             </p>
-            <div className="overflow-x-auto sm-btn">
+            {/* a11y fix (2026-09-05, client-hunter B-14): data-a11y-section
+                is a scoping hook for scripts/verify-a11y.mjs, matching the
+                convention ScriptDoctorPanel.tsx's
+                data-a11y-section="shape-rhythm" already established — axe's
+                color-contrast rule needs a scoped subtree, not the whole
+                document, to measure exactly this table's own bugs. */}
+            <div className="overflow-x-auto sm-btn" data-a11y-section="slate-table">
               <table className="w-full text-xs font-mono border-collapse">
                 <thead>
                   <tr className="sm-btn--ink">
@@ -673,13 +699,30 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                     // that is not a real score. Badge them "incomplete" and
                     // suppress the derived score/verdict/percentile cells.
                     const incomplete = entry.analysisComplete !== true;
+                    // a11y fix (2026-09-05, client-hunter B-14): rows used to
+                    // be `bg-white dark:bg-zinc-900` / `bg-gray-50
+                    // dark:bg-zinc-800` — a REAL dark background in dark
+                    // mode — while the "#"/Title cells inherit `.sm-btn`'s
+                    // theme-invariant `color:var(--sm-ink)` and every other
+                    // cell used a `text-gray-500 dark:text-gray-400` (or
+                    // similar) pair. Measured live (⌥⇧D, 2 ranked scripts):
+                    // 6 of 36 nodes fell to 1.06-1.13:1 in dark mode. The
+                    // rows now sit on the SAME theme-invariant tokens
+                    // `.sm-card` uses (--sm-panel/--sm-panel-2,
+                    // design-system.css) — see that file's header for the
+                    // write-up of this convention — so every text colour
+                    // below only ever needs to clear 4.5:1 against those two
+                    // LIGHT backgrounds, and the `dark:` variants that used
+                    // to pair with a real dark row are dropped rather than
+                    // left to mismatch it.
+                    const rowBg = i % 2 === 0 ? "bg-[var(--sm-panel)]" : "bg-[var(--sm-panel-2)]";
                     if (incomplete) {
                       return (
                         <tr
                           key={entry.contentHash ?? `${entry.title}-${i}`}
-                          className={i % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-gray-50 dark:bg-zinc-800"}
+                          className={rowBg}
                         >
-                          <td className="px-2 py-2 font-bold text-gray-400">—</td>
+                          <td className="px-2 py-2 font-bold text-[var(--sm-ink-mute)]">—</td>
                           <td
                             className="px-2 py-2 truncate max-w-[160px]"
                             title={entry.contentHash ? `contentHash: ${entry.contentHash}` : undefined}
@@ -687,20 +730,20 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                             {entry.title}
                           </td>
                           <td className="px-2 py-2">
-                            <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-gray-200 text-gray-600 dark:bg-zinc-700 dark:text-gray-300">
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-gray-200 text-gray-600">
                               Incomplete
                             </span>
                           </td>
-                          <td className="px-2 py-2 text-gray-400">—</td>
-                          <td className="px-2 py-2 text-gray-400">—</td>
-                          <td className="px-2 py-2 text-gray-500 dark:text-gray-400">
+                          <td className="px-2 py-2 text-[var(--sm-ink-mute)]">—</td>
+                          <td className="px-2 py-2 text-[var(--sm-ink-mute)]">—</td>
+                          <td className="px-2 py-2 text-[var(--sm-ink-mute)]">
                             {entry.totalSceneCount !== undefined
                               ? `${entry.sceneCount.toLocaleString()} of ${entry.totalSceneCount.toLocaleString()} scenes analyzed`
                               : `${entry.sceneCount.toLocaleString()} scenes analyzed before analysis became incomplete`}
                           </td>
-                          <td className="px-2 py-2 text-gray-400">—</td>
-                          <td className="px-2 py-2 text-gray-400">—</td>
-                          <td className="px-2 py-2 text-gray-400">—</td>
+                          <td className="px-2 py-2 text-[var(--sm-ink-mute)]">—</td>
+                          <td className="px-2 py-2 text-[var(--sm-ink-mute)]">—</td>
+                          <td className="px-2 py-2 text-[var(--sm-ink-mute)]">—</td>
                         </tr>
                       );
                     }
@@ -709,7 +752,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                     return (
                       <tr
                         key={entry.contentHash ?? `${entry.title}-${i}`}
-                        className={i % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-gray-50 dark:bg-zinc-800"}
+                        className={rowBg}
                       >
                         <td className="px-2 py-2 font-bold">{i + 1}</td>
                         <td
@@ -730,11 +773,11 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                               {verdictMeta.label}
                             </span>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-[var(--sm-ink-mute)]">—</span>
                           )}
                         </td>
                         <td
-                          className="px-2 py-2 text-gray-500 dark:text-gray-400"
+                          className="px-2 py-2 text-[var(--sm-ink-mute)]"
                           title={
                             typeof entry.healthPercentile === "number"
                               ? exactRankTooltip(entry.healthPercentile)
@@ -745,17 +788,17 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                             ? percentileBand(entry.healthPercentile)
                             : "—"}
                         </td>
-                        <td className="px-2 py-2 text-gray-500 dark:text-gray-400">
+                        <td className="px-2 py-2 text-[var(--sm-ink-mute)]">
                           {entry.sceneCount} / {entry.wordCount.toLocaleString()}
                         </td>
-                        <td className="px-2 py-2 text-green-700 dark:text-green-400">
+                        <td className="px-2 py-2 text-green-800">
                           {entry.topDimension ?? "—"}
                         </td>
-                        <td className="px-2 py-2 text-red-700 dark:text-red-400">
+                        <td className="px-2 py-2 text-red-700">
                           {entry.weakestDimension ?? "—"}
                         </td>
                         <td
-                          className="px-2 py-2 text-gray-500 dark:text-gray-400"
+                          className="px-2 py-2 text-[var(--sm-ink-mute)]"
                           title="Descriptive only — not part of the score or this ranking"
                         >
                           {typeof entry.meanAbsDialogueShareDelta === "number"

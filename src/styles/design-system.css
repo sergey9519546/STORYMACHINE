@@ -12,6 +12,34 @@
  * point at woff2 files vendored under public/fonts/ (served at the site root),
  * with Inter/system + cursive kept only as fallbacks in --sm-font-body /
  * --sm-font-hand for the brief pre-load window.
+ *
+ * THEME CONVENTION (written down 2026-09-05 after client-hunter B-11/B-14
+ * found the same bug shipped in both directions on two different panels):
+ * every --sm-* token above (panel/panel-2/ink/ink-mute/ink-faint/hair/etc.)
+ * is THEME-INVARIANT — dark mode (the `.dark` class, toggled by Alt+Shift+D)
+ * never changes what any of them resolve to. A surface built on this system
+ * must pick exactly ONE of two shapes and never blend them:
+ *   (1) THEME-INVARIANT — background AND text both come from --sm-* tokens,
+ *       no `dark:` variant on either. This is the default for anything using
+ *       .sm-panel/.sm-card/--sm-panel-2/--sm-ink/--sm-ink-mute — it already
+ *       reads correctly in both themes with zero extra classes.
+ *   (2) FULLY THEMED — background AND text both carry a real `dark:` pair
+ *       (e.g. `bg-white dark:bg-zinc-900` with `text-black dark:text-white`,
+ *       or per-node `text-gray-500 dark:text-gray-400`) so the two travel
+ *       together as the toggle flips.
+ * The bug in both directions is picking a --sm-* (invariant) TEXT token and
+ * pairing it with a `dark:` (themed) BACKGROUND, or the reverse — the two
+ * halves silently drift apart the moment dark mode is active, because only
+ * one of them actually reacts to the toggle. B-11 (SnapshotManager.tsx's
+ * version cards) was invariant ink on a real dark card: 1.13-2.45:1.
+ * The Shape & Rhythm fix in the same batch was the mirror image: `dark:`
+ * text on a background that stayed invariant. Before adding a new surface
+ * or column, grep the element's own background class and its text class
+ * together — if one carries `dark:` and the other doesn't, that pairing is
+ * the defect, not a style choice. tests/core/theme-convention.test.ts is a
+ * source-level scan that now catches the most common instance of this
+ * automatically (a `dark:bg-*` class alongside `text-black` or
+ * `text-[var(--sm-ink` in the same element's className) — see that file.
  */
 
 :root {
