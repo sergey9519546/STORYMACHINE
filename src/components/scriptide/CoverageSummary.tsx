@@ -179,6 +179,28 @@ export default function CoverageSummary({
   const [streamProgress, setStreamProgress] = useState<DoctorStreamProgress | null>(null);
   const genRef = useRef(0);
   const sampleFired = useRef(false);
+  // PROVENANCE IS A PROPERTY OF THE RUN (B-4 review fix, 2026-09-05). The
+  // sample's own identity used to live only in the mount effect's control
+  // flow: once `sampleFired` was set, EVERY later evaluation of that effect
+  // fell through to a plain `void run()`, which re-analysed the sample text
+  // now sitting in the editor and handed the result up as
+  // `isSample: false` — overwriting the correctly-flagged report. Two
+  // triggers reached it: StrictMode's dev remount, and (in dev AND in a
+  // production build) the genuine dependency change when installing the
+  // sample flips `doctorAutoSample` to false. The consequences were all
+  // downstream of that one lie: the demo was written into the writer's real
+  // Draft History, the panel's `analyzedIsSample` came up false so "Verify my
+  // rewrite" was offered on a script that is not the writer's, and the golden
+  // path paid for two full 14-pass analyses instead of one.
+  //
+  // These two refs make the run itself the source of truth: `sampleRunRef`
+  // remembers that the report on screen came from the sample, and
+  // `lastRunTextRef` remembers exactly which text was last submitted, so a
+  // re-evaluation of the effect cannot re-run (or re-label) work already
+  // done. Both are refs, not state: they must be readable synchronously
+  // inside the effect that fires on the same commit.
+  const sampleRunRef = useRef(false);
+  const lastRunTextRef = useRef<string | null>(null);
   // G0-02: false once the panel unmounts (Coverage closed mid-flight), so a
   // late response can't invoke parent callbacks over a torn-down editor.
   const aliveRef = useRef(true);
@@ -209,6 +231,12 @@ export default function CoverageSummary({
         return;
       }
       const gen = ++genRef.current;
+      // Claimed before the request goes out, so the effect below can see that
+      // this exact text is already being analyzed (and by what kind of run)
+      // without waiting for the response.
+      const isSampleRun = !!override?.sample;
+      sampleRunRef.current = isSampleRun;
+      lastRunTextRef.current = text;
       // G0-02: draft version this request is measuring. Compared at resolution
       // so edits made during flight invalidate the result.
       const startDraftGen = getDraftGeneration?.() ?? 0;
@@ -261,11 +289,11 @@ export default function CoverageSummary({
         // is told to re-run against their current draft.
         const stale = !aliveRef.current || isDraftStale(startDraftGen, getDraftGeneration?.() ?? startDraftGen);
         setReport(data);
-        setUsingSample(!!override?.sample);
+        setUsingSample(isSampleRun);
         setStatus("success");
         if (stale) return;
         onFreshReport?.();
-        if (override?.sample && onLoadSampleIntoEditor) {
+        if (isSampleRun && onLoadSampleIntoEditor && override) {
           onLoadSampleIntoEditor(override.fountain);
         }
         // W4: hand the computed report up so "Full report" can thread it into
@@ -288,7 +316,7 @@ export default function CoverageSummary({
           generation: getDraftGeneration?.() ?? startDraftGen,
           title: override?.title ?? title ?? "Untitled",
           fountain: override?.fountain ?? fountain,
-          isSample: !!override?.sample,
+          isSample: isSampleRun, // the RUN's own provenance — see sampleRunRef
         });
       } catch (e) {
         if (gen !== genRef.current) return;
@@ -333,6 +361,25 @@ export default function CoverageSummary({
       });
       return;
     }
+    // B-4 (2026-09-05): the fallthrough is GUARDED now. Two conditions, both
+    // measured on the golden path rather than reasoned about:
+    //
+    //   - a sample run already owns this panel's report. Re-running it as a
+    //     plain (non-sample) run is what downgraded the report's provenance to
+    //     `isSample: false` and planted the demo in the writer's Draft
+    //     History. The writer's own re-run affordance ("Re-run") calls `run`
+    //     directly and is unaffected; this guard is only about the effect
+    //     re-firing on a dependency change.
+    //   - the text that would be submitted is byte-identical to the text the
+    //     last run already submitted. The doctor is deterministic on its
+    //     input, so that request can only produce the report already on
+    //     screen — at the cost of a second full 14-pass analysis (the golden
+    //     path measurably paid for two).
+    //
+    // Anything genuinely new — a different draft, a remount into a fresh
+    // component instance — still runs, exactly as before.
+    if (sampleRunRef.current) return;
+    if (lastRunTextRef.current !== null && lastRunTextRef.current === fountain.trim()) return;
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLoadSample]);

@@ -40,6 +40,7 @@ import {
   launchChromium,
   pickFreePort,
   shutdown,
+  waitForDomQuiet,
   waitForRenderedText,
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
@@ -56,6 +57,12 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 // rounding relationship the prior EXPECT.health: 69 had to the old exported
 // 68.9).
 const EXPECT = { verdict: 'CONSIDER', health: 78, minScenes: 12 };
+
+// The honest draft-rank line the panel must render for the built-in sample
+// instead of ranking a demo among the writer's own drafts (B-6, 2026-09-05).
+// Kept verbatim here so a copy edit that quietly drops the line fails this
+// gate rather than passing unnoticed.
+const SAMPLE_NOT_RANKED = 'The sample is not ranked against your drafts';
 
 let serverProc = null;
 let browser = null;
@@ -81,6 +88,22 @@ async function main() {
   const page = await browser.newPage();
   wireConsoleCapture(page, genuineErrors);
 
+  // B-4/B-5/B-6 golden-path provenance guards (2026-09-05). Every POST to the
+  // doctor's streaming route is counted here, before the first click, because
+  // the two defects this gate now blocks are both invisible in the rendered
+  // report: the sample used to be analysed TWICE (a second, unflagged run
+  // fired from CoverageSummary's effect once `doctorAutoSample` flipped
+  // false), and that second run's report carried `isSample: false` — which
+  // planted the demo in the writer's real Draft History and unlocked
+  // "Verify my rewrite" on a script that is not theirs. Counting requests and
+  // reading localStorage is the only way to see either from the outside.
+  const doctorStreamPosts = [];
+  page.on('request', (req) => {
+    if (req.method() === 'POST' && req.url().includes('/api/scriptide/doctor/stream')) {
+      doctorStreamPosts.push(req.url());
+    }
+  });
+
   console.log(`[smoke] loading ${BASE} ...`);
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
@@ -101,7 +124,90 @@ async function main() {
   if (!okHealth) throw new Error(`report did not render health ~${EXPECT.health}`);
   console.log(`[smoke] report rendered: verdict=${EXPECT.verdict}, health~${EXPECT.health}.`);
 
-  // 4. Console-error gate.
+  // 4. The golden path continues into the full report — the door 100% of
+  // first-time writers use. Everything below is asserted on THAT panel.
+  const fullReport = page.getByRole('button', { name: 'Full report', exact: true }).first();
+  await fullReport.click({ timeout: timing.ms(15000) });
+  await page.waitForSelector('[role="dialog"]', { timeout: timing.ms(15000) });
+  // Returns the body whether or not the line appears; 4c below reports its absence.
+  await waitForRenderedText(page, SAMPLE_NOT_RANKED, { timeoutMs: 20000 });
+  await waitForDomQuiet(page, { quietMs: 400, timeoutMs: timing.ms(8000) });
+  const panelText = (await page.textContent('body')) ?? '';
+
+  // Every provenance assertion below is COLLECTED rather than thrown one at a
+  // time: these failures share one root cause (a second, unflagged run of the
+  // sample), and whoever debugs a red gate needs to see all of them in one
+  // run, not peel them off one build at a time.
+  const problems = [];
+
+  // 4a. The demo must never be written into the writer's own Draft History.
+  const storedHistory = await page.evaluate(() => {
+    try {
+      return localStorage.getItem('sm_doctor_history_v1');
+    } catch {
+      return 'ERR';
+    }
+  });
+  const historyEntries = (() => {
+    if (!storedHistory || storedHistory === 'ERR') return [];
+    try {
+      const parsed = JSON.parse(storedHistory);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+  if (historyEntries.length !== 0) {
+    problems.push(
+      `the built-in sample was recorded into Draft History (sm_doctor_history_v1 holds ${historyEntries.length}: `
+      + `${historyEntries.map((e) => `${e && e.title}@${e && e.health}`).join(', ')}) - it is a demo, not the writer's draft`,
+    );
+  } else {
+    console.log('[smoke] Draft History is empty after the sample golden path (sm_doctor_history_v1 unset).');
+  }
+
+  // 4b. One analysis, not two.
+  if (doctorStreamPosts.length !== 1) {
+    problems.push(
+      `the sample was analysed ${doctorStreamPosts.length} time(s) on the golden path; exactly 1 POST `
+      + '/api/scriptide/doctor/stream is expected (a second run re-pays the whole 14-pass analysis and '
+      + "overwrites the report's sample provenance)",
+    );
+  } else {
+    console.log('[smoke] exactly one POST /api/scriptide/doctor/stream on the golden path.');
+  }
+
+  // 4c. The sample is never ranked among the writer's own drafts, and says so
+  // rather than silently omitting the line.
+  if (!panelText.includes(SAMPLE_NOT_RANKED)) {
+    problems.push(`the sample report does not carry the honest draft-rank line ("${SAMPLE_NOT_RANKED}")`);
+  }
+  if (/Rank among your drafts:/.test(panelText)) {
+    problems.push("the sample report ranks the demo among the writer's own drafts");
+  }
+  if (panelText.includes(SAMPLE_NOT_RANKED) && !/Rank among your drafts:/.test(panelText)) {
+    console.log(`[smoke] draft-rank line on the sample: "${SAMPLE_NOT_RANKED}".`);
+  }
+
+  // 4d. "Verify my rewrite" is withheld on the sample from THIS entry point
+  // too (the panel-loaded sample already withheld it; the threaded one did
+  // not, because the guard read `uploadedFile`, which is null here).
+  const verifyBtn = page.getByRole('button', { name: /verify my rewrite/i }).first();
+  if ((await verifyBtn.count()) > 0) {
+    if (!(await verifyBtn.isDisabled())) {
+      problems.push('"Verify my rewrite" is offered on the built-in sample (StartScreen entry point)');
+    } else if (!/built-in sample script, not your draft/.test(panelText)) {
+      problems.push('"Verify my rewrite" is withheld on the sample without saying why');
+    } else {
+      console.log('[smoke] "Verify my rewrite" is withheld on the sample, with a reason.');
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`${problems.length} golden-path provenance failure(s):\n  - ` + problems.join('\n  - '));
+  }
+
+  // 5. Console-error gate.
   if (genuineErrors.length > 0) {
     throw new Error(`${genuineErrors.length} genuine console error(s):\n  - ` + genuineErrors.slice(0, 5).join('\n  - '));
   }

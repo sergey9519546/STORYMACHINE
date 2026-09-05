@@ -628,11 +628,27 @@ async function main() {
   // which is the thing this assertion actually cares about, with a
   // timeout budget generous enough for a real run (matches the old
   // waitForResponse's 30s allowance).
-  const verdictRendered = await pageA
-    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: timing.ms(30000) })
+  //
+  // 2026-09-05: this wait used to poll `document.body.innerText` for
+  // /RECOMMEND|CONSIDER|PASS/ across the WHOLE page, and innerText reflects
+  // CSS text-transform — so the loading line "Running pass 1 of 14…", rendered
+  // uppercase, satisfied it. The suite then clicked "Full report" DURING the
+  // sample run, unmounting CoverageSummary mid-flight (its own `stale` guard
+  // then correctly refuses to install the sample or hand the report up), and
+  // asserted the hydration contract against a panel that had nothing to
+  // hydrate from. Wait for the summary's OWN "Full report" button instead —
+  // it renders only once a report is on screen — and read the verdict from
+  // the summary panel alone, where no progress copy lives. Caught by driving
+  // it: [debug] "verdict-wait matched line: RUNNING PASS 1 OF 14…".
+  const summaryPanel = pageA.locator('aside[role="region"]');
+  const summaryFullReportBtn = summaryPanel.getByRole('button', { name: 'Full report', exact: true }).first();
+  const summaryReportRendered = await summaryFullReportBtn
+    .waitFor({ state: 'visible', timeout: timing.ms(30000) })
     .then(() => true)
     .catch(() => false);
-  record('P3', 'Sample coverage produces a rendered verdict (Doctor reachable end to end)', verdictRendered, 'checked CoverageSummary body for a verdict word');
+  const summaryText = summaryReportRendered ? await summaryPanel.first().innerText() : '';
+  const verdictRendered = summaryReportRendered && /RECOMMEND|CONSIDER|PASS/.test(summaryText);
+  record('P3', 'Sample coverage produces a rendered verdict (Doctor reachable end to end)', verdictRendered, `summary panel verdict text present=${verdictRendered}`);
 
   const fullReportBtn = pageA.getByRole('button', { name: 'Full report', exact: true }).first();
   // W4 (docs/PATH_TO_EXCELLENCE.md Phase W): "Full report" used to unmount
@@ -671,7 +687,6 @@ async function main() {
   );
   await pageA.waitForTimeout(timing.ms(400));
 
-
   const [download] = await Promise.all([
     pageA.waitForEvent('download', { timeout: timing.ms(20000) }),
     exportBtn.click(),
@@ -694,18 +709,34 @@ async function main() {
     'Exported coverage HTML carries the health-percentile line (same denominator copy as the panel)',
     exportedHtmlHasPercentileLine,
   );
-  const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // The rank sentence is built from the SHARED copy helpers
+  // (src/lib/draft-rank-copy.ts), never a literal in this file — the browser
+  // gate must move with the copy, not pin an older version of it.
+  const reEscape = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const rankedDraftRankLineRe = new RegExp(
     `Rank among your drafts: (?:tied )?\\w+ of \\d+ ${reEscape(draftRankDenominatorLabel())} \\(by health\\)`,
   );
   const firstDraftRankLineRe = new RegExp(
     `First saved draft — rank among your drafts appears after ${reEscape(draftRankNextOpportunityLabel())}`,
   );
-  const exportedHtmlHasDraftRankLine = rankedDraftRankLineRe.test(exportedHtml) || firstDraftRankLineRe.test(exportedHtml);
+  // 2026-09-05 (B-6): this download is of the built-in SAMPLE (the golden
+  // path threads it in from StartScreen). A demo is not one of the writer's
+  // drafts, so it carries no rank — not the ranked sentence, and not the
+  // "first saved draft" one either, which would have been a plain falsehood
+  // about a script the writer did not write. The rank line's own coverage
+  // moved to the WRITER's draft, further down this section (search
+  // "P3-provenance"), where it is a true claim — and both places test the
+  // same two shared-copy regexes built above.
+  const draftRankClaimOnSampleExport =
+    rankedDraftRankLineRe.test(exportedHtml)
+    || firstDraftRankLineRe.test(exportedHtml)
+    || /Rank among your drafts/.test(exportedHtml)
+    || /First saved draft/.test(exportedHtml);
   record(
     'P3',
-    'Exported coverage HTML carries the draft-rank line (rank among the writer\'s own saved drafts)',
-    exportedHtmlHasDraftRankLine,
+    'Exported coverage HTML of the SAMPLE makes no draft-rank claim (it is not the writer\'s draft)',
+    !draftRankClaimOnSampleExport,
+    draftRankClaimOnSampleExport ? 'a draft-rank sentence appears in a sample-sourced export' : '',
   );
 
   // "Coverage letter" (POST /api/export/coverage-letter) — the connected-
@@ -819,6 +850,86 @@ async function main() {
   // keyless deploy — which is every deploy this suite boots — so the proof
   // has to be an end-to-end one: edit the draft, click, get a receipt with
   // real numbers in it. Same page, same complete sample report, Labs OFF. ──
+  // ── Provenance at the SECOND entry point (B-5/B-6, 2026-09-05) ──────────
+  // Everything above ran against the report threaded in from StartScreen's
+  // "Try sample coverage" — the built-in DEMO, not the writer's draft. Two
+  // things must hold in that state, and neither did before this fix: the rank
+  // line must not rank a demo among the writer's own drafts (it ranked it,
+  // and the demo's 78 took first place from real work), and "Verify my
+  // rewrite" must be withheld with a reason (it was OFFERED here, because the
+  // guard read `uploadedFile`, which is null on the threaded path — the panel-
+  // loaded sample one click away withheld it correctly all along).
+  const sampleNotRankedCount = await pageA
+    .getByText('The sample is not ranked against your drafts', { exact: false })
+    .count();
+  record(
+    'P3-provenance',
+    'the threaded SAMPLE report says plainly that it is not ranked among the writer\'s drafts',
+    sampleNotRankedCount >= 1,
+    `matches=${sampleNotRankedCount}`,
+  );
+  const rankedClaimOnSample = await pageA.getByText(/Rank among your drafts:/).count();
+  record(
+    'P3-provenance',
+    'the threaded SAMPLE report never ranks the demo among the writer\'s own drafts',
+    rankedClaimOnSample === 0,
+    `"Rank among your drafts:" matches=${rankedClaimOnSample}`,
+  );
+
+  const verifyOnSample = pageA.getByRole('button', { name: 'Verify my rewrite', exact: true }).first();
+  const verifyOnSampleVisible = await verifyOnSample.isVisible().catch(() => false);
+  const verifyOnSampleDisabled = verifyOnSampleVisible
+    ? await verifyOnSample.isDisabled().catch(() => false)
+    : false;
+  const sampleWithholdReasons = await pageA.getByText(/built-in sample script, not your draft/).count();
+  record(
+    'P3-provenance',
+    '"Verify my rewrite" is withheld — visibly, and with a reason — on the sample reached from StartScreen',
+    verifyOnSampleVisible && verifyOnSampleDisabled && sampleWithholdReasons >= 1,
+    `visible=${verifyOnSampleVisible} disabled=${verifyOnSampleDisabled} reasons=${sampleWithholdReasons}`,
+  );
+
+  // The sample's text IS the editor draft by now (the golden path installs it),
+  // so re-running the diagnosis from the panel produces a report of the
+  // WRITER's own draft — the provenance every assertion below this point
+  // needs, and the one where a draft rank is a true claim.
+  const rerunBtn = pageA.getByRole('button', { name: 'Re-run diagnosis', exact: true }).first();
+  await rerunBtn.click({ timeout: timing.ms(15000) });
+  const rerunLanded = await pageA
+    .waitForFunction(
+      () => {
+        const t = document.body.innerText;
+        return !t.includes('The sample is not ranked against your drafts')
+          && /Rank among your drafts|First saved draft/.test(t);
+      },
+      { timeout: timing.ms(120000) },
+    )
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P3-provenance',
+    'Re-run diagnosis on the editor draft produces a report of the WRITER\'s own draft (the rank line returns)',
+    rerunLanded,
+    rerunLanded ? '' : 'no draft-rank line after re-running the diagnosis on the editor draft',
+  );
+
+  // …and THAT report's export carries the draft-rank line (the coverage the
+  // sample-export assertion above deliberately gave up).
+  const [draftDownload] = await Promise.all([
+    pageA.waitForEvent('download', { timeout: timing.ms(20000) }),
+    exportBtn.click(),
+  ]);
+  const draftDownloadPath = await draftDownload.path();
+  const draftExportedHtml = draftDownloadPath ? readFileSync(draftDownloadPath, 'utf8') : '';
+  const draftExportHasRankLine =
+    rankedDraftRankLineRe.test(draftExportedHtml) || firstDraftRankLineRe.test(draftExportedHtml);
+  record(
+    'P3-provenance',
+    'Exported coverage HTML of the WRITER\'s own draft carries the draft-rank line',
+    draftExportHasRankLine,
+    `${draftExportedHtml.length} bytes, filename=${draftDownload.suggestedFilename()}`,
+  );
+
   const verifyBtn = pageA.getByRole('button', { name: 'Verify my rewrite', exact: true }).first();
   const verifyVisibleOff = await verifyBtn.isVisible().catch(() => false);
   record(
@@ -869,7 +980,12 @@ async function main() {
 
     if (receiptRendered) {
       const receiptText = await receipt.innerText();
-      const healthPair = /Health\s+(\d+)\s*→\s*(\d+)/.exec(receiptText);
+      // One decimal on each endpoint since 2026-09-05 (B-7): the card used to
+      // print whole numbers beside a one-decimal delta chip ("Health 65 → 66"
+      // next to "+1.5" for a real 64.6 → 66.1), so the arithmetic a reader can
+      // do on screen did not close. `\d+(?:\.\d+)?` accepts either shape —
+      // this assertion is about the delta being REAL, not about its format.
+      const healthPair = /Health\s+(\d+(?:\.\d+)?)\s*→\s*(\d+(?:\.\d+)?)/.exec(receiptText);
       const movedHealth = !!healthPair && healthPair[1] !== healthPair[2];
       record(
         'P2-generative',

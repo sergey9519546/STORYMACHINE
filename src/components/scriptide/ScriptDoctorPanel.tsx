@@ -56,6 +56,14 @@ import {
 import {
   draftRankSentence, draftRankExportPayload, type DraftRankExportPayload,
 } from "../../lib/draft-rank-copy.ts";
+import {
+  SCRIPT_KEY_EDITOR,
+  analyzedScriptIdentity,
+  computeSampleContentHash,
+  groupHistoryByScript,
+  type AnalyzedScript,
+} from "../../lib/doctor-history-identity.ts";
+import { parseFountainTitleBlock } from "../../lib/fountain-title-block.ts";
 import type { Snapshot } from "./SnapshotManager.tsx";
 import {
   DOCTOR_STREAM_TOTAL_PASSES,
@@ -390,6 +398,34 @@ function DraftRankLine({ draftRank, className }: { draftRank: DraftRank; classNa
       {draftRankSentence(draftRank, 'union')}
     </div>
   );
+}
+
+/** The line that replaces the rank on the built-in sample (2026-09-05, B-6).
+ *  The sample used to be ranked "among your drafts" one paragraph above the
+ *  sentence that withholds Verify precisely BECAUSE it is not your draft —
+ *  and, scoring 78, it took first place from the writer's own work. The
+ *  section does not silently vanish for the demo: it says what it is. */
+const SAMPLE_NOT_RANKED_LINE =
+  "The sample is not ranked against your drafts — it is a demo script, not your work.";
+
+/** Renders the draft-rank line, or — for the built-in sample — the honest
+ *  note that stands in for it. One component so the two render sites (the
+ *  complete-report header and the incomplete-report header) can never
+ *  disagree about which of the two a given report gets. */
+function DraftRankOrSampleNote({
+  draftRank,
+  isSample,
+  className,
+}: {
+  draftRank: DraftRank | null;
+  isSample: boolean;
+  className: string;
+}) {
+  if (isSample) {
+    return <div className={`text-[10px] font-mono mt-0.5 ${className}`}>{SAMPLE_NOT_RANKED_LINE}</div>;
+  }
+  if (!draftRank) return null;
+  return <DraftRankLine draftRank={draftRank} className={className} />;
 }
 
 // ─── Story metrics (server/nvm/analyze/metrics.ts via report.metrics) ───────
@@ -1184,7 +1220,20 @@ const DOCTOR_HISTORY_FORMULA_VERSION = 2;
 
 interface DoctorHistoryEntry {
   at: number;
+  /** The ANALYZED document's own title (src/lib/doctor-history-identity.ts's
+   *  analyzedScriptIdentity) — an uploaded file's title page or filename, the
+   *  editor's own title, the sample's own title. NOT the host project's
+   *  `title` prop, which is what this field held until 2026-09-05 and which
+   *  made every entry read "Dead Frequency" no matter what was analyzed. */
   title: string;
+  /** Which script this run was a run OF — see src/lib/
+   *  doctor-history-identity.ts. Optional because every entry recorded before
+   *  2026-09-05 predates it: those stay stored, stay listed (grouped as
+   *  "earlier drafts"), and are counted in no single script's rank
+   *  denominator, since nothing in them can say which script they belong to.
+   *  Absence is a known fact here, not an unknown — the same convention
+   *  formulaVersion and mode already use below. */
+  scriptKey?: string;
   contentHash: string;
   health: number;
   verdict?: CoverageVerdict;
@@ -1251,6 +1300,12 @@ function isCurrentDoctorHistoryEntry(value: unknown): value is DoctorHistoryEntr
       typeof (dimension as Record<string, unknown>).score === "number",
     ) &&
     (entry.formulaVersion === undefined || (typeof entry.formulaVersion === "number" && Number.isFinite(entry.formulaVersion))) &&
+    // A pre-2026-09-05 entry has no scriptKey at all and must still validate —
+    // migration here is additive (read old, write new), never a filter that
+    // silently deletes a writer's earlier history. A present-but-empty or
+    // non-string key is corrupt storage, though, and is rejected like any
+    // other malformed field.
+    (entry.scriptKey === undefined || (typeof entry.scriptKey === "string" && entry.scriptKey.length > 0)) &&
     (entry.mode === undefined || entry.mode === "quick" || entry.mode === "deep")
   );
 }
@@ -1283,6 +1338,31 @@ function clearDoctorHistory(): void {
   }
 }
 
+/** An uploaded document's OWN title — the `Title:` line of its Fountain title
+ *  page, read client-side from the exact text that was analyzed
+ *  (src/lib/fountain-title-block.ts, the same parser ScriptIDE uses to fill
+ *  its Title tab from a pasted script). For an .fdx/.pdf upload there is no
+ *  Fountain text client-side, so the server's own convertedFountain (already
+ *  on the report, and already what "Export report" reads for a pdf source) is
+ *  the second source. Returns null when the document simply carries no title
+ *  page — the caller falls back to the filename stem rather than inventing a
+ *  name or, as before, borrowing the host project's. */
+function uploadedScriptOwnTitle(
+  upload: UploadedScript,
+  report: ScriptDoctorReport | null,
+): string | null {
+  if (upload.format === "fountain") {
+    const parsed = parseFountainTitleBlock(upload.content)?.title?.trim();
+    if (parsed) return parsed;
+  }
+  const converted = report?.source?.convertedFountain;
+  if (converted) {
+    const parsed = parseFountainTitleBlock(converted)?.title?.trim();
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
 /** Append a new history entry for `report` (unless it's an exact repeat of
  *  the most recently recorded draft, i.e. same contentHash — an unchanged
  *  script has nothing new to record), capped at 50 entries with the oldest
@@ -1291,10 +1371,17 @@ function clearDoctorHistory(): void {
  *  the delta baseline, or to detect the "identical script" case when its
  *  contentHash matches the new report's. A missing contentHash (a report
  *  shape older than this feature) skips recording entirely rather than
- *  storing an entry that could never be matched against later. */
+ *  storing an entry that could never be matched against later.
+ *
+ *  `script` is the ANALYZED document's identity (src/lib/
+ *  doctor-history-identity.ts) — its own title and a stable per-script key.
+ *  Before 2026-09-05 this took the host project's `title` prop instead, which
+ *  is why a writer who uploaded "Script Alpha" while the sample happened to
+ *  be open in the editor got a history row labelled "Dead Frequency", and why
+ *  no surface could tell one script's runs from another's. */
 function recordDoctorHistory(
   report: ScriptDoctorReport,
-  title: string,
+  script: AnalyzedScript,
   mode: "quick" | "deep",
 ): { history: DoctorHistoryEntry[]; previous: DoctorHistoryEntry | null } {
   const existing = loadDoctorHistory();
@@ -1310,7 +1397,10 @@ function recordDoctorHistory(
 
   const entry: DoctorHistoryEntry = {
     at: Date.now(),
-    title: title.trim() || "Untitled",
+    // The ANALYZED document's identity, not the host project's title — see
+    // DoctorHistoryEntry.title/scriptKey and src/lib/doctor-history-identity.ts.
+    title: script.title.trim() || "Untitled",
+    scriptKey: script.key,
     contentHash: report.contentHash,
     health: report.health,
     verdict: report.verdict,
@@ -1828,6 +1918,15 @@ interface FixStructuralSignalsDelta {
  *  SnapshotManager's trend line and the coverage letter use, so a writer sees
  *  one claim about these two numbers everywhere they appear. */
 function FixStructuralSignalsStrip({ signals }: { signals: FixStructuralSignalsDelta }) {
+  // Two decimals, deliberately — the shared precision EVERY surface that
+  // prints these two aggregates uses (this strip, the panel's own Shape &
+  // Rhythm section, SnapshotManager's Versions trend, coverage-html.ts and
+  // coverage-letter.ts). B-7 asked for "the delta's precision" here as it did
+  // for health above; unlike health, this row prints no delta of its own, and
+  // giving it a third decimal would make the same reading disagree with the
+  // four other places a writer can see it. Precision changes for these two
+  // signals belong in one pass across all five surfaces, not in this card
+  // alone.
   const pair = (before: number, after: number | undefined) =>
     after === undefined ? before.toFixed(2) : `${before.toFixed(2)} → ${after.toFixed(2)}`;
   return (
@@ -2064,8 +2163,15 @@ function FixReceiptCard({
       </div>
 
       <div className="flex items-center gap-3 flex-wrap text-xs font-mono text-black dark:text-gray-100">
+        {/* Endpoints at the DELTA's precision (B-7, 2026-09-05). These were
+            rounded to whole numbers beside a one-decimal delta chip, so the
+            card printed "Health 65 → 66" next to "+1.5" for a real 64.6 →
+            66.1: a reader doing the arithmetic on the two numbers actually
+            shown got +1, and the receipt contradicted itself. `healthDelta`
+            above is round1(after − before), so one decimal on each endpoint
+            makes the subtraction on screen close exactly. */}
         <span className="flex items-center gap-1.5">
-          Health {Math.round(before.health)} &rarr; {Math.round(after.health)}{" "}
+          Health {before.health.toFixed(1)} &rarr; {after.health.toFixed(1)}{" "}
           <DeltaGlyph delta={healthDelta} />
         </span>
         {verdictChanged && (
@@ -2206,6 +2312,71 @@ export default function ScriptDoctorPanel({
   // below now reads it too — a plain hook-ordering move, no behavior change
   // for the delta-strip machinery that already used it.
   const [history, setHistory] = useState<DoctorHistoryEntry[]>(() => loadDoctorHistory());
+  // Whether the currently-displayed report was generated from the built-in
+  // sample script — snapshotted alongside analyzedSnapshot/activeReportTitle
+  // for the same reason: `uploadedFile` is live state that can move on (e.g.
+  // cleared) after diagnosis succeeds, so the fix-and-verify flow's "is this
+  // report a read-only demo" gate must reuse what THIS report actually was,
+  // not whatever source happens to be active right now.
+  //
+  // Declared here (ahead of its original spot below, alongside
+  // activeReportTitle) because the draft-rank memo and verifyBlockedReason
+  // both read it now — a plain hook-ordering move, no behavior change.
+  const [analyzedIsSample, setAnalyzedIsSample] = useState(false);
+  // WHICH SCRIPT the report on screen is a report OF (2026-09-05, B-3):
+  // a stable key plus the analyzed document's OWN title, from
+  // src/lib/doctor-history-identity.ts. Set by every path that produces a
+  // report (runDiagnosis and the initialReport hydration below), stamped onto
+  // the Draft History row that run records, and used to scope both the rank
+  // denominator and the Draft History list. Null only before the first report
+  // of this panel's lifetime, when nothing is displayed to scope anything to.
+  const [analyzedScript, setAnalyzedScript] = useState<AnalyzedScript | null>(null);
+  // The built-in sample's own contentHash, computed once in the browser the
+  // same way the server computes a report's (sha256 of the trimmed text). It
+  // exists only to recognize a sample run recorded into history BEFORE the
+  // provenance fix landed (a legacy row carries no scriptKey, and its `title`
+  // was stamped from the host project, so content is the only honest
+  // evidence). null whenever WebCrypto is unavailable — such a row then stays
+  // in the "earlier drafts" group, which already keeps it out of every
+  // per-script denominator.
+  const [sampleContentHash, setSampleContentHash] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void computeSampleContentHash(sampleScriptFountain).then((hash) => {
+      if (alive) setSampleContentHash(hash);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  // The script the panel is currently talking about. Before the first report
+  // there is nothing analyzed yet, and the editor draft is the only thing this
+  // panel could be about, so that is the fallback — never a fabricated
+  // identity for a document that does not exist.
+  const currentScript: AnalyzedScript = useMemo(
+    () => analyzedScript ?? analyzedScriptIdentity({ kind: "editor", hostTitle: title }),
+    [analyzedScript, title],
+  );
+  // ONE computed object behind BOTH numbers the panel shows about Draft
+  // History, so they can never drift apart again (they answer different
+  // questions and the hunter's state table caught them coinciding only by
+  // accident):
+  //   - `currentEntries`/`currentCount` — recorded runs OF THE SCRIPT ON
+  //     SCREEN, including the run being displayed (which has its own row).
+  //     This is the Draft History button's "N of this script" count and the
+  //     history side of the rank union below.
+  //   - `elsewhereCount` — recorded runs of other scripts, the built-in
+  //     sample, and pre-migration entries with no script key. Listed under
+  //     their own headings; counted in no script's denominator.
+  // The rank's own `of` is a THIRD number by construction and says so in its
+  // own sentence: it is the deduped union of this script's runs and its saved
+  // Versions, with the displayed run counted once (computeDraftRank excludes
+  // the history row it just wrote for itself and adds the current draft back
+  // explicitly). See DraftRankLine's doc comment.
+  const historyView = useMemo(
+    () => groupHistoryByScript(history, currentScript.key, currentScript.title, sampleContentHash),
+    [history, currentScript, sampleContentHash],
+  );
   // 2026-09-04 — second, honest denominator beside the calibration
   // reference-set percentile: rank among the writer's OWN saved drafts of
   // this script — the deduped UNION of ScriptIDE `snapshots` (Versions tab)
@@ -2222,11 +2393,32 @@ export default function ScriptDoctorPanel({
   // time this runs) from the union — without this, every real run counted
   // itself a second time ("tied 1st of 2" for one run and zero saved
   // Versions).
+  //
+  // 2026-09-05 (B-3/B-6 review fix) — TWO further scoping rules, both of them
+  // load-bearing for the sentence this number renders inside ("… of this
+  // script"):
+  //   1. Only Draft History entries recorded for the SAME script count
+  //      (historyView.currentEntries — see the historyView memo below).
+  //      Before this, the whole global array counted, so a writer looking at
+  //      Script Beta was ranked against Script Alpha and the built-in demo.
+  //   2. ScriptIDE `snapshots` join the union ONLY when the report on screen
+  //      was computed from the editor draft. A saved Version is a version of
+  //      that one document (src/lib/scriptide-draft-store.ts persists exactly
+  //      one draft); an uploaded file has no Versions, and counting the
+  //      editor's against it repeats the same category error at a different
+  //      scale.
+  // The sample is excluded outright (see the analyzedIsSample gate): a demo
+  // is not one of the writer's drafts, which is the very thing the Verify
+  // control says one paragraph below this line.
+  const rankSnapshots = useMemo(
+    () => (currentScript.key === SCRIPT_KEY_EDITOR ? snapshots ?? [] : []),
+    [currentScript.key, snapshots],
+  );
   const draftRank: DraftRank | null = useMemo(
-    () => (reportIsComplete && report
-      ? computeDraftRank(snapshots ?? [], history, report.health, report.contentHash, report.analyzedAt)
+    () => (reportIsComplete && report && !analyzedIsSample
+      ? computeDraftRank(rankSnapshots, historyView.currentEntries, report.health, report.contentHash, report.analyzedAt)
       : null),
-    [reportIsComplete, report, snapshots, history],
+    [reportIsComplete, report, analyzedIsSample, rankSnapshots, historyView],
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Upgrade item #3: set instead of (never alongside) errorMessage when the
@@ -2257,21 +2449,25 @@ export default function ScriptDoctorPanel({
   // still on screen. Null for pdf-sourced reports — those export from
   // report.source.convertedFountain instead, which the server already returns.
   const [analyzedSnapshot, setAnalyzedSnapshot] = useState<{ fountain?: string; fdx?: string } | null>(null);
-  // The title actually sent with the currently-displayed report's request —
-  // ordinarily just the `title` prop, but a sample run overrides it with the
-  // sample's own title (see runDiagnosis's sampleOverride param). "Export
-  // report" reuses THIS rather than the live `title` prop for the same
-  // stale-state reason analyzedSnapshot exists: exporting a sample-sourced
-  // report must never get relabeled under whatever project title happens to
-  // be open, since the two have nothing to do with each other.
+  // The ANALYZED document's own title for the currently-displayed report —
+  // the editor's title for an editor-sourced report, the sample's own title
+  // for the sample, and an uploaded file's own title page (or filename stem)
+  // for an upload. "Export report" reuses THIS rather than the live `title`
+  // prop for the same stale-state reason analyzedSnapshot exists: exporting a
+  // sample- or upload-sourced report must never get relabeled under whatever
+  // project title happens to be open, since the two have nothing to do with
+  // each other.
+  //
+  // 2026-09-05 (B-3): it used to hold the title SENT with the request, which
+  // for an upload is the host project's `title` prop — so a report of
+  // "Script Alpha", uploaded while the sample sat in the editor, exported and
+  // recorded itself as "Dead Frequency". It now comes from the same
+  // analyzedScriptIdentity call that keys Draft History, so the report's
+  // label and its history row can never disagree.
   const [activeReportTitle, setActiveReportTitle] = useState<string | undefined>(undefined);
-  // Whether the currently-displayed report was generated from the built-in
-  // sample script — snapshotted alongside analyzedSnapshot/activeReportTitle
-  // for the same reason: `uploadedFile` is live state that can move on (e.g.
-  // cleared) after diagnosis succeeds, so the fix-and-verify flow's "is this
-  // report a read-only demo" gate must reuse what THIS report actually was,
-  // not whatever source happens to be active right now.
-  const [analyzedIsSample, setAnalyzedIsSample] = useState(false);
+  // (`analyzedIsSample` and `analyzedScript` — the rest of this report's
+  // provenance — are declared with `history` above, where the draft-rank memo
+  // that reads them lives.)
 
   // The entry to compare the current report against: null on the very first
   // diagnosis ever recorded (nothing to compare to), or an entry whose
@@ -2762,7 +2958,27 @@ export default function ScriptDoctorPanel({
         setAnalyzedSnapshot(snapshotForThisRun);
         reportDraftGenRef.current = draftGenForThisRun; // G0-02: draft version this report reflects
         setStaleWriteBackNotice(null); // fresh report — clear any prior stale-write warning
-        setActiveReportTitle(effectiveTitle);
+        // WHICH SCRIPT this report is a report OF (2026-09-05, B-3). The three
+        // cases match runSource's own classification below exactly — sample,
+        // upload, editor draft — and the title is the ANALYZED document's own
+        // (an upload's title page or filename; the sample's own title; the
+        // editor's title), never the host project's `title` prop. That prop is
+        // what `activeReportTitle` used to hold for an upload, which is how a
+        // report of "Script Alpha" came to be exported, and recorded in Draft
+        // History, as "Dead Frequency".
+        const analyzedIdentity = analyzedScriptIdentity(
+          isSampleRun
+            ? { kind: "sample", sampleTitle: sampleScriptTitle }
+            : uploadedFile && uploadedFile.provenance !== "sample"
+            ? {
+                kind: "upload",
+                fileName: uploadedFile.name,
+                ownTitle: uploadedScriptOwnTitle(uploadedFile, data),
+              }
+            : { kind: "editor", hostTitle: effectiveTitle },
+        );
+        setActiveReportTitle(analyzedIdentity.title);
+        setAnalyzedScript(analyzedIdentity);
         setAnalyzedIsSample(isSampleRun);
         // A fresh diagnosis starts a new fix-and-verify lifecycle: any prior
         // report's receipts are keyed by root-cause finding ids that likely
@@ -2802,7 +3018,7 @@ export default function ScriptDoctorPanel({
         // lineage contract on ScriptDoctorReport.deepRead — not whether the
         // LLM actually fired this particular time.
         if (!isSampleRun && isWholeDraftAnalysisComplete(data)) {
-          const { history: nextHistory, previous } = recordDoctorHistory(data, effectiveTitle ?? "", effectiveMode);
+          const { history: nextHistory, previous } = recordDoctorHistory(data, analyzedIdentity, effectiveMode);
           setHistory(nextHistory);
           setPreviousEntry(previous);
         } else if (!isSampleRun) {
@@ -2936,7 +3152,16 @@ export default function ScriptDoctorPanel({
     setReport(initialReport.report);
     setAnalyzedSnapshot({ fountain: initialReport.fountain });
     reportDraftGenRef.current = initialReport.generation; // G0-02: same write-back guard a fresh run would set
-    setActiveReportTitle(initialReport.title);
+    // A threaded report is never sourced from an upload — CoverageSummary
+    // analyzes either the editor draft or the built-in sample — so those are
+    // the only two identities reachable here (2026-09-05, B-3/B-5).
+    const threadedIdentity = analyzedScriptIdentity(
+      initialReport.isSample
+        ? { kind: "sample", sampleTitle: initialReport.title || sampleScriptTitle }
+        : { kind: "editor", hostTitle: initialReport.title },
+    );
+    setActiveReportTitle(threadedIdentity.title);
+    setAnalyzedScript(threadedIdentity);
     setAnalyzedIsSample(initialReport.isSample);
     setLastRunMode("quick"); // CoverageSummary only ever calls the quick /doctor route
     setStatus("success");
@@ -2960,7 +3185,7 @@ export default function ScriptDoctorPanel({
     if (!initialReport.isSample && isWholeDraftAnalysisComplete(initialReport.report)) {
       const { history: nextHistory, previous } = recordDoctorHistory(
         initialReport.report,
-        initialReport.title,
+        threadedIdentity,
         "quick",
       );
       setHistory(nextHistory);
@@ -3386,9 +3611,27 @@ export default function ScriptDoctorPanel({
    *  produces an editor-sourced report on which the control is live. A reason
    *  that said merely "clear the upload" would repeat the same class of
    *  falsehood this revision exists to remove. */
+  //
+  //  PROVENANCE IS A PROPERTY OF THE REPORT, NOT OF `uploadedFile` (review
+  //  finding B-5, 2026-09-05). `uploadedFile` is only ever set by this panel's
+  //  own loadSample/handleFileSelected. On the product's PRIMARY entry point —
+  //  StartScreen's "Try sample coverage" → "Full report" — the sample report
+  //  is threaded in as `initialReport` and `uploadedFile` is null, so the
+  //  sample branch below never fired and a first-time writer was offered
+  //  "Verify my rewrite" against the demo. `analyzedIsSample` is the flag that
+  //  travels WITH the report (set from initialReport.isSample on the threaded
+  //  path and from isSampleRun on the run path), so it goes first. The two
+  //  sample sentences differ because the way out differs: a panel-loaded
+  //  sample has a chip with a ✕; a threaded one was installed into the editor
+  //  and has no chip to dismiss, so telling that writer to press ✕ would be
+  //  the same class of falsehood this branch exists to remove.
   const verifyBlockedReason: string | null =
     !fixSourceText
       ? "No analyzable script text is available for this report."
+      : analyzedIsSample
+      ? uploadedFile?.provenance === "sample"
+        ? "This report is the built-in sample script, not your draft. Dismiss the sample (✕ above) and run the diagnosis again to verify a rewrite of your own draft."
+        : "This report is the built-in sample script, not your draft. Replace the editor's text with your own draft and run the diagnosis again to verify a rewrite of it."
       : uploadedFile
       ? // PROVENANCE BEFORE FORMAT (review finding, 2026-09-05). The built-in
         // sample is stored as an `uploadedFile` with format "fountain" and
@@ -3398,6 +3641,12 @@ export default function ScriptDoctorPanel({
         // "Stop analyzing the sample script". Withholding was right; the
         // sentence was not. The chip's own two provenances are the first split
         // here, exactly as they are in the chip itself.
+        // Kept as a defensive fallback now that `analyzedIsSample` (above)
+        // catches the sample from BOTH entry points: a sample chip can only
+        // sit beside a report the sample itself produced (loadSample calls
+        // setReport(null) first), so this branch is not normally reached —
+        // and if some future path sets the chip without the flag, the
+        // withhold still fires here rather than silently offering Verify.
         uploadedFile.provenance === "sample"
         ? "This report is the built-in sample script, not your draft. Dismiss the sample (✕ above) and run the diagnosis again to verify a rewrite of your own draft."
         : uploadedFile.format === "fountain"
@@ -4291,7 +4540,7 @@ export default function ScriptDoctorPanel({
                     {healthPercentileSentence(report.healthPercentile)}
                   </div>
                 )}
-                {draftRank && <DraftRankLine draftRank={draftRank} className="text-ink/60" />}
+                <DraftRankOrSampleNote draftRank={draftRank} isSample={analyzedIsSample} className="text-ink/60" />
                 <p className="text-xs font-mono leading-relaxed mt-3 pt-3 border-t border-ink/15 text-ink/80">
                   {VERDICT_META[report.verdict].explainer}
                 </p>
@@ -4340,7 +4589,7 @@ export default function ScriptDoctorPanel({
                         {healthPercentileSentence(report.healthPercentile)}
                       </div>
                     )}
-                    {draftRank && <DraftRankLine draftRank={draftRank} className="opacity-70" />}
+                    <DraftRankOrSampleNote draftRank={draftRank} isSample={analyzedIsSample} className="opacity-70" />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4">
@@ -5028,63 +5277,96 @@ export default function ScriptDoctorPanel({
                     )}
                     <HistoryIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Draft History
                   </span>
+                  {/* WHAT THIS COUNTS (2026-09-05, B-3): recorded runs OF THE
+                      SCRIPT ON SCREEN — the same set the rank's denominator is
+                      built from, rendered from the same `historyView` object so
+                      the two can never disagree — plus, named separately,
+                      everything else the list below still shows (other scripts,
+                      the built-in sample, and pre-migration entries that carry
+                      no script key). It used to read `history.length`: every run
+                      of every script, under a heading a writer reads as this
+                      one's. */}
                   <span className="text-[9px] font-mono text-[var(--sm-ink-mute)] uppercase">
-                    {history.length} draft{history.length === 1 ? "" : "s"}
+                    {historyView.currentCount} run{historyView.currentCount === 1 ? "" : "s"} of this script
+                    {historyView.elsewhereCount > 0 && <> &middot; {historyView.elsewhereCount} elsewhere</>}
                   </span>
                 </button>
                 {historyOpen && (
                   <div className="border-2 border-t-0 border-black dark:border-white/20 p-3 space-y-3">
-                    <ul className="space-y-1.5">
-                      {[...history]
-                        .reverse()
-                        .slice(0, DOCTOR_HISTORY_DISPLAY_MAX)
-                        .map((entry) => (
-                          <li
-                            key={`${entry.at}-${entry.contentHash}`}
-                            className="flex items-center justify-between gap-2 text-[10px] font-mono text-black dark:text-gray-100 border-b border-black/10 dark:border-white/10 pb-1.5 last:border-b-0 last:pb-0"
-                          >
-                            <span className="text-[var(--sm-ink-mute)] shrink-0">
-                              {new Date(entry.at).toLocaleString()}
+                    {/* Grouped by script (2026-09-05, B-3). Nothing is hidden:
+                        every group the store holds is listed under the title its
+                        runs were actually recorded with — the script on screen
+                        first, then other scripts (most recently run first), then
+                        the built-in sample, then entries recorded before runs
+                        were tracked per script, which no longer masquerade as
+                        runs of whatever is open now. Each group shows its most
+                        recent DOCTOR_HISTORY_DISPLAY_MAX rows and says so when it
+                        is holding more. */}
+                    {historyView.groups.map((group) => {
+                      const shown = group.entries.slice(0, DOCTOR_HISTORY_DISPLAY_MAX);
+                      return (
+                        <div key={group.key ?? "__unkeyed__"} className="space-y-1.5">
+                          <p className="flex items-baseline justify-between gap-2 text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+                            <span className="truncate">
+                              {group.title}
+                              {group.kind === "current" && " (this script)"}
                             </span>
-                            <span className="font-bold shrink-0">{Math.round(entry.health)}</span>
-                            {entry.verdict && (
-                              <span className="uppercase font-bold shrink-0">{entry.verdict}</span>
-                            )}
-                            <span className="text-gray-600 dark:text-gray-300 truncate">
-                              {entry.totalIssues} issue{entry.totalIssues === 1 ? "" : "s"}
+                            <span className="shrink-0 font-mono normal-case tracking-normal">
+                              {group.entries.length} run{group.entries.length === 1 ? "" : "s"}
+                              {group.entries.length > shown.length ? ` (latest ${shown.length} shown)` : ""}
                             </span>
-                            {/* Cross-version entries are never deleted — they stay
-                                listed with a subtle tag rather than vanishing, since
-                                a scoring-formula change is not a reason to erase a
-                                writer's own recorded history. */}
-                            {entryFormulaVersion(entry) !== DOCTOR_HISTORY_FORMULA_VERSION && (
-                              <span
-                                className="text-[9px] italic text-gray-400 dark:text-gray-500 shrink-0"
-                                title="Recorded under a previous version of the health-scoring formula — not directly comparable to current scores."
+                          </p>
+                          <ul className="space-y-1.5">
+                            {shown.map((entry) => (
+                              <li
+                                key={`${entry.at}-${entry.contentHash}`}
+                                className="flex items-center justify-between gap-2 text-[10px] font-mono text-black dark:text-gray-100 border-b border-black/10 dark:border-white/10 pb-1.5 last:border-b-0 last:pb-0"
                               >
-                                (older scoring model)
-                              </span>
-                            )}
-                            {/* Deep-read provenance tag — quick entries stay
-                                untagged (the common case); only a deep-read
-                                entry needs the callout, since that's the one
-                                whose signals came from a different process. */}
-                            {entryMode(entry) === "deep" && (
-                              <span
-                                className="text-[9px] italic text-indigo-700 shrink-0"
-                                title="This diagnosis was a deep read — an LLM sensed each scene's meaning into the same signal schema, rather than the deterministic lexicon alone."
-                              >
-                                (deep read)
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                    </ul>
+                                <span className="text-[var(--sm-ink-mute)] shrink-0">
+                                  {new Date(entry.at).toLocaleString()}
+                                </span>
+                                <span className="font-bold shrink-0">{Math.round(entry.health)}</span>
+                                {entry.verdict && (
+                                  <span className="uppercase font-bold shrink-0">{entry.verdict}</span>
+                                )}
+                                <span className="text-gray-600 dark:text-gray-300 truncate">
+                                  {entry.totalIssues} issue{entry.totalIssues === 1 ? "" : "s"}
+                                </span>
+                                {/* Cross-version entries are never deleted — they stay
+                                    listed with a subtle tag rather than vanishing, since
+                                    a scoring-formula change is not a reason to erase a
+                                    writer's own recorded history. */}
+                                {entryFormulaVersion(entry) !== DOCTOR_HISTORY_FORMULA_VERSION && (
+                                  <span
+                                    className="text-[9px] italic text-gray-400 dark:text-gray-500 shrink-0"
+                                    title="Recorded under a previous version of the health-scoring formula — not directly comparable to current scores."
+                                  >
+                                    (older scoring model)
+                                  </span>
+                                )}
+                                {/* Deep-read provenance tag — quick entries stay
+                                    untagged (the common case); only a deep-read
+                                    entry needs the callout, since that's the one
+                                    whose signals came from a different process. */}
+                                {entryMode(entry) === "deep" && (
+                                  <span
+                                    className="text-[9px] italic text-indigo-700 shrink-0"
+                                    title="This diagnosis was a deep read — an LLM sensed each scene's meaning into the same signal schema, rather than the deterministic lexicon alone."
+                                  >
+                                    (deep read)
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
                     <div className="pt-2 border-t border-black/10 dark:border-white/10">
                       {confirmingClearHistory ? (
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-mono text-[var(--sm-stamp-on-light)]">
-                            Clear all {history.length} saved draft{history.length === 1 ? "" : "s"}?
+                            Clear all {historyView.totalCount} recorded run{historyView.totalCount === 1 ? "" : "s"}, every script?
                           </span>
                           <button
                             onClick={() => {

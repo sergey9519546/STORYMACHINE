@@ -90,7 +90,19 @@ describe("W4 — CoverageSummary -> ScriptDoctorPanel 'Full report' handoff", ()
       assert.match(block, /generation:\s*getDraftGeneration\?\.\(\) \?\? startDraftGen,/);
       assert.match(block, /title:\s*override\?\.title \?\? title \?\? "Untitled",/);
       assert.match(block, /fountain:\s*override\?\.fountain \?\? fountain,/);
-      assert.match(block, /isSample:\s*!!override\?\.sample,/);
+      // 2026-09-05 (B-4): provenance comes from the RUN's own claimed
+      // identity, not from a second read of `override` at resolution time.
+      // The old shape (`isSample: !!override?.sample`) was correct for the
+      // call that made it and wrong for what happened next: once
+      // `sampleFired` was set, a later evaluation of the mount effect fell
+      // through to a plain `void run()` that re-analysed the sample text now
+      // sitting in the editor and handed it up as `isSample: false`, planting
+      // the demo in the writer's Draft History and unlocking "Verify my
+      // rewrite" on it. `isSampleRun` is claimed before the request goes out;
+      // see CoverageSummary's sampleRunRef.
+      assert.match(block, /isSample:\s*isSampleRun,/);
+      assert.match(coverageSummary, /const isSampleRun = !!override\?\.sample;/);
+      assert.match(coverageSummary, /sampleRunRef\.current = isSampleRun;/);
     });
 
     it("declares onReportComputed as a dependency of the run() callback (always the current prop)", () => {
@@ -134,10 +146,23 @@ describe("W4 — CoverageSummary -> ScriptDoctorPanel 'Full report' handoff", ()
     it("a fresh handoff hydrates report/status/history WITHOUT any network call", () => {
       const idx = scriptDoctorPanel.indexOf("const isFresh = currentGen");
       assert.ok(idx > -1, "expected the freshness check in the initialReport hydration effect");
-      const block = scriptDoctorPanel.slice(idx, idx + 2600);
+      // Window widened 2600 -> 3600 on 2026-09-05: the hydration effect grew the
+      // script-identity derivation (B-3) between these assertions' first and
+      // last matches. Same assertions, same one effect body — the window must
+      // still END inside that effect, which it does (the next declaration,
+      // handleExportReport, sits well past it).
+      const block = scriptDoctorPanel.slice(idx, idx + 3600);
       assert.match(block, /setReport\(initialReport\.report\);/);
       assert.match(block, /reportDraftGenRef\.current = initialReport\.generation;/, "must set the G0-02 write-back guard exactly as a fresh run would");
-      assert.match(block, /setActiveReportTitle\(initialReport\.title\);/);
+      // 2026-09-05 (B-3): the threaded report's title now goes through the
+      // same script-identity helper every other path uses
+      // (src/lib/doctor-history-identity.ts), so the panel's label, its export
+      // and its Draft History row cannot disagree about what was analyzed. The
+      // identity is still derived from `initialReport` alone — no new input.
+      assert.match(block, /const threadedIdentity = analyzedScriptIdentity\(/);
+      assert.match(block, /kind: "editor", hostTitle: initialReport\.title/);
+      assert.match(block, /setActiveReportTitle\(threadedIdentity\.title\);/);
+      assert.match(block, /setAnalyzedScript\(threadedIdentity\);/);
       assert.match(block, /setAnalyzedIsSample\(initialReport\.isSample\);/);
       assert.match(block, /setStatus\("success"\);/);
       assert.match(block, /recordDoctorHistory\(/, "must record draft-over-draft history the same as a fresh runDiagnosis()");
@@ -155,7 +180,12 @@ describe("W4 — CoverageSummary -> ScriptDoctorPanel 'Full report' handoff", ()
       // entry point, even though a real diagnosis (CoverageSummary's own
       // /api/scriptide/doctor call) is exactly what produced this report.
       const idx = scriptDoctorPanel.indexOf("const isFresh = currentGen");
-      const block = scriptDoctorPanel.slice(idx, idx + 2600);
+      // Window widened 2600 -> 3600 on 2026-09-05: the hydration effect grew the
+      // script-identity derivation (B-3) between these assertions' first and
+      // last matches. Same assertions, same one effect body — the window must
+      // still END inside that effect, which it does (the next declaration,
+      // handleExportReport, sits well past it).
+      const block = scriptDoctorPanel.slice(idx, idx + 3600);
       assert.match(
         block,
         /trackDoctorRun\(initialReport\.isSample \? "sample" : "draft"\);/,
