@@ -1131,6 +1131,30 @@ async function main() {
     if (sectionVisible10a) {
       await auditElement(page10a, versionsSection10a, 'light-ship-versions');
     }
+
+    // Round 3 fix (independent review round 2, item 3): 10a audited only
+    // the SAVE modal — but this round's own regression (SnapshotManager.tsx,
+    // the "Current unsaved changes will be lost." caption) lived in the
+    // RESTORE modal, which nothing gated. Open it once here (light theme;
+    // the dark pass gets its own re-open after the toggle below), audit,
+    // then Escape without actually restoring (there are two saved versions
+    // on screen either way, so this doesn't disturb them).
+    if (sectionVisible10a) {
+      const restoreBtn10a = page10a.getByRole('button', { name: /^Restore snapshot/ }).first();
+      const restoreReachable10a = await restoreBtn10a.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+      record('ship-versions-gate', 'a "Restore snapshot" button is reachable from the Versions list', restoreReachable10a);
+      if (restoreReachable10a) {
+        await restoreBtn10a.click();
+        const restoreModal10a = page10a.locator('[role="dialog"][aria-labelledby="restore-snapshot-modal-title"]').first();
+        const restoreVisible10a = await restoreModal10a.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+        record('ship-versions-gate', 'restore-snapshot-modal opens', restoreVisible10a);
+        if (restoreVisible10a) {
+          await auditElement(page10a, restoreModal10a, 'light-restore-snapshot-modal');
+          await page10a.keyboard.press('Escape');
+          await restoreModal10a.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
+        }
+      }
+    }
   }
 
   // Dark theme, same section, same two saved versions already on screen —
@@ -1159,6 +1183,22 @@ async function main() {
         await auditElement(page10a, modalDark10a, 'dark-save-snapshot-modal');
         await page10a.keyboard.press('Escape');
         await modalDark10a.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
+      }
+    }
+
+    // Round 3 fix (independent review round 2, item 3): dark-theme pass of
+    // the Restore modal audit added above.
+    const restoreBtnDark10a = page10a.getByRole('button', { name: /^Restore snapshot/ }).first();
+    const restoreReopened = await restoreBtnDark10a.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+    if (restoreReopened) {
+      await restoreBtnDark10a.click();
+      const restoreModalDark10a = page10a.locator('[role="dialog"][aria-labelledby="restore-snapshot-modal-title"]').first();
+      const restoreModalDarkVisible = await restoreModalDark10a.waitFor({ state: 'visible', timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+      record('ship-versions-gate', 'restore-snapshot-modal reopens in dark mode', restoreModalDarkVisible);
+      if (restoreModalDarkVisible) {
+        await auditElement(page10a, restoreModalDark10a, 'dark-restore-snapshot-modal');
+        await page10a.keyboard.press('Escape');
+        await restoreModalDark10a.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
       }
     }
   }

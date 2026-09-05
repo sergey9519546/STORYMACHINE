@@ -74,7 +74,13 @@ export function StateDeltaCard({ card, onConfirm, onEdit, onReject, disabled }: 
       </div>
 
       {card.dramaticIrony && (
-        <div className="text-[11px] bg-amber-500/10 text-amber-700 dark:text-amber-300 p-2 border border-amber-500/30 rounded flex items-center gap-2">
+        // a11y fix (2026-09-05, round 3 — theme-convention scanner's new
+        // reverse rule): this file carries no `dark:bg-*` anywhere — this
+        // card's whole surface is theme-invariant (`--sm-panel-2` cards
+        // throughout) — so `dark:text-amber-300` was an orphaned themed
+        // half with nothing dark to pair against. Dropped; `text-amber-700`
+        // alone is what already renders in both themes.
+        <div className="text-[11px] bg-amber-500/10 text-amber-700 p-2 border border-amber-500/30 rounded flex items-center gap-2">
           <span className="font-bold">🎭 Dramatic Irony:</span> Audience holds secret state unknown to in-scene characters.
         </div>
       )}

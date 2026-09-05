@@ -149,9 +149,16 @@ function LongTextField({
       {nearLimit && (
         <p
           id={`count-${charId}-${String(field)}`}
+          // a11y fix (2026-09-05, round 3 — theme-convention scanner's new
+          // reverse rule): this file has no `dark:bg-*` anywhere at all —
+          // this field's whole surface (the panel it sits in, the textarea
+          // above) is theme-invariant — so `dark:text-red-400`/`dark:text-
+          // yellow-400` were an orphaned themed half with no dark ambient
+          // to ever pair with. Dropped; the light-mode colour is already
+          // what renders in both themes.
           className={cn(
             "text-[9px] font-mono text-right mt-0.5",
-            count >= LONG_FIELD_MAX ? "text-red-500 dark:text-red-400" : "text-yellow-600 dark:text-yellow-400"
+            count >= LONG_FIELD_MAX ? "text-red-500" : "text-yellow-600"
           )}
         >
           {count}/{LONG_FIELD_MAX}

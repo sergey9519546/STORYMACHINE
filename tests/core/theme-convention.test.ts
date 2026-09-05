@@ -58,8 +58,9 @@
 // actually went invariant: not a Tailwind class on the row at all, but the
 // `.sm-btn` wrapper class two levels up).
 //
-// Two deliberate scope limits, kept because widening either would trade a
-// real capability for false positives or false confidence:
+// Three deliberate scope limits, kept because widening any of them would
+// trade a real capability for false positives or false confidence
+// (round 3 adds the third — independent review round 2, item 2):
 //   - `dark:bg-*` with a FRACTIONAL opacity suffix (`/10`, `/30`, …) is NOT
 //     treated as confidently dark. A low-alpha dark tint composites with
 //     whatever sits behind it — on this codebase's actual pattern (a
@@ -76,15 +77,52 @@
 //     (`dark:bg-zinc-800`, `dark:bg-zinc-900`) — so this exclusion loses no
 //     true positive.
 //   - A `className` that is a bare identifier referencing a variable
-//     defined elsewhere (e.g. SlatePanel.tsx's `const rowBg = i % 2 === 0
-//     ? "bg-[var(--sm-panel)]" : "bg-[var(--sm-panel-2)]"; ...
-//     className={rowBg}`) is not resolved back to its literal value — this
+//     defined elsewhere is not resolved back to its literal value — this
 //     walk reads the attribute's own source text, not a constant-folded
 //     evaluation. This cannot produce a false positive (an unresolved
 //     attribute just falls through to "inherit," same as no class at all)
-//     but it CAN miss a real bug hidden behind a variable; the browser
-//     gates in scripts/verify-a11y.mjs are the backstop for whatever this
-//     static walk cannot see.
+//     but it CAN miss a real bug hidden behind a variable. The LIVE shape
+//     of exactly this limit: SlatePanel.tsx's ranked table rows declare
+//     `const rowBg = i % 2 === 0 ? "bg-[var(--sm-panel)]" :
+//     "bg-[var(--sm-panel-2)]"` a few lines above, then reference it as
+//     `className={rowBg}` on the `<tr>` — this walk sees only the
+//     identifier `rowBg`, not the literal classes it holds, on both `<tr>`s
+//     that use it. That row background is theme-invariant today (proven at
+//     `fix/a-bare-var.tsx`, which reproduces the identical pattern with
+//     `main`'s pre-fix DARK values and still reports 0 — this walk cannot
+//     see it either way), so there is nothing live for this scanner to
+//     miss right now — but if a future edit made `rowBg` themed again
+//     (round 1 and round 2's own regression, in miniature), this walk
+//     would not catch it. `scripts/verify-a11y.mjs`'s step 10b
+//     (`light-/dark-slate-table`, a real scoped `axe.run` against the
+//     rendered table after a rank) is the backstop for exactly this case —
+//     proven able to catch it: the round-1 counterfactual
+//     (`.../scratchpad/gate-logs/slate-counterfactual-round2.log`) restored
+//     the pre-fix colours in the live DOM and the SAME scoped axe call
+//     reported the finding's own numbers (2.13/2.04 light, ~1.05 dark).
+//   - COMPOSITION ACROSS FUNCTION/COMPONENT BOUNDARIES IS NOT WALKED, and
+//     neither is JSX passed as an attribute value. This walk resets to the
+//     root defaults (`safe` background, `invariant` text) at the start of
+//     EVERY JSX tree it is handed — which is correct for the top-level
+//     call this test makes per file, but the walk never crosses INTO a
+//     separate function/component body it encounters (a `<Card s={s}/>`
+//     reference is a JsxSelfClosingElement or a childless JsxElement; this
+//     walk does not — and structurally cannot, without full type/import
+//     resolution across files and inlining — look inside `Card`'s own
+//     JSX to see what its `s` prop paints or colors), nor into JSX
+//     supplied as an attribute (`label={<span>…</span>}`, never a
+//     `node.children` entry). A `dark:bg-*` div wrapping `<Card
+//     s={s}/>` where `Card`'s own body renders an invariant-ink `<span>`
+//     is invisible to this walk (reproduced at `fix/b-cross-function.tsx`:
+//     0 violations; `fix/c-component-child.tsx`, a `<SomeText/>` child of a
+//     `dark:bg-zinc-800` div, likewise 0). Every real component in
+//     src/components today either renders its own text inline or is a
+//     leaf whose parent already gets scanned as its own file, so this has
+//     not (yet) hidden a live bug — but it means the reserved
+//     ScriptDoctorPanel.tsx count pinned below is a LOWER bound on what a
+//     component-boundary-aware walk would find, not the true count, and
+//     the browser gates remain the real backstop for cross-component
+//     composition the same way they are for the bare-variable case above.
 //
 // PROOF THIS DETECTOR HAS TEETH (LANE_STANDARD §3): run against
 // `git show main:src/components/scriptide/SnapshotManager.tsx` (i.e. before
@@ -100,19 +138,62 @@
 // fixed) tree, both files — along with every other file under
 // src/components except ScriptDoctorPanel.tsx (below) — report zero.
 //
-// ScriptDoctorPanel.tsx is the one exception: this walk finds 36 real
-// instances of the exact same defect there (verified by hand — e.g.
-// line ~5098's `<span className="text-xs font-bold">Graph Health</span>`
-// inside a `<div className="border-2 border-black dark:border-white/20
-// bg-white dark:bg-zinc-900 p-3">` — a genuine, unfixed B-11-shape bug).
-// That file is reserved for a different, concurrently-running lane (see
-// the original brief's constraints, and LANE_STANDARD §2's "the reason it
-// cannot be [fixed] is written down with file and line evidence") and the
-// round-1 independent review explicitly endorsed leaving it alone for
-// exactly that reason. The regression gate below therefore excludes it BY
-// NAME, with this paragraph as the citation, rather than silently scoping
-// past it — CoverageSummary.tsx and ScriptIDE.tsx (also reserved) need no
-// such exclusion, because this walk finds zero violations in either.
+// ROUND 3 (independent review round 2, item 1): the same proof for the
+// REVERSE rule. The forward-only detector reported ZERO violations against
+// `fix/f-reverse.tsx` (independent review's reproduction of this round's
+// own regression: `bg-[var(--sm-panel-2)]` — invariant, "safe" — wrapping
+// `<p className="text-xs text-gray-600 dark:text-gray-400">`) even though
+// the failure message already promised to catch "the reverse." With the
+// reverse rule implemented, that same fixture now reports ONE violation
+// (the `<p>`, effective background `safe`, effective text `themed`) — see
+// the "proof it can actually fail" describe block below.
+//
+// Turning the reverse rule ON and scanning the live tree found THREE more
+// real, live instances of the exact same shape — a themed `dark:text-*`
+// orphaned on a file with no `dark:bg-*` anywhere to pair it with — none
+// of them previously known:
+//   - Sidebar.tsx (LongTextField's character-count caption): `text-red-500
+//     dark:text-red-400` / `text-yellow-600 dark:text-yellow-400` — this
+//     entire file has zero `dark:bg-*` occurrences. FIXED (dropped the
+//     `dark:` half; the file's real ambient never leaves light).
+//   - StateDeltaCard.tsx (the "Dramatic Irony" callout): `text-amber-700
+//     dark:text-amber-300` on the SAME `bg-amber-500/10` — this file too
+//     has zero `dark:bg-*` occurrences. FIXED, same way.
+//   - ScriptIDE.tsx (`renderTitlePage`, `:2222`): `bg-[var(--sm-panel)]
+//     dark:text-white` — an invariant background with white text once
+//     dark mode is toggled. Real, live, NOT fixed — see RESERVED_FILES
+//     below for why (this file is reserved for a different lane).
+// Building the reverse rule ALSO surfaced one false positive along the way
+// (documented at hasFractionalDarkBg's definition below): a same-element
+// pair like `bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300`
+// (SlatePanel.tsx's former deploying/error banners, before round 2 made
+// the whole file invariant) is correctly, fully themed, but the earlier
+// version of this rule flagged it because a fractional dark background
+// was being treated as confidently "safe" rather than left ambiguous.
+// Fixed before this rule shipped — see the fixture proof below ("the
+// SlatePanel historical alert-box shape").
+//
+// ScriptDoctorPanel.tsx is the confirmed exception at scale: this walk
+// finds AT LEAST 65 real instances of the forward OR reverse shape there —
+// 36 forward (verified by hand in round 2 — e.g. line ~5098's `<span
+// className="text-xs font-bold">Graph Health</span>` inside a `<div
+// className="border-2 border-black dark:border-white/20 bg-white
+// dark:bg-zinc-900 p-3">`) plus 29 more the reverse rule newly finds this
+// round (e.g. `:807`'s `text-gray-600 dark:text-gray-300` — the identical
+// Sidebar.tsx/StateDeltaCard.tsx shape, in this file too). "At least"
+// because of the third scope limit above (composition across function/
+// component boundaries is not walked) — a component-boundary-aware
+// version of this walk could find more in that same file; 65 is what THIS
+// walk can see today, a floor, not a ceiling. That file is reserved for a
+// different, concurrently-running lane (see the original brief's
+// constraints, and LANE_STANDARD §2's "the reason it cannot be [fixed] is
+// written down with file and line evidence") and the round-1 independent
+// review explicitly endorsed leaving it alone for exactly that reason.
+// ScriptIDE.tsx joins it this round for the one reverse-rule hit above.
+// The regression gate below excludes both BY NAME, with this paragraph as
+// the citation, rather than silently scoping past them —
+// CoverageSummary.tsx (also reserved) needs no such exclusion, because
+// this walk finds zero violations there either way.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -125,10 +206,17 @@ const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const COMPONENTS_DIR = join(REPO_ROOT, 'src', 'components');
 
 // Reserved for a different, concurrently-running lane (see this file's
-// header) — real violations found there are disclosed in the round-2
-// report, not fixed here, and not asserted against below.
+// header) — real violations found there are disclosed in the round-2 and
+// round-3 reports, not fixed here, and not asserted against below.
+// ScriptIDE.tsx joined this set in round 3: the new REVERSE rule (see the
+// header) found ONE real, live instance at `:2222` (renderTitlePage's
+// `bg-[var(--sm-panel)] dark:text-white` — an invariant background with an
+// orphaned `dark:text-white`, so "written by" and the author field render
+// white-on-cream once dark mode is toggled) — a genuine bug, but in a file
+// this lane does not own.
 const RESERVED_FILES = new Set([
   join('src', 'components', 'scriptide', 'ScriptDoctorPanel.tsx'),
+  join('src', 'components', 'ScriptIDE.tsx'),
 ]);
 
 interface Violation {
@@ -138,7 +226,13 @@ interface Violation {
 }
 
 type BgMode = 'inherit' | 'safe' | 'dark';
-type TextMode = 'inherit' | 'safe' | 'invariant';
+// 'themed' (round 3, independent review round 2 item 1) is an element's own
+// (or inherited) `dark:text-*` color declaration — a text color that
+// EXPECTS the ambient to toggle with it. It is distinct from 'invariant'
+// (never changes) and 'safe' (a plain light-only color, e.g. `text-red-700`
+// alone, that never changes either but isn't the --sm-ink family this
+// scanner tracks). See findThemeConventionViolations's reverse check below.
+type TextMode = 'inherit' | 'safe' | 'invariant' | 'themed';
 
 // `.sm-btn` / `.sm-btn--ink` / `.sm-btn--stamp` (design-system.css:131-136)
 // each set BOTH a fixed background AND a fixed text color via a plain CSS
@@ -209,6 +303,14 @@ interface Classification {
   raw: string;
   newBg: BgMode;
   newText: TextMode;
+  // True when THIS element's own className declares SOME dark:bg-* token,
+  // solid or fractional — used to exempt a genuine same-element pair (a
+  // fractional dark:bg with the SAME element's own dark:text-*, e.g. a
+  // semantic alert box) from the reverse check even though the fractional
+  // background resolves to 'inherit' for propagation purposes. See the
+  // reverse-rule fixture proof below ("the SlatePanel historical alert-box
+  // shape") for why this exists.
+  ownAttemptedDarkBg: boolean;
 }
 
 function classify(
@@ -220,7 +322,27 @@ function classify(
   const raw = classNameRaw(el, sf);
   const isSmBtnFamily = SMBTN_FAMILY_RE.test(raw);
   const hasDarkBg = hasSolidDarkBg(raw);
-  const hasBg = hasDarkBg || hasAnyDarkBgToken(raw) || ANY_BG_RE.test(raw) || isSmBtnFamily;
+  // A FRACTIONAL dark:bg-* token (present, but not solid — see
+  // hasSolidDarkBg) makes this element's OWN dark-mode background
+  // ambiguous, not "confidently light." A same-element pair like
+  // `bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300` (a
+  // common semantic-alert shape, e.g. SlatePanel.tsx's historical
+  // deploying/error banners) is correctly, fully themed — but under
+  // `.dark`, Tailwind's cascade REPLACES `bg-red-50` with the translucent
+  // `dark:bg-red-950/40`, whose real rendered color depends on whatever
+  // ambient sits behind it, which could be genuinely dark. Treating that
+  // case as 'safe' (rather than passing the INHERITED bg through
+  // unchanged) previously produced a false REVERSE-rule positive on this
+  // exact shape (found building the reverse rule, round 3): the element's
+  // own `dark:text-*` looked "orphaned" against a background this walk had
+  // wrongly asserted was confidently light. `hasFractionalDarkBg` lets such
+  // an element fall through to `inherit` instead, so it takes on whatever
+  // the real ambient already was — correct whether that ambient is
+  // genuinely dark (this shape) or genuinely invariant (AnalysisPanel.tsx's
+  // real fractional-tint cards, this file's other fractional-opacity proof
+  // fixture, unaffected by this change).
+  const hasFractionalDarkBg = hasAnyDarkBgToken(raw) && !hasDarkBg;
+  const hasOwnSolidBg = hasDarkBg || ANY_BG_RE.test(raw) || isSmBtnFamily;
 
   let hasAnyTextColor = false;
   let hasDarkTextColor = false;
@@ -241,13 +363,26 @@ function classify(
   }
 
   const ownTextIsInvariant = hasOwnInvariantInk && !hasDarkTextColor;
-  const ownBgMode: BgMode = !hasBg ? 'inherit' : hasDarkBg ? 'dark' : 'safe';
-  const ownTextMode: TextMode = !hasAnyTextColor ? 'inherit' : ownTextIsInvariant ? 'invariant' : 'safe';
+  const ownBgMode: BgMode = hasDarkBg
+    ? 'dark'
+    : hasFractionalDarkBg
+      ? 'inherit' // ambiguous — pass the real ambient through, see above
+      : hasOwnSolidBg
+        ? 'safe'
+        : 'inherit';
+  const ownTextMode: TextMode = !hasAnyTextColor
+    ? 'inherit'
+    : ownTextIsInvariant
+      ? 'invariant'
+      : hasDarkTextColor
+        ? 'themed'
+        : 'safe';
 
   return {
     raw,
     newBg: ownBgMode === 'inherit' ? inheritedBg : ownBgMode,
     newText: ownTextMode === 'inherit' ? inheritedText : ownTextMode,
+    ownAttemptedDarkBg: hasDarkBg || hasFractionalDarkBg,
   };
 }
 
@@ -281,16 +416,36 @@ function hasDirectText(el: ts.JsxElement): boolean {
 /** The detector: a real JSX-subtree walk (TypeScript's own AST, not an
  *  indentation heuristic) that tracks the CSS-composited background and
  *  inherited text color down the tree and flags any text-bearing leaf where
- *  the two disagree — see this file's header for the full mechanism and its
- *  two disclosed scope limits. */
+ *  the two disagree, in EITHER direction — see this file's header for the
+ *  full mechanism and its disclosed scope limits.
+ *
+ *  FORWARD (B-11/B-14's shape): effective background is a solid `dark:bg-*`
+ *  and effective text is invariant ink — a real dark surface under text
+ *  that never reacts to the toggle.
+ *
+ *  REVERSE (round 3, independent review round 2 item 1 —
+ *  `SnapshotManager.tsx`'s own round-2 regression, reproduced at
+ *  `fix/f-reverse.tsx` in the review): effective background never carries a
+ *  `dark:bg-*` anywhere in the chain down to this leaf (it is `safe` —
+ *  invariant, or a plain light-only color) and this leaf's own text carries
+ *  a `dark:text-*` color — a themed text half with no themed background to
+ *  pair it with, so the `dark:` half fires against an ambient that never
+ *  goes dark. The failure message below names both. */
 function findThemeConventionViolations(source: string, filePath: string): Violation[] {
   const sf = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const violations: Violation[] = [];
 
   function visit(node: ts.Node, bg: BgMode, text: TextMode): void {
     if (ts.isJsxElement(node)) {
-      const { raw, newBg, newText } = classify(node.openingElement, sf, bg, text);
-      if (newBg === 'dark' && newText === 'invariant' && hasDirectText(node)) {
+      const { raw, newBg, newText, ownAttemptedDarkBg } = classify(node.openingElement, sf, bg, text);
+      const isForwardViolation = newBg === 'dark' && newText === 'invariant';
+      // `!ownAttemptedDarkBg`: a leaf whose OWN className already attempts
+      // a dark:bg-* (even a fractional one that resolves to 'inherit' for
+      // propagation, see hasFractionalDarkBg's comment) is a same-element
+      // themed pair, not an orphaned dark:text-* — exempt it here even
+      // though the resolved effective background is 'safe'.
+      const isReverseViolation = newBg === 'safe' && newText === 'themed' && !ownAttemptedDarkBg;
+      if ((isForwardViolation || isReverseViolation) && hasDirectText(node)) {
         const { line } = ts.getLineAndCharacterOfPosition(sf, node.openingElement.getStart(sf));
         violations.push({ file: filePath, line: line + 1, value: raw || '(inherited)' });
       }
@@ -412,6 +567,121 @@ describe('theme-convention scanner — proof it can actually fail (LANE_STANDARD
     const fixture = '<div className="bg-red-50 dark:bg-red-900/10 p-3"><p className="text-[var(--sm-ink)]">{"warn"}</p></div>';
     assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
   });
+
+  it('does NOT flag a same-element fractional-dark-bg PROPERLY paired with its own dark:text-* — the SlatePanel historical alert-box shape', () => {
+    // Building the reverse rule (round 3) this fixture was a false
+    // positive: `dark:bg-red-950/40` is fractional, so this walk (correctly)
+    // does not call it confidently dark — but the earlier version then
+    // asserted the opposite (confidently 'safe'), so the element's own
+    // `dark:text-red-300` looked orphaned and the reverse rule fired. A
+    // fractional dark:bg now falls through to `inherit` instead of
+    // asserting 'safe', so this same-element pair (correctly, fully
+    // themed — its true dark-mode background is genuinely ambiguous/
+    // context-dependent, not confidently light) is left alone either way.
+    // Literal shape of `git show main:src/components/SlatePanel.tsx`'s
+    // former deploying/error banners.
+    const fixture = '<div className="bg-red-50 dark:bg-red-950/40 border-2 border-red-300 dark:border-red-800 text-red-700 dark:text-red-300">{rankError}</div>';
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  // ── REVERSE rule (round 3, independent review round 2, item 1) ──────────
+
+  it('REVERSE: flags an invariant background whose descendant text carries an orphaned dark:text-* — this round\'s own regression', () => {
+    // Literal reproduction of the independent review's `fix/f-reverse.tsx`
+    // — the exact shape of the SnapshotManager.tsx:405 regression this
+    // round's own fix caught (bg-[var(--sm-panel-2)], invariant, wrapping
+    // a caption whose `dark:text-gray-400` kept firing with no themed
+    // background to pair it with). Before this rule existed, this fixture
+    // reported ZERO violations even though the failure message already
+    // promised "or the reverse."
+    const fixture = [
+      '<div className="bg-[var(--sm-panel-2)] p-6">',
+      '  <p className="text-xs text-gray-600 dark:text-gray-400">Current unsaved changes will be lost.</p>',
+      '</div>',
+    ].join('\n');
+    const violations = findThemeConventionViolations(fixture, 'fixture.tsx');
+    assert.equal(violations.length, 1);
+    assert.ok(violations[0].value.includes('dark:text-gray-400'));
+  });
+
+  it('REVERSE: does NOT flag a dark:text-* that IS paired with a real dark:bg-* ancestor (the correct fully-themed convention)', () => {
+    const fixture = [
+      '<div className="bg-white dark:bg-zinc-900 p-4">',
+      '  <p className="text-gray-600 dark:text-gray-400">fine</p>',
+      '</div>',
+    ].join('\n');
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  it('REVERSE: does NOT flag a dark:text-* on an invariant background that is ALSO overridden by the same element\'s own bg (same-element fully-themed pair)', () => {
+    const fixture = '<div className="bg-[var(--sm-panel-2)] p-4"><p className="bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400">fine</p></div>';
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  // ── Third scope limit (round 3, independent review round 2, item 2):
+  //    composition across function/component boundaries, and JSX passed as
+  //    an attribute value, are NOT walked. Both reproduced from the
+  //    review's own fixtures (fix/b-cross-function.tsx,
+  //    fix/c-component-child.tsx) — literal copies, not paraphrased —
+  //    proving the walk reports 0 on shapes that ARE real bugs, exactly as
+  //    the header now discloses. These are NOT "does not flag" fixtures in
+  //    the same sense as the ones above (which prove a CORRECT non-flag);
+  //    they document a known gap so its absence is a decision, not a
+  //    silent hole. ──────────────────────────────────────────────────────
+
+  it('SCOPE LIMIT (disclosed): does not see a bug that crosses a function/component boundary in the same file', () => {
+    // fix/b-cross-function.tsx — a <Card> whose invariant-ink <span>
+    // renders inside a dark:bg-zinc-800 <Panel> wrapper: a real B-11-shape
+    // bug (measured shape identical to the historical one), invisible to
+    // this walk because it never enters Card's own function body.
+    const fixture = [
+      'function Card({ s }) {',
+      '  return <div className="p-4"><span className="text-[var(--sm-ink-mute)]">{s.date}</span></div>;',
+      '}',
+      'export function Panel({ items }) {',
+      '  return (',
+      '    <div className="bg-white dark:bg-zinc-800 p-4">',
+      '      {items.map((s) => <Card key={s.id} s={s} />)}',
+      '    </div>',
+      '  );',
+      '}',
+    ].join('\n');
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  it('SCOPE LIMIT (disclosed): does not see a bug rendered by a child component (its own JSX lives in another function)', () => {
+    // fix/c-component-child.tsx — <SomeText/> may render invariant-ink
+    // text inside this dark:bg-zinc-800 div; this walk cannot know without
+    // resolving into SomeText's own definition.
+    const fixture = '<div className="bg-white dark:bg-zinc-800 p-4"><SomeText value={label} /></div>';
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  it('SCOPE LIMIT (disclosed, live): the bare-variable limit\'s actual shape in SlatePanel.tsx today reports 0 either way, so nothing live is currently hidden by it', () => {
+    // fix/a-bare-var.tsx — literal reproduction of SlatePanel.tsx's real
+    // `const rowBg = ...; <tr className={rowBg}>` pattern, fed BOTH the
+    // live (theme-invariant) value and, here, main's pre-fix DARK value —
+    // both report 0, because this walk never resolves `rowBg` back to
+    // either literal. scripts/verify-a11y.mjs step 10b
+    // (light-/dark-slate-table) is the real backstop for this shape — see
+    // this file's header for the counterfactual proof that it actually
+    // catches it.
+    const fixture = [
+      '<div className="overflow-x-auto sm-btn">',
+      '  <table><tbody>',
+      '    {entries.map((e, i) => {',
+      '      const rowBg = i % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-gray-50 dark:bg-zinc-800";',
+      '      return (',
+      '        <tr key={i} className={rowBg}>',
+      '          <td className="px-2 py-2 font-bold">{i + 1}</td>',
+      '        </tr>',
+      '      );',
+      '    })}',
+      '  </tbody></table>',
+      '</div>',
+    ].join('\n');
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
 });
 
 describe('theme-convention scanner — reproduces the real historical bugs on pre-fix source', () => {
@@ -472,13 +742,48 @@ describe('theme-convention scanner — the actual regression gate over src/compo
     );
   });
 
-  it('the reserved ScriptDoctorPanel.tsx exclusion is not silently hiding a bigger number than it looks — recorded here so a change is visible in review', () => {
+  it('the reserved ScriptDoctorPanel.tsx exclusion is a pinned LOWER BOUND, not a claimed total count', () => {
+    // Round 3 (independent review round 2, item 2): this was originally
+    // `assert.equal(violations.length, 36)` (the forward rule only). Given
+    // the disclosed third scope limit (composition across function/
+    // component boundaries is not walked — this file's header), that
+    // number was already only what THIS walk could see in a 5,000+ line
+    // file full of extracted sub-components, never a claimed total — a
+    // component-boundary-aware walk could find more. Adding the REVERSE
+    // rule this same round raised it further, for real: hand-checked, the
+    // new hits are genuine orphaned `dark:text-*` pairs in this file too
+    // (e.g. `:807`'s `text-gray-600 dark:text-gray-300` on an invariant
+    // ancestor), the same shape as the ones this round fixed in
+    // Sidebar.tsx and StateDeltaCard.tsx — not a scanner false-positive
+    // regression. Re-pinned at the new measured floor. `assert.ok(>= N)`
+    // still catches a REGRESSION (a fix there dropping the count, or this
+    // scanner's own logic drifting) without asserting a completeness this
+    // walk cannot back up — it fails loudly if the count ever drops below
+    // what was last confirmed, and a human should look at (not silently
+    // re-pin) a count that goes UP, since it could be this walk finding
+    // more real bugs OR a false-positive regression in the walk itself.
     const file = join(COMPONENTS_DIR, 'scriptide', 'ScriptDoctorPanel.tsx');
     const source = readFileSync(file, 'utf8');
     const violations = findThemeConventionViolations(source, relative(REPO_ROOT, file));
-    // Not a pass/fail assertion on the count itself (this lane does not own
-    // that file) — it pins the number so any future change to it shows up
-    // as a diff in this test rather than an invisible drift either way.
-    assert.equal(violations.length, 36);
+    assert.ok(
+      violations.length >= 65,
+      `expected at least 65 (previously confirmed, forward + reverse) violations in the reserved file, found ${violations.length} — `
+      + 'if this DROPPED, something in that file or this scanner regressed; if it ROSE, check by hand before re-pinning',
+    );
+  });
+
+  it('the reserved ScriptIDE.tsx exclusion is also a pinned lower bound', () => {
+    // Round 3: ScriptIDE.tsx joined RESERVED_FILES this round because the
+    // new reverse rule found one real, live bug there (renderTitlePage's
+    // `bg-[var(--sm-panel)] dark:text-white` — see RESERVED_FILES's own
+    // comment above). Same lower-bound shape as ScriptDoctorPanel.tsx's
+    // test above, for the same reason.
+    const file = join(COMPONENTS_DIR, 'ScriptIDE.tsx');
+    const source = readFileSync(file, 'utf8');
+    const violations = findThemeConventionViolations(source, relative(REPO_ROOT, file));
+    assert.ok(
+      violations.length >= 1,
+      `expected at least 1 (previously confirmed) violation in the reserved file, found ${violations.length}`,
+    );
   });
 });

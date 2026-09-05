@@ -431,6 +431,14 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="slate-panel-title"
+      // a11y fix (2026-09-05, round 3 — independent review round 2, item
+      // 4): this scoping hook used to start at the content container below,
+      // so the chrome header (the file/char counts, Add/Close buttons) and
+      // the file-picker error banner above it sat outside the audited
+      // subtree — a gate blind spot (both measured clean today, but nothing
+      // proved it). Moved to the drawer root so scripts/verify-a11y.mjs's
+      // scoped axe.run covers the whole dialog (37 nodes, in-DOM count).
+      data-a11y-section="slate-table"
       initial={{ x: "100%" }}
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
@@ -529,8 +537,14 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
           measured live at 2.26:1 fixing this item, the mirror image of
           B-11. `--sm-ink-mute` (already this file's own convention for
           descriptive captions, see ShapeRhythmTrendLine-equivalent copy
-          elsewhere in the app) replaces it everywhere in this panel. */}
-      <div className="p-6 space-y-6 flex-1" data-a11y-section="slate-table">
+          elsewhere in the app) replaces it everywhere in this panel.
+
+          Round 3 (independent review round 2, item 4): the scoping hook
+          itself moved up to the drawer root (above, on the `motion.div`) so
+          the chrome header and the file-picker error banner are covered
+          too — this container no longer carries its own copy, so exactly
+          one element in the dialog carries `data-a11y-section`. */}
+      <div className="p-6 space-y-6 flex-1">
         {/* ── File list ───────────────────────────────────────────────── */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
