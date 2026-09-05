@@ -205,11 +205,10 @@ async function main() {
   await cancelBtn.waitFor({ state: 'visible', timeout: timing.ms(10000) });
   await cancelBtn.click({ timeout: timing.ms(5000) });
   // Give the abort + the child's own status transition (loading -> idle) a
-  // moment to reach the parent, THEN check the toolbar toggle repeatedly
-  // over a real interval — the pre-fix bug was that this sentence never
-  // clears, not that it takes a moment to clear, so polling here would mask
-  // exactly the regression this step exists to catch. A single read after a
-  // fixed settle window is the correct check.
+  // moment to reach the parent — the pre-fix bug was that this sentence
+  // never clears, not that it takes a moment to clear, so polling here
+  // would mask exactly the regression this step exists to catch. A single
+  // read after a fixed settle window is the correct check.
   await cancelPage.waitForTimeout(timing.ms(800));
   const cancelToggle = cancelPage.getByRole('button', { name: 'Open full report' }).first();
   const cancelToggleTitle = await cancelToggle.getAttribute('title');

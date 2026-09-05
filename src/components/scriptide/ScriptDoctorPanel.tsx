@@ -831,8 +831,19 @@ function ShapeRhythmSection({
                   {signals.actionSentenceCvOverall.toFixed(2)}
                 </span>
               </div>
+              {/* Round-3 review fix (2026-09-05, non-blocking item 2): this
+                  gloss used to repeat the SAME words the retired third
+                  wording (named in src/lib/structural-signals-copy.ts's own
+                  header) used for the label above it — item 7/round-2
+                  replaced that wording everywhere else with the shared
+                  ACTION_PROSE_VARIATION_LABEL, but this gloss sat one line
+                  below the label reading as a near-synonym of it rather
+                  than an explanation. Reworded so it no longer echoes that
+                  retired phrasing at all; see structural-signals-copy.ts's
+                  header for the exact string this and every other surface
+                  no longer uses. */}
               <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
-                Sentence-length variation across the draft&rsquo;s action lines — descriptive only, not part
+                How much action-sentence length varies across the draft — descriptive only, not part
                 of the score.
               </p>
             </div>
@@ -885,8 +896,11 @@ function ShapeRhythmUnscored({ signals }: { signals: StructuralSignalsReport }) 
               {signals.actionSentenceCvOverall.toFixed(2)}
             </span>
           </div>
+          {/* Round-3 review fix (2026-09-05, non-blocking item 2): same
+              retired-wording rewording as ShapeRhythmSection's own gloss
+              above — see that comment. */}
           <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
-            Sentence-length variation across the draft&rsquo;s action lines — the one document-wide
+            How much action-sentence length varies across the draft — the one document-wide
             reading that needs no second scene. Descriptive only, not part of the score.
           </p>
         </div>

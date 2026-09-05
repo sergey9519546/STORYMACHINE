@@ -2782,7 +2782,50 @@ export default function ScriptIDE({
                   both the writer's next click at once: this one opens the
                   panel that button lives inside), but a query by accessible
                   name used to match both and needed an xpath
-                  `not(ancestor::aside)` to disambiguate; now it doesn't. */}
+                  `not(ancestor::aside)` to disambiguate; now it doesn't.
+                  Round-3 review fix (2026-09-05, non-blocking item 1): below
+                  the `sm` breakpoint (640px, the same one CoverageSummary's
+                  own aside uses to go from `w-full` to a fixed `sm:w-[380px]`
+                  drawer), this button is ALSO hidden while
+                  `toolSlot === "coverage" && !coverageFull` — the exact
+                  window in which CoverageSummary renders. Measured live: at
+                  375px the aside is `h-dvh w-full`, i.e. genuinely
+                  edge-to-edge over the ENTIRE viewport (confirmed by
+                  screenshot — its own header paints over this button's
+                  entire row, all the way up to y=0), so a real pointer click
+                  here could never reach this button in the first place; the
+                  bug was that keyboard Tab still could (this control has no
+                  focus trap of its own — CoverageSummary is `role="region"`,
+                  not a modal), landing a keyboard user on a button they
+                  cannot see, sitting behind an opaque full-screen panel. The
+                  first fix attempted here — raising just this button's
+                  z-index above the aside so a real click WOULD land — was
+                  tried and rejected: it renders as a stray "FULL REPORT"
+                  pill floating in the middle of the verdict paragraph's
+                  text, on top of the panel's own identical, correctly-placed
+                  "Full report" button visible a few lines below it — a
+                  worse, actively confusing state than the one being fixed,
+                  not a better one (kept as a screenshot in the round-3
+                  report). `max-sm:!hidden` (important-modifier, not plain
+                  `max-sm:hidden` — the SAME cascade-layer trap area 6 hit:
+                  `.sm-btn` in design-system.css sets `display: inline-flex`
+                  UNLAYERED, which beats any plain Tailwind display utility
+                  regardless of media query, and a plain `max-sm:hidden`
+                  measured `display: flex` live here before the `!` was
+                  added) is the same treatment area 6's `md:!hidden` gave
+                  `button[aria-label="Close studio panel"]` in the very same
+                  lane: remove a control from BOTH the
+                  pointer and the keyboard path once the surface it would
+                  open is already open and visually covering it — the
+                  panel's own controls (Run coverage / Cancel / the
+                  sticky-footer Full report / Retry-Use sample) are the real
+                  route in every one of those states, exactly as
+                  `coverageFullReportToggleState`'s own comment already says.
+                  Applies only to the `!coverageFull` half of this branch —
+                  once `coverageFull` is true the writer is inside a REAL
+                  `role="dialog"` (ScriptDoctorPanel) with its own focus
+                  trap, so Tab genuinely cannot reach this button there
+                  either, and no such inconsistency exists to fix. */}
               <button
                 type="button"
                 onClick={() =>
@@ -2798,7 +2841,7 @@ export default function ScriptIDE({
                 className={
                   toolSlot !== "coverage"
                     ? "sm-btn sm-btn--ink py-1.5"
-                    : "sm-btn py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    : `sm-btn py-1.5 disabled:opacity-40 disabled:cursor-not-allowed${coverageFull ? "" : " max-sm:!hidden"}`
                 }
               >
                 {toolSlot !== "coverage" ? "Open coverage" : coverageFull ? "Summary" : "Full report"}

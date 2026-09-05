@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 // Round-2 review fix (2026-09-05): the actual shared label, not a copy of
 // its string — src/lib/structural-signals-copy.ts is pure (no I/O, no
 // randomness), so importing it for real here is exactly what proves the
@@ -104,6 +105,26 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
 
     it('the exported constant is exactly "Action-prose variation" (title case, matching how it already renders on screen)', () => {
       assert.equal(ACTION_PROSE_VARIATION_LABEL, 'Action-prose variation');
+    });
+
+    // Round-3 review fix (2026-09-05, non-blocking item 2): the panel's own
+    // one-scene AND scored-section glosses ("Sentence-length variation
+    // across the draft's action lines — …") still repeated the retired
+    // third wording one line under the shared label, reading as a
+    // near-synonym rather than an explanation. Reworded; this asserts zero
+    // RENDERED occurrences remain anywhere in src/ or server/ — comments
+    // documenting the retired wording's history (this file's own header,
+    // coverage-letter.ts's own comment) are fine and expected, so the check
+    // is scoped to non-comment lines.
+    it('the retired third wording ("sentence-length variation across the draft") renders nowhere in src/ or server/ — only in historical comments', () => {
+      const rg = spawnSync('grep', ['-rn', '-i', 'sentence-length variation', resolve(__dirname, '../../src'), resolve(__dirname, '../../server')], { encoding: 'utf8' });
+      const hits = (rg.stdout ?? '').split('\n').filter((l) => l.trim().length > 0);
+      const nonCommentHits = hits.filter((l) => {
+        const afterPath = l.slice(l.indexOf(':', l.indexOf(':') + 1) + 1);
+        const trimmed = afterPath.trim();
+        return !trimmed.startsWith('//') && !trimmed.startsWith('*') && !trimmed.startsWith('/*');
+      });
+      assert.deepEqual(nonCommentHits, [], `retired wording still rendered:\n${nonCommentHits.join('\n')}`);
     });
   });
 

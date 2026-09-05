@@ -735,6 +735,46 @@ async function main() {
     !!hit375?.isFullReportBtn,
     `rect=${JSON.stringify(rect375)} hit=${JSON.stringify(hit375)}`,
   );
+
+  // Round-3 review, non-blocking item 1 (2026-09-05): the STATUS BAR's OWN
+  // "Open full report" toggle (ScriptIDE.tsx, distinct from the panel's own
+  // sticky-footer button above) sits directly underneath the coverage
+  // `aside` at 375px, which is `h-dvh w-full` — genuinely edge-to-edge over
+  // the ENTIRE viewport at this width (measured: its own header paints over
+  // this button's whole row, all the way to y=0), so a real, non-force
+  // click here could never reach it. That part matches "the panel's own
+  // controls are the route" and costs nothing on its own. The actual defect
+  // was narrower: this control had NO focus trap protecting it (the aside
+  // is `role="region"`, not a modal), so keyboard Tab could still land a
+  // writer on a button they cannot see, sitting behind an opaque
+  // full-screen panel — reachable by keyboard, not by pointer, an
+  // inconsistency neither input mode should have. Fixed by removing it
+  // from BOTH paths at once (`max-sm:!hidden`) rather than making the
+  // pointer path succeed — raising this button's stacking above the aside
+  // was tried and rejected: it renders a stray "FULL REPORT" pill floating
+  // over the verdict paragraph's own text, on top of the correct one
+  // already visible in the sticky footer a few lines below it (kept as a
+  // screenshot in the round-3 report) — a worse, more confusing state than
+  // the one being fixed. Both halves are asserted: the real click still
+  // legitimately cannot reach it (unchanged, and correctly so), and it is
+  // no longer part of the accessibility tree at all while covered — no
+  // reachable-by-keyboard-only phantom control remains.
+  const toolbarToggle375 = page375.getByRole('button', { name: 'Open full report' });
+  const toolbarToggle375Count = await toolbarToggle375.count();
+  let toolbarToggle375Clicked = false;
+  if (toolbarToggle375Count > 0) {
+    try {
+      await toolbarToggle375.first().click({ timeout: timing.ms(5000) });
+      toolbarToggle375Clicked = true;
+    } catch { /* expected: recorded below */ }
+  }
+  record(
+    'P3-mobile',
+    'at 375px, the STATUS BAR\'s own "Open full report" toggle is removed from the accessibility tree entirely while the coverage panel covers it (no phantom keyboard-reachable control behind an opaque full-screen panel)',
+    toolbarToggle375Count === 0 && !toolbarToggle375Clicked,
+    `count=${toolbarToggle375Count} clicked=${toolbarToggle375Clicked}`,
+  );
+
   let dialog375Opened = false;
   try {
     await fullReportBtn375.click({ timeout: timing.ms(10000) });
