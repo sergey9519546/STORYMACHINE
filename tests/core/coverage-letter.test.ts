@@ -560,8 +560,12 @@ describe('renderCoverageLetter — shape and rhythm caveat', () => {
     assert.match(markdown, /needs at least two scenes.*this draft has 1/);
     // meanAbsDialogueShareDelta is 0 by construction with one scene (no
     // scene-to-scene delta exists) — never named, since it is not a genuine
-    // reading. actionSentenceCvOverall IS genuinely computed and must appear.
-    assert.match(markdown, /action lines is 1\.00/);
+    // reading. actionSentenceCvOverall IS genuinely computed and must appear,
+    // under the SHARED label (round-2 review fix, 2026-09-05 — this used to
+    // be its own third wording, "the sentence-length variation across the
+    // draft's action lines", for the same reading the panel and coverage-
+    // html.ts name differently again; see src/lib/structural-signals-copy.ts).
+    assert.match(markdown, /action-prose variation is 1\.00/);
     assert.ok(!markdown.includes('scene-to-scene change in the dialogue/action word mix'));
   });
 
@@ -585,7 +589,7 @@ describe('renderCoverageLetter — shape and rhythm caveat', () => {
       `dialogue\\/action word mix is ${report.structuralSignals!.meanAbsDialogueShareDelta.toFixed(2)}`.replace('\\/', '/'),
     );
     const cvIdx = markdown.indexOf(
-      `action lines is ${report.structuralSignals!.actionSentenceCvOverall.toFixed(2)}`,
+      `action-prose variation is ${report.structuralSignals!.actionSentenceCvOverall.toFixed(2)}`,
     );
     assert.ok(meanAbsIdx !== -1, 'must state meanAbsDialogueShareDelta');
     assert.ok(cvIdx !== -1, 'must state actionSentenceCvOverall');

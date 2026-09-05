@@ -774,10 +774,13 @@ export default function CoverageSummary({
           (`document.elementFromPoint` at the button's own centre resolving
           to something else entirely) cannot occur once the button is not
           competing with in-flow content for a stacking position. Rendered
-          for every state that has something to open a full report on
-          (a completed report, an incomplete one, or a failure with a report
-          shape at all) — never for "idle"/"loading"/"error", which have no
-          report to open. */}
+          exactly when `status === "success" && report` — a completed
+          report, or an incomplete one (the same condition gates the
+          "Analysis incomplete" branch above; both have a report worth
+          opening) — never for "idle", "loading", or "error", none of which
+          have a report to open (a failed run has no report shape at all;
+          see ScriptIDE.tsx's own honest "Coverage failed — retry to open
+          the full report." title for that state's toolbar toggle instead). */}
       {status === "success" && report && (
         <div className="shrink-0 border-t-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] p-3">
           <button type="button" onClick={onOpenFullReport} className="sm-btn sm-btn--ink w-full">

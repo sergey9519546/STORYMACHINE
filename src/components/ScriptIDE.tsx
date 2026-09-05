@@ -473,6 +473,16 @@ export default function ScriptIDE({
    *  resolves) on a cold "write some script content" dead end with zero
    *  doctor POSTs ever completing. */
   const [coverageSummaryStatus, setCoverageSummaryStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  /** Round-2 review fix (2026-09-05): the status just BEFORE the one being
+   *  reported, so `handleCoverageSummaryStatusChange` below can tell "a run
+   *  that was genuinely in flight just terminated without a report" (loading
+   *  -> idle on Cancel; loading -> error on a failed request) apart from the
+   *  mount-time idle CoverageSummary reports before autoLoadSample's own run
+   *  has even started — both are the SAME "idle" value, only distinguishable
+   *  by what preceded it. Initialized to "idle" to match CoverageSummary's
+   *  own initial local state, so the very first (mount-time) report is
+   *  correctly read as idle-to-idle, not idle-to-idle-via-loading. */
+  const prevCoverageSummaryStatusRef = useRef<"idle" | "loading" | "success" | "error">("idle");
   /** Progressive depth: summary first; full Script Doctor is opt-in. */
   const [coverageFull, setCoverageFull] = useState(false);
   /** Current cursor line (1-based) for sidebar scene highlighting. */
@@ -2315,13 +2325,55 @@ export default function ScriptIDE({
   // fires `run({sample: true})` when `autoLoadSample` is true, so "a sample
   // run is in flight or about to start on this very commit" is a fact this
   // parent already holds, not one it has to wait to be told. `doctorAutoSample`
-  // is cleared back to false only once the sample text is actually installed
-  // into the draft (this component's own sample-install prop, wired to
-  // CoverageSummary below), which happens in the SAME call as
-  // `onReportComputed` — so `coverageReport` is already
-  // set by the time this clause's contribution would otherwise go stale.
-  const coverageSummaryLoadingCold =
-    !coverageReport && (coverageSummaryStatus === "loading" || (toolSlot === "coverage" && doctorAutoSample));
+  // is cleared back to false once the sample text is actually installed into
+  // the draft (this component's own sample-install prop, wired to
+  // CoverageSummary below — which happens in the SAME call as
+  // `onReportComputed`, so `coverageReport` is already set by the time this
+  // clause's contribution would otherwise go stale) OR once a run that was
+  // genuinely in flight terminates without one (Cancel or a failed request —
+  // see the `onStatusChange` handler below), so this clause can never stay
+  // true past the window it exists to cover.
+  //
+  // Round-2 review fix (2026-09-05): this used to be ONE boolean
+  // (`coverageSummaryLoadingCold`) paired with ONE constant title string at
+  // the toggle below — true for "loading" AND for "error" AND for a
+  // cancelled run alike, all sharing the SAME "Coverage is still running…"
+  // sentence. That was false in two states reachable in two clicks from the
+  // golden path: after Cancel (the toggle stayed disabled with "still
+  // running" indefinitely, because nothing ever cleared `doctorAutoSample`
+  // on cancel) and after a failed run (the toggle said "still running" while
+  // the panel two inches away said "COVERAGE FAILED"). Now ONE function of
+  // `coverageSummaryStatus` (+ the report and the sample-pending flag) drives
+  // BOTH `disabled` and the sentence together, so a status this file has not
+  // been taught about yet fails safe to "usable, no claim" rather than
+  // silently inheriting whatever the previous status's sentence said.
+  const coverageFullReportToggleState = ((): { disabled: boolean; title?: string } => {
+    if (coverageReport) return { disabled: false }; // already hydrated — always usable, nothing left to wait for.
+    if (coverageSummaryStatus === "loading" || (coverageSummaryStatus === "idle" && doctorAutoSample)) {
+      // The second clause is the earliest-instant race window described
+      // above (mount-time idle, sample run about to start) — genuinely
+      // still "running" in every observable sense, so the "still running"
+      // sentence stays honest for it too.
+      return { disabled: true, title: "Coverage is still running — the full report opens as soon as it finishes." };
+    }
+    if (coverageSummaryStatus === "error") {
+      // The panel itself already shows Retry/Use sample — sending the
+      // writer to a cold full report that has never seen a result would
+      // abandon that recovery UI, so this stays disabled with its own
+      // honest reason rather than silently reusing "still running" (false)
+      // or falling through to "usable, no claim" (loses the failure
+      // context the writer is currently looking at).
+      return { disabled: true, title: "Coverage failed — retry to open the full report." };
+    }
+    // Plain "idle" with no sample pending: either the writer has not run
+    // coverage yet, or a run was just Cancelled (onStatusChange above
+    // clears `doctorAutoSample` on that exact transition, which is what
+    // routes a cancel here instead of into the "loading" branch above).
+    // Both land the writer on ScriptDoctorPanel's own idle state (Run
+    // Diagnosis / Try a sample script) — a legitimate landing, not a cold
+    // dead end — so no title is needed and the toggle is usable.
+    return { disabled: false };
+  })();
 
   // ── E5: command palette action registry ─────────────────────────────────
   // Every `run` below calls the SAME named function a visible button
@@ -2713,29 +2765,36 @@ export default function ScriptIDE({
                   dialog. Found live with scripts/verify-focus-traps.mjs.
                   Golden-path fix (2026-09-05): the mini -> full transition
                   ALONE is held while CoverageSummary has a run in flight and
-                  no report yet (coverageSummaryLoadingCold) — switching to
-                  ScriptDoctorPanel here unmounts CoverageSummary, and its own
-                  `aliveRef` guard then correctly refuses to hand up a report
-                  that arrives after that, so clicking through at the earliest
-                  possible instant used to cold-open ScriptDoctorPanel on
-                  "write some script content" with zero doctor POSTs ever
-                  completing. Full -> mini (closing back to the summary) is
-                  never blocked — there's nothing to lose there. */}
+                  no report yet (coverageFullReportToggleState.disabled) —
+                  switching to ScriptDoctorPanel here unmounts CoverageSummary,
+                  and its own `aliveRef` guard then correctly refuses to hand
+                  up a report that arrives after that, so clicking through at
+                  the earliest possible instant used to cold-open
+                  ScriptDoctorPanel on "write some script content" with zero
+                  doctor POSTs ever completing. Full -> mini (closing back to
+                  the summary) is never blocked — there's nothing to lose
+                  there.
+                  Round-2 review fix (2026-09-05): `aria-label` gives this
+                  button a distinct accessible name ("Open full report") from
+                  CoverageSummary's own sticky-footer "Full report" button —
+                  the visible label is unchanged (both literally say "Full
+                  report" on screen, which reads fine since they're never
+                  both the writer's next click at once: this one opens the
+                  panel that button lives inside), but a query by accessible
+                  name used to match both and needed an xpath
+                  `not(ancestor::aside)` to disambiguate; now it doesn't. */}
               <button
                 type="button"
                 onClick={() =>
                   toolSlot !== "coverage"
                     ? openToolSlot("coverage")
-                    : coverageFull || !coverageSummaryLoadingCold
+                    : coverageFull || !coverageFullReportToggleState.disabled
                       ? setCoverageFull(!coverageFull)
                       : undefined
                 }
-                disabled={toolSlot === "coverage" && !coverageFull && coverageSummaryLoadingCold}
-                title={
-                  toolSlot === "coverage" && !coverageFull && coverageSummaryLoadingCold
-                    ? "Coverage is still running — the full report opens as soon as it finishes."
-                    : undefined
-                }
+                disabled={toolSlot === "coverage" && !coverageFull && coverageFullReportToggleState.disabled}
+                title={toolSlot === "coverage" && !coverageFull ? coverageFullReportToggleState.title : undefined}
+                aria-label={toolSlot === "coverage" && !coverageFull ? "Open full report" : undefined}
                 className={
                   toolSlot !== "coverage"
                     ? "sm-btn sm-btn--ink py-1.5"
@@ -3521,7 +3580,28 @@ export default function ScriptIDE({
               getDraftGeneration={getDraftGeneration}
               onFreshReport={() => setCoverageStale(false)}
               onReportComputed={setCoverageReport}
-              onStatusChange={setCoverageSummaryStatus}
+              onStatusChange={(status) => {
+                // Round-2 review fix (2026-09-05): a sample-flagged run that
+                // gets Cancelled or fails must not leave `doctorAutoSample`
+                // stuck true forever — it was previously cleared ONLY on a
+                // successful install or on panel close, so a cancel or a
+                // failed request left the toolbar toggle disabled with the
+                // stale "still running" title indefinitely, and left
+                // `provenance={doctorAutoSample ? "sample" : "user"}` (below)
+                // wrongly reporting "sample" for whatever the writer does
+                // next. Cleared exactly on a loading -> idle (Cancel) or
+                // loading -> error (failed request) transition — never on
+                // the mount-time idle CoverageSummary reports before its own
+                // sample run has even started, which is the earliest-instant
+                // race `coverageFullReportToggleState`'s doctorAutoSample
+                // clause still needs this flag TRUE for (see that value's own
+                // doc comment above, above the toolbar toggle it drives).
+                if (prevCoverageSummaryStatusRef.current === "loading" && (status === "idle" || status === "error") && doctorAutoSample) {
+                  setDoctorAutoSample(false);
+                }
+                prevCoverageSummaryStatusRef.current = status;
+                setCoverageSummaryStatus(status);
+              }}
               onLoadSampleIntoEditor={(text) => {
                 // G0-01 defense in depth: refuse a non-empty, differing
                 // draft. Retrospective #2: also refuse an empty draft the

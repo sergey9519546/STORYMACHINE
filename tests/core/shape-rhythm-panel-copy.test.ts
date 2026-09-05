@@ -11,6 +11,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+// Round-2 review fix (2026-09-05): the actual shared label, not a copy of
+// its string — src/lib/structural-signals-copy.ts is pure (no I/O, no
+// randomness), so importing it for real here is exactly what proves the
+// panel and WhatIfPanel.tsx render THIS value rather than a fourth
+// hand-typed wording that happens to match it today.
+import { ACTION_PROSE_VARIATION_LABEL } from '../../src/lib/structural-signals-copy.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8');
@@ -42,7 +48,63 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
     assert.ok(meanAbsIdx !== -1, 'meanAbsDialogueShareDelta must appear');
     assert.ok(cvIdx !== -1, 'actionSentenceCvOverall must appear');
     assert.match(panel, /Talk\/action swing/);
-    assert.match(panel, /Action-prose variation/);
+    // Round-2 review fix (2026-09-05): the panel renders the SHARED label
+    // (`{ACTION_PROSE_VARIATION_LABEL}`), not its own hand-typed string —
+    // see the "one label, three surfaces" describe block below for the
+    // cross-surface half of this.
+    assert.match(panel, /import \{ ACTION_PROSE_VARIATION_LABEL \} from "\.\.\/\.\.\/lib\/structural-signals-copy\.ts";/);
+    assert.match(panel, /\{ACTION_PROSE_VARIATION_LABEL\}/);
+  });
+
+  // Round-2 review finding #5 (2026-09-05): the SAME number
+  // (actionSentenceCvOverall) was labelled three different ways across
+  // ScriptDoctorPanel.tsx ("Action-prose variation"), server/lib/
+  // coverage-html.ts ("action-sentence variation"), and server/lib/
+  // coverage-letter.ts ("the sentence-length variation across the draft's
+  // action lines") — the number agreed everywhere (LANE_STANDARD §2's
+  // actual requirement), only the label drifted. src/lib/
+  // structural-signals-copy.ts is now the one place that string is typed;
+  // every surface (including WhatIfPanel.tsx's own DoctorReadout, and the
+  // panel's fix-and-verify receipt strip) imports it rather than
+  // re-typing it, exactly the "no surface re-implements it" convention
+  // draft-rank-copy.ts and percentile-copy.ts already established.
+  describe('one label, three (four) surfaces: ACTION_PROSE_VARIATION_LABEL', () => {
+    it('the panel imports and uses the shared constant, not a hand-typed string, at all three of its own render sites', () => {
+      const importIdx = panel.indexOf("from \"../../lib/structural-signals-copy.ts\"");
+      assert.ok(importIdx !== -1, 'ScriptDoctorPanel.tsx must import structural-signals-copy.ts');
+      const usageCount = (panel.match(/\{ACTION_PROSE_VARIATION_LABEL\}/g) ?? []).length;
+      assert.equal(usageCount, 3, 'expected 3 usages: ShapeRhythmSection, ShapeRhythmUnscored, and the fix-and-verify receipt strip');
+      assert.ok(!panel.includes('Action-prose variation'), 'no hand-typed literal should remain now that the constant is imported');
+    });
+
+    it('WhatIfPanel.tsx imports and uses the SAME shared constant, not its own fourth wording', () => {
+      assert.match(whatIfPanel, /import \{ ACTION_PROSE_VARIATION_LABEL \} from '\.\.\/lib\/structural-signals-copy\.ts';/);
+      assert.match(whatIfPanel, /\{ACTION_PROSE_VARIATION_LABEL\}/);
+      // A header comment describing the shared convention (naming the
+      // string as prose, for a reader) is fine and expected — the JSX
+      // render site itself is what must not hand-type the literal.
+      assert.ok(!whatIfPanel.includes('<span>Action-prose variation'), 'the render site must use the imported constant, not a literal');
+    });
+
+    it('coverage-html.ts imports the LOWERCASE derivative of the same constant (matching its own all-lowercase summary-line convention), not a fourth hand-typed word', () => {
+      const coverageHtml = read('../../server/lib/coverage-html.ts');
+      assert.match(coverageHtml, /import \{ ACTION_PROSE_VARIATION_LABEL_LOWER \} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+      const usageCount = (coverageHtml.match(/\$\{ACTION_PROSE_VARIATION_LABEL_LOWER\}/g) ?? []).length;
+      assert.equal(usageCount, 2, 'expected 2 usages: the scored summary line and the one-scene-unscored notice');
+      assert.ok(!coverageHtml.includes('action-sentence variation'), 'no hand-typed literal should remain now that the constant is imported');
+    });
+
+    it('coverage-letter.ts imports and embeds the SAME lowercase label in its own prose, not its own third wording', () => {
+      const coverageLetter = read('../../server/lib/coverage-letter.ts');
+      assert.match(coverageLetter, /import \{ ACTION_PROSE_VARIATION_LABEL_LOWER \} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+      const usageCount = (coverageLetter.match(/\$\{ACTION_PROSE_VARIATION_LABEL_LOWER\}/g) ?? []).length;
+      assert.equal(usageCount, 3, 'expected 3 usages: the intro sentence plus the scored and one-scene-unscored number-bearing clauses');
+      assert.ok(!coverageLetter.includes("the sentence-length variation across the draft's action lines"), 'no hand-typed literal should remain now that the constant is imported');
+    });
+
+    it('the exported constant is exactly "Action-prose variation" (title case, matching how it already renders on screen)', () => {
+      assert.equal(ACTION_PROSE_VARIATION_LABEL, 'Action-prose variation');
+    });
   });
 
   it('per-scene tooltip carries scene index, words, dialogueShare, speakers, lengthZ, and openCloseShift', () => {
@@ -266,7 +328,9 @@ describe("WhatIfPanel — the Lab's Script Doctor readout (2026-09-04)", () => {
   it('reuses the SAME "descriptive, not part of the score" labelling, not a second wording', () => {
     assert.match(whatIfPanel, /Shape &amp;\s*rhythm \(descriptive, not part of the score\)/);
     assert.match(whatIfPanel, /Talk\/action swing/);
-    assert.match(whatIfPanel, /Action-prose variation/);
+    // Round-2 review fix (2026-09-05): the shared constant, not the literal
+    // — see the "one label, three (four) surfaces" describe block above.
+    assert.match(whatIfPanel, /\{ACTION_PROSE_VARIATION_LABEL\}/);
   });
 
   it('gates both aggregates on the server having actually sent them — never a fabricated 0', () => {

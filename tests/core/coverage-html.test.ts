@@ -936,7 +936,7 @@ describe('renderCoverageHtml — Shape & Rhythm section, unscored (fewer than 2 
     );
     assert.ok(html.includes('Structural Signals'));
     assert.match(html, /Shape &amp; Rhythm needs at least two scenes; this draft has 1\./);
-    assert.match(html, /action-sentence variation 1\.00/);
+    assert.match(html, /action-prose variation 1\.00/);
     // meanAbsDialogueShareDelta is 0 by construction with one scene — never
     // named next to a genuine reading.
     assert.ok(!html.includes('mean talk/action swing'));
@@ -976,7 +976,7 @@ describe('renderCoverageHtml — Shape & Rhythm section, unscored (fewer than 2 
     assert.ok(html.includes('Structural Signals'));
     assert.ok(html.includes('sig-cell'), 'must render one bar per scene');
     assert.match(html, /mean talk\/action swing 0\.20/);
-    assert.match(html, /action-sentence variation 0\.55/);
+    assert.match(html, /action-prose variation 0\.55/);
     assert.ok(!html.includes('needs at least two scenes'));
   });
 });

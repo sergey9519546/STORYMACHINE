@@ -47,6 +47,7 @@ import { healthPercentileSentence, exactRankTooltip } from '../../src/lib/percen
 // helpers itself; see tests/core/percentile-copy-consistency.test.ts and
 // tests/core/draft-rank-copy-consistency.test.ts for the cross-surface proof.
 import { draftRankSentence, type DraftRankExportPayload } from '../../src/lib/draft-rank-copy.ts';
+import { ACTION_PROSE_VARIATION_LABEL_LOWER } from '../../src/lib/structural-signals-copy.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the
@@ -1058,7 +1059,7 @@ function buildStructuralSignalsSection(report: ScriptDoctorReport): string {
   <section class="section">
     <h2>Structural Signals (new, unwired diagnostics)</h2>
     <p class="sig-note">Shape &amp; Rhythm needs at least two scenes; this draft has ${block.sceneCount}.</p>
-    <p class="sig-note">action-sentence variation ${escapeHtml(block.actionSentenceCvOverall.toFixed(2))}</p>
+    <p class="sig-note">${ACTION_PROSE_VARIATION_LABEL_LOWER} ${escapeHtml(block.actionSentenceCvOverall.toFixed(2))}</p>
     <p class="sig-note">These readings are computed from document structure alone &mdash; word, line, sentence, turn and speaker counts &mdash; with no word list involved. They are <strong>diagnostic only and are not part of the score</strong>: no health, grade, verdict, dimension or priority above is derived from any number in this section.</p>
   </section>`;
   }
@@ -1088,7 +1089,7 @@ function buildStructuralSignalsSection(report: ScriptDoctorReport): string {
     `new-pairing scenes ${Math.round(block.newPairSceneRate * 100)}%`,
     `mean words/turn ${block.meanTurnWords.toFixed(1)}`,
     `lead share ${Math.round(block.meanLeadShare * 100)}% (trend ${block.leadShareSlope >= 0 ? '+' : ''}${block.leadShareSlope.toFixed(2)})`,
-    `action-sentence variation ${block.actionSentenceCvOverall.toFixed(2)}`,
+    `${ACTION_PROSE_VARIATION_LABEL_LOWER} ${block.actionSentenceCvOverall.toFixed(2)}`,
   ].map(escapeHtml).join(' &middot; ');
 
   return `

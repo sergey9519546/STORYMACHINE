@@ -37,6 +37,7 @@ import type {
 } from "../../../server/nvm/analyze/types.ts";
 import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type { StructuralSignalsReport, SceneStructuralSignals } from "../../../server/nvm/analyze/structural-signals.ts";
+import { ACTION_PROSE_VARIATION_LABEL } from "../../lib/structural-signals-copy.ts";
 import type {
   RevisionIssue,
   PassName,
@@ -748,7 +749,15 @@ function ShapeRhythmSection({
                     aria-label={`Scene ${scene.sceneIdx + 1}: ${scene.slug}${
                       clickable ? " — jump to this scene" : ""
                     }`}
-                    aria-pressed={selected}
+                    // Round-2 review fix (2026-09-05): no `aria-pressed`
+                    // here. This button does two things at once (select,
+                    // to update the live-region reading below; navigate,
+                    // when `clickable`) — neither is "toggle between two
+                    // states of THIS control", which is the contract
+                    // `aria-pressed` promises. The visible "selected" ring
+                    // (className below) is a sighted-only affordance; the
+                    // live region itself is how the selection is actually
+                    // communicated to assistive tech.
                     // B-9 fix: 24px minimum CSS-px width (WCAG 2.2 2.5.8's AA
                     // target-size minimum) — was `min-w-[10px]`, which on a
                     // feature-length draft (60+ scenes) hit that floor,
@@ -816,7 +825,7 @@ function ShapeRhythmSection({
             <div>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-widest text-black">
-                  Action-prose variation
+                  {ACTION_PROSE_VARIATION_LABEL}
                 </span>
                 <span className="text-xs font-bold text-black">
                   {signals.actionSentenceCvOverall.toFixed(2)}
@@ -870,7 +879,7 @@ function ShapeRhythmUnscored({ signals }: { signals: StructuralSignalsReport }) 
         <div>
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-black">
-              Action-prose variation
+              {ACTION_PROSE_VARIATION_LABEL}
             </span>
             <span className="text-xs font-bold text-black">
               {signals.actionSentenceCvOverall.toFixed(2)}
@@ -2032,7 +2041,7 @@ function FixStructuralSignalsStrip({ signals }: { signals: FixStructuralSignalsD
         {pair(signals.before.meanAbsDialogueShareDelta, signals.after?.meanAbsDialogueShareDelta)}
       </span>
       <span>
-        Action-prose variation{" "}
+        {ACTION_PROSE_VARIATION_LABEL}{" "}
         {pair(signals.before.actionSentenceCvOverall, signals.after?.actionSentenceCvOverall)}
       </span>
     </div>

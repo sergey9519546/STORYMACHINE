@@ -220,7 +220,20 @@ async function main() {
     // Smoke basics (assertion 5): the deterministic report actually rendered.
     record('ScriptDoctorPanel', 'SMOKE: coverage summary renders CONSIDER', bodyText.includes('CONSIDER'), 'checked page body for "CONSIDER"');
 
-    const fullReportBtn = page.getByRole('button', { name: 'Full report', exact: true }).first();
+    // Round-2 review fix (2026-09-05, item 3): the toolbar toggle now
+    // carries its OWN distinct accessible name ("Open full report", via
+    // `aria-label`), separate from CoverageSummary's own sticky-footer
+    // "Full report" button — querying by the old shared name here would
+    // now unambiguously resolve to the PANEL's footer button instead
+    // (which correctly stays "Full report"), and that button is UNMOUNTED
+    // the instant ScriptDoctorPanel opens (CoverageSummary itself
+    // unmounts), which is exactly the wrong element to treat as the
+    // "previously focused" trigger this focus-restore test verifies —
+    // the toolbar toggle is the one element the comment on it (ScriptIDE.tsx)
+    // says is "kept deliberately un-conditional so React never
+    // unmounts+remounts it", which is what makes it the correct trigger to
+    // restore focus to.
+    const fullReportBtn = page.getByRole('button', { name: 'Open full report' }).first();
     const triggerHandle = await fullReportBtn.elementHandle();
     await fullReportBtn.click();
 

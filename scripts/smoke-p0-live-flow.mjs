@@ -143,14 +143,27 @@ async function main() {
   wireConsoleCapture(earlyPage, genuineErrors);
   await earlyPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await earlyPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
-  // The toolbar toggle specifically — CoverageSummary's OWN "Full report"
-  // (inside the aside) can carry the identical visible text once its run
-  // finishes, so disambiguate by DOM ancestry rather than risk clicking
-  // the wrong one.
-  const earlyToggle = earlyPage.locator('xpath=//button[normalize-space(text())="Full report" and not(ancestor::aside)]').first();
+  // Round-2 review fix (2026-09-05, item 3): the toolbar toggle now carries
+  // its OWN distinct accessible name ("Open full report", via `aria-label`)
+  // apart from CoverageSummary's own sticky-footer "Full report" button —
+  // both used to share the exact accessible name "Full report", which is
+  // why this locator needed an `xpath=…not(ancestor::aside)` to disambiguate
+  // before; a plain role+name query is now unambiguous.
+  const earlyToggle = earlyPage.getByRole('button', { name: 'Open full report' }).first();
   await earlyToggle.waitFor({ state: 'attached', timeout: timing.ms(15000) });
+  // Round-2 review fix (2026-09-05, item 2): the comment below justifying
+  // `force: true` now has the assertion it always claimed to — the toggle
+  // must measure `disabled: true` at this instant, not just fail to open a
+  // dialog for some other reason (a slow click, a mis-targeted locator).
+  const earlyDisabled = await earlyToggle.isDisabled();
+  if (!earlyDisabled) {
+    throw new Error(
+      'golden-path regression: "Open full report" was NOT disabled at the earliest instant — a real '
+      + '(non-force) click would reach it before the sample run resolves',
+    );
+  }
   // `force: true`: the point of this assertion is that the toggle must be
-  // DISABLED (or otherwise a no-op) at this instant — proven directly below
+  // DISABLED (or otherwise a no-op) at this instant — proven directly above
   // via the disabled check — not that Playwright's own actionability wait
   // happens to stall long enough for the run to finish first.
   await earlyToggle.click({ force: true, timeout: timing.ms(5000) }).catch(() => { /* a genuinely disabled button can refuse the dispatch itself */ });
@@ -165,6 +178,98 @@ async function main() {
   }
   console.log('[smoke] earliest-instant "Full report" click did not cold-open the full report.');
   await earlyContext.close();
+
+  // 3c. Round-2 review item 1 (BLOCKING, 2026-09-05): "Coverage is still
+  // running…" used to stay on the toolbar toggle FOREVER after a Cancel,
+  // because nothing cleared `doctorAutoSample` on that transition —
+  // reproduced live by the reviewer, kept here as a permanent regression
+  // gate. Fresh context: clicks "Try sample coverage" then clicks "Cancel
+  // this coverage run" WHILE the run is still genuinely in flight. The
+  // built-in sample analyses fast enough (well under a second, no LLM
+  // calls) that a plain click-then-click race loses more often than it
+  // wins — route-delays the real request so the window to click Cancel is
+  // reliable, not a hope. The request is not stubbed (unlike 3d below): it
+  // reaches the real server exactly as it would for a writer, just later
+  // than it otherwise would, which only changes WHEN the response arrives,
+  // never what CoverageSummary's own Cancel/abort logic does with it.
+  const cancelContext = await browser.newContext();
+  const cancelPage = await cancelContext.newPage();
+  wireConsoleCapture(cancelPage, genuineErrors);
+  await cancelPage.route('**/api/scriptide/doctor/stream', async (route) => {
+    await new Promise((resolve) => { setTimeout(resolve, timing.ms(4000)); });
+    await route.continue();
+  });
+  await cancelPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await cancelPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
+  const cancelBtn = cancelPage.getByRole('button', { name: 'Cancel this coverage run' }).first();
+  await cancelBtn.waitFor({ state: 'visible', timeout: timing.ms(10000) });
+  await cancelBtn.click({ timeout: timing.ms(5000) });
+  // Give the abort + the child's own status transition (loading -> idle) a
+  // moment to reach the parent, THEN check the toolbar toggle repeatedly
+  // over a real interval — the pre-fix bug was that this sentence never
+  // clears, not that it takes a moment to clear, so polling here would mask
+  // exactly the regression this step exists to catch. A single read after a
+  // fixed settle window is the correct check.
+  await cancelPage.waitForTimeout(timing.ms(800));
+  const cancelToggle = cancelPage.getByRole('button', { name: 'Open full report' }).first();
+  const cancelToggleTitle = await cancelToggle.getAttribute('title');
+  const cancelToggleDisabled = await cancelToggle.isDisabled();
+  if (cancelToggleTitle && /still running/i.test(cancelToggleTitle)) {
+    throw new Error(
+      'golden-path regression: after Cancelling a coverage run, the toolbar toggle still reads '
+      + `"${cancelToggleTitle}" — a run that was cancelled is not "still running"`,
+    );
+  }
+  console.log(
+    `[smoke] after Cancel, "Open full report" toggle: disabled=${cancelToggleDisabled}, `
+    + `title=${JSON.stringify(cancelToggleTitle)} (no longer claims to be "still running").`,
+  );
+  await cancelContext.close();
+
+  // 3d. Round-2 review item 1 (BLOCKING, continued): the SAME "still
+  // running" sentence used to survive a FAILED run too — two controls on
+  // one screen contradicting each other (the panel says COVERAGE FAILED,
+  // the toolbar says still running). Fresh context, route-stubbed:
+  // intercepts POST /api/scriptide/doctor/stream and fulfills it with a 500
+  // before the sample click ever fires the request.
+  const errorContext = await browser.newContext();
+  const errorPage = await errorContext.newPage();
+  // This page's own sink, NOT `genuineErrors` — the route-stubbed 500 below
+  // is a deliberate injected failure, not a genuine app-code error, and
+  // Chrome logs its own "Failed to load resource: … 500" line for any
+  // non-2xx response regardless of how gracefully the app handles it (this
+  // one is handled gracefully — that's the whole point of this step). The
+  // real-run steps above/below correctly still use the shared sink.
+  const errorPageErrors = [];
+  wireConsoleCapture(errorPage, errorPageErrors);
+  await errorPage.route('**/api/scriptide/doctor/stream', (route) => {
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'boom' }),
+    });
+  });
+  await errorPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await errorPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
+  await errorPage.getByText(/coverage failed/i).first().waitFor({ timeout: timing.ms(15000) });
+  const errorToggle = errorPage.getByRole('button', { name: 'Open full report' }).first();
+  const errorToggleTitle = await errorToggle.getAttribute('title');
+  const errorToggleDisabled = await errorToggle.isDisabled();
+  if (errorToggleTitle && /still running/i.test(errorToggleTitle)) {
+    throw new Error(
+      'golden-path regression: after a FAILED coverage run, the toolbar toggle reads '
+      + `"${errorToggleTitle}" while the panel itself says the run failed — two controls on one screen `
+      + 'contradicting each other',
+    );
+  }
+  if (!errorToggleDisabled || !errorToggleTitle || !/failed/i.test(errorToggleTitle)) {
+    throw new Error(
+      `golden-path regression: after a FAILED coverage run, expected the toolbar toggle disabled with a `
+      + `"failed" sentence, got disabled=${errorToggleDisabled} title=${JSON.stringify(errorToggleTitle)}`,
+    );
+  }
+  console.log(`[smoke] after a failed run, "Open full report" toggle: title=${JSON.stringify(errorToggleTitle)}.`);
+  await errorContext.close();
 
   // 4. The golden path continues into the full report — the door 100% of
   // first-time writers use. Everything below is asserted on THAT panel.
