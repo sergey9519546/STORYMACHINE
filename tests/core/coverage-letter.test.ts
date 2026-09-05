@@ -296,6 +296,21 @@ describe('renderCoverageLetter — shape and wording', () => {
     assert.match(markdown, /not to the reference set above or to any other writer/i);
   });
 
+  // REVIEW FIX (round 2, 2026-09-05) — the letter used to call this number
+  // "your own saved drafts", while ScriptDoctorPanel.tsx's DraftRankLine
+  // calls the SAME number "runs and saved drafts of this script" right next
+  // to it: same number, two different claims about what it is (most of the
+  // union is Draft History runs, not saved Versions). Pinned here so the two
+  // surfaces can't drift again without a test failing on one of them.
+  it('the denominator noun phrase matches ScriptDoctorPanel.tsx\'s DraftRankLine verbatim — "runs and saved drafts of this script"', () => {
+    const { markdown } = renderCoverageLetter(
+      buildReport({ healthPercentile: 42 }),
+      { title: 'X', draftRank: { rank: 2, of: 5 } },
+    );
+    assert.match(markdown, /runs and saved drafts of this script/);
+    assert.doesNotMatch(markdown, /your own saved drafts of this script/);
+  });
+
   it('renders "first saved draft" copy, not a fabricated rank, when of <= 1', () => {
     const { markdown } = renderCoverageLetter(
       buildReport(),

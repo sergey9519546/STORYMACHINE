@@ -103,6 +103,19 @@ export interface DraftHistoryRecord {
 // after this fix, since Snapshot.contentHash is now stamped whenever the
 // source report carries one (see src/components/ScriptIDE.tsx's
 // confirmSnapshot).
+//
+// REVIEW NOTE (round 2, 2026-09-05): this is a CROSS-CLOCK comparison, not
+// two readings of the same clock. `Snapshot.analyzedAt` is a SERVER
+// `Date.now()` (server/routes/scriptide.ts stamps `report.analyzedAt`
+// before responding); `DraftHistoryRecord.at` is a CLIENT `Date.now()`
+// (ScriptDoctorPanel.tsx's recordDoctorHistory, stamped moments after the
+// response arrives). Any client clock skew beyond this window silently
+// DISABLES the fallback for a legacy (pre-contentHash) Snapshot — the
+// failure mode is always underdetection (double-counting a real duplicate
+// as two drafts), never the reverse (two genuinely different drafts always
+// need matching health AND a timestamp inside the window to collapse, so
+// skew alone can't manufacture a false match). Every entry recorded after
+// this fix carries `contentHash` and never depends on this fallback at all.
 const DEDUPE_TIMESTAMP_TOLERANCE_MS = 5000;
 
 export type DraftRank =
@@ -168,9 +181,10 @@ export type DraftRank =
  *  below already uses) let this function recognize and exclude that
  *  self-record from the union before counting or ranking anything — the
  *  current draft is added back exactly once, explicitly, below.
- *  `snapshotDraftRanks` below reuses this same parameter to exclude a
- *  snapshot from being ranked against itself (a duplicate save of the same
- *  content, not just the same array index).
+ *  `snapshotDraftRanks` below reuses this function per snapshot but does
+ *  NOT forward a contentHash/at pair of its own — see that function's
+ *  header for why passing one would silently break its own contract that
+ *  saved snapshots are never deduped against each other.
  *
  *  Returns null only when there is no health to rank (`currentHealth` is not
  *  a finite number) — never a fabricated position. Returns
@@ -309,24 +323,32 @@ export function snapshotTrend(snapshots: readonly Snapshot[]): SnapshotTrendEntr
  *  the live draft. null for a snapshot with no health value, matching
  *  computeDraftRank's own null contract exactly.
  *
- *  REVIEW FIX (round 2, 2026-09-05): passes snapshot i's own contentHash/
- *  analyzedAt through as computeDraftRank's `currentContentHash`/`currentAt`
- *  — not just index-based exclusion (`j !== i`) — so a snapshot is never
- *  ranked against a genuine duplicate of itself (the same content saved
- *  twice, at a different array index) any more than the live-draft caller
- *  in ScriptDoctorPanel.tsx is. No Draft History array is available here
- *  (this ranks a snapshot only among the OTHER saved Versions of this
- *  script, not the writer's Draft History runs — that union is the live
- *  panel's job, not the Versions list's). */
+ *  Self-exclusion is by ARRAY INDEX (`j !== i`) only — deliberately NOT by
+ *  passing snapshot i's own contentHash/analyzedAt through as
+ *  computeDraftRank's `currentContentHash`/`currentAt`. An earlier revision
+ *  of this function did pass them, reasoning it would protect a snapshot
+ *  from ranking against "a genuine duplicate of itself"; in practice it did
+ *  the opposite: computeDraftRank's own contract is that entries in
+ *  `snapshots` are NEVER deduped against each other (two genuinely separate
+ *  saves that happen to share a health value, or even the exact same text,
+ *  both still count — see that contract note above `union` in
+ *  computeDraftRank). Forwarding the contentHash made computeDraftRank's
+ *  self-exclusion step match it against a SIBLING snapshot that merely
+ *  shares the same content (e.g. the same script saved twice with no edits
+ *  in between), silently dropping that sibling from `of` — caught live by
+ *  scripts/verify-p2-p3-surfaces.mjs's "Ranks 1st of 2 by health among your
+ *  saved drafts" assertion, which saves the same script twice on purpose
+ *  and requires BOTH saves to count. The `j !== i` filter above already
+ *  gives the one guarantee that matters here — a snapshot is never counted
+ *  as its own "other" — with no content-based over-reach; there is no
+ *  Draft History array to cross-store-dedupe against in this call (that
+ *  union is the live panel's job, not the Versions list's), so
+ *  currentContentHash/currentAt would only ever have collided with a
+ *  sibling snapshot, never with anything they were meant to protect
+ *  against. */
 export function snapshotDraftRanks(snapshots: readonly Snapshot[]): (DraftRank | null)[] {
   return snapshots.map((snap, i) => {
     const others = snapshots.filter((_, j) => j !== i);
-    return computeDraftRank(
-      others,
-      [],
-      numberOrNull(snap.health),
-      typeof snap.contentHash === "string" ? snap.contentHash : null,
-      numberOrNull(snap.analyzedAt),
-    );
+    return computeDraftRank(others, [], numberOrNull(snap.health));
   });
 }

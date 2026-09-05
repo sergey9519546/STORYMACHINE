@@ -121,6 +121,8 @@ describe('routes/nvm — What-If Lab × Script Doctor', async () => {
       assert.equal(typeof branch.contentHash, 'string');
       assert.match(branch.contentHash, /^[0-9a-f]{64}$/, 'contentHash is a real sha256 hex digest, not a placeholder');
     }
+    assert.equal(typeof body.base.contentHash, 'string');
+    assert.match(body.base.contentHash, /^[0-9a-f]{64}$/);
   });
 
   it('a branch variant is the intervened timeline PLUS that branch — the intervened op is gone from the text and the branch adds a scene', async () => {

@@ -472,7 +472,7 @@ describe('snapshotDraftRanks', () => {
     assert.deepEqual(ranks[2], { rank: 3, of: 3, tied: false, unscored: 0 }, 'the 40 is behind both others');
   });
 
-  it('agrees exactly with computeDraftRank(others, [], thisHealth, thisContentHash, thisAt) called directly — same source, never a second implementation', () => {
+  it('agrees exactly with computeDraftRank(others, [], thisHealth) called directly — same source, never a second implementation', () => {
     const snapshots = [
       snap({ id: 'a', health: 90 }),
       snap({ id: 'b', health: 60 }),
@@ -481,10 +481,7 @@ describe('snapshotDraftRanks', () => {
     const ranks = snapshotDraftRanks(snapshots);
     snapshots.forEach((s, i) => {
       const others = snapshots.filter((_, j) => j !== i);
-      assert.deepEqual(
-        ranks[i],
-        computeDraftRank(others, [], s.health, typeof s.contentHash === 'string' ? s.contentHash : null, s.analyzedAt ?? null),
-      );
+      assert.deepEqual(ranks[i], computeDraftRank(others, [], s.health));
     });
   });
 
@@ -519,26 +516,44 @@ describe('snapshotDraftRanks', () => {
   // REVIEW round-2-re-review caveat (2026-09-05): currentContentHash/
   // currentAt are OPTIONAL on computeDraftRank, so a stale call site
   // compiles fine and can silently reintroduce a self-count. This proves
-  // snapshotDraftRanks itself never does: two snapshots with the exact same
-  // contentHash (a duplicate save of identical content, at two different
-  // array indices) must not count each other as "another draft" any more
-  // than a snapshot counts against its own array index.
-  it('never ranks a snapshot against a duplicate of itself — same contentHash at a different array index is excluded, not counted as another draft', () => {
+  // snapshotDraftRanks itself never does — but "never ranks against
+  // itself" means never ranks against its own ARRAY SLOT, not never ranks
+  // against a genuinely separate save that happens to share content. An
+  // earlier version of this test (and of snapshotDraftRanks itself) got
+  // that distinction backwards: it forwarded the snapshot's own
+  // contentHash/analyzedAt into computeDraftRank's self-exclusion params,
+  // which then matched and dropped a SIBLING snapshot that merely shared
+  // the same content — silently shrinking "of" for two real, distinct
+  // Save-Version clicks. scripts/verify-p2-p3-surfaces.mjs's own product
+  // test ("Ranks 1st of 2 by health among your saved drafts") saves the
+  // same script twice on purpose and requires BOTH to count; this test
+  // pins the same contract at the unit level, plus the real self-count
+  // guard (an N-snapshot array must never read as "of N+1").
+  it('two snapshots that are genuine duplicates (same contentHash, same health, different array index — Save Version clicked twice with no edit) each count as a SEPARATE draft, tied for 1st', () => {
     const dupeHash = 'dupe'.padEnd(64, '0');
     const snapshots = [
       snap({ id: 'first-save', health: 70, contentHash: dupeHash, analyzedAt: 1000 }),
       snap({ id: 'other', health: 55, contentHash: 'other'.padEnd(64, '0'), analyzedAt: 2000 }),
       // Re-saved the identical text later (same contentHash, same health) —
       // a real thing a writer can do (Save Version twice with no edit
-      // in between).
+      // in between), and a real distinct saved record, not a re-display of
+      // the first one.
       snap({ id: 'second-save', health: 70, contentHash: dupeHash, analyzedAt: 3000 }),
     ];
     const ranks = snapshotDraftRanks(snapshots);
-    // Each dupe ranks against only the ONE genuinely distinct other draft
-    // (of: 2 — the dupe's twin excluded, "other" counted), never "of: 3"
-    // (which would mean it counted its own duplicate as a second, separate
-    // draft) and never tied against its own twin.
-    assert.deepEqual(ranks[0], { rank: 1, of: 2, tied: false, unscored: 0 }, 'first-save vs. {other}: its own duplicate (second-save) is excluded, not counted or tied against');
-    assert.deepEqual(ranks[2], { rank: 1, of: 2, tied: false, unscored: 0 }, 'second-save vs. {other}: symmetric — excludes first-save the same way');
+    // "of: 3" (not 2): first-save's own duplicate (second-save) IS counted
+    // as another draft, tied with it for 1st, ahead of "other".
+    assert.deepEqual(ranks[0], { rank: 1, of: 3, tied: true, unscored: 0 }, 'first-save vs. {other, second-save}: its content-identical sibling still counts and ties');
+    assert.deepEqual(ranks[2], { rank: 1, of: 3, tied: true, unscored: 0 }, 'second-save vs. {other, first-save}: symmetric');
+  });
+
+  it('never inflates "of" by counting a snapshot against its own array slot — an N-snapshot array of distinct healths always reads "of N", never "of N+1"', () => {
+    const snapshots = [
+      snap({ id: 'a', health: 90, contentHash: 'a'.repeat(64), analyzedAt: 1000 }),
+      snap({ id: 'b', health: 60, contentHash: 'b'.repeat(64), analyzedAt: 2000 }),
+      snap({ id: 'c', health: 40, contentHash: 'c'.repeat(64), analyzedAt: 3000 }),
+    ];
+    const ranks = snapshotDraftRanks(snapshots);
+    for (const r of ranks) assert.equal(r?.of, 3, 'three distinct snapshots, never "of 4" from a self-count');
   });
 });
