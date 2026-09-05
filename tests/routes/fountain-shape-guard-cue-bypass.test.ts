@@ -25,6 +25,14 @@
 // .fdx, against both POST /api/scriptide/doctor and POST /api/export/verify,
 // rejects fast rather than reaching the analyzer.
 //
+// ROUND 4 (second independent review, 2026-09-05). The round-3 fix
+// (MAX_FOUNTAIN_CUE_WEIGHT) also did not bound cost: walking the weight~9.9M
+// iso-curve found the guard rejecting a 31s legal payload while accepting
+// two that cost 150-216s (low distinct, high occurrences — the corner
+// weight-as-a-product cannot see). Fixed with MAX_FOUNTAIN_FREQUENT_CUE_LINES.
+// The describe block at the end of this file reproduces the review's own
+// two attack points over HTTP.
+//
 // The .fdx payloads below are hand-built XML (not produced via
 // src/lib/fdx.ts's fountainToFdx), deliberately — fountainToFdx treats a
 // trailing `^` as a dual-dialogue FORMATTING marker and strips it from the
@@ -151,4 +159,117 @@ describe('cue-definition bypass families — POST /api/export/verify', async () 
       assert.ok(ms < FAST_REJECTION_MS, `${family} (fdx): expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
     });
   }
+});
+
+// ── Round-4 bypass: low-distinct/high-occurrence, weight-bound-blind
+// (2026-09-05 second independent review) ───────────────────────────────────
+// The round-3 fix (MAX_FOUNTAIN_CUE_WEIGHT, distinct x occurrences) does not
+// bound analyzer cost: walking the weight~9.9M iso-curve, the review found
+// the guard REJECTING a 31s payload (1,500 distinct x 30,000 occurrences)
+// while ACCEPTING two payloads that cost 150-216s — distinct=200/
+// occurrences=49,500 and distinct=400/occurrences=24,750, both weight~9.9M,
+// both under the 10,000,000 weight bound. Fixed with
+// MAX_FOUNTAIN_FREQUENT_CUE_LINES (server/lib/validation.ts) — a bound on
+// the COUNT of distinct cue lines that individually repeat often, which
+// both of these payloads blow (200 and 400 "frequent" lines respectively,
+// each repeating far more than the 15-occurrence threshold). These are the
+// review's own two attack points, reproduced here as an HTTP-level
+// regression test.
+describe('round-4 bypass (weight-bound-blind, low-distinct/high-occurrence) — POST /api/scriptide/doctor', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const FREQUENT_REJECTION_RE = /MAX_FOUNTAIN_FREQUENT_CUE_LINES/;
+
+  const ISO_WEIGHT_POINTS: Record<string, { distinct: number; occurrences: number }> = {
+    'distinct=200/occurrences=49,500 (review-measured 157s unguarded)': { distinct: 200, occurrences: 49_500 },
+    'distinct=400/occurrences=24,750 (review-measured 216s unguarded)': { distinct: 400, occurrences: 24_750 },
+  };
+
+  for (const [label, { distinct, occurrences }] of Object.entries(ISO_WEIGHT_POINTS)) {
+    it(`${label} is rejected fast via the frequent-cue-line bound, not the weight bound`, async () => {
+      // Short names/dialogue (not "CHARACTER<i>"/"Line.") — at 49,500
+      // occurrences the longer spelling used elsewhere in this file would
+      // exceed MAX_FOUNTAIN_CHARS (900,000) before ever reaching the guard's
+      // OWN bounds, which would test the wrong thing (the unconditional
+      // z.string().max() cap, not this guard).
+      const names = Array.from({ length: distinct }, (_, i) => `C${i}`);
+      let fountain = 'INT. ROOM - DAY\n\n';
+      for (let i = 0; i < occurrences; i++) fountain += `${names[i % distinct]}\nL.\n`;
+      assert.ok(fountain.length < 900_000, `test payload (${fountain.length} chars) must itself stay under MAX_FOUNTAIN_CHARS to prove this guard's own bound is what rejects it`);
+      // Sanity: this payload's weight sits at ~9.9M, comfortably under the
+      // 10,000,000 weight bound — if this assertion ever fails, the test is
+      // no longer proving what it claims to (that the OTHER bound is doing
+      // the work here).
+      assert.ok(distinct * occurrences < 10_000_000, `test payload's weight (${distinct * occurrences}) must stay under the weight bound to prove this is the frequent-line bound catching it`);
+
+      const start = Date.now();
+      const res = await post({ fountain });
+      const ms = Date.now() - start;
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.match(body.error, FREQUENT_REJECTION_RE);
+      assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+    });
+  }
+});
+
+// ── POST /api/scriptide/fix's candidateFountain — same guard, second field
+// (main-branch merge, 2026-09-05) ───────────────────────────────────────────
+// FixBodySchema's `candidateFountain` (added on main the same day, merged in
+// by this lane's rebase) reuses fountainField() — the exact same
+// zod-wrapped call to fountainShapeRejectionReason every other field on this
+// page proves against — so every bound above already applies to it with no
+// route-specific wiring. Two representative cases (not the full family
+// sweep — POST /api/scriptide/fix sits behind aiLimiter, 20 requests/min,
+// far tighter than gameLimiter): the round-2 caret bypass and the round-4
+// low-distinct/high-occurrence bypass, both submitted as `candidateFountain`
+// alongside a small, valid `fountain`.
+describe('cue-definition bypass families — POST /api/scriptide/fix (candidateFountain)', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/scriptide/fix`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const VALID_FOUNTAIN = 'INT. ROOM - DAY\n\nA quiet room.\n\nALEX\nHello there.\n';
+
+  it('caret bypass — candidateFountain is rejected fast, not analyzed', async () => {
+    const candidateFountain = buildFountain(CUE_LINE_BUILDERS['caret (tight)']!);
+    const start = Date.now();
+    const res = await post({ fountain: VALID_FOUNTAIN, candidateFountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, REJECTION_RE);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+
+  it('round-4 low-distinct/high-occurrence bypass — candidateFountain is rejected fast via the frequent-cue-line bound', async () => {
+    const distinct = 400;
+    const occurrences = 24_750;
+    const names = Array.from({ length: distinct }, (_, i) => `C${i}`);
+    let candidateFountain = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < occurrences; i++) candidateFountain += `${names[i % distinct]}\nL.\n`;
+    assert.ok(candidateFountain.length < 900_000, `test payload (${candidateFountain.length} chars) must itself stay under MAX_FOUNTAIN_CHARS`);
+
+    const start = Date.now();
+    const res = await post({ fountain: VALID_FOUNTAIN, candidateFountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
 });

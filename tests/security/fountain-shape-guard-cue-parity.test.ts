@@ -27,10 +27,24 @@
 // this file, against runScriptDoctor directly) at 39s for 20 repeats and a
 // non-terminating request at 34 repeats. Fixed with a second bound,
 // MAX_FOUNTAIN_CUE_WEIGHT, on distinct-cue-lines x total-cue-line-occurrences
-// (a cost proxy, not a vocabulary proxy) — see validation.ts's own comment
-// for the measurement grid this bound was chosen from. Part 3 below proves a
-// realistic feature-length script and every committed fixture clear the new
-// bound with wide margin.
+// (a cost proxy, not a vocabulary proxy).
+//
+// ROUND 4 (second independent review, 2026-09-05, of the round-3 fix).
+// MAX_FOUNTAIN_CUE_WEIGHT does not bound cost either — walking the
+// weight~9.9M iso-curve found the guard REJECTING a 31s payload (1,500
+// distinct x 30,000 occurrences) while ACCEPTING a 216s one (400 distinct x
+// 24,750 occurrences, same weight). An interim ratio-based bound (average
+// occurrences per distinct line) was tried and DISPROVEN by this repo's own
+// fixture: `tests/fixtures/blind-pairs/low-tide-bad.fountain`, a real
+// 219-line two-character scene, has ratio 24.5 (2 distinct, 49
+// occurrences) and would have been falsely rejected. Fixed with
+// MAX_FOUNTAIN_FREQUENT_CUE_LINES, a bound on the COUNT of distinct cue
+// lines that individually occur often — see validation.ts's own comment for
+// the full measurement grid and the reasoning for why a count, not an
+// average or a product, is the right shape for this bound. Part 3 below
+// proves a REALISTIC (skewed majors/minors, extension variants, caps
+// action) feature-length script, every committed fixture, and the round-4
+// false-rejection fixture (R4) all clear every bound with a stated margin.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -43,6 +57,8 @@ import {
   CUE_LIKE_LINE_RE,
   MAX_FOUNTAIN_DISTINCT_CUE_LINES,
   MAX_FOUNTAIN_CUE_WEIGHT,
+  MAX_FOUNTAIN_FREQUENT_CUE_LINES,
+  FREQUENT_CUE_OCCURRENCE_THRESHOLD,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE } from '../../src/lib/fountain.ts';
 
@@ -242,107 +258,183 @@ describe('fountainShapeRejectionReason — every committed fixture still passes 
   });
 });
 
-// ── Part 3: the cost bound (MAX_FOUNTAIN_CUE_WEIGHT) — margin proof ─────────
-// Recomputes (distinct cue lines, total cue-line occurrences) with the exact
-// same walk fountainShapeRejectionReason uses internally (isCueLikeLine,
-// trim, skip scene headings), so the margin numbers reported here are
-// guaranteed consistent with what the guard itself would compute — not a
+// ── Part 3: the cost bounds (WEIGHT + FREQUENT_CUE_LINES) — margin proof ────
+// Recomputes (distinct cue lines, total cue-line occurrences, and the count
+// of "frequent" ones) with the EXACT same walk fountainShapeRejectionReason
+// uses internally (isCueLikeLine, trim, skip scene headings, the
+// next-line-is-dialogue context check), so the margin numbers reported here
+// are guaranteed consistent with what the guard itself would compute — not a
 // second, possibly-drifted count.
-function cueWeightOf(text: string): { distinct: number; occurrences: number; weight: number } {
-  const sceneHeadingRe = /^(INT|EXT|EST|I\/E)[. ]/;
-  const seen = new Set<string>();
+const SCENE_HEADING_RE = /^(INT|EXT|EST|I\/E)[. ]/;
+function cueMetricsOf(text: string): { distinct: number; occurrences: number; weight: number; frequentCount: number } {
+  const lines = text.split('\n');
+  const counts = new Map<string, number>();
   let occurrences = 0;
-  for (const rawLine of text.split('\n')) {
-    const line = rawLine.trim();
-    if (line.length === 0 || sceneHeadingRe.test(line)) continue;
-    if (isCueLikeLine(line)) {
-      seen.add(line);
-      occurrences++;
-    }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim();
+    if (line.length === 0 || SCENE_HEADING_RE.test(line)) continue;
+    if (!isCueLikeLine(line)) continue;
+    const nextIsDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
+    if (!nextIsDialogue) continue;
+    counts.set(line, (counts.get(line) ?? 0) + 1);
+    occurrences++;
   }
-  return { distinct: seen.size, occurrences, weight: seen.size * occurrences };
+  let frequentCount = 0;
+  for (const c of counts.values()) if (c > FREQUENT_CUE_OCCURRENCE_THRESHOLD) frequentCount++;
+  return { distinct: counts.size, occurrences, weight: counts.size * occurrences, frequentCount };
 }
 
-// A synthesized realistic feature-length script: 80 distinct character
-// names, ~120 scenes, ~4,000 total cue occurrences (roughly 33 per scene, 50
-// per character — an unusually TALKATIVE cast by real-script standards, per
-// margin.mjs's finding that the densest committed fixture has 9 distinct
-// cue-like lines total), and enough words per dialogue line to land close to
-// 25,000 words — the shape the independent review asked this bound be
-// checked against.
-function buildRealisticFeature(): { text: string; wordCount: number; sceneCount: number } {
-  const DISTINCT_NAMES = 80;
-  const TOTAL_OCCURRENCES = 4000;
+// A synthesized PLAUSIBLE feature-length script — not the cleanest possible
+// shape (the round-3 test's mistake, per the 2026-09-05 review's R3
+// finding), but one with the furniture a real 120-page spec carries:
+//  - a skewed cast: a handful of MAJOR/lead characters who carry most of the
+//    dialogue (each comfortably over the "frequent" threshold, the way any
+//    real protagonist is), and many one-or-two-line MINOR/background names —
+//    the realistic shape the round-4 fix (MAX_FOUNTAIN_FREQUENT_CUE_LINES)
+//    is specifically calibrated against, rather than a uniform cast where
+//    every name is equally talkative;
+//  - (V.O.)/(O.S.)/(CONT'D) extension variants on some major dialogue, which
+//    inflate the DISTINCT cue-line count without inflating any one variant's
+//    own occurrence count much — exactly why a real script's distinct count
+//    can run well past its named-character count;
+//  - caps-heavy action lines (long ALL-CAPS emphasis, each followed by a
+//    blank line, never dialogue) interleaved between scenes, to prove the
+//    R4 context-check fix holds at feature length too, not just in the
+//    isolated R4 fixture below.
+function buildPlausibleFeature(): { text: string; wordCount: number; sceneCount: number } {
+  const MAJOR_COUNT = 8;
+  const MINOR_COUNT = 122;
   const SCENES = 120;
-  const names = Array.from({ length: DISTINCT_NAMES }, (_, i) => `CHARACTER${String(i).padStart(2, '0')}`);
-  // ~6 words per dialogue line x 4,000 occurrences ≈ 24,000 dialogue words,
-  // plus one 5-word action line per scene (120 x 5 = 600 words) ≈ 24,600 —
-  // close enough to "~25,000" to be the shape under test; the exact count is
-  // computed below and asserted, not assumed.
-  const dialogueWords = ['the', 'plan', 'was', 'never', 'going', 'to', 'work', 'like', 'this', 'again', 'tonight', 'trust', 'me'];
+  const EXTENSIONS = ['', ' (V.O.)', ' (O.S.)', " (CONT'D)"];
+  const dialogueWords = ['the', 'plan', 'was', 'never', 'going', 'to', 'work', 'like', 'this', 'again', 'tonight', 'trust', 'me', 'now', 'wait'];
+  const majors = Array.from({ length: MAJOR_COUNT }, (_, i) => `MAJOR${i}`);
+  const minors = Array.from({ length: MINOR_COUNT }, (_, i) => `MINOR${i}`);
+
+  let wordSeed = 0;
+  const dialogueLine = (): string => {
+    const words = Array.from({ length: 6 }, () => dialogueWords[wordSeed++ % dialogueWords.length]);
+    const line = words.join(' ');
+    return `${line[0]!.toUpperCase()}${line.slice(1)}.`;
+  };
+
+  // Each major speaks ~700 times, but — realistically — NOT evenly across
+  // its 4 extension variants: a (V.O.)/(O.S.)/(CONT'D) tag is used only when
+  // the scene actually calls for it (narration, an off-screen line, a
+  // page-break interruption), nowhere near as often as a character's
+  // ordinary plain cue. Each tagged variant gets a small fixed count (8,
+  // under the "frequent" threshold on its own); the rest goes to the plain
+  // form. 8 majors x 4 = 32 distinct lines, but only the 8 PLAIN ones are
+  // individually frequent — the tagged variants are distinct vocabulary
+  // without being cost-relevant, which is the whole point of a vocabulary
+  // bound and a frequency bound being two different things.
+  const TAGGED_VARIANT_OCCURRENCES = 8;
+  const majorLines: string[] = [];
+  for (const name of majors) {
+    const taggedTotal = TAGGED_VARIANT_OCCURRENCES * (EXTENSIONS.length - 1);
+    for (let e = 1; e < EXTENSIONS.length; e++) {
+      const cue = `${name}${EXTENSIONS[e]}`;
+      for (let k = 0; k < TAGGED_VARIANT_OCCURRENCES; k++) majorLines.push(cue);
+    }
+    const plainCue = name;
+    for (let k = 0; k < 700 - taggedTotal; k++) majorLines.push(plainCue);
+  }
+  // Each minor speaks 6 times total, split across its own 4 variants
+  // (round-robin) -> 122 x 4 = 488 distinct lines, 122 x 6 = 732 occurrences.
+  const minorLines: string[] = [];
+  for (const name of minors) {
+    for (let k = 0; k < 6; k++) minorLines.push(`${name}${EXTENSIONS[k % EXTENSIONS.length]}`);
+  }
+
+  const allDialogueCues = [...majorLines, ...minorLines];
+  // Deterministic shuffle (not crypto-random — this only needs to be a fixed,
+  // reproducible interleaving, not real randomness) so majors and minors mix
+  // through scenes the way a real draft's scene order would, rather than
+  // every major's lines landing consecutively.
+  for (let i = allDialogueCues.length - 1; i > 0; i--) {
+    const j = (i * 2654435761) % (i + 1);
+    [allDialogueCues[i], allDialogueCues[j]] = [allDialogueCues[j]!, allDialogueCues[i]!];
+  }
+
   let text = '';
-  let occurrencesLeft = TOTAL_OCCURRENCES;
-  for (let scene = 0; scene < SCENES; scene++) {
-    text += `INT. LOCATION ${scene} - DAY\n\n`;
-    text += 'The room is quiet, tense, waiting for someone to speak first.\n\n';
-    const remainingScenes = SCENES - scene;
-    const perScene = Math.max(1, Math.round(occurrencesLeft / remainingScenes));
-    for (let k = 0; k < perScene && occurrencesLeft > 0; k++) {
-      const name = names[(TOTAL_OCCURRENCES - occurrencesLeft) % DISTINCT_NAMES];
-      const line = Array.from({ length: 6 }, (_, w) => dialogueWords[(TOTAL_OCCURRENCES - occurrencesLeft + w) % dialogueWords.length]).join(' ');
-      text += `${name}\n${line[0]!.toUpperCase()}${line.slice(1)}.\n\n`;
-      occurrencesLeft--;
+  let idx = 0;
+  const perScene = Math.ceil(allDialogueCues.length / SCENES);
+  for (let s = 0; s < SCENES; s++) {
+    text += `INT. LOCATION ${s} - DAY\n\n`;
+    // Two caps-heavy action-emphasis lines per scene, each followed by a
+    // blank line (never dialogue) — the R4 shape, present at feature scale.
+    text += `A SUDDEN NOISE CUTS THROUGH THE SILENCE AND EVERYONE FREEZES SCENE ${s}\n\n`;
+    text += `THE LIGHTS FLICKER ONCE, TWICE, THEN HOLD SCENE ${s}\n\n`;
+    for (let k = 0; k < perScene && idx < allDialogueCues.length; k++, idx++) {
+      text += `${allDialogueCues[idx]}\n${dialogueLine()}\n\n`;
     }
   }
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   return { text, wordCount, sceneCount: SCENES };
 }
 
-describe('MAX_FOUNTAIN_CUE_WEIGHT — cost bound, margin proof', () => {
-  it('the realistic feature-length synthetic script (80 names, ~4,000 cue occurrences, 120 scenes) clears the weight bound with wide margin, and is not rejected', () => {
-    const { text, wordCount, sceneCount } = buildRealisticFeature();
-    const { distinct, occurrences, weight } = cueWeightOf(text);
-    assert.equal(distinct, 80, `expected exactly 80 distinct cue lines, got ${distinct}`);
-    assert.ok(occurrences >= 3900 && occurrences <= 4000, `expected ~4,000 cue occurrences, got ${occurrences}`);
-    assert.ok(wordCount >= 20_000, `expected the synthesized feature to carry a realistic word count, got ${wordCount}`);
+describe('MAX_FOUNTAIN_CUE_WEIGHT / MAX_FOUNTAIN_FREQUENT_CUE_LINES — cost bounds, margin proof', () => {
+  it('a plausible feature-length script (skewed majors/minors, extension variants, caps action) clears every bound and is not rejected', () => {
+    const { text, wordCount, sceneCount } = buildPlausibleFeature();
+    const { distinct, occurrences, weight, frequentCount } = cueMetricsOf(text);
     assert.equal(sceneCount, 120);
+    assert.ok(wordCount >= 20_000, `expected a realistic word count, got ${wordCount}`);
 
-    const margin = MAX_FOUNTAIN_CUE_WEIGHT / weight;
-    // Documented as ~31x in validation.ts's own comment; assert a
-    // conservative floor so a future edit to either the bound or the
-    // synthesized shape has to update both deliberately, not silently drift.
-    assert.ok(margin >= 25, `expected >=25x margin on a realistic feature-length script, got ${margin.toFixed(1)}x (weight=${weight}, bound=${MAX_FOUNTAIN_CUE_WEIGHT})`);
-    console.log(`realistic feature: distinct=${distinct} occurrences=${occurrences} words=${wordCount} scenes=${sceneCount} weight=${weight} margin=${margin.toFixed(1)}x`);
+    const vocabMargin = MAX_FOUNTAIN_DISTINCT_CUE_LINES / distinct;
+    const weightMargin = MAX_FOUNTAIN_CUE_WEIGHT / weight;
+    const frequentMargin = MAX_FOUNTAIN_FREQUENT_CUE_LINES / Math.max(1, frequentCount);
+    console.log(
+      `plausible feature: distinct=${distinct} occurrences=${occurrences} words=${wordCount} scenes=${sceneCount} `
+      + `weight=${weight} frequentCount=${frequentCount} `
+      + `vocabMargin=${vocabMargin.toFixed(1)}x weightMargin=${weightMargin.toFixed(1)}x frequentMargin=${frequentMargin.toFixed(1)}x`,
+    );
+
+    // These margins are DELIBERATELY modest, not the ~31x/18.8x the round-3
+    // design's cleanest-possible-script test reported — the 2026-09-05
+    // review's R3 finding was exactly that that number was ~10x optimistic.
+    // A plausible script's margin is honestly in the low single digits on at
+    // least one bound; asserting a generous floor here (not a tight one)
+    // documents that reality rather than re-inflating it.
+    assert.ok(vocabMargin >= 1.2, `vocabulary margin too thin: ${vocabMargin.toFixed(2)}x (distinct=${distinct})`);
+    assert.ok(weightMargin >= 1.5, `weight margin too thin: ${weightMargin.toFixed(2)}x (weight=${weight})`);
+    assert.ok(frequentMargin >= 3, `frequent-line margin too thin: ${frequentMargin.toFixed(2)}x (frequentCount=${frequentCount})`);
 
     assert.equal(fountainShapeRejectionReason(text), null);
   });
 
-  it('every committed fixture and calibration sample clears the weight bound with wide margin', async () => {
+  it('every committed fixture and calibration sample clears every bound with wide margin', async () => {
     const { REFERENCE_CORPUS } = await import('../../server/nvm/analyze/calibration/corpus.ts');
     const { fountain: p0SampleFountain } = await import('../../src/lib/sample-script.ts');
 
-    const rows: Array<{ name: string; distinct: number; occurrences: number; weight: number }> = [];
+    const rows: Array<{ name: string; distinct: number; occurrences: number; weight: number; frequentCount: number }> = [];
     for (const file of trackedFountainFiles()) {
       const rel = path.relative(REPO_ROOT, file);
       const text = readFileSync(file, 'utf8');
-      rows.push({ name: rel, ...cueWeightOf(text) });
+      rows.push({ name: rel, ...cueMetricsOf(text) });
     }
     for (const sample of REFERENCE_CORPUS) {
-      rows.push({ name: `calibration/${sample.label}`, ...cueWeightOf(sample.fountain) });
+      rows.push({ name: `calibration/${sample.label}`, ...cueMetricsOf(sample.fountain) });
     }
-    rows.push({ name: 'p0/sample-script', ...cueWeightOf(p0SampleFountain) });
+    rows.push({ name: 'p0/sample-script', ...cueMetricsOf(p0SampleFountain) });
 
-    const worst = rows.reduce((a, b) => (b.weight > a.weight ? b : a));
-    const margin = MAX_FOUNTAIN_CUE_WEIGHT / Math.max(1, worst.weight);
-    console.log(`worst committed fixture by weight: ${worst.name} distinct=${worst.distinct} occurrences=${worst.occurrences} weight=${worst.weight} margin=${margin.toFixed(0)}x`);
-    // Documented as >55,000x in validation.ts's own comment (max observed
-    // weight around 9 distinct x ~20 occurrences = 180) — assert a
-    // conservative floor several orders of magnitude below that so normal
-    // fixture growth doesn't make this test brittle.
-    assert.ok(margin >= 1000, `expected >=1000x margin on the worst committed fixture, got ${margin.toFixed(0)}x (${worst.name}, weight=${worst.weight})`);
+    const worstByWeight = rows.reduce((a, b) => (b.weight > a.weight ? b : a));
+    const worstByFrequent = rows.reduce((a, b) => (b.frequentCount > a.frequentCount ? b : a));
+    const weightMargin = MAX_FOUNTAIN_CUE_WEIGHT / Math.max(1, worstByWeight.weight);
+    const frequentMargin = MAX_FOUNTAIN_FREQUENT_CUE_LINES / Math.max(1, worstByFrequent.frequentCount);
+    console.log(
+      `worst committed fixture by weight: ${worstByWeight.name} distinct=${worstByWeight.distinct} `
+      + `occurrences=${worstByWeight.occurrences} weight=${worstByWeight.weight} margin=${weightMargin.toFixed(0)}x`,
+    );
+    console.log(
+      `worst committed fixture by frequent-count: ${worstByFrequent.name} frequentCount=${worstByFrequent.frequentCount} `
+      + `margin=${frequentMargin.toFixed(0)}x`,
+    );
+    assert.ok(weightMargin >= 1000, `expected >=1000x weight margin on the worst committed fixture, got ${weightMargin.toFixed(0)}x (${worstByWeight.name})`);
+    // Real fixtures top out at a small handful of frequent lines (a
+    // two-hander scene has exactly 2) — assert a generous but real floor.
+    assert.ok(frequentMargin >= 10, `expected >=10x frequent-line margin on the worst committed fixture, got ${frequentMargin.toFixed(0)}x (${worstByFrequent.name})`);
   });
 
-  it('names the bound in its rejection message', () => {
+  it('names the bound in its rejection message (weight)', () => {
     let text = 'INT. ROOM - DAY\n\n';
     const cues = Array.from({ length: 1500 }, (_, i) => `LEGALCUE${i}`);
     for (let r = 0; r < 20; r++) for (const c of cues) text += `${c}\nLine.\n`;
@@ -350,5 +442,45 @@ describe('MAX_FOUNTAIN_CUE_WEIGHT — cost bound, margin proof', () => {
     assert.ok(reason, 'expected 1,500 distinct cues x 20 repeats to be rejected by the weight bound');
     assert.match(reason!, WEIGHT_REJECTION_RE);
     assert.match(reason!, /MAX_FOUNTAIN_CUE_WEIGHT/);
+  });
+
+  it('names the bound in its rejection message (frequent-cue-lines)', () => {
+    // distinct=200, each repeating 30x (weight=1.2M, well under the weight
+    // bound — this must be caught by the frequent-line bound specifically).
+    let text = 'INT. ROOM - DAY\n\n';
+    const cues = Array.from({ length: 200 }, (_, i) => `FREQCUE${i}`);
+    for (let r = 0; r < 30; r++) for (const c of cues) text += `${c}\nLine.\n`;
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected 200 distinct cues x 30 repeats to be rejected by the frequent-line bound');
+    assert.match(reason!, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+  });
+
+  // ── R4 regression: the false-rejection surface the 40-char-cap removal
+  // opened (2026-09-05 review finding). A caps-heavy action feature with NO
+  // character dialogue at all — every long ALL-CAPS line is followed by a
+  // blank line, never dialogue — must not be mistaken for a cast of 1,660
+  // "characters". Before the next-line-is-dialogue context check (this same
+  // lane's fix, above), this fixture was rejected over the 1,500-line
+  // vocabulary bound even though the parser would classify every one of
+  // these lines as `action`.
+  it('a caps-heavy action feature with zero real dialogue is NOT rejected (R4 regression fixture)', () => {
+    const SCENES = 200;
+    const CAPS_LINES_PER_SCENE = 8;
+    let text = '';
+    for (let s = 0; s < SCENES; s++) {
+      text += `INT. LOCATION ${s} - DAY\n\n`;
+      text += 'A person moves through the room, quiet, deliberate, careful not to make a sound.\n\n';
+      for (let c = 0; c < CAPS_LINES_PER_SCENE; c++) {
+        text += `THE DOOR SLAMS SHUT WITH A DEAFENING CRACK THAT ECHOES SCENE ${s} LINE ${c}\n\n`;
+      }
+    }
+    const { distinct, frequentCount } = cueMetricsOf(text);
+    // Sanity: this fixture really does carry 1,600 cue-SHAPED lines (past
+    // the old, context-free bound's 1,500 ceiling) — the point of this test
+    // is that the context check excludes them from counting at all, not
+    // that they were never shaped like cues.
+    assert.ok(distinct === 0, `expected the context check to exclude every caps-heavy action line from the cue vocabulary, but ${distinct} were counted`);
+    assert.equal(frequentCount, 0);
+    assert.equal(fountainShapeRejectionReason(text), null);
   });
 });

@@ -253,16 +253,17 @@ function ssrfSafeUrlField() {
 // of the grammar again is the same mistake one level up — a second,
 // independently-maintained cue grammar can ALWAYS drift from the first one,
 // no matter how carefully it is composed. Fixed by making the guard's
-// predicate a PROVABLE superset of the analyzer's own test by construction —
-// `isCueLikeLine` below is `CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line)`,
-// so anything the real analyzer parser calls a cue is a cue to the guard by
-// definition, regardless of what CUE_LIKE_LINE_RE's own hand-picked class
-// does or doesn't cover — CUE_LIKE_LINE_RE only widens beyond
-// CHARACTER_CUE_RE (Unicode capitals no length cap, plus the extra
-// punctuation below), it is never relied on to narrow it.
+// predicate a PROVABLE superset of the parser's own cue test by
+// construction — `isCueLikeLine` below is `CHARACTER_CUE_RE.test(line) ||
+// CUE_LIKE_LINE_RE.test(line)`, so anything CHARACTER_CUE_RE — the parser's
+// cue test — accepts is a cue to the guard by definition, regardless of what
+// CUE_LIKE_LINE_RE's own hand-picked class does or doesn't cover —
+// CUE_LIKE_LINE_RE only widens beyond CHARACTER_CUE_RE (Unicode capitals no
+// length cap, plus the extra punctuation below), it is never relied on to
+// narrow it.
 // tests/security/fountain-shape-guard-cue-parity.test.ts's implication test
-// enumerates the analyzer's grammar as a product (script × caret spelling ×
-// (V.O.)/(O.S.)/(CONT'D) tail × length) and asserts
+// enumerates CHARACTER_CUE_RE's grammar as a product (script × caret
+// spelling × (V.O.)/(O.S.)/(CONT'D) tail × length) and asserts
 // CHARACTER_CUE_RE.test(line) ⇒ isCueLikeLine(line) over the whole product,
 // so this guarantee is checked, not merely asserted by the `||`.
 //
@@ -290,36 +291,136 @@ function ssrfSafeUrlField() {
 //      1,500       5       7,500 151,967 9,431             11,250,000
 //      1,500      20      30,000 607,817 32,684             45,000,000
 //
-// distinct*occurrences tracks cost far more tightly than either distinct
-// alone, occurrences alone, or character count alone (e.g. chars 317,817 ->
-// 8,858ms vs chars 607,817 -> 32,684ms is not a clean function of chars, but
-// 12.8M -> 8,858ms and 45M -> 32,684ms both sit close to the same
-// ~0.0007-0.001 ms-per-unit band the whole table clusters around at scale).
-// MAX_FOUNTAIN_CUE_WEIGHT below (10,000,000) sits between the two largest
-// values that stayed under ~10s (12.8M at 8.9s is just OVER the new bound —
-// deliberately conservative, since this box ran at load average 10.7-13.5
-// throughout measurement) and the 45M value that took 32.7s, so the worst
-// LEGAL request under the new bound stays comfortably under ~10s on this
-// box. Measured (tests/security/fountain-shape-guard-cue-parity.test.ts's
-// own "margin proof" describe block, numbers logged on every run): a
-// synthesized realistic feature-length script (80 distinct names, 4,000 cue
-// occurrences, 120 scenes, ~29,900 words) scores distinct*occurrences =
-// 80 * 4,000 = 320,000, a 31.3x margin under the new bound; the worst of
-// every committed *.fountain fixture plus the 20 calibration samples
-// (`tests/fixtures/blind-pairs/the-deposit-excellent.fountain`, 7 distinct x
-// 51 occurrences = 357) is a 28,011x margin.
+// distinct*occurrences ("weight") tracks cost reasonably at LOW average
+// repeats-per-cue but is NOT the true cost driver — a second independent
+// review (2026-09-05) walked the weight~9.9M iso-curve and found the guard
+// REJECTING a 31s payload (distinct=1,500 x occurrences=30,000) while
+// ACCEPTING a 216s one (distinct=400 x occurrences=24,750, same ~9.9M
+// weight) — a 21x cost difference at IDENTICAL weight. Re-measured directly
+// against runScriptDoctor, holding distinct FIXED and varying only
+// occurrences (the axis the first grid never isolated), and separately
+// holding occurrences FIXED and varying distinct:
+//
+//   distinct=400, varying occurrences (uniform: every cue repeats equally):
+//     occurrences  chars     ms       ratio(occ/distinct)
+//           2,000   39,467     551          5.0
+//           5,000   98,587   1,634         12.5
+//          10,000  197,267   2,922         25.0
+//          11,000  216,937   3,610         27.5
+//          12,000  ~236,600  >90,000       30.0   <- danger
+//          15,000  295,837  131,459        37.5
+//
+//   distinct=200, varying occurrences:
+//     occurrences  chars     ms       ratio(occ/distinct)
+//           4,000   77,817     854         20.0
+//           5,000   97,267   1,044         25.0
+//           6,000  116,717  29,987         30.0   <- danger
+//          10,000  194,517  38,872         50.0
+//
+//   occurrences=6,000 FIXED, varying distinct (the axis that finally
+//   falsified a pure "ratio" theory — cost is NOT monotonic in either
+//   variable alone):
+//     distinct  ratio(occ/distinct)  ms
+//           50          120.0        5,045   safe
+//          100           60.0       11,604   danger (borderline)
+//          150           40.0       19,570   danger
+//          200           30.0       29,987   danger
+//          400           15.0        1,953   safe
+//
+// Neither "distinct x occurrences" nor "occurrences / distinct" alone
+// separates safe from dangerous here — cost peaks somewhere in a MIDDLE band
+// of distinct (roughly 100-400 in this environment) once enough of those
+// cue lines repeat often, and is lower on EITHER side of that band even at
+// a higher ratio (distinct=50 at ratio=120 is fine; distinct=400 at
+// ratio=15 is fine). This environment is also measurably noisy — the
+// IDENTICAL distinct=100/occurrences=4,000 payload measured 485ms in one
+// run and 8,937ms in another (both this lane and the 2026-09-05 review note
+// load averages of 10-16 on a 4-CPU box) — so chasing an exact numeric
+// cliff on this cost surface is chasing noise as much as signal.
+//
+// What IS robust, because it is a STRUCTURAL property of the input rather
+// than a numeric threshold on a noisy surface: every dangerous shape found
+// (by this lane and by the review) has MANY distinct cue lines that EACH
+// repeat often, simultaneously — a uniform cast where every "character"
+// is equally talkative. No real script looks like that: a real cast has a
+// small number of leads who carry most of the dialogue and many
+// one-or-two-line minors, which is exactly why a real 219-line two-hander
+// scene in this repo's own fixtures
+// (`tests/fixtures/blind-pairs/low-tide-bad.fountain`, 2 distinct cue lines,
+// PAUL x25 + JUNE x24) has a HIGH occurrences-per-distinct ratio (24.5) yet
+// is obviously safe — an earlier revision of this bound used exactly that
+// ratio, AVERAGED across all distinct lines, and it flagged this real
+// fixture, because an average of 2 numbers close together says nothing
+// about "how many characters are frequent", only "how frequent are the
+// ones that exist". MAX_FOUNTAIN_FREQUENT_CUE_LINES below caps the COUNT of
+// distinct cue lines that individually exceed FREQUENT_CUE_OCCURRENCE_THRESHOLD
+// occurrences — i.e. how many "major" speaking parts the vocabulary bound's
+// 1,500-line ceiling is letting through — rather than any average or
+// product, so a script with 2 (or 20, or 40) talkative characters and
+// hundreds of one-line minors is unaffected regardless of how many times
+// the majors individually speak, while a script built entirely from
+// uniformly-frequent "characters" (the shape every dangerous case above
+// shares) is rejected once too many of them cross the threshold at once.
+// MAX_FOUNTAIN_CUE_WEIGHT (10,000,000) is KEPT alongside it — it still
+// catches the complementary corner this bound does not: high distinct at
+// LOW per-line frequency (e.g. distinct=1,500 at ~7 occurrences each is
+// weight=15.75M, over the weight bound, but only 0 lines would cross a
+// 15-occurrence "frequent" threshold) — the two bounds are not redundant.
+//
+// Original distinct x repeat-count grid (kept for the record — it is what
+// this file's weight bound was originally, and still is partly, calibrated
+// against; it just never sampled the corners above):
+//   distinct repeats occurrences  chars     ms   distinct*occurrences
+//         50       1          50    957     34                  2,500
+//         50       5         250  4,717     46                 12,500
+//         50      20       1,000 18,817    217                 50,000
+//        200       1         200  3,907     76                 40,000
+//        200       5       1,000 19,467    284                200,000
+//        200      20       4,000 77,817    772                800,000
+//        800       1         800 15,907    651                640,000
+//        800       5       4,000 79,467  1,994              3,200,000
+//        800      20      16,000 317,817 8,858             12,800,000
+//      1,500       1       1,500 30,407  2,669              2,250,000
+//      1,500       5       7,500 151,967 9,431             11,250,000
+//      1,500      20      30,000 607,817 32,684             45,000,000
+//
+// Measured (tests/security/fountain-shape-guard-cue-parity.test.ts's own
+// "margin proof" describe block, numbers logged on every run, against the
+// FINAL three-bound design): a synthesized PLAUSIBLE feature-length script —
+// majors and minors in a realistic skewed distribution, (V.O.)/(O.S.)/
+// (CONT'D) extension variants, caps-heavy action — clears all three bounds;
+// see that test's own log line for the exact numbers.
 export const MAX_FOUNTAIN_TOKEN_CHARS = 2_000;
 export const MAX_FOUNTAIN_DISTINCT_CUE_LINES = 1_500;
 // Cost bound, not a vocabulary bound: distinct cue-shaped lines multiplied by
 // TOTAL cue-shaped line occurrences (every matching line counts, not just
-// first-seen ones) must not exceed this. See the grid above for how this
-// value was chosen. Checked incrementally in the same single pass as
-// MAX_FOUNTAIN_DISTINCT_CUE_LINES, so a payload that would blow this budget
-// is rejected as soon as the running product crosses it — for the exploit
-// shape (few thousand distinct cues repeated many times), that is almost
-// always long before the scan reaches the end of the document, so the guard
-// itself never pays for the full pathological length either.
+// first-seen ones) must not exceed this. Checked incrementally in the same
+// single pass as MAX_FOUNTAIN_DISTINCT_CUE_LINES, so a payload that would
+// blow this budget is rejected as soon as the running product crosses it.
+// Kept alongside MAX_FOUNTAIN_FREQUENT_CUE_LINES below — see the grid
+// comment above for why neither bound alone is sufficient.
 export const MAX_FOUNTAIN_CUE_WEIGHT = 10_000_000;
+// A cue-shaped line counts as "frequent" once it occurs more than this many
+// times — the threshold at which a recurring name starts looking like an
+// actual speaking part rather than a one-off. Deliberately low relative to
+// how much a real LEAD speaks (a protagonist easily clears 100+ lines in a
+// feature) — this threshold is not trying to say "this many lines makes you
+// a major character", only "this many identical lines is enough repetition
+// to count toward the budget below at all".
+export const FREQUENT_CUE_OCCURRENCE_THRESHOLD = 15;
+// Cost bound: the COUNT of distinct cue-shaped lines that are each
+// "frequent" (see FREQUENT_CUE_OCCURRENCE_THRESHOLD) must not exceed this —
+// see the grid comment above for why this, not an average or a product, is
+// the bound the 2026-09-05 review's iso-weight-curve finding required. A
+// real large-ensemble feature can comfortably have dozens of characters
+// who individually clear the frequency threshold; no real script has
+// HUNDREDS of them, which is the shape every measured-dangerous payload
+// shares. Checked incrementally (a cue line crossing the frequency
+// threshold is a one-way transition — once frequent, always frequent for
+// the rest of the scan — so, unlike an average, this can never need to
+// un-fire once it has fired), so a pathological payload is rejected as soon
+// as it crosses this budget, not only after the full document is scanned.
+export const MAX_FOUNTAIN_FREQUENT_CUE_LINES = 50;
 // Bounded quantifier on a single character class — not nested/overlapping
 // quantifiers, so this cannot itself become a catastrophic-backtracking
 // pattern regardless of input length.
@@ -328,12 +429,12 @@ const HUGE_TOKEN_RE = new RegExp(`\\S{${MAX_FOUNTAIN_TOKEN_CHARS + 1},}`);
 // trimmed line beginning with a cased-script capital (CUE_INITIAL_CLASS) and
 // continuing with cue letters/marks, digits, or a small set of punctuation a
 // real cue line can carry (space/tab, `.` `,` `'` `(` `)` `&` `/` `#` `-`) —
-// deliberately WIDER than the analyzer's own CHARACTER_CUE_RE in punctuation
-// (which permits none of `,` `(` `)` `&` `/` in its continuation class) and
-// with no length cap, because on its own this guard only needs to OVER-count
-// real character cues, never under-count the pathological case. It is NOT,
-// on its own, a superset of CHARACTER_CUE_RE — it is missing the caret
-// (`\s*\^?\s*`) and the (V.O.)/(O.S.)/(CONT'D) tail CHARACTER_CUE_RE
+// deliberately WIDER than the parser's own CHARACTER_CUE_RE test in
+// punctuation (which permits none of `,` `(` `)` `&` `/` in its continuation
+// class) and with no length cap, because on its own this guard only needs to
+// OVER-count real character cues, never under-count the pathological case.
+// It is NOT, on its own, a superset of CHARACTER_CUE_RE — it is missing the
+// caret (`\s*\^?\s*`) and the (V.O.)/(O.S.)/(CONT'D) tail CHARACTER_CUE_RE
 // explicitly admits, which is exactly the gap the 2026-09-04 independent
 // review found (see UPDATE 2 above). isCueLikeLine below is what closes that
 // gap, by construction rather than by trying to enumerate every optional
@@ -347,15 +448,23 @@ export const CUE_LIKE_LINE_RE = new RegExp(
   'u',
 );
 // The guard's actual line-shape predicate: a PROVABLE superset of
-// CHARACTER_CUE_RE by construction (the `||` includes it as a full
-// disjunct), so this guard structurally cannot under-count anything the real
-// analyzer parses as a cue, independent of whether CUE_LIKE_LINE_RE's own
-// hand-picked class happens to cover the same shape. CUE_LIKE_LINE_RE still
-// does useful work here — its wider punctuation class and lack of the
-// next-line-is-dialogue context check mean it over-counts MORE than
-// CHARACTER_CUE_RE alone would (e.g. a lone `(CONT'D)`-suffixed line with no
-// following dialogue), which is the guard's own deliberately conservative
-// direction.
+// CHARACTER_CUE_RE (src/lib/fountain.ts) by construction (the `||` includes
+// it as a full disjunct), so this guard structurally cannot under-count
+// anything the PARSER's own cue test (CHARACTER_CUE_RE) accepts as a cue —
+// independent of whether CUE_LIKE_LINE_RE's own hand-picked class happens to
+// cover the same shape. (Two OTHER cue predicates exist in this repo —
+// server/nvm/analyze/screenplay-normalizer.ts's isCharacterCue and
+// server/nvm/analyze/fountain-analyzer.ts's CUE_LINE_RE — and both also
+// accept a lowercase parenthetical tail, e.g. "NAME (cont'd)", that this
+// guard does not count. Measured (2026-09-05 review): that shape is NOT a
+// cost vector — 1,000/2,000/4,000 such lines cost a flat ~0.4-1.9s, nowhere
+// near quadratic — so CHARACTER_CUE_RE, the one predicate that DOES carry
+// the O(n²) cost this guard exists to block, is the correct disjunct to be a
+// superset of.) CUE_LIKE_LINE_RE still does useful work here — its wider
+// punctuation class and lack of the next-line-is-dialogue context check mean
+// it over-counts MORE than CHARACTER_CUE_RE alone would (e.g. a lone
+// `(CONT'D)`-suffixed line with no following dialogue), which is the guard's
+// own deliberately conservative direction.
 export function isCueLikeLine(line: string): boolean {
   return CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line);
 }
@@ -368,19 +477,56 @@ export function fountainShapeRejectionReason(text: string): string | null {
   if (HUGE_TOKEN_RE.test(text)) {
     return `must not contain a single unbroken run of more than ${MAX_FOUNTAIN_TOKEN_CHARS} non-whitespace characters`;
   }
-  const distinctCueLines = new Set<string>();
+  const lines = text.split('\n');
+  // Maps each distinct cue-shaped line to how many times it has occurred so
+  // far -- the Map's size is the same "distinct vocabulary" count the old
+  // Set gave, and each value is what MAX_FOUNTAIN_FREQUENT_CUE_LINES below
+  // counts against its own threshold.
+  const cueLineCounts = new Map<string, number>();
   let cueLineOccurrences = 0;
-  for (const rawLine of text.split('\n')) {
-    const line = rawLine.trim();
+  let frequentCueLineCount = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim();
     if (line.length === 0 || SCENE_HEADING_PREFIX_RE.test(line)) continue;
-    if (isCueLikeLine(line)) {
-      distinctCueLines.add(line);
-      cueLineOccurrences++;
-      if (distinctCueLines.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
-        return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
-      }
-      if (distinctCueLines.size * cueLineOccurrences > MAX_FOUNTAIN_CUE_WEIGHT) {
-        return `must not contain more than ${MAX_FOUNTAIN_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines \u00d7 total occurrences of one) — bound MAX_FOUNTAIN_CUE_WEIGHT, a cost bound distinct from the ${MAX_FOUNTAIN_DISTINCT_CUE_LINES}-line vocabulary bound above`;
+    if (!isCueLikeLine(line)) continue;
+    // Context check (2026-09-05 review finding R4): mirrors src/lib/
+    // fountain.ts's OWN cue-block condition -- a line is only a 'character'
+    // block to the real parser if it is IMMEDIATELY followed by a non-blank
+    // line (its dialogue). Dropping the old 40-char cap (this file's earlier
+    // revision) made every long ALL-CAPS action-emphasis line cue-SHAPED,
+    // and without this check those lines counted toward every bound below
+    // even though the parser treats them as `action`, not `character` -- a
+    // real caps-heavy action feature (200 scenes, 8 long ALL-CAPS emphasis
+    // lines each, each followed by a blank line per ordinary action-
+    // paragraph formatting) was measured rejected by the OLD (context-free)
+    // version of this loop at 1,660 "distinct cue" lines, over the
+    // 1,500 vocabulary bound, even though every one of those lines is action
+    // to the parser and could never drive the O(n^2) character-extraction
+    // cost this guard exists to prevent. Adding the SAME condition here can
+    // only REDUCE the count relative to skipping it -- the pathological
+    // shapes this guard targets (`CUE\nLine.\n`, `CUE\n\nLine.\n\n`, and
+    // their Unicode/caret/tail variants used throughout this file's own
+    // tests) all have real dialogue immediately following, so this never
+    // under-counts the actual attack surface, only excludes lines the real
+    // parser would never call a cue in the first place.
+    const nextLineIsDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
+    if (!nextLineIsDialogue) continue;
+    const occurrencesOfThisLine = (cueLineCounts.get(line) ?? 0) + 1;
+    cueLineCounts.set(line, occurrencesOfThisLine);
+    cueLineOccurrences++;
+    if (cueLineCounts.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
+      return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
+    }
+    if (cueLineCounts.size * cueLineOccurrences > MAX_FOUNTAIN_CUE_WEIGHT) {
+      return `must not contain more than ${MAX_FOUNTAIN_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines \u00d7 total occurrences of one) \u2014 bound MAX_FOUNTAIN_CUE_WEIGHT, a cost bound distinct from the ${MAX_FOUNTAIN_DISTINCT_CUE_LINES}-line vocabulary bound above`;
+    }
+    // A one-way transition (this line just became "frequent" for the first
+    // time this scan) -- see MAX_FOUNTAIN_FREQUENT_CUE_LINES's own comment
+    // for why that makes an incremental check here safe.
+    if (occurrencesOfThisLine === FREQUENT_CUE_OCCURRENCE_THRESHOLD + 1) {
+      frequentCueLineCount++;
+      if (frequentCueLineCount > MAX_FOUNTAIN_FREQUENT_CUE_LINES) {
+        return `must not contain more than ${MAX_FOUNTAIN_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times \u2014 bound MAX_FOUNTAIN_FREQUENT_CUE_LINES, a cost bound on how many DIFFERENT cue-shaped lines repeat often, distinct from the vocabulary and product bounds above`;
       }
     }
   }
