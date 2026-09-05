@@ -36,9 +36,20 @@ beforeEach(() => {
   resetTimingCacheForTests();
 });
 
-describe('getTiming — cgroup CPU quota denominator', () => {
+const enoent = () => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); };
+/** No `/proc/self/cgroup` at all (non-Linux, or unreadable) — every test
+ *  below that isn't specifically about path resolution uses this so the
+ *  function falls straight through to the mount-root paths, unchanged from
+ *  before this review's fix. */
+const noSelfCgroup = (path: string) => {
+  if (path === '/proc/self/cgroup') return enoent();
+  throw new Error(`unexpected path ${path}`);
+};
+
+describe('getTiming — cgroup CPU quota denominator (mount-root paths, no /proc/self/cgroup)', () => {
   it('cgroup v2: "max 100000" (unlimited) falls back to physical CPU count', () => {
     const quota = readCgroupCpuQuota((p) => {
+      if (p === '/proc/self/cgroup') return enoent();
       assert.equal(p, '/sys/fs/cgroup/cpu.max');
       return 'max 100000\n';
     });
@@ -48,34 +59,85 @@ describe('getTiming — cgroup CPU quota denominator', () => {
   it('cgroup v2: "400000 100000" is a 4-cpu quota', () => {
     const quota = readCgroupCpuQuota((p) => {
       if (p === '/sys/fs/cgroup/cpu.max') return '400000 100000\n';
-      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      return enoent();
     });
     assert.equal(quota, 4);
   });
 
   it('cgroup v1: cfs_quota_us -1 (unlimited) falls back to physical CPU count', () => {
     const quota = readCgroupCpuQuota((p) => {
-      if (p === '/sys/fs/cgroup/cpu.max') throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
       if (p === '/sys/fs/cgroup/cpu/cpu.cfs_quota_us') return '-1\n';
       if (p === '/sys/fs/cgroup/cpu/cpu.cfs_period_us') return '100000\n';
-      throw new Error(`unexpected path ${p}`);
+      return enoent();
     });
     assert.equal(quota, null);
   });
 
   it('cgroup v1: 350000/100000 rounds up to a 4-cpu quota', () => {
     const quota = readCgroupCpuQuota((p) => {
-      if (p === '/sys/fs/cgroup/cpu.max') throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
       if (p === '/sys/fs/cgroup/cpu/cpu.cfs_quota_us') return '350000\n';
       if (p === '/sys/fs/cgroup/cpu/cpu.cfs_period_us') return '100000\n';
-      throw new Error(`unexpected path ${p}`);
+      return enoent();
     });
     assert.equal(quota, 4);
   });
 
   it('neither cgroup file present returns null', () => {
-    const enoent = () => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); };
-    assert.equal(readCgroupCpuQuota(enoent), null);
+    assert.equal(readCgroupCpuQuota(noSelfCgroup), null);
+  });
+});
+
+describe('getTiming — cgroup CPU quota RESOLVES THE PROCESS\'S OWN PATH before the mount root (independent review 2026-09-04)', () => {
+  it('cgroup v1, nested/non-namespaced (Docker\'s v1 default; this sandbox\'s own layout): the hierarchy ROOT is unlimited (-1) and ENOENTs entirely, only the process\'s own subtree carries the real quota', () => {
+    // Mirrors this container's own /proc/self/cgroup shape
+    // (docs/audits/2026-09-04-evening-batch/AUDIT.md's review: "4:memory:/process_api/…").
+    const nestedPath = '/process_api/01a06dee-ff3d-7062-be27-cd5470d8e90d/claude-code-bash';
+    const quota = readCgroupCpuQuota((p) => {
+      if (p === '/proc/self/cgroup') {
+        return [
+          '4:memory:/process_api/01a06dee-ff3d-7062-be27-cd5470d8e90d/claude-code-bash',
+          `1:cpu:${nestedPath}`,
+          '',
+        ].join('\n');
+      }
+      if (p === `/sys/fs/cgroup/cpu${nestedPath}/cpu.cfs_quota_us`) return '200000\n';
+      if (p === `/sys/fs/cgroup/cpu${nestedPath}/cpu.cfs_period_us`) return '100000\n';
+      // The mount ROOT — v2 absent, v1 root unlimited — ENOENTs, proving the
+      // nested nested path (not a lucky root fallback) produced the answer.
+      return enoent();
+    });
+    assert.equal(quota, 2, 'a 200000/100000 quota at the process\'s own nested v1 path is 2 whole CPUs');
+  });
+
+  it('cgroup v2, nested (e.g. under a systemd slice): resolves /sys/fs/cgroup<path>/cpu.max before the mount root', () => {
+    const nestedPath = '/user.slice/user-1000.slice/session-3.scope';
+    const quota = readCgroupCpuQuota((p) => {
+      if (p === '/proc/self/cgroup') return `0::${nestedPath}\n`;
+      if (p === `/sys/fs/cgroup${nestedPath}/cpu.max`) return '300000 100000\n';
+      // The v2 mount ROOT ENOENTs — proving the nested path produced the answer.
+      return enoent();
+    });
+    assert.equal(quota, 3, 'a 300000/100000 quota at the process\'s own nested v2 path is 3 whole CPUs');
+  });
+
+  it('a process AT the namespace root (process path "/") reads the same file the mount-root fallback would — real behavior on a namespaced container is unchanged', () => {
+    const quota = readCgroupCpuQuota((p) => {
+      if (p === '/proc/self/cgroup') return '1:cpu:/\n';
+      if (p === '/sys/fs/cgroup/cpu/cpu.cfs_quota_us') return '400000\n';
+      if (p === '/sys/fs/cgroup/cpu/cpu.cfs_period_us') return '100000\n';
+      return enoent();
+    });
+    assert.equal(quota, 4);
+  });
+
+  it('an unparseable /proc/self/cgroup (no matching v1/v2 line) falls back to the mount root exactly as if the file were absent', () => {
+    const quota = readCgroupCpuQuota((p) => {
+      if (p === '/proc/self/cgroup') return '4:memory:/only-memory-here\n';
+      if (p === '/sys/fs/cgroup/cpu/cpu.cfs_quota_us') return '200000\n';
+      if (p === '/sys/fs/cgroup/cpu/cpu.cfs_period_us') return '100000\n';
+      return enoent();
+    });
+    assert.equal(quota, 2);
   });
 });
 

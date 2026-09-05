@@ -54,9 +54,10 @@ import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browse
 // base values unchanged), growing linearly, capped at 4.0x (a pathologically
 // loaded box gets waits stretched 4x, never unbounded). `timing.ms(base)`
 // applies it; `timing.scale` is the raw factor for suites that need it
-// directly (e.g. to inflate a raw socket timeout inline). The one log line
-// this prints is the whole visible contract: `[verify] load L/cpus →
-// timeout scale Sx`.
+// directly (e.g. to inflate a raw socket timeout inline). There are now TWO
+// possible log lines — the ordinary scaled one below, or "policy inactive"
+// (see THE PLATFORM CHECK) — not one; whichever fires is the whole visible
+// contract for that run.
 //
 // THE DENOMINATOR (2026-09-04 fix — audit `docs/audits/2026-09-04-evening-
 // batch/AUDIT.md`, "getTiming load scale"). `os.cpus().length` alone is
@@ -65,11 +66,35 @@ import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browse
 // 28 (seven times over its real quota) computed 28/64 = 0.44/cpu and scaled
 // 1.0x — indistinguishable in the log from an idle machine. The denominator
 // is now `min(os.cpus().length, ceil(quota/period))`, reading the cgroup CPU
-// allowance where present: v2 `/sys/fs/cgroup/cpu.max` ("max 100000" means
-// unlimited; otherwise `quota period`), else v1
-// `/sys/fs/cgroup/cpu/cpu.cfs_quota_us` + `cpu.cfs_period_us` (a quota of
-// `-1` means unlimited). Neither file present, unlimited, or unparseable ->
-// the denominator is just `os.cpus().length`, unchanged from before.
+// allowance where present: v2 `cpu.max` ("max 100000" means unlimited;
+// otherwise `quota period`), else v1 `cfs_quota_us` + `cfs_period_us` (a
+// quota of `-1` means unlimited) — `readCgroupCpuQuota()` below resolves
+// THIS PROCESS's own cgroup path (via `/proc/self/cgroup`) under each mount
+// before falling back to the mount's hierarchy root, and its own doc comment
+// explains why the root alone is not enough. Neither file present,
+// unlimited, or unparseable -> the denominator is just `os.cpus().length`,
+// unchanged from before.
+//
+// THE TRADE-OFF THIS DENOMINATOR CHANGE INTRODUCES (independent review
+// 2026-09-04, not caught by the original brief): `os.loadavg()` reads
+// `/proc/loadavg`, which is NOT namespaced per-container — it always reports
+// the HOST's load, no matter how small the cgroup's own quota is. The new
+// denominator, by contrast, IS container-scoped. So on a quota-limited
+// container running on a busy SHARED host — a normal-looking host at, say,
+// load 60 on 64 cores, with THIS container quota'd to 4 cpus — the ratio
+// becomes 60/4 = 15/cpu, pinned at the 4.0x ceiling, even though the
+// container itself is completely idle. Two real consequences: every timeout
+// is stretched 4x (so a genuinely hung suite now takes 4x longer to fail,
+// which weakens exactly the timing proof this policy exists to protect), and
+// `VERIFY_MAX_LOAD_PER_CPU`, if set, can refuse to even START a run that
+// should have been allowed to proceed. This is a straight trade against the
+// bug the denominator change fixes (host-count-as-denominator silently
+// UNDER-scaling on a quota-limited container) — it swaps under-scaling for
+// over-scaling, not for "always correct." Fixing this for real needs a
+// CONTAINER-SCOPED load signal instead of the host-wide `/proc/loadavg`:
+// cgroup v2's `cpu.stat`'s `throttled_usec` (time this cgroup was actually
+// throttled) or the kernel's PSI `cpu.pressure` file are both scoped to the
+// cgroup itself and would settle this; neither is read here yet.
 //
 // THE PLATFORM CHECK. `os.loadavg()` returns `[0, 0, 0]` unconditionally on
 // Windows — the maintainer's own machine, per CLAUDE.md's OneDrive gotcha —
@@ -96,34 +121,104 @@ import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browse
 const MIN_SCALE = 1.0;
 const MAX_SCALE = 4.0;
 
-/** Cgroup v2: `/sys/fs/cgroup/cpu.max`, one line `"$MAX_OR_QUOTA $PERIOD"`.
- *  Cgroup v1: `/sys/fs/cgroup/cpu/cpu.cfs_quota_us` (-1 = unlimited) and
- *  `cpu.cfs_period_us`, both in microseconds. Returns the whole-CPU quota
- *  (rounded up) or `null` when neither file is present/parseable/unlimited
- *  — callers fall back to the physical CPU count in that case. `readFile`
- *  defaults to the real filesystem; tests inject a stub so this is provable
- *  on a machine with neither cgroup version mounted.
- * @param {(path: string, encoding: 'utf8') => string} [readFile]
+/**
+ * Parses `/proc/self/cgroup` into THIS PROCESS's own controller-relative
+ * path, per controller version: cgroup v2's single `0::<path>` line, and
+ * cgroup v1's line whose comma-separated controller list contains `cpu`.
+ * Either may come back `null` (that version's line absent, or the file
+ * itself unreadable by the caller).
+ * @param {string} raw
+ * @returns {{ v2Path: string | null, v1Path: string | null }} */
+function parseSelfCgroupPaths(raw) {
+  let v2Path = null;
+  let v1Path = null;
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const firstColon = trimmed.indexOf(':');
+    const secondColon = trimmed.indexOf(':', firstColon + 1);
+    if (firstColon < 0 || secondColon < 0) continue;
+    const hierId = trimmed.slice(0, firstColon);
+    const controllers = trimmed.slice(firstColon + 1, secondColon);
+    const cgPath = trimmed.slice(secondColon + 1);
+    if (hierId === '0' && controllers === '') {
+      v2Path = cgPath;
+    } else if (controllers.split(',').includes('cpu')) {
+      v1Path = cgPath;
+    }
+  }
+  return { v2Path, v1Path };
+}
+
+/** Joins a cgroup mount root with a controller-relative path from
+ *  `/proc/self/cgroup`, without a double slash when that path is `/` (the
+ *  common case for a process that IS its cgroup's namespace root, where the
+ *  process-scoped path and the mount root coincide). */
+function joinCgroupPath(root, cgPath) {
+  return !cgPath || cgPath === '/' ? root : `${root}${cgPath}`;
+}
+
+/** Cgroup v2: `cpu.max`, one line `"$MAX_OR_QUOTA $PERIOD"`. Cgroup v1:
+ *  `cpu.cfs_quota_us` (-1 = unlimited) and `cpu.cfs_period_us`, both in
+ *  microseconds. Returns the whole-CPU quota (rounded up) or `null` when
+ *  neither file is present/parseable/unlimited — callers fall back to the
+ *  physical CPU count in that case.
+ *
+ *  RESOLVES THIS PROCESS'S OWN CGROUP PATH FIRST (independent review
+ *  2026-09-04: the mount-root-only version of this function could never see
+ *  a real quota on a cgroup v1 container without its own cgroup namespace —
+ *  Docker's v1 default, and this very sandbox's own layout, where
+ *  `/proc/self/cgroup` shows nested paths like
+ *  `4:memory:/process_api/<id>/claude-code-bash` — because the v1 hierarchy
+ *  ROOT's `cpu.cfs_quota_us` reads `-1` BY DEFINITION; only the process's
+ *  own controller-relative subtree carries its real limit). `/proc/self/cgroup`
+ *  is parsed for that path and tried under each mount before falling back
+ *  to the mount's hierarchy root — which is also the correct behavior for a
+ *  process that IS namespaced (root and process path coincide) and for
+ *  platforms where `/proc/self/cgroup` itself does not exist.
+ *
+ *  `readFile` defaults to the real filesystem and is used for every path
+ *  read here, `/proc/self/cgroup` included; tests inject a stub so both the
+ *  parsing AND the path resolution are provable without a real cgroup v1
+ *  container. @param {(path: string, encoding: 'utf8') => string} [readFile]
  * @returns {number | null} */
 export function readCgroupCpuQuota(readFile = readFileSync) {
+  let v2Path = null;
+  let v1Path = null;
   try {
-    const raw = readFile('/sys/fs/cgroup/cpu.max', 'utf8').trim();
-    const [quotaStr, periodStr] = raw.split(/\s+/);
-    if (quotaStr === 'max') return null;
-    const quota = Number(quotaStr);
-    const period = Number(periodStr);
-    if (Number.isFinite(quota) && quota > 0 && Number.isFinite(period) && period > 0) {
-      return Math.ceil(quota / period);
-    }
-  } catch { /* not cgroup v2, or file unreadable — try v1 */ }
+    ({ v2Path, v1Path } = parseSelfCgroupPaths(readFile('/proc/self/cgroup', 'utf8')));
+  } catch { /* no /proc/self/cgroup (non-Linux, or cgroups unavailable here) */ }
 
-  try {
-    const quota = Number(readFile('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim());
-    const period = Number(readFile('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim());
-    if (Number.isFinite(quota) && quota > 0 && Number.isFinite(period) && period > 0) {
-      return Math.ceil(quota / period);
-    }
-  } catch { /* not cgroup v1 either, or file unreadable */ }
+  const v2Candidates = new Set([
+    ...(v2Path ? [joinCgroupPath('/sys/fs/cgroup', v2Path)] : []),
+    '/sys/fs/cgroup',
+  ]);
+  for (const root of v2Candidates) {
+    try {
+      const raw = readFile(`${root}/cpu.max`, 'utf8').trim();
+      const [quotaStr, periodStr] = raw.split(/\s+/);
+      if (quotaStr === 'max') return null;
+      const quota = Number(quotaStr);
+      const period = Number(periodStr);
+      if (Number.isFinite(quota) && quota > 0 && Number.isFinite(period) && period > 0) {
+        return Math.ceil(quota / period);
+      }
+    } catch { /* this candidate absent/unreadable — try the next */ }
+  }
+
+  const v1Candidates = new Set([
+    ...(v1Path ? [joinCgroupPath('/sys/fs/cgroup/cpu', v1Path)] : []),
+    '/sys/fs/cgroup/cpu',
+  ]);
+  for (const root of v1Candidates) {
+    try {
+      const quota = Number(readFile(`${root}/cpu.cfs_quota_us`, 'utf8').trim());
+      const period = Number(readFile(`${root}/cpu.cfs_period_us`, 'utf8').trim());
+      if (Number.isFinite(quota) && quota > 0 && Number.isFinite(period) && period > 0) {
+        return Math.ceil(quota / period);
+      }
+    } catch { /* this candidate absent/unreadable — try the next */ }
+  }
 
   return null;
 }

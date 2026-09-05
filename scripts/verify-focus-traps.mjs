@@ -107,17 +107,34 @@ async function activeElementInfo(page) {
 }
 
 /**
- * Runs the four focus-trap assertions against whatever `[role="dialog"]` is
+ * Runs the five focus-trap assertions against whatever `[role="dialog"]` is
  * currently open, using `restoreTriggerHandle` (an ElementHandle to the
  * control expected to regain focus on close) for a precise identity check —
  * not a text-match, which could pass on a same-looking-but-different node.
+ *
+ * `accessibleName` is the dialog's expected computed accessible name (what
+ * `aria-labelledby`/`aria-label` resolves to). Independent review 2026-09-04
+ * (docs/audits/2026-09-04-evening-batch/ — the timing/snapshot-modal lane's
+ * review): before this assertion, `aria-labelledby` (or the `id` it points
+ * at) could be deleted from either snapshot modal and this suite still
+ * reported every other check green — presence, focus, trap, and restore are
+ * all indifferent to whether the dialog has a NAME at all, so nothing here
+ * actually gated the one attribute the brief required. This is the one line
+ * that makes it load-bearing, for every dialog this suite drives.
  */
-async function verifyDialog(page, { name, restoreTriggerHandle, closeDialog }) {
+async function verifyDialog(page, { name, accessibleName, restoreTriggerHandle, closeDialog }) {
   await page.waitForSelector('[role="dialog"]', { timeout: timing.ms(10000) });
   // Let framer-motion enter animations and the hook's own effect settle —
   // ScriptDoctorPanel's spring exit alone takes ~600ms; give entry the same
   // headroom rather than tuning per-dialog constants.
   await page.waitForTimeout(timing.ms(400));
+
+  // 0. ACCESSIBLE NAME — resolves the dialog by its computed accessible
+  // name (the aria-labelledby/id pair, or aria-label, actually taking
+  // effect), not merely by role. Exactly one dialog with that name must be
+  // on screen.
+  const namedDialogCount = await page.getByRole('dialog', { name: accessibleName, exact: true }).count();
+  record(name, `ACCESSIBLE NAME "${accessibleName}" resolves via role=dialog`, namedDialogCount === 1, `count=${namedDialogCount}`);
 
   // 1. INITIAL FOCUS
   const initial = await activeElementInfo(page);
@@ -203,6 +220,7 @@ async function main() {
 
     await verifyDialog(page, {
       name: 'ScriptDoctorPanel',
+      accessibleName: 'Script Doctor',
       restoreTriggerHandle: triggerHandle,
       closeDialog: async () => page.keyboard.press('Escape'),
     });
@@ -234,9 +252,9 @@ async function main() {
     // tracker doc comment for why this is what actually gets restored to.
     const inspectHandle = await inspectBtn.elementHandle();
 
-    for (const { menuLabel, dialogName } of [
-      { menuLabel: 'What-if', dialogName: 'WhatIfPanel' },
-      { menuLabel: "Writers' room", dialogName: 'RoomPanel' },
+    for (const { menuLabel, dialogName, accessibleName } of [
+      { menuLabel: 'What-if', dialogName: 'WhatIfPanel', accessibleName: 'What-If Lab' },
+      { menuLabel: "Writers' room", dialogName: 'RoomPanel', accessibleName: "Writers' Room" },
     ]) {
       console.log(`\n=== ${dialogName} (StoryMachine -> Inspect -> ${menuLabel}) ===`);
       await inspectBtn.click();
@@ -246,6 +264,7 @@ async function main() {
 
       await verifyDialog(page, {
         name: dialogName,
+        accessibleName,
         restoreTriggerHandle: inspectHandle,
         closeDialog: async () => page.keyboard.press('Escape'),
       });
@@ -284,6 +303,7 @@ async function main() {
 
     await verifyDialog(page, {
       name: 'SnapshotManager (Save Snapshot)',
+      accessibleName: 'Save Snapshot',
       restoreTriggerHandle: triggerHandle,
       closeDialog: async () => page.keyboard.press('Escape'),
     });
@@ -333,6 +353,7 @@ async function main() {
 
     await verifyDialog(page, {
       name: 'SnapshotManager (Restore Snapshot)',
+      accessibleName: 'Restore Snapshot?',
       restoreTriggerHandle,
       closeDialog: async () => page.keyboard.press('Escape'),
     });
