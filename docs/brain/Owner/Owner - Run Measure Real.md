@@ -24,7 +24,7 @@ except the number.
 REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
 ```
 
-Run [[Gate - Corpus Layout Verification]] (`npm run verify:corpus-layout
+Run [[Gate - Corpus Layout Verification]] (`npm run verify:corpus-layout --
 --corpus-dir=<corpus>`) first — it is the pre-flight check that catches a
 mismatched or partially-migrated corpus before a measurement run wastes
 time against it.
