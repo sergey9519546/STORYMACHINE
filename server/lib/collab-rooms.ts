@@ -83,6 +83,18 @@ function keyFor(roomId: string): string {
   return crypto.createHash('sha256').update(roomId, 'utf8').digest('hex');
 }
 
+// Exported alias of the SAME hash keyFor() uses internally (2026-09-05
+// review finding C4) — a one-way digest of a room id is safe to log (it
+// cannot be reversed into the live capability the raw id is), while still
+// letting an operator correlate log lines about the SAME room without this
+// module handing out a second, independently-derived hash that could drift
+// from the one actually used for lookup. server/collab/yjs-server.ts's
+// upgrade handler uses this for its one-line-per-upgrade log — never the
+// raw room id, and never the join token, which this function never sees.
+export function hashRoomId(roomId: string): string {
+  return keyFor(roomId);
+}
+
 function pruneExpired(now: number): void {
   for (const [key, rec] of rooms) {
     if (now - rec.lastSeenAt > COLLAB_ROOM_TTL_MS) rooms.delete(key);

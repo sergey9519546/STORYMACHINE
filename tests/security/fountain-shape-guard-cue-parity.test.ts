@@ -98,8 +98,11 @@ import {
   MAX_FOUNTAIN_CUE_WEIGHT,
   MAX_FOUNTAIN_FREQUENT_CUE_LINES,
   FREQUENT_CUE_OCCURRENCE_THRESHOLD,
+  MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES,
+  MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT,
 } from '../../server/lib/validation.ts';
-import { CHARACTER_CUE_RE } from '../../src/lib/fountain.ts';
+import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
+import { normalizeScreenplay } from '../../server/nvm/analyze/screenplay-normalizer.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -617,5 +620,181 @@ describe('MAX_FOUNTAIN_CUE_WEIGHT / MAX_FOUNTAIN_FREQUENT_CUE_LINES — cost bou
       }
     }
     assert.equal(fountainShapeRejectionReason(text), null);
+  });
+});
+
+// ── ROUND 7 (2026-09-05 review finding A1, BLOCKER): the round-6 blank-gap
+// exclusion clause is a COMPLETE bypass ────────────────────────────────────
+// The round-6 clause excluded a blank-gapped candidate whenever the content
+// AFTER the gap was itself cue-shaped per isCueLikeLine — which has NO
+// length/word cap, so any ALL-CAPS "dialogue" of 5+ words matches it too.
+// screenplay-normalizer.ts's isCharacterCue (the predicate normalizeScreenplay
+// ACTUALLY uses during its double-spaced reflow) rejects anything over 4
+// words or 30 chars, so that same ALL-CAPS line is ordinary dialogue text to
+// the real pipeline — reflowed into a real adjacent cue+dialogue pair — while
+// being "cue-shaped" enough to make the guard skip the cue above it entirely.
+// Measured (2026-09-05): a 458,716-char payload (distinct=200,
+// occurrences=6,000 short cues, each followed by a blank line then one long
+// ALL-CAPS "dialogue" line) was guard-ACCEPTED while normalizeScreenplay +
+// parseFountain produced 6,000 real `character` blocks downstream;
+// runScriptDoctor took 115,694 ms end to end. Fixed by making the blank-gap
+// branch's decision depend on the CANDIDATE's own shape (isCharacterCue)
+// rather than the shape of whatever follows it — see validation.ts's own
+// "ROUND 7" comment for the full trace.
+describe('ROUND 7 (finding A1): the caps-heavy-"dialogue" bypass — a blank-gapped cue must count regardless of what follows it', () => {
+  const CAPS_DIALOGUE = 'THIS IS AN ALL CAPITALS SPEECH LINE OF SUBSTANTIAL LENGTH INDEED';
+  const MIXED_DIALOGUE = 'some ordinary dialogue line here.';
+
+  function buildCapsDialogueBypass(distinct: number, occurrences: number, dialogueLine: string): string {
+    const parts: string[] = ['INT. ROOM - DAY', ''];
+    for (let k = 0; k < occurrences; k++) {
+      parts.push(`PERSON${k % distinct}`, '', dialogueLine, '');
+    }
+    return parts.join('\n');
+  }
+
+  it('sanity: the ALL-CAPS "dialogue" line is cue-shaped to isCueLikeLine but NOT to isCharacterCue (the property the bypass exploited)', async () => {
+    const { isCharacterCue } = await import('../../server/nvm/analyze/screenplay-normalizer.ts');
+    assert.equal(isCueLikeLine(CAPS_DIALOGUE), true, 'must still be cue-shaped to the guard\'s outer predicate (that IS the exploit)');
+    assert.equal(isCharacterCue(CAPS_DIALOGUE), false, 'must NOT be a real cue to the normalizer (>4 words / >30 chars)');
+  });
+
+  it('the A1 payload (distinct=200, occurrences=6,000, 458,716 chars) IS rejected — the guard fired blind before this fix', () => {
+    const distinct = 200, occurrences = 6000;
+    const text = buildCapsDialogueBypass(distinct, occurrences, CAPS_DIALOGUE);
+    assert.equal(text.length, 458_716, 'payload size must match the measured A1 shape exactly');
+
+    // Prove this is not a synthetic worry: the REAL pipeline (normalize +
+    // parse) really does turn every one of these into a `character` block —
+    // the guard's job is to see that coming, not just to reject something.
+    const blocks = parseFountain(normalizeScreenplay(text));
+    const characterBlocks = blocks.filter((b) => b.type === 'character').length;
+    assert.equal(characterBlocks, occurrences, 'sanity: the real pipeline must produce one character block per occurrence for this to be a real bypass');
+
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the A1 payload to be rejected — the guard must not be blind to it');
+    assert.ok(ms < 100, `expected the guard to reject in well under 100ms (single O(n) pass), took ${ms}ms`);
+  });
+
+  it('the general invariant: for the SAME cue vocabulary and occurrence count, the guard\'s verdict must not depend on the case of the dialogue line', () => {
+    const distinct = 200, occurrences = 6000;
+    const capsReason = fountainShapeRejectionReason(buildCapsDialogueBypass(distinct, occurrences, CAPS_DIALOGUE));
+    const mixedReason = fountainShapeRejectionReason(buildCapsDialogueBypass(distinct, occurrences, MIXED_DIALOGUE));
+    assert.ok(capsReason, 'the ALL-CAPS-dialogue variant must be rejected');
+    assert.ok(mixedReason, 'the mixed-case-dialogue variant must be rejected (this was already true before the fix)');
+    // Both variants produce the identical count of real cues downstream, so
+    // both must trip the SAME bound at the SAME point in the scan.
+    assert.equal(capsReason, mixedReason);
+  });
+
+  it('a legitimate small double-spaced two-hander with a long ALL-CAPS emphasis line mixed in is still NOT rejected', () => {
+    // Guards against an over-correction: a real script legitimately has both
+    // real double-spaced dialogue AND the occasional caps-heavy action line
+    // (the R4 shape) in the same document — the fix must not conflate them.
+    let text = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 30; i++) {
+      text += `${i % 2 === 0 ? 'PAUL' : 'JUNE'}\n\nSomething ordinary gets said here, line ${i}.\n\n`;
+    }
+    text += 'THE DOOR SLAMS SHUT WITH A DEAFENING CRACK THAT ECHOES DOWN THE HALL\n\n';
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  // R4 must still hold after this fix — the whole reason the finding calls
+  // for a DIFFERENT mechanism (the candidate's own shape) rather than simply
+  // reverting to "any non-blank line ahead counts".
+  it('the R4 caps-heavy-action fixture is STILL accepted after the ROUND 7 fix', () => {
+    const SCENES = 200;
+    const CAPS_LINES_PER_SCENE = 8;
+    let text = '';
+    for (let s = 0; s < SCENES; s++) {
+      text += `INT. LOCATION ${s} - DAY\n\n`;
+      text += 'A person moves through the room, quiet, deliberate, careful not to make a sound.\n\n';
+      for (let c = 0; c < CAPS_LINES_PER_SCENE; c++) {
+        text += `THE DOOR SLAMS SHUT WITH A DEAFENING CRACK THAT ECHOES SCENE ${s} LINE ${c}\n\n`;
+      }
+    }
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+});
+
+// ── A3 (2026-09-05 review, MEDIUM): boneyard-aware counting ─────────────────
+// Two halves, both proved here: (1) cue-shaped lines inside a /* boneyard */
+// comment must NOT count against the real-script bounds (over-reject fix —
+// parseFountain (src/lib/fountain.ts) types them `boneyard`, and
+// extractSceneContent (fountain-analyzer.ts) explicitly skips that type, so
+// they are never a `character`/`dialogue` block); (2) boneyard content gets
+// its OWN bounds (MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES/_WEIGHT), because
+// the revision pipeline's dialogue pass does NOT skip boneyard content the
+// way extractSceneContent does — profiled: a 244,912-char boneyard wrapping
+// 6,000 distinct cue-shaped lines cost 27.5-34s in runScriptDoctor.
+describe('A3: boneyard-aware cue counting', () => {
+  function bigBoneyard(distinct: number, occPerName = 1): string {
+    const p: string[] = ['INT. ROOM - DAY', '', '/*'];
+    for (let k = 0; k < occPerName; k++) {
+      for (let d = 0; d < distinct; d++) p.push(`PERSON${d}`, 'ordinary dialogue line here.', '');
+    }
+    p.push('*/');
+    return p.join('\n');
+  }
+
+  it('does NOT reject a legitimate commented-out cast list (50 old character names) inside a boneyard', () => {
+    const p: string[] = [
+      'INT. ROOM - DAY', '', 'She walks in.', '',
+      '/*', 'Old cast (cut in rewrite):',
+    ];
+    for (let i = 0; i < 50; i++) p.push(`OLD CHARACTER ${i}`);
+    p.push('*/', '', 'ALEX', 'Hello there.', '');
+    assert.equal(fountainShapeRejectionReason(p.join('\n')), null);
+  });
+
+  it('does NOT reject a legitimate commented-out deleted scene (20 real cue+dialogue pairs) inside a boneyard', () => {
+    const p: string[] = ['INT. ROOM - DAY', '', 'She walks in.', '', '/*'];
+    for (let i = 0; i < 20; i++) p.push(`MINOR${i}`, 'A commented-out line of dialogue.', '');
+    p.push('*/', '', 'ALEX', 'Hello there.', '');
+    assert.equal(fountainShapeRejectionReason(p.join('\n')), null);
+  });
+
+  it('the A3 attack shape (244,912-char boneyard, 6,000 distinct cue-shaped lines) IS rejected, fast, via the boneyard distinct-line bound', () => {
+    const text = bigBoneyard(6000);
+    assert.equal(text.length, 244_912, 'payload size must match the measured A3 shape exactly');
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the boneyard attack payload to be rejected');
+    assert.match(reason!, /MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES/);
+    assert.ok(ms < 100, `expected a fast rejection (well under 100ms), took ${ms}ms`);
+  });
+
+  it('a boneyard weight-bound corner (1,500 distinct x 8 occurrences each, under the distinct cap but over the weight cap) is rejected via MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT', () => {
+    const text = bigBoneyard(1500, 8);
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected this weight-bound corner to be rejected');
+    assert.match(reason!, /MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT/);
+  });
+
+  it('a boneyard right at the distinct-line ceiling (1,500 distinct x 1 occurrence) is NOT rejected', () => {
+    const text = bigBoneyard(MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES, 1);
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  it('one more distinct line than the boneyard ceiling IS rejected', () => {
+    const text = bigBoneyard(MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES + 1, 1);
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason);
+    assert.match(reason!, /MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES/);
+  });
+
+  it('a legitimate small real cast outside a boneyard is not affected by a large legitimate boneyard nearby', () => {
+    // The boneyard branch and the real-script branch are mutually exclusive
+    // per line (inBoneyard gates which counters run) — this proves a large
+    // legitimate boneyard does not ALSO inflate the outside-boneyard bounds.
+    const p: string[] = ['INT. ROOM - DAY', '', '/*'];
+    for (let i = 0; i < 100; i++) p.push(`CHARACTER${i}`, 'Line.', '');
+    p.push('*/', '');
+    // A small, ordinary real cast outside the boneyard.
+    p.push('ALEX', 'Hello.', '', 'SAM', 'Hi back.', '');
+    assert.equal(fountainShapeRejectionReason(p.join('\n')), null);
   });
 });

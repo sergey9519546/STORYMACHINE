@@ -45,6 +45,7 @@ describe('getDoctorPoolWarmState / resetDoctorPoolWarmStateForTests', () => {
     const state = getDoctorPoolWarmState();
     assert.deepEqual(state, {
       started: false, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false,
+      completedAfterDeadline: false, settledAfterTimeoutMs: null,
     });
   });
 
@@ -181,12 +182,77 @@ describe('warmDoctorPool — deadline (follow-up review item 4, 2026-09-04)', ()
     assert.equal(state.finished, true, 'a wedged job must not leave finished stuck at false');
     assert.equal(state.timedOut, true);
     assert.equal(typeof state.ms, 'number');
+    // 2026-09-05 review finding B2: immediately after the deadline fires,
+    // nothing has settled late yet.
+    assert.equal(state.completedAfterDeadline, false);
+    assert.equal(state.settledAfterTimeoutMs, null);
     // The deadline is 50ms; warmDoctorPool() must return close to that, not
     // hang indefinitely waiting on the never-resolving job.
     assert.ok(elapsed < 2000, `expected warmDoctorPool() to return near the 50ms deadline, took ${elapsed}ms`);
 
     releaseJob();
     await stallUntilReleased;
+  });
+
+  // B2 (2026-09-05 review, LOW). Before this fix, a timed-out prewarm froze
+  // /health.doctorPool at slotsWarmed:0/failed:0 FOREVER — the abandoned
+  // `jobsSettled` promise kept running in the background but nothing wrote
+  // its outcome back, so `void jobsSettled` discarded the real result even
+  // after every worker warmed successfully a moment later. This is the
+  // opposite of the test above: the job does NOT stall forever, it just
+  // resolves a little AFTER the (short) deadline, and this test proves the
+  // snapshot updates in place once that happens.
+  it('updates slotsWarmed/failed and flips completedAfterDeadline once an abandoned job settles late', async () => {
+    delete process.env.NODE_ENV;
+    delete process.env.DOCTOR_POOL_PREWARM;
+    process.env.DOCTOR_POOL_PREWARM_TIMEOUT_MS = '30';
+
+    let calls = 0;
+    let releaseJob: () => void = () => {};
+    const settleLate = new Promise<void>((resolve) => { releaseJob = resolve; });
+
+    await warmDoctorPool({ runJob: async () => { calls++; return settleLate; } });
+
+    const timedOutState = getDoctorPoolWarmState();
+    assert.equal(timedOutState.timedOut, true, 'precondition: the short deadline must have fired first');
+    assert.equal(timedOutState.completedAfterDeadline, false);
+    assert.equal(timedOutState.slotsWarmed, 0, 'frozen snapshot, same as before this fix, until the job actually settles');
+    assert.ok(calls >= 1, 'expected at least one warm-up job to have been dispatched');
+
+    // Let the abandoned job(s) resolve now, and give their .then() a tick to run.
+    releaseJob();
+    await settleLate;
+    await new Promise((r) => setTimeout(r, 10));
+
+    const settledState = getDoctorPoolWarmState();
+    assert.equal(settledState.timedOut, true, 'the deadline DID fire — that stays true, it is not un-happened');
+    assert.equal(settledState.completedAfterDeadline, true, 'the late settlement must flip this once it lands');
+    assert.equal(settledState.slotsWarmed, calls, 'the real outcome (every dispatched job warmed) must replace the frozen 0');
+    assert.equal(settledState.failed, 0);
+    assert.equal(typeof settledState.settledAfterTimeoutMs, 'number');
+    assert.ok(settledState.settledAfterTimeoutMs! >= 0);
+  });
+
+  // A late settlement must never clobber a NEWER generation of warmState —
+  // e.g. a reset that happened in between.
+  it('a late-settling abandoned job does not overwrite a warmState that was reset in the meantime', async () => {
+    delete process.env.NODE_ENV;
+    delete process.env.DOCTOR_POOL_PREWARM;
+    process.env.DOCTOR_POOL_PREWARM_TIMEOUT_MS = '30';
+
+    let releaseJob: () => void = () => {};
+    const settleLate = new Promise<void>((resolve) => { releaseJob = resolve; });
+    await warmDoctorPool({ runJob: async () => { return settleLate; } });
+    assert.equal(getDoctorPoolWarmState().timedOut, true, 'precondition: the short deadline must have fired first');
+
+    resetDoctorPoolWarmStateForTests();
+    const resetState = getDoctorPoolWarmState();
+
+    releaseJob();
+    await settleLate;
+    await new Promise((r) => setTimeout(r, 10));
+
+    assert.deepEqual(getDoctorPoolWarmState(), resetState, 'the late settlement must be a no-op once the state has moved on');
   });
 
   it('does NOT time out when every job settles well within the deadline', async () => {
@@ -225,6 +291,7 @@ describe('resetDoctorPoolWarmStateForTests', () => {
 
     assert.deepEqual(getDoctorPoolWarmState(), {
       started: false, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false,
+      completedAfterDeadline: false, settledAfterTimeoutMs: null,
     });
   });
 });

@@ -148,6 +148,42 @@ describe('collab WebSocket — auth gate', async () => {
     assert.equal(captured.join('').includes(roomId), false);
   });
 
+  // C4 (2026-09-05 review, LOW). Before this, an ACCEPTED collab upgrade was
+  // invisible in the logs entirely — only the rejected path
+  // (collab_auth_rejected, tested above) logged anything, so grepping for
+  // collab activity showed every failure and zero successes. This proves the
+  // new collab_upgrade line: exactly one per accepted upgrade, the room id
+  // HASHED (never the raw id — same reason the rejected-path test above
+  // exists), and the join token never present in the log at all.
+  it('logs one collab_upgrade line per accepted connection, with the room id hashed and the token never present', async () => {
+    const { hashRoomId } = await import('../../server/lib/collab-rooms.ts');
+    const { roomId, token } = await joinable();
+    const captured: string[] = [];
+    const realOut = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array, ...rest: unknown[]) => {
+      captured.push(String(chunk));
+      return (realOut as (...a: unknown[]) => boolean)(chunk, ...rest);
+    }) as typeof process.stdout.write;
+    try {
+      const outcome = await attemptConnection(`${baseWsUrl}/collab/${roomId}?token=${token}`);
+      assert.equal(outcome, 'open');
+    } finally {
+      process.stdout.write = realOut;
+    }
+
+    const lines = captured.join('').split('\n').filter(Boolean);
+    const upgradeLines = lines
+      .map((l) => { try { return JSON.parse(l) as Record<string, unknown>; } catch { return null; } })
+      .filter((o): o is Record<string, unknown> => !!o && o.msg === 'collab_upgrade');
+
+    assert.equal(upgradeLines.length, 1, `expected exactly one collab_upgrade line, got: ${JSON.stringify(lines)}`);
+    assert.equal(upgradeLines[0]!.room, hashRoomId(roomId), 'the logged room field must be the SAME hash collab-rooms.ts uses internally');
+    assert.notEqual(upgradeLines[0]!.room, roomId, 'the raw room id must never be logged');
+    const serialized = captured.join('');
+    assert.ok(!serialized.includes(roomId), 'the raw room id must not appear anywhere in the captured output');
+    assert.ok(!serialized.includes(token), 'the join token must never appear in the logged output');
+  });
+
   // LAST: clearing the registry would break every test above it.
   it('rejects a still-valid token once its room has left the registry', async () => {
     const { roomId, token } = await joinable();

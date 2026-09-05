@@ -27,6 +27,22 @@ import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
 // the scoring-reachable src/lib/fountain.ts does not itself touch a
 // scoring-path file — fountain.ts is not edited by this change.
 import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../src/lib/fountain.ts';
+// isCharacterCue is the OTHER cue predicate in this repo — the one
+// server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay() itself
+// uses to decide, during its double-spaced reflow, whether a line becomes a
+// cue. It disagrees with CHARACTER_CUE_RE/isCueLikeLine in the one direction
+// that matters for this guard's blank-gap context check: it rejects a bare
+// name over 4 words or 30 characters, where CHARACTER_CUE_RE/isCueLikeLine
+// have no such cap (2026-09-05 review finding A1 — see
+// fountainShapeRejectionReason's own comment on the blank-gap branch for the
+// full trace of the bypass this closes). Reused here, not re-derived, for
+// the same reason CHARACTER_CUE_RE is imported above rather than copied:
+// screenplay-normalizer.ts is on doctor.ts's import graph (ALWAYS reachable,
+// per scripts/check-scoring-receipt.mjs), but validation.ts itself sits
+// OUTSIDE that graph (verified the same way as the fountain.ts import
+// above), so importing its predicate — without editing the file — does not
+// touch a scoring-path file.
+import { isCharacterCue } from '../nvm/analyze/screenplay-normalizer.ts';
 
 // ── SSRF-safe outbound URL guard (audit finding S1-a-1, BLOCKER) ────────────
 // POST /api/ai-config lets an ANONYMOUS caller set baseUrl/imgBaseUrl/
@@ -421,6 +437,31 @@ export const FREQUENT_CUE_OCCURRENCE_THRESHOLD = 15;
 // un-fire once it has fired), so a pathological payload is rejected as soon
 // as it crosses this budget, not only after the full document is scanned.
 export const MAX_FOUNTAIN_FREQUENT_CUE_LINES = 50;
+// ── Boneyard bounds (2026-09-05 review finding A3) ──────────────────────────
+// A `/* … */` boneyard is never a `character`/`dialogue` block to the
+// analyzer's own scene-content extraction (extractSceneContent,
+// server/nvm/analyze/fountain-analyzer.ts, explicitly skips `boneyard`-typed
+// blocks — src/lib/fountain.ts's parseFountain types everything between the
+// markers `boneyard` regardless of content). So counting cue-shaped lines
+// INSIDE a boneyard against the bounds above over-rejects a legitimate
+// script that comments out an old cast list or a deleted scene.
+//
+// But boneyard content is not free everywhere: the revision pipeline's
+// dialogue pass (server/nvm/revision/passes/dialogue.ts, ALWAYS-scoring-path
+// — never edited by this change) builds its character list from the raw
+// ALL-CAPS-line shape directly and does NOT skip boneyard content the way
+// extractSceneContent does. Profiled 2026-09-05 (`node --prof` against
+// runScriptDoctor): a 244,912-char boneyard wrapping 6,000 distinct
+// cue-shaped lines cost 27.5-34s, with `dialoguePass` and a
+// `new RegExp('\\b' + name + '\\b')` built per distinct name dominating the
+// profile. So boneyard content gets its OWN pair of bounds — same shape and
+// order of magnitude as the real-script bounds above, so a legitimate small
+// commented-out cast list or deleted scene still passes (see the "does NOT
+// reject a legitimate commented-out cast list" fixture in
+// tests/security/fountain-shape-guard-cue-parity.test.ts) while the measured
+// cost shape does not.
+export const MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES = 1_500;
+export const MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT = 10_000_000;
 // Bounded quantifier on a single character class — not nested/overlapping
 // quantifiers, so this cannot itself become a catastrophic-backtracking
 // pattern regardless of input length.
@@ -485,9 +526,48 @@ export function fountainShapeRejectionReason(text: string): string | null {
   const cueLineCounts = new Map<string, number>();
   let cueLineOccurrences = 0;
   let frequentCueLineCount = 0;
+  // Boneyard tracking (2026-09-05 review finding A3) — mirrors src/lib/
+  // fountain.ts's parseFountain `inBoneyard` toggle EXACTLY: a trimmed line
+  // starting with '/*' opens it; it closes on a line containing '*/' unless
+  // that SAME line both opens and fails to close (an unterminated `/*` on
+  // its own line stays open). Any drift from the parser's own rule here
+  // would either re-open the vector this guard exists to close (the guard
+  // thinks it's OUT of a boneyard the parser is still IN — content the
+  // parser drops gets miscounted as real script text is the SAFE direction,
+  // over-reject) or reintroduce the over-reject A3 itself reports (the guard
+  // thinks it's IN a boneyard the parser is already OUT of). Matching the
+  // parser exactly avoids both failure directions rather than picking one.
+  let inBoneyard = false;
+  const boneyardCueLineCounts = new Map<string, number>();
+  let boneyardCueOccurrences = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!.trim();
-    if (line.length === 0 || SCENE_HEADING_PREFIX_RE.test(line)) continue;
+    if (line.length === 0) continue;
+
+    if (line.startsWith('/*')) inBoneyard = true;
+    if (inBoneyard) {
+      // See MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES/_WEIGHT's own comment
+      // for why boneyard content gets counted against a SEPARATE pair of
+      // bounds rather than either being ignored outright or folded into the
+      // real-script bounds above.
+      if (!SCENE_HEADING_PREFIX_RE.test(line) && isCueLikeLine(line)) {
+        const boneyardOccurrencesOfThisLine = (boneyardCueLineCounts.get(line) ?? 0) + 1;
+        boneyardCueLineCounts.set(line, boneyardOccurrencesOfThisLine);
+        boneyardCueOccurrences++;
+        if (boneyardCueLineCounts.size > MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES) {
+          return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES`;
+        }
+        if (boneyardCueLineCounts.size * boneyardCueOccurrences > MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT) {
+          return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines × total occurrences of one) inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT`;
+        }
+      }
+      if (line.includes('*/') && !(line.startsWith('/*') && !line.includes('*/'))) {
+        inBoneyard = false;
+      }
+      continue;
+    }
+
+    if (SCENE_HEADING_PREFIX_RE.test(line)) continue;
     if (!isCueLikeLine(line)) continue;
     // Context check (2026-09-05 review finding R4, widened same day for a
     // second review's DOUBLE-SPACED bypass): a line only becomes a
@@ -536,18 +616,61 @@ export function fountainShapeRejectionReason(text: string): string | null {
     // distance that turns out to be — the exclusion clause (target line
     // must not itself be cue-shaped) is unchanged and still does the same
     // job for any gap width.
+    //
+    // ROUND 7 (2026-09-05 review finding A1, BLOCKER — the round-6 clause
+    // above was a COMPLETE bypass). The round-6 exclusion asked "does the
+    // content AFTER the gap look cue-shaped (isCueLikeLine)?" on the theory
+    // (stated, and FALSE) that a double-spaced cue's own dialogue "is
+    // ordinary mixed-case prose (never matches isCueLikeLine)". isCueLikeLine
+    // has NO length or word cap, so any ALL-CAPS "dialogue" of 5+ words is
+    // itself cue-shaped to THIS test — which made the cue ABOVE it excluded
+    // (guard: 0 cues counted) while screenplay-normalizer.ts's isCharacterCue
+    // (the predicate normalizeScreenplay's reflow ACTUALLY uses) rejects
+    // anything over 4 words / 30 chars, so its reflow treats that same
+    // ALL-CAPS line as ordinary dialogue text and produces a real
+    // cue+dialogue pair. Measured: a 458,716-char payload (distinct=200,
+    // occurrences=6,000 short cues, each followed by a blank line then one
+    // long ALL-CAPS "dialogue" line) was guard-ACCEPTED while normalizeScreenplay
+    // + parseFountain produced 6,000 real `character` blocks; runScriptDoctor
+    // took 115,694 ms end to end — every cue in the payload was invisible to
+    // all three bounds above because the loop `continue`d here before any of
+    // them ran.
+    //
+    // The structural mistake was testing the shape of what comes AFTER the
+    // gap at all. normalizeScreenplay's reflow (server/nvm/analyze/
+    // screenplay-normalizer.ts) decides whether THIS line becomes a cue using
+    // its OWN predicate on the line ITSELF — isCharacterCue(line) — pushing it
+    // to the output unconditionally on what follows (even two isCharacterCue
+    // lines back to back both end up typed 'character' by parseFountain,
+    // since parseFountain's own cue test only requires an immediate non-blank
+    // next line, not that it "looks like dialogue"). So the safe question for
+    // a blank-gapped candidate is never "what does the content after the gap
+    // look like" — it is "would THIS line survive normalizeScreenplay's own
+    // cue test", i.e. isCharacterCue(line), which is exactly the predicate
+    // that governs the reflow this whole branch exists to model. That
+    // correctly counts every short/name-shaped candidate regardless of what
+    // follows it (closing the A1 bypass — the attack's cue names are always
+    // isCharacterCue-true) while still excluding a candidate that is cue-SHAPED
+    // to isCueLikeLine but not itself isCharacterCue-shaped — e.g. the R4
+    // caps-heavy-action fixture below, where the "cue" candidate itself is a
+    // 14-word ALL-CAPS emphasis line that isCharacterCue rejects on its OWN
+    // shape (not on what follows it), so it is never promoted to a cue by
+    // normalizeScreenplay's reflow regardless of what comes after the gap.
     const immediateDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
     let nextLineIsDialogue = immediateDialogue;
     if (!nextLineIsDialogue) {
       // lines[i+1] is blank (or i is the last line) — scan past every
-      // consecutive blank line to the first non-blank one, at whatever
-      // distance that is. Only THIS blank-gap path applies the
-      // not-cue-shaped exclusion; the immediate (gap=0) case above matches
-      // the real parser's own condition exactly (any non-blank line, no
-      // content test), so it is never narrowed by this heuristic.
+      // consecutive blank line to confirm there IS a next non-blank line at
+      // all (a cue with nothing at all after it, ever, in the whole
+      // document, is the LAST reflowed line and parseFountain's own
+      // immediate-non-blank-next-line test then fails it too — matching that
+      // edge case keeps this branch from over-counting a truly terminal
+      // cue). The DECISION of whether that candidate counts no longer
+      // depends on the SHAPE of whatever is found there — see the ROUND 7
+      // comment above for why testing the next line's shape was the bypass.
       let j = i + 1;
       while (j < lines.length && lines[j]!.trim() === '') j++;
-      nextLineIsDialogue = j < lines.length && !isCueLikeLine(lines[j]!.trim());
+      nextLineIsDialogue = j < lines.length && isCharacterCue(line);
     }
     if (!nextLineIsDialogue) continue;
     const occurrencesOfThisLine = (cueLineCounts.get(line) ?? 0) + 1;

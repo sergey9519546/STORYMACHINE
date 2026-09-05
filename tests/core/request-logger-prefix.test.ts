@@ -129,6 +129,50 @@ describe('requestLogger — logs the mount-prefixed path (server/lib/request-log
   });
 });
 
+// C2 (2026-09-05 review, LOW). Express sets req.baseUrl to the mount prefix
+// and req.path to '/' for a request at the BARE mount root — its own
+// convention for "nothing past the mount point" — so a naive
+// `req.baseUrl + req.path` concatenation invented a trailing slash the
+// client never sent (`GET /api` logged as `path: "/api/"`). This describe
+// block proves the fixed loggedPath() drops that invented slash, without
+// disturbing any deeper sub-path (already covered above). Note: Express
+// itself gives `GET /mounted` and `GET /mounted/` the IDENTICAL
+// `req.baseUrl`/`req.path` pair (`'/mounted'`/`'/'`) by the time this
+// middleware runs — the two requests are indistinguishable from inside
+// Express, so a fix here can only pick ONE byte-accurate answer for the
+// bare-mount-root shape, not recover which of the two the client actually
+// sent; `/mounted` (no invented character) is the one this field's own
+// comment already promises ("byte-identical to the request target").
+describe('requestLogger — a bare mount root does not log an invented trailing slash (finding C2)', () => {
+  it('GET /mounted (the bare mount root, no trailing slash on the wire) logs path "/mounted", not "/mounted/"', async () => {
+    const app = express();
+    app.use(requestLogger());
+    const sub = express.Router();
+    sub.get('/', (_req, res) => { res.json({ ok: true }); });
+    app.use('/mounted', sub);
+
+    const server = await new Promise<import('http').Server>((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const { port } = server.address() as AddressInfo;
+
+    try {
+      const lines = await withCapturedStdout(async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/mounted`);
+        assert.equal(res.status, 200);
+      });
+
+      const requests = requestLogLines(lines);
+      assert.equal(requests.length, 1, `expected exactly one request log line, got: ${lines.join('\n')}`);
+      assert.equal(requests[0]!.path, '/mounted', 'a bare mount root must log the path the client actually requested, no invented "/"');
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
+  });
+});
+
 describe('requestLogger — proved against the live app.ts /api 404 guard', () => {
   it('GET /api/definitely-not-a-route logs path "/api/definitely-not-a-route", not "/definitely-not-a-route"', async () => {
     process.env.SESSION_DB_DIR = ':memory:';

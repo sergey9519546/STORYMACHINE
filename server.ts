@@ -118,30 +118,81 @@ export function createShutdownHandler(
 ): (signal: string, exitCode?: number) => void {
   const drainMs = opts.drainMs ?? shutdownDrainMs();
   const scheduleClose = opts.scheduleClose ?? ((fn: () => void, ms: number) => { setTimeout(fn, ms); });
+  // Shared across every call the returned closure ever receives (not
+  // re-declared per call, unlike `beginClose` before this fix) — that state
+  // is exactly what B1/B3 below need: "has a shutdown already begun" and
+  // "which exit code does the eventual process.exit() use" have to survive
+  // from the FIRST call to whatever calls follow it.
+  let shuttingDown = false;
+  let closeStarted = false;
+  let firstExitCode = 0;
+
+  const beginClose = (): void => {
+    // B3 guard: a forced second call and an already-scheduled first call
+    // racing to the same beginClose() must still only close/exit once.
+    if (closeStarted) return;
+    closeStarted = true;
+    server.close(() => {
+      // Close all SQLite handles before exiting so WAL files are flushed cleanly.
+      for (const { stage } of sessions.values()) {
+        try { stage.close(); } catch { /* already closed */ }
+      }
+      process.exit(firstExitCode);
+    });
+    // Hard-kill after 10s (from when close() actually starts, i.e. AFTER
+    // the drain window above) if in-flight requests haven't drained. A
+    // crash-driven shutdown keeps its own (non-zero) exit code even on
+    // the hard-kill path — an orchestrator distinguishing "drained
+    // cleanly" from "had to be killed" shouldn't also lose the signal
+    // that this exit was crash-triggered.
+    setTimeout(() => process.exit(firstExitCode === 0 ? 1 : firstExitCode), 10_000).unref();
+  };
 
   return (signal: string, exitCode = 0) => {
     setDraining();
-    logger.info('server_shutdown', { signal, exitCode, drainMs });
 
-    const beginClose = (): void => {
-      server.close(() => {
-        // Close all SQLite handles before exiting so WAL files are flushed cleanly.
-        for (const { stage } of sessions.values()) {
-          try { stage.close(); } catch { /* already closed */ }
-        }
-        process.exit(exitCode);
-      });
-      // Hard-kill after 10s (from when close() actually starts, i.e. AFTER
-      // the drain window above) if in-flight requests haven't drained. A
-      // crash-driven shutdown keeps its own (non-zero) exit code even on
-      // the hard-kill path — an orchestrator distinguishing "drained
-      // cleanly" from "had to be killed" shouldn't also lose the signal
-      // that this exit was crash-triggered.
-      setTimeout(() => process.exit(exitCode === 0 ? 1 : exitCode), 10_000).unref();
-    };
+    if (shuttingDown) {
+      // B3 (2026-09-05 review, LOW): the near-universal operator convention
+      // is that a SECOND shutdown signal means "stop waiting, close now" —
+      // an impatient operator's Ctrl-C Ctrl-C, or a second SIGTERM from an
+      // orchestrator that's given up waiting. Before this fix, a second
+      // signal fell through to the SAME `if (drainMs > 0)` branch as the
+      // first — scheduling a SECOND drain timer and (once that one elapsed)
+      // a SECOND 10s hard-kill timer — so the total shutdown time was
+      // identical to the single-signal case and the second signal did
+      // nothing but log a line. Now it skips whatever drain window is still
+      // pending and closes immediately; `closeStarted` (above) keeps this
+      // idempotent if the first call's own scheduled close fires around the
+      // same time.
+      logger.info('server_shutdown_forced', { signal, exitCode });
+      beginClose();
+      return;
+    }
+    shuttingDown = true;
+    firstExitCode = exitCode;
 
-    if (drainMs > 0) {
-      scheduleClose(beginClose, drainMs);
+    // B1 (2026-09-05 review, HIGH): a crash-driven shutdown (exitCode !== 0
+    // — the uncaughtException path installCrashHandlers() below wires up)
+    // must never drain. The whole reason a crash-driven shutdown exists at
+    // all is that the process is now running on undefined state (see this
+    // function's own doc comment above); the drain window's entire purpose
+    // is to keep the listener open and ACCEPTING BRAND-NEW CONNECTIONS for
+    // `drainMs` longer, which is the opposite of correct once that's true.
+    // Before this fix, `drainMs` applied unconditionally to both paths —
+    // reproduced directly: with SHUTDOWN_DRAIN_MS=8000, a process that had
+    // already logged `uncaught_exception` went on to accept and 200 twenty
+    // more BRAND-NEW TCP connections over the next ~8s before finally
+    // exiting. This repo's own docker-compose.yml default is 35000 — 35
+    // real seconds of a crashed process serving live traffic on every
+    // uncaught exception. Only a graceful, operator-requested shutdown
+    // (SIGTERM/SIGINT, exitCode 0) gets the drain window now; a crash-driven
+    // one (any non-zero exitCode) still flips draining and still closes
+    // cleanly (SQLite handles, WAL flush) — it just does so immediately.
+    const effectiveDrainMs = exitCode === 0 ? drainMs : 0;
+    logger.info('server_shutdown', { signal, exitCode, drainMs: effectiveDrainMs });
+
+    if (effectiveDrainMs > 0) {
+      scheduleClose(beginClose, effectiveDrainMs);
     } else {
       beginClose();
     }

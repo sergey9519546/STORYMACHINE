@@ -63,13 +63,28 @@ import { logger } from './logger.ts';
 // excludes the query string, same as `req.path` alone always did, so that
 // property holds unchanged (server/app.ts's comment on this middleware's
 // call site documents the full rationale).
+// C2 (2026-09-05 review, LOW). A request at a bare mount root (`GET /api`,
+// `GET /assets`) has `req.baseUrl === '/api'`/`'/assets'` and
+// `req.path === '/'` — Express's own convention for "nothing past the mount
+// point" — so the plain concatenation above invents a trailing slash the
+// client never sent (`GET /api` logged as `path: "/api/"`). Harmless for
+// grepping, but this field's own comment above claims it "reconstructs the
+// real, full, prefix-included path Express itself parsed" — and for this
+// one shape, byte-for-byte, it did not. Fixed by dropping req.path's lone
+// `/` when baseUrl already supplies the full path; every other shape
+// (`req.path` empty, or a real sub-path like `/does-not-exist.js`) is
+// unchanged.
+function loggedPath(req: { baseUrl: string; path: string }): string {
+  return req.path === '/' && req.baseUrl ? req.baseUrl : req.baseUrl + req.path;
+}
+
 export function requestLogger(): import('express').RequestHandler {
   return (req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
       logger.info('request', {
         method: req.method,
-        path: req.baseUrl + req.path,
+        path: loggedPath(req),
         status: res.statusCode,
         ms: Date.now() - start,
       });

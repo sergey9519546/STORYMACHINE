@@ -111,6 +111,14 @@ router.get('/health', (_req, res) => {
       // worker must not leave /ready 503 forever), this just says how it
       // got there.
       timedOut: warm.timedOut,
+      // 2026-09-05 review finding B2: when `timedOut` is true, the abandoned
+      // warm-up jobs may still settle in the background — this flips true
+      // once they do, and `ms`/the fields above stay frozen at the timeout
+      // snapshot while `completedAfterDeadline`/`settledAfterTimeoutMs`
+      // report that the real outcome arrived late rather than never. Always
+      // false when `timedOut` is false.
+      completedAfterDeadline: warm.completedAfterDeadline,
+      settledAfterTimeoutMs: warm.settledAfterTimeoutMs,
     },
   });
 });

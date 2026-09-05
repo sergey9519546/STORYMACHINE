@@ -401,6 +401,60 @@ async function fountainPathologyFuzz(base) {
       'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
   }
 
+  // ── ROUND 7 bypass: caps-heavy-"dialogue" (finding A1, BLOCKER, 2026-09-05)
+  // ───────────────────────────────────────────────────────────────────────
+  // The round-6 blank-gap exclusion excluded a candidate whenever the content
+  // AFTER the gap was itself cue-shaped per isCueLikeLine — which has no
+  // length/word cap, so a 5+-word ALL-CAPS "dialogue" line matched it too,
+  // even though screenplay-normalizer.ts's isCharacterCue (the predicate
+  // normalizeScreenplay's reflow actually uses) rejects it as a cue and
+  // reflows it as ordinary dialogue. Measured: 458,716 chars (distinct=200,
+  // occurrences=6,000), guard-ACCEPTED, 115,694 ms in runScriptDoctor. Fixed
+  // by keying the blank-gap branch's decision on the CANDIDATE's own shape
+  // (isCharacterCue), not the shape of whatever follows it. See
+  // tests/security/fountain-shape-guard-cue-parity.test.ts's "ROUND 7"
+  // block and tests/routes/fountain-shape-guard-cue-bypass.test.ts's own
+  // copy for the full trace.
+  {
+    const capsDistinct = 200, capsOccurrences = 6000;
+    const capsDialogueLine = 'THIS IS AN ALL CAPITALS SPEECH LINE OF SUBSTANTIAL LENGTH INDEED';
+    const parts = ['INT. ROOM - DAY', ''];
+    for (let k = 0; k < capsOccurrences; k++) parts.push(`PERSON${k % capsDistinct}`, '', capsDialogueLine, '');
+    const capsDialogueBypass = parts.join('\n');
+    await attack(base, 'round7-bypass caps-heavy-dialogue (raw) /api/scriptide/doctor', '/api/scriptide/doctor', jsonPost({ fountain: capsDialogueBypass }),
+      'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
+    await attack(base, 'round7-bypass caps-heavy-dialogue (raw) /api/export/verify', '/api/export/verify', jsonPost({ fountain: capsDialogueBypass, expected: { contentHash: 'a'.repeat(64) } }),
+      'must reject fast via the frequent-cue-line bound, not hang analyzing it', 400);
+  }
+
+  // ── A3 bound: a huge boneyard wrapping thousands of cue-shaped lines
+  // (2026-09-05 review, MEDIUM) ─────────────────────────────────────────────
+  // The revision pipeline's dialogue pass does NOT skip boneyard content the
+  // way the analyzer's own extractSceneContent does, so a large `/* … */`
+  // block full of cue-shaped lines is real cost even though parseFountain
+  // types it `boneyard`. Measured: 244,912 chars, 6,000 distinct cue-shaped
+  // lines inside one boneyard, 27.5-34s in runScriptDoctor. Fixed with
+  // MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES/_WEIGHT (server/lib/
+  // validation.ts) — a separate pair of bounds so a legitimate small
+  // commented-out cast list or deleted scene still passes.
+  {
+    const boneyardDistinct = 6000;
+    const boneyardParts = ['INT. ROOM - DAY', '', '/*'];
+    for (let i = 0; i < boneyardDistinct; i++) boneyardParts.push(`PERSON${i}`, 'ordinary dialogue line here.', '');
+    boneyardParts.push('*/');
+    const boneyardBypass = boneyardParts.join('\n');
+    await attack(base, 'A3-bound huge-boneyard (raw) /api/scriptide/doctor', '/api/scriptide/doctor', jsonPost({ fountain: boneyardBypass }),
+      'must reject fast via the boneyard distinct-cue-line bound, not hang analyzing it', 400);
+
+    // No-fire companion: a small, legitimate commented-out cast list must
+    // still be accepted — the over-reject half of A3.
+    const legitParts = ['INT. ROOM - DAY', '', 'She walks in.', '', '/*', 'Old cast (cut in rewrite):'];
+    for (let i = 0; i < 50; i++) legitParts.push(`OLD CHARACTER ${i}`);
+    legitParts.push('*/', '', 'ALEX', 'Hello there.', '');
+    await attack(base, 'A3-bound legitimate-small-boneyard (raw) /api/scriptide/doctor', '/api/scriptide/doctor', jsonPost({ fountain: legitParts.join('\n') }),
+      undefined, 200);
+  }
+
   // SSE route: a 200 with a doctor_error frame is this route's honest shape
   // (see server/routes/scriptide.ts's own comment) — record it as ok as long
   // as it's fast and the body actually carries the rejection, not a report.

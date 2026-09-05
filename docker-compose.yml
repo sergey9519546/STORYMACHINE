@@ -46,7 +46,24 @@ services:
     # BOTH TOGETHER: if you change SHUTDOWN_DRAIN_MS below, this must stay
     # comfortably above (drain-ms/1000 + 10 + margin), or Compose's own
     # deadline silently reintroduces the same defect.
-    stop_grace_period: 50s
+    #
+    # 2026-09-05 review finding B5: this used to be a hardcoded `50s`
+    # literal while SHUTDOWN_DRAIN_MS right below it was env-overridable —
+    # so `SHUTDOWN_DRAIN_MS=120000 docker compose up` silently reintroduced
+    # the exact defect the paragraph above describes (SIGKILL at 50s, 70s
+    # before server.close() ever ran, no WAL flush, exit 137), because only
+    # ONE of the two numbers tied together by "RAISE BOTH TOGETHER" could
+    # actually be raised from the environment. STOP_GRACE_PERIOD now mirrors
+    # SHUTDOWN_DRAIN_MS's own `${VAR:-default}` shape so both are raised
+    # together with one override, not one you have to remember to edit here
+    # by hand. Compose's own syntax for this field is a plain duration
+    # string ("50s", "2m30s") — it does not do arithmetic, so this is not
+    # DERIVED from SHUTDOWN_DRAIN_MS (Compose can't read one env var to
+    # compute another), it is a SEPARATE variable an operator raising
+    # SHUTDOWN_DRAIN_MS must set to the same rule (drain-ms/1000 + 10 +
+    # margin) — e.g. `SHUTDOWN_DRAIN_MS=120000 STOP_GRACE_PERIOD=145s`. See
+    # README's Deployment section for the worked example.
+    stop_grace_period: ${STOP_GRACE_PERIOD:-50s}
     ports:
       - "${PORT:-3000}:3000"
     # Loads every variable in .env into the container as-is (AI provider

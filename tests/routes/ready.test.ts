@@ -80,7 +80,10 @@ describe('routes/config — GET /ready and /health.doctorPool', () => {
     assert.equal(typeof body.uptime, 'number');
     assert.equal(typeof body.sessions, 'number');
     assert.equal(typeof body.version, 'string');
-    assert.deepEqual(body.doctorPool, { warm: false, warmedAt: null, ms: null, timedOut: false });
+    assert.deepEqual(body.doctorPool, {
+      warm: false, warmedAt: null, ms: null, timedOut: false,
+      completedAfterDeadline: false, settledAfterTimeoutMs: null,
+    });
   });
 
   it('GET /ready flips 503 -> 200 once warmDoctorPool() settles (fake pool warm function, no real workers)', async () => {

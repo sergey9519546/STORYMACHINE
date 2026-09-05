@@ -29,6 +29,11 @@
 // budget either (that's the "independent budgets" assertion below).
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import type { AddressInfo } from 'net';
 import { startTestServer, type TestServer } from './helpers.ts';
 import { createShutdownHandler, installCrashHandlers } from '../../server.ts';
 import { isDraining, resetDrainingForTests } from '../../server/lib/readiness.ts';
@@ -260,6 +265,81 @@ describe('hardening — 413 for request bodies over express.json()\'s 1mb cap', 
   });
 });
 
+// C3 (2026-09-05 review, LOW). Express's OWN router throws a URIError with
+// `.status = .statusCode = 400` when route-matching hits a percent-escape it
+// cannot decode (express/lib/router/layer.js's decode_param — a `*`
+// wildcard route, this app's own SPA catch-all included, decodes the whole
+// matched segment). `GET /%zz` at the site root used to fall through this
+// file's global error handler all the way to the generic 500/
+// `unhandled_error` branch — the wrong status for a pure client mistake (a
+// malformed URL), and log noise that reads as a server-side bug it never
+// was. This needs the real static/SPA-catch-all wiring (serveStatic:true,
+// NODE_ENV=production — see server/app.ts), which only exists with a real
+// `dist/` on disk, so this describe block builds a minimal fake one (mirrors
+// the 2026-09-05 review's own probe) rather than using the route helper's
+// serveStatic:false boot the rest of this file shares. A raw socket sends
+// the literal `%zz` — fetch()/undici's own URL parsing would reject or
+// normalize it before the request ever left this process.
+describe('hardening — malformed percent-encoding at the site root gets 400, not 500 (finding C3)', () => {
+  let server: import('http').Server;
+  let port: number;
+  let fakeRoot: string;
+  let originalCwd: string;
+
+  before(async () => {
+    originalCwd = process.cwd();
+    fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-c3-'));
+    fs.mkdirSync(path.join(fakeRoot, 'dist', 'assets'), { recursive: true });
+    fs.writeFileSync(path.join(fakeRoot, 'dist', 'index.html'), '<!doctype html><title>x</title>');
+    process.chdir(fakeRoot);
+    process.env.NODE_ENV = 'production';
+
+    const { createApp } = await import('../../server/app.ts');
+    const app = await createApp({ serveStatic: true });
+    server = await new Promise<import('http').Server>((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    port = (server.address() as AddressInfo).port;
+  });
+
+  after(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+    process.chdir(originalCwd);
+    delete process.env.NODE_ENV;
+    fs.rmSync(fakeRoot, { recursive: true, force: true });
+  });
+
+  function rawGet(target: string): Promise<{ statusLine: string; body: string }> {
+    return new Promise((resolve, reject) => {
+      let buf = '';
+      const socket = net.connect(port, '127.0.0.1', () => {
+        socket.write(`GET ${target} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`);
+      });
+      socket.on('data', (d) => { buf += d.toString(); });
+      socket.on('end', () => {
+        const [statusLine, ...rest] = buf.split('\r\n\r\n');
+        resolve({ statusLine: (statusLine ?? '').split('\r\n')[0] ?? '', body: rest.join('\r\n\r\n') });
+      });
+      socket.on('error', reject);
+    });
+  }
+
+  it('GET /%zz returns 400 with a clear JSON body, not 500', async () => {
+    const { statusLine, body } = await rawGet('/%zz');
+    assert.match(statusLine, /^HTTP\/1\.1 400/, `expected a 400 status line, got: ${statusLine}`);
+    const parsed = JSON.parse(body);
+    assert.equal(typeof parsed.error, 'string');
+    assert.ok(parsed.error.length > 0);
+  });
+
+  it('a well-formed asset 404 (unaffected by the new branch) still gets a plain 404', async () => {
+    const { statusLine } = await rawGet('/assets/does-not-exist.js');
+    assert.match(statusLine, /^HTTP\/1\.1 404/);
+  });
+});
+
 // S1-c — process-level crash safety net (BLOCKER finding). server.ts had
 // SIGTERM/SIGINT graceful shutdown but no uncaughtException/unhandledRejection
 // handlers, so a rejected promise anywhere in the process (a session-store
@@ -412,6 +492,87 @@ describe('hardening — process-level crash handlers (server.ts)', () => {
     shutdown('uncaughtException', 1);
     closeCallback?.();
     assert.deepEqual(exitCalls, [1], 'crash-driven shutdown should exit non-zero');
+  }));
+
+  // B1 (2026-09-05 review, HIGH). SHUTDOWN_DRAIN_MS used to apply to the
+  // uncaughtException path unconditionally, so a crashed process kept
+  // ACCEPTING AND SERVING BRAND-NEW REQUESTS for the whole drain window
+  // (35s under this repo's own docker-compose default) — reopening the
+  // exact hazard createShutdownHandler()'s own doc comment names ("continuing
+  // after an uncaught exception runs on undefined state"). Fixed: a
+  // crash-driven shutdown (any non-zero exitCode) never drains, regardless
+  // of the configured drainMs; a graceful signal-driven one (exitCode 0)
+  // still does. This test would have failed on the pre-fix code — a
+  // ('uncaughtException', 1) call there scheduled the close via the
+  // injected `scheduleClose`, exactly like SIGTERM.
+  it('createShutdownHandler({drainMs}) — a graceful (SIGTERM, 0) shutdown drains; an uncaughtException (exitCode 1) shutdown does not', withStubbedExit((exitCalls) => {
+    resetDrainingForTests();
+
+    // SIGTERM: must schedule via the injected scheduler, not close immediately.
+    {
+      let closeCalled = false;
+      const fakeServer = { close: (cb: () => void) => { closeCalled = true; cb(); } } as unknown as import('http').Server;
+      let scheduledFn: (() => void) | undefined;
+      const scheduleClose = (fn: () => void) => { scheduledFn = fn; };
+      const shutdown = createShutdownHandler(fakeServer, { drainMs: 5000, scheduleClose });
+
+      shutdown('SIGTERM', 0);
+      assert.equal(closeCalled, false, 'SIGTERM with drainMs>0 must schedule the close, not run it immediately');
+      assert.ok(scheduledFn, 'the injected scheduler must have been called for a graceful shutdown');
+      scheduledFn?.();
+      assert.equal(closeCalled, true);
+    }
+
+    resetDrainingForTests();
+
+    // uncaughtException: must close immediately, the injected scheduler must
+    // never be consulted at all, regardless of drainMs.
+    {
+      let closeCalled = false;
+      const fakeServer = { close: (cb: () => void) => { closeCalled = true; cb(); } } as unknown as import('http').Server;
+      let scheduleCloseCalled = false;
+      const scheduleClose = () => { scheduleCloseCalled = true; };
+      const shutdown = createShutdownHandler(fakeServer, { drainMs: 5000, scheduleClose });
+
+      shutdown('uncaughtException', 1);
+      assert.equal(scheduleCloseCalled, false, 'a crash-driven shutdown must never consult the drain scheduler');
+      assert.equal(closeCalled, true, 'a crash-driven shutdown must close immediately regardless of drainMs');
+    }
+
+    resetDrainingForTests();
+  }));
+
+  // B3 (2026-09-05 review, LOW). A second shutdown signal used to schedule a
+  // SECOND drain timer and a SECOND 10s hard-kill timer instead of forcing
+  // anything — total shutdown time was identical to the single-signal case,
+  // so an impatient operator's Ctrl-C Ctrl-C did nothing. Fixed: a second
+  // call while a shutdown is already pending skips the remaining drain and
+  // closes now (idempotently — close/exit still only happens once even if
+  // the first call's own scheduled close fires around the same time).
+  it('createShutdownHandler({drainMs}) — a second shutdown signal forces an immediate close instead of scheduling a second drain', withStubbedExit((exitCalls) => {
+    resetDrainingForTests();
+    let closeCalls = 0;
+    const fakeServer = { close: (cb: () => void) => { closeCalls++; cb(); } } as unknown as import('http').Server;
+    const scheduledFns: Array<() => void> = [];
+    const scheduleClose = (fn: () => void) => { scheduledFns.push(fn); };
+    const shutdown = createShutdownHandler(fakeServer, { drainMs: 6000, scheduleClose });
+
+    shutdown('SIGTERM', 0);
+    assert.equal(closeCalls, 0, 'first signal must still respect the drain window');
+    assert.equal(scheduledFns.length, 1, 'first signal schedules exactly one drain timer');
+
+    shutdown('SIGTERM', 0);
+    assert.equal(closeCalls, 1, 'second signal must close NOW rather than scheduling a second drain timer');
+    assert.equal(scheduledFns.length, 1, 'second signal must not register a second drain timer at all');
+    assert.deepEqual(exitCalls, [0]);
+
+    // If the FIRST signal's own drain timer still fires later (it was never
+    // cancelled, only made redundant), the close/exit must not double-fire.
+    scheduledFns[0]?.();
+    assert.equal(closeCalls, 1, 'a stale first-signal timer firing after the forced close must be a no-op');
+    assert.deepEqual(exitCalls, [0], 'exit must still have been called exactly once');
+
+    resetDrainingForTests();
   }));
 
   // Intercepts process.on() during installCrashHandlers() so the handler

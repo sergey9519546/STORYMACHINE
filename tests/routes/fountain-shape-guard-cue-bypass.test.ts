@@ -438,3 +438,41 @@ describe('double-spaced bypass (ROUND 5) — POST /api/export/verify', async () 
     });
   }
 });
+
+// ── ROUND 7 bypass (finding A1, BLOCKER, 2026-09-05): the caps-heavy-
+// "dialogue" shape — a blank-gapped cue followed by a long ALL-CAPS line —
+// was a COMPLETE bypass of every bound this file's other describe blocks
+// prove. See tests/security/fountain-shape-guard-cue-parity.test.ts's own
+// "ROUND 7" describe block for the pure-function proof (including the
+// pipeline-parity sanity check); this is the HTTP-level regression.
+function buildCapsDialogueBypass(distinct: number, occurrences: number): string {
+  const parts: string[] = ['INT. ROOM - DAY', ''];
+  for (let k = 0; k < occurrences; k++) {
+    parts.push(`PERSON${k % distinct}`, '', 'THIS IS AN ALL CAPITALS SPEECH LINE OF SUBSTANTIAL LENGTH INDEED', '');
+  }
+  return parts.join('\n');
+}
+
+describe('ROUND 7 bypass (caps-heavy-"dialogue", finding A1) — POST /api/scriptide/doctor', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  it('the A1 payload (distinct=200, occurrences=6,000, 458,716 chars) is rejected fast, not analyzed', async () => {
+    const fountain = buildCapsDialogueBypass(200, 6000);
+    assert.equal(fountain.length, 458_716, 'payload size must match the measured A1 shape exactly');
+    const start = Date.now();
+    const res = await post({ fountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+});

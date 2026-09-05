@@ -529,10 +529,23 @@ export interface DoctorPoolWarmState {
    *  forever, which meant GET /ready 503'd forever for a process that was in
    *  fact serving every request correctly (the pool falls back in-process). */
   timedOut: boolean;
+  /** True once the abandoned warm-up jobs from a TIMED-OUT prewarm have
+   *  actually settled in the background and slotsWarmed/failed below reflect
+   *  their real outcome rather than the frozen 0/0 the timeout branch first
+   *  reports. Always false when `timedOut` is false (nothing was ever
+   *  abandoned to settle late). 2026-09-05 review finding B2: before this
+   *  field existed, the abandoned settle promise was discarded outright
+   *  (`void jobsSettled`), so `/health.doctorPool` reported slotsWarmed:0 for
+   *  the rest of the process's life even after every worker warmed
+   *  successfully moments later. */
+  completedAfterDeadline: boolean;
+  /** ms between the deadline firing and the abandoned jobs actually
+   *  settling — null until `completedAfterDeadline` flips true. */
+  settledAfterTimeoutMs: number | null;
 }
 
 const initialWarmState = (): DoctorPoolWarmState =>
-  ({ started: false, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false });
+  ({ started: false, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false, completedAfterDeadline: false, settledAfterTimeoutMs: null });
 
 /** How long warmDoctorPool() waits for every warm-up job to settle before
  *  giving up and reporting `finished:true, timedOut:true` anyway. 30s is
@@ -569,17 +582,17 @@ export async function warmDoctorPool(
   opts: { runJob?: (fountain: string) => Promise<unknown> } = {},
 ): Promise<void> {
   if (process.env.NODE_ENV === 'test') {
-    warmState = { started: true, finished: true, ms: 0, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: false };
+    warmState = { started: true, finished: true, ms: 0, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: false, completedAfterDeadline: false, settledAfterTimeoutMs: null };
     return;
   }
   if (process.env.DOCTOR_POOL_PREWARM === '0') {
-    warmState = { started: true, finished: true, ms: 0, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: false };
+    warmState = { started: true, finished: true, ms: 0, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: false, completedAfterDeadline: false, settledAfterTimeoutMs: null };
     return;
   }
 
   const runJob = opts.runJob ?? ((fountain: string) => runScriptDoctorOffThread(fountain));
   const startedAt = Date.now();
-  warmState = { started: true, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false };
+  warmState = { started: true, finished: false, ms: null, slotsWarmed: 0, failed: 0, finishedAt: null, timedOut: false, completedAfterDeadline: false, settledAfterTimeoutMs: null };
   let failures = 0;
 
   try {
@@ -631,21 +644,51 @@ export async function warmDoctorPool(
 
     if (outcome === 'timeout') {
       logger.warn('doctor_pool_prewarm_timed_out', { requested: count, deadlineMs, ms: elapsed });
-      warmState = {
+      const timedOutState: DoctorPoolWarmState = {
         started: true, finished: true, ms: elapsed, slotsWarmed: 0, failed: 0, finishedAt: Date.now(), timedOut: true,
+        completedAfterDeadline: false, settledAfterTimeoutMs: null,
       };
+      warmState = timedOutState;
       // The still-pending jobs may resolve or reject later; each already
       // catches its own rejection above (the .catch in the Array.from
       // callback), so letting jobsSettled keep running in the background
       // after we've moved on can never surface as an unhandled rejection —
       // GET /ready and /health must not wait on a worker that may never
       // answer.
-      void jobsSettled;
+      //
+      // B2 fix (2026-09-05 review, LOW): before this, the promise was
+      // discarded outright (`void jobsSettled`), so `/health.doctorPool`
+      // reported slotsWarmed:0/failed:0 for the rest of the process's life
+      // even after every worker warmed successfully a moment later — the
+      // deadline firing froze a wrong snapshot forever. Now the eventual
+      // settlement updates warmState in place: `timedOut` stays true (the
+      // deadline genuinely fired — that's honest history, not something to
+      // un-happen) while `completedAfterDeadline`/`slotsWarmed`/`failed`/
+      // `settledAfterTimeoutMs` report the real outcome once it's known.
+      // The `warmState === timedOutState` identity check guards against a
+      // late settlement clobbering a NEWER generation of warmState — e.g. a
+      // test's resetDoctorPoolWarmStateForTests(), or a second
+      // warmDoctorPool() call — that has run in the meantime.
+      const timedOutAt = Date.now();
+      jobsSettled.then(() => {
+        const settledAfterTimeoutMs = Date.now() - timedOutAt;
+        logger.info('doctor_pool_prewarm_settled_late', { requested: count, failures, settledAfterTimeoutMs });
+        if (warmState === timedOutState) {
+          warmState = {
+            ...timedOutState,
+            slotsWarmed: count - failures,
+            failed: failures,
+            completedAfterDeadline: true,
+            settledAfterTimeoutMs,
+          };
+        }
+      });
       return;
     }
 
     warmState = {
       started: true, finished: true, ms: elapsed, slotsWarmed: count - failures, failed: failures, finishedAt: Date.now(), timedOut: false,
+      completedAfterDeadline: false, settledAfterTimeoutMs: null,
     };
 
     logger.info('doctor_pool_prewarmed', {
@@ -663,7 +706,7 @@ export async function warmDoctorPool(
     // to the pool itself. `finished` still flips to true here: a /ready
     // gate must never wait forever on a warm-up that has already given up.
     const elapsed = Date.now() - startedAt;
-    warmState = { started: true, finished: true, ms: elapsed, slotsWarmed: 0, failed: failures, finishedAt: Date.now(), timedOut: false };
+    warmState = { started: true, finished: true, ms: elapsed, slotsWarmed: 0, failed: failures, finishedAt: Date.now(), timedOut: false, completedAfterDeadline: false, settledAfterTimeoutMs: null };
     logger.warn('doctor_pool_prewarm_failed', {
       error: err instanceof Error ? err.message : String(err),
       ms: elapsed,

@@ -114,17 +114,28 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   // never reaches a log line today, on this route or any other.
   //
   // Verified with certainty this is the ONLY place in server/** that logs
-  // per-request path/URL data: the global error handler below (`path:
-  // req.path`) uses the pathname-only field — deliberately unchanged by this
-  // fix, since it runs after Express has already finished routing (so
-  // req.path there is the top-level, unstripped path in practice) and
-  // touching it is outside this fix's scope — and a repo-wide grep of
-  // server/** for `req.url` / `req.originalUrl` turns up exactly one other
-  // hit (server/collab/yjs-server.ts, parsing a WS upgrade request's room id
-  // and auth token — never logged raw; only the parsed `room` value is
-  // logged). Nothing in server/** logs a full URL or query string anywhere,
-  // so there is no redaction to wire in — this comment documents *why*
-  // that's true and safe by construction, rather than incidental.
+  // per-request path/URL data FOR AN ORDINARY EXPRESS REQUEST: the global
+  // error handler below (`path: req.path`) uses the pathname-only field —
+  // deliberately unchanged by this fix, since it runs after Express has
+  // already finished routing (so req.path there is the top-level,
+  // unstripped path in practice) and touching it is outside this fix's
+  // scope — and a repo-wide grep of server/** for `req.url` /
+  // `req.originalUrl` turns up exactly one other hit (server/collab/
+  // yjs-server.ts, parsing a WS upgrade request's room id and auth token —
+  // never logged raw). Nothing in server/** logs a full URL or query string
+  // anywhere, so there is no redaction to wire in — this comment documents
+  // *why* that's true and safe by construction, rather than incidental.
+  //
+  // NOT covered by this middleware at all (2026-09-05 review finding C4,
+  // documented rather than left to read as complete): a WebSocket upgrade
+  // (`server/collab/yjs-server.ts`'s `/collab/:room`) is handled on the
+  // HTTP server's own `'upgrade'` event, which never runs ANY Express
+  // middleware — this one included — so requestLogger() structurally cannot
+  // see it, coverage or no coverage bug. That path now logs its own single
+  // `collab_upgrade` line per accepted connection (room id hashed, exactly
+  // like collab-rooms.ts's own registry key; the join token never logged),
+  // alongside the pre-existing `collab_auth_rejected` for a refused one —
+  // see that file's own comment at the call site.
   app.use(requestLogger());
   // Assign a trace ID to every request for correlation across logs.
   app.use((_req, res, next) => { res.locals.traceId = crypto.randomUUID(); next(); });
@@ -350,6 +361,32 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
     // client — not this server — got wrong.
     if (('status' in err && (err as { status?: unknown }).status === 413) || (err as { type?: unknown }).type === 'entity.too.large') {
       res.status(413).json({ error: 'Request body too large' });
+      return;
+    }
+    // C3 (2026-09-05 review, LOW). Express's OWN router throws a plain
+    // URIError, with `.status`/`.statusCode` set to 400, when route-matching
+    // hits a percent-escape it cannot decode (express/lib/router/layer.js's
+    // decode_param — a `*` wildcard route, this app's own SPA catch-all
+    // above included, decodes the whole matched segment). Reproduced: `GET
+    // /%zz` at the site root throws here with message `Failed to decode
+    // param '%zz'` and `status: 400` already attached. That is a pure
+    // client mistake (a malformed URL), not a server fault — but before
+    // this branch it fell all the way through to the generic 500 below and
+    // was logged as `unhandled_error`, both the wrong status for a client
+    // typo and log noise that reads as a server-side bug it never was.
+    // Generalized to any error carrying its own 4xx status that reaches
+    // here unhandled by a branch above (not just this one shape) — passed
+    // through and logged at `warn`, a client-mistake signal, never
+    // `unhandled_error`.
+    const clientStatus = (err as { status?: unknown }).status ?? (err as { statusCode?: unknown }).statusCode;
+    if (typeof clientStatus === 'number' && clientStatus >= 400 && clientStatus < 500) {
+      logger.warn('client_error', {
+        message: err.message,
+        status: clientStatus,
+        method: req.method,
+        path: req.path,
+      });
+      res.status(clientStatus).json({ error: 'Malformed request' });
       return;
     }
     logger.error('unhandled_error', {

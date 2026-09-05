@@ -21,7 +21,7 @@ import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { logger } from '../lib/logger.ts';
 import { verifyCollabToken } from '../lib/collab-auth.ts';
-import { collabRoomExists, touchCollabRoom } from '../lib/collab-rooms.ts';
+import { collabRoomExists, touchCollabRoom, hashRoomId } from '../lib/collab-rooms.ts';
 import { boundedIntegerEnv } from '../lib/runtime-limits.ts';
 
 // y-protocols message type tags (wire constants).
@@ -345,6 +345,15 @@ export function attachCollabServer(server: HttpServer): WebSocketServer {
       socket.destroy();
       return;
     }
+    // C4 (2026-09-05 review, LOW). Before this, an ACCEPTED collab upgrade
+    // was invisible in the logs entirely — only the rejected path
+    // (collab_auth_rejected, above) logged anything, so an operator grepping
+    // for collab activity saw every failure and zero successes. One line per
+    // upgrade now, with the room id HASHED the same way collab-rooms.ts
+    // already keys its own registry (hashRoomId, a one-way sha256 — never
+    // reversible into the live capability the raw id is) and the token
+    // NEVER logged (parseToken()'s return value never reaches this call).
+    logger.info('collab_upgrade', { room: hashRoomId(roomId) });
     wss.handleUpgrade(req, socket, head, (conn) => {
       wss.emit('connection', conn, req, room);
     });
