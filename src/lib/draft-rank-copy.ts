@@ -21,6 +21,38 @@
 // from src/lib — see server/lib/coverage-letter.ts's own percentile-copy.ts
 // import, server/routes/export.ts's fountain.ts/fdx.ts/docx.ts imports).
 
+import type { DraftRank } from "./snapshot-trend.ts";
+
+/** The wire shape both /api/export/coverage-letter and /api/export/coverage
+ *  accept for `draftRank` — server/lib/validation.ts's DraftRankSchema,
+ *  which requires `rank >= 1` (it has nothing else to validate: there is no
+ *  ordinal to check without one). */
+export type DraftRankExportPayload = { rank: number; of: number; tied?: boolean; unscored?: number };
+
+/** Narrows a live DraftRank down to the wire shape the export routes accept,
+ *  or `undefined` when there is nothing rankable to send.
+ *
+ *  REVIEW FIX (rebase defect, 2026-09-05): DraftRank grew a second shape
+ *  this session — `{ rank: null, of: 0, unscored: N }` for "N saved records
+ *  exist but none carries a score yet" — and ScriptDoctorPanel.tsx's HTML
+ *  export (handleExportReport) forwarded the panel's `draftRank` object
+ *  UNGUARDED, unlike the letter export (handleExportCoverageLetter) which
+ *  already checked `draftRank.rank !== null` inline. DraftRankSchema's
+ *  `rank: z.number().int().min(1)` rejects `null`, so the exact "5 saved
+ *  drafts have no score yet" state that reads fine in the panel 400'd on
+ *  "Export report" where it used to download. One helper now guards BOTH
+ *  call sites so this can't drift apart between them again — never forward
+ *  `draftRank` itself; always forward what this returns. */
+export function draftRankExportPayload(draftRank: DraftRank | null): DraftRankExportPayload | undefined {
+  if (!draftRank || draftRank.rank === null) return undefined;
+  return {
+    rank: draftRank.rank,
+    of: draftRank.of,
+    ...(draftRank.tied ? { tied: true } : {}),
+    ...(draftRank.unscored > 0 ? { unscored: draftRank.unscored } : {}),
+  };
+}
+
 /** The denominator noun phrase for "rank among your drafts" — the deduped
  *  UNION of ScriptDoctorPanel's own Draft History runs and ScriptIDE
  *  Version snapshots (computeDraftRank). Every surface that states this

@@ -225,4 +225,37 @@ describe('routes/export/coverage — HTTP behavior', async () => {
       assert.ok(!html.includes('<h2>Recurring Issue Clusters</h2>'), 'no Recurring Issue Clusters heading when nothing generic clusters for this script');
     }
   });
+
+  // REVIEW FIX (rebase defect, 2026-09-05): DraftRank grew a second shape —
+  // { rank: null, of: 0, unscored: N } for "N saved drafts have no score
+  // yet" — and ScriptDoctorPanel.tsx's client-side export forwarded that
+  // object to this route UNGUARDED before the fix (src/lib/
+  // draft-rank-copy.ts's draftRankExportPayload). DraftRankSchema (server/
+  // lib/validation.ts) requires `rank >= 1`, so a client still sending the
+  // pre-fix shape would get a 400 where a writer used to get a download.
+  // The fixed client never sends `draftRank` at all in that state (the same
+  // way it always omitted the field before draftRank existed) — this proves
+  // the route side of that contract: omitting draftRank (exactly what the
+  // fixed client now does for an unscored draft) still exports cleanly, with
+  // no rank line in the document.
+  it('POST with no draftRank field (what the fixed client sends when every saved draft is unscored) returns 200 with no rank line', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait' });
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.ok(!html.includes('Rank among your drafts'), 'no draft-rank line when draftRank was never sent');
+  });
+
+  it('POST the pre-fix unranked shape ({ rank: null, ... }) is rejected by the schema, not silently accepted as "no rank"', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait', draftRank: { rank: null, of: 0, unscored: 5 } });
+    assert.equal(res.status, 400, 'the schema must reject this shape outright — the fix is that the CLIENT never sends it, not that the server tolerates it');
+  });
+
+  it('POST a valid ranked draftRank renders the rank line', () => {
+    return post({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Long Wait', draftRank: { rank: 2, of: 5 } })
+      .then(async (res) => {
+        assert.equal(res.status, 200);
+        const html = await res.text();
+        assert.match(html, /Rank among your drafts:\s*2nd of 5/);
+      });
+  });
 });

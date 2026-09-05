@@ -263,3 +263,40 @@ describe('SlatePanel.tsx — Shape & Rhythm column labelling is visible, not too
     assert.match(slatePanel, /title="Descriptive only — not part of the score or this ranking"/);
   });
 });
+
+// REVIEW FIX (rebase defect, 2026-09-05): the "REVISE round 2" rebase gave
+// DraftRank a second shape, { rank: null, of: 0, unscored: N } — read fine
+// by the in-panel DraftRankLine, but ScriptDoctorPanel.tsx's HTML export
+// (handleExportReport) forwarded the panel's `draftRank` object to
+// POST /api/export/coverage UNGUARDED, unlike the coverage-LETTER export
+// (handleExportCoverageLetter) a few hundred lines below it, which already
+// checked `draftRank.rank !== null` inline. server/lib/validation.ts's
+// DraftRankSchema requires `rank >= 1`, so the exact "N saved drafts have no
+// score yet" state — which the in-panel line renders just fine — 400'd
+// "Export report" where it used to download. Fixed by routing BOTH export
+// payloads through one shared helper, draftRankExportPayload
+// (src/lib/draft-rank-copy.ts, unit-tested directly in
+// tests/core/snapshot-trend.test.ts) rather than either call site building
+// or checking the wire shape itself — this is a static proof that neither
+// export path can silently regress back to forwarding the raw object.
+describe('ScriptDoctorPanel.tsx — export payloads never forward an unranked draftRank to the wire', () => {
+  it('imports draftRankExportPayload rather than hand-rolling the null-guard at each call site', () => {
+    assert.match(panel, /import\s*\{[^}]*draftRankExportPayload[^}]*\}\s*from\s*"\.\.\/\.\.\/lib\/draft-rank-copy\.ts"/);
+  });
+
+  it('both handleExportReport and handleExportCoverageLetter call draftRankExportPayload(draftRank) before assigning payload.draftRank', () => {
+    const callSites = panel.match(/draftRankExportPayload\(draftRank\)/g) ?? [];
+    assert.ok(callSites.length >= 2, `expected draftRankExportPayload(draftRank) at both export call sites, found ${callSites.length}`);
+  });
+
+  it('neither export handler assigns the raw draftRank object straight onto payload.draftRank', () => {
+    // The exact regression pattern this rebase introduced: an unguarded
+    // `payload.draftRank = draftRank;` (no narrowing function in between).
+    // `draftRank.rank !== null` itself still appears legitimately elsewhere
+    // in this file (DraftRankLine's own render branch, unrelated to either
+    // export payload) so that check belongs at the export call sites
+    // specifically, covered by the "both call draftRankExportPayload" test
+    // above rather than a blanket source-wide absence check here.
+    assert.doesNotMatch(panel, /payload\.draftRank\s*=\s*draftRank;/);
+  });
+});

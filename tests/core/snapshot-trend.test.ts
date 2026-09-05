@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {
   snapshotTrend, computeDraftRank, snapshotDraftRanks, type DraftHistoryRecord,
 } from '../../src/lib/snapshot-trend.ts';
+import { draftRankExportPayload } from '../../src/lib/draft-rank-copy.ts';
 import type { Snapshot } from '../../src/components/scriptide/SnapshotManager.tsx';
 
 function snap(overrides: Partial<Snapshot> & { id: string }): Snapshot {
@@ -555,5 +556,55 @@ describe('snapshotDraftRanks', () => {
     ];
     const ranks = snapshotDraftRanks(snapshots);
     for (const r of ranks) assert.equal(r?.of, 3, 'three distinct snapshots, never "of 4" from a self-count');
+  });
+});
+
+// ── draftRankExportPayload — the wire-shape guard both export routes rely on ──
+// REVIEW FIX (rebase defect, 2026-09-05): DraftRank grew the
+// `{ rank: null, of: 0, unscored: N }` shape this session, and
+// ScriptDoctorPanel.tsx's HTML export (handleExportReport) forwarded the raw
+// draftRank object unguarded — server/lib/validation.ts's DraftRankSchema
+// requires `rank >= 1`, so the exact "N saved drafts have no score yet" state
+// 400'd "Export report" where it used to download; handleExportCoverageLetter
+// already had an inline `rank !== null` guard, which is exactly how the two
+// call sites drifted apart. draftRankExportPayload (src/lib/
+// draft-rank-copy.ts) is the one place both now call.
+describe('draftRankExportPayload', () => {
+  it('returns undefined for null (no draft rank computed yet)', () => {
+    assert.equal(draftRankExportPayload(null), undefined);
+  });
+
+  it('returns undefined for the unscored shape — never forwards rank: null to the wire', () => {
+    assert.equal(draftRankExportPayload({ rank: null, of: 0, unscored: 5 }), undefined);
+  });
+
+  it('returns the ranked shape as-is (no tied/unscored) for the plain ranked case', () => {
+    assert.deepEqual(
+      draftRankExportPayload({ rank: 2, of: 5, tied: false, unscored: 0 }),
+      { rank: 2, of: 5 },
+    );
+  });
+
+  it('carries tied: true through when the rank is a genuine tie', () => {
+    assert.deepEqual(
+      draftRankExportPayload({ rank: 1, of: 6, tied: true, unscored: 0 }),
+      { rank: 1, of: 6, tied: true },
+    );
+  });
+
+  it('carries unscored through when > 0, omits it (not as 0) when there is nothing unranked', () => {
+    assert.deepEqual(
+      draftRankExportPayload({ rank: 1, of: 3, tied: false, unscored: 2 }),
+      { rank: 1, of: 3, unscored: 2 },
+    );
+    const withoutUnscored = draftRankExportPayload({ rank: 1, of: 3, tied: false, unscored: 0 });
+    assert.equal(Object.prototype.hasOwnProperty.call(withoutUnscored, 'unscored'), false);
+  });
+
+  it('the first-saved-draft state ({ rank: 1, of: 1 }) is a real ranked shape, not the unscored one — still forwarded', () => {
+    assert.deepEqual(
+      draftRankExportPayload({ rank: 1, of: 1, tied: false, unscored: 0 }),
+      { rank: 1, of: 1 },
+    );
   });
 });

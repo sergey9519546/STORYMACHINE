@@ -55,6 +55,7 @@ import {
 } from "../../lib/percentile-copy.ts";
 import {
   draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
+  draftRankExportPayload, type DraftRankExportPayload,
 } from "../../lib/draft-rank-copy.ts";
 import type { Snapshot } from "./SnapshotManager.tsx";
 import {
@@ -2993,7 +2994,7 @@ export default function ScriptDoctorPanel({
     // two can differ (the host project's title vs. the sample's own), and
     // exporting under the wrong one would mislabel a demo as the user's work.
     const exportTitle = activeReportTitle ?? title;
-    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: DraftRank };
+    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: DraftRankExportPayload };
     if (report.source?.format === "pdf") {
       const converted = report.source.convertedFountain;
       if (!converted) {
@@ -3013,7 +3014,16 @@ export default function ScriptDoctorPanel({
     // coverage LETTER export already does (handleExportCoverageLetter below,
     // server/lib/coverage-letter.ts's buildCaveats): purely additive, absent
     // when there's nothing yet to rank.
-    if (draftRank) payload.draftRank = draftRank;
+    //
+    // REVIEW FIX (rebase defect, 2026-09-05): draftRankExportPayload
+    // (src/lib/draft-rank-copy.ts) is the ONE place that narrows DraftRank's
+    // `{ rank: null, of: 0, unscored }` shape away before it reaches the
+    // wire — forwarding `draftRank` itself, unguarded, 400'd this export
+    // (server/lib/validation.ts's DraftRankSchema requires `rank >= 1`)
+    // whenever every saved record was unscored, in a state the in-panel line
+    // renders just fine. Never inline this check again; call the helper.
+    const exportDraftRank = draftRankExportPayload(draftRank);
+    if (exportDraftRank) payload.draftRank = exportDraftRank;
 
     fetch("/api/export/coverage", {
       method: "POST",
@@ -3171,7 +3181,7 @@ export default function ScriptDoctorPanel({
     setCoverageLetterError(null);
 
     const exportTitle = activeReportTitle ?? title;
-    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: { rank: number; of: number; tied?: boolean; unscored?: number } };
+    let payload: { fountain?: string; fdx?: string; title?: string; draftRank?: DraftRankExportPayload };
     if (report.source?.format === "pdf") {
       const converted = report.source.convertedFountain;
       if (!converted) {
@@ -3204,14 +3214,12 @@ export default function ScriptDoctorPanel({
     // `unscored` (review round 2) rides along whenever > 0, so the letter's
     // "N of M ... are unranked" clause can never disagree with the in-panel
     // one — both read it off this SAME draftRank object.
-    if (draftRank && draftRank.rank !== null) {
-      payload.draftRank = {
-        rank: draftRank.rank,
-        of: draftRank.of,
-        ...(draftRank.tied ? { tied: true } : {}),
-        ...(draftRank.unscored > 0 ? { unscored: draftRank.unscored } : {}),
-      };
-    }
+    //
+    // draftRankExportPayload (src/lib/draft-rank-copy.ts) is the shared
+    // guard — see handleExportReport above for why inlining this check
+    // twice is exactly how it drifted apart once already.
+    const letterDraftRank = draftRankExportPayload(draftRank);
+    if (letterDraftRank) payload.draftRank = letterDraftRank;
 
     fetch("/api/export/coverage-letter", {
       method: "POST",
