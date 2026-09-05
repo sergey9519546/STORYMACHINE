@@ -140,9 +140,11 @@ services:
       # /ready, not /health (2026-09-04 ops audit finding A): /health answers
       # 200 unconditionally from the moment the port accepts connections, so
       # it never told `docker compose ps` (or a load balancer reading the
-      # same signal) about the window (measured ~2.1-2.7s idle, up to ~3.9s
-      # under load) where the Script Doctor
-      # worker pool is still pre-warming and a request would pay the full
+      # same signal) about the measured warm-up window ("~2.1–2.7 s on an
+      # idle box, up to ~3.9 s under load (measured 2026-09-04/05)" —
+      # warmDoctorPool()'s own doc comment, server/nvm/analyze/
+      # doctor-pool.ts, the one place this figure is defined) where the
+      # Script Doctor worker pool is still pre-warming and a request would pay the full
       # cold-start cost. /ready answers 503 until that pre-warm settles, then
       # 200 until this process begins shutting down — NOT rate limited, so
       # ordinary application load can never make this healthcheck itself
@@ -155,8 +157,10 @@ services:
       # refused instead of ever seeing 503. See server.ts's
       # shutdownDrainMs() and GET /ready's comment in
       # server/routes/config.ts for the measured timeline. start_period
-      # widened to 15s (from 10s) to comfortably cover the measured
-      # warm-up (~2.1-2.7s idle, up to ~3.9s under load) with headroom.
+      # widened to 15s (from 10s) to comfortably cover the measured warm-up
+      # ("~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
+      # 2026-09-04/05)" — warmDoctorPool()'s own doc comment,
+      # server/nvm/analyze/doctor-pool.ts) with headroom.
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/ready"]
       interval: 30s
       timeout: 5s

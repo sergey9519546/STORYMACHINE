@@ -20,21 +20,50 @@ these files lived in session scratch space and are described, not copied;
 every finding they produced is pinned by a committed test or fixture on main.
 
 **On the intermediate round commits cited inside the six review files (added
-2026-09-05, after-the-fact audit).** Each review file names the specific
-commit its round examined — e.g. `guard-review.md`'s "commit a0667ab3",
-`readiness-review.md`'s "commit 91b8dc73", `timing-review.md`'s "commit
-cc68cf7d". Those per-round SHAs are lane-worktree commits from before each
-lane was rebased onto main for its merge: rebasing rewrites commit hashes,
-so the exact object a mid-round review looked at does not survive the
-rebase that landed it. Checked directly against this repo: all such SHAs
-still exist as loose objects right now (`git cat-file -e <sha>` succeeds),
-but **none is reachable from any branch or ref** (`git branch --all
---contains <sha>` returns nothing, and none appears in `git log --all`) —
-they will not survive a `git gc --prune=now` and are already absent from a
-fresh clone of the remote. State that plainly: **only the six merge SHAs in
-the table above are durable.** A re-verifier who tries `git show <a
-round-commit SHA>` from those files should expect "fatal: bad object", not
-a bug in their checkout.
+2026-09-05, after-the-fact audit; corrected 2026-09-05, same day, after an
+independent reviewer caught the correction's own over-claim).** Each review
+file names the specific commit its round examined — e.g. `guard-review.md`'s
+"commit a0667ab3", `readiness-review.md`'s "commit 91b8dc73",
+`timing-review.md`'s "commit cc68cf7d". Those per-round SHAs are USUALLY
+lane-worktree commits from before each lane was rebased onto main for its
+merge: rebasing normally rewrites commit hashes, so the exact object a
+mid-round review looked at does not survive the rebase that landed it.
+
+**This is not universally true, and the first version of this note wrongly
+said "none is reachable" without checking every cited SHA.** Verified
+directly against this repo (`git cat-file -e <sha>` for existence, `git
+merge-base --is-ancestor <sha> 802f1c16` for reachability from the current
+tip — every SHA below cross-checked against the actual commit list, not
+sampled):
+
+- **21 of the cited round SHAs are genuinely unreachable** — exist as loose
+  objects right now but are ancestors of no branch or ref, will not survive
+  `git gc --prune=now`, and are already absent from a fresh clone of the
+  remote: `4671c543`, `321e95ba`, `ba4cf424` (fixverify-review.md);
+  `38f47648`, `a0667ab3`, `cc405ccb`, `9f171a5c` (guard-review.md);
+  `8eef1375`, `4cf4d0b1`, `91f6e7f8` (rank-review.md); `91b8dc73`,
+  `934cf84e`, `7511733f` (readiness-review.md); `cc68cf7d`, `a15d7e32`,
+  `c11dd263` (timing-review.md); `aa45951e`, `842f0fcc`, `c2eb1606`,
+  `41c40ddf`, `5c53a390` (xsurface-review.md). A re-verifier who tries
+  `git show` on any of these should expect "fatal: bad object", not a bug in
+  their checkout.
+- **3 cited SHAs are, in fact, reachable — the exceptions the first version
+  missed:** `5dffc831` and `3d13383c` (`rank-review.md:328`, the "Re-review
+  — rebase" round) ARE ancestors of `58eaafbf` (that lane's own final merge
+  SHA, already in the table above) — for this one lane specifically, the
+  rebase workflow carried the intermediate round commits forward intact
+  rather than squashing them away, unlike the other five lanes. And
+  `guard-review.md:836`'s "Re-review #4 — commit `5d2b2638`" is not a
+  separate pre-rebase intermediate commit at all: `5d2b2638` IS the shape
+  guard lane's own final merge SHA, already durable and already in the
+  table — that round's citation simply names the commit that round became,
+  not a squashed-away predecessor of it.
+
+So the correct statement is narrower than "only the six merge SHAs are
+durable": **every round-commit citation across the six files is durable
+EXCEPT the 21 listed above**, and a re-verifier should check reachability
+per-SHA (`git merge-base --is-ancestor <sha> <current main>`) rather than
+assuming every non-final-merge citation is a dead pre-rebase object.
 
 The findings themselves are not lost — each review's described diff for a
 lane is fully contained in that lane's own merge commit(s) below, which

@@ -77,30 +77,32 @@ every review found something the gates had passed:**
   swallowed call — a counting spy fails on the planted probe; the withheld
   reason was then wrong for the sample-script state, the same class one axis
   over.
-- **The shape guard** (five rounds — recount, 2026-09-05: `guard-review.md`
-  has five top-level review passes, verdicts REVISE, REVISE, REVISE, REVISE,
-  MERGE, matching the batch README's own "REVISE 5 → 4 → 1 → 1 → MERGE" row;
-  this entry originally undercounted it as "four rounds"): the rebuilt guard missed the dual-
+- **The shape guard** (four rounds): the rebuilt guard missed the dual-
   dialogue caret; the fixture sweep walked the disk and failed from the repo
   root; the fuzz cases could not fail; the weight bound was not a cost bound
   (a 216-second legal request at the same weight as a rejected 31-second
   one); the structural bound that replaced it was defeated by double-spaced
   input, which is what PDF and FDX imports produce; and that fix was off by
   one blank line. The worst legal cue-shaped request is now measured in
-  seconds, not minutes, and every bypass has a pinned fixture.
+  seconds, not minutes, and every bypass has a pinned fixture. *(Correction,
+  independent review, 2026-09-05: "four rounds" undercounts it by one —
+  `guard-review.md` has FIVE top-level review passes, verdicts REVISE,
+  REVISE, REVISE, REVISE, MERGE, matching the batch README's own "REVISE 5 →
+  4 → 1 → 1 → MERGE" row. It is five rounds.)*
 
 The pattern the audit named — proving a property with the one example that
 motivated it — held through the reviews too: each lane fixed the example the
 reviewer gave and the reviewer found the next member of the class. The
 standard now says so in §3, and every review is committed under
 `docs/audits/2026-09-05-review-batch/` so the next round starts from them. Main moved from 1e170831
-to 5d2b2638: 6 lanes, 17 review rounds (recount, 2026-09-05: re-summing each
-lane's actual top-level review-file headers — readiness 3, timing 2,
-cross-surface parity 2, draft rank/dark mode/a11y 3, keyless Fix & verify 2,
-shape guard 5 — gives 17, not the "15" this line originally stated; even the
-per-lane prose above, taken as written, sums to 16, so neither 15 nor 16 was
-ever a correct total), every merge behind one full suite and
-one battery on the rebased branch.
+to 5d2b2638: 6 lanes, 15 review rounds, every merge behind one full suite and
+one battery on the rebased branch. *(Correction, independent review,
+2026-09-05: "15" is wrong under any correct count. Re-summing each lane's
+actual top-level review-file headers — readiness 3, timing 2, cross-surface
+parity 2, draft rank/dark mode/a11y 3, keyless Fix & verify 2, shape guard 5
+(see the correction on that bullet above) — gives 17. Even the per-lane
+prose above, taken as written before that correction, sums to 16. It is 17
+review rounds.)*
 
 **2026-09-04, evening — build, attack, repair, deploy, verify.** The owner's
 brief tightened twice during this batch: *"do not merely audit, recommend,

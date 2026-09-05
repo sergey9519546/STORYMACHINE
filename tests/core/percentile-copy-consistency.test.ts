@@ -249,20 +249,31 @@ describe('draft-rank-copy.ts — no surface re-implements it', () => {
   const panel = read('../../src/components/scriptide/ScriptDoctorPanel.tsx');
   const coverageHtml = read('../../server/lib/coverage-html.ts');
   const coverageLetter = read('../../server/lib/coverage-letter.ts');
+  const snapshotManager = read('../../src/components/scriptide/SnapshotManager.tsx');
 
   const NO_LOCAL_DENOMINATOR = /\bfunction\s+draftRankDenominatorLabel\s*\(|\b(?:const|let|var)\s+draftRankDenominatorLabel\s*=/;
   const NO_LOCAL_NEXT_OPPORTUNITY = /\bfunction\s+draftRankNextOpportunityLabel\s*\(|\b(?:const|let|var)\s+draftRankNextOpportunityLabel\s*=/;
   const NO_LOCAL_UNRANKED_NOTE = /\bfunction\s+unrankedDraftsNote\s*\(|\b(?:const|let|var)\s+unrankedDraftsNote\s*=/;
+  const NO_LOCAL_SENTENCE = /\bfunction\s+draftRankSentence\s*\(|\b(?:const|let|var)\s+draftRankSentence\s*=/;
 
-  for (const [name, src, importPath] of [
-    ['ScriptDoctorPanel.tsx', panel, '../../lib/draft-rank-copy.ts'],
-    ['coverage-html.ts', coverageHtml, '../../src/lib/draft-rank-copy.ts'],
-    ['coverage-letter.ts', coverageLetter, '../../src/lib/draft-rank-copy.ts'],
+  // 2026-09-05 follow-up (client-hunter B-12): the granular
+  // denominator/next-opportunity/unranked-note fix left SnapshotManager.tsx
+  // as a FOURTH hand-copy — it called draftRankDenominatorLabel('saved') for
+  // the noun but still hand-composed everything around it, with no "tied"
+  // prefix and no unrankedDraftsNote() call, so a genuine dead heat and a
+  // mixed ranked+unscored Versions list both silently lost information the
+  // other three surfaces already carried. draftRankSentence(draftRank,
+  // scope) is now the ONE implementation of the whole sentence (every
+  // branch: ranked, tied, unranked-note, first-draft) for every surface that
+  // renders a compact label — the panel, the HTML export, and this badge.
+  for (const [name, src] of [
+    ['ScriptDoctorPanel.tsx', panel],
+    ['coverage-html.ts', coverageHtml],
+    ['SnapshotManager.tsx', snapshotManager],
   ] as const) {
-    it(`${name} imports the draft-rank denominator/next-opportunity/unranked-note copy from draft-rank-copy.ts rather than hand-writing it`, () => {
-      assert.ok(src.includes(importPath), `${name} must import from ${importPath}`);
-      assert.ok(src.includes('draftRankDenominatorLabel'), `${name} must call draftRankDenominatorLabel()`);
-      assert.ok(src.includes('draftRankNextOpportunityLabel'), `${name} must call draftRankNextOpportunityLabel()`);
+    it(`${name} calls the single draftRankSentence() from draft-rank-copy.ts rather than re-composing ordinal/denominator/tied/unranked-note itself`, () => {
+      assert.match(src, /draftRankSentence\(/, `${name} must call draftRankSentence()`);
+      assert.ok(!NO_LOCAL_SENTENCE.test(src), `${name} must not define a local draftRankSentence()`);
       assert.ok(!NO_LOCAL_DENOMINATOR.test(src), `${name} must not define a local draftRankDenominatorLabel()`);
       assert.ok(!NO_LOCAL_NEXT_OPPORTUNITY.test(src), `${name} must not define a local draftRankNextOpportunityLabel()`);
       assert.ok(!NO_LOCAL_UNRANKED_NOTE.test(src), `${name} must not define a local unrankedDraftsNote()`);
@@ -274,24 +285,27 @@ describe('draft-rank-copy.ts — no surface re-implements it', () => {
     assert.ok(!/appears? after your next save\b/.test(coverageHtml));
   });
 
-  // 2026-09-05 (owner rule: one wording per concept) — the last draft-rank
-  // sentence off the shared helpers: SnapshotManager.tsx's per-snapshot
-  // badge ranks against a NARROWER set (saved Versions only — see
-  // draft-rank-copy.ts's DraftRankDenominatorScope header) than the three
-  // surfaces above, so it calls draftRankDenominatorLabel('saved') rather
-  // than the union default — never draftRankNextOpportunityLabel(), since
-  // this badge has no "first draft" branch of its own (a snapshot with
-  // nothing else scored renders "Only saved draft with a health score so
-  // far" instead, a distinct sentence this module does not own).
-  const snapshotManager = read('../../src/components/scriptide/SnapshotManager.tsx');
-  it('SnapshotManager.tsx imports draftRankDenominatorLabel(\'saved\') from draft-rank-copy.ts rather than hand-writing "your saved drafts"', () => {
-    assert.ok(snapshotManager.includes('../../lib/draft-rank-copy.ts'), 'SnapshotManager.tsx must import from ../../lib/draft-rank-copy.ts');
-    assert.match(snapshotManager, /draftRankDenominatorLabel\(\s*['"]saved['"]\s*\)/);
-    assert.ok(!NO_LOCAL_DENOMINATOR.test(snapshotManager), 'SnapshotManager.tsx must not define a local draftRankDenominatorLabel()');
+  it('SnapshotManager.tsx no longer hand-writes the pre-migration "among your saved drafts" literal (missing "of this script", no tied prefix, no unranked note)', () => {
+    assert.ok(!/among your saved drafts`/.test(snapshotManager), 'the old bare "among your saved drafts" template-literal ending must be gone');
+    assert.ok(!/`Ranks \$\{ordinal\(draftRank\.rank\)\}/.test(snapshotManager), 'the old hand-composed "Ranks ${ordinal}..." template literal (no tied prefix, no note) must be gone');
   });
 
-  it('SnapshotManager.tsx no longer hand-writes the pre-migration "among your saved drafts" literal (missing "of this script")', () => {
-    assert.ok(!/among your saved drafts`/.test(snapshotManager), 'the old bare "among your saved drafts" template-literal ending must be gone');
+  // coverage-letter.ts is the one surface that deliberately does NOT call
+  // draftRankSentence(): its rendering is a longer caveat PARAGRAPH ("Among
+  // your own X, this one ranks/ties for N of M by health — a comparison to
+  // your own history...") structurally unlike the three compact labels
+  // above, so it composes its own sentence from the SAME granular helpers
+  // draftRankSentence itself is built from — never a fourth, independent
+  // hand-copy of the denominator/next-opportunity/unranked-note words
+  // themselves, only of the surrounding prose shape.
+  it("coverage-letter.ts imports the granular draftRankDenominatorLabel/draftRankNextOpportunityLabel/unrankedDraftsNote helpers directly (its longer caveat paragraph is not a compact label, so it does not call draftRankSentence())", () => {
+    assert.ok(coverageLetter.includes('../../src/lib/draft-rank-copy.ts'), 'coverage-letter.ts must import from ../../src/lib/draft-rank-copy.ts');
+    assert.ok(coverageLetter.includes('draftRankDenominatorLabel'), 'coverage-letter.ts must call draftRankDenominatorLabel()');
+    assert.ok(coverageLetter.includes('draftRankNextOpportunityLabel'), 'coverage-letter.ts must call draftRankNextOpportunityLabel()');
+    assert.ok(coverageLetter.includes('unrankedDraftsNote'), 'coverage-letter.ts must call unrankedDraftsNote()');
+    assert.ok(!NO_LOCAL_DENOMINATOR.test(coverageLetter), 'coverage-letter.ts must not define a local draftRankDenominatorLabel()');
+    assert.ok(!NO_LOCAL_NEXT_OPPORTUNITY.test(coverageLetter), 'coverage-letter.ts must not define a local draftRankNextOpportunityLabel()');
+    assert.ok(!NO_LOCAL_UNRANKED_NOTE.test(coverageLetter), 'coverage-letter.ts must not define a local unrankedDraftsNote()');
   });
 });
 

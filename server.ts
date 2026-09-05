@@ -233,8 +233,10 @@ export function startBackupSchedule(): NodeJS.Timeout | undefined {
  * DOCTOR_POOL_PREWARM_BEFORE_LISTEN=1 (2026-09-04 ops audit finding A,
  * follow-up) — off by default. The default boot fires warmDoctorPool()
  * fire-and-forget from the listen callback below, so the port accepts
- * connections a measured ~2.1-2.7s (idle) to up to ~3.9s (under load) before
- * the pool finishes warming; GET /ready exists
+ * connections a measured "~2.1–2.7 s on an idle box, up to ~3.9 s under
+ * load (measured 2026-09-04/05)" (warmDoctorPool()'s own doc comment,
+ * server/nvm/analyze/doctor-pool.ts, the one place this figure is defined)
+ * before the pool finishes warming; GET /ready exists
  * so an orchestrator can hold traffic back for exactly that window without
  * this process itself booting any slower. Some single-process deployments
  * have no such orchestrator in front of them — a bare `docker run` with no

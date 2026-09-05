@@ -1,7 +1,9 @@
 // Doctor pool warm-state machine — 2026-09-04 ops audit finding A.
 //
-// warmDoctorPool() (server/nvm/analyze/doctor-pool.ts) runs for ~2.1-2.7s
-// AFTER the port is already accepting connections (server.ts dispatches it
+// warmDoctorPool() (server/nvm/analyze/doctor-pool.ts) runs for the measured
+// "~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
+// 2026-09-04/05)" (warmDoctorPool()'s own doc comment — the one place this
+// figure is defined) AFTER the port is already accepting connections (server.ts dispatches it
 // fire-and-forget from the app.listen callback — see that file's comment).
 // Before this fix nothing recorded when it started or finished, so a request
 // landing in that window silently paid the cold-start cost with no way for

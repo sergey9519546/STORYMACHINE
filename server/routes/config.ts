@@ -151,13 +151,16 @@ router.get('/health', (_req, res) => {
 //   2. NOT YET WARM — the Script Doctor worker pool's boot-time pre-warm
 //      (server/nvm/analyze/doctor-pool.ts's warmDoctorPool() and
 //      getDoctorPoolWarmState()) has not settled. The pre-warm runs for
-//      ~2.1-2.7s (idle) to up to ~3.9s (this box, under load) AFTER the port already accepts connections (server.ts
-//      dispatches it fire-and-forget from the app.listen callback), so a
-//      request landing in that window would otherwise silently pay the
-//      cold-start cost with no way for an orchestrator to know to hold
-//      traffic back. Once warm, this route answers 200 until draining
-//      begins (see (1)) — immediately 200 when pre-warm is disabled or a
-//      no-op (NODE_ENV=test, DOCTOR_POOL_PREWARM=0): getDoctorPoolWarmState()
+//      "~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
+//      2026-09-04/05)" (warmDoctorPool()'s own doc comment, the one place
+//      this figure is defined) AFTER the port already accepts connections
+//      (server.ts dispatches it fire-and-forget from the app.listen
+//      callback), so a request landing in that window would otherwise
+//      silently pay the cold-start cost with no way for an orchestrator to
+//      know to hold traffic back. Once warm, this route answers 200 until
+//      draining begins (see (1)) — immediately 200 when pre-warm is
+//      disabled or a no-op (NODE_ENV=test, DOCTOR_POOL_PREWARM=0):
+//      getDoctorPoolWarmState()
 //      .finished is set true by warmDoctorPool() itself on those branches so
 //      this route never blocks traffic on a warm-up that will never happen,
 //      and never blocks forever on one that hangs (doctor-pool.ts's deadline).

@@ -6,8 +6,8 @@ import {
   snapshotTrend, snapshotDraftRanks, type SnapshotTrendEntry, type DraftRank,
 } from "../../lib/snapshot-trend.ts";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
-import { ordinal, exactRankTooltip, compactPercentileNote } from "../../lib/percentile-copy.ts";
-import { draftRankDenominatorLabel } from "../../lib/draft-rank-copy.ts";
+import { exactRankTooltip, compactPercentileNote } from "../../lib/percentile-copy.ts";
+import { draftRankSentence } from "../../lib/draft-rank-copy.ts";
 
 // writer #9 (upgrade-writer-experience discovery) — "score over revisions".
 // The four score fields are ALL optional: a snapshot only carries them when
@@ -182,22 +182,21 @@ function SnapshotPercentileAndRankLine({
       )}
       {draftRank && (
         <span>
-          {/* `rank === null` checked first (not just `of <= 1`) so TypeScript
-              narrows `draftRank.rank` to `number` in the ordinal() branch —
-              the DraftRank union's real discriminant is `rank`, not `of`.
-              Also correctly covers the "nothing else is scored, though other
-              unscored snapshots may exist" case (rank: null), which reads
-              the same as "only saved draft with a health score so far". */}
-          {draftRank.rank === null || draftRank.of <= 1
-            ? "Only saved draft with a health score so far"
-            // 2026-09-05 (owner rule: one wording per concept) — routed
-            // through the shared draftRankDenominatorLabel('saved') instead
-            // of this component's own "your saved drafts" literal. The
-            // narrower 'saved' scope is deliberate, not a drift: this badge
-            // ranks against snapshotDraftRanks' empty-history call
-            // (src/lib/snapshot-trend.ts), never Draft History runs, so it
-            // must not read "runs and saved drafts" like the union scope.
-            : `Ranks ${ordinal(draftRank.rank)} of ${draftRank.of} by health among your ${draftRankDenominatorLabel('saved')}`}
+          {/* 2026-09-05 (client-hunter finding B-12) — this used to
+              hand-render `Ranks ${ordinal} of ${of} by health among your
+              ${draftRankDenominatorLabel('saved')}` directly, which fixed
+              the NOUN (see that helper's own history) but left this the
+              fourth surface still missing the "tied" prefix and the
+              unranked-drafts note the panel/letter/HTML already carry for
+              the identical fields — a genuine dead heat between two saved
+              Versions read as clean separation, and an unscored sibling
+              Version silently vanished from the count. draftRankSentence
+              (src/lib/draft-rank-copy.ts) is the single implementation of
+              every draft-rank state now, for every scope; this is its
+              'saved' scope, matching the narrower set snapshotDraftRanks
+              ranks against (saved Versions only, never Draft History runs —
+              see that function's own header). */}
+          {draftRankSentence(draftRank, 'saved')}
         </span>
       )}
     </div>

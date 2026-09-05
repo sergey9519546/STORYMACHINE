@@ -54,8 +54,7 @@ import {
   ordinal, percentileBand, exactRankTooltip, healthPercentileSentence,
 } from "../../lib/percentile-copy.ts";
 import {
-  draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
-  draftRankExportPayload, type DraftRankExportPayload,
+  draftRankSentence, draftRankExportPayload, type DraftRankExportPayload,
 } from "../../lib/draft-rank-copy.ts";
 import type { Snapshot } from "./SnapshotManager.tsx";
 import {
@@ -373,26 +372,22 @@ const PERCENTILE_BADGE_CLASS =
  *      `draftRank.tied` (audit round 2, 2026-09-04): several byte-identical
  *      drafts sharing a health value all rendered a plain ordinal like
  *      "1st of 6" before this, which reads as clean separation from the
- *      rest of the field when it is actually a dead heat. */
+ *      rest of the field when it is actually a dead heat.
+ *
+ *  2026-09-05 follow-up (client-hunter B-12): the "N of M ... are unranked"
+ *  clause and the sentence composition above both now come from the single
+ *  draftRankSentence(draftRank, 'union') implementation
+ *  (src/lib/draft-rank-copy.ts) rather than being re-composed here from
+ *  ordinal()/draftRankDenominatorLabel()/draftRankNextOpportunityLabel()/
+ *  unrankedDraftsNote() individually — this component was the ORIGINAL
+ *  source of truth those helpers were extracted FROM, but leaving it as a
+ *  hand-composition let a second surface (SnapshotManager.tsx's 'saved'
+ *  scope) drift on the exact same tied-prefix/unranked-note logic this
+ *  panel already had correct. */
 function DraftRankLine({ draftRank, className }: { draftRank: DraftRank; className: string }) {
-  const text =
-    draftRank.rank === null
-      ? `${draftRank.unscored} saved draft${draftRank.unscored === 1 ? "" : "s"} `
-        + `${draftRank.unscored === 1 ? "has" : "have"} no score yet — run the doctor before saving to rank them`
-      : draftRank.of <= 1
-      ? `First saved draft — rank among your drafts appears after ${draftRankNextOpportunityLabel()}`
-      : `Rank among your drafts: ${draftRank.tied ? "tied " : ""}${ordinal(draftRank.rank)} of ${draftRank.of} ${draftRankDenominatorLabel()} (by health)`;
-  // REVIEW FIX (round 2, 2026-09-05) — the "N of M ... are unranked" clause:
-  // a bare `of` figure silently drops any saved record that has no health at
-  // all (edited-since-last-diagnosis, or saved before scoring existed) from
-  // the count entirely. Only meaningful in the ranked branch — the
-  // rank === null branch already IS that same information as its own
-  // dedicated copy.
-  const unrankedNote = draftRank.rank !== null ? unrankedDraftsNote(draftRank.unscored, draftRank.of) : null;
   return (
     <div className={`text-[10px] font-mono mt-0.5 ${className}`}>
-      {text}
-      {unrankedNote && <> — {unrankedNote}</>}
+      {draftRankSentence(draftRank, 'union')}
     </div>
   );
 }

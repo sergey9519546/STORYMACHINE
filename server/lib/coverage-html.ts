@@ -33,7 +33,7 @@ import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 // server/routes/export.ts's imports of fountain.ts/fdx.ts/docx.ts — so this
 // is an established pattern, not a new one; it does not touch the scoring
 // path (no import edge to/from doctor.ts either direction).
-import { ordinal, healthPercentileSentence, exactRankTooltip } from '../../src/lib/percentile-copy.ts';
+import { healthPercentileSentence, exactRankTooltip } from '../../src/lib/percentile-copy.ts';
 // Shared draft-rank copy (2026-09-05 migration — this file's buildDraftRankLine
 // was added by the cross-surface-parity lane BEFORE src/lib/draft-rank-copy.ts
 // existed (see that module's own header: the panel and the coverage LETTER
@@ -42,13 +42,11 @@ import { ordinal, healthPercentileSentence, exactRankTooltip } from '../../src/l
 // once the shared helpers landed, so this export quietly kept rendering the
 // pre-fix wording while the panel and the letter moved on — a live
 // cross-surface-parity regression between two lanes that landed the same day.
-// Importing the same three helpers coverage-letter.ts and ScriptDoctorPanel.tsx
-// already use closes that gap; see tests/core/percentile-copy-consistency.test.ts
-// and tests/core/draft-rank-copy-consistency.test.ts for the cross-surface proof.
-import {
-  draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
-  type DraftRankExportPayload,
-} from '../../src/lib/draft-rank-copy.ts';
+// Now calls the single draftRankSentence() implementation directly (2026-09-05
+// follow-up, client-hunter B-12) rather than re-composing the granular
+// helpers itself; see tests/core/percentile-copy-consistency.test.ts and
+// tests/core/draft-rank-copy-consistency.test.ts for the cross-surface proof.
+import { draftRankSentence, type DraftRankExportPayload } from '../../src/lib/draft-rank-copy.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the
@@ -148,22 +146,23 @@ function buildHealthPercentileLine(report: ScriptDoctorReport): string {
  *  drafts of this script" / "your next save" copy, which drifted from the
  *  panel and the letter once those two moved to the shared
  *  draft-rank-copy.ts helpers (that module's own header tells the drift
- *  story). Now byte-identical to ScriptDoctorPanel.tsx's DraftRankLine `text`
- *  computation for every DraftRank state this schema can carry (ranked,
- *  tied, with an unranked-drafts note, or first-draft) — see
+ *  story).
+ *
+ *  2026-09-05 follow-up (client-hunter B-12): now calls the single
+ *  draftRankSentence(draftRank, 'union') implementation directly rather than
+ *  re-composing ordinal()/draftRankDenominatorLabel()/
+ *  draftRankNextOpportunityLabel()/unrankedDraftsNote() itself — the exact
+ *  re-composition that had ALREADY drifted once between this file and the
+ *  panel (this module's own denominator/next-opportunity history above),
+ *  and that a second, independent re-composition (SnapshotManager.tsx's
+ *  'saved'-scope badge) drifted again on the tied prefix and the unranked
+ *  note. Byte-identical to ScriptDoctorPanel.tsx's DraftRankLine for every
+ *  DraftRank state this schema can carry (ranked, tied, with an
+ *  unranked-drafts note, or first-draft) — see
  *  tests/core/draft-rank-copy-consistency.test.ts. */
 function buildDraftRankLine(draftRank: DraftRankExportPayload | undefined): string {
   if (!draftRank) return '';
-  const { rank, of, tied, unscored } = draftRank;
-  const text = of <= 1
-    ? `First saved draft — rank among your drafts appears after ${draftRankNextOpportunityLabel()}`
-    : `Rank among your drafts: ${tied ? 'tied ' : ''}${ordinal(rank)} of ${of} ${draftRankDenominatorLabel()} (by health)`;
-  // Same "N of M ... are unranked" clause and " — " join ScriptDoctorPanel.tsx's
-  // DraftRankLine appends (only meaningful in the ranked branch — a
-  // first-saved-draft script has nothing else to be unranked among).
-  const unrankedNote = of > 1 ? unrankedDraftsNote(unscored ?? 0, of) : null;
-  const body = unrankedNote ? `${text} — ${unrankedNote}` : text;
-  return `<div class="health-percentile">${body}</div>`;
+  return `<div class="health-percentile">${draftRankSentence(draftRank, 'union')}</div>`;
 }
 
 // ── Section builders ──────────────────────────────────────────────────────────

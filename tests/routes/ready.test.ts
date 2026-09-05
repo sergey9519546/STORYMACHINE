@@ -1,7 +1,9 @@
 // GET /ready and GET /health's doctorPool field — 2026-09-04 ops audit
 // finding A: the Script Doctor worker pool's boot-time pre-warm
-// (warmDoctorPool(), server/nvm/analyze/doctor-pool.ts) runs for ~2.1-3.9s
-// AFTER the port is already accepting connections (server.ts fires it from
+// (warmDoctorPool(), server/nvm/analyze/doctor-pool.ts) runs for the
+// measured "~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
+// 2026-09-04/05)" (warmDoctorPool()'s own doc comment — the one place this
+// figure is defined) AFTER the port is already accepting connections (server.ts fires it from
 // the app.listen callback, fire-and-forget), so a request landing in that
 // window silently pays the full cold-start cost with nothing telling an
 // orchestrator when warm-up is done. GET /ready is the fix: 503 before the

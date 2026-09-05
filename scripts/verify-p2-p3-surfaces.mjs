@@ -63,7 +63,7 @@ import {
 // happily keep matching the OLD "your own saved drafts of this script" /
 // "your next save" wording forever, even after every renderer moved on —
 // this gate would never notice the drift it exists to catch.
-import { draftRankDenominatorLabel, draftRankNextOpportunityLabel } from '../src/lib/draft-rank-copy.ts';
+import { draftRankDenominatorLabel, draftRankNextOpportunityLabel, draftRankSentence } from '../src/lib/draft-rank-copy.ts';
 // SnapshotManager.tsx's per-snapshot badge ranks against a NARROWER set than
 // the panel/letter/HTML above (snapshotDraftRanks calls computeDraftRank with
 // an empty history array — saved Versions only, never Draft History runs),
@@ -1108,7 +1108,18 @@ async function main() {
       // eslint-disable-next-line no-await-in-loop
       await nameInput.waitFor({ state: 'hidden', timeout: timing.ms(5000) }).catch(() => {});
     }
-    const expectedStrictRankText = `Ranks 1st of 2 by health among your ${savedScopeDraftRankNoun}`;
+    // 2026-09-05 review fix (client-hunter B-12): the same script saved
+    // TWICE with no edit between saves is a genuine dead heat — both saved
+    // records share the exact same health — so computeDraftRank's tie rule
+    // (src/lib/snapshot-trend.ts) sets `tied: true`, and the badge now
+    // correctly prefixes "tied " (draftRankSentence's fix for the bug this
+    // exact scenario used to hide: before the fix, this assertion's own
+    // hardcoded "Ranks 1st of 2..." literal — with no "tied" — happened to
+    // match the OLD, broken, always-untied rendering, so this gate could
+    // never have caught the bug it exists to catch). Derived from the
+    // shared helper, not a literal, so a future wording or tie-rule change
+    // moves both sides together.
+    const expectedStrictRankText = draftRankSentence({ rank: 1, of: 2, tied: true }, 'saved');
     const strictRankVisible = await pageA.getByText(expectedStrictRankText)
       .first().waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
     record(

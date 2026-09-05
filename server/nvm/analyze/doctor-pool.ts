@@ -449,6 +449,18 @@ export function doctorPoolStatus(): { enabled: boolean; disabled: boolean; worke
  * request is a pure win with no behavior change: `runScriptDoctorOffThread`
  * is contract-identical either way (this file's own doc comment on it).
  *
+ * THE CANONICAL WARM-UP FIGURE (2026-09-05 review fix — this codebase used
+ * to cite two different ranges, "~2.1-2.7s" and "~2.1-3.9s", for the exact
+ * same measurement, and neither one lived in this file, the one that owns
+ * the mechanism): the full warm-up window across every configured slot
+ * measures **"~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
+ * 2026-09-04/05)"**. Every other reference to this range anywhere in this
+ * codebase — README.md, Dockerfile, docker-compose.yml, server.ts,
+ * server/routes/config.ts, .env.example, and this file's own
+ * DoctorPoolWarmState/prewarmDeadlineMs comments below — quotes that exact
+ * sentence rather than paraphrasing it, so `grep -rn "idle box, up to"`
+ * finds one wording, not several.
+ *
  * Dispatches one tiny, disposable analysis per configured pool slot so each
  * worker thread actually gets spawned and proves it can load doctor.ts,
  * exactly the same path `pump()` takes for a real request. Each call uses
@@ -478,11 +490,14 @@ const WARM_UP_FOUNTAIN = (index: number): string =>
 
 /**
  * Observable warm state for the pre-warm above — the piece the 2026-09-04
- * ops audit found missing entirely: a request landing in the ~2.1-2.7s
- * window between "port is accepting connections" (server.ts's app.listen
- * callback) and "pool is warm" pays the full cold-start cost with nothing —
- * a load balancer, a health check, a test — able to tell the two states
- * apart. GET /ready (server/routes/config.ts) reads this via
+ * ops audit found missing entirely: a request landing in the warm-up window
+ * ("~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
+ * 2026-09-04/05)" — see warmDoctorPool()'s own doc comment above, the one
+ * place this figure is defined) between "port is accepting connections"
+ * (server.ts's app.listen callback) and "pool is warm" pays the full
+ * cold-start cost with nothing — a load balancer, a health check, a test —
+ * able to tell the two states apart. GET /ready (server/routes/config.ts)
+ * reads this via
  * `getDoctorPoolWarmState()` to gate traffic on it.
  *
  * `finished` is the field that matters for readiness: it becomes true both
@@ -521,8 +536,9 @@ const initialWarmState = (): DoctorPoolWarmState =>
 
 /** How long warmDoctorPool() waits for every warm-up job to settle before
  *  giving up and reporting `finished:true, timedOut:true` anyway. 30s is
- *  generous against the measured ~2.1-3.9s real-world warm-up (this file's
- *  own doc comments) while still bounding the worst case: without a
+ *  generous against the measured warm-up ("~2.1–2.7 s on an idle box, up to
+ *  ~3.9 s under load (measured 2026-09-04/05)" — warmDoctorPool()'s own doc
+ *  comment above) while still bounding the worst case: without a
  *  deadline, an unresponsive worker (accepts a job, never replies — the one
  *  case runScriptDoctorOffThread has no per-job timeout for) would leave
  *  `finished` false, and therefore GET /ready 503, forever. Overridable via

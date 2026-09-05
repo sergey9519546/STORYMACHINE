@@ -1,7 +1,10 @@
 // DOCTOR_POOL_PREWARM_BEFORE_LISTEN — 2026-09-04 ops audit finding A,
 // follow-up. GET /ready (tests/routes/ready.test.ts) lets an orchestrator
-// hold traffic back during the Script Doctor worker pool's ~2.1-2.7s
-// boot-time pre-warm without the process itself booting any slower. Some
+// hold traffic back during the Script Doctor worker pool's measured
+// "~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
+// 2026-09-04/05)" boot-time pre-warm (warmDoctorPool()'s own doc comment —
+// the one place this figure is defined) without the process itself booting
+// any slower. Some
 // single-process deployments have no such orchestrator in front of them and
 // would rather the port simply not open until the pool is warm. This flag
 // (default OFF) is that trade: server.ts's awaitPrewarmBeforeListenIfConfigured()
