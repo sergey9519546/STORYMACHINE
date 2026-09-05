@@ -31,6 +31,8 @@
     "restore-session": "node --experimental-strip-types scripts/restore-session.ts",
     "check-docs": "node --experimental-strip-types scripts/check-docs-quality.ts --all",
     "check-docs:strict": "node --experimental-strip-types scripts/check-docs-quality.ts --all --strict",
+    "brain": "node scripts/brain-graph.mjs",
+    "check-brain": "node scripts/brain-graph.mjs --check",
     "setup-hooks": "cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo '✓ Git hooks installed'",
     "prepare": "test -d .git && npm run setup-hooks || true",
     "validate": "npm run lint && npm run check-docs && npm run check-server-reachability && npm test",

@@ -99,6 +99,15 @@ touches scoring, measurement, or the user-facing surface, follow the
 applicable machine-checked evidence gate; do not treat engineering progress
 as P0 evidence or begin P4 retention/lock-in work before P0 PASS.
 
+## Project brain
+
+`docs/brain/00 Home.md` is a maintained, Obsidian-compatible knowledge graph
+over the Decision Log, gates, product surfaces, session records, audits, and
+measurement docs — open it first if you are new to the repository. Run
+`npm run brain` after adding or renaming a note (regenerates
+`docs/brain/brain.graph.json` and `GRAPH.md`); `npm run check-brain` is
+CI-blocking and fails on a stale graph or an unresolved `[[wikilink]]`.
+
 ## ADRs
 
 Significant decisions are captured as Architecture Decision Records in

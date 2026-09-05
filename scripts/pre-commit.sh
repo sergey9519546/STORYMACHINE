@@ -20,10 +20,18 @@ if [ -f .git/MERGE_HEAD ]; then
     exit 0
 fi
 
-# Get list of staged markdown files
-STAGED_MD_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.md$' || true)
+# Get list of staged markdown files. NUL-delimited end to end (git diff -z,
+# read -d '', an array) so a filename containing a space — e.g. anything
+# under docs/brain/ — survives intact instead of being word-split into
+# bogus path fragments (`docs/brain/Audits/Audit - 2026-07-14 High-End
+# Audit.md` becoming seven separate nonexistent "files") and crashing
+# check-docs-quality.ts with ENOENT/EISDIR instead of ever checking the doc.
+STAGED_MD_FILES=()
+while IFS= read -r -d '' f; do
+    STAGED_MD_FILES+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACM -z -- '*.md')
 
-if [ -z "$STAGED_MD_FILES" ]; then
+if [ ${#STAGED_MD_FILES[@]} -eq 0 ]; then
     echo "✓ No markdown files staged, skipping doc quality check"
     exit 0
 fi
@@ -31,7 +39,7 @@ fi
 echo "📝 Checking documentation quality for staged .md files..."
 
 # Run doc quality check on staged files
-node --experimental-strip-types scripts/check-docs-quality.ts $STAGED_MD_FILES
+node --experimental-strip-types scripts/check-docs-quality.ts "${STAGED_MD_FILES[@]}"
 
 # Check exit code
 if [ $? -eq 0 ]; then

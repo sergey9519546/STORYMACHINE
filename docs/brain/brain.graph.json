@@ -1,0 +1,1428 @@
+{
+  "nodes": [
+    {
+      "id": "docs/brain/00 Home.md",
+      "type": "home",
+      "title": "STORYMACHINE — Project Brain",
+      "path": "docs/brain/00 Home.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-07-14 High-End Audit.md",
+      "type": "audit",
+      "title": "Audit — 2026-07-14 High-End Audit",
+      "path": "docs/brain/Audits/Audit - 2026-07-14 High-End Audit.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-02 Retrospective",
+      "path": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-04 Evening Batch.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-04 Evening Batch",
+      "path": "docs/brain/Audits/Audit - 2026-09-04 Evening Batch.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-04 Reverification.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-04 Reverification",
+      "path": "docs/brain/Audits/Audit - 2026-09-04 Reverification.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-05 Review Batch",
+      "path": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md"
+    },
+    {
+      "id": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
+      "type": "branch",
+      "title": "Branch — Advice-Rule-Fixes",
+      "path": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "id": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
+      "type": "branch",
+      "title": "Branch — R5 (Verbosity Bias)",
+      "path": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 1 - User Validation First.md",
+      "type": "decision",
+      "title": "Decision #1 — User Validation First (2026-07-15)",
+      "path": "docs/brain/Decisions/Decision 1 - User Validation First.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
+      "type": "decision",
+      "title": "Decision #2 — Retire the P0 Hard-Gate (2026-08-11)",
+      "path": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md",
+      "type": "decision",
+      "title": "Decision #3 — Demote the Generative Surface to Labs (2026-09-03)",
+      "path": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md",
+      "type": "decision",
+      "title": "Decision #4 — Adopt the Power-Analysis Proposals (2026-09-03)",
+      "path": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md",
+      "type": "decision",
+      "title": "Decision #5 — Every Reported Unverified Gate Gets an Expiry (2026-09-03)",
+      "path": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 6 - License the Repository.md",
+      "type": "decision",
+      "title": "Decision #6 — License the Repository (2026-09-03) — DECISION NEEDED",
+      "path": "docs/brain/Decisions/Decision 6 - License the Repository.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "type": "gate",
+      "title": "Gate — AUC-24 Ratchet",
+      "path": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Browser Battery Suites.md",
+      "type": "gate",
+      "title": "Gate — Browser Battery Suites",
+      "path": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Claims Register Lane.md",
+      "type": "gate",
+      "title": "Gate — Claims Register Lane",
+      "path": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Honesty Audit.md",
+      "type": "gate",
+      "title": "Gate — Honesty Audit",
+      "path": "docs/brain/Gates/Gate - Honesty Audit.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Output-Identity Harness.md",
+      "type": "gate",
+      "title": "Gate — Output-Identity Harness",
+      "path": "docs/brain/Gates/Gate - Output-Identity Harness.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Pure-Core Boundary.md",
+      "type": "gate",
+      "title": "Gate — Pure-Core Boundary",
+      "path": "docs/brain/Gates/Gate - Pure-Core Boundary.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Receipt Gate.md",
+      "type": "gate",
+      "title": "Gate — Receipt Gate",
+      "path": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "id": "docs/brain/Glossary.md",
+      "type": "glossary",
+      "title": "Glossary",
+      "path": "docs/brain/Glossary.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - ARC_RECALIBRATION_WAVE_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — ARC_RECALIBRATION_WAVE_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - ARC_RECALIBRATION_WAVE_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - BASELINE_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — BASELINE_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - BASELINE_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md",
+      "type": "measurement",
+      "title": "Measurement — BLIND_PAIRS_2026-09-04",
+      "path": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md",
+      "type": "measurement",
+      "title": "Measurement — BLIND_PAIRS_ON_BRANCHES_2026-09-04",
+      "path": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - CC0_CORPUS_EXPANSION_2026-08-04.md",
+      "type": "measurement",
+      "title": "Measurement — CC0_CORPUS_EXPANSION_2026-08-04",
+      "path": "docs/brain/Measurements/Measurement - CC0_CORPUS_EXPANSION_2026-08-04.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - CLIMAX_LOCATOR_PROBE_2026-08-05.md",
+      "type": "measurement",
+      "title": "Measurement — CLIMAX_LOCATOR_PROBE_2026-08-05",
+      "path": "docs/brain/Measurements/Measurement - CLIMAX_LOCATOR_PROBE_2026-08-05.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - CLIMAX_RELOCATE_REDERIVATION_2026-08-24.md",
+      "type": "measurement",
+      "title": "Measurement — CLIMAX_RELOCATE_REDERIVATION_2026-08-24",
+      "path": "docs/brain/Measurements/Measurement - CLIMAX_RELOCATE_REDERIVATION_2026-08-24.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - COMPOSITE_MINGAP_FINDING_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — COMPOSITE_MINGAP_FINDING_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - COMPOSITE_MINGAP_FINDING_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - CORPUS_EXPANSION_2026-07-29.md",
+      "type": "measurement",
+      "title": "Measurement — CORPUS_EXPANSION_2026-07-29",
+      "path": "docs/brain/Measurements/Measurement - CORPUS_EXPANSION_2026-07-29.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - DENSITY_RECAL_FINDING_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — DENSITY_RECAL_FINDING_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - DENSITY_RECAL_FINDING_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md",
+      "type": "measurement",
+      "title": "Measurement — DETECTOR_DEFECTS_2026-08-03",
+      "path": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "type": "measurement",
+      "title": "Measurement — DISCRIMINATION_BASELINE_2026-07-29",
+      "path": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - HEALTH_REARCH_INCREMENT1_LANDED_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — HEALTH_REARCH_INCREMENT1_LANDED_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - HEALTH_REARCH_INCREMENT1_LANDED_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - IMPORT_COMPREHENSION_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — IMPORT_COMPREHENSION_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - IMPORT_COMPREHENSION_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - NOVELTY_SIGNAL_2026-08-05.md",
+      "type": "measurement",
+      "title": "Measurement — NOVELTY_SIGNAL_2026-08-05",
+      "path": "docs/brain/Measurements/Measurement - NOVELTY_SIGNAL_2026-08-05.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - P1_CONTINUATION_BRIEF_2026-08-11.md",
+      "type": "measurement",
+      "title": "Measurement — P1_CONTINUATION_BRIEF_2026-08-11",
+      "path": "docs/brain/Measurements/Measurement - P1_CONTINUATION_BRIEF_2026-08-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - P1_STATUS_2026-07-29.md",
+      "type": "measurement",
+      "title": "Measurement — P1_STATUS_2026-07-29",
+      "path": "docs/brain/Measurements/Measurement - P1_STATUS_2026-07-29.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - POWER_ANALYSIS_2026-09-02.md",
+      "type": "measurement",
+      "title": "Measurement — POWER_ANALYSIS_2026-09-02",
+      "path": "docs/brain/Measurements/Measurement - POWER_ANALYSIS_2026-09-02.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - READINESS_ASSESSMENT_2026-07-28.md",
+      "type": "measurement",
+      "title": "Measurement — READINESS_ASSESSMENT_2026-07-28",
+      "path": "docs/brain/Measurements/Measurement - READINESS_ASSESSMENT_2026-07-28.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - REAL_SCRIPT_DISCRIMINATION_2026-07-28.md",
+      "type": "measurement",
+      "title": "Measurement — REAL_SCRIPT_DISCRIMINATION_2026-07-28",
+      "path": "docs/brain/Measurements/Measurement - REAL_SCRIPT_DISCRIMINATION_2026-07-28.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - REBUILD_EXPERIMENT_2026-08-04.md",
+      "type": "measurement",
+      "title": "Measurement — REBUILD_EXPERIMENT_2026-08-04",
+      "path": "docs/brain/Measurements/Measurement - REBUILD_EXPERIMENT_2026-08-04.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24.md",
+      "type": "measurement",
+      "title": "Measurement — RULE_CHANNEL_EVIDENCE_2026-08-24",
+      "path": "docs/brain/Measurements/Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - SATURATION_ROOT_CAUSE_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — SATURATION_ROOT_CAUSE_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - SATURATION_ROOT_CAUSE_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - STRESS_LEDGER_CALIBRATION_2026-08-11.md",
+      "type": "measurement",
+      "title": "Measurement — STRESS_LEDGER_CALIBRATION_2026-08-11",
+      "path": "docs/brain/Measurements/Measurement - STRESS_LEDGER_CALIBRATION_2026-08-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - STRUCTURAL_FORM_EXPERIMENT_2026-08-03.md",
+      "type": "measurement",
+      "title": "Measurement — STRUCTURAL_FORM_EXPERIMENT_2026-08-03",
+      "path": "docs/brain/Measurements/Measurement - STRUCTURAL_FORM_EXPERIMENT_2026-08-03.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "type": "measurement",
+      "title": "Measurement — STRUCTURAL_SIGNALS_2026-09-04",
+      "path": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29.md",
+      "type": "measurement",
+      "title": "Measurement — STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29",
+      "path": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md",
+      "type": "measurement",
+      "title": "Measurement — STRUCTURAL_SIGNAL_SCREEN_2026-08-03",
+      "path": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - SURFACE_REVALIDATION_2026-08-04.md",
+      "type": "measurement",
+      "title": "Measurement — SURFACE_REVALIDATION_2026-08-04",
+      "path": "docs/brain/Measurements/Measurement - SURFACE_REVALIDATION_2026-08-04.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - SUSPENSE_DELTA_DEGENERACY_2026-08-05.md",
+      "type": "measurement",
+      "title": "Measurement — SUSPENSE_DELTA_DEGENERACY_2026-08-05",
+      "path": "docs/brain/Measurements/Measurement - SUSPENSE_DELTA_DEGENERACY_2026-08-05.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - TEMPORAL_ORDER_SENSITIVITY_2026-08-03.md",
+      "type": "measurement",
+      "title": "Measurement — TEMPORAL_ORDER_SENSITIVITY_2026-08-03",
+      "path": "docs/brain/Measurements/Measurement - TEMPORAL_ORDER_SENSITIVITY_2026-08-03.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md",
+      "type": "measurement",
+      "title": "Measurement — UNWIRED_SIGNALS_EVIDENCE_2026-08-21",
+      "path": "docs/brain/Measurements/Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md",
+      "type": "measurement",
+      "title": "Measurement — VERBOSITY_BIAS_2026-07-11",
+      "path": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md",
+      "type": "measurement",
+      "title": "Measurement — WHAT_THE_SCORE_DOES_2026-07-28",
+      "path": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md"
+    },
+    {
+      "id": "docs/brain/Measurements Index.md",
+      "type": "measurement-index",
+      "title": "Measurements Index",
+      "path": "docs/brain/Measurements Index.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - Fix GitHub Actions.md",
+      "type": "owner",
+      "title": "Owner Item — Fix GitHub Actions (Billing/Runner Block)",
+      "path": "docs/brain/Owner/Owner - Fix GitHub Actions.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - Fix Repo Description.md",
+      "type": "owner",
+      "title": "Owner Item — Fix the Repository Description",
+      "path": "docs/brain/Owner/Owner - Fix Repo Description.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - Index.md",
+      "type": "owner",
+      "title": "Owner-Only Items — Index",
+      "path": "docs/brain/Owner/Owner - Index.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - License Decision.md",
+      "type": "owner",
+      "title": "Owner Item — Decide the License",
+      "path": "docs/brain/Owner/Owner - License Decision.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "type": "owner",
+      "title": "Owner Item — Lock and Commit the AUC-24 Table",
+      "path": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - Make Repo Private.md",
+      "type": "owner",
+      "title": "Owner Item — Make the Repository Private and Enable Branch Protection",
+      "path": "docs/brain/Owner/Owner - Make Repo Private.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - P0 Fielding.md",
+      "type": "owner",
+      "title": "Owner Item — Field P0: Writers and Blind Readers",
+      "path": "docs/brain/Owner/Owner - P0 Fielding.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - Push Release Tag.md",
+      "type": "owner",
+      "title": "Owner Item — Push the Release Tag, Delete the Stale One",
+      "path": "docs/brain/Owner/Owner - Push Release Tag.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "type": "owner",
+      "title": "Owner Item — Measure and Merge R5 (or Manually Merge with Advice-Rule-Fixes)",
+      "path": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "id": "docs/brain/Owner/Owner - Run Measure Real.md",
+      "type": "owner",
+      "title": "Owner Item — Run the Real-Corpus Measurement",
+      "path": "docs/brain/Owner/Owner - Run Measure Real.md"
+    },
+    {
+      "id": "docs/brain/Patterns.md",
+      "type": "patterns",
+      "title": "Patterns — Recurring Mistake Classes",
+      "path": "docs/brain/Patterns.md"
+    },
+    {
+      "id": "docs/brain/Sessions/Session - 2026-08-24 Completion Sweep.md",
+      "type": "session",
+      "title": "Session — 2026-08-24, Later: The Completion Sweep and Its Six Lanes",
+      "path": "docs/brain/Sessions/Session - 2026-08-24 Completion Sweep.md"
+    },
+    {
+      "id": "docs/brain/Sessions/Session - 2026-08-24 Five Landings.md",
+      "type": "session",
+      "title": "Session — 2026-08-24, Five Landings After the Phase Close-Out",
+      "path": "docs/brain/Sessions/Session - 2026-08-24 Five Landings.md"
+    },
+    {
+      "id": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "type": "session",
+      "title": "Session — 2026-09-03, the Retrospective's Twelve Findings, Worked",
+      "path": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md"
+    },
+    {
+      "id": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "type": "session",
+      "title": "Session — 2026-09-04, Evening: Build, Attack, Repair, Deploy, Verify",
+      "path": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md"
+    },
+    {
+      "id": "docs/brain/Sessions/Session - 2026-09-04 Fixing to Building.md",
+      "type": "session",
+      "title": "Session — 2026-09-04, From Fixing What Was Wrong to Building What Was Missing",
+      "path": "docs/brain/Sessions/Session - 2026-09-04 Fixing to Building.md"
+    },
+    {
+      "id": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md",
+      "type": "session",
+      "title": "Session — 2026-09-04, Later: The Hardening Batch",
+      "path": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md"
+    },
+    {
+      "id": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",
+      "type": "session",
+      "title": "Session — 2026-09-05, Overnight: The Review Batch",
+      "path": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Collab Room.md",
+      "type": "surface",
+      "title": "Surface — Collab Room",
+      "path": "docs/brain/Surfaces/Surface - Collab Room.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "type": "surface",
+      "title": "Surface — Coverage HTML",
+      "path": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "type": "surface",
+      "title": "Surface — Coverage Letter",
+      "path": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Exports.md",
+      "type": "surface",
+      "title": "Surface — Exports",
+      "path": "docs/brain/Surfaces/Surface - Exports.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Fix and Verify.md",
+      "type": "surface",
+      "title": "Surface — Fix and Verify",
+      "path": "docs/brain/Surfaces/Surface - Fix and Verify.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "type": "surface",
+      "title": "Surface — Script Doctor Panel",
+      "path": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Slate.md",
+      "type": "surface",
+      "title": "Surface — Slate",
+      "path": "docs/brain/Surfaces/Surface - Slate.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Versions and Snapshots.md",
+      "type": "surface",
+      "title": "Surface — Versions and Snapshots",
+      "path": "docs/brain/Surfaces/Surface - Versions and Snapshots.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - What-If Lab.md",
+      "type": "surface",
+      "title": "Surface — What-If Lab",
+      "path": "docs/brain/Surfaces/Surface - What-If Lab.md"
+    }
+  ],
+  "edges": [
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Measurements Index.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Owner/Owner - Index.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Decisions/Decision 1 - User Validation First.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Sessions/Session - 2026-08-24 Five Landings.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Audits/Audit - 2026-07-14 High-End Audit.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Measurements Index.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Owner/Owner - Index.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-07-14 High-End Audit.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md",
+      "to": "docs/brain/Gates/Gate - Pure-Core Boundary.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-04 Evening Batch.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-04 Evening Batch.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-04 Reverification.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-04 Reverification.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
+      "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 1 - User Validation First.md",
+      "to": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
+      "to": "docs/brain/Decisions/Decision 1 - User Validation First.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md",
+      "to": "docs/brain/Surfaces/Surface - Fix and Verify.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 6 - License the Repository.md",
+      "to": "docs/brain/Owner/Owner - License Decision.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Browser Battery Suites.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Honesty Audit.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Honesty Audit.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Pure-Core Boundary.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Receipt Gate.md",
+      "to": "docs/brain/Gates/Gate - Pure-Core Boundary.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Gates/Gate - Pure-Core Boundary.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Glossary.md",
+      "to": "docs/brain/Audits/Audit - 2026-07-14 High-End Audit.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - CC0_CORPUS_EXPANSION_2026-08-04.md",
+      "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - CLIMAX_RELOCATE_REDERIVATION_2026-08-24.md",
+      "to": "docs/brain/Measurements/Measurement - NOVELTY_SIGNAL_2026-08-05.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - COMPOSITE_MINGAP_FINDING_2026-07-11.md",
+      "to": "docs/brain/Measurements/Measurement - SATURATION_ROOT_CAUSE_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - CORPUS_EXPANSION_2026-07-29.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DENSITY_RECAL_FINDING_2026-07-11.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DENSITY_RECAL_FINDING_2026-07-11.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md",
+      "to": "docs/brain/Measurements/Measurement - CC0_CORPUS_EXPANSION_2026-08-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "to": "docs/brain/Measurements/Measurement - CORPUS_EXPANSION_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md",
+      "to": "docs/brain/Measurements/Measurement - ARC_RECALIBRATION_WAVE_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - IMPORT_COMPREHENSION_2026-07-11.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - NOVELTY_SIGNAL_2026-08-05.md",
+      "to": "docs/brain/Measurements/Measurement - CLIMAX_RELOCATE_REDERIVATION_2026-08-24.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - P1_CONTINUATION_BRIEF_2026-08-11.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - P1_CONTINUATION_BRIEF_2026-08-11.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - P1_CONTINUATION_BRIEF_2026-08-11.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - P1_STATUS_2026-07-29.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - P1_STATUS_2026-07-29.md",
+      "to": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - POWER_ANALYSIS_2026-09-02.md",
+      "to": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - READINESS_ASSESSMENT_2026-07-28.md",
+      "to": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - REAL_SCRIPT_DISCRIMINATION_2026-07-28.md",
+      "to": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - SATURATION_ROOT_CAUSE_2026-07-11.md",
+      "to": "docs/brain/Measurements/Measurement - COMPOSITE_MINGAP_FINDING_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRESS_LEDGER_CALIBRATION_2026-08-11.md",
+      "to": "docs/brain/Measurements/Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_FORM_EXPERIMENT_2026-08-03.md",
+      "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "to": "docs/brain/Surfaces/Surface - Versions and Snapshots.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "to": "docs/brain/Surfaces/Surface - Slate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "to": "docs/brain/Surfaces/Surface - What-If Lab.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md",
+      "to": "docs/brain/Surfaces/Surface - Fix and Verify.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md",
+      "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - SUSPENSE_DELTA_DEGENERACY_2026-08-05.md",
+      "to": "docs/brain/Measurements/Measurement - CLIMAX_LOCATOR_PROBE_2026-08-05.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - SUSPENSE_DELTA_DEGENERACY_2026-08-05.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md",
+      "to": "docs/brain/Measurements/Measurement - STRESS_LEDGER_CALIBRATION_2026-08-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md",
+      "to": "docs/brain/Measurements/Measurement - DENSITY_RECAL_FINDING_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md",
+      "to": "docs/brain/Measurements/Measurement - REAL_SCRIPT_DISCRIMINATION_2026-07-28.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/00 Home.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - CC0_CORPUS_EXPANSION_2026-08-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - CLIMAX_LOCATOR_PROBE_2026-08-05.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - CLIMAX_RELOCATE_REDERIVATION_2026-08-24.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - CORPUS_EXPANSION_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - NOVELTY_SIGNAL_2026-08-05.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - P1_CONTINUATION_BRIEF_2026-08-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - P1_STATUS_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - POWER_ANALYSIS_2026-09-02.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - READINESS_ASSESSMENT_2026-07-28.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - REBUILD_EXPERIMENT_2026-08-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - STRESS_LEDGER_CALIBRATION_2026-08-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_FORM_EXPERIMENT_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_DIAGNOSIS_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNAL_SCREEN_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - SURFACE_REVALIDATION_2026-08-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - SUSPENSE_DELTA_DEGENERACY_2026-08-05.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - TEMPORAL_ORDER_SENSITIVITY_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - ARC_RECALIBRATION_WAVE_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - BASELINE_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - COMPOSITE_MINGAP_FINDING_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - DENSITY_RECAL_FINDING_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - HEALTH_REARCH_INCREMENT1_LANDED_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - IMPORT_COMPREHENSION_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - REAL_SCRIPT_DISCRIMINATION_2026-07-28.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - SATURATION_ROOT_CAUSE_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Fix Repo Description.md",
+      "to": "docs/brain/Gates/Gate - Honesty Audit.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Fix Repo Description.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - Make Repo Private.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - Fix Repo Description.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - Run Measure Real.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - Push Release Tag.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - P0 Fielding.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - Fix GitHub Actions.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - License Decision.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Index.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - License Decision.md",
+      "to": "docs/brain/Decisions/Decision 6 - License the Repository.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - License Decision.md",
+      "to": "docs/brain/Decisions/Decision 6 - License the Repository.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "to": "docs/brain/Owner/Owner - Run Measure Real.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - P0 Fielding.md",
+      "to": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Owner/Owner - Run Measure Real.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Run Measure Real.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Run Measure Real.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Surfaces/Surface - Versions and Snapshots.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Measurements/Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Sessions/Session - 2026-08-24 Five Landings.md"
+    },
+    {
+      "from": "docs/brain/Patterns.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-08-24 Completion Sweep.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-08-24 Completion Sweep.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-08-24 Five Landings.md",
+      "to": "docs/brain/Measurements/Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-08-24 Five Landings.md",
+      "to": "docs/brain/Measurements/Measurement - NOVELTY_SIGNAL_2026-08-05.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-02 Retrospective.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Gates/Gate - Pure-Core Boundary.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Surfaces/Surface - Collab Room.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Measurements/Measurement - POWER_ANALYSIS_2026-09-02.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-03 Retrospective Findings.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Measurements/Measurement - STRUCTURAL_SIGNALS_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-04 Evening Batch.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Surfaces/Surface - Versions and Snapshots.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Evening Build Attack Repair.md",
+      "to": "docs/brain/Surfaces/Surface - What-If Lab.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Fixing to Building.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Fixing to Building.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Fixing to Building.md",
+      "to": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Fixing to Building.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Fixing to Building.md",
+      "to": "docs/brain/Decisions/Decision 6 - License the Repository.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-04 Reverification.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-04 Reverification.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Surfaces/Surface - Fix and Verify.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Slate.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Fix and Verify.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Versions and Snapshots.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Versions and Snapshots.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - What-If Lab.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    }
+  ]
+}

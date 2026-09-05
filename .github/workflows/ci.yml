@@ -101,6 +101,21 @@ jobs:
         run: npm run check-docs
         continue-on-error: true
 
+      # docs/brain/ is the project brain — an Obsidian-compatible knowledge
+      # graph over the Decision Log, gates, surfaces, session records, audits,
+      # and measurement docs (see CLAUDE.md's "Project brain" paragraph and
+      # tests/core/brain-coverage.test.ts, which runs as part of `npm test`
+      # below and asserts every source-of-truth entry has a note). This step
+      # only checks that the committed graph export (brain.graph.json,
+      # GRAPH.md) matches what scripts/brain-graph.mjs would regenerate right
+      # now, and that every wikilink resolves — a stale or broken graph export
+      # is a doc bug the same way a stale generated rulebook would be.
+      # Blocking, like the other check-* steps above: unlike check-docs (AI
+      # writing patterns, judgment calls), a stale export or a dangling
+      # [[wikilink]] is unambiguous.
+      - name: Check project brain (docs/brain freshness)
+        run: npm run check-brain
+
       # Deliberately NO GEMINI_API_KEY here: the product's official keyless
       # analysis-only mode is what CI must prove. With a fake key set, the
       # "keyless" degradation paths construct a real client and attempt live

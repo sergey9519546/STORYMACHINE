@@ -104,6 +104,12 @@ jobs:
         run: npm run check-docs
         continue-on-error: true
 
+      # Mirrors ci.yml's project-brain freshness check — see that file's
+      # comment. Blocking here too: a release is the last place to publish
+      # with a stale docs/brain/ graph export.
+      - name: Check project brain (docs/brain freshness)
+        run: npm run check-brain
+
       - name: Run tests (keyless — analysis-only posture)
         # Mirrors ci.yml: RUN_E2E gates tests/e2e/journeys.test.ts, the only
         # full-stack test. A release is the last place to skip it.

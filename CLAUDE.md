@@ -12,6 +12,17 @@ precedes every merge) · `README.md` (setup, env vars) ·
 P0–P4 briefs and gates). Research and retired wave material is filed
 backlog, not active direction; see ROADMAP §8.
 
+**Project brain.** `docs/brain/00 Home.md` is the first stop for a session
+or agent with no prior context on this repository — an Obsidian-compatible
+knowledge graph linking every Decision Log entry, gate, product surface,
+session record, audit, and measurement doc to the repo files that back it.
+`npm run brain` regenerates the graph (`docs/brain/brain.graph.json`,
+`docs/brain/GRAPH.md`); `npm run check-brain` verifies it is fresh and every
+`[[wikilink]]` resolves (CI-blocking). `tests/core/brain-coverage.test.ts`
+is the staleness guard: a new Decision Log entry, audits directory, dated
+`docs/p1-benchmark`/`docs/scoring` doc, or `docs/PATH_TO_EXCELLENCE.md`
+session-record heading must also get a brain note, or that test fails.
+
 ## Quality bar
 
 Build the strongest version of a **validated** change, not the quickest one
