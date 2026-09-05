@@ -257,7 +257,35 @@ const SMBTN_FAMILY_RE = /(^|[\s"'`{])sm-btn(--ink|--stamp)?(?=[\s"'`}]|$)/;
 // `bg-black dark:bg-[var(--sm-panel)]` (reserved, carries no text, so this
 // was a latent false-positive shape rather than a live one — but a
 // scanner whose value is not crying wolf should not carry it forward).
-const DARK_BG_TOKEN_SRC = '(^|[\\s"\'`{])dark:bg-(?!\\[var\\(--sm-panel)[\\w.\\[\\]#()-]+(\\/\\d{1,3})?';
+// Round 5 (independent review round 4, follow-up 1): the lookahead used to
+// be a bare prefix match (`(?!\[var\(--sm-panel`), which disagreed with
+// INVARIANT_BG_VAR_RE below on a hypothetical `dark:bg-[var(--sm-panelXYZ)]`
+// — excluded from EITHER dark-bg regex by the lookahead, but not matched
+// by INVARIANT_BG_VAR_RE's exact-token requirement either, so it fell
+// through to `inherit` rather than the `safe` it should resolve to.
+// Tightened to require the exact closing `)]` (with the optional `-2`),
+// so the two paths can never disagree on a token name they don't both
+// recognize — see the fixture proof below.
+//
+// Round 5 (independent review round 4, follow-up 2): this used to be ONE
+// character class covering both plain color-name tokens (`dark:bg-red-950`)
+// and arbitrary-value tokens (`dark:bg-[...]`), and that class excluded
+// `/` so the (\/\d{1,3})? suffix group could read a trailing Tailwind
+// shorthand opacity (`dark:bg-red-950/40`). But an arbitrary CSS
+// color-function value can carry its OWN internal `/` for an alpha channel
+// (`dark:bg-[rgb(24_24_27/0.95)]`, CSS Color Module 4 syntax) — the shared
+// class stopped consuming at that internal slash, and the trailing group
+// then greedily read "/0" off "0.95)]" (alpha 0), wrongly exempting an
+// effectively opaque background. Split into two alternatives: BRACKET
+// tokens (`\[[^\]]*\]`) may contain `/` freely, since it's an arbitrary
+// value this walk doesn't otherwise parse; NAMED tokens keep the original,
+// `/`-free class so the outer Tailwind shorthand suffix still parses the
+// same way it always did. Each alternative still allows an OUTER trailing
+// `/NN` shorthand too (Tailwind allows applying opacity to an arbitrary
+// value from outside it, `dark:bg-[...]/50`) — see hasSolidDarkBg for how
+// the two alpha sources (outer shorthand vs. inner CSS-function slash) are
+// reconciled.
+const DARK_BG_TOKEN_SRC = '(^|[\\s"\'`{])dark:bg-(?!\\[var\\(--sm-panel(-2)?\\)\\])(?:(\\[[^\\]]*\\])|([\\w.#()-]+))(\\/\\d{1,3})?';
 const ANY_BG_RE = /(^|[\s"'`{])bg-[\w./\[\]#%()-]+/;
 const TEXT_TOKEN_RE = /(^|[\s"'`{])(dark:)?text-(\[[^\]]*\]|[\w./%-]+)/g;
 
@@ -299,14 +327,52 @@ const FRACTIONAL_DARK_BG_SOLID_THRESHOLD = 60;
  *  invariant LIGHT panel, not a dark surface. */
 const INVARIANT_BG_VAR_RE = /(^|[\s"'`{])dark:bg-\[var\(--sm-panel(-2)?\)\](?=[\s"'`}]|$)/;
 
-/** A confidently dark `dark:bg-*` token: no opacity suffix at all, or one
- *  at/above FRACTIONAL_DARK_BG_SOLID_THRESHOLD — see this file's header
- *  for why fractional opacity below that line is excluded. */
+/** Looks for a CSS Color Module 4 style internal alpha channel inside an
+ *  arbitrary-value bracket (`[rgb(24_24_27/0.95)]` — Tailwind stands
+ *  underscores in for the spaces `rgb(24 24 27 / 0.95)` would otherwise
+ *  need) — the LAST `/` inside the brackets, followed by a number, either
+ *  a 0-1 fraction or an already-0-100 value. Returns the alpha as a 0-100
+ *  number, or `null` when the bracket carries no such marker at all (an
+ *  8-digit hex, a bare arbitrary value with no slash, …) — this walk
+ *  cannot tell in that case, so it is treated as confidently solid (the
+ *  safe direction — see hasSolidDarkBg). */
+function parseInternalAlpha(bracketContent: string): number | null {
+  const inner = bracketContent.slice(1, -1); // strip the outer [ ]
+  const slash = inner.lastIndexOf('/');
+  if (slash === -1) return null;
+  const value = Number.parseFloat(inner.slice(slash + 1));
+  if (Number.isNaN(value)) return null;
+  return value <= 1 ? value * 100 : value;
+}
+
+/** A confidently dark `dark:bg-*` token: no opacity information at all
+ *  (named or bracket-form with nothing to read), or an opacity — Tailwind
+ *  shorthand OUTSIDE the token, or a CSS-function alpha channel INSIDE an
+ *  arbitrary-value bracket, see parseInternalAlpha — at or above
+ *  FRACTIONAL_DARK_BG_SOLID_THRESHOLD. Below that line, this walk cannot
+ *  confidently call it dark (see this file's header). */
 function hasSolidDarkBg(raw: string): boolean {
   for (const m of raw.matchAll(new RegExp(DARK_BG_TOKEN_SRC, 'g'))) {
-    if (!m[2]) return true; // no opacity suffix — fully solid
-    const alpha = Number.parseInt(m[2].slice(1), 10); // strip the leading "/"
-    if (alpha >= FRACTIONAL_DARK_BG_SOLID_THRESHOLD) return true;
+    // Group indices: [0] full match, [1] boundary, [2] the lookahead's own
+    // inner "-2" capture (always undefined in any match this loop sees —
+    // a negative lookahead that matched would have blocked the match
+    // entirely), [3] bracket token, [4] named token, [5] outer suffix.
+    const [, , , bracketToken, namedToken, outerSuffix] = m;
+    if (outerSuffix) {
+      // A Tailwind shorthand opacity OUTSIDE the token — applies to either
+      // form (`dark:bg-red-950/40` or `dark:bg-[...]/50`) and always wins
+      // over whatever might be inside a bracket, since it's what actually
+      // controls the rendered alpha.
+      const alpha = Number.parseInt(outerSuffix.slice(1), 10);
+      if (alpha >= FRACTIONAL_DARK_BG_SOLID_THRESHOLD) return true;
+      continue;
+    }
+    if (bracketToken) {
+      const alpha = parseInternalAlpha(bracketToken);
+      if (alpha === null || alpha >= FRACTIONAL_DARK_BG_SOLID_THRESHOLD) return true;
+      continue;
+    }
+    if (namedToken) return true; // no opacity information anywhere — solid
   }
   return false;
 }
@@ -625,6 +691,59 @@ describe('theme-convention scanner — proof it can actually fail (LANE_STANDARD
   //    is confidently dark, not ambiguous — see
   //    FRACTIONAL_DARK_BG_SOLID_THRESHOLD's comment. ─────────────────────
 
+  it('a HIGH-opacity dark:bg-[rgb(…/0.95)] (CSS-function alpha syntax, INSIDE the brackets) IS caught (round 5, independent review round 4, follow-up 2)', () => {
+    // Before this round, the shared bracket/named character class excluded
+    // "/", so matching stopped at the internal slash inside
+    // `[rgb(24_24_27/0.95)]` and the trailing `(\/\d{1,3})?` group then
+    // read "/0" off "0.95)]" (parsed as alpha 0) — wrongly exempting an
+    // effectively opaque (95%) background. parseInternalAlpha now reads
+    // the alpha from INSIDE the bracket when there's no outer Tailwind
+    // shorthand suffix to prefer instead.
+    const fixture = [
+      '<div className="bg-white dark:bg-[rgb(24_24_27/0.95)] p-4">',
+      '  <span className="text-[var(--sm-ink)]">{"caught"}</span>',
+      '</div>',
+    ].join('\n');
+    const violations = findThemeConventionViolations(fixture, 'fixture.tsx');
+    assert.equal(violations.length, 1);
+  });
+
+  it('dark:bg-zinc-900/[0.95] (Tailwind\'s own arbitrary-opacity shorthand) still IS caught', () => {
+    // The outer "/" here is NOT inside the arbitrary-value bracket (there
+    // is no bracket on the color name itself) — the named-token branch
+    // matches "zinc-900" and stops before the "/", the outer suffix group
+    // then fails to match "[0.95]" (not digits), so this token carries no
+    // alpha information at all and defaults to confidently solid — the
+    // same "nothing to read, so solid" direction as `dark:bg-[#18181bF2]`
+    // below.
+    const fixture = [
+      '<div className="bg-white dark:bg-zinc-900/[0.95] p-4">',
+      '  <span className="text-[var(--sm-ink)]">{"caught"}</span>',
+      '</div>',
+    ].join('\n');
+    const violations = findThemeConventionViolations(fixture, 'fixture.tsx');
+    assert.equal(violations.length, 1);
+  });
+
+  it('dark:bg-[#18181bF2] (8-digit hex with an alpha byte, no internal slash to read) still IS caught', () => {
+    const fixture = [
+      '<div className="bg-white dark:bg-[#18181bF2] p-4">',
+      '  <span className="text-[var(--sm-ink)]">{"caught"}</span>',
+      '</div>',
+    ].join('\n');
+    const violations = findThemeConventionViolations(fixture, 'fixture.tsx');
+    assert.equal(violations.length, 1);
+  });
+
+  it('a LOW internal alpha inside an arbitrary-value bracket (dark:bg-[rgb(…/0.3)]) is still NOT confidently dark', () => {
+    const fixture = [
+      '<div className="bg-white dark:bg-[rgb(24_24_27/0.3)] p-4">',
+      '  <span className="text-[var(--sm-ink)]">{"not caught"}</span>',
+      '</div>',
+    ].join('\n');
+    assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
   it('a HIGH-opacity dark:bg-*/95 (effectively opaque) IS caught by the forward rule, unlike a genuinely low-opacity one', () => {
     const fixture = [
       '<div className="bg-white dark:bg-zinc-900/95 p-4">',
@@ -660,6 +779,25 @@ describe('theme-convention scanner — proof it can actually fail (LANE_STANDARD
   it('does NOT treat dark:bg-[var(--sm-panel-2)] as a dark background either', () => {
     const fixture = '<div className="bg-black dark:bg-[var(--sm-panel-2)] p-4"><span className="text-[var(--sm-ink)]">{"fine"}</span></div>';
     assert.deepEqual(findThemeConventionViolations(fixture, 'fixture.tsx'), []);
+  });
+
+  it('does NOT extend the --sm-panel exclusion to a LOOK-ALIKE token name (round 5, independent review round 4, follow-up 1)', () => {
+    // Before this round the DARK_BG_TOKEN_SRC lookahead was a bare prefix
+    // match (`(?!\[var\(--sm-panel`), which would have excluded THIS token
+    // from the dark-bg regexes too (same prefix) while INVARIANT_BG_VAR_RE
+    // (an exact-token match) would NOT have recognized it as the known
+    // invariant panel either — the two paths disagreed, and the token fell
+    // through to `inherit` rather than being confidently classified either
+    // way. Tightening the lookahead to require the exact closing `)]`
+    // means a look-alike name is no longer excluded from the dark
+    // classification at all — it is read as an ordinary (unknown)
+    // arbitrary-value background and, having no internal alpha marker to
+    // read, defaults to confidently dark (the same treatment
+    // `dark:bg-[var(--sm-ink)]` already gets) — the opposite of being
+    // treated as the safe, invariant panel.
+    const fixture = '<div className="dark:bg-[var(--sm-panelXYZ)] p-4"><span className="text-[var(--sm-ink)]">{"x"}</span></div>';
+    const violations = findThemeConventionViolations(fixture, 'fixture.tsx');
+    assert.equal(violations.length, 1);
   });
 
   it('a REAL dark:bg-zinc-* still IS caught even when it sits next to an unrelated dark:bg-[var(--sm-panel)] token', () => {

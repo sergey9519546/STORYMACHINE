@@ -171,6 +171,71 @@ async function auditElement(page, locator, surfaceName) {
 }
 
 /**
+ * Round 5 (independent review round 4, follow-up 3): a self-contained
+ * (no closure references — it is serialized and run IN the page by
+ * `locator.evaluate`) contrast measurement, canvas-resolved so it works
+ * against Tailwind v4's `oklch()` output the same way `getComputedStyle`
+ * does, alpha-composited up the ancestor chain so a text color sitting on
+ * a translucent tint (e.g. StateDeltaCard's `bg-amber-500/10`) measures
+ * against what it ACTUALLY renders on, not a bare `rgba()` string. Reports
+ * the ratio AND the element count of the scope it was called on, so a
+ * step can show it audited the right, narrowly-scoped node rather than
+ * asserting a "no violations" that could just as easily mean "found
+ * nothing to check."
+ */
+function measureContrastNode(el) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 1;
+  const c2 = cv.getContext('2d', { willReadFrequently: true });
+  const toRgb = (c) => {
+    c2.clearRect(0, 0, 1, 1);
+    c2.fillStyle = '#000';
+    c2.fillStyle = c;
+    c2.fillRect(0, 0, 1, 1);
+    const d = c2.getImageData(0, 0, 1, 1).data;
+    return { rgb: [d[0], d[1], d[2]], a: d[3] / 255 };
+  };
+  const lum = (rgb) => {
+    const [r, g, b] = rgb.map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const l1 = lum(a);
+    const l2 = lum(b);
+    const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+    return Number(((hi + 0.05) / (lo + 0.05)).toFixed(2));
+  };
+  const blend = (fg, bg, a) => fg.map((v, i) => Math.round(v * a + bg[i] * (1 - a)));
+  const bgOf = (node) => {
+    let n = node;
+    const stack = [];
+    while (n && n !== document.documentElement) {
+      const c = toRgb(getComputedStyle(n).backgroundColor);
+      if (c.a > 0) stack.push(c);
+      if (c.a > 0.999) break;
+      n = n.parentElement;
+    }
+    if (!stack.length) return [255, 255, 255];
+    let out = stack[stack.length - 1].a > 0.999 ? stack[stack.length - 1].rgb : [255, 255, 255];
+    for (let i = stack.length - 2; i >= 0; i--) out = blend(stack[i].rgb, out, stack[i].a);
+    return out;
+  };
+  const cs = getComputedStyle(el);
+  const fg = toRgb(cs.color);
+  const bg = bgOf(el);
+  return {
+    text: (el.textContent || '').trim().slice(0, 60),
+    fg: `rgb(${fg.rgb})`,
+    bg: `rgb(${bg})`,
+    ratio: ratio(fg.rgb, bg),
+    nodeCount: el.querySelectorAll('*').length + 1,
+  };
+}
+
+/**
  * Scrolls the "Full report" dialog's own scroll container until the Shape &
  * Rhythm section is actually in view, and returns a Locator scoped to the
  * section's own DOM subtree (for `auditElement` above) — not the whole
@@ -1346,6 +1411,151 @@ async function main() {
     record('coverage-html-gate', 'dark (prefers-color-scheme): no horizontal overflow at 375px', !overflowDark10c);
     await context10cDark.close();
   }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 10d) Sidebar's character-count caption + StateDeltaCard's Dramatic
+  //      Irony callout (round 5, independent review round 4 follow-up 3,
+  //      carried from round 3): round 4's colour fix (text-red-500/text-
+  //      yellow-600/text-amber-700 -> text-red-700/text-amber-800/text-
+  //      amber-800, measured 5.59/6.17/5.75:1) was never reached by any
+  //      step of this suite — the theme-convention scanner pins the
+  //      CONVENTION (no orphaned dark:text-* half), not the CONTRAST, and
+  //      nothing browser-side drove either surface into existence. Both
+  //      need real interaction to exist at all: the Sidebar caption only
+  //      renders past a character threshold, and StateDeltaCard only
+  //      renders after a successful /api/live/intent response — a real
+  //      AI-key call this keyless suite never has. Mocking that one route
+  //      (keeping every other field of /api/ai-config live, overriding
+  //      only llmReady) lets this step drive the REAL component with a
+  //      controlled payload instead of skipping the surface outright.
+  //      A LANE_STANDARD §3 fail-first proof does not apply here — both
+  //      colours are already fixed on this tree, nothing to show failing —
+  //      so instead this step proves it reached the intended, narrowly-
+  //      scoped nodes (not zero, not the whole page) by logging the node
+  //      count and the measured ratio at every step.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== 10d) Sidebar character-count caption + StateDeltaCard Dramatic Irony, both themes ===');
+  const context10d = await browser.newContext();
+  const page10d = await context10d.newPage();
+  wireConsoleCapture(page10d, genuineConsoleErrors);
+  await page10d.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch { /* noop */ } });
+  await page10d.route('**/api/ai-config', async (route) => {
+    const response = await route.fetch();
+    const json = await response.json().catch(() => ({}));
+    await route.fulfill({ response, json: { ...json, llmReady: true } });
+  });
+  await page10d.route('**/api/live/intent', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      intent: { riskCategory: 'C' },
+      card: {
+        action: 'verify-a11y probe: a mocked state delta with dramatic irony',
+        effects: [],
+        requiresConfirmation: true,
+        dramaticIrony: true,
+      },
+    }),
+  }));
+  await page10d.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  const startFresh10d = page10d.getByRole('button', { name: /start fresh/i }).first();
+  const startReachable10d = await startFresh10d.waitFor({ timeout: timing.ms(15000) }).then(() => true).catch(() => false);
+  record('sidebar-counter-gate', 'the editor is reachable via "Start fresh"', startReachable10d);
+  if (startReachable10d) {
+    await startFresh10d.click();
+    await page10d.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
+  }
+
+  // ── Sidebar character-count caption: Characters tab -> Add Character ->
+  //    type past the warn/max thresholds on the Ghost field. ─────────────
+  const charactersTab10d = page10d.getByRole('tab', { name: /characters/i }).first();
+  const sidebarReachable10d = await charactersTab10d.waitFor({ timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+  record('sidebar-counter-gate', 'the Characters tab is reachable', sidebarReachable10d);
+  let ghostField10d = null;
+  if (sidebarReachable10d) {
+    await charactersTab10d.click();
+    await page10d.getByRole('button', { name: 'Add Character' }).first().click();
+    ghostField10d = page10d.getByPlaceholder('What haunts them?').first();
+    const ghostVisible = await ghostField10d.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+    record('sidebar-counter-gate', 'the new character\'s Ghost field is reachable', ghostVisible);
+    if (!ghostVisible) ghostField10d = null;
+  }
+
+  // ── StateDeltaCard: type a line into the editor, wait for the mocked
+  //    /api/live/intent response's debounced round-trip. ─────────────────
+  const cm10d = page10d.locator('.cm-content').first();
+  const editorReady10d = await cm10d.waitFor({ state: 'visible', timeout: timing.ms(10000) }).then(() => true).catch(() => false);
+  record('state-delta-gate', 'the editor is reachable to type a triggering line', editorReady10d);
+  if (editorReady10d) {
+    // .focus() (a real DOM focus call), not .click() — the empty-editor
+    // placeholder overlay ("Type or paste Fountain format:") sits on top
+    // of .cm-content until it has content, and a real pointer click there
+    // gets intercepted by that overlay (the same reason every other probe
+    // in this codebase that types into a fresh editor uses .focus()).
+    await cm10d.focus();
+    await page10d.keyboard.insertText('MARA picks up the letter and reads it silently, alone.');
+  }
+  const deltaCardHeading10d = page10d.getByText('State Delta Proposal', { exact: true }).first();
+  const deltaCardReachable10d = editorReady10d
+    ? await deltaCardHeading10d.waitFor({ timeout: timing.ms(10000) }).then(() => true).catch(() => false)
+    : false;
+  record('state-delta-gate', 'the mocked /api/live/intent response renders a StateDeltaCard', deltaCardReachable10d);
+  const ironyCallout10d = page10d.getByText('Dramatic Irony:', { exact: false }).locator('..').first();
+
+  for (const mode of ['light', 'dark']) {
+    if (mode === 'dark') {
+      await page10d.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+      await page10d.waitForTimeout(timing.ms(300));
+    }
+
+    if (ghostField10d) {
+      // near-limit (yellow/amber-800) — Sidebar.tsx's LONG_FIELD_WARN_THRESHOLD
+      // is 450, LONG_FIELD_MAX is 500; 460 sits in the warn band without
+      // hitting the red at-limit band below.
+      // eslint-disable-next-line no-await-in-loop
+      await ghostField10d.fill('x'.repeat(460));
+      const nearCaption10d = page10d.locator('p[id^="count-"]').first();
+      // eslint-disable-next-line no-await-in-loop
+      const nearVisible10d = await nearCaption10d.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+      record('sidebar-counter-gate', `${mode}: near-limit caption renders`, nearVisible10d);
+      if (nearVisible10d) {
+        // eslint-disable-next-line no-await-in-loop
+        const m = await nearCaption10d.evaluate(measureContrastNode);
+        console.log(`  [${mode}] Sidebar near-limit caption — ${m.ratio}:1, ${m.nodeCount} node(s) in scope — ${m.fg} on ${m.bg} — "${m.text}"`);
+        // eslint-disable-next-line no-await-in-loop
+        await auditElement(page10d, nearCaption10d, `${mode}-sidebar-near-limit-caption`);
+      }
+
+      // at/over-limit (red/red-700) — Sidebar.tsx's LONG_FIELD_MAX (500).
+      // eslint-disable-next-line no-await-in-loop
+      await ghostField10d.fill('x'.repeat(500));
+      const atLimitCaption10d = page10d.locator('p[id^="count-"]').first();
+      // eslint-disable-next-line no-await-in-loop
+      const atLimitVisible10d = await atLimitCaption10d.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+      record('sidebar-counter-gate', `${mode}: at-limit caption renders`, atLimitVisible10d);
+      if (atLimitVisible10d) {
+        // eslint-disable-next-line no-await-in-loop
+        const m = await atLimitCaption10d.evaluate(measureContrastNode);
+        console.log(`  [${mode}] Sidebar at-limit caption — ${m.ratio}:1, ${m.nodeCount} node(s) in scope — ${m.fg} on ${m.bg} — "${m.text}"`);
+        // eslint-disable-next-line no-await-in-loop
+        await auditElement(page10d, atLimitCaption10d, `${mode}-sidebar-at-limit-caption`);
+      }
+    }
+
+    if (deltaCardReachable10d) {
+      // eslint-disable-next-line no-await-in-loop
+      const ironyVisible10d = await ironyCallout10d.waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
+      record('state-delta-gate', `${mode}: the Dramatic Irony callout renders`, ironyVisible10d);
+      if (ironyVisible10d) {
+        // eslint-disable-next-line no-await-in-loop
+        const m = await ironyCallout10d.evaluate(measureContrastNode);
+        console.log(`  [${mode}] StateDeltaCard Dramatic Irony — ${m.ratio}:1, ${m.nodeCount} node(s) in scope — ${m.fg} on ${m.bg} — "${m.text}"`);
+        // eslint-disable-next-line no-await-in-loop
+        await auditElement(page10d, ironyCallout10d, `${mode}-state-delta-dramatic-irony`);
+      }
+    }
+  }
+  await context10d.close();
 
   // ── Console errors, same convention as the rest of the browser battery. ─
   if (genuineConsoleErrors.length > 0) {
