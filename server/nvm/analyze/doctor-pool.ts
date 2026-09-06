@@ -49,13 +49,18 @@
 //      down; the fallback is what makes that guarantee, and
 //      DOCTOR_WORKER_POOL=off exercises the same path by hand.
 //
-//   5. A BOUNDED WALL CLOCK (Decision #7, 2026-09-06). One analysis may not
-//      occupy a worker indefinitely. The budget, its default (30 s) and the
-//      derivation of that number live in server/lib/doctor-budget.ts; the
-//      enforcement lives here, and it reuses property 2's primitive rather
-//      than inventing a second kind of cancellation. Like Cancel, it applies
-//      to the WORKER path only — see armAnalysisBudget()'s comment for why
-//      the in-process fallback deliberately has no budget.
+//   5. A BOUNDED WALL CLOCK (Decision #7, 2026-09-06, as amended by its
+//      round-2 review). A submission may not wait, or run, indefinitely —
+//      and those are TWO bounds, not one, because only the second is a
+//      property of the draft: DOCTOR_QUEUE_BUDGET_MS (60 s) bounds the wait
+//      for a free worker and answers 503 + Retry-After with a contention
+//      sentence; DOCTOR_ANALYSIS_BUDGET_MS (30 s) bounds occupancy once
+//      running and answers 400 with the analysis sentence. Both numbers and
+//      both sentences live in server/lib/doctor-budget.ts; the enforcement
+//      lives here, and the running half reuses property 2's primitive rather
+//      than inventing a second kind of cancellation. Like Cancel, both apply
+//      to the WORKER path only — see armQueueBudget()'s comment for why the
+//      in-process fallback deliberately has no budget.
 //
 // Deep read (opts.deepRead) deliberately does NOT go through the pool: it
 // fans out LLM calls whose budget/abort machinery (withAiBudget's
@@ -67,7 +72,7 @@
 import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import { logger } from '../../lib/logger.ts';
-import { DoctorAnalysisBudgetExceededError, doctorAnalysisBudgetMs } from '../../lib/doctor-budget.ts';
+import { DoctorAnalysisBudgetExceededError, doctorAnalysisBudgetMs, doctorQueueBudgetMs } from '../../lib/doctor-budget.ts';
 import type { StoryContext } from '../revision/passes/types.ts';
 import type { ScriptDoctorReport, DoctorProgressEvent } from './types.ts';
 import type { DoctorWorkerRequest, DoctorWorkerResponse } from './doctor-worker.ts';
@@ -104,15 +109,20 @@ interface PendingJob {
   onProgress?: (event: DoctorProgressEvent) => void;
   resolve: (report: ScriptDoctorReport) => void;
   reject: (err: unknown) => void;
-  /** Per-analysis wall-clock budget timer (Decision #7, 2026-09-06 — see
-   *  server/lib/doctor-budget.ts for the number and its derivation). Armed
-   *  when the job is SUBMITTED, not when it is dispatched: the writer's wait
-   *  includes the time this job spends queued behind another, and the
-   *  reviewer who asked for this named it a pool-sizing question precisely
-   *  because queueing is the other half of it. Absent when the budget is
-   *  switched off, and never armed on the in-process path — see
-   *  armAnalysisBudget below. */
-  budgetTimer?: NodeJS.Timeout;
+  /** QUEUE-wait budget timer (Decision #7 as amended by its round-2 review,
+   *  2026-09-06). Armed at SUBMISSION, cleared at dispatch. Bounds how long
+   *  this job waits for a free worker — contention, not the draft's cost, so
+   *  it has its own larger default and its own 503 + Retry-After answer. See
+   *  server/lib/doctor-budget.ts's "TWO BUDGETS, NOT ONE". */
+  queueTimer?: NodeJS.Timeout;
+  /** RUNNING budget timer. Armed at DISPATCH, cleared on settlement. Bounds
+   *  how long this analysis may OCCUPY a worker — the draft's own cost, so it
+   *  keeps the 400. Round 1 used one timer from submission for both, which
+   *  made the running sentence render for jobs that had never run. */
+  runTimer?: NodeJS.Timeout;
+  /** Date.now() at dispatch — feeds the EWMA behind the queued case's
+   *  Retry-After estimate. */
+  startedAt?: number;
 }
 
 interface WorkerSlot {
@@ -157,15 +167,61 @@ function abortReasonToError(signal: AbortSignal): unknown {
 // the WAIT without stopping the WORK, which is the failure this exists to
 // prevent, not a milder version of it.
 
-/** Arm the budget for one submitted job. No-op when the budget is switched
- *  off (`DOCTOR_ANALYSIS_BUDGET_MS=0`/`off`), and never called on the
- *  in-process path (deep read, `DOCTOR_WORKER_POOL=off`, or a host that
- *  cannot spawn a worker): there is no thread to terminate there, exactly as
- *  there is nothing for Cancel to terminate there, and rejecting a caller
- *  while the main thread keeps running the analysis to completion would be a
- *  lie the pool can afford even less than the wait. */
-function armAnalysisBudget(job: PendingJob): void {
-  const budgetMs = doctorAnalysisBudgetMs();
+// Round-2 amendment: there are TWO budgets, because a submission spends its
+// wall clock in two places that mean different things. Round 1 armed one
+// timer at submission and rejected both with the same error, so the running
+// sentence ("This draft took longer to analyze … split the draft into shorter
+// files") rendered for jobs that had never run — reproduced at 40 of 60
+// concurrent legitimate 346 KB features on a 2-worker pool. See
+// server/lib/doctor-budget.ts's "TWO BUDGETS, NOT ONE" for the split, the
+// numbers and the status codes.
+
+/** Mean recent job duration, for the queued case's `Retry-After` estimate.
+ *  An EWMA over completed analyses rather than a running average: the useful
+ *  estimate is "what is this pool doing NOW", and a long-lived server that
+ *  averaged over its whole history would answer with last week's workload.
+ *  Seeded at 2,000 ms — the measured solo cost of the heavy-but-legitimate
+ *  346 KB feature the round-2 review used (1.7-3.2 s) — so the very first
+ *  contention answer is grounded rather than zero. */
+const RETRY_AFTER_SEED_JOB_MS = 2_000;
+const RETRY_AFTER_EWMA_ALPHA = 0.25;
+let meanJobMs = RETRY_AFTER_SEED_JOB_MS;
+
+function recordJobDuration(startedAt: number): void {
+  const elapsed = Date.now() - startedAt;
+  if (elapsed <= 0) return;
+  meanJobMs = Math.round(RETRY_AFTER_EWMA_ALPHA * elapsed + (1 - RETRY_AFTER_EWMA_ALPHA) * meanJobMs);
+}
+
+/** Seconds to put in `Retry-After` (and in the queued sentence, so the SSE
+ *  path — which cannot send a header once its stream has opened — carries the
+ *  same number). Derived from what the pool is actually carrying: the work
+ *  still ahead (queued jobs plus the ones on workers now), divided by the
+ *  pool size, times the mean recent job time.
+ *
+ *  Capped at 120 s and floored at 1 s. The cap is not arbitrary: past the
+ *  client's own diagnosis watchdog the number stops being actionable advice
+ *  and starts being a number nobody can act on, so the estimate says "two
+ *  minutes" rather than an honest-but-useless "nine minutes". */
+const RETRY_AFTER_MAX_SECONDS = 120;
+
+function estimateRetryAfterSeconds(): number {
+  const busy = slots.filter(s => s.active).length;
+  const ahead = queue.length + busy;
+  const size = Math.max(1, configuredPoolSize());
+  const estimateMs = Math.ceil(ahead / size) * meanJobMs;
+  return Math.min(RETRY_AFTER_MAX_SECONDS, Math.max(1, Math.ceil(estimateMs / 1000)));
+}
+
+/** Arm the QUEUE-wait budget for one submitted job. No-op when it is switched
+ *  off (`DOCTOR_QUEUE_BUDGET_MS=0`/`off`), and never called on the in-process
+ *  path (deep read, `DOCTOR_WORKER_POOL=off`, or a host that cannot spawn a
+ *  worker): there is no thread to terminate there, exactly as there is nothing
+ *  for Cancel to terminate there, and rejecting a caller while the main thread
+ *  keeps running the analysis to completion would be a lie the pool can afford
+ *  even less than the wait. */
+function armQueueBudget(job: PendingJob): void {
+  const budgetMs = doctorQueueBudgetMs();
   if (budgetMs <= 0) return;
   // Deliberately NOT `.unref()`'d — same reasoning warmDoctorPool()'s
   // deadline timer documents below: this timer backs a guarantee a caller is
@@ -173,29 +229,55 @@ function armAnalysisBudget(job: PendingJob): void {
   // event loop draining and never fire at all. It cannot hold a process open
   // beyond the job it bounds, because clearAnalysisBudget() runs on EVERY
   // settlement path (the job's own resolve/reject are wrapped in
-  // runScriptDoctorOffThread below).
-  job.budgetTimer = setTimeout(() => onAnalysisBudgetExceeded(job, budgetMs), budgetMs);
+  // runScriptDoctorOffThread below) and dispatch() clears it besides.
+  job.queueTimer = setTimeout(() => onQueueBudgetExceeded(job, budgetMs), budgetMs);
 }
 
+/** Arm the RUNNING budget, at dispatch — this is the one that bounds worker
+ *  occupancy, and the one whose 400 Decision #7 argued for. */
+function armRunBudget(job: PendingJob): void {
+  const budgetMs = doctorAnalysisBudgetMs();
+  if (budgetMs <= 0) return;
+  job.runTimer = setTimeout(() => onRunBudgetExceeded(job, budgetMs), budgetMs);
+}
+
+function clearQueueBudget(job: PendingJob): void {
+  if (job.queueTimer) {
+    clearTimeout(job.queueTimer);
+    job.queueTimer = undefined;
+  }
+}
+
+/** Disarm everything this job has armed. Called on every settlement path, and
+ *  on each of the in-process carve-outs. */
 function clearAnalysisBudget(job: PendingJob): void {
-  if (job.budgetTimer) {
-    clearTimeout(job.budgetTimer);
-    job.budgetTimer = undefined;
+  clearQueueBudget(job);
+  if (job.runTimer) {
+    clearTimeout(job.runTimer);
+    job.runTimer = undefined;
   }
 }
 
-/** The budget fired. Two states are possible and both are handled, because a
- *  job that is still QUEUED has also been costing the writer wall clock:
- *  drop it from the queue, or terminate the worker running it exactly the way
- *  dispatch()'s onAbort does. */
-function onAnalysisBudgetExceeded(job: PendingJob, budgetMs: number): void {
+/** The QUEUE budget fired: this job never reached a worker. Drop it from the
+ *  FIFO and answer 503 with a contention sentence and a Retry-After estimate.
+ *  If it is no longer in the queue it was dispatched in the meantime and
+ *  dispatch() has already cleared this timer — a fired-but-not-yet-run timer
+ *  cannot be un-fired, so do nothing rather than reject a running job with
+ *  the wrong half of the mechanism. */
+function onQueueBudgetExceeded(job: PendingJob, budgetMs: number): void {
   const queuedAt = queue.indexOf(job);
-  if (queuedAt >= 0) {
-    queue.splice(queuedAt, 1);
-    logger.warn('doctor_analysis_budget_exceeded', { budgetMs, state: 'queued' });
-    job.reject(new DoctorAnalysisBudgetExceededError(budgetMs));
-    return;
-  }
+  if (queuedAt < 0) return;
+  queue.splice(queuedAt, 1);
+  const retryAfterSeconds = estimateRetryAfterSeconds();
+  logger.warn('doctor_analysis_budget_exceeded', {
+    budgetMs, state: 'queued', retryAfterSeconds, queued: queue.length, meanJobMs,
+  });
+  job.reject(new DoctorAnalysisBudgetExceededError(budgetMs, 'queued', retryAfterSeconds));
+}
+
+/** The RUNNING budget fired: terminate the worker exactly the way dispatch()'s
+ *  onAbort does, and answer 400 with the analysis sentence. */
+function onRunBudgetExceeded(job: PendingJob, budgetMs: number): void {
   const slot = slots.find(s => s.active?.job === job);
   const active = slot?.active;
   // Already settled (result, error, abort or shutdown won the race) — the
@@ -209,7 +291,7 @@ function onAnalysisBudgetExceeded(job: PendingJob, budgetMs: number): void {
   dropSlot(slot);
   void slot.worker.terminate();
   logger.warn('doctor_analysis_budget_exceeded', { budgetMs, state: 'running' });
-  job.reject(new DoctorAnalysisBudgetExceededError(budgetMs));
+  job.reject(new DoctorAnalysisBudgetExceededError(budgetMs, 'running'));
   pump();
 }
 
@@ -277,6 +359,11 @@ function finishJob(slot: WorkerSlot, settle: () => void): void {
   if (active?.onAbort && active.job.signal) {
     active.job.signal.removeEventListener('abort', active.onAbort);
   }
+  // Feed the Retry-After estimate from real completions only — a job that was
+  // cancelled, terminated by a budget, or killed with its worker never
+  // reaches here, so a queue of stopped jobs cannot teach the pool that
+  // analyses are instant.
+  if (active?.job.startedAt !== undefined) recordJobDuration(active.job.startedAt);
   slot.active = undefined;
   setBusy(slot, false);
   settle();
@@ -380,6 +467,14 @@ function dispatch(slot: WorkerSlot, job: PendingJob): void {
   clearIdleTimer(slot);
   setBusy(slot, true);
   const id = nextRequestId++;
+  // The two budgets hand over here, synchronously, before postMessage: from
+  // this line on the job is RUNNING, so the queue-wait timer is disarmed and
+  // the occupancy timer takes over. Doing it in this order is what makes
+  // onQueueBudgetExceeded's "no longer in the queue -> do nothing" branch a
+  // safety net rather than the normal path.
+  clearQueueBudget(job);
+  armRunBudget(job);
+  job.startedAt = Date.now();
 
   if (job.signal) {
     const onAbort = () => {
@@ -481,7 +576,7 @@ export async function runScriptDoctorOffThread(
       resolve: (settled) => { clearAnalysisBudget(job); resolve(settled); },
       reject: (err) => { clearAnalysisBudget(job); reject(err); },
     };
-    armAnalysisBudget(job);
+    armQueueBudget(job);
     queue.push(job);
     pump();
   });
@@ -540,14 +635,22 @@ export function purgeDoctorWorkers(): number {
 
 /** Introspection for tests: whether the pool is actually carrying work, or
  *  has fallen back to in-process execution. */
-export function doctorPoolStatus(): { enabled: boolean; disabled: boolean; workers: number; queued: number; analysisBudgetMs: number } {
+export function doctorPoolStatus(): {
+  enabled: boolean; disabled: boolean; workers: number; queued: number;
+  analysisBudgetMs: number; queueBudgetMs: number; retryAfterSeconds: number;
+} {
   return {
     enabled: poolEnabled(),
     disabled: poolDisabled,
     workers: slots.length,
     queued: queue.length,
-    // Decision #7: 0 means the operator switched the per-analysis budget off.
+    // Decision #7: 0 on either of these means the operator switched that
+    // half of the budget off. `retryAfterSeconds` is what a contention
+    // rejection would advise right now, which is also the cheapest way for a
+    // test to observe the estimator without provoking a rejection.
     analysisBudgetMs: doctorAnalysisBudgetMs(),
+    queueBudgetMs: doctorQueueBudgetMs(),
+    retryAfterSeconds: estimateRetryAfterSeconds(),
   };
 }
 

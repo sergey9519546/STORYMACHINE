@@ -635,6 +635,92 @@ overrule me if it wants the literal criterion applied").
 
 **Status**: Active.
 
+**Amendment (2026-09-06) — the budget is TWO budgets, because the wait has two
+halves and only one of them is the draft's fault.** This decision as first
+written armed ONE timer at submission, covering queue wait and execution
+together, and answered both with the same error, the same sentence and the
+same 400. The independent review of that build produced the state where that
+is untrue and measured it: **60 concurrent distinct 346 KB features** (each
+~2–3 s solo, half of `gameLimiter`'s own per-IP allowance, nothing oversized
+anywhere) against a default 2-worker pool. The reviewer's box shed 6 of 60 at
+~34,455 ms; re-run on this lane's box, **40 of 60** were rejected at ~34,800 ms
+reading *"This draft took longer to analyze than this server's per-analysis
+budget (30s) … split the draft into shorter files."* For those requests every
+clause of it is false: the draft never ran, it is not slow, and splitting it
+addresses nothing. `NORTH_STAR`-adjacent but decisive here is LANE_STANDARD §2
+— *a sentence that promises something must be true in every state that renders
+it* — and this is a **registered** claim, so the ledger the honesty audit
+exists to protect was carrying a falsehood.
+
+**What changes**:
+
+- **`DOCTOR_ANALYSIS_BUDGET_MS` (30,000 ms) now bounds EXECUTION only**, armed
+  at dispatch. Everything this entry says above about its derivation, its
+  status (**400**) and its sentence (row 72) is unchanged and now applies to
+  exactly the state it was reasoned about: an analysis actually occupying a
+  worker. The rejection of a 5xx for this half — *"it invites a blind retry of
+  what is, for the same draft on the same server, a deterministic outcome"* —
+  stands.
+- **`DOCTOR_QUEUE_BUDGET_MS` (60,000 ms) is new** and bounds the WAIT for a
+  free worker, armed at submission and disarmed at dispatch. It answers
+  **503** with a `Retry-After` header and **its own registered sentence**
+  (row 73), which names the server, states plainly that nothing is wrong with
+  the draft, gives no "split the draft" advice, and says when to come back.
+  503 is right here for the reasons 400 is right there, inverted: a queued
+  rejection is **not** deterministic, retrying later is exactly the correct
+  client behaviour, and a 4xx additionally files server contention inside
+  client-error metrics where no operator would look for it. The `Retry-After`
+  number is derived from what the pool is actually carrying — (queued jobs +
+  busy workers) ÷ pool size × an EWMA of recent job durations — floored at 1 s
+  and capped at 120 s, past which it stops being advice anyone can act on. The
+  SSE route cannot send a header after its stream opens, so the queued
+  sentence carries that same estimate **in words**; the panel's Retry stays
+  enabled either way.
+
+**Should the queued half have its own, larger budget at all?** Yes — this is
+the substantive design call in the amendment, and it is set by arithmetic with
+a measurement as the check, not the other way round.
+
+- **Ceiling (binding):** the two budgets COMPOSE — a job admitted at 59.9 s
+  still gets its full 30 s — so `queue + running` must stay under the panel's
+  own 120 s diagnosis watchdog, or a contended writer meets the generic
+  "Diagnosis timed out (120s)" copy instead of a registered sentence.
+  60 + 30 = 90 s leaves 30 s of margin, and a test asserts that sum.
+- **Floor (measured):** re-running the same 60-concurrent burst on the same
+  box with only this changed — round 1's single 30 s budget vs. a 60 s queue
+  budget — **20 of 60 scored / 40 rejected (all 40 with the false sentence)**
+  became **34 of 60 scored / 26 rejected with an honest 503 and `Retry-After`
+  5–66 s**. Fourteen requests that were being shed are now served, and the
+  rest are labelled truthfully.
+- **What is deliberately NOT claimed:** that 60 s admits any burst. It does
+  not, and no value under the 120 s watchdog could — 60 feature-length
+  submissions at ~2–3 s each on 2 workers need well over 100 s to drain, past
+  the point where the writer's own client has already given up. Sixty
+  concurrent feature-length analyses against a 2-worker pool is genuinely past
+  capacity, and shedding the overflow with 503 + `Retry-After` is the correct
+  answer rather than a shortfall of this number. The remedy for a deployment
+  that meets these 503s under ordinary load is `DOCTOR_WORKER_POOL_SIZE`, and
+  README's env table says so at the row.
+
+Note that occupancy is bounded **tighter** by this split, not looser: 30 s now
+measures execution alone rather than execution plus however long the queue
+happened to be.
+
+**What the amendment does NOT change**: the derivation of the 30 s number, the
+no-fire table, the worker-path-only carve-out, the "nothing is deleted"
+posture, or anything on the scoring path (`check-scoring-receipt` still
+reports no scoring-path files changed; output identity is still 45/45
+byte-identical).
+
+**Evidence for the amendment**: `tests/core/doctor-analysis-budget.test.ts`
+(the queued case gets state `queued`/503/`Retry-After` and never row 72's
+sentence; the two sentences are asserted to be different strings; the
+budget sum is asserted against the client watchdog) and
+`tests/routes/doctor-analysis-budget.test.ts` (a burst behind one busy worker
+is shed 503 with the header and the sentence agreeing on the same number, on
+both the JSON and the SSE route). Both were confirmed to FAIL against the
+round-1 behaviour before passing against this one.
+
 ---
 
 ## Decision Template (for future entries)

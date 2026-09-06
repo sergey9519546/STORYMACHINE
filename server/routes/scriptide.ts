@@ -745,17 +745,27 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
       // guard already makes this a no-op, but skip the logger.error call too:
       // a cancelled analysis is expected traffic, not a fault to log as one.
     } else if (isDoctorAnalysisBudgetExceeded(err)) {
-      // Decision #7 (2026-09-06): the per-analysis wall-clock budget fired
-      // and doctor-pool.ts terminated the worker. The JSON routes get this
-      // as a 400 from server/app.ts's global error handler; this route has
-      // already flushed SSE headers, so it cannot send a status — it sends
-      // the SAME registered sentence (docs/CLAIMS_REGISTER.md row 72) in the
-      // `doctor_error` frame the client already renders verbatim
-      // (src/lib/doctor-stream.ts throws `new Error(serverError)`, and
-      // ScriptDoctorPanel's error state prints it beside a Retry). Logged at
-      // `warn` with the same event name the pool uses, never `sse-error`: a
-      // bound doing its job is not a fault.
-      logger.warn('doctor_analysis_budget_rejected', { route: 'scriptide-doctor-stream', budgetMs: err.budgetMs });
+      // Decision #7 (2026-09-06, round-2 amendment): one of the two
+      // wall-clock budgets fired — either doctor-pool.ts terminated the
+      // worker mid-analysis (`running`) or the submission never reached one
+      // under contention (`queued`). The JSON routes get 400 or 503 from
+      // server/app.ts's global error handler; this route has already flushed
+      // SSE headers, so it can send neither a status nor a `Retry-After`.
+      // The DISTINCTION still reaches the writer, because the two states
+      // carry two different registered sentences (docs/CLAIMS_REGISTER.md
+      // rows 72 and 73) and the queued one says its retry estimate in words
+      // for exactly this transport — sent in the `doctor_error` frame the
+      // client already renders verbatim (src/lib/doctor-stream.ts throws
+      // `new Error(serverError)`, and ScriptDoctorPanel's error state prints
+      // it beside an enabled Retry). Logged at `warn` with the same event
+      // name the pool uses, never `sse-error`: a bound doing its job is not
+      // a fault.
+      logger.warn('doctor_analysis_budget_rejected', {
+        route: 'scriptide-doctor-stream',
+        budgetMs: err.budgetMs,
+        state: err.state,
+        ...(err.retryAfterSeconds !== undefined ? { retryAfterSeconds: err.retryAfterSeconds } : {}),
+      });
       emitSSE({ type: 'doctor_error', error: err.message });
     } else {
       logger.error('sse-error', { route: 'scriptide-doctor-stream', detail: (err as Error).message });

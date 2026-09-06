@@ -32,11 +32,15 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  CLIENT_DIAGNOSIS_WATCHDOG_MS,
   DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS,
   DOCTOR_ANALYSIS_BUDGET_ERROR_NAME,
+  DOCTOR_QUEUE_BUDGET_DEFAULT_MS,
   DoctorAnalysisBudgetExceededError,
   doctorAnalysisBudgetMs,
   doctorAnalysisBudgetSentence,
+  doctorQueueBudgetMs,
+  doctorQueueBudgetSentence,
   isDoctorAnalysisBudgetExceeded,
 } from '../../server/lib/doctor-budget.ts';
 import { runScriptDoctorOffThread, shutdownDoctorPool, doctorPoolStatus } from '../../server/nvm/analyze/doctor-pool.ts';
@@ -49,17 +53,22 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const tinyScript = (tag: string): string =>
   `INT. ROOM ${tag} - DAY\n\nA figure waits by the window.\n\nALEX\nWe should go.\n\nSAM\nNot yet.\n`;
 
-function withBudgetEnv<T>(value: string | undefined, fn: () => T): T {
-  const previous = process.env.DOCTOR_ANALYSIS_BUDGET_MS;
-  if (value === undefined) delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
-  else process.env.DOCTOR_ANALYSIS_BUDGET_MS = value;
+function withEnv<T>(name: string, value: string | undefined, fn: () => T): T {
+  const previous = process.env[name];
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
   try {
     return fn();
   } finally {
-    if (previous === undefined) delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
-    else process.env.DOCTOR_ANALYSIS_BUDGET_MS = previous;
+    if (previous === undefined) delete process.env[name];
+    else process.env[name] = previous;
   }
 }
+
+const withBudgetEnv = <T>(value: string | undefined, fn: () => T): T =>
+  withEnv('DOCTOR_ANALYSIS_BUDGET_MS', value, fn);
+const withQueueBudgetEnv = <T>(value: string | undefined, fn: () => T): T =>
+  withEnv('DOCTOR_QUEUE_BUDGET_MS', value, fn);
 
 describe('doctorAnalysisBudgetMs — configuration', () => {
   it('defaults to the shipped 30s budget when the env var is unset or empty', () => {
@@ -91,19 +100,55 @@ describe('doctorAnalysisBudgetMs — configuration', () => {
     }
   });
 
-  it('stays below the client-side 120s diagnosis watchdog, or the writer never sees the sentence', () => {
+  it('stays below the client-side 120s diagnosis watchdog — and so does the SUM of the two budgets', () => {
     // src/components/scriptide/ScriptDoctorPanel.tsx aborts a diagnosis after
-    // 120s and prints its own "Diagnosis timed out (120s)" copy. A budget at
-    // or above that would be dead code from the writer's point of view.
+    // 120s and prints its own "Diagnosis timed out (120s)" copy. The budgets
+    // COMPOSE: a job admitted at the last moment of the queue budget then
+    // gets its full running budget, so it is the sum that has to stay inside
+    // the watchdog or a contended request meets the panel's generic timeout
+    // instead of one of the registered sentences.
+    assert.equal(CLIENT_DIAGNOSIS_WATCHDOG_MS, 120_000);
+    assert.ok(DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS < CLIENT_DIAGNOSIS_WATCHDOG_MS);
+    assert.ok(DOCTOR_QUEUE_BUDGET_DEFAULT_MS < CLIENT_DIAGNOSIS_WATCHDOG_MS);
     assert.ok(
-      DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS < 120_000,
-      'the default budget must fire before the panel\'s own 120s watchdog',
+      DOCTOR_QUEUE_BUDGET_DEFAULT_MS + DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS < CLIENT_DIAGNOSIS_WATCHDOG_MS,
+      `queue + running (${DOCTOR_QUEUE_BUDGET_DEFAULT_MS + DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms) must stay inside the panel's ${CLIENT_DIAGNOSIS_WATCHDOG_MS}ms watchdog`,
     );
   });
 
-  it('doctorPoolStatus reports the configured budget, so an operator can confirm what is in force', () => {
+  it('the queue budget is a SEPARATE, larger number — queue wait is contention, not the draft\'s cost', () => {
+    withQueueBudgetEnv(undefined, () => {
+      assert.equal(doctorQueueBudgetMs(), DOCTOR_QUEUE_BUDGET_DEFAULT_MS);
+      assert.equal(DOCTOR_QUEUE_BUDGET_DEFAULT_MS, 60_000);
+    });
+    assert.ok(
+      DOCTOR_QUEUE_BUDGET_DEFAULT_MS > DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS,
+      'a shared or smaller queue budget sheds work the pool could have served — measured on the '
+      + 'round-2 review\'s 60-concurrent burst: 20 scored / 40 rejected at one 30s budget, 34 scored / 26 at 60s',
+    );
+    withQueueBudgetEnv('90000', () => assert.equal(doctorQueueBudgetMs(), 90_000));
+    withQueueBudgetEnv('0', () => assert.equal(doctorQueueBudgetMs(), 0));
+    withQueueBudgetEnv('off', () => assert.equal(doctorQueueBudgetMs(), 0));
+    for (const bad of ['abc', '-5', '9999999999']) {
+      withQueueBudgetEnv(bad, () => assert.equal(doctorQueueBudgetMs(), DOCTOR_QUEUE_BUDGET_DEFAULT_MS));
+    }
+  });
+
+  it('doctorPoolStatus reports both configured budgets, so an operator can confirm what is in force', () => {
     withBudgetEnv('12345', () => assert.equal(doctorPoolStatus().analysisBudgetMs, 12_345));
     withBudgetEnv('off', () => assert.equal(doctorPoolStatus().analysisBudgetMs, 0));
+    withQueueBudgetEnv('23456', () => assert.equal(doctorPoolStatus().queueBudgetMs, 23_456));
+    withQueueBudgetEnv('off', () => assert.equal(doctorPoolStatus().queueBudgetMs, 0));
+  });
+
+  it('the Retry-After estimate is bounded and actionable on an idle pool', () => {
+    // Idle pool: nothing queued, nothing busy -> the smallest honest answer,
+    // never 0 (a Retry-After of 0 invites an immediate retry storm) and never
+    // past the client watchdog (a number nobody can act on).
+    const seconds = doctorPoolStatus().retryAfterSeconds;
+    assert.ok(Number.isInteger(seconds), 'Retry-After must be whole seconds');
+    assert.ok(seconds >= 1, `Retry-After must never be 0, got ${seconds}`);
+    assert.ok(seconds <= CLIENT_DIAGNOSIS_WATCHDOG_MS / 1000, `Retry-After must stay actionable, got ${seconds}`);
   });
 });
 
@@ -122,10 +167,42 @@ describe('the budget error — one registered sentence, recognizable across modu
     assert.doesNotMatch(sentence, /will succeed|too large|invalid|malformed/i);
   });
 
-  it('is recognized by name as well as by prototype', () => {
+  it('the QUEUED sentence names the server, clears the draft, and gives a retry time', () => {
+    const sentence = doctorQueueBudgetSentence(60_000, 45);
+    assert.match(sentence, /^This server is busy/);
+    assert.match(sentence, /waited longer than the 60s it allows for a free analysis slot/);
+    assert.match(sentence, /the run never started and nothing was scored/);
+    assert.match(sentence, /Nothing is wrong with the draft/);
+    assert.match(sentence, /try again in about 45 seconds\./);
+    // The round-2 blocker in one assertion: none of the running sentence's
+    // draft-blaming clauses may appear on a job that never ran.
+    assert.doesNotMatch(sentence, /split the draft/);
+    assert.doesNotMatch(sentence, /This draft took longer to analyze/);
+    // Singular/plural, because "1 seconds" is the kind of thing that ships.
+    assert.match(doctorQueueBudgetSentence(60_000, 1), /try again in about 1 second\./);
+  });
+
+  it('the two sentences are genuinely different strings — one state, one wording', () => {
+    assert.notEqual(
+      doctorQueueBudgetSentence(60_000, 30),
+      doctorAnalysisBudgetSentence(30_000),
+    );
+  });
+
+  it('is recognized by name as well as by prototype, and carries the state that decides the status', () => {
     const real = new DoctorAnalysisBudgetExceededError(30_000);
     assert.ok(isDoctorAnalysisBudgetExceeded(real));
+    assert.equal(real.state, 'running', 'the default state is the occupancy one');
     assert.equal(real.status, 400, 'the JSON routes answer with the shape guard\'s own 4xx');
+    assert.equal(real.retryAfterSeconds, undefined, 'no Retry-After on a deterministic outcome');
+    assert.equal(real.message, doctorAnalysisBudgetSentence(30_000));
+
+    const queued = new DoctorAnalysisBudgetExceededError(60_000, 'queued', 45);
+    assert.ok(isDoctorAnalysisBudgetExceeded(queued));
+    assert.equal(queued.state, 'queued');
+    assert.equal(queued.status, 503, 'contention is a server state, and a retry is correct behaviour');
+    assert.equal(queued.retryAfterSeconds, 45);
+    assert.equal(queued.message, doctorQueueBudgetSentence(60_000, 45));
     // A structurally identical error from a second module instance (a worker
     // realm, a differently-specified import) must still be recognized.
     const fromAnotherRealm = new Error('whatever');
@@ -136,78 +213,117 @@ describe('the budget error — one registered sentence, recognizable across modu
   });
 });
 
-describe('the budget fires, and cancels the job the way Cancel does', () => {
+describe('the budgets fire, each in its own state, and cancel the job the way Cancel does', () => {
   before(async () => { await shutdownDoctorPool(); });
   after(async () => {
     delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+    delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+    delete process.env.DOCTOR_WORKER_POOL_SIZE;
     await shutdownDoctorPool();
   });
 
-  it('rejects a RUNNING analysis with the typed error once the budget is crossed', async (t) => {
+  it('a RUNNING analysis past its budget gets the analysis sentence, state "running", 400', async (t) => {
     if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
       // In-process fallback: there is no worker to terminate, which is the
-      // documented carve-out (armAnalysisBudget's own comment), not a gap
-      // this test should paper over.
+      // documented carve-out (armQueueBudget's own comment), not a gap this
+      // test should paper over.
       t.skip('worker pool unavailable in this environment — the budget is a worker-path mechanism');
       return;
     }
     clearDoctorCache();
     process.env.DOCTOR_ANALYSIS_BUDGET_MS = '1';
+    // Queue budget left at its default: this job is dispatched immediately
+    // (pump() runs synchronously on submission), so only the RUNNING budget
+    // can be what stops it — which is exactly the distinction under test.
+    delete process.env.DOCTOR_QUEUE_BUDGET_MS;
     const err = await runScriptDoctorOffThread(tinyScript('running')).then(
       () => null,
       (e: unknown) => e,
     );
-    assert.ok(err, 'expected the 1ms budget to stop the analysis');
+    assert.ok(err, 'expected the 1ms running budget to stop the analysis');
     assert.ok(isDoctorAnalysisBudgetExceeded(err), `expected the budget error, got ${(err as Error)?.name}`);
-    assert.equal((err as DoctorAnalysisBudgetExceededError).budgetMs, 1);
-    assert.match((err as Error).message, /per-analysis budget \(1ms\)/);
+    const budgetErr = err as DoctorAnalysisBudgetExceededError;
+    assert.equal(budgetErr.state, 'running');
+    assert.equal(budgetErr.status, 400);
+    assert.equal(budgetErr.budgetMs, 1);
+    assert.equal(budgetErr.retryAfterSeconds, undefined);
+    assert.match(budgetErr.message, /per-analysis budget \(1ms\)/);
   });
 
-  it('rejects a QUEUED analysis too — a job waiting behind another is also spending the writer\'s wall clock', async (t) => {
+  // ── The round-2 BLOCKER, as a test ────────────────────────────────────────
+  // The reviewer produced it with 60 concurrent distinct 346 KB features on a
+  // 2-worker pool: on this box 40 of the 60 were rejected at ~34.8 s reading
+  // "This draft took longer to analyze … split the draft into shorter files",
+  // for jobs that had never run. The mechanism is identical at any scale —
+  // one worker busy, the rest of the burst waiting — so this reproduces it
+  // deterministically in milliseconds instead of shipping a 35-second,
+  // load-sensitive burst into every CI run. The real 60-concurrent
+  // before/after is in the lane report.
+  it('a QUEUED submission gets the CONTENTION sentence, state "queued", 503 + Retry-After — never the draft sentence', async (t) => {
     if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
       t.skip('worker pool unavailable in this environment');
       return;
     }
     await shutdownDoctorPool();
     clearDoctorCache();
-    const previousSize = process.env.DOCTOR_WORKER_POOL_SIZE;
     process.env.DOCTOR_WORKER_POOL_SIZE = '1';
-    process.env.DOCTOR_ANALYSIS_BUDGET_MS = '1';
+    process.env.DOCTOR_QUEUE_BUDGET_MS = '1';
+    // The running budget stays at its shipped default, so nothing here can be
+    // stopped for occupancy — every rejection below has to be a queue one.
+    delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
     try {
-      // Three submissions, one worker: at least two of them are still in the
-      // FIFO queue when the 1ms timers fire.
+      // Five submissions, one worker: the first is dispatched synchronously,
+      // the other four are still in the FIFO when their 1ms timers fire.
       const settled = await Promise.allSettled([
-        runScriptDoctorOffThread(tinyScript('q1')),
-        runScriptDoctorOffThread(tinyScript('q2')),
-        runScriptDoctorOffThread(tinyScript('q3')),
+        runScriptDoctorOffThread(tinyScript('c1')),
+        runScriptDoctorOffThread(tinyScript('c2')),
+        runScriptDoctorOffThread(tinyScript('c3')),
+        runScriptDoctorOffThread(tinyScript('c4')),
+        runScriptDoctorOffThread(tinyScript('c5')),
       ]);
-      const budgetRejections = settled.filter(
-        (s) => s.status === 'rejected' && isDoctorAnalysisBudgetExceeded(s.reason),
+      const rejections = settled.flatMap((s) => (s.status === 'rejected' ? [s.reason] : []));
+      assert.ok(
+        rejections.length >= 4,
+        `expected the queued submissions to be shed, got ${JSON.stringify(settled.map((s) => s.status))}`,
       );
-      assert.equal(
-        budgetRejections.length, 3,
-        `every submission should have been stopped by the 1ms budget, got ${JSON.stringify(settled.map((s) => s.status))}`,
-      );
+      for (const reason of rejections) {
+        assert.ok(isDoctorAnalysisBudgetExceeded(reason), `expected a budget error, got ${(reason as Error)?.name}`);
+        const err = reason as DoctorAnalysisBudgetExceededError;
+        assert.equal(err.state, 'queued', 'a job that never reached a worker is not a "running" rejection');
+        assert.equal(err.status, 503, 'contention is a server state — a 4xx would file it as a client error');
+        assert.ok(
+          err.retryAfterSeconds !== undefined && err.retryAfterSeconds >= 1,
+          `a 503 must carry an actionable Retry-After, got ${err.retryAfterSeconds}`,
+        );
+        // The blocker itself: NONE of these may render row 72's sentence.
+        assert.match(err.message, /^This server is busy/);
+        assert.doesNotMatch(err.message, /This draft took longer to analyze/);
+        assert.doesNotMatch(err.message, /split the draft/);
+        assert.match(err.message, /Nothing is wrong with the draft/);
+      }
     } finally {
-      if (previousSize === undefined) delete process.env.DOCTOR_WORKER_POOL_SIZE;
-      else process.env.DOCTOR_WORKER_POOL_SIZE = previousSize;
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      delete process.env.DOCTOR_QUEUE_BUDGET_MS;
       await shutdownDoctorPool();
     }
   });
 
-  it('does not fire when the analysis finishes inside the budget — the ordinary path is untouched', async () => {
+  it('does not fire when the analysis finishes inside the budgets — the ordinary path is untouched', async () => {
     clearDoctorCache();
     process.env.DOCTOR_ANALYSIS_BUDGET_MS = String(DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS);
+    process.env.DOCTOR_QUEUE_BUDGET_MS = String(DOCTOR_QUEUE_BUDGET_DEFAULT_MS);
     const report = await runScriptDoctorOffThread(tinyScript('ok'));
     assert.ok(report.contentHash, 'a fast analysis must return its report unchanged');
   });
 
-  it('arms nothing at all when the operator switches the budget off', async () => {
+  it('arms nothing at all when the operator switches the budgets off', async () => {
     clearDoctorCache();
     process.env.DOCTOR_ANALYSIS_BUDGET_MS = 'off';
+    process.env.DOCTOR_QUEUE_BUDGET_MS = 'off';
     assert.equal(doctorPoolStatus().analysisBudgetMs, 0);
-    // With the budget off, even a value that would otherwise stop every run
-    // (1ms, above) cannot: nothing is armed, so this must return a report.
+    assert.equal(doctorPoolStatus().queueBudgetMs, 0);
+    // With both off, even a value that would otherwise stop every run (1ms,
+    // above) cannot: nothing is armed, so this must return a report.
     const report = await runScriptDoctorOffThread(tinyScript('off'));
     assert.ok(report.contentHash);
   });

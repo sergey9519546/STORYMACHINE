@@ -30,12 +30,37 @@ headroom** → ~28 s → 30 s; the same number `DOCTOR_POOL_PREWARM_TIMEOUT_MS`
 already defaults to; and below the panel's own 120 s watchdog so the writer
 reads the honest sentence rather than a generic timeout.
 
-**What the writer sees:** one registered sentence
-(`docs/CLAIMS_REGISTER.md` row 72) in the panel's existing error state beside
-its existing Retry. JSON routes answer `400 { error }` — the same status and
-body shape the shape guard's own analysis-cost 4xx uses; the SSE route, which
-has already flushed headers, sends the identical string in a `doctor_error`
-frame.
+**Two budgets, after the round-2 review (2026-09-06).** The first build armed
+one timer at submission for both the queue wait and the run, so the sentence
+about a slow draft rendered for jobs that had never run — measured at **40 of
+60** concurrent legitimate 346 KB features on a 2-worker pool. The halves are
+now separate, because only one of them is the draft's fault:
+
+| | bounds | default | answer | sentence |
+|---|---|---|---|---|
+| `DOCTOR_ANALYSIS_BUDGET_MS` | worker **occupancy**, from dispatch | 30,000 ms | **400** | row 72 |
+| `DOCTOR_QUEUE_BUDGET_MS` | the **wait** for a worker, from submission | 60,000 ms | **503** + `Retry-After` | row 73 |
+
+400 for the running half because that outcome is deterministic for a given
+draft on a given server (a 5xx would invite a blind retry); 503 for the queued
+half for the mirror reason — contention is not deterministic, a retry IS the
+right client behaviour, and a 4xx would file server contention inside
+client-error metrics. The queue budget is larger on purpose, and its size is
+arithmetic with a measurement as the check: the budgets compose, so
+60 + 30 = 90 s must stay under the panel's 120 s watchdog (a test asserts that
+sum), and re-running the same 60-concurrent burst turned **20 scored / 40
+falsely-blamed 400s** into **34 scored / 26 honest 503s** with `Retry-After`
+5–66 s. It is not claimed that 60 s admits any burst — nothing under the
+watchdog could, and shedding genuine overflow is the right answer; the remedy
+for 503s under ordinary load is `DOCTOR_WORKER_POOL_SIZE`.
+
+**What the writer sees:** one registered sentence per state
+(`docs/CLAIMS_REGISTER.md` rows 72 and 73) in the panel's existing error state
+beside its existing enabled Retry. The queued sentence names the server, says
+plainly that nothing is wrong with the draft, gives no "split the draft"
+advice, and carries the retry estimate in words — which is how the SSE route,
+already past its headers, delivers the same distinction a `Retry-After` header
+gives the JSON routes.
 
 **Deliberate limits, written down rather than discovered:** the budget applies
 to the **worker path only** (with `DOCTOR_WORKER_POOL=off`, on a host that

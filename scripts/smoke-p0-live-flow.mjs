@@ -294,9 +294,16 @@ async function main() {
   // Two assertions, and the second is the one that makes this a live check
   // rather than a string match: the writer must (a) read the honest,
   // registered sentence instead of a bare "Coverage failed", and (b) still
-  // be able to get a report afterwards — the panel is not wedged, and the
-  // tool works again the moment it is pointed at a server with the shipped
-  // budget.
+  // be able to get a real report afterwards.
+  //
+  // Precisely what (b) proves, since "recovers" could be read as the stronger
+  // claim: it does NOT click Retry on the 1 ms server — there, every run
+  // crosses the budget by construction, so a Retry would deterministically
+  // fail again and asserting otherwise would be asserting a falsehood. It
+  // asserts that the panel is left in a working state (an ENABLED Retry, not
+  // a wedged spinner) and that the SAME browser, pointed at the server with
+  // the shipped budget, renders a full report — i.e. nothing about the
+  // stopped run poisons the client.
   const budgetPort = await pickFreePort();
   const budgetBase = `http://127.0.0.1:${budgetPort}`;
   budgetServerProc = await bootKeylessServer({
@@ -339,9 +346,9 @@ async function main() {
   await budgetPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
   const recoveredBody = await waitForRenderedText(budgetPage, EXPECT.verdict, { timeoutMs: 30000 });
   if (!recoveredBody.includes(EXPECT.verdict)) {
-    throw new Error(`per-analysis budget regression: no report after recovering from a stopped run (expected verdict "${EXPECT.verdict}")`);
+    throw new Error(`per-analysis budget regression: the same browser could not get a report from the shipped-budget server after a stopped run (expected verdict "${EXPECT.verdict}")`);
   }
-  console.log('[smoke] recovered after a budget-stopped run: report rendered against the shipped budget.');
+  console.log('[smoke] after a budget-stopped run the panel is left working: same browser, shipped-budget server, full report rendered.');
   await budgetContext.close();
   await shutdown({ serverProc: budgetServerProc, graceMs: 500 });
   budgetServerProc = null;

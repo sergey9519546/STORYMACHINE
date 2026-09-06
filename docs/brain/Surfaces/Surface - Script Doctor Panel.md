@@ -28,20 +28,31 @@ involved.
 **When a run does not finish**
 ([[Decision 7 - Per-Analysis Wall-Clock Budget]], 2026-09-06):
 the analysis runs on a worker thread
-(`server/nvm/analyze/doctor-pool.ts`) under a per-analysis wall-clock budget,
-`DOCTOR_ANALYSIS_BUDGET_MS` (default **30,000 ms** — derived from a measured
-~14 s accepted worst case with 2× headroom, and kept below this panel's own
-120 s diagnosis watchdog so the writer reads the honest sentence rather than
-the generic timeout copy). Crossing it terminates the worker exactly the way
-this panel's **Cancel** button already does, and the writer meets one
-registered sentence (`docs/CLAIMS_REGISTER.md` row 72) in this panel's
-existing error state beside its existing Retry — delivered as `400 { error }`
-on the JSON doctor routes and as a `doctor_error` frame on
-`POST /api/scriptide/doctor/stream`. The budget applies to the **worker path
-only**: with `DOCTOR_WORKER_POOL=off`, on a host that cannot spawn workers, or
-on the deep-read route the analysis runs in-process, where there is nothing to
-terminate — the same carve-out Cancel already has, and the panel's Cancel copy
-already says so.
+(`server/nvm/analyze/doctor-pool.ts`) under **two** wall-clock budgets, and
+which one fires decides what this panel renders:
+
+- **`DOCTOR_ANALYSIS_BUDGET_MS`** (default **30,000 ms**, derived from a
+  measured ~14 s accepted worst case with 2× headroom) bounds how long an
+  analysis may OCCUPY a worker. Crossing it terminates the worker exactly the
+  way this panel's **Cancel** button already does, and the writer meets
+  `docs/CLAIMS_REGISTER.md` **row 72** — `400 { error }` on the JSON doctor
+  routes, a `doctor_error` frame on `POST /api/scriptide/doctor/stream`.
+- **`DOCTOR_QUEUE_BUDGET_MS`** (default **60,000 ms**) bounds how long a
+  submission WAITS for a free worker. That is server contention, not the
+  draft, so it gets **row 73** instead — a different sentence naming the
+  server, with no "split the draft" advice — and **503** with a `Retry-After`
+  the pool estimates from its own queue depth and recent job times. Before
+  this split, 40 of 60 concurrent legitimate requests read row 72's
+  draft-blaming copy for analyses that had never started.
+
+Either way the sentence lands in this panel's existing error state beside its
+existing **enabled** Retry, and the sum of the two budgets is asserted to stay
+under this panel's own 120 s diagnosis watchdog so the writer reads a
+registered sentence rather than the generic timeout copy. Both budgets apply
+to the **worker path only**: with `DOCTOR_WORKER_POOL=off`, on a host that
+cannot spawn workers, or on the deep-read route the analysis runs in-process,
+where there is nothing to terminate — the same carve-out Cancel already has,
+and the panel's Cancel copy already says so.
 
 **Browser suite:** `scripts/verify-p2-p3-surfaces.mjs` (`P2-generative`
 phase drives this panel with Labs on and off from the same starting point);
@@ -57,4 +68,4 @@ recovery.
 - `tests/core/script-doctor.test.ts`,
   `tests/core/doctor-analysis-budget.test.ts`,
   `tests/routes/doctor-analysis-budget.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72 (this panel's claims)
+- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73 (this panel's claims)

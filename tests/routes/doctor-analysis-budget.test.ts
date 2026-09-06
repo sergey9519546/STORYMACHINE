@@ -24,6 +24,10 @@ import { doctorAnalysisBudgetSentence } from '../../server/lib/doctor-budget.ts'
 
 const SCRIPT = 'INT. ROOM - DAY\n\nA figure waits by the window.\n\nALEX\nWe should go.\n\nSAM\nNot yet.\n';
 const SENTENCE_AT_1MS = doctorAnalysisBudgetSentence(1);
+/** Distinct per call so the doctor's content-hash LRU cannot answer a request
+ *  this test needs to reach the pool. */
+const distinctScript = (tag: string): string =>
+  `INT. ROOM ${tag} - DAY\n\nA figure waits by the window.\n\nALEX\nWe should go.\n\nSAM\nNot yet.\n`;
 
 describe('POST /api/scriptide/doctor(/stream) — the per-analysis budget on the wire', () => {
   let server: TestServer;
@@ -37,6 +41,8 @@ describe('POST /api/scriptide/doctor(/stream) — the per-analysis budget on the
   });
   after(async () => {
     delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+    delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+    delete process.env.DOCTOR_WORKER_POOL_SIZE;
     await server.close();
     await shutdownDoctorPool();
   });
@@ -90,6 +96,94 @@ describe('POST /api/scriptide/doctor(/stream) — the per-analysis budget on the
       assert.ok(!frames.some((f) => f.type === 'doctor_result'), 'no report may be reported alongside a stopped run');
     } finally {
       delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+    }
+  });
+
+  // ── The round-2 BLOCKER on the wire ──────────────────────────────────────
+  // Reproduced by the reviewer with 60 concurrent distinct 346 KB features on
+  // a 2-worker pool (on this box: 40 of 60 rejected at ~34.8 s reading "This
+  // draft took longer to analyze … split the draft into shorter files", for
+  // jobs that never ran). The mechanism is identical at any scale — the
+  // worker is busy, the rest of the burst waits — so this drives the same
+  // path over HTTP deterministically, with one worker and a 1 ms queue
+  // budget, instead of shipping a 35-second load-sensitive burst into CI.
+  // The real 60-concurrent before/after is in the lane report.
+  it('a burst that queues behind a busy worker is shed with 503 + Retry-After and the CONTENTION sentence, never row 72\'s', async (t) => {
+    if (!poolUsable) { t.skip('worker pool unavailable'); return; }
+    await shutdownDoctorPool();
+    clearDoctorCache();
+    process.env.DOCTOR_WORKER_POOL_SIZE = '1';
+    process.env.DOCTOR_QUEUE_BUDGET_MS = '1';
+    // Running budget at its shipped default: nothing here can be stopped for
+    // occupancy, so every rejection below must be a queue one.
+    delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+    try {
+      const responses = await Promise.all(
+        ['b1', 'b2', 'b3', 'b4', 'b5'].map(async (tag) => {
+          const res = await postDoctor('/api/scriptide/doctor', { fountain: distinctScript(tag) });
+          return { status: res.status, retryAfter: res.headers.get('retry-after'), body: await res.json() as Record<string, unknown> };
+        }),
+      );
+      const shed = responses.filter((r) => r.status !== 200);
+      assert.ok(shed.length >= 4, `expected the queued submissions to be shed, got ${JSON.stringify(responses.map((r) => r.status))}`);
+      for (const r of shed) {
+        assert.equal(r.status, 503, 'contention is a server state — a 4xx would file it as a client error');
+        const retryAfter = Number(r.retryAfter);
+        assert.ok(
+          Number.isInteger(retryAfter) && retryAfter >= 1,
+          `a 503 must carry an actionable integer Retry-After header, got ${JSON.stringify(r.retryAfter)}`,
+        );
+        assert.deepEqual(Object.keys(r.body), ['error'], 'same body shape as validate()\'s own 4xx');
+        const message = String(r.body.error);
+        assert.match(message, /^This server is busy/);
+        assert.match(message, /Nothing is wrong with the draft/);
+        assert.match(message, new RegExp(`try again in about ${retryAfter} seconds?\\.`), 'the header and the sentence must agree');
+        // The blocker itself.
+        assert.notEqual(message, SENTENCE_AT_1MS);
+        assert.doesNotMatch(message, /This draft took longer to analyze/);
+        assert.doesNotMatch(message, /split the draft/);
+        assert.notEqual(message, 'Malformed request');
+      }
+    } finally {
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+      await shutdownDoctorPool();
+    }
+  });
+
+  it('the SSE route carries the same distinction — the contention sentence, not row 72\'s', async (t) => {
+    if (!poolUsable) { t.skip('worker pool unavailable'); return; }
+    await shutdownDoctorPool();
+    clearDoctorCache();
+    process.env.DOCTOR_WORKER_POOL_SIZE = '1';
+    process.env.DOCTOR_QUEUE_BUDGET_MS = '1';
+    delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+    try {
+      const texts = await Promise.all(
+        ['s1', 's2', 's3', 's4'].map(async (tag) => {
+          const res = await postDoctor('/api/scriptide/doctor/stream', { fountain: distinctScript(tag) });
+          return res.text();
+        }),
+      );
+      const errorFrames = texts.flatMap((text) => text.split('\n\n').filter(Boolean).flatMap((frame) => {
+        const line = frame.split('\n').find((l) => l.startsWith('data: '));
+        if (!line) return [];
+        const payload = JSON.parse(line.slice(6)) as Record<string, unknown>;
+        return payload.type === 'doctor_error' ? [String(payload.error)] : [];
+      }));
+      assert.ok(errorFrames.length >= 3, `expected shed submissions to report doctor_error frames, got ${errorFrames.length}`);
+      for (const message of errorFrames) {
+        assert.match(message, /^This server is busy/);
+        // SSE cannot send a Retry-After header once the stream has opened, so
+        // the estimate has to be IN the sentence for this transport.
+        assert.match(message, /try again in about \d+ seconds?\./);
+        assert.doesNotMatch(message, /This draft took longer to analyze/);
+        assert.notEqual(message, 'internal_error');
+      }
+    } finally {
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+      await shutdownDoctorPool();
     }
   });
 

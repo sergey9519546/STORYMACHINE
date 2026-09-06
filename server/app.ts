@@ -368,24 +368,33 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
       res.status(413).json({ error: 'Request body too large' });
       return;
     }
-    // Decision #7 (2026-09-06): one analysis crossed the Script Doctor's
-    // per-analysis wall-clock budget and the worker running it was
-    // terminated (server/nvm/analyze/doctor-pool.ts). This branch sits
-    // ABOVE the generic 4xx passthrough below on purpose: that branch
-    // answers `{ error: 'Malformed request' }`, which would replace the one
-    // registered, writer-facing sentence this state has
-    // (docs/CLAIMS_REGISTER.md row 72) with copy that is not true — the
-    // request was well-formed, it was the analysis that did not finish.
-    // Status and body shape match the Fountain shape guard's own
-    // analysis-cost 4xx (`{ error }` at 400) — see the class's own comment
-    // for why a 5xx was rejected. Logged at `warn`, not `unhandled_error`:
-    // a bound doing its job is not a fault.
+    // Decision #7 (2026-09-06, as amended by its round-2 review): a
+    // submission crossed one of the Script Doctor's two wall-clock budgets
+    // (server/nvm/analyze/doctor-pool.ts). The error carries which, and that
+    // decides the status: `running` (the worker was terminated mid-analysis)
+    // answers 400, matching the Fountain shape guard's own analysis-cost
+    // 4xx; `queued` (it never reached a worker — server contention, not the
+    // draft) answers 503 with `Retry-After`, because there a retry IS the
+    // correct client behaviour and a 4xx would additionally file contention
+    // inside client-error metrics. Both carry their own registered sentence
+    // (docs/CLAIMS_REGISTER.md rows 72 and 73) in the same `{ error }` body
+    // shape validate()'s own 400 uses.
+    //
+    // This branch sits ABOVE the generic 4xx passthrough below on purpose:
+    // that branch answers `{ error: 'Malformed request' }`, which would
+    // replace either registered sentence with copy that is not true — the
+    // request was well-formed; it was the analysis that did not finish, or
+    // never started. Logged at `warn`, not `unhandled_error`: a bound doing
+    // its job is not a fault.
     if (isDoctorAnalysisBudgetExceeded(err)) {
       logger.warn('doctor_analysis_budget_rejected', {
         budgetMs: err.budgetMs,
+        state: err.state,
+        ...(err.retryAfterSeconds !== undefined ? { retryAfterSeconds: err.retryAfterSeconds } : {}),
         method: req.method,
         path: req.path,
       });
+      if (err.retryAfterSeconds !== undefined) res.setHeader('Retry-After', String(err.retryAfterSeconds));
       res.status(err.status).json({ error: err.message });
       return;
     }

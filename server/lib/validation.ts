@@ -1601,11 +1601,22 @@ export function legacyVoiceEligibleWeightRejectionReason(text: string): string |
 //   box, same hour, 3 runs each: guard total 68.6-75.3ms;
 //   `normalizeScreenplay` + `parseFountain` alone 26.3-28.5ms;
 //   `structuredClone(blocks)` — the lower bound on what postMessage would
-//   cost — 21.6-26.1ms for 27,393 blocks (2.65 MB serialized). The
-//   transport is 80-95% of the parse it would replace, so the whole
-//   refactor buys single-digit milliseconds out of a ~70ms guard on a
-//   multi-second analysis, while adding megabytes of per-request clone
-//   traffic and a scoring-path edit.
+//   cost — 21.6-26.1ms for 27,393 blocks (2.65 MB serialized). So on the
+//   STRUCTURED-CLONE path (the one postMessage actually uses) the transport
+//   is 80-95% of the parse it would replace: the whole refactor buys
+//   single-digit milliseconds out of a ~70ms guard on a multi-second
+//   analysis, while adding megabytes of per-request traffic and a
+//   scoring-path edit.
+//
+//   The cheaper serialization was considered rather than overlooked, and it
+//   is measured by the same probe: `JSON.stringify(blocks)` is only
+//   6.4-7.8ms. A hand-rolled JSON transport would therefore beat structured
+//   clone — but the receiving realm still has to `JSON.parse` and
+//   materialize those 27,393 objects, which is the half not measured here
+//   and is not free, and SEAM 1 is disqualifying on its own. Recorded so a
+//   future reader does not re-derive the 80-95% figure from the
+//   structured-clone number alone and conclude the transport question was
+//   never asked.
 //
 // Probe: this lane's measure-guard.mjs (payload builder + the three timings
 // above). Do not re-propose the reuse without re-running it; if the doctor
