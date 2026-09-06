@@ -27,6 +27,46 @@ recorded here so the claim is checkable rather than asserted.
 | `wip/phase-w-ui-checkpoint` | 3 | **content superseded** — see below |
 | `claude/inverse-chekhov-detector` | n/a | deleted by owner after PR #257 merged; `33a2ee48` confirmed an ancestor of main |
 
+#### Addendum — 2026-09-06: three scoring branches, rebased, renamed, pushed
+
+Nothing above is retracted; this records what happened after it. The 2026-09-02
+reconciliation was taken against `main` @ `939f7829`, which is now `2bfcbf9d`,
+and the branch table above did not include the two parked scoring branches
+because at that time neither existed on the remote under a name this audit
+tracks.
+
+Both have now been rebased onto `main` @ `2bfcbf9d`, renamed, and pushed, and
+the stacked tree the second owner measurement needs — which
+`docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md` recorded as "not
+producible" — has been built:
+
+| Branch | Tip | Commits on main | Disposition |
+|---|---|---|---|
+| `scoring/stacked-r5-plus-advice` | `1bae835d` | 11 | **the tree to measure** — R5 with advice-rule-fixes merged in |
+| `scoring/r5-verbosity-bias` | `cfb7233c` | 6 | R5 alone, rebased |
+| `scoring/advice-rule-fixes` | `c1873e3c` | 3 | advice-rule fixes alone, rebased |
+| `claude/r5-verbosity-bias-pending-measurement` | `0f625c27` | pre-rebase | superseded by `scoring/r5-verbosity-bias`; kept, not deleted |
+| `claude/advice-rule-fixes-pending-measurement` | `68c64eca` | pre-rebase | superseded by `scoring/advice-rule-fixes`; kept, not deleted |
+
+All three carry PENDING receipt entries and none may merge:
+`node scripts/check-scoring-receipt.mjs main..HEAD` exits 1 on each, by
+design, because it finds a PENDING entry and refuses it. Everything else is
+green on all three — lint, the full `npm test`, build, `check-no-console`,
+`check-docs`, `honesty-audit`, `check-server-reachability`, `check-brain`.
+
+The recorded five-file conflict between the two branches
+(`character-arc.ts`, `rhythm.ts`, `fountain.ts`, `agency-signal.test.ts`,
+plus the receipts ledger) turned out not to be a disagreement between them at
+all: R5 touches none of those four code files. The conflicts came from the
+two branches' merge-bases sitting 74 commits apart, so any stacking attempt
+had to replay `main`'s own history across the gap. With both rebased onto one
+`main`, the merge conflicts on the receipts ledger and the regenerated brain
+graph only.
+
+Still owner-only, and unchanged in substance: `npm run measure-real` against
+the local corpus. See `docs/brain/Owner/Owner - R5 Measurement and Merge.md`
+for the exact sequence.
+
 `wip/phase-w-ui-checkpoint` is the only branch carrying commits absent from
 main by SHA, because the work was squash-merged as `a86756f`. Checked three
 ways: it introduces **zero files main lacks**; its tip predates main's by

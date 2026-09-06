@@ -1,14 +1,16 @@
 ---
 type: branch
-updated: 2026-09-05
-sources: [docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md, docs/PATH_TO_EXCELLENCE.md, docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md]
+updated: 2026-09-06
+sources: [docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md, docs/PATH_TO_EXCELLENCE.md, docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md]
 status: parked
 ---
 
 # Branch — R5 (Verbosity Bias)
 
-**Branch:** `origin/claude/r5-verbosity-bias-pending-measurement` @
-`0f625c27` (4 commits).
+**Branch:** `origin/scoring/r5-verbosity-bias` @ `cfb7233c` (6 commits on
+`main` @ `2bfcbf9d`). Rebased and renamed 2026-09-06; the old
+`origin/claude/r5-verbosity-bias-pending-measurement` @ `0f625c27` is the
+pre-rebase object and is superseded, not deleted.
 
 **What it is:** the dispatched fix for retrospective finding #1 (the
 health score rewards padding — appending stateless filler moved health
@@ -29,16 +31,34 @@ reports move (28 change verdict), one feature-scale tier assertion is
 SUSPENDED pending verdict re-anchoring, and the 72-row real-corpus manifest
 is stale until re-locked.
 
-**The conflict:** R5 branched from an older `main` commit (~74 commits
-behind where [[Branch - Advice Rule Fixes]] branched); the two branches
-conflict on five files (`character-arc.ts`, `rhythm.ts`, `fountain.ts`,
-plus two others) when stacked, so a clean rebase is not possible — a manual
-merge is required. On the blind-pairs fixtures, **R5 alone orders 3 of 6**
-pairs (up from 1 of 6 on main) — but only by un-pinning a tie and exposing
-raw weighted-issue order, itself at chance on this set; 0 of 12 blind
-scripts tie at one health value (main ties 9 of 12).
+**The conflict, resolved 2026-09-06.** R5 branched from a `main` commit ~74
+commits behind where [[Branch - Advice Rule Fixes]] branched, and stacking the
+two used to conflict on five files. Rebasing both onto the same `main`
+(`2bfcbf9d`) removes that entirely: R5's own rebase had ONE conflict,
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, and the stack merge conflicts on
+no code file at all. R5 never touched `character-arc.ts`, `rhythm.ts`,
+`fountain.ts` or `agency-signal.test.ts` — those conflicts were `main`'s own
+history being replayed across the merge-base gap. The stack now exists as
+[[Branch - Stacked R5 plus Advice]].
+
+On the blind-pairs fixtures, **R5 alone orders 3 of 6** pairs (up from 1 of 6
+on main) — but only by un-pinning a tie and exposing raw weighted-issue
+order, itself at chance on this set; 0 of 12 blind scripts tie at one health
+value (main ties 9 of 12).
+
+**Re-measured on the new baseline (2026-09-06, in-repo evidence only):** all
+45 output-identity reports move, health RMS **20.45** with 28 verdict changes
+— the branch's own write-up says 23.5, measured against the old `main` at
+`e40f4cf5`; the difference is `main` moving under the branch (principally the
+2026-09-04 corpus-integrity correction), not the branch changing. Gates on
+the rebased tree: `npm run lint` 0, `npm test` 0 (12,934 tests, 0 failing),
+`npm run build` 0, `npm run test:metamorphic` 0 (8 of 8 hard,
+`empty_verbosity` −4.4), `check-brain` 0.
+`check-scoring-receipt.mjs main..HEAD` exits 1, correctly, because the entry
+is PENDING.
 
 ## Sources
 
 - `docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md`
+- `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` — the R5 entry and its 2026-09-06 rebase addendum
 - `docs/DECISION_LOG.md` / `docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md` finding #1

@@ -55,6 +55,12 @@
       "path": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
     },
     {
+      "id": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
+      "type": "branch",
+      "title": "Branch — Stacked (R5 + Advice-Rule-Fixes)",
+      "path": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
       "id": "docs/brain/Decisions/Decision 1 - User Validation First.md",
       "type": "decision",
       "title": "Decision #1 — User Validation First (2026-07-15)",
@@ -417,7 +423,7 @@
     {
       "id": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "type": "owner",
-      "title": "Owner Item — Measure and Merge R5 (or Manually Merge with Advice-Rule-Fixes)",
+      "title": "Owner Item — Measure and Merge the Stacked Scoring Branch",
       "path": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
@@ -697,6 +703,10 @@
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
+      "from": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
       "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
@@ -707,6 +717,34 @@
     {
       "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
       "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
       "from": "docs/brain/Decisions/Decision 1 - User Validation First.md",
@@ -1242,15 +1280,19 @@
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
-      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
-      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {
       "from": "docs/brain/Owner/Owner - Run Measure Real.md",
