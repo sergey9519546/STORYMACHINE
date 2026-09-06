@@ -1917,10 +1917,22 @@ OWNER MEASUREMENT.
   of 45 (mean +0.44, RMS 6.88, largest single move −33.5 on `room-12`, which
   falls 33.5 to 0, and +12.9 on the calibration sample `Adrift`); verdict
   changes on 3 of 45 (`Reasonable Doubt`, `Second Wind`, `The Visit`, all
-  PASS to CONSIDER); `sceneCount` is unchanged on all 45. The 16 fixtures
-  whose health does not move are the ones still pinned at the saturating
-  clamp in `main`'s `densityPenalty` — a detector fix cannot move a number
-  that is already at its ceiling.
+  PASS to CONSIDER); `sceneCount` is unchanged on all 45.
+- **The 16 fixtures whose health does not move, classified — three groups, not
+  one.** An earlier version of this addendum said all 16 were "still pinned at
+  the saturating clamp in `main`'s `densityPenalty`". That is true of 7 of
+  them. Recomputing `main`'s `densityPenalty` (`doctor.ts`, the pre-R5 form:
+  logistic below density 1, `10 + 2.5·(density^3.75 − 1)` at or above it) on
+  each fixture's own before/after weighted issues and word count gives:
+
+  | group | n | fixtures | what is actually happening |
+  | --- | --- | --- | --- |
+  | at the logistic ceiling | 7 | `p0/sample-script`, `dead-frequency`, `counter-offer`, `synthetic/60-`, `/120-`, `/240-`, `/300-scenes` | penalty 9.99–10.00 on both sides; the clamp explanation holds |
+  | weighted issues unchanged | 7 | `Firebreak`, `Lockdown`, `Low Tide`, `Splitting the House`, `The Corner Booth`, `Yard Signs`, `Zero Day` | the six fixes fire identically on these, so there is nothing to move. No clamp is involved: they sit at density 1.70–2.10, on the POWER branch well past the clamp, with penalties 25.7–47.9 |
+  | moved below display rounding | 2 | `chain-of-custody` (penalty 12.975 → 12.903), `mise` (14.182 → 14.086) | past the clamp, genuinely moved, rounded away in the displayed health |
+
+  The correction matters because for the middle seven the original sentence
+  named the opposite mechanism to the one operating.
 - **Gates re-run on the rebased tree, each in the foreground, exit code read
   from its own log:** `npm run lint` 0 ·
   `tests/core/advice-rule-fixes.test.ts` 0 (26/26) ·
@@ -1937,6 +1949,31 @@ OWNER MEASUREMENT.
   branch, by design** — it finds this entry and refuses it because the heading
   says PENDING, exactly as the entry above predicted it would. Not a rebase
   artifact; not to be closed by editing the heading.
+- **What DOES close it, once the corpus run exists.** Not appending a measured
+  entry beside a pending one: `checkReceiptForRange`
+  (`scripts/check-scoring-receipt.mjs:650-673`) extracts EVERY entry the range
+  adds and validates each, and `ok` is `problems.length === 0`, so one
+  surviving pending entry fails the range no matter what sits next to it. The
+  gate's own remedy string at `:573-575` says to append a superseding measured
+  entry, which is wrong for this reason — a pre-existing defect on `main`, out
+  of scope here. Verified by running the gate's exported
+  `extractEntries`/`validateEntry` over the added receipt lines of
+  `main...HEAD`: a single-branch range gives 1 entry and 1 problem, then 2
+  entries and still 1 problem once a well-formed measured entry is appended,
+  then 1 entry and 0 problems once that entry is converted in place; the
+  stacked three-entry range gives 3 and 3, then 4 and 3, then 3 and 0.
+- **The conversion, per entry:** drop the pending marker from the `###`
+  heading, replace the `Measured AUC-24` value, replace `Corpus fingerprint:
+  none. No corpus was read.` with the real fingerprint, rewrite the Runner
+  attestation into the first person past tense, and remove every phrase in
+  `PENDING_PHRASES` (`:487-492`) from ANYWHERE in the entry body. Those four
+  phrases are deliberately NOT reproduced in this ledger: each space in their
+  patterns is compiled to `\s+`, which matches a newline, so a quoted copy of
+  the list inside an entry keeps that entry pending even after its heading is
+  fixed. That is measured, not predicted — a draft of this bullet quoted them
+  and held the converted stacked range at 1 problem instead of 0 until the
+  quotation came out. `docs/brain/Owner/Owner - R5 Measurement and Merge.md`
+  spells the four out, and the gate does not read that file.
 - **Blind matched pairs, in-repo fixtures, no private corpus:** unchanged from
   the 2026-09-04 finding on the new baseline — 1 of 6 ordered, mean gap +0.03,
   9 of 12 scripts still pinned at exactly 76.0, against `main @ 2bfcbf9d`'s
