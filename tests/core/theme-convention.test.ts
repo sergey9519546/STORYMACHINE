@@ -58,9 +58,10 @@
 // actually went invariant: not a Tailwind class on the row at all, but the
 // `.sm-btn` wrapper class two levels up).
 //
-// Three deliberate scope limits, kept because widening any of them would
+// Four deliberate scope limits, kept because widening any of them would
 // trade a real capability for false positives or false confidence
-// (round 3 adds the third — independent review round 2, item 2):
+// (round 3 adds the third — independent review round 2, item 2; round 7
+// adds the fourth — independent review, paneltheme lane round 1, item 3):
 //   - `dark:bg-*` with a FRACTIONAL opacity suffix (`/10`, `/30`, …) is NOT
 //     treated as confidently dark. A low-alpha dark tint composites with
 //     whatever sits behind it — on this codebase's actual pattern (a
@@ -77,12 +78,33 @@
 //     (`dark:bg-zinc-800`, `dark:bg-zinc-900`) — so this exclusion loses no
 //     true positive.
 //   - A `className` that is a bare identifier referencing a variable
-//     defined elsewhere is not resolved back to its literal value — this
-//     walk reads the attribute's own source text, not a constant-folded
-//     evaluation. This cannot produce a false positive (an unresolved
-//     attribute just falls through to "inherit," same as no class at all)
-//     but it CAN miss a real bug hidden behind a variable. The LIVE shape
-//     of exactly this limit: SlatePanel.tsx's ranked table rows declare
+//     defined elsewhere — or the same underlying mechanism, an identifier
+//     or property-access embedded inside a template literal's `${...}` —
+//     is not resolved back to its literal value: this walk reads the
+//     attribute's own source text, not a constant-folded evaluation.
+//     ROUND 7 CORRECTION (independent review, paneltheme lane round 1,
+//     item 2, 2026-09-06): this used to claim that "cannot produce a false
+//     positive, only a possible missed case" — that was wrong.
+//     ScriptDoctorPanel.tsx's IssueCard/RootCauseCard severity badges are
+//     the live counterexample: `${meta.badge}` (SEVERITY_META's `badge`
+//     field) resolves at runtime to an already correct, self-contained,
+//     theme-safe `bg-red-600 text-white` / `bg-amber-500 text-black` /
+//     `bg-zinc-400 text-black` triple with no `dark:` variant needed at
+//     all — but this walk cannot see through the property access, so
+//     combined with the real `dark:bg-zinc-800` ancestor both cards sit in,
+//     it read as "inherits the root's invariant ink onto a real dark
+//     surface," a FALSE POSITIVE on code that was never broken. Fixed (that
+//     lane) by inlining the identical ternary directly at the two flagged
+//     JSX sites — byte-identical rendered classes, now visible in source —
+//     with a source-match test (below) pinning those two copies back to
+//     `SEVERITY_META` so a future palette edit cannot silently leave one
+//     copy stale. The bare-identifier case CAN still only miss a bug, not
+//     invent one, when the identifier's value is itself ambiguous or
+//     unknown (the `rowBg` case right below); it is specifically an
+//     identifier that resolves to an ALREADY-correct, self-contained value
+//     the walk has no way to verify that turns a miss into an invention.
+//     The LIVE shape of the miss-only case: SlatePanel.tsx's ranked table
+//     rows declare
 //     `const rowBg = i % 2 === 0 ? "bg-[var(--sm-panel)]" :
 //     "bg-[var(--sm-panel-2)]"` a few lines above, then reference it as
 //     `className={rowBg}` on the `<tr>` — this walk sees only the
@@ -118,11 +140,41 @@
 //     `dark:bg-zinc-800` div, likewise 0). Every real component in
 //     src/components today either renders its own text inline or is a
 //     leaf whose parent already gets scanned as its own file, so this has
-//     not (yet) hidden a live bug — but it means the reserved
-//     ScriptDoctorPanel.tsx count pinned below is a LOWER bound on what a
-//     component-boundary-aware walk would find, not the true count, and
-//     the browser gates remain the real backstop for cross-component
+//     not (yet) hidden a live bug — but it means any count this walk
+//     reports for a file with reusable sub-components is a LOWER bound on
+//     what a component-boundary-aware walk would find, not the true count,
+//     and the browser gates remain the real backstop for cross-component
 //     composition the same way they are for the bare-variable case above.
+//   - A REUSABLE COMPONENT'S OWN TOP-LEVEL JSX IS EVALUATED FROM THE FILE'S
+//     ROOT DEFAULTS, NOT ITS REAL CALLER'S AMBIENT (round 7 — independent
+//     review, paneltheme lane round 1, item 3). This is the flip side of
+//     the limit just above: the walk does not skip a component's own
+//     function body — `visit(sf, 'safe', 'invariant')` walks the WHOLE
+//     file's AST, so it eventually reaches every top-level function's own
+//     `return (<jsx>...)`) — but it reaches it starting from the SAME two
+//     root defaults every time, with no notion of which real ambient any
+//     caller actually renders that component in. This cuts BOTH ways: a
+//     component whose real callers all sit on a genuinely dark surface, and
+//     which is CORRECTLY given themed text for that reason, can be flagged
+//     as a false REVERSE violation (bg assumed `safe` at the file root,
+//     text `themed`) even though it is right; conversely a component that
+//     IS broken for its real callers can evaluate clean if the file-root
+//     defaults happen to make its own classes look consistent. Live
+//     instances (`ScriptDoctorPanel.tsx`, found by manual review during the
+//     paneltheme round, not by this walk): `FixStructuralSignalsStrip` and
+//     `FixDeltaList` are always rendered inside a real
+//     `bg-gray-50 dark:bg-zinc-800` receipt card at every call site; once
+//     given the (correct) themed text pair that ambient calls for, this
+//     walk's own independent, root-relative evaluation of their JSX flagged
+//     them as REVERSE violations. Fixed by having each declare the SAME
+//     `bg-gray-50 dark:bg-zinc-800` on its own root — redundant paint under
+//     an identically-colored real parent, so nothing renders differently —
+//     which makes the walk's assumed ambient agree with the real one. There
+//     is no cheap general fix for this limit (it would need call-site
+//     analysis across every reference to a component, the same class of
+//     work the boundary limit above already declines); the two real
+//     instances found so far are handled at the site, and the browser gates
+//     remain the backstop for a case this walk cannot see coming.
 //
 // PROOF THIS DETECTOR HAS TEETH (LANE_STANDARD §3): run against
 // `git show main:src/components/scriptide/SnapshotManager.tsx` (i.e. before
@@ -136,7 +188,8 @@
 // :721 the health number, :726 the RECOMMEND/CONSIDER/PASS verdict chip),
 // logged at .../theme-scan-main-SlatePanel.log. Against the LIVE (fully
 // fixed) tree, both files — along with every other file under
-// src/components except ScriptDoctorPanel.tsx (below) — report zero.
+// src/components, ScriptDoctorPanel.tsx and ScriptIDE.tsx included since
+// round 6 — report zero.
 //
 // ROUND 3 (independent review round 2, item 1): the same proof for the
 // REVERSE rule. The forward-only detector reported ZERO violations against
@@ -195,20 +248,47 @@
 // docs/DECISION_LOG.md and the 2026-09-06 lane report for the fail-then-
 // pass proof and the Playwright/axe contrast measurements.
 //
-// One real bug this round's fix-then-scan surfaced ONLY by manual review,
-// not the scanner: FixStructuralSignalsStrip (ScriptDoctorPanel.tsx) is a
-// small reusable component with no bg of its own, always rendered inside a
-// real dark:bg-zinc-800 receipt card at both of its call sites — but this
-// walk scans every top-level function's own JSX independently from the
-// file's root defaults (safe/invariant), with no notion of which real
-// ambient a caller renders it on (the same mechanism behind the disclosed
-// cross-function/component scope limit below, just cutting the other way:
-// it can also make a CORRECTLY-fixed component newly look like a violation,
-// or a genuinely broken one look clean, depending on which text mode its
-// root happens to declare). Its own comment (where it's defined) records
-// the fix and why an explicit, redundant, visually-identical bg had to be
-// added to its own root so the walk's assumed ambient and its real one
-// agree.
+// Two real bugs this round's fix-then-scan surfaced ONLY by manual review,
+// not the scanner: FixStructuralSignalsStrip and FixDeltaList
+// (ScriptDoctorPanel.tsx) are small reusable components with no bg of their
+// own, always rendered inside a real dark:bg-zinc-800 receipt card at every
+// call site — but this walk scans every top-level function's own JSX
+// independently from the file's root defaults (safe/invariant), with no
+// notion of which real ambient a caller renders it on. This is now the
+// FOURTH numbered scope limit above (round 7, independent review, item 3) —
+// it cuts both ways: it can make a CORRECTLY-fixed component newly look
+// like a violation, or a genuinely broken one look clean, depending on
+// which text mode its root happens to declare. Each component's own
+// comment (where it's defined) records the fix and why an explicit,
+// redundant, visually-identical bg had to be added to its own root so the
+// walk's assumed ambient and its real one agree.
+//
+// ROUND 7 (2026-09-06, independent review, paneltheme lane round 1) — three
+// more corrections/additions from that review:
+//   - Item 1 (the severity-palette duplication): ScriptDoctorPanel.tsx's
+//     IssueCard and RootCauseCard each inline a literal ternary for their
+//     severity badge (see round 6's note in this file's own history and
+//     the item-2 correction above) that must stay byte-identical to
+//     SEVERITY_META's `badge` field — a third, unpinned copy of the same
+//     three class pairs. Chosen fix: a source-match test (below,
+//     "severity badge palette stays pinned to SEVERITY_META"), not
+//     teaching this walk to resolve `${identifier.field}` shapes generally.
+//     Reasoning: general resolution would need scope-aware tracing (find
+//     the nearest enclosing `const meta = SOME_OBJECT[computed]` binding,
+//     then resolve SOME_OBJECT's own top-level object literal) applied
+//     file-wide, which is real, untested new surface — a class of change
+//     this file's own history has been deliberately conservative about
+//     widening (see the three-then-four scope limits above, each kept
+//     narrow on purpose "because widening any of them would trade a real
+//     capability for false positives or false confidence"). A three-line
+//     source-match test is smaller, has no blast radius outside this one
+//     known shape, and — same as the exact-floor tests this file already
+//     used for the old allowlist — fails loudly the moment the three
+//     copies disagree, which is the actual risk being managed.
+//   - Item 2: corrected above (the bare-identifier/property-access scope
+//     limit's "cannot produce a false positive" claim).
+//   - Item 3: the fourth scope limit, promoted above from this note alone
+//     into the numbered list.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -983,5 +1063,83 @@ describe('theme-convention scanner — the actual regression gate over src/compo
       'theme-convention violation (dark:bg-* composited with invariant ink text, or the reverse):\n'
       + allViolations.map((v) => `  ${v.file}:${v.line} — ${v.value}`).join('\n'),
     );
+  });
+});
+
+// ROUND 7 (independent review, paneltheme lane round 1, item 1): the fix for
+// IssueCard's/RootCauseCard's severity-badge false positive (this file's
+// header, the item-2 correction) inlined SEVERITY_META's `badge` values as
+// literal ternaries directly in those two components' JSX, so the walk above
+// can see them. That makes the three-value palette
+// (bg-red-600/bg-amber-500/bg-zinc-400 paired with text-white/text-black/
+// text-black) exist in THREE places in one file: SEVERITY_META itself, and
+// the two inlined copies — with nothing before this test pinning them
+// together. This is a source-match test, not a scanner change (see this
+// file's header for why that trade-off was made): it reads the same source
+// text `findThemeConventionViolations` already reads and asserts the three
+// copies agree, so an edit to SEVERITY_META that forgets the other two fails
+// loudly here instead of shipping a silently stale badge.
+describe('severity badge palette — SEVERITY_META and its two inlined copies stay pinned (round 7)', () => {
+  const SDP_PATH = join(COMPONENTS_DIR, 'scriptide', 'ScriptDoctorPanel.tsx');
+  const source = readFileSync(SDP_PATH, 'utf8');
+
+  /** SEVERITY_META's three `badge` string values, in critical/major/minor
+   *  order — the single source of truth this test pins everything else to. */
+  function extractSeverityMetaBadges(src: string): { critical: string; major: string; minor: string } {
+    const re = /const SEVERITY_META:[\s\S]*?critical:\s*\{[^}]*?badge:\s*"([^"]+)"[^}]*?\}[\s\S]*?major:\s*\{[^}]*?badge:\s*"([^"]+)"[^}]*?\}[\s\S]*?minor:\s*\{[^}]*?badge:\s*"([^"]+)"[^}]*?\}/;
+    const m = src.match(re);
+    assert.ok(
+      m,
+      'SEVERITY_META\'s shape (critical/major/minor entries, each with a `badge:` string field) '
+      + 'was not found in ScriptDoctorPanel.tsx — this test\'s pattern is now stale, update it '
+      + 'to match the current declaration before trusting its result',
+    );
+    return { critical: m![1], major: m![2], minor: m![3] };
+  }
+
+  /** One of the two inlined `<ident>.severity === "critical" ? "…" : <ident>.
+   *  severity === "major" ? "…" : "…"` ternaries — same order, so it can be
+   *  compared directly against extractSeverityMetaBadges' result. `ident` is
+   *  captured and backreferenced so this only matches a ternary that
+   *  actually re-checks the SAME identifier's `.severity` in both branches
+   *  (rules out accidentally matching two unrelated ternaries stitched
+   *  together by the regex). */
+  function extractInlinedBadgeTernary(src: string, label: string): { critical: string; major: string; minor: string } {
+    const re = /(\w+)\.severity === "critical"\s*\n?\s*\?\s*"([^"]+)"\s*\n?\s*:\s*\1\.severity === "major"\s*\n?\s*\?\s*"([^"]+)"\s*\n?\s*:\s*"([^"]+)"/;
+    const m = src.match(re);
+    assert.ok(
+      m,
+      `The inlined severity-badge ternary for ${label} (a \`<ident>.severity === "critical" ? "…" : `
+      + `<ident>.severity === "major" ? "…" : "…"\` shape) was not found in ScriptDoctorPanel.tsx — `
+      + 'either it was reverted back to `${meta.badge}` (fine — delete this test along with the '
+      + 'now-unneeded inlining) or its shape changed and this pattern needs updating',
+    );
+    return { critical: m![2], major: m![3], minor: m![4] };
+  }
+
+  const metaBadges = extractSeverityMetaBadges(source);
+
+  it('SEVERITY_META itself has the three expected badge classes (sanity — proves the extractor works)', () => {
+    assert.deepEqual(metaBadges, {
+      critical: 'bg-red-600 text-white',
+      major: 'bg-amber-500 text-black',
+      minor: 'bg-zinc-400 text-black',
+    });
+  });
+
+  it('IssueCard\'s inlined ternary matches SEVERITY_META exactly', () => {
+    const issueCardSection = source.slice(source.indexOf('function IssueCard'), source.indexOf('function RootCauseCard'));
+    assert.deepEqual(extractInlinedBadgeTernary(issueCardSection, 'IssueCard'), metaBadges);
+  });
+
+  it('RootCauseCard\'s inlined ternary matches SEVERITY_META exactly', () => {
+    const rootCauseSection = source.slice(source.indexOf('function RootCauseCard'));
+    assert.deepEqual(extractInlinedBadgeTernary(rootCauseSection, 'RootCauseCard'), metaBadges);
+  });
+
+  it('proof this test can actually fail: a deliberately mismatched ternary is caught', () => {
+    const badFixture = 'x.severity === "critical" ? "bg-blue-600 text-white" : x.severity === "major" ? "bg-amber-500 text-black" : "bg-zinc-400 text-black"';
+    const extracted = extractInlinedBadgeTernary(badFixture, 'fixture');
+    assert.notDeepEqual(extracted, metaBadges);
   });
 });
