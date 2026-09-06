@@ -79,6 +79,78 @@ export const AUC24_FLOOR = 0.622;
  *  code rather than a sentence in a doc that drifts from it. */
 export const AUC24_FLOOR_MARGIN = 0.05;
 
+/**
+ * ── THE PUBLIC-BENCHMARK FLOORS ───────────────────────────────────────────
+ *
+ * These two are NOT the AUC-24 ratchet and must never be compared to it, to
+ * each other's lineage, or to the 761-script P1 baseline. They belong here,
+ * next to AUC24_FLOOR, for exactly the reason AUC24_FLOOR is here: one
+ * definition of a floor, imported everywhere, so it cannot be raised in one
+ * file and left behind in another.
+ *
+ * WHAT THEY MEASURE. scripts/lib/public-benchmark.ts scores the 32
+ * DISTRIBUTABLE .fountain files (20 CC0 scripts in data/screenplays + 12
+ * blind-pair fixtures) intact and then degraded, on every CI run, with no
+ * corpus mount — tests/core/public-benchmark.test.ts. Both floors are on the
+ * ALL-PAIRS Mann-Whitney statistic that computeAuc below defines, so the two
+ * numbers are directly comparable to each other; that comparison IS the
+ * finding they exist to protect.
+ *
+ * WHY TWO. PUBLIC_SHUFFLE_DROP_FLOOR uses shuffleDropDegrade — the AUC-24
+ * recipe, which drops every third scene and therefore moves
+ * `scarcityPenalty = 140/sceneCount` (doctor.ts:465-467) directly.
+ * PUBLIC_ORDER_FLOOR uses degradeClimaxRelocate, which preserves scene count
+ * exactly, so the scarcity term cancels (measured: mean scarcity delta
+ * 0.000 over all 32 scripts) and what is left is order-sensitivity alone.
+ *
+ * BOTH FLOORS ARE NEAR CHANCE, AND THAT IS THE CURRENT TRUTH, NOT A TARGET.
+ * Measured on this tree, 2026-09-06: shuffle-drop 0.5586 (95% CI
+ * [0.4219, 0.6973]), climax-relocate 0.4673 (95% CI [0.4014, 0.5264]). Both
+ * intervals contain 0.5. On this corpus the doctor does not reliably prefer
+ * an intact script to a mechanically damaged copy of itself under either
+ * recipe. A floor set at a near-chance measurement is a ratchet against
+ * getting WORSE at something the engine is already bad at, which is the only
+ * honest thing to assert here. Raising either number is a measurement's job,
+ * never an edit's.
+ *
+ * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
+ * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
+ * rule channel 0.076) predicts that dropping every third scene of a 10-scene
+ * script adds 140/7 - 140/10 = 6.00 points of scarcity penalty, against 0.58
+ * points at the private corpus's median 118 scenes, and therefore that a
+ * short-script shuffle-drop benchmark would look ~10x MORE separable. It does
+ * not. Measured decomposition over these 32 scripts: the scarcity penalty
+ * does rise by a mean of +5.693 points, and the DENSITY penalty falls by a
+ * mean of 7.625 points at the same time, because dropping a third of the
+ * scenes removes a larger share of the weighted issues than of the words and
+ * `density = weightedIssues / wordCount^0.7` is convex. Net mean health
+ * MOVES UP 1.93 points under degradation. The prediction was right about the
+ * scarcity term and wrong about the total, which is exactly why the floor is
+ * set from a measurement instead of from the arithmetic.
+ *
+ * HOW THEY WERE SET. floor = round4(measured - PUBLIC_FLOOR_MARGIN), from
+ * `npm run benchmark:public` on this tree. The measured values, the bootstrap
+ * intervals, N, and the per-script pairs are in
+ * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md and in the PUBLIC-CORPUS
+ * section of docs/p1-benchmark/MEASUREMENT_RECEIPTS.md.
+ */
+export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386;
+
+/** See PUBLIC_SHUFFLE_DROP_FLOOR above. Near chance, deliberately: measured
+ *  0.4673, and its own 95% CI [0.4014, 0.5264] contains 0.5. */
+export const PUBLIC_ORDER_FLOOR = 0.4473;
+
+/**
+ * The margin between a fresh public-benchmark measurement and the floor
+ * locked from it. Smaller than AUC24_FLOOR_MARGIN (0.05) on purpose: this
+ * measurement is RE-RUN ON EVERY CI RUN over committed text, so it carries no
+ * corpus-drift or re-measurement uncertainty — the only slack it needs is for
+ * a genuinely intended scoring change, and a 0.02 band keeps the ratchet
+ * tight enough to notice one. A change that moves either statistic by more
+ * than this is supposed to fail, be looked at, and be re-locked deliberately.
+ */
+export const PUBLIC_FLOOR_MARGIN = 0.02;
+
 /** Identifies the exact degradation the committed table was produced by. Bump
  *  the version if the recipe, the PRNG, or the seed template ever changes —
  *  a table produced by a different recipe is not comparable, and the

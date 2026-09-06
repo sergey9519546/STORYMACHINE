@@ -158,6 +158,59 @@ export const GATES = [
 ];
 
 /**
+ * ── VERIFIED GATES (2026-09-06) ────────────────────────────────────────────
+ * The list above is what did NOT get checked. Until now a reader had no way
+ * to tell "absent from this report because it ran" from "absent because
+ * nobody wrote it down" — and for the whole life of this script the honest
+ * answer for discrimination was the second one: EVERY discrimination
+ * assertion in the repository was either corpus-gated (skipped) or waiting on
+ * an owner-local lock (skipped), so a reader scanning this output found the
+ * AUC-24 gap and nothing to set against it.
+ *
+ * That changed when tests/core/public-benchmark.test.ts landed: a
+ * discrimination number computed end to end, in CI, on committed text, with
+ * no env var and no owner step. It is a DIFFERENT KIND OF ROW from everything
+ * above — it reports that a gate RAN, not that one didn't — so it is rendered
+ * in its own section rather than smuggled into a report about gaps.
+ *
+ * A verified gate still declares a `file` (or `env`) so this is a check, not
+ * an assertion: if its input disappears the row says ABSENT and this script
+ * exits non-zero, exactly as an expired gap does. A "verified" row that
+ * cannot verify itself would be the same false assurance the whole file
+ * exists to prevent.
+ *
+ * @typedef {object} VerifiedGate
+ * @property {string} suite      the test file that does the checking.
+ * @property {string} file       repo-relative input whose presence proves the suite has something to assert against.
+ * @property {string} command    how a reader reproduces the number outside CI.
+ * @property {string} proves     what actually gets checked on every run.
+ * @property {string} doesNotProve  the claim a reader might wrongly take from it.
+ */
+
+/** @type {VerifiedGate[]} */
+export const VERIFIED_GATES = [
+  {
+    suite: 'tests/core/public-benchmark.test.ts',
+    file: 'tests/fixtures/public-corpus-manifest.json',
+    command: 'npm run benchmark:public',
+    proves:
+      'Degradation discrimination on the 32 DISTRIBUTABLE screenplays (20 CC0 in '
+      + 'data/screenplays + 12 blind-pair fixtures), recomputed from committed .fountain text on '
+      + 'every CI run with no corpus mount: two AUCs — shuffle-drop (the AUC-24 recipe) and '
+      + 'climax-relocate (scene count preserved) — each against a floor in scripts/lib/auc.ts, '
+      + 'each with a seeded 2000-resample 95% bootstrap interval, on a pre-registered '
+      + 'sha256-derived split. Plus a 32-row manifest lock (sceneCount/words/health/verdict), so '
+      + 'a scoring change\'s effect on real distributable prose is a reviewable numeric diff.',
+    doesNotProve:
+      'Nothing about the AUC-24 >= 0.622 ratchet above — different corpus, different script '
+      + 'length, different denominator. And it is not a good result: measured 2026-09-06, both '
+      + 'AUCs are near chance (shuffle-drop 0.5586, climax-relocate 0.4673) and both 95% '
+      + 'intervals contain 0.5. The floors are set at those values minus a margin, so the '
+      + 'engine cannot get WORSE at this unnoticed. They are the current truth, not a target.',
+  },
+];
+
+/**
  * A gate ran if its env var is set, or if its input file is present.
  * @param {Gate} g
  * @param {{ env?: Record<string, string | undefined>, root?: string }} [opts]
@@ -245,9 +298,57 @@ export function render({ skipped, ran, expired }) {
   return lines.join('\n');
 }
 
+/**
+ * Which verified gates can still verify themselves.
+ *
+ * @param {VerifiedGate[]} [gates]
+ * @param {{ env?: Record<string, string | undefined>, root?: string }} [opts]
+ * @returns {{ present: VerifiedGate[], absent: VerifiedGate[], exitCode: number }}
+ */
+export function evaluateVerified(gates = VERIFIED_GATES, opts = {}) {
+  const present = gates.filter((g) => gateRan(g, opts));
+  const absent = gates.filter((g) => !gateRan(g, opts));
+  return { present, absent, exitCode: absent.length > 0 ? 1 : 0 };
+}
+
+/** @param {{ present: VerifiedGate[], absent: VerifiedGate[] }} result */
+export function renderVerified({ present, absent }) {
+  if (present.length === 0 && absent.length === 0) return '';
+  const lines = [
+    '='.repeat(72),
+    `VERIFIED GATES: ${present.length} of ${present.length + absent.length} ran here, with no corpus and no owner step`,
+    '='.repeat(72),
+    'These are the checks the report above is NOT about. Listed so "not mentioned',
+    'as a gap" and "actually measured" stop looking the same.',
+    '',
+  ];
+  for (const g of [...present, ...absent]) {
+    const ok = present.includes(g);
+    lines.push(`  [${ok ? 'RAN' : 'ABSENT'}] ${g.suite}`);
+    lines.push(`     input:     ${g.file}${ok ? '' : '  — MISSING. This row can no longer verify itself.'}`);
+    lines.push(`     reproduce: ${g.command}`);
+    lines.push(`     proves:    ${g.proves}`);
+    lines.push(`     but not:   ${g.doesNotProve}`);
+    lines.push('');
+  }
+  if (absent.length) {
+    lines.push(
+      '-'.repeat(72),
+      `${absent.length} verified gate(s) lost the input they check against. This step is`,
+      'failing on purpose: a row claiming something is measured, next to a missing',
+      'file, is the false assurance this whole script exists to prevent.',
+      '-'.repeat(72),
+    );
+  }
+  lines.push('='.repeat(72), '');
+  return lines.join('\n');
+}
+
 // Run only when invoked directly, so tests can import the pieces above.
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const result = evaluateGates();
+  const verified = evaluateVerified();
   process.stdout.write(render(result));
-  process.exit(result.exitCode);
+  process.stdout.write(renderVerified(verified));
+  process.exit(result.exitCode || verified.exitCode);
 }

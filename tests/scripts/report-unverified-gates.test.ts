@@ -15,7 +15,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { evaluateGates, gateRan, isExpired, render, GATES } from '../../scripts/report-unverified-gates.mjs';
+import {
+  evaluateGates, gateRan, isExpired, render, GATES,
+  evaluateVerified, renderVerified, VERIFIED_GATES,
+} from '../../scripts/report-unverified-gates.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(REPO_ROOT, 'scripts/report-unverified-gates.mjs');
@@ -187,5 +190,53 @@ describe('the real gate list', () => {
     // with no expires line at all.
     const skippedGateBlocks = out.split(/\[SKIPPED\]/).slice(1);
     assert.ok(skippedGateBlocks.length >= 2);
+  });
+});
+
+// ── Verified gates (2026-09-06) ────────────────────────────────────────────
+// The reporter gained a second, opposite kind of row: a gate that DID run,
+// here, with no corpus and no owner step. It is a different claim from every
+// row above it, so it gets its own section — and it carries the same
+// self-check, because a row asserting "this is measured" next to a missing
+// input file is the exact false assurance this script exists to prevent.
+describe('verified gates', () => {
+  const okGate = {
+    suite: 's', file: 'tests/fixtures/real-corpus-manifest.json',
+    command: 'npm run x', proves: 'p', doesNotProve: 'd',
+  };
+  const goneGate = { ...okGate, file: 'tests/fixtures/definitely-not-here.json' };
+
+  it('a verified gate whose input exists reports RAN and exits 0', () => {
+    const r = evaluateVerified([okGate], { root: REPO_ROOT });
+    assert.equal(r.present.length, 1);
+    assert.equal(r.exitCode, 0);
+    assert.match(renderVerified(r), /\[RAN\] s/);
+  });
+
+  it('a verified gate whose input vanished reports ABSENT and BLOCKS', () => {
+    // The failure this catches: deleting tests/fixtures/public-corpus-manifest.json
+    // would otherwise leave the reporter cheerfully claiming the benchmark is
+    // measured, which is the same shape as the "0 failures" line this whole
+    // script exists to qualify.
+    const r = evaluateVerified([goneGate], { root: REPO_ROOT });
+    assert.equal(r.absent.length, 1);
+    assert.equal(r.exitCode, 1);
+    const out = renderVerified(r);
+    assert.match(out, /\[ABSENT\]/);
+    assert.match(out, /MISSING\. This row can no longer verify itself\./);
+  });
+
+  it('the real list names the public benchmark, its command, and what it does NOT prove', () => {
+    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    assert.match(out, /VERIFIED GATES: 1 of 1 ran here/);
+    assert.match(out, /tests\/core\/public-benchmark\.test\.ts/);
+    assert.match(out, /reproduce: npm run benchmark:public/);
+    // The non-comparability warning is the load-bearing half of the row: the
+    // AUC-24 ratchet and this benchmark are exactly the kind of pair that gets
+    // conflated (CLAUDE.md spends a paragraph on that hazard).
+    assert.match(out, /Nothing about the AUC-24 >= 0\.622 ratchet/);
+    for (const g of VERIFIED_GATES) {
+      assert.ok(g.file && g.command && g.proves && g.doesNotProve, `${g.suite} is missing a field`);
+    }
   });
 });

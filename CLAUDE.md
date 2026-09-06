@@ -141,8 +141,9 @@ REAL corpus` still holds for any scoring change, and the shuffle-drop AUC
 must not regress below its floor. Commit to the branch designated for the
 current session — never a branch name hardcoded here.
 
-**Which floor, exactly** (these are three different statistics and have been
-confused before): the ratchet is **AUC-24 >= 0.622**, asserted in
+**Which floor, exactly** (these are FIVE different statistics — it was three
+until 2026-09-06 — and they have been confused before): the ratchet is
+**AUC-24 >= 0.622**, asserted in
 `tests/core/real-script-corpus.test.ts` (env-gated on
 `REAL_SCRIPT_CORPUS_DIR`). It measures ONE combined degradation — shuffle
 scenes AND drop every third — over a 24-script subset; last measured 0.731.
@@ -162,6 +163,33 @@ degradations on a 153-script hash-locked test partition, against a >= 0.80
 gate. Do not "update" the 0.622 ratchet to a P1 number — different corpus,
 different degradation, different denominator; raising it that way breaks that
 test for no real regression.
+
+The fourth and fifth statistics are the **PUBLIC BENCHMARK** floors, added
+2026-09-06 and living beside `AUC24_FLOOR` in `scripts/lib/auc.ts`:
+**`PUBLIC_SHUFFLE_DROP_FLOOR` = 0.5386** and **`PUBLIC_ORDER_FLOOR` =
+0.4473**, asserted by `tests/core/public-benchmark.test.ts` — the first
+discrimination assertion in this repository that runs on EVERY CI run, with no
+corpus, no key and no owner-local step, because the 32 screenplays it scores
+(20 CC0 in `data/screenplays/` + the 12 blind-pair fixtures) are committed to
+this repository. Measured on this tree 2026-09-06: shuffle-drop **0.5586**
+(95% CI [0.4219, 0.6973]) and climax-relocate **0.4673** (95% CI
+[0.4014, 0.5264]); floors are those values minus a 0.02 margin. **Both
+intervals contain 0.5** — on 9-14-scene distributable prose the doctor does
+not reliably prefer an intact script to a mechanically damaged copy of itself,
+and these floors ratchet that so it cannot get quietly worse. They are the
+current truth, not a target; raise either only from a rerun.
+
+These two are NOT comparable to AUC-24 or to the P1 baseline either — 32
+short scripts vs feature-length, and the feature-scale deductions
+(`ARC_DED_MIN_SCENES` / `CLIMAX_DED_MIN_SCENES`, both 15) never fire at this
+length, so the public benchmark measures a strictly smaller engine. What
+distinguishes the two public statistics from each other is scene count:
+shuffle-drop changes it, climax-relocate preserves it exactly (measured
+scarcity delta 0.000), so only the second isolates order-sensitivity.
+Reproduce either with `npm run benchmark:public`; re-lock the manifest, the
+split and the floors with `npm run benchmark:public -- --lock`; full method,
+per-script pairs and the three-branch comparison in
+`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md`.
 
 **The floor's VALUE is still not CI-verifiable — the corpus physically cannot
 reach CI (local-only, copyright; mounting it via secrets was rejected, since

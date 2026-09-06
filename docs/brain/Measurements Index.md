@@ -8,12 +8,12 @@ status: active
 # Measurements Index
 
 One note per measurement document under `docs/p1-benchmark/*_20*.md` and
-`docs/scoring/*_20*.md` — 35 total. `docs/p1-benchmark/README.md` is the
+`docs/scoring/*_20*.md` — 36 total. `docs/p1-benchmark/README.md` is the
 canonical index for that directory's own status table and gate
 disambiguation; this index exists so every measurement doc has a
 brain-linked summary reachable from [[00 Home]].
 
-## docs/p1-benchmark (23)
+## docs/p1-benchmark (24)
 
 [[Measurement - BLIND_PAIRS_2026-09-04]] ·
 [[Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04]] ·
@@ -27,6 +27,7 @@ brain-linked summary reachable from [[00 Home]].
 [[Measurement - P1_CONTINUATION_BRIEF_2026-08-11]] ·
 [[Measurement - P1_STATUS_2026-07-29]] ·
 [[Measurement - POWER_ANALYSIS_2026-09-02]] ·
+[[Measurement - PUBLIC_BENCHMARK_2026-09-06]] ·
 [[Measurement - READINESS_ASSESSMENT_2026-07-28]] ·
 [[Measurement - REBUILD_EXPERIMENT_2026-08-04]] ·
 [[Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24]] ·

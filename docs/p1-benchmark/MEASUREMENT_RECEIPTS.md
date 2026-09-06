@@ -1950,3 +1950,94 @@ mechanism that could move them changed between round 1 and round 2 — only
 a timeout guard on the failure path was added, and the identity re-run
 above is the direct proof that the success path (every one of the 45
 fixtures) is unaffected."
+---
+
+## 4. PUBLIC-CORPUS entries — a fourth kind, and why it is not a receipt at all
+
+Everything above this heading is an **attestation**: the corpus is
+local-only, CI cannot recompute the number, so the ledger records that a
+human ran the step and takes their word for the value. §2 of this file spells
+out the boundary — "this ledger raises the cost of omission, not the cost of
+lying."
+
+A PUBLIC-CORPUS entry is the opposite shape and must never be filed as if it
+were the same thing. The text it measures is committed to this repository and
+redistributable, so **anybody can re-run it and get the same numbers**, and
+`tests/core/public-benchmark.test.ts` re-runs it unconditionally on every CI
+run. There is nothing to attest to. The entry exists so that a reader of this
+ledger can see the public number next to the private one and, above all, so
+that nobody mistakes one for the other.
+
+**Three rules for entries under this heading:**
+
+1. Never fill in a `Measured AUC-24` field. A PUBLIC-CORPUS entry is a
+   different statistic on a different corpus at a different script length.
+2. Always quote the reproduction command, because reproduction — not
+   attestation — is the whole basis of the entry.
+3. A PUBLIC-CORPUS entry **does not satisfy** a scoring-path range's receipt
+   requirement. `scripts/check-scoring-receipt.mjs` gates on the AUC-24
+   measurement; a public number cannot stand in for it, exactly as a `PENDING`
+   entry cannot.
+
+### 2026-09-06 — PUBLIC BENCHMARK LANDED: degradation discrimination on 32 distributable screenplays, computed in CI (PUBLIC-CORPUS — not an AUC-24 receipt, and no real-corpus measurement was run)
+
+- **Date:** 2026-09-06
+- **Git SHA:** measured on the lane worktree at `main @ c16f7e0c` plus this
+  lane's own (then-uncommitted) changes; `c16f7e0c` is the base and is a real
+  commit in this repository.
+- **Commands (all four run in this worktree; anyone can re-run them, with no
+  corpus, no key and no env var):**
+  ```
+  npm run benchmark:public
+  npm run benchmark:public -- --control
+  npm run benchmark:public -- --json
+  npm run benchmark:public -- --lock     # rewrote the two committed fixtures
+  ```
+- **Measured AUC-24:** **not applicable, and deliberately left blank.** No
+  real-corpus measurement was run for this range and none is claimed. The
+  private corpus does not exist in this environment.
+- **Measured public AUCs (N = 32; all-pairs Mann-Whitney, the
+  `scripts/lib/auc.ts` `computeAuc` definition; seeded 2000-resample
+  percentile bootstrap, seed 42):**
+  - `SHUFFLE_DROP` (the AUC-24 recipe, scene count changes):
+    **0.5586**, 95% CI **[0.4219, 0.6973]**, mean health gap −1.93.
+    Matched-pair 0.5313, 95% CI [0.3750, 0.6875].
+  - `CLIMAX_RELOCATE` (scene count preserved; measured scarcity delta exactly
+    0.000): **0.4673**, 95% CI **[0.4014, 0.5264]**, mean health gap −1.46.
+    Matched-pair 0.4219, 95% CI [0.2813, 0.5625].
+  - **Both intervals contain 0.5.** These are not good numbers; they are the
+    current numbers, ratcheted at `PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386` and
+    `PUBLIC_ORDER_FLOOR = 0.4473` (measured minus a 0.02 margin) so they
+    cannot get worse unnoticed.
+- **Corpus fingerprint:** 32 `.fountain` files — 20 CC0 originals in
+  `data/screenplays/` (`data/screenplays/LICENSE-live-action.md`) and 12
+  blind-pair fixtures in `tests/fixtures/blind-pairs/`
+  (CC0 in each file's boneyard). Every file's sha256 is committed in
+  `tests/fixtures/public-corpus-manifest.json` alongside its
+  `sceneCount`/`words`/`health`/`verdict`. The 20 calibration samples were
+  scored separately as a labelled control (strong band mean 62.40, troubled
+  37.08, 5 of 5 ordered, gap 25.32) and are excluded from every asserted
+  number, per `RULE_CHANNEL_EVIDENCE_2026-08-24.md` §0 finding 3.
+- **Branch table (fetched, not merged; each branch extracted to a scratch tree
+  and scored by its own doctor):** `scoring/r5-verbosity-bias` shuffle-drop
+  **0.1245** [0.0513, 0.2129]; `scoring/advice-rule-fixes` **0.5298**
+  [0.4033, 0.6548]; `scoring/stacked-r5-plus-advice` **0.1089**
+  [0.0361, 0.1973]. Full tables, including `CLIMAX_RELOCATE` and per-branch
+  manifest movement, in `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §7.
+  **No receipt on any of those branches changes, and none of them was
+  modified by this lane.**
+- **Scoring-path status of THIS range:**
+  `node scripts/check-scoring-receipt.mjs main..HEAD` reports **no
+  scoring-path files changed**. The manifest, the split and the floors are
+  fixtures and constants under `tests/` and `scripts/lib/`; nothing reachable
+  from `doctor.ts` or `src/lib/fountain.ts` was touched. This entry is filed
+  because the ledger is where measurements live, not because a gate demanded
+  one.
+- **Runner attestation:** none is owed, and that is the point of this section.
+  Nothing here rests on my word: `npm run benchmark:public` reproduces every
+  figure above from committed text on any machine, and
+  `tests/core/public-benchmark.test.ts` recomputes both AUCs and re-checks all
+  32 manifest rows on every CI run without an env var. For the record I did
+  run each command listed above in this worktree and read its output, and I
+  did **not** run `npm run measure-real` — the private corpus is not present
+  in this environment, and no AUC-24 value is claimed anywhere in this entry.

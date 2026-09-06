@@ -151,6 +151,12 @@
       "path": "docs/brain/Gates/Gate - Output-Identity Harness.md"
     },
     {
+      "id": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "type": "gate",
+      "title": "Gate — Public Benchmark",
+      "path": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
       "id": "docs/brain/Gates/Gate - Pure-Core Boundary.md",
       "type": "gate",
       "title": "Gate — Pure-Core Boundary",
@@ -281,6 +287,12 @@
       "type": "measurement",
       "title": "Measurement — POWER_ANALYSIS_2026-09-02",
       "path": "docs/brain/Measurements/Measurement - POWER_ANALYSIS_2026-09-02.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md",
+      "type": "measurement",
+      "title": "Measurement — PUBLIC_BENCHMARK_2026-09-06",
+      "path": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md"
     },
     {
       "id": "docs/brain/Measurements/Measurement - READINESS_ASSESSMENT_2026-07-28.md",
@@ -571,6 +583,10 @@
     {
       "from": "docs/brain/00 Home.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
     },
     {
       "from": "docs/brain/00 Home.md",
@@ -873,6 +889,22 @@
       "to": "docs/brain/Glossary.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Measurements/Measurement - RULE_CHANNEL_EVIDENCE_2026-08-24.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Pure-Core Boundary.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
@@ -1021,6 +1053,18 @@
       "to": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md"
     },
     {
+      "from": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
       "from": "docs/brain/Measurements/Measurement - READINESS_ASSESSMENT_2026-07-28.md",
       "to": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
     },
@@ -1155,6 +1199,10 @@
     {
       "from": "docs/brain/Measurements Index.md",
       "to": "docs/brain/Measurements/Measurement - POWER_ANALYSIS_2026-09-02.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md"
     },
     {
       "from": "docs/brain/Measurements Index.md",

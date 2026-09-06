@@ -1,0 +1,582 @@
+// PUBLIC BENCHMARK — degradation discrimination on the DISTRIBUTABLE corpus,
+// computed on every CI run, with no corpus mount and no owner-local step.
+//
+// ── Why this file exists ───────────────────────────────────────────────────
+// ROADMAP P1 asks for "a legally distributable benchmark of real drafts
+// running in CI". Until now the project had two discrimination instruments
+// and neither ran in CI:
+//
+//   * tests/core/real-script-corpus.test.ts — the AUC-24 ratchet. Env-gated on
+//     REAL_SCRIPT_CORPUS_DIR, and the corpus is local-only for copyright
+//     reasons, so it SKIPS on every CI run.
+//   * tests/core/auc24-table.test.ts — the same statistic recomputed from a
+//     committed table of numbers. Real machinery, but the table itself can
+//     only be produced by the owner (`npm run lock-auc24`) and is not
+//     committed yet, so it SKIPS too.
+//
+// The text this file measures is already in the repository and already
+// redistributable, so neither gate applies: CI can run the whole measurement
+// end to end, from .fountain bytes to an AUC with a bootstrap interval. That
+// is the entire claim being made here — an ALWAYS-ON number, not a better
+// number.
+//
+// ── What this benchmark IS, stated before any result ───────────────────────
+// A degradation-sensitivity regression benchmark on 32 short distributable
+// screenplays. It answers "did a scoring change make the doctor less able to
+// tell an intact script from a mechanically damaged copy of ITSELF, on text
+// anyone can re-run?" It does NOT answer "does health track craft on real
+// writing" — see PUBLIC_BENCHMARK_LIMITS below, which is quoted verbatim by
+// the test, by `npm run benchmark:public`, and by the measurement doc, so the
+// caveats cannot drift away from the number they qualify.
+//
+// ── Reuse, not reimplementation ────────────────────────────────────────────
+// Every piece of arithmetic below is imported:
+//
+//   computeAuc, shuffleDropDegrade, degradationSeed  <- scripts/lib/auc.ts
+//     (the AUC-24 statistic and the AUC-24 recipe, byte-for-byte the ones the
+//      ratchet uses — so degradation (a) here is the ratchet's own recipe on
+//      different text, not a lookalike)
+//   mulberry32, pairwiseAuc, bootstrapCi,
+//   degradeClimaxRelocate, BOOTSTRAP_DEFAULT        <- scripts/lib/rebuild-experiment-lib.mjs
+//     (the four-degradation harness's PRNG, matched-pair AUC, seeded
+//      percentile bootstrap, and the scene-count-preserving degradation)
+//
+// ONE function is adapted rather than imported, and this is the whole of the
+// adaptation: `bootstrapCiAllPairs`. rebuild-experiment-lib's `bootstrapCi`
+// hardcodes `pairwiseAuc` inside its resample loop, so it cannot produce an
+// interval for the all-pairs Mann-Whitney statistic that scripts/lib/auc.ts
+// defines. `bootstrapCiAllPairs` performs the IDENTICAL resample — same
+// mulberry32, same default seed 42, same "resample n pairs with replacement",
+// same 2.5/97.5 percentile bounds off a sorted Float64Array — and differs
+// only in which statistic it recomputes inside the loop. Both intervals are
+// reported for both degradations, so nothing rests on that choice.
+//
+// PURITY: this module reads .fountain files off disk (that is its job) and
+// runs the doctor. It reads no environment variable and no clock.
+
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
+import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
+import { computeAuc, degradationSeed, shuffleDropDegrade } from './auc.ts';
+import {
+  BOOTSTRAP_DEFAULT,
+  bootstrapCi,
+  degradeClimaxRelocate,
+  mulberry32,
+  pairwiseAuc,
+} from './rebuild-experiment-lib.mjs';
+
+export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+// ───────────────────────────────────────────────────────────────────────────
+// The corpus: what is in it, and on whose licence
+// ───────────────────────────────────────────────────────────────────────────
+
+/** One distributable set. `licence` and `provenance` are transcribed from the
+ *  set's own licence/header file, named in `provenanceFile` — never asserted
+ *  here independently of it. */
+export interface CorpusSet {
+  id: string;
+  dir: string;
+  provenanceFile: string;
+  licence: string;
+  provenance: string;
+  /** What a reviewer must hold against any number this set contributes to. */
+  caveat: string;
+}
+
+export const PUBLIC_CORPUS_SETS: readonly CorpusSet[] = [
+  {
+    id: 'cc0-live-action',
+    dir: 'data/screenplays',
+    provenanceFile: 'data/screenplays/LICENSE-live-action.md',
+    licence: 'CC0 1.0 Universal (Public Domain Dedication)',
+    provenance:
+      'Original works written in 2026 for the STORYMACHINE benchmark corpus; '
+      + 'LICENSE-live-action.md §Provenance: "None is copied from, adapted from, or based on '
+      + 'any real, produced, copyrighted, or publicly-distributed screenplay."',
+    caveat:
+      'AGENT-AUTHORED. undertow.fountain\'s own boneyard says so and adds: "Not a substitute '
+      + 'for professionally-authored \'real writing\' in P1\'s validation sense."',
+  },
+  {
+    id: 'blind-pairs',
+    dir: 'tests/fixtures/blind-pairs',
+    provenanceFile: 'tests/fixtures/blind-pairs/README.md',
+    licence: 'CC0 1.0 Universal, declared in each file\'s /* */ boneyard',
+    provenance:
+      'Six matched excellent/bad pairs written 2026-09-04 by an author who had read no '
+      + 'scoring rule, lexicon, revision pass, calibration sample or prior discrimination '
+      + 'number at the time of writing (README.md "The exact order of operations", steps 1-5; '
+      + 'the write-first order is a fact in the git history).',
+    caveat:
+      'Twelve short scripts by a SINGLE author, not blind-labelled by independent readers, '
+      + 'no held-out labels. The README says it: "evidence, not a benchmark."',
+  },
+];
+
+/**
+ * The calibration corpus is measured and printed, and is DELIBERATELY NOT part
+ * of any asserted number.
+ *
+ * docs/p1-benchmark/RULE_CHANNEL_EVIDENCE_2026-08-24.md §0 finding 3 shows the
+ * band ordering there is carried ENTIRELY by the weighted-rule channel —
+ * zeroing that channel "breaks calibration band monotonicity outright". The
+ * samples were hand-authored from the rules' own lexicons
+ * (calibration/corpus.ts's header names the literal strings), so including
+ * them would let the engine's recognition of its own vocabulary inflate a
+ * benchmark whose whole purpose is to be independent of it. Reported as a
+ * labelled CONTROL: a contrast to read the 32-script number against, never a
+ * contributor to it.
+ */
+export const CALIBRATION_CONTROL_NOTE =
+  'CONTROL ONLY — excluded from every asserted number. The calibration corpus was authored '
+  + 'from the rules\' own lexicons, and RULE_CHANNEL_EVIDENCE_2026-08-24 §0 finding 3 shows its '
+  + 'band ordering is carried entirely by the weighted-rule channel.';
+
+/** One distributable script, as it sits on disk. */
+export interface PublicScript {
+  /** Repo-relative path. Also the degradation seed key — see `seed`. */
+  file: string;
+  /** Which CorpusSet it came from. */
+  set: string;
+  /** sha256 of the file's bytes (NOT of the trimmed text — this is a file
+   *  fixture lock, so it must move if a single byte of the file moves). */
+  sha256: string;
+  text: string;
+}
+
+export function sha256Hex(bytes: Buffer | string): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+/** Every .fountain file in the two distributable sets, in a stable order:
+ *  set order first (as declared above), then filename ascending. The order is
+ *  part of the artifact — the manifest is committed in it. */
+export function listPublicCorpus(root: string = REPO_ROOT): PublicScript[] {
+  const out: PublicScript[] = [];
+  for (const set of PUBLIC_CORPUS_SETS) {
+    const dir = path.join(root, set.dir);
+    const names = readdirSync(dir)
+      .filter((n) => n.endsWith('.fountain'))
+      .sort();
+    for (const name of names) {
+      const bytes = readFileSync(path.join(dir, name));
+      out.push({
+        file: `${set.dir}/${name}`,
+        set: set.id,
+        sha256: sha256Hex(bytes),
+        text: bytes.toString('utf8'),
+      });
+    }
+  }
+  return out;
+}
+
+/** How many scripts the benchmark expects. A set that grows or shrinks must
+ *  do so in a diff that also moves this constant and re-locks the manifest. */
+export const PUBLIC_CORPUS_SIZE = 32;
+
+// ───────────────────────────────────────────────────────────────────────────
+// The pre-registered split
+// ───────────────────────────────────────────────────────────────────────────
+
+export const PARTITIONS = ['exploration', 'holdout'] as const;
+export type Partition = (typeof PARTITIONS)[number];
+
+/**
+ * THE SPLIT RULE, stated once and implemented once.
+ *
+ * partition(file) = holdout iff parseInt(sha256(file bytes).slice(0, 8), 16) % 10 < 3
+ *
+ * Three properties this rule has and a hand-picked split does not:
+ *
+ *  1. NOBODY CHOSE IT. The assignment is a function of the file's own bytes.
+ *     There is no version of this where a script lands in exploration because
+ *     it scored inconveniently — the split was computed before any AUC was.
+ *  2. ADDING A SCRIPT NEVER REASSIGNS AN EXISTING ONE. A rank-based rule
+ *     ("sort by hash, take the first 30%") would reshuffle every assignment
+ *     whenever the corpus grows; a per-file modulo cannot. That is what makes
+ *     it a PRE-registration rather than a snapshot.
+ *  3. EDITING A SCRIPT MOVES IT, LOUDLY. The hash is over file bytes, so any
+ *     edit changes both the manifest row and possibly the partition, and both
+ *     show up as a reviewable diff in tests/fixtures/public-benchmark-split.json.
+ *
+ * ~30% holdout was chosen for the same reason the P1 corpus split reserves a
+ * test partition: a set nobody has looked at while tuning. At N=32 the
+ * holdout is small and its own AUC is correspondingly wide — that is reported,
+ * not hidden.
+ *
+ * KNOWN LIMITATION, stated here rather than discovered later: the blind-pairs
+ * set contains near-duplicates by construction (an `-excellent` and a `-bad`
+ * member share a premise, a ten-scene skeleton and a cast). A per-file rule
+ * can put one member in exploration and its partner in holdout, so the
+ * holdout is not fully independent of the exploration half for those scripts.
+ * Keying the split on the pair instead would fix that and break property (1),
+ * because "which member's hash names the pair" is a choice. The split is
+ * per-file; the limitation is written down.
+ */
+export const PUBLIC_SPLIT_RULE =
+  "holdout iff parseInt(sha256(file bytes).slice(0, 8), 16) % 10 < 3; otherwise exploration";
+
+export function partitionFor(sha256: string): Partition {
+  return parseInt(sha256.slice(0, 8), 16) % 10 < 3 ? 'holdout' : 'exploration';
+}
+
+/** Repo-relative paths of the two committed artifacts, and the one command
+ *  that (re)produces them. One constant each, so the lock script, the tests,
+ *  the gate reporter and the docs cannot disagree about where they are. */
+export const PUBLIC_SPLIT_PATH = 'tests/fixtures/public-benchmark-split.json';
+export const PUBLIC_MANIFEST_PATH = 'tests/fixtures/public-corpus-manifest.json';
+export const PUBLIC_LOCK_COMMAND = 'npm run benchmark:public -- --lock';
+
+// ───────────────────────────────────────────────────────────────────────────
+// The two degradations
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * (b) is the reason this benchmark reports two numbers instead of one.
+ *
+ * doctor.ts:465-467 is `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)`,
+ * summed into craftPenalty at doctor.ts:657. The AUC-24 recipe drops every
+ * third scene, so it moves that term directly — and doctor.ts's own comment at
+ * :2092-2093 records what that means: "the doctor's shuffle-drop 'structural
+ * discrimination' is almost entirely a scene-COUNT artifact (scarcity term AUC
+ * 0.938; the weightedIssues rule channel AUC is 0.076)".
+ *
+ * The arithmetic predicts that artifact is ~10x larger at this corpus's
+ * length. A 10-scene script dropped to 7 moves scarcity by 140/7 - 140/10 =
+ * 6.00 points; on the private corpus's median 118 scenes the same recipe
+ * moves it by 140/79 - 140/118 = 0.58 points. The prediction that follows —
+ * "a short-script shuffle-drop benchmark would look far MORE separable" —
+ * was MEASURED HERE AND IS FALSE, and the reason is worth carrying in the
+ * code: over these 32 scripts the scarcity penalty rises by a mean of +5.693
+ * points exactly as predicted, while the density penalty falls by a mean of
+ * 7.625 points at the same time (dropping a third of the scenes removes a
+ * larger share of the weighted issues than of the words, and
+ * `density = weightedIssues / wordCount^0.7` is convex). Net, degradation
+ * RAISES mean health by 1.93 points, and the AUC lands at 0.5586 —
+ * indistinguishable from chance, not inflated.
+ *
+ * That is precisely why both degradations are reported. Neither number can be
+ * argued from the formula alone; both have to be run.
+ *
+ * degradeClimaxRelocate moves the last scene to position 1 and changes nothing
+ * else: the scene COUNT is identical, so the scarcity term cancels exactly
+ * (verified — mean scarcity delta 0.000 over all 32 scripts) and what is left
+ * is order-sensitivity. It is expected to be near chance, and is:
+ * doctor.ts:2100 records act-swap AUC 0.48 -> 0.62 on the private corpus, the
+ * P1 baseline reports CLIMAX_RELOCATE 0.523 on its 153-script test partition,
+ * and this corpus gives 0.4673.
+ */
+export interface Degradation {
+  id: string;
+  label: string;
+  sceneCountPreserving: boolean;
+  recipe: string;
+  source: string;
+  apply: (script: PublicScript) => string | null;
+  /** Seed integer for this script, or null for a deterministic recipe that
+   *  uses no PRNG. Recorded per row so a run is reproducible from the file. */
+  seedFor: (script: PublicScript) => number | null;
+}
+
+export const PUBLIC_DEGRADATIONS: readonly Degradation[] = [
+  {
+    id: 'SHUFFLE_DROP',
+    label: 'shuffle scenes AND drop every third (the AUC-24 recipe)',
+    sceneCountPreserving: false,
+    recipe:
+      'seeded Fisher-Yates shuffle of all INT./EXT. scenes, then drop every third scene of '
+      + 'the shuffled order (index % 3 === 2); any pre-first-slugline head is preserved verbatim',
+    source: 'scripts/lib/auc.ts shuffleDropDegrade (imported verbatim — the AUC-24 ratchet\'s own recipe)',
+    apply: (s) => shuffleDropDegrade(s.text, s.file),
+    seedFor: (s) => degradationSeed(s.file),
+  },
+  {
+    id: 'CLIMAX_RELOCATE',
+    label: 'move the final scene to position 1 (scene count preserved)',
+    sceneCountPreserving: true,
+    recipe: 'pop the last scene and splice it in at index 1; preamble and every scene body unchanged',
+    source: 'scripts/lib/rebuild-experiment-lib.mjs degradeClimaxRelocate (imported verbatim)',
+    apply: (s) => degradeClimaxRelocate(s.text) as string | null,
+    seedFor: () => null,
+  },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// The two statistics, and intervals for both
+// ───────────────────────────────────────────────────────────────────────────
+
+/** One script's intact and degraded health, plus the scene counts that make
+ *  the scene-count-artifact argument checkable rather than asserted. */
+export interface HealthPair {
+  file: string;
+  set: string;
+  partition: Partition;
+  seed: number | null;
+  real: number;
+  degraded: number;
+  intactScenes: number;
+  degradedScenes: number;
+}
+
+export interface Interval {
+  lo: number;
+  hi: number;
+}
+
+/**
+ * Bootstrap interval for the ALL-PAIRS statistic. See this file's header for
+ * why it is adapted rather than imported: rebuild-experiment-lib's bootstrapCi
+ * hardcodes pairwiseAuc in its loop. Everything else — the PRNG, the default
+ * seed, the resample shape, the percentile bounds, the Float64Array sort — is
+ * the same procedure, so the two intervals below are comparable to each other.
+ */
+export function bootstrapCiAllPairs(
+  pairs: readonly HealthPair[],
+  iterations: number = BOOTSTRAP_DEFAULT,
+  seed = 42,
+): Interval {
+  if (pairs.length === 0) return { lo: NaN, hi: NaN };
+  const rng = mulberry32(seed);
+  const n = pairs.length;
+  const aucs = new Float64Array(iterations);
+  for (let i = 0; i < iterations; i++) {
+    const intact: number[] = [];
+    const degraded: number[] = [];
+    for (let j = 0; j < n; j++) {
+      const pick = pairs[Math.floor(rng() * n)];
+      intact.push(pick.real);
+      degraded.push(pick.degraded);
+    }
+    aucs[i] = computeAuc(intact, degraded);
+  }
+  const sorted = Array.from(aucs).sort((a, b) => a - b);
+  return { lo: sorted[Math.floor(0.025 * iterations)], hi: sorted[Math.floor(0.975 * iterations)] };
+}
+
+export interface DegradationResult {
+  id: string;
+  label: string;
+  sceneCountPreserving: boolean;
+  recipe: string;
+  source: string;
+  n: number;
+  /** Scripts the recipe refused (too few scenes). Reported, never silently dropped. */
+  skipped: string[];
+  /** The AUC-24 statistic: Mann-Whitney over the full intact x degraded grid
+   *  (scripts/lib/auc.ts computeAuc). This is the ASSERTED one. */
+  aucAllPairs: number;
+  /** The four-degradation harness's statistic: matched pair, script vs its own
+   *  degraded self (rebuild-experiment-lib pairwiseAuc). Reported alongside. */
+  aucPaired: number;
+  ciAllPairs: Interval;
+  ciPaired: Interval;
+  bootstrapIterations: number;
+  bootstrapSeed: number;
+  /** Mean (intact - degraded) health, in points. */
+  meanGap: number;
+  pairs: HealthPair[];
+}
+
+/** Everything a run produces. Rendered by `npm run benchmark:public`, asserted
+ *  by tests/core/public-benchmark.test.ts, transcribed into the measurement
+ *  doc — one shape, so the three cannot disagree. */
+export interface BenchmarkResult {
+  scripts: ScriptRow[];
+  degradations: DegradationResult[];
+  calibrationControl: CalibrationControlResult | null;
+}
+
+/**
+ * `verdict` is OPTIONAL on ScriptDoctorReport (types.ts:329) — a report can
+ * come back without one. Locking a blank cell in that case would make "the
+ * doctor stopped producing verdicts" look identical to "this row is fine", so
+ * the absence is recorded as a value and the test asserts no row carries it.
+ */
+export const MISSING_VERDICT = 'NO-VERDICT';
+
+/** A manifest row: what gets locked. Numbers and a hash — no screenplay text. */
+export interface ScriptRow {
+  file: string;
+  sha256: string;
+  sceneCount: number;
+  words: number;
+  health: number;
+  verdict: string;
+}
+
+export interface CalibrationControlResult {
+  note: string;
+  bands: { band: string; n: number; meanHealth: number }[];
+  strongOverTroubled: { ordered: number; of: number; meanGap: number };
+}
+
+/**
+ * Score every distributable script intact, then under each degradation.
+ *
+ * `onScript` exists so the CLI can show progress without this module printing
+ * anything (it is imported by a test; a library that writes to stdout when a
+ * test imports it is a library that fails `check-no-console` reviews for the
+ * wrong reason).
+ */
+export async function measurePublicBenchmark(options: {
+  root?: string;
+  bootstrapIterations?: number;
+  bootstrapSeed?: number;
+  includeCalibrationControl?: boolean;
+  onScript?: (file: string, index: number, total: number) => void;
+} = {}): Promise<BenchmarkResult> {
+  const root = options.root ?? REPO_ROOT;
+  const iterations = options.bootstrapIterations ?? BOOTSTRAP_DEFAULT;
+  const seed = options.bootstrapSeed ?? 42;
+  const scripts = listPublicCorpus(root);
+
+  const rows: ScriptRow[] = [];
+  const intactByFile = new Map<string, { health: number; sceneCount: number }>();
+  for (const [i, script] of scripts.entries()) {
+    options.onScript?.(script.file, i, scripts.length);
+    const report = await runScriptDoctor(script.text);
+    rows.push({
+      file: script.file,
+      sha256: script.sha256,
+      sceneCount: report.sceneCount,
+      words: report.wordCount,
+      health: report.health,
+      verdict: report.verdict ?? MISSING_VERDICT,
+    });
+    intactByFile.set(script.file, { health: report.health, sceneCount: report.sceneCount });
+  }
+
+  const degradations: DegradationResult[] = [];
+  for (const degradation of PUBLIC_DEGRADATIONS) {
+    const pairs: HealthPair[] = [];
+    const skipped: string[] = [];
+    for (const script of scripts) {
+      const degradedText = degradation.apply(script);
+      if (degradedText === null) {
+        skipped.push(script.file);
+        continue;
+      }
+      const degradedReport = await runScriptDoctor(degradedText);
+      const intact = intactByFile.get(script.file)!;
+      pairs.push({
+        file: script.file,
+        set: script.set,
+        partition: partitionFor(script.sha256),
+        seed: degradation.seedFor(script),
+        real: intact.health,
+        degraded: degradedReport.health,
+        intactScenes: intact.sceneCount,
+        degradedScenes: degradedReport.sceneCount,
+      });
+    }
+    degradations.push({
+      id: degradation.id,
+      label: degradation.label,
+      sceneCountPreserving: degradation.sceneCountPreserving,
+      recipe: degradation.recipe,
+      source: degradation.source,
+      n: pairs.length,
+      skipped,
+      aucAllPairs: computeAuc(pairs.map((p) => p.real), pairs.map((p) => p.degraded)),
+      aucPaired: pairwiseAuc(pairs) as number,
+      ciAllPairs: bootstrapCiAllPairs(pairs, iterations, seed),
+      ciPaired: bootstrapCi(pairs, iterations, seed) as Interval,
+      bootstrapIterations: iterations,
+      bootstrapSeed: seed,
+      meanGap: pairs.reduce((acc, p) => acc + (p.real - p.degraded), 0) / pairs.length,
+      pairs,
+    });
+  }
+
+  return {
+    scripts: rows,
+    degradations,
+    calibrationControl: options.includeCalibrationControl
+      ? await measureCalibrationControl()
+      : null,
+  };
+}
+
+/** The labelled control. Scored, printed, never asserted against a floor and
+ *  never mixed into the 32-script statistic. */
+export async function measureCalibrationControl(): Promise<CalibrationControlResult> {
+  const byBand = new Map<string, number[]>();
+  const health = new Map<string, number>();
+  for (const sample of REFERENCE_CORPUS) {
+    const report = await runScriptDoctor(sample.fountain);
+    if (!byBand.has(sample.band)) byBand.set(sample.band, []);
+    byBand.get(sample.band)!.push(report.health);
+    health.set(sample.label, report.health);
+  }
+  const strong = REFERENCE_CORPUS.filter((s) => s.band === 'strong');
+  const troubled = REFERENCE_CORPUS.filter((s) => s.band === 'troubled');
+  // Pair them by position, exactly as docs/p1-benchmark/BLIND_PAIRS_2026-09-04.md
+  // reports "5 of 5 with a 25.32 gap" — the strong and troubled bands hold five
+  // samples each and are compared index-wise.
+  let ordered = 0;
+  let gapSum = 0;
+  const n = Math.min(strong.length, troubled.length);
+  for (let i = 0; i < n; i++) {
+    const good = health.get(strong[i].label)!;
+    const bad = health.get(troubled[i].label)!;
+    if (good > bad) ordered += 1;
+    gapSum += good - bad;
+  }
+  return {
+    note: CALIBRATION_CONTROL_NOTE,
+    bands: [...byBand.entries()].map(([band, values]) => ({
+      band,
+      n: values.length,
+      meanHealth: values.reduce((a, b) => a + b, 0) / values.length,
+    })),
+    strongOverTroubled: { ordered, of: n, meanGap: n === 0 ? NaN : gapSum / n },
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// What the number can and cannot say
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Quoted verbatim by the test's failure message, by `npm run benchmark:public`,
+ * and by docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md. A caveat that lives
+ * in one file next to the number cannot be left behind when the number is
+ * copied somewhere else.
+ */
+export const PUBLIC_BENCHMARK_LIMITS = [
+  'WHAT THIS BENCHMARK CAN SHOW',
+  '  * That the doctor still separates an intact script from a mechanically damaged copy of',
+  '    ITSELF, recomputed from committed text on every CI run, by anyone, with no corpus mount.',
+  '  * That a scoring change did or did not move that separation — as a numeric diff, with a',
+  '    seeded bootstrap interval, on a pre-registered split.',
+  '  * The scene-count question, directly rather than by arithmetic: (a) changes scene count and',
+  '    (b) does not, so the two numbers can be read against each other. On this corpus that',
+  '    comparison refuted the prediction that (a) would be inflated — see the header of',
+  '    PUBLIC_DEGRADATIONS for the measured decomposition (+5.693 scarcity, -7.625 density).',
+  '',
+  'WHAT IT SAYS TODAY (2026-09-06, this tree)',
+  '  * Shuffle-drop AUC 0.5586, 95% CI [0.4219, 0.6973]. Climax-relocate AUC 0.4673, 95% CI',
+  '    [0.4014, 0.5264]. BOTH intervals contain 0.5: on this corpus the doctor does not',
+  '    reliably prefer an intact script to a mechanically damaged copy of itself.',
+  '',
+  'WHAT IT CANNOT SHOW',
+  '  * That health tracks CRAFT. Mechanical damage is not bad writing. The blind-pairs result',
+  '    (1 of 6 ordered, tests/core/blind-pairs-discrimination.test.ts) is the craft question,',
+  '    and it is a different, failing measurement.',
+  '  * That any number here transfers to feature-length real writing. N=32, 9-14 scenes each.',
+  '    ARC_DED_MIN_SCENES and CLIMAX_DED_MIN_SCENES are both 15 (doctor.ts:2101, :619-622), so',
+  '    the feature-scale deductions never fire on this corpus at all — this benchmark measures a',
+  '    strictly smaller engine than the AUC-24 ratchet does.',
+  '  * Anything about the AUC-24 >= 0.622 ratchet. Different corpus, different denominator,',
+  '    different script length. The owner\'s `npm run measure-real` run is what confirms or',
+  '    refutes transfer; nothing in this repository can.',
+  '  * Craft validity of the SOURCE TEXT. Twenty of the 32 scripts are agent-authored and the',
+  '    other twelve are one human author\'s, unlabelled by independent readers.',
+].join('\n');

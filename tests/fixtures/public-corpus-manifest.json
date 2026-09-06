@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "lockCommand": "npm run benchmark:public -- --lock",
+  "note": "Locked from the tree at lock time. Every future scoring change that moves any of these numbers shows up here as a reviewable numeric diff — the thing that exists today only for a corpus CI cannot read (tests/fixtures/real-corpus-manifest.json).",
+  "sets": [
+    {
+      "id": "cc0-live-action",
+      "dir": "data/screenplays",
+      "provenanceFile": "data/screenplays/LICENSE-live-action.md",
+      "licence": "CC0 1.0 Universal (Public Domain Dedication)"
+    },
+    {
+      "id": "blind-pairs",
+      "dir": "tests/fixtures/blind-pairs",
+      "provenanceFile": "tests/fixtures/blind-pairs/README.md",
+      "licence": "CC0 1.0 Universal, declared in each file's /* */ boneyard"
+    }
+  ],
+  "scriptCount": 32,
+  "scripts": [
+    {
+      "file": "data/screenplays/chain-of-custody.fountain",
+      "sha256": "3c8d0d03dec9ea0658dc9f44ad785dc3b9dcf5a54b870962bbb077bf036ac977",
+      "sceneCount": 13,
+      "words": 824,
+      "health": 76.3,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/close-quarters.fountain",
+      "sha256": "8ca30768cbf966c88b4cd6565898aa04fc67a9c097036cb17fa185b5cbaad605",
+      "sceneCount": 13,
+      "words": 840,
+      "health": 75.6,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/code-blue.fountain",
+      "sha256": "29967a197f68a02b5ab0ee06714122e9b03bc9c3efdd7c8d4e8aee6cbdbc3f33",
+      "sceneCount": 14,
+      "words": 951,
+      "health": 78,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/counter-offer.fountain",
+      "sha256": "88efab9e4fb76d88cc8b80b2abaa7daacf189c90fc62f2319696a2b531202d65",
+      "sceneCount": 10,
+      "words": 1521,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/dead-frequency.fountain",
+      "sha256": "9fca286f16dd562ecda63f32476bb60f7d9a9bde396f883cde12cd94aceffa99",
+      "sceneCount": 12,
+      "words": 1830,
+      "health": 78.3,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/high-voltage.fountain",
+      "sha256": "4c48ab402fc6568742abfdd0cd22e576db6da94b7f62d916630ebaa37fd0ab61",
+      "sceneCount": 13,
+      "words": 934,
+      "health": 75.4,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/mise.fountain",
+      "sha256": "59924b1f6d495f81e849859494efff1e35fd1ce47a16a27a89e6c0a6544e016d",
+      "sceneCount": 12,
+      "words": 917,
+      "health": 74.2,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/off-season.fountain",
+      "sha256": "1dd1c2bc68956a15d4c59b80148945b49a3fed3a83b6f19a7537b55ce2a32bb4",
+      "sceneCount": 9,
+      "words": 752,
+      "health": 71.2,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/quiet-season.fountain",
+      "sha256": "0c8e79f16f00e8d539a32adbf482f64d1d34ac8f3cba80dc5765eb1d1f49968d",
+      "sceneCount": 10,
+      "words": 668,
+      "health": 73.2,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/red-line.fountain",
+      "sha256": "f730ade5917e5205309b85148bd56e05a9d1d34544c2ad0ef6456e7f22f0c903",
+      "sceneCount": 14,
+      "words": 982,
+      "health": 73.7,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/room-12.fountain",
+      "sha256": "9cb9b4b597f3d2e5751d5ef46eac5323f0c3425ac3c0bf018203d0c9ea9767c9",
+      "sceneCount": 10,
+      "words": 427,
+      "health": 33.5,
+      "verdict": "PASS"
+    },
+    {
+      "file": "data/screenplays/runoff.fountain",
+      "sha256": "6896803e4bd79118371546b80ab3771c29a57aae17a0141fe9ebaa3020083c5e",
+      "sceneCount": 9,
+      "words": 1448,
+      "health": 74.6,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/same-page.fountain",
+      "sha256": "f11072fa3618a615013f6205554a75e01f79282b74e0884286e326f83b083546",
+      "sceneCount": 11,
+      "words": 803,
+      "health": 75.8,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/soft-launch.fountain",
+      "sha256": "b6c6f301fcbe10c64eb929ce425b7732962db091e8e5e1e5119fa31ef798df6f",
+      "sceneCount": 12,
+      "words": 967,
+      "health": 77.3,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/the-defense-rests.fountain",
+      "sha256": "eade33f5ba25013201f524271cc56cbaf7cb08989e73582d66a7ce9cb7951bd1",
+      "sceneCount": 12,
+      "words": 958,
+      "health": 77,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/the-detour.fountain",
+      "sha256": "5857841903919c2acb03ba60f912b935c4eee250dea7b520bd1f0b04ab74b651",
+      "sceneCount": 11,
+      "words": 747,
+      "health": 74,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/the-key-under-the-mat.fountain",
+      "sha256": "89814093294d56142008d32711eca1b913b4c574b9b8851872d88a90762db891",
+      "sceneCount": 11,
+      "words": 890,
+      "health": 74.2,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/transfer-window.fountain",
+      "sha256": "e821d38b291a65c51120ee6c7471efcb6923948bf4060d68d876492fb70ed39c",
+      "sceneCount": 10,
+      "words": 454,
+      "health": 31.9,
+      "verdict": "PASS"
+    },
+    {
+      "file": "data/screenplays/two-lane.fountain",
+      "sha256": "8524023d834abbc9d0edaf772a40600048c5bac61de5c73e37d1fb0a37480a50",
+      "sceneCount": 13,
+      "words": 1006,
+      "health": 79,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "data/screenplays/undertow.fountain",
+      "sha256": "2f50c3ab4613bccf08b37c0a4e7f92996f33b4cc23b9e3962ab93f213adde1d6",
+      "sceneCount": 12,
+      "words": 884,
+      "health": 77.1,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/fence-line-bad.fountain",
+      "sha256": "41e9463180264754774c6d7a9d3db359e7d6d0478b4fc51c64f5dd8a1a3f9bb4",
+      "sceneCount": 10,
+      "words": 1022,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/fence-line-excellent.fountain",
+      "sha256": "408f2252622f759970f13953a940856627c22212e9f508415be9dc090cba525b",
+      "sceneCount": 10,
+      "words": 980,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/low-tide-bad.fountain",
+      "sha256": "b5ab271d826e891351119e021c2d441c6d5353706f78e5acee2f3118cc5ed82b",
+      "sceneCount": 10,
+      "words": 965,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/low-tide-excellent.fountain",
+      "sha256": "953a459e8ba9e7581d6fa06d7e6de076671679ee1aae427214dba8f2a123af93",
+      "sceneCount": 10,
+      "words": 950,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/night-shift-bad.fountain",
+      "sha256": "0f96e3d48324f20bed399861c36fc508765f984251ca82100a1c0823ac53f29e",
+      "sceneCount": 10,
+      "words": 1006,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/night-shift-excellent.fountain",
+      "sha256": "b8557cea8e84b8deb9a2c51706a59aad557eecc390e90aade2a6f579fb4fea6d",
+      "sceneCount": 10,
+      "words": 933,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/signal-drift-bad.fountain",
+      "sha256": "e8725568ce1436d6b050fe56e056224e9de1bae73d30d6c5b0643dad50a0cdf5",
+      "sceneCount": 10,
+      "words": 957,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/signal-drift-excellent.fountain",
+      "sha256": "b554b3fb5f4e53a1e477a3cedd49636f4b2bb573dedc4dd5fe798df2b7779807",
+      "sceneCount": 10,
+      "words": 894,
+      "health": 75.6,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/the-deposit-bad.fountain",
+      "sha256": "edfb16d002dd64195d41ff0529f34ea55a55184bcfe4e2e4ce631e4a3628541c",
+      "sceneCount": 10,
+      "words": 962,
+      "health": 76,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/the-deposit-excellent.fountain",
+      "sha256": "c5ca7addadb785216cbe162952f84f9d643cb7593f29f5c7b76944ceb949d7df",
+      "sceneCount": 10,
+      "words": 953,
+      "health": 75.1,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/the-ledger-bad.fountain",
+      "sha256": "0761ac787bb63830fc923cb117fff8d3df97e973b96aae37d9625784f572d267",
+      "sceneCount": 10,
+      "words": 907,
+      "health": 74.8,
+      "verdict": "CONSIDER"
+    },
+    {
+      "file": "tests/fixtures/blind-pairs/the-ledger-excellent.fountain",
+      "sha256": "51c087884f60fbe06a599c6afe51f98d24bdac26e6d1216a563c808511651ca1",
+      "sceneCount": 10,
+      "words": 881,
+      "health": 76,
+      "verdict": "CONSIDER"
+    }
+  ]
+}

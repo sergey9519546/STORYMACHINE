@@ -36,7 +36,9 @@ carries AUC ~0.938 — more generated rules stopped adding signal a long time
 ago. The rule catalog (3,217 pass-scoped constants,
 `docs/rulebook/README.md`) is a maintained conceptual set, not a quality
 claim; the wave program that grew it is retired and must not be resumed.
-See [[Gate - AUC-24 Ratchet]] and the [[Measurements Index|measurement notes]] for
+See [[Gate - AUC-24 Ratchet]], [[Gate - Public Benchmark]] — added 2026-09-06,
+the first discrimination number this repository computes on **every** CI run,
+and it lands near chance — and the [[Measurements Index|measurement notes]] for
 where discrimination currently stands.
 
 ## The current phase
