@@ -2296,8 +2296,13 @@ either; all three are PENDING.
   `tests/core/blind-pairs-discrimination.test.ts` 0 (3/3).
 - **`node scripts/check-scoring-receipt.mjs main..HEAD` exits 1 on this
   branch, by design.** It finds all three PENDING entries in this range and
-  refuses them, which is what a PENDING entry is for. Closing it means
-  running the measurement, not editing a heading.
+  refuses them, which is what a PENDING entry is for. Closing it means running
+  the measurement and then rewriting all three entries IN PLACE — appending a
+  measured entry beside them does not work, because `checkReceiptForRange`
+  (`:650-673`) validates every entry the range adds. The exact edit, the check
+  that establishes it, and the reason the phrase list is not quoted in this
+  ledger are in the two bullets under "What DOES close it" in the R5 addendum
+  above; they apply to this entry unchanged.
 - **Runner attestation:** "I, the branch-sync lane
   (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), rebased both branches
   onto `2bfcbf9d` myself, built this merge myself, resolved its one conflict
@@ -2309,7 +2314,12 @@ either; all three are PENDING.
   entry comes from fixtures committed to this repository. The owner's step is
   to check out `scoring/stacked-r5-plus-advice`, run
   `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, then
-  `npm run lock-auc24`, then re-lock the 72-row
-  `tests/fixtures/real-corpus-manifest.json`, then supersede this entry with
-  one carrying the measured number. Until that entry exists this branch must
+  `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24` — the variable is
+  repeated because an inline assignment applies to one command only, and a bare
+  `npm run lock-auc24` refuses with `REAL_SCRIPT_CORPUS_DIR is not set` and
+  writes nothing — then re-lock the 72-row
+  `tests/fixtures/real-corpus-manifest.json` (no command does this; read
+  `tests/fixtures/real-corpus-manifest.README.md` first, its array order is
+  load-bearing), then rewrite all three entries in this range IN PLACE as
+  measured, per the bullets above. Until that rewrite happens this branch must
   not merge."
