@@ -925,34 +925,77 @@ function accumulateDialogueWords(lines: string[], startIdx: number, joinAcrossGa
  *  downstream predicates across rounds 1-8. Yields in document order; the
  *  caller decides what to do with each occurrence (apply a bound, or just
  *  count it). */
+/** Resolves the EXACT line array walkGuardCueOccurrences (and everything
+ *  downstream of it) will read for `text`, plus the document-wide
+ *  double-spaced decision that pooling/wrap-joining depends on — the SAME
+ *  decision normalizeScreenplay itself makes before parseFountain ever
+ *  runs. Exported (2026-09-05 review round 6, oracle gap) purely so a TEST
+ *  can exercise this REAL function directly rather than a hand-copied
+ *  replica of its logic — the round-5 document-level parity test's own
+ *  `guardSceneSegmentCount` was exactly such a replica, and reproducing the
+ *  walk's decision instead of calling it is why it could not see the
+ *  round-6 bug below (the replica and the real walk had already drifted).
+ *
+ *  2026-09-05 review round 4, BLOCKER — mirrors screenplay-normalizer.ts's
+ *  OWN line-ending normalization EXACTLY (`normalizeScreenplay`'s first
+ *  line, `raw.replace(/\r\n?/g, '\n')`) — but, per round 6 below, ONLY to
+ *  DECIDE double-spaced-ness, the same narrow purpose normalizeScreenplay
+ *  itself uses this exact normalization for. Without ANY normalization
+ *  here, a CR-only document (`\r`, no `\n` at all — a classic-Mac or
+ *  mangled-export line ending) would be ONE line to this whole walk while
+ *  normalizeScreenplay still normalizes line endings first and reflows a
+ *  double-spaced one into real character blocks — measured (round 4): a
+ *  105,690-char double-spaced CR-only payload was guard-ACCEPTED with
+ *  `guardCueOccurrences` reading 0 against 2,000 real pipeline blocks, and
+ *  cost 42,910ms/HTTP 43,148ms.
+ *
+ *  2026-09-05 review round 6, BLOCKER — the round-4 fix above applied its
+ *  \r-normalization to EVERY document unconditionally, but
+ *  normalizeScreenplay only does that "permanently" for a document it
+ *  actually REFLOWS (screenplay-normalizer.ts:137-141: it builds `allLines`
+ *  via the identical `\r\n? -> \n` normalization SOLELY to decide
+ *  `isDoubleSpaced`, then `if (!isDoubleSpaced(allLines)) return raw;` —
+ *  the ORIGINAL string, `\r`s and all, unchanged). parseFountain then
+ *  splits THAT on `'\n'` alone, so a lone `\r` NOT followed by `\n` is
+ *  ordinary text embedded inside one line to the real pipeline, never a
+ *  line break — while this function's OLD unconditional normalization
+ *  turned every such `\r` into an extra line break regardless. In a
+ *  single-spaced script, ONE stray `\r` inside an action paragraph — e.g. a
+ *  line ending "...something happens.\rINT. GHOST - DAY" repeated 500
+ *  times — read as up to hundreds of extra "scene headings" the analyzer
+ *  never sees at all, running `sceneIndex` past ANALYZER_SCENE_CEILING and
+ *  EMPTYING voiceWordCounts entirely (every real cue's occurrence now read
+ *  as past-ceiling) — the exact inverse of round 4's finding: instead of
+ *  one ghost character sneaking IN, every REAL character got pushed OUT,
+ *  and an empty eligibility map means `nonZeroVoiceWordCounts.length >= 2`
+ *  is false, so the bound never evaluated AT ALL. Measured: 132,077 chars,
+ *  guard-ACCEPT with 0 eligible names against 200 real ones (60 words
+ *  each), `runScriptDoctor` 49,234ms / HTTP 200 in 51,437ms — a document
+ *  identical to a REJECTing control except for that one stray `\r`. Fixed
+ *  by resolving the SAME array normalizeScreenplay would hand to
+ *  parseFountain: the \r-normalized array when the document WILL be
+ *  reflowed (matching what the reflow itself reads), or the untouched,
+ *  '\n'-split-only raw text otherwise (matching normalizeScreenplay's own
+ *  `return raw` — a lone `\r` stays embedded inside a line, never becomes
+ *  an extra split point here either). This keeps round 3's CR-only
+ *  DOUBLE-SPACED payload rejected (it IS reflowed, so it still gets the
+ *  normalized array) while closing the single-spaced case. */
+export function resolveGuardLines(text: string): { lines: string[]; docIsDoubleSpaced: boolean } {
+  const normLines = text.replace(/\r\n?/g, '\n').split('\n');
+  const docIsDoubleSpaced = isDoubleSpacedForVoiceGrouping(normLines);
+  const lines = docIsDoubleSpaced ? normLines : text.split('\n');
+  return { lines, docIsDoubleSpaced };
+}
+
 function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
-  // 2026-09-05 review round 4, BLOCKER — mirrors screenplay-normalizer.ts's
-  // OWN line-ending normalization EXACTLY (`normalizeScreenplay`'s first
-  // line, `raw.replace(/\r\n?/g, '\n')`) before this walk ever splits on
-  // '\n'. Without this, a CR-only document (`\r`, no `\n` at all — a
-  // classic-Mac or mangled-export line ending) is ONE line to this entire
-  // walk: every bound in this file (distinct/weight/frequent-cue-lines,
-  // AND the voice-eligible-weight bound, since isDoubleSpacedForVoiceGrouping
-  // below reads the SAME `lines` array) goes vacuous, while
-  // normalizeScreenplay still normalizes the line endings first and reflows
-  // the double-spaced document into a full script parseFountain reads as
-  // real character blocks — measured: a 105,690-char double-spaced CR-only
-  // payload was guard-ACCEPTED with `guardCueOccurrences` reading 0 against
-  // 2,000 real pipeline character blocks (violating the ROUND 1 cue oracle
-  // too, not just the voice bound), and cost 42,910ms/HTTP 43,148ms. A
-  // single-spaced CR-only document is inert either way (normalizeScreenplay
-  // returns non-double-spaced text unreflowed), which is why the original
-  // A2 "line endings are clean" finding held — it was measured on that
-  // shape only. One normalization, at the one place every downstream split
-  // in this walk reads from, closes it for every bound at once.
-  const lines = text.replace(/\r\n?/g, '\n').split('\n');
   // 2026-09-05 review round 3 — computed ONCE, document-wide, matching
   // normalizeScreenplay's own document-wide reflow decision (see
   // isDoubleSpacedForVoiceGrouping's own comment). Drives whether
   // dialogueWords below joins a wrapped paragraph's fragments or counts
   // only the first, the same choice the real pipeline already made for
-  // this exact text.
-  const docIsDoubleSpaced = isDoubleSpacedForVoiceGrouping(lines);
+  // this exact text — AND, per round 6, which line array this walk reads
+  // (see resolveGuardLines' own comment for the full mechanism).
+  const { lines, docIsDoubleSpaced } = resolveGuardLines(text);
   // Boneyard tracking (2026-09-05 review finding A3) — mirrors src/lib/
   // fountain.ts's parseFountain `inBoneyard` toggle EXACTLY: a trimmed line
   // starting with '/*' opens it; it closes on a line containing '*/' unless

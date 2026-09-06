@@ -106,6 +106,7 @@ import {
   guardVoiceWordCounts,
   guardEligibleVoiceWordCounts,
   isSceneSegmentHeading,
+  resolveGuardLines,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
 import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/screenplay-normalizer.ts';
@@ -979,32 +980,78 @@ function pipelineWordsByBaseName(text: string): Map<string, number> {
   return counts;
 }
 
-describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word count(name), and guard-ineligible ⊆ pipeline-ineligible', () => {
-  const VOICE_ELIGIBLE_MIN_WORDS = 30; // mirrors validation.ts's own (private) constant — see that file's comment
+const VOICE_ELIGIBLE_MIN_WORDS = 30; // mirrors validation.ts's own (private) constant — see that file's comment
 
-  /** Runs the guardWords >= pipelineWords and ineligible-subset checks for
-   *  one generated document, over the UNION of every base name either side
-   *  recognizes (a name absent from one side reads as 0 for that side). */
-  function assertWordOracle(label: string, text: string): void {
-    const guardCounts = guardVoiceWordCounts(text);
-    const pipelineCounts = pipelineWordsByBaseName(text);
-    const allNames = new Set<string>([...guardCounts.keys(), ...pipelineCounts.keys()]);
-    for (const name of allNames) {
-      const g = guardCounts.get(name) ?? 0;
-      const p = pipelineCounts.get(name) ?? 0;
-      assert.ok(
-        g >= p,
-        `ORACLE VIOLATION "${label}" name="${name}": guardWords=${g} < pipelineWords=${p}`,
-      );
-      const guardIneligible = g < VOICE_ELIGIBLE_MIN_WORDS;
-      const pipelineIneligible = p < VOICE_ELIGIBLE_MIN_WORDS;
-      assert.ok(
-        !guardIneligible || pipelineIneligible,
-        `ORACLE VIOLATION "${label}" name="${name}": guard treats it ineligible (${g} words) but the pipeline finds it ELIGIBLE (${p} words) — this is bypass A/B's exact shape`,
-      );
-    }
+/** Runs the guardWords >= pipelineWords and ineligible-subset checks for
+ *  one generated document, over the UNION of every base name either side
+ *  recognizes (a name absent from one side reads as 0 for that side).
+ *  Module-scoped (2026-09-05 review round 6) rather than nested inside the
+ *  "ROUND 3 oracle" describe block below, since the round-6 corpus needs
+ *  it too. */
+function assertWordOracle(label: string, text: string): void {
+  const guardCounts = guardVoiceWordCounts(text);
+  const pipelineCounts = pipelineWordsByBaseName(text);
+  const allNames = new Set<string>([...guardCounts.keys(), ...pipelineCounts.keys()]);
+  for (const name of allNames) {
+    const g = guardCounts.get(name) ?? 0;
+    const p = pipelineCounts.get(name) ?? 0;
+    assert.ok(
+      g >= p,
+      `ORACLE VIOLATION "${label}" name="${name}": guardWords=${g} < pipelineWords=${p}`,
+    );
+    const guardIneligible = g < VOICE_ELIGIBLE_MIN_WORDS;
+    const pipelineIneligible = p < VOICE_ELIGIBLE_MIN_WORDS;
+    assert.ok(
+      !guardIneligible || pipelineIneligible,
+      `ORACLE VIOLATION "${label}" name="${name}": guard treats it ineligible (${g} words) but the pipeline finds it ELIGIBLE (${p} words) — this is bypass A/B's exact shape`,
+    );
   }
+}
 
+// 2026-09-05 review round 6, oracle gap — the two properties above
+// (guardWords >= pipelineWords; ineligible-subset) and the round-5
+// decision-set-subset property both compare against, or derive from, either
+// the RAW `guardVoiceWordCounts` or a set-membership check — neither one
+// evaluates the actual VALUES the bound's decision is built from. R6-1's
+// guard-eligible map was EMPTY (every real cue pushed past the ceiling by
+// the stray-\r bug), so `guardWords >= pipelineWords` compared the raw
+// (unbounded) 60 against the pipeline's 60 and passed, and the decision-set
+// subset (`∅ ⊆ anything`) passed too — both hold while the bound's actual
+// input is empty. This property closes that gap directly: for every name
+// the CEILING-AWARE pipeline finds eligible (> 0 words), the guard's own
+// ceiling-aware accumulation (`guardEligibleVoiceWordCounts`) must report
+// AT LEAST that many words — AND, separately, if the pipeline has any
+// eligible name at all, the guard's eligible set must be non-empty (a
+// dedicated non-vacuity check, since an inequality over an empty map holds
+// vacuously and would not have caught R6-1 on its own). Together with the
+// round-5 decision-set-subset property (which catches a GHOST entering the
+// guard's set) this is now two-sided: one direction catches a name
+// wrongly ADDED to the guard's decision, the other catches every name
+// wrongly REMOVED from it — the round-4 and round-6 bypasses, respectively,
+// in one pair of properties.
+function assertEligibleWordsAtLeastPipeline(label: string, text: string): void {
+  const guardEligible = guardEligibleVoiceWordCounts(text);
+  const pipelineEligible = pipelineWordsByBaseName(text); // already ceiling-aware
+  let pipelineHasEligible = false;
+  for (const [name, pWords] of pipelineEligible) {
+    if (pWords <= 0) continue;
+    pipelineHasEligible = true;
+    const gWords = guardEligible.get(name) ?? 0;
+    assert.ok(
+      gWords >= pWords,
+      `ORACLE VIOLATION "${label}" name="${name}": guardEligibleVoiceWordCounts=${gWords} < ceiling-aware pipeline=${pWords} — this is R6-1's exact shape (the guard's real decision input undercounts a name the analyzer scores for real)`,
+    );
+  }
+  if (pipelineHasEligible) {
+    const guardHasEligible = [...guardEligible.values()].some((w) => w > 0);
+    assert.ok(
+      guardHasEligible,
+      `ORACLE VIOLATION "${label}": the ceiling-aware pipeline has at least one eligible name, but the guard's ceiling-aware decision set is EMPTY — the bound would never even evaluate, exactly R6-1's shape`,
+    );
+  }
+}
+
+describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word count(name), and guard-ineligible ⊆ pipeline-ineligible', () => {
   const DLG = 'this is ordinary lowercase dialogue here.'; // 6 words
 
   it('plain adjacent cue+dialogue, every cue-oracle family, gaps 0-3 — sanity that the word oracle holds on round-1\'s own corpus too', () => {
@@ -1279,15 +1326,24 @@ describe('ROUND 5 (finding 1, BLOCKER): scene-segmentation predicate parity with
 
   // CR-only / CRLF: isSceneSegmentHeading itself operates on an
   // already-trimmed, already-normalized single line, so this proves the
-  // DOCUMENT-LEVEL plumbing (line-ending normalization feeding it the same
+  // DOCUMENT-LEVEL plumbing (line-ending resolution feeding it the same
   // scene count the real pipeline computes) holds for every recognized
-  // heading style, not only the round-4 INT.-only sweep. `guardSceneSegmentCount`
-  // replicates validation.ts's own walk structure exactly (same normalize,
-  // same boneyard-toggle order, same predicate) rather than reusing an
-  // export, so this test independently proves the WALK wiring, not just the
-  // predicate function in isolation.
+  // heading style, not only the round-4 INT.-only sweep.
+  //
+  // 2026-09-05 review round 6, oracle gap — `guardSceneSegmentCount` used to
+  // be a REPLICA of validation.ts's own line-resolution logic (its own
+  // comment said so explicitly). That replica hard-coded the round-4 shape
+  // (`text.replace(/\r\n?/g, '\n').split('\n')` unconditionally) and had
+  // already silently drifted from the real walk by the time round 6 changed
+  // that logic to be conditional on `docIsDoubleSpaced` — which is exactly
+  // why this "document-level parity" test could not see the round-6 bug:
+  // it was proving the replica agreed with itself, not that the guard
+  // agreed with the real pipeline. Fixed by calling `resolveGuardLines`
+  // (validation.ts, exported test-only for this reason) directly — the
+  // SAME function walkGuardCueOccurrences itself now calls — so this test
+  // exercises the real wiring and can never drift from it again.
   function guardSceneSegmentCount(text: string): number {
-    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    const { lines } = resolveGuardLines(text);
     let inBoneyard = false;
     let count = 0;
     for (const raw of lines) {
@@ -1458,6 +1514,160 @@ describe('ROUND 5 regressions: three heading-spelling bypass payloads reject fas
   it('R5-6 control: a walk-on placed exactly at scene 400 (the ceiling boundary, still eligible) is unchanged — still accepts', () => {
     const text = buildCeilingCrossingDoc((s) => `INT. LOCATION ${s} - DAY`, 399, 'INT. HALL - DAY');
     assert.equal(fountainShapeRejectionReason(text), null, 'expected the at-the-ceiling walk-on control to keep accepting (unchanged from round 4)');
+  });
+});
+
+// ── ROUND 6 (2026-09-05 review round 6, BLOCKER, of the round-5 fix
+// `81ff69fe`): the guard's line array was STILL not what the real pipeline
+// reads. Round 4 normalized `\r\n?` -> `\n` unconditionally before
+// splitting; round 6 found normalizeScreenplay only keeps that
+// normalization PERMANENTLY when it actually reflows (`isDoubleSpaced`) —
+// for an ordinary single-spaced script it returns the raw string, `\r`s and
+// all, which parseFountain then splits on `'\n'` ALONE, so a lone `\r`
+// embedded inside one line is ordinary text to the real pipeline but an
+// extra line break to the (round-4-shaped) guard. A single stray `\r`
+// inside one action paragraph, repeated enough times, pushed `sceneIndex`
+// past `ANALYZER_SCENE_CEILING` for EVERY real cue, emptying
+// `voiceWordCounts` and skipping the bound entirely — 200 real, fully
+// eligible characters (60 words each) guard-ACCEPTED with ZERO eligible
+// names, HTTP 200 in 51,437ms (measured pre-fix), for a document identical
+// to a REJECTing control except for that one stray `\r`. FIXED (see
+// `resolveGuardLines`'s own comment in validation.ts): the walk now
+// resolves the SAME line array normalizeScreenplay would hand to
+// parseFountain — the `\r`-normalized array only when the document actually
+// reflows, the untouched `'\n'`-split-only text otherwise.
+describe('ROUND 6 oracle: lone \\r embedded inside a single-spaced line — both the cue-count and word-map oracles must hold', () => {
+  const DLG6 = 'this is ordinary lowercase dialogue here.';
+
+  function pipelineCharacterBlockCount(text: string): number {
+    return parseFountain(normalizeScreenplay(text)).filter((b) => b.type === 'character').length;
+  }
+
+  // Mirrors r5attack.mjs's own `base()` generator BYTE-FOR-BYTE (same blank
+  // -line spacing after each block — the attack-scale test below pins the
+  // exact measured length against this): 5 cues per real INT. scene, one
+  // lone stray `\r` (repeated `crRepeat` times) embedded inside the FIRST
+  // scene's action line only — everything else single-spaced, ordinary
+  // Fountain.
+  function docWithLoneCrInAction(distinct: number, scenes: number, cuesPerScene: number, crRepeat: number): string {
+    let t = '', occ = 0;
+    for (let s = 0; s < scenes; s++) {
+      t += `INT. LOCATION ${s} - DAY\n\n`;
+      t += s === 0 && crRepeat > 0
+        ? `Something happens${'\rINT. GHOST - DAY'.repeat(crRepeat)}\n\n`
+        : 'Something happens in the room.\n\n';
+      for (let i = 0; i < cuesPerScene; i++, occ++) t += `CHAR${occ % distinct}\n${DLG6}\n\n`;
+    }
+    return t;
+  }
+
+  // A second placement: the stray `\r` sits inside a DIALOGUE line rather
+  // than an action line — a different real-world shape (a copy-pasted
+  // classic-Mac fragment landing mid-sentence in what a writer typed),
+  // proving the fix is not narrowly tied to where in the document the `\r`
+  // appears.
+  function docWithLoneCrInDialogue(distinct: number, occurrences: number, crRepeat: number): string {
+    let t = 'INT. ROOM - DAY\n';
+    for (let occ = 0; occ < occurrences; occ++) {
+      const dlg = occ === 0 && crRepeat > 0
+        ? `this is dialogue${'\rINT. GHOST - DAY'.repeat(crRepeat)} with a stray cr`
+        : DLG6;
+      t += `CHAR${occ % distinct}\n${dlg}\n`;
+    }
+    return t;
+  }
+
+  it('a lone \\r inside an action line (small scale, crRepeat 1-5): cue-count and word-map oracles both hold', () => {
+    for (const crRepeat of [1, 2, 3, 5]) {
+      const text = docWithLoneCrInAction(4, 6, 2, crRepeat);
+      const guardCount = guardCueOccurrences(text);
+      const pipelineCount = pipelineCharacterBlockCount(text);
+      assert.ok(
+        guardCount >= pipelineCount,
+        `ORACLE VIOLATION crRepeat=${crRepeat}: guard counted ${guardCount} but the pipeline produced ${pipelineCount} character blocks`,
+      );
+      assertWordOracle(`lone-cr-in-action crRepeat=${crRepeat}`, text);
+      assertEligibleWordsAtLeastPipeline(`lone-cr-in-action crRepeat=${crRepeat}`, text);
+    }
+  });
+
+  it('a lone \\r inside a dialogue line: cue-count and word-map oracles both hold', () => {
+    const text = docWithLoneCrInDialogue(10, 20, 3);
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.ok(
+      guardCount >= pipelineCount,
+      `ORACLE VIOLATION: guard counted ${guardCount} but the pipeline produced ${pipelineCount} character blocks`,
+    );
+    assertWordOracle('lone-cr-in-dialogue', text);
+    assertEligibleWordsAtLeastPipeline('lone-cr-in-dialogue', text);
+  });
+
+  it('a document with NO stray \\r (control) still satisfies every property', () => {
+    const text = docWithLoneCrInAction(4, 6, 2, 0);
+    assertWordOracle('no-cr control', text);
+    assertEligibleWordsAtLeastPipeline('no-cr control', text);
+  });
+
+  // Belt-and-suspenders: the exact r5attack.mjs/R6-1 attack-scale shape —
+  // 200 names over 400 real scenes (5 cues/scene, under the frequent-cue
+  // bound), one action line carrying 500 embedded stray `\r`s.
+  it('oracle holds at attack scale for R6-1\'s exact shape (200 names x 5/scene over 400 scenes, one action line with 500 embedded \\r fake headings)', () => {
+    const text = docWithLoneCrInAction(200, 400, 5, 500);
+    assert.equal(text.length, 132_077, 'payload size must match the measured R6-1 shape exactly');
+    const guardCount = guardCueOccurrences(text);
+    const pipelineCount = pipelineCharacterBlockCount(text);
+    assert.equal(pipelineCount, 2000, 'sanity: the real pipeline must still produce 2,000 character blocks for this document');
+    assert.ok(guardCount >= pipelineCount, `guard=${guardCount} pipeline=${pipelineCount}`);
+    assertEligibleWordsAtLeastPipeline('R6-1 attack scale', text);
+  });
+});
+
+// ── ROUND 6 regressions: R6-1 (the stray-\r bypass) rejects fast, and both
+// controls (no \r at all, and a partial 50-\r inflation still short of the
+// ceiling) keep their existing, correct verdicts. Timed with
+// `fountainShapeRejectionReason` directly, the same way every prior round's
+// regression block is.
+describe('ROUND 6 regressions: the stray-\\r bypass rejects fast, both controls are unchanged', () => {
+  const DLG6 = 'this is ordinary lowercase dialogue here.';
+
+  function buildR6Doc(inflate: number): string {
+    let t = '', occ = 0;
+    for (let s = 0; s < 400; s++) {
+      t += `INT. LOCATION ${s} - DAY\n\n`;
+      t += s === 0 && inflate > 0
+        ? `Something happens${'\rINT. GHOST - DAY'.repeat(inflate)}\n\n`
+        : 'Something happens in the room.\n\n';
+      for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG6}\n\n`;
+    }
+    return t;
+  }
+
+  it('R6-0 control (no \\r inflation) is unchanged — still rejects (200 fully eligible names over 400 scenes trips MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT on its own)', () => {
+    const text = buildR6Doc(0);
+    assert.equal(text.length, 123_590, 'payload size must match the measured R6-0 control shape exactly');
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the R6-0 control to keep rejecting');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  it('R6-1: one action line with 500 \\r-embedded fake headings (measured pre-fix: ACCEPT with 0 eligible names vs. 200 real ones, runScriptDoctor 49,234ms; HTTP 200 in 51,437ms) now rejects fast', () => {
+    const text = buildR6Doc(500);
+    assert.equal(text.length, 132_077, 'payload size must match the measured R6-1 shape exactly');
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the stray-\\r bypass to no longer empty the eligibility map and skip the bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+
+  it('R6-2 control: the same shape with only 50 \\r-embedded fake headings (partial inflation, not enough to empty the map) is unchanged — still rejects', () => {
+    const text = buildR6Doc(50);
+    assert.equal(text.length, 124_427, 'payload size must match the measured R6-2 shape exactly');
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the R6-2 partial-inflation control to keep rejecting');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
   });
 });
 
