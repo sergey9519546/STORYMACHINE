@@ -1892,3 +1892,62 @@ is that reports over these fixtures were wrong and had to move.
   finding about these six fixes, and do not answer it by moving the floor in
   `scripts/lib/auc.ts`. Discharge path is
   `docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md` section 7."
+
+#### 2026-09-06 addendum — rebased onto `main` at `2bfcbf9d`, gates re-run, still PENDING
+
+The entry above cites a branch rebased on `main` at `c21fdc5b`. This branch
+has since been rebased onto `main` at `2bfcbf9d` (86 commits later) and lives
+at `scoring/advice-rule-fixes`. The rebase had exactly one conflict,
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, resolved by keeping both sides:
+`main`'s entries and this branch's PENDING entry, in date order. No code file
+conflicted. This addendum records what a re-run against the new baseline
+produces; it is still not a corpus measurement and the entry is still PENDING
+OWNER MEASUREMENT.
+
+- **Baseline used:** `main` at `2bfcbf9d`, extracted with
+  `git archive main | tar -x` into a scratch tree with `node_modules`
+  symlinked from the working checkout.
+- **Command:** `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`,
+  then the same with `--tree` at this branch's worktree and `--out <after>`,
+  then `node scripts/check-doctor-output-identity.mjs --compare <before> <after>`.
+- **Corpus fingerprint:** none. No corpus was read. The identity harness walks
+  the 45 in-repo reports described in the R5 addendum above.
+- **Output identity against the new baseline:** FAIL, as a scoring change
+  must — 45 of 45 reports differ somewhere in their JSON. Health moves on 29
+  of 45 (mean +0.44, RMS 6.88, largest single move −33.5 on `room-12`, which
+  falls 33.5 to 0, and +12.9 on the calibration sample `Adrift`); verdict
+  changes on 3 of 45 (`Reasonable Doubt`, `Second Wind`, `The Visit`, all
+  PASS to CONSIDER); `sceneCount` is unchanged on all 45. The 16 fixtures
+  whose health does not move are the ones still pinned at the saturating
+  clamp in `main`'s `densityPenalty` — a detector fix cannot move a number
+  that is already at its ceiling.
+- **Gates re-run on the rebased tree, each in the foreground, exit code read
+  from its own log:** `npm run lint` 0 ·
+  `tests/core/advice-rule-fixes.test.ts` 0 (26/26) ·
+  `tests/core/agency-signal.test.ts` 0 (52/52) ·
+  `tests/core/core-02.test.ts` 0 (427/427) · `tests/core/core-03.test.ts` 0
+  (307/307) · `tests/core/pure-core-boundary.test.ts` 0 (6/6) ·
+  `tests/core/reversal-detection.test.ts` 0 (39/39) ·
+  `tests/passes/conflict.test.ts` 0 (465/465) ·
+  `tests/passes/dialogue.test.ts` 0 (473/473) ·
+  `tests/passes/structure.test.ts` 0 (490/490) ·
+  `tests/core/calibration.test.ts` 0 (21/21) ·
+  `tests/core/blind-pairs-discrimination.test.ts` 0 (3/3).
+- **`node scripts/check-scoring-receipt.mjs main..HEAD` exits 1 on this
+  branch, by design** — it finds this entry and refuses it because the heading
+  says PENDING, exactly as the entry above predicted it would. Not a rebase
+  artifact; not to be closed by editing the heading.
+- **Blind matched pairs, in-repo fixtures, no private corpus:** unchanged from
+  the 2026-09-04 finding on the new baseline — 1 of 6 ordered, mean gap +0.03,
+  9 of 12 scripts still pinned at exactly 76.0, against `main @ 2bfcbf9d`'s
+  1 of 6 and −0.02. Mean top-ten rule overlap falls 7.83 to 7.17, which is the
+  six detector fixes changing which findings reach the queue.
+- **Runner attestation:** "I, the branch-sync lane
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), performed the rebase
+  onto `2bfcbf9d` myself, resolved its single conflict myself, and ran every
+  command listed above myself on 2026-09-06, reading each exit code out of its
+  own log file. **I did NOT run `npm run measure-real` and this addendum
+  claims no AUC-24 value: the real corpus is not present in this container and
+  `REAL_SCRIPT_CORPUS_DIR` was left unset.** The owner's measurement is
+  unchanged and is now best taken on `scoring/stacked-r5-plus-advice`, which
+  is this branch merged onto the rebased R5 branch."
