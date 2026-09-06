@@ -37,6 +37,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-06 Mistake Search",
+      "path": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "type": "branch",
       "title": "Branch — Advice-Rule-Fixes",
@@ -463,6 +469,12 @@
       "path": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md"
     },
     {
+      "id": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "type": "session",
+      "title": "Session — 2026-09-05, Day: The Mistake Search and the Project Brain",
+      "path": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md"
+    },
+    {
       "id": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",
       "type": "session",
       "title": "Session — 2026-09-05, Overnight: The Review Batch",
@@ -638,6 +650,38 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Owner/Owner - Push Release Tag.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Surfaces/Surface - Versions and Snapshots.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Surfaces/Surface - Slate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
       "to": "docs/brain/Patterns.md"
     },
     {
@@ -1395,6 +1439,42 @@
     {
       "from": "docs/brain/Sessions/Session - 2026-09-04 Hardening Batch.md",
       "to": "docs/brain/Audits/Audit - 2026-09-04 Reverification.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Surfaces/Surface - Versions and Snapshots.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Surfaces/Surface - Slate.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/00 Home.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-05 Mistake Search and Brain.md",
+      "to": "docs/brain/Owner/Owner - Push Release Tag.md"
     },
     {
       "from": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",

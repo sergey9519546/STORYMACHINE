@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-05, main @ 5d2b2638 (five session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-06, main @ 7d97c3e5 (six session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,104 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-05, day — the mistake search and the project brain.** The owner
+asked for two things: *"search for mistakes"* over everything the review
+batch had just merged, and a project brain — *"is there a project brain? is
+it updated?"* — for a repository whose only map was `CLAUDE.md`. Three
+read-only hunters (server, client, docs) read the merged range `1e170831..
+802f1c16` and produced 1,271 lines of findings with reproduction commands;
+those became six build lanes, each through `docs/LANE_STANDARD.md`'s
+independent review. **Again none passed on the first pass, and the reviews
+found more than the hunt had:**
+
+- **Docs parity** (one round): the coverage HTML rendered its own copy of
+  the percentile and draft-rank sentences; it now calls the shared modules,
+  and the warm-up sentence that sixteen sites quoted differently is one
+  canonical measured sentence.
+- **Server fixes** (one round, plus a reviewer-specified follow-up
+  commit): the cue guard's blank-gap context was keyed
+  on the wrong predicate; a boneyard-wrapped payload reflowed into thousands
+  of character blocks under the new bounds; the crash-path shutdown skipped
+  the drain; the request logger printed the literal text `undefined` as a
+  path prefix; a `URIError` from a malformed URL was a 500.
+- **Client provenance** (one round): Draft History was one global list, so a
+  writer looking at one script was ranked against every other script and
+  the demo, all labelled with the host project's title; the sample was
+  re-analysed on mount and handed up as the writer's own work. Entries now
+  carry a per-script identity, legacy rows enter no denominator, the golden
+  path makes one doctor POST instead of two, and the brief's own premise (a
+  per-document id to borrow) was found false and documented rather than
+  faked.
+- **Dark mode and the a11y gate** (five rounds): every word on a snapshot
+  card measured 1.13–2.45:1 in dark mode because a real dark background was
+  paired with light-theme text tokens — the same defect in the Slate table,
+  both snapshot modals, the Sidebar counter and a state-delta callout. The
+  convention is written down (a surface is theme-invariant or fully themed,
+  never mixed) and enforced by a source scanner that parses the TypeScript
+  AST, models background occlusion and inheritance, and pins the two files
+  it cannot yet fix at exactly 65 and 1 hits so a new one fails loudly. The
+  reviewer's own probes became shipped fixtures; the round-4 "fixed" colours
+  were re-measured at 3.32 and 2.56 and sent back; the exported coverage
+  HTML's 375 px overflow was root-caused to unbroken rule-name tokens, not
+  the strips the brief guessed. `verify:a11y` went from 74 to 117
+  assertions.
+- **Layout** (four rounds): "Full report" was on screen at 375 px but no
+  real pointer event could reach it, so the whole Doctor panel was
+  unreachable on a phone; clicking it at the earliest instant unmounted the
+  running sample and opened a cold panel; the Slate produced four React
+  duplicate-key errors on a double upload; a "still running" toolbar sentence
+  stayed true forever after a cancelled or failed run — the exact class the
+  hunt was about, found by the reviewer, not the hunt. The fix exposed a bug
+  in the focus-trap suite (its restore-focus check, once the two "Full report"
+  controls had distinct names, resolved to the panel's own button — which
+  unmounts the instant the panel opens), and two tests that filtered comments by line prefix miscounted
+  prose, which produced a structural comment stripper — whose first version
+  the reviewer then showed skipped comments inside empty syntax lists.
+- **The cost bound on the cue guard** (seven rounds): the round-8
+  bypass (`NAME (cont'd)` lowercase) was closed by making the guard's
+  candidate predicate the union of all three cue predicates and adding the
+  direct oracle the eight rounds had lacked — `guardCueOccurrences(text) >=
+  character blocks in parseFountain(normalizeScreenplay(text))`. The
+  reviewer then showed the guard's *accepted* region still held requests
+  costing 22 s to 5 m 44 s: the analyzer's voice pass is O(distinct²) and
+  all-or-nothing on every character clearing 30 words, and the calibration
+  grid had never sampled past 20 repeats. A measured bound on that driver
+  followed, and then six more bypass classes in four rounds — a
+  parenthetical-only walk-on, double-spaced wrapped dialogue, CR-only line
+  endings, the analyzer's 400-scene ceiling that the guard's view did not
+  share, a scene predicate narrower than the parser's, and a stray carriage
+  return inside a single-spaced line — each closed with a word-map oracle
+  and a predicate-parity proof. The seventh round retired
+  the hand-modelled walk altogether: the guard now reads the real
+  `parseFountain(normalizeScreenplay(text))` blocks — the same call the
+  route makes anyway, measured cheaper than the model it replaced — and
+  fails closed when the parse yields no character blocks in a cue-dense
+  document. That was the first round of seven in which the reviewer could
+  not construct a bypass. The accepted worst case fell from 343,598 ms to
+  the analyzer's own ceiling cost of ~12–14 s.
+
+**The brain** (two rounds): `docs/brain/` is an Obsidian-compatible vault of
+87 notes — every decision, gate, surface, session record, audit, measurement
+doc, owner item and unmerged branch, plus a glossary and a patterns note —
+with a generator that fails on any unresolved wikilink and a seven-assertion
+staleness test in CI. The reviewer's round 1 found the generator's
+direct-invocation guard silently exited 0 on any path with a space (so the
+new CI step could pass while doing nothing), a staleness assertion that any
+note could satisfy, and six unfaithful numbers, including the 3,216 → 3,217
+correction the vault had dropped. `CLAUDE.md` now points there first.
+
+Main moved from 802f1c16 to 7d97c3e5: six build lanes plus the brain,
+21 review rounds (docs parity 1, server fixes 1, client provenance 1,
+dark mode 5, brain 2, layout 4, cue-guard cost bound 7 — counted from the
+`## Round` headers and verdict lines of the committed review files), every merge behind one full suite and one battery on the
+rebased branch. Reviewers' probe scripts were reused as lane fixtures four
+times; the audit tags `audit/2026-09-05/<lane>-roundN` exist locally for
+every reviewed round and cannot be pushed from this sandbox.
+
+**What only the owner can do now** (in addition to the list below): push the
+`audit/2026-09-05/*` tags (`git push origin --tags` from a machine that is
+not behind the tag-blocking proxy).
 
 **2026-09-05, overnight — the review batch.** The owner asked for a system
 that makes the subagents do the best version of the work, and for the usage
