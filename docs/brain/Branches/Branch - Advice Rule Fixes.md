@@ -7,7 +7,7 @@ status: parked
 
 # Branch — Advice-Rule-Fixes
 
-**Branch:** `origin/scoring/advice-rule-fixes` @ `c1873e3c` (3 commits on
+**Branch:** `origin/scoring/advice-rule-fixes` @ `8a6dd037` (4 commits on
 `main` @ `2bfcbf9d`). Rebased and renamed 2026-09-06; the old
 `origin/claude/advice-rule-fixes-pending-measurement` @ `68c64eca` is the
 pre-rebase object and is superseded, not deleted.
@@ -34,8 +34,17 @@ file conflicted in the stack merge. The stacked tree now exists as
 
 **Re-measured on the new baseline (2026-09-06, in-repo evidence only):** 45
 of 45 output-identity reports differ; health moves on 29 of 45 (RMS 6.88) and
-3 verdicts change. The 16 that do not move are already at `main`'s density
-clamp — a detector fix cannot move a number sitting at its ceiling. Blind
+3 verdicts change. The 16 that do not move split three ways, and only the
+first group is a clamp story: **7** sit at the saturating logistic ceiling
+(`p0/sample-script`, `dead-frequency`, `counter-offer` and the four
+`synthetic/*-scenes`, penalty 9.99–10.00 on both sides), so a detector fix
+cannot move a number already at its ceiling; **7** carry weighted issues that
+do not change at all (`Firebreak`, `Lockdown`, `Low Tide`, `Splitting the
+House`, `The Corner Booth`, `Yard Signs`, `Zero Day`) — these sit at density
+1.70–2.10, on the POWER branch well past the clamp, with penalties 25.7–47.9,
+so no clamp is involved: the six fixes simply fire identically on them; and
+**2** (`chain-of-custody` 12.975 → 12.903, `mise` 14.182 → 14.086) do move,
+past the clamp, by less than the displayed rounding. Blind
 pairs are unchanged at 1 of 6; mean top-ten rule overlap falls 7.83 to 7.17.
 Gates on the rebased tree: `npm run lint` 0, `npm test` 0 (12,961 tests, 0
 failing), `npm run build` 0, `check-brain` 0.

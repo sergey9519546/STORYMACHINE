@@ -42,9 +42,9 @@ producible" — has been built:
 
 | Branch | Tip | Commits on main | Disposition |
 |---|---|---|---|
-| `scoring/stacked-r5-plus-advice` | `1bae835d` | 11 | **the tree to measure** — R5 with advice-rule-fixes merged in |
-| `scoring/r5-verbosity-bias` | `cfb7233c` | 6 | R5 alone, rebased |
-| `scoring/advice-rule-fixes` | `c1873e3c` | 3 | advice-rule fixes alone, rebased |
+| `scoring/stacked-r5-plus-advice` | `65e76888` | 16 | **the tree to measure** — R5 with advice-rule-fixes merged in |
+| `scoring/r5-verbosity-bias` | `fa256566` | 7 | R5 alone, rebased |
+| `scoring/advice-rule-fixes` | `8a6dd037` | 4 | advice-rule fixes alone, rebased |
 | `claude/r5-verbosity-bias-pending-measurement` | `0f625c27` | pre-rebase | superseded by `scoring/r5-verbosity-bias`; kept, not deleted |
 | `claude/advice-rule-fixes-pending-measurement` | `68c64eca` | pre-rebase | superseded by `scoring/advice-rule-fixes`; kept, not deleted |
 
@@ -53,6 +53,19 @@ All three carry PENDING receipt entries and none may merge:
 design, because it finds a PENDING entry and refuses it. Everything else is
 green on all three — lint, the full `npm test`, build, `check-no-console`,
 `check-docs`, `honesty-audit`, `check-server-reachability`, `check-brain`.
+
+Closing that gate after the corpus run takes a specific edit, and it is worth
+writing down here because the gate's own remedy string is misleading. Appending
+a measured entry beside the PENDING ones does not clear the range:
+`checkReceiptForRange` (`scripts/check-scoring-receipt.mjs:650-673`) validates
+EVERY entry the range adds, so one surviving PENDING entry fails it regardless
+of what sits next to it — confirmed by running the gate's exported
+`extractEntries`/`validateEntry` over the stack's three entries with a
+well-formed measured entry appended (4 entries, still 3 problems). Each PENDING
+entry has to be rewritten IN PLACE into a measured one, including removing the
+four phrases `pendingReason` scans for anywhere in the body ("has not been
+run", "was not run", "not yet measured", "pending owner measurement"). The
+step-by-step is in `docs/brain/Owner/Owner - R5 Measurement and Merge.md`.
 
 The recorded five-file conflict between the two branches
 (`character-arc.ts`, `rhythm.ts`, `fountain.ts`, `agency-signal.test.ts`,

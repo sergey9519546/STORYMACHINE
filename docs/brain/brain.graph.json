@@ -1280,6 +1280,10 @@
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
     },
     {

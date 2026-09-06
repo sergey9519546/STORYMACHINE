@@ -24,24 +24,74 @@ without a corpus. There is now ONE branch to measure, not two plus a merge.
 git fetch origin
 git checkout scoring/stacked-r5-plus-advice
 REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
-npm run lock-auc24
+REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24
 # then re-lock the 72-row tests/fixtures/real-corpus-manifest.json in place
 ```
 
-Then supersede the three PENDING entries in
-`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` with one carrying the measured
-AUC-24. Until such an entry exists, none of the three branches may merge, and
-`node scripts/check-scoring-receipt.mjs main..HEAD` will keep exiting 1 on all
-three — which is the gate working, not a bug to route around by editing a
-heading.
+The variable is repeated on purpose. An inline assignment applies to one
+command only, so a bare `npm run lock-auc24` on the next line runs with it
+unset and the script refuses: `[FATAL] REAL_SCRIPT_CORPUS_DIR is not set —
+refusing to run. … Nothing was written.` [[Owner - Lock AUC24 Table]] writes it
+the same way. Before hand-editing the manifest, read
+`tests/fixtures/real-corpus-manifest.README.md`: there is no automated re-lock
+command, and that file is where the constraint lives that its array order is
+load-bearing and must never be sorted.
+
+**Then close the receipt gate, which takes a specific edit.** Appending a
+measured entry beside the PENDING ones does NOT work, and neither does the
+remedy string the gate itself prints ("append a superseding measured entry",
+`scripts/check-scoring-receipt.mjs:573-575`).
+`checkReceiptForRange` (`:650-673`) extracts EVERY entry the range adds and
+validates each one; `ok` is `problems.length === 0`, so one surviving PENDING
+entry fails the whole range no matter what sits next to it. Verified by running
+the gate's own exported `extractEntries`/`validateEntry` over this branch's
+three entries: as shipped, 3 entries, 3 problems; with a well-formed measured
+entry appended, 4 entries, still 3 problems.
+
+What closes it is **rewriting each of the three entries in place** so the range
+adds measured entries and no pending one. In each entry:
+
+1. drop `PENDING` from the `###` heading and name what was measured instead;
+2. replace `**Measured AUC-24:** **PENDING** — not measured…` with the number
+   the run produced;
+3. replace `**Corpus fingerprint:** none. No corpus was read.` with the real
+   fingerprint;
+4. rewrite the `**Runner attestation:**` so it says in the first person that
+   the run happened;
+5. and remove the four phrases the gate's `pendingReason` scans for ANYWHERE in
+   the entry body (`:487-492`) — "has not been run", "was not run", "not yet
+   measured", "pending owner measurement". The 2026-09-06 addenda inside these
+   entries contain several of them; leaving one behind keeps the entry pending
+   even after the heading is fixed. `\bPENDING\b` is whole-word and
+   case-insensitive, so "appending" is safe and "Pending" is not.
+
+Two traps worth knowing before doing that edit. Each space in those four
+patterns is compiled to `\s+`, so a phrase still matches when a line wrap falls
+inside it — "has" at the end of one line and "not been run" at the start of the
+next is a hit, and a search that only looks within single lines will miss it.
+That is measured, not predicted: it is why this file spells the four phrases
+out and the receipt ledger deliberately does not. This note is not a file the
+gate reads; a quoted copy of the list inside a receipt entry would hold that
+entry pending on its own.
+
+Same rewrite verified on a scratch copy: with all three converted this way, the
+gate's validator reports 3 entries and 0 problems. Do not close it by editing
+only a heading — that is the one route the entry text itself forbids.
 
 **The three branches, all pushed, all PENDING:**
 
 | branch | tip | what it is |
 | --- | --- | --- |
-| `scoring/stacked-r5-plus-advice` | `1bae835d` | **measure this one** — [[Branch - Stacked R5 plus Advice]] |
-| `scoring/r5-verbosity-bias` | `cfb7233c` | [[Branch - R5 Verbosity Bias]] alone |
-| `scoring/advice-rule-fixes` | `c1873e3c` | [[Branch - Advice Rule Fixes]] alone |
+| `scoring/stacked-r5-plus-advice` | `65e76888` | **measure this one** — [[Branch - Stacked R5 plus Advice]] |
+| `scoring/r5-verbosity-bias` | `fa256566` | [[Branch - R5 Verbosity Bias]] alone |
+| `scoring/advice-rule-fixes` | `8a6dd037` | [[Branch - Advice Rule Fixes]] alone |
+
+The stack CONTAINS both singles as unsquashed ancestors, so merging it subsumes
+them and the other two need not be merged separately. Whichever lands last needs
+one `npm run brain` afterwards — all three branches and the docs branch
+regenerated `brain.graph.json`/`GRAPH.md` independently — and
+`docs/brain/Measurements Index.md`'s `## docs/scoring (N)` count needs the
+arithmetic fixed by hand, because each side increments it.
 
 **What to expect, so a fall in AUC-24 is read correctly.** These branches move
 scores hard: 45 of 45 in-repo reports change on the stack, health RMS 19.02,

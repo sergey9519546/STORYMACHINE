@@ -7,7 +7,7 @@ status: parked
 
 # Branch — R5 (Verbosity Bias)
 
-**Branch:** `origin/scoring/r5-verbosity-bias` @ `cfb7233c` (6 commits on
+**Branch:** `origin/scoring/r5-verbosity-bias` @ `fa256566` (7 commits on
 `main` @ `2bfcbf9d`). Rebased and renamed 2026-09-06; the old
 `origin/claude/r5-verbosity-bias-pending-measurement` @ `0f625c27` is the
 pre-rebase object and is superseded, not deleted.
@@ -47,10 +47,24 @@ order, itself at chance on this set; 0 of 12 blind scripts tie at one health
 value (main ties 9 of 12).
 
 **Re-measured on the new baseline (2026-09-06, in-repo evidence only):** all
-45 output-identity reports move, health RMS **20.45** with 28 verdict changes
-— the branch's own write-up says 23.5, measured against the old `main` at
-`e40f4cf5`; the difference is `main` moving under the branch (principally the
-2026-09-04 corpus-integrity correction), not the branch changing. Gates on
+45 output-identity reports move, health RMS **20.45**, mean −9.95, largest
+single move −38.9 on `off-season`, 28 verdict changes.
+
+The like-for-like comparison is the SAME harness on the pre-rebase pair, and it
+is not the 23.5 that appears in the fix doc. 23.5 is the constant-sweep
+tie-break RMS in `docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md` §"how the two
+constants were picked", whose stated population is the 45 identity fixtures
+**plus the calibration corpus and the length variants** — a different statistic
+over a superset. The R5 receipt entry itself reports no RMS at all; it reports
+range −39.9 to +24.2, mean −11.2, 45 of 45, 28 verdicts. Running the identity
+harness on `0f625c27` against `e40f4cf5` reproduces exactly that (mean −11.24,
+max −39.9 on `mise` 72.9 → 33.0, 28 verdicts) and gives **RMS 22.16**. So the
+real shift is 22.16 → 20.45 = **1.71 points**, and `main`'s own drift over the
+same 45 fixtures across those 160 commits measures RMS **0.91** (16 fixtures
+moved, all `data/screenplays/*`, no verdict change, max +3.1 — the signature of
+the 2026-09-04 provenance-header correction). That accounts for part of the
+1.71; the rest is not separately attributed here, because it was not separately
+measured. Gates on
 the rebased tree: `npm run lint` 0, `npm test` 0 (12,934 tests, 0 failing),
 `npm run build` 0, `npm run test:metamorphic` 0 (8 of 8 hard,
 `empty_verbosity` −4.4), `check-brain` 0.
