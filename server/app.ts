@@ -330,7 +330,25 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
         // URLs), so it needs to be revalidated on every request rather than
         // served stale from a cache that thinks it's still the old build.
         res.setHeader('Cache-Control', 'no-cache');
-        res.sendFile(path.join(distPath, 'index.html'));
+        // { root: distPath } + a bare filename, NOT
+        // res.sendFile(path.join(distPath, 'index.html')) — Express 5 pulls
+        // in send@1.x (via serve-static@2.x), and send@1's dotfile guard
+        // (default `dotfiles: 'ignore'`, i.e. 404) checks EVERY segment of
+        // the resolved path when no `root` option is given, not just the
+        // segment relative to the app's own directory. A path with no `root`
+        // is resolved via plain `path.resolve()` and split on the OS
+        // separator, so any dot-prefixed ANCESTOR directory in the absolute
+        // path — e.g. a checkout under `.claude/worktrees/...`, or any
+        // dotfile-named parent a deployment happens to sit under — silently
+        // 404s here even though the file exists and has nothing to do with
+        // the flagged segment. Passing `root` makes send() resolve and
+        // dotfile-check only the path RELATIVE TO root ('index.html', one
+        // segment, no dot) — Express's own documented pattern for exactly
+        // this reason. Reproduced without the fix: this checkout's own path
+        // contains `.claude`, so every production-mode deep link 404'd here
+        // (send logged `send ignore dotfile ".../​.claude/​.../dist/index.html"`)
+        // until this was found via a direct call to `send()` with DEBUG=send.
+        res.sendFile('index.html', { root: distPath });
       });
     }
   }
