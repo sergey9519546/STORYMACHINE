@@ -25,6 +25,7 @@ import { useModalFocusTrap } from "../lib/use-modal-focus-trap.ts";
 import {
   percentileBand, exactRankTooltip, percentileColumnHeaderTooltip, slatePercentileCaption,
 } from "../lib/percentile-copy.ts";
+import { formatSignalValue } from "../lib/structural-signals-copy.ts";
 import {
   Layers3,
   X,
@@ -907,7 +908,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                         >
                           {typeof entry.meanAbsDialogueShareDelta === "number"
                             && typeof entry.actionSentenceCvOverall === "number"
-                            ? `swing ${entry.meanAbsDialogueShareDelta.toFixed(2)} · cv ${entry.actionSentenceCvOverall.toFixed(2)}`
+                            ? `swing ${formatSignalValue(entry.meanAbsDialogueShareDelta)} · cv ${formatSignalValue(entry.actionSentenceCvOverall)}`
                             : "—"}
                         </td>
                       </tr>

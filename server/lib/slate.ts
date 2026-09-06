@@ -23,6 +23,7 @@ import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 // that had already drifted from the panel's own wording ("a fixed 20-sample
 // reference set" vs. the qualified "hand-authored synthetic" phrasing).
 import { percentileColumnHeaderTooltip, slatePercentileCaption } from '../../src/lib/percentile-copy.ts';
+import { formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
 
 export interface SlateEntry {
   title: string;
@@ -271,7 +272,7 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
     // never scored the block (fewer than 2 scenes) — never a fabricated 0.
     const shapeRhythm = (typeof entry.meanAbsDialogueShareDelta === 'number'
       && typeof entry.actionSentenceCvOverall === 'number')
-      ? `swing ${entry.meanAbsDialogueShareDelta.toFixed(2)} &middot; cv ${entry.actionSentenceCvOverall.toFixed(2)}`
+      ? `swing ${formatSignalValue(entry.meanAbsDialogueShareDelta)} &middot; cv ${formatSignalValue(entry.actionSentenceCvOverall)}`
       : '&mdash;';
     return `
     <tr>

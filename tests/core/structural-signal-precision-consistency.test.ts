@@ -1,23 +1,29 @@
 // src/lib/structural-signals-copy.ts's formatSignalValue()/formatSignalDelta()
 // — the ONE shared precision rule for the two structural-signal aggregates
-// (meanAbsDialogueShareDelta, actionSentenceCvOverall) shown across five
+// (meanAbsDialogueShareDelta, actionSentenceCvOverall) shown across six
 // surfaces: the Script Doctor panel's Shape & Rhythm strip and its
 // fix-and-verify receipt (ScriptDoctorPanel.tsx), the exported coverage HTML
-// and letter (server/lib/coverage-html.ts, coverage-letter.ts), and the
+// and letter (server/lib/coverage-html.ts, coverage-letter.ts), the
 // What-If Lab / Versions draft trend (WhatIfPanel.tsx,
-// SnapshotManager.tsx's ShapeRhythmTrendLine).
+// SnapshotManager.tsx's ShapeRhythmTrendLine), and the Slate triage table
+// (src/components/SlatePanel.tsx, server/lib/slate.ts).
 //
 // HISTORY (docs/audits/2026-09-06-mistake-search/findings/B-client.md B-7,
 // deferred by the provenance review — see that file's own row 5 and
 // docs/audits/2026-09-06-mistake-search/provenance-review.md's matching
-// line): every one of the five surfaces printed these two aggregates with a
-// bare `.toFixed(2)`. A real receipt measured `before.meanAbsDialogueShareDelta
-// 0.0042` -> `after 0.0254` and rendered as "Talk/action swing 0.00 -> 0.03"
-// — the BEFORE value collapses to a displayed zero (indistinguishable from a
-// genuine 0), and the printed delta (+0.03) overstates the true one (+0.0212)
-// by 42%. Health already prints before/after at the delta's OWN precision
-// (64.6 -> 66.1 beside +1.5, not 65 -> 66); this brings the two structural
-// aggregates to the same standard.
+// line): every one of the (originally five named) surfaces printed these two
+// aggregates with a bare `.toFixed(2)`. A real receipt measured
+// `before.meanAbsDialogueShareDelta 0.0042` -> `after 0.0254` and rendered as
+// "Talk/action swing 0.00 -> 0.03" — the BEFORE value collapses to a
+// displayed zero (indistinguishable from a genuine 0), and the printed delta
+// (+0.03) overstates the true one (+0.0212) by 42%. Health already prints
+// before/after at the delta's OWN precision (64.6 -> 66.1 beside +1.5, not
+// 65 -> 66); this brings the two structural aggregates to the same standard.
+// The Slate triage table (SlatePanel.tsx, slate.ts) renders the identical
+// two aggregates a SIXTH way (`swing X · cv Y`, single-value only, no
+// before/after there) and was found and migrated in the same follow-up pass
+// that added this describe block — the owner rule is one implementation per
+// concept, not five-plus-one.
 //
 // No React render harness exists in this repo (see tests/core/
 // shape-rhythm-panel-copy.test.ts's own header) — this file follows the
@@ -27,7 +33,7 @@
 // that every React surface calls THOSE functions rather than a local
 // `.toFixed(2)` — since a surface's JSX only ever interpolates the shared
 // function's return value, "imports it, never redefines it" is the strongest
-// available proof short of a browser render that all five can never disagree.
+// available proof short of a browser render that all six can never disagree.
 // The two surfaces that are pure functions (coverage-html.ts, coverage-letter.ts)
 // are driven end-to-end with real ScriptDoctorReport fixtures instead.
 
@@ -36,6 +42,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
   formatSignalValue, formatSignalDelta,
   SIGNAL_VALUE_FLOOR_PRECISION, SIGNAL_VALUE_CEILING_PRECISION,
@@ -55,6 +62,8 @@ const whatIfPanelSrc = read('../../src/components/WhatIfPanel.tsx');
 const snapshotManagerSrc = read('../../src/components/scriptide/SnapshotManager.tsx');
 const coverageHtmlSrc = read('../../server/lib/coverage-html.ts');
 const coverageLetterSrc = read('../../server/lib/coverage-letter.ts');
+const slatePanelSrc = read('../../src/components/SlatePanel.tsx');
+const slateSrc = read('../../server/lib/slate.ts');
 
 // ── The exact table this brief asks the consistency test to drive ──────────
 const DELTA_CASES: Array<{ name: string; before: number; after: number; expected: string }> = [
@@ -189,6 +198,40 @@ describe('every surface imports formatSignalValue/formatSignalDelta rather than 
     assert.equal(count, 3, `expected 3 formatSignalValue(...) usages, found ${count}`);
     assert.ok(!coverageLetterSrc.includes('meanAbsDialogueShareDelta.toFixed('));
     assert.ok(!coverageLetterSrc.includes('actionSentenceCvOverall.toFixed('));
+  });
+
+  // The Slate triage table — a SIXTH surface, found by grepping for every
+  // remaining `.toFixed(` on these two aggregates after the first five were
+  // wired (owner rule: one implementation per concept, not five-plus-one).
+  // Single-value only (a triage row is one script's one reading, never a
+  // before/after comparison), so formatSignalValue, not formatSignalDelta.
+  it('SlatePanel.tsx imports formatSignalValue and uses it for both aggregates in the ranked table', () => {
+    assert.match(slatePanelSrc, /import\s*\{\s*formatSignalValue\s*\}\s*from\s*"\.\.\/lib\/structural-signals-copy\.ts";/);
+    assert.match(slatePanelSrc, /formatSignalValue\(entry\.meanAbsDialogueShareDelta\)/);
+    assert.match(slatePanelSrc, /formatSignalValue\(entry\.actionSentenceCvOverall\)/);
+    assert.ok(!slatePanelSrc.includes('entry.meanAbsDialogueShareDelta.toFixed('));
+    assert.ok(!slatePanelSrc.includes('entry.actionSentenceCvOverall.toFixed('));
+  });
+
+  it('server/lib/slate.ts imports formatSignalValue and uses it for both aggregates in the exported ranked table', () => {
+    assert.match(slateSrc, /import\s*\{\s*formatSignalValue\s*\}\s*from\s*'\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+    assert.match(slateSrc, /formatSignalValue\(entry\.meanAbsDialogueShareDelta\)/);
+    assert.match(slateSrc, /formatSignalValue\(entry\.actionSentenceCvOverall\)/);
+    assert.ok(!slateSrc.includes('entry.meanAbsDialogueShareDelta.toFixed('));
+    assert.ok(!slateSrc.includes('entry.actionSentenceCvOverall.toFixed('));
+  });
+
+  it('no bare .toFixed( on either aggregate survives anywhere in the tracked src/ or server/ tree', () => {
+    // The strongest available closing assertion for "found every toFixed( on
+    // a signal value" — not just the six named surfaces, but the whole tree,
+    // so a SEVENTH hand-copy introduced later fails here immediately rather
+    // than waiting for another audit to find it.
+    const rg = spawnSync(
+      'grep', ['-rlE', '(meanAbsDialogueShareDelta|actionSentenceCvOverall)\\.toFixed\\(', resolve(__dirname, '../../src'), resolve(__dirname, '../../server')],
+      { encoding: 'utf8' },
+    );
+    const hits = (rg.stdout ?? '').split('\n').filter((l) => l.trim().length > 0);
+    assert.deepEqual(hits, [], `bare .toFixed( on a structural-signal aggregate still found in:\n${hits.join('\n')}`);
   });
 });
 
