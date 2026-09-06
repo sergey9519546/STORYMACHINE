@@ -148,9 +148,23 @@ function firstDifference(a: string, b: string): string {
 
 describe('routes/export — every doctor-consuming export runs off the main thread', () => {
   let server: TestServer;
-  before(async () => { server = await startTestServer(); });
+  before(async () => {
+    // This suite proves a CANCEL TERMINATES the worker, and it observes that
+    // through `doctorPoolStatus().workers` dropping to 0. Since the round-3
+    // review (2026-09-06) the pool warms a REPLACEMENT worker immediately
+    // after any deliberate terminate, so on a deployment that count comes
+    // straight back up — which is the point of that change, and would make
+    // this suite's observation ambiguous rather than wrong. Pin the respawn
+    // off for this process so the assertion keeps meaning "the worker running
+    // the cancelled job was killed"; the respawn's own coverage (the pool is
+    // restored to its configured size) lives in
+    // tests/core/doctor-analysis-budget.test.ts.
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '0';
+    server = await startTestServer();
+  });
   after(async () => {
     delete process.env.DOCTOR_WORKER_POOL;
+    delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
     await server.close();
     // Leave no worker holding this test process open.
     await shutdownDoctorPool();

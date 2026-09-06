@@ -19,7 +19,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, type TestServer } from './helpers.ts';
 import { clearDoctorCache } from '../../server/nvm/analyze/doctor.ts';
-import { doctorPoolStatus, shutdownDoctorPool } from '../../server/nvm/analyze/doctor-pool.ts';
+import { doctorPoolStatus, shutdownDoctorPool, setDoctorPoolMeanJobMsForTests } from '../../server/nvm/analyze/doctor-pool.ts';
 import { doctorAnalysisBudgetSentence } from '../../server/lib/doctor-budget.ts';
 
 const SCRIPT = 'INT. ROOM - DAY\n\nA figure waits by the window.\n\nALEX\nWe should go.\n\nSAM\nNot yet.\n';
@@ -43,6 +43,8 @@ describe('POST /api/scriptide/doctor(/stream) — the per-analysis budget on the
     delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
     delete process.env.DOCTOR_QUEUE_BUDGET_MS;
     delete process.env.DOCTOR_WORKER_POOL_SIZE;
+    delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+    setDoctorPoolMeanJobMsForTests(2_000);
     await server.close();
     await shutdownDoctorPool();
   });
@@ -183,6 +185,58 @@ describe('POST /api/scriptide/doctor(/stream) — the per-analysis budget on the
     } finally {
       delete process.env.DOCTOR_WORKER_POOL_SIZE;
       delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+      await shutdownDoctorPool();
+    }
+  });
+
+  // ── Admission control on the wire (round-3) ──────────────────────────────
+  // Round 2 shipped wait-then-shed: a hopeless submission still sat in the
+  // FIFO for the whole 60 s budget before being told to retry (measured:
+  // first 503 at 60,296 ms on a saturated pool). The same estimator is now
+  // consulted at SUBMISSION, so the answer arrives at once — with the same
+  // status, the same header and the same sentence, because it is the same
+  // state. The EWMA is stubbed so the decision is arithmetic rather than a
+  // race; the live before/after is in the lane report.
+  it('refuses a hopeless submission at the door — same 503, same sentence, in milliseconds instead of a minute', async (t) => {
+    if (!poolUsable) { t.skip('worker pool unavailable'); return; }
+    await shutdownDoctorPool();
+    clearDoctorCache();
+    process.env.DOCTOR_WORKER_POOL_SIZE = '1';
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '0';
+    delete process.env.DOCTOR_QUEUE_BUDGET_MS;   // shipped 60s budget in force
+    delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+    // Ten minutes of work per job ahead: any non-idle pool is hopeless.
+    setDoctorPoolMeanJobMsForTests(600_000);
+    try {
+      const responses = await Promise.all(
+        ['a1', 'a2', 'a3', 'a4', 'a5', 'a6'].map(async (tag) => {
+          const started = Date.now();
+          const res = await postDoctor('/api/scriptide/doctor', { fountain: distinctScript(tag) });
+          return {
+            status: res.status,
+            retryAfter: res.headers.get('retry-after'),
+            ms: Date.now() - started,
+            body: await res.json() as Record<string, unknown>,
+          };
+        }),
+      );
+      const shed = responses.filter((r) => r.status !== 200);
+      assert.ok(shed.length >= 1, `expected at least one submission refused at the door, got ${JSON.stringify(responses.map((r) => r.status))}`);
+      assert.ok(responses.some((r) => r.status === 200), 'the pool must still serve the submission it admitted — admission may not shed everything');
+      for (const r of shed) {
+        assert.equal(r.status, 503);
+        assert.ok(Number(r.retryAfter) >= 1, `expected a Retry-After header, got ${JSON.stringify(r.retryAfter)}`);
+        const message = String(r.body.error);
+        assert.match(message, /^This server is busy/);
+        assert.doesNotMatch(message, /This draft took longer to analyze/);
+        // The point of the round: this answer used to take the full queue
+        // budget (60,000 ms) to arrive.
+        assert.ok(r.ms < 2_000, `an admission refusal must not wait on the queue budget, took ${r.ms}ms`);
+      }
+    } finally {
+      setDoctorPoolMeanJobMsForTests(2_000);
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
       await shutdownDoctorPool();
     }
   });

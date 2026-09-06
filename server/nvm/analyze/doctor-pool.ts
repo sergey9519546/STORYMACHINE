@@ -34,8 +34,16 @@
 //      with no await points to check a flag at, so a cooperative cancel would
 //      not actually stop it. Terminating is safe precisely because the worker
 //      holds no state anyone else can observe (see doctor-worker.ts). The
-//      dead worker is dropped from the pool and a fresh one is spawned on the
-//      next request.
+//      dead worker is dropped from the pool and — since the round-3 review,
+//      2026-09-06 — a replacement is warmed EAGERLY rather than spawned
+//      lazily on the next request: a terminate used to leave the pool one
+//      warm worker short, so the next, unrelated writer paid the ~2-3 s
+//      cold start (measured: after ten forced budget kills, `workers` was 0
+//      and the next ordinary submission took 9,513 ms). This applies equally
+//      to Cancel, to a running-budget kill and to a privacy purge — see
+//      respawnWarmWorkerAfterTerminate() for the guards, and note that the
+//      replacement is a FRESH realm that has never seen a report, so it
+//      cannot undo what a purge deleted.
 //
 //   3. ERROR PROPAGATION. A throw inside the worker comes back as a typed
 //      message and is rethrown here with the original name/message/stack, so
@@ -60,7 +68,12 @@
 //      lives here, and the running half reuses property 2's primitive rather
 //      than inventing a second kind of cancellation. Like Cancel, both apply
 //      to the WORKER path only — see armQueueBudget()'s comment for why the
-//      in-process fallback deliberately has no budget.
+//      in-process fallback deliberately has no budget. Since the round-3
+//      review the queue half is enforced twice: once at SUBMISSION, where a
+//      submission the pool already knows it cannot serve in time is refused
+//      in milliseconds instead of after a 60 s wait (admissionRejection(),
+//      with two documented biases toward admitting), and once by the timer,
+//      for a job that was admitted and then had the queue grow behind it.
 //
 // Deep read (opts.deepRead) deliberately does NOT go through the pool: it
 // fans out LLM calls whose budget/abort machinery (withAiBudget's
@@ -144,6 +157,9 @@ const slots: WorkerSlot[] = [];
 let nextRequestId = 1;
 /** Latched when the environment proves it cannot run the worker at all. */
 let poolDisabled = false;
+/** Latched for the duration of shutdownDoctorPool() so the eager respawn
+ *  below cannot race a teardown into spawning the worker it just killed. */
+let shuttingDown = false;
 
 /** An abort that happened before/while a job was queued or running. */
 class DoctorAbortError extends Error {
@@ -211,6 +227,87 @@ function estimateRetryAfterSeconds(): number {
   const size = Math.max(1, configuredPoolSize());
   const estimateMs = Math.ceil(ahead / size) * meanJobMs;
   return Math.min(RETRY_AFTER_MAX_SECONDS, Math.max(1, Math.ceil(estimateMs / 1000)));
+}
+
+/** Test-only: pin the EWMA so an admission test can assert a decision instead
+ *  of racing a real workload into producing one. Mirrors
+ *  resetDoctorPoolWarmStateForTests()'s role for the pre-warm state. */
+export function setDoctorPoolMeanJobMsForTests(ms: number): void {
+  meanJobMs = ms;
+}
+
+// ── Admission control (round-3 review follow-up, 2026-09-06) ────────────────
+// The queue budget alone is WAIT-THEN-SHED: a submission that is already
+// hopeless still sits in the FIFO for the whole 60 s before being told to come
+// back. Measured on the two-wave burst probe, round-2 build: the first 503 of
+// a wave landing on an already-saturated pool arrived at **60,296 ms**, and it
+// then advised "try again in about 25 seconds" — a minute of a writer's time
+// spent to deliver advice the pool could have given at once.
+//
+// So the same estimator that produces `Retry-After` is consulted at
+// SUBMISSION. If the wait this job would face already exceeds the budget by a
+// clear margin, it is refused immediately — never enqueued — with the same
+// 503, the same header and the same registered sentence a timer rejection
+// sends. A job that IS admitted keeps its timer, which is what still catches
+// the case the brief named: admitted, then the queue grew behind it.
+//
+// TWO deliberate biases toward ADMITTING, because an admission rejection must
+// only fire where the timer would have fired anyway:
+//
+//   1. The job's OWN round is excluded. `Retry-After`'s estimator counts the
+//      work ahead including this submission; the queue budget bounds the WAIT,
+//      not wait-plus-run, so admission subtracts one round
+//      (`- meanJobMs`). Without this the check is systematically pessimistic
+//      by one whole job.
+//   2. An overshoot MARGIN of 1.5x. Measured on the same before-run: the
+//      luckiest submission of the saturated wave completed at 57.7 s while
+//      this estimator put its wait at ~80 s — the estimator over-stated the
+//      real wait by ~1.45x, because the EWMA's early samples carry worker
+//      cold-start (the first completion measured 5,118 ms against a ~2-3 s
+//      steady-state job). Refusing at 1.0x would therefore have shed
+//      submissions that went on to be SERVED. 1.5 is that measured 1.45
+//      rounded up, and it is the number that keeps the scored count from
+//      dropping.
+//
+// Both biases mean the check is deliberately LATE rather than eager: it fires
+// only for submissions the pool is confident it cannot serve. Everything
+// nearer the boundary still goes through the timer path and gets the same
+// answer 60 s later, exactly as before.
+const ADMISSION_OVERSHOOT = 1.5;
+
+/** `DOCTOR_QUEUE_ADMISSION=off` (or `0`) reverts to pure wait-then-shed: the
+ *  queue budget's timer still sheds, nothing is refused at the door. Exists
+ *  for two reasons and both are real: an operator who would rather have every
+ *  submission wait its turn than be refused early can have that, and it makes
+ *  the admission check A/B-measurable on ONE binary — the before/after in this
+ *  lane's report was taken that way rather than by rebuilding. */
+function admissionEnabled(): boolean {
+  const raw = process.env.DOCTOR_QUEUE_ADMISSION;
+  return raw !== 'off' && raw !== '0';
+}
+
+/**
+ * Should this submission be refused before it is ever queued? Returns the
+ * error to throw, or undefined to admit. Never called for a cache hit, for
+ * deep read, or on the in-process path — none of those queue.
+ */
+function admissionRejection(): DoctorAnalysisBudgetExceededError | undefined {
+  if (!admissionEnabled()) return undefined;
+  const budgetMs = doctorQueueBudgetMs();
+  if (budgetMs <= 0) return undefined; // queue budget switched off — nothing to admit against
+  const busy = slots.filter(s => s.active).length;
+  const size = Math.max(1, configuredPoolSize());
+  // The brief's formula, with bias (1) applied: ceil((queued + busy + 1) /
+  // size) rounds of work stand between submission and this job's own result;
+  // one of those rounds IS this job, so the WAIT is one round less.
+  const waitAheadMs = (Math.ceil((queue.length + busy + 1) / size) - 1) * meanJobMs;
+  if (waitAheadMs <= budgetMs * ADMISSION_OVERSHOOT) return undefined;
+  const retryAfterSeconds = estimateRetryAfterSeconds();
+  logger.warn('doctor_analysis_budget_exceeded', {
+    budgetMs, state: 'queued', admission: true, waitAheadMs, retryAfterSeconds,
+    queued: queue.length, busy, meanJobMs,
+  });
+  return new DoctorAnalysisBudgetExceededError(budgetMs, 'queued', retryAfterSeconds);
 }
 
 /** Arm the QUEUE-wait budget for one submitted job. No-op when it is switched
@@ -293,6 +390,9 @@ function onRunBudgetExceeded(job: PendingJob, budgetMs: number): void {
   logger.warn('doctor_analysis_budget_exceeded', { budgetMs, state: 'running' });
   job.reject(new DoctorAnalysisBudgetExceededError(budgetMs, 'running'));
   pump();
+  // The kill cost this pool a warm worker; put one back rather than leaving
+  // the next writer to pay the cold start (round-3).
+  respawnWarmWorkerAfterTerminate('budget');
 }
 
 function clearIdleTimer(slot: WorkerSlot): void {
@@ -374,10 +474,84 @@ function finishJob(slot: WorkerSlot, settle: () => void): void {
     dropSlot(slot);
     void slot.worker.terminate();
     pump();
+    respawnWarmWorkerAfterTerminate('purge');
     return;
   }
   pump();
   if (!slot.active) armIdleTimer(slot);
+}
+
+// ── Eager respawn after a deliberate terminate (round-3, 2026-09-06) ────────
+// Terminating is this pool's only honest cancellation (property 2), and both
+// users of it — Cancel and the running-budget kill — leave the pool ONE WARM
+// WORKER SHORT. Nothing respawned it, so the slot was refilled lazily by
+// pump() on the NEXT submission, which meant an unrelated writer paid the
+// worker cold start the boot-time pre-warm exists to avoid. Measured by the
+// round-2 reviewer: after ten forced budget kills, `workers` sat at 0 and the
+// next ordinary submission took 9,513 ms, ~2-3 s of it spawning a thread and
+// loading doctor.ts inside it.
+//
+// So a deliberate terminate now schedules a replacement through the SAME path
+// boot uses — one throwaway analysis, which is what actually warms a worker
+// (doctor-worker.ts imports doctor.ts lazily inside the first request, so
+// merely spawning the thread warms nothing).
+//
+// Guards, each one load-bearing:
+//   * never during shutdownDoctorPool() (it would resurrect what teardown is
+//     killing), and never when the pool is disabled or switched off;
+//   * never when work is already queued — pump() is about to spawn on demand
+//     and that real job warms the worker itself, so a throwaway would only
+//     compete with it for a slot;
+//   * never past the configured pool size, counting respawns already in
+//     flight, so repeated kills cannot fan out into a spawn storm;
+//   * OFF under NODE_ENV=test unless asked for explicitly, exactly like the
+//     boot pre-warm and for the same reason — a test run should not spend
+//     wall-clock time warming a pool nobody is about to measure, and several
+//     existing suites assert `workers === 0` after a cancel. NOTE, because it
+//     is easy to over-trust: this repository's own runner
+//     (scripts/run-tests.mjs) does NOT set NODE_ENV, so that branch is not
+//     what protects those suites here — the two that observe termination
+//     through the worker count pin DOCTOR_POOL_EAGER_RESPAWN=0 themselves
+//     (tests/routes/export-offthread.test.ts,
+//     tests/routes/scriptide-doctor-pdf-offthread.test.ts), which is explicit
+//     and cannot rot the way an ambient variable can.
+function eagerRespawnEnabled(): boolean {
+  const explicit = process.env.DOCTOR_POOL_EAGER_RESPAWN;
+  if (explicit === '1') return true;
+  if (explicit === '0') return false;
+  if (process.env.NODE_ENV === 'test') return false;
+  if (process.env.DOCTOR_POOL_PREWARM === '0') return false;
+  return true;
+}
+
+/** Mirrors WARM_UP_FOUNTAIN below (same shape, same purpose) but with its own
+ *  slug: the content must differ from every other warm-up, boot's included,
+ *  or the coordinator-side LRU answers it and no worker is ever reached — the
+ *  exact trap warmDoctorPool() documents for its own per-slot index. */
+const RESPAWN_WARM_FOUNTAIN = (index: number): string =>
+  `INT. RESPAWN ROOM ${index} - DAY\n\nA figure stands, waiting for nothing in particular.\n\nWARMUP\nHello.\n`;
+
+let respawnCounter = 0;
+let respawnsInFlight = 0;
+
+/** Call immediately after a deliberate `worker.terminate()`. Never throws,
+ *  never awaited by the caller — a warm-up failure is the same "this
+ *  environment cannot host the pool" case spawnSlot() already treats as
+ *  harmless, and the lazy path still works. */
+function respawnWarmWorkerAfterTerminate(reason: 'budget' | 'cancel' | 'purge'): void {
+  if (shuttingDown || poolDisabled || !poolEnabled() || !eagerRespawnEnabled()) return;
+  if (queue.length > 0) return;
+  if (slots.length + respawnsInFlight >= configuredPoolSize()) return;
+  respawnsInFlight++;
+  const startedAt = Date.now();
+  void runScriptDoctorOffThread(RESPAWN_WARM_FOUNTAIN(respawnCounter++))
+    .then(
+      () => logger.info('doctor_pool_worker_respawned', { reason, ms: Date.now() - startedAt, workers: slots.length }),
+      (err: unknown) => logger.warn('doctor_pool_worker_respawn_failed', {
+        reason, error: err instanceof Error ? err.message : String(err),
+      }),
+    )
+    .finally(() => { respawnsInFlight--; });
 }
 
 function spawnSlot(): WorkerSlot | undefined {
@@ -489,6 +663,9 @@ function dispatch(slot: WorkerSlot, job: PendingJob): void {
       void slot.worker.terminate();
       job.reject(abortReasonToError(signal));
       pump();
+      // Same as the budget kill: Cancel has always left the pool one warm
+      // worker short, and the next writer paid for it (round-3).
+      respawnWarmWorkerAfterTerminate('cancel');
     };
     job.signal.addEventListener('abort', onAbort, { once: true });
     slot.active = { job, id, onAbort };
@@ -565,6 +742,12 @@ export async function runScriptDoctorOffThread(
     return report;
   }
 
+  // Admission control (round-3): refuse a hopeless submission NOW rather than
+  // 60 s from now. Deliberately after the cache peek and after the in-process
+  // branch above — neither of those queues, so neither can be hopeless.
+  const refusedOnAdmission = admissionRejection();
+  if (refusedOnAdmission) throw refusedOnAdmission;
+
   const report = await new Promise<ScriptDoctorReport>((resolve, reject) => {
     // The job's own settlement clears its budget timer, so every path that
     // ends this analysis — result, worker error, worker exit, abort, pool
@@ -588,15 +771,28 @@ export async function runScriptDoctorOffThread(
 /** Tear the pool down — for tests and for a clean process shutdown. Queued
  *  jobs are rejected rather than left dangling. */
 export async function shutdownDoctorPool(): Promise<void> {
-  while (queue.length > 0) {
-    queue.shift()!.reject(new Error('Script Doctor pool was shut down.'));
+  // Latched for the whole teardown so a terminate here — or one that fires
+  // from a job settling under us — cannot trigger the eager respawn and
+  // resurrect a worker this call exists to kill.
+  shuttingDown = true;
+  try {
+    while (queue.length > 0) {
+      queue.shift()!.reject(new Error('Script Doctor pool was shut down.'));
+    }
+    const terminating = slots.splice(0).map(slot => {
+      clearIdleTimer(slot);
+      slot.active = undefined;
+      return slot.worker.terminate().catch(() => undefined);
+    });
+    await Promise.all(terminating);
+    // Nothing can be "in flight" once the pool is torn down: any respawn
+    // warm-up still pending has just had its job rejected above, and leaving
+    // the counter high would make the NEXT terminate think a replacement was
+    // already on its way and skip one.
+    respawnsInFlight = 0;
+  } finally {
+    shuttingDown = false;
   }
-  const terminating = slots.splice(0).map(slot => {
-    clearIdleTimer(slot);
-    slot.active = undefined;
-    return slot.worker.terminate().catch(() => undefined);
-  });
-  await Promise.all(terminating);
 }
 
 /**
@@ -630,6 +826,12 @@ export function purgeDoctorWorkers(): number {
     void slot.worker.terminate();
     terminated++;
   }
+  // Round-3: a wipe is a deliberate terminate like the other two, and leaves
+  // the pool exactly as cold. The replacement worker is spawned fresh and has
+  // never seen a report, so warming it back up cannot undo the deletion this
+  // function performs — see the header above for why a fresh realm is the
+  // whole mechanism here.
+  if (terminated > 0) respawnWarmWorkerAfterTerminate('purge');
   return terminated;
 }
 
@@ -638,6 +840,7 @@ export function purgeDoctorWorkers(): number {
 export function doctorPoolStatus(): {
   enabled: boolean; disabled: boolean; workers: number; queued: number;
   analysisBudgetMs: number; queueBudgetMs: number; retryAfterSeconds: number;
+  meanJobMs: number; eagerRespawn: boolean; admission: boolean;
 } {
   return {
     enabled: poolEnabled(),
@@ -651,6 +854,10 @@ export function doctorPoolStatus(): {
     analysisBudgetMs: doctorAnalysisBudgetMs(),
     queueBudgetMs: doctorQueueBudgetMs(),
     retryAfterSeconds: estimateRetryAfterSeconds(),
+    // Round-3 introspection: what the admission check is working from.
+    meanJobMs,
+    eagerRespawn: eagerRespawnEnabled(),
+    admission: admissionEnabled(),
   };
 }
 

@@ -43,7 +43,10 @@ import {
   doctorQueueBudgetSentence,
   isDoctorAnalysisBudgetExceeded,
 } from '../../server/lib/doctor-budget.ts';
-import { runScriptDoctorOffThread, shutdownDoctorPool, doctorPoolStatus } from '../../server/nvm/analyze/doctor-pool.ts';
+import {
+  runScriptDoctorOffThread, shutdownDoctorPool, doctorPoolStatus,
+  setDoctorPoolMeanJobMsForTests, purgeDoctorWorkers,
+} from '../../server/nvm/analyze/doctor-pool.ts';
 import { runScriptDoctor, clearDoctorCache } from '../../server/nvm/analyze/doctor.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -214,11 +217,19 @@ describe('the budget error — one registered sentence, recognizable across modu
 });
 
 describe('the budgets fire, each in its own state, and cancel the job the way Cancel does', () => {
-  before(async () => { await shutdownDoctorPool(); });
+  before(async () => {
+    // Explicit, not ambient: NODE_ENV is 'test' under the runner but unset
+    // when this file is executed directly, and the eager respawn (round-3)
+    // keys off it. These tests are about the budgets, so pin it off rather
+    // than letting a replacement worker appear halfway through one.
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '0';
+    await shutdownDoctorPool();
+  });
   after(async () => {
     delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
     delete process.env.DOCTOR_QUEUE_BUDGET_MS;
     delete process.env.DOCTOR_WORKER_POOL_SIZE;
+    delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
     await shutdownDoctorPool();
   });
 
@@ -271,6 +282,11 @@ describe('the budgets fire, each in its own state, and cancel the job the way Ca
     // The running budget stays at its shipped default, so nothing here can be
     // stopped for occupancy — every rejection below has to be a queue one.
     delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+    // Round-3: pin the EWMA to 1 ms so admission control (which consults the
+    // same estimator at submission) ADMITS every one of these and the TIMER
+    // is what sheds them. Admission's own coverage is its own describe below;
+    // this test must keep exercising the timer path it was written for.
+    setDoctorPoolMeanJobMsForTests(1);
     try {
       // Five submissions, one worker: the first is dispatched synchronously,
       // the other four are still in the FIFO when their 1ms timers fire.
@@ -302,6 +318,7 @@ describe('the budgets fire, each in its own state, and cancel the job the way Ca
         assert.match(err.message, /Nothing is wrong with the draft/);
       }
     } finally {
+      setDoctorPoolMeanJobMsForTests(2_000);
       delete process.env.DOCTOR_WORKER_POOL_SIZE;
       delete process.env.DOCTOR_QUEUE_BUDGET_MS;
       await shutdownDoctorPool();
@@ -326,6 +343,224 @@ describe('the budgets fire, each in its own state, and cancel the job the way Ca
     // above) cannot: nothing is armed, so this must return a report.
     const report = await runScriptDoctorOffThread(tinyScript('off'));
     assert.ok(report.contentHash);
+  });
+});
+
+// ── Admission control (round-3) ─────────────────────────────────────────────
+// The queue budget alone is wait-then-shed: measured on the two-wave burst
+// probe against the round-2 build, the first 503 of a wave landing on an
+// already-saturated pool arrived at 60,296 ms and then advised "try again in
+// about 25 seconds". The same estimator is now consulted at submission, so a
+// hopeless submission is refused at once. The EWMA is STUBBED here rather
+// than produced by a real workload: the decision under test is arithmetic,
+// and racing 60 real analyses into CI to reach it would be slow and
+// load-sensitive. The live before/after is in the lane report.
+describe('admission control — a hopeless submission is refused now, not in 60 seconds', () => {
+  const previousMean = 2_000;
+  before(async () => {
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '0'; // see the budgets describe above
+    await shutdownDoctorPool();
+  });
+  after(async () => {
+    setDoctorPoolMeanJobMsForTests(previousMean);
+    delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+    delete process.env.DOCTOR_WORKER_POOL_SIZE;
+    delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+    await shutdownDoctorPool();
+  });
+
+  it('refuses in milliseconds — not after the queue budget — with the same 503 and sentence a timer rejection sends', async (t) => {
+    if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
+      t.skip('worker pool unavailable in this environment');
+      return;
+    }
+    clearDoctorCache();
+    // A mean job time so large that ANY queue depth is already hopeless
+    // against the budget: one job ahead of this one is 10 minutes of work.
+    setDoctorPoolMeanJobMsForTests(600_000);
+    process.env.DOCTOR_QUEUE_BUDGET_MS = String(DOCTOR_QUEUE_BUDGET_DEFAULT_MS);
+    process.env.DOCTOR_WORKER_POOL_SIZE = '1';
+    try {
+      // One submission in flight so the pool is not idle; the second is the
+      // one admission must refuse.
+      const inFlight = runScriptDoctorOffThread(tinyScript('adm-busy'));
+      const started = performance.now();
+      const err = await runScriptDoctorOffThread(tinyScript('adm-shed')).then(() => null, (e: unknown) => e);
+      const ms = performance.now() - started;
+      assert.ok(err, 'expected the hopeless submission to be refused');
+      assert.ok(isDoctorAnalysisBudgetExceeded(err), `expected the budget error, got ${(err as Error)?.name}`);
+      const budgetErr = err as DoctorAnalysisBudgetExceededError;
+      assert.equal(budgetErr.state, 'queued', 'an admission refusal is a queue rejection, not a running one');
+      assert.equal(budgetErr.status, 503);
+      assert.ok(budgetErr.retryAfterSeconds !== undefined && budgetErr.retryAfterSeconds >= 1);
+      // Identical copy to the timer path — one state, one wording.
+      assert.match(budgetErr.message, /^This server is busy/);
+      assert.doesNotMatch(budgetErr.message, /This draft took longer to analyze/);
+      // The whole point: immediately, not after DOCTOR_QUEUE_BUDGET_MS.
+      assert.ok(ms < 50, `admission must answer in milliseconds, took ${Math.round(ms)}ms`);
+      assert.equal(doctorPoolStatus().queued, 0, 'a refused submission must never be enqueued');
+      await inFlight.catch(() => undefined);
+    } finally {
+      setDoctorPoolMeanJobMsForTests(previousMean);
+      delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      await shutdownDoctorPool();
+    }
+  });
+
+  it('admits an ordinary submission on an idle pool, and admits when the queue budget is switched off', async (t) => {
+    if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
+      t.skip('worker pool unavailable in this environment');
+      return;
+    }
+    clearDoctorCache();
+    // Even with an absurd mean, an IDLE pool has nothing ahead of the new
+    // job, so its wait-ahead is zero rounds and it must be admitted — the
+    // check bounds the WAIT, never the draft.
+    setDoctorPoolMeanJobMsForTests(600_000);
+    try {
+      const report = await runScriptDoctorOffThread(tinyScript('adm-idle'));
+      assert.ok(report.contentHash, 'an idle pool must admit');
+
+      // And with the queue budget off there is nothing to admit against.
+      process.env.DOCTOR_QUEUE_BUDGET_MS = 'off';
+      const second = await runScriptDoctorOffThread(tinyScript('adm-off'));
+      assert.ok(second.contentHash);
+    } finally {
+      setDoctorPoolMeanJobMsForTests(previousMean);
+      delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+      await shutdownDoctorPool();
+    }
+  });
+
+  it('is biased toward ADMITTING: a submission whose estimated wait merely reaches the budget still gets in', async (t) => {
+    if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
+      t.skip('worker pool unavailable in this environment');
+      return;
+    }
+    clearDoctorCache();
+    process.env.DOCTOR_WORKER_POOL_SIZE = '1';
+    process.env.DOCTOR_QUEUE_BUDGET_MS = String(DOCTOR_QUEUE_BUDGET_DEFAULT_MS);
+    // One job in flight -> one round of wait ahead. A mean equal to the whole
+    // budget makes the naive estimate exactly the budget; the 1.5x overshoot
+    // margin (derived from the measured ~1.45x over-statement of this
+    // estimator at the shed boundary) means this must still be ADMITTED.
+    setDoctorPoolMeanJobMsForTests(DOCTOR_QUEUE_BUDGET_DEFAULT_MS);
+    try {
+      const inFlight = runScriptDoctorOffThread(tinyScript('bias-busy'));
+      const report = await runScriptDoctorOffThread(tinyScript('bias-admit'));
+      assert.ok(report.contentHash, 'a boundary submission must be admitted, not shed at the door');
+      await inFlight.catch(() => undefined);
+    } finally {
+      setDoctorPoolMeanJobMsForTests(previousMean);
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      delete process.env.DOCTOR_QUEUE_BUDGET_MS;
+      await shutdownDoctorPool();
+    }
+  });
+});
+
+// ── Eager respawn after a deliberate terminate (round-3) ────────────────────
+describe('a terminated worker is replaced eagerly, not on the next writer\'s request', () => {
+  after(async () => {
+    delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+    delete process.env.DOCTOR_WORKER_POOL_SIZE;
+    await shutdownDoctorPool();
+  });
+
+  it('is OFF under NODE_ENV=test and under DOCTOR_POOL_PREWARM=0, ON otherwise, and always overridable', () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousPrewarm = process.env.DOCTOR_POOL_PREWARM;
+    try {
+      delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+      delete process.env.DOCTOR_POOL_PREWARM;
+
+      // Off under the test runner: several existing suites
+      // (tests/routes/export-offthread.test.ts,
+      // tests/routes/scriptide-doctor-pdf-offthread.test.ts) assert
+      // `workers === 0` after a cancel, and a run should not spend wall clock
+      // warming a pool nobody is about to measure — the same carve-out the
+      // boot pre-warm makes, for the same reasons.
+      process.env.NODE_ENV = 'test';
+      assert.equal(doctorPoolStatus().eagerRespawn, false);
+
+      // Off wherever the operator already opted out of boot warm-up.
+      process.env.NODE_ENV = 'production';
+      process.env.DOCTOR_POOL_PREWARM = '0';
+      assert.equal(doctorPoolStatus().eagerRespawn, false);
+
+      // On for an ordinary deployment — the case the writer actually meets.
+      delete process.env.DOCTOR_POOL_PREWARM;
+      assert.equal(doctorPoolStatus().eagerRespawn, true);
+
+      // And explicitly overridable in both directions.
+      process.env.DOCTOR_POOL_EAGER_RESPAWN = '0';
+      assert.equal(doctorPoolStatus().eagerRespawn, false);
+      process.env.NODE_ENV = 'test';
+      process.env.DOCTOR_POOL_EAGER_RESPAWN = '1';
+      assert.equal(doctorPoolStatus().eagerRespawn, true);
+    } finally {
+      delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNodeEnv;
+      if (previousPrewarm === undefined) delete process.env.DOCTOR_POOL_PREWARM; else process.env.DOCTOR_POOL_PREWARM = previousPrewarm;
+    }
+  });
+
+  it('restores the pool to its configured size after a purge terminates every worker', async (t) => {
+    if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
+      t.skip('worker pool unavailable in this environment');
+      return;
+    }
+    await shutdownDoctorPool();
+    clearDoctorCache();
+    process.env.DOCTOR_WORKER_POOL_SIZE = '1';
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '1';
+    try {
+      // Warm one worker with a real analysis.
+      await runScriptDoctorOffThread(tinyScript('respawn-warm'));
+      assert.equal(doctorPoolStatus().workers, 1, 'precondition: one warm worker');
+
+      const terminated = purgeDoctorWorkers();
+      assert.equal(terminated, 1, 'the purge must have terminated the idle worker');
+
+      // Before this change the pool sat at 0 until the next real submission,
+      // which then paid the cold start. Now a replacement is warmed eagerly;
+      // allow the same deadline the boot pre-warm is given.
+      const deadline = Date.now() + 30_000;
+      while (doctorPoolStatus().workers < 1) {
+        if (Date.now() > deadline) {
+          assert.fail(`pool size was not restored within 30s (workers=${doctorPoolStatus().workers})`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      assert.ok(doctorPoolStatus().workers >= 1, 'the pool is warm again without a writer having asked for anything');
+    } finally {
+      delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      await shutdownDoctorPool();
+    }
+  });
+
+  it('never resurrects a worker during shutdown, and never exceeds the configured pool size', async (t) => {
+    if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
+      t.skip('worker pool unavailable in this environment');
+      return;
+    }
+    clearDoctorCache();
+    process.env.DOCTOR_WORKER_POOL_SIZE = '1';
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '1';
+    try {
+      await runScriptDoctorOffThread(tinyScript('respawn-shutdown'));
+      await shutdownDoctorPool();
+      // A respawn racing teardown would leave a live worker behind here and
+      // hold the test process open.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      assert.equal(doctorPoolStatus().workers, 0, 'shutdown must win against the eager respawn');
+    } finally {
+      delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+      delete process.env.DOCTOR_WORKER_POOL_SIZE;
+      await shutdownDoctorPool();
+    }
   });
 });
 

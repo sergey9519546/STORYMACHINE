@@ -29,8 +29,19 @@ import { FIXTURE_PDF, buildLongScreenplayPdf } from './pdf-fixture.ts';
 
 describe('routes/scriptide/doctor/pdf — runs off the main thread', () => {
   let server: TestServer;
-  before(async () => { server = await startTestServer(); });
+  before(async () => {
+    // Same pin, same reason, as tests/routes/export-offthread.test.ts's own
+    // `before`: this suite observes "the cancelled worker was terminated"
+    // through `doctorPoolStatus().workers` reaching 0, and the round-3 eager
+    // respawn (2026-09-06) deliberately puts a warm replacement back the
+    // instant that happens. Pinning it off keeps this assertion about
+    // TERMINATION; the respawn has its own coverage in
+    // tests/core/doctor-analysis-budget.test.ts.
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '0';
+    server = await startTestServer();
+  });
   after(async () => {
+    delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
     await server.close();
     // Leave no worker holding this test process open.
     await shutdownDoctorPool();

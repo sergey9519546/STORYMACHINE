@@ -62,6 +62,27 @@ advice, and carries the retry estimate in words — which is how the SSE route,
 already past its headers, delivers the same distinction a `Retry-After` header
 gives the JSON routes.
 
+**Second amendment (round-3, 2026-09-06) — two consequences of the split,
+built rather than deferred:**
+
+- **Admission control.** The queue budget is now checked at SUBMISSION as well
+  as by the timer, so a submission the pool already cannot serve is refused at
+  once instead of waiting the full 60 s to be told to come back. Measured A/B
+  on one binary (`DOCTOR_QUEUE_ADMISSION=off` vs on): first 503 of a wave
+  landing on a saturated pool **60,361 / 60,267 ms → 1,055 / 512 ms**, with
+  the served count unchanged inside run-to-run spread (49/43 vs 46/47 of 80).
+  Two biases keep it from shedding work the timer would have served: the
+  estimate excludes the job's own execution, and must exceed the budget by
+  1.5x — the measured over-statement of the estimator at the shed boundary.
+  Same 503, same `Retry-After`, same row-73 sentence: same state, sooner.
+- **Eager respawn after a terminate.** Cancel, a run-budget kill and a purge
+  all terminate a worker, and all three used to leave the pool one warm worker
+  short until the next submission — an unrelated writer paid the ~2–3 s cold
+  start (measured: `workers: 0` after ten kills, 9,513 ms for the next
+  ordinary submission). A replacement is now warmed through the same path boot
+  uses. This is also where **Cancel's** long-standing version of that cost is
+  finally written down.
+
 **Deliberate limits, written down rather than discovered:** the budget applies
 to the **worker path only** (with `DOCTOR_WORKER_POOL=off`, on a host that
 cannot spawn workers, or on deep read there is nothing to terminate — the same

@@ -721,6 +721,76 @@ is shed 503 with the header and the sentence agreeing on the same number, on
 both the JSON and the SSE route). Both were confirmed to FAIL against the
 round-1 behaviour before passing against this one.
 
+**Second amendment (2026-09-06) — don't make a writer wait a minute to be told
+to come back, and don't leave the pool cold after a kill.** The review of the
+first amendment recorded two consequences of it as out of scope. Both are
+built here rather than left for someone to rediscover.
+
+**(a) Admission control — the queue budget is now enforced at SUBMISSION as
+well as by the timer.** The first amendment was pure wait-then-shed: a
+submission the pool could never have served in time still sat in the FIFO for
+the whole 60 s before being refused, and was then told "try again in about 25
+seconds" — a minute of a writer's time spent delivering advice the pool could
+have given at once (measured by the reviewer at 62.9 s; re-measured here at
+60,361 ms for the first 503 of a wave landing on a saturated pool). The same
+estimator that produces `Retry-After` is now consulted before a job is
+queued: if the wait this submission would face already exceeds the queue
+budget by a margin, it is refused immediately, never enqueued, with the same
+503, the same `Retry-After` and the same registered sentence (row 73) — it is
+the same state, so it gets the same answer, just sooner. A job that IS
+admitted keeps its timer, which still catches the case where the queue grew
+behind it after admission.
+
+Measured A/B on one binary (`DOCTOR_QUEUE_ADMISSION=off` vs. on, two paired
+runs each, same box, 60 concurrent 346 KB features then 20 more 8 s later):
+
+| | admission off | admission on |
+|---|---|---|
+| first 503 of the wave landing on a saturated pool | 60,361 / 60,267 ms | **1,055 / 512 ms** |
+| first 503 of the cold opening wave (timer path) | 62,625 / 63,688 ms | 62,750 / 64,058 ms |
+| submissions served, out of 80 | 49 / 43 | 46 / 47 |
+
+The served count is unchanged within run-to-run spread — which it must be,
+because **an admission refusal may only fire where the timer would have fired
+anyway**. Two deliberate biases toward admitting enforce that: the estimate
+excludes the job's OWN execution (the queue budget bounds the wait, not
+wait-plus-run), and it must exceed the budget by **1.5×** before anything is
+refused — that factor is the measured ~1.45× by which this estimator
+over-stated the real wait at the shed boundary, because the EWMA's early
+samples carry worker cold start. The cold opening wave, where the pool has no
+completed samples to learn from, is therefore untouched: admission does not
+fire there at all, and the timer answers exactly as before.
+`DOCTOR_QUEUE_ADMISSION=off` reverts to wait-then-shed for an operator who
+prefers it.
+
+**(b) A terminated worker is now replaced eagerly.** Terminating is this
+pool's only honest cancellation, and every user of it — Cancel, the running
+budget's kill, and the "delete everything" purge — left the pool one warm
+worker short, with the slot refilled only on the next submission. That made
+an unrelated writer pay the worker cold start the boot pre-warm exists to
+avoid (the reviewer measured `workers: 0` after ten forced kills and 9,513 ms
+for the next ordinary submission, ~2–3 s of it spawning a thread and loading
+the analyzer inside it). A deliberate terminate now schedules a replacement
+through the same one-throwaway-analysis path boot uses, never awaited, never
+past `DOCTOR_WORKER_POOL_SIZE`, never during shutdown, and off under
+`NODE_ENV=test` and `DOCTOR_POOL_PREWARM=0` for the same reasons the boot
+pre-warm is. **This is the documentation of Cancel's behaviour that was
+missing too**: cancelling an analysis has always terminated the worker, and
+until now that cost was silently transferred to the next writer.
+Warming a replacement after a purge cannot undo the deletion — the
+replacement is a fresh thread that has never seen a report, which is the whole
+mechanism a purge relies on.
+
+**Evidence for the second amendment**: `tests/core/doctor-analysis-budget.test.ts`
+(a hopeless submission refused in under 50 ms with the row-73 sentence and
+never enqueued; an idle pool and a boundary submission both admitted; the
+pool restored to its configured size after a purge; shutdown winning against
+the respawn; the enable/disable matrix for both switches) and
+`tests/routes/doctor-analysis-budget.test.ts` (the same refusal over HTTP,
+with the `Retry-After` header, arriving in under 2 s against a 60 s budget,
+while the admitted submission is still served). Both were confirmed to FAIL
+with each mechanism disarmed before passing with it.
+
 ---
 
 ## Decision Template (for future entries)

@@ -45,6 +45,14 @@ which one fires decides what this panel renders:
   this split, 40 of 60 concurrent legitimate requests read row 72's
   draft-blaming copy for analyses that had never started.
 
+The queue half is enforced twice (round-3): once at **submission**, so a
+writer whose draft the pool already cannot take is told in milliseconds rather
+than after a minute of waiting (measured 60.4 s → 1.1 s on a saturated pool),
+and once by the timer, for a submission admitted before the queue grew behind
+it. Cancelling from this panel, and a run-budget kill, both terminate the
+worker — and now warm a replacement eagerly, so the NEXT writer no longer pays
+the ~2–3 s cold start those terminations used to leave behind.
+
 Either way the sentence lands in this panel's existing error state beside its
 existing **enabled** Retry, and the sum of the two budgets is asserted to stay
 under this panel's own 120 s diagnosis watchdog so the writer reads a
