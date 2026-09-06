@@ -1951,3 +1951,175 @@ PENDING OWNER MEASUREMENT.
   `npm run lock-auc24`, then re-lock
   `tests/fixtures/real-corpus-manifest.json` — and until an entry carrying a
   measured number exists, this branch must not merge."
+---
+
+### 2026-09-04 — advice-rule fixes (six measured detector defects) — **PENDING OWNER MEASUREMENT**
+
+- **What this entry is.** An honest ledger row for a scoring change whose
+  real-corpus measurement has NOT been run. It is a promise, not a receipt.
+  `scripts/check-scoring-receipt.mjs` is built to refuse a PENDING entry as
+  satisfying a range's requirement, and it refuses this one: running
+  `node scripts/check-scoring-receipt.mjs main..HEAD` on this branch exits
+  non-zero and names this entry. That is the intended state. The branch is
+  not mergeable until the owner measures and files a superseding entry.
+
+- **What changed, and why it is a scoring change.** Six defects from the
+  2026-09-04 advice-quality audit, written up in full with before/after
+  evidence in `docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md`:
+  1. the suspense-dip reversal predicate was `< -1` on an integer channel,
+     i.e. `<= -2`, reached by **0 of the 42 scripts this repository ships** —
+     `NO_REVERSALS` (major) and `NO_REVERSALS_LONG_STORY` (critical, 4x
+     health weight) were constants. Corrected to `<= -1` across 29 executable
+     call sites behind one new definition, `server/nvm/screenplay/suspense-dip.ts`;
+  2. `ON_THE_NOSE` could not fire on a script written entirely on the nose
+     (five-adverb filler whitelist + per-scene density gate);
+  3. `AS_YOU_KNOW_BOB` fired on a line REFUSING exposition, and
+     `SYCOPHANTIC_AGREEMENT`'s entire measured output across 42 scripts was
+     one false positive on the deliberately-excellent fixture;
+  4. `DANGER_TENSION_WORDS` read `run/runs/running`, `shot/shots` and `dark`
+     as physical peril (measured: `dark` 0/15 peril readings, `run*` 1/27,
+     and one of the six `shot` hits is a CAMERA shot);
+  5. three findings printed facts the script contradicts (a dialogue-cue
+     count rendered as a scene count, a dialogue line cited as an action
+     line, a timestamp cited as a dramatic-reveal colon);
+  6. `wordCount` — the health density denominator — counted boneyard words,
+     and `parseFountain` had no title-page handling at all. Both were named
+     as unfixed residuals by the 2026-09-04 corpus-contamination correction
+     above; this range fixes them, and also fixes the raw-line scanners in
+     `voice.ts` and `originality.ts` that were still reading the boneyard as
+     prose (measured: 23 distinct rules changed count when the boneyard was
+     removed; after the fix, zero).
+
+- **Date:** 2026-09-04 (the code change; **no measurement was run on this
+  date or any other**).
+- **Git SHA:** the branch tip of `worktree-agent-a37bc80df64444bd7`, rebased
+  on `main` at `c21fdc5b494e6431c679763e525fc12e759183d8`.
+- **Command:** none. No real-corpus command was run. `npm run measure-real`
+  was NOT executed; `measure-auc-split.mjs` was NOT executed;
+  `REAL_SCRIPT_CORPUS_DIR` was never set in this session and appears nowhere
+  in this range.
+- **Measured AUC-24:** **PENDING** — not measured. No AUC number is claimed,
+  estimated, or carried forward from a prior entry.
+- **Flag-run AUCs:** **PENDING** — none.
+- **Corpus fingerprint:** no real-corpus text was read; this container has no
+  copy of it. The inputs actually measured are the 20 tracked CC0 fixtures
+  (`cat data/screenplays/*.fountain | sha256sum` =
+  `1f967ce496be043d50c72fef29f0b6ac675388d6c1488f1b91f71a9025f0702c`,
+  unchanged by this range), the 20 calibration `REFERENCE_CORPUS` samples,
+  and two new matched fixtures added by this range
+  (`cat tests/fixtures/advice-audit/bad.fountain tests/fixtures/advice-audit/excellent.fountain | sha256sum`
+  = `c5477655be77a37972801944e6f7764ca837c07421d422ab5246ce4f6315c55b`).
+  `tests/fixtures/real-corpus-manifest.json` is **unchanged by this range and
+  is owed a re-lock** — this change moves health on 38 of the 45 in-repo
+  report fixtures, so it will move produced scripts too, and only the owner
+  can re-measure it.
+
+- **What WAS measured here, in-repo, and can be re-derived by anyone.**
+  - `check-doctor-output-identity.mjs` against `git archive main`:
+    `OUTPUT IDENTITY: FAIL — 45 fixture(s) differ`. 38 moved on
+    health/verdict/sceneCount/issue count, **3 changed verdict** (calibration
+    `Reasonable Doubt` 53.2 -> 60.6, `Second Wind` 58.2 -> 63.1, `The Visit`
+    55.0 -> 61.2, all PASS -> CONSIDER), **0 changed sceneCount**. Largest
+    moves: `room-12` 33.5 -> 0.0 and `transfer-window` 31.9 -> 15.4 (both
+    denominator-only: 21% and 17% of their word counts were licence text),
+    `Adrift` 31.8 -> 44.7, `Merge` 20.9 -> 31.5, `The Grift` 17.6 -> 12.4.
+  - Calibration band averages: strong 62.4 -> 65.6, competent 52.5 -> 58.2,
+    weak 42.1 -> 45.5, troubled 37.1 -> 40.3. Strict band monotonicity holds
+    and `tests/core/calibration.test.ts` passes unchanged, but the
+    strong-to-competent gap NARROWED from 9.9 to 7.4 — recorded because it is
+    a mild degradation of the calibration corpus's separation and nothing was
+    retuned to hide it.
+  - `npm run test:metamorphic`: 6/7 raw, 6 hard passes, the one documented
+    known-failing witness (`empty_verbosity`, delta 5.60) unchanged from
+    baseline. Hard invariants hold.
+  - `npm test`: 11767 tests, 0 failures, 91 skipped (baseline before the
+    change: 11736 / 0 / 91). `npm run lint`, `npm run build`,
+    `npm run check-no-console`, `npm run check-server-reachability`,
+    `npm run check-docs` and `npm run honesty-audit` all exit 0.
+
+- **What this change makes WORSE, stated because it is a cost of the fix.**
+  `RELIEF_WORDS` has the same word-sense defect that this range fixed on the
+  danger side (`quiet` in "a quiet gallery" describes a location, not a
+  de-escalation). Under the unreachable `< -1` threshold nothing noticed;
+  under `<= -1` an incidental relief word now reads as a reversal. Measured
+  consequences: `GOAL_WITHOUT_OPPOSITION` is still suppressed on the
+  deliberately-bad fixture (the one audit-named defect of seventeen that
+  survives), and `NO_REVERSALS`/`NO_REVERSALS_LONG_STORY` now FAIL to fire on
+  that same fixture, which genuinely has no reversals — a false negative this
+  change created. Auditing the relief lexicon is separate scoring work with
+  its own measurement.
+
+- **Runner attestation:** "I, the Claude Code session working in an isolated
+  worktree (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), wrote every
+  probe cited above myself and read every figure out of its own log file with
+  its own exit code. **I did not run any real-corpus measurement, and I am
+  making no claim whatsoever about AUC-24 or any P1 statistic.** The
+  761-script corpus is local-only and this container has no copy of it, so I
+  could not have. This entry exists to record real work honestly while the
+  measurement it needs is still outstanding, and to be REFUSED by the guard
+  until that measurement happens. The specific thing I most want on the
+  record for the owner: this range changes the health denominator for every
+  script anyone analyses and widens a predicate that was previously dead, so
+  a re-measurement is not a formality here. Treat any fall in AUC-24 as a real
+  finding about these six fixes, and do not answer it by moving the floor in
+  `scripts/lib/auc.ts`. Discharge path is
+  `docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md` section 7."
+
+#### 2026-09-06 addendum — rebased onto `main` at `2bfcbf9d`, gates re-run, still PENDING
+
+The entry above cites a branch rebased on `main` at `c21fdc5b`. This branch
+has since been rebased onto `main` at `2bfcbf9d` (86 commits later) and lives
+at `scoring/advice-rule-fixes`. The rebase had exactly one conflict,
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, resolved by keeping both sides:
+`main`'s entries and this branch's PENDING entry, in date order. No code file
+conflicted. This addendum records what a re-run against the new baseline
+produces; it is still not a corpus measurement and the entry is still PENDING
+OWNER MEASUREMENT.
+
+- **Baseline used:** `main` at `2bfcbf9d`, extracted with
+  `git archive main | tar -x` into a scratch tree with `node_modules`
+  symlinked from the working checkout.
+- **Command:** `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`,
+  then the same with `--tree` at this branch's worktree and `--out <after>`,
+  then `node scripts/check-doctor-output-identity.mjs --compare <before> <after>`.
+- **Corpus fingerprint:** none. No corpus was read. The identity harness walks
+  the 45 in-repo reports described in the R5 addendum above.
+- **Output identity against the new baseline:** FAIL, as a scoring change
+  must — 45 of 45 reports differ somewhere in their JSON. Health moves on 29
+  of 45 (mean +0.44, RMS 6.88, largest single move −33.5 on `room-12`, which
+  falls 33.5 to 0, and +12.9 on the calibration sample `Adrift`); verdict
+  changes on 3 of 45 (`Reasonable Doubt`, `Second Wind`, `The Visit`, all
+  PASS to CONSIDER); `sceneCount` is unchanged on all 45. The 16 fixtures
+  whose health does not move are the ones still pinned at the saturating
+  clamp in `main`'s `densityPenalty` — a detector fix cannot move a number
+  that is already at its ceiling.
+- **Gates re-run on the rebased tree, each in the foreground, exit code read
+  from its own log:** `npm run lint` 0 ·
+  `tests/core/advice-rule-fixes.test.ts` 0 (26/26) ·
+  `tests/core/agency-signal.test.ts` 0 (52/52) ·
+  `tests/core/core-02.test.ts` 0 (427/427) · `tests/core/core-03.test.ts` 0
+  (307/307) · `tests/core/pure-core-boundary.test.ts` 0 (6/6) ·
+  `tests/core/reversal-detection.test.ts` 0 (39/39) ·
+  `tests/passes/conflict.test.ts` 0 (465/465) ·
+  `tests/passes/dialogue.test.ts` 0 (473/473) ·
+  `tests/passes/structure.test.ts` 0 (490/490) ·
+  `tests/core/calibration.test.ts` 0 (21/21) ·
+  `tests/core/blind-pairs-discrimination.test.ts` 0 (3/3).
+- **`node scripts/check-scoring-receipt.mjs main..HEAD` exits 1 on this
+  branch, by design** — it finds this entry and refuses it because the heading
+  says PENDING, exactly as the entry above predicted it would. Not a rebase
+  artifact; not to be closed by editing the heading.
+- **Blind matched pairs, in-repo fixtures, no private corpus:** unchanged from
+  the 2026-09-04 finding on the new baseline — 1 of 6 ordered, mean gap +0.03,
+  9 of 12 scripts still pinned at exactly 76.0, against `main @ 2bfcbf9d`'s
+  1 of 6 and −0.02. Mean top-ten rule overlap falls 7.83 to 7.17, which is the
+  six detector fixes changing which findings reach the queue.
+- **Runner attestation:** "I, the branch-sync lane
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), performed the rebase
+  onto `2bfcbf9d` myself, resolved its single conflict myself, and ran every
+  command listed above myself on 2026-09-06, reading each exit code out of its
+  own log file. **I did NOT run `npm run measure-real` and this addendum
+  claims no AUC-24 value: the real corpus is not present in this container and
+  `REAL_SCRIPT_CORPUS_DIR` was left unset.** The owner's measurement is
+  unchanged and is now best taken on `scoring/stacked-r5-plus-advice`, which
+  is this branch merged onto the rebased R5 branch."

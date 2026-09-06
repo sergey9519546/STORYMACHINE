@@ -567,6 +567,7 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { isSuspenseDip } from '../../screenplay/suspense-dip.ts';
 
 /** Extract unique character IDs from dialogue highlights across all records */
 function extractCharacterIds(records: PassInput['records']): Set<string> {
@@ -616,7 +617,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
 
   // ── Escalation without character agency ───────────────────────────────────
   // Discrimination-harness guard: structure.reversalCount only counts scenes
-  // where suspenseDelta < -1 (screenplay/structure.ts) — a narrow, SUSPENSE-DROP
+  // where suspenseDelta dips (screenplay/suspense-dip.ts) — a narrow, SUSPENSE-DROP
   // definition of "reversal" that misses a story whose stakes rise through
   // explicit character-driven clock raises or clue plants (proactive beats) even
   // when the on-page tension never dips. Before this guard, a tight, well-built
@@ -1359,7 +1360,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   }
 
   // REACTIVE_GOAL_ADOPTION (minor, n≥6): All proactive acts (≥2) are immediately
-  // preceded by or coincident with a negative trigger — a reversal (suspenseDelta < -1)
+  // preceded by or coincident with a negative trigger — a reversal (a suspense dip)
   // in the prior scene, or a negative emotional shift in the same or prior scene.
   // The protagonist only acts when forced by adversity; they never initiate from
   // autonomous desire. True protagonism requires at least one proactive beat born
@@ -1374,7 +1375,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     if (proactiveItems230.length >= 2) {
       const allReactive230 = proactiveItems230.every(idx => {
         const selfNeg230 = records[idx].emotionalShift === 'negative';
-        const priorReversal230 = idx > 0 && records[idx - 1].suspenseDelta < -1;
+        const priorReversal230 = idx > 0 && isSuspenseDip(records[idx - 1].suspenseDelta);
         const priorNeg230 = idx > 0 && records[idx - 1].emotionalShift === 'negative';
         return selfNeg230 || priorReversal230 || priorNeg230;
       });

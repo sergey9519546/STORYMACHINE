@@ -39,8 +39,9 @@ brain-linked summary reachable from [[00 Home]].
 [[Measurement - TEMPORAL_ORDER_SENSITIVITY_2026-08-03]] ·
 [[Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21]]
 
-## docs/scoring (13)
+## docs/scoring (14)
 
+[[Measurement - ADVICE_RULE_FIXES_2026-09-04]] ·
 [[Measurement - ARC_RECALIBRATION_WAVE_2026-07-11]] ·
 [[Measurement - BASELINE_2026-07-11]] ·
 [[Measurement - COMPOSITE_MINGAP_FINDING_2026-07-11]] ·
