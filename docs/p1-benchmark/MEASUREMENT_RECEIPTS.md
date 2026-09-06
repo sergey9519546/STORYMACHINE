@@ -2259,8 +2259,13 @@ either; all three are PENDING.
   `scoring/r5-verbosity-bias` with `scoring/advice-rule-fixes` merged into it
   by `git merge --no-ff`; the merge's one conflict was
   `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, resolved by keeping both
-  PENDING entries and both 2026-09-06 addenda in date order. No code file
-  conflicted.
+  unmeasured entries and both 2026-09-06 addenda in date order. No code file
+  conflicted. (The wording is deliberate: "unmeasured", not the bare marker
+  word, because `pendingReason` tests that word against the VALUE of this very
+  field — scan three in the conversion bullets in the R5 addendum above — and a
+  field value runs to the next `- **` bullet, so eight lines of ordinary prose
+  about a merge sit inside it. Applying the recipe's other two scans alone left
+  the real CLI at exit 1 on exactly this entry.)
 - **Command:** `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`,
   then the same with `--tree` at the stack worktree and `--out <after>`, then
   `node scripts/check-doctor-output-identity.mjs --compare <before> <after>`;
