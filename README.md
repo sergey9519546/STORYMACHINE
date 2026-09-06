@@ -130,6 +130,26 @@ look:
   directly: **just over three minutes** wall clock with Chromium pre-cached,
   all eight green. CI runs it as its own blocking `browser` job.
 
+  **Local Chromium version.** `playwright` is an exact-pinned devDependency
+  (`package.json` — no `^`/`~`, and `tests/core/ci-gates-intact.test.ts`
+  fails the build if that ever changes), and each Playwright release pins
+  one specific Chromium build by revision number
+  (`node_modules/playwright-core/browsers.json`). A machine that
+  pre-provisions its own Chromium outside Playwright's normal install path
+  (a dev container image, a shared sandbox) has that binary at a fixed
+  revision, so bumping `playwright` can silently outrun it — Playwright then
+  refuses to launch at all (`browserType.launch: Executable doesn't exist at
+  .../chromium_headless_shell-<new-revision>/...`), not just misbehave.
+  Point it at the pre-provisioned binary instead of letting Playwright look
+  for the revision it expects:
+  `PW_CHROMIUM_PATH=/path/to/chromium npm run verify:browser` (every
+  `verify:*` script under `scripts/` reads the same override — see each
+  script's own header for the exact variable and a standalone-run example).
+  **CI never needs this:** the `browser` job in `.github/workflows/ci.yml`
+  runs `npx playwright install --with-deps chromium` before the battery,
+  which always fetches the exact revision the checked-out `playwright`
+  version pins — the override above is a local/sandbox convenience only.
+
   **Timing under load.** Every `waitForFunction`/`waitForSelector`/download/
   boot timeout the battery uses is scaled by one shared policy
   (`scripts/lib/browser-verify.mjs`'s `getTiming()`): each suite reads

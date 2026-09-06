@@ -68,10 +68,10 @@ on every change — keeping it short is not tidiness, it is the cost model.
 | Concern | Choice |
 |---|---|
 | Runtime | Node >=22.13.0 \|\| >=24 (ESM, `tsx` / `--experimental-strip-types`) |
-| HTTP | Express 4 |
+| HTTP | Express 5 |
 | Persistence | better-sqlite3, one DB per session |
 | Collab | `ws` + Yjs |
-| Frontend | React 19, Vite 6, Tailwind 4, CodeMirror 6 |
+| Frontend | React 19, Vite 8, Tailwind 4, CodeMirror 6 |
 | Validation | zod on every route body |
 | AI | Gemini default; OpenAI-compatible fallback; server-side only |
 

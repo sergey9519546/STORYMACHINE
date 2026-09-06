@@ -340,6 +340,109 @@ describe('hardening — malformed percent-encoding at the site root gets 400, no
   });
 });
 
+// Express 5 fix (2026-09-06 review round 1, REVISE #2). server/app.ts's
+// SPA-fallback route used to call
+// `res.sendFile(path.join(distPath, 'index.html'))` — no `root` option.
+// Express 5 pulls in send@1.x (via serve-static@2.x, up from send@0.19.x
+// under Express 4); send@1's dotfile guard (default `dotfiles: 'ignore'`,
+// i.e. silently 404) checks EVERY segment of the resolved ABSOLUTE path
+// when no `root` is given, not just the part relative to the app's own
+// directory. This repo's own checkout happens to live under
+// `.claude/worktrees/<id>/…`, so the unfixed form 404'd every production-
+// mode SPA request here — but the fix (`res.sendFile('index.html', {
+// root: distPath })`) is what actually matters, not the sandbox that
+// happened to expose it: on ANY checkout path with no dot segment
+// (a normal CI runner's `/home/runner/work/<repo>/<repo>`, e.g.), the
+// OLD unfixed form also returns 200, so `verify:production` alone cannot
+// tell the two forms apart on such a path. This block builds its OWN
+// dot-prefixed temp ancestor via `fs.mkdtempSync`'s `.`-prefixed
+// template, so the regression it guards reproduces on every machine this
+// suite runs on — never mind where the checkout itself lives. Verified
+// fail-first in a scratch copy before landing: reverting the fix back to
+// `res.sendFile(path.join(distPath, 'index.html'))` makes the first two
+// `it()`s below fail with 404 (`send ignore dotfile ".../.sm-dotguard-…/
+// dist/index.html"`), while the asset and traversal checks are unaffected
+// either way (assets are served through `express.static`, which always
+// passes its own `root` and was never at risk).
+describe('hardening — SPA fallback survives a dot-prefixed ancestor directory (Express 5 send@1 dotfile guard, finding from 2026-09-06 review)', () => {
+  let server: import('http').Server;
+  let port: number;
+  let fakeRoot: string;
+  let originalCwd: string;
+
+  before(async () => {
+    originalCwd = process.cwd();
+    // The leading '.' in the mkdtemp template is the whole point: it makes
+    // the temp directory ITSELF the dot-prefixed ancestor segment, so this
+    // test does not depend on os.tmpdir() (never dot-prefixed on any
+    // platform this repo targets) or on this checkout's own path.
+    fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), '.sm-dotguard-'));
+    fs.mkdirSync(path.join(fakeRoot, 'dist', 'assets'), { recursive: true });
+    fs.writeFileSync(
+      path.join(fakeRoot, 'dist', 'index.html'),
+      '<!doctype html><title>dotguard-shell</title>',
+    );
+    fs.writeFileSync(
+      path.join(fakeRoot, 'dist', 'assets', 'main-abc123.js'),
+      'console.log("dotguard-asset");',
+    );
+    process.chdir(fakeRoot);
+    process.env.NODE_ENV = 'production';
+
+    const { createApp } = await import('../../server/app.ts');
+    const app = await createApp({ serveStatic: true });
+    server = await new Promise<import('http').Server>((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    port = (server.address() as AddressInfo).port;
+  });
+
+  after(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+    process.chdir(originalCwd);
+    delete process.env.NODE_ENV;
+    fs.rmSync(fakeRoot, { recursive: true, force: true });
+  });
+
+  it('sanity: the temp root really is dot-prefixed — this is the regression\'s actual trigger', () => {
+    assert.ok(
+      path.basename(fakeRoot).startsWith('.'),
+      `expected a dot-prefixed temp dir, got: ${fakeRoot}`,
+    );
+  });
+
+  it('GET / (SPA fallback at the root) returns 200 with the app shell', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/`);
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /dotguard-shell/);
+  });
+
+  it('GET /some/deep/route (SPA fallback, a deep link) returns 200 with the app shell', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/some/deep/route`);
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /dotguard-shell/);
+  });
+
+  it('a hashed asset under /assets/ still 200s (served via express.static, never at risk)', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/assets/main-abc123.js`);
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /dotguard-asset/);
+  });
+
+  it('a traversal probe against the assets mount is still blocked under a dot-ancestor root', async () => {
+    const res = await fetch(
+      `http://127.0.0.1:${port}/assets/..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd`,
+    );
+    assert.ok(
+      res.status === 403 || res.status === 404,
+      `expected the traversal probe to be rejected (403/404), got ${res.status}`,
+    );
+    assert.ok(!/root:/.test(await res.text()), 'must never leak /etc/passwd contents');
+  });
+});
+
 // S1-c — process-level crash safety net (BLOCKER finding). server.ts had
 // SIGTERM/SIGINT graceful shutdown but no uncaughtException/unhandledRejection
 // handlers, so a rejected promise anywhere in the process (a session-store
