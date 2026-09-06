@@ -2546,6 +2546,67 @@ describe('ROUND 7 regressions: the parenthetical-demotion ghost rejects fast, th
   });
 });
 
+// ── ROUND 7 follow-up (2026-09-06 review, non-blocking item 1): the
+// `w > 0` filter in realVoiceEligibleWeightRejectionReason is a DELIBERATE
+// divergence from analyzeVoices, not a mirror — voice-delta.ts keeps a
+// zero-token (pure-punctuation) character as a `dialogueByCharacter` key
+// and its own `< MIN_WORDS` check then makes it ABSTAIN, while the guard
+// filters such a character out and can still evaluate (and reject) the
+// same document. That is the SAFE direction: mirroring analyzeVoices
+// faithfully here was measured to cost the bound entirely (a 12,407ms
+// accepted document). Pinned here so a later round does not "restore
+// fidelity" and reopen that exact regression.
+describe('ROUND 7 follow-up: the guard\'s w > 0 filter deliberately diverges from analyzeVoices — pinned so it is never "fixed" toward fidelity', () => {
+  const DLG = 'this is ordinary lowercase dialogue here.';
+  function base(poison: string): string {
+    let t = '', occ = 0;
+    for (let s = 0; s < 400; s++) {
+      t += `INT. LOCATION ${s} - DAY\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n\n${DLG}\n\n`;
+    }
+    return t + poison;
+  }
+
+  it('a zero-token (pure-punctuation) character appended to the R7-0 control: the REAL analyzer would abstain, but the guard still rejects — both facts, verified directly', () => {
+    const text = base('SILENT\n\n?!\n\n');
+    assert.equal(text.length, 125_602, 'payload size must match the measured shape exactly');
+
+    // Fact 1: a FAITHFUL (unfiltered) reading of the real parsed blocks
+    // shows SILENT as a genuine 0-word dialogueByCharacter entry — exactly
+    // the state that makes the real analyzeVoices abstain (it iterates
+    // every character and abstains the moment ANY one is under
+    // VOICE_ELIGIBLE_MIN_WORDS, including a literal 0). Built independently
+    // here (not via buildRealVoiceWordCounts, which already applies the
+    // guard's own filter) so this is a check against the real pipeline's
+    // OWN blocks, not a restatement of the guard's logic.
+    const blocks = parseFountain(normalizeScreenplay(text));
+    const unfiltered = new Map<string, number>();
+    let currentSpeaker: string | null = null;
+    for (const b of blocks) {
+      const t = b.text.trim();
+      if (!t) continue;
+      if (b.type === 'scene_heading') { currentSpeaker = null; continue; }
+      if (b.type === 'character' || b.type === 'dual_dialogue') {
+        currentSpeaker = t.trim().replace(/\^\s*$/, '').replace(/\(\s*(V\.O\.|O\.S\.|CONT'?D)\s*\)/gi, '').trim();
+        if (!unfiltered.has(currentSpeaker)) unfiltered.set(currentSpeaker, 0);
+        continue;
+      }
+      if (b.type === 'dialogue' && currentSpeaker) {
+        const words = (t.toLowerCase().match(/[a-z']+/g) ?? []).filter((w) => /[a-z]/.test(w)).length;
+        unfiltered.set(currentSpeaker, (unfiltered.get(currentSpeaker) ?? 0) + words);
+      }
+    }
+    assert.equal(unfiltered.get('SILENT'), 0, 'sanity: SILENT must be a genuine 0-word dialogueByCharacter entry in the real (unfiltered) pipeline reading');
+    const wouldAbstain = [...unfiltered.values()].some((w) => w < 30);
+    assert.equal(wouldAbstain, true, 'sanity: a faithful (unfiltered) reading must show the real analyzer would abstain on this document');
+
+    // Fact 2: the guard, with its deliberate w > 0 filter, still rejects.
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the guard to still reject despite the zero-token character — this is the documented, deliberate safe-direction divergence');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+});
+
 // ── ROUND 7, item 3: fail-closed when the real parse and the cue-shape
 // signal radically disagree (2026-09-06 review round 7). CUE_LIKE_LINE_RE
 // (the guard's own cue-shape test) is DELIBERATELY wider than CHARACTER_CUE_RE

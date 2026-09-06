@@ -578,6 +578,28 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // 54 tracked fixtures, the CC0 corpus, a realistic 150-name skewed feature)
 // clears it by at least 3x — see this file's own margin-proof test.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 300_000;
+// 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
+// worst case, recorded here rather than left unstated: a document sitting
+// at the analyzer's own 400-scene ceiling, with a genuine (not hand-model-
+// invented) one-or-two-word walk-on character, is legitimately ACCEPTED by
+// this bound (nonZeroWordCounts.length < 2, or allEligible false for a
+// REAL reason) and measures ~12-14s in runScriptDoctor — 200 names x 10
+// occurrences at 125,608 chars: 12,340ms; 600 names x 15 occurrences at
+// 488,602 chars: 13,566ms; it plateaus (4x the dialogue volume adds only
+// ~10%). Both sides agree here: the walk-on really is under
+// VOICE_ELIGIBLE_MIN_WORDS, analyzeVoices really does abstain, and the
+// remaining ~12-14s is the ordinary cost of the other thirteen analysis
+// passes over a document at the size the analyzer itself advertises
+// supporting — not a mis-modelled eligibility set (that class, rounds 4-7,
+// is closed; see realVoiceEligibleWeightRejectionReason's own comment).
+// This crosses the "~10s" figure named earlier in this comment, but
+// bounding it further would mean rejecting legitimate documents at the
+// analyzer's OWN advertised ceiling for their ordinary cost, which is a
+// request-timeout/worker-pool sizing decision, not something a shape guard
+// should enforce by refusing otherwise-valid input. For scale: this
+// series of reviews started at 343,598ms accepted (round 2) and the
+// bypasses rounds 4-7 each found ran 42,000-51,000ms; the residual
+// accepted worst case is now ~14s.
 // ── Boneyard bounds (2026-09-05 review finding A3) ──────────────────────────
 // A `/* … */` boneyard is never a `character`/`dialogue` block to the
 // analyzer's own scene-content extraction (extractSceneContent,
@@ -1509,6 +1531,54 @@ export function legacyVoiceEligibleWeightRejectionReason(text: string): string |
 // is IMPORTED (a plain exported constant — see that import's own comment);
 // nothing else here is imported, since none of it is exported by either
 // scoring-path file.
+//
+// 2026-09-06 review round 7 follow-up, non-blocking — ONE DELIBERATE
+// DIVERGENCE from the mirror above, and it must stay a divergence: this
+// function's own word map is filtered to `w > 0` (see
+// realVoiceEligibleWeightRejectionReason's own comment on that filter)
+// before checking eligibility, while analyzeVoices does NOT filter —
+// a character whose pooled dialogue tokenizes to exactly zero words (a
+// speaking part that is nothing but punctuation) stays a key in
+// dialogueByCharacter with 0 words, and voice-delta.ts's own `< MIN_WORDS`
+// check then makes analyzeVoices ABSTAIN. Faithfully mirroring that would
+// mean NOT filtering zero-word entries out of nonZeroWordCounts either —
+// but doing so was measured to cost this bound entirely: appending
+// `SILENT\n\n?!\n\n` to a 200-uniform-eligible-character control (itself
+// otherwise well over MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) adds a zero-word
+// 201st character, which under a faithful (unfiltered) implementation would
+// make the analyzer's OWN abstention condition hold and correctly skip the
+// bound — mirroring that turns the guard's decision to ACCEPT a document
+// `runScriptDoctor` then measures at 12,407ms. The `w > 0` filter keeps this
+// guard REJECTING that same document (see the regression test pinning both
+// facts) — the guard's own eligibility view and the analyzer's are
+// deliberately NOT identical here, and that gap is the SAFE direction
+// (over-rejecting a document the real analyzer would have abstained on
+// costs nothing; the reverse would have reopened exactly the class of
+// 40-50-second bypass rounds 2-7 closed). Do not "restore fidelity" to this
+// one spot without re-deriving the cost math above from scratch.
+//
+// 2026-09-06 review round 7 follow-up, non-blocking — MEASURED COST of the
+// real parse this section adds, recorded here rather than left implicit:
+// on the round-2 reviewer's own 860,417-char ACCEPTED feature-shaped
+// payload (the one shape that reaches this parse at all — a cheap
+// pre-parse bound already rejects everything else before ever getting
+// here), this whole guard went from 20-26ms (the retired hand-modelled
+// walk, main@85fca55a) to 107-140ms (this real-parse version) — of which
+// `normalizeScreenplay(text)` + `parseFountain(...)` alone measures ~50ms.
+// That ~50ms is genuinely paid TWICE for an accepted request: this
+// function is a zod `superRefine` (see fountainField's own comment below)
+// whose parsed `blocks` are discarded once it returns, and
+// server/nvm/analyze/fountain-analyzer.ts's analyzeFountainText calls the
+// IDENTICAL `parseFountain(normalizeScreenplay(fountain))` again,
+// independently, moments later during the real analysis. Threading this
+// function's own `blocks` out of validation.ts and into the route so the
+// second call can reuse them is a real, available option — noted here as a
+// DEFERRED one (it needs a small refactor to the request-handling path this
+// fix's scope did not include), not an oversight. 107-140ms is still under
+// 1% of the multi-second cost of the analysis passes that follow it, and a
+// rejected payload never reaches this parse at all (the cheap bounds still
+// answer in 28-45ms with no parse) — the double-parse is a real, measured
+// cost, just not one large enough on its own to justify the refactor today.
 /** Mirrors voice-delta.ts's own `tokenize()` exactly
  *  (`text.toLowerCase().match(/[a-z']+/g)`, filtering to tokens containing
  *  at least one letter) — replicated rather than imported (voice-delta.ts's
@@ -1600,6 +1670,13 @@ const FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD = 6_000;
 function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences: number): string | null {
   let blocks: FountainBlock[];
   try {
+    // Measured cost (2026-09-06 review round 7 follow-up — see this
+    // section's own header comment for the full number and the double-parse
+    // note): ~50ms of this call's own ~107-140ms total at the 860,417-char
+    // ceiling, paid AGAIN moments later by fountain-analyzer.ts's
+    // analyzeFountainText on an accepted request (this function's `blocks`
+    // are discarded once this zod refinement returns) — a real, deferred
+    // reuse opportunity, not an unnoticed cost.
     blocks = parseFountain(normalizeScreenplay(text));
   } catch {
     if (cueLineOccurrences > FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD) {
@@ -1613,6 +1690,16 @@ function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences
   }
 
   const wordCounts = buildRealVoiceWordCounts(blocks);
+  // 2026-09-06 review round 7 follow-up, non-blocking — DELIBERATE
+  // DIVERGENCE from analyzeVoices, not a mirror: voice-delta.ts keeps a
+  // zero-word character as a `dialogueByCharacter` key and its own
+  // `< MIN_WORDS` check then makes it ABSTAIN; filtering such a character
+  // OUT here instead means this bound can still evaluate (and reject) a
+  // document the real analyzer would have abstained on. That is
+  // INTENTIONAL and SAFE, not a bug to "fix" toward fidelity — see this
+  // section's own header comment for the measured 12,407ms cost of the
+  // faithful (unfiltered) alternative, and the regression test pinning
+  // both facts (guard rejects, analyzer abstains) on the same document.
   const nonZeroWordCounts = [...wordCounts.values()].filter((w) => w > 0);
   if (nonZeroWordCounts.length >= 2) {
     let allEligible = true;
