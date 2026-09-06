@@ -7,7 +7,7 @@ status: parked
 
 # Branch — Advice-Rule-Fixes
 
-**Branch:** `origin/scoring/advice-rule-fixes` @ `8a6dd037` (4 commits on
+**Branch:** `origin/scoring/advice-rule-fixes` @ `a1cf7677` (5 commits on
 `main` @ `2bfcbf9d`). Rebased and renamed 2026-09-06; the old
 `origin/claude/advice-rule-fixes-pending-measurement` @ `68c64eca` is the
 pre-rebase object and is superseded, not deleted.

@@ -7,8 +7,8 @@ status: pending-measurement
 
 # Branch — Stacked (R5 + Advice-Rule-Fixes)
 
-**Branch:** `origin/scoring/stacked-r5-plus-advice` @ `65e76888`
-(16 commits ahead of `main` @ `2bfcbf9d`, including two merges that take each
+**Branch:** `origin/scoring/stacked-r5-plus-advice` @ `408166ae`
+(21 commits ahead of `main` @ `2bfcbf9d`, including four merges that take each
 contributing branch's round-1 review corrections).
 
 **What it is:** [[Branch - R5 Verbosity Bias]] with

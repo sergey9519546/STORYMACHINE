@@ -32,7 +32,15 @@ The variable is repeated on purpose. An inline assignment applies to one
 command only, so a bare `npm run lock-auc24` on the next line runs with it
 unset and the script refuses: `[FATAL] REAL_SCRIPT_CORPUS_DIR is not set —
 refusing to run. … Nothing was written.` [[Owner - Lock AUC24 Table]] writes it
-the same way. Before hand-editing the manifest, read
+the same way.
+
+The two commands fail differently, which is worth knowing before reading the
+output. `lock-auc24` refuses loudly and exits 1; `measure-real` prints
+`[SKIP] REAL_SCRIPT_CORPUS_DIR not set` and **exits 0**. So a mistyped variable
+on the first line looks like success and scrolls past, and the hard refusal
+that follows names a different command. If the first line prints that SKIP
+banner, it measured nothing — fix the variable and run it again before going
+any further. (The asymmetry belongs to those scripts, not to this note.) Before hand-editing the manifest, read
 `tests/fixtures/real-corpus-manifest.README.md`: there is no automated re-lock
 command, and that file is where the constraint lives that its array order is
 load-bearing and must never be sorted.
@@ -49,21 +57,57 @@ three entries: as shipped, 3 entries, 3 problems; with a well-formed measured
 entry appended, 4 entries, still 3 problems.
 
 What closes it is **rewriting each of the three entries in place** so the range
-adds measured entries and no pending one. In each entry:
+adds measured entries and no pending one.
 
-1. drop `PENDING` from the `###` heading and name what was measured instead;
-2. replace `**Measured AUC-24:** **PENDING** — not measured…` with the number
-   the run produced;
-3. replace `**Corpus fingerprint:** none. No corpus was read.` with the real
-   fingerprint;
-4. rewrite the `**Runner attestation:**` so it says in the first person that
-   the run happened;
-5. and remove the four phrases the gate's `pendingReason` scans for ANYWHERE in
-   the entry body (`:487-492`) — "has not been run", "was not run", "not yet
-   measured", "pending owner measurement". The 2026-09-06 addenda inside these
-   entries contain several of them; leaving one behind keeps the entry pending
-   even after the heading is fixed. `\bPENDING\b` is whole-word and
-   case-insensitive, so "appending" is safe and "Pending" is not.
+`pendingReason` runs **three** scans, and all three have to come back clean.
+Steps 1, 5 and 6 below are those scans; steps 2-4 are the content the receipt
+owes once the run exists.
+
+1. **Scan one — the `###` heading.** Drop `PENDING` from it and name what was
+   measured instead.
+2. Replace `**Measured AUC-24:** **PENDING** — not measured…` with the number
+   the run produced.
+3. Replace `**Corpus fingerprint:** none. No corpus was read.` with the real
+   fingerprint.
+4. Rewrite the `**Runner attestation:**` so it says in the first person that
+   the run happened.
+5. **Scan two — the four phrases, anywhere in the entry body.** Remove every
+   phrase in `PENDING_PHRASES` (`:487-492`) — "has not been run", "was not
+   run", "not yet measured", "pending owner measurement". The 2026-09-06
+   addenda inside these entries contain several of them; leaving one behind
+   keeps the entry pending even after the heading is fixed. `\bPENDING\b` is
+   whole-word and case-insensitive, so "appending" is safe and "Pending" is
+   not.
+6. **Scan three — the VALUE of every required field.** `pendingReason` also
+   tests the bare word against the value of each `REQUIRED_FIELDS` entry
+   (`:505-512`) — Command, Corpus fingerprint, Runner attestation, and Git SHA
+   or Baseline used — and a value runs from its own `- **` line all the way to
+   the next `- **` bullet (`fieldValueByPattern`, `:455-464`). That window is
+   large: it can cross a `####` addendum heading and swallow prose that looks
+   like it belongs to a later section. Two of the three entries currently carry
+   the bare word inside a Runner-attestation value — as the honest pending
+   marker they are meant to carry until the measurement exists — so this scan
+   has real work to do on every one of them.
+
+Step 6 is not theoretical, and it is not a stacked-branch quirk. Measured in a
+throwaway clone, by applying this recipe mechanically to each branch's ledger
+and running the real CLI (`node scripts/check-scoring-receipt.mjs main..HEAD`):
+
+| branch | before | scans one and two only | all three scans |
+| --- | --- | --- | --- |
+| `scoring/stacked-r5-plus-advice` | exit 1 | **exit 1** | **exit 0** |
+| `scoring/r5-verbosity-bias` | exit 1 | **exit 1** | **exit 0** |
+| `scoring/advice-rule-fixes` | exit 1 | **exit 1** | **exit 0** |
+
+In every case the surviving failure names the same thing — `the **Runner
+attestation** field contains "PENDING"` — because each entry's attestation ends
+by explaining that its own heading says so, and on the advice entry the field
+value runs on past the end of the entry's bullets into the `####` addendum
+heading. A separate instance, the stacked entry's `Baseline used` describing its
+merge resolution in prose, has been reworded at the source so it is clean before
+you touch it; the scan stays in the recipe because the attestation instances
+cannot be reworded — they are the honest marker, and they have to survive until
+the measurement exists.
 
 Two traps worth knowing before doing that edit. Each space in those four
 patterns is compiled to `\s+`, so a phrase still matches when a line wrap falls
@@ -82,9 +126,9 @@ only a heading — that is the one route the entry text itself forbids.
 
 | branch | tip | what it is |
 | --- | --- | --- |
-| `scoring/stacked-r5-plus-advice` | `65e76888` | **measure this one** — [[Branch - Stacked R5 plus Advice]] |
-| `scoring/r5-verbosity-bias` | `fa256566` | [[Branch - R5 Verbosity Bias]] alone |
-| `scoring/advice-rule-fixes` | `8a6dd037` | [[Branch - Advice Rule Fixes]] alone |
+| `scoring/stacked-r5-plus-advice` | `408166ae` | **measure this one** — [[Branch - Stacked R5 plus Advice]] |
+| `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |
+| `scoring/advice-rule-fixes` | `a1cf7677` | [[Branch - Advice Rule Fixes]] alone |
 
 The stack CONTAINS both singles as unsquashed ancestors, so merging it subsumes
 them and the other two need not be merged separately. Whichever lands last needs

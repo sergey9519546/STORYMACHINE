@@ -7,7 +7,7 @@ status: parked
 
 # Branch — R5 (Verbosity Bias)
 
-**Branch:** `origin/scoring/r5-verbosity-bias` @ `fa256566` (7 commits on
+**Branch:** `origin/scoring/r5-verbosity-bias` @ `52bf410a` (8 commits on
 `main` @ `2bfcbf9d`). Rebased and renamed 2026-09-06; the old
 `origin/claude/r5-verbosity-bias-pending-measurement` @ `0f625c27` is the
 pre-rebase object and is superseded, not deleted.

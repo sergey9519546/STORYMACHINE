@@ -42,9 +42,9 @@ producible" — has been built:
 
 | Branch | Tip | Commits on main | Disposition |
 |---|---|---|---|
-| `scoring/stacked-r5-plus-advice` | `65e76888` | 16 | **the tree to measure** — R5 with advice-rule-fixes merged in |
-| `scoring/r5-verbosity-bias` | `fa256566` | 7 | R5 alone, rebased |
-| `scoring/advice-rule-fixes` | `8a6dd037` | 4 | advice-rule fixes alone, rebased |
+| `scoring/stacked-r5-plus-advice` | `408166ae` | 21 | **the tree to measure** — R5 with advice-rule-fixes merged in |
+| `scoring/r5-verbosity-bias` | `52bf410a` | 8 | R5 alone, rebased |
+| `scoring/advice-rule-fixes` | `a1cf7677` | 5 | advice-rule fixes alone, rebased |
 | `claude/r5-verbosity-bias-pending-measurement` | `0f625c27` | pre-rebase | superseded by `scoring/r5-verbosity-bias`; kept, not deleted |
 | `claude/advice-rule-fixes-pending-measurement` | `68c64eca` | pre-rebase | superseded by `scoring/advice-rule-fixes`; kept, not deleted |
 
@@ -62,9 +62,14 @@ EVERY entry the range adds, so one surviving PENDING entry fails it regardless
 of what sits next to it — confirmed by running the gate's exported
 `extractEntries`/`validateEntry` over the stack's three entries with a
 well-formed measured entry appended (4 entries, still 3 problems). Each PENDING
-entry has to be rewritten IN PLACE into a measured one, including removing the
-four phrases `pendingReason` scans for anywhere in the body ("has not been
-run", "was not run", "not yet measured", "pending owner measurement"). The
+entry has to be rewritten IN PLACE into a measured one. `pendingReason` runs
+three scans, not two: the `###` heading, the four phrases it looks for anywhere
+in the entry body ("has not been run", "was not run", "not yet measured",
+"pending owner measurement"), and the VALUE of every required field, where a
+value runs from its own bullet to the next `- **` one and can cross a `####`
+addendum heading. Measured in a throwaway clone against the real CLI: applying
+the first two scans alone leaves all three branches at exit 1, every time on a
+Runner-attestation field value; adding the third takes all three to exit 0. The
 step-by-step is in `docs/brain/Owner/Owner - R5 Measurement and Merge.md`.
 
 The recorded five-file conflict between the two branches
