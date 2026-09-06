@@ -37,6 +37,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-06 Currency Batch",
+      "path": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
       "type": "audit",
       "title": "Audit — 2026-09-06 Mistake Search",
@@ -493,6 +499,12 @@
       "path": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
     },
     {
+      "id": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "type": "session",
+      "title": "Session — 2026-09-06: Current, Synced, Upgraded",
+      "path": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Collab Room.md",
       "type": "surface",
       "title": "Surface — Collab Room",
@@ -662,6 +674,34 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-05 Review Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md",
       "to": "docs/brain/Patterns.md"
     },
     {
@@ -1555,6 +1595,54 @@
     {
       "from": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-06 Currency Batch.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Owner/Owner - Push Release Tag.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Owner/Owner - Fix GitHub Actions.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Owner/Owner - License Decision.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
+      "to": "docs/brain/Owner/Owner - Make Repo Private.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",

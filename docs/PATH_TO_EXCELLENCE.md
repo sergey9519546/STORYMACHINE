@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-06, main @ a21fffdd (six session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-06, main @ 5b50af8b (seven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,59 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-06 — current, synced, upgraded.** The owner asked for everything
+still open to be taken care of and the project brought current. Three
+lanes, nine review rounds, none merged on the first pass:
+
+- **The scoring branches are synced** (three rounds). The R5 verbosity-bias
+  fix and the advice-rule fixes existed only as local worktree branches,
+  74 commits behind main; the record said they conflicted on five code
+  files. Rebased onto main, they conflicted on nothing but the receipts
+  ledger — the "five files" were main's own history being replayed — so
+  the stacked branch the second measurement needs now exists too. All
+  three are on origin as `scoring/*`, every receipt still PENDING, no
+  corpus number claimed anywhere; the blind pairs were re-scored on all
+  three (main reproduces the 2026-09-04 table exactly; the stack orders
+  4/6, inside chance on six pairs, and the receipt says so). The reviewer
+  applied the owner's conversion recipe literally and found it left the
+  gate red: the gate also scans every required field's value for the bare
+  word PENDING, and the recipe was one scan short on all three branches.
+  The recipe now has three scans and a transcript proving exit 0.
+- **One analysis is bounded by wall clock** (four rounds, Decision #7).
+  The guard's accepted worst case was the analyzer's own ceiling cost of
+  ~12–14 s, a pool decision rather than a guard one. `DOCTOR_ANALYSIS_BUDGET_MS`
+  (30 s, twice the measured 13.8 s worst case) terminates a running job
+  the way Cancel does, with a registered sentence. The reviewer's first
+  burst probe showed a job rejected while still *queued* being told its
+  draft was slow, so the budget split in two: a 60 s queue budget answered
+  with 503 and a Retry-After derived from the pool's own job-time average,
+  and then admission control that refuses a hopeless submission at the
+  door (first shed answer 60 s → under a second in seven of eight runs).
+  Eager worker respawn after a kill was found able to outlive a shutdown
+  and hang the process; it now carries a shutdown generation. The pool's
+  cache test asserts by counting worker runs and cache hits instead of a
+  timing ratio. Reusing the guard's parse in the route was stopped with
+  numbers: the blocks would cross a worker boundary, and the transport
+  costs 80–95% of the parse it would replace.
+- **Dependencies are current** (two rounds). `npm audit` 3 → 0. Eight
+  majors landed one per commit behind the full suite and the battery:
+  better-sqlite3 13 (which also removes the native build from the
+  Dockerfile), motion 13, lucide-react 1.x, express 5, vite 8 with its
+  React plugin, the Gemini SDK 2.x, playwright 1.63. Two skipped with
+  reasons: typescript 7 drops the compiler API two tests use as a library;
+  Node 26 typings would be untrue while CI, the Dockerfile and `engines`
+  say 22. Express 5's newer `send` refused every deep link when the
+  checkout path had a dot-prefixed ancestor — caught by the production
+  suite, fixed with an explicit root, and given a regression test that
+  fails on a normal CI path. The reviewer diffed the live router tree under
+  both majors: 136 routes, identical.
+
+Main moved from 2bfcbf9d to 5b50af8b (dependency lane reviewed MERGE; its merge follows in the next record commit). Every review is under
+`docs/audits/2026-09-06-currency/`. Still owner-only: the corpus runs on
+the stacked branch and the AUC-24 lock before 2026-10-01, the tag pushes,
+the Actions account block, the licence, the visibility toggle, and the
+Node 24 base image.
 
 **2026-09-05, day — the mistake search and the project brain.** The owner
 asked for two things: *"search for mistakes"* over everything the review
