@@ -9,7 +9,7 @@ merged or was pushed. Each `*-review.md` is one reviewer's full record.
 |---|---|---|
 | scoring-branch sync (R5, advice rules, and the stacked branch rebased onto main, pushed as `scoring/*`; receipts PENDING) | REVISE 4 → REVISE 1 → MERGE (+2 nits) | branches 52bf410a / a1cf7677 / 408166ae; docs da3db049 |
 | per-analysis wall-clock budget, Decision #7 (parse reuse stopped with numbers) | REVISE 1 → MERGE (+2 built) → REVISE 1 → MERGE (+1) | 5b50af8b |
-| dependency currency (0 audit advisories; 8 majors landed, 2 skipped with reasons) | REVISE 2 → MERGE (+1) | merge pending at time of writing (reviewed MERGE) |
+| dependency currency (0 audit advisories; 8 majors landed, 2 skipped with reasons) | REVISE 2 → MERGE (+1) | 08722bbe |
 
 Nine review rounds; no lane merged on its first pass. What the reviews
 caught that the lanes' own gates had passed: an owner instruction that

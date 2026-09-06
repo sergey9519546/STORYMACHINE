@@ -10,7 +10,7 @@ status: active
 **Heading:** "2026-09-06 — current, synced, upgraded." The owner asked for
 everything still open to be taken care of. Three lanes, nine review rounds
 ([[Audit - 2026-09-06 Currency Batch]]), none merged on the first pass.
-Main moved `2bfcbf9d → 5b50af8b`, with the dependency lane (reviewed MERGE) merging next.
+Main moved `2bfcbf9d → 08722bbe`.
 
 **What landed (from the record):**
 

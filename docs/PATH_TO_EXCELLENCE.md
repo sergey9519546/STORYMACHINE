@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-06, main @ 5b50af8b (seven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-06, main @ 08722bbe (seven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -82,7 +82,7 @@ lanes, nine review rounds, none merged on the first pass:
   fails on a normal CI path. The reviewer diffed the live router tree under
   both majors: 136 routes, identical.
 
-Main moved from 2bfcbf9d to 5b50af8b (dependency lane reviewed MERGE; its merge follows in the next record commit). Every review is under
+Main moved from 2bfcbf9d to 08722bbe. Every review is under
 `docs/audits/2026-09-06-currency/`. Still owner-only: the corpus runs on
 the stacked branch and the AUC-24 lock before 2026-10-01, the tag pushes,
 the Actions account block, the licence, the visibility toggle, and the
