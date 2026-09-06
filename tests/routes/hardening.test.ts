@@ -397,13 +397,25 @@ describe('hardening — SPA fallback survives a dot-prefixed ancestor directory 
     port = (server.address() as AddressInfo).port;
   });
 
+  // try/finally, and each cleanup step guarded on the thing it needs having
+  // actually been set: a before() failure between the chdir (fakeRoot,
+  // originalCwd already assigned) and the server assignment must still
+  // restore cwd and remove the temp dir, not throw on `server.close()` with
+  // `server` undefined and leave the process cwd'd into a temp dir that
+  // then never gets cleaned up — which would also bury whatever the real
+  // before() error was under a second, unrelated TypeError.
   after(async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-    });
-    process.chdir(originalCwd);
-    delete process.env.NODE_ENV;
-    fs.rmSync(fakeRoot, { recursive: true, force: true });
+    try {
+      if (server) {
+        await new Promise<void>((resolve, reject) => {
+          server.close((err) => (err ? reject(err) : resolve()));
+        });
+      }
+    } finally {
+      if (originalCwd) process.chdir(originalCwd);
+      delete process.env.NODE_ENV;
+      if (fakeRoot) fs.rmSync(fakeRoot, { recursive: true, force: true });
+    }
   });
 
   it('sanity: the temp root really is dot-prefixed — this is the regression\'s actual trigger', () => {
