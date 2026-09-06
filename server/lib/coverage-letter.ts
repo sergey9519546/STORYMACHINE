@@ -84,6 +84,7 @@ import {
   draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
 } from '../../src/lib/draft-rank-copy.ts';
 import { ACTION_PROSE_VARIATION_LABEL_LOWER } from '../../src/lib/structural-signals-copy.ts';
+import { formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
 
 export interface CoverageLetterOptions {
   title?: string;
@@ -329,13 +330,13 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
       'Shape and rhythm: the exported HTML report carries a new "Structural Signals" strip — scene '
       + `length, talk-versus-action mix, speech turns, speaker pairings and ${ACTION_PROSE_VARIATION_LABEL_LOWER}, `
       + 'read from the shape of the document rather than from any word list. Two readings from it: the '
-      + `mean scene-to-scene change in the dialogue/action word mix is ${meanAbsDialogueShareDelta.toFixed(2)}, `
+      + `mean scene-to-scene change in the dialogue/action word mix is ${formatSignalValue(meanAbsDialogueShareDelta)}, `
       // Round-2 review fix (2026-09-05): was its own third wording ("the
       // sentence-length variation across the draft's action lines") for the
       // SAME reading the panel calls "Action-prose variation" and
       // coverage-html.ts calls "action-sentence variation" — one label, from
       // src/lib/structural-signals-copy.ts, for all three now.
-      + `and the ${ACTION_PROSE_VARIATION_LABEL_LOWER} is ${actionSentenceCvOverall.toFixed(2)}. `
+      + `and the ${ACTION_PROSE_VARIATION_LABEL_LOWER} is ${formatSignalValue(actionSentenceCvOverall)}. `
       + 'Both are descriptive only — new and deliberately unwired: they are shown as diagnostics and no '
       + 'part of the score, grade, or verdict above is derived from them.',
     );
@@ -353,7 +354,7 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
       'Shape and rhythm: needs at least two scenes to read scene-to-scene change — this draft has '
       + `${report.structuralSignals.sceneCount}. One document-wide reading is still meaningful with a `
       + `single scene: the ${ACTION_PROSE_VARIATION_LABEL_LOWER} is `
-      + `${report.structuralSignals.actionSentenceCvOverall.toFixed(2)}. Descriptive only — no part of `
+      + `${formatSignalValue(report.structuralSignals.actionSentenceCvOverall)}. Descriptive only — no part of `
       + 'the score, grade, or verdict above is derived from it.',
     );
   }

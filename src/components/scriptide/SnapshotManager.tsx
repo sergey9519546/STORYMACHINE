@@ -8,6 +8,7 @@ import {
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 import { exactRankTooltip, compactPercentileNote } from "../../lib/percentile-copy.ts";
 import { draftRankSentence } from "../../lib/draft-rank-copy.ts";
+import { formatSignalDelta } from "../../lib/structural-signals-copy.ts";
 
 // writer #9 (upgrade-writer-experience discovery) — "score over revisions".
 // The four score fields are ALL optional: a snapshot only carries them when
@@ -128,14 +129,22 @@ function ShapeRhythmTrendLine({ entries }: { entries: SnapshotTrendEntry[] }) {
 
   const oldest = points[0];
   const newest = points[points.length - 1];
+  // 2026-09-06 (signal-precision pass, docs/audits/2026-09-06-mistake-
+  // search/findings/B-client.md B-7): formatSignalDelta is the ONE
+  // before/after rendering every surface that shows these two aggregates
+  // now shares (ScriptDoctorPanel.tsx's Shape & Rhythm strip and
+  // fix-and-verify receipt, coverage-html.ts, coverage-letter.ts,
+  // WhatIfPanel.tsx) — a fixed two-decimal render here used to be able to
+  // show a real oldest-to-newest change as "0.00 -> 0.03" or as no visible
+  // change at all; see src/lib/structural-signals-copy.ts's own header.
   const swingText =
     points.length > 1
-      ? `${oldest.meanAbsDialogueShareDelta.toFixed(2)} → ${newest.meanAbsDialogueShareDelta.toFixed(2)}`
-      : newest.meanAbsDialogueShareDelta.toFixed(2);
+      ? formatSignalDelta(oldest.meanAbsDialogueShareDelta, newest.meanAbsDialogueShareDelta)
+      : formatSignalDelta(newest.meanAbsDialogueShareDelta, undefined);
   const cvText =
     points.length > 1
-      ? `${oldest.actionSentenceCvOverall.toFixed(2)} → ${newest.actionSentenceCvOverall.toFixed(2)}`
-      : newest.actionSentenceCvOverall.toFixed(2);
+      ? formatSignalDelta(oldest.actionSentenceCvOverall, newest.actionSentenceCvOverall)
+      : formatSignalDelta(newest.actionSentenceCvOverall, undefined);
 
   return (
     <div className="flex items-center gap-3 px-1 flex-wrap text-[10px] font-mono text-[var(--sm-ink-mute)]">

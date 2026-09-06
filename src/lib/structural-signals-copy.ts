@@ -46,3 +46,106 @@ export const ACTION_PROSE_VARIATION_LABEL = 'Action-prose variation';
  *  this derives from the one canonical string rather than being typed a
  *  second time. */
 export const ACTION_PROSE_VARIATION_LABEL_LOWER = ACTION_PROSE_VARIATION_LABEL.toLowerCase();
+
+// ─── Signal-value precision (2026-09-06, docs/audits/2026-09-06-mistake-
+// search/findings/B-client.md B-7 + the follow-on "signal precision" pass
+// the provenance review deferred) ───────────────────────────────────────
+//
+// The PROBLEM: `meanAbsDialogueShareDelta` and `actionSentenceCvOverall`
+// (server/nvm/analyze/structural-signals.ts, both rounded to 4 decimal
+// places at the source via that module's own `r4()`) were printed with a
+// bare `.toFixed(2)` at every call site across five surfaces — the panel's
+// Shape & Rhythm strip and its fix-and-verify receipt (ScriptDoctorPanel.tsx),
+// the exported coverage HTML and letter (server/lib/coverage-html.ts,
+// coverage-letter.ts), and the What-If Lab / Versions draft trend
+// (WhatIfPanel.tsx, SnapshotManager.tsx's ShapeRhythmTrendLine). Two
+// distinct failures follow from a FIXED 2-decimal floor: a genuinely
+// nonzero reading below 0.005 prints as "0.00" (indistinguishable from an
+// actual zero), and two genuinely different readings that are close enough
+// to tie at 2 decimals (e.g. 0.5 vs 0.5001) print as identical numbers with
+// no signal that a comparison even happened — silently implying "no
+// change" for a real, if small, one.
+//
+// The FIX, mirrored from how the health delta already prints (before/after
+// at the delta's own precision, not a fixed one — see FixStructuralSignalsStrip's
+// 2026-09-05 comment, superseded by this module): `formatSignalValue`
+// widens a single reading past the 2-decimal floor only far enough to stop
+// showing a truly nonzero value as "0.00" (never below the floor, never
+// past the ceiling — the source's own 4-decimal rounding resolution).
+// `formatSignalDelta` does the same for a before/after pair, ALSO widening
+// when the two values still tie at a given precision despite being
+// genuinely different numbers — so "0.5 -> 0.5001" earns the full 4
+// decimals it needs to show as a change at all, while "0.10 -> 0.12"
+// (already legible at the floor) stays at 2. Two values that are EXACTLY
+// equal (not merely tied after rounding) render an explicit "(no measured
+// change)" instead of a bare repeated number, so a reader never has to
+// guess whether an unchanged-looking pair was actually compared.
+//
+// ONE implementation, imported by all five surfaces — never a sixth
+// hand-typed `.toFixed(2)` on either aggregate. Pure, no I/O, no
+// randomness, and NOT reachable from server/nvm/analyze/doctor.ts's import
+// graph (this module only formats numbers doctor.ts already computed; it
+// never feeds back into scoring) — presentation only, like the label above.
+// Tested for cross-surface agreement by tests/core/
+// structural-signal-precision-consistency.test.ts.
+
+/** Never show fewer than 2 decimals (today's existing floor, so an
+ *  already-legible pair like 0.10 -> 0.12 renders exactly as it always
+ *  has) and never more than 4 (the source's own `r4()` rounding
+ *  resolution — beyond this, both values are shown with total fidelity, so
+ *  there is nothing left to widen for). */
+export const SIGNAL_VALUE_FLOOR_PRECISION = 2;
+export const SIGNAL_VALUE_CEILING_PRECISION = 4;
+
+/** True when rounding `value` to `precision` decimals would display a
+ *  genuinely nonzero reading as exactly zero — the "0.0042 renders as
+ *  0.00" failure mode, evaluated at one candidate precision. */
+function hidesNonzeroAsZero(value: number, precision: number): boolean {
+  return value !== 0 && Number(value.toFixed(precision)) === 0;
+}
+
+/** A single structural-signal reading, at the fewest decimals (from the
+ *  floor) that stop it displaying as zero when it isn't one. `opts.precision`
+ *  sets the starting point (defaults to the floor); it is still clamped to
+ *  [floor, ceiling] and still widened past that if it would hide a nonzero
+ *  value, so a caller can never accidentally request a MISLEADING low
+ *  precision, only a lower one that happens to already be safe. */
+export function formatSignalValue(value: number, opts?: { precision?: number }): string {
+  let precision = Math.max(
+    SIGNAL_VALUE_FLOOR_PRECISION,
+    Math.min(SIGNAL_VALUE_CEILING_PRECISION, opts?.precision ?? SIGNAL_VALUE_FLOOR_PRECISION),
+  );
+  while (precision < SIGNAL_VALUE_CEILING_PRECISION && hidesNonzeroAsZero(value, precision)) {
+    precision += 1;
+  }
+  return value.toFixed(precision);
+}
+
+/** The fewest decimals (from the floor, up to the ceiling) at which
+ *  `before` and `after` are both faithfully nonzero (when they genuinely
+ *  are) AND visibly different from each other (when they genuinely are).
+ *  Falls back to the ceiling when even full source-rounding precision
+ *  cannot separate them — the "no measured change" case formatSignalDelta
+ *  renders explicitly rather than silently. */
+function deltaPrecision(before: number, after: number): number {
+  for (let p = SIGNAL_VALUE_FLOOR_PRECISION; p < SIGNAL_VALUE_CEILING_PRECISION; p++) {
+    const stillTied = before !== after && before.toFixed(p) === after.toFixed(p);
+    if (!hidesNonzeroAsZero(before, p) && !hidesNonzeroAsZero(after, p) && !stillTied) return p;
+  }
+  return SIGNAL_VALUE_CEILING_PRECISION;
+}
+
+/** THE one before/after rendering for a structural-signal aggregate, for
+ *  every surface that shows one: `"<before> -> <after>"` at the precision
+ *  the pair needs to read honestly, or `"<before> (no measured change)"`
+ *  when the two are equal at that precision (exactly equal, or tied even
+ *  at the ceiling). `after: undefined` (no candidate/comparison to show)
+ *  falls back to the single-value rendering. */
+export function formatSignalDelta(before: number, after: number | undefined): string {
+  if (after === undefined) return formatSignalValue(before);
+  const precision = deltaPrecision(before, after);
+  const beforeText = before.toFixed(precision);
+  const afterText = after.toFixed(precision);
+  if (beforeText === afterText) return `${beforeText} (no measured change)`;
+  return `${beforeText} → ${afterText}`;
+}

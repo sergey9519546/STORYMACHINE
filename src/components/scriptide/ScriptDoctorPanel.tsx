@@ -38,6 +38,7 @@ import type {
 import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type { StructuralSignalsReport, SceneStructuralSignals } from "../../../server/nvm/analyze/structural-signals.ts";
 import { ACTION_PROSE_VARIATION_LABEL } from "../../lib/structural-signals-copy.ts";
+import { formatSignalValue, formatSignalDelta } from "../../lib/structural-signals-copy.ts";
 import type {
   RevisionIssue,
   PassName,
@@ -814,7 +815,7 @@ function ShapeRhythmSection({
                   Talk/action swing
                 </span>
                 <span className="text-xs font-bold text-black">
-                  {signals.meanAbsDialogueShareDelta.toFixed(2)}
+                  {formatSignalValue(signals.meanAbsDialogueShareDelta)}
                 </span>
               </div>
               <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
@@ -828,7 +829,7 @@ function ShapeRhythmSection({
                   {ACTION_PROSE_VARIATION_LABEL}
                 </span>
                 <span className="text-xs font-bold text-black">
-                  {signals.actionSentenceCvOverall.toFixed(2)}
+                  {formatSignalValue(signals.actionSentenceCvOverall)}
                 </span>
               </div>
               {/* Round-3 review fix (2026-09-05, non-blocking item 2): this
@@ -893,7 +894,7 @@ function ShapeRhythmUnscored({ signals }: { signals: StructuralSignalsReport }) 
               {ACTION_PROSE_VARIATION_LABEL}
             </span>
             <span className="text-xs font-bold text-black">
-              {signals.actionSentenceCvOverall.toFixed(2)}
+              {formatSignalValue(signals.actionSentenceCvOverall)}
             </span>
           </div>
           {/* Round-3 review fix (2026-09-05, non-blocking item 2): same
@@ -2036,27 +2037,26 @@ interface FixStructuralSignalsDelta {
  *  SnapshotManager's trend line and the coverage letter use, so a writer sees
  *  one claim about these two numbers everywhere they appear. */
 function FixStructuralSignalsStrip({ signals }: { signals: FixStructuralSignalsDelta }) {
-  // Two decimals, deliberately — the shared precision EVERY surface that
-  // prints these two aggregates uses (this strip, the panel's own Shape &
-  // Rhythm section, SnapshotManager's Versions trend, coverage-html.ts and
-  // coverage-letter.ts). B-7 asked for "the delta's precision" here as it did
-  // for health above; unlike health, this row prints no delta of its own, and
-  // giving it a third decimal would make the same reading disagree with the
-  // four other places a writer can see it. Precision changes for these two
-  // signals belong in one pass across all five surfaces, not in this card
-  // alone.
-  const pair = (before: number, after: number | undefined) =>
-    after === undefined ? before.toFixed(2) : `${before.toFixed(2)} → ${after.toFixed(2)}`;
+  // 2026-09-06 (docs/audits/2026-09-06-mistake-search/findings/B-client.md
+  // B-7, the "signal precision" pass the provenance review deferred): this
+  // used to be a hand-rolled `pair()` fixed at two decimals — the exact
+  // shape B-7 flagged ("0.00 -> 0.03" for a true 0.0042 -> 0.0254 change).
+  // formatSignalDelta (src/lib/structural-signals-copy.ts) is now the ONE
+  // implementation every surface that prints these two aggregates calls —
+  // this strip, the panel's own Shape & Rhythm section (formatSignalValue,
+  // no comparison to make there), SnapshotManager's Versions trend,
+  // WhatIfPanel.tsx, coverage-html.ts and coverage-letter.ts — so a
+  // precision change here can never again disagree with the other five.
   return (
     <div className="text-[10px] font-mono text-[var(--sm-ink-mute)] flex items-center gap-3 flex-wrap">
       <span className="uppercase tracking-widest font-bold">Shape &amp; rhythm (descriptive, not part of the score)</span>
       <span>
         Talk/action swing{" "}
-        {pair(signals.before.meanAbsDialogueShareDelta, signals.after?.meanAbsDialogueShareDelta)}
+        {formatSignalDelta(signals.before.meanAbsDialogueShareDelta, signals.after?.meanAbsDialogueShareDelta)}
       </span>
       <span>
         {ACTION_PROSE_VARIATION_LABEL}{" "}
-        {pair(signals.before.actionSentenceCvOverall, signals.after?.actionSentenceCvOverall)}
+        {formatSignalDelta(signals.before.actionSentenceCvOverall, signals.after?.actionSentenceCvOverall)}
       </span>
     </div>
   );

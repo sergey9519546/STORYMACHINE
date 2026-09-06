@@ -19,6 +19,7 @@ import type { CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
 import { compactPercentileNote, exactRankTooltip } from '../lib/percentile-copy.ts';
 import { ACTION_PROSE_VARIATION_LABEL } from '../lib/structural-signals-copy.ts';
+import { formatSignalValue } from '../lib/structural-signals-copy.ts';
 import {
   GitBranch, Eye, Zap, X, Check, AlertTriangle, FlaskConical, Play, Ban, Link2, Clock3,
   Stethoscope, FileDown,
@@ -511,8 +512,8 @@ function DoctorReadout({ label, draft, delta }: {
               <span className="uppercase tracking-widest font-bold">
                 Shape &amp; rhythm (descriptive, not part of the score)
               </span>
-              <span>Talk/action swing {draft.meanAbsDialogueShareDelta.toFixed(2)}</span>
-              <span>{ACTION_PROSE_VARIATION_LABEL} {draft.actionSentenceCvOverall.toFixed(2)}</span>
+              <span>Talk/action swing {formatSignalValue(draft.meanAbsDialogueShareDelta)}</span>
+              <span>{ACTION_PROSE_VARIATION_LABEL} {formatSignalValue(draft.actionSentenceCvOverall)}</span>
             </div>
           )}
         </>
