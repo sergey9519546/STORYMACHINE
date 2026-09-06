@@ -1963,12 +1963,28 @@ PENDING OWNER MEASUREMENT.
   entries and still 1 problem once a well-formed measured entry is appended,
   then 1 entry and 0 problems once that entry is converted in place; the
   stacked three-entry range gives 3 and 3, then 4 and 3, then 3 and 0.
-- **The conversion, per entry:** drop the pending marker from the `###`
-  heading, replace the `Measured AUC-24` value, replace `Corpus fingerprint:
-  none. No corpus was read.` with the real fingerprint, rewrite the Runner
-  attestation into the first person past tense, and remove every phrase in
-  `PENDING_PHRASES` (`:487-492`) from ANYWHERE in the entry body. Those four
-  phrases are deliberately NOT reproduced in this ledger: each space in their
+- **The conversion, per entry, in three scans not two.** `pendingReason` looks
+  in THREE places, and an earlier version of this list described only two of
+  them. (i) The `###` heading — drop the pending marker and name what was
+  measured. (ii) Every phrase in `PENDING_PHRASES` (`:487-492`), ANYWHERE in
+  the entry body. (iii) **The VALUE of every field in `REQUIRED_FIELDS`**
+  (Command, Corpus fingerprint, Runner attestation, and Git SHA or Baseline
+  used), which is tested for the bare word on its own at `:505-512` — and a
+  value runs from its own `- **` line all the way to the next `- **` bullet
+  (`fieldValueByPattern`, `:455-464`), so it can reach across a `####` addendum
+  heading and swallow text that looks like it belongs to a later section. Then
+  replace the `Measured AUC-24` value, replace `Corpus fingerprint: none. No
+  corpus was read.` with the real fingerprint, and rewrite the Runner
+  attestation into the first person past tense.
+- **Scan (iii) is not theoretical.** Applying scans (i) and (ii) alone to the
+  three entries of the stacked range leaves the real CLI at exit 1, on the one
+  branch the owner is told to measure: the stacked entry's `Baseline used`
+  value described its merge resolution in prose, and that prose contained the
+  bare word. That prose has since been reworded here, but the scan stays in the
+  recipe because the same shape recurs — two of these entries carry the bare
+  word inside a Runner-attestation value today, as the honest pending marker
+  they are meant to carry until the measurement exists.
+- **Why the four phrases are not quoted in this ledger.** Each space in their
   patterns is compiled to `\s+`, which matches a newline, so a quoted copy of
   the list inside an entry keeps that entry pending even after its heading is
   fixed. That is measured, not predicted — a draft of this bullet quoted them
