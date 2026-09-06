@@ -26,7 +26,13 @@ import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
 // `node scripts/check-scoring-receipt.mjs` on this range), so importing FROM
 // the scoring-reachable src/lib/fountain.ts does not itself touch a
 // scoring-path file — fountain.ts is not edited by this change.
-import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../src/lib/fountain.ts';
+// 2026-09-06 review round 7, STRUCTURAL — parseFountain itself, imported for
+// the same reason CHARACTER_CUE_RE is: this file sits outside doctor.ts's
+// import graph (verified the same way, `node scripts/check-scoring-receipt.mjs`
+// on this range), so importing FROM the scoring-reachable src/lib/fountain.ts
+// does not touch a scoring-path file. See realVoiceEligibleWeightRejectionReason's
+// own comment for why this is now called directly instead of hand-modelled.
+import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
 // isCharacterCue is the OTHER cue predicate in this repo — the one
 // server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay() itself
 // uses to decide, during its double-spaced reflow, whether a line becomes a
@@ -42,7 +48,7 @@ import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../src
 // OUTSIDE that graph (verified the same way as the fountain.ts import
 // above), so importing its predicate — without editing the file — does not
 // touch a scoring-path file.
-import { isCharacterCue } from '../nvm/analyze/screenplay-normalizer.ts';
+import { isCharacterCue, normalizeScreenplay } from '../nvm/analyze/screenplay-normalizer.ts';
 // 2026-09-05 review round 4, BLOCKER — imported (not replicated) so the
 // guard's own scene-truncation view can never silently drift from the
 // analyzer's: `dialogueByCharacter` (fountain-analyzer.ts) is built ONLY
@@ -753,14 +759,34 @@ export function isSceneSegmentHeading(trimmedLine: string): boolean {
   return SCENE_SEGMENT_RE.test(trimmedLine) || trimmedLine.startsWith('.');
 }
 
-/** One occurrence the guard counts against ITS OWN bounds — either a
+/** One occurrence the guard counts against the CUE-COUNT bounds (distinct/
+ *  weight/frequent-line — see those constants' own comments) — either a
  *  real-script cue+dialogue candidate or one found inside a `/* boneyard *\/`
- *  comment (tracked separately; see MAX_FOUNTAIN_BONEYARD_*'s own comment).
- *  `dialogueWords`/`voiceKey` (2026-09-05 review round 2, finding "the cost
- *  bounds are miscalibrated") are populated ONLY for a real-script (non-
- *  boneyard) occurrence — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own
- *  comment for what they drive and why. */
+ *  comment (tracked separately against MAX_FOUNTAIN_BONEYARD_*). 2026-09-06
+ *  review round 7, STRUCTURAL — this interface used to ALSO carry
+ *  `dialogueWords`/`voiceKey`/`sceneIndex` for the voice-eligible-weight
+ *  bound's hand-modelled walk; that model is retired (see
+ *  realVoiceEligibleWeightRejectionReason's own comment) in favor of reading
+ *  the REAL parsed blocks directly, so this occurrence shape is back down to
+ *  what the cue-count bounds actually need. The retired fields (and the walk
+ *  that produced them) survive as LegacyGuardCueOccurrence /
+ *  legacyWalkGuardCueOccurrences below, kept ONLY as a test-only export for
+ *  the round-7 equivalence proof that retiring them changed no fixture's
+ *  accept/reject decision. */
 interface GuardCueOccurrence {
+  line: string;
+  boneyard: boolean;
+}
+
+/** LEGACY (2026-09-06 review round 7, STRUCTURAL — retired from production).
+ *  The pre-round-7 shape of GuardCueOccurrence, carrying everything the
+ *  hand-modelled voice-eligible-weight walk needed. Kept ONLY so
+ *  legacyWalkGuardCueOccurrences / legacyVoiceEligibleWeightRejectionReason
+ *  below can still be exercised by tests/security/…'s round-7 equivalence
+ *  test, proving the retirement changed no fixture's decision — see that
+ *  test and realVoiceEligibleWeightRejectionReason's own comment for why the
+ *  real parse replaced this model rather than patching it a further time. */
+interface LegacyGuardCueOccurrence {
   line: string;
   boneyard: boolean;
   /** Word count of the dialogue text this cue occurrence introduces (the
@@ -987,7 +1013,21 @@ export function resolveGuardLines(text: string): { lines: string[]; docIsDoubleS
   return { lines, docIsDoubleSpaced };
 }
 
-function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
+/** LEGACY (2026-09-06 review round 7, STRUCTURAL — retired from production,
+ *  kept test-only). This is the pre-round-7 walk, UNCHANGED, still yielding
+ *  LegacyGuardCueOccurrence's full dialogueWords/voiceKey/sceneIndex shape
+ *  for legacyVoiceEligibleWeightRejectionReason and the round 2/3/5/6 test
+ *  oracles below. `fountainShapeRejectionReason` no longer calls this —
+ *  see the new, trimmed `walkGuardCueOccurrences` just below and
+ *  realVoiceEligibleWeightRejectionReason's own comment for why: this walk
+ *  hand-modelled "which character says how many words, truncated at
+ *  ANALYZER_SCENE_CEILING" without ever running the real parser, and every
+ *  review round from 4 through 7 found a new way that model disagreed with
+ *  parseFountain(normalizeScreenplay(text)) — measured on the round-2
+ *  reviewer's own 860,417-char payload, THIS walk cost 100.8ms against
+ *  72.8ms for the real parse it was approximating, so retiring it is not
+ *  just safer, it is cheaper. */
+function* legacyWalkGuardCueOccurrences(text: string): Generator<LegacyGuardCueOccurrence> {
   // 2026-09-05 review round 3 — computed ONCE, document-wide, matching
   // normalizeScreenplay's own document-wide reflow decision (see
   // isDoubleSpacedForVoiceGrouping's own comment). Drives whether
@@ -1170,10 +1210,62 @@ function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
   }
 }
 
+/** The walk fountainShapeRejectionReason's CUE-COUNT bounds (distinct/
+ *  weight/frequent-line, plus the boneyard mirrors) run, and guardCueOccurrences
+ *  drains unconditionally for the pipeline-parity oracle test — one
+ *  implementation of "what counts as a countable cue occurrence" for both,
+ *  so they can never quietly drift apart the way isCueLikeLine's OWN
+ *  definition drifted from the downstream predicates across rounds 1-8.
+ *  2026-09-06 review round 7, STRUCTURAL — this is the TRIMMED shape of the
+ *  walk: it decides which lines are cue occurrences (same isCueLikeLine +
+ *  blank-gap-then-dialogue context check every prior round hardened), but no
+ *  longer tracks dialogueWords/voiceKey/sceneIndex, since the voice-eligible-
+ *  weight bound that consumed them now reads the REAL parsed blocks instead
+ *  (see realVoiceEligibleWeightRejectionReason's own comment). Still built on
+ *  resolveGuardLines (round 6's CR-handling fix applies to the CUE-COUNT
+ *  bounds too, not only the old voice tracking) — only the per-occurrence
+ *  payload got smaller. Yields in document order. */
+function* walkGuardCueOccurrences(text: string): Generator<GuardCueOccurrence> {
+  const { lines } = resolveGuardLines(text);
+  let inBoneyard = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim();
+    if (line.length === 0) continue;
+
+    if (line.startsWith('/*')) inBoneyard = true;
+    if (inBoneyard) {
+      if (!SCENE_HEADING_PREFIX_RE.test(line) && isCueLikeLine(line)) {
+        yield { line, boneyard: true };
+      }
+      if (line.includes('*/') && !(line.startsWith('/*') && !line.includes('*/'))) {
+        inBoneyard = false;
+      }
+      continue;
+    }
+
+    if (SCENE_HEADING_PREFIX_RE.test(line)) continue;
+    if (!isCueLikeLine(line)) continue;
+    // Blank-gap-then-dialogue context check — see legacyWalkGuardCueOccurrences'
+    // own "ROUND 7" comment above for the full history of why this exact
+    // shape (test the CANDIDATE's own isCharacterCue shape, never what
+    // follows the gap) is the one that holds across every review round.
+    const immediateDialogue = i < lines.length - 1 && lines[i + 1]!.trim() !== '';
+    let nextLineIsDialogue = immediateDialogue;
+    if (!nextLineIsDialogue) {
+      let j = i + 1;
+      while (j < lines.length && lines[j]!.trim() === '') j++;
+      nextLineIsDialogue = j < lines.length && isCharacterCue(line);
+    }
+    if (!nextLineIsDialogue) continue;
+    yield { line, boneyard: false };
+  }
+}
+
 /** Returns null when `text` has no known pathological-cost shape, else a
- *  human-readable rejection reason. O(length) single pass (walkGuardCueOccurrences
- *  above is the O(length) walk; every check here is O(1) per yielded
- *  occurrence); safe to run on the full MAX_FOUNTAIN_CHARS ceiling. */
+ *  human-readable rejection reason. O(length) single pass for the cue-count
+ *  bounds (walkGuardCueOccurrences above), followed by ONE real parse for
+ *  the voice-eligible-weight bound (realVoiceEligibleWeightRejectionReason
+ *  below) — safe to run on the full MAX_FOUNTAIN_CHARS ceiling. */
 export function fountainShapeRejectionReason(text: string): string | null {
   if (HUGE_TOKEN_RE.test(text)) {
     return `must not contain a single unbroken run of more than ${MAX_FOUNTAIN_TOKEN_CHARS} non-whitespace characters`;
@@ -1188,36 +1280,32 @@ export function fountainShapeRejectionReason(text: string): string | null {
   const boneyardCueLineCounts = new Map<string, number>();
   let boneyardCueOccurrences = 0;
   let boneyardFrequentCueLineCount = 0;
-  // Voice-eligibility cost bound (2026-09-05 review round 2) — see
-  // MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment. Keyed by voiceKey
-  // (base name, extension tags stripped), NOT `occ.line` — the same
-  // grouping voice-delta.ts's analyzeVoices actually pools dialogue by, so
-  // "JOX" and "JOX (V.O.)" accumulate into ONE running total, matching the
-  // real character's true word count rather than splitting it across
-  // cheaper-looking halves. Boneyard occurrences never touch this map
-  // (dialogueWords/voiceKey are 0/'' for them — see GuardCueOccurrence's own
-  // comment) since boneyard content never reaches voiceAnalysis either.
-  const voiceWordCounts = new Map<string, number>();
 
+  // Cheap, pre-parse bounds (2026-09-06 review round 7, STRUCTURAL — kept
+  // exactly as they were, and kept IN FRONT of the real-parse voice bound
+  // below): a pathological payload must clear the distinct/weight/frequent-
+  // line cue-count bounds and the boneyard mirrors before this function ever
+  // hands the text to parseFountain. These bounds no longer track dialogue
+  // words or scene index at all — see GuardCueOccurrence's own comment.
   for (const occ of walkGuardCueOccurrences(text)) {
     if (occ.boneyard) {
       const boneyardOccurrencesOfThisLine = (boneyardCueLineCounts.get(occ.line) ?? 0) + 1;
       boneyardCueLineCounts.set(occ.line, boneyardOccurrencesOfThisLine);
       boneyardCueOccurrences++;
       if (boneyardCueLineCounts.size > MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES) {
-        return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines inside a /* boneyard */ comment \u2014 bound MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES`;
+        return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_DISTINCT_CUE_LINES`;
       }
       if (boneyardCueLineCounts.size * boneyardCueOccurrences > MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT) {
-        return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines \u00d7 total occurrences of one) inside a /* boneyard */ comment \u2014 bound MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT`;
+        return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines × total occurrences of one) inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT`;
       }
       // Third bound, mirroring MAX_FOUNTAIN_FREQUENT_CUE_LINES on the
-      // real-script path below \u2014 see MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES's
+      // real-script path below — see MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES's
       // own comment (2026-09-05 review, "A1 invariant inside a boneyard")
       // for why the distinct/weight pair alone is insufficient here too.
       if (boneyardOccurrencesOfThisLine === FREQUENT_CUE_OCCURRENCE_THRESHOLD + 1) {
         boneyardFrequentCueLineCount++;
         if (boneyardFrequentCueLineCount > MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES) {
-          return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times inside a /* boneyard */ comment \u2014 bound MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES`;
+          return `must not contain more than ${MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times inside a /* boneyard */ comment — bound MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES`;
         }
       }
       continue;
@@ -1225,24 +1313,11 @@ export function fountainShapeRejectionReason(text: string): string | null {
     const occurrencesOfThisLine = (cueLineCounts.get(occ.line) ?? 0) + 1;
     cueLineCounts.set(occ.line, occurrencesOfThisLine);
     cueLineOccurrences++;
-    // 2026-09-05 review round 4, BLOCKER — an occurrence past
-    // ANALYZER_SCENE_CEILING contributes NOTHING to voiceWordCounts, the
-    // same way a parenthetical-only occurrence contributes nothing: the
-    // real analyzer's dialogueByCharacter is built only from the first
-    // ANALYZER_SCENE_CEILING scene groups, so a character existing ONLY
-    // past the ceiling is exactly as invisible to voice-delta.ts as one
-    // with zero real dialogue. sceneIndex 0 (before any scene heading at
-    // all) is <= the ceiling and still counted — matches allRawScenes
-    // including any content ahead of the first heading in its own first
-    // slice element.
-    if (occ.sceneIndex <= ANALYZER_SCENE_CEILING) {
-      voiceWordCounts.set(occ.voiceKey, (voiceWordCounts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
-    }
     if (cueLineCounts.size > MAX_FOUNTAIN_DISTINCT_CUE_LINES) {
       return `must not contain more than ${MAX_FOUNTAIN_DISTINCT_CUE_LINES} distinct all-caps character-cue-shaped lines`;
     }
     if (cueLineCounts.size * cueLineOccurrences > MAX_FOUNTAIN_CUE_WEIGHT) {
-      return `must not contain more than ${MAX_FOUNTAIN_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines \u00d7 total occurrences of one) \u2014 bound MAX_FOUNTAIN_CUE_WEIGHT, a cost bound distinct from the ${MAX_FOUNTAIN_DISTINCT_CUE_LINES}-line vocabulary bound above`;
+      return `must not contain more than ${MAX_FOUNTAIN_CUE_WEIGHT} in (distinct all-caps character-cue-shaped lines × total occurrences of one) — bound MAX_FOUNTAIN_CUE_WEIGHT, a cost bound distinct from the ${MAX_FOUNTAIN_DISTINCT_CUE_LINES}-line vocabulary bound above`;
     }
     // A one-way transition (this line just became "frequent" for the first
     // time this scan) -- see MAX_FOUNTAIN_FREQUENT_CUE_LINES's own comment
@@ -1250,62 +1325,14 @@ export function fountainShapeRejectionReason(text: string): string | null {
     if (occurrencesOfThisLine === FREQUENT_CUE_OCCURRENCE_THRESHOLD + 1) {
       frequentCueLineCount++;
       if (frequentCueLineCount > MAX_FOUNTAIN_FREQUENT_CUE_LINES) {
-        return `must not contain more than ${MAX_FOUNTAIN_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times \u2014 bound MAX_FOUNTAIN_FREQUENT_CUE_LINES, a cost bound on how many DIFFERENT cue-shaped lines repeat often, distinct from the vocabulary and product bounds above`;
+        return `must not contain more than ${MAX_FOUNTAIN_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times — bound MAX_FOUNTAIN_FREQUENT_CUE_LINES, a cost bound on how many DIFFERENT cue-shaped lines repeat often, distinct from the vocabulary and product bounds above`;
       }
     }
   }
-  // Voice-eligibility cost bound (2026-09-05 review round 2) \u2014 deferred to
-  // the END of the scan, unlike the three incremental bounds above, because
-  // a character's TOTAL word count (and therefore whether it clears
-  // VOICE_ELIGIBLE_MIN_WORDS) is not known until every one of its
-  // occurrences, wherever they fall in the document, has been seen. Still
-  // one O(length) pass overall \u2014 this is an O(distinct-character-count)
-  // reduction afterward, bounded by MAX_FOUNTAIN_DISTINCT_CUE_LINES already
-  // enforced above. Fires ONLY when every distinct character clears the
-  // floor \u2014 the one condition under which voice-delta.ts's O(distinct\u00b2)
-  // pass actually runs instead of abstaining (see MAX_FOUNTAIN_VOICE_
-  // ELIGIBLE_WEIGHT's own comment) \u2014 so a script with even one real
-  // one-line walk-on character, which is nearly every real script, never
-  // reaches this check at all.
-  // 2026-09-05 review round 3 \u2014 a voiceKey with an EXACT-ZERO accumulated
-  // total is excluded here rather than treated as "ineligible with 0
-  // words". The two are not the same thing: fountain-analyzer.ts's
-  // extractSceneContent only ever adds a speaker to `dialogueByCharacter`
-  // when it has at least one real `dialogue`-typed line \u2014 a cue whose only
-  // followers are parentheticals (`(beat)`, or its every occurrence
-  // followed by nothing else before the next cue/heading) NEVER enters
-  // dialogueByCharacter at all, so it cannot be the reason analyzeVoices
-  // abstains. Before this exclusion, such a name registered as
-  // "ineligible" here exactly the way a genuinely short real character
-  // does, and either one alone was enough to defeat `allEligible` below \u2014
-  // that was round 3's finding A (a 35-character `WALKON\n(beat)\n` suffix
-  // flipped a rejected payload to accepted while analyzeVoices, seeing no
-  // such character at all, ran the full O(distinct\u00b2) pass anyway). A
-  // genuinely short character (1+ real words, still under
-  // VOICE_ELIGIBLE_MIN_WORDS) is UNCHANGED by this \u2014 it stays in the map
-  // and still correctly defeats allEligible, matching that it DOES enter
-  // dialogueByCharacter and DOES cause abstention for real.
-  const nonZeroVoiceWordCounts = [...voiceWordCounts.values()].filter((words) => words > 0);
-  if (nonZeroVoiceWordCounts.length >= 2) {
-    let allEligible = true;
-    let totalEligibleWords = 0;
-    for (const words of nonZeroVoiceWordCounts) {
-      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
-      totalEligibleWords += words;
-    }
-    if (allEligible) {
-      const voiceEligibleWeight = nonZeroVoiceWordCounts.length * totalEligibleWords;
-      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
-        // 2026-09-05 review round 3, LOW item \u2014 this state is a legitimate
-        // large fully-speaking ensemble, not malformed input (measured: the
-        // pre-round-2 buildPlausibleFeature() fixture, a genuine 72s
-        // payload, trips exactly this branch) \u2014 say so, not just the bound
-        // name.
-        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters \u00d7 their total pooled dialogue words) \u2014 this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft \u2014 bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
-      }
-    }
-  }
-  return null;
+  // Voice-eligibility cost bound (2026-09-06 review round 7, STRUCTURAL) —
+  // see realVoiceEligibleWeightRejectionReason's own comment. Every
+  // cheap, pre-parse bound above has already passed by this point.
+  return realVoiceEligibleWeightRejectionReason(text, cueLineOccurrences);
 }
 
 // \u2500\u2500 ROUND 8 oracle (2026-09-05 review finding A1-R8) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -1355,7 +1382,7 @@ export function guardCueOccurrences(text: string): number {
 // input.
 export function guardVoiceWordCounts(text: string): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const occ of walkGuardCueOccurrences(text)) {
+  for (const occ of legacyWalkGuardCueOccurrences(text)) {
     if (occ.boneyard) continue;
     counts.set(occ.voiceKey, (counts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
   }
@@ -1390,7 +1417,7 @@ export function guardVoiceWordCounts(text: string): Map<string, number> {
 // guardCueOccurrences already established above).
 function computeEligibleVoiceWordCounts(text: string): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const occ of walkGuardCueOccurrences(text)) {
+  for (const occ of legacyWalkGuardCueOccurrences(text)) {
     if (occ.boneyard) continue;
     if (occ.sceneIndex > ANALYZER_SCENE_CEILING) continue;
     counts.set(occ.voiceKey, (counts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
@@ -1398,12 +1425,215 @@ function computeEligibleVoiceWordCounts(text: string): Map<string, number> {
   return counts;
 }
 
-/** Test-only view of fountainShapeRejectionReason's OWN ceiling-aware
- *  per-name word accumulation (see computeEligibleVoiceWordCounts's own
- *  comment) — the decision-set property compares THIS against the
- *  ceiling-aware pipeline model, not guardVoiceWordCounts' raw one. */
+/** LEGACY (2026-09-06 review round 7, STRUCTURAL) — test-only view of the
+ *  RETIRED hand-modelled bound's own ceiling-aware per-name word
+ *  accumulation (see computeEligibleVoiceWordCounts's own comment and
+ *  legacyVoiceEligibleWeightRejectionReason below). No longer what
+ *  fountainShapeRejectionReason evaluates in production — kept so the
+ *  round-5/6 decision-set-property tests, and the round-7 corpus addition
+ *  proving that property's own fail-first sensitivity, keep exercising a
+ *  real implementation rather than a re-derived stand-in. */
 export function guardEligibleVoiceWordCounts(text: string): Map<string, number> {
   return computeEligibleVoiceWordCounts(text);
+}
+
+/** LEGACY (2026-09-06 review round 7, STRUCTURAL — retired from production).
+ *  The round 2-6 hand-modelled voice-eligible-weight bound, evaluated over
+ *  legacyWalkGuardCueOccurrences's approximation instead of the real parse.
+ *  fountainShapeRejectionReason no longer calls this — see
+ *  realVoiceEligibleWeightRejectionReason's own comment for the measured
+ *  reason (the real parse is both more correct AND cheaper). Exported
+ *  test-only so tests/security/…'s round-7 equivalence test can compare
+ *  THIS function's decision against the real one over every fixture and
+ *  payload this file has ever been reviewed against — proving the
+ *  retirement changed no accept/reject decision, rather than assuming it. */
+export function legacyVoiceEligibleWeightRejectionReason(text: string): string | null {
+  const voiceWordCounts = new Map<string, number>();
+  for (const occ of legacyWalkGuardCueOccurrences(text)) {
+    if (occ.boneyard) continue;
+    if (occ.sceneIndex <= ANALYZER_SCENE_CEILING) {
+      voiceWordCounts.set(occ.voiceKey, (voiceWordCounts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
+    }
+  }
+  const nonZeroVoiceWordCounts = [...voiceWordCounts.values()].filter((words) => words > 0);
+  if (nonZeroVoiceWordCounts.length >= 2) {
+    let allEligible = true;
+    let totalEligibleWords = 0;
+    for (const words of nonZeroVoiceWordCounts) {
+      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
+      totalEligibleWords += words;
+    }
+    if (allEligible) {
+      const voiceEligibleWeight = nonZeroVoiceWordCounts.length * totalEligibleWords;
+      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
+        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
+      }
+    }
+  }
+  return null;
+}
+
+// ── Real-parse voice-eligibility bound (2026-09-06 review round 7,
+// STRUCTURAL) ───────────────────────────────────────────────────────────────
+// Rounds 4 through 7 were all the SAME failure shape: legacyWalkGuardCueOccurrences
+// hand-modelled "which character says how many words, truncated at
+// ANALYZER_SCENE_CEILING scenes" without ever running the real parser, and
+// each round found a new way the approximation disagreed with
+// parseFountain(normalizeScreenplay(text)) — CR-only line endings (round 4),
+// the 400-scene ceiling's own heading grammar (round 5), a stray `\r` inside
+// a line (round 6), and now a parenthetical-only cue demoting the NEXT cue
+// to `action` per src/lib/fountain.ts:139-140's `!prevBlock ||
+// prevBlock.type === 'empty'` rule (round 7 — screenplay-normalizer.ts's
+// parenthetical branch emits no trailing blank line, so the reflowed cue
+// right after a parenthetical-only cue has `prevBlock.type === 'parenthetical'`
+// and is silently demoted, along with its own dialogue). Measured on this
+// tree at the round-2 reviewer's own 860,417-char payload:
+// normalizeScreenplay + parseFountain costs 72.8ms; legacyWalkGuardCueOccurrences
+// costs 100.8ms for the SAME approximation work it was standing in for — so
+// building the character -> word map from the REAL parsed blocks is not
+// just more correct, it is CHEAPER, closing this entire CLASS of bypass
+// rather than patching the hand model a further time.
+//
+// Mirrors (read, never imported — replicate-vs-import by KIND, the same
+// rule stripCueExtensionForVoiceGrouping's own comment states):
+// fountain-analyzer.ts's segmentScenes (scene groups are heading-delimited,
+// one group per scene_heading block, any preamble before the FIRST heading
+// folded into that first group, a document with no heading at all is
+// exactly one group — the "UNTITLED SCENE" case) and extractSceneContent
+// (character/dual_dialogue sets the current speaker; dialogue pools under
+// it; action does NOT reset the speaker; every other block type is skipped
+// and does NOT reset it either), fountain-analyzer.ts's normalizeCharacterName
+// (byte-for-byte identical to stripCueExtensionForVoiceGrouping above —
+// reused directly, not re-derived), and voice-delta.ts's own MIN_WORDS=30
+// threshold with its letter-only tokenize(). ANALYZER_SCENE_CEILING itself
+// is IMPORTED (a plain exported constant — see that import's own comment);
+// nothing else here is imported, since none of it is exported by either
+// scoring-path file.
+/** Mirrors voice-delta.ts's own `tokenize()` exactly
+ *  (`text.toLowerCase().match(/[a-z']+/g)`, filtering to tokens containing
+ *  at least one letter) — replicated rather than imported (voice-delta.ts's
+ *  tokenize is not exported), and used verbatim now rather than the old
+ *  countWords()'s deliberate over-count: this function reads the REAL
+ *  dialogue text the analyzer will tokenize, so it needs the SAME count,
+ *  not a safe-direction approximation of it. */
+function voiceTokenCount(text: string): number {
+  const words = text.toLowerCase().match(/[a-z']+/g) ?? [];
+  return words.filter((w) => /[a-z]/.test(w)).length;
+}
+
+/** Builds the character -> pooled-dialogue-word-count map exactly as
+ *  fountain-analyzer.ts's dialogueByCharacter would, from ALREADY-PARSED
+ *  `parseFountain(normalizeScreenplay(text))` blocks — see this section's
+ *  own header comment for the full mirrored-arithmetic list. `blocks` is
+ *  passed in (rather than re-parsing) so realVoiceEligibleWeightRejectionReason
+ *  can do its own character-block-existence check and this map-build with
+ *  ONE parse call. */
+function buildRealVoiceWordCounts(blocks: FountainBlock[]): Map<string, number> {
+  const headingIdxs: number[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i]!.type === 'scene_heading') headingIdxs.push(i);
+  }
+
+  const counts = new Map<string, number>();
+  const walkSceneBlocks = (sceneBlocks: FountainBlock[]): void => {
+    let currentSpeaker = '';
+    for (const b of sceneBlocks) {
+      const t = b.text.trim();
+      if (!t) continue;
+      if (b.type === 'character' || b.type === 'dual_dialogue') {
+        currentSpeaker = stripCueExtensionForVoiceGrouping(t);
+      } else if (b.type === 'dialogue') {
+        if (currentSpeaker) {
+          counts.set(currentSpeaker, (counts.get(currentSpeaker) ?? 0) + voiceTokenCount(t));
+        }
+      }
+      // action/parenthetical/transition/shot/etc: no signal, and — matching
+      // extractSceneContent exactly — do NOT reset currentSpeaker.
+    }
+  };
+
+  if (headingIdxs.length === 0) {
+    walkSceneBlocks(blocks); // whole document is one "UNTITLED SCENE" group
+    return counts;
+  }
+  const groupCount = Math.min(headingIdxs.length, ANALYZER_SCENE_CEILING);
+  for (let h = 0; h < groupCount; h++) {
+    const start = headingIdxs[h]!;
+    const end = h + 1 < headingIdxs.length ? headingIdxs[h + 1]! : blocks.length;
+    let sceneBlocks = blocks.slice(start + 1, end);
+    if (h === 0 && headingIdxs[0]! > 0) {
+      sceneBlocks = [...blocks.slice(0, headingIdxs[0]!), ...sceneBlocks];
+    }
+    walkSceneBlocks(sceneBlocks);
+  }
+  return counts;
+}
+
+// Fail-closed threshold (2026-09-06 review round 7, item 3): the "plausible
+// feature" fixture below (skewed majors/minors, extension variants, caps
+// action, feature-length) measures 5,844 cue-shaped-line occurrences; the
+// round-2 "realistic feature" fixture measures 2,676. Both are legitimate,
+// and both clear every cheap pre-parse bound with room to spare. This
+// threshold sits comfortably above the larger of the two (~1.7x headroom)
+// so no real script's ordinary cue volume can trip it — it exists ONLY to
+// catch the narrow case where the cue-shape signal and the real parse
+// result disagree at a scale no real screenplay reaches (the parse throws,
+// or finds zero character blocks, while the document is dense with
+// cue-shaped lines) — a parser-safety fallback, not a formatting rule.
+const FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD = 6_000;
+
+/** The voice-eligible-weight bound (MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT),
+ *  evaluated against the REAL character -> word map (buildRealVoiceWordCounts
+ *  above) instead of the retired hand model — see this section's own header
+ *  comment. `cueLineOccurrences` is the count fountainShapeRejectionReason's
+ *  own cheap pre-parse walk already computed.
+ *
+ *  Fail-closed (2026-09-06 review round 7, item 3): if parseFountain /
+ *  normalizeScreenplay throw, or the parse yields ZERO character/
+ *  dual_dialogue blocks at all, while the document is already dense with
+ *  cue-shaped lines (see FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD's own
+ *  comment), reject rather than silently treating "the parser saw no
+ *  characters" as "there is nothing to bound" — an ordinary plain document
+ *  (an essay, a to-do list) has few or no cue-shaped lines and legitimately
+ *  produces zero characters; this only fires when the CUE-SHAPE signal and
+ *  the PARSE result disagree at a scale no real screenplay reaches. */
+function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences: number): string | null {
+  let blocks: FountainBlock[];
+  try {
+    blocks = parseFountain(normalizeScreenplay(text));
+  } catch {
+    if (cueLineOccurrences > FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD) {
+      return `could not be analyzed for its character cast even though it contains ${cueLineOccurrences} cue-shaped lines — this is a parse-safety fallback, not a formatting error — bound FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD`;
+    }
+    return null;
+  }
+  const hasAnyCharacterBlock = blocks.some((b) => b.type === 'character' || b.type === 'dual_dialogue');
+  if (!hasAnyCharacterBlock && cueLineOccurrences > FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD) {
+    return `could not be analyzed for its character cast even though it contains ${cueLineOccurrences} cue-shaped lines — this is a parse-safety fallback, not a formatting error — bound FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD`;
+  }
+
+  const wordCounts = buildRealVoiceWordCounts(blocks);
+  const nonZeroWordCounts = [...wordCounts.values()].filter((w) => w > 0);
+  if (nonZeroWordCounts.length >= 2) {
+    let allEligible = true;
+    let totalEligibleWords = 0;
+    for (const words of nonZeroWordCounts) {
+      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
+      totalEligibleWords += words;
+    }
+    if (allEligible) {
+      const voiceEligibleWeight = nonZeroWordCounts.length * totalEligibleWords;
+      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
+        // 2026-09-05 review round 3, LOW item — this state is a legitimate
+        // large fully-speaking ensemble, not malformed input (measured: the
+        // pre-round-2 buildPlausibleFeature() fixture, a genuine 72s
+        // payload, trips exactly this branch) — say so, not just the bound
+        // name.
+        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
+      }
+    }
+  }
+  return null;
 }
 
 /** z.string().min(1).max(MAX_FOUNTAIN_CHARS) plus the pathological-shape guard

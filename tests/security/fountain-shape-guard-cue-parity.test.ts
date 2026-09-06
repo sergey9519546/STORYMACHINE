@@ -107,6 +107,7 @@ import {
   guardEligibleVoiceWordCounts,
   isSceneSegmentHeading,
   resolveGuardLines,
+  legacyVoiceEligibleWeightRejectionReason,
 } from '../../server/lib/validation.ts';
 import { CHARACTER_CUE_RE, parseFountain } from '../../src/lib/fountain.ts';
 import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/screenplay-normalizer.ts';
@@ -2421,5 +2422,354 @@ describe('ROUND 4 oracle: CR-only and CRLF line endings — guardCueOccurrences(
     const pipelineCount = pipelineCharacterBlockCount(text);
     assert.equal(pipelineCount, 12_000);
     assert.ok(guardCount >= pipelineCount, `guard=${guardCount} pipeline=${pipelineCount}`);
+  });
+});
+
+// ── ROUND 7 (2026-09-06 review round 7, BLOCKER + STRUCTURAL): a
+// parenthetical-only cue demotes the NEXT cue to `action` in parseFountain
+// (src/lib/fountain.ts:139-140 — a cue is typed `character` ONLY when
+// `!prevBlock || prevBlock.type === 'empty'`; screenplay-normalizer.ts's
+// reflow emits a parenthetical with no trailing blank line, so the cue right
+// after one has `prevBlock.type === 'parenthetical'` and falls through to
+// `action`, along with its own dialogue). The hand-modelled legacy walk had
+// no model of that rule and credited a ghost character the analyzer never
+// pools — one ghost under 30 words was enough to switch `allEligible` off
+// and skip the whole bound (125,627 chars, legacy-ACCEPT, guard-eligible 201
+// vs. analyzer 200, `runScriptDoctor` 50,666ms; a 37-char-different control
+// rejects in 13ms). STRUCTURAL fix: the voice-eligible-weight bound now
+// reads the REAL parsed blocks directly (realVoiceEligibleWeightRejectionReason,
+// validation.ts) instead of hand-modelling them, so this ghost — and every
+// prior round's divergence — cannot recur by construction: a demoted cue is
+// simply `action` in the blocks this function reads too.
+describe('ROUND 7 corpus: parenthetical-only-cue-then-cue demotion, one variant per cue family', () => {
+  const DLG = 'this is ordinary lowercase dialogue here.';
+
+  // Mirrors r6attack.mjs's own `base()`/POISON shape exactly: 200 uniform
+  // eligible names over 400 double-spaced scenes (5 cues/scene), plus a
+  // parenthetical-only cue immediately followed by another cue — using the
+  // FAMILY's own naming convention for both the poisoning cue and the
+  // walk-on it demotes, so this is round 3's parenthetical-only-walk-on
+  // shape AND round 7's demotion shape combined, per family.
+  function buildParenDemotionDoc(cueOf: (i: number) => string): string {
+    let t = '', occ = 0;
+    for (let s = 0; s < 400; s++) {
+      t += `INT. LOCATION ${s} - DAY\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 5; i++, occ++) t += `${cueOf(occ % 200)}\n\n${DLG}\n\n`;
+    }
+    t += `PARENONLY\n\n(beat)\n\n${cueOf(9999)}\n\nhi there\n\n`;
+    return t;
+  }
+
+  // Independently computed per family, rather than assuming a uniform
+  // REJECT: some cue-naming conventions (the 41+ char cue and caret
+  // families) do not survive normalizeScreenplay's OWN isCharacterCue gate
+  // during double-spaced reflow at all (isCharacterCue itself caps at 4
+  // words / 30 chars — a 41+ char name or a bare caret suffix never becomes
+  // a real reflowed cue, independent of this test's poison), so their real
+  // pipeline never assembles anything close to a 200-fully-eligible cast.
+  // The property that must hold for EVERY family is not "always rejects" —
+  // it is "the production decision matches what an independent, ceiling-
+  // aware read of the REAL pipeline says", which is exactly what would be
+  // violated by a ghost the hand model invents but the pipeline does not.
+  it('the real production function\'s decision matches an independent real-pipeline computation, per family (the ghost cannot survive a real parse)', () => {
+    for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+      const text = buildParenDemotionDoc(cueOf);
+      const pipelineCounts = pipelineWordsByBaseName(text);
+      const nonZero = [...pipelineCounts.values()].filter((w) => w > 0);
+      const allEligible = nonZero.length >= 2 && nonZero.every((w) => w >= VOICE_ELIGIBLE_MIN_WORDS);
+      const expectedWeight = allEligible ? nonZero.length * nonZero.reduce((a, b) => a + b, 0) : 0;
+      const expectReject = allEligible && expectedWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT;
+      const reason = fountainShapeRejectionReason(text);
+      assert.equal(!!reason, expectReject, `"${family}": expected reject=${expectReject} (independently computed from the real ceiling-aware pipeline: ${nonZero.length} eligible names), got reject=${!!reason}${reason ? ` (${reason})` : ''}`);
+      if (expectReject) assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/, `"${family}"`);
+    }
+  });
+
+  // Fail-first proof (2026-09-06 review round 7, item 4): confirms this
+  // corpus is not vacuous by checking it AGAINST THE RETIRED LEGACY
+  // function directly — at least one family must show the OLD bypass (a
+  // "ghost" eligible name absent from the real pipeline), proving the
+  // shape genuinely exercises the bug the real-parse rewrite closes, not a
+  // shape that happened to work by construction. `legacyVoiceEligibleWeightRejectionReason`
+  // is retired from production (see its own comment) — this is the ONLY
+  // test in this file that still calls it against a NEW payload, and it
+  // does so specifically to prove the corpus's own bite, not to validate
+  // production behavior.
+  it('fail-first: the corpus above genuinely defeats the RETIRED legacy function on at least one family (proving it is not a vacuous corpus)', () => {
+    let anyBypass = false;
+    const bypassed: string[] = [];
+    for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
+      const text = buildParenDemotionDoc(cueOf);
+      const legacyReason = legacyVoiceEligibleWeightRejectionReason(text);
+      if (!legacyReason) { anyBypass = true; bypassed.push(family); }
+    }
+    assert.ok(anyBypass, 'expected at least one family to bypass the legacy (retired) voice-eligible-weight function — otherwise this corpus proves nothing about the bug it targets');
+    assert.ok(bypassed.length >= 5, `expected the demotion bug to reproduce broadly, not on a single cherry-picked family; got ${bypassed.length}/${Object.keys(ORACLE_CUE_FAMILIES).length}: ${bypassed.join(', ')}`);
+  });
+});
+
+// ── ROUND 7 regressions: R7-1 (the exact reviewer payload) rejects fast,
+// and its control (R7-0, no poison) keeps rejecting on its own merits (200
+// fully-eligible characters alone already crosses the bound).
+describe('ROUND 7 regressions: the parenthetical-demotion ghost rejects fast, the control is unchanged', () => {
+  const DLG = 'this is ordinary lowercase dialogue here.';
+  function base(poison: string): string {
+    let t = '', occ = 0;
+    for (let s = 0; s < 400; s++) {
+      t += `INT. LOCATION ${s} - DAY\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n\n${DLG}\n\n`;
+    }
+    return t + poison;
+  }
+  const POISON = 'PARENONLY\n\n(beat)\n\nWALKON\n\nhi there\n\n';
+
+  it('R7-0 control (double-spaced, no poison) rejects — 200 fully eligible characters cross the bound on their own', () => {
+    const text = base('');
+    assert.equal(text.length, 125_590, 'payload size must match the measured R7-0 shape exactly');
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason);
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  it('R7-1: a parenthetical-only cue demoting the next cue (measured pre-fix: legacy-ACCEPT, guard-eligible 201 vs analyzer 200, runScriptDoctor 50,666ms; HTTP 200 in 49,799ms) now rejects fast', () => {
+    const text = base(POISON);
+    assert.equal(text.length, 125_627, 'payload size must match the measured R7-1 shape exactly');
+    // Sanity: the legacy function really did bypass on this exact payload —
+    // pins the BEFORE state directly, not just via a comment.
+    assert.equal(legacyVoiceEligibleWeightRejectionReason(text), null, 'sanity: the retired legacy function must still show the bypass on this exact payload, or this regression test is not testing what it claims');
+    const start = Date.now();
+    const reason = fountainShapeRejectionReason(text);
+    const ms = Date.now() - start;
+    assert.ok(reason, 'expected the parenthetical-demotion ghost to no longer bypass the voice-eligible-weight bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
+  });
+});
+
+// ── ROUND 7, item 3: fail-closed when the real parse and the cue-shape
+// signal radically disagree (2026-09-06 review round 7). CUE_LIKE_LINE_RE
+// (the guard's own cue-shape test) is DELIBERATELY wider than CHARACTER_CUE_RE
+// (the real parser's cue test) in punctuation — it admits `,` `(` `)` `&`
+// `/`, which CHARACTER_CUE_RE's continuation class does not (see
+// CUE_LIKE_LINE_RE's own comment). A document built entirely from cue-shaped
+// lines using ONLY that wider punctuation (e.g. "NAME, 0") is cue-like to
+// the guard's own counting (so cueLineOccurrences climbs normally) but NEVER
+// matches CHARACTER_CUE_RE, so parseFountain never types ANY of them
+// `character` — a genuine, naturally-occurring zero-character-block parse
+// for a document dense with cue-shaped lines, exactly the shape
+// realVoiceEligibleWeightRejectionReason's fail-closed branch exists for.
+describe('ROUND 7, item 3: fail-closed on a real zero-character-block parse with a high cue-shaped-line count', () => {
+  it('a document built from CUE_LIKE_LINE_RE-but-not-CHARACTER_CUE_RE cues (comma-punctuated names) parses to ZERO character blocks and is rejected fail-closed', () => {
+    const DISTINCT = 50;
+    let text = '';
+    for (let i = 0; i < 7000; i++) text += `NAME, ${i % DISTINCT}\nHello there.\n\n`;
+
+    // Sanity: this really is the shape the fail-closed branch targets — cue-
+    // like to the guard, but not to the real parser at all.
+    assert.equal(isCueLikeLine('NAME, 0'), true, 'sanity: "NAME, 0" must be cue-shaped to the guard\'s own predicate');
+    const blocks = parseFountain(normalizeScreenplay(text));
+    const hasAnyCharacterBlock = blocks.some((b) => b.type === 'character' || b.type === 'dual_dialogue');
+    assert.equal(hasAnyCharacterBlock, false, 'sanity: the real parser must produce ZERO character/dual_dialogue blocks for this shape, or this is not exercising the fail-closed branch');
+    const cueCount = guardCueOccurrences(text);
+    assert.ok(cueCount > 6_000, `sanity: expected the guard\'s own cue count to exceed the fail-closed threshold, got ${cueCount}`);
+
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the fail-closed branch to reject a document this dense with cue-shaped lines yet parsing to zero real characters');
+    assert.match(reason!, /FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD/);
+  });
+
+  it('an ordinary legitimate document with the SAME comma-punctuated cue shape, but few of them, is NOT rejected (the fail-closed branch does not fire on ordinary low-volume cue shapes)', () => {
+    let text = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 5; i++) text += `NAME, ${i}\nHello there.\n\n`;
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  it('the realistic-feature fixture (buildPlausibleFeature-shaped, real characters throughout) is NOT rejected by the fail-closed branch', () => {
+    // A real document with real character blocks throughout must never trip
+    // the fail-closed branch, regardless of its cue-shaped-line volume —
+    // confirms the branch is gated on hasAnyCharacterBlock, not merely on a
+    // high occurrence count.
+    let text = '';
+    for (let s = 0; s < 200; s++) {
+      text += `INT. LOCATION ${s} - DAY\n\nSomething happens.\n\n`;
+      for (let i = 0; i < 40; i++) text += `CHAR${i % 50}\nOrdinary dialogue line here today.\n\n`;
+    }
+    const blocks = parseFountain(normalizeScreenplay(text));
+    assert.ok(blocks.some((b) => b.type === 'character'), 'sanity: this fixture must have real character blocks');
+    // This fixture may or may not cross the voice-eligible-weight bound on
+    // its own merits — the point here is only that it is never rejected FOR
+    // THE FAIL-CLOSED REASON specifically.
+    const reason = fountainShapeRejectionReason(text);
+    if (reason) assert.doesNotMatch(reason, /FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD/);
+  });
+});
+
+// ── ROUND 7 equivalence proof (2026-09-06 review round 7, STRUCTURAL):
+// retiring legacyWalkGuardCueOccurrences / legacyVoiceEligibleWeightRejectionReason
+// from production is safe ONLY if every fixture and every reviewer payload
+// this file has ever been checked against gives the SAME accept/reject
+// decision under the real-map implementation. This test runs the WHOLE set
+// through both `legacyFountainShapeRejectionReason` (below — the retired
+// combined decision: identical, unchanged cue-count/boneyard bounds, then
+// the legacy voice-eligible-weight function) and the real
+// `fountainShapeRejectionReason`, asserting the accept/reject VERDICT
+// agrees for every one (message text may differ; the decision may not).
+describe('ROUND 7 equivalence: retiring the legacy voice-eligible-weight walk changes no fixture\'s or payload\'s accept/reject decision', () => {
+  // The cue-count/boneyard bounds are UNCHANGED code (see validation.ts's
+  // own history — only the voice bound's DATA SOURCE moved) — so whenever
+  // fountainShapeRejectionReason(text) rejects for a reason that does NOT
+  // name the voice bound or the fail-closed bound, that rejection came from
+  // one of those unchanged bounds, and the legacy pipeline would have
+  // rejected identically (same code, unmoved) — trivially equivalent. The
+  // legacy combined decision is therefore: defer to the CURRENT function's
+  // own cue-count verdict when it is one, and to the LEGACY voice function
+  // only when the cue-count bounds all pass — exactly reconstructing what
+  // the pre-round-7 combined function computed, from parts that still exist.
+  function legacyFountainShapeRejectionReason(text: string): string | null {
+    const newReason = fountainShapeRejectionReason(text);
+    if (newReason && !/MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT|FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD/.test(newReason)) {
+      return newReason;
+    }
+    return legacyVoiceEligibleWeightRejectionReason(text);
+  }
+
+  function assertSameDecision(label: string, text: string): void {
+    const legacyAccepts = legacyFountainShapeRejectionReason(text) === null;
+    const newAccepts = fountainShapeRejectionReason(text) === null;
+    assert.equal(newAccepts, legacyAccepts, `EQUIVALENCE VIOLATION "${label}": legacy accepts=${legacyAccepts}, real-parse accepts=${newAccepts} — retiring the legacy walk changed this fixture's decision`);
+  }
+
+  it('every tracked .fountain fixture, every calibration sample, and the P0 sample give the same decision', async () => {
+    const { REFERENCE_CORPUS } = await import('../../server/nvm/analyze/calibration/corpus.ts');
+    const { fountain: p0SampleFountain } = await import('../../src/lib/sample-script.ts');
+    for (const file of trackedFountainFiles()) {
+      assertSameDecision(path.relative(REPO_ROOT, file), readFileSync(file, 'utf8'));
+    }
+    for (const sample of REFERENCE_CORPUS) {
+      assertSameDecision(`calibration/${sample.label}`, sample.fountain);
+    }
+    assertSameDecision('P0 sample', p0SampleFountain);
+  });
+
+  it('every round 1-7 reviewer payload and control gives the same decision', () => {
+    const DLG = 'this is ordinary lowercase dialogue here.';
+    function uniformCast(distinct: number, occurrences: number): string {
+      let t = 'INT. ROOM - DAY\n\n', occ = 0, scene = 0;
+      while (occ < occurrences) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room, quietly and without much fuss.\n\n`;
+        for (let i = 0; i < 40 && occ < occurrences; i++, occ++) t += `CHAR${occ % distinct}\n${DLG}\n\n`;
+      }
+      return t;
+    }
+    function dsWrapped(distinct: number, occPerChar: number, wrapLines: number): string {
+      let t = '', scene = 0, occ = 0;
+      const total = distinct * occPerChar;
+      while (occ < total) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 40 && occ < total; i++, occ++) {
+          t += `CHAR${occ % distinct}\n\n`;
+          for (let w = 0; w < wrapLines; w++) t += `line ${w} has five words\n\n`;
+        }
+      }
+      return t;
+    }
+    function buildCeilingCrossingDoc(headingOf: (s: number) => string, scenes: number, tailHeading: string): string {
+      let t = '', occ = 0;
+      for (let s = 0; s < scenes; s++) {
+        t += `${headingOf(s)}\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+      }
+      return t + `${tailHeading}\n\nWALKON\nhi\n\n`;
+    }
+    function buildR6Doc(inflate: number): string {
+      let t = '', occ = 0;
+      for (let s = 0; s < 400; s++) {
+        t += `INT. LOCATION ${s} - DAY\n\n`;
+        t += s === 0 && inflate > 0
+          ? `Something happens${'\rINT. GHOST - DAY'.repeat(inflate)}\n\n`
+          : 'Something happens in the room.\n\n';
+        for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+      }
+      return t;
+    }
+    const payloads: Record<string, string> = {
+      'round-2 reviewer payload 1 (50x18,000)': uniformCast(50, 18_000),
+      'round-2 reviewer payload 2 (520x6,000)': uniformCast(520, 6_000),
+      'round-3 bypass A (parenthetical-only walk-on)': (() => {
+        let t = 'INT. ROOM - DAY\n\n';
+        for (let occ = 0; occ < 2000; occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+        return t + 'INT. HALL - DAY\n\nWALKON\n(beat)\n\n';
+      })(),
+      'round-3 bypass B (double-spaced wrapped, D=200 occ/char=4 wrap=3)': dsWrapped(200, 4, 3),
+      'round-4 CR-only double-spaced': (() => {
+        let t = '', occ = 0, scene = 0;
+        while (occ < 2000) {
+          t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+          for (let i = 0; i < 40 && occ < 2000; i++, occ++) t += `CHAR${occ % 200}\n\n${DLG}\n\n`;
+        }
+        return t.replace(/\n/g, '\r');
+      })(),
+      'round-4 walk-on past the 400-scene ceiling': (() => {
+        let t = '', occ = 0;
+        for (let s = 0; s < 410; s++) {
+          t += `INT. LOCATION ${s} - DAY\n\nSomething happens in the room.\n\n`;
+          for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG}\n\n`;
+        }
+        return t + 'INT. HALL - DAY\n\nWALKON\nhi\n\n';
+      })(),
+      'round-5 .FORCED headings past ceiling': buildCeilingCrossingDoc((s) => `.SCENE ${s}`, 410, '.SCENE FINAL'),
+      'round-5 lowercase int. headings past ceiling': buildCeilingCrossingDoc((s) => `int. location ${s} - day`, 410, 'int. hall - day'),
+      'round-5 INTERIOR headings past ceiling': buildCeilingCrossingDoc((s) => `INTERIOR LOCATION ${s} - DAY`, 410, 'INTERIOR HALL - DAY'),
+      'round-5 control: INT. headings past ceiling': buildCeilingCrossingDoc((s) => `INT. LOCATION ${s} - DAY`, 410, 'INT. HALL - DAY'),
+      'round-5 control: walk-on at scene 400 (boundary)': buildCeilingCrossingDoc((s) => `INT. LOCATION ${s} - DAY`, 399, 'INT. HALL - DAY'),
+      'round-6 control (no stray \\r)': buildR6Doc(0),
+      'round-6 stray-\\r bypass (500 embedded)': buildR6Doc(500),
+      'round-6 partial inflation (50 embedded)': buildR6Doc(50),
+    };
+    // Round 7's own payloads (base7 control + the parenthetical-demotion
+    // ghost) are DELIBERATELY excluded here: the ghost is the ONE payload
+    // this whole equivalence test predicts will DISAGREE (legacy accepts,
+    // real-parse rejects) — that disagreement is the fix working, not a
+    // regression, and is already pinned by its own dedicated "ROUND 7
+    // regressions" describe block above rather than asserted equal here.
+    for (const [label, text] of Object.entries(payloads)) {
+      assertSameDecision(label, text);
+    }
+  });
+
+  it('the round-2 realistic 150-name skewed feature and the round-3/plausible-feature fixtures still give the same decision', () => {
+    // Reuses this file's own realisticSkewedFeature-shaped generator (round
+    // 2's own fixture) inline, since that function is scoped to its own
+    // describe block above.
+    const words = ['the', 'plan', 'was', 'never', 'going', 'to', 'work', 'like', 'this', 'again', 'tonight', 'trust', 'me', 'now', 'wait', 'listen'];
+    const MAJOR_COUNT = 12, MINOR_COUNT = 138;
+    const majors = Array.from({ length: MAJOR_COUNT }, (_, i) => `PROTAGONIST${i}`);
+    const minors = Array.from({ length: MINOR_COUNT }, (_, i) => `EXTRA${i}`);
+    let seed = 0;
+    const line = (n: number): string => {
+      const ws = Array.from({ length: n }, () => words[seed++ % words.length]);
+      return `${ws[0]![0]!.toUpperCase()}${ws[0]!.slice(1)} ${ws.slice(1).join(' ')}.`;
+    };
+    const majorBlocks: string[] = [];
+    for (const name of majors) for (let k = 0; k < 200; k++) majorBlocks.push(name);
+    const minorBlocks: string[] = [];
+    for (const name of minors) for (let k = 0; k < 2; k++) minorBlocks.push(name);
+    const allBlocks = [...majorBlocks, ...minorBlocks];
+    for (let i = allBlocks.length - 1; i > 0; i--) {
+      const j = (i * 2654435761) % (i + 1);
+      [allBlocks[i], allBlocks[j]] = [allBlocks[j]!, allBlocks[i]!];
+    }
+    let text = '', idx = 0;
+    const perScene = 30;
+    let scene = 0;
+    while (idx < allBlocks.length) {
+      text += `INT. LOCATION ${scene++} - DAY\n\nA moment passes before anyone speaks.\n\n`;
+      for (let k = 0; k < perScene && idx < allBlocks.length; k++, idx++) {
+        const name = allBlocks[idx]!;
+        const isMajor = name.startsWith('PROTAGONIST');
+        text += `${name}\n${line(isMajor ? 9 : 4)}\n\n`;
+      }
+    }
+    assertSameDecision('round-2 realistic 150-name skewed feature', text);
   });
 });
