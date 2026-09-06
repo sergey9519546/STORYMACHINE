@@ -1882,11 +1882,15 @@ first person that `npm run measure-real` was not run.
   a scoring-path change that moves 45 of 45 in-repo reports, so it owes a real
   corpus measurement, and that measurement is the owner's:
   `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, then
-  `npm run lock-auc24`, then re-lock `tests/fixtures/real-corpus-manifest.json`
-  in place, then supersede this entry with one carrying the measured number.
-  Until that entry exists this branch must not merge, and this heading says
-  PENDING OWNER MEASUREMENT so no reviewer can mistake this for the receipt
-  the change actually owes."
+  `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24` (the variable is
+  repeated because an inline assignment applies to one command only — a bare
+  `npm run lock-auc24` here refuses with `REAL_SCRIPT_CORPUS_DIR is not set`),
+  then re-lock `tests/fixtures/real-corpus-manifest.json` in place, then
+  rewrite this entry IN PLACE into a measured one — appending a measured entry
+  beside it does not clear the range; see the 2026-09-06 addendum below for the
+  exact edit. Until that rewrite happens this branch must not merge, and this
+  heading says PENDING OWNER MEASUREMENT so no reviewer can mistake this for
+  the receipt the change actually owes."
 
 #### 2026-09-06 addendum — rebased onto `main` at `2bfcbf9d`, gates re-run, still PENDING
 
@@ -1911,11 +1915,25 @@ PENDING OWNER MEASUREMENT.
 - **Output identity against the new baseline:** FAIL, as a scoring change
   must — 45 of 45 reports differ. Health moves on 45 of 45 (mean −9.95, RMS
   20.45, largest single move −38.9 on `off-season`, smallest 0.5); verdict
-  changes on 28 of 45; `sceneCount` is unchanged on all 45. The earlier
-  RMS figure in the entry above was 23.5 against `e40f4cf5`: the difference is
-  `main`'s own movement under this branch, principally the 2026-09-04
-  corpus-integrity correction that stopped scoring the fixtures' provenance
-  headers, not any change to this branch.
+  changes on 28 of 45; `sceneCount` is unchanged on all 45.
+- **The like-for-like comparison, and what 23.5 is NOT.** The entry above
+  reports no RMS: its identity result is range −39.9 to +24.2, mean −11.2,
+  45 of 45, 28 verdicts. The figure 23.5 belongs to a different computation in
+  a different document — the constant-sweep tie-break in
+  `docs/scoring/VERBOSITY_BIAS_FIX_2026-09-03.md`, whose stated population is
+  the 45 identity fixtures **plus the calibration corpus and the length
+  variants**. It is not the identity-harness RMS and was never comparable to
+  it. Running the identity harness on `0f625c27` against `e40f4cf5` — the same
+  harness, the same 45 fixtures — reproduces the entry's own numbers exactly
+  (45 of 45 moved, mean −11.24, max −39.9 on `mise` 72.9 → 33.0, 28 verdict
+  changes) and gives **RMS 22.16**. The real like-for-like shift is therefore
+  22.16 → 20.45 = **1.71 points**. Measured separately, `main`'s OWN movement
+  from `e40f4cf5` to `2bfcbf9d` over those same 45 fixtures is RMS **0.91**
+  (16 fixtures moved, every one of them a `data/screenplays/*` file, no verdict
+  change, max +3.1 — the signature of the 2026-09-04 provenance-header
+  correction). That accounts for part of the 1.71. The remainder is not
+  attributed here because it was not separately measured; asserting a cause
+  for it is what the earlier wording did wrong.
 - **Gates re-run on the rebased tree, each in the foreground, exit code read
   from its own log:** `npm run lint` 0 · `tests/core/verbosity-bias.test.ts`
   0 (4/4) · `tests/core/calibration.test.ts` 0 (21/21) ·
@@ -1932,6 +1950,31 @@ PENDING OWNER MEASUREMENT.
   heading, and refuses it as satisfying the range — which is the correct
   behaviour and the reason the heading says PENDING. It is not a rebase
   artifact and it must not be closed by editing this heading.
+- **What DOES close it, once the corpus run exists.** Not appending a measured
+  entry beside a pending one: `checkReceiptForRange`
+  (`scripts/check-scoring-receipt.mjs:650-673`) extracts EVERY entry the range
+  adds and validates each, and `ok` is `problems.length === 0`, so one
+  surviving pending entry fails the range no matter what sits next to it. The
+  gate's own remedy string at `:573-575` says to append a superseding measured
+  entry, which is wrong for this reason — a pre-existing defect on `main`, out
+  of scope here. Verified by running the gate's exported
+  `extractEntries`/`validateEntry` over the added receipt lines of
+  `main...HEAD`: a single-branch range gives 1 entry and 1 problem, then 2
+  entries and still 1 problem once a well-formed measured entry is appended,
+  then 1 entry and 0 problems once that entry is converted in place; the
+  stacked three-entry range gives 3 and 3, then 4 and 3, then 3 and 0.
+- **The conversion, per entry:** drop the pending marker from the `###`
+  heading, replace the `Measured AUC-24` value, replace `Corpus fingerprint:
+  none. No corpus was read.` with the real fingerprint, rewrite the Runner
+  attestation into the first person past tense, and remove every phrase in
+  `PENDING_PHRASES` (`:487-492`) from ANYWHERE in the entry body. Those four
+  phrases are deliberately NOT reproduced in this ledger: each space in their
+  patterns is compiled to `\s+`, which matches a newline, so a quoted copy of
+  the list inside an entry keeps that entry pending even after its heading is
+  fixed. That is measured, not predicted — a draft of this bullet quoted them
+  and held the converted stacked range at 1 problem instead of 0 until the
+  quotation came out. `docs/brain/Owner/Owner - R5 Measurement and Merge.md`
+  spells the four out, and the gate does not read that file.
 - **Blind matched pairs, in-repo fixtures, no private corpus:** this branch
   orders 3 of 6 (mean gap +1.50, 12 distinct health values, 0 of 12 scripts
   pinned) against `main @ 2bfcbf9d`'s 1 of 6 (mean gap −0.02, 9 of 12 pinned
@@ -1948,9 +1991,12 @@ PENDING OWNER MEASUREMENT.
   container and `REAL_SCRIPT_CORPUS_DIR` was left unset.** The owner's step is
   unchanged — check out `scoring/stacked-r5-plus-advice`, run
   `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, then
-  `npm run lock-auc24`, then re-lock
-  `tests/fixtures/real-corpus-manifest.json` — and until an entry carrying a
-  measured number exists, this branch must not merge."
+  `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24` (repeat the variable:
+  an inline assignment applies to one command only, and a bare
+  `npm run lock-auc24` refuses with `REAL_SCRIPT_CORPUS_DIR is not set`), then
+  re-lock `tests/fixtures/real-corpus-manifest.json` — and until this entry and
+  its addendum are rewritten in place as measured, this branch must not
+  merge."
 ---
 
 ### 2026-09-04 — advice-rule fixes (six measured detector defects) — **PENDING OWNER MEASUREMENT**
