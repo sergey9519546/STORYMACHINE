@@ -51,9 +51,16 @@ describe('routes/config — HTTP behavior', async () => {
     // version: package.json's version in this checkout (never empty/undefined).
     assert.equal(typeof body.version, 'string');
     assert.ok(body.version.length > 0, 'version must not be empty');
-    // commit: no GIT_SHA is set for this test run (no Docker build-arg
-    // plumbing in `npm test`), so build-info.ts's documented fallback applies.
-    assert.equal(body.commit, 'dev');
+    // commit: no GIT_SHA is set for this test run (`npm test` sets no
+    // Docker build-arg and, locally, no env override either) — but this
+    // process IS running from a git checkout, so build-info.ts's
+    // 2026-09-06 checkout fallback (`git rev-parse HEAD`, once, at module
+    // load) resolves a real 40-hex commit instead of the old unconditional
+    // 'dev'. 'dev' would only reappear for a checkout with no `.git` at all
+    // (a stripped Docker image, or GIT_SHA genuinely unresolvable) — see
+    // tests/core/build-info.test.ts for that fallback path exercised in
+    // isolation, and for the "never 'dev' from this checkout" assertion.
+    assert.match(body.commit, /^[0-9a-f]{40}$/, 'a report produced from this checkout must carry the real HEAD commit, not "dev"');
   });
 
   it('GET /api/ai-config returns 200 and never leaks a key value, only boolean flags', async () => {

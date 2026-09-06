@@ -1657,6 +1657,14 @@
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Exports.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
       "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
     },
@@ -1667,6 +1675,14 @@
     {
       "from": "docs/brain/Surfaces/Surface - Exports.md",
       "to": "docs/brain/Surfaces/Surface - Slate.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Exports.md",

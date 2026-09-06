@@ -73,7 +73,7 @@ const CORE_ALLOWLIST: Record<string, string> = {
   'server/engine/types.ts':
     'Shared narrative type vocabulary (StoryGenre, EmotionalArc, Belief) plus one ACTION_TYPES constant; declarations only — it reaches no engine runtime.',
   'server/lib/build-info.ts':
-    'commit (aliased engineCommit) — feeds ScriptDoctorReport.provenance.engineCommit; a build-time env read at module load, no imports, no I/O per call.',
+    'commit (aliased engineCommit) — feeds ScriptDoctorReport.provenance.engineCommit; a build-time env read at module load, falling back to one cached `git rev-parse HEAD` (no per-call I/O — computed once at module load, same as the env-read path it falls back from) when GIT_SHA is unset and a checkout is present.',
   'server/lib/genre-router.ts':
     'GENRE_RULE_MODIFIERS / TONE_REGISTERS / composeThresholds — genre- and tone-conditioned rule thresholds four revision passes read to pick a number.',
   'server/lib/llm-port.ts':

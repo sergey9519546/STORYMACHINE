@@ -128,8 +128,19 @@ jobs:
         # skipped on every CI run since it was written; first executed
         # 2026-08-03 (10/10, ~3s, three consecutive clean runs). No reason to
         # leave the one end-to-end check dark: enabled.
+        #
+        # GIT_SHA (P3, 2026-09-06): the same build-time identity env the
+        # Dockerfile bakes (ARG GIT_SHA -> ENV GIT_SHA), set explicitly here
+        # too rather than left to server/lib/build-info.ts's checkout
+        # fallback — a report generated during this step should carry the
+        # exact commit CI is testing, not "whatever `git rev-parse HEAD`
+        # happens to resolve to" on a runner whose checkout config could
+        # change independently of this line. github.sha is always the full
+        # 40-hex SHA CI is running (the PR merge commit on a pull_request
+        # event, the pushed commit on a push event).
         env:
           RUN_E2E: "1"
+          GIT_SHA: ${{ github.sha }}
         run: npm test
 
       # Required-receipt enforcement for the AUC-24 structural-degradation

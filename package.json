@@ -24,6 +24,7 @@
     "honesty-audit": "node scripts/honesty-audit.mjs",
     "discharge-obligations": "node scripts/discharge-obligations.mjs",
     "check-scoring-receipt": "node scripts/check-scoring-receipt.mjs",
+    "verify-report": "node --experimental-strip-types scripts/verify-report.mjs",
     "check-no-console": "node scripts/check-no-console.mjs",
     "fuzz-routes": "node scripts/fuzz-routes.mjs",
     "check-server-reachability": "node scripts/verify-server-reachability.mjs",

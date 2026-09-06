@@ -96,6 +96,46 @@ the IndexedDB draft mirror, and calls `POST /api/session/delete`.
 | `POST /api/session/delete` | Destroy the caller's own session — evict its `Stage` and unlink its SQLite files. Unrecoverable; backs the "delete everything" control in Settings → Session |
 | `GET /api/ledger/fountain` | Export action log as annotated Fountain screenplay |
 
+## Verifying a report
+
+Every exported Script Doctor coverage report (the HTML export, the coverage
+letter, or a raw report JSON) carries a full SHA-256 hash of the script text
+plus the numbers it claims (health, verdict, total issues and, when present,
+health percentile and engine identity). Anyone holding the original script
+text can independently re-run the deterministic engine and confirm those
+numbers weren't hand-edited — two ways:
+
+**On your own machine (recommended for an unpublished script):**
+
+```
+npm run verify-report -- report.html script.fountain
+```
+
+The script text never leaves your computer — this reads both files from
+local disk, re-runs the same keyless, deterministic engine in-process, and
+prints the result. No server, no network call. Works against any of the
+three export shapes:
+
+```
+npm run verify-report -- letter.md script.fountain
+npm run verify-report -- report.json script.fountain
+```
+
+It prints three verdicts and exits `0` only when the first two are both
+"yes":
+
+- `authentic: yes/no` — does the script's own hash match what the report claims?
+- `reproducible under this engine: yes/no` (per field) — does a fresh analysis of that exact text reproduce the report's numbers, within the same tolerance `/api/export/verify` uses?
+- `engine: report <sha> vs local <sha>` — an advisory comparison of which build of the engine produced each side (a mismatch here does not fail the run: reproducing a report's numbers is not the same claim as attesting which build produced the original — see the CLI's own header).
+
+**Hosted, via a running instance:** open `#verify` (the "Verify a report"
+link on the start screen) and paste the script text and the claimed values,
+or `POST` them directly to `/api/export/verify`. This is the same
+comparison (`server/lib/verify-compare.ts`, shared by the route and the
+CLI above) but requires sending the script text to whatever instance
+answers the request — prefer the offline command above for a draft you
+haven't published yet.
+
 ## Running Tests
 
 ```
@@ -203,6 +243,7 @@ local poking accumulates real `.db` files there over time.
 - `npm run generate-p0-sample` - Generate P0 validation sample coverage report
 - `npm run backup` - Backup session data
 - `npm run restore-session <sessionId> <snapshotFile>` - Restore one session from a snapshot (see "Restoring a snapshot" below)
+- `npm run verify-report -- <report> <script.fountain>` - Offline, no-network re-attestation of a coverage report against its original script text (see "Verifying a report" above)
 - `npm run honesty-audit` - Scan shipped surface for overclaim language (CI-enforced)
 - `npm run check-scoring-receipt` - Fail if a scoring-path file changed without a matching measurement receipt (CI-enforced)
 - `npm run measure-real` - Measure discrimination on the local real-script corpus (needs `REAL_SCRIPT_CORPUS_DIR`; not runnable in CI)

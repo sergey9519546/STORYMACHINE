@@ -1779,3 +1779,109 @@ is that reports over these fixtures were wrong and had to move.
   separate future change that would owe a real `npm run measure-real` run
   against the AUC-24 floor; the path is written down in §6 of
   `docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md`."
+
+### 2026-09-06 — P3 VERIFY-REPORT CLI: `server/lib/build-info.ts` gained a checkout `git rev-parse HEAD` fallback for `engineCommit` — no scoring measurement, because no score moved (output-identity receipt instead)
+
+- **What changed on the scoring path:** exactly one file, `server/lib/build-info.ts`
+  (already `CORE_ALLOWLIST`-justified in `tests/core/pure-core-boundary.test.ts`
+  as "commit (aliased engineCommit) — feeds `ScriptDoctorReport.provenance
+  .engineCommit`"). Before this range, `commit` was the build-time `GIT_SHA`
+  env var or, if unset, the literal string `'dev'` — correct inside the
+  Dockerfile's baked-ENV contract, but vacuous everywhere else (`npm run dev`,
+  `npm test`, a bare checkout): comparing `'dev'` to `'dev'` proves nothing
+  about which engine build produced a report, which is exactly the gap
+  ROADMAP §3 P3's `npm run verify-report` CLI needs closed to make its
+  `engine: report <sha> vs local <sha>` line meaningful. The fix is additive,
+  not formula/threshold/deduction/weight: when `GIT_SHA` is unset, `commit` now
+  falls back to a single cached `git rev-parse HEAD` (`readCommitFromCheckout`,
+  exported the same way `computeContentHash` is, for the same "spot-checkable
+  in isolation" reason) run once at module load against the checkout the
+  module physically lives in, returning `'dev'` for anything short of a clean
+  40-hex answer (no `.git`, no `git` binary, an unresolvable HEAD). `GIT_SHA`
+  still wins unconditionally when set — the Docker/CI baked-value contract is
+  untouched — so the ONLY observable change to `ScriptDoctorReport` is that
+  `provenance.engineCommit` reads a real 40-hex commit instead of `'dev'` when
+  no `GIT_SHA` is set and a `.git` is present. No other field of the report can
+  be touched by this: `readCommitFromCheckout` has no path back into
+  `health`/`verdict`/`sceneCount`/any deduction — it is a leaf function of
+  `(repoRoot)` that only ever feeds the one provenance string.
+- **Command:** `node --experimental-strip-types scripts/check-doctor-output-identity.mjs`
+  with `--ignore-keys provenance.engineCommit` — NOT `npm run measure-real`.
+  This range claims zero health/verdict/sceneCount movement; an
+  identity-modulo-one-key proof is the correct, stronger receipt for that
+  claim, same reasoning the 2026-08-21, 2026-09-03 LANE R6, and 2026-09-04
+  STRUCTURAL SIGNALS entries above give for their own output-identity
+  receipts. `provenance.engineCommit` specifically (not the whole `provenance`
+  object, unlike the 2026-09-03 LANE R6 entry) is ignored, because
+  `rulebookCount`/`groundTruthSource`/`percentileBasis`/
+  `structuralReliabilityNote` are untouched by this range and the compare
+  should catch it if any of them moved.
+- **Baseline used:** `git archive` at `c16f7e0c3147b09ec24fe2f61cbafa49f74bd34a`
+  (the `main` tip this lane branched from), extracted to a scratch directory
+  with `node_modules` symlinked in from the real checkout (no `.git` in the
+  extracted tree, so the OLD `build-info.ts` in that tree reports `'dev'`
+  exactly as it always has). The comparison tree was this branch's own working
+  tree at the time of measurement (`--tree .`), which DOES have a `.git`
+  (this is a worktree checkout), so the NEW `build-info.ts` resolves its own
+  real HEAD commit there — the exact contrast this range's fix is claimed to
+  produce.
+- **What was run — output identity, modulo the one key this range changes,
+  over all 45 in-repo fixtures** (20 `data/screenplays/*.fountain` live-action
+  fixtures, 20 calibration `REFERENCE_CORPUS` samples, the P0 sample script, 4
+  synthetic concatenations at 60/120/240/300 scenes):
+  `node --experimental-strip-types scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`
+  then `--tree . --out <after>` then
+  `node --experimental-strip-types scripts/check-doctor-output-identity.mjs --compare <before> <after> --ignore-keys provenance.engineCommit`.
+  Exit codes 0 / 0 / 0, captured by redirecting each run to a log file and
+  reading `$?`. Compare output, verbatim:
+  ```
+  Ignored keys (excluded from the identity check, over 45 compared reports):
+    "provenance.engineCommit": differs in 45/45 reports
+
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical modulo the ignored key(s) [provenance.engineCommit] (analyzedAt excluded).
+  ```
+  `provenance.engineCommit` genuinely differs in all 45/45 reports (`'dev'` on
+  the baseline tree, the real 40-hex local HEAD on this branch's tree) — the
+  ignore list isn't hiding a no-op key. A run with NO flags over the same two
+  snapshot directories was captured as a negative control: exit 1,
+  `OUTPUT IDENTITY: FAIL — 45 fixture(s) differ.`, with every one of the 45
+  reported diffs landing on the exact same single line
+  (`"engineCommit": "dev"` → `"engineCommit": "c16f7e0c3147b09ec24fe2f61cbafa49f74bd34a"`)
+  and nothing else — proving both that the flagged run above does real work
+  (it is not a comparison that trivially passes) and that the unflagged diff
+  is confined to precisely the one key this range's Command line claims to
+  change, not a superset of it.
+- **Second check — every OTHER field, spot-checked directly, not just implied
+  by the compare's silence.** A small script read `health`, `verdict`,
+  `sceneCount`, `totalIssues`, `grade`, `wordCount`, and `healthPercentile`
+  back out of all 45 before/after snapshot pairs and diffed them field by
+  field, independent of the harness's own stripped-JSON comparison: **0
+  mismatches across 45 fixtures × 7 fields (315 comparisons).**
+- **Flag-run AUCs:** none. No `measure-auc-split.mjs` or `measure-real` flag
+  run was performed against this range — this is a provenance-only,
+  non-scoring change and none is claimed.
+- **Corpus fingerprint:** not applicable — no real-corpus text was read; the
+  45 in-repo fixtures are the whole input, same as every prior output-identity
+  entry above. `tests/fixtures/real-corpus-manifest.json` is unchanged by this
+  range and no manifest re-lock was needed, because no produced script's
+  health, verdict, or scene count moved — that is what the identity PASS and
+  the independent field-by-field spot check above say.
+- **Runner attestation:** "I, the orchestrating Claude Code session
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), extracted the
+  baseline tree with `git archive` at `c16f7e0c3147b09ec24fe2f61cbafa49f74bd34a`
+  myself, symlinked `node_modules` in from the real checkout, and ran the
+  three harness commands above myself on 2026-09-06. I read the PASS line and
+  the per-key differ count directly out of the flagged compare run's own log
+  file along with its exit code (0), and separately ran the same compare with
+  no flags as a negative control and read its FAIL line, its per-fixture diff
+  output (confirming every one of the 45 diffs lands on the same single
+  `engineCommit` line and nothing else), and its exit code (1) from that run's
+  own log file. I separately wrote and ran the field-by-field spot check
+  described above and read its zero-mismatch result myself. This is an
+  identity-modulo-one-key receipt, not a discrimination-statistic measurement:
+  no real-corpus AUC measurement was run against this range, and none is
+  claimed — the change adds a cached, checkout-only fallback for one
+  provenance string that a deployed Docker image never reaches (it always
+  carries a baked `GIT_SHA`), and the byte-level identity of every other field
+  across all 45 reports, plus the field-by-field spot check, is the receipt it
+  owes."

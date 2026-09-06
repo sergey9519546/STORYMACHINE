@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-05
-sources: [server/lib/coverage-letter.ts, server/routes/coverage-letter.ts, tests/core/coverage-letter.test.ts]
+updated: 2026-09-06
+sources: [server/lib/coverage-letter.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, scripts/verify-report.mjs, tests/core/coverage-letter.test.ts]
 status: active
 ---
 
@@ -26,8 +26,24 @@ structural-signal aggregates, "descriptive only … no part of the score").
 export); covered by `tests/routes/export-coverage-letter.test.ts` and the
 fixture-based `tests/fixtures/coverage-letter/report1.expected.md`.
 
+**Verify line, offline-first (P3, 2026-09-06):** `verifyLine` (prose, since
+the letter is connected text rather than a labelled `<dl>`) now names the
+offline path first — `npm run verify-report -- letter.md script.fountain`,
+the script never leaves the verifier's machine — before the hosted
+`#verify`/`POST /api/export/verify` path (`docs/CLAIMS_REGISTER.md` row 74;
+all three committed `report*.expected.md` fixtures under
+`tests/fixtures/coverage-letter/` were updated to match, byte for byte).
+`hashLine` and `provenanceLine` are unchanged and, being identical strings
+in both the markdown and plain-text renderers, are what
+`scripts/verify-report.mjs` parses out of either a `.md` or a `.txt` export
+of this letter — see [[Surface - Coverage HTML]] for the shared
+`server/lib/verify-compare.ts` comparator both this route and the CLI call.
+
 ## Sources
 
 - `server/lib/coverage-letter.ts`
+- `server/lib/verify-compare.ts`
+- `scripts/verify-report.mjs`
 - `tests/core/coverage-letter.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 34-35, 39, 55, 56-57
+- `tests/scripts/verify-report.test.ts`
+- `docs/CLAIMS_REGISTER.md` rows 34-35, 39, 55, 56-57, 74-75

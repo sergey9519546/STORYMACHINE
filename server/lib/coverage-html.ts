@@ -550,9 +550,9 @@ function buildFooterSection(report: ScriptDoctorReport): string {
         deterministic analysis:
       </div>
       <ol class="verify-steps">
-        <li>Open any Story Machine instance and go to <code>#verify</code> (the &ldquo;Verify a report&rdquo; link on the start screen), or POST the script text to <code>/api/export/verify</code>.</li>
-        <li>Paste the original script text and the expected values below.</li>
-        <li>The service recomputes the hash and re-runs the analysis; every value must match.</li>
+        <li><strong>On your own machine</strong> (the script never leaves your computer): <code>npm run verify-report -- report.html script.fountain</code>.</li>
+        <li><strong>Or, hosted:</strong> open any Story Machine instance and go to <code>#verify</code> (the &ldquo;Verify a report&rdquo; link on the start screen), or POST the script text to <code>/api/export/verify</code> &mdash; paste the original script text and the values below.</li>
+        <li>Either way, the tool recomputes the hash and re-runs the analysis; every value must match.</li>
       </ol>
       <dl class="verify-claims">
         <div><dt>Script-text hash (SHA-256, full)</dt><dd><code>${escapeHtml(report.contentHash)}</code></dd></div>

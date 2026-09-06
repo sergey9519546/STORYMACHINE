@@ -35,6 +35,6 @@ It does not read for market fit, casting, or budget — those require a human re
 
 ---
 Script-text hash (SHA-256): 42f08fc26ba8a760b26ff903ceaa934ad6fcc7b6caa89c95ce9fab7902ffee42
-To verify this letter, run the identical script text through Story Machine’s Script Doctor again (the app’s #verify page, or POST /api/export/verify) and confirm the health, verdict, and hash above all match.
+To verify this letter, run the identical script text through Story Machine’s Script Doctor again: on your own machine with npm run verify-report -- letter.md script.fountain (the script never leaves your computer), or through a hosted instance (the app’s #verify page, or POST /api/export/verify). Confirm the health, verdict, and hash above all match.
 Engine commit: dev · Rulebook: 3,217 rule concepts.
 Generated August 21, 2026 at 02:38:59 AM UTC

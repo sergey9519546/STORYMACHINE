@@ -384,9 +384,10 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     ? `Script-text hash (SHA-256): ${report.contentHash}`
     : null;
   const verifyLine = report.contentHash
-    ? 'To verify this letter, run the identical script text through Story Machine’s Script Doctor '
-      + 'again (the app’s #verify page, or POST /api/export/verify) and confirm the health, verdict, '
-      + 'and hash above all match.'
+    ? 'To verify this letter, run the identical script text through Story Machine’s Script Doctor again: '
+      + 'on your own machine with npm run verify-report -- letter.md script.fountain (the script never '
+      + 'leaves your computer), or through a hosted instance (the app’s #verify page, or POST '
+      + '/api/export/verify). Confirm the health, verdict, and hash above all match.'
     : 'This report has no verification hash attached and cannot be independently re-verified.';
 
   // Same two provenance fields the exported coverage HTML's verify block

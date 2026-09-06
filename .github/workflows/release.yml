@@ -113,8 +113,11 @@ jobs:
       - name: Run tests (keyless — analysis-only posture)
         # Mirrors ci.yml: RUN_E2E gates tests/e2e/journeys.test.ts, the only
         # full-stack test. A release is the last place to skip it.
+        # GIT_SHA: mirrors ci.yml's — see that file's comment. A release
+        # build's own test run should attest the exact commit being tagged.
         env:
           RUN_E2E: "1"
+          GIT_SHA: ${{ github.sha }}
         run: npm test
 
       # Mirrors ci.yml's receipt gate, scoped to a release instead of a change.

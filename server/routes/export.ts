@@ -26,6 +26,7 @@ import { extractTitlePage, buildLogline, buildPitchContent } from '../lib/loglin
 import { buildSlateEntry, rankSlate, renderSlateHtml, type SlateEntry } from '../lib/slate.ts';
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
 import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
+import { checkContentHash, compareVerifyClaims } from '../lib/verify-compare.ts';
 
 const router = express.Router();
 export default router;
@@ -617,34 +618,13 @@ router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asy
 // hash mismatch and never pays for a 14-pass pipeline run. Only a matching
 // hash unlocks the (quick, deterministic) doctor re-run that the rest of
 // `expected`'s fields are checked against.
-const VERIFY_FLOAT_TOLERANCE = 0.05;
-// health/healthPercentile are displayed and typically re-typed/re-serialized
-// as one-decimal numbers (coverage-html.ts's `.toFixed(1)`, doctor.ts's
-// Math.round(x*10)/10 for health; healthPercentile is unrounded but derived
-// from the same one-decimal-rounded inputs upstream) — a caller quoting a
-// number back from a printed/exported report, or whose own JSON round-trip
-// reformatted a float, can legitimately differ from the freshly computed
-// value by less than one full unit in the last decimal place. 0.05 is half of
-// that one-decimal step: it accepts any difference explainable purely by
-// display/round-trip rounding while still catching a genuinely wrong number.
-
-interface VerifyMismatch { field: string; expected: unknown; actual: unknown }
-
-// #4: engineCommit/rulebookCount are the ONLY two `expected` fields that
-// describe the ENGINE rather than the script's content or score. A mismatch
-// confined to this set — the content hash matched, and every content/score
-// field that WAS checked also matched — means the report is authentic for
-// this script but was produced by a different build of the engine than is
-// running now: a soft, advisory outcome ("re-run to confirm under the
-// current engine"), never a sign of tampering. Any mismatch outside this set
-// is a hard failure regardless of what else does or doesn't match.
-const ENGINE_IDENTITY_FIELDS = new Set(['engineCommit', 'rulebookCount']);
-
-type MismatchKind = 'content_mismatch' | 'score_mismatch' | 'engine_mismatch' | null;
-
-const ENGINE_MISMATCH_MESSAGE =
-  'The engine has moved since this report was produced. The script content and score both still ' +
-  'check out — re-run this verification to confirm under the current engine.';
+//
+// The comparison itself — the tolerance, the field set, the engine-identity
+// soft-mismatch carve-out — lives in server/lib/verify-compare.ts, shared
+// with `npm run verify-report` (scripts/verify-report.mjs), the offline CLI
+// that lets a third party re-attest a report WITHOUT uploading the writer's
+// script to this or any server. See that module's header for why sharing it
+// matters (one implementation, not two that can quietly drift on tolerance).
 
 router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), asyncHandler(async (req, res) => {
   const { expected } = req.body as {
@@ -670,15 +650,9 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
     // or call runScriptDoctor on this path — `recomputed` below carries only
     // contentHash, and `checked` names only contentHash, which is the honest
     // signal that no report field was ever compared (see comment above).
-    if (actualContentHash !== expected.contentHash) {
-      res.json({
-        verified: false,
-        mismatchKind: 'content_mismatch' as MismatchKind,
-        checked: ['contentHash'],
-        mismatches: [{ field: 'contentHash', expected: expected.contentHash, actual: actualContentHash }] as VerifyMismatch[],
-        recomputed: { contentHash: actualContentHash },
-        verifiedAt,
-      });
+    const hashMismatch = checkContentHash(actualContentHash, expected);
+    if (hashMismatch) {
+      res.json({ ...hashMismatch, verifiedAt });
       return;
     }
 
@@ -704,100 +678,7 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
       return;
     }
 
-    const checked: string[] = ['contentHash'];
-    const mismatches: VerifyMismatch[] = [];
-
-    if (expected.health !== undefined) {
-      checked.push('health');
-      if (Math.abs(expected.health - report.health) > VERIFY_FLOAT_TOLERANCE) {
-        mismatches.push({ field: 'health', expected: expected.health, actual: report.health });
-      }
-    }
-    if (expected.verdict !== undefined) {
-      checked.push('verdict');
-      if (expected.verdict !== report.verdict) {
-        mismatches.push({ field: 'verdict', expected: expected.verdict, actual: report.verdict });
-      }
-    }
-    if (expected.totalIssues !== undefined) {
-      checked.push('totalIssues');
-      if (expected.totalIssues !== report.totalIssues) {
-        mismatches.push({ field: 'totalIssues', expected: expected.totalIssues, actual: report.totalIssues });
-      }
-    }
-    if (expected.healthPercentile !== undefined) {
-      checked.push('healthPercentile');
-      const actualPercentile = report.healthPercentile;
-      if (actualPercentile === undefined || Math.abs(expected.healthPercentile - actualPercentile) > VERIFY_FLOAT_TOLERANCE) {
-        mismatches.push({ field: 'healthPercentile', expected: expected.healthPercentile, actual: actualPercentile });
-      }
-    }
-    // #4: engineCommit/rulebookCount, checked the same way as every field
-    // above (exact string / exact int — no float tolerance needed), but kept
-    // out of `hardMismatches` below so a difference confined to these two
-    // fields reports as the soft engine_mismatch outcome, never as a content
-    // or score failure.
-    if (expected.engineCommit !== undefined) {
-      checked.push('engineCommit');
-      const actualEngineCommit = report.provenance?.engineCommit;
-      if (actualEngineCommit === undefined || expected.engineCommit !== actualEngineCommit) {
-        mismatches.push({ field: 'engineCommit', expected: expected.engineCommit, actual: actualEngineCommit });
-      }
-    }
-    if (expected.rulebookCount !== undefined) {
-      checked.push('rulebookCount');
-      const actualRulebookCount = report.provenance?.rulebookCount;
-      if (actualRulebookCount === undefined || expected.rulebookCount !== actualRulebookCount) {
-        mismatches.push({ field: 'rulebookCount', expected: expected.rulebookCount, actual: actualRulebookCount });
-      }
-    }
-
-    const hardMismatches = mismatches.filter((m) => !ENGINE_IDENTITY_FIELDS.has(m.field));
-    const engineMismatches = mismatches.filter((m) => ENGINE_IDENTITY_FIELDS.has(m.field));
-    const mismatchKind: MismatchKind = hardMismatches.length > 0
-      ? 'score_mismatch'
-      : engineMismatches.length > 0
-        ? 'engine_mismatch'
-        : null;
-
-    res.json({
-      // `verified` reflects content/score correctness ONLY — an engine-only
-      // mismatch does not flip it false, because the report IS authentic for
-      // this script and this score; `mismatchKind`/`mismatches` still
-      // surface the engine difference for a caller that cares.
-      verified: hardMismatches.length === 0,
-      mismatchKind,
-      ...(mismatchKind === 'engine_mismatch' ? { message: ENGINE_MISMATCH_MESSAGE } : {}),
-      checked,
-      mismatches,
-      recomputed: {
-        contentHash: actualContentHash,
-        health: report.health,
-        verdict: report.verdict,
-        totalIssues: report.totalIssues,
-        healthPercentile: report.healthPercentile,
-        engineCommit: report.provenance?.engineCommit,
-        rulebookCount: report.provenance?.rulebookCount,
-        // 2026-09-04 (honesty-audit matrix fix) — the same two document
-        // aggregates ScriptDoctorPanel.tsx's "Shape & Rhythm" section and
-        // both coverage exports already show, recomputed here for parity
-        // with every other surface. PURELY INFORMATIONAL: there is no
-        // `expected.structuralSignals` field on VerifyBodySchema, so this
-        // block can never be `checked` and can never produce a mismatch or
-        // move `verified` — see tests/routes/export-verify.test.ts's
-        // "an edited structuralSignals aggregate does not affect verified"
-        // for the assertion that proves it. Omitted entirely when the report
-        // carries no scored structuralSignals block, matching every other
-        // optional field's presence-gated render on this route.
-        ...(report.structuralSignals?.scored ? {
-          structuralSignals: {
-            meanAbsDialogueShareDelta: report.structuralSignals.meanAbsDialogueShareDelta,
-            actionSentenceCvOverall: report.structuralSignals.actionSentenceCvOverall,
-          },
-        } : {}),
-      },
-      verifiedAt,
-    });
+    res.json({ ...compareVerifyClaims(report, expected), verifiedAt });
   } catch (err) {
     logger.error('export_verify_error', { message: (err as Error).message });
     res.status(500).json({ error: 'Verification failed' });

@@ -180,6 +180,12 @@ export default function VerifyReport() {
             re-runs the deterministic analysis and every value must match, proving
             the report wasn&rsquo;t hand-edited.
           </p>
+          <p className="max-w-[62ch] text-[13px] leading-relaxed text-ink/60">
+            Would rather not paste an unpublished script into this page? Verify it
+            offline instead, on your own machine, with the same check this page
+            runs: <code className="font-mono">npm run verify-report -- report.html script.fountain</code>
+            . The script text never leaves your computer.
+          </p>
         </header>
 
         <section aria-labelledby="verify-script-heading" className="sm-panel">
