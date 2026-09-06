@@ -151,6 +151,12 @@
       "path": "docs/brain/Glossary.md"
     },
     {
+      "id": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md",
+      "type": "measurement",
+      "title": "Measurement — ADVICE_RULE_FIXES_2026-09-04",
+      "path": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md"
+    },
+    {
       "id": "docs/brain/Measurements/Measurement - ARC_RECALIBRATION_WAVE_2026-07-11.md",
       "type": "measurement",
       "title": "Measurement — ARC_RECALIBRATION_WAVE_2026-07-11",
@@ -837,6 +843,30 @@
       "to": "docs/brain/Gates/Gate - LLM Provider Smoke Test.md"
     },
     {
+      "from": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md",
+      "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
       "from": "docs/brain/Measurements/Measurement - BLIND_PAIRS_2026-09-04.md",
       "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
     },
@@ -1107,6 +1137,10 @@
     {
       "from": "docs/brain/Measurements Index.md",
       "to": "docs/brain/Measurements/Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - ADVICE_RULE_FIXES_2026-09-04.md"
     },
     {
       "from": "docs/brain/Measurements Index.md",
