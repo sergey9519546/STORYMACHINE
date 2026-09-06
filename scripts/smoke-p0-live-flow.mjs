@@ -64,7 +64,18 @@ const EXPECT = { verdict: 'CONSIDER', health: 78, minScenes: 12 };
 // gate rather than passing unnoticed.
 const SAMPLE_NOT_RANKED = 'The sample is not ranked against your drafts';
 
+// Step 3e (Decision #7, 2026-09-06): the stable half of the one registered
+// sentence a writer meets when the Script Doctor's per-analysis wall-clock
+// budget stops a run (docs/CLAIMS_REGISTER.md row 72,
+// server/lib/doctor-budget.ts's doctorAnalysisBudgetSentence). The
+// parenthesised budget itself is deliberately NOT matched here — this step
+// stubs the budget to 1 ms, so the deployment default (30s) would not appear;
+// the wording either side of it is what the writer actually reads and what a
+// copy edit must not silently drop.
+const BUDGET_SENTENCE = "took longer to analyze than this server's per-analysis budget";
+
 let serverProc = null;
+let budgetServerProc = null;
 let browser = null;
 const genuineErrors = [];
 
@@ -270,6 +281,71 @@ async function main() {
   console.log(`[smoke] after a failed run, "Open full report" toggle: title=${JSON.stringify(errorToggleTitle)}.`);
   await errorContext.close();
 
+  // 3e. Decision #7 (2026-09-06): the Script Doctor's per-analysis
+  // wall-clock budget. A SECOND keyless server is booted with
+  // DOCTOR_ANALYSIS_BUDGET_MS=1, which makes every analysis cross the budget
+  // — the same branch a genuinely ~14 s draft would take on a 30 s
+  // deployment, reached in milliseconds instead of by shipping a
+  // 14-second fixture into a CI gate. A second server, not a route stub,
+  // because the thing under test is the SERVER's behaviour: the pool
+  // terminating the worker, the route framing the error, and the panel
+  // rendering it — a stubbed response would prove only the last of those.
+  //
+  // Two assertions, and the second is the one that makes this a live check
+  // rather than a string match: the writer must (a) read the honest,
+  // registered sentence instead of a bare "Coverage failed", and (b) still
+  // be able to get a report afterwards — the panel is not wedged, and the
+  // tool works again the moment it is pointed at a server with the shipped
+  // budget.
+  const budgetPort = await pickFreePort();
+  const budgetBase = `http://127.0.0.1:${budgetPort}`;
+  budgetServerProc = await bootKeylessServer({
+    repo: REPO,
+    port: budgetPort,
+    baseUrl: budgetBase,
+    logPrefix: 'smoke-budget',
+    extraEnv: { DOCTOR_ANALYSIS_BUDGET_MS: '1' },
+  });
+  const budgetContext = await browser.newContext();
+  const budgetPage = await budgetContext.newPage();
+  // This page's own sink: a deliberately stopped analysis is an injected
+  // failure, not a genuine app-code error — the same separation step 3d
+  // above makes for its injected 500.
+  const budgetPageErrors = [];
+  wireConsoleCapture(budgetPage, budgetPageErrors);
+  await budgetPage.goto(budgetBase, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await budgetPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
+  await budgetPage.getByText(/coverage failed/i).first().waitFor({ timeout: timing.ms(20000) });
+  const budgetPanelText = (await budgetPage.textContent('body')) ?? '';
+  if (!budgetPanelText.includes(BUDGET_SENTENCE)) {
+    throw new Error(
+      'per-analysis budget regression: a run stopped by the budget did not render the registered sentence '
+      + `("${BUDGET_SENTENCE}") — the writer sees only a bare failure. Panel text around the failure: `
+      + JSON.stringify(budgetPanelText.slice(Math.max(0, budgetPanelText.search(/coverage failed/i) - 40), 400)),
+    );
+  }
+  const budgetRetry = budgetPage.getByRole('button', { name: /^retry$/i }).first();
+  if ((await budgetRetry.count()) === 0 || (await budgetRetry.isDisabled())) {
+    throw new Error('per-analysis budget regression: the panel offers no enabled Retry after a stopped run');
+  }
+  console.log(
+    `[smoke] budget-stopped run renders the registered sentence, with an enabled Retry `
+    + `(${budgetPageErrors.length} console error(s) on this page, expected for an injected failure).`,
+  );
+
+  // Recovery: the same browser, pointed at the server with the shipped
+  // budget, still produces a real report.
+  await budgetPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await budgetPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
+  const recoveredBody = await waitForRenderedText(budgetPage, EXPECT.verdict, { timeoutMs: 30000 });
+  if (!recoveredBody.includes(EXPECT.verdict)) {
+    throw new Error(`per-analysis budget regression: no report after recovering from a stopped run (expected verdict "${EXPECT.verdict}")`);
+  }
+  console.log('[smoke] recovered after a budget-stopped run: report rendered against the shipped budget.');
+  await budgetContext.close();
+  await shutdown({ serverProc: budgetServerProc, graceMs: 500 });
+  budgetServerProc = null;
+
   // 4. The golden path continues into the full report — the door 100% of
   // first-time writers use. Everything below is asserted on THAT panel.
   const fullReport = page.getByRole('button', { name: 'Full report', exact: true }).first();
@@ -371,7 +447,11 @@ function gitSha() {
   });
 }
 
-const teardown = () => shutdown({ browser, serverProc, graceMs: 800 });
+const teardown = async () => {
+  await shutdown({ browser, serverProc, graceMs: 800 });
+  // Step 3e's second server, if a failure landed before it was shut down.
+  if (budgetServerProc) await shutdown({ serverProc: budgetServerProc, graceMs: 500 });
+};
 
 try {
   await main();

@@ -4,6 +4,11 @@ import path from 'path';
 import { logger } from './lib/logger.ts';
 import { requestLogger } from './lib/request-logger.ts';
 import { ValidationError, SessionBusyError, SessionCapacityError, gameLimiter } from './lib/session-store.ts';
+// A dependency-free leaf (server/lib/doctor-budget.ts imports nothing), so
+// recognizing a budget-exceeded analysis here costs this file none of the
+// analyzer's module graph — the same reason every doctor-adjacent import in
+// the route files is dynamic.
+import { isDoctorAnalysisBudgetExceeded } from './lib/doctor-budget.ts';
 import configRouter      from './routes/config.ts';
 import gameRouter        from './routes/game.ts';
 import scriptideRouter   from './routes/scriptide.ts';
@@ -361,6 +366,27 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
     // client — not this server — got wrong.
     if (('status' in err && (err as { status?: unknown }).status === 413) || (err as { type?: unknown }).type === 'entity.too.large') {
       res.status(413).json({ error: 'Request body too large' });
+      return;
+    }
+    // Decision #7 (2026-09-06): one analysis crossed the Script Doctor's
+    // per-analysis wall-clock budget and the worker running it was
+    // terminated (server/nvm/analyze/doctor-pool.ts). This branch sits
+    // ABOVE the generic 4xx passthrough below on purpose: that branch
+    // answers `{ error: 'Malformed request' }`, which would replace the one
+    // registered, writer-facing sentence this state has
+    // (docs/CLAIMS_REGISTER.md row 72) with copy that is not true — the
+    // request was well-formed, it was the analysis that did not finish.
+    // Status and body shape match the Fountain shape guard's own
+    // analysis-cost 4xx (`{ error }` at 400) — see the class's own comment
+    // for why a 5xx was rejected. Logged at `warn`, not `unhandled_error`:
+    // a bound doing its job is not a fault.
+    if (isDoctorAnalysisBudgetExceeded(err)) {
+      logger.warn('doctor_analysis_budget_rejected', {
+        budgetMs: err.budgetMs,
+        method: req.method,
+        path: req.path,
+      });
+      res.status(err.status).json({ error: err.message });
       return;
     }
     // C3 (2026-09-05 review, LOW). Express's OWN router throws a plain

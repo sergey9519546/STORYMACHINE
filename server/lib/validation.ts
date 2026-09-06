@@ -1570,15 +1570,47 @@ export function legacyVoiceEligibleWeightRejectionReason(text: string): string |
 // whose parsed `blocks` are discarded once it returns, and
 // server/nvm/analyze/fountain-analyzer.ts's analyzeFountainText calls the
 // IDENTICAL `parseFountain(normalizeScreenplay(fountain))` again,
-// independently, moments later during the real analysis. Threading this
-// function's own `blocks` out of validation.ts and into the route so the
-// second call can reuse them is a real, available option — noted here as a
-// DEFERRED one (it needs a small refactor to the request-handling path this
-// fix's scope did not include), not an oversight. 107-140ms is still under
-// 1% of the multi-second cost of the analysis passes that follow it, and a
-// rejected payload never reaches this parse at all (the cheap bounds still
-// answer in 28-45ms with no parse) — the double-parse is a real, measured
-// cost, just not one large enough on its own to justify the refactor today.
+// independently, moments later during the real analysis. 107-140ms is still
+// under 1% of the multi-second cost of the analysis passes that follow it,
+// and a rejected payload never reaches this parse at all (the cheap bounds
+// still answer in 28-45ms with no parse).
+//
+// 2026-09-06 FOLLOW-UP — the reuse this comment used to call "a real,
+// available option ... DEFERRED" was investigated and is NOT one. Two
+// independent seams block it, and the second means it would not even pay:
+//
+//   SEAM 1 — the second parse is inside
+//   `analyzeFountainText(fountain: string)`
+//   (server/nvm/analyze/fountain-analyzer.ts:2333), reached from
+//   `runScriptDoctor` (server/nvm/analyze/doctor.ts). BOTH files are
+//   tier-1 ALWAYS-SCORING in scripts/check-scoring-receipt.mjs — matched by
+//   exact path, with no import-graph analysis involved. There is no way to
+//   hand either of them pre-parsed blocks without changing its signature,
+//   so any form of this reuse — a request-scoped memo the analyzer
+//   consults, a transform that attaches blocks to the validated body,
+//   anything — requires a scoring-path edit and therefore a measurement
+//   receipt for a change that moves no number.
+//
+//   SEAM 2 — and this is the one that settles it: the analysis does not run
+//   in this realm. Routes call `runScriptDoctorOffThread`
+//   (server/nvm/analyze/doctor-pool.ts), which posts the FOUNTAIN STRING to
+//   a worker thread; the worker parses it there
+//   (server/nvm/analyze/doctor-worker.ts). A main-thread memo is invisible
+//   to that realm, so the blocks would have to be structured-cloned across
+//   postMessage. Measured on this same 860,417-char ACCEPTED payload, same
+//   box, same hour, 3 runs each: guard total 68.6-75.3ms;
+//   `normalizeScreenplay` + `parseFountain` alone 26.3-28.5ms;
+//   `structuredClone(blocks)` — the lower bound on what postMessage would
+//   cost — 21.6-26.1ms for 27,393 blocks (2.65 MB serialized). The
+//   transport is 80-95% of the parse it would replace, so the whole
+//   refactor buys single-digit milliseconds out of a ~70ms guard on a
+//   multi-second analysis, while adding megabytes of per-request clone
+//   traffic and a scoring-path edit.
+//
+// Probe: this lane's measure-guard.mjs (payload builder + the three timings
+// above). Do not re-propose the reuse without re-running it; if the doctor
+// ever stops running off-thread, only SEAM 1 remains and the arithmetic
+// changes.
 /** Mirrors voice-delta.ts's own `tokenize()` exactly
  *  (`text.toLowerCase().match(/[a-z']+/g)`, filtering to tokens containing
  *  at least one letter) — replicated rather than imported (voice-delta.ts's
@@ -1675,8 +1707,11 @@ function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences
     // note): ~50ms of this call's own ~107-140ms total at the 860,417-char
     // ceiling, paid AGAIN moments later by fountain-analyzer.ts's
     // analyzeFountainText on an accepted request (this function's `blocks`
-    // are discarded once this zod refinement returns) — a real, deferred
-    // reuse opportunity, not an unnoticed cost.
+    // are discarded once this zod refinement returns). Reusing them in the
+    // analyzer was investigated on 2026-09-06 and ruled out with numbers —
+    // see the "2026-09-06 FOLLOW-UP" block in this section's header for the
+    // two seams (a tier-1 scoring-path signature change, and a
+    // worker-realm transport that costs 80-95% of the parse it replaces).
     blocks = parseFountain(normalizeScreenplay(text));
   } catch {
     if (cueLineOccurrences > FAIL_CLOSED_CUE_OCCURRENCE_THRESHOLD) {

@@ -49,6 +49,14 @@
 //      down; the fallback is what makes that guarantee, and
 //      DOCTOR_WORKER_POOL=off exercises the same path by hand.
 //
+//   5. A BOUNDED WALL CLOCK (Decision #7, 2026-09-06). One analysis may not
+//      occupy a worker indefinitely. The budget, its default (30 s) and the
+//      derivation of that number live in server/lib/doctor-budget.ts; the
+//      enforcement lives here, and it reuses property 2's primitive rather
+//      than inventing a second kind of cancellation. Like Cancel, it applies
+//      to the WORKER path only — see armAnalysisBudget()'s comment for why
+//      the in-process fallback deliberately has no budget.
+//
 // Deep read (opts.deepRead) deliberately does NOT go through the pool: it
 // fans out LLM calls whose budget/abort machinery (withAiBudget's
 // AsyncLocalStorage scope in routes/scriptide.ts) is main-thread state, and
@@ -59,6 +67,7 @@
 import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import { logger } from '../../lib/logger.ts';
+import { DoctorAnalysisBudgetExceededError, doctorAnalysisBudgetMs } from '../../lib/doctor-budget.ts';
 import type { StoryContext } from '../revision/passes/types.ts';
 import type { ScriptDoctorReport, DoctorProgressEvent } from './types.ts';
 import type { DoctorWorkerRequest, DoctorWorkerResponse } from './doctor-worker.ts';
@@ -95,6 +104,15 @@ interface PendingJob {
   onProgress?: (event: DoctorProgressEvent) => void;
   resolve: (report: ScriptDoctorReport) => void;
   reject: (err: unknown) => void;
+  /** Per-analysis wall-clock budget timer (Decision #7, 2026-09-06 — see
+   *  server/lib/doctor-budget.ts for the number and its derivation). Armed
+   *  when the job is SUBMITTED, not when it is dispatched: the writer's wait
+   *  includes the time this job spends queued behind another, and the
+   *  reviewer who asked for this named it a pool-sizing question precisely
+   *  because queueing is the other half of it. Absent when the budget is
+   *  switched off, and never armed on the in-process path — see
+   *  armAnalysisBudget below. */
+  budgetTimer?: NodeJS.Timeout;
 }
 
 interface WorkerSlot {
@@ -127,6 +145,72 @@ class DoctorAbortError extends Error {
 
 function abortReasonToError(signal: AbortSignal): unknown {
   return signal.reason instanceof Error ? signal.reason : new DoctorAbortError();
+}
+
+// ── Per-analysis wall-clock budget (Decision #7, 2026-09-06) ────────────────
+// server/lib/doctor-budget.ts owns the number, the sentence and the error
+// type (and the full derivation); this block owns the ENFORCEMENT, which is
+// deliberately the same primitive property 2 of this file's header already
+// describes for Cancel: terminate the worker. A cooperative flag is not an
+// option — runScriptDoctor is a synchronous CPU loop with no await point at
+// which one could be observed — so anything short of terminating would stop
+// the WAIT without stopping the WORK, which is the failure this exists to
+// prevent, not a milder version of it.
+
+/** Arm the budget for one submitted job. No-op when the budget is switched
+ *  off (`DOCTOR_ANALYSIS_BUDGET_MS=0`/`off`), and never called on the
+ *  in-process path (deep read, `DOCTOR_WORKER_POOL=off`, or a host that
+ *  cannot spawn a worker): there is no thread to terminate there, exactly as
+ *  there is nothing for Cancel to terminate there, and rejecting a caller
+ *  while the main thread keeps running the analysis to completion would be a
+ *  lie the pool can afford even less than the wait. */
+function armAnalysisBudget(job: PendingJob): void {
+  const budgetMs = doctorAnalysisBudgetMs();
+  if (budgetMs <= 0) return;
+  // Deliberately NOT `.unref()`'d — same reasoning warmDoctorPool()'s
+  // deadline timer documents below: this timer backs a guarantee a caller is
+  // already awaiting, and an unref'd timer can lose the race against an
+  // event loop draining and never fire at all. It cannot hold a process open
+  // beyond the job it bounds, because clearAnalysisBudget() runs on EVERY
+  // settlement path (the job's own resolve/reject are wrapped in
+  // runScriptDoctorOffThread below).
+  job.budgetTimer = setTimeout(() => onAnalysisBudgetExceeded(job, budgetMs), budgetMs);
+}
+
+function clearAnalysisBudget(job: PendingJob): void {
+  if (job.budgetTimer) {
+    clearTimeout(job.budgetTimer);
+    job.budgetTimer = undefined;
+  }
+}
+
+/** The budget fired. Two states are possible and both are handled, because a
+ *  job that is still QUEUED has also been costing the writer wall clock:
+ *  drop it from the queue, or terminate the worker running it exactly the way
+ *  dispatch()'s onAbort does. */
+function onAnalysisBudgetExceeded(job: PendingJob, budgetMs: number): void {
+  const queuedAt = queue.indexOf(job);
+  if (queuedAt >= 0) {
+    queue.splice(queuedAt, 1);
+    logger.warn('doctor_analysis_budget_exceeded', { budgetMs, state: 'queued' });
+    job.reject(new DoctorAnalysisBudgetExceededError(budgetMs));
+    return;
+  }
+  const slot = slots.find(s => s.active?.job === job);
+  const active = slot?.active;
+  // Already settled (result, error, abort or shutdown won the race) — the
+  // timer will have been cleared, but a timer that had already fired into
+  // this task cannot be un-fired, so answer nothing rather than rejecting a
+  // promise someone has already resolved.
+  if (!slot || !active) return;
+  if (active.onAbort && job.signal) job.signal.removeEventListener('abort', active.onAbort);
+  slot.active = undefined;
+  setBusy(slot, false);
+  dropSlot(slot);
+  void slot.worker.terminate();
+  logger.warn('doctor_analysis_budget_exceeded', { budgetMs, state: 'running' });
+  job.reject(new DoctorAnalysisBudgetExceededError(budgetMs));
+  pump();
 }
 
 function clearIdleTimer(slot: WorkerSlot): void {
@@ -256,6 +340,13 @@ function spawnSlot(): WorkerSlot | undefined {
       if (active) {
         slot.active = undefined;
         setBusy(slot, false);
+        // Disarm the budget before retrying in-process: from here on there is
+        // no worker to terminate, so a budget that fired would reject the
+        // caller while the main thread kept running the analysis to
+        // completion — the "stopped the wait, not the work" outcome this
+        // mechanism exists to avoid. Same carve-out, same reason, as the
+        // in-process path armAnalysisBudget() never arms at all.
+        clearAnalysisBudget(active.job);
         runInProcess(active.job.request, active.job.onProgress).then(active.job.resolve, active.job.reject);
       }
     } else if (active) {
@@ -319,6 +410,10 @@ function pump(): void {
   while (queue.length > 0) {
     if (poolDisabled) {
       const job = queue.shift()!;
+      // Same carve-out as the worker-error fallback below: nothing to
+      // terminate on the main thread, so the budget is disarmed rather than
+      // left to reject a caller whose analysis is still running.
+      clearAnalysisBudget(job);
       runInProcess(job.request, job.onProgress).then(job.resolve, job.reject);
       continue;
     }
@@ -376,7 +471,18 @@ export async function runScriptDoctorOffThread(
   }
 
   const report = await new Promise<ScriptDoctorReport>((resolve, reject) => {
-    queue.push({ request, signal, onProgress, resolve, reject });
+    // The job's own settlement clears its budget timer, so every path that
+    // ends this analysis — result, worker error, worker exit, abort, pool
+    // shutdown, or the budget itself — disarms it exactly once.
+    const job: PendingJob = {
+      request,
+      signal,
+      onProgress,
+      resolve: (settled) => { clearAnalysisBudget(job); resolve(settled); },
+      reject: (err) => { clearAnalysisBudget(job); reject(err); },
+    };
+    armAnalysisBudget(job);
+    queue.push(job);
     pump();
   });
 
@@ -434,8 +540,15 @@ export function purgeDoctorWorkers(): number {
 
 /** Introspection for tests: whether the pool is actually carrying work, or
  *  has fallen back to in-process execution. */
-export function doctorPoolStatus(): { enabled: boolean; disabled: boolean; workers: number; queued: number } {
-  return { enabled: poolEnabled(), disabled: poolDisabled, workers: slots.length, queued: queue.length };
+export function doctorPoolStatus(): { enabled: boolean; disabled: boolean; workers: number; queued: number; analysisBudgetMs: number } {
+  return {
+    enabled: poolEnabled(),
+    disabled: poolDisabled,
+    workers: slots.length,
+    queued: queue.length,
+    // Decision #7: 0 means the operator switched the per-analysis budget off.
+    analysisBudgetMs: doctorAnalysisBudgetMs(),
+  };
 }
 
 /**

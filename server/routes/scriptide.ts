@@ -21,6 +21,7 @@ import {
   CharactersExportBodySchema, CharactersImportBodySchema,
   rejectPathologicalConvertedFountain, fountainShapeRejectionReason,
 } from '../lib/validation.ts';
+import { isDoctorAnalysisBudgetExceeded } from '../lib/doctor-budget.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues, sceneLineSpans } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
@@ -743,6 +744,19 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
       // first place) — nothing left to tell it. emitSSE's own `signal.aborted`
       // guard already makes this a no-op, but skip the logger.error call too:
       // a cancelled analysis is expected traffic, not a fault to log as one.
+    } else if (isDoctorAnalysisBudgetExceeded(err)) {
+      // Decision #7 (2026-09-06): the per-analysis wall-clock budget fired
+      // and doctor-pool.ts terminated the worker. The JSON routes get this
+      // as a 400 from server/app.ts's global error handler; this route has
+      // already flushed SSE headers, so it cannot send a status — it sends
+      // the SAME registered sentence (docs/CLAIMS_REGISTER.md row 72) in the
+      // `doctor_error` frame the client already renders verbatim
+      // (src/lib/doctor-stream.ts throws `new Error(serverError)`, and
+      // ScriptDoctorPanel's error state prints it beside a Retry). Logged at
+      // `warn` with the same event name the pool uses, never `sse-error`: a
+      // bound doing its job is not a fault.
+      logger.warn('doctor_analysis_budget_rejected', { route: 'scriptide-doctor-stream', budgetMs: err.budgetMs });
+      emitSSE({ type: 'doctor_error', error: err.message });
     } else {
       logger.error('sse-error', { route: 'scriptide-doctor-stream', detail: (err as Error).message });
       emitSSE({ type: 'doctor_error', error: 'internal_error' });

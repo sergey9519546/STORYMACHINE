@@ -488,6 +488,155 @@ retroactively addressed under a new license. `LICENSE` and `package.json`'s
 
 ---
 
+## Decision #7: Bound One Analysis by Wall Clock, Not by Shape (2026-09-06)
+
+**Context**: Eight review rounds against `server/lib/validation.ts`'s Fountain
+shape guard (`docs/audits/2026-09-06-mistake-search/serverfix2-review.md`)
+closed every payload family where the guard's model of the analyzer disagreed
+with the analyzer itself — the series began at an accepted `POST
+/api/scriptide/doctor` that ran for **343,598 ms** and ended with the last
+four rounds' bypasses at 42–51 s each. What round 7 left behind (§7.7) is a
+different animal: a document where the guard and the analyzer **agree**. A
+draft sitting at the analyzer's own 400-scene ceiling with a large cast and
+one short-spoken character makes `analyzeVoices` correctly abstain, and the
+other thirteen passes then do ordinary, correct work for **~12–14 s** (the
+reviewer measured 12,340 ms and 13,566 ms on a box at load 1.9–3.0; this
+lane re-measured the most expensive corner of the accepted envelope — 800
+distinct cues × 15 occurrences, 632,427 chars, 389 scenes — at **13,765 ms**).
+The reviewer's own words: *"Bounding it would mean rejecting documents at the
+ceiling the analyzer itself advertises, which is a request-timeout/pool
+question, not a validation-guard one."* It was recorded for the orchestrator
+to rule on. This entry is that ruling.
+
+**The Question**: Should the ~12–14 s accepted worst case be pushed back into
+the shape guard (rejecting large-but-legitimate drafts before analysis), left
+unbounded, or bounded where it actually lives — in the worker pool that
+executes the analysis?
+
+**Options Considered**:
+
+1. **Tighten the shape guard until nothing over ~10 s is accepted.** The
+   literal reading of the standing "any accepted `/doctor` over 10 s" review
+   criterion. Rejected: the only lever the guard has is document shape, and
+   the documents in question are shaped like real screenplays at the ceiling
+   the analyzer itself advertises (400 scenes). Every threshold tight enough
+   to catch them also rejects a legitimate large ensemble feature, and the
+   guard would be answering a cost question with a formatting verdict — the
+   error message would have to say something untrue about the draft.
+2. **Leave it unbounded.** ~14 s is survivable and the pool already keeps it
+   off the main thread. Rejected: "the current worst case is acceptable" is
+   not a bound. It is exactly the state the 2026-08-14 audit found (a
+   ~350-scene script holding the server for 22+ minutes), and the property
+   that made that possible — no analysis has a ceiling — is untouched by any
+   amount of guard work. The next slow pass, a wedged worker, or the next
+   shape nobody has found yet reopens it silently.
+3. **Bound the wall clock of one analysis in the worker pool** (chosen).
+
+**Decision**: **Adopt a configurable per-analysis wall-clock budget**,
+`DOCTOR_ANALYSIS_BUDGET_MS`, defaulting to **30,000 ms**, enforced in
+`server/nvm/analyze/doctor-pool.ts` using the same primitive Cancel already
+uses (terminate the worker). Crossing it stops the analysis, and the writer
+is told so in one registered sentence.
+
+**How the default was derived** (stated so it can be re-derived, not
+re-guessed):
+
+- Accepted worst case measured on this lane's box: **13,765 ms**; the round-7
+  reviewer measured the same family at 12,340–13,566 ms and called its own
+  absolute numbers "~10–20% pessimistic" under load. Call the accepted
+  ceiling **~14 s**.
+- **2× headroom** over that ceiling = ~28 s, rounded to **30 s**. The headroom
+  is the whole point: the same draft that finishes in 14 s on an idle box can
+  take materially longer on a contended one, and a wall-clock bound that
+  fires on legitimate work is worse than no bound at all.
+- 30,000 is also `DOCTOR_POOL_PREWARM_TIMEOUT_MS`'s existing default, so an
+  operator reading the env table meets **one** number for "how long the doctor
+  is allowed to take", not two.
+- It must stay **below the client's own 120 s diagnosis watchdog**
+  (`src/components/scriptide/ScriptDoctorPanel.tsx`), or the writer would meet
+  the generic "Diagnosis timed out (120s)" copy and never see the honest
+  sentence. 30 s is well inside it, and a test asserts that relationship.
+
+**What the writer sees**: one sentence, registered in
+`docs/CLAIMS_REGISTER.md` (row 72) and rendered by the panel's existing error
+state beside its existing Retry — *"This draft took longer to analyze than
+this server's per-analysis budget (30s), so the run was stopped and nothing
+was scored. Try again, or split the draft into shorter files and analyze them
+separately."* It deliberately does not promise that a retry will succeed (on
+the same draft and the same server it usually will not) and does not blame the
+draft (a contended box can cross the budget on a draft that is fine). The JSON
+routes answer **400 `{ error: <that sentence> }`** — the same status and body
+shape the shape guard's own analysis-cost rejection
+(`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`, which says in its own message that it
+is "a cast-size and analysis-cost limit, not a formatting error") already
+uses; a 5xx was considered and rejected because it invites a blind retry of
+what is, for the same draft on the same server, a deterministic outcome. The
+SSE route (`POST /api/scriptide/doctor/stream`) has already flushed its
+headers by then and cannot send a status, so it sends the identical sentence
+in the `doctor_error` frame the client already renders verbatim.
+
+**Rationale**:
+
+- It bounds the failure MODE rather than today's instance of it. The value of
+  this mechanism is not that it rejects the ~14 s document — at 30 s it does
+  not, and is designed not to. It is that after this entry, no submission can
+  occupy a worker unboundedly, for any reason, ever again.
+- It puts the bound where the cost is. The guard can only see shape; the pool
+  can see elapsed time, which is the thing actually being protected.
+- It reuses machinery that already exists and is already trusted: the pool's
+  own cancellation primitive, the routes' existing error shapes, the panel's
+  existing error state. Nothing new renders; nothing new is invented.
+
+**What this does NOT decide**:
+
+- It does not change the shape guard, any of its bounds, or a single accept /
+  reject decision it makes. `node scripts/check-scoring-receipt.mjs` reports no
+  scoring-path files changed, and the doctor's output-identity harness is
+  byte-identical over all 45 fixtures.
+- It does not bound the IN-PROCESS path — deep read, `DOCTOR_WORKER_POOL=off`,
+  or a host that cannot spawn a worker. `runScriptDoctor` is a synchronous CPU
+  loop with no await point, so on the main thread there is nothing to
+  terminate; a budget there would stop the WAIT without stopping the WORK,
+  which is worse than the wait. This is the same carve-out Cancel already has,
+  for the same reason, and it is written down at the mechanism rather than
+  left to be discovered.
+- It does not re-open pool SIZING. `DOCTOR_WORKER_POOL_SIZE` is unchanged; the
+  budget is armed at SUBMISSION rather than at dispatch precisely because the
+  time a job spends queued behind another is the writer's wall clock too, and
+  that half of the problem is a sizing question this entry does not answer.
+- It does not claim CI verifies the ~14 s figure. The measurements above are
+  this lane's and the round-7 reviewer's, on named payloads, reproducible from
+  the report. What CI asserts is the other direction — that the budget does
+  NOT fire on the 54 tracked `.fountain` fixtures (the 20 CC0 reference
+  screenplays included), the 20 calibration samples, the P0 sample, or a
+  realistic 150-name / 3,000-block feature, each measured individually against
+  half the default (`tests/core/doctor-analysis-budget.test.ts`; slowest
+  legitimate item 6,935 ms, a 4.3× margin).
+
+**Expected Outcomes**: A writer who submits a draft the server cannot analyse
+in time gets an honest sentence and a working Retry in under a minute instead
+of an indefinite spinner; an operator gets one env var and one measured
+default; and the "one submission occupies a worker forever" failure mode is
+closed by construction rather than by the absence of a known payload that
+triggers it.
+
+**Evidence**: `tests/core/doctor-analysis-budget.test.ts` (configuration,
+the sentence, both fire states — running and queued — and the no-fire table);
+`tests/routes/doctor-analysis-budget.test.ts` (the 400 body shape and the SSE
+frame carry the same sentence); `scripts/smoke-p0-live-flow.mjs` step 3e (a
+second keyless server booted with `DOCTOR_ANALYSIS_BUDGET_MS=1`: the panel
+renders the sentence, offers an enabled Retry, and the same browser then gets
+a real report from a server with the shipped budget). All three were confirmed
+to FAIL with the mechanism disarmed before being confirmed to pass with it.
+
+**Decided by**: maintainer delegate, ruling on the item round 7 explicitly
+referred to the orchestrator (§7.7, "I record it so the orchestrator can
+overrule me if it wants the literal criterion applied").
+
+**Status**: Active.
+
+---
+
 ## Decision Template (for future entries)
 
 **Context**: What situation prompted this decision?

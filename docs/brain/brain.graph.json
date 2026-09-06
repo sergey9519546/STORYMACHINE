@@ -97,6 +97,12 @@
       "path": "docs/brain/Decisions/Decision 6 - License the Repository.md"
     },
     {
+      "id": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md",
+      "type": "decision",
+      "title": "Decision #7 — Bound One Analysis by Wall Clock, Not by Shape (2026-09-06)",
+      "path": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
       "id": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "type": "gate",
       "title": "Gate — AUC-24 Ratchet",
@@ -777,6 +783,14 @@
     {
       "from": "docs/brain/Decisions/Decision 6 - License the Repository.md",
       "to": "docs/brain/Owner/Owner - License Decision.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
@@ -1585,6 +1599,10 @@
     {
       "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Slate.md",
