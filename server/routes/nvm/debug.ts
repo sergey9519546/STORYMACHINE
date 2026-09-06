@@ -19,7 +19,7 @@ export default router;
 router.get('/api/debug/explain/:eventId', gameLimiter, validateParams(EventIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { explainAction } = await import('../../nvm/debug/inspector.ts');
-  const panel = explainAction(stage, req.params.eventId);
+  const panel = explainAction(stage, req.params.eventId as string);
   if (!panel) { res.status(404).json({ error: 'event not found' }); return; }
   res.json(panel);
 }));
@@ -28,7 +28,7 @@ router.get('/api/debug/explain/:eventId', gameLimiter, validateParams(EventIdPar
 router.get('/api/debug/explain-scene/:locationId', gameLimiter, validateParams(LocationIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { explainScene } = await import('../../nvm/debug/inspector.ts');
-  res.json({ panels: explainScene(stage, req.params.locationId) });
+  res.json({ panels: explainScene(stage, req.params.locationId as string) });
 }));
 
 // GET /api/nvm/project/:target — project current canon to a format

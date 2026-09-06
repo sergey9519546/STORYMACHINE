@@ -318,7 +318,12 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
       // so index.html gets the same explicit header no matter which URL asked
       // for it.
       app.use(express.static(distPath, { index: false }));
-      app.get('*', (_req, res) => {
+      // Express 5's path-to-regexp (v8) no longer accepts a bare '*'
+      // wildcard — it must be named, and '{*splat}' (braces) is what makes
+      // it also match the bare root '/' (an unbraced '*splat' matches any
+      // path EXCEPT root). This is the SPA catch-all: every path, root
+      // included, must fall through to index.html.
+      app.get('/{*splat}', (_req, res) => {
         // index.html must NOT share the long, immutable cache above: it is
         // the one file whose content legitimately changes on every deploy
         // (it's what points the browser at the current build's hashed asset

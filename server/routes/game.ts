@@ -979,7 +979,7 @@ router.get('/api/beat-traces', gameLimiter, asyncHandler(async (req, res) => {
 // Active dramatic pressure on a specific agent (bias signals not yet applied)
 router.get('/api/dramatic-pressure/:charId', gameLimiter, validateParams(CharIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  res.json(stage.getActivePressures(req.params.charId));
+  res.json(stage.getActivePressures(req.params.charId as string));
 }));
 
 // All belief edges (contradiction graph)
@@ -1000,7 +1000,7 @@ router.get('/api/belief-edges', gameLimiter, asyncHandler(async (req, res) => {
 // Goal mutations for a specific agent
 router.get('/api/goal-mutations/:charId', gameLimiter, validateParams(CharIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  res.json(stage.getGoalMutations(req.params.charId));
+  res.json(stage.getGoalMutations(req.params.charId as string));
 }));
 
 // All goal mutations across all agents
@@ -1027,7 +1027,7 @@ router.get('/api/dramatic-pressure-all', gameLimiter, asyncHandler(async (req, r
 // Persuasion log for one agent
 router.get('/api/persuasion/:charId', gameLimiter, validateParams(CharIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  res.json(stage.getPersuasionLog(req.params.charId, 20));
+  res.json(stage.getPersuasionLog(req.params.charId as string, 20));
 }));
 
 // QBN choice filtering — filter by accumulated qualities AND consequenceScope ceiling

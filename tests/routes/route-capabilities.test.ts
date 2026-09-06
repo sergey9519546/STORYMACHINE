@@ -30,10 +30,18 @@ import assert from 'node:assert/strict';
 import './helpers.ts';
 
 // ── Route enumeration ───────────────────────────────────────────────────────
-// Walks Express 4's real router tree (app._router.stack) rather than
+// Walks Express 5's real router tree (app.router.stack) rather than
 // maintaining a hand-written route list — the entire point of this test is
 // catching routes ADDED later without anyone remembering to update a parallel
 // list here.
+//
+// Express 4 -> 5: the root tree used to hang off the private `app._router`;
+// Express 5's `router` package restored `app.router` as the public,
+// documented accessor (@types/express-serve-static-core's `Application`
+// interface types it directly), so this walks that instead. The per-layer
+// shape stayed close enough that the rest of this walk (layer.route,
+// layer.route.path/methods/stack, layer.name === 'router' for a nested
+// router) is unchanged — see below for the one shape that DID move.
 //
 // Path reconstruction: every router in this codebase is mounted with NO path
 // prefix — server/app.ts does `app.use(configRouter)` (not
@@ -42,12 +50,18 @@ import './helpers.ts';
 // prefix) for all eight NVM sub-routers — so every route's full path already
 // lives on `layer.route.path` with nothing to prepend. Rather than silently
 // assuming that forever, `assertRootMount` below checks Express's own
-// `layer.regexp.fast_slash` marker (path-to-regexp's internal flag for
-// exactly "this layer was mounted at '/'") on every nested-router layer we
-// descend into, so a future `app.use('/prefix', someRouter)` fails this test
-// loudly — with a message saying which layer broke the assumption — instead
-// of silently producing wrong paths that this test would then quietly
-// misjudge.
+// root-mount marker on every nested-router layer we descend into, so a
+// future `app.use('/prefix', someRouter)` fails this test loudly — with a
+// message saying which layer broke the assumption — instead of silently
+// producing wrong paths that this test would then quietly misjudge. Express
+// 4's path-to-regexp exposed this as `layer.regexp.fast_slash`; Express 5's
+// path-to-regexp v8 rewrote the matcher internals (no more `.regexp` at all —
+// matching now goes through `layer.matchers`) and put the same "mounted at
+// exactly '/'" fact directly on the layer as `layer.slash` (verified against
+// a live `createApp()` router tree: every root-mounted nested-router layer
+// here has `slash: true`, `regexp: undefined`). Checking both keeps this
+// robust to either shape rather than silently trusting a field that may not
+// exist.
 //
 // A `layer.route` object only exists for layers created by
 // `router.<method>(path, ...)` / `router.route(path)` — i.e. an actual
@@ -63,14 +77,18 @@ interface WalkedRoute {
   handles: unknown[];
 }
 
-function assertRootMount(layer: { regexp?: { fast_slash?: boolean }; name?: string }, path: string): void {
+function assertRootMount(
+  layer: { regexp?: { fast_slash?: boolean }; slash?: boolean; name?: string },
+  path: string,
+): void {
   assert.ok(
-    layer.regexp?.fast_slash,
+    layer.slash ?? layer.regexp?.fast_slash,
     `Route walk assumption violated: a nested router layer near "${path}" is mounted with a ` +
-    `non-root path prefix (layer.regexp.fast_slash is falsy). This test's path reconstruction ` +
-    `assumes every router.use()/app.use() in this codebase mounts sub-routers at '/' with no ` +
-    `prefix argument — that assumption no longer holds, so route paths below may be wrong. ` +
-    `Fix the walk in tests/routes/route-capabilities.test.ts to prepend the real mount prefix.`,
+    `non-root path prefix (neither layer.slash nor layer.regexp.fast_slash is truthy). This ` +
+    `test's path reconstruction assumes every router.use()/app.use() in this codebase mounts ` +
+    `sub-routers at '/' with no prefix argument — that assumption no longer holds, so route ` +
+    `paths below may be wrong. Fix the walk in tests/routes/route-capabilities.test.ts to ` +
+    `prepend the real mount prefix.`,
   );
 }
 
@@ -301,7 +319,7 @@ describe('route-capabilities — completeness walk (T-15)', () => {
     const { createApp } = await import('../../server/app.ts');
     const app = await createApp({ serveStatic: false });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    routes = walkRoutes((app as any)._router.stack);
+    routes = walkRoutes((app.router as any).stack);
   });
 
   it('walked at least the known route count (sanity floor against a broken walk)', () => {

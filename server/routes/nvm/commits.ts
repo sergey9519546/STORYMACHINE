@@ -26,7 +26,7 @@ router.get('/api/nvm/commits', gameLimiter, asyncHandler(async (req, res) => {
 // GET /api/nvm/commits/:commitId — single commit
 router.get('/api/nvm/commits/:commitId', gameLimiter, validateParams(CommitIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const commit = stage.getCommit(req.params.commitId);
+  const commit = stage.getCommit(req.params.commitId as string);
   if (!commit) { res.status(404).json({ error: 'commit not found' }); return; }
   res.json(commit);
 }));
