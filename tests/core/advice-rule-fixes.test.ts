@@ -348,16 +348,41 @@ describe('advice fixes — the matched pair, as the audit measured it', () => {
     );
   });
 
-  // HONEST LIMIT, asserted so nobody reads the file as claiming more than it
-  // shows: after all six fixes the two scripts still receive the SAME health
-  // score. These fixes remove specific false claims; they do not make the
-  // composite score discriminate. That is P1's job and it needs real writing.
-  it('but health still does not separate them — recorded, not hidden', async () => {
+  // RE-ANCHORED ON THE STACKED TREE (2026-09-06), following this test's own
+  // instruction rather than deleting it. On the advice branch alone the
+  // assertion below read `|good - bad| < 5` and held at 76.0 vs 76.0: the
+  // pair did NOT separate, because main's `densityPenalty` saturates its
+  // logistic at penalty 10.00 for any density >= ~0.65 and both members of
+  // this 10-scene pair sit inside that clamp. Stacking the R5 verbosity-bias
+  // fix underneath (single continuous curve `8 * density^2` over a
+  // scene-opportunity denominator, no clamp) removes the dead zone, and the
+  // finding-count difference these six fixes produced — 132 findings on the
+  // excellent member against 150 on the bad one, 0 criticals against 1 —
+  // becomes visible in health for the first time: 60.4 vs 47.1.
+  //
+  // So the separation is NOT new craft judgment from the six detector fixes;
+  // it is the same weighted-issue difference the fixes created, read through
+  // a curve that stops flattening it. Both directions are asserted, tightly,
+  // because both are real events a future change could cause and neither may
+  // pass silently: a fall back toward zero means the clamp (or an equivalent
+  // saturation) is back, and a large move means the detector set shifted.
+  // Re-measure and update docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md
+  // section 9 rather than widening the tolerance.
+  //
+  // Neither number is corpus-validated. This pair is two in-repo fixtures,
+  // not real writing; `npm run measure-real` on the owner's corpus is still
+  // the measurement this branch owes.
+  it('health separates the pair on the stacked tree — re-anchored, not hidden', async () => {
     const good = await findings(EXCELLENT);
     const bad = await findings(BAD);
+    const gap = good.report.health - bad.report.health;
     assert.ok(
-      Math.abs(good.report.health - bad.report.health) < 5,
-      `if this ever starts failing, the composite score has begun to separate the pair — re-measure and update docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md rather than deleting this test. excellent=${good.report.health} bad=${bad.report.health}`,
+      gap > 0,
+      `the well-made member must not score at or below its badly-made twin — excellent=${good.report.health} bad=${bad.report.health}`,
+    );
+    assert.ok(
+      Math.abs(gap - 13.3) <= 0.1,
+      `the stacked-tree gap moved off its locked value of 13.3 — re-measure and update docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md section 9 rather than widening this tolerance. excellent=${good.report.health} bad=${bad.report.health} gap=${gap.toFixed(1)}`,
     );
   });
 });

@@ -543,3 +543,49 @@ them, which is R1 — four sparse binary channels that read "absent" on
 almost every script, feeding a top-ten queue that promotes whichever
 absence-shaped finding happens to be next in pipeline order. That is the
 problem. This is not a fix for it.
+
+## 9. On the stacked tree (2026-09-06) — the pair does separate
+
+Sections 0-8 describe this branch **alone**, on top of `main`'s health
+formula. Since 2026-09-06 the branch also exists stacked underneath the R5
+verbosity-bias fix, as `scoring/stacked-r5-plus-advice`, because that is the
+tree the owner's second `npm run measure-real` needs. One statement above
+changes on that tree, and it changes in the direction section 8 said it did
+not:
+
+| tree | excellent | bad | gap |
+| --- | --- | --- | --- |
+| this branch alone (main's density formula) | 76.0 | 76.0 | 0.0 |
+| stacked on R5 | 60.4 | 47.1 | **+13.3** |
+
+Findings are identical on both trees — 132 on the excellent member against
+150 on the bad one, 0 criticals against 1 — so nothing about what the six
+fixes detect changed. What changed is the curve that reads the count.
+`main`'s `densityPenalty` saturates its logistic at penalty 10.00 for any
+density at or above roughly 0.65, and both members of this ten-scene pair sit
+inside that clamp, so a difference of eighteen findings displayed as no
+difference at all. R5 replaces that piecewise curve with one continuous
+`8 * density^2` over a scene-opportunity denominator, which never flattens,
+and the same eighteen findings become 13.3 points of health.
+
+Section 8's claim — "the excellent and bad scripts still score 76.0 and 76.0"
+— is therefore true of this branch alone and false of the stack. It is left
+standing above rather than rewritten, because it is the accurate record of
+what this branch does by itself.
+
+Read the size of that gap carefully. It is not evidence that these six fixes
+made the score discriminate: it is the same weighted-issue difference the
+fixes produced, made visible by removing a dead zone. The corresponding
+blind-pairs run on the same date puts the honest ceiling on it — main orders
+1 of 6 blind matched pairs, R5 alone 3 of 6, this branch alone 1 of 6, the
+stack 4 of 6, on twelve fixtures whose raw weighted-issue channel is close to
+a coin flip. Two in-repo fixtures are not real writing, and no number here or
+in section 1 is corpus-validated. `npm run measure-real` against the owner's
+local corpus, and the AUC-24 floor in `scripts/lib/auc.ts`, remain the
+measurement this work owes; see the PENDING entries in
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`.
+
+The re-anchored assertion is
+`tests/core/advice-rule-fixes.test.ts`'s "health separates the pair on the
+stacked tree", which pins 13.3 in both directions and exists only on the
+stacked branch.

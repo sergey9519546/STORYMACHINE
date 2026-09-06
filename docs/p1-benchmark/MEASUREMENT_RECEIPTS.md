@@ -2123,3 +2123,110 @@ OWNER MEASUREMENT.
   `REAL_SCRIPT_CORPUS_DIR` was left unset.** The owner's measurement is
   unchanged and is now best taken on `scoring/stacked-r5-plus-advice`, which
   is this branch merged onto the rebased R5 branch."
+
+---
+
+### 2026-09-06 — STACKED TREE (R5 verbosity-bias + advice-rule fixes) — **PENDING OWNER MEASUREMENT**
+
+**This entry carries NO AUC-24 number and this branch must not merge until
+one is added.** It exists because the owner's second measurement needs a tree
+that actually builds, and until 2026-09-06 no such tree existed: the two
+branches had merge-bases 74 commits apart and every attempt to stack them
+conflicted. Both are now rebased onto the same `main`, the stack is
+`scoring/stacked-r5-plus-advice`, and this row records what it does on
+in-repo evidence only. Neither contributing branch's numbers are measured
+either; all three are PENDING.
+
+- **Date:** 2026-09-06.
+- **Baseline used:** `main` at `2bfcbf9d`, extracted with
+  `git archive main | tar -x` into a scratch tree with `node_modules`
+  symlinked from the working checkout. The stack is
+  `scoring/r5-verbosity-bias` with `scoring/advice-rule-fixes` merged into it
+  by `git merge --no-ff`; the merge's one conflict was
+  `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, resolved by keeping both
+  PENDING entries and both 2026-09-06 addenda in date order. No code file
+  conflicted.
+- **Command:** `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`,
+  then the same with `--tree` at the stack worktree and `--out <after>`, then
+  `node scripts/check-doctor-output-identity.mjs --compare <before> <after>`;
+  plus `npm run lint`, `npm run test:metamorphic`, `npm test`, and the
+  per-file test runs listed below.
+- **Measured AUC-24:** **PENDING** — not measured, not estimated, not
+  carried forward from any prior entry. `npm run measure-real` was not
+  executed in this range and `REAL_SCRIPT_CORPUS_DIR` was never set.
+- **Corpus fingerprint:** none. No corpus was read. Everything below comes
+  from the 45 in-repo identity fixtures and the 12 in-repo blind-pairs
+  fixtures.
+- **Output identity against the new baseline:** FAIL, as a scoring change
+  must — 45 of 45 reports differ. Health moves on 45 of 45 (mean −7.40, RMS
+  19.02, largest single move −34.3 on `the-key-under-the-mat`, smallest 0.7);
+  verdict changes on 27 of 45; `sceneCount` is unchanged on all 45. For
+  comparison against the same baseline, R5 alone is RMS 20.45 with 28 verdict
+  changes and advice alone is RMS 6.88 with 3.
+- **Blind matched pairs, in-repo fixtures, no private corpus** (the
+  computation registered in
+  `docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md`, re-run on the new
+  baseline):
+
+  | tree | ordered/6 | mean gap | mean top-10 overlap | calibration ordered/5 | calibration mean gap | blind scripts pinned at one health |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | `main @ 2bfcbf9d` | 1/6 | −0.02 | 7.83/10 | 5/5 | 25.32 | 9 of 12 (at 76.0) |
+  | R5 alone | 3/6 | +1.50 | 7.83/10 | 5/5 | 11.14 | 0 of 12 |
+  | advice alone | 1/6 | +0.03 | 7.17/10 | 5/5 | 25.36 | 9 of 12 (at 76.0) |
+  | **stacked** | **4/6** | **+2.02** | 7.17/10 | 5/5 | 12.54 | **0 of 12** |
+
+  The stack orders one more pair (`fence-line`) than R5 alone and three more
+  than either `main` or advice alone. Read it with the mechanism, not as a
+  win: R5 removes the saturating clamp that pins nine of twelve scripts at
+  exactly 76.0, which exposes the raw weighted-issue ordering, and the six
+  detector fixes then change that ordering on one pair. Weighted-issue
+  ordering is close to a coin flip on this corpus, so 4 of 6 on six pairs is
+  well inside what chance produces. Twelve short fixtures are not the
+  measurement this branch owes.
+- **One in-repo assertion re-anchored, and why:**
+  `tests/core/advice-rule-fixes.test.ts`'s "but health still does not
+  separate them" pinned the advice branch's honest limit — its matched pair
+  scored 76.0 against 76.0. On the stack that pair separates, 60.4 against
+  47.1, in the correct direction. Findings are identical on both trees (132
+  against 150, 0 criticals against 1); only the curve reading them changed.
+  Following the test's own instruction, the assertion was re-anchored rather
+  than deleted or widened: it now pins the 13.3-point gap in both directions
+  and fails on the advice-alone tree, which was verified by running the
+  re-anchored file there (exit 1, "the well-made member must not score at or
+  below its badly-made twin — excellent=76 bad=76"). Section 9 of
+  `docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md` records the same thing.
+- **Gates on the stacked tree, each in the foreground, exit code read from its
+  own log:** `npm run lint` 0 · `npm run test:metamorphic` 0, 8 of 8 hard,
+  zero known-failing witnesses, `empty_verbosity` at −4.5 ·
+  `tests/core/verbosity-bias.test.ts` 0 (4/4) ·
+  `tests/core/calibration.test.ts` 0 (21/21) ·
+  `tests/core/feature-scale-discrimination.test.ts` 0 (6/6) ·
+  `tests/core/rebuild-experiment.test.ts` 0 (40/40) ·
+  `tests/core/script-doctor.test.ts` 0 (86/86) ·
+  `tests/core/advice-rule-fixes.test.ts` 0 (26/26 after the re-anchor) ·
+  `tests/core/agency-signal.test.ts` 0 (52/52) ·
+  `tests/core/reversal-detection.test.ts` 0 (39/39) ·
+  `tests/core/core-02.test.ts` 0 (427/427) · `tests/core/core-03.test.ts` 0
+  (307/307) · `tests/passes/conflict.test.ts` 0 (465/465) ·
+  `tests/passes/dialogue.test.ts` 0 (473/473) ·
+  `tests/passes/structure.test.ts` 0 (490/490) ·
+  `tests/core/blind-pairs-discrimination.test.ts` 0 (3/3).
+- **`node scripts/check-scoring-receipt.mjs main..HEAD` exits 1 on this
+  branch, by design.** It finds all three PENDING entries in this range and
+  refuses them, which is what a PENDING entry is for. Closing it means
+  running the measurement, not editing a heading.
+- **Runner attestation:** "I, the branch-sync lane
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), rebased both branches
+  onto `2bfcbf9d` myself, built this merge myself, resolved its one conflict
+  myself, and ran every command listed above myself on 2026-09-06, reading
+  each exit code out of its own log file. **I did NOT run
+  `npm run measure-real`, and this entry claims no AUC-24 value, because
+  there is none: the real corpus is not present in this container and
+  `REAL_SCRIPT_CORPUS_DIR` was deliberately left unset.** Every number in this
+  entry comes from fixtures committed to this repository. The owner's step is
+  to check out `scoring/stacked-r5-plus-advice`, run
+  `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, then
+  `npm run lock-auc24`, then re-lock the 72-row
+  `tests/fixtures/real-corpus-manifest.json`, then supersede this entry with
+  one carrying the measured number. Until that entry exists this branch must
+  not merge."
