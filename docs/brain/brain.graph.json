@@ -355,6 +355,12 @@
       "path": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md"
     },
     {
+      "id": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md",
+      "type": "measurement",
+      "title": "Measurement — VERBOSITY_BIAS_FIX_2026-09-03",
+      "path": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md"
+    },
+    {
       "id": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md",
       "type": "measurement",
       "title": "Measurement — WHAT_THE_SCORE_DOES_2026-07-28",
@@ -1009,6 +1015,26 @@
       "to": "docs/brain/Measurements/Measurement - DENSITY_RECAL_FINDING_2026-07-11.md"
     },
     {
+      "from": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md",
+      "to": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md",
+      "to": "docs/brain/Measurements/Measurement - BLIND_PAIRS_ON_BRANCHES_2026-09-04.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
       "from": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md",
       "to": "docs/brain/Measurements/Measurement - REAL_SCRIPT_DISCRIMINATION_2026-07-28.md"
     },
@@ -1151,6 +1177,10 @@
     {
       "from": "docs/brain/Measurements Index.md",
       "to": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements Index.md",
+      "to": "docs/brain/Measurements/Measurement - VERBOSITY_BIAS_FIX_2026-09-03.md"
     },
     {
       "from": "docs/brain/Measurements Index.md",

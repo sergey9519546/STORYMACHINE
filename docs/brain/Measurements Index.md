@@ -39,7 +39,7 @@ brain-linked summary reachable from [[00 Home]].
 [[Measurement - TEMPORAL_ORDER_SENSITIVITY_2026-08-03]] ·
 [[Measurement - UNWIRED_SIGNALS_EVIDENCE_2026-08-21]]
 
-## docs/scoring (12)
+## docs/scoring (13)
 
 [[Measurement - ARC_RECALIBRATION_WAVE_2026-07-11]] ·
 [[Measurement - BASELINE_2026-07-11]] ·
@@ -52,6 +52,7 @@ brain-linked summary reachable from [[00 Home]].
 [[Measurement - SATURATION_ROOT_CAUSE_2026-07-11]] ·
 [[Measurement - STRUCTURAL_SIGNALS_2026-09-04]] ·
 [[Measurement - VERBOSITY_BIAS_2026-07-11]] ·
+[[Measurement - VERBOSITY_BIAS_FIX_2026-09-03]] ·
 [[Measurement - WHAT_THE_SCORE_DOES_2026-07-28]]
 
 Highest-priority starting points: [[Measurement - DISCRIMINATION_BASELINE_2026-07-29]]
