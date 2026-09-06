@@ -161,8 +161,8 @@
 //     has zero `dark:bg-*` occurrences. FIXED, same way.
 //   - ScriptIDE.tsx (`renderTitlePage`, `:2222`): `bg-[var(--sm-panel)]
 //     dark:text-white` — an invariant background with white text once
-//     dark mode is toggled. Real, live, NOT fixed — see RESERVED_FILES
-//     below for why (this file is reserved for a different lane).
+//     dark mode is toggled. FIXED in round 6 (2026-09-06) — see that
+//     round's note below.
 // Building the reverse rule ALSO surfaced one false positive along the way
 // (documented at hasFractionalDarkBg's definition below): a same-element
 // pair like `bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300`
@@ -173,27 +173,42 @@
 // Fixed before this rule shipped — see the fixture proof below ("the
 // SlatePanel historical alert-box shape").
 //
-// ScriptDoctorPanel.tsx is the confirmed exception at scale: this walk
-// finds AT LEAST 65 real instances of the forward OR reverse shape there —
-// 36 forward (verified by hand in round 2 — e.g. line ~5098's `<span
-// className="text-xs font-bold">Graph Health</span>` inside a `<div
-// className="border-2 border-black dark:border-white/20 bg-white
-// dark:bg-zinc-900 p-3">`) plus 29 more the reverse rule newly finds this
-// round (e.g. `:807`'s `text-gray-600 dark:text-gray-300` — the identical
-// Sidebar.tsx/StateDeltaCard.tsx shape, in this file too). "At least"
-// because of the third scope limit above (composition across function/
-// component boundaries is not walked) — a component-boundary-aware
-// version of this walk could find more in that same file; 65 is what THIS
-// walk can see today, a floor, not a ceiling. That file is reserved for a
-// different, concurrently-running lane (see the original brief's
-// constraints, and LANE_STANDARD §2's "the reason it cannot be [fixed] is
-// written down with file and line evidence") and the round-1 independent
-// review explicitly endorsed leaving it alone for exactly that reason.
-// ScriptIDE.tsx joins it this round for the one reverse-rule hit above.
-// The regression gate below excludes both BY NAME, with this paragraph as
-// the citation, rather than silently scoping past them —
-// CoverageSummary.tsx (also reserved) needs no such exclusion, because
-// this walk finds zero violations there either way.
+// ROUND 6 (2026-09-06) — the two previously-reserved files are FIXED and the
+// allowlist is gone. ScriptDoctorPanel.tsx carried 65 real forward+reverse
+// instances (36 forward — e.g. the Structural Analysis cards' `<span
+// className="text-xs font-bold">Graph Health</span>` inside a real
+// `bg-white dark:bg-zinc-900` surface, measured 1.06:1 in dark — plus 29
+// reverse, e.g. the identical Sidebar.tsx/StateDeltaCard.tsx orphaned-
+// dark:text-* shape recurring inside this file too); ScriptIDE.tsx carried
+// one (`renderTitlePage`'s `bg-[var(--sm-panel)] dark:text-white`, an
+// invariant background with an orphaned dark:text-white, ~1.15:1 in dark).
+// Both are fixed now: every real dark:bg-* surface in ScriptDoctorPanel.tsx
+// either moved to the theme-invariant --sm-* tokens (matching
+// SnapshotManager.tsx/SlatePanel.tsx's own fix) or, where the surface is
+// genuinely meant to follow the OS theme (the IssueCard/RootCauseCard/
+// FixReceiptCard family and the GODMODE structural-analysis cards, which
+// already mixed themed and invariant siblings before this round), got a
+// matching dark: pair on its text; ScriptIDE.tsx's title page dropped the
+// orphaned dark:text-white. The regression gate below is zero-tolerance
+// across ALL of src/components — no per-file exclusion, no lower bound —
+// because a gate that cannot fail for a file is not a gate. See
+// docs/DECISION_LOG.md and the 2026-09-06 lane report for the fail-then-
+// pass proof and the Playwright/axe contrast measurements.
+//
+// One real bug this round's fix-then-scan surfaced ONLY by manual review,
+// not the scanner: FixStructuralSignalsStrip (ScriptDoctorPanel.tsx) is a
+// small reusable component with no bg of its own, always rendered inside a
+// real dark:bg-zinc-800 receipt card at both of its call sites — but this
+// walk scans every top-level function's own JSX independently from the
+// file's root defaults (safe/invariant), with no notion of which real
+// ambient a caller renders it on (the same mechanism behind the disclosed
+// cross-function/component scope limit below, just cutting the other way:
+// it can also make a CORRECTLY-fixed component newly look like a violation,
+// or a genuinely broken one look clean, depending on which text mode its
+// root happens to declare). Its own comment (where it's defined) records
+// the fix and why an explicit, redundant, visually-identical bg had to be
+// added to its own root so the walk's assumed ambient and its real one
+// agree.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -205,19 +220,14 @@ import ts from 'typescript';
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const COMPONENTS_DIR = join(REPO_ROOT, 'src', 'components');
 
-// Reserved for a different, concurrently-running lane (see this file's
-// header) — real violations found there are disclosed in the round-2 and
-// round-3 reports, not fixed here, and not asserted against below.
-// ScriptIDE.tsx joined this set in round 3: the new REVERSE rule (see the
-// header) found ONE real, live instance at `:2222` (renderTitlePage's
-// `bg-[var(--sm-panel)] dark:text-white` — an invariant background with an
-// orphaned `dark:text-white`, so "written by" and the author field render
-// white-on-cream once dark mode is toggled) — a genuine bug, but in a file
-// this lane does not own.
-const RESERVED_FILES = new Set([
-  join('src', 'components', 'scriptide', 'ScriptDoctorPanel.tsx'),
-  join('src', 'components', 'ScriptIDE.tsx'),
-]);
+// Round 6 (2026-09-06): the file-level allowlist that used to live here
+// (ScriptDoctorPanel.tsx, ScriptIDE.tsx — two files the lane that wrote this
+// scanner could not edit) is gone. Both files are fixed; the regression gate
+// below now scans every .tsx file under src/components with zero exceptions.
+// If a future file genuinely cannot be fixed in the same lane that touches
+// this scanner, re-add a SET here with the file's own LANE_STANDARD §2
+// evidence (never a bare name) — but that is a last resort, not a default:
+// a gate that cannot fail for a file is not a gate.
 
 interface Violation {
   file: string;
@@ -950,14 +960,19 @@ describe('theme-convention scanner — reproduces the real historical bugs on pr
 });
 
 describe('theme-convention scanner — the actual regression gate over src/components', () => {
-  it('finds zero violations in every file this lane owns (ScriptDoctorPanel.tsx excluded — see header)', () => {
+  it('finds zero violations in EVERY .tsx file under src/components — zero-tolerance, no exclusions (round 6, 2026-09-06)', () => {
+    // Round 6: the ScriptDoctorPanel.tsx/ScriptIDE.tsx allowlist and its two
+    // pinned-floor tests are gone. Both files carried real, live contrast
+    // bugs (65 and 1 instances respectively — see this file's header for the
+    // fail-first count) and are now fixed; this gate scans every .tsx file
+    // under src/components with no per-file exception, because a gate that
+    // cannot fail for a file is not a gate.
     const files = listTsxFiles(COMPONENTS_DIR);
     assert.ok(files.length > 50, `sanity: expected many .tsx files under src/components, found ${files.length}`);
 
     const allViolations: Violation[] = [];
     for (const file of files) {
       const rel = relative(REPO_ROOT, file);
-      if (RESERVED_FILES.has(rel)) continue;
       const source = readFileSync(file, 'utf8');
       allViolations.push(...findThemeConventionViolations(source, rel));
     }
@@ -967,53 +982,6 @@ describe('theme-convention scanner — the actual regression gate over src/compo
       [],
       'theme-convention violation (dark:bg-* composited with invariant ink text, or the reverse):\n'
       + allViolations.map((v) => `  ${v.file}:${v.line} — ${v.value}`).join('\n'),
-    );
-  });
-
-  it('the reserved ScriptDoctorPanel.tsx exclusion is a pinned, exact MEASURED FLOOR — re-pin by hand', () => {
-    // Round 4 (independent review round 3, item 4): round 3 loosened this
-    // to `assert.ok(violations.length >= 65)`, reasoning that the
-    // detector's own third scope limit (composition across function/
-    // component boundaries — this file's header) means the true count
-    // could always be higher, so asserting a specific total would claim a
-    // completeness this walk cannot back up. That reasoning is right about
-    // the NUMBER but wrong about the OPERATOR: `>=` catches a fix in this
-    // file dropping the count (confirmed by construction: 65 -> 0 fails),
-    // but it lets a NEW violation added to this reserved file — by the
-    // concurrently-running lane that owns it — pass silently, which is
-    // exactly the case that matters most while that lane is actively
-    // editing it. `assert.equal` keeps the same honesty (the comment says
-    // plainly this is a measured floor on what THIS walk sees today, not a
-    // claim about the file's true violation count) while restoring BOTH
-    // directions of the signal: re-run this walk and update the number by
-    // hand — never loosen back to `>=` — if a legitimate change to that
-    // file moves the count either way.
-    const file = join(COMPONENTS_DIR, 'scriptide', 'ScriptDoctorPanel.tsx');
-    const source = readFileSync(file, 'utf8');
-    const violations = findThemeConventionViolations(source, relative(REPO_ROOT, file));
-    assert.equal(
-      violations.length,
-      65,
-      `measured floor: this walk saw exactly 65 forward+reverse violations in the reserved file last time it was `
-      + `hand-checked; found ${violations.length} now — re-measure by hand and re-pin, do not loosen this back to >=`,
-    );
-  });
-
-  it('the reserved ScriptIDE.tsx exclusion is also a pinned, exact measured floor', () => {
-    // Round 3: ScriptIDE.tsx joined RESERVED_FILES this round because the
-    // new reverse rule found one real, live bug there (renderTitlePage's
-    // `bg-[var(--sm-panel)] dark:text-white` — see RESERVED_FILES's own
-    // comment above; still 1.15:1 in dark mode, still not fixed here,
-    // another lane owns this file). Round 4: same exact-floor treatment as
-    // ScriptDoctorPanel.tsx's test above, for the same reason.
-    const file = join(COMPONENTS_DIR, 'ScriptIDE.tsx');
-    const source = readFileSync(file, 'utf8');
-    const violations = findThemeConventionViolations(source, relative(REPO_ROOT, file));
-    assert.equal(
-      violations.length,
-      1,
-      `measured floor: this walk saw exactly 1 violation in the reserved file last time it was hand-checked; `
-      + `found ${violations.length} now — re-measure by hand and re-pin, do not loosen this back to >=`,
     );
   });
 });

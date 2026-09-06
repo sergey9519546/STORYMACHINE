@@ -922,7 +922,14 @@ function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
       <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
         Story Metrics
       </h3>
-      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
+      {/* a11y fix (2026-09-06, theme-convention gate) — this caption sits
+          directly on the theme-invariant panel (no dark:bg- ancestor
+          anywhere above it), so `dark:text-gray-300` was an orphaned themed
+          half with no themed background to pair it with — same shape as
+          Root Causes' own caption fix above. --sm-ink-mute matches the
+          sibling section captions in this file (Story Structure, Root
+          Causes) that already use it for the identical role. */}
+      <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mb-2">
         Deterministic shape readings — how the story moves, not how good it is. Descriptive, not graded.
       </p>
       <div className="space-y-3">
@@ -960,11 +967,16 @@ function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
                   title={m.caption}
                   className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-2"
                 >
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+                  {/* a11y fix (2026-09-06, theme-convention gate) — this tile's
+                      own background is a REAL dark:bg-zinc-800 surface, so its
+                      text must be FULLY THEMED, not an invariant --sm-ink
+                      token — same pairing DraftDeltaStrip already uses on the
+                      identical bg-gray-50/dark:bg-zinc-800 tile shape below. */}
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                     {m.label}
                   </p>
-                  <p className="text-lg font-bold text-black leading-tight">{display}</p>
-                  <p className="text-[9px] font-mono text-[var(--sm-ink-mute)] leading-snug mt-0.5">
+                  <p className="text-lg font-bold text-black dark:text-gray-100 leading-tight">{display}</p>
+                  <p className="text-[9px] font-mono text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
                     {m.caption}
                   </p>
                 </div>
@@ -1040,7 +1052,9 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
       <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
         Story Structure Analysis
       </h3>
-      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-3">
+      {/* a11y fix (2026-09-06, theme-convention gate) — invariant panel, no
+          dark:bg- ancestor: see StoryMetricsSection's identical fix above. */}
+      <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mb-3">
         Graph-based structural diagnostics — promise tracking, causal flow, escalation.
       </p>
 
@@ -1052,7 +1066,12 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
             {assessment.label}
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[10px] font-mono text-gray-600 dark:text-gray-400">
+        {/* a11y fix (2026-09-06, theme-convention gate) — `assessment.bg` is a
+            plain light-only color (bg-green-50/bg-amber-50/bg-red-50, no
+            dark: variant — see assessmentMeta's own comment above), so this
+            banner never actually darkens; the child spans below inherit
+            whatever this div declares and had no color of their own. */}
+        <div className="flex items-center gap-3 text-[10px] font-mono text-[var(--sm-ink-mute)]">
           <span>{summary.totalIssues} issues</span>
           <span>·</span>
           <span>{summary.criticalCount} critical</span>
@@ -1105,18 +1124,28 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                     </div>
                   </button>
                   {isExpanded && (
+                    // a11y fix (2026-09-06, theme-convention gate): this
+                    // card's own background is a FRACTIONAL dark:bg-*/50
+                    // tint (bg-red-50/50 dark:bg-red-900/10, matched against
+                    // the invariant panel behind it) — the same shape as
+                    // AnalysisPanel.tsx's already-correct alert cards, which
+                    // pair a fractional tint with INVARIANT --sm-ink text,
+                    // never a themed dark:text-* half. These descendants had
+                    // the reverse: themed text with no themed background
+                    // ambient to pair against. Converted to match
+                    // AnalysisPanel's convention.
                     <div className="mt-2 pl-5 space-y-2">
-                      <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                      <p className="text-[10px] font-mono text-[var(--sm-ink-soft)] leading-relaxed">
                         {diag.impact}
                       </p>
                       {diag.suggestions.length > 0 && (
                         <div>
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-1">
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)] mb-1">
                             Suggestions:
                           </p>
                           <ul className="space-y-1">
                             {diag.suggestions.map((suggestion, si) => (
-                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
+                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-[var(--sm-ink-soft)]">
                                 <span className="text-[var(--sm-stamp-on-light)] shrink-0">→</span>
                                 <span>{suggestion}</span>
                               </li>
@@ -1172,18 +1201,22 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                     </div>
                   </button>
                   {isExpanded && (
+                    // a11y fix (2026-09-06, theme-convention gate): same
+                    // fractional-tint-card fix as the Critical Issues block
+                    // above (bg-amber-50/50 dark:bg-amber-900/10) — see its
+                    // comment.
                     <div className="mt-2 pl-5 space-y-2">
-                      <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                      <p className="text-[10px] font-mono text-[var(--sm-ink-soft)] leading-relaxed">
                         {diag.impact}
                       </p>
                       {diag.suggestions.length > 0 && (
                         <div>
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-1">
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)] mb-1">
                             Suggestions:
                           </p>
                           <ul className="space-y-1">
                             {diag.suggestions.map((suggestion, si) => (
-                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
+                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-[var(--sm-ink-soft)]">
                                 <span className="text-[var(--sm-warn-on-light)] shrink-0">→</span>
                                 <span>{suggestion}</span>
                               </li>
@@ -1205,21 +1238,34 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Info className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" aria-hidden="true" />
-            <h4 className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+            {/* a11y fix (2026-09-06, theme-convention gate): this heading and
+                everything below it sits on the theme-invariant panel — no
+                dark:bg- ancestor anywhere in this subtree (the `details`
+                below is a fractional /10 tint, same non-darkening shape as
+                the Critical/Medium cards above) — so the `dark:text-zinc-*`
+                halves were orphaned. Dropped, but zinc-500 itself turned out
+                to be a SEPARATE, pre-existing bug (verify:a11y worst-20
+                contrast survey, 2026-09-06): computed 4.22:1 on this panel,
+                just under AA, in BOTH themes — not caught by dropping the
+                dark: half. --sm-ink-mute (4.82-5.57:1) is the section
+                headings elsewhere in this file already use for the same
+                role. text-zinc-600 (below) is dark enough already (~6.8:1)
+                and needed no change. */}
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
               Low Priority ({diagnostics.low.length})
             </h4>
           </div>
           <details className="border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/10 p-2.5">
-            <summary className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 cursor-pointer">
+            <summary className="text-[10px] font-mono text-zinc-600 cursor-pointer">
               Click to expand {diagnostics.low.length} minor issue{diagnostics.low.length === 1 ? '' : 's'}
             </summary>
             <div className="mt-2 space-y-2">
               {diagnostics.low.map((diag, i) => (
                 <div key={i} className="pl-2 border-l-2 border-zinc-300 dark:border-zinc-600">
-                  <p className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 leading-snug">
+                  <p className="text-[11px] font-bold text-zinc-900 leading-snug">
                     {diag.message}
                     {diag.sceneIdx !== undefined && (
-                      <span className="ml-1.5 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
+                      <span className="ml-1.5 text-[10px] font-mono text-zinc-600">
                         (Scene {diag.sceneIdx + 1})
                       </span>
                     )}
@@ -1252,7 +1298,10 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
                     <p className="text-[11px] font-bold text-[var(--sm-ok-on-light)] leading-snug mb-1">
                       {strength.message}
                     </p>
-                    <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {/* a11y fix (2026-09-06, theme-convention gate): same
+                        fractional-tint-card fix as Critical/Medium above
+                        (bg-green-50/50 dark:bg-green-900/10). */}
+                    <p className="text-[10px] font-mono text-[var(--sm-ink-soft)] leading-relaxed">
                       {strength.impact}
                     </p>
                   </div>
@@ -1566,7 +1615,13 @@ function DeltaGlyph({ delta, invert = false }: { delta: number; invert?: boolean
   // measured under 4.5:1 against bg-gray-50 in light mode. Full responsive
   // pair: -on-light against the light card, the *-400 shade (already proven
   // >=8:1 against zinc-800/900 elsewhere in this file) for dark.
-  const color = flat ? "text-gray-400" : improved ? "text-[var(--sm-ok-on-light)] dark:!text-green-400" : "text-[var(--sm-stamp-on-light)] dark:!text-red-400";
+  // a11y fix (2026-09-06, verify:a11y worst-20 contrast survey): the FLAT
+  // branch was still bare "text-gray-400" — measured 2.49:1 against the
+  // bg-gray-50 card this comment already says every call site renders in.
+  // text-gray-500/dark:text-gray-400 is the same muted-on-this-exact-card
+  // pair already proven throughout this file's real dark:bg-zinc-800/900
+  // surfaces (e.g. IssueCard's pass-name label).
+  const color = flat ? "text-gray-500 dark:text-gray-400" : improved ? "text-[var(--sm-ok-on-light)] dark:!text-green-400" : "text-[var(--sm-stamp-on-light)] dark:!text-red-400";
   const Icon = flat ? Minus : delta > 0 ? ArrowUp : ArrowDown;
   return (
     <span className={`inline-flex items-center gap-0.5 font-bold ${color}`}>
@@ -1609,7 +1664,11 @@ function DraftDeltaStrip({
 
   return (
     <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+      {/* a11y fix (2026-09-06, theme-convention gate): this strip's own
+          background is a REAL dark:bg-zinc-800 surface — the sibling
+          reading below already carries a themed pair
+          (text-black dark:text-gray-100), this label needs the same. */}
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
         vs. previous draft ({relativeTimeFrom(previous.at)})
       </p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-mono text-black dark:text-gray-100">
@@ -1628,7 +1687,10 @@ function DraftDeltaStrip({
           </span>
         )}
         {issuesDelta === 0 && (
-          <span className="text-gray-400">Issue count unchanged</span>
+          // a11y fix (2026-09-06, verify:a11y worst-20 contrast survey):
+          // this strip's own background is a real dark:bg-zinc-800 surface
+          // — bare text-gray-400 has no dark: half to react with it.
+          <span className="text-gray-500 dark:text-gray-400">Issue count unchanged</span>
         )}
       </div>
       {dimensionDeltas.length > 0 && (
@@ -1784,13 +1846,34 @@ function IssueCard({
   return (
     <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+        {/* a11y fix (2026-09-06, theme-convention gate): SEVERITY_META.badge
+            (bg-red-600 text-white / bg-amber-500 text-black /
+            bg-zinc-400 text-black) is itself a self-contained, already
+            theme-invariant pair — none of its three values carry a dark:
+            variant, by design, so it reads correctly in both themes as-is.
+            The scanner cannot see that: `${meta.badge}` is a variable
+            reference, so this span's OWN template literal carries no color
+            token at all and the walk (correctly, given what it can see)
+            treated it as inheriting the ambient invariant ink onto this
+            card's real dark:bg-zinc-800 surface. Inlined as a literal
+            ternary — the same idiom the scanner already treats as
+            transparent for a ternary background/text pair elsewhere in this
+            file's own test header — so the real, always-correct classes are
+            visible in source, not just at runtime. Renders byte-identical
+            classes to `meta.badge` for every value of `issue.severity`. */}
         <span
-          className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${meta.badge}`}
+          className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${
+            issue.severity === "critical"
+              ? "bg-red-600 text-white"
+              : issue.severity === "major"
+              ? "bg-amber-500 text-black"
+              : "bg-zinc-400 text-black"
+          }`}
         >
           {meta.label}
         </span>
         {pass && (
-          <span className="text-[9px] font-mono uppercase tracking-widest text-[var(--sm-ink-mute)]">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400">
             {formatPassName(pass)}
           </span>
         )}
@@ -1803,13 +1886,13 @@ function IssueCard({
             onClick={onNavigate}
             aria-label={`Jump to "${issue.location}" in the script`}
             title="Jump to this line in the editor"
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-black dark:text-gray-100 border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
           >
             Jump <ArrowRight className="w-2.5 h-2.5" aria-hidden="true" />
           </button>
         )}
       </div>
-      <p className="text-[10px] font-bold uppercase text-black mb-1 flex items-center gap-1.5 flex-wrap">
+      <p className="text-[10px] font-bold uppercase text-black dark:text-gray-100 mb-1 flex items-center gap-1.5 flex-wrap">
         {issue.rule}
         {/* Upgrade item #12: links straight to this rule's rulebook entry
             (docs/rulebook/<pass>.md#rule-<rule>) — undefined only when no
@@ -1821,7 +1904,7 @@ function IssueCard({
             target="_blank"
             rel="noreferrer noopener"
             title={`Why this matters — rulebook entry for ${issue.rule}`}
-            className="inline-flex items-center gap-0.5 normal-case font-mono text-[9px] font-normal text-[var(--sm-ink-mute)] hover:text-black dark:hover:text-white underline decoration-dotted"
+            className="inline-flex items-center gap-0.5 normal-case font-mono text-[9px] font-normal text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white underline decoration-dotted"
           >
             <Info className="w-2.5 h-2.5" aria-hidden="true" /> Why this matters
           </a>
@@ -1878,12 +1961,21 @@ function RootCauseCard({
       className={`bg-gray-50 dark:bg-zinc-800 border-2 border-l-[6px] ${ROOT_CAUSE_SEVERITY_BORDER[finding.severity]} border-black/10 dark:border-white/10 p-3 space-y-2`}
     >
       <div className="flex items-center gap-2 flex-wrap">
+        {/* a11y fix (2026-09-06, theme-convention gate): same
+            scanner-legibility fix as IssueCard's identical badge above —
+            see its comment. */}
         <span
-          className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${meta.badge}`}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${
+            finding.severity === "critical"
+              ? "bg-red-600 text-white"
+              : finding.severity === "major"
+              ? "bg-amber-500 text-black"
+              : "bg-zinc-400 text-black"
+          }`}
         >
           <Icon className="w-3 h-3" aria-hidden="true" /> {meta.label}
         </span>
-        <span className="text-xs font-bold uppercase tracking-wide text-black">
+        <span className="text-xs font-bold uppercase tracking-wide text-black dark:text-gray-100">
           {finding.title}
         </span>
         {onNavigate && (
@@ -1892,7 +1984,7 @@ function RootCauseCard({
             onClick={onNavigate}
             aria-label={`Jump to "${finding.title}" in the script`}
             title="Jump to these lines in the editor"
-            className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
+            className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-black dark:text-gray-100 border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
           >
             Jump <ArrowRight className="w-2.5 h-2.5" aria-hidden="true" />
           </button>
@@ -1901,7 +1993,7 @@ function RootCauseCard({
       <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
         {finding.explanation}
       </p>
-      <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
+      <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
         {finding.memberCount} issue{finding.memberCount === 1 ? "" : "s"}
         {sceneLabel ? ` • ${sceneLabel}` : ""}
       </p>
@@ -1911,7 +2003,7 @@ function RootCauseCard({
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
             aria-controls={notesId}
-            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black hover:underline"
+            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black dark:text-gray-100 hover:underline"
           >
             {open ? (
               <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -1975,7 +2067,11 @@ function RootCauseCard({
                   {fixState.pending ? "Fixing & verifying…" : "Fix & verify"}
                 </button>
                 {disabledReason && !fixState.pending && (
-                  <p className="text-[10px] font-mono text-[var(--sm-ink-mute)]">
+                  // a11y fix (2026-09-06, theme-convention gate): this
+                  // caption's ambient is RootCauseCard's own
+                  // dark:bg-zinc-800 surface (this block sits directly
+                  // inside it, no intervening bg reset).
+                  <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
                     {disabledReason}
                   </p>
                 )}
@@ -2046,8 +2142,21 @@ function FixStructuralSignalsStrip({ signals }: { signals: FixStructuralSignalsD
   // no comparison to make there), SnapshotManager's Versions trend,
   // WhatIfPanel.tsx, coverage-html.ts and coverage-letter.ts — so a
   // precision change here can never again disagree with the other five.
+  // a11y fix (2026-09-06, theme-convention gate — found by manual review,
+  // not the scanner: this walk scans every top-level function's own JSX
+  // independently from the file's root defaults (safe/invariant), with no
+  // notion of which real ambient a caller renders it on — so a reusable
+  // component like this one is evaluated as if mounted directly on the
+  // invariant panel, never as the real dark:bg-zinc-800 receipt card BOTH
+  // of its actual call sites wrap it in. That made the original invariant
+  // ink read as "correct" (invariant-on-assumed-safe passes), while it was
+  // really invariant-ink-on-a-real-dark-background at both real call sites.
+  // Since the true ambient is always dark here, this now declares its OWN
+  // matching bg — redundant paint under an identically-colored parent, so
+  // nothing renders differently — which lets BOTH the text-mode-derived
+  // trigger the scanner uses AND the walk's real DOM behavior agree.
   return (
-    <div className="text-[10px] font-mono text-[var(--sm-ink-mute)] flex items-center gap-3 flex-wrap">
+    <div className="bg-gray-50 dark:bg-zinc-800 text-[10px] font-mono text-gray-500 dark:text-gray-400 flex items-center gap-3 flex-wrap">
       <span className="uppercase tracking-widest font-bold">Shape &amp; rhythm (descriptive, not part of the score)</span>
       <span>
         Talk/action swing{" "}
@@ -2144,8 +2253,17 @@ function FixDeltaList({
   emptyLabel: string;
 }) {
   const isCleared = tone === "cleared";
+  // a11y fix (2026-09-06, theme-convention gate — found the same way
+  // FixStructuralSignalsStrip's was, see that component's own comment): this
+  // walk scans every top-level function's own JSX independently from the
+  // file's root defaults, with no notion of which real ambient a caller
+  // renders it on. FixDeltaList is ALWAYS rendered inside the receipt
+  // card's real bg-gray-50 dark:bg-zinc-800 surface (both call sites, the
+  // "Cleared" and "Introduced" columns) — declaring the same bg on its own
+  // root (redundant paint under an identically-colored parent) lets the
+  // walk's assumed ambient and the real one agree.
   return (
-    <div>
+    <div className="bg-gray-50 dark:bg-zinc-800">
       <p
         className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${
           isCleared ? "text-[var(--sm-ok-on-light)] dark:!text-[var(--sm-ok-on-dark)]" : "text-[var(--sm-stamp-on-light)] dark:!text-[var(--sm-stamp-on-dark)]"
@@ -2154,7 +2272,10 @@ function FixDeltaList({
         {isCleared ? "Cleared" : "Introduced"} ({items.length})
       </p>
       {items.length === 0 ? (
-        <p className="text-[10px] font-mono text-gray-400">{emptyLabel}</p>
+        // a11y fix (2026-09-06, verify:a11y worst-20 contrast survey): bare
+        // text-gray-400 measured 2.49:1 on this real dark:bg-zinc-800
+        // surface. Same fix as DeltaGlyph's flat branch above.
+        <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400">{emptyLabel}</p>
       ) : (
         <ul className="space-y-1">
           {items.map((issue, i) => (
@@ -2290,7 +2411,10 @@ function FixReceiptCard({
     return (
       <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+          {/* a11y fix (2026-09-06, theme-convention gate) — this box's own
+              background is a REAL dark:bg-zinc-800 surface, same pairing as
+              the "Not comparable" heading right above this branch. */}
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
             Fix &amp; verify — no candidate
           </p>
           <button
@@ -2330,11 +2454,14 @@ function FixReceiptCard({
       className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-3"
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+        {/* a11y fix (2026-09-06, theme-convention gate) — same fix as the
+            "no candidate" heading above: this receipt card's own background
+            is a real dark:bg-zinc-800 surface. */}
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
           {isWriterCandidate ? "Verified — your rewrite" : "Fix & verify receipt"}
         </p>
         {isWriterCandidate && (
-          <span className="text-[9px] font-mono text-[var(--sm-ink-mute)] normal-case tracking-normal">
+          <span className="text-[9px] font-mono text-gray-500 dark:text-gray-400 normal-case tracking-normal">
             Measured by the Script Doctor. No AI was used.
           </span>
         )}
@@ -2394,10 +2521,12 @@ function FixReceiptCard({
       </div>
 
       <div>
+        {/* a11y fix (2026-09-06, theme-convention gate) \u2014 receipt card's
+            real dark:bg-zinc-800 ambient, same as the labels above. */}
         <button
           onClick={onToggleDiff}
           aria-expanded={diffOpen}
-          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black hover:underline"
+          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black dark:text-gray-100 hover:underline"
         >
           {diffOpen ? (
             <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -2418,7 +2547,13 @@ function FixReceiptCard({
                     ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:!text-green-400"
                     : d.type === "removed"
                     ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:!text-red-400"
-                    : "text-[var(--sm-ink-mute)]"
+                    // a11y fix (2026-09-06, theme-convention gate): this
+                    // diff box's own background is a REAL dark:bg-zinc-900
+                    // surface (unlike the outer receipt card, it has no
+                    // opacity), so an unchanged ('same') row needs the same
+                    // themed pairing the added/removed rows above it
+                    // already carry, not an invariant --sm-ink token.
+                    : "text-gray-500 dark:text-gray-400"
                 }`}
               >
                 <span className="w-3 shrink-0 select-none">
@@ -2430,7 +2565,7 @@ function FixReceiptCard({
               </div>
             ))}
             {changedTotal > diff.length && (
-              <div className="px-2 py-1 text-[var(--sm-ink-mute)]">
+              <div className="px-2 py-1 text-gray-500 dark:text-gray-400">
                 &hellip; and {changedTotal - diff.length} more changed line(s) not shown.
               </div>
             )}
@@ -2440,7 +2575,7 @@ function FixReceiptCard({
 
       {isWriterCandidate ? (
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] flex-1 min-w-[12rem]">
+          <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 flex-1 min-w-[12rem]">
             This rewrite is your own editor text &mdash; there is nothing to apply. Re-run diagnosis to
             make it the report on screen.
           </p>
@@ -2452,7 +2587,7 @@ function FixReceiptCard({
           </button>
         </div>
       ) : applied ? (
-        <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest">
+        <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
           Re-run diagnosis to see the new report.
         </p>
       ) : (
@@ -4457,7 +4592,13 @@ export default function ScriptDoctorPanel({
         {/* ── Idle state ── */}
         {status === "idle" &&
           (isEmpty ? (
-            <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600 text-gray-400 space-y-4">
+            // a11y fix (2026-09-06, verify:a11y worst-20 contrast survey):
+            // this container sits directly on the invariant panel (no bg of
+            // its own) — bare text-gray-400 measured ~2.27:1 there, same
+            // pre-existing-in-both-themes shape as the Scene Heatmap fix
+            // above. --sm-ink-faint is the design system's own "labels /
+            // captions" tier.
+            <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600 text-[var(--sm-ink-faint)] space-y-4">
               <p className="text-xs uppercase tracking-widest">
                 Write some script content, or upload a script file above, before
                 running a diagnosis.
@@ -4475,7 +4616,11 @@ export default function ScriptDoctorPanel({
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+              {/* a11y fix (2026-09-06, theme-convention gate): this idle-state
+                  paragraph and the label below it sit directly on the
+                  theme-invariant panel — no dark:bg- ancestor anywhere in
+                  this branch — so their `dark:text-*` halves were orphaned. */}
+              <p className="text-xs leading-relaxed text-gray-700">
                 Script Doctor runs the full 14-pass narrative revision engine in
                 diagnose-only mode — dialogue, structure, character arcs, conflict,
                 pacing, theme, voice, and more — and returns a health score, a
@@ -4496,10 +4641,14 @@ export default function ScriptDoctorPanel({
                   : undefined;
                 return (
                   <label
+                    // a11y fix (2026-09-06, verify:a11y worst-20 contrast
+                    // survey): the disabled branch's bare text-gray-400
+                    // measured ~2.27:1 on this invariant panel — same
+                    // pre-existing shape as the idle-empty-state fix above.
                     className={`flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest select-none ${
                       disabledReason
-                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                        : "text-gray-700 dark:text-gray-300 cursor-pointer"
+                        ? "text-[var(--sm-ink-faint)] cursor-not-allowed"
+                        : "text-gray-700 cursor-pointer"
                     }`}
                     title={disabledReason}
                   >
@@ -4543,7 +4692,12 @@ export default function ScriptDoctorPanel({
         {status === "loading" && (
           <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-500" aria-hidden="true" />
-            <p className="text-xs uppercase tracking-widest text-gray-500" role="status" aria-live="polite">
+            {/* a11y fix (2026-09-06, verify:a11y worst-20 contrast survey):
+                this text sits on the invariant panel (no bg on this
+                container) — text-gray-500 computes to ~4.22:1 there, just
+                under AA. --sm-ink-mute is this design system's own muted
+                text tier for exactly this surface (4.82-5.57:1). */}
+            <p className="text-xs uppercase tracking-widest text-[var(--sm-ink-mute)]" role="status" aria-live="polite">
               {streamProgress
                 ? doctorProgressLabel(streamProgress)
                 : lastRunRoute === "deep"
@@ -4863,7 +5017,13 @@ export default function ScriptDoctorPanel({
                     </>
                   )}
                 </p>
-                <p className="mt-1 text-[10px] normal-case tracking-normal text-[var(--sm-ink-mute)] leading-snug">
+                {/* a11y fix (2026-09-06, theme-convention gate): this
+                    findingsDelta box's own background is a REAL
+                    dark:bg-zinc-800 surface (see its wrapping div above),
+                    same as the "Notes are matched by rule" caption's
+                    ancestor — needs the same themed pair the box's own
+                    header text already carries, not an invariant token. */}
+                <p className="mt-1 text-[10px] normal-case tracking-normal text-gray-500 dark:text-gray-400 leading-snug">
                   Notes are matched by rule and by the scene they fall in, not by line
                   number — so editing one scene doesn&rsquo;t churn the count for the rest
                   of the draft.
@@ -5125,13 +5285,28 @@ export default function ScriptDoctorPanel({
                         >
                           <div className={`h-full ${band.bar}`} style={{ width: `${pct}%` }} />
                         </div>
-                        <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-1">
+                        {/* a11y fix (2026-09-06, theme-convention gate): the
+                            progress bar's own track above (bg-gray-200
+                            dark:bg-zinc-700) has no text of its own, so it
+                            never established a real dark ambient here — this
+                            dimension row sits directly on the invariant
+                            panel, so both captions' `dark:text-*` halves
+                            were orphaned. */}
+                        <p className="text-[11px] font-mono text-gray-600 leading-snug mt-1">
                           {dim.summary}
                         </p>
                         {/* D5 false-precision fix: name how much evidence backs this
                             number — a 0-100 score from 2-4 passes on a handful of
                             fired issues is not the same claim as one from all 14. */}
-                        <p className="text-[10px] font-mono text-gray-400 dark:text-gray-500 leading-snug mt-0.5">
+                        {/* a11y fix (2026-09-06, verify:a11y worst-20 contrast
+                            survey): bare text-gray-400 measured 2.27:1 on
+                            --sm-panel in BOTH themes (pre-existing, same
+                            shape as the Scene Heatmap fix above — not a
+                            theme-convention violation since this color never
+                            had a dark: half to begin with, just genuinely
+                            too light). --sm-ink-faint is the design system's
+                            own "labels / captions" tier, 4.82-5.57:1. */}
+                        <p className="text-[10px] font-mono text-[var(--sm-ink-faint)] leading-snug mt-0.5">
                           Based on {dim.issueCount} issue{dim.issueCount === 1 ? "" : "s"} across{" "}
                           {dim.passes.length} pass{dim.passes.length === 1 ? "" : "es"} (
                           {dim.passes.map(formatPassName).join(", ")}).
@@ -5150,11 +5325,15 @@ export default function ScriptDoctorPanel({
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                   What&rsquo;s Working
                 </h3>
+                {/* a11y fix (2026-09-06, theme-convention gate): this list
+                    sits directly on the invariant panel — no dark:bg-
+                    ancestor anywhere above it — so the row's own
+                    `dark:text-gray-100` was orphaned. */}
                 <ul className="space-y-1.5">
                   {report.strengths.map((s, i) => (
                     <li
                       key={i}
-                      className="flex items-start gap-2 text-xs font-mono text-black dark:text-gray-100 leading-relaxed"
+                      className="flex items-start gap-2 text-xs font-mono text-black leading-relaxed"
                     >
                       <CheckCircle2
                         className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--sm-ok-on-light)]"
@@ -5245,7 +5424,17 @@ export default function ScriptDoctorPanel({
                     />
                   ))}
                 </div>
-                <div className="flex justify-between text-[9px] font-mono text-gray-400 mt-1 uppercase">
+                {/* a11y fix (2026-09-06, verify:a11y worst-20 contrast survey
+                    — theme-convention doesn't catch this one, since
+                    "text-gray-400" alone is a plain color, not the
+                    --sm-ink/text-black family that scanner treats as
+                    invariant ink; measured live at 2.27:1 on --sm-panel).
+                    Same pre-existing, both-themes bug the structural-signal
+                    bar chart's identical Scene 1/Scene N labels were already
+                    fixed for above (see that REVIEW FIX comment) — this is
+                    the Scene Heatmap's own separate copy of the same shape,
+                    missed in that round. Same fix: --sm-ink-mute. */}
+                <div className="flex justify-between text-[9px] font-mono text-[var(--sm-ink-mute)] mt-1 uppercase">
                   <span>Scene 1</span>
                   <span>Scene {report.sceneHeatmap.length}</span>
                 </div>
@@ -5295,11 +5484,19 @@ export default function ScriptDoctorPanel({
                   Structural Analysis
                 </h3>
                 <div className="space-y-2">
+                  {/* a11y fix (2026-09-06, theme-convention gate): every card
+                      in this GODMODE block has a REAL dark:bg-zinc-900
+                      surface, and these headings/values carried NO text
+                      color at all — inheriting the app's default invariant
+                      ink (body { color: var(--color-ink) }), measured 1.06:1
+                      in dark mode on "Graph Health". Added the same themed
+                      pair this file's body text already uses on this exact
+                      background elsewhere (e.g. IssueCard's description). */}
                   {report.graphHealth && (
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold">Graph Health</span>
-                        <span className="text-xs font-mono">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-[var(--sm-stamp-on-light)] dark:!text-red-400">−{report.graphHealth.graphDeduction}hp</span>}</span>
+                        <span className="text-xs font-bold text-black dark:text-gray-100">Graph Health</span>
+                        <span className="text-xs font-mono text-black dark:text-gray-100">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-[var(--sm-stamp-on-light)] dark:!text-red-400">−{report.graphHealth.graphDeduction}hp</span>}</span>
                       </div>
                       {report.graphHealth.findings.length > 0 && (
                         <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
@@ -5311,8 +5508,8 @@ export default function ScriptDoctorPanel({
                   {report.disclosureAnalysis?.scored && (
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold">Disclosure & Epistemics</span>
-                        <span className="text-xs font-mono">{report.disclosureAnalysis.violationCount} violations, {report.disclosureAnalysis.epistemicGaps.length} gaps</span>
+                        <span className="text-xs font-bold text-black dark:text-gray-100">Disclosure & Epistemics</span>
+                        <span className="text-xs font-mono text-black dark:text-gray-100">{report.disclosureAnalysis.violationCount} violations, {report.disclosureAnalysis.epistemicGaps.length} gaps</span>
                       </div>
                       {report.disclosureAnalysis.epistemicGaps.length > 0 && (
                         <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
@@ -5323,10 +5520,10 @@ export default function ScriptDoctorPanel({
                   )}
                   {report.characterFunctions && report.characterFunctions.length > 0 && (
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
-                      <span className="text-xs font-bold">Character Functions</span>
+                      <span className="text-xs font-bold text-black dark:text-gray-100">Character Functions</span>
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {report.characterFunctions.map((cf, i) => (
-                          <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 border border-gray-300 dark:border-gray-700">
+                          <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700">
                             {cf.characterId}: {cf.function}
                           </span>
                         ))}
@@ -5336,8 +5533,8 @@ export default function ScriptDoctorPanel({
                   {report.subplots && report.subplots.totalSubplots > 0 && (
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold">Subplots</span>
-                        <span className="text-xs font-mono">{report.subplots.totalSubplots} threads ({report.subplots.unresolvedSubplots} unresolved, {report.subplots.intersectionCount} intersections)</span>
+                        <span className="text-xs font-bold text-black dark:text-gray-100">Subplots</span>
+                        <span className="text-xs font-mono text-black dark:text-gray-100">{report.subplots.totalSubplots} threads ({report.subplots.unresolvedSubplots} unresolved, {report.subplots.intersectionCount} intersections)</span>
                       </div>
                       <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
                         {report.subplots.subplots.slice(0, 5).map((sp, i) => <li key={i}>• {sp.description}</li>)}
@@ -5347,8 +5544,8 @@ export default function ScriptDoctorPanel({
                   {report.ruleBreaking?.scored && report.ruleBreaking.findings.length > 0 && (
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold">Deliberate Rule-Breaking</span>
-                        <span className="text-xs font-mono">
+                        <span className="text-xs font-bold text-black dark:text-gray-100">Deliberate Rule-Breaking</span>
+                        <span className="text-xs font-mono text-black dark:text-gray-100">
                           {report.ruleBreaking.findings.filter(f => f.readsAsDeliberate).length}/{report.ruleBreaking.findings.length} deliberate
                         </span>
                       </div>
@@ -5410,7 +5607,12 @@ export default function ScriptDoctorPanel({
                         aria-expanded={isOpen}
                         className="w-full flex items-center justify-between gap-2 p-3 text-left hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                       >
-                        <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest">
+                        {/* a11y fix (2026-09-06, theme-convention gate): this
+                            row's own bg-white dark:bg-zinc-900 IS a real dark
+                            surface (unlike Shape & Rhythm's invariant
+                            bg-[var(--sm-panel)] button above) — see the
+                            Structural Analysis cards' identical fix. */}
+                        <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest text-black dark:text-gray-100">
                           {isOpen ? (
                             <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                           ) : (
@@ -5435,7 +5637,18 @@ export default function ScriptDoctorPanel({
                       {isOpen && (
                         <div className="p-3 pt-0 space-y-2">
                           {p.issues.length === 0 ? (
-                            <p className="text-[10px] font-mono text-gray-500 uppercase px-1 pb-2">
+                            // a11y fix (2026-09-06, verify:a11y axe scan):
+                            // this pass card's own bg-white dark:bg-zinc-900
+                            // is a real dark surface — bare text-gray-500
+                            // (no dark: half) measured a SERIOUS axe
+                            // color-contrast violation, 3.66:1, in dark
+                            // mode. theme-convention.test.ts's own forward
+                            // rule only tracks the --sm-ink/text-black
+                            // family as "invariant ink" — a plain
+                            // never-themed safe color like this one is
+                            // outside that rule's scope, which is why axe
+                            // (not the scanner) is what caught it.
+                            <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase px-1 pb-2">
                               No issues found by this pass.
                             </p>
                           ) : (
@@ -5472,7 +5685,11 @@ export default function ScriptDoctorPanel({
                   aria-expanded={historyOpen}
                   className="w-full flex items-center justify-between gap-2 p-3 text-left border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                 >
-                  <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest">
+                  {/* a11y fix (2026-09-06, theme-convention gate): this
+                      header's own bg-white dark:bg-zinc-900 is a real dark
+                      surface — same fix as Per-Pass Breakdown's header
+                      above. */}
+                  <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest text-black dark:text-gray-100">
                     {historyOpen ? (
                       <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                     ) : (
@@ -5489,7 +5706,7 @@ export default function ScriptDoctorPanel({
                       no script key). It used to read `history.length`: every run
                       of every script, under a heading a writer reads as this
                       one's. */}
-                  <span className="text-[9px] font-mono text-[var(--sm-ink-mute)] uppercase">
+                  <span className="text-[9px] font-mono text-gray-500 dark:text-gray-400 uppercase">
                     {historyView.currentCount} run{historyView.currentCount === 1 ? "" : "s"} of this script
                     {historyView.elsewhereCount > 0 && <> &middot; {historyView.elsewhereCount} elsewhere</>}
                   </span>
@@ -5519,11 +5736,15 @@ export default function ScriptDoctorPanel({
                               {group.entries.length > shown.length ? ` (latest ${shown.length} shown)` : ""}
                             </span>
                           </p>
+                          {/* a11y fix (2026-09-06, theme-convention gate):
+                              this list sits directly on the invariant panel
+                              (its own wrapping div carries a border, no bg)
+                              — every `dark:text-*` half below was orphaned. */}
                           <ul className="space-y-1.5">
                             {shown.map((entry) => (
                               <li
                                 key={`${entry.at}-${entry.contentHash}`}
-                                className="flex items-center justify-between gap-2 text-[10px] font-mono text-black dark:text-gray-100 border-b border-black/10 dark:border-white/10 pb-1.5 last:border-b-0 last:pb-0"
+                                className="flex items-center justify-between gap-2 text-[10px] font-mono text-black border-b border-black/10 dark:border-white/10 pb-1.5 last:border-b-0 last:pb-0"
                               >
                                 <span className="text-[var(--sm-ink-mute)] shrink-0">
                                   {new Date(entry.at).toLocaleString()}
@@ -5532,7 +5753,7 @@ export default function ScriptDoctorPanel({
                                 {entry.verdict && (
                                   <span className="uppercase font-bold shrink-0">{entry.verdict}</span>
                                 )}
-                                <span className="text-gray-600 dark:text-gray-300 truncate">
+                                <span className="text-gray-600 truncate">
                                   {entry.totalIssues} issue{entry.totalIssues === 1 ? "" : "s"}
                                 </span>
                                 {/* Cross-version entries are never deleted — they stay
@@ -5540,8 +5761,12 @@ export default function ScriptDoctorPanel({
                                     a scoring-formula change is not a reason to erase a
                                     writer's own recorded history. */}
                                 {entryFormulaVersion(entry) !== DOCTOR_HISTORY_FORMULA_VERSION && (
+                                  // a11y fix (2026-09-06, verify:a11y
+                                  // worst-20 contrast survey): this list
+                                  // sits on the invariant panel — bare
+                                  // text-gray-400 measured ~2.27:1.
                                   <span
-                                    className="text-[9px] italic text-gray-400 dark:text-gray-500 shrink-0"
+                                    className="text-[9px] italic text-[var(--sm-ink-faint)] shrink-0"
                                     title="Recorded under a previous version of the health-scoring formula — not directly comparable to current scores."
                                   >
                                     (older scoring model)

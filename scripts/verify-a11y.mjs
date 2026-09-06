@@ -236,6 +236,94 @@ function measureContrastNode(el) {
 }
 
 /**
+ * Self-contained (no closure references — serialized and run IN the page,
+ * same constraint as `measureContrastNode` above, whose color math this
+ * duplicates rather than shares, since a `locator.evaluate` callback cannot
+ * call out to another function defined in this Node process) worst-contrast
+ * SURVEY over every visible text leaf inside `root`: walks every element,
+ * keeps the ones with non-empty OWN direct text (a leaf, not a container —
+ * same "direct text" idea theme-convention.test.ts's AST walk uses, just
+ * measured live in the DOM instead of read from source), measures each with
+ * the identical canvas-resolved, alpha-composited contrast math, and returns
+ * the worst `limit` sorted ascending by ratio. Used for the panel theme
+ * lane's per-node before/after table (LANE_STANDARD §3) — a single number
+ * ("axe found 0 violations") does not show HOW MUCH headroom the fix
+ * bought, and scanning broadly (not just the handful of previously-known
+ * bad nodes) is what proves the whole Doctor panel, not just the spots this
+ * lane already knew about.
+ */
+function worstContrastNodes(root, limit) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 1;
+  const c2 = cv.getContext('2d', { willReadFrequently: true });
+  const toRgb = (c) => {
+    c2.clearRect(0, 0, 1, 1);
+    c2.fillStyle = '#000';
+    c2.fillStyle = c;
+    c2.fillRect(0, 0, 1, 1);
+    const d = c2.getImageData(0, 0, 1, 1).data;
+    return { rgb: [d[0], d[1], d[2]], a: d[3] / 255 };
+  };
+  const lum = (rgb) => {
+    const [r, g, b] = rgb.map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const l1 = lum(a);
+    const l2 = lum(b);
+    const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+    return Number(((hi + 0.05) / (lo + 0.05)).toFixed(2));
+  };
+  const blend = (fg, bg, a) => fg.map((v, i) => Math.round(v * a + bg[i] * (1 - a)));
+  const bgOf = (node) => {
+    let n = node;
+    const stack = [];
+    while (n && n !== document.documentElement) {
+      const c = toRgb(getComputedStyle(n).backgroundColor);
+      if (c.a > 0) stack.push(c);
+      if (c.a > 0.999) break;
+      n = n.parentElement;
+    }
+    if (!stack.length) return [255, 255, 255];
+    let out = stack[stack.length - 1].a > 0.999 ? stack[stack.length - 1].rgb : [255, 255, 255];
+    for (let i = stack.length - 2; i >= 0; i--) out = blend(stack[i].rgb, out, stack[i].a);
+    return out;
+  };
+  const isVisible = (el) => {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0;
+  };
+  const hasOwnDirectText = (el) => Array.from(el.childNodes).some(
+    (n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() !== '',
+  );
+
+  const out = [];
+  const all = root.querySelectorAll('*');
+  for (const el of all) {
+    if (!hasOwnDirectText(el) || !isVisible(el)) continue;
+    const cs = getComputedStyle(el);
+    const fg = toRgb(cs.color);
+    if (fg.a === 0) continue; // fully transparent text paints nothing
+    const bg = bgOf(el);
+    out.push({
+      tag: el.tagName.toLowerCase(),
+      selector: el.id ? `#${el.id}` : (el.className && typeof el.className === 'string' ? `.${el.className.trim().split(/\s+/).slice(0, 2).join('.')}` : el.tagName.toLowerCase()),
+      text: (el.textContent || '').trim().slice(0, 50),
+      fg: `rgb(${fg.rgb})`,
+      bg: `rgb(${bg})`,
+      ratio: ratio(fg.rgb, bg),
+    });
+  }
+  out.sort((a, b) => a.ratio - b.ratio);
+  return out.slice(0, limit);
+}
+
+/**
  * Scrolls the "Full report" dialog's own scroll container until the Shape &
  * Rhythm section is actually in view, and returns a Locator scoped to the
  * section's own DOM subtree (for `auditElement` above) — not the whole
@@ -1556,6 +1644,219 @@ async function main() {
     }
   }
   await context10d.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 11) Script Doctor — the FULL "Full report" dialog, every section
+  //     expanded, both themes, at rest — the paneltheme lane's own gate
+  //     (2026-09-06). Sections 5/6 above already cover the report at its
+  //     DEFAULT scroll/collapse state; this step goes further and opens
+  //     every collapsible section a real reader would actually expand:
+  //     Shape & Rhythm (already gated above, re-checked here inside the
+  //     SAME expanded pass so it's measured alongside everything else, not
+  //     in isolation), Root Causes' "contributing notes" and its
+  //     deterministic "Verify my rewrite" fix receipt (the ONE fix-and-
+  //     verify path a keyless server can actually reach — generation needs
+  //     an AI key, verification does not), Draft History, and the Per-Pass
+  //     Breakdown. A hand-typed 4-line script (sections 5/6's own script)
+  //     is too thin for structural signals or Root Causes to exist at all
+  //     (see section 6's own comment) — this uses a real multi-scene draft,
+  //     analyzed via the actual "Run Diagnosis" path (not the built-in
+  //     sample, which BLOCKS "Verify my rewrite" — see
+  //     ScriptDoctorPanel.tsx's verifyBlockedReason: a sample report is not
+  //     the editor's own draft, so the deterministic-verify control stays
+  //     disabled for it by design).
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== 11) Script Doctor — Full report, EVERY section expanded, both themes ===');
+  const context11 = await browser.newContext();
+  const page11 = await context11.newPage();
+  wireConsoleCapture(page11, genuineConsoleErrors);
+  await page11.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await page11.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await page11.locator('header.sm-pagetop').waitFor({ timeout: timing.ms(15000) });
+
+  const editor11 = page11.locator('.cm-content').first();
+  await editor11.waitFor({ timeout: timing.ms(10000) });
+  await editor11.focus();
+  const draft11 = [
+    'INT. KITCHEN - MORNING',
+    '',
+    'MARA stares at a cold cup of coffee. The clock reads 6:04.',
+    '',
+    'MARA',
+    "I don't have time for this today.",
+    '',
+    'She pours it out and grabs her coat off the chair.',
+    '',
+    'EXT. STREET - CONTINUOUS',
+    '',
+    'Mara walks fast, phone pressed to her ear.',
+    '',
+    'MARA (V.O.)',
+    'Tell him I already left. Tell him whatever you want.',
+    '',
+    'A car horn blares. She does not flinch.',
+    '',
+    'INT. OFFICE LOBBY - DAY',
+    '',
+    'DARIUS waits by the elevator, checking his watch.',
+    '',
+    'DARIUS',
+    'You said seven fifteen.',
+    '',
+    'MARA',
+    'I said I would try.',
+    '',
+    'They ride the elevator in silence.',
+    '',
+    'INT. CONFERENCE ROOM - CONTINUOUS',
+    '',
+    'The room is empty except for a single folder on the table.',
+    '',
+    'DARIUS',
+    'They already left. This was the whole meeting.',
+    '',
+    'MARA',
+    'Then we will catch up. We always do.',
+    '',
+  ].join('\n');
+  await page11.keyboard.insertText(draft11);
+  // The Doctor tab (labelled "Coverage" in the nav) is where the report
+  // lives — same navigation section 5 above uses. This app auto-runs the
+  // deterministic quick read as soon as the editor has enough content
+  // (measured live: by the time the Coverage tab is reachable, a report
+  // already exists) — "Run Diagnosis" is only a MANUAL re-run trigger, so
+  // this waits for the report text directly rather than requiring the
+  // button, same resilient pattern section 5 above uses.
+  const coverageNavBtn11 = page11.getByRole('button', { name: 'Coverage', exact: true }).first();
+  await coverageNavBtn11.click();
+  const runDiagnosisBtn11 = page11.getByRole('button', { name: 'Run Diagnosis', exact: true }).first();
+  if (await runDiagnosisBtn11.count()) {
+    await runDiagnosisBtn11.waitFor({ state: 'visible', timeout: timing.ms(5000) }).catch(() => {});
+    await runDiagnosisBtn11.click().catch(() => {});
+  }
+  const reportRendered11 = await page11.waitForFunction(
+    () => /CONSIDER|RECOMMEND|PASS/.test(document.body.textContent || ''),
+    { timeout: timing.ms(45000) },
+  ).then(() => true).catch(() => false);
+  record('doctor-full-report-gate', 'a real (non-sample) multi-scene draft produces a report via Run Diagnosis', reportRendered11);
+
+  if (reportRendered11) {
+    for (const mode of ['light', 'dark']) {
+      if (mode === 'dark') {
+        // eslint-disable-next-line no-await-in-loop
+        await editor11.focus();
+        // eslint-disable-next-line no-await-in-loop
+        await page11.keyboard.press(isMac ? 'Alt+Shift+d' : 'Alt+Shift+D');
+        // eslint-disable-next-line no-await-in-loop
+        await page11.waitForTimeout(timing.ms(300));
+      }
+
+      const fullReportBtn11 = page11.getByRole('button', { name: 'Full report', exact: true }).first();
+      // eslint-disable-next-line no-await-in-loop
+      const fullReportReachable11 = await fullReportBtn11.count().then((n) => n > 0);
+      record('doctor-full-report-gate', `${mode}: "Full report" is reachable`, fullReportReachable11);
+      if (!fullReportReachable11) continue; // eslint-disable-line no-continue
+
+      // eslint-disable-next-line no-await-in-loop
+      await fullReportBtn11.click();
+      const dialog11 = page11.getByRole('dialog').first();
+      // eslint-disable-next-line no-await-in-loop
+      await dialog11.waitFor({ state: 'visible', timeout: timing.ms(10000) });
+
+      // Shape & Rhythm — reuse the existing scroll-into-view helper (axe's
+      // color-contrast rule skips off-screen-in-a-scroller nodes; see its
+      // own header).
+      // eslint-disable-next-line no-await-in-loop
+      const shapeRhythmSection11 = await scrollShapeRhythmIntoView(page11).catch(() => null);
+      record('doctor-full-report-gate', `${mode}: Shape & Rhythm section is reachable`, !!shapeRhythmSection11);
+
+      // Root Causes — expand every "Show the N contributing notes" toggle
+      // present, then run the deterministic "Verify my rewrite" so the fix
+      // receipt (FixReceiptCard + FixStructuralSignalsStrip + the diff
+      // view) actually exists in the DOM, not just its collapsed button.
+      const rootCauseToggles11 = dialog11.getByRole('button', { name: /Show the \d+ contributing note/ });
+      // eslint-disable-next-line no-await-in-loop
+      const rootCauseCount11 = await rootCauseToggles11.count();
+      record('doctor-full-report-gate', `${mode}: Root Causes cards present (informational — depends on this draft's own findings)`, true, `${rootCauseCount11} card(s) with member notes`);
+      for (let i = 0; i < rootCauseCount11; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await rootCauseToggles11.nth(i).click().catch(() => {});
+      }
+
+      const verifyBtn11 = dialog11.getByRole('button', { name: 'Verify my rewrite', exact: true }).first();
+      // eslint-disable-next-line no-await-in-loop
+      const verifyReachable11 = await verifyBtn11.count().then((n) => n > 0);
+      record('doctor-full-report-gate', `${mode}: "Verify my rewrite" (the keyless, deterministic fix-receipt path) is reachable`, verifyReachable11);
+      if (verifyReachable11) {
+        // eslint-disable-next-line no-await-in-loop
+        const verifyDisabled11 = await verifyBtn11.isDisabled();
+        if (!verifyDisabled11) {
+          // eslint-disable-next-line no-await-in-loop
+          await verifyBtn11.click();
+          // eslint-disable-next-line no-await-in-loop
+          const receiptRendered11 = await dialog11.getByText(/Verified — your rewrite/).first()
+            .waitFor({ timeout: timing.ms(15000) }).then(() => true).catch(() => false);
+          record('doctor-full-report-gate', `${mode}: the deterministic fix receipt (FixReceiptCard) renders`, receiptRendered11);
+          if (receiptRendered11) {
+            const diffToggle11 = dialog11.getByRole('button', { name: /View changed lines/ }).first();
+            // eslint-disable-next-line no-await-in-loop
+            if (await diffToggle11.count()) await diffToggle11.click().catch(() => {});
+          }
+        }
+      }
+
+      // Draft History — this run just added an entry, so the section exists
+      // by construction; open it.
+      const historyToggle11 = dialog11.getByRole('button', { name: /Draft History/ }).first();
+      // eslint-disable-next-line no-await-in-loop
+      const historyReachable11 = await historyToggle11.count().then((n) => n > 0);
+      record('doctor-full-report-gate', `${mode}: "Draft History" is reachable`, historyReachable11);
+      if (historyReachable11) {
+        // eslint-disable-next-line no-await-in-loop
+        const historyExpanded11 = await historyToggle11.getAttribute('aria-expanded');
+        if (historyExpanded11 !== 'true') {
+          // eslint-disable-next-line no-await-in-loop
+          await historyToggle11.click().catch(() => {});
+        }
+      }
+
+      // Per-Pass Breakdown — open a couple of pass rows too, for "every
+      // section" completeness. Root Causes' own toggles are already open by
+      // this point (clicked above), so this only ever finds still-collapsed
+      // per-pass rows (and Draft History, already opened above too).
+      const passToggles11 = dialog11.locator('button[aria-expanded="false"]');
+      // eslint-disable-next-line no-await-in-loop
+      const passToggleCount11 = await passToggles11.count();
+      for (let i = 0; i < Math.min(passToggleCount11, 5); i++) {
+        // eslint-disable-next-line no-await-in-loop
+        await passToggles11.nth(i).click().catch(() => {});
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      await auditElement(page11, dialog11, `${mode}-doctor-full-report-EXPANDED`);
+
+      // Worst-20 contrast survey across the whole expanded dialog — the
+      // per-node before/after table LANE_STANDARD §3 asks for. Logged, not
+      // gated on its own (axe's color-contrast rule above already gates
+      // seriously/critically failing nodes) — this is the broader, ranked
+      // measurement a single pass/fail count can't show.
+      // eslint-disable-next-line no-await-in-loop
+      const worst11 = await dialog11.evaluate(worstContrastNodes, 20);
+      console.log(`\n  [${mode}] worst 20 contrast nodes in the expanded Full report dialog:`);
+      console.log('  ratio  | fg                  | bg                  | node');
+      for (const n of worst11) {
+        console.log(`  ${n.ratio.toFixed(2)}:1 | ${n.fg.padEnd(19)} | ${n.bg.padEnd(19)} | ${n.selector} "${n.text}"`);
+      }
+      const worstBelowAA11 = worst11.filter((n) => n.ratio < 4.5);
+      record('doctor-full-report-gate', `${mode}: worst-20 survey — nodes below 4.5:1 among the 20 lowest-contrast text nodes`, worstBelowAA11.length === 0, `${worstBelowAA11.length}/20 below 4.5:1 — worst: ${worst11[0] ? `${worst11[0].ratio}:1 (${worst11[0].selector})` : 'n/a'}`);
+
+      // eslint-disable-next-line no-await-in-loop
+      await page11.keyboard.press('Escape');
+      // eslint-disable-next-line no-await-in-loop
+      await page11.waitForTimeout(timing.ms(200));
+    }
+  }
+  await context11.close();
 
   // ── Console errors, same convention as the rest of the browser battery. ─
   if (genuineConsoleErrors.length > 0) {

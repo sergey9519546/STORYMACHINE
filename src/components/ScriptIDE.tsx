@@ -2240,7 +2240,14 @@ export default function ScriptIDE({
 
   // ── Title page ───────────────────────────────────────────────────────────────
   const renderTitlePage = () => (
-    <div className="p-12 bg-[var(--sm-panel)] dark:text-white h-full flex flex-col items-center justify-center text-center font-courier">
+    // a11y fix (2026-09-06, theme-convention gate): bg-[var(--sm-panel)] is
+    // the design system's theme-invariant light panel token — it never goes
+    // dark — so the `dark:text-white` here was orphaned: once dark mode was
+    // toggled, "written by" and the title/author fields rendered white text
+    // on the still-cream panel (measured ~1.15:1). Dropped; the default ink
+    // color (body { color: var(--color-ink) }, src/index.css) is itself
+    // theme-invariant and already correct here.
+    <div className="p-12 bg-[var(--sm-panel)] h-full flex flex-col items-center justify-center text-center font-courier">
       <div className="w-full max-w-md space-y-12">
         <input
           value={titlePage.title}
