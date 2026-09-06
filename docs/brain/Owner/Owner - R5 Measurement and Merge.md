@@ -40,7 +40,9 @@ output. `lock-auc24` refuses loudly and exits 1; `measure-real` prints
 on the first line looks like success and scrolls past, and the hard refusal
 that follows names a different command. If the first line prints that SKIP
 banner, it measured nothing — fix the variable and run it again before going
-any further. (The asymmetry belongs to those scripts, not to this note.) Before hand-editing the manifest, read
+any further. (The asymmetry belongs to those scripts, not to this note.)
+
+Before hand-editing the manifest, read
 `tests/fixtures/real-corpus-manifest.README.md`: there is no automated re-lock
 command, and that file is where the constraint lives that its array order is
 load-bearing and must never be sorted.
@@ -87,7 +89,10 @@ owes once the run exists.
    like it belongs to a later section. Two of the three entries currently carry
    the bare word inside a Runner-attestation value — as the honest pending
    marker they are meant to carry until the measurement exists — so this scan
-   has real work to do on every one of them.
+   has real work to do on every one of them, **at conversion time, not
+   before**: those markers stay exactly where they are until the corpus run has
+   happened, and come out as part of the same edit that fills in the AUC-24
+   number.
 
 Step 6 is not theoretical, and it is not a stacked-branch quirk. Measured in a
 throwaway clone, by applying this recipe mechanically to each branch's ledger
