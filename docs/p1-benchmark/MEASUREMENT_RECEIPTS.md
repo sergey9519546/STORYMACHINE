@@ -1887,3 +1887,67 @@ first person that `npm run measure-real` was not run.
   Until that entry exists this branch must not merge, and this heading says
   PENDING OWNER MEASUREMENT so no reviewer can mistake this for the receipt
   the change actually owes."
+
+#### 2026-09-06 addendum — rebased onto `main` at `2bfcbf9d`, gates re-run, still PENDING
+
+The entry above was written against `main` at `e40f4cf5`. This branch has
+since been rebased onto `main` at `2bfcbf9d` (160 commits later) and lives at
+`scoring/r5-verbosity-bias`; the numbers above therefore describe a baseline
+this branch no longer sits on, and are kept unedited as the record of what was
+measured then. What follows is what a re-run against the NEW baseline
+produces. It is still not a corpus measurement and this entry is still
+PENDING OWNER MEASUREMENT.
+
+- **Baseline used:** `main` at `2bfcbf9d`, extracted with
+  `git archive main | tar -x` into a scratch tree with `node_modules`
+  symlinked from the working checkout, exactly as the entries above do it.
+- **Command:** `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>`,
+  then the same with `--tree` at this branch's worktree and `--out <after>`,
+  then `node scripts/check-doctor-output-identity.mjs --compare <before> <after>`.
+- **Corpus fingerprint:** none. No corpus was read. The in-repo fixture set
+  the identity harness walks is 45 reports — 20 `data/screenplays/*.fountain`
+  live-action fixtures, the 20 `REFERENCE_CORPUS` calibration samples, the P0
+  sample script, and the four synthetic scene-count fixtures.
+- **Output identity against the new baseline:** FAIL, as a scoring change
+  must — 45 of 45 reports differ. Health moves on 45 of 45 (mean −9.95, RMS
+  20.45, largest single move −38.9 on `off-season`, smallest 0.5); verdict
+  changes on 28 of 45; `sceneCount` is unchanged on all 45. The earlier
+  RMS figure in the entry above was 23.5 against `e40f4cf5`: the difference is
+  `main`'s own movement under this branch, principally the 2026-09-04
+  corpus-integrity correction that stopped scoring the fixtures' provenance
+  headers, not any change to this branch.
+- **Gates re-run on the rebased tree, each in the foreground, exit code read
+  from its own log:** `npm run lint` 0 · `tests/core/verbosity-bias.test.ts`
+  0 (4/4) · `tests/core/calibration.test.ts` 0 (21/21) ·
+  `tests/core/feature-scale-discrimination.test.ts` 0 (6/6) ·
+  `tests/core/rebuild-experiment.test.ts` 0 (40/40) ·
+  `tests/core/script-doctor.test.ts` 0 (86/86) ·
+  `tests/core/blind-pairs-discrimination.test.ts` 0 (3/3) ·
+  `evals/scoring/runner/metamorphic-exit.test.ts` 0 (4/4) ·
+  `evals/scoring/runner/run-metamorphic-classify.test.ts` 0 (6/6) ·
+  `npm run test:metamorphic` 0, 8 of 8 hard, zero known-failing witnesses,
+  `empty_verbosity` at −4.4 (the padding witness this branch exists to flip).
+- **`node scripts/check-scoring-receipt.mjs main..HEAD` exits 1 on this
+  branch, by design.** It finds this entry, reads the word PENDING in the
+  heading, and refuses it as satisfying the range — which is the correct
+  behaviour and the reason the heading says PENDING. It is not a rebase
+  artifact and it must not be closed by editing this heading.
+- **Blind matched pairs, in-repo fixtures, no private corpus:** this branch
+  orders 3 of 6 (mean gap +1.50, 12 distinct health values, 0 of 12 scripts
+  pinned) against `main @ 2bfcbf9d`'s 1 of 6 (mean gap −0.02, 9 of 12 pinned
+  at exactly 76.0). Both figures reproduce
+  `docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md` on the new
+  baseline.
+- **Runner attestation:** "I, the branch-sync lane
+  (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), performed the rebase
+  onto `2bfcbf9d` myself, resolved its one conflict
+  (`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`) by keeping both sides, and ran
+  every command listed above myself on 2026-09-06, reading each exit code out
+  of its own log file. **I did NOT run `npm run measure-real` and this
+  addendum claims no AUC-24 value: the real corpus is not present in this
+  container and `REAL_SCRIPT_CORPUS_DIR` was left unset.** The owner's step is
+  unchanged — check out `scoring/stacked-r5-plus-advice`, run
+  `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, then
+  `npm run lock-auc24`, then re-lock
+  `tests/fixtures/real-corpus-manifest.json` — and until an entry carrying a
+  measured number exists, this branch must not merge."
