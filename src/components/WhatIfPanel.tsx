@@ -18,8 +18,7 @@ import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
 import type { CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
 import { compactPercentileNote, exactRankTooltip } from '../lib/percentile-copy.ts';
-import { ACTION_PROSE_VARIATION_LABEL } from '../lib/structural-signals-copy.ts';
-import { formatSignalValue } from '../lib/structural-signals-copy.ts';
+import { ACTION_PROSE_VARIATION_LABEL, formatSignalValue } from '../lib/structural-signals-copy.ts';
 import {
   GitBranch, Eye, Zap, X, Check, AlertTriangle, FlaskConical, Play, Ban, Link2, Clock3,
   Stethoscope, FileDown,

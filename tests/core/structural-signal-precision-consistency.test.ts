@@ -53,6 +53,13 @@ import type {
   ScriptDoctorReport, DoctorGrade, CoverageVerdict,
 } from '../../server/nvm/analyze/types.ts';
 import type { StructuralSignalsReport } from '../../server/nvm/analyze/structural-signals.ts';
+// Read-only: this test IMPORTS the real computeStructuralSignals to pin the
+// module header's r4() input contract from the source side (2026-09-06
+// review round 1, follow-up 3) — it never edits structural-signals.ts (or
+// anything else reachable from doctor.ts's import graph), so
+// check-scoring-receipt.mjs correctly reports no scoring-path file changed
+// even though this test file reads into that module.
+import { computeStructuralSignals } from '../../server/nvm/analyze/structural-signals.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8');
@@ -138,12 +145,137 @@ describe('formatSignalValue() / formatSignalDelta() — precision rule', () => {
   });
 });
 
+// Review round 1, follow-up 4: formatSignalDelta must guard `before` the
+// SAME way it already guards `after` — a missing/invalid reading on either
+// side renders the shared unreadable-signal text or falls back to the
+// single-value rendering of whichever side IS valid, never throws.
+describe('formatSignalDelta() — before/after are guarded symmetrically (never throws on a missing or invalid reading)', () => {
+  it('before missing/null/NaN, after a real number: falls back to formatSignalValue(after), symmetric to the existing after-missing case', () => {
+    assert.equal(formatSignalDelta(undefined, 0.0254), formatSignalValue(0.0254));
+    assert.equal(formatSignalDelta(null as unknown as number, 0.0254), formatSignalValue(0.0254));
+    assert.equal(formatSignalDelta(NaN, 0.0254), formatSignalValue(0.0254));
+  });
+
+  it('after missing/null/NaN, before a real number: unchanged existing behavior — falls back to formatSignalValue(before)', () => {
+    assert.equal(formatSignalDelta(0.0042, undefined), formatSignalValue(0.0042));
+    assert.equal(formatSignalDelta(0.0042, null as unknown as number), formatSignalValue(0.0042));
+    assert.equal(formatSignalDelta(0.0042, NaN), formatSignalValue(0.0042));
+  });
+
+  it('both missing/invalid: the shared unreadable-signal text, never a crash', () => {
+    assert.equal(formatSignalDelta(undefined, undefined), '—');
+    assert.equal(formatSignalDelta(null as unknown as number, null as unknown as number), '—');
+    assert.equal(formatSignalDelta(NaN, NaN), '—');
+    assert.equal(formatSignalDelta(undefined, NaN), '—');
+  });
+
+  it('never throws for any combination of number | null | undefined | NaN on either side', () => {
+    const values: Array<number | null | undefined> = [0.0042, 0, undefined, null, NaN];
+    for (const before of values) {
+      for (const after of values) {
+        assert.doesNotThrow(() => formatSignalDelta(before, after), `formatSignalDelta(${before}, ${after}) must not throw`);
+      }
+    }
+  });
+});
+
+// Review round 1, follow-up 3: the module header now states an explicit
+// input contract — both aggregates arrive already rounded to 4 decimal
+// places via structural-signals.ts's own r4() (":503"/":514", calling
+// ":192"'s Math.round(n * 10_000) / 10_000). Pinned here from the SOURCE
+// side: a real computeStructuralSignals() call, not a hand-typed number
+// that merely happens to land on the grid.
+describe('r4() input contract — both aggregates land on the 0.0001 grid at the source, pinned from computeStructuralSignals() itself', () => {
+  // Three scenes with deliberately uneven dialogue/action word counts (not
+  // round fractions of 10) and varied action-sentence lengths, so a
+  // genuinely non-terminating ratio (thirds, sevenths) would surface as
+  // floating-point noise past 4 decimals if r4() were not actually rounding.
+  const script = [
+    'INT. ROOM - DAY',
+    '',
+    'One two three four five six seven.',
+    '',
+    'BOB',
+    'Eight nine ten eleven twelve thirteen.',
+    '',
+    'INT. HALL - DAY',
+    '',
+    'Filler word count varies quite a bit differently here across this scene body entirely today.',
+    '',
+    'CAROL',
+    'Short.',
+    '',
+    'INT. STREET - NIGHT',
+    '',
+    'A brief and terse action line for variety.',
+    '',
+  ].join('\n');
+
+  const isOnQuarterMillGrid = (n: number) => Math.abs(n * 10_000 - Math.round(n * 10_000)) < 1e-9;
+
+  it('the fixture actually scores (sanity check: >= 2 scenes, the aggregates are nonzero, not a degenerate all-zero fixture)', () => {
+    const block = computeStructuralSignals(script);
+    assert.equal(block.scored, true);
+    assert.ok(block.sceneCount >= 2);
+    assert.notEqual(block.meanAbsDialogueShareDelta, 0);
+    assert.notEqual(block.actionSentenceCvOverall, 0);
+  });
+
+  it('meanAbsDialogueShareDelta lands exactly on the 0.0001 grid', () => {
+    const { meanAbsDialogueShareDelta } = computeStructuralSignals(script);
+    assert.ok(
+      isOnQuarterMillGrid(meanAbsDialogueShareDelta),
+      `meanAbsDialogueShareDelta ${meanAbsDialogueShareDelta} is not an r4()-rounded 4dp value`,
+    );
+  });
+
+  it('actionSentenceCvOverall lands exactly on the 0.0001 grid', () => {
+    const { actionSentenceCvOverall } = computeStructuralSignals(script);
+    assert.ok(
+      isOnQuarterMillGrid(actionSentenceCvOverall),
+      `actionSentenceCvOverall ${actionSentenceCvOverall} is not an r4()-rounded 4dp value`,
+    );
+  });
+
+  it('holds across a spread of scene counts and word-count shapes, not just the one fixture above', () => {
+    for (const sceneCount of [2, 3, 5, 7, 11]) {
+      const scenes = Array.from({ length: sceneCount }, (_, i) => {
+        const words = 5 + i * 3 + (i % 2);
+        const actionLine = Array.from({ length: words }, () => 'word').join(' ') + '.';
+        return `INT. SCENE ${i + 1} - DAY\n\n${actionLine}\n\nSPEAKER${i}\nA short line here today.\n`;
+      }).join('\n');
+      const block = computeStructuralSignals(scenes);
+      assert.ok(isOnQuarterMillGrid(block.meanAbsDialogueShareDelta), `sceneCount=${sceneCount}: meanAbsDialogueShareDelta off-grid`);
+      assert.ok(isOnQuarterMillGrid(block.actionSentenceCvOverall), `sceneCount=${sceneCount}: actionSentenceCvOverall off-grid`);
+    }
+  });
+
+  it('formatSignalValue/formatSignalDelta never need to widen past the ceiling for a source-produced reading (the ceiling really is total fidelity under this contract)', () => {
+    // Given the grid contract, the ceiling (4dp) always reproduces the exact
+    // source value — so formatSignalValue at the ceiling round-trips.
+    const block = computeStructuralSignals(script);
+    assert.equal(
+      Number(formatSignalValue(block.meanAbsDialogueShareDelta, { precision: SIGNAL_VALUE_CEILING_PRECISION })),
+      block.meanAbsDialogueShareDelta,
+    );
+    assert.equal(
+      Number(formatSignalValue(block.actionSentenceCvOverall, { precision: SIGNAL_VALUE_CEILING_PRECISION })),
+      block.actionSentenceCvOverall,
+    );
+  });
+});
+
 // ── Cross-surface: every surface calls the SAME shared functions ───────────
 describe('every surface imports formatSignalValue/formatSignalDelta rather than a local .toFixed(2) on these two aggregates', () => {
-  it('ScriptDoctorPanel.tsx imports both functions', () => {
+  it('ScriptDoctorPanel.tsx imports both functions (merged into the one existing structural-signals-copy.ts import, review round 1 follow-up 5, not a second import statement)', () => {
     assert.match(
       panelSrc,
-      /import\s*\{\s*formatSignalValue,\s*formatSignalDelta\s*\}\s*from\s*"\.\.\/\.\.\/lib\/structural-signals-copy\.ts";/,
+      /import \{ ACTION_PROSE_VARIATION_LABEL, formatSignalValue, formatSignalDelta \} from "\.\.\/\.\.\/lib\/structural-signals-copy\.ts";/,
+    );
+    assert.equal(
+      (panelSrc.match(/from "\.\.\/\.\.\/lib\/structural-signals-copy\.ts";/g) ?? []).length,
+      1,
+      'exactly one import statement from structural-signals-copy.ts',
     );
   });
 
@@ -166,8 +298,9 @@ describe('every surface imports formatSignalValue/formatSignalDelta rather than 
     assert.ok(!/(?:signals|result)\.(?:before\.)?actionSentenceCvOverall\.toFixed\(/.test(panelSrc));
   });
 
-  it('WhatIfPanel.tsx imports and uses formatSignalValue at both its render sites', () => {
-    assert.match(whatIfPanelSrc, /import\s*\{\s*formatSignalValue\s*\}\s*from\s*'\.\.\/lib\/structural-signals-copy\.ts';/);
+  it('WhatIfPanel.tsx imports and uses formatSignalValue at both its render sites (merged into the one existing import, not a second statement)', () => {
+    assert.match(whatIfPanelSrc, /import \{ ACTION_PROSE_VARIATION_LABEL, formatSignalValue \} from '\.\.\/lib\/structural-signals-copy\.ts';/);
+    assert.equal((whatIfPanelSrc.match(/from '\.\.\/lib\/structural-signals-copy\.ts';/g) ?? []).length, 1);
     assert.match(whatIfPanelSrc, /formatSignalValue\(draft\.meanAbsDialogueShareDelta\)/);
     assert.match(whatIfPanelSrc, /formatSignalValue\(draft\.actionSentenceCvOverall\)/);
     assert.ok(!whatIfPanelSrc.includes('draft.meanAbsDialogueShareDelta.toFixed('));
@@ -184,16 +317,18 @@ describe('every surface imports formatSignalValue/formatSignalDelta rather than 
     assert.ok(!body.includes('.toFixed('), 'no bare .toFixed( should remain in ShapeRhythmTrendLine');
   });
 
-  it('coverage-html.ts imports formatSignalValue and uses it at all 3 numeric sites (one-scene notice, mean talk/action swing, action-prose variation)', () => {
-    assert.match(coverageHtmlSrc, /import\s*\{\s*formatSignalValue\s*\}\s*from\s*'\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+  it('coverage-html.ts imports formatSignalValue and uses it at all 3 numeric sites (one-scene notice, mean talk/action swing, action-prose variation); merged into the one existing import', () => {
+    assert.match(coverageHtmlSrc, /import \{ ACTION_PROSE_VARIATION_LABEL_LOWER, formatSignalValue \} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+    assert.equal((coverageHtmlSrc.match(/from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/g) ?? []).length, 1);
     const count = (coverageHtmlSrc.match(/formatSignalValue\(block\.(meanAbsDialogueShareDelta|actionSentenceCvOverall)\)/g) ?? []).length;
     assert.equal(count, 3, `expected 3 formatSignalValue(block....) usages, found ${count}`);
     assert.ok(!coverageHtmlSrc.includes('block.actionSentenceCvOverall.toFixed('));
     assert.ok(!coverageHtmlSrc.includes('block.meanAbsDialogueShareDelta.toFixed('));
   });
 
-  it('coverage-letter.ts imports formatSignalValue and uses it at all 3 numeric sites', () => {
-    assert.match(coverageLetterSrc, /import\s*\{\s*formatSignalValue\s*\}\s*from\s*'\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+  it('coverage-letter.ts imports formatSignalValue and uses it at all 3 numeric sites; merged into the one existing import', () => {
+    assert.match(coverageLetterSrc, /import \{ ACTION_PROSE_VARIATION_LABEL_LOWER, formatSignalValue \} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+    assert.equal((coverageLetterSrc.match(/from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/g) ?? []).length, 1);
     const count = (coverageLetterSrc.match(/formatSignalValue\((?:meanAbsDialogueShareDelta|actionSentenceCvOverall|report\.structuralSignals\.actionSentenceCvOverall)\)/g) ?? []).length;
     assert.equal(count, 3, `expected 3 formatSignalValue(...) usages, found ${count}`);
     assert.ok(!coverageLetterSrc.includes('meanAbsDialogueShareDelta.toFixed('));
@@ -232,6 +367,62 @@ describe('every surface imports formatSignalValue/formatSignalDelta rather than 
     );
     const hits = (rg.stdout ?? '').split('\n').filter((l) => l.trim().length > 0);
     assert.deepEqual(hits, [], `bare .toFixed( on a structural-signal aggregate still found in:\n${hits.join('\n')}`);
+  });
+
+  // Review round 1, follow-up 5: the assertion above matches the LITERAL
+  // field name immediately before `.toFixed(`, so a hand-copy that first
+  // aliases the reading into a differently-named local
+  // (`const v = block.actionSentenceCvOverall; ...v.toFixed(2)...`) would
+  // slip past it. This is a narrower, targeted catch for exactly that
+  // shape — a declaration assigned FROM one of the two aggregate field
+  // names, whose declared name later takes `.toFixed(` anywhere in the
+  // same file — checked over every file this pass touched, so a widened
+  // pattern doesn't false-positive on the OTHER structural-signal fields
+  // (sceneLengthCv, leadShareSlope, the per-scene tooltip readings, …)
+  // those same files still legitimately print with a bare `.toFixed(2)`
+  // (out of scope for this pass — never shown as a before/after delta).
+  it('no renamed local alias of either aggregate reaches .toFixed( either, in any file this pass touched', () => {
+    const files = [
+      { name: 'ScriptDoctorPanel.tsx', src: panelSrc },
+      { name: 'SnapshotManager.tsx', src: snapshotManagerSrc },
+      { name: 'WhatIfPanel.tsx', src: whatIfPanelSrc },
+      { name: 'coverage-html.ts', src: coverageHtmlSrc },
+      { name: 'coverage-letter.ts', src: coverageLetterSrc },
+      { name: 'SlatePanel.tsx', src: slatePanelSrc },
+      { name: 'slate.ts', src: slateSrc },
+    ];
+    const declRe = /(?:const|let|var)\s+(\w+)\s*=\s*[\w.$?]*\.(?:meanAbsDialogueShareDelta|actionSentenceCvOverall)\b/g;
+    const hits: string[] = [];
+    for (const { name, src } of files) {
+      for (const m of src.matchAll(declRe)) {
+        const alias = m[1];
+        if (new RegExp(`\\b${alias}\\.toFixed\\(`).test(src)) hits.push(`${name}: local alias "${alias}"`);
+      }
+    }
+    assert.deepEqual(hits, [], `renamed local alias of a structural-signal aggregate reaching .toFixed( in:\n${hits.join('\n')}`);
+  });
+
+  // Fixture proving the alias-detection regex above actually fires on the
+  // shape it targets, rather than never matching anything (the same
+  // "prove the guard can fail" discipline shape-rhythm-panel-copy.test.ts's
+  // stripComments fixture already established for a different guard).
+  it('the alias-detection regex fires on a synthetic renamed-alias hand-copy, and does not fire on the real (fixed) files', () => {
+    const declRe = /(?:const|let|var)\s+(\w+)\s*=\s*[\w.$?]*\.(?:meanAbsDialogueShareDelta|actionSentenceCvOverall)\b/g;
+    const badFixture = 'const v = block.actionSentenceCvOverall;\nconsole.log(`cv ${v.toFixed(2)}`);\n';
+    const badHits: string[] = [];
+    for (const m of badFixture.matchAll(declRe)) {
+      const alias = m[1];
+      if (new RegExp(`\\b${alias}\\.toFixed\\(`).test(badFixture)) badHits.push(alias);
+    }
+    assert.deepEqual(badHits, ['v'], 'the fixture must be caught — proves the regex can fail, not just always pass');
+
+    const goodFixture = 'const v = block.actionSentenceCvOverall;\nconsole.log(`cv ${formatSignalValue(v)}`);\n';
+    const goodHits: string[] = [];
+    for (const m of goodFixture.matchAll(declRe)) {
+      const alias = m[1];
+      if (new RegExp(`\\b${alias}\\.toFixed\\(`).test(goodFixture)) goodHits.push(alias);
+    }
+    assert.deepEqual(goodHits, [], 'routing the alias through formatSignalValue must not be flagged');
   });
 });
 

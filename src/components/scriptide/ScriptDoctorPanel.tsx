@@ -37,8 +37,7 @@ import type {
 } from "../../../server/nvm/analyze/types.ts";
 import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type { StructuralSignalsReport, SceneStructuralSignals } from "../../../server/nvm/analyze/structural-signals.ts";
-import { ACTION_PROSE_VARIATION_LABEL } from "../../lib/structural-signals-copy.ts";
-import { formatSignalValue, formatSignalDelta } from "../../lib/structural-signals-copy.ts";
+import { ACTION_PROSE_VARIATION_LABEL, formatSignalValue, formatSignalDelta } from "../../lib/structural-signals-copy.ts";
 import type {
   RevisionIssue,
   PassName,

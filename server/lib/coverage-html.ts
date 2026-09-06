@@ -47,8 +47,7 @@ import { healthPercentileSentence, exactRankTooltip } from '../../src/lib/percen
 // helpers itself; see tests/core/percentile-copy-consistency.test.ts and
 // tests/core/draft-rank-copy-consistency.test.ts for the cross-surface proof.
 import { draftRankSentence, type DraftRankExportPayload } from '../../src/lib/draft-rank-copy.ts';
-import { ACTION_PROSE_VARIATION_LABEL_LOWER } from '../../src/lib/structural-signals-copy.ts';
-import { formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
+import { ACTION_PROSE_VARIATION_LABEL_LOWER, formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
 
 // ── Escaping ──────────────────────────────────────────────────────────────────
 // The one and only path any user/screenplay-derived string takes into the

@@ -53,8 +53,12 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
     // Round-2 review fix (2026-09-05): the panel renders the SHARED label
     // (`{ACTION_PROSE_VARIATION_LABEL}`), not its own hand-typed string —
     // see the "one label, three surfaces" describe block below for the
-    // cross-surface half of this.
-    assert.match(panel, /import \{ ACTION_PROSE_VARIATION_LABEL \} from "\.\.\/\.\.\/lib\/structural-signals-copy\.ts";/);
+    // cross-surface half of this. The import may also carry
+    // formatSignalValue/formatSignalDelta from the same module (2026-09-06
+    // signal-precision pass, merged into one statement by review round 1's
+    // follow-up 5) — matched loosely so this assertion does not re-split
+    // every time this module gains another named export.
+    assert.match(panel, /import \{[^}]*\bACTION_PROSE_VARIATION_LABEL\b[^}]*\} from "\.\.\/\.\.\/lib\/structural-signals-copy\.ts";/);
     assert.match(panel, /\{ACTION_PROSE_VARIATION_LABEL\}/);
   });
 
@@ -80,7 +84,7 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
     });
 
     it('WhatIfPanel.tsx imports and uses the SAME shared constant, not its own fourth wording', () => {
-      assert.match(whatIfPanel, /import \{ ACTION_PROSE_VARIATION_LABEL \} from '\.\.\/lib\/structural-signals-copy\.ts';/);
+      assert.match(whatIfPanel, /import \{[^}]*\bACTION_PROSE_VARIATION_LABEL\b[^}]*\} from '\.\.\/lib\/structural-signals-copy\.ts';/);
       assert.match(whatIfPanel, /\{ACTION_PROSE_VARIATION_LABEL\}/);
       // A header comment describing the shared convention (naming the
       // string as prose, for a reader) is fine and expected — the JSX
@@ -90,7 +94,7 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
 
     it('coverage-html.ts imports the LOWERCASE derivative of the same constant (matching its own all-lowercase summary-line convention), not a fourth hand-typed word', () => {
       const coverageHtml = read('../../server/lib/coverage-html.ts');
-      assert.match(coverageHtml, /import \{ ACTION_PROSE_VARIATION_LABEL_LOWER \} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+      assert.match(coverageHtml, /import \{[^}]*\bACTION_PROSE_VARIATION_LABEL_LOWER\b[^}]*\} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
       const usageCount = (coverageHtml.match(/\$\{ACTION_PROSE_VARIATION_LABEL_LOWER\}/g) ?? []).length;
       assert.equal(usageCount, 2, 'expected 2 usages: the scored summary line and the one-scene-unscored notice');
       assert.ok(!coverageHtml.includes('action-sentence variation'), 'no hand-typed literal should remain now that the constant is imported');
@@ -98,7 +102,7 @@ describe('ScriptDoctorPanel — "Shape & Rhythm" section', () => {
 
     it('coverage-letter.ts imports and embeds the SAME lowercase label in its own prose, not its own third wording', () => {
       const coverageLetter = read('../../server/lib/coverage-letter.ts');
-      assert.match(coverageLetter, /import \{ ACTION_PROSE_VARIATION_LABEL_LOWER \} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
+      assert.match(coverageLetter, /import \{[^}]*\bACTION_PROSE_VARIATION_LABEL_LOWER\b[^}]*\} from '\.\.\/\.\.\/src\/lib\/structural-signals-copy\.ts';/);
       const usageCount = (coverageLetter.match(/\$\{ACTION_PROSE_VARIATION_LABEL_LOWER\}/g) ?? []).length;
       assert.equal(usageCount, 3, 'expected 3 usages: the intro sentence plus the scored and one-scene-unscored number-bearing clauses');
       assert.ok(!coverageLetter.includes("the sentence-length variation across the draft's action lines"), 'no hand-typed literal should remain now that the constant is imported');

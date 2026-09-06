@@ -83,8 +83,7 @@ import { ordinal, REFERENCE_SET_SIZE, REFERENCE_SET_LABEL } from '../../src/lib/
 import {
   draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
 } from '../../src/lib/draft-rank-copy.ts';
-import { ACTION_PROSE_VARIATION_LABEL_LOWER } from '../../src/lib/structural-signals-copy.ts';
-import { formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
+import { ACTION_PROSE_VARIATION_LABEL_LOWER, formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
 
 export interface CoverageLetterOptions {
   title?: string;
