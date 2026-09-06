@@ -47,6 +47,12 @@ the example its reviewer gave and the reviewer found the next member of the
 class — with the new ending that the class is closed by construction (read
 the real parse) rather than by another example. See [[Patterns]].
 
+**Follow-ups landed the same night** (from the record): one shared
+structural-signal formatter across six surfaces (c9bbc673) and the Doctor
+panel's 66 mixed-theme hits fixed with the scanner made zero-tolerance
+(a21fffdd) — one review round each, both MERGE with five items built
+before merging. Reviews in [[Audit - 2026-09-06 Mistake Search]].
+
 **Owner-only from this session:** push the local `audit/2026-09-05/*` tags
 ([[Owner - Push Release Tag]]).
 

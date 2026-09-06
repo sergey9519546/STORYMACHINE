@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-06, main @ 7d97c3e5 (six session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-06, main @ a21fffdd (six session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -128,6 +128,19 @@ dark mode 5, brain 2, layout 4, cue-guard cost bound 7 — counted from the
 rebased branch. Reviewers' probe scripts were reused as lane fixtures four
 times; the audit tags `audit/2026-09-05/<lane>-roundN` exist locally for
 every reviewed round and cannot be pushed from this sandbox.
+
+**Two follow-ups the reviews had queued landed the same night** (one review
+round each, both MERGE with five follow-up items built before merging):
+the structural-signal values that six surfaces printed with a bare
+`toFixed(2)` — so a change of 0.0042 → 0.0254 rendered as `0.00 → 0.03` —
+now go through one shared formatter that widens precision only as far as
+the delta needs, with a cross-surface consistency test and a whole-tree
+grep so a seventh hand-copy fails; and the 66 mixed-theme hits the scanner
+had pinned in the Doctor panel and editor were fixed, the allowlist removed
+so the scanner is zero-tolerance across `src/components`, and `verify:a11y`
+gained a step that opens the full report with every section expanded in
+both themes (worst node 1.04:1 before, 4.63:1 after; 134 assertions). Main
+moved on to a21fffdd.
 
 **What only the owner can do now** (in addition to the list below): push the
 `audit/2026-09-05/*` tags (`git push origin --tags` from a machine that is

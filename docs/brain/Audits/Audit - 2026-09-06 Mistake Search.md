@@ -12,7 +12,8 @@ status: active
 three read-only hunters' findings with reproduction commands; and one
 review file per lane: `docsparity-review.md`, `serverfix-review.md`,
 `provenance-review.md`, `brain-review.md`, `a11ydark-review.md`,
-`layout-review.md`, `serverfix2-review.md`).
+`layout-review.md`, `serverfix2-review.md`, and for the two follow-up
+lanes `sigprecision-review.md`, `paneltheme-review.md`).
 
 **What it is:** the committed record of the mistake search the owner asked
 for over everything [[Session - 2026-09-05 Review Batch]] had merged
@@ -26,7 +27,10 @@ conducted under `docs/LANE_STANDARD.md` §6 before its lane merged.
 client provenance MERGE (08d3398b); brain REVISE 10 → MERGE (4cbaf02f);
 dark mode / a11y gate five rounds (60bce1a6); layout four rounds
 (85fca55a); cue-guard cost bound seven rounds, REVISE ×6 then MERGE
-(7d97c3e5). Twenty-one review rounds; no lane passed on its first pass.
+(7d97c3e5); follow-ups signal precision MERGE +5 (c9bbc673) and
+Doctor-panel theme convention MERGE +5 (a21fffdd). Twenty-one review rounds
+on the seven lanes plus one each on the follow-ups; no lane passed on its
+first pass without a numbered list.
 
 **What was NOT reproduced here:** the reviewers' probe scripts lived in
 session scratch space and are described, not copied; the README says every
