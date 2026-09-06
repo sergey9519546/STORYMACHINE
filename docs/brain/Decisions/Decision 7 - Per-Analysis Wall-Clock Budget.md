@@ -68,20 +68,29 @@ built rather than deferred:**
 - **Admission control.** The queue budget is now checked at SUBMISSION as well
   as by the timer, so a submission the pool already cannot serve is refused at
   once instead of waiting the full 60 s to be told to come back. Measured A/B
-  on one binary (`DOCTOR_QUEUE_ADMISSION=off` vs on): first 503 of a wave
-  landing on a saturated pool **60,361 / 60,267 ms → 1,055 / 512 ms**, with
-  the served count unchanged inside run-to-run spread (49/43 vs 46/47 of 80).
-  Two biases keep it from shedding work the timer would have served: the
-  estimate excludes the job's own execution, and must exceed the budget by
-  1.5x — the measured over-statement of the estimator at the shed boundary.
-  Same 503, same `Retry-After`, same row-73 sentence: same state, sooner.
+  on one binary (`DOCTOR_QUEUE_ADMISSION=off` vs on), **four runs per arm on a
+  box carrying other lanes**: first 503 of a wave landing on a saturated pool
+  **60,296-60,474 ms -> 853-959 ms in 3 of 4 runs** (the fourth fell back to
+  the timer at 60,342 ms because the EWMA had not learned enough by then --
+  the mechanism's honest limit, not a defect). Served count **50-52 off vs
+  50-54 on**, same median: no measurable difference, which is the property
+  that matters. Two biases keep it from shedding work the timer would have
+  served: the estimate excludes the job's own execution, and must exceed the
+  budget by 1.5x -- the measured over-statement of the estimator at the shed
+  boundary. Same 503, same `Retry-After`, same row-73 sentence: same state,
+  sooner.
 - **Eager respawn after a terminate.** Cancel, a run-budget kill and a purge
   all terminate a worker, and all three used to leave the pool one warm worker
-  short until the next submission — an unrelated writer paid the ~2–3 s cold
+  short until the next submission -- an unrelated writer paid the ~2-3 s cold
   start (measured: `workers: 0` after ten kills, 9,513 ms for the next
   ordinary submission). A replacement is now warmed through the same path boot
   uses. This is also where **Cancel's** long-standing version of that cost is
-  finally written down.
+  finally written down. The first build of it RACED shutdown: a replacement
+  could spawn after `shutdownDoctorPool()` had resolved, hanging the process
+  and turning a clean SIGTERM into exit 1 ten seconds late. Closed with a
+  shutdown generation, a bounded drain of in-flight respawns, and an
+  orphan-terminating `finally` (probe: exit 124 -> exit 0, workers 0, no
+  MessagePort).
 
 **Deliberate limits, written down rather than discovered:** the budget applies
 to the **worker path only** (with `DOCTOR_WORKER_POOL=off`, on a host that

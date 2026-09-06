@@ -152,6 +152,34 @@ interface WorkerSlot {
   retireWhenIdle?: boolean;
 }
 
+// ── Countable outcomes (round-4 review, 2026-09-06) ─────────────────────────
+// "The repeat submission was served from the cache" used to be observable only
+// as "it was faster", and tests/core/doctor-worker-pool.test.ts asserted it as
+// a wall-clock RATIO (`secondMs < firstMs / 2`). That assertion flaked twice
+// in three full runs — most recently against a worker realm this lane's own
+// eager respawn was spawning concurrently with the measurement — while being
+// unable to fail for the reason it names: a slow-but-cached run and a
+// fast-but-uncached run are indistinguishable to it.
+//
+// So the pool counts what actually happened. These three are the complete,
+// mutually exclusive set of outcomes for a submission that reaches
+// runScriptDoctorOffThread and is not rejected: it was answered from the
+// coordinator LRU, it ran on a worker, or it ran in-process. A test (and
+// GET /health) can now assert the MECHANISM rather than a symptom of it.
+// Monotonic for the life of the process; resetDoctorPoolCountersForTests()
+// rebases them for a test that wants deltas from a known point.
+let cacheHits = 0;
+let workerRuns = 0;
+let inProcessRuns = 0;
+
+/** Test-only: zero the counters above. Production never calls this — the
+ *  numbers on /health are process-lifetime totals. */
+export function resetDoctorPoolCountersForTests(): void {
+  cacheHits = 0;
+  workerRuns = 0;
+  inProcessRuns = 0;
+}
+
 const queue: PendingJob[] = [];
 const slots: WorkerSlot[] = [];
 let nextRequestId = 1;
@@ -427,6 +455,7 @@ async function runInProcess(
   request: Omit<DoctorWorkerRequest, 'id'>,
   onProgress?: (event: DoctorProgressEvent) => void,
 ): Promise<ScriptDoctorReport> {
+  inProcessRuns++;
   const { runScriptDoctor } = await import('./doctor.ts');
   return runScriptDoctor(
     request.fountain,
@@ -533,25 +562,83 @@ const RESPAWN_WARM_FOUNTAIN = (index: number): string =>
 
 let respawnCounter = 0;
 let respawnsInFlight = 0;
+/** Bumped on every shutdownDoctorPool() entry. A respawn captures it and
+ *  refuses to act once it has moved — see respawnWarmWorkerAfterTerminate. */
+let shutdownGeneration = 0;
+/** Every respawn currently in flight, so shutdownDoctorPool() can wait for
+ *  them rather than racing them. */
+const respawnPromises = new Set<Promise<void>>();
+/** How long shutdownDoctorPool() will wait for in-flight respawns before
+ *  giving up and terminating anyway. Generous against a worker spawn
+ *  (~460-540 ms cold) and far short of server.ts's 10 s hard-kill, which is
+ *  the deadline that actually matters: a shutdown must never be the thing
+ *  that hits it. */
+const RESPAWN_DRAIN_MS = 3_000;
 
 /** Call immediately after a deliberate `worker.terminate()`. Never throws,
  *  never awaited by the caller — a warm-up failure is the same "this
  *  environment cannot host the pool" case spawnSlot() already treats as
  *  harmless, and the lazy path still works. */
+/** Terminate every slot outright — the shape shutdownDoctorPool() uses, reused
+ *  by the orphan cleanup below. */
+function terminateAllSlots(): void {
+  for (const slot of slots.splice(0)) {
+    clearIdleTimer(slot);
+    slot.active = undefined;
+    void slot.worker.terminate();
+  }
+}
+
 function respawnWarmWorkerAfterTerminate(reason: 'budget' | 'cancel' | 'purge'): void {
   if (shuttingDown || poolDisabled || !poolEnabled() || !eagerRespawnEnabled()) return;
   if (queue.length > 0) return;
   if (slots.length + respawnsInFlight >= configuredPoolSize()) return;
   respawnsInFlight++;
   const startedAt = Date.now();
-  void runScriptDoctorOffThread(RESPAWN_WARM_FOUNTAIN(respawnCounter++))
-    .then(
-      () => logger.info('doctor_pool_worker_respawned', { reason, ms: Date.now() - startedAt, workers: slots.length }),
-      (err: unknown) => logger.warn('doctor_pool_worker_respawn_failed', {
+  // ROUND-4 REVIEW BLOCKER (2026-09-06). The `shuttingDown` check above runs
+  // BEFORE the awaits inside runScriptDoctorOffThread, and shutdownDoctorPool
+  // clears that flag in its own `finally` — so a respawn scheduled just before
+  // a shutdown used to spawn its worker AFTER the shutdown had resolved, with
+  // nothing left to terminate it. Reproduced: the process hung holding a
+  // MessagePort with `workers === 1` two seconds after shutdown returned, and
+  // server.ts's 10 s hard-kill then turned a clean SIGTERM redeploy into
+  // exit 1.
+  //
+  // Three things close it, and all three are needed because the spawn happens
+  // inside an async call this function does not control:
+  //   1. a shutdown GENERATION captured here and re-checked after every await
+  //      point this function owns, so a respawn that has not started yet
+  //      simply never starts;
+  //   2. shutdownDoctorPool() draining `respawnPromises` before its splice, so
+  //      a respawn already in flight has its worker created (or its job
+  //      rejected) in time to be terminated by that splice;
+  //   3. this `finally`, which terminates anything that landed anyway — the
+  //      backstop for an ordering neither of the first two anticipated.
+  const generation = shutdownGeneration;
+  const settled = (async () => {
+    try {
+      // Yield once, then re-check: `shutdownDoctorPool()` may have run to
+      // completion between this function being called and this body running.
+      await Promise.resolve();
+      if (generation !== shutdownGeneration || shuttingDown) return;
+      await runScriptDoctorOffThread(RESPAWN_WARM_FOUNTAIN(respawnCounter++));
+      logger.info('doctor_pool_worker_respawned', { reason, ms: Date.now() - startedAt, workers: slots.length });
+    } catch (err: unknown) {
+      logger.warn('doctor_pool_worker_respawn_failed', {
         reason, error: err instanceof Error ? err.message : String(err),
-      }),
-    )
-    .finally(() => { respawnsInFlight--; });
+      });
+    } finally {
+      respawnsInFlight--;
+      if (generation !== shutdownGeneration) {
+        // A shutdown began (or finished) while this was in flight. Whatever
+        // this warm-up left behind is an orphan that would hold the event
+        // loop open — take it down.
+        terminateAllSlots();
+      }
+    }
+  })();
+  respawnPromises.add(settled);
+  void settled.finally(() => { respawnPromises.delete(settled); });
 }
 
 function spawnSlot(): WorkerSlot | undefined {
@@ -640,6 +727,9 @@ function spawnSlot(): WorkerSlot | undefined {
 function dispatch(slot: WorkerSlot, job: PendingJob): void {
   clearIdleTimer(slot);
   setBusy(slot, true);
+  // Counted HERE, at the one point a submission is genuinely handed to a
+  // worker realm — see the counters' own comment above.
+  workerRuns++;
   const id = nextRequestId++;
   // The two budgets hand over here, synchronously, before postMessage: from
   // this line on the job is RUNNING, so the queue-wait timer is disarmed and
@@ -731,7 +821,7 @@ export async function runScriptDoctorOffThread(
   // immediately — never worth a thread hop.
   const { doctorCachePeek, doctorCacheAdopt } = await import('./doctor.ts');
   const cached = doctorCachePeek(fountain, storyContext, deepRead);
-  if (cached) return cached;
+  if (cached) { cacheHits++; return cached; }
 
   const request: Omit<DoctorWorkerRequest, 'id'> = { fountain, storyContext, deepRead };
 
@@ -774,10 +864,31 @@ export async function shutdownDoctorPool(): Promise<void> {
   // Latched for the whole teardown so a terminate here — or one that fires
   // from a job settling under us — cannot trigger the eager respawn and
   // resurrect a worker this call exists to kill.
+  shutdownGeneration++;
   shuttingDown = true;
   try {
     while (queue.length > 0) {
       queue.shift()!.reject(new Error('Script Doctor pool was shut down.'));
+    }
+    // Round-4 blocker: let any respawn already in flight settle FIRST, so its
+    // worker exists (or its queued job has been rejected above) by the time
+    // the splice below runs — otherwise it lands after this function has
+    // resolved and holds the event loop open with nobody left to terminate
+    // it. Bounded, because a warm-up that never settles must not be able to
+    // block a shutdown; the generation check and the respawn's own `finally`
+    // are what cover the case where this deadline is the one that wins.
+    if (respawnPromises.size > 0) {
+      let drainTimer: NodeJS.Timeout | undefined;
+      const drainDeadline = new Promise<void>((resolve) => {
+        drainTimer = setTimeout(resolve, RESPAWN_DRAIN_MS);
+      });
+      await Promise.race([Promise.allSettled([...respawnPromises]).then(() => undefined), drainDeadline]);
+      if (drainTimer) clearTimeout(drainTimer);
+      // A respawn that settled during the drain may have queued its warm-up
+      // job; drop anything that arrived while we waited.
+      while (queue.length > 0) {
+        queue.shift()!.reject(new Error('Script Doctor pool was shut down.'));
+      }
     }
     const terminating = slots.splice(0).map(slot => {
       clearIdleTimer(slot);
@@ -790,6 +901,12 @@ export async function shutdownDoctorPool(): Promise<void> {
     // the counter high would make the NEXT terminate think a replacement was
     // already on its way and skip one.
     respawnsInFlight = 0;
+    respawnPromises.clear();
+    // Belt and braces for the round-4 blocker: if anything spawned while the
+    // splice above was awaiting its terminations, take it down now rather
+    // than leaving it to hold the event loop open. `slots` is normally empty
+    // here, so this is a no-op on every ordinary shutdown.
+    if (slots.length > 0) terminateAllSlots();
   } finally {
     shuttingDown = false;
   }
@@ -841,6 +958,7 @@ export function doctorPoolStatus(): {
   enabled: boolean; disabled: boolean; workers: number; queued: number;
   analysisBudgetMs: number; queueBudgetMs: number; retryAfterSeconds: number;
   meanJobMs: number; eagerRespawn: boolean; admission: boolean;
+  cacheHits: number; workerRuns: number; inProcessRuns: number;
 } {
   return {
     enabled: poolEnabled(),
@@ -858,6 +976,12 @@ export function doctorPoolStatus(): {
     meanJobMs,
     eagerRespawn: eagerRespawnEnabled(),
     admission: admissionEnabled(),
+    // Round-4: process-lifetime outcome counters. A submission that reaches
+    // the pool ends in exactly one of these three, so "was this served from
+    // the cache?" is now a countable fact rather than a timing inference.
+    cacheHits,
+    workerRuns,
+    inProcessRuns,
   };
 }
 

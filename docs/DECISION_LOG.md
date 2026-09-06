@@ -741,29 +741,47 @@ the same state, so it gets the same answer, just sooner. A job that IS
 admitted keeps its timer, which still catches the case where the queue grew
 behind it after admission.
 
-Measured A/B on one binary (`DOCTOR_QUEUE_ADMISSION=off` vs. on, two paired
-runs each, same box, 60 concurrent 346 KB features then 20 more 8 s later):
+Measured A/B on one binary (`DOCTOR_QUEUE_ADMISSION=off` vs. on, **four runs
+per arm**, same box, 60 concurrent 346 KB features then 20 more 8 s later).
+Ranges, not single runs — the first draft of this entry quoted one pair, and
+the round-3 review showed that a single pair of a noisy box could be read
+either way:
 
-| | admission off | admission on |
+| | admission off (4 runs) | admission on (4 runs) |
 |---|---|---|
-| first 503 of the wave landing on a saturated pool | 60,361 / 60,267 ms | **1,055 / 512 ms** |
-| first 503 of the cold opening wave (timer path) | 62,625 / 63,688 ms | 62,750 / 64,058 ms |
-| submissions served, out of 80 | 49 / 43 | 46 / 47 |
+| first 503 of the wave landing on a saturated pool | **60,296–60,474 ms** | **853–959 ms in 3 of 4 runs; 60,342 ms in the fourth** |
+| first 503 of the cold opening wave (timer path) | 62,275–62,603 ms | 62,801–62,930 ms |
+| submissions served, out of 80 | **50–52** (median 51) | **50–54** (median 51) |
 
-The served count is unchanged within run-to-run spread — which it must be,
-because **an admission refusal may only fire where the timer would have fired
-anyway**. Two deliberate biases toward admitting enforce that: the estimate
-excludes the job's OWN execution (the queue budget bounds the wait, not
-wait-plus-run), and it must exceed the budget by **1.5×** before anything is
-refused — that factor is the measured ~1.45× by which this estimator
-over-stated the real wait at the shed boundary, because the EWMA's early
-samples carry worker cold start. The cold opening wave, where the pool has no
-completed samples to learn from, is therefore untouched: admission does not
-fire there at all, and the timer answers exactly as before.
-`DOCTOR_QUEUE_ADMISSION=off` reverts to wait-then-shed for an operator who
-prefers it.
+**Served count: no measurable difference** — the two ranges overlap and the
+medians match. That is the property that matters, because **an admission
+refusal may only fire where the timer would have fired anyway**. Two
+deliberate biases toward admitting enforce it: the estimate excludes the job's
+OWN execution (the queue budget bounds the wait, not wait-plus-run), and it
+must exceed the budget by **1.5×** before anything is refused — the measured
+~1.45× by which this estimator over-stated the real wait at the shed boundary,
+because the EWMA's early samples carry worker cold start.
 
-**(b) A terminated worker is now replaced eagerly.** Terminating is this
+**Latency: the win is real but not universal, and the entry says which.** The
+mechanism needs the EWMA to have learned the real per-job cost; on a pool with
+no completed samples it correctly admits everything. In 3 of 4 runs the second
+wave's first refusal arrived in under a second; in the fourth the EWMA had not
+moved far enough by the 8 s mark and the timer answered at 60.3 s, exactly as
+it did before this change. Across all eight ON runs measured in this lane and
+its reviews (including the reviewer's own, which fired the second wave at 3 s
+rather than 8 s), seven answered between 0.13 s and 3.7 s and one at 60.3 s.
+The cold opening wave is untouched in every run. `DOCTOR_QUEUE_ADMISSION=off`
+reverts to wait-then-shed for an operator who prefers it.
+
+**Caveat on the box, stated rather than implied**: none of these runs were on
+a quiet machine — other lanes were building and testing throughout, which is
+why the served counts are quoted as ranges and why the 1.5× margin (whose
+headroom over the measured worst-case over-statement is only ~3%) is the
+number to re-measure on a quiet box before anyone raises it or lowers the
+queue budget.
+
+**(b) A terminated worker is now replaced eagerly — and the replacement can
+never outlive a shutdown.** Terminating is this
 pool's only honest cancellation, and every user of it — Cancel, the running
 budget's kill, and the "delete everything" purge — left the pool one warm
 worker short, with the slot refilled only on the next submission. That made
@@ -780,6 +798,24 @@ until now that cost was silently transferred to the next writer.
 Warming a replacement after a purge cannot undo the deletion — the
 replacement is a fresh thread that has never seen a report, which is the whole
 mechanism a purge relies on.
+
+The first build of this got the shutdown ordering wrong, and the round-3
+review caught it: the `shuttingDown` flag was checked BEFORE the awaits that
+actually spawn the worker, while `shutdownDoctorPool()` clears that flag in
+its own `finally` — so a respawn scheduled just before a shutdown spawned its
+replacement AFTER the shutdown had resolved, with nothing left to terminate
+it. Reproduced on the pre-fix tree: the process **hung** (`exit 124`) holding
+a worker `MessagePort` with `workers === 1` two seconds after
+`shutdownDoctorPool()` returned. In production that is `server.ts`'s 10 s
+hard-kill turning a clean SIGTERM redeploy into **exit 1, ten seconds late**,
+any time a Cancel, a budget kill or a purge lands shortly before the signal.
+Three things close it, all three needed because the spawn happens inside an
+async call the respawn does not control: a shutdown **generation** captured
+before the await and re-checked after it; `shutdownDoctorPool()` **draining**
+in-flight respawns (bounded at 3 s, far short of that 10 s hard-kill) before
+its own splice; and a `finally` that terminates anything that landed anyway.
+Same probe after the fix: **exit 0**, `workers === 0`, no `MessagePort` on the
+loop.
 
 **Evidence for the second amendment**: `tests/core/doctor-analysis-budget.test.ts`
 (a hopeless submission refused in under 50 ms with the row-73 sentence and

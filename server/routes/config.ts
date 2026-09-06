@@ -7,7 +7,7 @@ import { checkAdminAuth, isLoopbackAddress, timingSafeStringEqual } from '../lib
 import { instantiatePreset } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { version as buildVersion, commit as buildCommit } from '../lib/build-info.ts';
-import { getDoctorPoolWarmState } from '../nvm/analyze/doctor-pool.ts';
+import { getDoctorPoolWarmState, doctorPoolStatus } from '../nvm/analyze/doctor-pool.ts';
 import { isDraining } from '../lib/readiness.ts';
 import {
   validate as validateOutline, OutlineBodySchema, ImportBodySchema,
@@ -88,6 +88,7 @@ const SIMULATION_OBSERVATION_NOTABLE_EXCLUSIONS = [
 // keeps responding even when Gemini/keys/everything else is down.
 router.get('/health', (_req, res) => {
   const warm = getDoctorPoolWarmState();
+  const pool = doctorPoolStatus();
   res.json({
     status: 'ok',
     uptime: Math.round(process.uptime()),
@@ -119,6 +120,17 @@ router.get('/health', (_req, res) => {
       // false when `timedOut` is false.
       completedAfterDeadline: warm.completedAfterDeadline,
       settledAfterTimeoutMs: warm.settledAfterTimeoutMs,
+      // Round-4 review (2026-09-06): process-lifetime outcome counters for
+      // the pool. Every submission that reaches it ends in exactly one of
+      // these three — answered from the coordinator LRU, run on a worker, or
+      // run in-process (the deep-read path and the no-workers fallback) — so
+      // an operator can read cache effectiveness and worker utilisation
+      // without inferring either from latency. Additive, and all three are
+      // plain counters: nothing here can throw, which is the property this
+      // endpoint is built on.
+      cacheHits: pool.cacheHits,
+      workerRuns: pool.workerRuns,
+      inProcessRuns: pool.inProcessRuns,
     },
   });
 });

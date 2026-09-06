@@ -541,6 +541,59 @@ describe('a terminated worker is replaced eagerly, not on the next writer\'s req
     }
   });
 
+  // ── Round-4 review BLOCKER ────────────────────────────────────────────────
+  // The respawn checked `shuttingDown` BEFORE the awaits that actually spawn
+  // the worker, and shutdownDoctorPool() clears that flag in its own
+  // `finally` — so a respawn scheduled just before a shutdown spawned its
+  // worker AFTER the shutdown had resolved. Reproduced by the reviewer and
+  // re-reproduced here on the pre-fix tree: the process HUNG (exit 124),
+  // holding a MessagePort with `workers === 1` two seconds after
+  // shutdownDoctorPool() returned. In production that is server.ts's 10 s
+  // hard-kill turning a clean SIGTERM redeploy into exit 1, ten seconds late.
+  // This test is the shape of that probe: force a run-budget kill (which
+  // schedules a respawn), shut the pool down immediately, then look again
+  // after the spawn would have landed.
+  it('leaves no orphan worker when a shutdown lands on a respawn already in flight', async (t) => {
+    if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
+      t.skip('worker pool unavailable in this environment');
+      return;
+    }
+    await shutdownDoctorPool();
+    clearDoctorCache();
+    process.env.DOCTOR_POOL_EAGER_RESPAWN = '1';
+    process.env.DOCTOR_ANALYSIS_BUDGET_MS = '60';   // guarantees the kill
+    process.env.DOCTOR_QUEUE_ADMISSION = 'off';     // the kill, not the door
+    delete process.env.DOCTOR_WORKER_POOL_SIZE;
+    try {
+      // Big enough that 60 ms cannot finish it, so the run budget terminates
+      // the worker and schedules a replacement.
+      const DLG = 'this is ordinary lowercase dialogue here.';
+      let heavy = 'INT. OPENING - DAY\n\nA figure waits.\n\n';
+      for (let scene = 0, occ = 0; occ < 1200; scene++) {
+        heavy += `INT. LOCATION ${scene} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 15 && occ < 1200; i++, occ++) heavy += `CHAR${occ % 80}\n${DLG}\n\n`;
+      }
+      await runScriptDoctorOffThread(heavy).catch(() => undefined);
+      await shutdownDoctorPool();
+      // Long enough for a cold worker spawn (~460-540 ms) to have landed if
+      // anything were still going to spawn.
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      assert.equal(
+        doctorPoolStatus().workers, 0,
+        'a worker appeared after shutdownDoctorPool() resolved — it would hold the event loop open and make a clean SIGTERM exit 1',
+      );
+      assert.equal(
+        process.getActiveResourcesInfo().filter((r) => r === 'MessagePort').length, 0,
+        'a worker MessagePort is still open after shutdown — the pool is holding the event loop',
+      );
+    } finally {
+      delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+      delete process.env.DOCTOR_ANALYSIS_BUDGET_MS;
+      delete process.env.DOCTOR_QUEUE_ADMISSION;
+      await shutdownDoctorPool();
+    }
+  });
+
   it('never resurrects a worker during shutdown, and never exceeds the configured pool size', async (t) => {
     if (doctorPoolStatus().disabled || !doctorPoolStatus().enabled) {
       t.skip('worker pool unavailable in this environment');

@@ -80,9 +80,18 @@ describe('routes/config — GET /ready and /health.doctorPool', () => {
     assert.equal(typeof body.uptime, 'number');
     assert.equal(typeof body.sessions, 'number');
     assert.equal(typeof body.version, 'string');
+    // Round-4 review (2026-09-06): the block grew three additive outcome
+    // counters (cacheHits / workerRuns / inProcessRuns — doctor-pool.ts),
+    // so an operator can read cache effectiveness and worker utilisation
+    // instead of inferring either from latency. Still a whole-object
+    // deepEqual, so a field appearing or vanishing keeps failing this test
+    // rather than passing unnoticed. Zero here because this server has not
+    // analysed anything yet — which is itself the assertion that the
+    // counters start at a known point and are not fabricated.
     assert.deepEqual(body.doctorPool, {
       warm: false, warmedAt: null, ms: null, timedOut: false,
       completedAfterDeadline: false, settledAfterTimeoutMs: null,
+      cacheHits: 0, workerRuns: 0, inProcessRuns: 0,
     });
   });
 

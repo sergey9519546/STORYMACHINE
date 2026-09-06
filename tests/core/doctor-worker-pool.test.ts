@@ -28,7 +28,28 @@ import {
 } from '../../server/nvm/analyze/doctor-pool.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
 
-after(async () => { await shutdownDoctorPool(); });
+// 2026-09-06 round-4 review. The suites in this file run CONCURRENTLY under
+// node:test (the failing stack showed `async Promise.all (index 0)`), so the
+// cancellation suite's abort lands while the event-loop and cache suites are
+// timing things. Since round 3 an abort also warms a REPLACEMENT worker
+// (server/nvm/analyze/doctor-pool.ts's respawnWarmWorkerAfterTerminate) —
+// spawning a thread and loading the analyzer inside it, concurrently with
+// those measurements. That is a real new contention source, and the merge
+// gate caught it: `doctor_pool_worker_respawned reason=cancel` appears in the
+// log immediately after a flaked timing assertion.
+//
+// Two fixes, both applied: the cache assertion no longer times anything (it
+// counts outcomes — see the LRU test below), and the respawn is pinned OFF
+// for this process, so this file measures the pool it is describing rather
+// than the pool plus a background warm-up. The respawn's own coverage lives
+// in tests/core/doctor-analysis-budget.test.ts, which asserts the pool is
+// restored to its configured size after a terminate.
+process.env.DOCTOR_POOL_EAGER_RESPAWN = '0';
+
+after(async () => {
+  delete process.env.DOCTOR_POOL_EAGER_RESPAWN;
+  await shutdownDoctorPool();
+});
 
 /** A script big enough that the analysis takes long enough to sample the
  *  event loop during it, without making the suite slow. */
@@ -122,40 +143,72 @@ describe('doctor worker pool — cache, cancellation, errors', () => {
     const fountain = REFERENCE_CORPUS[1].fountain;
     clearDoctorCache();
 
+    // Deltas, not absolutes: this file's earlier suites have already run
+    // analyses through the same pool, so the counters are non-zero here.
+    const before = doctorPoolStatus();
+    const realRunsBefore = before.workerRuns + before.inProcessRuns;
+
     const beforeFirst = performance.now();
     const first = await runScriptDoctorOffThread(fountain);
     const firstMs = performance.now() - beforeFirst;
+    const afterFirst = doctorPoolStatus();
     const beforeSecond = performance.now();
     const second = await runScriptDoctorOffThread(fountain);
     const secondMs = performance.now() - beforeSecond;
+    const afterSecond = doctorPoolStatus();
 
     const { analyzedAt: _a, ...firstStable } = first;
     const { analyzedAt: _b, ...secondStable } = second;
     assert.deepEqual(secondStable, firstStable);
-    // A cache hit costs one sha256; a re-run costs a thread hop plus the
-    // whole pipeline — so a cache hit must be meaningfully faster than the
-    // REAL run it should have skipped, relative to that run's own cost, the
-    // same way the clearDoctorCache() check just below this is relative to
-    // `secondMs` rather than a fixed wall-clock budget. 2026-09-05 review
-    // round 4 follow-up: a fixed `secondMs < 50` budget flaked under
-    // full-suite CPU contention (this file's other tests run concurrently
-    // and legitimately slow every wall-clock measurement down), even though
-    // 3 isolated re-runs and an empty `git diff main..HEAD` on this whole
-    // area (doctor.ts/doctor-pool.ts/this file) confirmed the cache itself
-    // was never actually skipped — only the absolute-ms assertion was thin.
-    assert.ok(
-      secondMs < firstMs / 2,
-      `repeat submission (${Math.round(secondMs)}ms) was not meaningfully faster than the real run it should have skipped (${Math.round(firstMs)}ms) — the LRU was not consulted`,
+
+    // ── 2026-09-06 round-4 review: this is asserted by COUNTING, not timing.
+    //
+    // The previous form was a wall-clock ratio (`secondMs < firstMs / 2`),
+    // itself already a rewrite of an even thinner fixed `secondMs < 50ms`
+    // budget after that flaked under full-suite CPU contention. The ratio
+    // flaked too — twice in three full runs, most recently with a `first`
+    // run of 3ms (its own worker realm was already warm from the sweep
+    // above, which clearDoctorCache() cannot reach) and once against a
+    // worker being spawned concurrently by the pool's eager respawn. And it
+    // could never have failed for the reason it names: a slow-but-cached run
+    // and a fast-but-uncached run are indistinguishable to a stopwatch.
+    //
+    // doctor-pool.ts now counts the three mutually exclusive outcomes a
+    // submission can have, so "the LRU answered it" is a fact rather than an
+    // inference. The timing is kept as an informational line — useful when
+    // reading a log, never a pass/fail condition.
+    console.log(
+      `[lru] first submission ${Math.round(firstMs)}ms, repeat ${Math.round(secondMs)}ms `
+      + `(informational — the assertions below count outcomes, not milliseconds)`,
+    );
+    const realRunsAfterFirst = afterFirst.workerRuns + afterFirst.inProcessRuns;
+    const realRunsAfterSecond = afterSecond.workerRuns + afterSecond.inProcessRuns;
+    assert.equal(
+      realRunsAfterFirst, realRunsBefore + 1,
+      'the first submission must actually run (on a worker, or in-process where workers are unavailable)',
+    );
+    assert.equal(
+      realRunsAfterSecond, realRunsAfterFirst,
+      'the repeat submission reached a worker (or ran in-process) — the coordinator LRU was not consulted',
+    );
+    assert.equal(
+      afterSecond.cacheHits, afterFirst.cacheHits + 1,
+      'the repeat submission was not served from the coordinator LRU',
     );
 
     // And the cache genuinely lives on the coordinator: clearing it there
-    // must make the next call do real work again.
+    // must make the next call do real work again — also counted rather than
+    // timed, for the same reason.
     clearDoctorCache();
-    const afterClear = performance.now();
     await runScriptDoctorOffThread(fountain);
-    assert.ok(
-      performance.now() - afterClear > secondMs,
+    const afterClear = doctorPoolStatus();
+    assert.equal(
+      afterClear.workerRuns + afterClear.inProcessRuns, realRunsAfterSecond + 1,
       'clearDoctorCache() did not affect the pooled path — the cache is not on the coordinator',
+    );
+    assert.equal(
+      afterClear.cacheHits, afterSecond.cacheHits,
+      'the post-clear submission was still served from a cache — clearDoctorCache() did not reach the coordinator LRU',
     );
   });
 
