@@ -131,6 +131,45 @@ export interface StructuralSignalsReport {
   /** Mean |dialogueShareDelta| over scenes 1..n-1 — how much the talk/action
    *  mix actually moves from scene to scene. */
   meanAbsDialogueShareDelta: number;
+  /** `meanAbsDialogueShareDelta` divided by the standard deviation of the same
+   *  per-scene shares, clamped to [0, 2] — a scale-free roughness index.
+   *
+   *  WHY IT EXISTS (2026-09-07). The raw channel above is the only one of the
+   *  thirteen that ordered all three separation sets in its registered
+   *  direction (docs/scoring/STRUCTURAL_SIGNALS_2026-09-04.md §4), and it
+   *  carries the open confound §4's attack 1 named: it is anti-correlated
+   *  with CAST SIZE on every set, and cast size (`meanSpeakersPerScene`,
+   *  registered with NO direction) orders 32 of 32 pairs on its own. Anything
+   *  that acts on the SCALE of scene-to-scene share variation — a bigger cast
+   *  splitting each scene's dialogue more evenly is exactly such a thing —
+   *  cancels in a ratio of a mean absolute difference to a standard
+   *  deviation. Measured, on this branch:
+   *
+   *    Spearman against meanSpeakersPerScene, 32 public-corpus scripts:
+   *      raw -0.695  ->  normalised -0.015
+   *    Spearman against meanSpeakersPerScene, the 12 blind fixtures:
+   *      raw -0.643  ->  normalised -0.176
+   *
+   *  and the separation the raw channel had is kept: 5 of 6 blind pairs
+   *  ordered on the signal alone, on both.
+   *
+   *  IT IS NOT WIRED INTO ANY SCORE, and the measurement that decided that is
+   *  recorded here rather than in a commit message: under the
+   *  scene-count-preserving CLIMAX_RELOCATE degradation this signal MOVES on
+   *  32 of 32 scripts — it is genuinely order-sensitive, unlike
+   *  `actionSentenceCvOverall`, which a scene permutation leaves
+   *  bit-identical — but it moves UP on 16 and DOWN on 16, and the intact
+   *  script is the higher of the pair on exactly 16 of 32. That is 0.5 by
+   *  count, so a bounded deduction reading it in the registered direction
+   *  would contribute exactly chance to that channel. See
+   *  docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md §7.
+   *
+   *  The clamp bounds a ratio whose denominator can be near zero on a script
+   *  whose dialogue share barely varies; 2 is above the ~1.13 a white-noise
+   *  sequence produces and above every value this corpus reaches (max 1.7848).
+   *  Zero when the shares have no dispersion at all — there is no roughness
+   *  to normalise. */
+  meanAbsDialogueShareDeltaNormalised: number;
   /** max(dialogueShare) − min(dialogueShare) across scenes. */
   dialogueShareRange: number;
   /** Fraction of scenes that introduce at least one new speaker pairing. */
@@ -172,6 +211,10 @@ export const STRUCTURAL_SIGNAL_SPECS: ReadonlyArray<{
 }> = [
   { key: 'sceneLengthCv', definition: 'sd/mean of per-scene word counts', direction: 'higher' },
   { key: 'meanAbsDialogueShareDelta', definition: 'mean scene-to-scene absolute change in dialogue-word share', direction: 'higher' },
+  // Same registered direction as its raw parent, and deliberately so: this is
+  // the SAME hypothesis with a confound divided out, not a new one, so
+  // registering a fresh prior for it would be direction-fishing.
+  { key: 'meanAbsDialogueShareDeltaNormalised', definition: 'mean scene-to-scene absolute change in dialogue-word share, divided by the sd of those shares (cast-size-free roughness index, clamped to [0, 2])', direction: 'higher' },
   { key: 'dialogueShareRange', definition: 'max minus min per-scene dialogue-word share', direction: 'higher' },
   { key: 'newPairSceneRate', definition: 'fraction of scenes introducing a speaker pairing never co-present before', direction: 'higher' },
   { key: 'lastNewPairPosition', definition: 'normalized position of the last scene to introduce a new pairing', direction: 'none' },
@@ -184,6 +227,17 @@ export const STRUCTURAL_SIGNAL_SPECS: ReadonlyArray<{
   { key: 'meanOpenCloseShift', definition: 'mean normalized line-length difference between a scene’s first third and last third', direction: 'higher' },
   { key: 'openCloseModeFlipRate', definition: 'fraction of scenes whose first and last line differ in mode (action vs dialogue)', direction: 'none' },
 ];
+
+/** The cast-size-free roughness index — see
+ *  `meanAbsDialogueShareDeltaNormalised`'s own comment for the measurement
+ *  that motivates it and for why it is not wired into any score. A named
+ *  function rather than an inline expression so the clamp and the
+ *  zero-dispersion case are stated once and are directly testable. */
+export function normalisedShareRoughness(meanAbsDelta: number, shareSd: number): number {
+  const ROUGHNESS_CLAMP = 2;
+  if (!(shareSd > 0)) return 0;
+  return Math.min(ROUGHNESS_CLAMP, meanAbsDelta / shareSd);
+}
 
 // ── small numeric helpers ───────────────────────────────────────────────────
 
@@ -318,6 +372,7 @@ function emptyReport(): StructuralSignalsReport {
     scenes: [],
     sceneLengthCv: 0,
     meanAbsDialogueShareDelta: 0,
+    meanAbsDialogueShareDeltaNormalised: 0,
     dialogueShareRange: 0,
     newPairSceneRate: 0,
     lastNewPairPosition: 0,
@@ -501,6 +556,7 @@ export function computeStructuralSignals(fountain: string): StructuralSignalsRep
     scenes: sceneRows,
     sceneLengthCv: r4(cv(sceneWords)),
     meanAbsDialogueShareDelta: r4(mean(absDeltas)),
+    meanAbsDialogueShareDeltaNormalised: r4(normalisedShareRoughness(mean(absDeltas), sd(shares))),
     dialogueShareRange: r4(shares.length > 0 ? Math.max(...shares) - Math.min(...shares) : 0),
     newPairSceneRate: r4(newPairScenes / sceneRows.length),
     lastNewPairPosition: r4(

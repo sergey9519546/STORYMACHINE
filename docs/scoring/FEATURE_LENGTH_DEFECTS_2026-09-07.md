@@ -29,7 +29,7 @@ scenes AND pays them again for stapling unrelated scripts together. (3) is the
 One Bet — it is the reason `SHUFFLE_DROP`'s mean health gap is negative on
 `main` before any branch is involved, and it is why twelve CONSIDER shorts
 concatenated score RECOMMEND. A fourth item, `meanAbsDialogueShareDelta`, was
-measured as a candidate wiring and is reported in §7.
+measured as a candidate wiring and is a NULL result — reported in §7.
 
 ---
 
@@ -108,6 +108,7 @@ are in §8.1.
 | 2 | voice: per-character abstention | 0.5313 | 0.4219 | 1.0000 | 1/6, −0.0167 | 21/21 pass | KNOWN FAIL +5.4 | KNOWN FAIL +8.2 | 0 of 45 (45 byte-differ) | 0 of 45 |
 | 3 | `ORPHAN_CLUE` proper-noun/title guard | **0.5781** | **0.5156** | 1.0000 | **0/6**, −0.0667 | 21/21 pass | KNOWN FAIL +5.3 | KNOWN FAIL +7.0 | 18 of 45, RMS 10.652 | 2 of 45 |
 | 4 | density steepness 50→2 + scarcity saturation | **0.8750** | **0.5469** | 1.0000 | **4/6**, +0.3833 | 21/21 pass | KNOWN FAIL +5.3 | **PASS −2.0** (promoted to `hard`) | 25 of 45, RMS 9.580 | 6 of 45 |
+| 5 | normalised dialogue-share roughness (exposed, NOT wired) | 0.8750 | 0.5469 | 1.0000 | 4/6, +0.3833 | 21/21 pass | KNOWN FAIL +5.3 | PASS −2.0 | 0 of 45 (45 byte-differ) | 0 of 45 |
 
 ### 8.1 Per-commit detail
 
@@ -543,3 +544,81 @@ fire on the public corpus, so it measures a strictly smaller engine, and
 scarcity saturation in particular will move every feature-length script by
 roughly 8 points, and nothing in this repository can tell you whether AUC-24
 stays above its 0.622 floor. That is the owner's run.
+
+
+## 7. `meanAbsDialogueShareDelta`, normalised — a null result, measured
+
+**What was built.** `meanAbsDialogueShareDeltaNormalised`, a new channel on
+`StructuralSignalsReport`: the existing raw channel divided by the standard
+deviation of the same per-scene dialogue shares, clamped to [0, 2]. Registered
+in `STRUCTURAL_SIGNAL_SPECS` with the SAME direction (`higher`) as its raw
+parent, deliberately — it is that hypothesis with a confound divided out, not
+a new one, and registering a fresh prior for it would be direction-fishing.
+
+**The normalisation, stated.** `mean|share_n − share_{n−1}| / sd(share)` is a
+scale-free roughness index. Anything that acts on the SCALE of scene-to-scene
+share variation cancels exactly in a ratio of a mean absolute difference to a
+standard deviation — and a bigger cast splitting each scene's dialogue more
+evenly is precisely such a thing. That is the mechanism by which the confound
+`STRUCTURAL_SIGNALS_2026-09-04.md` §4 attack 1 named should disappear, and it
+is asserted directly on the arithmetic as well as measured on the corpus
+(`server/nvm/analyze/structural-signals.test.ts`, "invariant to a uniform
+rescaling of the share sequence, and the raw one is not").
+
+**The confound shrinks, as predicted:**
+
+| set | Spearman(raw, `meanSpeakersPerScene`) | Spearman(normalised, same) |
+|---|---|---|
+| 32 public-corpus scripts | **−0.695** | **−0.015** |
+| 12 blind-pair fixtures | **−0.643** | **−0.176** |
+
+and the separation the raw channel had is kept: **5 of 6** blind pairs ordered
+on the signal alone, on both the raw and the normalised version. The
+normalised channel's range on this corpus is 0.8682–1.7848, comfortably inside
+the clamp.
+
+**It is order-SENSITIVE, which is the whole reason it was the candidate.**
+`STRUCTURAL_SIGNALS_2026-09-04.md` §6 nominated two channels;
+`actionSentenceCvOverall` is computed over a document-wide multiset and a scene
+permutation leaves it bit-identical, so it cannot move a scene-count-preserving
+statistic by construction. This one can, and does: under `CLIMAX_RELOCATE` it
+moves on **32 of 32** scripts, mean |delta| 0.1427.
+
+**AND IT IS A NULL. It moves at random.** Under `CLIMAX_RELOCATE` it moves UP
+on 16 scripts and DOWN on 16; the intact script is the higher of the pair on
+**exactly 16 of 32**, which is 0.5 by count. Wiring it in its registered
+direction cannot raise that channel.
+
+That was then measured rather than left as arithmetic. A bounded ramp of the
+shape the structural block already uses (cap 6 — the same order as
+`GLOBAL_ARC_DEDUCTION` — deducting below a roughness of 1.0), applied to every
+script's real `runScriptDoctor` health over the real corpus and the real
+degradations:
+
+```
+SHUFFLE_DROP       unwired 0.8750 (28/4/0)  ->  wired 0.8750 (28/4/0)
+CLIMAX_RELOCATE    unwired 0.5469 (17/14/1)  ->  wired 0.5156 (16/15/1)
+DIALOGUE_FLATTEN   unwired 1.0000 (32/0/0)  ->  wired 1.0000 (32/0/0)
+```
+
+**Wiring it does not raise the order-sensitive statistic — it LOWERS it**,
+0.5469 → 0.5156, by flipping one pair. So the channel ships **exposed and not
+wired**, per the brief's own instruction, and the fact that no score reads it
+is asserted rather than trusted
+(`structural-signals.test.ts`, "NOT WIRED: no score reads the normalised
+channel" greps `doctor.ts`, so a later change that wires it fails here and
+owes this measurement re-run).
+
+**What that null does and does not say.** It says this signal does not help
+the doctor tell an intact script from one with its climax moved to the front,
+on 32 short distributable scripts. It does NOT say the signal is worthless:
+its blind-pair ordering (5 of 6 on the signal alone, on six pairs) is the
+craft question, and it is untouched by this result. What the confound
+measurement adds is that whatever that 5 of 6 is, it is no longer mostly cast
+size — which is the honest reason to keep the channel on the report rather
+than delete it.
+
+**Cost:** zero. All six benchmark AUCs, the blind pairs, the calibration bands,
+the metamorphic suite and every one of the 45 in-repo fixtures' health values
+are byte-identical to commit 4; the 45 reports differ only by gaining the new
+field.

@@ -551,6 +551,7 @@ describe('renderCoverageLetter — shape and rhythm caveat', () => {
     const { markdown } = renderCoverageLetter(buildReport({
       structuralSignals: {
         scored: false, sceneCount: 1, scenes: [], sceneLengthCv: 0, meanAbsDialogueShareDelta: 0,
+        meanAbsDialogueShareDeltaNormalised: 0,
         dialogueShareRange: 0, newPairSceneRate: 0, lastNewPairPosition: 0, meanSpeakersPerScene: 0,
         meanTurnWords: 0, meanLeadShare: 0, leadShareSlope: 0, speakerEntropy: 0,
         actionSentenceCvOverall: 0.9994, meanOpenCloseShift: 0, openCloseModeFlipRate: 0,
@@ -573,6 +574,7 @@ describe('renderCoverageLetter — shape and rhythm caveat', () => {
     const { markdown } = renderCoverageLetter(buildReport({
       structuralSignals: {
         scored: false, sceneCount: 0, scenes: [], sceneLengthCv: 0, meanAbsDialogueShareDelta: 0,
+        meanAbsDialogueShareDeltaNormalised: 0,
         dialogueShareRange: 0, newPairSceneRate: 0, lastNewPairPosition: 0, meanSpeakersPerScene: 0,
         meanTurnWords: 0, meanLeadShare: 0, leadShareSlope: 0, speakerEntropy: 0,
         actionSentenceCvOverall: 0, meanOpenCloseShift: 0, openCloseModeFlipRate: 0,
