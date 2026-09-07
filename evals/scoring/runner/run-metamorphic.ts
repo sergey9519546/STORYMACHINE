@@ -28,10 +28,22 @@ const WRITE_BASELINE = process.env.METAMORPHIC_WRITE_BASELINE === '1' || process
 const baseReport = await runScriptDoctor(BASE);
 const results: MetamorphicResult[] = [];
 for (const c of METAMORPHIC_CASES) {
+  // A case with `parts` does not transform the shared base script: its
+  // comparison point is the MAXIMUM health over the parts it names, and the
+  // variant is built from those same parts. See MetamorphicCase.parts.
+  let baseHealth = baseReport.health;
+  if (c.parts) {
+    let max = -Infinity;
+    for (const part of c.parts()) {
+      const pr = await runScriptDoctor(part);
+      if (pr.health > max) max = pr.health;
+    }
+    baseHealth = max;
+  }
   const variant = c.transform(BASE);
   const vr = await runScriptDoctor(variant);
-  const { passed, reason } = check(c, baseReport.health, vr.health);
-  results.push({ id: c.id, category: c.category, baseHealth: baseReport.health, variantHealth: vr.health, delta: +(vr.health - baseReport.health).toFixed(2), passed, reason });
+  const { passed, reason } = check(c, baseHealth, vr.health);
+  results.push({ id: c.id, category: c.category, baseHealth, variantHealth: vr.health, delta: +(vr.health - baseHealth).toFixed(2), passed, reason });
 }
 
 const pass = results.filter(r => r.passed).length;
@@ -47,7 +59,8 @@ for (const r of results) {
 }
 console.log(`\n${pass}/${results.length} cases passed raw; hard passes ${hardPasses}; known-failing witnesses ${knownFailures.length}.`);
 
-console.log('KNOWN FAILING POLICY: empty_verbosity (documented verbosity bias — not a CI hard fail)');
+console.log(`KNOWN FAILING POLICY (not a CI hard fail): ${[...KNOWN_FAILING_CASE_IDS].join(', ')} — empty_verbosity is the documented verbosity bias (VERBOSITY_BIAS_2026-07-11.md); stapled_shorts is the documented length pathology (FEATURE_LENGTH_DEFECTS_2026-09-07.md).`);
+console.log('NOTE: a `parts` case (stapled_shorts) reports base = the MAXIMUM health over its parts, not the shared base script.');
 if (knownFailures.length > 0) {
   console.log(`CURRENT WITNESS: ${knownFailures.map(r => r.id).join(', ')} still fails as documented.`);
 }
