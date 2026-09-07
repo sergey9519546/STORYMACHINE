@@ -116,6 +116,45 @@ ANA
 We are checking a checkbox, not a script.
 `;
 
+/**
+ * Types `text` into the focused element WITHOUT handing React a drain gap
+ * between keystrokes — the difference between a browser step that can fail on
+ * the unfixed tree and one that cannot.
+ *
+ * `page.keyboard.type()` awaits a CDP round-trip PER KEY. That round-trip is
+ * an idle gap, and an idle gap is exactly what React's nested-update counter
+ * needs to reset: `commitRootImpl` only increments it when a commit ends with
+ * pending sync/default lanes, so one drained frame anywhere in the burst puts
+ * the counter back to zero. Feature-length defect #1 is a ratchet of ~1 per
+ * keystroke against a limit of 50, so an awaited burst reproduces it only when
+ * the machine is loaded enough to lose the race — measured 5/5, 4/5 and 2/3
+ * under load but 0/5 idle, which is why round 1 of this lane wrongly recorded
+ * the defect as "load-dependent" and this step as un-fail-first.
+ *
+ * Dispatching the same keys through `Input.dispatchKeyEvent` and awaiting the
+ * promises ONCE at the end removes the per-key gap. Measured on this box, two
+ * builds differing by one line (ScriptIDE.tsx's `saveStatus` declaration):
+ * unfixed 3/3 threw React #185, fixed 0/3 with zero errors of any kind.
+ *
+ * `timing.ms()` still governs every WAIT in this phase; there is deliberately
+ * no wait inside the burst, because the absence of one is the instrument.
+ */
+async function typeWithoutDrainGaps(page, text) {
+  const cdp = await page.context().newCDPSession(page);
+  const pending = [];
+  for (const ch of text) {
+    if (ch === '\n') {
+      pending.push(cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 }));
+      pending.push(cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }));
+    } else {
+      pending.push(cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', text: ch, unmodifiedText: ch, key: ch }));
+      pending.push(cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ch }));
+    }
+  }
+  await Promise.all(pending);
+  await cdp.detach().catch(() => {});
+}
+
 /** Uploads IDLE_PROBE_FOUNTAIN through ScriptDoctorPanel's real file input
  *  (the hidden <input type="file"> behind its "Upload" trigger), which is the
  *  panel's own supported way back to the idle state. */
@@ -2001,17 +2040,21 @@ async function main() {
   //      listener — the loop is explained in
   //      tests/core/scriptide-render-loop-guard.test.ts.
   //
-  //      HONEST LIMIT OF THIS ASSERTION: the defect is load-dependent, so
-  //      this step is a real end-to-end regression check but NOT a
-  //      deterministic fail-first instrument. Measured on the unfixed tree
-  //      with this exact interaction: 5/5, 4/5 and 2/3 reproductions while
-  //      the box was busy; 0/5 while it was idle (React's counter resets
-  //      whenever a commit finishes with no pending lanes, and an idle box
-  //      drains between keystrokes). The DETERMINISTIC fail-first guard for
-  //      the same defect is tests/core/scriptide-render-loop-guard.test.ts,
-  //      which fails with exit 1 on the unfixed tree every time. Both are
-  //      kept: the unit guard cannot be timing-fooled, and this one is the
-  //      only check that exercises the real editor at real length.
+  //      THIS STEP IS FAIL-FIRST (corrected round 2, 2026-09-07). Round 1
+  //      recorded it as un-fail-first and blamed machine load; the real
+  //      variable is KEY DELIVERY. `page.keyboard.type()` awaits a CDP
+  //      round-trip per key and that round-trip is the drain gap that resets
+  //      React's counter, so an awaited burst reproduced the defect only
+  //      under load (5/5, 4/5, 2/3 busy; 0/5 idle). The burst below goes
+  //      through typeWithoutDrainGaps() (non-awaited
+  //      Input.dispatchKeyEvent — see its doc comment), and against two
+  //      builds differing by one line the whole phase measures **3/3 loop
+  //      errors unfixed, 0/3 fixed**.
+  //
+  //      tests/core/scriptide-render-loop-guard.test.ts is KEPT alongside it
+  //      and is not redundant: that guard is a source-level grep for one hook
+  //      on one line, so it pins the convention but could never catch the
+  //      same ratchet arriving through a different setter. This step could.
   //   2. the report offers a jump control for (at least) every finding the
   //      server resolved to a span, not the ONE the panel used to render;
   //   3. an honestly unlocatable finding says so, and a real jump from a
@@ -2066,13 +2109,11 @@ async function main() {
   });
   featureConsoleErrors.length = 0;
   featurePageErrors.length = 0;
-  await pageC.evaluate(() => document.querySelector('.cm-content')?.focus());
+  await pageC.locator('.cm-content').first().click();
   await pageC.keyboard.press('Control+End');
   await pageC.waitForTimeout(timing.ms(200));
-  // >50 characters with no pause: React's nested-update limit is 50, and the
-  // defect was a per-keystroke no-op state write that pushed the counter one
-  // step further on every one of them. A shorter burst cannot reach it.
-  await pageC.keyboard.type(
+  await typeWithoutDrainGaps(
+    pageC,
     "\n\nINT. HARGROVE & PYLE - MARGUERITE'S OFFICE - NIGHT\n\nMarguerite burns the transfer papers.\n\nMARGUERITE\nIt was never the papers. It was me.\n",
   );
   await pageC.waitForTimeout(timing.ms(3000));
@@ -2265,14 +2306,14 @@ async function main() {
   );
   record(
     'P2-featurelen',
-    'every root-cause card\'s headline count and expander count agree (item #10: "15 issues" over "the 12 contributing notes")',
+    'every root-cause card\'s headline count and expander count agree (item #10: the card used to say "N issues" over "the M contributing notes")',
     countAgreement.length > 0 && disagreeing.length === 0,
     `cards=${countAgreement.length} disagreeing=${disagreeing.length} ${JSON.stringify(disagreeing.slice(0, 2))}`,
   );
   const bothNumbersShown = countAgreement.filter((c) => c.issues !== c.rules);
   record(
     'P2-featurelen',
-    'where the two counts differ the card states BOTH ("15 issues from 12 rules")',
+    'where the two counts differ the card states BOTH (e.g. "15 issues from 10 rules")',
     bothNumbersShown.length > 0,
     `cards stating both=${bothNumbersShown.length} of ${countAgreement.length}`,
   );

@@ -16,8 +16,18 @@ import { createIdempotentWriter } from './idempotent-state.ts';
 
 export function useIdempotentState<T>(
   initial: T | (() => T),
+  /** Equality test, defaulting to Object.is (React's own). Pass a structural
+   *  one for state whose writer allocates a fresh object each time — an
+   *  identity comparison can never absorb THAT repeat, which is the shape of
+   *  the second, still-latent instance of the same defect this hook exists for
+   *  (ScriptIDE's title-page autofill; see its declaration site). */
+  equals?: (a: T, b: T) => boolean,
 ): [T, (next: T) => void] {
   const [value, setValue] = useState<T>(initial);
+  // Latest comparator, read through a ref so an inline arrow at the call site
+  // does not rebuild the writer (and so the writer never captures a stale one).
+  const equalsRef = useRef<((a: T, b: T) => boolean) | undefined>(equals);
+  equalsRef.current = equals;
   // The latest value WRITTEN, which is ahead of `value` between a write and
   // the re-render it causes. Comparing against this (rather than against the
   // rendered `value`) is what makes two same-value writes inside one tick
@@ -32,6 +42,7 @@ export function useIdempotentState<T>(
         latestRef.current = next;
         setValue(next);
       },
+      equals: (a, b) => (equalsRef.current ?? Object.is)(a, b),
     });
   }
   const set = useCallback((next: T) => { writerRef.current(next); }, []);

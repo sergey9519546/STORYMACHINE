@@ -52,6 +52,7 @@ export function FindingJump({
   onJump,
   className = "",
   surface = "themed",
+  focusable = true,
 }: {
   target: JumpTarget;
   /** Absent when no host is listening for navigation (the panel can render
@@ -77,6 +78,30 @@ export function FindingJump({
    *                 invariant ink tokens are the only correct choice.
    */
   surface?: "themed" | "invariant";
+  /**
+   * Whether the "no location" note is a TAB STOP (round-2 review finding 2,
+   * 2026-09-07).
+   *
+   * The note has to be reachable — a reason a writer cannot get to is not a
+   * reason — but on the 231-scene fixture the first cut put 374 focusable,
+   * non-interactive spans into the Full Report, i.e. 374 extra Tab presses
+   * between the controls a keyboard user can actually act on. 345 of those
+   * 374 are rows of the Per-Pass Breakdown appendix, which is a list to read,
+   * not a list to act on.
+   *
+   * So focusability follows the surface's purpose:
+   *   true  (default) — the act-on surfaces: Top Priorities, root-cause
+   *                     headlines, and the member rows a writer revealed by
+   *                     opening an expander. 29 notes on that fixture.
+   *   false           — the per-pass appendix. The note still renders, still
+   *                     carries its reason in `title` (hover) and in
+   *                     `aria-label` on a `role="note"`, and a screen reader
+   *                     still announces it in reading order, because reading
+   *                     order does not depend on tabindex. What is given up is
+   *                     sighted-keyboard Tab reachability on rows that have no
+   *                     action to reach.
+   */
+  focusable?: boolean;
 }) {
   const invariant = surface === "invariant";
   if (target.kind === "jump" && onJump) {
@@ -100,12 +125,16 @@ export function FindingJump({
       : "No location — this view has no editor to jump into.";
 
   return (
-    // tabIndex={0} deliberately: the reason must be reachable by keyboard and
-    // by a screen reader, not only by a mouse hover. role="note" (rather than
-    // a bare focusable span) is what keeps it announced as explanatory text
-    // instead of an interactive control the writer would try to activate.
+    // tabIndex={0} deliberately on the act-on surfaces: the reason must be
+    // reachable by keyboard and by a screen reader there, not only by a mouse
+    // hover. role="note" (rather than a bare focusable span) is what keeps it
+    // announced as explanatory text instead of an interactive control the
+    // writer would try to activate — and it is what keeps the reason in the
+    // screen reader's reading order even where `focusable` is false (see that
+    // prop's doc comment for the 374 -> 29 tab-stop reduction).
     <span
-      tabIndex={0}
+      tabIndex={focusable ? 0 : undefined}
+      data-no-location-focusable={focusable ? "" : undefined}
       role="note"
       data-no-location=""
       aria-label={reason}

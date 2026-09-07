@@ -533,7 +533,7 @@ try {
   // read the report -> jump to a line
   const jumpBtn = page.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
   const hasJump = await jumpBtn.count() > 0;
-  record('journey', 'the report renders a "Jump to line" affordance', hasJump);
+  record('journey', 'the report renders a jump affordance named for its destination ("Jump to scene N" / "Jump to line N")', hasJump);
   if (hasJump) {
     await jumpBtn.click();
     const flashed = await page.waitForSelector('.cm-sm-finding-flash', { timeout: timing.ms(2000) }).then(() => true).catch(() => false);

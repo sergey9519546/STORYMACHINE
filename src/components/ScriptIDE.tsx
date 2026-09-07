@@ -32,6 +32,7 @@ import {
   type ScriptIDEDraftEnvelope,
   type ScriptIDEDraftState,
   type ScriptIDEServerSnapshot,
+  type TitlePageState,
 } from "../lib/scriptide-draft-store";
 import { readScriptIDEDraftIDB, writeScriptIDEDraftIDB } from "../lib/scriptide-idb-store";
 import { decideSampleInstall } from "../lib/sample-install-guard";
@@ -521,7 +522,23 @@ export default function ScriptIDE({
   // initialDraft.titlePage entirely, so a writer's title/author/contact
   // silently vanished on every reload or fresh export even though the
   // envelope had room for it right next to snapshots/researchNotes.
-  const [titlePage, setTitlePage] = useState(initialDraft.titlePage);
+  // useIdempotentState with a STRUCTURAL equals (round-2 review finding 1,
+  // 2026-09-07): the title-page autofill effect below runs on every keystroke
+  // and calls setTitlePage(derived) with a FRESHLY ALLOCATED object, which no
+  // Object.is bail-out — React's or ours — can ever absorb. Today it fires at
+  // most once per draft because deriveTitlePageFromScript returns null as soon
+  // as isDefaultTitlePage() is false, but a draft whose Fountain title block
+  // parses to exactly DEFAULT_TITLE_PAGE ("Title: UNTITLED SCRIPT" /
+  // "Author: AUTHOR NAME" / "Contact: CONTACT INFO") leaves that guard true
+  // forever and reproduces the SAME render -> effect -> setState ratchet that
+  // threw React #185, through a different setter — which the source-level
+  // guard in tests/core/scriptide-render-loop-guard.test.ts, being a grep for
+  // one hook on one line, could never catch. Comparing the three fields makes
+  // the repeat a real no-op regardless of object identity.
+  const [titlePage, setTitlePage] = useIdempotentState<TitlePageState>(
+    initialDraft.titlePage as TitlePageState,
+    (a, b) => a.title === b.title && a.author === b.author && a.contact === b.contact,
+  );
   const [researchNotes, setResearchNotes] = useState<
     { id: string; title: string; content: string }[]
   >(initialDraft.researchNotes as { id: string; title: string; content: string }[]);

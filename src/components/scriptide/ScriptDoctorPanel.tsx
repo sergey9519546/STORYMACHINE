@@ -1846,6 +1846,7 @@ function IssueCard({
   pass,
   jump,
   onJump,
+  jumpFocusable = true,
 }: {
   issue: RevisionIssue;
   pass?: PassName;
@@ -1860,6 +1861,11 @@ function IssueCard({
   /** Absent when no host is listening for navigation; FindingJump then
    *  renders its honest note rather than a dead button. */
   onJump?: (startLine: number, endLine: number) => void;
+  /** Passed straight to FindingJump: false for the Per-Pass Breakdown
+   *  appendix, whose 345 unlocatable rows would otherwise be 345 extra tab
+   *  stops for a keyboard user (round-2 review finding 2). Jump BUTTONS are
+   *  always focusable — this only governs the "no location" note. */
+  jumpFocusable?: boolean;
 }) {
   const meta = SEVERITY_META[issue.severity];
   return (
@@ -1899,7 +1905,7 @@ function IssueCard({
         <span className="text-[10px] font-mono text-gray-600 dark:text-gray-300 ml-auto">
           {issue.location}
         </span>
-        <FindingJump target={jump} onJump={onJump} />
+        <FindingJump target={jump} onJump={onJump} focusable={jumpFocusable} />
       </div>
       <p className="text-[10px] font-bold uppercase text-black dark:text-gray-100 mb-1 flex items-center gap-1.5 flex-wrap">
         {issue.rule}
@@ -5696,6 +5702,13 @@ export default function ScriptDoctorPanel({
                                 issue={issue}
                                 jump={jumpForIssue(issue.location)}
                                 onJump={onNavigateToFinding}
+                                // The appendix: a list to read, not to act on.
+                                // Its unlocatable rows keep their reason (hover
+                                // + screen-reader reading order) without adding
+                                // 345 tab stops between the controls a keyboard
+                                // writer can actually use. See FindingJump's
+                                // `focusable` doc comment.
+                                jumpFocusable={false}
                               />
                             ))
                           )}

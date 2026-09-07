@@ -285,6 +285,36 @@ describe("finding-jump — over tests/fixtures/feature-length/assembled-feature.
     }
   });
 
+  it("the pair docs/CLAIMS_REGISTER.md row 80 quotes is one this fixture's panel actually renders", async () => {
+    // Round-2 review finding 7: the row's headline column used to quote
+    // "15 issues from 12 rules", which is the discovery's example from a
+    // 146-scene assembly and is NOT a pair any card on the committed fixture
+    // produces. The register's headline column quotes shipped strings
+    // elsewhere, so it must here too — and this assertion is what keeps that
+    // true if the clustering ever moves.
+    const r = await report;
+    const issues = r.passes.flatMap((p) => p.issues.map((i) => ({ ...i, pass: p.pass })));
+    const located = locateIssues(issues, fountain);
+    const spans = sceneLineSpans(fountain);
+    const causes = clusterIssues(located, spans);
+    const rendered = causes.map((c) => rootCauseCountSentence(c.memberCount, c.memberRules.length));
+    const expanders = causes.map((c) => rootCauseExpanderLabel(c.memberCount, c.memberRules.length));
+    const registerRow = readFileSync(resolve(__dirname, "../../docs/CLAIMS_REGISTER.md"), "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| 80 |"));
+    assert.ok(registerRow, "claims register row 80 must exist");
+    const quoted = registerRow.split("|")[2].trim();
+    const [quotedHead, quotedExpander] = quoted.split(" / ").map((x) => x.trim());
+    assert.ok(
+      rendered.includes(quotedHead),
+      `register row 80 quotes "${quotedHead}", which no root cause on this fixture renders. Rendered pairs include: ${[...new Set(rendered)].slice(0, 6).join(" | ")}`,
+    );
+    assert.ok(
+      expanders.includes(quotedExpander),
+      `register row 80 quotes expander "${quotedExpander}", which no root cause on this fixture renders`,
+    );
+  });
+
   it("every root cause gets a headline jump or a reason, and every member rule gets one too", async () => {
     const r = await report;
     const issues = r.passes.flatMap((p) => p.issues.map((i) => ({ ...i, pass: p.pass })));

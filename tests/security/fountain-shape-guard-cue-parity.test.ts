@@ -490,48 +490,111 @@ describe('MAX_FOUNTAIN_CUE_WEIGHT / MAX_FOUNTAIN_FREQUENT_CUE_LINES — cost bou
     }
     rows.push({ name: 'p0/sample-script', ...cueMetricsOf(p0SampleFountain) });
 
-    const worstByWeight = rows.reduce((a, b) => (b.weight > a.weight ? b : a));
-    const worstByFrequent = rows.reduce((a, b) => (b.frequentCount > a.frequentCount ? b : a));
-    const weightMargin = MAX_FOUNTAIN_CUE_WEIGHT / Math.max(1, worstByWeight.weight);
-    const frequentMargin = MAX_FOUNTAIN_FREQUENT_CUE_LINES / Math.max(1, worstByFrequent.frequentCount);
-    console.log(
-      `worst committed fixture by weight: ${worstByWeight.name} distinct=${worstByWeight.distinct} `
-      + `occurrences=${worstByWeight.occurrences} weight=${worstByWeight.weight} margin=${weightMargin.toFixed(0)}x`,
-    );
-    console.log(
-      `worst committed fixture by frequent-count: ${worstByFrequent.name} frequentCount=${worstByFrequent.frequentCount} `
-      + `margin=${frequentMargin.toFixed(0)}x`,
-    );
-    // FLOOR CHANGED 1000x -> 100x, 2026-09-06, with the measurement that
-    // forced it — recorded here rather than quietly edited.
+    // TWO TIERS, NOT ONE FLOOR (round-2 review fix, 2026-09-07).
     //
-    // The 1000x figure was a property of the CORPUS, not of the guard: when
-    // it was written, the largest committed .fountain file in the repository
-    // was 12 scenes / 10,861 B, so every row in this sweep was short-form and
-    // the worst weight was a few hundredths of the bound. The corpus now
-    // contains one deliberately feature-length fixture
-    // (tests/fixtures/feature-length/assembled-feature.fountain, 231 scenes,
-    // 114 KB — see its README for why it exists), and it is legitimately the
-    // worst row: distinct=83, occurrences=510, weight=42,330 against
-    // MAX_FOUNTAIN_CUE_WEIGHT, i.e. a 236x margin. Keeping 1000x would have
-    // meant asserting that no committed fixture may be feature length, which
-    // is the exact short-form bias that fixture exists to remove.
+    // Round 1 of this lane lowered the single corpus-wide floor 1000x -> 100x
+    // to admit tests/fixtures/feature-length/assembled-feature.fountain (231
+    // scenes, the repository's first stimulus at product length). That was
+    // wrong in BOTH directions and the review measured why:
     //
-    // 100x is still an enormous margin and is consistent with this file's own
-    // stated reality one test up: a PLAUSIBLE feature's honest weight margin
-    // is low single digits (that test asserts a 1.5x floor and explains why a
-    // bigger number there was ~10x optimistic). A real 120-page draft sitting
-    // at 236x is nowhere near the DoS bound; a script that gets within 100x of
-    // it is not a screenplay, which is what this assertion is for.
-    assert.ok(weightMargin >= 100, `expected >=100x weight margin on the worst committed fixture, got ${weightMargin.toFixed(0)}x (${worstByWeight.name})`);
-    // Real fixtures top out at a small handful of frequent lines (a
-    // two-hander scene has exactly 2) — assert a generous but real floor.
-    // UNCHANGED at 10x, but note it is now met EXACTLY: the feature-length
-    // fixture has frequentCount=5 against MAX_FOUNTAIN_FREQUENT_CUE_LINES=50.
-    // A future fixture with a sixth frequently-recurring cue will trip this,
-    // and that is the correct moment to re-derive the floor from a real
-    // measurement — not now, when nothing has failed.
-    assert.ok(frequentMargin >= 10, `expected >=10x frequent-line margin on the worst committed fixture, got ${frequentMargin.toFixed(0)}x (${worstByFrequent.name})`);
+    //   * it SUBTRACTED protection from every row that predates the fixture.
+    //     This assertion reads the WORST row, so one floor is one floor for
+    //     all of them — and the worst pre-existing row is
+    //     tests/fixtures/blind-pairs/the-deposit-excellent.fountain at
+    //     weight=357, a 28,011x margin. Those 75 rows cleared the old floor by
+    //     28x; under a flat 100x any of them could regress 280-fold and this
+    //     gate would stay green.
+    //   * and 100x/10x are calibrated to THIS concatenation, whose twenty
+    //     disjoint casts keep its cue weight artificially low — not to what a
+    //     feature costs. This file's own buildPlausibleFeature() (120 scenes,
+    //     44k words, a skewed major/minor cast) measures 6.2x weight / 6.3x
+    //     frequent, an order of magnitude BELOW those floors, so the first
+    //     genuinely realistic feature-length fixture anyone committed would
+    //     have failed here for no real reason.
+    //
+    // So the corpus is split by class and each class keeps a floor derived
+    // from its own measurement:
+    //
+    //   short-form (75 rows: 54 tracked fixtures + 20 calibration + P0 sample)
+    //     measured worst 28,011x weight / 25.0x frequent -> floors 1000x / 10x,
+    //     exactly the guarantee that existed before this lane.
+    //   feature-scale (tests/fixtures/feature-length/**)
+    //     floors derived from buildPlausibleFeature()'s 6.2x / 6.3x with
+    //     headroom -> 5x / 3x, and asserted against buildPlausibleFeature()
+    //     itself as well as the committed fixture, so the floor cannot drift
+    //     away from the thing it was derived from.
+    const isFeatureScale = (name: string) => name.replace(/\\/g, '/').includes('tests/fixtures/feature-length/');
+    const shortFormRows = rows.filter((r) => !isFeatureScale(r.name));
+    const featureRows = rows.filter((r) => isFeatureScale(r.name));
+    assert.ok(shortFormRows.length >= 70, `expected the pre-existing short-form corpus, found ${shortFormRows.length} rows`);
+    assert.ok(featureRows.length >= 1, 'expected at least one feature-scale fixture row — the tier below would otherwise prove nothing');
+
+    const marginsOf = (subset: typeof rows) => {
+      const worstByWeight = subset.reduce((a, b) => (b.weight > a.weight ? b : a));
+      const worstByFrequent = subset.reduce((a, b) => (b.frequentCount > a.frequentCount ? b : a));
+      return {
+        worstByWeight,
+        worstByFrequent,
+        weightMargin: MAX_FOUNTAIN_CUE_WEIGHT / Math.max(1, worstByWeight.weight),
+        frequentMargin: MAX_FOUNTAIN_FREQUENT_CUE_LINES / Math.max(1, worstByFrequent.frequentCount),
+      };
+    };
+    const shortForm = marginsOf(shortFormRows);
+    const feature = marginsOf(featureRows);
+    const plausible = cueMetricsOf(buildPlausibleFeature().text);
+    const plausibleWeightMargin = MAX_FOUNTAIN_CUE_WEIGHT / Math.max(1, plausible.weight);
+    const plausibleFrequentMargin = MAX_FOUNTAIN_FREQUENT_CUE_LINES / Math.max(1, plausible.frequentCount);
+
+    for (const [tier, m] of [['short-form', shortForm], ['feature-scale', feature]] as const) {
+      console.log(
+        `worst ${tier} row by weight: ${m.worstByWeight.name} distinct=${m.worstByWeight.distinct} `
+        + `occurrences=${m.worstByWeight.occurrences} weight=${m.worstByWeight.weight} margin=${m.weightMargin.toFixed(0)}x`,
+      );
+      console.log(
+        `worst ${tier} row by frequent-count: ${m.worstByFrequent.name} frequentCount=${m.worstByFrequent.frequentCount} `
+        + `margin=${m.frequentMargin.toFixed(1)}x`,
+      );
+    }
+    console.log(
+      `buildPlausibleFeature() (the feature tier's derivation): weight=${plausible.weight} `
+      + `frequentCount=${plausible.frequentCount} weightMargin=${plausibleWeightMargin.toFixed(1)}x `
+      + `frequentMargin=${plausibleFrequentMargin.toFixed(1)}x`,
+    );
+
+    // ── Tier 1: the 75 rows that predate the feature fixture. UNCHANGED
+    // guarantee — these are the floors this sweep carried before 2026-09-06,
+    // and nothing about admitting a feature-length fixture licenses relaxing
+    // them for a short-form script.
+    assert.ok(
+      shortForm.weightMargin >= 1000,
+      `expected >=1000x weight margin on the worst SHORT-FORM row, got ${shortForm.weightMargin.toFixed(0)}x (${shortForm.worstByWeight.name})`,
+    );
+    assert.ok(
+      shortForm.frequentMargin >= 10,
+      `expected >=10x frequent-line margin on the worst SHORT-FORM row, got ${shortForm.frequentMargin.toFixed(1)}x (${shortForm.worstByFrequent.name})`,
+    );
+
+    // ── Tier 2: feature scale. Derived from buildPlausibleFeature(), not from
+    // the committed concatenation, and asserted on BOTH so the two can never
+    // drift apart silently. Measured when written: plausible feature 6.2x /
+    // 6.3x, assembled fixture 236x / 10x.
+    assert.ok(
+      plausibleWeightMargin >= 5,
+      `the feature tier's own derivation regressed: buildPlausibleFeature() weight margin ${plausibleWeightMargin.toFixed(1)}x < 5x`,
+    );
+    assert.ok(
+      plausibleFrequentMargin >= 3,
+      `the feature tier's own derivation regressed: buildPlausibleFeature() frequent margin ${plausibleFrequentMargin.toFixed(1)}x < 3x`,
+    );
+    assert.ok(
+      feature.weightMargin >= 5,
+      `expected >=5x weight margin on the worst FEATURE-SCALE fixture, got ${feature.weightMargin.toFixed(1)}x (${feature.worstByWeight.name})`,
+    );
+    assert.ok(
+      feature.frequentMargin >= 3,
+      `expected >=3x frequent-line margin on the worst FEATURE-SCALE fixture, got ${feature.frequentMargin.toFixed(1)}x (${feature.worstByFrequent.name})`,
+    );
+
   });
 
   it('names the bound in its rejection message (weight)', () => {

@@ -108,12 +108,30 @@ deterministic, CC0, regenerable via
 discipline: it is a deliberately incoherent assembly, so it may be measured
 for scale and behaviour and never for craft.
 
-A second lesson from the same defect: a load-dependent gate is not a
-fail-first instrument. The browser step reproduces the render loop only when
-the machine is busy (5/5, 4/5 and 2/3 on the unfixed tree under load; 0/5
-idle), so the deterministic guard is a source-level one
-(`tests/core/scriptide-render-loop-guard.test.ts`) — see "A gate that cannot
-fail" above for the class this belongs to.
+## A harness that hides the defect it is pointed at
+
+The same 2026-09-06 render loop produced a second, sharper lesson, and the
+first attempt at it got the diagnosis wrong — which is the pattern worth
+recording. The browser step that types a new scene into the feature draft
+reproduced the loop 5/5 and 4/5 while the machine was busy and **0/5 while it
+was idle**, so round 1 recorded the defect as "load-dependent" and the gate as
+a real regression check but not a fail-first instrument. The independent
+review measured the actual variable: `page.keyboard.type()` awaits a CDP
+round-trip **per key**, and that round-trip is a drained frame — exactly what
+React's nested-update counter needs to reset. Delivering the identical keys
+through non-awaited `Input.dispatchKeyEvent` removes the gap and the gate
+becomes deterministic: **3/3 failures on the unfixed tree, 0/3 on the fixed
+one**, whole suite, same box.
+
+Generalised: when a gate is intermittent, suspect the harness's own
+synchronisation before concluding the defect is probabilistic. A test tool
+that politely waits between actions is simulating a *slower* user than the one
+the bug needs, and "this cannot be made deterministic" is a claim that must be
+measured like any other. It is also why the source-level guard
+(`tests/core/scriptide-render-loop-guard.test.ts`) is kept alongside rather
+than instead: a grep for one hook on one line pins the convention but could
+never catch the same ratchet arriving through a different setter — which
+`ScriptIDE.tsx`'s title-page autofill was one condition away from doing.
 
 ## Sources
 

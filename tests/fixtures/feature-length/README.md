@@ -88,6 +88,25 @@ If a future change genuinely needs identity coverage at this exact document,
 move the file to `tests/fixtures/` (top level) and re-lock the receipts
 deliberately, rather than discovering the re-lock as a surprise.
 
+## Which sweeps pick this file up
+
+The repository's tracked-file walkers find it, so committing it enrolled it in
+four sweeps. All four are intended; the third and fourth are the ones whose
+cost it materially changes, and they are listed here because a fixture that
+quietly makes a gate slower or a bound tighter should say so.
+
+| sweep | how it finds the file | effect |
+|---|---|---|
+| `tests/core/fixture-provenance-comment-guard.test.ts` | recursive walk of `tests/fixtures/` | intended — it is what caught this fixture's first draft putting "CC0" on the title page, where the parser scores it as action |
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | tracked-file listing | intended — it is now the FEATURE-SCALE tier of that file's two-tier margin proof (weight 236x, frequent 10x). The 75 short-form rows keep their own, unlowered 1000x/10x floors |
+| `tests/core/doctor-analysis-budget.test.ts` | tracked-file listing | intended — runs the full `runScriptDoctor` over every tracked fixture against a 15,000 ms no-fire margin. This file is the most expensive row in that sweep at ~1,058 ms, i.e. 14x headroom, and the only row that exercises the budget check at the length the budget exists for |
+| `scripts/honesty-audit.mjs` | tracked-file listing | intended — the boneyard header is scanned like every other tracked file; exit 0 |
+
+Not picked up, verified by reading each walker:
+`scripts/check-doctor-output-identity.mjs` (non-recursive — see the section
+below) and `server/nvm/analyze/calibration/corpus.ts` (a TypeScript array, not
+a walker; `REFERENCE_CORPUS.length === 20` is still asserted in three places).
+
 ## Is there a coherent feature-length fixture too?
 
 **No, and one cannot be made from this repository's material legally.** A

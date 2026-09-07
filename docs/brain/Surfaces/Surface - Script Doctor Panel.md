@@ -81,7 +81,13 @@ keyboard-reachable "NO LOCATION" note whose hover/focus text says which kind
 of nothing it is: a whole-draft (act-level or cross-scene-pattern) finding,
 or one the report could not resolve to a line. On the 231-scene fixture that
 is 374 notes beside 605 jump controls — before this change the panel offered
-ONE control in Coverage and said nothing at all about the rest.
+ONE control in Coverage and said nothing at all about the rest. Only 29 of
+those 374 are TAB STOPS: the note is focusable on the act-on surfaces (top
+priorities, root-cause headlines, expander-revealed member rows) and not in
+the Per-Pass Breakdown appendix, which is a list to read. Measured focusable
+elements in the Full Report: 1,640 -> 1,295 on the fixture, 291 -> 211 on the
+built-in sample. The reason stays in `title` and in `aria-label` on a
+`role="note"`, so screen-reader reading order is unaffected either way.
 
 **Root-cause card counts** (2026-09-06, discovery item #10): the card used to
 say "15 issues converge here" directly above "SHOW THE 12 CONTRIBUTING
@@ -90,8 +96,9 @@ both are true: 15 individual notes fired, from 12 distinct rules. The panel
 now states the writer-facing size as ISSUES (`memberCount`, which is also
 what the server's own explanation sentence leads with and what
 `cluster.ts` sorts by), shows both numbers where they differ
-("15 issues from 12 rules"), and names the expander after what it actually
-lists ("Show the 12 rules behind them"). `rootCauseCountSentence()` /
+("15 issues from 10 rules" — the first such card on the feature fixture, as
+rendered), and names the expander after what it actually lists ("Show the 10
+rules behind them"). 30 of that fixture's 70 root causes disagree this way. `rootCauseCountSentence()` /
 `rootCauseExpanderLabel()` in `src/lib/finding-jump.ts` are the only place
 that wording lives; `docs/CLAIMS_REGISTER.md` row 80 registers the sentence (row 81 registers the jump control's own naming rule and its two "no location" reasons).
 
@@ -103,10 +110,16 @@ per-keystroke no-op `setSaveStatus` write in `ScriptIDE.tsx`'s localStorage
 persistence effect that React could not bail out of while the same fiber had
 the keystroke's own update pending, so every commit ended with pending lanes
 and the nested-update counter never reset. Fixed with `useIdempotentState`
-(`src/hooks/useIdempotentState.ts`); guarded by
+(`src/hooks/useIdempotentState.ts`), which `ScriptIDE.tsx`'s title-page
+autofill also now uses with a STRUCTURAL equals — that writer allocates a
+fresh object every keystroke and was one condition away from the same ratchet
+through a different setter. Guarded by
 `tests/core/scriptide-render-loop-guard.test.ts` and by
-`scripts/verify-p2-p3-surfaces.mjs`'s `P2-featurelen` phase. See
-[[Patterns]], "No fixture at product length", for why it shipped.
+`scripts/verify-p2-p3-surfaces.mjs`'s `P2-featurelen` phase, which is
+fail-first: 3/3 failures on a tree with the one line reverted, 0/3 on this
+one. See [[Patterns]], "No fixture at product length" (why it shipped) and
+"A harness that hides the defect it is pointed at" (why the gate needed
+non-awaited key delivery to catch it).
 
 **Browser suite:** `scripts/verify-p2-p3-surfaces.mjs` (`P2-generative`
 phase drives this panel with Labs on and off from the same starting point;

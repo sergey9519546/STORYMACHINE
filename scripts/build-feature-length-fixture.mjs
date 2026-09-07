@@ -45,6 +45,15 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const SOURCE_DIR = 'data/screenplays';
 export const OUTPUT_PATH = 'tests/fixtures/feature-length/assembled-feature.fountain';
 
+/** The CC0 live-action corpus's size and its agent-authored split, both read
+ *  from data/screenplays/LICENSE-live-action.md. Named constants rather than
+ *  prose in the generated header (round-2 review finding 5: "twenty" and
+ *  "Fourteen of the twenty" were hardcoded strings inside a header whose every
+ *  other number was derived, so adding a 21st screenplay would have produced a
+ *  regenerated file whose own prose was false). */
+export const EXPECTED_SOURCE_COUNT = 20;
+export const AGENT_AUTHORED_COUNT = 14;
+
 /** Fixed title page. A real submitted draft has one; the parser types these
  *  lines as action (src/lib/fountain.ts has no title-page handling — see
  *  tests/core/fixture-provenance-comment-guard.test.ts's scope note), which is
@@ -73,7 +82,7 @@ function provenanceBoneyard(sources) {
   lines.push('/*');
   lines.push('ASSEMBLED FEATURE-LENGTH FIXTURE — NOT A STORY.');
   lines.push('');
-  lines.push('This file is a DELIBERATELY INCOHERENT assembly: the bodies of twenty');
+  lines.push(`This file is a DELIBERATELY INCOHERENT assembly: the bodies of ${sources.length}`);
   lines.push('unrelated short screenplays concatenated in lexicographic filename order.');
   lines.push('There is no throughline, no protagonist, no act structure and no intended');
   lines.push('meaning across the seams. It exists for ONE purpose: to exercise this');
@@ -97,8 +106,9 @@ function provenanceBoneyard(sources) {
   lines.push('per data/screenplays/LICENSE-live-action.md, which is also the record of');
   lines.push('their provenance: each is an ORIGINAL work written for the STORYMACHINE');
   lines.push('benchmark corpus, none adapted from any produced or copyrighted');
-  lines.push('screenplay. Fourteen of the twenty are AGENT-AUTHORED (Claude, 2026-08-04)');
-  lines.push('and are mechanism-test material, not professionally-authored writing.');
+  lines.push(`screenplay. ${AGENT_AUTHORED_COUNT} of the ${sources.length} are AGENT-AUTHORED`);
+  lines.push('(Claude, 2026-08-04) and are mechanism-test material, not');
+  lines.push('professionally-authored writing.');
   lines.push('This assembly inherits that dedication and that caveat in full.');
   lines.push('');
   lines.push('SOURCES, in the order they appear below (file — scenes — words):');
@@ -141,8 +151,19 @@ function wordCountOf(text) {
 export function assembleFeatureFixture(repo = REPO) {
   const dir = path.join(repo, SOURCE_DIR);
   const files = readdirSync(dir).filter((f) => f.endsWith('.fountain')).sort();
-  if (files.length === 0) {
-    throw new Error(`no .fountain sources under ${SOURCE_DIR} — cannot assemble`);
+  if (files.length !== EXPECTED_SOURCE_COUNT) {
+    // Not `> 0`: round-2 review finding 5. Every derived number in the header
+    // now comes from `sources`, but the CC0 manifest's own split (how many of
+    // the sources are agent-authored) is a fact about a KNOWN set of files, so
+    // a 21st screenplay must be a deliberate act — update EXPECTED_SOURCE_COUNT
+    // and AGENT_AUTHORED_COUNT against data/screenplays/LICENSE-live-action.md,
+    // then regenerate — rather than something the assembler absorbs silently
+    // and then describes wrongly.
+    throw new Error(
+      `expected exactly ${EXPECTED_SOURCE_COUNT} .fountain sources under ${SOURCE_DIR}, found ${files.length}. `
+      + 'If the CC0 corpus really changed, update EXPECTED_SOURCE_COUNT/AGENT_AUTHORED_COUNT here '
+      + 'against data/screenplays/LICENSE-live-action.md and regenerate.',
+    );
   }
   const sources = files.map((file) => {
     const text = readFileSync(path.join(dir, file), 'utf8').replace(/\r\n/g, '\n').trim();

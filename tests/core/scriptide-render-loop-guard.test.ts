@@ -129,6 +129,41 @@ describe("ScriptIDE render-loop guard — save status never schedules a no-op up
     );
   });
 
+  it("declares titlePage with useIdempotentState AND a structural equals (the same ratchet, one condition away)", () => {
+    // Round-2 review finding 1. The title-page autofill effect
+    // (ScriptIDE.tsx's deriveTitlePageFromScript effect, deps [scriptText])
+    // runs on every keystroke and writes a FRESHLY ALLOCATED object, which no
+    // identity comparison — React's or ours — can absorb. It is inert today
+    // only because deriveTitlePageFromScript returns null once
+    // isDefaultTitlePage() is false; a draft whose Fountain title block parses
+    // to exactly DEFAULT_TITLE_PAGE leaves that guard true forever and
+    // reproduces the identical render -> effect -> setState ratchet through a
+    // DIFFERENT setter. A structural equals makes the repeat a real no-op.
+    assert.match(
+      scriptIde,
+      /const \[titlePage, setTitlePage\] = useIdempotentState<TitlePageState>\(/,
+      "ScriptIDE.tsx must declare titlePage via useIdempotentState",
+    );
+    assert.match(
+      scriptIde,
+      /\(a, b\) => a\.title === b\.title && a\.author === b\.author && a\.contact === b\.contact,/,
+      "titlePage needs a STRUCTURAL equals — Object.is can never absorb a freshly allocated object",
+    );
+    assert.doesNotMatch(
+      scriptIde,
+      /const \[titlePage, setTitlePage\] = useState/,
+      "titlePage must not be a raw useState",
+    );
+  });
+
+  it("keeps the title-page autofill effect writing unconditionally (the fix is the setter, not a new branch)", () => {
+    assert.match(
+      scriptIde,
+      /const derived = deriveTitlePageFromScript\(draftRef\.current\.titlePage, scriptText\);\s*\n\s*if \(derived\) setTitlePage\(derived\);/,
+      "the autofill effect must still apply a derived title page on every edit",
+    );
+  });
+
   it("imports the hook it claims to use", () => {
     assert.match(
       scriptIde,

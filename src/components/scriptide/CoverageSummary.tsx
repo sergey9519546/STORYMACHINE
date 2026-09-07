@@ -36,7 +36,7 @@ interface CoverageSummaryProps {
    *  clear the stale flag or install a sample over edits made during flight. */
   getDraftGeneration?: () => number;
   onOpenFullReport: () => void;
-  /** Plain cursor move, no highlight — the original "Jump to line" wiring.
+  /** Plain cursor move, no highlight — the original jump wiring.
    *  Kept as the fallback for a host that has not wired
    *  {@link CoverageSummaryProps.onNavigateToFinding}; when both are present
    *  the highlighting one wins. */
@@ -753,7 +753,12 @@ export default function CoverageSummary({
                   action bar below the scroll region (past
                   sm-panel-body's closing tag) — its own stacking context,
                   never competing with in-flow content for a pixel — so
-                  only the contextual "Jump to line" stays here. */}
+                  only the contextual jump control stays here — whose
+                  VISIBLE label is now "Jump to scene N" whenever the top
+                  priority is scene-anchored (2026-09-06, item #9: it was
+                  always "Jump to line N", including for a scene-tier
+                  finding it was not actually sending the writer to a line
+                  of). Registered as docs/CLAIMS_REGISTER.md row 81. */}
               {/* Item #9: one control, one naming rule, and — when this
                   finding genuinely has no line — an honest reason in the same
                   slot instead of an empty gap. The sm-btn--stamp styling is

@@ -28,10 +28,20 @@ describe("ScriptIDE.tsx — titlePage round-trips through the draft envelope", (
   const source = fs.readFileSync(SRC, "utf8");
 
   it("seeds titlePage state from initialDraft.titlePage, not a hardcoded literal", () => {
+    // 2026-09-07: the STATE HOOK changed (useState -> useIdempotentState with
+    // a structural equals, because the title-page autofill effect writes a
+    // freshly allocated object on every keystroke and was one condition away
+    // from the React #185 ratchet — see
+    // tests/core/scriptide-render-loop-guard.test.ts). The GUARANTEE this
+    // test exists for is unchanged and is still asserted in both directions:
+    // the seed is `initialDraft.titlePage`, and it is never a hardcoded
+    // placeholder. The declaration's hook is pinned by that other file, so
+    // this one deliberately accepts either hook rather than duplicating the
+    // choice in two places and having to change both.
     assert.match(
       source,
-      /const \[titlePage, setTitlePage\] = useState\(initialDraft\.titlePage\);/,
-      "titlePage must be seeded the same way isDarkMode/snapshots/researchNotes already are",
+      /const \[titlePage, setTitlePage\] = use(?:State|IdempotentState)(?:<TitlePageState>)?\(\s*initialDraft\.titlePage(?: as TitlePageState)?[,)]/,
+      "titlePage must be seeded from initialDraft.titlePage, the same way isDarkMode/snapshots/researchNotes already are",
     );
     // The regression this guards against: a hardcoded placeholder object
     // passed directly to useState, ignoring the persisted envelope entirely.

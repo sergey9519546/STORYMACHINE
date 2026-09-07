@@ -636,7 +636,7 @@ async function main() {
   // panel this suite itself just closed, not a real gap).
   const jumpBtn = page2b.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
   const jumpBtnExists = await jumpBtn.count().then((n) => n > 0);
-  record('keyboard-journey', 'read/jump: a "jump to line" finding control exists in the report and is keyboard-activatable', jumpBtnExists);
+  record('keyboard-journey', 'read/jump: a jump-to-scene/line finding control exists in the report and is keyboard-activatable', jumpBtnExists);
   let jumpedToLine = false;
   if (jumpBtnExists) {
     await jumpBtn.focus();
@@ -644,7 +644,7 @@ async function main() {
     await page2b.waitForTimeout(timing.ms(300));
     jumpedToLine = await page2b.evaluate(() => document.activeElement?.className?.includes?.('cm-') ?? false);
   }
-  record('keyboard-journey', 'read/jump: activating "jump to line" (Enter) moves focus into the editor', jumpedToLine);
+  record('keyboard-journey', 'read/jump: activating the jump control (Enter) moves focus into the editor', jumpedToLine);
 
   // Capture/recovery probe: focus is now in the editor (from the jump
   // above) WITHOUT tab-escape armed — the exact KNOWN ISSUE state. One

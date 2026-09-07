@@ -2,7 +2,9 @@
 // Browser proof for the 2026-08-24 leftover-polish pass — the three claims
 // that can only be settled in a real browser:
 //
-//   A. Coverage's "Jump to line" now HIGHLIGHTS the finding's lines
+//   A. Coverage's jump control now HIGHLIGHTS the finding's lines
+//      (2026-09-06: its visible label is "Jump to scene N" when the top
+//      priority is scene-anchored — it was always "Jump to line N" before)
 //      (FountainEditorHandle.highlightRange), the same way the full doctor
 //      panel's finding clicks already did, instead of only moving the cursor.
 //   B. The Settings tab strip follows the WAI-ARIA tabs keyboard pattern:
@@ -111,8 +113,8 @@ try {
     } catch { /* body already gone; the assertion below reports the shortfall */ }
   });
 
-  // ── A. Coverage "Jump to line" highlights ────────────────────────────────
-  console.log('\n=== A — Coverage "Jump to line" flashes the lines ===');
+  // ── A. Coverage's jump control highlights ────────────────────────────────
+  console.log('\n=== A — Coverage\'s jump control flashes the lines ===');
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} });
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
@@ -123,7 +125,7 @@ try {
 
   const jumpBtn = page.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
   const jumpCount = await jumpBtn.count();
-  record('A', 'Coverage renders a "Jump to line" button for the sample', jumpCount > 0, `count=${jumpCount}`);
+  record('A', 'Coverage renders a jump control for the sample (named for its destination: "Jump to scene N" / "Jump to line N")', jumpCount > 0, `count=${jumpCount}`);
 
   const flashBefore = await page.locator('.cm-sm-finding-flash').count();
   record('A', 'no finding highlight is painted before the click', flashBefore === 0, `count=${flashBefore}`);
