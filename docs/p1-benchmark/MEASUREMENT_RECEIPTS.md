@@ -1885,3 +1885,68 @@ is that reports over these fixtures were wrong and had to move.
   carries a baked `GIT_SHA`), and the byte-level identity of every other field
   across all 45 reports, plus the field-by-field spot check, is the receipt it
   owes."
+
+**ADDENDUM — 2026-09-07, round 2 (`42206178`): the same one file changed
+again, on the same range, and the identity claim above still holds.**
+
+Independent review of the round-1 tree (`16bfec58`, tag
+`audit/2026-09-06/verifycli-round1`) returned REVISE with five findings, one
+of which (finding 5) touches this exact receipt's file:
+`server/lib/build-info.ts`'s `readCommitFromCheckout` had no timeout on its
+`git rev-parse HEAD` call — a stalling `git` was reproduced blocking module
+load past 8s against a 30s-sleeping `PATH`-shimmed `git`, with no cap. The
+round-2 fix (commit `42206178`, still the same range vs `main @
+c16f7e0c3147b09ec24fe2f61cbafa49f74bd34a` this receipt's baseline already
+uses) adds `timeout: 2000, killSignal: 'SIGKILL'` to that one
+`execFileSync` call. The existing `catch` already yields `'dev'` on any
+failure — a timeout is just one more way to reach it, not a new code path
+with its own output. **Updated failure-mode list for `readCommitFromCheckout`
+(supersedes the "no `.git`, no `git` binary, an unresolvable HEAD" list
+above)**: no `.git` entry, no `git` binary, an unresolvable HEAD, OR a `git`
+invocation that does not return within **2 seconds** — all four fall through
+to the identical `'dev'` result, and none of the four can produce anything
+else.
+
+Because this is the same class of change (still additive, still confined to
+the one provenance string, still no formula/threshold/deduction/weight
+touched) on the same range, the original identity claim was RE-RUN rather
+than re-argued, against THIS tree (`42206178`), against the SAME baseline
+(`git archive c16f7e0c3147b09ec24fe2f61cbafa49f74bd34a` — unchanged, since
+`main` had not moved) with a fresh `--tree .` snapshot of the round-2
+working tree:
+
+```
+node --experimental-strip-types scripts/check-doctor-output-identity.mjs --tree . --out <r2-after>
+  -> exit 0, "Wrote 45 report snapshots"
+node --experimental-strip-types scripts/check-doctor-output-identity.mjs --compare <round-1 before> <r2-after> --ignore-keys provenance.engineCommit
+  -> exit 0
+     Ignored keys (excluded from the identity check, over 45 compared reports):
+       "provenance.engineCommit": differs in 45/45 reports
+
+     OUTPUT IDENTITY: PASS — all 45 reports are byte-identical modulo the ignored key(s) [provenance.engineCommit] (analyzedAt excluded).
+```
+
+Identical PASS line, identical single ignored key, identical 45/45 differ
+count as the original measurement above — the timeout addition moved
+nothing. No new baseline snapshot was needed (the round-1 `<before>`
+snapshot is still valid: it was never touched by round 2, and `main` has
+not moved since it was captured), and no new corpus text was read. **This
+addendum amends the existing entry in place rather than opening a new one**,
+per the coordinator's instruction: the underlying claim ("no score moved,
+`server/lib/build-info.ts` output-identical modulo `provenance.engineCommit`
+alone") is unchanged by round 2 — only the file's failure-mode list and the
+commit this receipt now attests to are updated.
+
+**Runner attestation (addendum):** "I, the same orchestrating Claude Code
+session (session_01KKzwCFMhQZL8WgeBNvkRBB, remote container), re-ran the
+`--tree .` snapshot and the flagged `--compare` against the ORIGINAL
+round-1 `<before>` baseline snapshot myself on 2026-09-07, against the
+round-2 working tree at commit `42206178`, and read the identical PASS
+line, the identical single ignored key, and the identical 45/45 differ
+count directly out of that run's own log file along with its exit code
+(0). I did not re-run the negative control or the field-by-field spot
+check a second time, because neither the comparison inputs nor the
+mechanism that could move them changed between round 1 and round 2 — only
+a timeout guard on the failure path was added, and the identity re-run
+above is the direct proof that the success path (every one of the 45
+fixtures) is unaffected."
