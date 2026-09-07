@@ -453,7 +453,8 @@ function structuralSignalsFixture(overrides: Partial<StructuralSignalsReport> = 
         lengthZ: 0.5, openCloseShift: 0.2, actionSentenceCv: 0.3, openCloseModeFlip: true,
       },
     ],
-    sceneLengthCv: 0.2, meanAbsDialogueShareDelta: 0.0042, dialogueShareRange: 0.2,
+    sceneLengthCv: 0.2, meanAbsDialogueShareDelta: 0.0042, meanAbsDialogueShareDeltaNormalised: 0.0117,
+    dialogueShareRange: 0.2,
     newPairSceneRate: 0.5, lastNewPairPosition: 1, meanSpeakersPerScene: 1.5,
     meanTurnWords: 11, meanLeadShare: 0.8, leadShareSlope: -0.4, speakerEntropy: 0.5,
     actionSentenceCvOverall: 0.0254, meanOpenCloseShift: 0.15, openCloseModeFlipRate: 0.5,
@@ -523,6 +524,7 @@ describe('coverage-html.ts / coverage-letter.ts — render formatSignalValue() v
   it('the one-scene unscored branch (coverage-html.ts and coverage-letter.ts) also renders through formatSignalValue, for the value B-10 proved is genuinely computed with one scene', () => {
     const oneSceneReport = buildReportWithSignals(structuralSignalsFixture({
       scored: false, sceneCount: 1, scenes: [], actionSentenceCvOverall: 0.0254, meanAbsDialogueShareDelta: 0,
+      meanAbsDialogueShareDeltaNormalised: 0,
     }));
     const html = renderCoverageHtml(oneSceneReport, 'One Scene');
     const { markdown } = renderCoverageLetter(oneSceneReport, { title: 'One Scene' });

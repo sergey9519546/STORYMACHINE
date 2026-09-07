@@ -985,6 +985,7 @@ describe('renderCoverageHtml — rendered contrast (WCAG AA, client-hunter B-15)
 function structuralSignalsFixture(overrides: Partial<ScriptDoctorReport['structuralSignals']> = {}): NonNullable<ScriptDoctorReport['structuralSignals']> {
   return {
     scored: false, sceneCount: 1, scenes: [], sceneLengthCv: 0, meanAbsDialogueShareDelta: 0,
+    meanAbsDialogueShareDeltaNormalised: 0,
     dialogueShareRange: 0, newPairSceneRate: 0, lastNewPairPosition: 0, meanSpeakersPerScene: 0,
     meanTurnWords: 0, meanLeadShare: 0, leadShareSlope: 0, speakerEntropy: 0,
     actionSentenceCvOverall: 0.9994, meanOpenCloseShift: 0, openCloseModeFlipRate: 0,
@@ -1042,7 +1043,8 @@ describe('renderCoverageHtml — Shape & Rhythm section, unscored (fewer than 2 
               lengthZ: 0.5, openCloseShift: 0.2, actionSentenceCv: 0.3, openCloseModeFlip: true,
             },
           ],
-          sceneLengthCv: 0.2, meanAbsDialogueShareDelta: 0.2, dialogueShareRange: 0.2,
+          sceneLengthCv: 0.2, meanAbsDialogueShareDelta: 0.2, meanAbsDialogueShareDeltaNormalised: 0.5,
+          dialogueShareRange: 0.2,
           newPairSceneRate: 0.5, lastNewPairPosition: 1, meanSpeakersPerScene: 1.5,
           meanTurnWords: 11, meanLeadShare: 0.8, leadShareSlope: -0.4, speakerEntropy: 0.5,
           actionSentenceCvOverall: 0.55, meanOpenCloseShift: 0.15, openCloseModeFlipRate: 0.5,
