@@ -1,17 +1,23 @@
 ---
 type: owner
-updated: 2026-09-06
-sources: [docs/PATH_TO_EXCELLENCE.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md]
+updated: 2026-09-07
+sources: [docs/PATH_TO_EXCELLENCE.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md, docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md]
 status: active
 ---
 
-# Owner Item — Measure and Merge the Stacked Scoring Branch
+# Owner Item — Measure and Merge the Parked Scoring Branches
 
 **Why only the owner:** it needs the same local, copyright-restricted corpus
-as [[Owner - Run Measure Real]], plus a judgment call on a scoring-path
-change whose costs are written down and whose benefit is not yet measured on
-real writing. The corpus cannot reach CI, so [[Gate - Receipt Gate]] can only
+as [[Owner - Run Measure Real]], plus a judgment call on scoring-path changes
+whose costs are written down and whose benefit has not been measured on real
+writing. The corpus cannot reach CI, so [[Gate - Receipt Gate]] can only
 check that a human ran the measurement, never that the number is real.
+
+**What changed 2026-09-07:** a fourth branch,
+`scoring/feature-length-defects`, arrived and takes the front of the queue —
+see the branch table below for the measurement that reorders it. This note
+still covers the whole queue; only the order and the first `git checkout`
+moved.
 
 **What changed 2026-09-06:** the manual merge this note used to ask for has
 been done. Both branches were rebased onto `main` @ `2bfcbf9d`, renamed, and
@@ -22,11 +28,15 @@ without a corpus. There is now ONE branch to measure, not two plus a merge.
 
 ```
 git fetch origin
-git checkout scoring/stacked-r5-plus-advice
+git checkout scoring/feature-length-defects        # 2026-09-07: measure this one first
 REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
 REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24
 # then re-lock the 72-row tests/fixtures/real-corpus-manifest.json in place
 ```
+
+(Substitute `scoring/stacked-r5-plus-advice` to measure that head instead —
+everything below applies to either. See the branch table for why the order
+changed and why the two are alternatives.)
 
 The variable is repeated on purpose. An inline assignment applies to one
 command only, so a bare `npm run lock-auc24` on the next line runs with it
@@ -131,31 +141,37 @@ only a heading — that is the one route the entry text itself forbids.
 
 | branch | tip | what it is |
 | --- | --- | --- |
-| `scoring/feature-length-defects` | `bcc96f85` | **measure this one FIRST** — [[Branch - Feature-Length Defects]] |
-| `scoring/feature-length-saturation-only` | `efd1a463` | **second, only if the first is rejected** — [[Branch - Feature-Length Saturation Only]], the saturation half alone |
-| `scoring/stacked-r5-plus-advice` | `408166ae` | third — [[Branch - Stacked R5 plus Advice]] |
+| `scoring/feature-length-defects` | see the branch note | **measure this one FIRST** — [[Branch - Feature-Length Defects]] |
+| `scoring/stacked-r5-plus-advice` | `408166ae` | [[Branch - Stacked R5 plus Advice]] |
 | `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |
 | `scoring/advice-rule-fixes` | `a1cf7677` | [[Branch - Advice Rule Fixes]] alone |
 
-**THE ORDER CHANGED 2026-09-07 (corrected 2026-09-11), and the two heads are
-ALTERNATIVES, not a stack.** `scoring/feature-length-defects` attacks the same
-defect from the opposite direction: R5 replaces the density denominator
-`wordCount^0.7` with `(sceneCount·30)^0.7`, and the feature-length branch
-measured exactly that substitution on the public benchmark — paired
-shuffle-drop **0.0938**, worse than doing nothing, because a scene drop
-shrinks that denominator faster than the weighted issues it normalises. The
-same benchmark puts the feature-length branch at **0.8750**. They collide on
-ONE function (`densityPenalty`; R5 leaves `scarcityPenalty` untouched), which
-is why the saturation half is landable on its own. The decision tree, the
-correction of the "same two functions" reason, and the two-part account of
-what AUC-24 can and cannot settle (the ~10.5-point level shift is
-rank-preserving and cannot move it; the scarcity channel's degradation delta
-going from +0.586 to exactly 0.000 for every script of about 22 scenes or more
-is what the run tests) live in the fuller version of this note ON THE BRANCH
-(`docs/brain/Owner/Owner - R5 Measurement and Merge.md` at `bcc96f85`) and in
-the branch's `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.2a. Read
-that section before deciding. The recipe above applies unchanged to every
-branch in the table.
+**THE ORDER CHANGED 2026-09-07, and the two heads are ALTERNATIVES, not a
+stack.** `scoring/feature-length-defects` branches from `main` @ `9b199b72`
+independently of the other three and attacks the SAME defect from the opposite
+direction. R5 replaces the density denominator `wordCount^0.7` with
+`(sceneCount·30)^0.7`; the feature-length branch measured exactly that
+substitution on the public benchmark and it **inverts** — paired shuffle-drop
+**0.0938**, worse than doing nothing — because a scene drop shrinks that
+denominator by `(2/3)^0.7 = 0.752` while weighted issues fall to 0.546, so it
+normalises by the quantity the degradation attacks. The same benchmark puts
+the feature-length branch at **0.8750** on that channel. Both cannot land: the
+two rewrite the same two functions in `doctor.ts`, and a merge of the pair
+would have to pick one density formula anyway.
+
+So measure `scoring/feature-length-defects` first. If its AUC-24 holds, the R5
+stack's density change is superseded on the evidence and what remains worth
+salvaging from it is `scoring/advice-rule-fixes`'s six detector-correctness
+fixes, which touch no formula. If it does NOT hold, the stack is still there
+and nothing has been lost. The numbers behind that reading are in
+[[Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07]] §8.2 — the candidate
+comparison is the artifact to read before choosing.
+
+**The one thing to check on that branch specifically.** Its scarcity
+saturation is byte-identical for every script of 15 scenes or fewer, so the
+public benchmark and the calibration corpus are both blind to it. On the
+private corpus (median 118 scenes) it will move EVERY script by roughly 8
+points. That is the single largest unmeasured effect in this queue.
 
 The stack CONTAINS both singles as unsquashed ancestors, so merging it subsumes
 them and the other two need not be merged separately. Whichever lands last needs

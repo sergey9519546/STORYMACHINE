@@ -2257,3 +2257,103 @@ that nobody mistakes one for the other.
   **not** run `npm run measure-real` — the private corpus is not present here
   and no AUC-24 value is claimed anywhere in this entry. Full method and both
   decomposition tables: `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §11.
+
+
+---
+
+### 2026-09-07 — FEATURE-LENGTH DEFECTS: the health formula stops paying for deletion and for length, plus three report-honesty fixes (PENDING OWNER MEASUREMENT — no real-corpus run happened)
+
+**Branch:** `scoring/feature-length-defects`, six commits on `main` @
+`9b199b72`. **This is a scoring-path change and its AUC-24 is not known.**
+`node scripts/check-scoring-receipt.mjs main..HEAD` exits **1** on this entry,
+which is the intended state: the entry is an honest ledger row, not a receipt.
+
+- **Command:** `npm run benchmark:public` · `npm run benchmark:public -- --lock`
+  (once, in the commit that changed the formula) ·
+  `node --experimental-strip-types tests/core/blind-pairs-discrimination.test.ts` ·
+  `node --experimental-strip-types tests/core/calibration.test.ts` ·
+  `npm run test:metamorphic` ·
+  `node scripts/check-doctor-output-identity.mjs --tree . --out <dir>` and
+  `--compare <before> <after>` · `npm run lint` · `npm test`. Every one was run
+  in the foreground in this worktree and its output read. **`npm run
+  measure-real` was NOT among them** — see the attestation below.
+- **Corpus fingerprint:** none for AUC-24 — no private corpus was read, and no
+  AUC-24 value appears anywhere in this entry. The corpus that WAS read is the
+  32 committed distributable screenplays the public benchmark scores (20 CC0 in
+  `data/screenplays/` + the 12 blind-pair fixtures), locked by sha256 per file
+  in `tests/fixtures/public-corpus-manifest.json` and
+  `tests/fixtures/public-benchmark-split.json`, both re-locked in this range.
+- **Git SHA:** measured at each commit of `scoring/feature-length-defects` in
+  turn, against the baseline `main` @ `9b199b72`; the running table in
+  `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8 carries one block per
+  commit.
+- **Measured AUC-24:** **PENDING** — the private 761-script corpus is not
+  present in this environment, so this branch has no AUC-24 number and claims
+  none.
+
+**What changed, and what moved.** Two formula constants and four report
+defects:
+
+1. `voice-delta.ts` abstains PER CHARACTER instead of per script (18 of 45
+   in-repo fixtures scored before, 44 of 45 after), with a 220x performance fix
+   (42,062 ms → 191 ms on a 200-name payload) proven bit-identical against a
+   from-scratch reference implementation, and the shape guard's cost model
+   moved with it.
+2. `ORPHAN_CLUE` gained a proper-noun / title / location guard. The critical
+   tier of a 139-scene document was eight character names; retitling the script
+   changed the writer's first instruction. It no longer can.
+3. `SUB_DENSITY_STEEPNESS` 50 → 2 and `scarcityPenalty` saturates at 15 scenes.
+4. `meanAbsDialogueShareDeltaNormalised` added, EXPOSED AND NOT WIRED — a
+   measured null (16 of 32 under `CLIMAX_RELOCATE`; wiring it lowers that
+   channel 0.5469 → 0.5156).
+5. `buildPlainSummary` / `buildStrengths` can no longer contradict the five
+   dimension scores. Strings only: output identity over all 45 fixtures is
+   **PASS modulo `plainSummary`, `strengths` and `provenance.engineCommit`**.
+
+**Public-benchmark movement (distributable text, reproducible by anyone, no
+corpus and no key):**
+
+| channel | `main` @ `9b199b72` | this branch | floor, re-locked |
+|---|---|---|---|
+| `SHUFFLE_DROP` matched-pair | 0.5313 | **0.8750** [0.7500, 0.9688] | 0.855 |
+| `SHUFFLE_DROP` all-pairs | 0.5586 | 0.8306 [0.7236, 0.9277] | 0.8106 |
+| `CLIMAX_RELOCATE` matched-pair | 0.4219 | **0.5469** [0.3750, 0.7188] | 0.5269 |
+| `CLIMAX_RELOCATE` all-pairs | 0.4673 | 0.5151 [0.4551, 0.5767] | 0.4951 |
+| `DIALOGUE_FLATTEN` control | 1.0000 / 0.9473 | 1.0000 / 1.0000 | 0.98 / 0.98 |
+
+Sign counts moved with them: shuffle-drop 17/15/0 → 28/4/0 with the mean
+health gap going from **−1.93** (the damaged copy scored higher) to **+2.10**;
+climax-relocate's exact ties fell from 11 of 32 to 1, and zero scripts remain
+pinned at health 76.0. Blind matched pairs 1 of 6 → 4 of 6, mean gap −0.0167 →
++0.3833. Calibration band monotonicity intact, 21/21, and not one of the 20
+samples moves. Metamorphic 7 hard passes; the new `stapled_shorts` witness went
+from +8.2 (registered known-failing) to −2.0 and was promoted to `hard`.
+
+**In-repo blast radius:** all 45 output-identity fixtures byte-differ; health
+moves on **25 of 45** (RMS 9.580, mean +2.944, largest +32.2 on
+`transfer-window`), **6 verdicts flip**, 5 grades flip. Four assertions moved
+and are each re-anchored with the measurement that justifies them, never a
+widened tolerance — the public-benchmark pinning guard is INVERTED, three
+formula spot-checks are re-run, two synthetic craft pairs return to `todo`
+with `COMPOSITE_MIN_GAP` left at 5.0, and one 1e-6 tolerance becomes the 0.1
+display rounding it always relied on. Full table:
+`docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.4.
+
+**THE ONE THING THE OWNER'S RUN HAS TO CHECK.** `scarcityPenalty` saturating
+at 15 scenes is byte-identical for every script of 15 scenes or fewer, so the
+whole public benchmark and the whole calibration corpus are blind to it. On the
+private corpus, whose median is 118 scenes, it will move **every** script by
+roughly 8 points. Whether AUC-24 stays above its 0.622 floor is not knowable
+from this repository. If it falls, that is a real finding about this change:
+do not answer it by moving the floor in `scripts/lib/auc.ts`.
+
+**Runner attestation:** I ran every command listed above myself, in this
+worktree, in the foreground, and read each one's output; every number in this
+entry and in `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` came out of
+one of those runs and none is transcribed from another document or from any
+prior measurement. I did **not** run `npm run measure-real`, and I could not:
+the private 761-script corpus is not present in this environment. No AUC-24
+value is claimed anywhere in this entry, and this entry is therefore marked
+PENDING and is not a receipt for this range. The conversion recipe — all three
+of `pendingReason`'s scans, not just the heading — is in
+`docs/brain/Owner/Owner - R5 Measurement and Merge.md`.

@@ -465,7 +465,7 @@
     {
       "id": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "type": "owner",
-      "title": "Owner Item — Measure and Merge the Stacked Scoring Branch",
+      "title": "Owner Item — Measure and Merge the Parked Scoring Branches",
       "path": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
@@ -817,6 +817,18 @@
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
@@ -1460,6 +1472,10 @@
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
     },
     {
@@ -1469,6 +1485,10 @@
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",

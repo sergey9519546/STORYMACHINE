@@ -224,13 +224,20 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
   // MECHANISM each case exists to pin is restated with it — a spot-check
   // whose numbers are refreshed without its reasoning is a rubber stamp.
   it('matches the documented formula for a known issue count', () => {
-    // weightedIssues = 4*1 + 1.5*2 + 0.5*3 = 8.5; sceneCount=10, wordCount=300.
-    // Was 86 before the density recalibration. It is lower now because a
-    // 10-scene script may claim only 10/15 of the density credit its low
-    // issue count would otherwise buy — the credit cap, doing exactly what
-    // it is for.
+    // weightedIssues = 4*1 + 1.5*2 + 0.5*3 = 8.5; sceneCount=10, wordCount=300,
+    // so density = 8.5/300^0.7 = 0.1889 — well inside the sub-1 branch.
+    // Was 86 before the density recalibration. It is lower now for one
+    // reason: at steepness 50 that density sat far below the old logistic's
+    // 0.52 midpoint and cost ~0 points, while the near-linear steepness-2
+    // curve charges roughly proportionally.
+    //
+    // CORRECTED 2026-09-07, same branch, one commit later: this line briefly
+    // read 82.7, which was measured against a scene-count CREDIT CAP that
+    // was evaluated and then REJECTED (it introduced a new health-74.7 pin —
+    // see docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md §8.2). The value
+    // below is re-run against the formula that actually shipped.
     const health = computeHealthScore({ critical: 1, major: 2, minor: 3 }, 10, 300);
-    assert.equal(health, 82.7);
+    assert.equal(health, 84.6);
     assert.equal(gradeForHealth(health), 'strong');
   });
 
@@ -265,13 +272,18 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
     // fixture that happens to have zero issues must not read as a proven
     // "excellent" script — there wasn't enough material for most of the
     // pipeline's structural checks to have had a fair chance to fire.
-    // scarcityPenalty (140/4 = 35, unchanged — 4 is below the saturation
-    // point) keeps even a clean tiny script in a plausible mid band instead
-    // of at the ceiling, and since 2026-09-07 the credit cap adds to that: a
-    // 4-scene script may claim only 4/15 of the density credit, so it carries
-    // 7.33 of density penalty despite having no issues at all.
+    // scarcityPenalty (140/4 = 35) keeps even a clean tiny script in a
+    // plausible mid band instead of at the ceiling. 4 is below the 2026-09-07
+    // saturation point and a zero-issue script has density 0, so BOTH of that
+    // branch's changes leave this case exactly where it was — the value here
+    // is unchanged from before the recalibration, which is itself worth
+    // pinning: the branch moved the middle of the curve, not its origin.
+    //
+    // CORRECTED 2026-09-07: this line briefly read 57.7, measured against the
+    // scene-count credit cap that was evaluated and REJECTED one commit later
+    // (see docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md §8.2).
     const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 4, 80);
-    assert.equal(health, 57.7);
+    assert.equal(health, 65);
     assert.equal(gradeForHealth(health), 'solid');
   });
 

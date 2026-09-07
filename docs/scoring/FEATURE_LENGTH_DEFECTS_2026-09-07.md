@@ -109,6 +109,7 @@ are in §8.1.
 | 3 | `ORPHAN_CLUE` proper-noun/title guard | **0.5781** | **0.5156** | 1.0000 | **0/6**, −0.0667 | 21/21 pass | KNOWN FAIL +5.3 | KNOWN FAIL +7.0 | 18 of 45, RMS 10.652 | 2 of 45 |
 | 4 | density steepness 50→2 + scarcity saturation | **0.8750** | **0.5469** | 1.0000 | **4/6**, +0.3833 | 21/21 pass | KNOWN FAIL +5.3 | **PASS −2.0** (promoted to `hard`) | 25 of 45, RMS 9.580 | 6 of 45 |
 | 5 | normalised dialogue-share roughness (exposed, NOT wired) | 0.8750 | 0.5469 | 1.0000 | 4/6, +0.3833 | 21/21 pass | KNOWN FAIL +5.3 | PASS −2.0 | 0 of 45 (45 byte-differ) | 0 of 45 |
+| 6 | honest `plainSummary` / `strengths` (strings only) | 0.8750 | 0.5469 | 1.0000 | 4/6, +0.3833 | 21/21 pass | KNOWN FAIL +5.3 | PASS −2.0 | **0 of 45** (identity PASS modulo the two keys) | 0 of 45 |
 
 ### 8.1 Per-commit detail
 
@@ -622,3 +623,149 @@ than delete it.
 the metamorphic suite and every one of the 45 in-repo fixtures' health values
 are byte-identical to commit 4; the 45 reports differ only by gaining the new
 field.
+
+
+## 9. Commit 6 — the paragraph may not contradict the five numbers beside it
+
+This one changes STRINGS, not numbers, and §9.2's identity receipt is what
+proves it.
+
+**The defect (product-discovery item 8), reproduced on `main @ 9b199b72` and
+again on this branch before the fix:**
+
+```
+=== inert 2-scene script ===
+health 30 (troubled)  verdict PASS  scenes 2
+dimensions: Structure & Pacing 100 | Character 100 | Dialogue & Voice 100 | Plot Logic & Payoff 100 | Theme & Originality 100
+plainSummary: PASS — scored in the bottom band, below the decline line; overall score 30/100. … Structure &
+              Pacing is the highest-scoring diagnostic dimension, with nothing flagged. No diagnostic
+              dimension had an issue flagged.
+strengths (5): "Nothing to fix in Structure & Pacing — clean across all 2 scene(s)."  (…and four more)
+
+=== assembled feature (stapled 12) ===
+health 80  dimensions: Structure 95 | Character 82 | Dialogue 99 | Plot 84 | Theme 100
+plainSummary: … Character is the lowest-scoring diagnostic dimension, at 82/100 …      <- 82 is ABOVE 80
+```
+
+**One omission causes both.** `computeDimensionScore` is scarcity-free by
+construction (Wave 18-β: it calls `densityPenalty` ALONE, deliberately), while
+`health` carries `scarcityPenalty` on top. The dimensions and the overall are
+therefore two different statistics, and whenever the scene-count term is large
+the dimensions sit above the overall. At that point calling the smallest of
+them "the lowest-scoring dimension" points the writer at the wrong thing, and
+printing them without naming the term is the paragraph withholding the finding.
+
+**Fixed at the source, because nothing downstream can fix it.**
+`plainSummary` is synthesised inside `aggregateReport` and all four consumers
+interpolate it opaquely. `strengths` is different in kind — it is a list a
+renderer chooses to show — so the two are treated separately, per the exports
+reviewer's item 6.
+
+**What the paragraph does now:**
+
+```
+inert 2-scene:  … Every diagnostic dimension scores at or above the overall (lowest: Structure & Pacing
+                at 100/100), because the dimensions read issue density alone while the overall also
+                carries the scene-count term — at 2 scene(s) that term alone removes 70 point(s).
+                The gap is the length of the draft, not the dimensions.
+                strengths: []
+stapled 12:     … (same sentence) … at 139 scene(s) that term alone removes 9 point(s). …
+mise (77.4):    … Structure & Pacing is the lowest-scoring diagnostic dimension, at 76/100 — most of the
+                trouble is around revelation drought.        <- UNCHANGED; 76 is below 77
+```
+
+The disclosure fires only when the displayed lowest dimension is at least
+`SCENE_TERM_DISCLOSURE_MIN_POINTS` (1) above the displayed overall — compared
+as DISPLAYED, because a contradiction that exists only at three decimals is
+not one a reader can see. The scene-count figure is read from
+`scarcityPenalty` itself rather than re-derived, so a second copy of
+`140 / min(n, 15)` cannot drift into the prose.
+
+**The strengths rule is narrow on purpose.** A DIMENSION may not be called a
+strength under a bottom-band verdict. The other guards read structural facts
+(escalating tension, clock continuity, turn distribution), and a bottom-band
+draft that measurably escalates has still earned that sentence — deleting it
+would be a different dishonesty. Asserted in both directions
+(`tests/core/summary-honesty.test.ts`, "a bottom-band report keeps a
+structural strength it genuinely earned").
+
+**Fail-first, run rather than asserted.** With both guards reverted to their
+pre-change constants and nothing else touched, **6 of the new file's 9 tests
+fail**; restored, 0 do.
+
+### 9.1 What the exports lane must satisfy once this lands
+
+The scoring path now guarantees exactly one thing about `report.strengths`,
+and it is asserted (`summary-honesty.test.ts`, "the guarantee the exports
+'What's Working' block relies on"):
+
+> No strength names a diagnostic dimension unless that dimension's own
+> `issueCount` is 0 **and** the verdict is not bottom-band.
+
+So the exports-side "What's Working" block, eleven lines below the summary in
+the coverage HTML, may render `report.strengths` verbatim and cannot list a
+strength the same report's dimension scores contradict. Three things it must
+NOT do, because the guarantee does not extend to them:
+
+1. **Do not synthesise strengths from the dimension scores.** A renderer that
+   derives "Dialogue & Voice is clean" from `score === 100` reintroduces the
+   exact defect, because a 100 there means "nothing was flagged in two
+   scenes", not "this is clean".
+2. **Do not render the block at all when `strengths` is empty.** A
+   bottom-band report legitimately has none, and an empty "What's Working"
+   heading reads as an omission rather than as a finding.
+3. **Do not re-order or re-title the bullets against a dimension.** The
+   bullets no longer map onto dimensions one-to-one — most of them are
+   structural facts — so grouping them under dimension headings would assert
+   a correspondence the data does not carry.
+
+### 9.2 The identity receipt
+
+Run over all 45 in-repo fixtures against the previous commit's snapshot, with
+exactly the keys this commit is allowed to move ignored — the shape the P3
+lane's receipt used for `provenance.engineCommit`:
+
+```
+node scripts/check-doctor-output-identity.mjs --compare <before> <after> \
+  --ignore-keys plainSummary,strengths,provenance.engineCommit
+
+Ignored keys (excluded from the identity check, over 45 compared reports):
+  "plainSummary": differs in 21/45 reports
+  "strengths": differs in 0/45 reports
+  "provenance.engineCommit": differs in 45/45 reports
+
+OUTPUT IDENTITY: PASS — all 45 reports are byte-identical modulo the ignored
+key(s) [plainSummary, strengths, provenance.engineCommit] (analyzedAt excluded).
+```
+
+Every other byte of every report is unchanged: **no health value, no verdict,
+no grade, no dimension score, no finding and no id moves.** `strengths`
+differs on **0 of 45** because no tracked fixture is bottom-band with a
+zero-issue dimension — the shape that guard exists for is the inert two-scene
+script, which is a test fixture rather than a tracked one, and it is asserted
+there directly. `provenance.engineCommit` is a per-commit stamp and differs by
+construction.
+
+Benchmark, blind pairs, calibration and metamorphic are all byte-identical to
+commit 5: `SHUFFLE_DROP` 0.8750/0.8306, `CLIMAX_RELOCATE` 0.5469/0.5151,
+control 1.0000/1.0000, blind 4 of 6 at +0.3833, calibration 21/21, metamorphic
+7 hard passes with `stapled_shorts` at −2.0.
+
+### 9.3 A correction to commit 4, found by this commit's test run
+
+Commit 4's re-anchoring of `tests/core/script-doctor.test.ts` was measured
+against a variant that commit did not ship. Two of the three spot-check values
+were taken while the scene-count CREDIT CAP was still in the tree; the cap was
+then measured, rejected (§8.2) and removed, and that file was not re-run
+before the commit landed. The shipped formula's values are:
+
+| case | committed in commit 4 | actual, corrected here | why |
+|---|---|---|---|
+| `{1,2,3}` at 10 scenes / 300 words | 82.7 | **84.6** | no credit cap: density 0.1889 is charged by the near-linear curve alone |
+| `{0,0,0}` at 25 scenes / 2000 words | 90.7 | 90.7 (unchanged) | the saturated scarcity term, correctly measured |
+| `{0,0,0}` at 4 scenes / 80 words | 57.7 | **65** | no credit cap, and density 0 — this case is identical to `main`, which is itself worth pinning: the branch moved the middle of the curve, not its origin |
+
+Recorded rather than quietly amended, because "which commit was wrong" is the
+part a reviewer cannot re-derive. It is also the reason the lane standard puts
+one full `npm test` on the FINAL tree: this is exactly what that run is for,
+and it is what found it.
