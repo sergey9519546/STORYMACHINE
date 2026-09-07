@@ -25,22 +25,15 @@ import {
   PUBLIC_MANIFEST_PATH,
   PUBLIC_SPLIT_PATH,
   PUBLIC_SPLIT_RULE,
+  AUC_LIB_PATH,
   REPO_ROOT,
   listPublicCorpus,
   measurePublicBenchmark,
   partitionFor,
+  relockFloorSource,
   type BenchmarkResult,
 } from './lib/public-benchmark.ts';
-import { PUBLIC_FLOOR_MARGIN, PUBLIC_FLOORS } from './lib/auc.ts';
-
-/** Repo-relative path of the file whose floor constants `--lock` rewrites. */
-const AUC_LIB = 'scripts/lib/auc.ts';
-
-/** floor = round4(measured - margin). The ONE place that rule is arithmetic
- *  rather than prose; `scripts/lib/auc.ts` states it and this implements it. */
-function floorFor(measured: number): number {
-  return Math.round((measured - PUBLIC_FLOOR_MARGIN) * 1e4) / 1e4;
-}
+import { PUBLIC_FLOORS } from './lib/auc.ts';
 
 const USAGE = [
   'benchmark-public — degradation discrimination on the 32 distributable screenplays',
@@ -218,10 +211,15 @@ async function main(): Promise<void> {
   if (lock) {
     writeFileSync(path.join(REPO_ROOT, PUBLIC_SPLIT_PATH), `${JSON.stringify(buildSplit(), null, 2)}\n`);
     writeFileSync(path.join(REPO_ROOT, PUBLIC_MANIFEST_PATH), `${JSON.stringify(buildManifest(result), null, 2)}\n`);
+    const wroteFixtures = [PUBLIC_SPLIT_PATH, PUBLIC_MANIFEST_PATH];
     out();
-    out(`locked ${PUBLIC_SPLIT_PATH}`);
-    out(`locked ${PUBLIC_MANIFEST_PATH}`);
-    for (const line of relockFloors(result)) out(line);
+    for (const f of wroteFixtures) out(`locked ${f}`);
+    const floors = relockFloors(result, wroteFixtures);
+    for (const line of floors.lines) out(line);
+    if (!floors.ok) {
+      process.exitCode = 1;
+      return;
+    }
     out();
     out('RE-LOCK RULE — read the diff before committing.');
     out('  Re-lock ONLY after a scoring change you intended. `--lock` moves every floor to');
@@ -236,60 +234,55 @@ async function main(): Promise<void> {
 }
 
 /**
- * Rewrite the six floor constants in `scripts/lib/auc.ts` from this run.
+ * Apply `relockFloorSource` to the real `scripts/lib/auc.ts`.
  *
- * WHY THIS EXISTS. Round 1 shipped a CLAUDE.md sentence claiming `--lock`
- * re-locked "the manifest, the split and the floors"; it re-locked two of the
- * three, and `auc.ts` came back byte-identical. An instruction that fails when
- * followed is worse than none: a maintainer lands an intentional scoring
- * change, runs `--lock`, sees a clean diff on `auc.ts`, commits — and ships a
- * ratchet asserting a stale number. Rather than weaken the sentence, the
- * command now does what it said.
+ * WHY THE COMMAND DOES THIS AT ALL. Round 1 shipped a CLAUDE.md sentence
+ * claiming `--lock` re-locked "the manifest, the split and the floors"; it
+ * re-locked two of the three, and `auc.ts` came back byte-identical. An
+ * instruction that fails when followed is worse than none: a maintainer lands
+ * an intentional scoring change, runs `--lock`, sees a clean `auc.ts` diff,
+ * commits — and ships a ratchet asserting a stale number. The command now does
+ * what it said.
  *
- * It edits ONLY lines of the exact shape `export const NAME = <number>;` for
- * the names in PUBLIC_FLOORS, and refuses (loudly, without writing) if any one
- * of them is not found — so a refactor that reshapes those lines fails here
- * instead of silently locking nothing.
+ * WHY A REFUSAL EXITS NON-ZERO (round 3). It used to print REFUSED and exit 0.
+ * That is the same defect one layer down: a re-lock that half-succeeded looked
+ * exactly like one that worked, and the operator's next move — commit the diff
+ * — would have shipped re-locked FIXTURES beside stale FLOORS. The fixtures
+ * are written before this runs and are not rolled back, so the refusal names
+ * them explicitly: what is on disk after a failed `--lock` is a partially
+ * re-locked tree, and the exit code says so.
+ *
+ * @returns lines to print, and whether the run should fail.
  */
-function relockFloors(result: BenchmarkResult): string[] {
-  const file = path.join(REPO_ROOT, AUC_LIB);
-  const before = readFileSync(file, 'utf8');
-  let source = before;
-  const lines: string[] = [];
-  const missing: string[] = [];
+function relockFloors(result: BenchmarkResult, wroteFixtures: string[]): { ok: boolean; lines: string[] } {
+  const file = path.join(REPO_ROOT, AUC_LIB_PATH);
+  const relock = relockFloorSource(readFileSync(file, 'utf8'), result.degradations);
 
-  for (const floor of PUBLIC_FLOORS) {
-    const d = result.degradations.find((x) => x.id === floor.degradation);
-    if (!d) {
-      missing.push(`${floor.constant} (no ${floor.degradation} result in this run)`);
-      continue;
-    }
-    const measured = floor.statistic === 'paired' ? d.aucPaired : d.aucAllPairs;
-    const next = floorFor(measured);
-    const pattern = new RegExp(`(export const ${floor.constant} = )(-?[0-9.]+)(;)`);
-    if (!pattern.test(source)) {
-      missing.push(`${floor.constant} (no single-line \`export const … = <number>;\` in ${AUC_LIB})`);
-      continue;
-    }
-    source = source.replace(pattern, `$1${next}$3`);
-    lines.push(
-      `  ${floor.constant.padEnd(38)} ${String(floor.value).padStart(7)} -> ${String(next).padStart(7)}`
-      + `   (measured ${measured.toFixed(4)}${floor.primary ? ', PRIMARY' : ''}`
-      + `${next === floor.value ? ', unchanged' : ''})`,
-    );
+  if (!relock.ok) {
+    return {
+      ok: false,
+      lines: [
+        '',
+        `REFUSED to rewrite ${AUC_LIB_PATH}: ${relock.missing.length} floor constant(s) could not be located.`,
+        ...relock.missing.map((m) => `  - ${m}`),
+        '',
+        'NO FLOOR WAS WRITTEN — not even the ones that were found, because a half-re-locked',
+        'set of floors (some from this run, some from an older one) is the one state nobody',
+        'can reason about afterwards.',
+        '',
+        'YOUR TREE IS NOW PARTIALLY RE-LOCKED. These were already written before the floors',
+        'were attempted, and were NOT rolled back:',
+        ...wroteFixtures.map((f) => `  - ${f}`),
+        'Revert them, or fix the constant shape (one line, `export const NAME = <number>;`)',
+        'and re-run so the fixtures and the floors come from the same measurement.',
+        '',
+        'Exiting non-zero: a refusal that exits 0 looks exactly like a successful re-lock.',
+      ],
+    };
   }
 
-  if (missing.length > 0) {
-    return [
-      '',
-      `REFUSED to rewrite ${AUC_LIB}: ${missing.length} floor constant(s) could not be located.`,
-      ...missing.map((m) => `  - ${m}`),
-      'No floor was written. Fix the shape (one line, `export const NAME = <number>;`) and re-run.',
-    ];
-  }
-
-  writeFileSync(file, source);
-  return ['', `locked ${AUC_LIB} — six floor constants:`, ...lines];
+  writeFileSync(file, relock.source);
+  return { ok: true, lines: ['', `locked ${AUC_LIB_PATH} — six floor constants:`, ...relock.lines] };
 }
 
 await main();

@@ -61,7 +61,13 @@ import { fileURLToPath } from 'node:url';
 
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
-import { computeAuc, degradationSeed, shuffleDropDegrade } from './auc.ts';
+import {
+  PUBLIC_FLOORS,
+  PUBLIC_FLOOR_MARGIN,
+  computeAuc,
+  degradationSeed,
+  shuffleDropDegrade,
+} from './auc.ts';
 import {
   BOOTSTRAP_DEFAULT,
   bootstrapCi,
@@ -638,6 +644,79 @@ export async function measureCalibrationControl(): Promise<CalibrationControlRes
 // ───────────────────────────────────────────────────────────────────────────
 // What the number can and cannot say
 // ───────────────────────────────────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────────────────────────
+// Re-locking the floor constants
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Repo-relative path of the file whose floor constants `--lock` rewrites. */
+export const AUC_LIB_PATH = 'scripts/lib/auc.ts';
+
+/** floor = round4(measured - margin). The ONE place that rule is arithmetic
+ *  rather than prose; scripts/lib/auc.ts states it and this implements it. */
+export function floorFor(measured: number, margin: number = PUBLIC_FLOOR_MARGIN): number {
+  return Math.round((measured - margin) * 1e4) / 1e4;
+}
+
+export interface FloorRelock {
+  /** False when ANY constant could not be located. Nothing is rewritten then,
+   *  and the CLI turns this into a non-zero exit. */
+  ok: boolean;
+  /** The rewritten source. Equal to the input when `ok` is false. */
+  source: string;
+  /** One `before -> after` line per constant, for the operator to read. */
+  lines: string[];
+  /** Constants that could not be located, with why. */
+  missing: string[];
+}
+
+/**
+ * Rewrite the six floor constants in `scripts/lib/auc.ts` from a measurement.
+ *
+ * PURE, and living here rather than in the CLI, for one reason: both of its
+ * outcomes have to be testable, and neither is testable if the only way to
+ * reach them is to run a script that edits the real `auc.ts` in place. The CLI
+ * does the reading, the writing and the exit code; this does the decision.
+ *
+ * It edits ONLY lines of the exact shape `export const NAME = <number>;` for
+ * the names in PUBLIC_FLOORS, and refuses — writing nothing at all, not even
+ * the constants it did find — if any one of them is missing. A partial re-lock
+ * would leave some floors from this run and some from an older one, which is
+ * the one state nobody could reason about afterwards.
+ */
+export function relockFloorSource(
+  source: string,
+  degradations: readonly DegradationResult[],
+  margin: number = PUBLIC_FLOOR_MARGIN,
+): FloorRelock {
+  let next = source;
+  const lines: string[] = [];
+  const missing: string[] = [];
+
+  for (const floor of PUBLIC_FLOORS) {
+    const d = degradations.find((x) => x.id === floor.degradation);
+    if (!d) {
+      missing.push(`${floor.constant} (no ${floor.degradation} result in this run)`);
+      continue;
+    }
+    const measured = floor.statistic === 'paired' ? d.aucPaired : d.aucAllPairs;
+    const value = floorFor(measured, margin);
+    const pattern = new RegExp(`(export const ${floor.constant} = )(-?[0-9.]+)(;)`);
+    if (!pattern.test(next)) {
+      missing.push(`${floor.constant} (no single-line \`export const … = <number>;\` in ${AUC_LIB_PATH})`);
+      continue;
+    }
+    next = next.replace(pattern, `$1${value}$3`);
+    lines.push(
+      `  ${floor.constant.padEnd(38)} ${String(floor.value).padStart(7)} -> ${String(value).padStart(7)}`
+      + `   (measured ${measured.toFixed(4)}${floor.primary ? ', PRIMARY' : ''}`
+      + `${value === floor.value ? ', unchanged' : ''})`,
+    );
+  }
+
+  if (missing.length > 0) return { ok: false, source, lines: [], missing };
+  return { ok: true, source: next, lines, missing };
+}
 
 /**
  * Quoted verbatim by the test's failure message, by `npm run benchmark:public`,

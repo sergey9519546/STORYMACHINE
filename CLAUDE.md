@@ -210,9 +210,12 @@ shuffle-drop changes it, climax-relocate preserves it exactly (measured
 scarcity delta 0.000), so only the second isolates order-sensitivity.
 Reproduce with `npm run benchmark:public`. `npm run benchmark:public -- --lock`
 re-locks the manifest, the split **and all six floor constants** in
-`scripts/lib/auc.ts`, printing every before/after — it does NOT rewrite prose,
-and the suite fails until the narrative in `auc.ts` and the numbers in the doc
-match the run. Re-lock only after a scoring change you intended, and read the
+`scripts/lib/auc.ts`, printing every before/after; if it cannot locate a
+constant it writes no floor at all and **exits 1**, naming the fixtures it had
+already written. It does NOT rewrite prose, and the suite fails until the
+narrative in `auc.ts` and the numbers in the doc match the run. Note that
+`npm run gates` now runs this benchmark's suite to verify its own claim, so
+that command costs ~6 s rather than being instant. Re-lock only after a scoring change you intended, and read the
 `auc.ts` diff: a re-lock after an unintended regression silently lowers the
 ratchet. Full method, per-script pairs, the control table and the three-branch
 comparison (pinned to SHAs) in

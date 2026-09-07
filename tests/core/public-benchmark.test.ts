@@ -72,9 +72,11 @@ import {
   PUBLIC_SPLIT_PATH,
   PUBLIC_SPLIT_RULE,
   REPO_ROOT,
+  floorFor,
   listPublicCorpus,
   measurePublicBenchmark,
   partitionFor,
+  relockFloorSource,
   type ScriptRow,
 } from '../../scripts/lib/public-benchmark.ts';
 
@@ -451,6 +453,63 @@ describe('public benchmark — the ratchet (six floors: three degradations x two
         + 're-lock with `npm run benchmark:public -- --lock` and record the run — or the floor was lowered by hand.',
       );
     }
+  });
+
+  it('`--lock` rewrites every floor from the measurement, and only those lines', () => {
+    // Driven on a STRING, not on the real scripts/lib/auc.ts — that is why
+    // relockFloorSource lives in the harness rather than in the CLI. The CLI
+    // does the file I/O and the exit code; the decision is testable here with
+    // no I/O at all.
+    const src = readFileSync(path.join(REPO_ROOT, 'scripts/lib/auc.ts'), 'utf8');
+    const relock = relockFloorSource(src, result.degradations);
+    assert.equal(relock.ok, true, `relock refused on a healthy tree: ${relock.missing.join('; ')}`);
+    assert.deepEqual(relock.missing, []);
+    assert.equal(relock.lines.length, PUBLIC_FLOORS.length, 'one before -> after line per floor');
+    for (const floor of PUBLIC_FLOORS) {
+      const d = byId.get(floor.degradation)!;
+      const measured = floor.statistic === 'paired' ? d.aucPaired : d.aucAllPairs;
+      assert.match(
+        relock.source,
+        new RegExp(`export const ${floor.constant} = ${floorFor(measured)};`),
+        `${floor.constant} was not rewritten to round4(measured - margin)`,
+      );
+    }
+    // Idempotent on a correctly locked tree: the floors already equal
+    // round4(measured - margin), so re-locking changes nothing. If this ever
+    // fails, the committed floors and the current measurement have diverged.
+    assert.equal(relock.source, src, 'a re-lock on an up-to-date tree must be a no-op');
+  });
+
+  it('`--lock` REFUSES, writes nothing, and reports why when a constant is reshaped', () => {
+    // The failure the CLI turns into a non-zero exit (round 3). A partial
+    // re-lock — some floors from this run, some from an older one — is the one
+    // state nobody can reason about afterwards, so a single missing constant
+    // must abandon the whole rewrite rather than apply the five it did find.
+    const src = readFileSync(path.join(REPO_ROOT, 'scripts/lib/auc.ts'), 'utf8');
+    const reshaped = src.replace(
+      'export const PUBLIC_ORDER_FLOOR = ',
+      'export const PUBLIC_ORDER_FLOOR =\n  ',
+    );
+    assert.notEqual(reshaped, src, 'the fixture edit must actually change the source');
+    const relock = relockFloorSource(reshaped, result.degradations);
+    assert.equal(relock.ok, false);
+    assert.equal(relock.source, reshaped, 'a refused relock must return the input untouched');
+    assert.deepEqual(relock.lines, [], 'a refused relock reports no before -> after lines');
+    assert.equal(relock.missing.length, 1);
+    assert.match(relock.missing[0], /PUBLIC_ORDER_FLOOR/);
+    assert.match(relock.missing[0], /single-line/);
+  });
+
+  it('`--lock` REFUSES when a degradation is missing from the run entirely', () => {
+    // The other way it can fail: the harness stopped producing a channel a
+    // floor guards. Rewriting the rest would leave that floor asserting an old
+    // measurement with nothing left to compare it against.
+    const src = readFileSync(path.join(REPO_ROOT, 'scripts/lib/auc.ts'), 'utf8');
+    const relock = relockFloorSource(src, result.degradations.filter((d) => d.id !== 'DIALOGUE_FLATTEN'));
+    assert.equal(relock.ok, false);
+    assert.equal(relock.source, src);
+    assert.equal(relock.missing.length, 2, 'both DIALOGUE_FLATTEN floors must be reported');
+    for (const m of relock.missing) assert.match(m, /no DIALOGUE_FLATTEN result in this run/);
   });
 
   it('the floor constants are still in the one-line shape `--lock` rewrites', () => {

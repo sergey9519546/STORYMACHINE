@@ -2,6 +2,18 @@
 // Reports which verification gates did NOT actually run — and blocks once a
 // reported gap has been open past its expiry.
 //
+// ── RUNTIME (2026-09-06 round 2, stated because it changed) ────────────────
+// This script used to be instant: it stat()ed a few files and printed. It now
+// also RUNS each VERIFIED gate's suite and reads the exit code (see the
+// VERIFIED_GATES block below for why a row that claims "this was measured"
+// has to check the measurement). That makes `npm run gates` cost about
+// 5.8-6.4s on this machine — measured over three consecutive runs — instead
+// of a fraction of a second, essentially all of it
+// tests/core/public-benchmark.test.ts's 128 doctor runs and three bootstraps.
+// The CI step is `if: always()` and unchanged otherwise; the cost is flagged
+// here rather than left for someone to discover in a build-time graph, and it
+// scales with however many verified gates get added later.
+//
 // WHY THIS EXISTS. `npm test` reporting "0 failures" reads as "everything is
 // verified." It is not. Several suites skip silently when their input is
 // absent — including the AUC-24 structural-degradation ratchet that CLAUDE.md

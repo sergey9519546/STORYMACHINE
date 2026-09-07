@@ -579,7 +579,7 @@ them, and this lane deliberately changed no file on any of those branches.
 | manifest lock (32 rows) | `tests/fixtures/public-corpus-manifest.json` |
 | pre-registered split | `tests/fixtures/public-benchmark-split.json` |
 | CLI | `scripts/benchmark-public.ts`, `npm run benchmark:public` |
-| re-lock command | `npm run benchmark:public -- --lock` — rewrites the manifest, the split, **and the six floor constants in `scripts/lib/auc.ts`**, printing every `before -> after`. Round 1 claimed it re-locked the floors and did not; that is fixed rather than reworded. What it still does **not** rewrite is prose: the narrative in `auc.ts` and the numbers in this document are yours, and `tests/core/public-benchmark.test.ts` fails until both agree with the measurement. Re-lock ONLY after a scoring change you intended, and read the `auc.ts` diff — a re-lock after an unintended regression silently lowers the ratchet, which is the one way this machinery can be defeated. |
+| re-lock command | `npm run benchmark:public -- --lock` — rewrites the manifest, the split, **and the six floor constants in `scripts/lib/auc.ts`**, printing every `before -> after`. Round 1 claimed it re-locked the floors and did not; that is fixed rather than reworded. If any constant is not in the single-line shape it edits, it writes **no floor at all** — not even the ones it found, since a half-re-locked set is the one state nobody can reason about — and **exits 1**, naming the fixtures it had already written so you know the tree is partially re-locked. (A refusal used to exit 0, which looked exactly like success.) What it still does **not** rewrite is prose: the narrative in `auc.ts` and the numbers in this document are yours, and `tests/core/public-benchmark.test.ts` fails until both agree with the measurement. Re-lock ONLY after a scoring change you intended, and read the `auc.ts` diff — a re-lock after an unintended regression silently lowers the ratchet, which is the one way this machinery can be defeated. |
 | gate row | `scripts/report-unverified-gates.mjs` `VERIFIED_GATES` (`npm run gates`) |
 | receipt | `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, PUBLIC-CORPUS section |
 
@@ -587,10 +587,21 @@ them, and this lane deliberately changed no file on any of those branches.
 + 32 dialogue-flatten) plus three 2000-resample bootstraps: **3.75 s** measured
 (`npm run benchmark:public -- --json` reports `elapsedMs`; the control added
 ~0.70 s to round 1's 3.05 s), 5.0 s wall for the whole CLI including Node
-start. `tests/core/public-benchmark.test.ts` is **4.87 s** wall on its own,
-well inside the 60 s budget this lane was held to. `npm run gates` now also
-runs that suite (see §9's gate row and `scripts/report-unverified-gates.mjs`),
-so the reporter costs about 5 s more than it did.
+start. `tests/core/public-benchmark.test.ts` is **5.66 s** wall on its own,
+well inside the 60 s budget this lane was held to.
+
+**`npm run gates` got slower, and that is a deliberate CI-time change, not a
+side effect.** The reporter now RUNS each verified gate's suite and reads its
+exit code — checking the fixture alone let a deleted suite still print `[RAN]`
+— so it costs **5.8–6.4 s** (measured over three consecutive runs) instead of a
+fraction of a second, essentially all of it this benchmark's 128 doctor runs.
+The CI step is `if: always()` and otherwise unchanged. It is stated here and in
+`scripts/report-unverified-gates.mjs`'s own header rather than left for someone
+to find in a build-time graph, and it will scale with however many verified
+gates are added later. `tests/scripts/report-unverified-gates.test.ts` pays the
+same cost once (6.09 s): its five separate invocations of the reporter were
+hoisted to one shared call, because six copies of the same string are not worth
+six suite runs.
 
 ---
 
