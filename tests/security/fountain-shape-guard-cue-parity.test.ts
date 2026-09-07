@@ -866,18 +866,18 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
     assert.ok(weightMargin >= 3, `weight margin too thin: ${weightMargin.toFixed(2)}x (weight=${weight})`);
     assert.ok(frequentMargin >= 3, `frequent-line margin too thin: ${frequentMargin.toFixed(2)}x (frequentCount=${frequentCount})`);
 
-    // The NEW bound (MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) needs a DIFFERENT
-    // honesty statement than a plain ratio: it is all-or-nothing (see its
-    // own comment) — it evaluates a weight AT ALL only once every distinct
-    // character clears MIN_WORDS=30, which this fixture's minors (2 short
-    // lines each) deliberately do not. So the guard never reaches this
-    // bound for this fixture — a stronger guarantee than any finite margin
-    // ("never at risk" rather than "currently under the line"), which is
-    // also exactly the mechanism that makes a REAL 150-named-character
-    // feature (which always has some genuine one-off walk-on parts) safe in
-    // production. Reported here as the hypothetical margin IF every
-    // character were eligible, purely to show the raw numbers, followed by
-    // the honest statement of why that hypothetical does not apply.
+    // UPDATED 2026-09-07 (branch scoring/feature-length-defects). This block
+    // used to report that the bound is ALL-OR-NOTHING and therefore never
+    // evaluated for this fixture at all — "a stronger guarantee than any
+    // finite margin". That guarantee is gone, deliberately: with
+    // voice-delta.ts abstaining PER CHARACTER, a cast of 150 in which 12
+    // names are talkative and 138 are one-liners really does run 12 x 11 / 2
+    // Burrows's-Delta pairs, so the bound now reads the ELIGIBLE SUBSET and
+    // this fixture gets a real, finite margin like everything else. Both
+    // numbers are printed below: the eligible-subset weight the guard
+    // actually evaluates, and the old hypothetical (every name eligible),
+    // which is what the shape would cost if the minors ever grew into
+    // speaking parts.
     const wordsByBaseName = new Map<string, number>();
     const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
@@ -887,19 +887,28 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
         wordsByBaseName.set(t, (wordsByBaseName.get(t) ?? 0) + dialogueWordCount);
       }
     }
-    const eligibleCount = [...wordsByBaseName.values()].filter((w) => w >= 30).length;
+    const eligible = [...wordsByBaseName.values()].filter((w) => w >= 30);
+    const eligibleCount = eligible.length;
+    const eligibleWeight = eligibleCount * eligible.reduce((a, b) => a + b, 0);
     const totalWordsIfAllEligible = [...wordsByBaseName.values()].reduce((a, b) => a + b, 0);
     const hypotheticalWeight = wordsByBaseName.size * totalWordsIfAllEligible;
     console.log(
       `realistic feature: distinct=${distinct} occurrences=${occurrences} words=${wordCount} `
       + `vocabMargin=${vocabMargin.toFixed(1)}x weightMargin=${weightMargin.toFixed(1)}x frequentMargin=${frequentMargin.toFixed(1)}x | `
-      + `voice-eligible-weight: ${eligibleCount} of ${wordsByBaseName.size} base names individually clear MIN_WORDS=30 `
-      + `(NOT all of them, by design — the ${wordsByBaseName.size - eligibleCount} minors under the floor keep the `
-      + `all-or-nothing bound from ever evaluating a weight for this fixture at all — the hypothetical `
-      + `weight IF every one of them were eligible would be ${hypotheticalWeight} against a ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} `
-      + `bound, i.e. this fixture works BECAUSE it does not try to clear that hypothetical, the same way a real script would)`,
+      + `voice-eligible-weight: ${eligibleCount} of ${wordsByBaseName.size} base names individually clear MIN_WORDS=30, `
+      + `so the guard evaluates ${eligibleCount} x their pooled words = ${eligibleWeight} against a `
+      + `${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} bound (${(MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT / eligibleWeight).toFixed(1)}x headroom); `
+      + `if all ${wordsByBaseName.size} names ever became eligible the weight would be ${hypotheticalWeight}, i.e. rejected`,
     );
     assert.ok(eligibleCount < wordsByBaseName.size, 'sanity: this fixture must have at least one under-threshold minor, or it is not testing the mechanism it claims to');
+    assert.ok(
+      eligibleWeight <= MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+      `a realistic 150-name feature must clear the eligible-subset bound: ${eligibleWeight} vs ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}`,
+    );
+    assert.ok(
+      hypotheticalWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+      'sanity: the all-eligible hypothetical must be over the bound, or this fixture is not exercising the subset distinction at all',
+    );
   });
 
   // Bound-headroom test (brief item (d)): every already-tracked fixture the
@@ -914,12 +923,15 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
       // sibling concept) — but since dialogueWords/voiceKey are internal to
       // walkGuardCueOccurrences, this recomputes them the same way
       // fountainShapeRejectionReason's own header documents: per-base-name
-      // (extension-stripped) pooled word count, product of distinct-count x
-      // total-pooled-words, ONLY when every distinct name individually
-      // clears 30 words (mirrors voice-delta.ts's own MIN_WORDS). Returns
-      // null when not every name is eligible (the bound would not even be
-      // evaluated on this text) — a null margin is the SAFEST outcome, not
-      // a gap in the proof.
+      // (extension-stripped) pooled word count, restricted to the ELIGIBLE
+      // SUBSET (names individually clearing 30 words — voice-delta.ts's own
+      // VOICE_MIN_WORDS), product of eligible-count x their pooled words.
+      // UPDATED 2026-09-07: this used to return null unless EVERY name was
+      // eligible, mirroring the retired all-or-nothing model; under
+      // per-character abstention that would leave most real scripts
+      // unmeasured, which is a gap in the proof rather than a safe default.
+      // Returns null only when fewer than two names are eligible — the one
+      // case where analyzeVoices genuinely abstains and there is no cost.
       const lines = text.split('\n');
       const CUE_RE = /^[A-Z][A-Z0-9 '.\-#]*$/;
       const wordsByName = new Map<string, number>();
@@ -937,13 +949,15 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
         const words = next.split(/\s+/).filter(Boolean).length;
         wordsByName.set(baseName, (wordsByName.get(baseName) ?? 0) + words);
       }
-      if (wordsByName.size < 2) return 0;
+      let eligibleCount = 0;
       let total = 0;
       for (const w of wordsByName.values()) {
-        if (w < 30) return null; // not every name eligible — bound never fires
+        if (w < 30) continue;                     // excluded from the pair set
+        eligibleCount++;
         total += w;
       }
-      return wordsByName.size * total;
+      if (eligibleCount < 2) return null;          // analyzeVoices abstains: no cost
+      return eligibleCount * total;
     }
 
     const { REFERENCE_CORPUS } = await import('../../server/nvm/analyze/calibration/corpus.ts');
@@ -968,8 +982,13 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
     }
     console.log(
       worstMargin === Infinity
-        ? 'voice-eligible-weight headroom: no tracked fixture ever reaches full eligibility (every one has a sub-30-word character) — infinite margin by construction'
+        ? 'voice-eligible-weight headroom: no tracked fixture has two voice-eligible characters — infinite margin by construction'
         : `voice-eligible-weight headroom: worst tracked fixture is "${worstName}" at ${worstMargin.toFixed(1)}x`,
+    );
+    assert.notEqual(
+      worstMargin,
+      Infinity,
+      'this headroom proof is worthless if no tracked fixture reaches the bound at all — under per-character eligibility most of them must',
     );
   });
 });
@@ -1601,9 +1620,24 @@ describe('ROUND 5 regressions: three heading-spelling bypass payloads reject fas
     assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
   });
 
-  it('R5-6 control: a walk-on placed exactly at scene 400 (the ceiling boundary, still eligible) is unchanged — still accepts', () => {
+  // RE-ANCHORED 2026-09-07 (branch scoring/feature-length-defects), per this
+  // suite's own rule that a moved anchor is re-measured and stated, never
+  // widened. This control USED to assert ACCEPT, and it was right to: under
+  // the old all-or-nothing eligibility model the single one-word walk-on
+  // made `allEligible` false, the weight bound was never evaluated, and the
+  // document was accepted. That acceptance was only ever safe because
+  // voice-delta.ts's analyzeVoices ALSO abstained for the whole script on
+  // that same walk-on. It no longer does — abstention is per character as of
+  // the same branch — so the 200 uniformly talkative names in this payload
+  // are now scored as 19,900 Burrows's-Delta pairs. Measured directly on
+  // this exact shape: analyzeVoices ALONE takes 42,062 ms. The verdict that
+  // changed is the guard catching up to the analyzer, not the guard getting
+  // stricter for its own sake.
+  it('R5-6: a walk-on placed exactly at scene 400 (the ceiling boundary, still eligible) now REJECTS — its 200 eligible names cost 42,062ms in analyzeVoices alone once per-character abstention landed', () => {
     const text = buildCeilingCrossingDoc((s) => `INT. LOCATION ${s} - DAY`, 399, 'INT. HALL - DAY');
-    assert.equal(fountainShapeRejectionReason(text), null, 'expected the at-the-ceiling walk-on control to keep accepting (unchanged from round 4)');
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the at-the-ceiling walk-on to be rejected now that one walk-on no longer abstains the whole voice analysis');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
   });
 });
 
@@ -1910,7 +1944,17 @@ describe('ROUND 4 regressions: CR-only line endings and the 400-scene eligibilit
     assert.ok(ms < 500, `expected a fast rejection (<500ms), took ${ms}ms`);
   });
 
-  it('R4-2b control: the SAME walk-on moved to scene 1 (well inside the ceiling) keeps its current, correct verdict — accepted, because it genuinely IS a one-word walk-on to both the guard and the real analyzer', () => {
+  // RE-ANCHORED 2026-09-07 (branch scoring/feature-length-defects). The
+  // original rationale — "it genuinely IS a one-word walk-on to both the
+  // guard and the real analyzer", i.e. the analyzer abstains too, so the
+  // document is free — stopped being true when voice-delta.ts moved to
+  // per-character abstention. MEASURED on this exact payload after that
+  // change: 200 of 201 base names clear the 30-word floor, pooled 11,970
+  // words, weight 200 x 11,970 = 2,394,000 against the 300,000 bound (8.0x
+  // over), and analyzeVoices ALONE takes 42,062 ms to compute the resulting
+  // 19,900 pairs. So the verdict flips to REJECT, and this test now pins the
+  // number that justifies it rather than the acceptance that no longer does.
+  it('R4-2b: the SAME walk-on moved to scene 1 now REJECTS too — weight 2,394,000 vs the 300,000 bound, 19,900 pairs, 42,062ms in analyzeVoices alone', () => {
     function uniform(distinct: number, occurrences: number, perScene: number): string {
       let t = '', occ = 0, scene = 0;
       while (occ < occurrences) {
@@ -1920,7 +1964,15 @@ describe('ROUND 4 regressions: CR-only line endings and the 400-scene eligibilit
       return t;
     }
     const text = 'INT. HALL - DAY\n\nWALKON\nhi\n\n' + uniform(200, 2050, 5);
-    assert.equal(fountainShapeRejectionReason(text), null, 'expected the scene-1 walk-on control to stay accepted — the fix must not turn EVERY walk-on into a rejection, only ones the real analyzer would truncate away');
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the scene-1 walk-on payload to reject: its 200 talkative names are now all voice-eligible');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+
+    // FAIL-FIRST for the OTHER direction: a payload whose cast really is too
+    // small to be expensive must still be accepted, or this bound has simply
+    // become "reject everything".
+    const small = 'INT. HALL - DAY\n\nWALKON\nhi\n\n' + uniform(4, 40, 5);
+    assert.equal(fountainShapeRejectionReason(small), null, 'a genuinely small cast must still be accepted');
   });
 });
 
@@ -2564,36 +2616,75 @@ describe('ROUND 7 corpus: parenthetical-only-cue-then-cue demotion, one variant 
     for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
       const text = buildParenDemotionDoc(cueOf);
       const pipelineCounts = pipelineWordsByBaseName(text);
-      const nonZero = [...pipelineCounts.values()].filter((w) => w > 0);
-      const allEligible = nonZero.length >= 2 && nonZero.every((w) => w >= VOICE_ELIGIBLE_MIN_WORDS);
-      const expectedWeight = allEligible ? nonZero.length * nonZero.reduce((a, b) => a + b, 0) : 0;
-      const expectReject = allEligible && expectedWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT;
+      // UPDATED 2026-09-07: the oracle models the ELIGIBLE SUBSET, because
+      // that is what the guard reads now — see voiceEligibleWeightReason.
+      // The retired all-or-nothing oracle would agree with the guard on
+      // these particular families by coincidence and disagree the moment a
+      // family's poison name carries a nonzero-but-sub-30 word count, which
+      // is exactly the shape this corpus is built from.
+      const eligible = [...pipelineCounts.values()].filter((w) => w >= VOICE_ELIGIBLE_MIN_WORDS);
+      const expectedWeight = eligible.length >= 2 ? eligible.length * eligible.reduce((a, b) => a + b, 0) : 0;
+      const expectReject = eligible.length >= 2 && expectedWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT;
       const reason = fountainShapeRejectionReason(text);
-      assert.equal(!!reason, expectReject, `"${family}": expected reject=${expectReject} (independently computed from the real ceiling-aware pipeline: ${nonZero.length} eligible names), got reject=${!!reason}${reason ? ` (${reason})` : ''}`);
+      assert.equal(!!reason, expectReject, `"${family}": expected reject=${expectReject} (independently computed from the real ceiling-aware pipeline: ${eligible.length} eligible names), got reject=${!!reason}${reason ? ` (${reason})` : ''}`);
       if (expectReject) assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/, `"${family}"`);
     }
   });
 
-  // Fail-first proof (2026-09-06 review round 7, item 4): confirms this
-  // corpus is not vacuous by checking it AGAINST THE RETIRED LEGACY
-  // function directly — at least one family must show the OLD bypass (a
-  // "ghost" eligible name absent from the real pipeline), proving the
-  // shape genuinely exercises the bug the real-parse rewrite closes, not a
-  // shape that happened to work by construction. `legacyVoiceEligibleWeightRejectionReason`
-  // is retired from production (see its own comment) — this is the ONLY
-  // test in this file that still calls it against a NEW payload, and it
-  // does so specifically to prove the corpus's own bite, not to validate
-  // production behavior.
-  it('fail-first: the corpus above genuinely defeats the RETIRED legacy function on at least one family (proving it is not a vacuous corpus)', () => {
-    let anyBypass = false;
+  // RE-ANCHORED 2026-09-07 (branch scoring/feature-length-defects), with the
+  // corpus's bite preserved rather than dropped.
+  //
+  // This test used to prove non-vacuity by showing the RETIRED legacy
+  // function BYPASSED on at least five families. It no longer can, and the
+  // reason is the point: the bypass it demonstrated was always "make one
+  // name ineligible and the all-or-nothing gate never evaluates a weight at
+  // all". With eligibility read per character (voiceEligibleWeightReason,
+  // mirroring voice-delta.ts's own per-character abstention), that entire
+  // CLASS of bypass is structurally closed — poisoning one name now removes
+  // one name from the eligible set instead of removing the whole bound.
+  //
+  // So the corpus's bite is re-stated as the property that is still true and
+  // still falsifiable: the legacy WALK still miscounts the cast on these
+  // documents (the demotion ghost is a walk defect, not a bound defect), and
+  // the bound is nonetheless no longer defeatable by it. If the walk ever
+  // stopped miscounting, the first assertion fails and this corpus really
+  // would be vacuous; if the bound ever became defeatable again, the second
+  // does.
+  it('fail-first: the demotion ghost still miscounts the cast on at least five families, and NO family can defeat the bound with it any more', () => {
+    const miscounted: string[] = [];
     const bypassed: string[] = [];
+    let familiesWithARealCast = 0;
     for (const [family, cueOf] of Object.entries(ORACLE_CUE_FAMILIES)) {
       const text = buildParenDemotionDoc(cueOf);
-      const legacyReason = legacyVoiceEligibleWeightRejectionReason(text);
-      if (!legacyReason) { anyBypass = true; bypassed.push(family); }
+      const guardNames = guardEligibleVoiceWordCounts(text).size;
+      const pipelineNames = pipelineWordsByBaseName(text).size;
+      if (guardNames !== pipelineNames) miscounted.push(`${family}(${guardNames}/${pipelineNames})`);
+
+      // Only families whose cue convention survives normalizeScreenplay's own
+      // isCharacterCue gate ever assemble an over-bound cast — the 41+ char
+      // and caret families do not, and a walk that accepts THEM is correct,
+      // not bypassed. So the expectation is the same real-pipeline oracle
+      // subtest 1 uses, never a blanket "everything rejects".
+      const eligible = [...pipelineWordsByBaseName(text).values()].filter((w) => w >= VOICE_ELIGIBLE_MIN_WORDS);
+      const oracleRejects = eligible.length >= 2
+        && eligible.length * eligible.reduce((a, b) => a + b, 0) > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT;
+      if (!oracleRejects) continue;
+      familiesWithARealCast++;
+      if (!legacyVoiceEligibleWeightRejectionReason(text)) bypassed.push(family);
     }
-    assert.ok(anyBypass, 'expected at least one family to bypass the legacy (retired) voice-eligible-weight function — otherwise this corpus proves nothing about the bug it targets');
-    assert.ok(bypassed.length >= 5, `expected the demotion bug to reproduce broadly, not on a single cherry-picked family; got ${bypassed.length}/${Object.keys(ORACLE_CUE_FAMILIES).length}: ${bypassed.join(', ')}`);
+    assert.ok(
+      miscounted.length >= 5,
+      `expected the demotion ghost to still miscount broadly, or this corpus no longer exercises the walk defect it targets; got ${miscounted.length}/${Object.keys(ORACLE_CUE_FAMILIES).length}: ${miscounted.join(', ')}`,
+    );
+    assert.ok(
+      familiesWithARealCast >= 5,
+      `expected at least five families to assemble a real over-bound cast, or the bypass claim below is vacuous; got ${familiesWithARealCast}`,
+    );
+    assert.deepEqual(
+      bypassed,
+      [],
+      `per-character eligibility must close the whole one-poisoned-name bypass class; these families still defeat the bound: ${bypassed.join(', ')}`,
+    );
   });
 });
 
@@ -2623,9 +2714,14 @@ describe('ROUND 7 regressions: the parenthetical-demotion ghost rejects fast, th
   it('R7-1: a parenthetical-only cue demoting the next cue (measured pre-fix: legacy-ACCEPT, guard-eligible 201 vs analyzer 200, runScriptDoctor 50,666ms; HTTP 200 in 49,799ms) now rejects fast', () => {
     const text = base(POISON);
     assert.equal(text.length, 125_627, 'payload size must match the measured R7-1 shape exactly');
-    // Sanity: the legacy function really did bypass on this exact payload —
-    // pins the BEFORE state directly, not just via a comment.
-    assert.equal(legacyVoiceEligibleWeightRejectionReason(text), null, 'sanity: the retired legacy function must still show the bypass on this exact payload, or this regression test is not testing what it claims');
+    // RE-ANCHORED 2026-09-07: this used to pin the BEFORE state as
+    // "the legacy function bypasses on this exact payload". Under
+    // per-character eligibility it no longer does, and that is the fix —
+    // the poison removes one name from the eligible set instead of removing
+    // the bound. What is pinned now is the property that survives: both the
+    // retired walk and the real one reject this payload, so the demotion
+    // ghost cannot be used to get under the bound by either route.
+    assert.ok(legacyVoiceEligibleWeightRejectionReason(text), 'the one-poisoned-name bypass must be closed on the retired walk too, not only on the real one');
     const start = Date.now();
     const reason = fountainShapeRejectionReason(text);
     const ms = Date.now() - start;

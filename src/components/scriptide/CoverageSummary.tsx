@@ -118,6 +118,16 @@ const STAT_DEFINITIONS = {
     "Share of the script's words that are action/description rather than dialogue (action words ÷ action+dialogue words). A word-count split, not a judgment of literary subtlety — there's no single ideal ratio.",
   voiceSeparation:
     "Character pairs whose dialogue is statistically distinguishable (Burrows's Delta) out of every pair with enough dialogue to test. Higher is better — a low pair risks two characters sounding interchangeable.",
+  /** Appended to the sentence above when characters were held out. Until
+   *  2026-09-07 a single character under the 30-word floor abstained the
+   *  WHOLE analysis, so this tile read N/A on every feature-length script
+   *  while the sentence above promised a per-pair filter the code did not
+   *  implement. The filter is per character now; this names who it dropped
+   *  so "N/A" and a partial matrix are never unexplained. */
+  voiceSeparationExcluded:
+    'Characters with under 30 words of dialogue are left out of the pairs, not scored against anybody:',
+  voiceSeparationUnscored:
+    'Not scored: fewer than two characters have enough dialogue (30 words) to compare.',
   resolvedQs:
     "Substantive questions raised in dialogue that a later line goes on to answer, out of every question raised. Higher (closer to the total) is better — the gap is open threads left dangling.",
 } as const;
@@ -434,6 +444,20 @@ export default function CoverageSummary({
   }, [onClose]);
 
   const top = report?.topPriorities?.[0];
+  // The Voice Separation tile's description is computed, not constant,
+  // because the honest sentence depends on which state the tile is in:
+  // scored with everybody in, scored with sparse characters held out, or
+  // not scored at all. See STAT_DEFINITIONS.voiceSeparationExcluded.
+  const voiceSeparationDescription = (() => {
+    const va = report?.voiceAnalysis;
+    const excluded = va?.excludedCharacters ?? [];
+    const base = STAT_DEFINITIONS.voiceSeparation;
+    if (va && !va.scored) return `${base} ${STAT_DEFINITIONS.voiceSeparationUnscored}`;
+    if (excluded.length === 0) return base;
+    const shown = excluded.slice(0, 6).join(', ');
+    const rest = excluded.length > 6 ? ` and ${excluded.length - 6} more` : '';
+    return `${base} ${STAT_DEFINITIONS.voiceSeparationExcluded} ${shown}${rest}.`;
+  })();
   const root = report?.rootCauses?.[0];
   const reportIsComplete = report ? isWholeDraftAnalysisComplete(report) : false;
   // The span the "Jump to line" button targets. A root cause already carries
@@ -712,7 +736,7 @@ export default function CoverageSummary({
               <StatTile
                 id="tile-voice-separation"
                 label="Voice Separation"
-                description={STAT_DEFINITIONS.voiceSeparation}
+                description={voiceSeparationDescription}
                 cardClassName="sm-card py-2 text-center"
                 valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]"
               >

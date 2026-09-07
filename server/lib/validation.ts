@@ -495,6 +495,41 @@ function ssrfSafeUrlField() {
 // "weight" shape, 4x the occurrences — differ by 328x: the first is under
 // MIN_WORDS, the second is not.
 //
+// ── 2026-09-07 UPDATE (branch scoring/feature-length-defects) — READ THIS
+// BEFORE THE GRID BELOW, because two of its premises changed. ──────────────
+// (1) ELIGIBILITY IS NO LONGER ALL-OR-NOTHING. voice-delta.ts's analyzeVoices
+//     used to abstain for the WHOLE script if ANY one character fell under
+//     MIN_WORDS=30 — the "binary switch" this comment describes at length.
+//     It now EXCLUDES that character from the pair set and scores the rest,
+//     because the old rule made the channel structurally dead on every real
+//     feature (they all have a one-line walk-on). So the guard's model moved
+//     with it: voiceEligibleWeightReason reads the ELIGIBLE SUBSET, and a
+//     document with one walk-on no longer skips the bound entirely. The
+//     change is strictly stricter — it rejects a superset of what it
+//     rejected before — and it closes the round-7 residual recorded at the
+//     end of this comment (a 400-scene document with a genuine walk-on,
+//     previously ACCEPTED, measured at ~12-14s).
+// (2) THE COST GRID BELOW IS NOW A HISTORICAL WORST CASE, NOT THE CURRENT
+//     ONE. Its numbers were driven by burrowsDelta re-deriving BOTH
+//     characters' full frequency tables once per function word per pair.
+//     voice-delta.ts now derives each character's table once and reuses it.
+//     Measured on this branch, same box, on the exact payload the grid's
+//     distinct=200 row describes (200 eligible names, 11,970 pooled words,
+//     19,900 pairs): analyzeVoices alone went from 42,062 ms to 191 ms, and
+//     a deliberately extreme 520-name / 249,600-word cast (weight
+//     129,792,000, 433x this bound) now costs 563 ms.
+// WHAT WAS DELIBERATELY NOT DONE: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT was NOT
+// raised to match. Every payload this file's suite pins as rejected stays
+// rejected, and no cost bound is loosened as a side effect of a scoring
+// change. The cost of that conservatism is stated rather than hidden: the
+// suite's own synthetic "realistic 150-name feature" now sits at 1.2x
+// headroom (eligible weight 259,200 against 300,000) where it previously
+// never reached the bound at all, so a legitimate ensemble feature somewhat
+// larger than that fixture would now be rejected for a cost the measurements
+// above put in the tens of milliseconds. Re-deriving this constant from the
+// new rate is real, owner-facing work for a lane whose review is about this
+// guard — it is not a scoring lane's to do unilaterally.
+//
 // THE FIX (MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT below): track, per distinct
 // character (grouped by BASE NAME — stripping (V.O.)/(O.S.)/(CONT'D) the
 // same way fountain-analyzer.ts's normalizeCharacterName does before
@@ -579,11 +614,14 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // clears it by at least 3x — see this file's own margin-proof test.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 300_000;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
-// worst case, recorded here rather than left unstated: a document sitting
+// worst case. CLOSED 2026-09-07 by the per-character eligibility change (see
+// this section's 2026-09-07 UPDATE): the shape below is now REJECTED, and
+// tests/security/…'s R5-6 and R4-2b controls were re-anchored to say so.
+// Kept for the measurement. A document sitting
 // at the analyzer's own 400-scene ceiling, with a genuine (not hand-model-
-// invented) one-or-two-word walk-on character, is legitimately ACCEPTED by
+// invented) one-or-two-word walk-on character, was legitimately ACCEPTED by
 // this bound (nonZeroWordCounts.length < 2, or allEligible false for a
-// REAL reason) and measures ~12-14s in runScriptDoctor — 200 names x 10
+// REAL reason) and measured ~12-14s in runScriptDoctor — 200 names x 10
 // occurrences at 125,608 chars: 12,340ms; 600 names x 15 occurrences at
 // 488,602 chars: 13,566ms; it plateaus (4x the dialogue volume adds only
 // ~10%). Both sides agree here: the walk-on really is under
@@ -1477,22 +1515,10 @@ export function legacyVoiceEligibleWeightRejectionReason(text: string): string |
       voiceWordCounts.set(occ.voiceKey, (voiceWordCounts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
     }
   }
-  const nonZeroVoiceWordCounts = [...voiceWordCounts.values()].filter((words) => words > 0);
-  if (nonZeroVoiceWordCounts.length >= 2) {
-    let allEligible = true;
-    let totalEligibleWords = 0;
-    for (const words of nonZeroVoiceWordCounts) {
-      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
-      totalEligibleWords += words;
-    }
-    if (allEligible) {
-      const voiceEligibleWeight = nonZeroVoiceWordCounts.length * totalEligibleWords;
-      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
-        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
-      }
-    }
-  }
-  return null;
+  // Same single implementation of the bound the real-parse path uses — see
+  // voiceEligibleWeightReason. Only the WALK differs between these two
+  // functions, which is the whole point of the round-7 equivalence test.
+  return voiceEligibleWeightReason(voiceWordCounts);
 }
 
 // ── Real-parse voice-eligibility bound (2026-09-06 review round 7,
@@ -1746,25 +1772,56 @@ function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences
   // section's own header comment for the measured 12,407ms cost of the
   // faithful (unfiltered) alternative, and the regression test pinning
   // both facts (guard rejects, analyzer abstains) on the same document.
-  const nonZeroWordCounts = [...wordCounts.values()].filter((w) => w > 0);
-  if (nonZeroWordCounts.length >= 2) {
-    let allEligible = true;
-    let totalEligibleWords = 0;
-    for (const words of nonZeroWordCounts) {
-      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
-      totalEligibleWords += words;
-    }
-    if (allEligible) {
-      const voiceEligibleWeight = nonZeroWordCounts.length * totalEligibleWords;
-      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
-        // 2026-09-05 review round 3, LOW item — this state is a legitimate
-        // large fully-speaking ensemble, not malformed input (measured: the
-        // pre-round-2 buildPlausibleFeature() fixture, a genuine 72s
-        // payload, trips exactly this branch) — say so, not just the bound
-        // name.
-        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
-      }
-    }
+  return voiceEligibleWeightReason(wordCounts);
+}
+
+/** The voice-eligible-weight bound itself, over a per-base-name pooled word
+ *  map. Factored out (2026-09-07) so the real-parse path above and the
+ *  retired legacy path below evaluate ONE implementation of the bound and
+ *  cannot drift — the round-7 equivalence test compares their decisions, and
+ *  a bound duplicated in two places is exactly the drift that test exists to
+ *  catch.
+ *
+ *  ELIGIBILITY IS PER CHARACTER, NOT ALL-OR-NOTHING (2026-09-07). This
+ *  mirrors `voice-delta.ts`'s `analyzeVoices`, which as of the same date
+ *  excludes a character under `VOICE_MIN_WORDS` from the pair set instead of
+ *  abstaining for the whole script. The old model — "evaluate a weight at
+ *  all only once EVERY distinct character clears the floor" — was a faithful
+ *  mirror of the old analyzer and is now a HOLE: with per-character
+ *  abstention a 520-name cast where 519 names are talkative and one is a
+ *  one-line walk-on runs 519 x 518 / 2 Burrows's-Delta pairs, and under the
+ *  old gate that document was never even measured against the bound (the
+ *  measured cost of exactly that shape was 322,435 ms; see this section's
+ *  header grid). The eligible SET is now what the bound reads, which is also
+ *  what the cost model always said drives the cost:
+ *  (eligible-character count) x (their total pooled words).
+ *
+ *  This makes the guard strictly stricter — it rejects a superset of what it
+ *  rejected before, never a subset — so no document that was rejected is now
+ *  accepted. What it costs is stated, not assumed: the round-7 residual
+ *  ("a document at the analyzer's own 400-scene ceiling with a genuine
+ *  one-or-two-word walk-on is legitimately ACCEPTED and measures ~12-14 s")
+ *  is closed by this change rather than left standing, and every tracked
+ *  fixture's new headroom is asserted in
+ *  tests/security/fountain-shape-guard-cue-parity.test.ts. */
+function voiceEligibleWeightReason(wordCounts: Map<string, number>): string | null {
+  let eligibleCount = 0;
+  let totalEligibleWords = 0;
+  for (const words of wordCounts.values()) {
+    if (words < VOICE_ELIGIBLE_MIN_WORDS) continue;
+    eligibleCount++;
+    totalEligibleWords += words;
+  }
+  // Under two eligible characters analyzeVoices abstains outright: there is
+  // no pair to compute and therefore no cost to bound.
+  if (eligibleCount < 2) return null;
+  const voiceEligibleWeight = eligibleCount * totalEligibleWords;
+  if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
+    // 2026-09-05 review round 3, LOW item — this state is a legitimate
+    // large ensemble, not malformed input (measured: the pre-round-2
+    // buildPlausibleFeature() fixture, a genuine 72s payload, trips exactly
+    // this branch) — say so, not just the bound name.
+    return `has too large a cast of individually voice-scorable characters (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in characters who each speak at least ${VOICE_ELIGIBLE_MIN_WORDS} words × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
   }
   return null;
 }
