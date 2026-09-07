@@ -9,7 +9,12 @@ import {
   check,
 } from './metamorphic-lib.ts';
 import type { MetamorphicResult } from '../contracts/scoring-eval-case.ts';
-import { METAMORPHIC_CASES } from './metamorphic-cases.ts';
+import {
+  METAMORPHIC_CASES,
+  STAPLED_SHORT_NAMES,
+  stapledShortParts,
+  stapledShortsText,
+} from './metamorphic-cases.ts';
 
 function result(id: string, passed: boolean): MetamorphicResult {
   return {
@@ -61,9 +66,40 @@ describe('metamorphic classifyResults', () => {
       'scene_shuffle',
       'scene_reverse',
       'scene_dup_padding',
+      'stapled_shorts',
     ]);
-    assert.deepEqual([...KNOWN_FAILING_CASE_IDS], ['empty_verbosity']);
-    assert.deepEqual([...HARD_CASE_IDS], ids.filter(id => id !== 'empty_verbosity'));
+    assert.deepEqual([...KNOWN_FAILING_CASE_IDS], ['empty_verbosity', 'stapled_shorts']);
+    assert.deepEqual([...HARD_CASE_IDS], ids.filter(id => id !== 'empty_verbosity' && id !== 'stapled_shorts'));
+  });
+});
+
+describe('stapled_shorts case shape', () => {
+  const stapled = METAMORPHIC_CASES.find(c => c.id === 'stapled_shorts')!;
+
+  it('names exactly twelve parts and reads each of them', () => {
+    assert.equal(STAPLED_SHORT_NAMES.length, 12);
+    assert.equal(stapledShortParts().length, 12);
+    assert.equal(stapled.parts, stapledShortParts, 'the case must use the SAME loader as the variant builder');
+  });
+
+  it('is the only case with a `parts` comparison point', () => {
+    assert.deepEqual(METAMORPHIC_CASES.filter(c => c.parts).map(c => c.id), ['stapled_shorts']);
+  });
+
+  it('the variant contains every part\'s scene body and no part\'s title page', () => {
+    const text = stapledShortsText();
+    for (const part of stapledShortParts()) {
+      const body = part.slice(part.search(/^(INT\.|EXT\.)/mi));
+      assert.ok(text.includes(body.trimEnd()), 'every part\'s scene body must survive the staple');
+      const titlePage = part.slice(0, part.search(/^(INT\.|EXT\.)/mi));
+      if (titlePage.includes('Title:')) {
+        assert.ok(!text.includes(titlePage.trim()), 'no part\'s title page may be stapled into the middle of the document');
+      }
+    }
+  });
+
+  it('asserts an inequality, not a tolerance', () => {
+    assert.deepEqual(stapled.expect, { kind: 'not_increase', epsilon: 0 });
   });
 });
 

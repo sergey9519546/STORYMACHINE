@@ -61,6 +61,12 @@
       "path": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
     },
     {
+      "id": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "type": "branch",
+      "title": "Branch — Feature-Length Defects",
+      "path": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
       "type": "branch",
       "title": "Branch — R5 (Verbosity Bias)",
@@ -257,6 +263,12 @@
       "type": "measurement",
       "title": "Measurement — EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11",
       "path": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md"
+    },
+    {
+      "id": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "type": "measurement",
+      "title": "Measurement — FEATURE_LENGTH_DEFECTS_2026-09-07",
+      "path": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md"
     },
     {
       "id": "docs/brain/Measurements/Measurement - HEALTH_REARCH_INCREMENT1_LANDED_2026-07-11.md",
@@ -795,6 +807,22 @@
       "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
     },
     {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md"
+    },
+    {
       "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
@@ -1045,6 +1073,22 @@
     {
       "from": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md",
       "to": "docs/brain/Measurements/Measurement - ARC_RECALIBRATION_WAVE_2026-07-11.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
     },
     {
       "from": "docs/brain/Measurements/Measurement - IMPORT_COMPREHENSION_2026-07-11.md",
