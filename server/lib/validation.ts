@@ -2571,7 +2571,18 @@ export const SlateBodySchema = z.object({
 // health but not healthPercentile).
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
-const VerifyExpectedSchema = z.object({
+// Exported (round-2 review finding 1, 2026-09-06): `npm run verify-report`
+// (scripts/verify-report.mjs) parses an `expected` object out of an
+// exported artifact by hand (regex over HTML/markdown, or a JSON.parse) —
+// unlike this route, nothing upstream of it is zod. A parsed claim that
+// isn't a real number (`Number('OUTSTANDING')` is `NaN`) used to sail
+// through the CLI's own comparator, because `Math.abs(NaN - x) > tolerance`
+// is `false` — a mismatch that can't be computed silently reads as no
+// mismatch. Importing THIS schema (not a second hand-declared one) is what
+// makes the CLI reject exactly what this route would reject with a 400: the
+// same `z.number()` here already refuses `NaN` server-side, which is why
+// the route was never exposed to this bug in the first place.
+export const VerifyExpectedSchema = z.object({
   contentHash: z.string().regex(CONTENT_HASH_RE, 'contentHash must be a 64-character lowercase hex sha256 digest'),
   health: z.number().min(0).max(100).optional(),
   verdict: z.enum(['RECOMMEND', 'CONSIDER', 'PASS']).optional(),

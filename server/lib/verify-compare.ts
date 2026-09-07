@@ -19,6 +19,7 @@
 // by reachability FROM doctor.ts, and nothing reachable from doctor.ts
 // imports this file).
 import type { CoverageVerdict, ScriptDoctorReport } from '../nvm/analyze/types.ts';
+import { VerifyExpectedSchema } from './validation.ts';
 
 export interface VerifyExpected {
   contentHash: string;
@@ -78,6 +79,39 @@ export const ENGINE_IDENTITY_FIELDS = new Set(['engineCommit', 'rulebookCount'])
 export const ENGINE_MISMATCH_MESSAGE =
   'The engine has moved since this report was produced. The script content and score both still ' +
   'check out — re-run this verification to confirm under the current engine.';
+
+export interface ClaimValidationFailure { field: string; message: string }
+
+/**
+ * Validates a parsed `expected` claims object against the SAME zod schema
+ * `POST /api/export/verify` enforces via `validate(VerifyBodySchema)`
+ * BEFORE its handler (and therefore `checkContentHash`/`compareVerifyClaims`
+ * below) ever runs. The route is safe from a malformed claim by construction
+ * — zod already ran. A caller that assembles `expected` by hand from a
+ * rendered artifact (the verify-report CLI, scraping HTML/markdown with
+ * regexes, or `JSON.parse`) has no such gate in front of it, and needs one:
+ * round-2 review finding 1 (2026-09-06) — a health claim the CLI's regex
+ * parser could not read as a number (`Number('OUTSTANDING')` is `NaN`, and
+ * so is `Number('6.5.0')` matched by a `[\d.]+` capture) reached
+ * `compareVerifyClaims` unvalidated. `Math.abs(NaN - report.health) >
+ * VERIFY_FLOAT_TOLERANCE` evaluates to `false` — every comparison against
+ * `NaN` does — so the mismatch that could not be computed was silently
+ * treated as no mismatch at all, and the CLI printed `VERIFIED`, exit 0, on
+ * a report whose health claim was not even readable. Importing this schema
+ * (not re-declaring a second one) is what guarantees the CLI rejects
+ * exactly what this route would reject with 400 — the same `z.number()`
+ * already refuses `NaN` and any out-of-range value; the same `z.enum(...)`
+ * already refuses a verdict string that isn't one of the three real values.
+ * Returns `null` when every present field validates; otherwise the first
+ * failing field (by schema declaration order) and zod's own message.
+ */
+export function validateVerifyExpected(candidate: Record<string, unknown>): ClaimValidationFailure | null {
+  const result = VerifyExpectedSchema.safeParse(candidate);
+  if (result.success) return null;
+  const issue = result.error.issues[0];
+  const field = issue.path.length > 0 ? String(issue.path[0]) : '(unknown field)';
+  return { field, message: issue.message };
+}
 
 /**
  * Cheap-first content-hash check, shared by the route (which must decide

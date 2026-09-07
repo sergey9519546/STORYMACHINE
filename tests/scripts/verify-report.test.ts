@@ -155,23 +155,40 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
   });
 
   // ── Case 2: inflated health on untouched text -> exit 1, field named ───────
-  it('inflated health on untouched text -> exit 1, health named as the mismatch', () => {
+  // Round 2 note: this tampers HEALTH EVERYWHERE the document renders it
+  // (the <dl>, the header health-number, and the plainSummary sentence) —
+  // i.e. a self-consistent forgery, the one shape finding 2's NEW
+  // self-consistency check (below) correctly does NOT catch, because there
+  // is no internal disagreement to find. That is what lets this case reach
+  // the ORIGINAL bug this test exists for: does re-running the engine on
+  // the genuine, untouched script text catch a score the document is
+  // lying about? A forgery confined to ONE rendering (leaving the others
+  // truthful) is covered by the dedicated "finding 2" tests further down,
+  // and is caught earlier, by a different, more specific message.
+  it('inflated health on untouched text (forged consistently everywhere it renders) -> exit 1, health named as the mismatch', () => {
     const original = readFileSync(reportHtmlPath, 'utf8');
     const healthMatch = original.match(/<dt>Health<\/dt><dd><code>([\d.]+)<\/code><\/dd>/);
     assert.ok(healthMatch, 'sanity: the fixture report must publish a Health verify-claim');
-    const realHealth = Number(healthMatch![1]);
-    const inflated = (realHealth > 50 ? realHealth - 40 : realHealth + 40).toFixed(1);
-    const tampered = original.replace(
-      `<dt>Health</dt><dd><code>${healthMatch![1]}</code></dd>`,
-      `<dt>Health</dt><dd><code>${inflated}</code></dd>`,
-    );
-    assert.notEqual(tampered, original, 'sanity: the replace must actually have matched something');
+    const realHealth = healthMatch![1];
+    const inflated = (Number(realHealth) > 50 ? Number(realHealth) - 40 : Number(realHealth) + 40).toFixed(1);
+    const inflatedRounded = String(Math.round(Number(inflated)));
+    const realRounded = String(Math.round(Number(realHealth)));
+
+    let tampered = original
+      .replace(`<dt>Health</dt><dd><code>${realHealth}</code></dd>`, `<dt>Health</dt><dd><code>${inflated}</code></dd>`)
+      .replace(`>${realHealth}</div>`, `>${inflated}</div>`) // the health-number headline
+      .replace(`overall score ${realRounded}/100`, `overall score ${inflatedRounded}/100`); // plainSummary
+    assert.notEqual(tampered, original, 'sanity: at least one replace must have matched');
+    assert.ok(!tampered.includes(`>${realHealth}</div>`) && !tampered.includes(`<code>${realHealth}</code>`),
+      'sanity: every rendering of the real health value must have been replaced, or the checks below are not testing what they claim to');
+
     const tamperedPath = path.join(dir, 'report-tampered-health.html');
     writeFileSync(tamperedPath, tampered);
 
     const { status, stdout } = runCli([tamperedPath, scriptPath]);
     assert.equal(status, 1, stdout);
     assert.match(stdout, /authentic: yes/, 'the text itself is untouched — only the score was tampered');
+    assert.doesNotMatch(stdout, /disagrees with its own verify block/, 'a CONSISTENT forgery must not be misreported as a self-inconsistency — it must reach the reproduction check');
     assert.match(stdout, /health: no/);
     assert.match(stdout, /NOT VERIFIED.*health/s);
     // The other fields must still report clean — a real bug here would be
@@ -192,7 +209,7 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
   });
 
   // ── Case 4: a different engineCommit -> exit 0, engine line shows the mismatch ──
-  it('a report from a different engineCommit -> exit 0, engine line shows the mismatch, "reproduction is not attestation" is printed', () => {
+  it('a report from a different engineCommit -> exit 0, engine line shows the mismatch, "reproduction is not attestation" is printed, AND the advisory + qualified verdict appear (round-2 finding 3)', () => {
     const original = readFileSync(reportHtmlPath, 'utf8');
     const engineMatch = original.match(/<dt>Engine commit<\/dt><dd><code>([0-9a-f]+|dev)<\/code><\/dd>/);
     assert.ok(engineMatch, 'sanity: the fixture report must publish an Engine commit verify-claim');
@@ -209,7 +226,16 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
     assert.match(stdout, /authentic: yes/);
     assert.match(stdout, new RegExp(`engine: report ${fakeCommit} vs local \\S+ {2}\\(MISMATCH\\)`));
     assert.match(stdout, /reproduction is not attestation/i);
-    assert.match(stdout, /^VERIFIED/m, 'an engine-only mismatch must not fail the run — reproduction is soft, not a tamper signal');
+    // Round-2 review finding 3: compareVerifyClaims's own ENGINE_MISMATCH_MESSAGE
+    // (server/lib/verify-compare.ts) must actually reach stdout, and the
+    // engine advisory must be the last substantive thing printed BEFORE the
+    // verdict line — a skimming reader (or a script grepping only the final
+    // line) must not see a bare, unqualified "VERIFIED".
+    assert.match(stdout, /The engine has moved since this report was produced\./);
+    const advisoryIdx = stdout.indexOf('The engine has moved since this report was produced.');
+    const verdictIdx = stdout.search(/^VERIFIED/m);
+    assert.ok(advisoryIdx > 0 && verdictIdx > advisoryIdx, 'the engine-mismatch advisory must print BEFORE the verdict line');
+    assert.match(stdout, /^VERIFIED \(engine identity differs/m, 'an engine mismatch must qualify the closing verdict line, not read as a bare VERIFIED');
   });
 
   // ── Argument / file-not-found handling ──────────────────────────────────────
@@ -229,5 +255,142 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
     const { status, stderr } = runCli([reportHtmlPath, path.join(dir, 'nope.fountain')]);
     assert.notEqual(status, 0);
     assert.match(stderr, /Script file not found/);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Round 2 — independent review findings 1, 2, 4 (2026-09-06).
+  // Each of these attacks reproduces the exact bypass the round-1 review
+  // demonstrated against the round-1 commit (16bfec58): on that tree every
+  // one of these cases printed VERIFIED / a misleading diagnosis, exit 0/1
+  // for the wrong reason. They are written to fail against that tree and
+  // pass against this one — the fail-first proof the review asked for.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Finding 1: a claim the parser cannot read as a number ──────────────────
+  describe('finding 1 — a health claim that is not a real number must be a hard failure, not silently unchecked', () => {
+    it('HTML: "OUTSTANDING" in place of a health number -> exit 1, "claim unreadable: health" (NOT VERIFIED, never VERIFIED)', () => {
+      const original = readFileSync(reportHtmlPath, 'utf8');
+      const healthMatch = original.match(/<dt>Health<\/dt><dd><code>([\d.]+)<\/code><\/dd>/);
+      assert.ok(healthMatch, 'sanity: fixture must publish a Health claim');
+      const tampered = original.replace(
+        `<dt>Health</dt><dd><code>${healthMatch![1]}</code></dd>`,
+        '<dt>Health</dt><dd><code>OUTSTANDING</code></dd>',
+      );
+      const tamperedPath = path.join(dir, 'attack-nan.html');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /authentic: no — claim unreadable: health/);
+      assert.doesNotMatch(stdout, /^VERIFIED/m, 'a NaN health claim must never print a bare VERIFIED');
+      assert.match(stdout, /NOT VERIFIED — claim unreadable: health\./);
+    });
+
+    it('letter: "6.5.0" in place of the headline health number -> exit 1, "claim unreadable: health"', () => {
+      const original = readFileSync(letterMdPath, 'utf8');
+      const healthMatch = original.match(/Health\s+([\d.]+)\/100/);
+      assert.ok(healthMatch, 'sanity: fixture letter must publish a headline Health figure');
+      const tampered = original.replace(`Health ${healthMatch![1]}/100`, 'Health 6.5.0/100');
+      const tamperedPath = path.join(dir, 'attack-nan-letter.md');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /authentic: no — claim unreadable: health/);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+    });
+
+    it('HTML: an unrecognized verdict word ("MAYBE") -> exit 1, "claim unreadable: verdict" (the zod enum, not a re-declared one, catches it)', () => {
+      const original = readFileSync(reportHtmlPath, 'utf8');
+      const tampered = original.replace('<dt>Verdict</dt><dd><code>CONSIDER</code></dd>', '<dt>Verdict</dt><dd><code>MAYBE</code></dd>');
+      assert.notEqual(tampered, original, 'sanity: the fixture verdict must actually be CONSIDER for this substitution to apply');
+      const tamperedPath = path.join(dir, 'attack-bad-verdict.html');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /authentic: no — claim unreadable: verdict/);
+    });
+  });
+
+  // ── Finding 2: the visible document vs. its own verify block ───────────────
+  describe('finding 2 — a forgery confined to what a reader sees, with the verify block untouched, must be caught', () => {
+    it('HTML: only the health-headline number is forged (the <dl> is untouched) -> exit 1, "disagrees with its own verify block"', () => {
+      const original = readFileSync(reportHtmlPath, 'utf8');
+      const headlineMatch = original.match(/<div class="health-number"[^>]*>([\d.]+)<\/div>/);
+      assert.ok(headlineMatch, 'sanity: fixture must render a health-number headline');
+      const forged = (Number(headlineMatch![1]) > 50 ? 5 : 95).toFixed(1);
+      const tampered = original.replace(headlineMatch![0], headlineMatch![0].replace(headlineMatch![1], forged));
+      assert.notEqual(tampered, original);
+      const tamperedPath = path.join(dir, 'attack-bodyonly.html');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /authentic: no — the visible report disagrees with its own verify block/);
+      assert.match(stdout, /the health headline says health = /);
+      assert.doesNotMatch(stdout, /^VERIFIED/m, 'a self-inconsistent document must never print VERIFIED');
+      // Must fire BEFORE the hash/reproduction machinery even runs — the
+      // script text is genuine and untouched, so nothing past this check
+      // should have a reason to execute.
+      assert.doesNotMatch(stdout, /reproducible under this engine:/);
+    });
+
+    it('HTML: only the verdict stamp is forged (the <dl> Verdict is untouched) -> exit 1, disagreement names verdict', () => {
+      const original = readFileSync(reportHtmlPath, 'utf8');
+      const stampMatch = original.match(/<div class="stamp"[^>]*>([\s\S]*?)<\/div>/);
+      assert.ok(stampMatch, 'sanity: fixture must render a verdict stamp');
+      const realLabel = stampMatch![1].trim();
+      assert.equal(realLabel, 'CONSIDER', 'sanity: fixture verdict must be CONSIDER for this test to target the right label');
+      const tampered = original.replace(stampMatch![0], stampMatch![0].replace(realLabel, 'RECOMMEND'));
+      const tamperedPath = path.join(dir, 'attack-stamp-only.html');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /authentic: no — the visible report disagrees with its own verify block/);
+      assert.match(stdout, /verdict stamp says verdict = RECOMMEND/);
+    });
+
+    it('letter: only the headline health number is forged (the plainSummary sentence is untouched) -> exit 1, disagreement named — proves the letter is genuinely immune, not merely lucky', () => {
+      const original = readFileSync(letterMdPath, 'utf8');
+      const headlineMatch = original.match(/Health\s+([\d.]+)\/100/);
+      assert.ok(headlineMatch, 'sanity: fixture letter must publish a headline Health figure');
+      const forged = (Number(headlineMatch![1]) > 50 ? 5 : 95).toFixed(1);
+      const tampered = original.replace(`Health ${headlineMatch![1]}/100`, `Health ${forged}/100`);
+      const tamperedPath = path.join(dir, 'attack-bodyonly-letter.md');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /authentic: no — the visible report disagrees with its own verify block/);
+      assert.match(stdout, /the summary sentence says health = /);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+    });
+  });
+
+  // ── Finding 4: CRLF vs LF must be diagnosed honestly, not as "a different script" ──
+  describe('finding 4 — a CRLF copy of the exact same script must be diagnosed by line endings, not misreported as a different script', () => {
+    it('a genuine report + a CRLF copy of its own script -> exit 1, "differs only by line endings" (never "does not describe the script")', () => {
+      const crlfScript = MULTI_SCENE_FOUNTAIN.replace(/\n/g, '\r\n');
+      const crlfScriptPath = path.join(dir, 'script-crlf.fountain');
+      writeFileSync(crlfScriptPath, crlfScript);
+
+      const { status, stdout } = runCli([reportHtmlPath, crlfScriptPath]);
+      assert.equal(status, 1, `a real byte-for-byte hash mismatch must still fail — this is a diagnosis fix, not a bypass. stdout:\n${stdout}`);
+      assert.match(stdout, /the hash differs only by line endings/i);
+      assert.match(stdout, /NOT VERIFIED — the hash differs only by line endings, not by content\./);
+      assert.doesNotMatch(stdout, /does not describe the script you provided/);
+    });
+
+    it('a genuinely different script (not a line-ending variant) still reports the original "does not describe" diagnosis', () => {
+      // Regression guard alongside the fix: the CRLF check must not swallow
+      // the case it did NOT create — a real different-script mismatch (this
+      // suite's existing case 3 fixture) must keep its original wording.
+      const { status, stdout } = runCli([reportHtmlPath, differentScriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /This report does not describe the script you provided/);
+      assert.doesNotMatch(stdout, /line endings/i);
+    });
   });
 });

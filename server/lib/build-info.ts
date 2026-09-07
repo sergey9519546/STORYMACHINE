@@ -32,8 +32,19 @@
 // (single subprocess, no network) and this only ever runs once per process
 // (a top-level const, not a per-report call), so "one report" and "ten
 // thousand reports in this process's lifetime" pay the exact same cost.
-// Never throws: a missing/broken git binary, a corrupt repo, or a non-40-hex
-// answer all fall through to "dev" exactly like the old no-GIT_SHA case did.
+// Never throws AND never hangs: a missing/broken git binary, a corrupt
+// repo, or a non-40-hex answer all fall through to "dev" exactly like the
+// old no-GIT_SHA case did — and a `git` that never returns (a broken FS
+// mount, a corrupt index, a shell alias gone wrong) is capped at a 2s
+// timeout rather than blocking module load — and therefore every process
+// that imports doctor.ts, including this one — indefinitely. Round-2 review
+// finding 5 (2026-09-06): reproduced with a PATH-shimmed `git` that sleeps
+// 30s — module load was still blocked at 8s with no timeout set. A boot
+// path that explicitly promises "never throws" was silently allowed to
+// hang, which is a stronger failure than throwing (nothing times it out
+// upstream). `killSignal: 'SIGKILL'` because a hung `git` process is not
+// expected to honor SIGTERM's default grace period any better than it
+// honored finishing in 2s.
 // Read via fs + JSON.parse (not a JSON import) so this compiles cleanly
 // under this project's tsconfig (no `resolveJsonModule`) and under
 // --experimental-strip-types, which does not execute type-checking anyway.
@@ -62,6 +73,8 @@ export function readCommitFromCheckout(repoRoot: string): string {
       cwd: repoRoot,
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
+      timeout: 2000,
+      killSignal: 'SIGKILL',
     }).trim();
     return FULL_SHA_RE.test(sha) ? sha : 'dev';
   } catch {

@@ -59,7 +59,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runScriptDoctor, computeContentHash } from '../server/nvm/analyze/doctor.ts';
 import { isWholeDraftAnalysisComplete } from '../server/lib/analysis-completeness.ts';
-import { checkContentHash, compareVerifyClaims, ENGINE_IDENTITY_FIELDS } from '../server/lib/verify-compare.ts';
+import {
+  checkContentHash, compareVerifyClaims, validateVerifyExpected, ENGINE_IDENTITY_FIELDS,
+} from '../server/lib/verify-compare.ts';
 import { commit as localEngineCommit } from '../server/lib/build-info.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -107,6 +109,46 @@ function unescapeHtml(value) {
 // with only the fields the artifact actually publishes present — exactly the
 // set POST /api/export/verify's `expected` accepts, so the SAME comparator
 // checks only what was actually claimed, same as the route.
+//
+// Round-2 review finding 2 (2026-09-06): a hosted `/api/export/verify` call
+// only ever RECEIVES the scraped claims a caller sends it — it has no way to
+// know what a document's own reader-facing prose says, so it cannot detect a
+// forgery confined to the parts of a report a human actually reads. This CLI
+// holds the WHOLE document, which is a real capability the hosted route
+// lacks — and `parseHtmlReport`'s original scrape of ONLY the machine-
+// readable `<dl class="verify-claims">` block threw that capability away: a
+// forged `<div class="health-number">99.0</div>` in the header, with the
+// `<dl>` left untouched, printed VERIFIED. `collectBodyClaims` below reads
+// every OTHER rendering of health/verdict the document carries — the
+// header's health-number/verdict stamp (HTML only), and the doctor's own
+// `plainSummary` first sentence (`"<VERDICT> — <descriptor>; overall score
+// <N>/100."`, doctor.ts's buildPlainSummary — present, verbatim, in the
+// HTML body, the letter's Summary section, AND a raw report JSON's
+// `plainSummary` field, so ONE regex covers all three artifact shapes) —
+// and `findBodyBlockDisagreements` fails the whole run the moment any of
+// them disagrees with the block claims this file already trusted, before
+// either is ever compared against the freshly recomputed truth.
+
+/** The doctor's own first summary sentence — see the header comment above.
+ *  Present verbatim (case-sensitive, no HTML-entity-escapable characters in
+ *  either verdict word or descriptor) in all three artifact shapes, so this
+ *  one pattern is the shared "does the document agree with itself" probe. */
+const PLAIN_SUMMARY_RE = /(RECOMMEND|CONSIDER|PASS)\s+—\s+[^;]+;\s*overall score\s+(\d+)\/100\./;
+
+/** `[{ label, field: 'health'|'verdict', value, kind: 'exact'|'rounded' }]`
+ *  extracted from the doctor's plainSummary sentence, if present. `kind:
+ *  'rounded'` on the health claim because buildPlainSummary uses
+ *  `Math.round(health)` (an integer), unlike the verify block's
+ *  `.toFixed(1)` — comparing them requires rounding the block's side first,
+ *  not a tolerance. */
+function collectPlainSummaryClaims(text) {
+  const m = text.match(PLAIN_SUMMARY_RE);
+  if (!m) return [];
+  return [
+    { label: 'the summary sentence', field: 'verdict', value: m[1], kind: 'exact' },
+    { label: 'the summary sentence', field: 'health', value: Number(m[2]), kind: 'rounded' },
+  ];
+}
 
 /** `<dl class="verify-claims">` — coverage-html.ts's buildFooterSection.
  *  Same block tests/routes/export-verify.test.ts's scrapeVerifyClaims()
@@ -114,7 +156,7 @@ function unescapeHtml(value) {
  *  extraction, not the comparison logic verify-compare.ts shares). */
 function parseHtmlReport(text) {
   const block = text.match(/<dl class="verify-claims">([\s\S]*?)<\/dl>/);
-  if (!block) return null;
+  if (!block) return { expected: null, bodyClaims: [] };
   const claims = {};
   for (const [, term, value] of block[1].matchAll(/<dt>([^<]+)<\/dt><dd><code>([^<]*)<\/code><\/dd>/g)) {
     claims[unescapeHtml(term).trim()] = unescapeHtml(value).trim();
@@ -126,7 +168,25 @@ function parseHtmlReport(text) {
   if (claims['Total issues'] !== undefined) expected.totalIssues = Number(claims['Total issues']);
   if (claims['Engine commit'] !== undefined) expected.engineCommit = claims['Engine commit'];
   if (claims['Rulebook count'] !== undefined) expected.rulebookCount = Number(claims['Rulebook count']);
-  return expected;
+
+  // The two reader-facing renderings a verify-claims-only scrape used to
+  // ignore entirely (coverage-html.ts's buildHeaderSection/buildHealthSection):
+  //   <div class="health-number" style="...">65.0</div>
+  //   <div class="stamp" style="...">RECOMMEND</div>   (verdictStyle.label —
+  //     the SAME reverse map the letter parser already uses for its
+  //     "PASS (decline)" -> "PASS" wrapping, reused here.)
+  const bodyClaims = collectPlainSummaryClaims(text);
+  const healthNumberMatch = text.match(/<div class="health-number"[^>]*>([\d.]+)<\/div>/);
+  if (healthNumberMatch) {
+    bodyClaims.push({ label: 'the health headline', field: 'health', value: Number(healthNumberMatch[1]), kind: 'exact' });
+  }
+  const stampMatch = text.match(/<div class="stamp"[^>]*>([\s\S]*?)<\/div>/);
+  if (stampMatch) {
+    const label = unescapeHtml(stampMatch[1].trim());
+    bodyClaims.push({ label: 'the verdict stamp', field: 'verdict', value: VERDICT_LABEL_TO_ENUM[label] ?? label, kind: 'exact' });
+  }
+
+  return { expected, bodyClaims };
 }
 
 /** coverage-letter.ts's verify footer — server/lib/coverage-letter.ts:383-398.
@@ -164,12 +224,26 @@ function parseLetterReport(text) {
   // coverage-letter.ts's buildLetterData) — left unset, exactly like a
   // route caller who never named them: `compareVerifyClaims` only checks
   // fields present in `expected`.
-  return Object.keys(expected).length > 0 ? expected : null;
+  if (Object.keys(expected).length === 0) return { expected: null, bodyClaims: [] };
+
+  // Unlike the HTML shape, the letter's headline/bold-verdict-line ARE the
+  // primary source parsed above — there is no separate machine-readable
+  // block duplicating them for a forger to leave untouched. The doctor's
+  // plainSummary sentence (present verbatim in the letter's `## Summary` /
+  // `SUMMARY` section either way) is still a genuinely SEPARATE rendering,
+  // though, so the same self-consistency check applies here too — see the
+  // header comment above `PLAIN_SUMMARY_RE`.
+  return { expected, bodyClaims: collectPlainSummaryClaims(text) };
 }
 
 /** A raw ScriptDoctorReport JSON — either the object itself (what
  *  POST /api/scriptide/doctor returns, spread at the top level) or `{
- *  report: {...} }` (a caller-chosen wrapper), read leniently. */
+ *  report: {...} }` (a caller-chosen wrapper), read leniently. `bodyClaims`
+ *  here is a genuine (if narrow) self-consistency check even though JSON has
+ *  no separate "rendered" surface: `report.plainSummary` and
+ *  `report.health`/`report.verdict` are still three independently-editable
+ *  fields of the same hand-editable file, and nothing else in this format
+ *  would catch one moving without the others. */
 function parseJsonReport(text) {
   let data;
   try {
@@ -180,7 +254,7 @@ function parseJsonReport(text) {
   const report = (data && typeof data === 'object' && typeof data.contentHash === 'string')
     ? data
     : (data && typeof data === 'object' && data.report && typeof data.report === 'object' ? data.report : null);
-  if (!report) return null;
+  if (!report) return { expected: null, bodyClaims: [] };
   const expected = {};
   if (typeof report.contentHash === 'string') expected.contentHash = report.contentHash;
   if (typeof report.health === 'number') expected.health = report.health;
@@ -191,7 +265,8 @@ function parseJsonReport(text) {
     if (typeof report.provenance.engineCommit === 'string') expected.engineCommit = report.provenance.engineCommit;
     if (typeof report.provenance.rulebookCount === 'number') expected.rulebookCount = report.provenance.rulebookCount;
   }
-  return expected;
+  const bodyClaims = typeof report.plainSummary === 'string' ? collectPlainSummaryClaims(report.plainSummary) : [];
+  return { expected, bodyClaims };
 }
 
 /** Picks a parser by extension first, then falls back to sniffing content —
@@ -199,15 +274,61 @@ function parseJsonReport(text) {
  *  should not be refused on the extension alone. */
 function parseArtifact(filePath, text) {
   const ext = path.extname(filePath).toLowerCase();
-  if (ext === '.json') return { kind: 'json', expected: parseJsonReport(text) };
-  if (ext === '.html' || ext === '.htm') return { kind: 'html', expected: parseHtmlReport(text) };
-  if (ext === '.md' || ext === '.markdown' || ext === '.txt') return { kind: 'letter', expected: parseLetterReport(text) };
+  if (ext === '.json') return { kind: 'json', ...parseJsonReport(text) };
+  if (ext === '.html' || ext === '.htm') return { kind: 'html', ...parseHtmlReport(text) };
+  if (ext === '.md' || ext === '.markdown' || ext === '.txt') return { kind: 'letter', ...parseLetterReport(text) };
 
   // Unknown extension: sniff.
   const trimmed = text.trim();
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return { kind: 'json', expected: parseJsonReport(text) };
-  if (/<dl class="verify-claims">/.test(text)) return { kind: 'html', expected: parseHtmlReport(text) };
-  return { kind: 'letter', expected: parseLetterReport(text) };
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return { kind: 'json', ...parseJsonReport(text) };
+  if (/<dl class="verify-claims">/.test(text)) return { kind: 'html', ...parseHtmlReport(text) };
+  return { kind: 'letter', ...parseLetterReport(text) };
+}
+
+// ── Body-vs-block self-consistency (round-2 review finding 2) ──────────────
+
+/** Compares every collected body claim against the block's own `expected`
+ *  value for the same field. Returns a list of human-readable disagreement
+ *  strings — empty when the document agrees with itself (or has nothing to
+ *  compare, which is not a disagreement). A field the block never claimed
+ *  (`expected[claim.field] === undefined`) is skipped: there is nothing to
+ *  disagree WITH, and `compareVerifyClaims` never checked it either. */
+function findBodyBlockDisagreements(expected, bodyClaims) {
+  const disagreements = [];
+  for (const claim of bodyClaims) {
+    const blockValue = expected[claim.field];
+    if (blockValue === undefined) continue;
+    const blockCompare = claim.kind === 'rounded' ? Math.round(blockValue) : blockValue;
+    if (blockCompare !== claim.value) {
+      disagreements.push(
+        `${claim.label} says ${claim.field} = ${claim.value}, but this report's verify block says ${claim.field} = ${blockCompare}`,
+      );
+    }
+  }
+  return disagreements;
+}
+
+// ── CRLF diagnosis (round-2 review finding 4) ───────────────────────────────
+// The route applies NO normalisation beyond fdx conversion before hashing —
+// verified directly: server/routes/export.ts's resolveFountainOrRespond()
+// returns the raw `fountain` field untouched on the plain-text path, and the
+// route hashes with the identical `computeContentHash` (`.trim()` only) this
+// CLI imports. So a CLI that reports a CRLF-vs-LF copy as "a different
+// script" is being exactly as strict as the route — but a less honest
+// DIAGNOSIS than the truth: the likeliest real cross-platform failure is not
+// a forged script, it's a Windows checkout, an editor that rewrote line
+// endings, or `core.autocrlf=true` (CLAUDE.md already flags this repo's own
+// CRLF hazard). Tried both directions since we don't know which the ORIGINAL
+// script used.
+function normalizeToLf(text) { return text.replace(/\r\n/g, '\n'); }
+function normalizeToCrlf(text) { return text.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n'); }
+
+/** Returns true only when the hashes disagree on the raw bytes but agree
+ *  after normalising line endings — i.e. the text is genuinely the same
+ *  script, differently line-ended, not a different script. */
+function hashDiffersOnlyByLineEndings(scriptText, expectedContentHash) {
+  return computeContentHash(normalizeToLf(scriptText)) === expectedContentHash
+    || computeContentHash(normalizeToCrlf(scriptText)) === expectedContentHash;
 }
 
 // ── Presentation helpers ─────────────────────────────────────────────────────
@@ -261,8 +382,38 @@ async function main(argv) {
       + 'Only a report exported with a contentHash (Script Doctor coverage HTML/letter/JSON) can be verified.',
     );
   }
-  const { expected } = parsed;
+  const { expected, bodyClaims } = parsed;
   console.log(`Parsed as: ${parsed.kind}`);
+
+  // Round-2 review finding 1: every claim this file parsed by hand must
+  // survive the SAME zod schema the route puts in front of its handler
+  // before anything downstream trusts it as a number/enum/int at all. A
+  // claim this cannot validate is not "no mismatch" — Math.abs(NaN - x) is
+  // never > the tolerance, which is exactly how a health claim of
+  // "OUTSTANDING" used to sail through as VERIFIED.
+  const claimFailure = validateVerifyExpected(expected);
+  if (claimFailure) {
+    console.log('');
+    console.log(`authentic: no — claim unreadable: ${claimFailure.field}`);
+    console.log(`  ${claimFailure.message}`);
+    console.log('A claim that cannot be validated must never read as checked — no further comparison performed.');
+    return verdictFail(`NOT VERIFIED — claim unreadable: ${claimFailure.field}.`);
+  }
+
+  // Round-2 review finding 2: does the document agree with ITSELF? The
+  // hosted route never sees this — it only ever receives whichever claims a
+  // caller scraped and sent it. This CLI holds the whole rendered document,
+  // so a forgery confined to what a human actually reads (the health
+  // headline, the verdict stamp, the summary sentence) — with the verify
+  // block left untouched — is checkable here and must not pass silently.
+  const disagreements = findBodyBlockDisagreements(expected, bodyClaims);
+  if (disagreements.length > 0) {
+    console.log('');
+    console.log('authentic: no — the visible report disagrees with its own verify block');
+    for (const d of disagreements) console.log(`  ${d}`);
+    console.log('A report whose own rendered numbers contradict its verify block cannot be trusted — no further comparison performed.');
+    return verdictFail('NOT VERIFIED — the visible report disagrees with its own verify block.');
+  }
 
   const actualContentHash = computeContentHash(scriptText);
   const hashResult = checkContentHash(actualContentHash, expected);
@@ -274,6 +425,17 @@ async function main(argv) {
     console.log(`  report's claimed contentHash: ${expected.contentHash}`);
     console.log(`  this script's contentHash:    ${actualContentHash}`);
     console.log('');
+    // Round-2 review finding 4: the route applies no CRLF normalisation
+    // either (verified against server/routes/export.ts directly), so a
+    // byte-for-byte hash mismatch here is exactly as strict as the hosted
+    // path — but "a different script" is the wrong DIAGNOSIS for the
+    // single most likely real cross-platform failure: the same script,
+    // copied across a CRLF/LF boundary (a Windows checkout, an editor
+    // rewrite, this repo's own documented `core.autocrlf` hazard).
+    if (hashDiffersOnlyByLineEndings(scriptText, expected.contentHash)) {
+      console.log('The hash differs only by line endings — re-export from the same platform or normalise your copy to match, then re-verify.');
+      return verdictFail('NOT VERIFIED — the hash differs only by line endings, not by content.');
+    }
     console.log('This report does not describe the script you provided — no further comparison performed.');
     return verdictFail('NOT VERIFIED — the script text does not match this report.');
   }
@@ -317,9 +479,25 @@ async function main(argv) {
     console.log(`  rulebookCount: report ${expected.rulebookCount}, local ${comparison.recomputed.rulebookCount}${rbMismatch ? '  (differs)' : ''}`);
   }
 
+  // Round-2 review finding 3: compareVerifyClaims computes this advisory
+  // (server/lib/verify-compare.ts's ENGINE_MISMATCH_MESSAGE) and sets
+  // `mismatchKind: 'engine_mismatch'` for exactly this reason — the route
+  // ships it to every HTTP caller. Printing it, and printing it as the LAST
+  // thing before the verdict, is what stops a skimming reader (or a script
+  // parsing only the final line) from seeing a bare "VERIFIED" and missing
+  // that the report's engine identity did not match this one.
+  if (comparison.mismatchKind === 'engine_mismatch') {
+    console.log('');
+    console.log(comparison.message);
+  }
+
   console.log('');
   if (comparison.verified) {
-    console.log('VERIFIED — authentic and reproducible under this engine.');
+    console.log(
+      comparison.mismatchKind === 'engine_mismatch'
+        ? 'VERIFIED (engine identity differs — see the advisory above) — authentic and reproducible under this engine.'
+        : 'VERIFIED — authentic and reproducible under this engine.',
+    );
     return 0;
   }
   const failedFields = comparison.mismatches

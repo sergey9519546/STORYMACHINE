@@ -20,7 +20,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readCommitFromCheckout, commit } from '../../server/lib/build-info.ts';
@@ -89,5 +89,42 @@ describe('server/lib/build-info.ts — engine commit identity', () => {
     ).trim();
     assert.match(out, /^[0-9a-f]{40}$/, `expected the checkout fallback's 40-hex commit, got ${JSON.stringify(out)}`);
     assert.equal(out, realHeadSha());
+  });
+
+  // Round-2 review finding 5: a stalling `git` used to block module load
+  // (measured: still hanging at 8s with no timeout). A PATH-shimmed `git`
+  // that sleeps 30s and never answers reproduces that hang; with the
+  // timeout in place, the module must finish loading — and fall back to
+  // 'dev', since the shimmed git never produced a 40-hex SHA — well inside
+  // 30s.
+  it('a stalling `git` does not hang module load — it times out and falls back to "dev"', () => {
+    const shimDir = mkdtempSync(path.join(tmpdir(), 'build-info-slow-git-'));
+    try {
+      const shimPath = path.join(shimDir, 'git');
+      writeFileSync(shimPath, '#!/bin/sh\nsleep 30\necho deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n');
+      chmodSync(shimPath, 0o755);
+
+      const start = Date.now();
+      const out = execFileSync(
+        process.execPath,
+        ['--experimental-strip-types', '-e', "import('./server/lib/build-info.ts').then(m => console.log(m.commit))"],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: { ...process.env, GIT_SHA: '', PATH: `${shimDir}:${process.env.PATH ?? ''}` },
+          timeout: 15_000, // outer safety net for THIS test, not the mechanism under test
+        },
+      ).trim();
+      const elapsedMs = Date.now() - start;
+
+      assert.equal(out, 'dev', 'a git call that never returns a real SHA in time must fall back to "dev"');
+      assert.ok(
+        elapsedMs < 10_000,
+        `module load took ${elapsedMs}ms — the internal git-rev-parse timeout (2000ms) did not cap the stall; `
+        + 'the pre-fix behavior hung at 8s+ against a 30s sleeping git',
+      );
+    } finally {
+      rmSync(shimDir, { recursive: true, force: true });
+    }
   });
 });
