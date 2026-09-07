@@ -1204,6 +1204,13 @@ function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCo
 
 export interface StrengthsInput {
   structure: StructureState;
+  /** The report's own coverage verdict. Read by ONE guard — the
+   *  dimension-clean bullet below — so a bottom-band report can never open
+   *  with "Nothing to fix in Dialogue & Voice". See that guard's comment for
+   *  the measured defect. Optional so every fixture written before
+   *  2026-09-07 still typechecks; absent is treated as "not bottom-band",
+   *  which is the pre-existing behaviour. */
+  verdict?: CoverageVerdict;
   /** Whether any scene seeded a clue (records[].seededClueIds.length > 0
    *  somewhere) — needed alongside structure.openClues === 0 because a
    *  script that never planted anything hasn't earned a payoff-completeness
@@ -1765,14 +1772,37 @@ function buildAccelerationStrength(
 }
 
 export function buildStrengths(input: StrengthsInput): string[] {
-  const { structure, anyClueSeeded, sceneCount, bySeverity, dimensions, records = [] } = input;
+  const { structure, anyClueSeeded, sceneCount, bySeverity, dimensions, records = [], verdict } = input;
   const strengths: string[] = [];
 
   // Guard: a genuinely zero-issue dimension is real, checked evidence —
   // name it rather than folding it into a vague "looks good".
-  for (const dim of dimensions) {
-    if (dim.issueCount === 0) {
-      strengths.push(`Nothing to fix in ${dim.label} — clean across all ${sceneCount} scene(s).`);
+  //
+  // …EXCEPT UNDER A BOTTOM-BAND VERDICT (2026-09-07). MEASURED DEFECT: a
+  // two-scene inert script scores health 30 and reads PASS — "scored in the
+  // bottom band, below the decline line" — while every one of the five
+  // dimensions scores 100 because no pass found anything to flag in two
+  // scenes of nothing happening. This loop then emitted FIVE bullets, and the
+  // report opened with "Nothing to fix in Structure & Pacing — clean across
+  // all 2 scene(s)" directly above a verdict that says the draft is in the
+  // bottom band. Both halves were arithmetically true and the pair was a lie:
+  // the dimensions are scarcity-free by construction (Wave 18-beta —
+  // computeDimensionScore calls densityPenalty alone, never scarcityPenalty),
+  // so on a two-scene document they measure "nothing was flagged", which is
+  // not the same fact as "this is clean".
+  //
+  // The narrow rule, and only it: a DIMENSION may not be called a strength
+  // when the verdict is bottom-band. The other guards below read structural
+  // facts (escalating tension, clock continuity, turn distribution) rather
+  // than dimension scores, so they are left alone — a bottom-band draft that
+  // genuinely escalates has still earned that sentence, and deleting it would
+  // be a different kind of dishonesty.
+  const bottomBand = verdict === 'PASS';
+  if (!bottomBand) {
+    for (const dim of dimensions) {
+      if (dim.issueCount === 0) {
+        strengths.push(`Nothing to fix in ${dim.label} — clean across all ${sceneCount} scene(s).`);
+      }
     }
   }
 
@@ -1891,11 +1921,46 @@ const METHODOLOGY_CAVEAT =
  *  to start. Every clause reads from already-computed data; nothing here
  *  re-derives or guesses, so identical input always produces an identical
  *  summary. */
+// ── The paragraph may not contradict the five numbers beside it ────────────
+// MEASURED DEFECT (2026-09-07, product-discovery item 8). Two shapes, both
+// reproduced directly:
+//
+//   * A two-scene inert script: health 30, verdict PASS ("bottom band"), and
+//     all five dimensions at 100. The paragraph read "Structure & Pacing is
+//     the highest-scoring diagnostic dimension, with nothing flagged. No
+//     diagnostic dimension had an issue flagged." — and said NOTHING about
+//     what actually removed 70 points.
+//   * A 139-scene assembled document: health 80, and the paragraph called
+//     Character "the lowest-scoring diagnostic dimension, at 82/100". 82 is
+//     ABOVE the overall it is being quoted beside.
+//
+// Both come from one omission. `computeDimensionScore` is scarcity-free by
+// construction (Wave 18-beta: it calls densityPenalty ALONE, deliberately),
+// while `health` carries `scarcityPenalty` on top. So the dimensions and the
+// overall are two different statistics, and whenever the scene-count term is
+// large the dimensions sit above the overall — at which point calling the
+// smallest of them "the lowest-scoring dimension" points the writer at the
+// wrong thing, and printing them at all without naming the term is the
+// paragraph withholding the actual finding.
+//
+// Fixed at the SOURCE, not downstream: `plainSummary` is a synthesised
+// sentence on the scoring path, and all four consumers interpolate it
+// opaquely, so no presentation site can repair it.
+//
+// SCENE_TERM_DISCLOSURE_MIN_POINTS is the gap, in displayed points, at which
+// the paragraph must stop implying the dimensions explain the score. 1 point
+// — anything above zero is already a contradiction the reader can see, and a
+// 1-point band keeps the sentence off reports where the two agree to within
+// rounding.
+const SCENE_TERM_DISCLOSURE_MIN_POINTS = 1;
+
 function buildPlainSummary(
   verdict: CoverageVerdict,
   health: number,
   builds: DimensionBuild[],
   topPriorities: Array<RevisionIssue & { pass: PassName }>,
+  sceneCount: number,
+  sceneTermPoints: number,
 ): string {
   const sentences: string[] = [
     `${verdict} — ${VERDICT_DESCRIPTORS[verdict]}; overall score ${Math.round(health)}/100.`,
@@ -1912,20 +1977,39 @@ function buildPlainSummary(
     if (b.score.score < weakest.score.score) weakest = b;
   }
 
+  // Compared as DISPLAYED, because these are the numbers a reader sees side
+  // by side — a contradiction that only exists at three decimals is not one.
+  const shownHealth = Math.round(health);
+  const shownWeakest = Math.round(weakest.score.score);
+  const dimensionsSitAbove = shownWeakest - shownHealth >= SCENE_TERM_DISCLOSURE_MIN_POINTS;
+
   sentences.push(
     strongest.score.issueCount === 0
       ? `${strongest.score.label} is the highest-scoring diagnostic dimension, with nothing flagged.`
       : `${strongest.score.label} is the highest-scoring diagnostic dimension, at ${Math.round(strongest.score.score)}/100.`,
   );
 
-  // weakest.mix === null only when every dimension cleared — a dimension can
-  // only be the minimum-scoring one AND issue-free if nothing anywhere
-  // scored below 100.
-  sentences.push(
-    weakest.mix === null
-      ? 'No diagnostic dimension had an issue flagged.'
-      : `${weakest.score.label} is the lowest-scoring diagnostic dimension, at ${Math.round(weakest.score.score)}/100 — most of the trouble is around ${weakest.mix.topRuleArea}.`,
-  );
+  if (dimensionsSitAbove) {
+    // The honest sentence: name the term, and say the dimensions cannot see
+    // it. Never call the smallest dimension "lowest-scoring" here — it is
+    // above the overall, so the phrase would send the writer to the wrong
+    // place.
+    sentences.push(
+      `Every diagnostic dimension scores at or above the overall (lowest: ${weakest.score.label} at ${shownWeakest}/100), `
+      + `because the dimensions read issue density alone while the overall also carries the scene-count term — `
+      + `at ${sceneCount} scene(s) that term alone removes ${Math.round(sceneTermPoints)} point(s). `
+      + 'The gap is the length of the draft, not the dimensions.',
+    );
+  } else {
+    // weakest.mix === null only when every dimension cleared — a dimension can
+    // only be the minimum-scoring one AND issue-free if nothing anywhere
+    // scored below 100.
+    sentences.push(
+      weakest.mix === null
+        ? 'No diagnostic dimension had an issue flagged.'
+        : `${weakest.score.label} is the lowest-scoring diagnostic dimension, at ${shownWeakest}/100 — most of the trouble is around ${weakest.mix.topRuleArea}.`,
+    );
+  }
 
   if (topPriorities.length > 0) {
     const topDescription = topPriorities[0].description.replace(/[.]+$/, '');
@@ -2275,6 +2359,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   const strengths = reconcileStrengthsWithCriticalFindings(
     buildStrengths({
       structure: analysis.structure,
+      verdict,
       anyClueSeeded,
       sceneCount: analysis.sceneCount,
       bySeverity,
@@ -2284,7 +2369,17 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     }),
     topPriorities,
   );
-  let plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
+  let plainSummary = buildPlainSummary(
+    verdict,
+    health,
+    dimensionBuilds,
+    topPriorities,
+    analysis.sceneCount,
+    // The same term the health formula applied, read from the same function
+    // rather than re-derived — a second copy of `140 / min(n, 15)` here is
+    // exactly the drift this paragraph exists to prevent.
+    scarcityPenalty(analysis.sceneCount),
+  );
   // DoS guard (S1-b) notice: analysis.sceneCount is already the
   // ceiling-truncated count (every formula above — health, dimensions,
   // verdict, strengths — is computed against it consistently), so surface
