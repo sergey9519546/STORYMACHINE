@@ -10,6 +10,15 @@ import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts
 import { isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
 import { computeJumpSpan } from "../../lib/jump-span.ts";
 import {
+  indexLocatedIssuesByLocation,
+  documentTierLocations,
+  jumpLabel,
+  NO_LOCATION_DOCUMENT_REASON,
+  NO_LOCATION_UNRESOLVED_REASON,
+  type JumpTarget,
+} from "../../lib/finding-jump.ts";
+import { FindingJump } from "./FindingJump.tsx";
+import {
   streamDoctorProgress,
   applyDoctorProgressEvent,
   doctorProgressLabel,
@@ -457,6 +466,33 @@ export default function CoverageSummary({
     locatedIssues: report?.locatedIssues,
   });
 
+  // Item #9 (2026-09-06): this card's control and the full report's controls
+  // used to carry two different accessible names for one concept — "Jump to
+  // line 136" here, `Jump to "<prose location>" in the script` there. Both
+  // now come from src/lib/finding-jump.ts's one naming rule, and both render
+  // through the same <FindingJump>. The anchor TIER of the top priority is
+  // what picks the word: a scene-attributed finding says "Jump to scene N"
+  // (which is what the writer is actually being sent to); a line-precise or
+  // fallback span keeps "Jump to line N".
+  const whatNextJump: JumpTarget = (() => {
+    if (!jumpSpan) {
+      const topLocation = top?.location;
+      const isDocumentTier =
+        typeof topLocation === "string" &&
+        documentTierLocations(report?.locatedIssues).has(topLocation);
+      return {
+        kind: "none",
+        reason: isDocumentTier ? NO_LOCATION_DOCUMENT_REASON : NO_LOCATION_UNRESOLVED_REASON,
+      };
+    }
+    const anchor =
+      typeof top?.location === "string"
+        ? indexLocatedIssuesByLocation(report?.locatedIssues).get(top.location)?.anchor
+        : undefined;
+    const { label, sceneNumber } = jumpLabel(jumpSpan.startLine, report?.sceneLineSpans, anchor);
+    return { kind: "jump", startLine: jumpSpan.startLine, endLine: jumpSpan.endLine, label, sceneNumber };
+  })();
+
   const nextLabel =
     top?.description?.slice(0, 140) ||
     root?.title ||
@@ -718,20 +754,35 @@ export default function CoverageSummary({
                   sm-panel-body's closing tag) — its own stacking context,
                   never competing with in-flow content for a pixel — so
                   only the contextual "Jump to line" stays here. */}
-              {jumpSpan && (onNavigateToFinding || onJumpToLine) && (
+              {/* Item #9: one control, one naming rule, and — when this
+                  finding genuinely has no line — an honest reason in the same
+                  slot instead of an empty gap. The sm-btn--stamp styling is
+                  kept for the jump case so this card's primary affordance
+                  still reads as the panel's own; FindingJump's own compact
+                  chrome carries the "no location" case. */}
+              {whatNextJump.kind === "jump" && (onNavigateToFinding || onJumpToLine) ? (
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() =>
                       onNavigateToFinding
-                        ? onNavigateToFinding(jumpSpan.startLine, jumpSpan.endLine)
-                        : onJumpToLine?.(jumpSpan.startLine)
+                        ? onNavigateToFinding(whatNextJump.startLine, whatNextJump.endLine)
+                        : onJumpToLine?.(whatNextJump.startLine)
                     }
+                    aria-label={whatNextJump.label}
                     className="sm-btn sm-btn--stamp"
                   >
-                    Jump to line {jumpSpan.startLine}
+                    {whatNextJump.label}
                     <ArrowRight className="h-3 w-3" aria-hidden="true" />
                   </button>
+                </div>
+              ) : (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {/* surface="invariant": this card sits on --sm-panel, which
+                      is the SAME light cream in both themes, so the themed
+                      `dark:text-gray-400` default would read 2.2:1 in dark
+                      mode (verify-a11y's dark sweep caught exactly that). */}
+                  <FindingJump target={whatNextJump} surface="invariant" />
                 </div>
               )}
             </div>

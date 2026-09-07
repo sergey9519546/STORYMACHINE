@@ -1,6 +1,6 @@
 ---
 type: patterns
-updated: 2026-09-05
+updated: 2026-09-06
 sources: [docs/LANE_STANDARD.md, docs/audits/2026-09-02-retrospective/RETROSPECTIVE.md, docs/audits/2026-09-05-review-batch/README.md, docs/PATH_TO_EXCELLENCE.md]
 status: active
 ---
@@ -78,6 +78,42 @@ build brief is not exempt: the "five session records" the owner brief named
 turned out to be seven headings once counted directly in
 `docs/PATH_TO_EXCELLENCE.md` — see [[Session - 2026-08-24 Five Landings]]
 through [[Session - 2026-09-05 Review Batch]], all seven.
+
+## No fixture at product length
+
+Every gate in the repository was green on inputs a third the size of the
+median user's draft, so the defects that only exist at product length shipped
+unseen. Measured 2026-09-06: the largest committed Fountain file anywhere
+under version control was **12 scenes / 10,861 B**
+(`tests/fixtures/feature-scale-discrimination/intact.fountain`);
+`data/screenplays/` is twenty shorts of 9-14 scenes; the built-in P0 sample is
+12 scenes; the calibration corpus is twenty short samples; every browser suite
+ran on short form. A read-only product discovery on a 231-scene assembly found
+four BROKEN/HALF-BUILT items that are invisible below ~40 scenes — the worst an
+infinite React render loop (error #185) fired by typing a new scene after a
+coverage run, reproduced 5/5 at feature length and 0/N on the 12-scene short.
+
+The trap is not "we forgot to test big inputs". It is that a *threshold* in the
+code (React's 50-nested-update limit, a bounded structural deduction, a
+clustering cut-off) can only be crossed by an input large enough to cross it,
+so a short-form suite is not a weaker version of the same test — it is a test
+of a different code path, passing honestly and proving nothing about the one
+that matters. The countermeasure is a committed stimulus at product length that
+the suites actually drive:
+`tests/fixtures/feature-length/assembled-feature.fountain` (231 scenes,
+deterministic, CC0, regenerable via
+`scripts/build-feature-length-fixture.mjs`), exercised by
+`scripts/verify-p2-p3-surfaces.mjs`'s `P2-featurelen` phase and
+`tests/core/finding-jump.test.ts`. Its README states the other half of the
+discipline: it is a deliberately incoherent assembly, so it may be measured
+for scale and behaviour and never for craft.
+
+A second lesson from the same defect: a load-dependent gate is not a
+fail-first instrument. The browser step reproduces the render loop only when
+the machine is busy (5/5, 4/5 and 2/3 on the unfixed tree under load; 0/5
+idle), so the deterministic guard is a source-level one
+(`tests/core/scriptide-render-loop-guard.test.ts`) — see "A gate that cannot
+fail" above for the class this belongs to.
 
 ## Sources
 

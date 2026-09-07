@@ -37,6 +37,10 @@
 
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+// See verify-a11y.mjs's note: the jump control's accessible name comes from
+// src/lib/finding-jump.ts (one naming rule for every finding, everywhere), so
+// this gate imports it instead of retyping it.
+import { JUMP_CONTROL_NAME_RE } from '../src/lib/finding-jump.ts';
 import {
   bootKeylessServer,
   createRecorder,
@@ -117,7 +121,7 @@ try {
   await page.waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: timing.ms(40000) });
   await page.screenshot({ path: join(SHOTS, 'A1-coverage-summary.png'), fullPage: false });
 
-  const jumpBtn = page.getByRole('button', { name: /jump to line \d+/i }).first();
+  const jumpBtn = page.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
   const jumpCount = await jumpBtn.count();
   record('A', 'Coverage renders a "Jump to line" button for the sample', jumpCount > 0, `count=${jumpCount}`);
 

@@ -41,6 +41,7 @@ import { deriveTitlePageFromScript, isDefaultTitlePage } from "../lib/title-page
 import { scriptExportFilename } from "../lib/export-filename";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import { useIdleDebouncedValue } from "../hooks/useIdleDebouncedValue.ts";
+import { useIdempotentState } from "../hooks/useIdempotentState.ts";
 import { getLabsEnabled } from "../lib/feature-flags";
 import {
   createCollabRoom,
@@ -524,7 +525,24 @@ export default function ScriptIDE({
   const [researchNotes, setResearchNotes] = useState<
     { id: string; title: string; content: string }[]
   >(initialDraft.researchNotes as { id: string; title: string; content: string }[]);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  // useIdempotentState, not useState (2026-09-06, feature-length defect #1).
+  // The localStorage persistence effect below writes "saving-local" on EVERY
+  // keystroke, and after the first keystroke of a burst that write is always
+  // the value already held. React's own same-value bail-out cannot absorb it:
+  // it only runs while the fiber has no pending update, and the keystroke's
+  // own setScriptText has just put one there. So every keystroke's commit
+  // ended with a pending default-lane update — the exact condition React's
+  // nested-update counter increments on — and the 52nd consecutive keystroke
+  // threw "Maximum update depth exceeded" (React #185) out of the editor's
+  // CodeMirror update listener. Feature-length only, because that is what
+  // makes commits slow enough that no gap ever lets React drain: 5/5
+  // reproductions on tests/fixtures/feature-length, 0/5 after this change.
+  // See src/hooks/idempotent-state.ts for the full mechanism.
+  //
+  // Every write to save status goes through this setter — a raw useState
+  // setter reintroduces the loop, and tests/core/scriptide-render-loop-guard.test.ts
+  // fails the build if one comes back.
+  const [saveStatus, setSaveStatus] = useIdempotentState<SaveStatus>("idle");
   const [saveConflict, setSaveConflict] = useState<ScriptIDEServerDraft | null>(null);
   // Finding 1: which of the two ways a conflict arose, so the banner can say
   // what actually happened instead of always guessing "another tab" — see

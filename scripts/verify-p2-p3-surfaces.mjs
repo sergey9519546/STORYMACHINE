@@ -64,6 +64,10 @@ import {
 // "your next save" wording forever, even after every renderer moved on —
 // this gate would never notice the drift it exists to catch.
 import { draftRankDenominatorLabel, draftRankNextOpportunityLabel, draftRankSentence } from '../src/lib/draft-rank-copy.ts';
+// Same reasoning for the jump affordance's accessible name: it has ONE
+// implementation (src/lib/finding-jump.ts) and this gate matches whatever that
+// module names it, rather than a literal that stops matching on a rename.
+import { JUMP_CONTROL_NAME_RE, ROOT_CAUSE_EXPANDER_NAME_RE } from '../src/lib/finding-jump.ts';
 // SnapshotManager.tsx's per-snapshot badge ranks against a NARROWER set than
 // the panel/letter/HTML above (snapshotDraftRanks calls computeDraftRank with
 // an empty history array — saved Versions only, never Draft History runs),
@@ -921,12 +925,17 @@ async function main() {
   );
   // The deterministic half of the same card must survive — this is a gate on
   // generation, not on the report.
-  const rootCauseHeadingOff = await pageA.getByText(/contributing note/i).count();
+  // (2026-09-06, item #10) The disclosure used to be named "Show the N
+  // contributing notes" while the card headline above it said "N issues" — two
+  // words for two different counts on one card. It now says "Show the N rules
+  // behind them" and the headline states both numbers; this gate matches the
+  // shared label helper rather than a literal, so the next rename moves it too.
+  const rootCauseHeadingOff = await pageA.getByRole('button', { name: ROOT_CAUSE_EXPANDER_NAME_RE }).count();
   record(
     'P2-generative',
     'Script Doctor: root-cause findings still render with Labs OFF (deterministic content untouched)',
     rootCauseHeadingOff >= 1,
-    `contributing-note disclosures=${rootCauseHeadingOff}`,
+    `member-rule disclosures=${rootCauseHeadingOff}`,
   );
 
 
@@ -1977,6 +1986,322 @@ async function main() {
   }
 
   await contextB.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // CONTEXT C — FEATURE LENGTH (2026-09-06).
+  //
+  // Everything above this line runs on 12-scene input, which is how four
+  // feature-length defects shipped unseen (see
+  // tests/fixtures/feature-length/README.md). This phase drives the same
+  // Doctor + Editor loop on the committed 231-scene fixture and asserts the
+  // three things that were only ever false at that length:
+  //
+  //   1. typing a new scene AFTER a coverage run does not throw React error
+  //      #185 ("Maximum update depth exceeded") out of the CodeMirror update
+  //      listener — the loop is explained in
+  //      tests/core/scriptide-render-loop-guard.test.ts.
+  //
+  //      HONEST LIMIT OF THIS ASSERTION: the defect is load-dependent, so
+  //      this step is a real end-to-end regression check but NOT a
+  //      deterministic fail-first instrument. Measured on the unfixed tree
+  //      with this exact interaction: 5/5, 4/5 and 2/3 reproductions while
+  //      the box was busy; 0/5 while it was idle (React's counter resets
+  //      whenever a commit finishes with no pending lanes, and an idle box
+  //      drains between keystrokes). The DETERMINISTIC fail-first guard for
+  //      the same defect is tests/core/scriptide-render-loop-guard.test.ts,
+  //      which fails with exit 1 on the unfixed tree every time. Both are
+  //      kept: the unit guard cannot be timing-fooled, and this one is the
+  //      only check that exercises the real editor at real length.
+  //   2. the report offers a jump control for (at least) every finding the
+  //      server resolved to a span, not the ONE the panel used to render;
+  //   3. an honestly unlocatable finding says so, and a real jump from a
+  //      priority row actually moves the editor.
+  // ══════════════════════════════════════════════════════════════════════
+  const featureFixturePath = join(REPO, 'tests/fixtures/feature-length/assembled-feature.fountain');
+  const featureFixtureText = readFileSync(featureFixturePath, 'utf8');
+  const featureFixtureScenes = (featureFixtureText.match(/^(INT\.|EXT\.|INT\/EXT|EXT\/INT|I\/E)/gm) || []).length;
+  record(
+    'P2-featurelen',
+    'the committed fixture really is feature length (a silently shrunken fixture would keep every gate green while testing nothing)',
+    featureFixtureScenes >= 140 && featureFixtureText.length > 50_000,
+    `scenes=${featureFixtureScenes} bytes=${featureFixtureText.length}`,
+  );
+
+  const contextC = await browser.newContext();
+  const pageC = await contextC.newPage();
+  const featurePageErrors = [];
+  pageC.on('pageerror', (e) => featurePageErrors.push(String(e && e.message ? e.message : e).slice(0, 300)));
+  wireConsoleCapture(pageC, genuineConsoleErrors);
+  // A second, phase-local console sink: wireConsoleCapture's list is asserted
+  // globally at the end of this suite, but this phase needs to attribute an
+  // error to THIS interaction (the loop surfaced as a console error thrown
+  // out of CodeMirror's update listener, not as a page error).
+  const featureConsoleErrors = [];
+  pageC.on('console', (m) => { if (m.type() === 'error') featureConsoleErrors.push(m.text().slice(0, 300)); });
+
+  await pageC.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  const [featureChooser] = await Promise.all([
+    pageC.waitForEvent('filechooser', { timeout: timing.ms(20000) }),
+    pageC.getByText(/OPEN MY SCRIPT/i).first().click(),
+  ]);
+  await featureChooser.setFiles(featureFixturePath);
+  await pageC.locator('.cm-content').first().waitFor({ timeout: timing.ms(30000) });
+  await pageC.waitForTimeout(timing.ms(2500));
+
+  await pageC.getByRole('button', { name: /^COVERAGE$/i }).first().click();
+  await pageC.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
+  await pageC.waitForFunction(() => /HEALTH/.test(document.body.innerText), { timeout: timing.ms(180000) });
+  await pageC.waitForTimeout(timing.ms(1500));
+  record(
+    'P2-featurelen',
+    'coverage completes on a 231-scene draft and renders a report',
+    /HEALTH/.test(await pageC.evaluate(() => document.body.innerText)),
+    '',
+  );
+
+  // ── 1. The render loop (discovery item #1, BLOCKER) ────────────────────
+  const scenesBeforeEdit = await pageC.evaluate(() => {
+    const m = document.body.innerText.match(/SCENE INDEX\s*\n\s*(\d+)/);
+    return m ? Number(m[1]) : null;
+  });
+  featureConsoleErrors.length = 0;
+  featurePageErrors.length = 0;
+  await pageC.evaluate(() => document.querySelector('.cm-content')?.focus());
+  await pageC.keyboard.press('Control+End');
+  await pageC.waitForTimeout(timing.ms(200));
+  // >50 characters with no pause: React's nested-update limit is 50, and the
+  // defect was a per-keystroke no-op state write that pushed the counter one
+  // step further on every one of them. A shorter burst cannot reach it.
+  await pageC.keyboard.type(
+    "\n\nINT. HARGROVE & PYLE - MARGUERITE'S OFFICE - NIGHT\n\nMarguerite burns the transfer papers.\n\nMARGUERITE\nIt was never the papers. It was me.\n",
+  );
+  await pageC.waitForTimeout(timing.ms(3000));
+  const scenesAfterEdit = await pageC.evaluate(() => {
+    const m = document.body.innerText.match(/SCENE INDEX\s*\n\s*(\d+)/);
+    return m ? Number(m[1]) : null;
+  });
+  const loopErrors = [...featureConsoleErrors, ...featurePageErrors].filter((e) =>
+    /Maximum update depth|error #185/i.test(e),
+  );
+  record(
+    'P2-featurelen',
+    'typing a new scene into the feature draft AFTER a coverage run throws no update-depth loop (React #185)',
+    loopErrors.length === 0,
+    loopErrors.length === 0 ? '' : `${loopErrors.length} loop error(s): ${loopErrors.slice(0, 2).join(' | ')}`,
+  );
+  record(
+    'P2-featurelen',
+    'zero page/console errors of ANY kind from that edit',
+    featureConsoleErrors.length === 0 && featurePageErrors.length === 0,
+    `console=${JSON.stringify(featureConsoleErrors.slice(0, 3))} page=${JSON.stringify(featurePageErrors.slice(0, 3))}`,
+  );
+  record(
+    'P2-featurelen',
+    'the edit actually landed — the scene count advanced',
+    typeof scenesBeforeEdit === 'number' && typeof scenesAfterEdit === 'number' && scenesAfterEdit === scenesBeforeEdit + 1,
+    `before=${scenesBeforeEdit} after=${scenesAfterEdit}`,
+  );
+
+  // ── 2 & 3. One jump affordance for every finding (item #9) ─────────────
+  // The edit deliberately invalidated the report on screen: G0-02's
+  // handoff guard (ScriptDoctorPanel's initialReportHydratedRef effect)
+  // correctly refuses to hydrate "Full report" from a report that predates
+  // the writer's current draft, so the edited page cannot also be the page
+  // that inspects a full report. The persisted draft is checked here — the
+  // edit had to survive autosave at 114 KB — and the jump/count assertions
+  // move to their own page below, on an UNEDITED load, where the rendered
+  // control count can be checked against the server's own answer for the
+  // exact same bytes.
+  const editedDraftText = await pageC.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('scriptide_draft_v1') || 'null')?.scriptText ?? null; } catch { return null; }
+  });
+  record(
+    'P2-featurelen',
+    'the persisted draft holds the whole edited feature (the edit survived autosave at 114 KB)',
+    typeof editedDraftText === 'string' && editedDraftText.length > featureFixtureText.length,
+    `persisted=${typeof editedDraftText === 'string' ? editedDraftText.length : null} fixture=${featureFixtureText.length}`,
+  );
+  await contextC.close();
+
+  // ── 2 & 3, on a clean load of the SAME fixture ─────────────────────────
+  // The floor for the rendered-control count comes from the SERVER's own
+  // answer for exactly these bytes, not a hand-picked constant that would
+  // keep passing after a regression.
+  const featureDoctorRes = await fetch(`${BASE}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fountain: featureFixtureText, title: 'THE LONG WAY DOWN' }),
+  });
+  const featureReport = await featureDoctorRes.json();
+  const featureAnchoredLocations = new Set(
+    (featureReport.locatedIssues ?? [])
+      .filter((l) => l.startLine !== undefined && l.endLine !== undefined)
+      .map((l) => l.issue.location),
+  );
+  const featurePassIssues = (featureReport.passes ?? []).flatMap((p) => p.issues);
+  // Every per-pass issue row whose prose location the server resolved — the
+  // floor the panel must meet (measured 554 of 899 on this fixture, 2026-09-06,
+  // against the ONE control the panel rendered before this change).
+  const expectedJumpFloor = featurePassIssues.filter((i) => featureAnchoredLocations.has(i.location)).length;
+  record(
+    'P2-featurelen',
+    'the analysed draft really produces findings with resolvable spans (an empty run is not a pass)',
+    featureReport.sceneCount >= 140 && featurePassIssues.length > 100 && expectedJumpFloor > 100,
+    `sceneCount=${featureReport.sceneCount} passIssues=${featurePassIssues.length} locatedWithSpan=${expectedJumpFloor} rootCauses=${(featureReport.rootCauses ?? []).length}`,
+  );
+
+  const contextD = await browser.newContext();
+  const pageD = await contextD.newPage();
+  wireConsoleCapture(pageD, genuineConsoleErrors);
+  await pageD.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  const [featureChooserD] = await Promise.all([
+    pageD.waitForEvent('filechooser', { timeout: timing.ms(20000) }),
+    pageD.getByText(/OPEN MY SCRIPT/i).first().click(),
+  ]);
+  await featureChooserD.setFiles(featureFixturePath);
+  await pageD.locator('.cm-content').first().waitFor({ timeout: timing.ms(30000) });
+  await pageD.waitForTimeout(timing.ms(2500));
+  await pageD.getByRole('button', { name: /^COVERAGE$/i }).first().click();
+  await pageD.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
+  await pageD.waitForFunction(() => /HEALTH/.test(document.body.innerText), { timeout: timing.ms(180000) });
+  await pageD.waitForTimeout(timing.ms(1500));
+
+  await pageD.getByRole('button', { name: /full report/i }).first().click({ timeout: timing.ms(20000) });
+  const fullReportOpened = await pageD.getByRole('heading', { name: /^Top Priorities$/i }).first()
+    .waitFor({ timeout: timing.ms(60000) })
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P2-featurelen',
+    'the full report opens on the feature draft (not the outdated-handoff state)',
+    fullReportOpened,
+    fullReportOpened ? '' : 'no "Top Priorities" heading — the panel did not hydrate a report',
+  );
+  await pageD.waitForTimeout(timing.ms(2000));
+  const jumpControlCount = await pageD.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).count();
+  record(
+    'P2-featurelen',
+    `the full report renders a jump control for at least every finding the server anchored (>= ${expectedJumpFloor})`,
+    jumpControlCount >= expectedJumpFloor,
+    `rendered=${jumpControlCount} serverAnchoredPassIssues=${expectedJumpFloor}`,
+  );
+  const noLocationCount = await pageD.locator('[data-no-location]').count();
+  record(
+    'P2-featurelen',
+    'honestly unlocatable findings render a "no location" note with a reason, instead of nothing',
+    noLocationCount > 0,
+    `no-location notes=${noLocationCount}`,
+  );
+  const noLocationDetail = noLocationCount > 0
+    ? await pageD.locator('[data-no-location]').first().evaluate((el) => ({
+        title: el.getAttribute('title'),
+        label: el.getAttribute('aria-label'),
+        tabindex: el.getAttribute('tabindex'),
+      }))
+    : { title: null, label: null, tabindex: null };
+  record(
+    'P2-featurelen',
+    'that note carries the honest reason on hover/focus and is keyboard-reachable',
+    typeof noLocationDetail.title === 'string' && /No location —/.test(noLocationDetail.title)
+      && noLocationDetail.label === noLocationDetail.title
+      && noLocationDetail.tabindex === '0',
+    `title=${JSON.stringify((noLocationDetail.title || '').slice(0, 80))} tabindex=${noLocationDetail.tabindex}`,
+  );
+
+  // Expanding a root cause reveals its contributing rules — each of which now
+  // carries its own control (they had none at all before this change).
+  const jumpsBeforeExpand = jumpControlCount;
+  const expander = pageD.getByRole('button', { name: ROOT_CAUSE_EXPANDER_NAME_RE }).first();
+  const expanderExists = (await expander.count()) > 0;
+  record('P2-featurelen', 'a root cause offers its "Show the N rules behind them" expander', expanderExists, '');
+  if (expanderExists) {
+    await expander.click();
+    await pageD.waitForTimeout(timing.ms(600));
+    const jumpsAfterExpand = await pageD.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).count();
+    record(
+      'P2-featurelen',
+      'expanding a root cause adds a jump control per contributing rule (they had none before 2026-09-06)',
+      jumpsAfterExpand > jumpsBeforeExpand,
+      `before=${jumpsBeforeExpand} after=${jumpsAfterExpand}`,
+    );
+  }
+
+  // Item #10 — the headline count and the expander count must never
+  // contradict each other on the same card.
+  // Read each card's own machine-readable counts and check the RENDERED
+  // sentences against them — the headline must state the issue count (and
+  // both counts when they differ), and the expander must state the rule
+  // count, using the word that matches what it lists.
+  const countAgreement = await pageD.evaluate(() => {
+    const out = [];
+    for (const meta of document.querySelectorAll('[data-rootcause-issues]')) {
+      const issues = Number(meta.getAttribute('data-rootcause-issues'));
+      const rules = Number(meta.getAttribute('data-rootcause-rules'));
+      const metaText = (meta.textContent || '').replace(/\s+/g, ' ').trim();
+      const card = meta.parentElement;
+      let expanderText = null;
+      for (const btn of card ? card.querySelectorAll('button') : []) {
+        const t = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+        if (/^Show the \d+ rules? behind (them|it)$/.test(t)) { expanderText = t; break; }
+      }
+      const issueWord = issues === 1 ? 'issue' : 'issues';
+      const ruleWord = rules === 1 ? 'rule' : 'rules';
+      out.push({
+        issues,
+        rules,
+        metaText,
+        expanderText,
+        headlineStatesIssues: metaText.toLowerCase().startsWith(`${issues} ${issueWord}`),
+        headlineStatesBothWhenTheyDiffer:
+          issues === rules || metaText.toLowerCase().includes(`from ${rules} ${ruleWord}`),
+        expanderStatesRules: expanderText === null || expanderText === `Show the ${rules} ${ruleWord} behind ${issues === 1 ? 'it' : 'them'}`,
+        expanderSaysNotes: expanderText !== null && /notes?\b/i.test(expanderText),
+      });
+    }
+    return out;
+  });
+  const disagreeing = countAgreement.filter(
+    (c) => !c.headlineStatesIssues || !c.headlineStatesBothWhenTheyDiffer || !c.expanderStatesRules || c.expanderSaysNotes,
+  );
+  record(
+    'P2-featurelen',
+    'every root-cause card\'s headline count and expander count agree (item #10: "15 issues" over "the 12 contributing notes")',
+    countAgreement.length > 0 && disagreeing.length === 0,
+    `cards=${countAgreement.length} disagreeing=${disagreeing.length} ${JSON.stringify(disagreeing.slice(0, 2))}`,
+  );
+  const bothNumbersShown = countAgreement.filter((c) => c.issues !== c.rules);
+  record(
+    'P2-featurelen',
+    'where the two counts differ the card states BOTH ("15 issues from 12 rules")',
+    bothNumbersShown.length > 0,
+    `cards stating both=${bothNumbersShown.length} of ${countAgreement.length}`,
+  );
+
+  // ── A DRIVEN jump from priority #3 ─────────────────────────────────────
+  // Priority #3 is the first top priority on this fixture that the server
+  // resolves to a span (#1 and #2 are honestly document-tier), so it is the
+  // exact row the discovery said a writer could not act on.
+  const priorityCards = pageD.locator('h3:has-text("Top Priorities") + div > div');
+  const thirdPriorityJump = priorityCards.nth(2).getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
+  const thirdJumpExists = (await thirdPriorityJump.count()) > 0;
+  record('P2-featurelen', 'top priority #3 carries a jump control (it did not before 2026-09-06)', thirdJumpExists, '');
+  if (thirdJumpExists) {
+    const jumpName = await thirdPriorityJump.getAttribute('aria-label');
+    await thirdPriorityJump.click();
+    await pageD.waitForTimeout(timing.ms(800));
+    const landed = await pageD.evaluate(() => ({
+      flashed: document.querySelectorAll('.cm-sm-finding-flash').length,
+      focused: document.activeElement?.className?.includes?.('cm-') ?? false,
+    }));
+    record(
+      'P2-featurelen',
+      'clicking priority #3\'s jump moves the editor to the finding (same highlightRange the Coverage jump uses)',
+      landed.flashed > 0 || landed.focused,
+      `name=${JSON.stringify(jumpName)} flashed=${landed.flashed} editorFocused=${landed.focused}`,
+    );
+  }
+
+  await contextD.close();
 
   if (genuineConsoleErrors.length > 0) {
     record('(global)', 'ZERO genuine browser console errors', false, `${genuineConsoleErrors.length} found: ${genuineConsoleErrors.slice(0, 5).join(' | ')}`);

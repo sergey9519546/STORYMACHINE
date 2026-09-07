@@ -59,11 +59,40 @@ describe('CoverageSummary.tsx — jump button targets a span, not a bare line', 
   });
 
   it('prefers the highlighting callback and falls back to the plain one', () => {
+    // 2026-09-06 (discovery item #9): computeJumpSpan's result is now wrapped
+    // in a JumpTarget (src/lib/finding-jump.ts) so the control can carry the
+    // destination in its own accessible name — hence `whatNextJump` rather
+    // than the bare `jumpSpan` this used to read. The behaviour asserted is
+    // unchanged: highlighting callback first, plain cursor move as fallback,
+    // and the button only when there is BOTH a span and a host listening.
     assert.match(
       source,
-      /onNavigateToFinding\s*\?\s*onNavigateToFinding\(jumpSpan\.startLine, jumpSpan\.endLine\)\s*:\s*onJumpToLine\?\.\(jumpSpan\.startLine\)/,
+      /onNavigateToFinding\s*\?\s*onNavigateToFinding\(whatNextJump\.startLine, whatNextJump\.endLine\)\s*:\s*onJumpToLine\?\.\(whatNextJump\.startLine\)/,
     );
-    assert.match(source, /\{jumpSpan && \(onNavigateToFinding \|\| onJumpToLine\) && \(/);
+    assert.match(source, /\{whatNextJump\.kind === "jump" && \(onNavigateToFinding \|\| onJumpToLine\) \? \(/);
+  });
+
+  it('names the control after its destination, from the one shared naming rule', () => {
+    // The same helper ScriptDoctorPanel's controls use, so Coverage and the
+    // full report can never name one concept two ways again (they used to:
+    // "Jump to line 136" here, `Jump to "<prose location>" in the script`
+    // there).
+    assert.match(source, /import \{[\s\S]*?jumpLabel,[\s\S]*?\} from "\.\.\/\.\.\/lib\/finding-jump\.ts";/);
+    assert.match(source, /const \{ label, sceneNumber \} = jumpLabel\(jumpSpan\.startLine, report\?\.sceneLineSpans, anchor\)/);
+    assert.match(source, /aria-label=\{whatNextJump\.label\}/);
+  });
+
+  it('says WHY there is no jump instead of rendering an empty slot', () => {
+    // The other half of item #9: a top priority the server left on the
+    // 'document' tier used to produce no control and no explanation at all.
+    assert.match(source, /NO_LOCATION_DOCUMENT_REASON/);
+    assert.match(source, /NO_LOCATION_UNRESOLVED_REASON/);
+    // surface="invariant" is load-bearing, not decoration: this card sits on
+    // --sm-panel, which is the same light cream in both themes, so the
+    // component's themed default (`dark:text-gray-400`) would read 2.2:1 in
+    // dark mode — a serious axe violation scripts/verify-a11y.mjs caught on
+    // this component's first cut.
+    assert.match(source, /<FindingJump target=\{whatNextJump\} surface="invariant" \/>/);
   });
 });
 

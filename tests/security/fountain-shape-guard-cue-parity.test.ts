@@ -502,9 +502,35 @@ describe('MAX_FOUNTAIN_CUE_WEIGHT / MAX_FOUNTAIN_FREQUENT_CUE_LINES — cost bou
       `worst committed fixture by frequent-count: ${worstByFrequent.name} frequentCount=${worstByFrequent.frequentCount} `
       + `margin=${frequentMargin.toFixed(0)}x`,
     );
-    assert.ok(weightMargin >= 1000, `expected >=1000x weight margin on the worst committed fixture, got ${weightMargin.toFixed(0)}x (${worstByWeight.name})`);
+    // FLOOR CHANGED 1000x -> 100x, 2026-09-06, with the measurement that
+    // forced it — recorded here rather than quietly edited.
+    //
+    // The 1000x figure was a property of the CORPUS, not of the guard: when
+    // it was written, the largest committed .fountain file in the repository
+    // was 12 scenes / 10,861 B, so every row in this sweep was short-form and
+    // the worst weight was a few hundredths of the bound. The corpus now
+    // contains one deliberately feature-length fixture
+    // (tests/fixtures/feature-length/assembled-feature.fountain, 231 scenes,
+    // 114 KB — see its README for why it exists), and it is legitimately the
+    // worst row: distinct=83, occurrences=510, weight=42,330 against
+    // MAX_FOUNTAIN_CUE_WEIGHT, i.e. a 236x margin. Keeping 1000x would have
+    // meant asserting that no committed fixture may be feature length, which
+    // is the exact short-form bias that fixture exists to remove.
+    //
+    // 100x is still an enormous margin and is consistent with this file's own
+    // stated reality one test up: a PLAUSIBLE feature's honest weight margin
+    // is low single digits (that test asserts a 1.5x floor and explains why a
+    // bigger number there was ~10x optimistic). A real 120-page draft sitting
+    // at 236x is nowhere near the DoS bound; a script that gets within 100x of
+    // it is not a screenplay, which is what this assertion is for.
+    assert.ok(weightMargin >= 100, `expected >=100x weight margin on the worst committed fixture, got ${weightMargin.toFixed(0)}x (${worstByWeight.name})`);
     // Real fixtures top out at a small handful of frequent lines (a
     // two-hander scene has exactly 2) — assert a generous but real floor.
+    // UNCHANGED at 10x, but note it is now met EXACTLY: the feature-length
+    // fixture has frequentCount=5 against MAX_FOUNTAIN_FREQUENT_CUE_LINES=50.
+    // A future fixture with a sixth frequently-recurring cue will trip this,
+    // and that is the correct moment to re-derive the floor from a real
+    // measurement — not now, when nothing has failed.
     assert.ok(frequentMargin >= 10, `expected >=10x frequent-line margin on the worst committed fixture, got ${frequentMargin.toFixed(0)}x (${worstByFrequent.name})`);
   });
 

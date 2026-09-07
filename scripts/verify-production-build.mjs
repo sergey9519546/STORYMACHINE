@@ -59,6 +59,10 @@ import {
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
 import { keylessBrowserServerEnv as buildKeylessEnv } from './lib/keyless-browser-certification.mjs';
+// See verify-a11y.mjs's note: the jump control's accessible name comes from
+// src/lib/finding-jump.ts (one naming rule for every finding, everywhere), so
+// this gate imports it instead of retyping it.
+import { JUMP_CONTROL_NAME_RE } from '../src/lib/finding-jump.ts';
 
 const REPO = process.cwd();
 
@@ -527,7 +531,7 @@ try {
   await page.screenshot({ path: join(OUT_DIR, 'production-coverage-report.png') }).catch(() => {});
 
   // read the report -> jump to a line
-  const jumpBtn = page.getByRole('button', { name: /jump to line \d+/i }).first();
+  const jumpBtn = page.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
   const hasJump = await jumpBtn.count() > 0;
   record('journey', 'the report renders a "Jump to line" affordance', hasJump);
   if (hasJump) {

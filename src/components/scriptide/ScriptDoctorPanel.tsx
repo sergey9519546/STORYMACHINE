@@ -16,7 +16,6 @@ import {
   FileText,
   CheckCircle2,
   ArrowRightLeft,
-  ArrowRight,
   Download,
   History as HistoryIcon,
   Trash2,
@@ -80,6 +79,19 @@ import {
   collectFindingIdentities,
   diffFindingIdentities,
 } from "../../lib/finding-identity.ts";
+import {
+  indexLocatedIssuesByLocation,
+  documentTierLocations,
+  jumpTargetForIssueLocation,
+  jumpTargetForFinding,
+  jumpTargetForMemberRule,
+  rootCauseCountSentence,
+  rootCauseExpanderLabel,
+  NO_LOCATION_UNRESOLVED_REASON,
+  type JumpTarget,
+  type LocationAnchorIndex,
+} from "../../lib/finding-jump.ts";
+import { FindingJump } from "./FindingJump.tsx";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -1832,15 +1844,22 @@ function SeverityChip({
 function IssueCard({
   issue,
   pass,
-  onNavigate,
+  jump,
+  onJump,
 }: {
   issue: RevisionIssue;
   pass?: PassName;
-  /** E2: present only when this issue's `location` resolved to a genuine
-   *  line anchor (see ScriptDoctorPanel's locationAnchorMap) AND a host is
-   *  listening for navigation — undefined for a 'document'-tier issue (act-
-   *  level/whole-script, no honest span) or when no editor is wired up. */
-  onNavigate?: () => void;
+  /** Item #9 (2026-09-06): EVERY issue row carries this now, resolved by
+   *  src/lib/finding-jump.ts — a "Jump to scene N" / "Jump to line N" button
+   *  when the server anchored it, and an honest, focus-reachable "no
+   *  location" note carrying the reason when it did not. It used to be an
+   *  optional `onNavigate` that rendered NOTHING for the 'document' tier,
+   *  which made "no line exists" indistinguishable from "not wired up" —
+   *  345 of the 231-scene fixture's 899 findings sat in that silent state. */
+  jump: JumpTarget;
+  /** Absent when no host is listening for navigation; FindingJump then
+   *  renders its honest note rather than a dead button. */
+  onJump?: (startLine: number, endLine: number) => void;
 }) {
   const meta = SEVERITY_META[issue.severity];
   return (
@@ -1880,17 +1899,7 @@ function IssueCard({
         <span className="text-[10px] font-mono text-gray-600 dark:text-gray-300 ml-auto">
           {issue.location}
         </span>
-        {onNavigate && (
-          <button
-            type="button"
-            onClick={onNavigate}
-            aria-label={`Jump to "${issue.location}" in the script`}
-            title="Jump to this line in the editor"
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-black dark:text-gray-100 border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
-          >
-            Jump <ArrowRight className="w-2.5 h-2.5" aria-hidden="true" />
-          </button>
-        )}
+        <FindingJump target={jump} onJump={onJump} />
       </div>
       <p className="text-[10px] font-bold uppercase text-black dark:text-gray-100 mb-1 flex items-center gap-1.5 flex-wrap">
         {issue.rule}
@@ -1931,19 +1940,23 @@ function IssueCard({
 function RootCauseCard({
   finding,
   fixState,
-  onNavigate,
+  jump,
+  memberJumps,
+  onJump,
 }: {
   finding: RootCauseFinding;
   /** Null when the finding has no line anchor (startLine/endLine both
    *  undefined) — there's no honest span to send POST /api/scriptide/fix,
    *  so no fix affordance renders at all for those findings. */
   fixState: RootCauseFixState | null;
-  /** E2: present only when the finding carries a genuine line anchor AND a
-   *  host is listening for navigation — mirrors IssueCard.onNavigate's
-   *  contract exactly (see the render-side hasAnchor check in the Root
-   *  Causes section for why the two never disagree with the fix affordance
-   *  about which findings have an honest span). */
-  onNavigate?: () => void;
+  /** Item #9: the card headline's own jump (or its honest reason) — same
+   *  shared control IssueCard uses, same naming rule. */
+  jump: JumpTarget;
+  /** Item #9: one entry per member rule, in `finding.memberRules` order, so
+   *  each contributing note inside the expander is reachable too — that list
+   *  previously rendered rule names with no way to get to them. */
+  memberJumps: JumpTarget[];
+  onJump?: (startLine: number, endLine: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const meta = SEVERITY_META[finding.severity];
@@ -1978,23 +1991,33 @@ function RootCauseCard({
         <span className="text-xs font-bold uppercase tracking-wide text-black dark:text-gray-100">
           {finding.title}
         </span>
-        {onNavigate && (
-          <button
-            type="button"
-            onClick={onNavigate}
-            aria-label={`Jump to "${finding.title}" in the script`}
-            title="Jump to these lines in the editor"
-            className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-black dark:text-gray-100 border border-black/20 dark:border-white/20 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
-          >
-            Jump <ArrowRight className="w-2.5 h-2.5" aria-hidden="true" />
-          </button>
-        )}
+        <FindingJump target={jump} onJump={onJump} className="ml-auto" />
       </div>
       <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
         {finding.explanation}
       </p>
-      <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-        {finding.memberCount} issue{finding.memberCount === 1 ? "" : "s"}
+      {/* Item #10 (2026-09-06): this line used to read "15 ISSUES" directly
+          above an expander reading "SHOW THE 12 CONTRIBUTING NOTES" — two
+          numbers, one word, on one card, and a writer had no way to tell
+          which was the size of their problem. They count different things
+          and both are true: 15 individual notes fired, produced by 12
+          distinct rules. rootCauseCountSentence() is the one place that
+          decides how to say that (issues are the writer-facing size — it is
+          what the server's own explanation sentence leads with and what
+          cluster.ts sorts by), and rootCauseExpanderLabel() names what the
+          expander actually lists: rules. Registered in
+          docs/CLAIMS_REGISTER.md. */}
+      <p
+        className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest"
+        // The two counts, machine-readable, so the browser gate can compare
+        // the RENDERED sentence against the data it came from instead of
+        // scraping numbers out of a card's concatenated innerText (which is
+        // how the first cut of that gate read "215 issues" off a card that
+        // says "2" and "15 issues" in adjacent nodes).
+        data-rootcause-issues={finding.memberCount}
+        data-rootcause-rules={finding.memberRules.length}
+      >
+        {rootCauseCountSentence(finding.memberCount, finding.memberRules.length)}
         {sceneLabel ? ` • ${sceneLabel}` : ""}
       </p>
       {finding.memberRules.length > 0 && (
@@ -2010,17 +2033,21 @@ function RootCauseCard({
             ) : (
               <ChevronRight className="w-3 h-3 shrink-0" aria-hidden="true" />
             )}
-            Show the {finding.memberRules.length} contributing note
-            {finding.memberRules.length === 1 ? "" : "s"}
+            {rootCauseExpanderLabel(finding.memberCount, finding.memberRules.length)}
           </button>
           {open && (
             <ul id={notesId} className="mt-1.5 space-y-1 pl-4">
               {finding.memberRules.map((rule, i) => (
                 <li
                   key={`${rule}-${i}`}
-                  className="text-[10px] font-mono text-gray-600 dark:text-gray-300 list-disc"
+                  className="flex items-center gap-2 text-[10px] font-mono text-gray-600 dark:text-gray-300 list-disc"
                 >
-                  {humanizeRule(rule)}
+                  <span className="min-w-0 flex-1">{humanizeRule(rule)}</span>
+                  {/* Item #9: each contributing rule is reachable too —
+                      resolved to the occurrence of that rule INSIDE this
+                      finding's own span (see jumpTargetForMemberRule), never
+                      to one outside it. */}
+                  <FindingJump target={memberJumps[i] ?? { kind: "none", reason: NO_LOCATION_UNRESOLVED_REASON }} onJump={onJump} />
                 </li>
               ))}
             </ul>
@@ -2939,16 +2966,33 @@ export default function ScriptDoctorPanel({
   // (pass, rule): resolution depends only on `location`, so two issues that
   // happen to share one (e.g. two notes about the same scene) resolve to the
   // identical span either way — a Map naturally collapses that redundancy.
-  const locationAnchorMap = useMemo(() => {
-    const map = new Map<string, { startLine: number; endLine: number }>();
-    for (const located of report?.locatedIssues ?? []) {
-      if (located.startLine === undefined || located.endLine === undefined) continue; // 'document' tier — no honest span
-      if (!map.has(located.issue.location)) {
-        map.set(located.issue.location, { startLine: located.startLine, endLine: located.endLine });
-      }
-    }
-    return map;
-  }, [report]);
+  //
+  // Item #9 (2026-09-06): the index now KEEPS the anchor tier alongside the
+  // span. The old map dropped it, which is why every jump control in this
+  // panel had to be named after the finding's prose location instead of its
+  // destination — src/lib/finding-jump.ts needs the tier to decide between
+  // "Jump to scene 12" and "Jump to line 340". Both this index and the
+  // document-tier set below live in that module, so CoverageSummary resolves
+  // its one control through the identical code.
+  const locationAnchorMap: LocationAnchorIndex = useMemo(
+    () => indexLocatedIssuesByLocation(report?.locatedIssues),
+    [report],
+  );
+  /** Locations the server resolved ONLY to the 'document' tier — it looked and
+   *  honestly found no line. Separated from "we could not resolve this at all"
+   *  so the "no location" note never tells a writer the wrong reason. */
+  const documentOnlyLocations = useMemo(
+    () => documentTierLocations(report?.locatedIssues),
+    [report],
+  );
+  /** Resolve one issue's prose location to a jump target (or its reason).
+   *  One resolver for topPriorities and for every per-pass issue, so the two
+   *  lists can never disagree about what a finding points at. */
+  const jumpForIssue = useMemo(
+    () => (location: string | undefined): JumpTarget =>
+      jumpTargetForIssueLocation(location, locationAnchorMap, report?.sceneLineSpans, documentOnlyLocations),
+    [locationAnchorMap, documentOnlyLocations, report],
+  );
 
   // G0-02: whether the DISPLAYED report predates the live editor draft —
   // the exact same decideWriteBack(reportDraftGenRef, getDraftGeneration())
@@ -5196,11 +5240,11 @@ export default function ScriptDoctorPanel({
                         key={finding.id}
                         finding={finding}
                         fixState={fixState}
-                        onNavigate={
-                          hasAnchor && onNavigateToFinding
-                            ? () => onNavigateToFinding(finding.startLine!, finding.endLine!)
-                            : undefined
-                        }
+                        jump={jumpTargetForFinding(finding, report.sceneLineSpans)}
+                        memberJumps={finding.memberRules.map((rule) =>
+                          jumpTargetForMemberRule(rule, finding, report.locatedIssues, report.sceneLineSpans),
+                        )}
+                        onJump={onNavigateToFinding}
                       />
                     );
                   })}
@@ -5570,21 +5614,15 @@ export default function ScriptDoctorPanel({
                   Top Priorities
                 </h3>
                 <div className="space-y-2">
-                  {report.topPriorities.map((issue, i) => {
-                    const anchor = locationAnchorMap.get(issue.location);
-                    return (
-                      <IssueCard
-                        key={i}
-                        issue={issue}
-                        pass={issue.pass}
-                        onNavigate={
-                          anchor && onNavigateToFinding
-                            ? () => onNavigateToFinding(anchor.startLine, anchor.endLine)
-                            : undefined
-                        }
-                      />
-                    );
-                  })}
+                  {report.topPriorities.map((issue, i) => (
+                    <IssueCard
+                      key={i}
+                      issue={issue}
+                      pass={issue.pass}
+                      jump={jumpForIssue(issue.location)}
+                      onJump={onNavigateToFinding}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -5652,20 +5690,14 @@ export default function ScriptDoctorPanel({
                               No issues found by this pass.
                             </p>
                           ) : (
-                            p.issues.map((issue, i) => {
-                              const anchor = locationAnchorMap.get(issue.location);
-                              return (
-                                <IssueCard
-                                  key={i}
-                                  issue={issue}
-                                  onNavigate={
-                                    anchor && onNavigateToFinding
-                                      ? () => onNavigateToFinding(anchor.startLine, anchor.endLine)
-                                      : undefined
-                                  }
-                                />
-                              );
-                            })
+                            p.issues.map((issue, i) => (
+                              <IssueCard
+                                key={i}
+                                issue={issue}
+                                jump={jumpForIssue(issue.location)}
+                                onJump={onNavigateToFinding}
+                              />
+                            ))
                           )}
                         </div>
                       )}

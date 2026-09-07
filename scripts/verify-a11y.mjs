@@ -53,6 +53,12 @@ import {
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
 import { createRequire } from 'node:module';
+// Item #9 (2026-09-06): the jump control's accessible name is now derived from
+// its ONE implementation (src/lib/finding-jump.ts) — "Jump to scene N" for a
+// scene-attributed finding, "Jump to line N" for a line-precise one — so this
+// gate matches whatever that module names it rather than a hand-typed literal
+// that silently stops matching when the wording moves.
+import { JUMP_CONTROL_NAME_RE, ROOT_CAUSE_EXPANDER_NAME_RE } from '../src/lib/finding-jump.ts';
 
 const REPO = process.cwd();
 // Resolve axe-core through node's own resolver rather than assuming it sits
@@ -628,7 +634,7 @@ async function main() {
   // separate global "Escape ladder" — closes this same non-modal panel as
   // a side effect; asserting reachability after that would be testing a
   // panel this suite itself just closed, not a real gap).
-  const jumpBtn = page2b.getByRole('button', { name: /jump to line/i }).first();
+  const jumpBtn = page2b.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
   const jumpBtnExists = await jumpBtn.count().then((n) => n > 0);
   record('keyboard-journey', 'read/jump: a "jump to line" finding control exists in the report and is keyboard-activatable', jumpBtnExists);
   let jumpedToLine = false;
@@ -1770,11 +1776,13 @@ async function main() {
       const shapeRhythmSection11 = await scrollShapeRhythmIntoView(page11).catch(() => null);
       record('doctor-full-report-gate', `${mode}: Shape & Rhythm section is reachable`, !!shapeRhythmSection11);
 
-      // Root Causes — expand every "Show the N contributing notes" toggle
+      // Root Causes — expand every member-rule disclosure ("Show the N rules
+      // behind them"; renamed from "contributing notes" 2026-09-06, item #10 —
+      // matched via the shared helper so a rename moves this gate with it)
       // present, then run the deterministic "Verify my rewrite" so the fix
       // receipt (FixReceiptCard + FixStructuralSignalsStrip + the diff
       // view) actually exists in the DOM, not just its collapsed button.
-      const rootCauseToggles11 = dialog11.getByRole('button', { name: /Show the \d+ contributing note/ });
+      const rootCauseToggles11 = dialog11.getByRole('button', { name: ROOT_CAUSE_EXPANDER_NAME_RE });
       // eslint-disable-next-line no-await-in-loop
       const rootCauseCount11 = await rootCauseToggles11.count();
       record('doctor-full-report-gate', `${mode}: Root Causes cards present (informational — depends on this draft's own findings)`, true, `${rootCauseCount11} card(s) with member notes`);
