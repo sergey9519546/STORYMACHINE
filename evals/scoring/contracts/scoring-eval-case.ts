@@ -12,6 +12,16 @@ export interface MetamorphicCase {
   description: string;
   /** pure text transform of a base Fountain script */
   transform: (base: string) => string;
+  /** OPTIONAL comparison-point override. A case with `parts` is not a
+   *  transform of the shared base script at all: the baseline it must not
+   *  beat is the MAXIMUM health over the texts this returns, and `transform`
+   *  ignores its `base` argument and builds the variant from the same parts.
+   *  Added for `stapled_shorts` (2026-09-07), whose claim — "a concatenation
+   *  of unrelated scripts must not outscore the best script in it" — is a
+   *  statement about a script set, not about one document's edit history,
+   *  and therefore has no single base script to transform. Every other case
+   *  leaves this undefined and reads the shared base exactly as before. */
+  parts?: () => string[];
   /** required movement of health (and optionally a named dimension) */
   expect:
     | { kind: 'unchanged'; epsilon: number }            // invariance
