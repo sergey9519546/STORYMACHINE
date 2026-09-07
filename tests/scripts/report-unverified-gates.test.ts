@@ -17,11 +17,24 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import {
   evaluateGates, gateRan, isExpired, render, GATES,
-  evaluateVerified, renderVerified, VERIFIED_GATES,
+  evaluateVerified, renderVerified, verifiedGateState, VERIFIED_GATES, VERIFIED_STATES,
 } from '../../scripts/report-unverified-gates.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(REPO_ROOT, 'scripts/report-unverified-gates.mjs');
+
+/**
+ * The reporter's real output, produced ONCE and shared by every assertion
+ * below that inspects it.
+ *
+ * Hoisted 2026-09-06 round 2: the script now RUNS each verified gate's suite
+ * (that is the point of the verified section — a row claiming "this was
+ * measured" has to check the measurement, not just the fixture beside it), so
+ * one invocation costs ~5s. Six independent `execFileSync` calls cost six
+ * times that for six copies of the same string. The exit code is still
+ * checked, because execFileSync throws on a non-zero status.
+ */
+const REPORTER_OUTPUT = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
 
 const envGate = { env: 'SOME_CORPUS_DIR', suite: 's1', protects: 'p', ifSkipped: 'i' };
 const fileGate = { file: 'tests/fixtures/real-corpus-manifest.json', suite: 's2', protects: 'p', ifSkipped: 'i' };
@@ -141,7 +154,7 @@ describe('the real gate list', () => {
     // This gate is the deliverable of retrospective finding #2: the AUC-24
     // ratchet recomputed in CI from committed numbers. Until the owner locks
     // the table it is the one gap in the project with a deadline on it.
-    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    const out = REPORTER_OUTPUT;
     assert.match(out, /tests\/core\/auc24-table\.test\.ts/);
     assert.match(out, /missing:\s+tests\/fixtures\/auc24-table\.json/);
     assert.match(out, /expires:\s+2026-10-01/);
@@ -151,7 +164,7 @@ describe('the real gate list', () => {
   it('exits 0 today — no gate has passed its expiry yet', () => {
     // If this fails, a deadline arrived. That is the mechanism working: close
     // the gate, or move the date in a diff a reviewer can refuse.
-    const r = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    const r = REPORTER_OUTPUT;
     assert.ok(r.length > 0);
   });
 
@@ -170,20 +183,20 @@ describe('the real gate list', () => {
   });
 
   it('the E2E journeys gate expires 2026-10-15', () => {
-    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    const out = REPORTER_OUTPUT;
     assert.match(out, /tests\/e2e\/journeys\.test\.ts/);
     assert.match(out, /unset:\s+RUN_E2E/);
     assert.match(out, /expires:\s+2026-10-15/);
   });
 
   it('the craft-kb gate expires 2026-11-01 and names the commit-vs-hash decision it forces', () => {
-    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    const out = REPORTER_OUTPUT;
     assert.match(out, /tests\/nvm\/generate\/craft-kb\.test\.ts/);
     assert.match(out, /expires:\s+2026-11-01/);
   });
 
   it('the two corpus-gated suites carry an explicit null expiry with a reason, not silence', () => {
-    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    const out = REPORTER_OUTPUT;
     assert.match(out, /tests\/core\/real-script-corpus\.test\.ts/);
     assert.match(out, /tests\/core\/anti-slop-real-corpus\.test\.ts/);
     // Both should render "expires: never — <reason>", never a bare SKIPPED
@@ -200,43 +213,89 @@ describe('the real gate list', () => {
 // self-check, because a row asserting "this is measured" next to a missing
 // input file is the exact false assurance this script exists to prevent.
 describe('verified gates', () => {
+  // A row here makes a POSITIVE claim ("this was measured"), unlike every gate
+  // above it, so it is checked three ways: input present, suite present, suite
+  // passing. `runSuite` is injected so these cases cost nothing to drive.
   const okGate = {
-    suite: 's', file: 'tests/fixtures/real-corpus-manifest.json',
+    suite: 'tests/core/auc.test.ts', file: 'tests/fixtures/real-corpus-manifest.json',
     command: 'npm run x', proves: 'p', doesNotProve: 'd',
   };
-  const goneGate = { ...okGate, file: 'tests/fixtures/definitely-not-here.json' };
+  const passing = { root: REPO_ROOT, runSuite: () => true };
 
-  it('a verified gate whose input exists reports RAN and exits 0', () => {
-    const r = evaluateVerified([okGate], { root: REPO_ROOT });
+  it('a verified gate reports RAN only when input, suite and result all hold', () => {
+    const r = evaluateVerified([okGate], passing);
     assert.equal(r.present.length, 1);
     assert.equal(r.exitCode, 0);
-    assert.match(renderVerified(r), /\[RAN\] s/);
+    assert.equal(r.states.get(okGate), 'ran');
+    const out = renderVerified(r);
+    assert.match(out, /\[RAN\] tests\/core\/auc\.test\.ts/);
+    assert.match(out, /run by this script, exit 0/);
   });
 
-  it('a verified gate whose input vanished reports ABSENT and BLOCKS', () => {
-    // The failure this catches: deleting tests/fixtures/public-corpus-manifest.json
-    // would otherwise leave the reporter cheerfully claiming the benchmark is
-    // measured, which is the same shape as the "0 failures" line this whole
-    // script exists to qualify.
-    const r = evaluateVerified([goneGate], { root: REPO_ROOT });
+  it('a verified gate whose INPUT vanished reports ABSENT and BLOCKS', () => {
+    // Deleting tests/fixtures/public-corpus-manifest.json would otherwise
+    // leave the reporter cheerfully claiming the benchmark is measured —
+    // the same shape as the "0 failures" line this whole script qualifies.
+    const r = evaluateVerified([{ ...okGate, file: 'tests/fixtures/definitely-not-here.json' }], passing);
+    assert.equal(r.absent.length, 1);
+    assert.equal(r.exitCode, 1);
+    assert.match(renderVerified(r), /\[ABSENT\]/);
+    assert.match(renderVerified(r), /its input file is gone/);
+  });
+
+  it('a verified gate whose SUITE vanished reports ABSENT and BLOCKS', () => {
+    // THE ROUND-1 HOLE, reproduced and closed. The reviewer deleted
+    // tests/core/public-benchmark.test.ts and ran `npm run gates`: the
+    // reporter printed "[RAN] tests/core/public-benchmark.test.ts", by name,
+    // with the file that does the measuring gone, and exited 0. Checking only
+    // the fixture was never enough — and a test file is the likelier deletion
+    // of the two, because a fixture reads as load-bearing and a test reads as
+    // something you can take out when it is in the way.
+    const r = evaluateVerified([{ ...okGate, suite: 'tests/core/definitely-not-here.test.ts' }], passing);
     assert.equal(r.absent.length, 1);
     assert.equal(r.exitCode, 1);
     const out = renderVerified(r);
     assert.match(out, /\[ABSENT\]/);
-    assert.match(out, /MISSING\. This row can no longer verify itself\./);
+    assert.match(out, /THE SUITE THAT DOES THE MEASURING IS GONE/);
+  });
+
+  it('a verified gate whose suite FAILS reports ABSENT and BLOCKS', () => {
+    // The state neither file check can reach: the suite is present and its
+    // assertions no longer hold. Only running it finds this.
+    const r = evaluateVerified([okGate], { root: REPO_ROOT, runSuite: () => false });
+    assert.equal(r.absent.length, 1);
+    assert.equal(r.exitCode, 1);
+    assert.match(renderVerified(r), /the suite ran and FAILED/);
+  });
+
+  it('verifiedGateState names all four outcomes, and only "ran" is a claim', () => {
+    assert.equal(verifiedGateState(okGate, passing), 'ran');
+    assert.equal(verifiedGateState(okGate, { root: REPO_ROOT, runSuite: () => false }), 'failing');
+    assert.equal(
+      verifiedGateState({ ...okGate, suite: 'nope.test.ts' }, passing),
+      'missing-suite',
+    );
+    assert.equal(
+      verifiedGateState({ ...okGate, file: 'nope.json' }, passing),
+      'missing-input',
+    );
+    assert.deepEqual([...VERIFIED_STATES].sort(), ['failing', 'missing-input', 'missing-suite', 'ran']);
   });
 
   it('the real list names the public benchmark, its command, and what it does NOT prove', () => {
-    const out = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+    const out = REPORTER_OUTPUT;
     assert.match(out, /VERIFIED GATES: 1 of 1 ran here/);
     assert.match(out, /tests\/core\/public-benchmark\.test\.ts/);
     assert.match(out, /reproduce: npm run benchmark:public/);
+    assert.match(out, /run by this script, exit 0/);
     // The non-comparability warning is the load-bearing half of the row: the
     // AUC-24 ratchet and this benchmark are exactly the kind of pair that gets
     // conflated (CLAUDE.md spends a paragraph on that hazard).
     assert.match(out, /Nothing about the AUC-24 >= 0\.622 ratchet/);
+    // And the row must not oversell the positive control it now cites.
+    assert.match(out, /proves only that the instrument works/);
     for (const g of VERIFIED_GATES) {
-      assert.ok(g.file && g.command && g.proves && g.doesNotProve, `${g.suite} is missing a field`);
+      assert.ok(g.file && g.suite && g.command && g.proves && g.doesNotProve, `${g.suite} is missing a field`);
     }
   });
 });

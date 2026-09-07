@@ -47,6 +47,7 @@
 // report, never block — the only change is that it is now chosen, not
 // missing.
 
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -173,11 +174,28 @@ export const GATES = [
  * above — it reports that a gate RAN, not that one didn't — so it is rendered
  * in its own section rather than smuggled into a report about gaps.
  *
- * A verified gate still declares a `file` (or `env`) so this is a check, not
- * an assertion: if its input disappears the row says ABSENT and this script
- * exits non-zero, exactly as an expired gap does. A "verified" row that
- * cannot verify itself would be the same false assurance the whole file
- * exists to prevent.
+ * A verified gate is CHECKED, not asserted, and — since 2026-09-06 round 2 —
+ * checked on all three of the things that have to be true for the row to be
+ * honest:
+ *
+ *   1. its INPUT exists (the fixture the suite measures against),
+ *   2. its SUITE exists, and
+ *   3. its suite PASSES — this script runs it and reads the exit code.
+ *
+ * (1) alone was the round-1 shape and it was not enough. The independent
+ * review deleted `tests/core/public-benchmark.test.ts` and ran `npm run
+ * gates`: the reporter printed `[RAN] tests/core/public-benchmark.test.ts`,
+ * by name, with the file that does the measuring gone, and exited 0. That is
+ * precisely the false assurance this file exists to prevent, and it is the
+ * likelier deletion of the two — a fixture reads as load-bearing, a test file
+ * reads as something you can comment out when it is in the way.
+ *
+ * Running the suite costs ~4.6s and is the only check that survives "the file
+ * is still there but its assertions were gutted". It is worth it here because
+ * this section makes a positive claim; the rest of the file only reports gaps.
+ *
+ * The runner is injectable so the tests can drive all four outcomes without
+ * spawning anything.
  *
  * @typedef {object} VerifiedGate
  * @property {string} suite      the test file that does the checking.
@@ -196,17 +214,26 @@ export const VERIFIED_GATES = [
     proves:
       'Degradation discrimination on the 32 DISTRIBUTABLE screenplays (20 CC0 in '
       + 'data/screenplays + 12 blind-pair fixtures), recomputed from committed .fountain text on '
-      + 'every CI run with no corpus mount: two AUCs — shuffle-drop (the AUC-24 recipe) and '
-      + 'climax-relocate (scene count preserved) — each against a floor in scripts/lib/auc.ts, '
-      + 'each with a seeded 2000-resample 95% bootstrap interval, on a pre-registered '
-      + 'sha256-derived split. Plus a 32-row manifest lock (sceneCount/words/health/verdict), so '
-      + 'a scoring change\'s effect on real distributable prose is a reviewable numeric diff.',
+      + 'every CI run with no corpus mount: THREE degradations x TWO statistics against six '
+      + 'floors in scripts/lib/auc.ts — shuffle-drop (the AUC-24 recipe), climax-relocate (scene '
+      + 'count preserved, so the 140/sceneCount term cancels), and DIALOGUE_FLATTEN as a POSITIVE '
+      + 'CONTROL. The control is what makes the other two readings interpretable: the score '
+      + 'catches it on 32 of 32 scripts, zero ties, so a near-chance reading elsewhere is the '
+      + 'score being blind, not the harness being broken. Matched-pair is the primary statistic '
+      + '(this is a paired design); all-pairs is floored too. Each carries a seeded '
+      + '2000-resample 95% bootstrap interval, on a pre-registered sha256-derived split. Plus a '
+      + '32-row manifest lock (sceneCount/words/health/verdict), so a scoring change\'s effect on '
+      + 'real distributable prose is a reviewable numeric diff.',
     doesNotProve:
       'Nothing about the AUC-24 >= 0.622 ratchet above — different corpus, different script '
       + 'length, different denominator. And it is not a good result: measured 2026-09-06, both '
-      + 'AUCs are near chance (shuffle-drop 0.5586, climax-relocate 0.4673) and both 95% '
-      + 'intervals contain 0.5. The floors are set at those values minus a margin, so the '
-      + 'engine cannot get WORSE at this unnoticed. They are the current truth, not a target.',
+      + 'MEASUREMENT channels are near chance (shuffle-drop 0.5313 matched-pair / 0.5586 '
+      + 'all-pairs; climax-relocate 0.4219 / 0.4673) and all four 95% intervals contain 0.5. The '
+      + 'control reads 1.0000 / 0.9473 but proves only that the instrument works — the engine '
+      + 'ships a deduction built for that exact manipulation. Floors are those values minus a '
+      + '0.02 margin, so the engine cannot get WORSE unnoticed. They are the current truth, not '
+      + 'a target. The split is reported, NOT used for held-out evaluation: the floors were '
+      + 'locked from all 32 scripts, holdout included.',
   },
 ];
 
@@ -299,33 +326,75 @@ export function render({ skipped, ran, expired }) {
 }
 
 /**
+ * Actually run a verified gate's suite and report whether it passed. The
+ * default runner; injectable via `opts.runSuite` so tests need not spawn.
+ *
+ * @param {string} suitePath absolute path to the suite file
+ * @returns {boolean} true iff the suite exited 0
+ */
+export function runSuiteDefault(suitePath) {
+  const result = spawnSync(process.execPath, ['--experimental-strip-types', suitePath], {
+    encoding: 'utf8',
+    stdio: 'ignore',
+    timeout: 300_000,
+  });
+  return result.status === 0;
+}
+
+/** The four states a verified row can be in. Only `ran` is a claim. */
+export const VERIFIED_STATES = ['ran', 'missing-input', 'missing-suite', 'failing'];
+
+/**
+ * @param {VerifiedGate} g
+ * @param {{ env?: Record<string, string | undefined>, root?: string, runSuite?: (p: string) => boolean }} [opts]
+ * @returns {'ran' | 'missing-input' | 'missing-suite' | 'failing'}
+ */
+export function verifiedGateState(g, { env = process.env, root = REPO_ROOT, runSuite = runSuiteDefault } = {}) {
+  if (!gateRan(g, { env, root })) return 'missing-input';
+  const suitePath = path.join(root, g.suite);
+  if (!existsSync(suitePath)) return 'missing-suite';
+  return runSuite(suitePath) ? 'ran' : 'failing';
+}
+
+/** Why each non-`ran` state is not a claim, rendered next to the row. */
+const VERIFIED_STATE_REASON = {
+  'missing-input': 'its input file is gone. This row can no longer verify itself.',
+  'missing-suite': 'THE SUITE THAT DOES THE MEASURING IS GONE. The row would otherwise still say RAN.',
+  failing: 'the suite ran and FAILED. Whatever it protects is not holding right now.',
+};
+
+/**
  * Which verified gates can still verify themselves.
  *
  * @param {VerifiedGate[]} [gates]
- * @param {{ env?: Record<string, string | undefined>, root?: string }} [opts]
- * @returns {{ present: VerifiedGate[], absent: VerifiedGate[], exitCode: number }}
+ * @param {{ env?: Record<string, string | undefined>, root?: string, runSuite?: (p: string) => boolean }} [opts]
+ * @returns {{ present: VerifiedGate[], absent: VerifiedGate[], states: Map<VerifiedGate, string>, exitCode: number }}
  */
 export function evaluateVerified(gates = VERIFIED_GATES, opts = {}) {
-  const present = gates.filter((g) => gateRan(g, opts));
-  const absent = gates.filter((g) => !gateRan(g, opts));
-  return { present, absent, exitCode: absent.length > 0 ? 1 : 0 };
+  const states = new Map(gates.map((g) => [g, verifiedGateState(g, opts)]));
+  const present = gates.filter((g) => states.get(g) === 'ran');
+  const absent = gates.filter((g) => states.get(g) !== 'ran');
+  return { present, absent, states, exitCode: absent.length > 0 ? 1 : 0 };
 }
 
-/** @param {{ present: VerifiedGate[], absent: VerifiedGate[] }} result */
-export function renderVerified({ present, absent }) {
+/** @param {{ present: VerifiedGate[], absent: VerifiedGate[], states?: Map<VerifiedGate, string> }} result */
+export function renderVerified({ present, absent, states }) {
   if (present.length === 0 && absent.length === 0) return '';
   const lines = [
     '='.repeat(72),
     `VERIFIED GATES: ${present.length} of ${present.length + absent.length} ran here, with no corpus and no owner step`,
     '='.repeat(72),
     'These are the checks the report above is NOT about. Listed so "not mentioned',
-    'as a gap" and "actually measured" stop looking the same.',
+    'as a gap" and "actually measured" stop looking the same. Each row is checked',
+    'three ways: its input exists, its suite exists, and its suite passes here.',
     '',
   ];
   for (const g of [...present, ...absent]) {
-    const ok = present.includes(g);
-    lines.push(`  [${ok ? 'RAN' : 'ABSENT'}] ${g.suite}`);
-    lines.push(`     input:     ${g.file}${ok ? '' : '  — MISSING. This row can no longer verify itself.'}`);
+    const state = states?.get(g) ?? (present.includes(g) ? 'ran' : 'missing-input');
+    lines.push(`  [${state === 'ran' ? 'RAN' : 'ABSENT'}] ${g.suite}`);
+    if (state !== 'ran') lines.push(`     WHY:       ${VERIFIED_STATE_REASON[state] ?? state}`);
+    lines.push(`     input:     ${g.file}`);
+    lines.push(`     suite:     ${g.suite}${state === 'ran' ? ' — run by this script, exit 0' : ''}`);
     lines.push(`     reproduce: ${g.command}`);
     lines.push(`     proves:    ${g.proves}`);
     lines.push(`     but not:   ${g.doesNotProve}`);
@@ -334,9 +403,10 @@ export function renderVerified({ present, absent }) {
   if (absent.length) {
     lines.push(
       '-'.repeat(72),
-      `${absent.length} verified gate(s) lost the input they check against. This step is`,
+      `${absent.length} verified gate(s) can no longer verify themselves. This step is`,
       'failing on purpose: a row claiming something is measured, next to a missing',
-      'file, is the false assurance this whole script exists to prevent.',
+      'input, a missing suite, or a failing one, is the false assurance this whole',
+      'script exists to prevent.',
       '-'.repeat(72),
     );
   }

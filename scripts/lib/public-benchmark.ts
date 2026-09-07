@@ -66,6 +66,7 @@ import {
   BOOTSTRAP_DEFAULT,
   bootstrapCi,
   degradeClimaxRelocate,
+  degradeDialogueFlatten,
   mulberry32,
   pairwiseAuc,
 } from './rebuild-experiment-lib.mjs';
@@ -279,11 +280,61 @@ export interface Degradation {
   sceneCountPreserving: boolean;
   recipe: string;
   source: string;
+  /** `measurement` — a channel whose reading is the finding. `control` — a
+   *  manipulation the score is KNOWN to detect, present so a null reading on
+   *  the measurement channels cannot be confused with a broken harness. See
+   *  PUBLIC_CONTROL_RATIONALE below. */
+  role: 'measurement' | 'control';
   apply: (script: PublicScript) => string | null;
   /** Seed integer for this script, or null for a deterministic recipe that
    *  uses no PRNG. Recorded per row so a run is reproducible from the file. */
   seedFor: (script: PublicScript) => number | null;
 }
+
+/**
+ * WHY THERE IS A THIRD DEGRADATION, AND WHY IT IS NOT EVIDENCE.
+ *
+ * The two measurement channels both read chance (0.5586 and 0.4673, both 95%
+ * intervals containing 0.5, both mean gaps running the wrong way). A reader
+ * given only those two numbers cannot tell **"the score is blind to
+ * mechanical damage"** from **"this harness never worked"** — and every null
+ * result in the artifact depends on that distinction. A benchmark whose every
+ * reading is null carries no information unless something in it responds.
+ *
+ * DIALOGUE_FLATTEN is that something. It replaces every dialogue and
+ * parenthetical line with "Hello." and the score catches it on **32 of 32**
+ * scripts, zero ties, mean gap +29.30 points. So the instrument demonstrably
+ * separates an intact script from a damaged one on this exact corpus, with
+ * these exact 32 files, through this exact code path — which is what makes
+ * the other two readings the SCORE's and not the harness's.
+ *
+ * IT IS A CONTROL, NOT VALIDITY EVIDENCE, and the difference matters:
+ *
+ *  - The engine ships a deduction built specifically for this manipulation
+ *    (doctor.ts's dialogue-degradation deduction, motivated in its own header
+ *    by DIALOGUE_FLATTEN measuring 0.54 at feature scale). Catching a
+ *    manipulation you built a detector for is a liveness check, not a
+ *    discovery.
+ *  - Roughly 17-18 of the 29.30 points come from OUTSIDE the
+ *    density/scarcity craft formula — measured: the craft formula predicts
+ *    75.20 for a flattened `the-ledger-excellent` and the doctor returns
+ *    58.1. That is the point: the control exercises a second, independent
+ *    scoring channel that neither SHUFFLE_DROP nor CLIMAX_RELOCATE touches,
+ *    so "the harness reaches the whole engine" is checked rather than
+ *    assumed.
+ *  - Its matched-pair AUC is 1.0000 with zero ties, so if a future change
+ *    breaks the harness this number moves first and moves unmistakably.
+ *
+ * The private-corpus lineage reports the same channel PASSING its own gate
+ * (DIALOGUE_FLATTEN test AUC 0.990 against >= 0.80,
+ * DISCRIMINATION_BASELINE_2026-07-29.md), which is the one place the public
+ * and private benchmarks agree qualitatively.
+ */
+export const PUBLIC_CONTROL_RATIONALE =
+  'DIALOGUE_FLATTEN is a POSITIVE CONTROL, not evidence: the engine ships a deduction built for '
+  + 'exactly this manipulation. It is here so a near-chance reading on the other two channels '
+  + 'cannot be dismissed as a broken harness — the instrument separates intact from damaged on '
+  + '32 of 32 scripts here, so those readings are the score\'s, not the harness\'s.';
 
 export const PUBLIC_DEGRADATIONS: readonly Degradation[] = [
   {
@@ -294,6 +345,7 @@ export const PUBLIC_DEGRADATIONS: readonly Degradation[] = [
       'seeded Fisher-Yates shuffle of all INT./EXT. scenes, then drop every third scene of '
       + 'the shuffled order (index % 3 === 2); any pre-first-slugline head is preserved verbatim',
     source: 'scripts/lib/auc.ts shuffleDropDegrade (imported verbatim — the AUC-24 ratchet\'s own recipe)',
+    role: 'measurement',
     apply: (s) => shuffleDropDegrade(s.text, s.file),
     seedFor: (s) => degradationSeed(s.file),
   },
@@ -303,7 +355,20 @@ export const PUBLIC_DEGRADATIONS: readonly Degradation[] = [
     sceneCountPreserving: true,
     recipe: 'pop the last scene and splice it in at index 1; preamble and every scene body unchanged',
     source: 'scripts/lib/rebuild-experiment-lib.mjs degradeClimaxRelocate (imported verbatim)',
+    role: 'measurement',
     apply: (s) => degradeClimaxRelocate(s.text) as string | null,
+    seedFor: () => null,
+  },
+  {
+    id: 'DIALOGUE_FLATTEN',
+    label: 'replace every dialogue line with "Hello." (POSITIVE CONTROL — the score must catch this)',
+    sceneCountPreserving: true,
+    recipe:
+      'normalize, parse, and replace the text of every dialogue and parenthetical line with '
+      + '"Hello."; scene headings, action and scene count are untouched',
+    source: 'scripts/lib/rebuild-experiment-lib.mjs degradeDialogueFlatten (imported verbatim)',
+    role: 'control',
+    apply: (s) => degradeDialogueFlatten(s.text) as string | null,
     seedFor: () => null,
   },
 ];
@@ -366,14 +431,40 @@ export interface DegradationResult {
   sceneCountPreserving: boolean;
   recipe: string;
   source: string;
+  role: 'measurement' | 'control';
   n: number;
+  /** Sign counts behind the AUC. `tied` is load-bearing: on CLIMAX_RELOCATE
+   *  11 of 32 pairs are EXACT ties because 10 scripts sit pinned at the
+   *  density penalty's 10-point cap, so a third of that statistic's N cannot
+   *  move at all and contributes 0.5 apiece by construction. An interval that
+   *  looks narrow because a third of its sample is frozen is not a more
+   *  precise measurement, and the number is printed so nobody reads it as one. */
+  ordered: number;
+  inverted: number;
+  tied: number;
   /** Scripts the recipe refused (too few scenes). Reported, never silently dropped. */
   skipped: string[];
-  /** The AUC-24 statistic: Mann-Whitney over the full intact x degraded grid
-   *  (scripts/lib/auc.ts computeAuc). This is the ASSERTED one. */
+  /**
+   * SECONDARY. Mann-Whitney over the full intact x degraded grid
+   * (scripts/lib/auc.ts computeAuc) — the AUC-24 statistic's definition.
+   * Reported because that is the lineage the shuffle-drop recipe comes from,
+   * and floored, but it is NOT the primary reading: it compares script A
+   * intact against script B degraded, mixing between-script variance (author,
+   * length, content) into a comparison this design controls by pairing.
+   */
   aucAllPairs: number;
-  /** The four-degradation harness's statistic: matched pair, script vs its own
-   *  degraded self (rebuild-experiment-lib pairwiseAuc). Reported alongside. */
+  /**
+   * PRIMARY. Matched pair — each script against a degraded copy of ITSELF
+   * (rebuild-experiment-lib pairwiseAuc), which is the estimator this design
+   * earns by construction.
+   *
+   * It is also the LESS FLATTERING of the two in 7 of the 8 cells this
+   * benchmark has measured across main and the three scoring branches, so
+   * quoting all-pairs as the headline would systematically report the
+   * friendlier number and would let a regression visible only in the paired
+   * statistic pass CI. Both are floored (see scripts/lib/auc.ts), so neither
+   * can move without an assertion noticing.
+   */
   aucPaired: number;
   ciAllPairs: Interval;
   ciPaired: Interval;
@@ -482,7 +573,11 @@ export async function measurePublicBenchmark(options: {
       sceneCountPreserving: degradation.sceneCountPreserving,
       recipe: degradation.recipe,
       source: degradation.source,
+      role: degradation.role,
       n: pairs.length,
+      ordered: pairs.filter((p) => p.real > p.degraded).length,
+      inverted: pairs.filter((p) => p.real < p.degraded).length,
+      tied: pairs.filter((p) => p.real === p.degraded).length,
       skipped,
       aucAllPairs: computeAuc(pairs.map((p) => p.real), pairs.map((p) => p.degraded)),
       aucPaired: pairwiseAuc(pairs) as number,
@@ -560,13 +655,30 @@ export const PUBLIC_BENCHMARK_LIMITS = [
   '    (b) does not, so the two numbers can be read against each other. On this corpus that',
   '    comparison refuted the prediction that (a) would be inflated — see the header of',
   '    PUBLIC_DEGRADATIONS for the measured decomposition (+5.693 scarcity, -7.625 density).',
+  '  * That the HARNESS works, separately from what it reads. DIALOGUE_FLATTEN is a positive',
+  '    control: the score catches it on 32 of 32 scripts with zero ties (matched-pair AUC',
+  '    1.0000, +29.30 points). So a near-chance reading on the other two channels is the',
+  '    SCORE being blind, not the instrument being broken — the one hypothesis a benchmark',
+  '    with only null readings can never rule out.',
   '',
-  'WHAT IT SAYS TODAY (2026-09-06, this tree)',
-  '  * Shuffle-drop AUC 0.5586, 95% CI [0.4219, 0.6973]. Climax-relocate AUC 0.4673, 95% CI',
-  '    [0.4014, 0.5264]. BOTH intervals contain 0.5: on this corpus the doctor does not',
-  '    reliably prefer an intact script to a mechanically damaged copy of itself.',
+  'WHAT IT SAYS TODAY (2026-09-06, this tree; matched-pair is the primary statistic)',
+  '  * Shuffle-drop 0.5313 matched-pair [0.3750, 0.6875] / 0.5586 all-pairs [0.4219, 0.6973].',
+  '    Climax-relocate 0.4219 [0.2813, 0.5625] / 0.4673 [0.4014, 0.5264]. ALL FOUR intervals',
+  '    contain 0.5: on this corpus the doctor does not reliably prefer an intact script to a',
+  '    mechanically damaged copy of itself. Control: 1.0000 / 0.9473.',
   '',
   'WHAT IT CANNOT SHOW',
+  '  * A moving reading on a third of the CLIMAX_RELOCATE sample. Ten of the 32 scripts sit',
+  '    pinned at exactly health 76.0 (density penalty at its 10-point cap plus a 14.0 scarcity',
+  '    term), so 11 of 32 pairs are EXACT ties that contribute 0.5 apiece by construction. That',
+  '    channel\'s point estimate rests on 21 movable scripts, and its narrower interval reflects',
+  '    pinning, not precision. Do not read it as the more precise of the two.',
+  '  * A held-out result. The split is PRE-REGISTERED AND REPORTED, not used for evaluation:',
+  '    every floor was locked from all 32 scripts, the five holdout files included, so no',
+  '    held-out evaluation has taken place and that holdout is already spent against these',
+  '    floors. ROADMAP P1 asks for held-out evaluation by name; this is not it. The split earns',
+  '    its keep the first time a future change is tuned on exploration and checked on holdout',
+  '    against floors re-locked from exploration alone.',
   '  * That health tracks CRAFT. Mechanical damage is not bad writing. The blind-pairs result',
   '    (1 of 6 ordered, tests/core/blind-pairs-discrimination.test.ts) is the craft question,',
   '    and it is a different, failing measurement.',

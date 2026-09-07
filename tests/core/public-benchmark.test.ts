@@ -24,34 +24,45 @@
 //   2. THE PRE-REGISTERED SPLIT. Every row of
 //      tests/fixtures/public-benchmark-split.json must equal what the rule
 //      recomputes from the file's own bytes. A hand-edit fails here.
-//   3. THE RATCHET. Both AUCs against floors in scripts/lib/auc.ts.
+//   3. THE RATCHET. Six floors in scripts/lib/auc.ts — three degradations
+//      times two statistics.
+//   4. THE POSITIVE CONTROL. Added round 2, and it is what makes (3)
+//      readable at all: see below.
 //
-// ── The floors are near chance, and the messages below say so ──────────────
-// Measured on this tree 2026-09-06: shuffle-drop 0.5586 (95% CI
-// [0.4219, 0.6973]); climax-relocate 0.4673 (95% CI [0.4014, 0.5264]). Both
-// intervals contain 0.5. These floors are a ratchet against getting WORSE at
-// something the engine is already bad at on this corpus — they are the
-// current truth, not a target, and a future change that raises either one has
-// to raise it FROM a rerun, not toward an aspiration. See
-// docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md.
+// ── The measurement floors are near chance, and the messages below say so ──
+// Measured on this tree 2026-09-06, matched-pair (PRIMARY) / all-pairs:
+// shuffle-drop 0.5313 / 0.5586; climax-relocate 0.4219 / 0.4673. All four of
+// those 95% intervals contain 0.5. These floors are a ratchet against getting
+// WORSE at something the engine is already bad at on this corpus — the
+// current truth, not a target, and a future change that raises one has to
+// raise it FROM a rerun. See docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md.
+//
+// ── Why there is a control, and why the primary statistic changed ──────────
+// Two round-2 review findings, both about how a reader would be misled:
+//
+//   * With only null readings, nothing here separated "the score is blind to
+//     mechanical damage" from "this harness never worked". DIALOGUE_FLATTEN
+//     is the manipulation the score demonstrably DOES catch — 32 of 32, zero
+//     ties — so the other two readings are the score's, not the instrument's.
+//   * Round 1 floored only the all-pairs statistic, which is the HIGHER of
+//     the two computed in 7 of the 8 cells measured across main and the three
+//     scoring branches. A paired design's honest estimator is the matched-pair
+//     one; it is now primary, and both are floored, so a regression visible in
+//     only one of them cannot pass.
 //
 // ── Runtime ────────────────────────────────────────────────────────────────
-// 96 doctor runs (32 intact + 32 shuffle-drop + 32 climax-relocate) plus two
-// 2000-resample bootstraps: 3.05s measured on this machine
-// (`npm run benchmark:public -- --json` reports elapsedMs). The measurement
-// runs ONCE at module load and every assertion below reads that one result,
-// so adding an assertion costs nothing.
+// 128 doctor runs (32 intact + 32 shuffle-drop + 32 climax-relocate + 32
+// dialogue-flatten) plus three 2000-resample bootstraps: 3.75s measured
+// (`npm run benchmark:public -- --json` reports elapsedMs; the control added
+// ~0.7s). The measurement runs ONCE at module load and every assertion below
+// reads that one result, so adding an assertion costs nothing.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import {
-  PUBLIC_FLOOR_MARGIN,
-  PUBLIC_ORDER_FLOOR,
-  PUBLIC_SHUFFLE_DROP_FLOOR,
-} from '../../scripts/lib/auc.ts';
+import { PUBLIC_FLOORS, PUBLIC_FLOOR_MARGIN } from '../../scripts/lib/auc.ts';
 import {
   MISSING_VERDICT,
   PUBLIC_CORPUS_SETS,
@@ -95,19 +106,20 @@ const result = await measurePublicBenchmark();
 const byId = new Map(result.degradations.map((d) => [d.id, d]));
 const shuffleDrop = byId.get('SHUFFLE_DROP')!;
 const climaxRelocate = byId.get('CLIMAX_RELOCATE')!;
+const dialogueFlatten = byId.get('DIALOGUE_FLATTEN')!;
 
 /** Print the measurement into the CI log. A benchmark whose number only
  *  appears when it FAILS is a benchmark nobody watches drift. */
 process.stdout.write(
-  '\nPUBLIC BENCHMARK (always-on, no corpus mount)\n'
+  '\nPUBLIC BENCHMARK (always-on, no corpus mount; matched-pair is the PRIMARY statistic)\n'
   + result.degradations
     .map(
       (d) =>
-        `  ${d.id.padEnd(16)} N=${d.n}  AUC(all-pairs) ${d.aucAllPairs.toFixed(4)} `
-        + `95% CI [${d.ciAllPairs.lo.toFixed(4)}, ${d.ciAllPairs.hi.toFixed(4)}]  `
-        + `AUC(matched-pair) ${d.aucPaired.toFixed(4)} `
-        + `95% CI [${d.ciPaired.lo.toFixed(4)}, ${d.ciPaired.hi.toFixed(4)}]  `
-        + `mean gap ${d.meanGap.toFixed(2)}  bootstrap ${d.bootstrapIterations}@seed ${d.bootstrapSeed}`,
+        `  ${d.id.padEnd(16)} ${(d.role === 'control' ? '[CONTROL]' : '[measure]')} N=${d.n}  `
+        + `paired ${d.aucPaired.toFixed(4)} [${d.ciPaired.lo.toFixed(4)}, ${d.ciPaired.hi.toFixed(4)}]  `
+        + `all-pairs ${d.aucAllPairs.toFixed(4)} [${d.ciAllPairs.lo.toFixed(4)}, ${d.ciAllPairs.hi.toFixed(4)}]  `
+        + `gap ${d.meanGap.toFixed(2)}  ordered/inverted/tied ${d.ordered}/${d.inverted}/${d.tied}  `
+        + `bootstrap ${d.bootstrapIterations}@seed ${d.bootstrapSeed}`,
     )
     .join('\n')
   + '\n',
@@ -263,7 +275,39 @@ describe('public benchmark — the pre-registered split', () => {
   });
 });
 
-describe('public benchmark — the two degradations', () => {
+describe('public benchmark — the three degradations', () => {
+  it('CLIMAX_RELOCATE\'s N is a third frozen — 11 exact ties, from 10 scripts pinned at health 76.0', () => {
+    // Round-2 review finding 6.7. Ten of the 32 intact scripts sit at exactly
+    // health 76.0 (density penalty at its 10-point cap plus a 14.0 scarcity
+    // term). Relocating a scene inside a script that is already pinned cannot
+    // move it, so 11 of 32 pairs are EXACT ties contributing 0.5 apiece by
+    // construction. That is why this channel's interval is narrower than
+    // shuffle-drop's — pinning, not precision — and the number is asserted so
+    // the reason cannot quietly stop being true while the interval keeps
+    // looking tight.
+    const pinnedAt76 = result.scripts.filter((s) => s.health === 76.0).length;
+    assert.ok(
+      climaxRelocate.tied >= 8,
+      `only ${climaxRelocate.tied} of ${climaxRelocate.n} CLIMAX_RELOCATE pairs are exact ties (was 11). If the `
+      + 'density cap stopped pinning scripts, that is a real scoring change and the interval means something '
+      + 'different now — re-read the doc\'s tie discussion before trusting the AUC.',
+    );
+    assert.ok(
+      pinnedAt76 >= 6,
+      `only ${pinnedAt76} scripts sit at exactly health 76.0 (was 10) — the pinning that explains the ties changed`,
+    );
+    assert.equal(
+      climaxRelocate.ordered + climaxRelocate.inverted + climaxRelocate.tied,
+      climaxRelocate.n,
+      'the sign counts must partition N',
+    );
+  });
+
+  it('SHUFFLE_DROP has no ties, so its wider interval is real spread and not the same artifact', () => {
+    assert.equal(shuffleDrop.tied, 0);
+    assert.equal(shuffleDrop.ordered + shuffleDrop.inverted, shuffleDrop.n);
+  });
+
   it('CLIMAX_RELOCATE preserves scene count on every script, so the scarcity term cancels', () => {
     // This is the assertion that earns the phrase "isolates order-sensitivity".
     // scarcityPenalty = 140/sceneCount (doctor.ts:465-467) is the doctor's
@@ -307,77 +351,167 @@ describe('public benchmark — the two degradations', () => {
   });
 });
 
-describe('public benchmark — the ratchet', () => {
-  it(`SHUFFLE_DROP AUC clears the ${PUBLIC_SHUFFLE_DROP_FLOOR} floor`, () => {
+describe('public benchmark — the positive control', () => {
+  // WHY THIS SUITE EXISTS (round-2 review finding 6.1). Both measurement
+  // channels read chance. Given only those two numbers, a reader cannot tell
+  // "the score is blind to mechanical damage" from "this harness never
+  // worked" — and every null reading in the artifact depends on that
+  // distinction. DIALOGUE_FLATTEN is the manipulation the score must catch;
+  // if it stops catching it, the harness is what broke.
+  it('the harness is demonstrably able to separate intact from damaged — 32 of 32, zero ties', () => {
+    assert.equal(dialogueFlatten.role, 'control', 'DIALOGUE_FLATTEN is a control, and must be labelled one');
+    assert.equal(dialogueFlatten.n, PUBLIC_CORPUS_SIZE);
+    assert.deepEqual(dialogueFlatten.skipped, []);
+    assert.equal(
+      dialogueFlatten.inverted,
+      0,
+      `${dialogueFlatten.inverted} script(s) scored HIGHER after every line of dialogue was replaced with `
+      + '"Hello." The positive control is the one manipulation this engine is built to catch; an inversion '
+      + 'here means the harness, not the score, is the thing to look at first.',
+    );
+    assert.equal(
+      dialogueFlatten.tied,
+      0,
+      'the control must be unambiguous — a tie here weakens the only evidence that the instrument reads anything',
+    );
     assert.ok(
-      shuffleDrop.aucAllPairs >= PUBLIC_SHUFFLE_DROP_FLOOR,
-      `shuffle-drop AUC ${shuffleDrop.aucAllPairs.toFixed(4)} (95% CI [${shuffleDrop.ciAllPairs.lo.toFixed(4)}, `
-      + `${shuffleDrop.ciAllPairs.hi.toFixed(4)}], N=${shuffleDrop.n}) fell below PUBLIC_SHUFFLE_DROP_FLOOR = `
-      + `${PUBLIC_SHUFFLE_DROP_FLOOR}. A change made the doctor less able to tell an intact script from `
-      + 'a shuffled-and-thinned copy of itself, on committed text anyone can re-run.\n'
-      + 'Reproduce: npm run benchmark:public\n'
-      + 'READ THIS BEFORE RAISING THE FLOOR: this number was 0.5586 when the floor was set, and its own '
-      + '95% interval contains 0.5. It is NOT a good score — it is the current truth, ratcheted so it '
-      + 'cannot quietly get worse. It is also not the AUC-24 >= 0.622 ratchet and must never be compared '
-      + 'to it: different corpus, different script length, different denominator.',
+      dialogueFlatten.meanGap > 20,
+      `control mean health gap is only ${dialogueFlatten.meanGap.toFixed(2)} points (was +29.30 when this was `
+      + 'written). The control is losing its grip; treat every near-chance reading in this file as suspect '
+      + 'until it is understood.',
     );
   });
 
-  it(`CLIMAX_RELOCATE AUC clears the ${PUBLIC_ORDER_FLOOR} floor (which is near chance, on purpose)`, () => {
+  it('the control exercises a scoring channel the other two degradations do not touch', () => {
+    // Measured: of the control's 29.30-point mean gap, 16.71 points on
+    // average are removed AFTER computeHealthScore — i.e. by the dedicated
+    // dialogue-degradation deduction, not by density or scarcity. Both
+    // measurement channels move health only through that formula. So this
+    // control also checks that the harness reaches past it, into the rest of
+    // the engine, which is what makes it a liveness check on the instrument
+    // rather than a second reading of the same term.
     assert.ok(
-      climaxRelocate.aucAllPairs >= PUBLIC_ORDER_FLOOR,
-      `order-preserving AUC ${climaxRelocate.aucAllPairs.toFixed(4)} (95% CI `
-      + `[${climaxRelocate.ciAllPairs.lo.toFixed(4)}, ${climaxRelocate.ciAllPairs.hi.toFixed(4)}], `
-      + `N=${climaxRelocate.n}) fell below PUBLIC_ORDER_FLOOR = ${PUBLIC_ORDER_FLOOR}.\n`
-      + 'WHAT THIS FLOOR IS. With scene count held constant the doctor cannot detect reordering: measured '
-      + '0.4673 here, and doctor.ts:2092-2093 records ~0.48 for the same recipe on the private corpus, '
-      + 'and the P1 baseline reports CLIMAX_RELOCATE 0.523 on its 153-script test partition. The floor is '
-      + 'that near-chance number minus a margin. This is the CURRENT TRUTH, NOT A TARGET: the assertion '
-      + 'exists so the engine cannot get worse at order-sensitivity without anyone noticing, not because '
-      + '0.4673 is acceptable.\n'
-      + 'Reproduce: npm run benchmark:public',
+      dialogueFlatten.sceneCountPreserving,
+      'the control must not change scene count, or its gap is contaminated by the scarcity term',
     );
+    const movedScenes = dialogueFlatten.pairs.filter((p) => p.intactScenes !== p.degradedScenes);
+    assert.deepEqual(movedScenes.map((p) => p.file), [], 'dialogue flattening changed a scene count');
   });
+});
 
-  it('both floors sit a stated margin below a real measurement, not at a round number', () => {
-    // The failure this prevents: a floor "adjusted" downward to make a red
-    // suite green. Every floor here is measured-minus-PUBLIC_FLOOR_MARGIN, so
-    // a floor further than the margin below today's measurement means either
-    // the score improved (re-lock it) or somebody moved the number by hand.
-    for (const [name, auc, floor] of [
-      ['SHUFFLE_DROP', shuffleDrop.aucAllPairs, PUBLIC_SHUFFLE_DROP_FLOOR],
-      ['CLIMAX_RELOCATE', climaxRelocate.aucAllPairs, PUBLIC_ORDER_FLOOR],
-    ] as const) {
+describe('public benchmark — the ratchet (six floors: three degradations x two statistics)', () => {
+  // PRIMARY is the matched-pair statistic. This is a paired design — every
+  // script against a degraded copy of itself — and all-pairs folds
+  // between-script variance back into a comparison the pairing controls.
+  // Round 1 floored only all-pairs, which is the HIGHER of the two in 7 of
+  // the 8 cells this benchmark has measured, so a regression visible only in
+  // the paired statistic would have passed CI. Both are floored now.
+  for (const floor of PUBLIC_FLOORS) {
+    const d = byId.get(floor.degradation)!;
+    const measured = floor.statistic === 'paired' ? d.aucPaired : d.aucAllPairs;
+    const ci = floor.statistic === 'paired' ? d.ciPaired : d.ciAllPairs;
+
+    it(`${floor.degradation} ${floor.statistic} AUC clears ${floor.constant} = ${floor.value}${floor.primary ? ' (PRIMARY)' : ''}`, () => {
       assert.ok(
-        floor <= auc,
-        `${name}: floor ${floor} is above the measured ${auc.toFixed(4)} — an aspiration, not a ratchet`,
+        measured >= floor.value,
+        `${floor.degradation} ${floor.statistic} AUC ${measured.toFixed(4)} `
+        + `(95% CI [${ci.lo.toFixed(4)}, ${ci.hi.toFixed(4)}], N=${d.n}) fell below ${floor.constant} = `
+        + `${floor.value}.\nReproduce: npm run benchmark:public\n`
+        + (d.role === 'control'
+          ? 'THIS IS THE POSITIVE CONTROL. It is the manipulation the score is built to catch, so a drop '
+            + 'here is evidence about the HARNESS before it is evidence about the score — check that the '
+            + 'degradation still produces damaged text at all before reading anything into the two '
+            + 'measurement channels.'
+          : 'READ THIS BEFORE RAISING THE FLOOR. The measurement channels were 0.5313/0.5586 '
+            + '(shuffle-drop) and 0.4219/0.4673 (climax-relocate) when these floors were set, and all '
+            + 'four of those 95% intervals contain 0.5. These are NOT good scores — they are the current '
+            + 'truth, ratcheted so they cannot quietly get worse. They are also not the AUC-24 >= 0.622 '
+            + 'ratchet and must never be compared to it: different corpus, different script length, '
+            + 'different denominator.'),
+      );
+    });
+  }
+
+  it('every floor sits a stated margin below a real measurement, not at a round number', () => {
+    // The failure this prevents: a floor "adjusted" downward to make a red
+    // suite green. Every floor is round4(measured - PUBLIC_FLOOR_MARGIN), so a
+    // floor further than the margin below today's measurement means either the
+    // score improved (re-lock it) or somebody moved the number by hand.
+    for (const floor of PUBLIC_FLOORS) {
+      const d = byId.get(floor.degradation)!;
+      const auc = floor.statistic === 'paired' ? d.aucPaired : d.aucAllPairs;
+      assert.ok(
+        floor.value <= auc,
+        `${floor.constant}: floor ${floor.value} is above the measured ${auc.toFixed(4)} — an aspiration, not a ratchet`,
       );
       assert.ok(
-        auc - floor < 4 * PUBLIC_FLOOR_MARGIN,
-        `${name}: measured ${auc.toFixed(4)} is ${(auc - floor).toFixed(4)} above floor ${floor}, more than `
-        + `4x the ${PUBLIC_FLOOR_MARGIN} margin. Either the score improved — re-lock the floor at `
-        + `${(auc - PUBLIC_FLOOR_MARGIN).toFixed(4)} and record the run — or the floor was lowered by hand.`,
+        auc - floor.value < 4 * PUBLIC_FLOOR_MARGIN,
+        `${floor.constant}: measured ${auc.toFixed(4)} is ${(auc - floor.value).toFixed(4)} above floor `
+        + `${floor.value}, more than 4x the ${PUBLIC_FLOOR_MARGIN} margin. Either the score improved — `
+        + 're-lock with `npm run benchmark:public -- --lock` and record the run — or the floor was lowered by hand.',
+      );
+    }
+  });
+
+  it('the floor constants are still in the one-line shape `--lock` rewrites', () => {
+    // `npm run benchmark:public -- --lock` rewrites these six lines with a
+    // regex on `export const NAME = <number>;`. A refactor that reshapes them
+    // (a computed value, a multi-line literal, a re-export) would make the
+    // re-lock command silently stop moving that floor — which is exactly the
+    // "instruction that fails when followed" this round was sent back to fix.
+    const src = readFileSync(path.join(REPO_ROOT, 'scripts/lib/auc.ts'), 'utf8');
+    for (const floor of PUBLIC_FLOORS) {
+      const match = new RegExp(`export const ${floor.constant} = (-?[0-9.]+);`).exec(src);
+      assert.ok(
+        match,
+        `${floor.constant} is no longer a single-line \`export const NAME = <number>;\` in scripts/lib/auc.ts, `
+        + 'so `npm run benchmark:public -- --lock` can no longer re-lock it. Restore the shape, or teach '
+        + 'relockFloors() in scripts/benchmark-public.ts the new one.',
+      );
+      assert.equal(
+        Number(match![1]),
+        floor.value,
+        `${floor.constant}'s source literal and its exported value disagree`,
       );
     }
   });
 });
 
 describe('public benchmark — the numbers in the docs are the numbers the code produces', () => {
-  const doc = readFileSync(path.join(REPO_ROOT, MEASUREMENT_DOC), 'utf8');
+  /** Every measured statistic and every floor, as the strings a doc must quote. */
+  const quotable = [
+    ...PUBLIC_FLOORS.map((f) => String(f.value)),
+    ...result.degradations.flatMap((d) => [d.aucPaired.toFixed(4), d.aucAllPairs.toFixed(4)]),
+  ];
 
-  it('the measurement doc quotes both floors and both measured AUCs verbatim', () => {
-    for (const needle of [
-      String(PUBLIC_SHUFFLE_DROP_FLOOR),
-      String(PUBLIC_ORDER_FLOOR),
-      shuffleDrop.aucAllPairs.toFixed(4),
-      climaxRelocate.aucAllPairs.toFixed(4),
-    ]) {
-      assert.ok(
-        doc.includes(needle),
-        `${MEASUREMENT_DOC} does not contain "${needle}". A measurement doc that has drifted from the `
-        + 'measurement is worse than no doc: re-run `npm run benchmark:public` and update it.',
-      );
-    }
+  it('the measurement doc quotes all six floors and all six measured AUCs verbatim', () => {
+    const doc = readFileSync(path.join(REPO_ROOT, MEASUREMENT_DOC), 'utf8');
+    const missing = quotable.filter((needle) => !doc.includes(needle));
+    assert.deepEqual(
+      missing,
+      [],
+      `${MEASUREMENT_DOC} does not contain: ${missing.join(', ')}. A measurement doc that has drifted from `
+      + 'the measurement is worse than no doc — re-run `npm run benchmark:public` and update it. (`--lock` '
+      + 'rewrites the constants and the fixtures; the prose is yours.)',
+    );
+  });
+
+  it('scripts/lib/auc.ts\'s own narrative quotes the values its floors were locked from', () => {
+    // The floors' explanatory block names the measured numbers. `--lock`
+    // rewrites the constants and NOT the prose, so without this check a
+    // re-lock leaves the file explaining its floors with the previous
+    // measurement's figures — the same drift the manifest lock exists to
+    // prevent, one file over.
+    const src = readFileSync(path.join(REPO_ROOT, 'scripts/lib/auc.ts'), 'utf8');
+    const missing = result.degradations
+      .flatMap((d) => [d.aucPaired.toFixed(4), d.aucAllPairs.toFixed(4)])
+      .filter((needle) => !src.includes(needle));
+    assert.deepEqual(
+      missing,
+      [],
+      `scripts/lib/auc.ts's PUBLIC-BENCHMARK FLOORS block no longer quotes: ${missing.join(', ')}. `
+      + 'Update the narrative in the same commit as the re-lock.',
+    );
   });
 
   it('the receipts ledger carries a PUBLIC-CORPUS section naming the reproducible command', () => {

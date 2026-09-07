@@ -82,36 +82,56 @@ export const AUC24_FLOOR_MARGIN = 0.05;
 /**
  * ── THE PUBLIC-BENCHMARK FLOORS ───────────────────────────────────────────
  *
- * These two are NOT the AUC-24 ratchet and must never be compared to it, to
- * each other's lineage, or to the 761-script P1 baseline. They belong here,
- * next to AUC24_FLOOR, for exactly the reason AUC24_FLOOR is here: one
- * definition of a floor, imported everywhere, so it cannot be raised in one
- * file and left behind in another.
+ * SIX constants: three degradations x two statistics. None of them is the
+ * AUC-24 ratchet and none may be compared to it, to each other's lineage, or
+ * to the 761-script P1 baseline. They live here, next to AUC24_FLOOR, for the
+ * reason AUC24_FLOOR lives here: one definition of a floor, imported
+ * everywhere, so it cannot be raised in one file and left behind in another.
  *
  * WHAT THEY MEASURE. scripts/lib/public-benchmark.ts scores the 32
  * DISTRIBUTABLE .fountain files (20 CC0 scripts in data/screenplays + 12
  * blind-pair fixtures) intact and then degraded, on every CI run, with no
- * corpus mount — tests/core/public-benchmark.test.ts. Both floors are on the
- * ALL-PAIRS Mann-Whitney statistic that computeAuc below defines, so the two
- * numbers are directly comparable to each other; that comparison IS the
- * finding they exist to protect.
+ * corpus mount — tests/core/public-benchmark.test.ts.
  *
- * WHY TWO. PUBLIC_SHUFFLE_DROP_FLOOR uses shuffleDropDegrade — the AUC-24
- * recipe, which drops every third scene and therefore moves
- * `scarcityPenalty = 140/sceneCount` (doctor.ts:465-467) directly.
- * PUBLIC_ORDER_FLOOR uses degradeClimaxRelocate, which preserves scene count
- * exactly, so the scarcity term cancels (measured: mean scarcity delta
- * 0.000 over all 32 scripts) and what is left is order-sensitivity alone.
+ * WHICH STATISTIC IS PRIMARY: the MATCHED-PAIR one (`*_PAIRED_FLOOR`). This
+ * is a paired design — every script against a degraded copy of ITSELF — so
+ * the estimator that respects the pairing is the honest reading. The
+ * all-pairs Mann-Whitney compares script A intact against script B degraded
+ * and folds between-script variance (author, length, content) back into a
+ * comparison the design controls. It is floored too, because the shuffle-drop
+ * recipe comes from that lineage and a reader will look for it — but it is
+ * the SECONDARY number, and it is the LESS conservative of the two in 7 of
+ * the 8 cells measured across main and the three scoring branches. Flooring
+ * only it would have meant ratcheting the friendlier statistic and letting a
+ * regression visible only in the paired one pass CI.
  *
- * BOTH FLOORS ARE NEAR CHANCE, AND THAT IS THE CURRENT TRUTH, NOT A TARGET.
- * Measured on this tree, 2026-09-06: shuffle-drop 0.5586 (95% CI
- * [0.4219, 0.6973]), climax-relocate 0.4673 (95% CI [0.4014, 0.5264]). Both
- * intervals contain 0.5. On this corpus the doctor does not reliably prefer
- * an intact script to a mechanically damaged copy of itself under either
- * recipe. A floor set at a near-chance measurement is a ratchet against
- * getting WORSE at something the engine is already bad at, which is the only
- * honest thing to assert here. Raising either number is a measurement's job,
- * never an edit's.
+ * WHY THREE DEGRADATIONS.
+ *
+ *  - SHUFFLE_DROP is the AUC-24 recipe: it drops every third scene and so
+ *    moves `scarcityPenalty = 140/sceneCount` (doctor.ts:465-467) directly.
+ *  - CLIMAX_RELOCATE preserves scene count exactly (measured: mean scarcity
+ *    delta 0.000 over all 32 scripts), so that term cancels and what is left
+ *    is order-sensitivity alone.
+ *  - DIALOGUE_FLATTEN is a POSITIVE CONTROL, not a finding. Both measurement
+ *    channels read chance; without a manipulation the score demonstrably DOES
+ *    detect, a reader cannot tell "the score is blind to mechanical damage"
+ *    from "the harness never worked". The score catches this one on 32 of 32
+ *    scripts with zero ties, through a scoring channel neither other
+ *    degradation touches (~17-18 of its 29.30-point gap comes from outside
+ *    the density/scarcity craft formula). The engine ships a deduction built
+ *    for exactly this manipulation, which is what makes it a liveness check
+ *    on the instrument rather than evidence about the score.
+ *
+ * THE TWO MEASUREMENT CHANNELS ARE NEAR CHANCE, AND THAT IS THE CURRENT
+ * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-06 — shuffle-drop
+ * 0.5586 all-pairs / 0.5313 matched-pair; climax-relocate 0.4673 / 0.4219.
+ * Every one of those four intervals contains 0.5. On this corpus the doctor
+ * does not reliably prefer an intact script to a mechanically damaged copy of
+ * itself under either recipe. A floor at a near-chance measurement is a
+ * ratchet against getting WORSE at something the engine is already bad at,
+ * which is the only honest thing to assert. Raising any of them is a
+ * measurement's job, never an edit's. (The control's floors are high because
+ * the control works: 0.9473 all-pairs / 1.0000 matched-pair.)
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
  * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
@@ -125,20 +145,30 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * scenes removes a larger share of the weighted issues than of the words and
  * `density = weightedIssues / wordCount^0.7` is convex. Net mean health
  * MOVES UP 1.93 points under degradation. The prediction was right about the
- * scarcity term and wrong about the total, which is exactly why the floor is
- * set from a measurement instead of from the arithmetic.
+ * scarcity term and wrong about the total, which is exactly why every floor
+ * below is set from a measurement instead of from the arithmetic.
  *
- * HOW THEY WERE SET. floor = round4(measured - PUBLIC_FLOOR_MARGIN), from
- * `npm run benchmark:public` on this tree. The measured values, the bootstrap
- * intervals, N, and the per-script pairs are in
+ * HOW THEY ARE SET AND RE-SET. floor = round4(measured - PUBLIC_FLOOR_MARGIN).
+ * `npm run benchmark:public -- --lock` rewrites all six constant lines below
+ * (and the two committed fixtures) from a fresh run and prints every
+ * before -> after. Do that ONLY after a scoring change you intended, and read
+ * the resulting diff: a re-lock following an unintended regression silently
+ * lowers the ratchet, which is the one way this machinery can be defeated.
+ * The values, intervals, N and per-script pairs are in
  * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md and in the PUBLIC-CORPUS
  * section of docs/p1-benchmark/MEASUREMENT_RECEIPTS.md.
+ *
+ * The six lines below are MACHINE-REWRITTEN by that command. Keep each on one
+ * line in the form `export const NAME = <number>;` — scripts/benchmark-public.ts
+ * matches exactly that shape, and tests/core/public-benchmark.test.ts asserts
+ * every one of them is still reachable by it.
  */
+export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5113;
 export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386;
-
-/** See PUBLIC_SHUFFLE_DROP_FLOOR above. Near chance, deliberately: measured
- *  0.4673, and its own 95% CI [0.4014, 0.5264] contains 0.5. */
+export const PUBLIC_ORDER_PAIRED_FLOOR = 0.4019;
 export const PUBLIC_ORDER_FLOOR = 0.4473;
+export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
+export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.9273;
 
 /**
  * The margin between a fresh public-benchmark measurement and the floor
@@ -146,10 +176,44 @@ export const PUBLIC_ORDER_FLOOR = 0.4473;
  * measurement is RE-RUN ON EVERY CI RUN over committed text, so it carries no
  * corpus-drift or re-measurement uncertainty — the only slack it needs is for
  * a genuinely intended scoring change, and a 0.02 band keeps the ratchet
- * tight enough to notice one. A change that moves either statistic by more
- * than this is supposed to fail, be looked at, and be re-locked deliberately.
+ * tight enough to notice one. A change that moves any of the six statistics
+ * by more than this is supposed to fail, be looked at, and be re-locked
+ * deliberately.
  */
 export const PUBLIC_FLOOR_MARGIN = 0.02;
+
+/**
+ * Which floor guards which (degradation, statistic) pair — ONE mapping, so
+ * the CLI, the test, the `--lock` rewriter and the docs cannot disagree about
+ * it. `constant` is the exact identifier `--lock` rewrites; `primary` marks
+ * the matched-pair reading this paired design earns.
+ */
+export const PUBLIC_FLOORS = [
+  {
+    degradation: 'SHUFFLE_DROP', statistic: 'paired', primary: true,
+    constant: 'PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR', value: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR,
+  },
+  {
+    degradation: 'SHUFFLE_DROP', statistic: 'allPairs', primary: false,
+    constant: 'PUBLIC_SHUFFLE_DROP_FLOOR', value: PUBLIC_SHUFFLE_DROP_FLOOR,
+  },
+  {
+    degradation: 'CLIMAX_RELOCATE', statistic: 'paired', primary: true,
+    constant: 'PUBLIC_ORDER_PAIRED_FLOOR', value: PUBLIC_ORDER_PAIRED_FLOOR,
+  },
+  {
+    degradation: 'CLIMAX_RELOCATE', statistic: 'allPairs', primary: false,
+    constant: 'PUBLIC_ORDER_FLOOR', value: PUBLIC_ORDER_FLOOR,
+  },
+  {
+    degradation: 'DIALOGUE_FLATTEN', statistic: 'paired', primary: true,
+    constant: 'PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR', value: PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR,
+  },
+  {
+    degradation: 'DIALOGUE_FLATTEN', statistic: 'allPairs', primary: false,
+    constant: 'PUBLIC_DIALOGUE_FLATTEN_FLOOR', value: PUBLIC_DIALOGUE_FLATTEN_FLOOR,
+  },
+] as const;
 
 /** Identifies the exact degradation the committed table was produced by. Bump
  *  the version if the recipe, the PRNG, or the seed template ever changes —

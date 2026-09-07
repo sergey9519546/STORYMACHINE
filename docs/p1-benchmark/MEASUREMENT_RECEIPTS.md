@@ -2041,3 +2041,116 @@ that nobody mistakes one for the other.
   run each command listed above in this worktree and read its output, and I
   did **not** run `npm run measure-real` — the private corpus is not present
   in this environment, and no AUC-24 value is claimed anywhere in this entry.
+
+### 2026-09-06 — PUBLIC BENCHMARK, ROUND 2 after independent review: a positive control, the matched-pair floors, and branch rows pinned to SHAs (PUBLIC-CORPUS — supersedes the numbers in the entry above; still not an AUC-24 receipt, and still no real-corpus measurement was run)
+
+- **What this supersedes:** the entry immediately above, dated the same day.
+  Per this ledger's convention that entry is not edited; this one restates its
+  figures where they changed and adds what it was missing. Nothing in it was
+  wrong — the independent review reproduced every statistic in it to four
+  decimals — but two of its choices made the numbers read better than they
+  should have, and one of its claims failed when followed.
+- **Date:** 2026-09-06
+- **Git SHA:** measured on the lane worktree at `main @ c16f7e0c` plus this
+  lane's round-1 commit `b79759a6` and its round-2 changes.
+- **Commands (all run in this worktree; anyone can re-run them, with no corpus,
+  no key and no env var):**
+  ```
+  npm run benchmark:public
+  npm run benchmark:public -- --control
+  npm run benchmark:public -- --json --quiet
+  npm run benchmark:public -- --lock       # now also rewrites six floor constants
+  npm run gates                            # now RUNS the benchmark suite
+  ```
+- **Measured AUC-24:** **not applicable, and deliberately left blank.** No
+  real-corpus measurement was run for this range and none is claimed. The
+  private corpus does not exist in this environment.
+- **What changed in the numbers.** Three degradations now, two statistics each,
+  and **the matched-pair statistic is primary** (this is a paired design; the
+  all-pairs figure the round-1 entry led with is the friendlier of the two in 7
+  of 8 cells). N = 32, seeded 2000-resample bootstrap, seed 42:
+  - `SHUFFLE_DROP` — matched-pair **0.5313** [0.3750, 0.6875]; all-pairs
+    **0.5586** [0.4219, 0.6973]; mean gap −1.93; ordered/inverted/tied 17/15/0.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4219** [0.2813, 0.5625]; all-pairs
+    **0.4673** [0.4014, 0.5264]; mean gap −1.46; **8/13/11 — eleven exact
+    ties**, because 10 of the 32 scripts sit pinned at health 76.0 on the
+    density cap. That channel's estimate rests on 21 movable scripts and its
+    narrower interval is pinning, not precision.
+  - `DIALOGUE_FLATTEN` — **POSITIVE CONTROL, not a finding.** Matched-pair
+    **1.0000** [1.0000, 1.0000]; all-pairs **0.9473** [0.8779, 1.0000]; mean
+    gap **+29.30**; 32/0/0. It is here because a benchmark whose every reading
+    is null cannot distinguish a blind score from a broken harness. Of its
+    29.30-point gap, **16.71 points on average come from outside the
+    density/scarcity craft formula** (measured; `the-ledger-excellent`
+    flattened: craft formula 75.20, actual health 58.1), so it also checks that
+    the harness reaches past the one term both measurement channels move
+    through. The engine ships a deduction built for exactly this manipulation
+    — it proves the instrument reads, never that the score is valid.
+  - **All four measurement-channel intervals contain 0.5.** Floors are those
+    values minus 0.02: `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.5113,
+    `PUBLIC_SHUFFLE_DROP_FLOOR` 0.5386, `PUBLIC_ORDER_PAIRED_FLOOR` 0.4019,
+    `PUBLIC_ORDER_FLOOR` 0.4473, `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` 0.98,
+    `PUBLIC_DIALOGUE_FLATTEN_FLOOR` 0.9273.
+- **Corpus fingerprint:** unchanged from the entry above — the same 32
+  `.fountain` files, the same committed sha256s in
+  `tests/fixtures/public-corpus-manifest.json`, the same 27/5 pre-registered
+  split. **The split is reported, NOT used for held-out evaluation:** all six
+  floors were locked from all 32 scripts, the five holdout files included, so
+  no held-out evaluation has taken place and that holdout is spent against
+  these floors. ROADMAP P1 names held-out evaluation; this is not it.
+- **Branch table, now pinned to the SHAs measured** (fetched and
+  `git archive`-extracted, **not merged**, nothing on them modified). Primary
+  matched-pair / secondary all-pairs, `SHUFFLE_DROP`:
+  - `scoring/r5-verbosity-bias @ 52bf410a` — **0.0938** [0.0000, 0.1875] /
+    0.1245 [0.0513, 0.2129]; 29 of 32 inverted; 28 of 32 verdicts
+    `CONSIDER` → `PASS`.
+  - `scoring/advice-rule-fixes @ a1cf7677` — **0.4375** [0.2813, 0.6250] /
+    0.5298 [0.4033, 0.6548].
+  - `scoring/stacked-r5-plus-advice @ 408166ae` — **0.0938** [0.0000, 0.1875] /
+    0.1089 [0.0361, 0.1973].
+  - The **control holds on all three** (1.0000 / 1.0000, 0.9844, 1.0000), which
+    is what licenses reading those as the score inverting rather than the
+    harness failing on those trees. Full tables, including `CLIMAX_RELOCATE`
+    and per-branch manifest movement, in
+    `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §7. **No receipt on any
+    of those branches changes.**
+- **Three mechanism fixes recorded because they change what the artifact
+  guarantees, not only what it says:**
+  1. `scripts/report-unverified-gates.mjs`'s VERIFIED row now checks its
+     **suite** and **runs it**, not just its fixture. The review deleted
+     `tests/core/public-benchmark.test.ts` and the round-1 reporter still
+     printed `[RAN]` for it and exited 0.
+  2. `npm run benchmark:public -- --lock` now rewrites the six floor constants
+     in `scripts/lib/auc.ts`, which round-1 CLAUDE.md said it did and it did
+     not (`auc.ts` came back byte-identical). Fixed by making the command true
+     rather than by weakening the sentence; it refuses, without writing, if any
+     constant is not in the single-line shape it edits.
+  3. The decomposition table's third row was a penalty delta labelled as a
+     health delta with a contradicting sign. Corrected; the arithmetic it
+     summarises (+5.693 scarcity, −7.625 density, health up 1.931) was and is
+     right everywhere else.
+- **Scoring-path status of THIS range:**
+  `node scripts/check-scoring-receipt.mjs main..HEAD` reports **no
+  scoring-path files changed**. Nothing reachable from `doctor.ts` or
+  `src/lib/fountain.ts` was touched in either round.
+- **A finding this entry records but this lane cannot act on.** The
+  independent review, working from the same decomposition: under shuffle-drop
+  the corpus retains 72.5% of its words but only 50.2% of its weighted issues,
+  and the sub-density branch is a logistic with steepness 50 around midpoint
+  0.52 (`doctor.ts:447-449`) — a near-step function whose whole 0→10-point
+  range is crossed by a density move of about ±0.05. `counter-offer` crosses it
+  in one step (density penalty 10.000 → 0.000, health +4.0 while a third of the
+  script is deleted); `room-12` gains 36.5 points the same way. Stated as a
+  property of the score: **on 9–14-scene scripts the health formula pays a
+  writer to delete a third of their scenes.** That is `doctor.ts`, it crosses
+  this gate, and it belongs to whoever picks up the density-term work — filed
+  here and in `PUBLIC_BENCHMARK_2026-09-06.md` §10 so it does not live only in
+  a benchmark document.
+- **Runner attestation:** none is owed, and that is the point of this section.
+  `npm run benchmark:public` reproduces every figure above from committed text
+  on any machine, and `tests/core/public-benchmark.test.ts` recomputes all six
+  AUCs and re-checks all 32 manifest rows on every CI run without an env var.
+  For the record I did run each command listed above in this worktree and read
+  its output, and I did **not** run `npm run measure-real` — the private corpus
+  is not present in this environment, and no AUC-24 value is claimed anywhere
+  in this entry.

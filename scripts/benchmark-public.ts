@@ -13,11 +13,12 @@
 // var, no corpus mount and no owner. Anyone can reproduce every figure in
 // docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md by running it.
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
   PUBLIC_BENCHMARK_LIMITS,
+  PUBLIC_CONTROL_RATIONALE,
   PUBLIC_CORPUS_SETS,
   PUBLIC_CORPUS_SIZE,
   PUBLIC_LOCK_COMMAND,
@@ -30,14 +31,25 @@ import {
   partitionFor,
   type BenchmarkResult,
 } from './lib/public-benchmark.ts';
-import { PUBLIC_ORDER_FLOOR, PUBLIC_SHUFFLE_DROP_FLOOR } from './lib/auc.ts';
+import { PUBLIC_FLOOR_MARGIN, PUBLIC_FLOORS } from './lib/auc.ts';
+
+/** Repo-relative path of the file whose floor constants `--lock` rewrites. */
+const AUC_LIB = 'scripts/lib/auc.ts';
+
+/** floor = round4(measured - margin). The ONE place that rule is arithmetic
+ *  rather than prose; `scripts/lib/auc.ts` states it and this implements it. */
+function floorFor(measured: number): number {
+  return Math.round((measured - PUBLIC_FLOOR_MARGIN) * 1e4) / 1e4;
+}
 
 const USAGE = [
   'benchmark-public — degradation discrimination on the 32 distributable screenplays',
   '',
   'Usage:',
   '  npm run benchmark:public                 print the table',
-  '  npm run benchmark:public -- --lock       also rewrite the manifest and split fixtures',
+  '  npm run benchmark:public -- --lock       also rewrite the manifest, the split, and the six',
+  '                                           floor constants in scripts/lib/auc.ts (read the diff:',
+  '                                           re-lock only after an INTENDED scoring change)',
   '  npm run benchmark:public -- --control    also score the calibration corpus (labelled CONTROL)',
   '  npm run benchmark:public -- --json       print the whole result as JSON',
   '  npm run benchmark:public -- --quiet      suppress per-script progress',
@@ -139,22 +151,30 @@ async function main(): Promise<void> {
   out();
 
   for (const d of result.degradations) {
-    const floor = d.id === 'SHUFFLE_DROP' ? PUBLIC_SHUFFLE_DROP_FLOOR : PUBLIC_ORDER_FLOOR;
+    const floorOf = (statistic: 'paired' | 'allPairs') =>
+      PUBLIC_FLOORS.find((f) => f.degradation === d.id && f.statistic === statistic)?.value;
     out('-'.repeat(78));
     out(`${d.id} — ${d.label}`);
+    out(`  role: ${d.role === 'control' ? 'POSITIVE CONTROL (liveness check on the harness)' : 'measurement channel'}`);
     out(`  scene count preserved: ${d.sceneCountPreserving ? 'YES' : 'no'}`);
     out(`  recipe: ${d.recipe}`);
     out(`  source: ${d.source}`);
     out(`  N = ${d.n}${d.skipped.length ? `  (skipped: ${d.skipped.join(', ')})` : ''}`);
     out(
-      `  AUC (all-pairs, the AUC-24 statistic): ${fixed(d.aucAllPairs)}  `
-      + `95% CI [${fixed(d.ciAllPairs.lo)}, ${fixed(d.ciAllPairs.hi)}]   floor ${floor}`,
+      `  AUC (matched pair — PRIMARY, this design is paired): ${fixed(d.aucPaired)}  `
+      + `95% CI [${fixed(d.ciPaired.lo)}, ${fixed(d.ciPaired.hi)}]   floor ${floorOf('paired')}`,
     );
     out(
-      `  AUC (matched pair, the rebuild-experiment statistic): ${fixed(d.aucPaired)}  `
-      + `95% CI [${fixed(d.ciPaired.lo)}, ${fixed(d.ciPaired.hi)}]`,
+      `  AUC (all-pairs — secondary, the AUC-24 definition): ${fixed(d.aucAllPairs)}  `
+      + `95% CI [${fixed(d.ciAllPairs.lo)}, ${fixed(d.ciAllPairs.hi)}]   floor ${floorOf('allPairs')}`,
     );
     out(`  bootstrap: ${d.bootstrapIterations} resamples, seed ${d.bootstrapSeed}`);
+    out(
+      `  sign counts: ordered ${d.ordered} / inverted ${d.inverted} / EXACT TIES ${d.tied}`
+      + (d.tied > 0
+        ? `  <- ${d.tied} of ${d.n} pairs cannot move; the interval is narrowed by pinning, not precision`
+        : ''),
+    );
     out(`  mean health gap (intact - degraded): ${fixed(d.meanGap, 2)} points`);
     out();
     out('  file                                                partition   intact  degraded    gap  scenes');
@@ -190,19 +210,86 @@ async function main(): Promise<void> {
   }
 
   out('-'.repeat(78));
+  out(PUBLIC_CONTROL_RATIONALE);
+  out('-'.repeat(78));
   out(PUBLIC_BENCHMARK_LIMITS);
   out('-'.repeat(78));
 
   if (lock) {
-    const splitFile = path.join(REPO_ROOT, PUBLIC_SPLIT_PATH);
-    const manifestFile = path.join(REPO_ROOT, PUBLIC_MANIFEST_PATH);
-    writeFileSync(splitFile, `${JSON.stringify(buildSplit(), null, 2)}\n`);
-    writeFileSync(manifestFile, `${JSON.stringify(buildManifest(result), null, 2)}\n`);
+    writeFileSync(path.join(REPO_ROOT, PUBLIC_SPLIT_PATH), `${JSON.stringify(buildSplit(), null, 2)}\n`);
+    writeFileSync(path.join(REPO_ROOT, PUBLIC_MANIFEST_PATH), `${JSON.stringify(buildManifest(result), null, 2)}\n`);
     out();
     out(`locked ${PUBLIC_SPLIT_PATH}`);
     out(`locked ${PUBLIC_MANIFEST_PATH}`);
-    out('Review the diff before committing: a moved row is a moved score.');
+    for (const line of relockFloors(result)) out(line);
+    out();
+    out('RE-LOCK RULE — read the diff before committing.');
+    out('  Re-lock ONLY after a scoring change you intended. `--lock` moves every floor to');
+    out('  round4(measured - 0.02) from THIS run, so re-locking after an unintended');
+    out('  regression silently lowers the ratchet — that is the one way this machinery can');
+    out('  be defeated, and the diff on scripts/lib/auc.ts is where it would be visible.');
+    out('  A moved manifest row is a moved score; a moved floor is a moved gate.');
+    out('  The narrative in scripts/lib/auc.ts and the numbers in');
+    out('  docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md are NOT rewritten by this');
+    out('  command — tests/core/public-benchmark.test.ts fails until you update them too.');
   }
+}
+
+/**
+ * Rewrite the six floor constants in `scripts/lib/auc.ts` from this run.
+ *
+ * WHY THIS EXISTS. Round 1 shipped a CLAUDE.md sentence claiming `--lock`
+ * re-locked "the manifest, the split and the floors"; it re-locked two of the
+ * three, and `auc.ts` came back byte-identical. An instruction that fails when
+ * followed is worse than none: a maintainer lands an intentional scoring
+ * change, runs `--lock`, sees a clean diff on `auc.ts`, commits — and ships a
+ * ratchet asserting a stale number. Rather than weaken the sentence, the
+ * command now does what it said.
+ *
+ * It edits ONLY lines of the exact shape `export const NAME = <number>;` for
+ * the names in PUBLIC_FLOORS, and refuses (loudly, without writing) if any one
+ * of them is not found — so a refactor that reshapes those lines fails here
+ * instead of silently locking nothing.
+ */
+function relockFloors(result: BenchmarkResult): string[] {
+  const file = path.join(REPO_ROOT, AUC_LIB);
+  const before = readFileSync(file, 'utf8');
+  let source = before;
+  const lines: string[] = [];
+  const missing: string[] = [];
+
+  for (const floor of PUBLIC_FLOORS) {
+    const d = result.degradations.find((x) => x.id === floor.degradation);
+    if (!d) {
+      missing.push(`${floor.constant} (no ${floor.degradation} result in this run)`);
+      continue;
+    }
+    const measured = floor.statistic === 'paired' ? d.aucPaired : d.aucAllPairs;
+    const next = floorFor(measured);
+    const pattern = new RegExp(`(export const ${floor.constant} = )(-?[0-9.]+)(;)`);
+    if (!pattern.test(source)) {
+      missing.push(`${floor.constant} (no single-line \`export const … = <number>;\` in ${AUC_LIB})`);
+      continue;
+    }
+    source = source.replace(pattern, `$1${next}$3`);
+    lines.push(
+      `  ${floor.constant.padEnd(38)} ${String(floor.value).padStart(7)} -> ${String(next).padStart(7)}`
+      + `   (measured ${measured.toFixed(4)}${floor.primary ? ', PRIMARY' : ''}`
+      + `${next === floor.value ? ', unchanged' : ''})`,
+    );
+  }
+
+  if (missing.length > 0) {
+    return [
+      '',
+      `REFUSED to rewrite ${AUC_LIB}: ${missing.length} floor constant(s) could not be located.`,
+      ...missing.map((m) => `  - ${m}`),
+      'No floor was written. Fix the shape (one line, `export const NAME = <number>;`) and re-run.',
+    ];
+  }
+
+  writeFileSync(file, source);
+  return ['', `locked ${AUC_LIB} — six floor constants:`, ...lines];
 }
 
 await main();

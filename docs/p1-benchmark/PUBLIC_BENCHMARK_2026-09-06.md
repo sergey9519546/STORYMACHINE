@@ -25,12 +25,21 @@ same statistic from a committed table of numbers, but that table can only be
 produced by the owner (`npm run lock-auc24`) and is not committed, so it skips
 too. The only always-on signal was
 `tests/core/blind-pairs-discrimination.test.ts`, which records a **failing**
-craft result and asserted no floor in the losing direction. This lane adds a
-discrimination number that is **computed end to end on every CI run** — from
-32 committed `.fountain` files, through the real doctor, to an AUC with a
-seeded bootstrap interval on a pre-registered split, against two floors. It is
-not a better number than AUC-24. It is a number that exists where there was
-none.
+craft result and asserted no floor in the losing direction. This lane adds
+discrimination numbers that are **computed end to end on every CI run** — from
+32 committed `.fountain` files, through the real doctor, to six AUCs (three
+degradations × two statistics) with seeded bootstrap intervals on a
+pre-registered split, against six floors. It is not a better number than
+AUC-24. It is a number that exists where there was none.
+
+**Round 2 (after independent review) changed three things about how those
+numbers read**, and they matter more than the numbers: a **positive control**
+was added, because a benchmark whose every reading is null cannot tell a blind
+score from a broken harness (§3, §4.4); the **matched-pair statistic is now
+primary and floored**, because it is the estimator a paired design earns and it
+was the less flattering of the two computed in 7 of 8 cells (§4); and the
+`--lock` command now actually re-locks the floors it was documented as
+re-locking (§9).
 
 ---
 
@@ -101,39 +110,80 @@ the holdout is not fully independent. Keying the split on the pair would fix
 that and break property (1), because "which member's hash names the pair" is a
 choice.
 
+**THE SPLIT IS REPORTED, NOT USED — say this before ROADMAP P1's wording
+supplies the connection for you.** P1 asks for "a pre-registered split,
+held-out evaluation, and uncertainty reporting". This benchmark delivers the
+first and the third. It does **not** deliver held-out evaluation: every one of
+the six floors was locked from **all 32 scripts, the five holdout files
+included**, and the partition AUCs below are printed and asserted nowhere. So
+no held-out evaluation has taken place here, and this holdout is already spent
+against these floors — you cannot later claim it as clean evidence for a change
+tuned against them. The split earns its keep the first time someone tunes on
+exploration and checks on holdout against floors re-locked from exploration
+alone; until then it is a pre-registration waiting for a use, honestly labelled
+as one.
+
 ---
 
-## 3. The two degradations, and why there are two
+## 3. The three degradations, and why there are three
 
-| | (a) `SHUFFLE_DROP` | (b) `CLIMAX_RELOCATE` |
-|---|---|---|
-| recipe | seeded Fisher-Yates shuffle of all scenes, then drop every third of the shuffled order | move the final scene to position 1 |
-| scene count | **changes** (10 → 7) | **preserved** (measured: mean scarcity delta **0.000** over all 32) |
-| imported from | `scripts/lib/auc.ts` `shuffleDropDegrade` — the AUC-24 ratchet's own recipe, byte for byte | `scripts/lib/rebuild-experiment-lib.mjs` `degradeClimaxRelocate` |
-| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2092-2093`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts |
+| | (a) `SHUFFLE_DROP` | (b) `CLIMAX_RELOCATE` | (c) `DIALOGUE_FLATTEN` |
+|---|---|---|---|
+| role | measurement | measurement | **POSITIVE CONTROL** |
+| recipe | seeded Fisher-Yates shuffle of all scenes, then drop every third of the shuffled order | move the final scene to position 1 | replace every dialogue and parenthetical line with `Hello.` |
+| scene count | **changes** (10 → 7) | **preserved** (measured: mean scarcity delta **0.000** over all 32) | preserved |
+| imported from | `scripts/lib/auc.ts` `shuffleDropDegrade` — the AUC-24 ratchet's own recipe, byte for byte | `scripts/lib/rebuild-experiment-lib.mjs` `degradeClimaxRelocate` | `scripts/lib/rebuild-experiment-lib.mjs` `degradeDialogueFlatten` |
+| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2092-2093`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts | P1 baseline `DIALOGUE_FLATTEN` **0.990** — the one channel that PASSES its ≥0.80 gate |
 
-(b) exists because `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)`
-(`doctor.ts:465-467`, summed into `craftPenalty` at `doctor.ts:657`) is the
-doctor's dominant discrimination term — the file's own comment at
+**(b) exists because scene count is the doctor's dominant term.**
+`scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)` (`doctor.ts:465-467`,
+summed into `craftPenalty` at `doctor.ts:657`); the file's own comment at
 `doctor.ts:2092-2093` records "scarcity term AUC 0.938; the weightedIssues rule
 channel AUC is 0.076". A degradation that changes scene count is partly
 measuring that arithmetic. One that preserves it cancels the term exactly and
 leaves order-sensitivity.
 
+**(c) exists because both measurement channels read chance, and a benchmark
+whose every reading is null carries no information.** Given only (a) and (b), a
+reader cannot tell **"the score is blind to mechanical damage"** from **"this
+harness never worked"** — and every conclusion in this document depends on that
+distinction. `DIALOGUE_FLATTEN` is a manipulation the score demonstrably does
+catch: **32 of 32 scripts, zero ties, mean gap +29.30 points** (§4.4). So the
+instrument separates intact from damaged, on these exact 32 files, through this
+exact code path, and the near-chance readings on (a) and (b) are the score's
+rather than the harness's.
+
+**It is a control, not evidence, and the difference is the point.** The engine
+ships a deduction built specifically for this manipulation — `doctor.ts`'s
+dialogue-degradation deduction, motivated in its own header by
+`DIALOGUE_FLATTEN` measuring 0.54 at feature scale. Catching a manipulation you
+built a detector for is a liveness check, not a discovery. Measured here: of
+the 29.30-point mean gap, **16.71 points on average come from outside the
+density/scarcity craft formula entirely** (per-script 17.1–18.0 on most files;
+`the-ledger-excellent` flattened has craft formula 75.20 and actual health
+58.1). That is what makes it a check on the whole instrument rather than a
+second reading of the same term: neither (a) nor (b) moves health through
+anything but that formula.
+
 ---
 
 ## 4. Results
 
-Statistics reported for both degradations, because the two lineages define AUC
-differently and mixing them has caused trouble before:
+Two statistics are computed and **both are floored**, because the two lineages
+define AUC differently and mixing them has caused trouble before:
 
-* **AUC (all-pairs)** — Mann-Whitney over the full intact × degraded grid.
-  `computeAuc` in `scripts/lib/auc.ts`; the AUC-24 definition. **This is the
-  statistic the floors assert**, for both degradations, so the two are directly
-  comparable to each other.
-* **AUC (matched-pair)** — each script against its own degraded self.
-  `pairwiseAuc` in `scripts/lib/rebuild-experiment-lib.mjs`; the definition the
-  761-script P1 baseline reports.
+* **AUC (matched-pair) — PRIMARY.** Each script against a degraded copy of
+  *itself*. `pairwiseAuc` in `scripts/lib/rebuild-experiment-lib.mjs`; the
+  definition the 761-script P1 baseline reports. This is a paired design, so
+  the estimator that respects the pairing is the honest reading — and it is
+  the **less** flattering of the two in 7 of the 8 measurement cells this
+  benchmark has produced across `main` and the three scoring branches.
+* **AUC (all-pairs) — secondary.** Mann-Whitney over the full intact ×
+  degraded grid. `computeAuc` in `scripts/lib/auc.ts`; the AUC-24 definition.
+  It compares script A intact against script B degraded, folding between-script
+  variance (author, length, content) back into a comparison the pairing
+  controls. Reported and floored because the shuffle-drop recipe comes from
+  that lineage and a reader will look for it — never as the headline.
 * Both intervals are seeded 2000-resample percentile bootstraps, **seed 42**,
   resampling scripts with replacement. The matched-pair interval is
   `bootstrapCi` imported verbatim; the all-pairs interval is
@@ -144,16 +194,27 @@ differently and mixing them has caused trouble before:
 
 ### 4.1 Headline
 
-| degradation | N | AUC (all-pairs) | 95% CI | AUC (matched-pair) | 95% CI | mean health gap | floor |
-|---|---|---|---|---|---|---|---|
-| `SHUFFLE_DROP` | 32 | **0.5586** | [0.4219, 0.6973] | 0.5313 | [0.3750, 0.6875] | −1.93 | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.5386** |
-| `CLIMAX_RELOCATE` | 32 | **0.4673** | [0.4014, 0.5264] | 0.4219 | [0.2813, 0.5625] | −1.46 | `PUBLIC_ORDER_FLOOR` = **0.4473** |
+| degradation | N | AUC matched-pair (PRIMARY) | 95% CI | floor | AUC all-pairs | 95% CI | floor | mean gap | ordered/inverted/tied |
+|---|---|---|---|---|---|---|---|---|---|
+| `SHUFFLE_DROP` | 32 | **0.5313** | [0.3750, 0.6875] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.5113** | 0.5586 | [0.4219, 0.6973] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.5386** | −1.93 | 17/15/0 |
+| `CLIMAX_RELOCATE` | 32 | **0.4219** | [0.2813, 0.5625] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.4019** | 0.4673 | [0.4014, 0.5264] | `PUBLIC_ORDER_FLOOR` = **0.4473** | −1.46 | 8/13/**11** |
+| `DIALOGUE_FLATTEN` *(control)* | 32 | **1.0000** | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` = **0.98** | 0.9473 | [0.8779, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` = **0.9273** | +29.30 | 32/0/0 |
 
-**Both 95% intervals contain 0.5.** On this corpus the doctor does not reliably
-prefer an intact script to a mechanically damaged copy of itself under either
-recipe, and the mean health gap is **negative** under both — the damaged copy
-scores *higher* on average. Floors are `round4(measured − 0.02)`
-(`PUBLIC_FLOOR_MARGIN`, `scripts/lib/auc.ts`).
+**All four measurement-channel intervals contain 0.5.** On this corpus the
+doctor does not reliably prefer an intact script to a mechanically damaged copy
+of itself under either recipe, and the mean health gap is **negative** under
+both — the damaged copy scores *higher* on average. The control reads 1.0000
+matched-pair, which is what licenses reading those two nulls as facts about the
+score. Floors are `round4(measured − 0.02)` (`PUBLIC_FLOOR_MARGIN`,
+`scripts/lib/auc.ts`), rewritten by `npm run benchmark:public -- --lock`.
+
+**A third of `CLIMAX_RELOCATE`'s N cannot move.** Ten of the 32 intact scripts
+sit at exactly health **76.0** — density penalty at its 10-point cap plus a
+14.0 scarcity term — so relocating a scene inside them changes nothing and
+**11 of 32 pairs are exact ties**, contributing 0.5 apiece by construction. Its
+point estimate rests on 21 movable scripts, and its narrower interval reflects
+that pinning, not precision. Do not read it as the more precise of the two.
+`SHUFFLE_DROP` has zero ties.
 
 Partition breakdown (matched-pair, for a set this small the all-pairs grid on 5
 scripts is not worth quoting):
@@ -249,6 +310,52 @@ happening.
 
 ---
 
+### 4.4 Per-script pairs — `DIALOGUE_FLATTEN` (the control)
+
+Every row ordered, no ties, no exceptions. This is the table that says the
+harness works.
+
+| file | partition | intact | flattened | gap |
+|---|---|---|---|---|
+| `chain-of-custody` | exploration | 76.3 | 35.5 | 40.8 |
+| `close-quarters` | exploration | 75.6 | 41.1 | 34.5 |
+| `code-blue` | exploration | 78.0 | 42.3 | 35.7 |
+| `counter-offer` | exploration | 76.0 | 48.9 | 27.1 |
+| `dead-frequency` | exploration | 78.3 | 56.4 | 21.9 |
+| `high-voltage` | exploration | 75.4 | 49.1 | 26.3 |
+| `mise` | holdout | 74.2 | 22.5 | 51.7 |
+| `off-season` | holdout | 71.2 | 30.4 | 40.8 |
+| `quiet-season` | holdout | 73.2 | 39.2 | 34.0 |
+| `red-line` | exploration | 73.7 | 40.6 | 33.1 |
+| `room-12` | exploration | 33.5 | 0.0 | 33.5 |
+| `runoff` | exploration | 74.6 | 56.2 | 18.4 |
+| `same-page` | exploration | 75.8 | 34.6 | 41.2 |
+| `soft-launch` | exploration | 77.3 | 48.9 | 28.4 |
+| `the-defense-rests` | exploration | 77.0 | 25.8 | 51.2 |
+| `the-detour` | exploration | 74.0 | 48.2 | 25.8 |
+| `the-key-under-the-mat` | exploration | 74.2 | 35.3 | 38.9 |
+| `transfer-window` | exploration | 31.9 | 0.0 | 31.9 |
+| `two-lane` | exploration | 79.0 | 52.9 | 26.1 |
+| `undertow` | exploration | 77.1 | 52.5 | 24.6 |
+| `fence-line-bad` | exploration | 76.0 | 47.3 | 28.7 |
+| `fence-line-excellent` | exploration | 76.0 | 56.9 | 19.1 |
+| `low-tide-bad` | exploration | 76.0 | 52.0 | 24.0 |
+| `low-tide-excellent` | exploration | 76.0 | 58.0 | 18.0 |
+| `night-shift-bad` | exploration | 76.0 | 52.0 | 24.0 |
+| `night-shift-excellent` | holdout | 76.0 | 58.9 | 17.1 |
+| `signal-drift-bad` | holdout | 76.0 | 52.6 | 23.4 |
+| `signal-drift-excellent` | exploration | 75.6 | 57.1 | 18.5 |
+| `the-deposit-bad` | exploration | 76.0 | 50.0 | 26.0 |
+| `the-deposit-excellent` | exploration | 75.1 | 52.2 | 22.9 |
+| `the-ledger-bad` | exploration | 74.8 | 42.7 | 32.1 |
+| `the-ledger-excellent` | exploration | 76.0 | 58.1 | 17.9 |
+
+Note the two scripts that were already pinned near the floor (`room-12`,
+`transfer-window`) reach health **0.0** here: the control is strong enough to
+saturate the low end, which is another reason its matched-pair AUC is 1.0000
+while its all-pairs AUC is 0.9473 — the all-pairs grid compares those floored
+scripts against other scripts' intact values.
+
 ## 5. The scene-count-artifact prediction, and what measuring it showed
 
 The brief this lane was built from, and
@@ -269,9 +376,15 @@ against each variant's own `bySeverity` / `sceneCount` / `wordCount`, with
 
 | term, `SHUFFLE_DROP`, mean over N=32 | value |
 |---|---|
-| extra **scarcity** penalty from losing scenes | **+5.693** points |
-| change in **density** penalty | **−7.625** points |
-| net change in health | **−1.931** (health goes UP under degradation) |
+| extra **scarcity** PENALTY from losing scenes | **+5.693** points |
+| change in **density** PENALTY | **−7.625** points |
+| net change in penalty = mean health **gap** (intact − degraded) | **−1.931** |
+| net change in **health** | **+1.931** — health goes UP under degradation |
+
+(The first three rows are penalty deltas and sum to −1.932; the last flips the
+sign because a penalty going down is health going up. Round 1 printed the third
+row labelled "net change in health", which contradicted its own parenthetical —
+corrected here after the independent review caught it.)
 
 Dropping every third scene removes a larger share of the weighted issues than
 of the words — for example `counter-offer` goes from 130.0 weighted issues over
@@ -286,9 +399,14 @@ The same decomposition on `CLIMAX_RELOCATE` returns **scarcity delta exactly
 cannot be moved by the scene-count channel.
 
 **The lesson, for the next person tempted to argue a number from the formula:**
-both of these figures had a confident prediction attached, and running the
-measurement changed one of them by 0.4 AUC. `measure-before-threshold` is not
-a slogan.
+both of these channels had a confident prediction attached. The prediction for
+`CLIMAX_RELOCATE` ("near chance") held — measured 0.4219 matched-pair. The
+prediction for `SHUFFLE_DROP` ("inflated by the scene-count artifact, and so
+much higher than the private corpus's number") did not: it measured 0.5313,
+which is not high, and the sign of the mean gap runs the opposite way to what
+the argument implies. No numeric prediction was ever written down for it, so
+there is no delta to quote — only a direction, and the direction was wrong.
+`measure-before-threshold` is not a slogan.
 
 ---
 
@@ -316,57 +434,83 @@ reproduces it on every CI run instead of in a dated document.
 
 ## 7. The same harness on the three pushed scoring branches
 
-Run on `origin/scoring/*` as pushed (fetched, **not merged**; each extracted to
-a scratch tree with only `scripts/lib/public-benchmark.ts` and a JSON runner
-copied in, so the doctor under test is that branch's own). No receipt on those
-branches changes — this lane touched none of them.
+Run on `origin/scoring/*` **at the SHAs named in every row below** (fetched and
+`git archive`-extracted to scratch trees, **not merged**; only
+`scripts/lib/public-benchmark.ts` and a JSON runner were copied in, so the
+doctor under test is that branch's own). Those refs move — the 2026-09-06
+branch-sync review records them at `cfb7233c` / `c1873e3c` / `1bae835d` earlier
+the same week — so a table without SHAs is unverifiable a day later. No receipt
+on those branches changes; this lane touched no file on any of them.
+
+Matched-pair is the primary statistic in every table.
 
 ### 7.1 `SHUFFLE_DROP`
 
-| tree | N | AUC (all-pairs) | 95% CI | AUC (matched-pair) | 95% CI | mean gap |
-|---|---|---|---|---|---|---|
-| `main @ c16f7e0c` | 32 | **0.5586** | [0.4219, 0.6973] | 0.5313 | [0.3750, 0.6875] | −1.93 |
-| `scoring/r5-verbosity-bias` | 32 | **0.1245** | [0.0513, 0.2129] | 0.0938 | [0.0000, 0.1875] | −15.78 |
-| `scoring/advice-rule-fixes` | 32 | **0.5298** | [0.4033, 0.6548] | 0.4375 | [0.2813, 0.6250] | −3.60 |
-| `scoring/stacked-r5-plus-advice` | 32 | **0.1089** | [0.0361, 0.1973] | 0.0938 | [0.0000, 0.1875] | −15.09 |
+| tree | N | AUC matched-pair (PRIMARY) | 95% CI | AUC all-pairs | 95% CI | mean gap | ord/inv/tie |
+|---|---|---|---|---|---|---|---|
+| `main @ c16f7e0c` | 32 | **0.5313** | [0.3750, 0.6875] | 0.5586 | [0.4219, 0.6973] | −1.93 | 17/15/0 |
+| `scoring/r5-verbosity-bias @ 52bf410a` | 32 | **0.0938** | [0.0000, 0.1875] | 0.1245 | [0.0513, 0.2129] | −15.78 | 3/29/0 |
+| `scoring/advice-rule-fixes @ a1cf7677` | 32 | **0.4375** | [0.2813, 0.6250] | 0.5298 | [0.4033, 0.6548] | −3.60 | 14/18/0 |
+| `scoring/stacked-r5-plus-advice @ 408166ae` | 32 | **0.0938** | [0.0000, 0.1875] | 0.1089 | [0.0361, 0.1973] | −15.09 | 3/29/0 |
 
 ### 7.2 `CLIMAX_RELOCATE`
 
-| tree | N | AUC (all-pairs) | 95% CI | AUC (matched-pair) | 95% CI | mean gap |
-|---|---|---|---|---|---|---|
-| `main @ c16f7e0c` | 32 | **0.4673** | [0.4014, 0.5264] | 0.4219 | [0.2813, 0.5625] | −1.46 |
-| `scoring/r5-verbosity-bias` | 32 | **0.5034** | [0.4302, 0.5811] | 0.4844 | [0.3281, 0.6563] | −0.19 |
-| `scoring/advice-rule-fixes` | 32 | **0.5068** | [0.4482, 0.5640] | 0.4844 | [0.3438, 0.6250] | −1.49 |
-| `scoring/stacked-r5-plus-advice` | 32 | **0.4971** | [0.4263, 0.5654] | 0.5313 | [0.3750, 0.7188] | 0.28 |
+| tree | N | AUC matched-pair (PRIMARY) | 95% CI | AUC all-pairs | 95% CI | mean gap | ord/inv/tie |
+|---|---|---|---|---|---|---|---|
+| `main @ c16f7e0c` | 32 | **0.4219** | [0.2813, 0.5625] | 0.4673 | [0.4014, 0.5264] | −1.46 | 8/13/11 |
+| `scoring/r5-verbosity-bias @ 52bf410a` | 32 | **0.4844** | [0.3281, 0.6563] | 0.5034 | [0.4302, 0.5811] | −0.19 | 15/16/1 |
+| `scoring/advice-rule-fixes @ a1cf7677` | 32 | **0.4844** | [0.3438, 0.6250] | 0.5068 | [0.4482, 0.5640] | −1.49 | 10/11/11 |
+| `scoring/stacked-r5-plus-advice @ 408166ae` | 32 | **0.5313** | [0.3750, 0.7188] | 0.4971 | [0.4263, 0.5654] | +0.28 | 17/15/0 |
 
-### 7.3 Manifest movement against `main`, per branch
+Note the tie column: R5 un-pins the density cap (1 tie instead of 11), so on
+that branch this channel is measuring 31 movable scripts rather than 21. The
+AUC moving from 0.4219 to 0.4844 is partly that, not only order-sensitivity.
+
+### 7.3 `DIALOGUE_FLATTEN` — the control, on every tree
+
+| tree | N | AUC matched-pair (PRIMARY) | 95% CI | AUC all-pairs | 95% CI | mean gap | ord/inv/tie |
+|---|---|---|---|---|---|---|---|
+| `main @ c16f7e0c` | 32 | **1.0000** | [1.0000, 1.0000] | 0.9473 | [0.8779, 1.0000] | +29.30 | 32/0/0 |
+| `scoring/r5-verbosity-bias @ 52bf410a` | 32 | **1.0000** | [1.0000, 1.0000] | 0.9019 | [0.8467, 0.9639] | +20.16 | 32/0/0 |
+| `scoring/advice-rule-fixes @ a1cf7677` | 32 | **0.9844** | [0.9531, 1.0000] | 0.9458 | [0.8716, 1.0000] | +34.65 | 31/0/1 |
+| `scoring/stacked-r5-plus-advice @ 408166ae` | 32 | **1.0000** | [1.0000, 1.0000] | 0.9375 | [0.8818, 0.9883] | +21.55 | 32/0/0 |
+
+**This row is what makes §7.1 readable.** The control holds on all four trees,
+so R5's 0.0938 is not a harness that stopped working on that branch — the same
+harness, on the same 32 files, still separates intact from flattened 32 of 32
+there. The inversion is the score's.
+
+### 7.4 Manifest movement against `main`, per branch
 
 | branch | health rows moved | verdict rows moved | `words` rows moved | mean health delta |
 |---|---|---|---|---|
-| `scoring/r5-verbosity-bias` | 32 / 32 | 28 / 32, all `CONSIDER` → `PASS` | 0 / 32 | **−24.73** |
-| `scoring/advice-rule-fixes` | 19 / 32 | 0 / 32 | **32 / 32** | −1.84 (over moved rows) |
-| `scoring/stacked-r5-plus-advice` | 32 / 32 | 25 / 32, all `CONSIDER` → `PASS` | 32 / 32 | **−22.42** |
+| `scoring/r5-verbosity-bias @ 52bf410a` | 32 / 32 | 28 / 32, all `CONSIDER` → `PASS` | 0 / 32 | **−24.73** (over the 32 moved) |
+| `scoring/advice-rule-fixes @ a1cf7677` | 19 / 32 | 0 / 32 | **32 / 32** | **−3.11** (over the 19 moved; −1.84 spread across all 32) |
+| `scoring/stacked-r5-plus-advice @ 408166ae` | 32 / 32 | 25 / 32, all `CONSIDER` → `PASS` | 32 / 32 | **−22.42** (over the 32 moved) |
 
-### 7.4 What that table does and does not say
+### 7.5 What that table does and does not say
 
 **Says, plainly:** had this benchmark existed before those branches were
-written, `PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386` would have **failed** on
-`scoring/r5-verbosity-bias` (0.1245) and on
-`scoring/stacked-r5-plus-advice` (0.1089), and `scoring/advice-rule-fixes`
-(0.5298) would have failed too, by 0.009. On this corpus the R5 change inverts
-the shuffle-drop statistic: the degraded copy outscores the intact one on
-nearly every script (mean gap −15.78 points). It also moves 28 of 32 scripts
-from `CONSIDER` to `PASS`, which is the worst of the three coverage verdicts
-(`doctor.ts` types: health ≥ 85 and ≥ 8 scenes → `RECOMMEND`, health ≥ 60 →
-`CONSIDER`, else `PASS`). That is a large, previously invisible fact about a
-branch whose stated purpose is a different (real) defect.
+written, the floors would have **failed on all three**. On the primary
+matched-pair statistic against `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5113`:
+`r5` 0.0938, `stacked` 0.0938, `advice` 0.4375. On the secondary all-pairs
+statistic against `PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386`: 0.1245, 0.1089, and
+0.5298 (short by 0.0088). On this corpus the R5 change inverts the shuffle-drop
+statistic — the degraded copy outscores the intact one on **29 of 32** scripts,
+mean gap −15.78 points. It also moves 28 of 32 scripts from `CONSIDER` to
+`PASS`, the worst of the three coverage verdicts (`doctor.ts` types: health ≥ 85
+and ≥ 8 scenes → `RECOMMEND`, health ≥ 60 → `CONSIDER`, else `PASS`). That is a
+large, previously invisible fact about a branch whose stated purpose is a
+different (real) defect.
 
 **Does not say** that R5 is wrong. Removing `wordCount` from the density
-penalty is a fix for a measured verbosity bias
+denominator is a fix for a measured verbosity bias
 (`docs/scoring/VERBOSITY_BIAS_2026-07-11.md`, and the `empty_verbosity`
 known-failing metamorphic case). What the number says is that on 9–14-scene
 scripts the same change makes health track raw issue count, which the
-shuffle-drop recipe reduces by a third along with the scenes. Whether that is
+shuffle-drop recipe reduces to a measured 0.502 of its intact value along with
+the scenes — and that R5 replaces the bounded sub-density logistic with an
+unbounded squared term, so nothing caps the resulting collapse. Whether that is
 also true at feature length is exactly what `npm run measure-real` on the
 owner's corpus decides, and this benchmark cannot.
 
@@ -375,7 +519,6 @@ owner's corpus decides, and this benchmark cannot.
 them, and this lane deliberately changed no file on any of those branches.
 
 ---
-
 ## 8. What this benchmark can and cannot show
 
 **Can**
@@ -384,14 +527,31 @@ them, and this lane deliberately changed no file on any of those branches.
   anyone, with no corpus mount, no key and no owner step.
 * Turn a scoring change's effect on real distributable prose into a reviewable
   numeric diff — 32 rows of `{sceneCount, words, health, verdict}` in
-  `tests/fixtures/public-corpus-manifest.json`, plus two AUCs with intervals.
+  `tests/fixtures/public-corpus-manifest.json`, plus six AUCs with intervals.
 * Settle the scene-count question by measurement rather than arithmetic (§5).
 * Catch a large regression in either direction. §7 is the worked example.
+* **Show that the harness itself works, separately from what it reads.** The
+  `DIALOGUE_FLATTEN` control separates intact from damaged on 32 of 32 scripts
+  with zero ties, on every tree measured including all three scoring branches
+  (§7.3). That is the one hypothesis a benchmark of pure nulls can never rule
+  out on its own, and it is ruled out here.
 
 **Cannot**
 
 * Show that health tracks **craft**. Mechanical damage is not bad writing. The
   craft question is the blind pairs, and its answer is 1 of 6.
+* Give a moving reading on a third of the `CLIMAX_RELOCATE` sample. Ten of the
+  32 scripts sit pinned at exactly health **76.0** (density penalty at its
+  10-point cap plus a 14.0 scarcity term), so **11 of 32 pairs are exact ties**
+  contributing 0.5 apiece by construction. That channel's estimate rests on 21
+  movable scripts and its narrower interval reflects pinning, not precision —
+  it is not the more precise of the two.
+* Deliver a **held-out evaluation**. The split is pre-registered and reported;
+  all six floors were locked from all 32 scripts, holdout included (§2).
+* Prove anything with the control. `DIALOGUE_FLATTEN` is a manipulation the
+  engine ships a dedicated deduction for. It proves the instrument reads, not
+  that the score is valid — and mistaking one for the other would be the
+  worst possible misreading of this document.
 * Transfer to feature-length real writing. N = 32 at 9–14 scenes.
   `ARC_DED_MIN_SCENES` and `CLIMAX_DED_MIN_SCENES` are both 15
   (`doctor.ts:2101`, `doctor.ts:619-622`), so the feature-scale deductions
@@ -414,17 +574,61 @@ them, and this lane deliberately changed no file on any of those branches.
 | piece | file |
 |---|---|
 | harness (corpus discovery, degradations, statistics, intervals, limits text) | `scripts/lib/public-benchmark.ts` |
-| floors and the margin | `scripts/lib/auc.ts` — `PUBLIC_SHUFFLE_DROP_FLOOR`, `PUBLIC_ORDER_FLOOR`, `PUBLIC_FLOOR_MARGIN` |
+| floors (six) and the margin | `scripts/lib/auc.ts` — `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR`, `PUBLIC_SHUFFLE_DROP_FLOOR`, `PUBLIC_ORDER_PAIRED_FLOOR`, `PUBLIC_ORDER_FLOOR`, `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR`, `PUBLIC_DIALOGUE_FLATTEN_FLOOR`, `PUBLIC_FLOOR_MARGIN`, and the `PUBLIC_FLOORS` mapping |
 | always-on assertions | `tests/core/public-benchmark.test.ts` |
 | manifest lock (32 rows) | `tests/fixtures/public-corpus-manifest.json` |
 | pre-registered split | `tests/fixtures/public-benchmark-split.json` |
 | CLI | `scripts/benchmark-public.ts`, `npm run benchmark:public` |
-| re-lock command | `npm run benchmark:public -- --lock` |
+| re-lock command | `npm run benchmark:public -- --lock` — rewrites the manifest, the split, **and the six floor constants in `scripts/lib/auc.ts`**, printing every `before -> after`. Round 1 claimed it re-locked the floors and did not; that is fixed rather than reworded. What it still does **not** rewrite is prose: the narrative in `auc.ts` and the numbers in this document are yours, and `tests/core/public-benchmark.test.ts` fails until both agree with the measurement. Re-lock ONLY after a scoring change you intended, and read the `auc.ts` diff — a re-lock after an unintended regression silently lowers the ratchet, which is the one way this machinery can be defeated. |
 | gate row | `scripts/report-unverified-gates.mjs` `VERIFIED_GATES` (`npm run gates`) |
 | receipt | `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, PUBLIC-CORPUS section |
 
-**Runtime.** 96 doctor runs (32 intact + 32 + 32) plus two 2000-resample
-bootstraps: **3.05 s** measured (`npm run benchmark:public -- --json` reports
-`elapsedMs`), 4.8 s wall for the whole CLI including Node start. The always-on
-test adds the same 3 s to `npm test`, well inside the 60 s budget this lane was
-held to.
+**Runtime.** 128 doctor runs (32 intact + 32 shuffle-drop + 32 climax-relocate
++ 32 dialogue-flatten) plus three 2000-resample bootstraps: **3.75 s** measured
+(`npm run benchmark:public -- --json` reports `elapsedMs`; the control added
+~0.70 s to round 1's 3.05 s), 5.0 s wall for the whole CLI including Node
+start. `tests/core/public-benchmark.test.ts` is **4.87 s** wall on its own,
+well inside the 60 s budget this lane was held to. `npm run gates` now also
+runs that suite (see §9's gate row and `scripts/report-unverified-gates.mjs`),
+so the reporter costs about 5 s more than it did.
+
+---
+
+## 10. For the scoring lane, not this one: the density term rewards deletion
+
+This is the independent reviewer's §5.1 finding, carried here verbatim in
+substance because it is the most useful thing the benchmark surfaced and it
+must not be left only in a benchmark document. **It is not a finding this lane
+can act on** — it is `doctor.ts`, it crosses the receipt gate, and it belongs
+to whoever picks up the density-term work.
+
+> The lane's refutation is right, and the reason it is right is worse than the
+> doc says. Under shuffle-drop the corpus retains **72.5% of its words but only
+> 50.2% of its weighted issues**, so `density = weightedIssues / wordCount^0.7`
+> falls hard — and the sub-density branch is a logistic with **steepness 50
+> around midpoint 0.52** (`doctor.ts:447-449`), i.e. a near-step function whose
+> entire 0→10-point range is traversed by a density move of about ±0.05.
+> `counter-offer` crosses it in one step: density 0.7699 → 0.3472, density
+> penalty **10.000 → 0.000**, and health rises 4 points while a third of the
+> script is deleted. `room-12` gains **36.5 points** the same way.
+>
+> Stated as a property of the score rather than of the benchmark: **on
+> 9–14-scene scripts the health formula pays you to delete a third of your
+> scenes.**
+
+Two consequences this document already records: the same saturation pins **10
+of the 32 scripts at exactly health 76.0**, which is where `CLIMAX_RELOCATE`'s
+11 exact ties come from (§4.1, §8); and it is why `SHUFFLE_DROP`'s mean health
+gap is negative on `main` before any branch is involved (§5).
+
+The reviewer's reading of why R5 amplifies this eightfold, also recorded here
+so the branch table is not the only place it lives: R5 replaces the density
+denominator `wordCount^0.7` with `(sceneCount × 30)^0.7` **and** drops the
+bounded sub-density logistic for an unbounded `8 · density²`. Shuffle-drop
+removes a third of the scenes, so R5's denominator shrinks by
+`(2/3)^0.7 ≈ 0.752` while the numerator falls to a measured 0.502 — density
+lands at ≈0.67 of intact, and a squared, uncapped penalty at ≈0.45. On `main`
+the logistic's 10-point ceiling absorbs most of that; R5 removes the ceiling.
+The result is not a new inversion — `main`'s own mean gap is already −1.93 with
+15 of 32 inverted — it is the same inversion unmasked and amplified: 29 of 32
+inverted, mean gap −15.78.

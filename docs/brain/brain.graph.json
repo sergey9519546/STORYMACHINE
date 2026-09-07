@@ -1058,6 +1058,10 @@
     },
     {
       "from": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {

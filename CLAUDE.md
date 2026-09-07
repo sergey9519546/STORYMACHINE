@@ -164,31 +164,58 @@ gate. Do not "update" the 0.622 ratchet to a P1 number — different corpus,
 different degradation, different denominator; raising it that way breaks that
 test for no real regression.
 
-The fourth and fifth statistics are the **PUBLIC BENCHMARK** floors, added
-2026-09-06 and living beside `AUC24_FLOOR` in `scripts/lib/auc.ts`:
-**`PUBLIC_SHUFFLE_DROP_FLOOR` = 0.5386** and **`PUBLIC_ORDER_FLOOR` =
-0.4473**, asserted by `tests/core/public-benchmark.test.ts` — the first
+The fourth and fifth statistics are the **PUBLIC BENCHMARK** measurement
+channels, added 2026-09-06 and living beside `AUC24_FLOOR` in
+`scripts/lib/auc.ts`. `tests/core/public-benchmark.test.ts` is the first
 discrimination assertion in this repository that runs on EVERY CI run, with no
 corpus, no key and no owner-local step, because the 32 screenplays it scores
 (20 CC0 in `data/screenplays/` + the 12 blind-pair fixtures) are committed to
-this repository. Measured on this tree 2026-09-06: shuffle-drop **0.5586**
-(95% CI [0.4219, 0.6973]) and climax-relocate **0.4673** (95% CI
-[0.4014, 0.5264]); floors are those values minus a 0.02 margin. **Both
-intervals contain 0.5** — on 9-14-scene distributable prose the doctor does
-not reliably prefer an intact script to a mechanically damaged copy of itself,
-and these floors ratchet that so it cannot get quietly worse. They are the
-current truth, not a target; raise either only from a rerun.
+this repository. Each channel is floored on TWO statistics, six constants in
+all, and **the matched-pair one is primary** — this is a paired design (every
+script against a degraded copy of itself), and all-pairs was the friendlier of
+the two in 7 of the 8 cells measured:
 
-These two are NOT comparable to AUC-24 or to the P1 baseline either — 32
-short scripts vs feature-length, and the feature-scale deductions
+| channel | matched-pair (PRIMARY) | floor | all-pairs | floor |
+|---|---|---|---|---|
+| shuffle-drop (scene count changes) | 0.5313 | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.5113 | 0.5586 | `PUBLIC_SHUFFLE_DROP_FLOOR` 0.5386 |
+| climax-relocate (scene count preserved) | 0.4219 | `PUBLIC_ORDER_PAIRED_FLOOR` 0.4019 | 0.4673 | `PUBLIC_ORDER_FLOOR` 0.4473 |
+
+Floors are those measured values minus a 0.02 margin. **All four intervals
+contain 0.5** ([0.3750, 0.6875] / [0.4219, 0.6973]; [0.2813, 0.5625] /
+[0.4014, 0.5264]) — on 9-14-scene distributable prose the doctor does not
+reliably prefer an intact script to a mechanically damaged copy of itself, and
+these floors ratchet that so it cannot get quietly worse. They are the current
+truth, not a target; raise any of them only from a rerun. Two readings that
+must not be taken for precision: 10 of the 32 scripts sit pinned at health
+76.0 on the density cap, so **11 of 32 climax-relocate pairs are exact ties**
+and that channel's narrower interval is pinning, not precision; and the
+pre-registered split is **reported, not used** — all six floors were locked
+from all 32 scripts, holdout included, so no held-out evaluation has happened.
+
+**A sixth pair of floors guards a POSITIVE CONTROL, not a finding.**
+`DIALOGUE_FLATTEN` (`PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` 0.98,
+`PUBLIC_DIALOGUE_FLATTEN_FLOOR` 0.9273; measured 1.0000 / 0.9473, 32 of 32
+ordered, zero ties) exists so that a near-chance reading on the two
+measurement channels cannot be dismissed as a broken harness. The engine ships
+a deduction built for exactly that manipulation, so it proves the instrument
+reads — never that the score is valid. If it ever drops, suspect the harness
+before the score.
+
+None of these six is comparable to AUC-24 or to the P1 baseline — 32 short
+scripts vs feature-length, and the feature-scale deductions
 (`ARC_DED_MIN_SCENES` / `CLIMAX_DED_MIN_SCENES`, both 15) never fire at this
 length, so the public benchmark measures a strictly smaller engine. What
-distinguishes the two public statistics from each other is scene count:
+distinguishes the two measurement channels from each other is scene count:
 shuffle-drop changes it, climax-relocate preserves it exactly (measured
 scarcity delta 0.000), so only the second isolates order-sensitivity.
-Reproduce either with `npm run benchmark:public`; re-lock the manifest, the
-split and the floors with `npm run benchmark:public -- --lock`; full method,
-per-script pairs and the three-branch comparison in
+Reproduce with `npm run benchmark:public`. `npm run benchmark:public -- --lock`
+re-locks the manifest, the split **and all six floor constants** in
+`scripts/lib/auc.ts`, printing every before/after — it does NOT rewrite prose,
+and the suite fails until the narrative in `auc.ts` and the numbers in the doc
+match the run. Re-lock only after a scoring change you intended, and read the
+`auc.ts` diff: a re-lock after an unintended regression silently lowers the
+ratchet. Full method, per-script pairs, the control table and the three-branch
+comparison (pinned to SHAs) in
 `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md`.
 
 **The floor's VALUE is still not CI-verifiable — the corpus physically cannot
