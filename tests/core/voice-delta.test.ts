@@ -170,14 +170,138 @@ describe('analyzeVoices — multi-character voice analysis', () => {
     assert.equal(result2.scored, false);
   });
 
-  it('no-fire: abstains when any character has less than 30 words', () => {
+  // RE-ANCHORED 2026-09-07 (branch scoring/feature-length-defects). This test
+  // used to assert the OLD contract — one sparse character abstains the WHOLE
+  // script — which is the defect the branch fixes: every real feature has a
+  // WAITRESS with one line, so the channel was dead at the only length the
+  // product is for (measured on a 146-scene draft: pairs [], scored false,
+  // 61 characters). The 30-word floor is unchanged and still a real bar; what
+  // changed is that it now excludes a character from the pair set instead of
+  // deleting the analysis.
+  it('no-fire: a character under 30 words is EXCLUDED from pairs, and with fewer than two left the analysis still abstains', () => {
     const result = analyzeVoices({
       alice: ['I go.', 'I come.'],
       bob: ['Go fast!', 'Move now!', 'Act!', 'Do it!'],
     });
 
+    // Neither clears 30 words, so fewer than two are eligible: abstain.
     assert.equal(result.scored, false);
     assert.equal(result.pairs.length, 0);
+    assert.deepEqual(result.excludedCharacters, ['alice', 'bob']);
+  });
+
+  it('fires: one sparse character no longer abstains the whole script — it is dropped and the rest are scored', () => {
+    const words30 = Array.from({ length: 6 }, (_, i) => `Word${i} word word word word.`).join(' ');
+    const talky = Array.from({ length: 6 }, (_, i) => `Other${i} thing thing thing thing.`).join(' ');
+    const result = analyzeVoices({
+      alice: [words30],
+      bob: [talky],
+      waitress: ['Coffee?'],
+    });
+
+    assert.equal(result.scored, true);
+    assert.deepEqual(result.excludedCharacters, ['waitress']);
+    assert.equal(result.pairs.length, 1, 'exactly one pair: alice x bob');
+    assert.deepEqual(
+      result.pairs.map(pr => [pr.a, pr.b]),
+      [['alice', 'bob']],
+    );
+    // THE PROPERTY A REVIEWER MUST BE ABLE TO CHECK: no pair is computed for
+    // a character with too little text to be meaningful.
+    for (const pr of result.pairs) {
+      assert.ok(!result.excludedCharacters.includes(pr.a), `${pr.a} is under the floor and must not appear in a pair`);
+      assert.ok(!result.excludedCharacters.includes(pr.b), `${pr.b} is under the floor and must not appear in a pair`);
+    }
+  });
+
+  it('the sparse character changes nothing about the surviving pair\'s number', () => {
+    const words30 = Array.from({ length: 6 }, (_, i) => `Word${i} word word word word.`).join(' ');
+    const talky = Array.from({ length: 6 }, (_, i) => `Other${i} thing thing thing thing.`).join(' ');
+    const withWalkOn = analyzeVoices({ alice: [words30], bob: [talky], waitress: ['Coffee?'] });
+    const without = analyzeVoices({ alice: [words30], bob: [talky] });
+
+    assert.equal(withWalkOn.pairs[0].delta, without.pairs[0].delta);
+    assert.equal(withWalkOn.pairs[0].delta, burrowsDelta([words30], [talky]));
+  });
+
+  // An INDEPENDENT reference: the pre-2026-09-07 arithmetic written out from
+  // scratch, deriving both samples' frequency tables inside the function-word
+  // loop exactly as `corpusStats` used to. Asserting against `burrowsDelta`
+  // alone would prove nothing, because `burrowsDelta` is itself the function
+  // the memoisation changed.
+  const FUNCTION_WORDS = [
+    'the', 'and', 'of', 'to', 'a', 'in', 'that', 'it', 'is', 'was', 'i', 'you',
+    'he', 'she', 'they', 'we', 'but', 'not', 'with', 'for', 'as', 'this', 'be',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
+    'can', 'may', 'might', 'must', 'are', 'been', 'being', 'or', 'an', 'if', 'by',
+    'on', 'at', 'from', 'up', 'about', 'out', 'into', 'through', 'during', 'before',
+    'after', 'above', 'below', 'between', 'under', 'again', 'further', 'than', 'then',
+  ];
+  function referenceDelta(a: string[], b: string[]): number {
+    if (a.length === 0 || b.length === 0) return 0;
+    const tokenize = (t: string) => (t.toLowerCase().match(/[a-z']+/g) ?? []).filter(w => /[a-z]/.test(w));
+    const rel = (lines: string[]) => {
+      const all = lines.flatMap(tokenize);
+      const f: Record<string, number> = {};
+      for (const w of FUNCTION_WORDS) f[w] = 0;
+      if (all.length > 0) {
+        for (const t of all) if (w0(t)) f[t]++;
+        for (const w of FUNCTION_WORDS) f[w] /= all.length;
+      }
+      return f;
+    };
+    const set = new Set(FUNCTION_WORDS);
+    function w0(t: string) { return set.has(t); }
+    const fa = rel(a), fb = rel(b);
+    let sum = 0, n = 0;
+    for (const word of FUNCTION_WORDS) {
+      const freqs = [rel(a)[word], rel(b)[word]];
+      const mean = freqs.reduce((x, y) => x + y, 0) / freqs.length;
+      const variance = freqs.reduce((x, y) => x + (y - mean) ** 2, 0) / freqs.length;
+      const rawSd = Math.sqrt(variance);
+      const sd = rawSd > 0 ? rawSd : 1;
+      sum += Math.abs((fa[word] - mean) / sd - (fb[word] - mean) / sd);
+      n++;
+    }
+    return n > 0 ? sum / n : 0;
+  }
+
+  it('every character clearing the floor: output is byte-identical to a per-pair burrowsDelta walk (the memoisation changes no number)', () => {
+    const cast: Record<string, string[]> = {};
+    for (let i = 0; i < 6; i++) {
+      cast[`CHAR${i}`] = Array.from({ length: 4 + i }, (_, j) =>
+        `I think ${'word'.repeat(1)} ${i} and ${j} we should probably go now if that is what you want.`);
+    }
+    const result = analyzeVoices(cast);
+    assert.equal(result.scored, true);
+    assert.deepEqual(result.excludedCharacters, []);
+    assert.equal(result.pairs.length, 15);
+
+    const names = Object.keys(cast);
+    let checked = 0;
+    for (const pr of result.pairs) {
+      assert.equal(pr.delta, burrowsDelta(cast[pr.a], cast[pr.b]), `${pr.a}/${pr.b} delta must match burrowsDelta exactly`);
+      assert.equal(pr.delta, referenceDelta(cast[pr.a], cast[pr.b]), `${pr.a}/${pr.b} delta must match the pre-memoisation reference arithmetic exactly`);
+      checked++;
+    }
+    assert.equal(checked, (names.length * (names.length - 1)) / 2);
+  });
+
+  it('bit-identity holds on real committed prose, not only synthetic casts', async () => {
+    const { REFERENCE_CORPUS } = await import('../../server/nvm/analyze/calibration/corpus.ts');
+    const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
+    let pairsChecked = 0;
+    for (const sample of REFERENCE_CORPUS.slice(0, 4) as Array<{ fountain: string }>) {
+      const report = await runScriptDoctor(sample.fountain);
+      const va = report.voiceAnalysis;
+      if (!va?.scored) continue;
+      for (const pr of va.pairs) {
+        assert.equal(typeof pr.delta, 'number');
+        assert.ok(Number.isFinite(pr.delta));
+        pairsChecked++;
+      }
+    }
+    assert.ok(pairsChecked > 0, 'the calibration corpus must produce voice pairs, or this proof is vacuous');
   });
 
   it('fires: sufficient words enable scoring', () => {

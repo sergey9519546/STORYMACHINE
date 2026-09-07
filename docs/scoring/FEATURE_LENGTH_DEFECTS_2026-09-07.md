@@ -105,6 +105,7 @@ are in §8.1.
 | # | commit | DROP | CLIMAX | CTRL | blind | cal | `empty_verbosity` | `stapled_shorts` | identity moved | verdict flips |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `stapled_shorts` witness | 0.5313 | 0.4219 | 1.0000 | 1/6, −0.0167 | 21/21 pass | KNOWN FAIL +5.4 | **KNOWN FAIL +8.2** | 0 of 45 | 0 of 45 |
+| 2 | voice: per-character abstention | 0.5313 | 0.4219 | 1.0000 | 1/6, −0.0167 | 21/21 pass | KNOWN FAIL +5.4 | KNOWN FAIL +8.2 | 0 of 45 (45 byte-differ) | 0 of 45 |
 
 ### 8.1 Per-commit detail
 
@@ -126,3 +127,102 @@ The witness is shown FAILING on the tree it was written against — base 78.3
 epsilon 0 — which is what makes it evidence rather than decoration. It is
 registered `known-failing`, the same disposition `empty_verbosity` carries,
 so it prints on every run and fails no build until the formula is fixed.
+
+
+**Commit 2 — the voice channel abstains per character, not per script.**
+
+Every AUC, every blind pair, every calibration band and every health value is
+unchanged, and that is the expected result, not a null one: nothing in the
+scoring pipeline reads `voiceAnalysis`. `doctor.ts:2292` carries it onto the
+report and the only consumers are display (`CoverageSummary.tsx`'s Voice
+Separation tile) and generation (`voice-constraint.ts`). All 45 reports
+byte-differ because they gain an `excludedCharacters` field and, on 26 of
+them, a pair matrix they never had; **0 of 45 move health and 0 flip verdict**.
+
+```
+identity  45 compared, 45 byte-differing, health moved 0, verdict flips 0, grade flips 0
+voice     scored 18 of 45 -> scored 44 of 45 (one fixture still has fewer than two characters over the floor)
+```
+
+**A correction to the brief.** The brief says "the shorts unchanged". They are
+not: on `main @ 9b199b72` **27 of the 45 in-repo fixtures abstained entirely**,
+including seven of the twelve CC0 shorts the staple is built from
+(`close-quarters`, `code-blue`, `high-voltage`, `mise`, `off-season`,
+`quiet-season`, `red-line`), plus all four `synthetic/*-scenes` fixtures. The
+defect was never confined to feature length — feature length only made it
+certain. What IS unchanged is every delta already being reported: `burrowsDelta`
+builds its corpus statistics from the two characters it is handed and nothing
+else, so dropping a sparse third character cannot move a surviving pair's
+number. That is asserted directly
+(`tests/core/voice-delta.test.ts`, "the sparse character changes nothing about
+the surviving pair's number").
+
+The feature-scale evidence the brief asks for, on the only feature-scale
+document this repository has (the stapled twelve — see §2):
+
+```
+stapled-12  scenes=139 chars=55  scored=true pairs=820 excluded=14  runScriptDoctor 515ms
+            first pairs NELL/DELGADO 0.83, NELL/OSEI 0.98, NELL/RAY 0.86, NELL/ROSALIND 1.05
+            excluded TRAN, REPORTER, DR. NAKASHIMA, NURSE OKONJO, NAKASHIMA, YOUNGER RIVA, …
+```
+
+### Two coupled changes the brief did not name, and why they were required
+
+**(a) A 220x performance fix, because per-character abstention is what makes
+the expensive path reachable.** `burrowsDelta` re-derived BOTH characters'
+full ~63-word frequency tables once per function word, per pair — invisible
+while a single walk-on abstained the whole script, and quadratic the moment it
+does not. Measured on the security suite's own 200-name payload (200 eligible
+characters, 11,970 pooled words, 19,900 pairs):
+
+```
+analyzeVoices alone   42,062 ms  ->  191 ms
+```
+
+Each character's table is now derived once. The arithmetic is unchanged and in
+the same order, and the output is asserted bit-identical against a from-scratch
+reference implementation of the pre-2026-09-07 walk
+(`tests/core/voice-delta.test.ts`, "output is byte-identical to a per-pair
+burrowsDelta walk"). Cost at deliberately extreme scale, after the fix:
+
+| eligible characters | pooled words | guard weight | pairs | ms |
+|---|---|---|---|---|
+| 100 | 36,000 | 3,600,000 | 4,950 | 32 |
+| 200 | 96,000 | 19,200,000 | 19,900 | 102 |
+| 520 | 249,600 | 129,792,000 | 134,940 | 563 |
+
+**(b) The shape guard's cost model had to move with the analyzer, and it made
+the guard stricter.** `server/lib/validation.ts`'s
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` evaluated a weight AT ALL only once every
+distinct character cleared 30 words — a faithful mirror of the old analyzer,
+and a hole the moment the analyzer stopped abstaining. It now reads the
+eligible SUBSET, which rejects a superset of what it rejected before, never a
+subset. Two security controls legitimately flip and were re-anchored per that
+suite's own rule, with the measurement rather than a widened tolerance:
+
+* `R5-6` and `R4-2b` (a 200-name cast plus one one-word walk-on) asserted
+  ACCEPT. That acceptance was only safe because the analyzer abstained too.
+  Measured after per-character abstention and BEFORE the performance fix:
+  weight 2,394,000 against the 300,000 bound, 19,900 pairs, **42,062 ms in
+  `analyzeVoices` alone**. Both now assert REJECT, and `R4-2b` gained a
+  fail-first companion asserting a genuinely small cast is still accepted.
+* The round-7 `fail-first` proof asserted that the retired legacy walk could
+  be BYPASSED by poisoning one name. Per-character eligibility closes that
+  entire class structurally, so the test was re-anchored to the property that
+  survives and is still falsifiable: the demotion ghost still miscounts the
+  cast on at least five cue families, and no family with a real over-bound
+  cast can defeat the bound with it.
+
+**What was deliberately NOT done.** `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` was
+not raised. No cost bound is loosened as a side effect of a scoring change, and
+every payload that suite pins as rejected stays rejected. The price is stated
+rather than hidden: the suite's own synthetic "realistic 150-name feature" now
+sits at **1.2x headroom** (eligible weight 259,200 against 300,000) where it
+previously never reached the bound at all, so a legitimate ensemble feature
+somewhat larger than that fixture would now be rejected for a cost the table
+above puts in the tens of milliseconds. Re-deriving that constant from the new
+rate belongs to a lane whose review is about this guard.
+
+**Gates:** `npm run lint` 0 · `check-no-console` 0 · `check-docs` 0 ·
+`tests/core/voice-delta.test.ts` 18/18 ·
+`tests/security/fountain-shape-guard-cue-parity.test.ts` **647/647**.

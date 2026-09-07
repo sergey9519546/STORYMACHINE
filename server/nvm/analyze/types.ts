@@ -83,6 +83,12 @@ export interface FountainAnalysis {
   voiceAnalysis?: {
     pairs: Array<{ a: string; b: string; delta: number; swapRisk: boolean }>;
     scored: boolean;
+    /** Characters held out of `pairs` for carrying under
+     *  `VOICE_MIN_WORDS` (voice-delta.ts) pooled dialogue words. Present
+     *  whenever `voiceAnalysis` is, and empty when nobody was held out.
+     *  Abstention is PER CHARACTER: `scored` is false only when fewer than
+     *  two characters clear the floor, not when any one falls under it. */
+    excludedCharacters?: string[];
   };
   /** Subtext ratio (ratio of subtext/action/indirect dialogue to direct exposition) */
   subtextRatio?: number;
@@ -315,6 +321,12 @@ export interface ScriptDoctorReport {
   voiceAnalysis?: {
     pairs: Array<{ a: string; b: string; delta: number; swapRisk: boolean }>;
     scored: boolean;
+    /** Characters held out of `pairs` for carrying under
+     *  `VOICE_MIN_WORDS` (voice-delta.ts) pooled dialogue words. Present
+     *  whenever `voiceAnalysis` is, and empty when nobody was held out.
+     *  Abstention is PER CHARACTER: `scored` is false only when fewer than
+     *  two characters clear the floor, not when any one falls under it. */
+    excludedCharacters?: string[];
   };
   subtextRatio?: number;
   questionLatencyOverall?: {
