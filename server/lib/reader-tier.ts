@@ -38,7 +38,7 @@
 // output. NOT on the scoring path.
 
 import type { ScriptDoctorReport, CoverageVerdict } from '../nvm/analyze/types.ts';
-import type { PassName, RevisionIssue } from '../nvm/revision/passes/types.ts';
+import type { RevisionIssue } from '../nvm/revision/passes/types.ts';
 import { locateIssues, sceneLineSpans, type SceneLineSpan } from '../nvm/analyze/locate.ts';
 import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 import { scenePageNumbers, pageRefLabel } from './page-refs.ts';
@@ -151,9 +151,10 @@ export function buildReaderTier(
 
   const spans = fountain ? sceneLineSpans(fountain) : [];
   const scenePages = fountain ? scenePageNumbers(fountain) : [];
-  const located = fountain
-    ? locateIssues(leading as Array<RevisionIssue & { pass: PassName }>, fountain)
-    : [];
+  // No cast: ScriptDoctorReport.topPriorities is already
+  // Array<RevisionIssue & { pass: PassName }>, which is exactly what locateIssues
+  // takes, and suppressContradictoryFindings is generic over that element type.
+  const located = fountain ? locateIssues(leading, fountain) : [];
 
   const priorities: ReaderTierFinding[] = leading.map((issue, i) => {
     const anchorLine = located[i]?.startLine;
