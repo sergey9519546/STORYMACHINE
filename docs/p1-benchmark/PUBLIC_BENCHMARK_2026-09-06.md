@@ -861,8 +861,8 @@ and its before → after print is quoted verbatim in
 
 | degradation | N | AUC matched-pair (PRIMARY) | 95% CI | floor | AUC all-pairs | 95% CI | floor | ordered/inverted/tied |
 |---|---|---|---|---|---|---|---|---|
-| `SHUFFLE_DROP` | 32 | **0.8750** | [0.7500, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.855** | 0.8291 | [0.7222, 0.9268] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.8091** | 28/4/0 |
-| `CLIMAX_RELOCATE` | 32 | **0.5469** | [0.3750, 0.7188] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.5269** | 0.5151 | [0.4473, 0.5820] | `PUBLIC_ORDER_FLOOR` = **0.4951** | 17/14/1 |
+| `SHUFFLE_DROP` | 32 | **0.9063** | [0.8125, 1.0000] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.8863** | 0.8433 | [0.7461, 0.9316] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.8233** | 29/3/0 |
+| `CLIMAX_RELOCATE` | 32 | **0.5938** | [0.4063, 0.7500] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.5738** | 0.5239 | [0.4609, 0.5918] | `PUBLIC_ORDER_FLOOR` = **0.5039** | 19/13/0 |
 | `DIALOGUE_FLATTEN` *(control)* | 32 | **1.0000** | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` = **0.98** | 1.0000 | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` = **0.98** | 32/0/0 |
 
 **What changed, and what did not.**
@@ -878,15 +878,26 @@ and its before → after print is quoted verbatim in
   density POWER branch, which the sub-1 slope constraint cannot reach. They are
   named here because the 28/4/0 sign count is reported two rows up and a reader
   should not have to reconstruct which four.
-* **ROUND 2 (2026-09-11) moved two of these numbers and one floor.** The
-  all-pairs point estimate went 0.8306 → **0.8291** and the mean gap
-  +2.109375 → **+1.89375**, because the scarcity term's saturation point moved
-  from 15 scenes to 12 (the round-1 value did not close the length pathology —
-  7 of 14 orderings of the staple witness's own parts still outscored its best
-  part). `PUBLIC_SHUFFLE_DROP_FLOOR` was re-locked **downward**, 0.8106 →
-  0.8091. Every other floor, both PRIMARY floors and `AUC24_FLOOR` are
-  unchanged. Round 1 wrote the mean gap as "+2.10", truncated rather than
-  rounded; both figures above are the full values.
+* **ROUND 2 (2026-09-11) moved the table twice, in two separate commits.** The
+  row above is the final state; the path to it matters because one floor moved
+  DOWN on the way.
+  1. The scarcity term's saturation point moved from 15 scenes to 12, because
+     the round-1 value did not close the length pathology — 7 of 14 orderings of
+     the staple witness's own twelve parts still outscored its best part. Effect:
+     all-pairs 0.8306 → 0.8291, mean gap +2.109375 → +1.89375,
+     `PUBLIC_SHUFFLE_DROP_FLOOR` re-locked **downward** 0.8106 → 0.8091. Every
+     other floor unchanged.
+  2. The `ORPHAN_CLUE` proper-noun guard's three false suppressions were fixed
+     (a prop sharing a word with a cue name, a script titled after its own
+     central object, and one step of outward chaining). Effect: matched-pair
+     0.8750 → **0.9063** with 28/4/0 → **29/3/0**, all-pairs 0.8291 →
+     **0.8433**, mean gap → **+1.96875**, climax-relocate 0.5469 → **0.5938**
+     with its last exact tie gone (17/14/1 → 19/13/0), control mean gap 26.40 →
+     26.91. All four measurement floors re-locked **upward**.
+  `AUC24_FLOOR` is untouched at 0.622 throughout. Round 1 wrote the mean gap as
+  "+2.10", truncated rather than rounded; every figure here is the full value.
+  **The climax-relocate interval still contains 0.5** ([0.4063, 0.7500]), so its
+  0.5738 floor ratchets a point estimate whose own interval still admits chance.
 * `CLIMAX_RELOCATE` 0.4219 → 0.5469 matched-pair, and **its exact ties fall
   from 11 of 32 to 1**. §4.1's warning that "a third of `CLIMAX_RELOCATE`'s N
   cannot move" no longer applies: zero scripts sit pinned at health 76.0. The

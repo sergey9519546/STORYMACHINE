@@ -874,6 +874,38 @@ function extractDistinctiveTokens(text: string): string[] {
   return [...tokens];
 }
 
+/** Caps runs that carry the INTRODUCTION CONVENTION: the run is immediately
+ *  followed by a comma or an opening parenthesis, which is how a screenplay
+ *  introduces a person and is not how it flags a prop.
+ *
+ *  "DISPATCHER NELL ARCEO, 40s, clipboard in hand" -> "dispatcher nell arceo"
+ *  "RIVA CHEN, 30s, August's former research partner" -> "riva chen"
+ *  "DISPATCHER NELL ARCEO (40s)" -> "dispatcher nell arceo"
+ *  "A hidden BRASS KEY glints under the mat" -> nothing
+ *  "MARA REVOLVER sits on the nightstand" -> nothing
+ *
+ *  Added 2026-09-11 (round 2 item 3) so buildProperNounGuard's full-name
+ *  learning pass reads the convention rather than every multi-word caps run —
+ *  see that function's own comment for the two suppressions the looser version
+ *  measured. Token normalisation (stopword filter, lowercase, >= 3 chars) is
+ *  deliberately the SAME as extractDistinctiveTokens', so the learning pass and
+ *  the candidate walk cannot disagree about what a token is. */
+function introductionTokens(text: string): string[] {
+  const tokens = new Set<string>();
+  for (const line of text.split(/\r?\n/)) {
+    if (isAllCapsLine(line)) continue;
+    for (const m of line.matchAll(CAPS_TOKEN_RE)) {
+      const after = line.slice((m.index ?? 0) + m[0].length);
+      if (!/^\s*[,(]/.test(after)) continue;
+      const words = m[0].split(/\s+/).filter(w => !CAPS_STOPWORDS.has(w));
+      if (words.length === 0) continue;
+      const id = words.join(' ').toLowerCase();
+      if (id.length >= 3) tokens.add(id);
+    }
+  }
+  return [...tokens];
+}
+
 function slugifyToken(raw: string): string {
   return raw.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
@@ -1701,6 +1733,36 @@ function tokenEvidenceByScene(text: string, token: string): ClueEvidence {
 // "BRASS KEY" beside a character called KEY stays a clue, because `brass` is
 // not a name word. That asymmetry is the whole difference between excluding
 // proper nouns and excluding half the props in the script.
+//
+// ── ROUND 2 (2026-09-11): the asymmetry above was FALSE as first shipped, and
+// two more shapes suppressed genuine props. An independent review measured all
+// three on this file's own fixture body:
+//
+//   (i)  `BRASS KEY` beside a character called KEY did NOT stay a clue. The
+//        full-name learning pass below read the caps run "BRASS KEY", saw that
+//        it contained the already-known cue word `key`, and added `brass` to
+//        nameWords — after which `words.every(w => nameWords.has(w))` was true
+//        and the prop was excluded. The exact example the comment used to
+//        justify "every, never any" was the counterexample, and
+//        clue-proper-noun-guard.test.ts's FIRES case never put a character
+//        called KEY in the script, so the claim was asserted in three places
+//        and tested in none.
+//   (ii) A script TITLED after its central object lost that object. Title
+//        `THE BRASS KEY` + prop `BRASS KEY` seeded nothing for the prop (and
+//        admitted a nonsense cluster id instead); a one-word real-word title
+//        (`LEVERAGE`) with a prop of the same name silenced the channel
+//        entirely. Screenplays are routinely named after the thing the story
+//        turns on, so this was not an edge case.
+//   (iii) One step of outward chaining into a prop was enough to delete it.
+//        The comment below claimed "the set cannot chain outward through
+//        unrelated props"; a caps phrase "MARA REVOLVER" in an action line
+//        taught `revolver` as a name word and the REVOLVER stopped being a
+//        clue, while the same body with the prop never cue-adjacent kept it.
+//
+// Both causes are fixed below — the learning pass now requires the
+// INTRODUCTION CONVENTION, and the title guard only excludes a token that
+// never occurs outside the title-page region — and all three shapes are
+// fixtures in clue-proper-noun-guard.test.ts, in both directions.
 function buildProperNounGuard(
   scenes: SceneUnit[],
   titlePageText: string,
@@ -1721,12 +1783,35 @@ function buildProperNounGuard(
   // keeps "ramon delgado" (cue DELGADO, `ramon` unknown) and even the bare
   // "dispatcher", which is exactly the noise measured in the critical tier.
   //
-  // One pass, not a fixed point: only tokens containing an ALREADY-KNOWN cue
-  // word teach new words, so the set cannot chain outward through unrelated
-  // props.
+  // TWO conditions, not one (the second added 2026-09-11, round 2 item 3).
+  //
+  //   (a) the caps run must contain an ALREADY-KNOWN cue word, so learning
+  //       cannot start from nothing; and
+  //   (b) the caps run must be FOLLOWED BY THE INTRODUCTION MARKER — a comma
+  //       or an opening parenthesis, immediately after the run. That is what
+  //       the convention this pass models actually looks like, in this
+  //       repository's own corpus and everywhere else: "DISPATCHER NELL ARCEO,
+  //       40s, clipboard in hand", "RIVA CHEN, 30s, August's former research
+  //       partner", "OFFICER TRAN, who steps aside", "DISPATCHER NELL ARCEO
+  //       (40s)". A PROP does not get that marker: "A hidden BRASS KEY glints
+  //       under the mat", "MARA REVOLVER sits on the nightstand".
+  //
+  // Condition (a) alone is what made the two suppressions (i) and (iii) in the
+  // header possible — it is satisfied by any caps run that happens to contain a
+  // cue word, including a prop. With (b) added, one pass still learns
+  // `dispatcher` and `arceo` from a cue of NELL, and no longer learns `brass`
+  // from "BRASS KEY" or `revolver` from "MARA REVOLVER".
+  //
+  // The residual, stated rather than left to be discovered: a caps run that IS
+  // followed by a comma and DOES contain a cue word still teaches its other
+  // words, so "BRASS KEY, still warm, lies under the mat" beside a character
+  // called KEY would suppress the prop. That shape needs the prop to be
+  // line-initial-ish AND comma-continued AND share a word with a cue name; it
+  // is a fixture below (`todo`, with the measured id list) rather than a claim
+  // that it cannot happen.
   const cueWords = new Set(nameWords);
   for (const s of scenes) {
-    for (const token of extractDistinctiveTokens(s.rawText)) {
+    for (const token of introductionTokens(s.rawText)) {
       const words = token.split(/\s+/).filter(Boolean);
       if (words.length < 2) continue;
       if (!words.some(w => cueWords.has(w))) continue;
@@ -1746,6 +1831,31 @@ function buildProperNounGuard(
       if (word.length >= 3) titleWords.add(word);
     }
   }
+  // THE TITLE GUARD IS NARROWED TO WHAT IT WAS FOR (2026-09-11, round 2 item
+  // 3). The defect it closes is structural, not lexical: segmentScenes folds
+  // every block before the first scene heading into scene 1, so `Title: THE
+  // LONG WAY DOWN` is scene-1 BODY TEXT to this walk and seeds "long way" and
+  // "down" as plants. Excluding title WORDS everywhere also deleted every prop
+  // a script is named after — measured: title `THE BRASS KEY` lost the BRASS
+  // KEY, title `LEVERAGE` lost a planted LEVERAGE and silenced the channel.
+  //
+  // So the test becomes "does this token exist anywhere OUTSIDE the title
+  // page". Body tokens are extracted from the same scene text with the
+  // title-page lines removed; a token present there is the writer's prop and
+  // is never excluded as a title, and a token present ONLY in the folded-in
+  // title page is excluded exactly as before. Nothing is silenced that was
+  // reported, and nothing is reported that the title page invented.
+  const titlePageLines = new Set(
+    titlePageText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0),
+  );
+  const bodyTokens = new Set<string>();
+  for (const s of scenes) {
+    const body = s.rawText
+      .split(/\r?\n/)
+      .filter(line => !titlePageLines.has(line.trim()))
+      .join('\n');
+    for (const token of extractDistinctiveTokens(body)) bodyTokens.add(token);
+  }
 
   // Location tokens out of the scene headings themselves. A heading is
   // "INT. RIVERSIDE MOTEL - NIGHT"; the location words are the ones between
@@ -1761,13 +1871,16 @@ function buildProperNounGuard(
 
   return (token: string): boolean => {
     if (speakerNames.has(token)) return true;
-    if (titleTokens.has(token)) return true;
     const words = token.split(/\s+/).filter(Boolean);
     if (words.length === 0) return true;
-    // EVERY word must be a name / title / location word -- see the header for
-    // why "any" would be wrong.
+    // TITLE: only when the token exists nowhere but the folded-in title page.
+    if (!bodyTokens.has(token)
+      && (titleTokens.has(token) || words.every(w => titleWords.has(w)))) {
+      return true;
+    }
+    // EVERY word must be a name / location word -- see the header for why
+    // "any" would be wrong.
     return words.every(w => nameWords.has(w))
-      || words.every(w => titleWords.has(w))
       || words.every(w => locationWords.has(w));
   };
 }
