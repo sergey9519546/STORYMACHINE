@@ -165,6 +165,126 @@ function normalizeCueName(raw: string): string {
 
 const MAX_CLAUSE_LEN = 140;
 
+/**
+ * The share of all spoken dialogue lines the most-present speaker has to hold
+ * before this module will write a logline about them at all.
+ *
+ * ── Why a gate exists (2026-09-11, producer-tier discovery defect #7) ───────
+ *
+ * buildLogline's subject is `report.characters[0]` — the speaker with the most
+ * dialogue lines, by that field's own documented ordering. On a real screenplay
+ * that speaker IS the protagonist. On a document that has no protagonist it is
+ * merely whoever happens to lead a flat distribution, and the logline becomes a
+ * confident sentence about a character who is not the subject of anything. The
+ * producer's report opened with it.
+ *
+ * ── MEASURED (2026-09-11, keyless, on the 33 scripts committed to this repo:
+ *    the 20 CC0 shorts in data/screenplays/, the 12 blind-pair fixtures in
+ *    tests/fixtures/blind-pairs/, and tests/fixtures/feature-length/
+ *    assembled-feature.fountain) ─────────────────────────────────────────────
+ *
+ *   most-present speaker's share of dialogue lines
+ *     lowest on the 32 real shorts ....... 27.8%  (close-quarters.fountain)
+ *     highest ............................ 62.1%  (signal-drift-bad.fountain)
+ *     assembled-feature.fountain ..........  7.3%  (504 dialogue lines, 231
+ *                                                  scenes, twenty unrelated
+ *                                                  stories concatenated)
+ *
+ * The distribution has one clean gap — 7.3% to 27.8% — and the only thing on
+ * the low side of it is the one document in the repository that genuinely has
+ * no protagonist. The threshold is set inside that gap.
+ *
+ * ── THE COST, stated rather than hidden ─────────────────────────────────────
+ *
+ * Loglines derived: 33 of 33 before this gate, 32 of 33 after. The single loss
+ * is the assembled feature, which is the intended loss: it is a concatenation,
+ * and a logline about it was always a false claim. No real short loses its
+ * logline, and the nearest real script to the threshold clears it by 7.8
+ * points. Registered in docs/CLAIMS_REGISTER.md.
+ *
+ * If a future corpus puts a genuine single-protagonist script under 20%, this
+ * gate costs that script its logline. That is the deliberate direction of the
+ * error: a missing logline is an omission a reader can see, and a logline about
+ * the wrong person is a claim they cannot check.
+ */
+export const PROTAGONIST_MIN_DIALOGUE_SHARE = 0.20;
+
+export interface SpeakerShare {
+  speaker: string;
+  /** Dialogue BLOCKS attributed to this speaker (one per cue -> dialogue pair). */
+  lines: number;
+  /** `lines` as a fraction of every attributed dialogue block in the script. */
+  share: number;
+}
+
+/** Dialogue-line share per speaker, ranked descending (ties broken by name so
+ *  the result is deterministic). Counts the same cue -> dialogue block pairs
+ *  findApparentGoal walks, with the same normalizeCueName treatment, so the two
+ *  cannot disagree about who said how much.
+ *
+ *  Verified against `report.characters[0]` — the independently computed
+ *  most-dialogue speaker this module takes as its subject — on all 33 committed
+ *  scripts: 0 disagreements. The gate below therefore measures the share of the
+ *  speaker the logline is actually about. */
+export function dialogueShares(fountain: string): SpeakerShare[] {
+  if (!fountain) return [];
+  const counts = new Map<string, number>();
+  let currentSpeaker = '';
+  for (const b of parseFountain(fountain)) {
+    const text = b.text.trim();
+    if (!text) continue;
+    if (b.type === 'character' || b.type === 'dual_dialogue') {
+      currentSpeaker = normalizeCueName(text);
+    } else if (b.type === 'dialogue' && currentSpeaker) {
+      counts.set(currentSpeaker, (counts.get(currentSpeaker) ?? 0) + 1);
+    }
+  }
+  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+  if (total === 0) return [];
+  return [...counts.entries()]
+    .map(([speaker, lines]) => ({ speaker, lines, share: lines / total }))
+    .sort((a, b) => b.lines - a.lines || a.speaker.localeCompare(b.speaker));
+}
+
+/** Does `speaker` hold enough of this script's dialogue for a logline about
+ *  them to be a claim rather than an artifact of a flat distribution?
+ *  A speaker who says nothing at all (or whom no dialogue block is attributed
+ *  to) fails, which is the same answer as "no protagonist". */
+export function hasProtagonistDialogueShare(fountain: string, speaker: string): boolean {
+  if (!speaker) return false;
+  const found = dialogueShares(fountain).find(s => s.speaker === speaker);
+  return found !== undefined && found.share >= PROTAGONIST_MIN_DIALOGUE_SHARE;
+}
+
+/** Every dialogue block's text, per scene index, joined — the evidence
+ *  frameSceneText checks a quoted line against.
+ *
+ *  Scene index is the count of scene headings parseFountain reports, which is
+ *  the same 0-based indexing ScreenplaySceneRecord.sceneIdx uses (both segment
+ *  the document at its scene headings), so `sceneDialogue[r.sceneIdx]` is that
+ *  record's own scene and nobody else's. An out-of-range index resolves to
+ *  undefined and is treated as "no dialogue evidence", never as a pass. */
+export function dialogueTextByScene(fountain: string): string[] {
+  const out: string[] = [];
+  let sceneIdx = -1;
+  for (const b of parseFountain(fountain)) {
+    if (b.type === 'scene_heading') {
+      sceneIdx += 1;
+      out[sceneIdx] = '';
+      continue;
+    }
+    if (sceneIdx < 0) continue;
+    if (b.type === 'dialogue') out[sceneIdx] = `${out[sceneIdx] ?? ''}\n${b.text.trim()}`;
+  }
+  return out.map(t => (t ?? '').trim());
+}
+
+/** Collapse whitespace and case so a quoted line can be matched against the
+ *  dialogue it is supposed to have come from without tripping over wrapping. */
+function normalizeForQuoteMatch(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 /** Lexicon of first-person want/need phrasing screenwriters actually write
  *  into dialogue. Deliberately narrow and literal (no inference) — a hit
  *  here means the character SAID something in this shape, not that the
@@ -224,7 +344,31 @@ export function findIncitingIncident(records: ScreenplaySceneRecord[]): string |
   if (records.length === 0) return null;
   const scene = records.find(r => r.purpose === 'introduce_conflict') ?? records[0];
   const text = scene.dramaticTurn || scene.revelation;
-  return text ? truncate(text, MAX_CLAUSE_LEN) : null;
+  if (!text) return null;
+  // 2026-09-11: ONE SENTENCE, the same discipline frameSceneText applies to the
+  // obstacle clause (see firstSentence's own comment). `truncate` alone let a
+  // two-sentence opening beat through and then cut it mid-word at 140
+  // characters, so the assembled logline read
+  //
+  //   When Floor-to-ceiling glass over a city skyline gone dark except for the
+  //   grid of streetlights below. A single TERM SHEET lies in the center of a…,
+  //   WREN is the most-present speaker across 10 scenes.
+  //
+  // — a subordinate clause containing a sentence break and an ellipsis, then a
+  // comma, then the main clause. MEASURED on the 32 real committed scripts: 4
+  // loglines carried a mid-clause "…" before this change (code-blue, counter-offer,
+  // mise, the-ledger-bad) and 0 after; no script
+  // loses its inciting clause, because every beat that had text still has a
+  // first sentence.
+  //
+  // KNOWN LIMIT, left undone deliberately and recorded rather than papered over:
+  // this clause is still spliced in UNQUOTED after "When", and the beat it comes
+  // from may be an action line rather than something a character says, so a
+  // logline can still read "When <stage direction>, X is the most-present
+  // speaker". The quote gate in frameSceneText is the fix pattern; applying it
+  // here would need its own measurement of how many scripts lose the clause
+  // entirely, which is a separate change with its own cost to state.
+  return truncate(firstSentence(text), MAX_CLAUSE_LEN);
 }
 
 /** CENTRAL OBSTACLE — three-tier fallback, checked in order, each reading a
@@ -243,7 +387,9 @@ export function findIncitingIncident(records: ScreenplaySceneRecord[]): string |
  *       highest-suspenseDelta scene's, used as-is.
  *  Degradation: if none of the three tiers finds anything, null (omit the
  *  "before ..." clause). */
-export function findCentralObstacle(records: ScreenplaySceneRecord[], protagonist: string): string | null {
+export function findCentralObstacle(
+  records: ScreenplaySceneRecord[], protagonist: string, fountain = '',
+): string | null {
   if (records.length === 0 || !protagonist) return null;
 
   // Tier (a) — relationship shifts.
@@ -278,15 +424,21 @@ export function findCentralObstacle(records: ScreenplaySceneRecord[], protagonis
 
   // Tier (c) — dominant conflict: climax scene, else the single
   // highest-suspense scene (only if it actually raises tension).
+  // The dialogue evidence tier (c)'s quote gate checks against — computed once
+  // here rather than per candidate scene. An empty `fountain` (a caller that
+  // predates this argument) yields no evidence, so no clause is ever quoted:
+  // the gate fails CLOSED.
+  const sceneDialogue = dialogueTextByScene(fountain);
+
   const climax = records.find(r => r.purpose === 'climax');
   if (climax) {
-    const framed = frameSceneText(climax);
+    const framed = frameSceneText(climax, sceneDialogue);
     if (framed) return framed;
   }
 
   const peak = records.reduce((a, b) => (b.suspenseDelta > a.suspenseDelta ? b : a));
   if (peak.suspenseDelta > 0) {
-    const framed = frameSceneText(peak);
+    const framed = frameSceneText(peak, sceneDialogue);
     if (framed) return framed;
   }
 
@@ -312,15 +464,44 @@ export function findCentralObstacle(records: ScreenplaySceneRecord[], protagonis
  *  label what the text is, quote it so it reads as lifted from the page (the
  *  same idiom assembleLogline already uses for `goal`), and keep one sentence,
  *  since a logline carries a single clause. No content is invented. */
-function frameSceneText(r: ScreenplaySceneRecord): string | null {
+function frameSceneText(r: ScreenplaySceneRecord, sceneDialogue: readonly string[]): string | null {
+  // 2026-09-11 (producer-tier discovery defect #7b): the QUOTE GATE.
+  //
+  // `dramaticTurn` and `revelation` are both whole lines lifted verbatim from
+  // the scene (fountain-analyzer.ts's detectDramaticTurn picks the line with the
+  // most turn verbs; detectRevelation the first line matching a disclosure
+  // pattern) — and the lines they scan are the scene's ACTION and DIALOGUE
+  // together. So either can be a line of stage direction, and this function
+  // wrapped it in quotation marks and handed it to a producer as something a
+  // character faces. Reproduced on data/screenplays/runoff.fountain, which
+  // rendered:
+  //
+  //     GUS must face the turn "The inspector nods, packs the binder, and leaves"
+  //
+  // That sentence is action, at runoff.fountain:146. Nobody says it. It is not a
+  // turn GUS faces; it is a description of a third party leaving a room.
+  //
+  // THE RULE: a quoted clause must be locatable in a DIALOGUE block inside this
+  // scene's own span. Both candidates are gated, not just the turn — a quotation
+  // mark is a claim that somebody said the words, and the revelation channel
+  // reads the same mixed line list. The turn is tried first and falls through to
+  // the revelation so a real spoken signal is not lost when only the turn is
+  // action; when neither is spoken in this scene, the function returns null and
+  // assembleLogline drops the clause rather than quoting the page at a reader.
+  const candidates: Array<{ label: string; raw: string }> = [];
   const turn = r.dramaticTurn?.trim();
   const revelation = r.revelation?.trim();
-  const raw = turn || revelation;
-  if (!raw) return null;
-  const label = turn ? 'the turn' : 'the revelation';
-  const clause = stripTrailingPunctuation(truncate(firstSentence(raw), MAX_CLAUSE_LEN));
-  if (!clause) return null;
-  return `${label} “${clause}”`;
+  if (turn) candidates.push({ label: 'the turn', raw: turn });
+  if (revelation) candidates.push({ label: 'the revelation', raw: revelation });
+
+  const spoken = normalizeForQuoteMatch(sceneDialogue[r.sceneIdx] ?? '');
+  for (const { label, raw } of candidates) {
+    if (spoken === '' || !spoken.includes(normalizeForQuoteMatch(raw))) continue;
+    const clause = stripTrailingPunctuation(truncate(firstSentence(raw), MAX_CLAUSE_LEN));
+    if (!clause) continue;
+    return `${label} “${clause}”`;
+  }
+  return null;
 }
 
 /** First sentence only — tier (c) text is frequently a multi-sentence speech,
@@ -351,7 +532,16 @@ function assembleLogline(
   if (obstacle) {
     return `${incitingClause}${protagonist} must face ${stripTrailingPunctuation(obstacle)}.`;
   }
-  return `${incitingClause}${protagonist} is the central figure across ${sceneCount} scene${sceneCount === 1 ? '' : 's'}.`;
+  // 2026-09-11 (producer-tier discovery defect #7c): this said "is the central
+  // figure", which claims narrative centrality. What the subject actually is, by
+  // report.characters[0]'s own definition, is the speaker with the most dialogue
+  // lines — and the two are not the same reading. MEASURED on the 32 real
+  // committed scripts (20 CC0 shorts + 12 blind-pair fixtures): the character
+  // who appears in the MOST SCENES is a different person from the
+  // most-dialogue speaker on 4 of 32, and the engine's own modal power holder
+  // (ScreenplaySceneRecord.powerHolder — who holds conversational control) is a
+  // different person on 18 of 32. The sentence now states the metric it has.
+  return `${incitingClause}${protagonist} is the most-present speaker across ${sceneCount} scene${sceneCount === 1 ? '' : 's'}.`;
 }
 
 /**
@@ -371,9 +561,16 @@ export function buildLogline(
   const protagonist = report.characters?.[0];
   if (!protagonist) return null;
 
+  // 2026-09-11 (producer-tier discovery defect #7a): the dialogue-share gate.
+  // Without a protagonist there is no logline to write — see
+  // PROTAGONIST_MIN_DIALOGUE_SHARE for the measurement and the stated cost
+  // (33 of 33 scripts derived a logline before, 32 of 33 after; the loss is the
+  // 231-scene concatenation, which is the intended loss).
+  if (!hasProtagonistDialogueShare(fountain, protagonist)) return null;
+
   const inciting = findIncitingIncident(records);
   const goal = findApparentGoal(fountain, protagonist);
-  const obstacle = findCentralObstacle(records, protagonist);
+  const obstacle = findCentralObstacle(records, protagonist, fountain);
 
   return assembleLogline(protagonist, report.sceneCount, inciting, goal, obstacle);
 }
@@ -436,8 +633,17 @@ export function buildSynopsis(records: ScreenplaySceneRecord[]): string | null {
 /** A labeled placeholder, never a fabricated comparable title — comps
  *  require human market judgment this deterministic engine has no basis
  *  for. Always present, never conditional, so the pitch document names the
- *  gap instead of silently omitting a section a producer expects to see. */
-export const COMPS_PLACEHOLDER = 'Comparable titles: ___';
+ *  gap instead of silently omitting a section a producer expects to see.
+ *
+ *  2026-09-11 (producer-tier discovery defect #7d): the placeholder used to be
+ *  the bare string `Comparable titles: ___`, which names a gap without saying
+ *  whose gap it is. A producer reading a blank in an otherwise filled-in
+ *  document cannot tell whether the engine failed, the analysis is still
+ *  running, or the line is theirs to complete. It now says who fills it and
+ *  why the engine will not. */
+export const COMPS_PLACEHOLDER =
+  'Comparable titles: ___ (yours to fill in — this is a deterministic engine with no '
+  + 'market data, and it will not invent a comp)';
 
 export function buildCompsSlot(): string {
   return COMPS_PLACEHOLDER;

@@ -25,6 +25,7 @@ import type { ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import type { ScreenplaySceneRecord } from '../nvm/screenplay/memory.ts';
 import type { SceneCharacterTally } from './breakdown.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
+import { COMPS_PLACEHOLDER } from './logline.ts';
 
 // ── Escaping (identical discipline to coverage-html.ts) ──────────────────────
 function escapeHtml(value: string): string {
@@ -553,7 +554,12 @@ export function renderPitchKitHtml(input: PitchKitInput): string {
   const loglineSection = buildLoglineSection(pitch?.logline ?? null);
   const genreSection = buildGenreSection(pitch?.genreLine ?? null);
   const synopsisSection = buildSynopsisSection(pitch?.synopsis ?? null);
-  const compsSection = buildCompsSection(pitch?.comps ?? 'Comparable titles: ___');
+  // COMPS_PLACEHOLDER, not a re-typed literal: this fallback used to hand-copy
+  // the string, so the 2026-09-11 change that made the placeholder say who fills
+  // the blank would have silently left the no-pitch-content path on the old
+  // wording — the same class of drift server/lib/root-cause-pipeline.ts exists
+  // to end. One constant, one wording.
+  const compsSection = buildCompsSection(pitch?.comps ?? COMPS_PLACEHOLDER);
 
   return `<!DOCTYPE html>
 <html lang="en">

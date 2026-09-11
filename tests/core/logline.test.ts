@@ -22,15 +22,23 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
+import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
 import {
   extractTitlePage, findIncitingIncident, findApparentGoal, findCentralObstacle,
   buildLogline, buildSynopsis, buildGenreLine, buildCompsSlot, buildPitchContent,
-  COMPS_PLACEHOLDER,
+  COMPS_PLACEHOLDER, PROTAGONIST_MIN_DIALOGUE_SHARE, dialogueShares,
+  hasProtagonistDialogueShare,
 } from '../../server/lib/logline.ts';
 import type { ScriptDoctorReport, DoctorGrade, CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
 import type { SceneCharacterTally } from '../../server/lib/breakdown.ts';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -229,6 +237,33 @@ describe('findApparentGoal', () => {
 
 // ── findCentralObstacle ────────────────────────────────────────────────────────
 
+// ── findCentralObstacle ──────────────────────────────────────────────────────
+//
+// Tier (c) (the climax/peak-suspense text) is QUOTE-GATED since 2026-09-11: it
+// may only quote a line that is locatable in a DIALOGUE block inside that
+// scene's own span, because a quotation mark claims somebody said the words.
+// Every tier-(c) case therefore supplies the Fountain evidence, and the cases
+// below it prove the gate refuses action lines, refuses a line spoken in a
+// DIFFERENT scene, and falls through from the turn to the revelation.
+//
+// `findCentralObstacle`'s third argument defaults to '' so the gate fails
+// CLOSED for any caller that has not been given the script text.
+
+/** Two scenes; `spoken` lands in scene 1's dialogue, `acted` in scene 1's
+ *  action. Scene 0 is inert filler so scene indices are real. */
+function twoSceneScript(opts: { spoken?: string; acted?: string } = {}): string {
+  return [
+    'INT. LOBBY - DAY',
+    '',
+    'Nothing happens here.',
+    '',
+    'INT. STAIRWELL - NIGHT',
+    '',
+    ...(opts.acted ? [opts.acted, ''] : []),
+    ...(opts.spoken ? ['DEV', opts.spoken, ''] : []),
+  ].join('\n');
+}
+
 describe('findCentralObstacle', () => {
   it('tier (a) fires: the protagonist\'s worst (most negative) relationship shift', () => {
     const records = [
@@ -243,7 +278,11 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0, relationshipShifts: [{ pairKey: 'DEV|MARIA', dimension: 'trust', amount: -5 }] }),
       makeRecord({ sceneIdx: 1, purpose: 'climax', dramaticTurn: 'The building collapses around them.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “The building collapses around them”');
+    const script = twoSceneScript({ spoken: 'The building collapses around them.' });
+    assert.equal(
+      findCentralObstacle(records, 'ROSA', script),
+      'the turn \u201cThe building collapses around them\u201d',
+    );
   });
 
   it('tier (b) fires: highest-betrayal scene with a distinct power-holder, when tier (a) is absent', () => {
@@ -259,7 +298,11 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0, betrayalSignal: 2, powerHolder: 'ROSA' }),
       makeRecord({ sceneIdx: 1, purpose: 'climax', dramaticTurn: 'Rosa faces the collapse alone.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “Rosa faces the collapse alone”');
+    const script = twoSceneScript({ spoken: 'Rosa faces the collapse alone.' });
+    assert.equal(
+      findCentralObstacle(records, 'ROSA', script),
+      'the turn \u201cRosa faces the collapse alone\u201d',
+    );
   });
 
   it('tier (c) fires: the climax scene\'s dramaticTurn when tiers (a)/(b) are absent', () => {
@@ -267,7 +310,11 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0 }),
       makeRecord({ sceneIdx: 1, purpose: 'climax', dramaticTurn: 'She confronts the man who killed her sister.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “She confronts the man who killed her sister”');
+    const script = twoSceneScript({ spoken: 'She confronts the man who killed her sister.' });
+    assert.equal(
+      findCentralObstacle(records, 'ROSA', script),
+      'the turn \u201cShe confronts the man who killed her sister\u201d',
+    );
   });
 
   it('tier (c) falls back to the single highest-suspense scene when no scene is tagged climax', () => {
@@ -275,11 +322,90 @@ describe('findCentralObstacle', () => {
       makeRecord({ sceneIdx: 0, suspenseDelta: 1, dramaticTurn: 'A car passes by.' }),
       makeRecord({ sceneIdx: 1, suspenseDelta: 5, dramaticTurn: 'Gunfire erupts in the alley.' }),
     ];
-    assert.equal(findCentralObstacle(records, 'ROSA'), 'the turn “Gunfire erupts in the alley”');
+    const script = twoSceneScript({ spoken: 'Gunfire erupts in the alley.' });
+    assert.equal(
+      findCentralObstacle(records, 'ROSA', script),
+      'the turn \u201cGunfire erupts in the alley\u201d',
+    );
   });
 
   it('no-fire: no signal in any tier returns null', () => {
     const records = [makeRecord({ sceneIdx: 0, suspenseDelta: 0 })];
+    assert.equal(findCentralObstacle(records, 'ROSA'), null);
+  });
+
+  // ── THE QUOTE GATE (2026-09-11, producer-tier discovery defect #7b) ────────
+  //
+  // REPRODUCTION: data/screenplays/runoff.fountain rendered
+  //   GUS must face the turn "The inspector nods, packs the binder, and leaves"
+  // That line is ACTION, at runoff.fountain:146. Nobody says it. It is a
+  // description of a third party leaving a room, quoted to a producer as the
+  // thing the protagonist faces.
+  it('no-fire: an ACTION line in the climax scene is never quoted as "the turn"', () => {
+    const records = [
+      makeRecord({ sceneIdx: 0 }),
+      makeRecord({
+        sceneIdx: 1, purpose: 'climax',
+        dramaticTurn: 'The inspector nods, packs the binder, and leaves.',
+      }),
+    ];
+    const script = twoSceneScript({ acted: 'The inspector nods, packs the binder, and leaves.' });
+    assert.equal(findCentralObstacle(records, 'ROSA', script), null);
+  });
+
+  it('fire: an action-line turn FALLS THROUGH to a spoken revelation rather than losing the signal', () => {
+    const records = [
+      makeRecord({ sceneIdx: 0 }),
+      makeRecord({
+        sceneIdx: 1, purpose: 'climax',
+        dramaticTurn: 'The inspector nods, packs the binder, and leaves.',
+        revelation: 'You signed the waiver yourself.',
+      }),
+    ];
+    const script = twoSceneScript({
+      acted: 'The inspector nods, packs the binder, and leaves.',
+      spoken: 'You signed the waiver yourself.',
+    });
+    assert.equal(
+      findCentralObstacle(records, 'ROSA', script),
+      'the revelation \u201cYou signed the waiver yourself\u201d',
+    );
+  });
+
+  it('no-fire: when NEITHER the turn nor the revelation is spoken, no clause is quoted', () => {
+    const records = [
+      makeRecord({
+        sceneIdx: 1, purpose: 'climax',
+        dramaticTurn: 'He closes the file.',
+        revelation: 'The vault door swings shut.',
+      }),
+    ];
+    const script = twoSceneScript({ acted: 'He closes the file. The vault door swings shut.' });
+    assert.equal(findCentralObstacle(records, 'ROSA', script), null);
+  });
+
+  it('no-fire: the line is spoken in a DIFFERENT scene, so it is not this scene\'s evidence', () => {
+    const records = [
+      makeRecord({ sceneIdx: 1, purpose: 'climax', dramaticTurn: 'Gunfire erupts in the alley.' }),
+    ];
+    // Spoken in scene 0, while the climax record points at scene 1.
+    const script = [
+      'INT. LOBBY - DAY',
+      '',
+      'DEV',
+      'Gunfire erupts in the alley.',
+      '',
+      'INT. STAIRWELL - NIGHT',
+      '',
+      'Silence.',
+    ].join('\n');
+    assert.equal(findCentralObstacle(records, 'ROSA', script), null);
+  });
+
+  it('no-fire: the gate fails CLOSED when no script text is supplied at all', () => {
+    const records = [
+      makeRecord({ sceneIdx: 0, purpose: 'climax', dramaticTurn: 'She confronts him.' }),
+    ];
     assert.equal(findCentralObstacle(records, 'ROSA'), null);
   });
 
@@ -291,20 +417,16 @@ describe('findCentralObstacle', () => {
   // VANCE's dialogue landed in the protagonist's obstacle slot: ungrammatical,
   // two sentences deep, and misattributed. It was the first line of the report.
   it('tier (c) never emits raw multi-sentence text into the obstacle slot', () => {
-    const records = [
-      makeRecord({
-        sceneIdx: 0,
-        purpose: 'climax',
-        dramaticTurn: "Turns out Holloway signed my transfer papers six years ago. We've never really stopped working together.",
-      }),
-    ];
-    const obstacle = findCentralObstacle(records, 'JUNE');
+    const speech = "Turns out Holloway signed my transfer papers six years ago. We've never really stopped working together.";
+    const records = [makeRecord({ sceneIdx: 0, purpose: 'climax', dramaticTurn: speech })];
+    const script = ['INT. OFFICE - NIGHT', '', 'VANCE', speech, ''].join('\n');
+    const obstacle = findCentralObstacle(records, 'JUNE', script);
     assert.ok(obstacle, 'tier (c) should still produce an obstacle');
     // One sentence only — the trailing speech is dropped.
     assert.ok(!obstacle!.includes("We've never really stopped"),
       `obstacle carried a second sentence: ${obstacle}`);
     // Quoted and labeled, so it reads grammatically after "must face".
-    assert.match(obstacle!, /^(the turn|the revelation) “.+”$/,
+    assert.match(obstacle!, /^(the turn|the revelation) \u201c.+\u201d$/,
       `obstacle must be a labeled, quoted noun phrase, got: ${obstacle}`);
     // The assembled sentence must be grammatical: no bare capitalized sentence
     // immediately after "must face".
@@ -318,9 +440,10 @@ describe('findCentralObstacle', () => {
     const records = [
       makeRecord({ sceneIdx: 0, purpose: 'climax', revelation: 'The vault was empty all along.' }),
     ];
-    const obstacle = findCentralObstacle(records, 'JUNE')!;
-    assert.equal(obstacle, 'the revelation “The vault was empty all along”');
-    for (const sentence of [`JUNE must face ${obstacle}.`, `JUNE must contend with “escape” before ${obstacle}.`]) {
+    const script = ['INT. BANK - DAY', '', 'DEV', 'The vault was empty all along.', ''].join('\n');
+    const obstacle = findCentralObstacle(records, 'JUNE', script)!;
+    assert.equal(obstacle, 'the revelation \u201cThe vault was empty all along\u201d');
+    for (const sentence of [`JUNE must face ${obstacle}.`, `JUNE must contend with \u201cescape\u201d before ${obstacle}.`]) {
       assert.doesNotMatch(sentence, /\s{2,}/, 'no doubled spacing');
       assert.match(sentence, /\.$/, 'ends in a single period');
     }
@@ -371,8 +494,17 @@ describe('buildLogline', () => {
     const records = [
       makeRecord({ sceneIdx: 0, purpose: 'climax', dramaticTurn: 'The dam finally breaks.' }),
     ];
-    // fountain has no ROSA dialogue at all, so findApparentGoal degrades to null.
-    const noGoalFountain = 'INT. DAM - DAY\n\nRosa watches the water rise.';
+    // ROSA never speaks a want-lexicon line, so findApparentGoal degrades to
+    // null — but she is still the only speaker, so the dialogue-share gate
+    // passes, and the climax turn IS spoken, so the quote gate passes too.
+    const noGoalFountain = [
+      'INT. DAM - DAY',
+      '',
+      'Rosa watches the water rise.',
+      '',
+      'ROSA',
+      'The dam finally breaks.',
+    ].join('\n');
     const logline = buildLogline(report, records, noGoalFountain);
     assert.ok(logline);
     // Tier (c) text is a whole sentence from the script, so it is labeled and
@@ -381,12 +513,87 @@ describe('buildLogline', () => {
     assert.ok(!logline!.includes('contend with'), 'must not fabricate a goal clause');
   });
 
-  it('degrades: neither goal nor obstacle found -> generic scene-count sentence', () => {
+  it('degrades: neither goal nor obstacle found -> a scene-count sentence naming the METRIC', () => {
     const report = makeReport({ characters: ['ROSA'], sceneCount: 5 });
     const records = [makeRecord({ sceneIdx: 0 })];
-    const bareFountain = 'INT. ROOM - DAY\n\nNothing much happens.';
+    // ROSA speaks one inert line: enough to clear the dialogue-share gate (she
+    // is 100% of the dialogue) without supplying a want, a turn or a revelation.
+    const bareFountain = ['INT. ROOM - DAY', '', 'ROSA', 'Mm.', ''].join('\n');
     const logline = buildLogline(report, records, bareFountain);
-    assert.equal(logline, 'ROSA is the central figure across 5 scenes.');
+    // 2026-09-11: "most-present speaker", not "central figure" — the metric is
+    // dialogue-line rank, and on 4 of the 32 committed scripts a different
+    // character appears in more scenes (18 of 32 for the engine's own modal
+    // power holder). See assembleLogline's comment for the measurement.
+    assert.equal(logline, 'ROSA is the most-present speaker across 5 scenes.');
+    assert.ok(!logline!.includes('central figure'), 'must not claim narrative centrality');
+  });
+
+  // ── THE DIALOGUE-SHARE GATE (2026-09-11, producer-tier discovery #7a) ───────
+  it('no-fire: a speaker below PROTAGONIST_MIN_DIALOGUE_SHARE gets no logline at all', () => {
+    const report = makeReport({ characters: ['ROSA'], sceneCount: 2 });
+    const records = [makeRecord({ sceneIdx: 0 })];
+    // ROSA holds 1 of 12 dialogue blocks — 8.3%, under the 20% threshold, the
+    // shape of a document with no protagonist (see
+    // tests/fixtures/feature-length/assembled-feature.fountain at 7.3%).
+    const lines = ['INT. ROOM - DAY', '', 'ROSA', 'Mm.', ''];
+    for (let i = 0; i < 11; i++) lines.push(`EXTRA${i}`, 'Words here.', '');
+    assert.equal(buildLogline(report, records, lines.join('\n')), null);
+  });
+
+  it('fire: a speaker at or above the threshold still gets one — the gate is a floor, not a ban', () => {
+    const report = makeReport({ characters: ['ROSA'], sceneCount: 2 });
+    const records = [makeRecord({ sceneIdx: 0 })];
+    // ROSA holds 1 of 4 dialogue blocks — 25%, above the 20% threshold.
+    const lines = ['INT. ROOM - DAY', '', 'ROSA', 'Mm.', ''];
+    for (let i = 0; i < 3; i++) lines.push(`EXTRA${i}`, 'Words here.', '');
+    assert.equal(buildLogline(report, records, lines.join('\n')),
+      'ROSA is the most-present speaker across 2 scenes.');
+  });
+
+  it('the threshold sits inside the measured gap between real scripts and a concatenation', () => {
+    // 7.3% (assembled-feature.fountain) .. 20% (threshold) .. 27.8%
+    // (close-quarters.fountain, the lowest of the 32 real committed scripts).
+    assert.ok(PROTAGONIST_MIN_DIALOGUE_SHARE > 0.073, 'must exclude the 231-scene concatenation');
+    assert.ok(PROTAGONIST_MIN_DIALOGUE_SHARE < 0.278, 'must not cost any real committed script its logline');
+  });
+});
+
+describe('dialogueShares / hasProtagonistDialogueShare', () => {
+  const script = [
+    'INT. ROOM - DAY',
+    '',
+    'ROSA',
+    'One.',
+    '',
+    'DEV',
+    'Two.',
+    '',
+    'DEV',
+    'Three.',
+    '',
+  ].join('\n');
+
+  it('ranks speakers by dialogue-block count and reports honest shares', () => {
+    const shares = dialogueShares(script);
+    assert.deepEqual(shares.map(s => s.speaker), ['DEV', 'ROSA']);
+    assert.deepEqual(shares.map(s => s.lines), [2, 1]);
+    assert.equal(shares[0].share.toFixed(4), (2 / 3).toFixed(4));
+  });
+
+  it('no-fire: empty input, and a script with cues but no dialogue, yield no shares', () => {
+    assert.deepEqual(dialogueShares(''), []);
+    assert.deepEqual(dialogueShares('INT. ROOM - DAY\n\nJust action.'), []);
+  });
+
+  it('a speaker absent from the script fails the gate rather than throwing', () => {
+    assert.equal(hasProtagonistDialogueShare(script, 'NOBODY'), false);
+    assert.equal(hasProtagonistDialogueShare(script, ''), false);
+    assert.equal(hasProtagonistDialogueShare('', 'ROSA'), false);
+  });
+
+  it('fire/no-fire either side of the threshold', () => {
+    assert.equal(hasProtagonistDialogueShare(script, 'DEV'), true);
+    assert.equal(hasProtagonistDialogueShare(script, 'ROSA'), true); // 33% > 20%
   });
 });
 
@@ -438,7 +645,11 @@ describe('buildGenreLine', () => {
 describe('buildCompsSlot', () => {
   it('always returns the labeled placeholder, never a fabricated comp', () => {
     assert.equal(buildCompsSlot(), COMPS_PLACEHOLDER);
-    assert.equal(buildCompsSlot(), 'Comparable titles: ___');
+    // 2026-09-11 (#7d): the blank now says WHOSE blank it is. A producer
+    // reading "Comparable titles: ___" cannot tell whether the engine failed,
+    // the analysis is unfinished, or the line is theirs to complete.
+    assert.match(buildCompsSlot(), /^Comparable titles: ___ \(yours to fill in/);
+    assert.match(buildCompsSlot(), /will not invent a comp\)$/);
   });
 });
 
@@ -537,5 +748,70 @@ describe('renderPitchKitHtml — pitch content markers', () => {
     assert.match(html, /No logline could be assembled/);
     assert.match(html, /No act-structure beats were detected/);
     assert.match(html, /Comparable titles: ___/, 'comps slot is always present, even with no signal');
+  });
+});
+
+// ── Corpus-level proof (real scripts, real analyzer, real doctor) ────────────
+//
+// The three unit-level gates above are checked here against the writing they
+// were derived from: the 20 CC0 shorts in data/screenplays/ and the 231-scene
+// concatenation in tests/fixtures/feature-length/. Runs the real pipeline
+// (runScriptDoctor + analyzeFountainText), not hand-built records, because the
+// defect was in what the real detectors produce, not in what a fixture says
+// they produce.
+
+describe('buildLogline — corpus-level proof on the committed screenplays', () => {
+  const SCREENPLAY_DIR = path.join(REPO_ROOT, 'data/screenplays');
+
+  async function loglineFor(fountainPath: string): Promise<string | null> {
+    const fountain = readFileSync(fountainPath, 'utf8');
+    const report = await runScriptDoctor(fountain);
+    const { records } = analyzeFountainText(fountain);
+    return buildLogline(report, records, fountain);
+  }
+
+  it('runoff.fountain no longer quotes an ACTION line as "the turn"', async () => {
+    // THE REPRODUCTION. Before the quote gate this rendered
+    //   ... must face the turn "The inspector nods, packs the binder, and leaves"
+    // and that sentence is action, at runoff.fountain:146.
+    const logline = await loglineFor(path.join(SCREENPLAY_DIR, 'runoff.fountain'));
+    assert.ok(logline, 'runoff still has a protagonist and must still get a logline');
+    assert.ok(
+      !logline!.includes('The inspector nods'),
+      `runoff still quotes the action line: ${logline}`,
+    );
+    assert.ok(
+      !/the turn \u201c/.test(logline!),
+      `runoff still quotes a turn it has no spoken evidence for: ${logline}`,
+    );
+  });
+
+  it('off-season.fountain KEEPS its turn — its climax turn is spoken dialogue', async () => {
+    // The other direction: the gate must not be a blanket ban on quoting.
+    const logline = await loglineFor(path.join(SCREENPLAY_DIR, 'off-season.fountain'));
+    assert.ok(logline);
+    assert.match(logline!, /the turn \u201c/, `off-season lost its spoken turn: ${logline}`);
+  });
+
+  it('all 20 CC0 shorts still derive a logline, and none claims a "central figure"', async () => {
+    const files = readdirSync(SCREENPLAY_DIR).filter(f => f.endsWith('.fountain')).sort();
+    assert.equal(files.length, 20, 'data/screenplays/ holds 20 CC0 live-action shorts');
+    for (const file of files) {
+      const logline = await loglineFor(path.join(SCREENPLAY_DIR, file));
+      assert.ok(logline, `${file} lost its logline to the dialogue-share gate`);
+      assert.ok(!logline!.includes('central figure'), `${file} still claims a central figure`);
+      // No mid-clause ellipsis: the inciting clause is one sentence now.
+      assert.ok(
+        !/\u2026[^\u201d]*$|\u2026,/.test(logline!),
+        `${file} carries a truncated clause mid-sentence: ${logline}`,
+      );
+    }
+  });
+
+  it('the 231-scene concatenation gets NO logline — it has no protagonist to write one about', async () => {
+    const logline = await loglineFor(
+      path.join(REPO_ROOT, 'tests/fixtures/feature-length/assembled-feature.fountain'),
+    );
+    assert.equal(logline, null);
   });
 });
