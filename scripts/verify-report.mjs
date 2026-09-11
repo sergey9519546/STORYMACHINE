@@ -172,17 +172,28 @@ function parseHtmlReport(text) {
   // The two reader-facing renderings a verify-claims-only scrape used to
   // ignore entirely (coverage-html.ts's buildHeaderSection/buildHealthSection):
   //   <div class="health-number" style="...">65.0</div>
-  //   <div class="stamp" style="...">RECOMMEND</div>   (verdictStyle.label —
+  //   <span class="stamp" style="...">RECOMMEND</span>   (verdictStyle.label —
   //     the SAME reverse map the letter parser already uses for its
   //     "PASS (decline)" -> "PASS" wrapping, reused here.)
+  //
+  // THE STAMP'S TAG IS NOT PART OF THE CLAIM (fixed 2026-09-11). This matched
+  // `<div class="stamp">` only. On 2026-09-11 the verdict stamp moved out of the
+  // report header into the producer tier (server/lib/reader-tier.ts) and became a
+  // `<span>` so it could sit inline beside the health reading — which silently
+  // turned this scrape off, and with it the CLI's ability to catch a forged
+  // verdict stamp. The forgery test's own sanity assertion caught it, but only
+  // because that test scraped the same way; nothing about the CLI's behaviour was
+  // checked against a tag change. It now accepts either tag, with a backreference
+  // so the close tag must match the open one, which also keeps every report
+  // exported before today parseable.
   const bodyClaims = collectPlainSummaryClaims(text);
   const healthNumberMatch = text.match(/<div class="health-number"[^>]*>([\d.]+)<\/div>/);
   if (healthNumberMatch) {
     bodyClaims.push({ label: 'the health headline', field: 'health', value: Number(healthNumberMatch[1]), kind: 'exact' });
   }
-  const stampMatch = text.match(/<div class="stamp"[^>]*>([\s\S]*?)<\/div>/);
+  const stampMatch = text.match(/<(div|span) class="stamp"[^>]*>([\s\S]*?)<\/\1>/);
   if (stampMatch) {
-    const label = unescapeHtml(stampMatch[1].trim());
+    const label = unescapeHtml(stampMatch[2].trim());
     bodyClaims.push({ label: 'the verdict stamp', field: 'verdict', value: VERDICT_LABEL_TO_ENUM[label] ?? label, kind: 'exact' });
   }
 

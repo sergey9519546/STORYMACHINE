@@ -336,14 +336,45 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
       assert.doesNotMatch(stdout, /reproducible under this engine:/);
     });
 
+    // 2026-09-11: the stamp's TAG is matched loosely on purpose. It was a `<div>`
+    // in the report header until the verdict moved into the producer tier and
+    // became an inline `<span>`; the CLI's own scrape was pinned to `<div>` and
+    // silently stopped catching a forged stamp at all. Both the CLI and this test
+    // now accept either tag (with a backreference, so the close tag must match),
+    // which also keeps every report exported before that change parseable. The
+    // case below this one asserts the old shape still works.
     it('HTML: only the verdict stamp is forged (the <dl> Verdict is untouched) -> exit 1, disagreement names verdict', () => {
       const original = readFileSync(reportHtmlPath, 'utf8');
-      const stampMatch = original.match(/<div class="stamp"[^>]*>([\s\S]*?)<\/div>/);
+      const stampMatch = original.match(/<(?:div|span) class="stamp"[^>]*>([\s\S]*?)<\/(?:div|span)>/);
       assert.ok(stampMatch, 'sanity: fixture must render a verdict stamp');
       const realLabel = stampMatch![1].trim();
       assert.equal(realLabel, 'CONSIDER', 'sanity: fixture verdict must be CONSIDER for this test to target the right label');
       const tampered = original.replace(stampMatch![0], stampMatch![0].replace(realLabel, 'RECOMMEND'));
       const tamperedPath = path.join(dir, 'attack-stamp-only.html');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /authentic: no — the visible report disagrees with its own verify block/);
+      assert.match(stdout, /verdict stamp says verdict = RECOMMEND/);
+    });
+
+    // REGRESSION GUARD (2026-09-11). The CLI's stamp scrape was pinned to
+    // `<div class="stamp">`; the stamp became a `<span>` when it moved into the
+    // producer tier, and the scrape silently stopped firing — a forged verdict
+    // would have passed. This case proves the PRE-CHANGE markup shape is still
+    // caught, so the fix is backward-compatible rather than a swap of one pinned
+    // tag for another: every coverage report exported before today is a `<div>`,
+    // and a reader checking one of those must still be protected.
+    it('HTML: a forged stamp in the PRE-2026-09-11 <div> markup is still caught', () => {
+      const original = readFileSync(reportHtmlPath, 'utf8');
+      const spanStamp = original.match(/<span class="stamp"([^>]*)>([\s\S]*?)<\/span>/);
+      assert.ok(spanStamp, 'sanity: today\u2019s renderer emits a <span> stamp');
+      // Rewrite today's span stamp into the old div shape, THEN forge the label —
+      // i.e. exactly the document a reader holding a report from last week has.
+      const asDiv = `<div class="stamp"${spanStamp![1]}>RECOMMEND</div>`;
+      const tampered = original.replace(spanStamp![0], asDiv);
+      const tamperedPath = path.join(dir, 'attack-stamp-legacy-div.html');
       writeFileSync(tamperedPath, tampered);
 
       const { status, stdout } = runCli([tamperedPath, scriptPath]);

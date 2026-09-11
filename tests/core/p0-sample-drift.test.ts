@@ -33,16 +33,34 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderP0SampleReport, OUT_FILE } from '../../scripts/generate-p0-sample-report.ts';
 
-/** Blank the two wall-clock renderings and nothing else.
+/** Blank the three values that CANNOT be stable between two runs, and nothing
+ *  else.
  *
- *  Both forms come from coverage-html.ts's formatDate/formatDateTime over
- *  report.analyzedAt: "September 11, 2026" in the header's meta line and
- *  "September 11, 2026 at 02:17:32 AM UTC" in the footer. The datetime pattern is
- *  replaced FIRST so the date pattern cannot eat half of it. */
-function maskClock(html: string): string {
+ *  1-2. THE CLOCK. Both forms come from coverage-html.ts's
+ *  formatDate/formatDateTime over report.analyzedAt: "September 11, 2026" in the
+ *  header's meta line and "September 11, 2026 at 02:17:32 AM UTC" in the footer.
+ *  The datetime pattern is replaced FIRST so the date pattern cannot eat half of
+ *  it.
+ *
+ *  3. THE ENGINE COMMIT. The verify block publishes
+ *  `report.provenance.engineCommit`, which server/lib/build-info.ts resolves from
+ *  `git rev-parse HEAD` when GIT_SHA is unset. It is therefore a different 40-hex
+ *  string at every commit, including every commit that does not touch the
+ *  renderer — so an unmasked guard would fail on its own next commit and the only
+ *  way to keep it green would be regenerating the artifact on every push, which
+ *  is how a guard becomes a ritual instead of a check. (Found exactly this way: the
+ *  guard's first full-suite run failed on its own lane's later commits.)
+ *
+ *  Masking it is not a loophole. The engine commit is PROVENANCE — it records
+ *  which commit produced the committed bytes, which is a true and useful fact that
+ *  a later render legitimately disagrees with. The check here is about the
+ *  RENDERER's output, and scripts/check-doctor-output-identity.mjs handles the
+ *  identical problem the same way by pinning GIT_SHA across both of its runs. */
+function maskVolatile(html: string): string {
   return html
     .replace(/[A-Z][a-z]+ \d{1,2}, \d{4} at \d{2}:\d{2}:\d{2} [AP]M [A-Z]+/g, '<TIMESTAMP>')
-    .replace(/[A-Z][a-z]+ \d{1,2}, \d{4}/g, '<DATE>');
+    .replace(/[A-Z][a-z]+ \d{1,2}, \d{4}/g, '<DATE>')
+    .replace(/\b[0-9a-f]{40}\b/g, '<ENGINE_COMMIT>');
 }
 
 describe('the committed P0 sample report matches the generator', () => {
@@ -50,8 +68,8 @@ describe('the committed P0 sample report matches the generator', () => {
     const { html } = await renderP0SampleReport();
     const committed = readFileSync(OUT_FILE, 'utf8');
 
-    const fresh = maskClock(html);
-    const onDisk = maskClock(committed);
+    const fresh = maskVolatile(html);
+    const onDisk = maskVolatile(committed);
     if (fresh !== onDisk) {
       // Point at the first difference: a 226 KB assert.equal diff is unreadable.
       const a = fresh.split('\n');
@@ -71,14 +89,20 @@ describe('the committed P0 sample report matches the generator', () => {
     assert.equal(fresh, onDisk);
   });
 
-  it('the mask covers the clock and nothing else — the guard can still fail', () => {
-    // A guard that masked too much would pass on a genuinely stale sample. Two
-    // directions: a clock change is invisible, and a CONTENT change is not.
-    const base = 'Generated September 11, 2026 at 02:17:32 AM UTC\nhealth 78.3\n';
-    const laterClock = 'Generated December 25, 2027 at 11:59:59 PM UTC\nhealth 78.3\n';
-    const changedContent = 'Generated September 11, 2026 at 02:17:32 AM UTC\nhealth 91.2\n';
-    assert.equal(maskClock(base), maskClock(laterClock), 'the clock must be masked');
-    assert.notEqual(maskClock(base), maskClock(changedContent), 'a real change must NOT be masked');
+  it('the mask covers the clock and the engine commit — and nothing else, so the guard can still fail', () => {
+    // A guard that masked too much would pass on a genuinely stale sample. Three
+    // directions: a clock change is invisible, an engine-commit change is
+    // invisible, and a CONTENT change is not.
+    const base = 'Generated September 11, 2026 at 02:17:32 AM UTC\nhealth 78.3\ncommit af26e356d9caae03e29b99f567c70da7d100ef72\n';
+    const laterClock = 'Generated December 25, 2027 at 11:59:59 PM UTC\nhealth 78.3\ncommit af26e356d9caae03e29b99f567c70da7d100ef72\n';
+    const laterCommit = 'Generated September 11, 2026 at 02:17:32 AM UTC\nhealth 78.3\ncommit 5ae09a78d0b437eb46ced1797ef42cff3deb4585\n';
+    const changedContent = 'Generated September 11, 2026 at 02:17:32 AM UTC\nhealth 91.2\ncommit af26e356d9caae03e29b99f567c70da7d100ef72\n';
+    assert.equal(maskVolatile(base), maskVolatile(laterClock), 'the clock must be masked');
+    assert.equal(maskVolatile(base), maskVolatile(laterCommit), 'the engine commit must be masked');
+    assert.notEqual(maskVolatile(base), maskVolatile(changedContent), 'a real change must NOT be masked');
+    // And the content hash — 64 hex, not 40 — must survive the commit mask.
+    const forgedHash = base.replace('health 78.3', 'health 78.3\nhash ' + 'a'.repeat(64));
+    assert.notEqual(maskVolatile(base), maskVolatile(forgedHash), 'a 64-hex content hash must NOT be masked');
   });
 
   it('the committed sample carries the surfaces this lane added — proof it was regenerated', async () => {
