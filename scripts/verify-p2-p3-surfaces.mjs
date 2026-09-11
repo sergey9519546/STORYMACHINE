@@ -68,6 +68,13 @@ import { draftRankDenominatorLabel, draftRankNextOpportunityLabel, draftRankSent
 // implementation (src/lib/finding-jump.ts) and this gate matches whatever that
 // module names it, rather than a literal that stops matching on a rename.
 import { JUMP_CONTROL_NAME_RE, ROOT_CAUSE_EXPANDER_NAME_RE } from '../src/lib/finding-jump.ts';
+// 2026-09-11: the percentile's comparability gate and the priorities heading, both
+// imported for the same reason every other shared helper in this list is — a
+// literal here would keep matching wording the product has moved off, and this
+// gate would never notice the drift it exists to catch. See
+// src/lib/percentile-copy.ts and src/lib/priorities-copy.ts.
+import { percentileIsComparable, notComparableSentence } from '../src/lib/percentile-copy.ts';
+import { prioritiesHeadingFor } from '../src/lib/priorities-copy.ts';
 // SnapshotManager.tsx's per-snapshot badge ranks against a NARROWER set than
 // the panel/letter/HTML above (snapshotDraftRanks calls computeDraftRank with
 // an empty history array — saved Versions only, never Draft History runs),
@@ -835,11 +842,46 @@ async function main() {
   // computes a draftRank (computeDraftRank returns {rank:1,of:1} even with
   // zero saved snapshots — never null for a finite health), so both must
   // render on this exact download.
-  const exportedHtmlHasPercentileLine = /Health percentile: [a-z0-9% ]+ within a 20-sample, hand-authored synthetic reference set/i.test(exportedHtml);
+  // 2026-09-11 (producer-tier discovery #12): the expected sentence is now
+  // DERIVED from the shared gated helper rather than pinned as a regex here, for
+  // exactly the reason the draft-rank assertion below already derives its own. A
+  // percentile is a band ONLY when the draft sits inside the calibration
+  // reference set's scene/word bounds; outside them every surface states
+  // "not comparable", and the sample this gate exports (12 scenes, 1,831 words)
+  // is outside them. A hardcoded band regex here would have failed the moment the
+  // product stopped overclaiming, which is backwards.
+  //
+  // The expectation is derived from the DOCUMENT'S OWN stated size: the producer
+  // tier prints "N scenes · M words", percentileIsComparable decides from that
+  // pair whether a band is a meaningful reading, and whichever of the two shared
+  // sentences that implies is what must appear. So this assertion checks the
+  // export's internal consistency as well as its copy, and it keeps working
+  // whichever side of the bounds the sample lands on.
+  // The tier's length line renders the separator as a literal U+00B7 (it goes
+  // through escapeHtml, which does not entity-encode it), so match both forms
+  // rather than assuming either.
+  const exportedSizes = /([\d,]+) scenes? (?:&middot;|\u00b7) ([\d,]+) words?/.exec(exportedHtml);
+  const exportedSceneCount = exportedSizes ? Number(exportedSizes[1].replace(/,/g, '')) : null;
+  const exportedWordCount = exportedSizes ? Number(exportedSizes[2].replace(/,/g, '')) : null;
+  const expectComparable = percentileIsComparable(exportedSceneCount, exportedWordCount);
+  const bandFormRe = /Health percentile: (?:top|bottom) \d+% within a 20-sample, hand-authored synthetic reference set/;
+  const exportedHtmlHasPercentileLine = expectComparable
+    ? bandFormRe.test(exportedHtml)
+    : exportedHtml.includes(notComparableSentence());
   record(
     'P3',
-    'Exported coverage HTML carries the health-percentile line (same denominator copy as the panel)',
-    exportedHtmlHasPercentileLine,
+    'Exported coverage HTML carries the health-percentile line (same shared, gated copy as the panel)',
+    exportedSizes !== null && exportedHtmlHasPercentileLine,
+    `scenes=${exportedSceneCount} words=${exportedWordCount} comparable=${expectComparable}`,
+  );
+  // And the other form must be ABSENT — a document that carried both would be
+  // stating two readings of one number, which is the defect this gate now covers.
+  record(
+    'P3',
+    'and NOT the other form — one reading of the percentile, not two',
+    expectComparable
+      ? !exportedHtml.includes(notComparableSentence())
+      : !bandFormRe.test(exportedHtml),
   );
   // The rank sentence is built from the SHARED copy helpers
   // (src/lib/draft-rank-copy.ts), never a literal in this file — the browser
@@ -2208,7 +2250,17 @@ async function main() {
   await pageD.waitForTimeout(timing.ms(1500));
 
   await pageD.getByRole('button', { name: /full report/i }).first().click({ timeout: timing.ms(20000) });
-  const fullReportOpened = await pageD.getByRole('heading', { name: /^Top Priorities$/i }).first()
+  // 2026-09-11: the heading is derived from prioritiesHeadingFor (the ONE shared
+  // implementation, src/lib/priorities-copy.ts), not the literal "Top Priorities"
+  // this gate used to pin. The panel's heading now states the count, so a literal
+  // here would stop matching anything the panel renders — and this assertion,
+  // whose job is to prove the report hydrated at all, would fail for the wrong
+  // reason. Matches whatever count the panel shows.
+  const prioritiesHeadingRe = new RegExp(
+    `^(?:${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => reEscape(prioritiesHeadingFor(n))).join('|')})$`,
+    'i',
+  );
+  const fullReportOpened = await pageD.getByRole('heading', { name: prioritiesHeadingRe }).first()
     .waitFor({ timeout: timing.ms(60000) })
     .then(() => true)
     .catch(() => false);
@@ -2216,7 +2268,7 @@ async function main() {
     'P2-featurelen',
     'the full report opens on the feature draft (not the outdated-handoff state)',
     fullReportOpened,
-    fullReportOpened ? '' : 'no "Top Priorities" heading — the panel did not hydrate a report',
+    fullReportOpened ? '' : 'no priorities heading — the panel did not hydrate a report',
   );
   await pageD.waitForTimeout(timing.ms(2000));
   const jumpControlCount = await pageD.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).count();
@@ -2322,7 +2374,13 @@ async function main() {
   // Priority #3 is the first top priority on this fixture that the server
   // resolves to a span (#1 and #2 are honestly document-tier), so it is the
   // exact row the discovery said a writer could not act on.
-  const priorityCards = pageD.locator('h3:has-text("Top Priorities") + div > div');
+  // Same shared heading as above — located by the panel's own rendered text for
+  // whatever count it shows, never the retired "Top Priorities" literal.
+  const renderedPrioritiesHeading = await pageD.getByRole('heading', { name: prioritiesHeadingRe })
+    .first().innerText();
+  const priorityCards = pageD.locator(
+    `h3:has-text("${renderedPrioritiesHeading.replace(/"/g, '\\"')}") + div > div`,
+  );
   const thirdPriorityJump = priorityCards.nth(2).getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
   const thirdJumpExists = (await thirdPriorityJump.count()) > 0;
   record('P2-featurelen', 'top priority #3 carries a jump control (it did not before 2026-09-06)', thirdJumpExists, '');
