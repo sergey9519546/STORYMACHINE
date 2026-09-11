@@ -278,25 +278,32 @@ describe('public benchmark — the pre-registered split', () => {
 });
 
 describe('public benchmark — the three degradations', () => {
-  it('CLIMAX_RELOCATE\'s N is a third frozen — 11 exact ties, from 10 scripts pinned at health 76.0', () => {
-    // Round-2 review finding 6.7. Ten of the 32 intact scripts sit at exactly
-    // health 76.0 (density penalty at its 10-point cap plus a 14.0 scarcity
-    // term). Relocating a scene inside a script that is already pinned cannot
-    // move it, so 11 of 32 pairs are EXACT ties contributing 0.5 apiece by
-    // construction. That is why this channel's interval is narrower than
-    // shuffle-drop's — pinning, not precision — and the number is asserted so
-    // the reason cannot quietly stop being true while the interval keeps
-    // looking tight.
+  it('CLIMAX_RELOCATE\'s N is no longer frozen — the density pin is gone, so the ties are too', () => {
+    // INVERTED 2026-09-07 (branch scoring/feature-length-defects), which is
+    // what this assertion's own failure message asked for: "If the density
+    // cap stopped pinning scripts, that is a real scoring change and the
+    // interval means something different now."
+    //
+    // Round-2 review finding 6.7 recorded the opposite state and it was
+    // right about it: ten of the 32 intact scripts sat at exactly health 76.0
+    // (the sub-1 density penalty at its 10-point saturation plus a 14.0
+    // scarcity term), so 11 of 32 CLIMAX_RELOCATE pairs were EXACT ties
+    // contributing 0.5 apiece by construction, and the channel's narrow
+    // interval was pinning rather than precision. The sub-1 curve's steepness
+    // moved 50 -> 2 and that saturation is gone: measured now, 1 tie of 32
+    // and 0 scripts at exactly 76.0. The assertion is inverted rather than
+    // deleted, so a change that REINTRODUCES the pin fails here.
     const pinnedAt76 = result.scripts.filter((s) => s.health === 76.0).length;
     assert.ok(
-      climaxRelocate.tied >= 8,
-      `only ${climaxRelocate.tied} of ${climaxRelocate.n} CLIMAX_RELOCATE pairs are exact ties (was 11). If the `
-      + 'density cap stopped pinning scripts, that is a real scoring change and the interval means something '
-      + 'different now — re-read the doc\'s tie discussion before trusting the AUC.',
+      climaxRelocate.tied <= 3,
+      `${climaxRelocate.tied} of ${climaxRelocate.n} CLIMAX_RELOCATE pairs are exact ties (was 11 before the `
+      + 'density recalibration, 1 after). A rising tie count means a saturation came back and the interval is '
+      + 'narrowing on pinning again — read the doc\'s tie discussion before trusting the AUC.',
     );
     assert.ok(
-      pinnedAt76 >= 6,
-      `only ${pinnedAt76} scripts sit at exactly health 76.0 (was 10) — the pinning that explains the ties changed`,
+      pinnedAt76 <= 2,
+      `${pinnedAt76} scripts sit at exactly health 76.0 (was 10 before the density recalibration, 0 after) — `
+      + 'the saturation that froze a third of this channel is back',
     );
     assert.equal(
       climaxRelocate.ordered + climaxRelocate.inverted + climaxRelocate.tied,

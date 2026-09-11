@@ -122,31 +122,50 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    for exactly this manipulation, which is what makes it a liveness check
  *    on the instrument rather than evidence about the score.
  *
- * THE TWO MEASUREMENT CHANNELS ARE NEAR CHANCE, AND THAT IS THE CURRENT
- * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-06 — shuffle-drop
- * 0.5586 all-pairs / 0.5313 matched-pair; climax-relocate 0.4673 / 0.4219.
- * Every one of those four intervals contains 0.5. On this corpus the doctor
- * does not reliably prefer an intact script to a mechanically damaged copy of
- * itself under either recipe. A floor at a near-chance measurement is a
- * ratchet against getting WORSE at something the engine is already bad at,
- * which is the only honest thing to assert. Raising any of them is a
- * measurement's job, never an edit's. (The control's floors are high because
- * the control works: 0.9473 all-pairs / 1.0000 matched-pair.)
+ * WHERE THE NUMBERS STAND, 2026-09-07 (branch scoring/feature-length-defects,
+ * re-locked by `npm run benchmark:public -- --lock` in the same commit as the
+ * scoring change). Shuffle-drop 0.8750 matched-pair / 0.8306 all-pairs;
+ * climax-relocate 0.5469 / 0.5151; control 1.0000 / 1.0000. Read each of
+ * those against what it was and against what it means:
+ *
+ *  - SHUFFLE-DROP moved 0.5313 -> 0.8750 matched-pair, and the sign counts
+ *    moved with it: 17 ordered / 15 inverted / 0 tied -> 28 / 4 / 0, with the
+ *    mean health gap going from -1.93 (the DAMAGED copy scored higher) to
+ *    +2.10. That is not a tuning: the formula stopped paying a writer to
+ *    delete a third of their scenes. See the DELETION REWARD block above
+ *    doctor.ts's densityPenalty.
+ *  - CLIMAX-RELOCATE moved 0.4219 -> 0.5469 matched-pair and its exact ties
+ *    collapsed from 11 of 32 to 1. That second number matters more than the
+ *    first: the channel's N is no longer a third frozen, so the estimate now
+ *    rests on 31 movable scripts rather than 21. Its interval [0.3750,
+ *    0.7188] still contains 0.5 — the doctor still does not reliably detect
+ *    reordering with scene count held constant. It reads chance HONESTLY now
+ *    instead of reading chance through a saturated formula.
+ *  - The CONTROL is unchanged in kind and cleaner in degree (0.9473 -> 1.0000
+ *    all-pairs). It is still a liveness check on the instrument, never
+ *    evidence about the score.
+ *
+ * NONE OF THIS IS EVIDENCE THE SCORE TRACKS CRAFT. Every degradation here is
+ * mechanical damage, and the craft question is the blind-pairs measurement
+ * (4 of 6 ordered on this branch, up from 1 of 6 — on six pairs, which is
+ * inside what chance produces). A floor is a ratchet against getting worse;
+ * raising one is a measurement's job, never an edit's.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
  * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
  * rule channel 0.076) predicts that dropping every third scene of a 10-scene
  * script adds 140/7 - 140/10 = 6.00 points of scarcity penalty, against 0.58
  * points at the private corpus's median 118 scenes, and therefore that a
- * short-script shuffle-drop benchmark would look ~10x MORE separable. It does
- * not. Measured decomposition over these 32 scripts: the scarcity penalty
- * does rise by a mean of +5.693 points, and the DENSITY penalty falls by a
- * mean of 7.625 points at the same time, because dropping a third of the
- * scenes removes a larger share of the weighted issues than of the words and
- * `density = weightedIssues / wordCount^0.7` is convex. Net mean health
- * MOVES UP 1.93 points under degradation. The prediction was right about the
- * scarcity term and wrong about the total, which is exactly why every floor
- * below is set from a measurement instead of from the arithmetic.
+ * short-script shuffle-drop benchmark would look ~10x MORE separable. It did
+ * not, and the reason WAS the defect. Measured decomposition over these 32
+ * scripts on `main @ 9b199b72`: the scarcity penalty rose by a mean of +5.693
+ * points while the DENSITY penalty fell by a mean of 7.625 at the same time,
+ * because dropping a third of the scenes removes a larger share of the
+ * weighted issues than of the words. Net mean health MOVED UP 1.93 points
+ * under degradation. The 2026-09-07 change closes exactly that gap, which is
+ * why the shuffle-drop floors moved as far as they did — and it is still true
+ * that every floor here is set from a measurement rather than from the
+ * arithmetic.
  *
  * HOW THEY ARE SET AND RE-SET. floor = round4(measured - PUBLIC_FLOOR_MARGIN).
  * `npm run benchmark:public -- --lock` rewrites all six constant lines below
@@ -163,12 +182,12 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * matches exactly that shape, and tests/core/public-benchmark.test.ts asserts
  * every one of them is still reachable by it.
  */
-export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5113;
-export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386;
-export const PUBLIC_ORDER_PAIRED_FLOOR = 0.4019;
-export const PUBLIC_ORDER_FLOOR = 0.4473;
+export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.855;
+export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8106;
+export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5269;
+export const PUBLIC_ORDER_FLOOR = 0.4951;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
-export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.9273;
+export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.98;
 
 /**
  * The margin between a fresh public-benchmark measurement and the floor

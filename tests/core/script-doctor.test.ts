@@ -206,30 +206,58 @@ describe('runScriptDoctor — diagnose-only guarantee', () => {
 
 describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
   // Post-saturation-fix formula (doctor.ts's craftPenalty):
-  //   penalty = DENSITY_SCALE * (weightedIssues / wordCount^WORD_COUNT_EXPONENT)^DENSITY_POWER
-  //           + SCARCITY_SCALE / sceneCount
+  //   penalty = densityPenalty(weightedIssues, wordCount, sceneCount)
+  //           + SCARCITY_SCALE / min(sceneCount, SCARCITY_SATURATION_SCENES)
   // with DENSITY_SCALE=2.5, WORD_COUNT_EXPONENT=0.7, DENSITY_POWER=3.75,
   // SCARCITY_SCALE=140 (doctor.ts). The exponents are irrational-ish tuned
   // constants (see doctor.ts's craftPenalty comment for the empirical
   // rationale), so — like the prior formula's spot-checks — these assert
   // against the ROUNDED displayed value rather than hand-expanded arithmetic;
   // computeHealthScore itself is the single source of truth for the formula.
+  //
+  // RE-ANCHORED 2026-09-07 (branch scoring/feature-length-defects). Three
+  // constants moved and one term is new, all measured in
+  // docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md: the sub-1 density
+  // curve's steepness (50 -> 2), a scene-count credit cap on that curve, and
+  // saturation of the scarcity term at 15 scenes. Every value below was
+  // re-run against computeHealthScore rather than hand-derived, and the
+  // MECHANISM each case exists to pin is restated with it — a spot-check
+  // whose numbers are refreshed without its reasoning is a rubber stamp.
   it('matches the documented formula for a known issue count', () => {
     // weightedIssues = 4*1 + 1.5*2 + 0.5*3 = 8.5; sceneCount=10, wordCount=300.
+    // Was 86 before the density recalibration. It is lower now because a
+    // 10-scene script may claim only 10/15 of the density credit its low
+    // issue count would otherwise buy — the credit cap, doing exactly what
+    // it is for.
     const health = computeHealthScore({ critical: 1, major: 2, minor: 3 }, 10, 300);
-    assert.equal(health, 86);
+    assert.equal(health, 82.7);
     assert.equal(gradeForHealth(health), 'strong');
   });
 
   it('approaches, but does not necessarily hit, 100 for zero issues at a well-evidenced scene count', () => {
-    // Zero issues still carries a small scarcityPenalty (SCARCITY_SCALE /
-    // sceneCount = 140/25 = 5.6) — a deliberate residual (see doctor.ts's
-    // craftPenalty comment): a report is never "0 issues, therefore
-    // literally 100" purely from a big denominator, it's the scarcity
-    // correction fading toward (not to) zero as scenes accumulate.
+    // Zero issues still carries a scarcityPenalty, and since 2026-09-07 that
+    // term SATURATES: 140/min(25, 15) = 9.333, not 140/25 = 5.6. The residual
+    // is deliberate for the same reason as before (a report is never "0
+    // issues, therefore literally 100" purely from a big denominator) and now
+    // also for a second one: the term used to fade to nothing, so length
+    // alone bought health without bound. At 25 scenes the density credit is
+    // uncapped (25 >= CREDIT_FULL_SCENES), so the whole penalty here is the
+    // saturated scarcity term.
     const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 25, 2000);
-    assert.equal(health, 94.4);
+    assert.equal(health, 90.7);
     assert.equal(gradeForHealth(health), 'excellent');
+  });
+
+  it('scarcity SATURATES: a 200-scene clean script scores no better than a 15-scene one', () => {
+    // The staple pathology in one assertion (evals/scoring/runner/
+    // metamorphic-cases.ts's `stapled_shorts` is the same claim end to end):
+    // past the saturation point, more scenes buy nothing.
+    const at15 = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 15, 2000);
+    const at200 = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 200, 2000);
+    assert.equal(at200, at15, 'scene count past the saturation point must not move health');
+    // …and below it, scene count still very much does.
+    const at8 = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 8, 2000);
+    assert.ok(at8 < at15, `below saturation the term must still bite: ${at8} vs ${at15}`);
   });
 
   it('does NOT return 100 for zero issues at a tiny scene/word count — small-script sanity', () => {
@@ -237,10 +265,13 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
     // fixture that happens to have zero issues must not read as a proven
     // "excellent" script — there wasn't enough material for most of the
     // pipeline's structural checks to have had a fair chance to fire.
-    // scarcityPenalty (140/4 = 35) keeps even a clean tiny script in a
-    // plausible mid band instead of at the ceiling.
+    // scarcityPenalty (140/4 = 35, unchanged — 4 is below the saturation
+    // point) keeps even a clean tiny script in a plausible mid band instead
+    // of at the ceiling, and since 2026-09-07 the credit cap adds to that: a
+    // 4-scene script may claim only 4/15 of the density credit, so it carries
+    // 7.33 of density penalty despite having no issues at all.
     const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 4, 80);
-    assert.equal(health, 65);
+    assert.equal(health, 57.7);
     assert.equal(gradeForHealth(health), 'solid');
   });
 

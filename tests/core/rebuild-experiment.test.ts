@@ -280,7 +280,22 @@ describe('rebuild-experiment — weighted-rule channel zeroing', () => {
     const a = ruleChannelZeroAdjustment({ bySeverity, sceneCount: 12, wordCount: REALISTIC_WORDS });
     const b = ruleChannelZeroAdjustment({ bySeverity, sceneCount: 120, wordCount: REALISTIC_WORDS });
     assert.ok(a > 0, 'fixture must produce a non-zero channel for this test to mean anything');
-    assert.equal(+a.toFixed(6), +b.toFixed(6));
+    // TOLERANCE WIDENED to one display step, 2026-09-07, and the reason is
+    // arithmetic rather than a weakened claim. The adjustment is
+    // `health(0 issues) - health(real issues)` at the SAME scene and word
+    // count, so the scarcity term cancels exactly — the claim this test makes
+    // is untouched. What it never controlled for is that computeHealthScore
+    // ROUNDS to one decimal before the subtraction, so the two roundings only
+    // cancel when the two scarcity terms share a fractional part. They used to
+    // by luck (140/12 and 140/120 are both x.6667); since scarcityPenalty
+    // saturates at 15 scenes, 140/120 is now 140/15 = 9.3333 and the two
+    // roundings can differ by exactly one display step. Asserting to 1e-6 was
+    // asserting a coincidence about two fractions, not the property named in
+    // the title.
+    assert.ok(
+      Math.abs(a - b) <= 0.1 + 1e-9,
+      `scene count must not move the rule channel by more than the 0.1 display rounding: ${a} vs ${b}`,
+    );
   });
 });
 

@@ -107,6 +107,7 @@ are in §8.1.
 | 1 | `stapled_shorts` witness | 0.5313 | 0.4219 | 1.0000 | 1/6, −0.0167 | 21/21 pass | KNOWN FAIL +5.4 | **KNOWN FAIL +8.2** | 0 of 45 | 0 of 45 |
 | 2 | voice: per-character abstention | 0.5313 | 0.4219 | 1.0000 | 1/6, −0.0167 | 21/21 pass | KNOWN FAIL +5.4 | KNOWN FAIL +8.2 | 0 of 45 (45 byte-differ) | 0 of 45 |
 | 3 | `ORPHAN_CLUE` proper-noun/title guard | **0.5781** | **0.5156** | 1.0000 | **0/6**, −0.0667 | 21/21 pass | KNOWN FAIL +5.3 | KNOWN FAIL +7.0 | 18 of 45, RMS 10.652 | 2 of 45 |
+| 4 | density steepness 50→2 + scarcity saturation | **0.8750** | **0.5469** | 1.0000 | **4/6**, +0.3833 | 21/21 pass | KNOWN FAIL +5.3 | **PASS −2.0** (promoted to `hard`) | 25 of 45, RMS 9.580 | 6 of 45 |
 
 ### 8.1 Per-commit detail
 
@@ -324,3 +325,221 @@ commit — `SHUFFLE_DROP` 0.5313 → 0.5781 matched-pair, `CLIMAX_RELOCATE`
 with its own caveat: `CLIMAX_RELOCATE`'s exact ties went from 11 to **17** of
 32, so more than half its N now cannot move, and its point estimate rests on
 15 scripts.
+
+
+### A correction to commit 3's entry
+
+Commit 3's block did not include `tests/core/discrimination.test.ts`, and it
+should have. Re-run afterwards with only that commit's `doctor.ts` in place,
+**two of that file's assertions were already failing there**, not at commit 4:
+
+```
+dramatized-vs-told-exposition   gap -1.4   INVERTED   (commit 3's tree)
+composite-reviewer-scenario     gap +0.1   below the 5.0 margin floor
+```
+
+Commit 4 recovers both partially (−1.4 → −0.2, +0.1 → +1.4). The attribution
+and the re-anchoring are in commit 4's entry below, under the heading they
+belong to; the misattribution is recorded here rather than quietly fixed,
+because "which commit broke it" is the part a reviewer cannot re-derive later.
+
+**Commit 4 — the length pathology. `SUB_DENSITY_STEEPNESS` 50 → 2, and
+`scarcityPenalty` saturates at 15 scenes.**
+
+```
+SHUFFLE_DROP     matched-pair 0.8750 [0.7500, 0.9688] floor 0.855  · all-pairs 0.8306 [0.7236, 0.9277] floor 0.8106 · 28/4/0
+CLIMAX_RELOCATE  matched-pair 0.5469 [0.3750, 0.7188] floor 0.5269 · all-pairs 0.5151 [0.4551, 0.5767] floor 0.4951 · 17/14/1
+DIALOGUE_FLATTEN matched-pair 1.0000 [1.0000, 1.0000] floor 0.98   · all-pairs 1.0000 [1.0000, 1.0000] floor 0.98   · 32/0/0
+blind pairs      ordered 4 of 6, mean gap +0.3833, no ties        <- the commit-3 ratchet failure is repaid, and passed
+calibration      tests 21, pass 21, fail 0 (band monotonicity intact; NOT ONE of the 20 samples moves)
+metamorphic      7/8 raw, hard passes 7, witnesses 1 — stapled_shorts PASSES at -2.0 and is PROMOTED to `hard`
+identity         45 compared, health moved 25, RMS 9.580, mean +2.944, largest +32.2, verdict flips 6, grade flips 5
+identity (this commit alone, vs commit 3): health moved 11 of 45, RMS 4.738, mean -1.236, verdict flips 4
+```
+
+### 8.2 The candidate comparison
+
+Every candidate was evaluated on the same block. The four rightmost columns
+are the acceptance criteria the brief set. Rows measured offline are exact:
+the residual `health − (100 − densityPenalty − scarcityPenalty)` is
+|resid| ≤ 0.05 on all 116 public-corpus and calibration rows, i.e. no
+deduction fires at 9-14 scenes; the two rows marked ✓harness were re-run
+through `npm run benchmark:public` end to end and agree.
+
+| candidate | DROP paired | DROP all-pairs | DROP mean gap | CLIMAX paired | CLIMAX ties | blind | calibration | control | staple |
+|---|---|---|---|---|---|---|---|---|---|
+| `main @ 9b199b72` | 0.5313 | 0.5586 | −1.93 | 0.4219 | 11/32 | 1/6 | MONO, gap 25.32 | 1.0000 | +8.2 FAIL |
+| commit 3 (clue guard) ✓harness | 0.5781 | 0.6196 | +1.18 | 0.5156 | 17/32 | 0/6 | MONO, gap 25.32 | 1.0000 | +7.0 FAIL |
+| **(a) R5 verbatim** `8·(wi/(n·30)^0.7)²` | **0.0938** | 0.1250 | −15.77 | 0.4844 | 1/32 | 3/6 | MONO, gap 11.16 | 0.9375 | +19.5 FAIL |
+| (a′) scene denominator, main's curve | **0.0938** | 0.1045 | −28.25 | 0.5000 | 2/32 | 3/6 | MONO, gap 21.32 | 0.8906 | +25.9 FAIL |
+| (b) credit cap alone (`cap=15`) | 0.9219 | 0.8779 | +2.86 | 0.5156 | 17/32 | 0/6 | MONO, gap 25.32 | 1.0000 | +7.0 FAIL |
+| (c) steepness 2 alone | 0.8750 | 0.8306 | +2.10 | 0.5625 | 0/32 | 4/6 | MONO, gap 25.32 | 1.0000 | +6.4 FAIL |
+| (d) saturation alone (`sat=15`) | 0.5781 | 0.6196 | +1.18 | 0.5156 | 17/32 | 0/6 | MONO, gap 25.32 | 1.0000 | −1.3 PASS |
+| (b)+(c)+(d) | 0.8750 | 0.8564 | +2.59 | 0.5625 | 2/32 | 4/6 | MONO, gap 25.32 | 1.0000 | −1.9 PASS |
+| **CHOSEN: (c)+(d)** ✓harness | **0.8750** | 0.8306 | +2.10 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−2.0 PASS** |
+
+**Why (a) inverts, understood before anything was chosen.** R5 replaces the
+denominator `wordCount^0.7` with `(sceneCount·30)^0.7`. Under the shuffle-drop
+recipe the scene count falls to 2/3, so that denominator shrinks by
+`(2/3)^0.7 = 0.752`, while the weighted issues fall to a measured **0.5460** of
+intact. Density therefore lands at `0.546/0.752 = 0.73` of intact and the
+penalty falls further than the +5.693 the scarcity term rises. R5 normalises by
+the quantity the degradation attacks, so the numerator always wins. Its
+unbounded `8·density²` amplifies that; `(a′)` shows the inversion survives
+swapping the curve back, so the denominator is the defect, not the curve.
+
+**Why (b) was measured well and rejected anyway.** The credit cap
+(`credit ≤ 10·min(1, sceneCount/15)`) is the best row in the table on the
+secondary statistic and it costs nothing on the primary one. It was still
+rejected, because it introduces a **new saturation exactly where this branch
+is removing one**: at 7 scenes it floors the density penalty at
+`10 − 10·(7/15) = 5.33`, and five of the six synthetic discrimination pairs'
+good halves land pinned at health **74.7** as a result:
+
+```
+                                  k=2, no cap        k=2 + cap=15
+subtext-vs-on-the-nose            75.5 - 73.1        74.7 - 73.1
+active-vs-passive-protagonist     74.9 - 73.5        74.7 - 73.5
+escalation-vs-flat-repetition     74.9 - 72.4        74.7 - 72.4
+setup-payoff-vs-orphaned-setups   74.8 - 74.2        74.7 - 74.2
+dramatized-vs-told-exposition     75.1 - 75.3        74.7 - 74.7
+```
+
+Trading the 76.0 pin for a 74.7 pin to buy 0.026 of a secondary statistic is
+not a trade worth making in a branch whose whole diagnosis is that saturation
+is the defect.
+
+**Why steepness 2 and not a value that measures better.** The brief's stated
+constraint is that the sub-1 curve's derivative must not exceed the scarcity
+slope. Stated per script as `Δscarcity / |Δdensity|` under the drop recipe,
+and measured over all 32 scripts on the commit-3 tree, the eight tightest are:
+
+```
+the-deposit-excellent    Δscarcity 6.000  |Δdensity| 0.5257  ratio 11.41   <- BINDING
+low-tide-excellent       Δscarcity 6.000  |Δdensity| 0.4747  ratio 12.64
+signal-drift-bad         Δscarcity 6.000  |Δdensity| 0.4686  ratio 12.80
+night-shift-bad          Δscarcity 6.000  |Δdensity| 0.4645  ratio 12.92
+fence-line-bad           Δscarcity 6.000  |Δdensity| 0.4562  ratio 13.15
+signal-drift-excellent   Δscarcity 6.000  |Δdensity| 0.4410  ratio 13.61
+the-deposit-bad          Δscarcity 6.000  |Δdensity| 0.4214  ratio 14.24
+quiet-season             Δscarcity 6.000  |Δdensity| 0.3905  ratio 15.36
+```
+
+**The constraint is very nearly infeasible, and that is a finding.** Any curve
+that must rise `SUB_DENSITY_SCALE = 10` points across a unit of density has
+MEAN slope 10, so its maximum is at least 10 — against a binding ratio of
+11.41 there is almost no room. Measured maximum slope by steepness:
+
+```
+k -> 0 (a straight line)  10.000  satisfies
+k = 2                     10.823  satisfies      <- CHOSEN
+k = 2.6335                11.410  satisfies (the exact boundary)
+k = 3                     11.815  VIOLATES
+k = 4                     13.140  VIOLATES
+k = 8                     20.760  VIOLATES
+k = 50 (main)            125.000  VIOLATES by 11x
+```
+
+k = 4, 5 and 8 all measure marginally better on shuffle-drop
+(paired 0.9063 at k = 4 with the cap) and every one of them violates the
+constraint, so none was taken. k = 2 is the largest integer that satisfies it,
+with the 5% headroom left rather than spent — and it is also the value at which
+`CLIMAX_RELOCATE`'s exact ties reach **zero** offline, i.e. the corpus is fully
+un-pinned.
+
+**Why saturation at 15 scenes.** `SCARCITY_SCALE / sceneCount` decays to zero,
+so length alone buys health without bound; §2 measures the whole of the staple
+gap as that term. Scarcity is a DEFICIENCY penalty — "there is not enough
+script here to judge" — so it must stop paying once there is enough. 15 is not
+a fitted number: it is `ARC_DED_MIN_SCENES` and `CLIMAX_DED_MIN_SCENES`
+(`doctor.ts`, both 15), the scene count at which the doctor's own structural
+deductions begin to read a script's shape at all. Below it, scene count is the
+only proxy the engine has for "is there enough here"; at and above it the
+engine reads structure directly. Sensitivity, measured:
+
+```
+sat=10  staple -4.3 PASS   sat=15  staple -1.9 PASS   sat=20  staple +0.4 FAIL
+sat=12  staple -4.2 PASS   sat=16  staple -1.3 PASS   sat=24  staple +1.6 FAIL
+sat=14  staple -2.6 PASS   sat=18  staple -0.3 PASS   none    staple +6.4 FAIL
+```
+
+The witness admits anything up to 18; 15 was chosen for the anchor, not for
+the margin, and the margin it happens to give is 1.9 points.
+
+**What saturation provably does NOT touch.** For any script of 15 scenes or
+fewer the term is byte-identical to before. The entire 32-script public
+benchmark (9-14 scenes intact, 6-10 degraded) and the entire 20-sample
+calibration corpus (9-10 scenes) are untouched by that line — confirmed by the
+`sat=15 alone` row above, which moves nothing except the staple. Its only
+in-repo evidence is the staple witness and the four `synthetic/*-scenes`
+fixtures, which lose 6.5-7.6 points each. **On the private corpus, whose median
+is 118 scenes, it will move every script by roughly 8 points and that is the
+single largest thing the owner's run has to check.**
+
+### 8.3 The floor re-lock — the reviewable artifact
+
+`npm run benchmark:public -- --lock`, printed verbatim:
+
+```
+locked tests/fixtures/public-benchmark-split.json
+locked tests/fixtures/public-corpus-manifest.json
+locked scripts/lib/auc.ts — six floor constants:
+  PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR        0.5113 ->   0.855   (measured 0.8750, PRIMARY)
+  PUBLIC_SHUFFLE_DROP_FLOOR               0.5386 ->  0.8106   (measured 0.8306)
+  PUBLIC_ORDER_PAIRED_FLOOR               0.4019 ->  0.5269   (measured 0.5469, PRIMARY)
+  PUBLIC_ORDER_FLOOR                      0.4473 ->  0.4951   (measured 0.5151)
+  PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR      0.98 ->    0.98   (measured 1.0000, PRIMARY, unchanged)
+  PUBLIC_DIALOGUE_FLATTEN_FLOOR           0.9273 ->    0.98   (measured 1.0000)
+```
+
+Every floor moves UP. `tests/fixtures/public-corpus-manifest.json` moves on
+33 of its 66 lines (every script's health, no script's scene count). The
+2026-09-06 measurement document is NOT rewritten — its §§0-10 stay as the
+record of what `main` did — and a §11 addendum carries the new table, because
+`tests/core/public-benchmark.test.ts` asserts that document quotes every floor
+and every measured AUC the code currently produces.
+
+### 8.4 What this cost, in full
+
+Four assertions moved. None was widened to fit a number.
+
+1. **`tests/core/public-benchmark.test.ts`, the pinning guard** — asserted
+   "11 exact ties, from 10 scripts pinned at health 76.0". Its own failure
+   message said what to do: "If the density cap stopped pinning scripts, that
+   is a real scoring change." Measured now: **1 tie, 0 scripts at 76.0.** The
+   assertion is INVERTED (`tied ≤ 3`, `pinned ≤ 2`) rather than deleted, so a
+   change that reintroduces the saturation fails here.
+2. **`tests/core/script-doctor.test.ts`, the formula spot-check** — three
+   values re-run against `computeHealthScore`, each with the mechanism
+   restated (`86 → 82.7`, `94.4 → 90.7`, `65 → 57.7`), plus a NEW assertion
+   that a 200-scene clean script scores no better than a 15-scene one while an
+   8-scene one still scores worse.
+3. **`tests/core/discrimination.test.ts`, two of six synthetic craft pairs** —
+   `dramatized-vs-told-exposition` inverts (−0.2) and
+   `composite-reviewer-scenario`'s margin is +1.4 against a 5.0 floor. **Both
+   arrive with commit 3's clue guard, not with this commit** (−1.4 and +0.1
+   there; this commit recovers both partially). `COMPOSITE_MIN_GAP` stays at
+   **5.0** — a floor moved down to meet a number is not a floor — and both are
+   returned to `todo` with the measurement and the attribution in the reason
+   string. The mechanism, recorded because it is uncomfortable: both pairs were
+   ordered partly by `ORPHAN_CLUE` firing on CHARACTER NAMES, with the weaker
+   half paying more of that penalty. That is the AUC-0.076 weighted-rule
+   channel turning out to be what ordered a craft pair.
+4. **`tests/core/rebuild-experiment.test.ts`, the scene-count invariance of
+   the rule channel** — tolerance widened from 1e-6 to one display step (0.1),
+   and the claim is unchanged. The adjustment is
+   `health(0 issues) − health(real issues)` at the same scene and word count,
+   so scarcity cancels exactly; what the 1e-6 assertion silently relied on is
+   that `computeHealthScore` rounds to one decimal and the two roundings only
+   cancel when the two scarcity terms share a fractional part. They used to by
+   luck (140/12 and 140/120 are both x.6667); with saturation 140/120 is
+   140/15 = 9.3333. It was asserting a coincidence about two fractions.
+
+**The one thing this branch does NOT claim.** Every number above is on 32
+short distributable scripts and 45 in-repo fixtures. The feature-scale
+deductions (`ARC_DED_MIN_SCENES` / `CLIMAX_DED_MIN_SCENES`, both 15) never
+fire on the public corpus, so it measures a strictly smaller engine, and
+`AUC-24` on the private 761-script corpus is untouched and unmeasured. The
+scarcity saturation in particular will move every feature-length script by
+roughly 8 points, and nothing in this repository can tell you whether AUC-24
+stays above its 0.622 floor. That is the owner's run.
