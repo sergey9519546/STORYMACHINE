@@ -265,7 +265,7 @@ export const PUBLIC_LOCK_COMMAND = 'npm run benchmark:public -- --lock';
  * was MEASURED HERE AND IS FALSE, and the reason is worth carrying in the
  * code: over these 32 scripts the scarcity penalty rises by a mean of +5.693
  * points exactly as predicted, while the density penalty falls by a mean of
- * 7.625 points at the same time (dropping a third of the scenes removes a
+ * 7.632 points at the same time (dropping a third of the scenes removes a
  * larger share of the weighted issues than of the words, and
  * `density = weightedIssues / wordCount^0.7` is convex). Net, degradation
  * RAISES mean health by 1.93 points, and the AUC lands at 0.5586 —

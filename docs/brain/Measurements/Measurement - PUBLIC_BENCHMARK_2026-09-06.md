@@ -42,7 +42,7 @@ short-script shuffle-drop benchmark would look ~10× MORE separable, because
 dropping 10 scenes to 7 adds 140/7 − 140/10 = 6.00 points of scarcity penalty
 against 0.58 at the private corpus's median 118 scenes. Decomposed over all
 32 scripts, scarcity does rise by a mean of +5.693 — and the density penalty
-falls by 7.625 at the same time, because the drop removes a larger share of
+falls by 7.632 at the same time, because the drop removes a larger share of
 weighted issues than of words and `density = weightedIssues/wordCount^0.7` is
 convex. Net, degradation RAISES health by 1.93 points. The arithmetic was
 right; the conclusion drawn from it was not.

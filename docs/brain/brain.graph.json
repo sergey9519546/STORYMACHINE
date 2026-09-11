@@ -67,6 +67,12 @@
       "path": "docs/brain/Branches/Branch - Feature-Length Defects.md"
     },
     {
+      "id": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "type": "branch",
+      "title": "Branch — Feature-Length Saturation Only",
+      "path": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
       "type": "branch",
       "title": "Branch — R5 (Verbosity Bias)",
@@ -812,11 +818,19 @@
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
@@ -833,6 +847,34 @@
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
       "to": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {
       "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
@@ -1473,6 +1515,10 @@
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",

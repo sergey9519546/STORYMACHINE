@@ -1,14 +1,18 @@
 ---
 type: branch
-updated: 2026-09-07
+updated: 2026-09-11
 sources: [docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md]
 status: pending-measurement
 ---
 
 # Branch — Feature-Length Defects
 
-**Branch:** `scoring/feature-length-defects`, six commits on `main` @
-`9b199b72`.
+**Branch:** `scoring/feature-length-defects`, thirteen commits on `main` @
+`ad3f6fa7` — seven from round 1 (with the formula commit split into two so the
+two halves are separately landable) plus six from round 2, the revision round an
+independent review asked for. The review is
+`docs/audits/2026-09-07-innovation/scoring-review.md` and the round-2 report is
+appended to `scoring-lane-report.md` beside it.
 
 **What it is:** the scoring lane's answer to [[Gate - Public Benchmark]] §10 —
 "the density term rewards deletion" — plus the report defects that only show
@@ -28,7 +32,12 @@ up at, or are only visible because of, feature length.
    was near-inert: it built its cue set by scanning `rawText`, which has the
    cue lines already stripped out.
 3. **The length pathology** — `SUB_DENSITY_STEEPNESS` 50 → 2 and
-   `scarcityPenalty` saturating at 15 scenes.
+   `scarcityPenalty` saturating at **12** scenes. Two separate commits, because
+   they are two separate functions and the owner may land only one of them; see
+   [[Branch - Feature-Length Saturation Only]]. Round 1 saturated at 15, which
+   did NOT close the pathology: 7 of 14 orderings of the staple witness's own
+   twelve parts still outscored its best part. The witness now asserts the
+   maximum over all 14 orderings.
 4. **`meanAbsDialogueShareDeltaNormalised`** — exposed, NOT wired, on a
    measured null.
 5. **Honest `plainSummary` / `strengths`** — the paragraph can no longer
@@ -38,13 +47,19 @@ up at, or are only visible because of, feature length.
 
 | channel | `main` @ `9b199b72` | this branch |
 |---|---|---|
-| `SHUFFLE_DROP` matched-pair | 0.5313 | **0.8750** |
-| `SHUFFLE_DROP` mean health gap | **−1.93** (damaged copy higher) | **+2.10** |
-| `CLIMAX_RELOCATE` matched-pair | 0.4219, 11 of 32 ties | **0.5469, 1 tie** |
+| `SHUFFLE_DROP` matched-pair | 0.5313 | **0.9063** |
+| `SHUFFLE_DROP` mean health gap | **−1.93125** (damaged copy higher) | **+1.96875** |
+| `SHUFFLE_DROP` sign counts | 17/15/0 | **29/3/0** |
+| `CLIMAX_RELOCATE` matched-pair | 0.4219, 11 of 32 ties | **0.5938, 0 ties** |
 | `DIALOGUE_FLATTEN` control | 1.0000 / 0.9473 | 1.0000 / 1.0000 |
 | blind matched pairs | 1 of 6, −0.02 | **4 of 6, +0.3833** |
 | calibration bands | MONO, gap 25.32 | MONO, gap 25.32 (not one sample moves) |
-| `stapled_shorts` witness | +8.2 KNOWN FAIL | **−2.0 PASS**, promoted to `hard` |
+| `stapled_shorts` witness | +8.2 KNOWN FAIL | **−1.8 PASS over all 14 orderings**, `hard` |
+
+Three of the 32 are still inverted under the drop — `transfer-window` +8.9,
+`room-12` +8.4, `quiet-season` +0.5 — and all three sit on the density POWER
+branch, which the sub-1 steepness change cannot reach. A writer of a dense
+10-scene script can still gain 8.9 points by deleting a third of their scenes.
 
 Blast radius: 25 of 45 in-repo fixtures move health (RMS 9.580), 6 verdicts
 flip. Four assertions moved, each re-anchored with its measurement rather than
@@ -56,21 +71,30 @@ merged — see [[Gate - Receipt Gate]] and [[Owner - R5 Measurement and Merge]].
 `check-scoring-receipt.mjs main..HEAD` exits **1**, correctly, because the
 entry is PENDING.
 
-**The one thing the owner's run has to check.** The scarcity saturation is
-byte-identical for every script of 15 scenes or fewer, so the public benchmark
-and the calibration corpus are blind to it. On the private corpus (median 118
-scenes) it will move every script by roughly 8 points, and whether AUC-24 stays
-above its 0.622 floor is not knowable from this repository. A fall is a real
-finding about this change, not a reason to move the floor — see
-[[Gate - AUC-24 Ratchet]].
+**What the owner's run can and cannot settle.** The scarcity saturation does two
+separable things to a feature-length script and only one can move a matched-pair
+rank statistic. A **near-uniform level shift** — every script at the private
+median of 118 scenes loses 10.480 points — moves verdicts, grades and all 72
+manifest rows, and is rank-preserving, so it cannot move AUC-24 at all. The
+**scarcity channel's degradation delta going to exactly zero** is the
+AUC-relevant change: `140/79 − 140/118 = +0.586` points of separation before,
+`0.000` after, for every script of roughly 22 scenes or more. So AUC-24 measures
+whether health still orders an intact feature above a shuffle-dropped copy of
+itself once that channel contributes nothing. It cannot apportion the result
+between the two halves, which is why [[Branch - Feature-Length Saturation Only]]
+exists. A fall is a real finding about this change, not a reason to move the
+floor — see [[Gate - AUC-24 Ratchet]].
 
 **Relation to the other parked branches.** It is INDEPENDENT of
 [[Branch - R5 Verbosity Bias]] and [[Branch - Stacked R5 plus Advice]], and it
 addresses the same defect from the opposite direction: R5 replaces the density
 denominator with scene opportunity, which this branch measured and rejected —
 paired shuffle-drop **0.0938**, an inversion, because it normalises by the
-quantity the degradation attacks. Both cannot land; see
-[[Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07]] §8.2.
+quantity the degradation attacks. They collide on ONE function, not two — R5
+rewrites `densityPenalty` and leaves `scarcityPenalty` alone — so the two halves
+of THIS branch are independently landable even though this branch and the R5
+stack are not. See [[Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07]] §8.2 and
+[[Branch - Feature-Length Saturation Only]].
 
 ## Sources
 
