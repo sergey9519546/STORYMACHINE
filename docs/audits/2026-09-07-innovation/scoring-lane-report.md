@@ -46,9 +46,12 @@ One follow-up I deliberately did not do: `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` is
 ## Round 2
 
 **Worktree:** `/home/user/wt-flength` (a git worktree; `/home/user/STORYMACHINE`
-was never checked out to and carries only this appended section, uncommitted).
+was never checked out to, and the only change this lane made there is this
+appended section — left for the orchestrator to commit, which it did mid-round as
+`3754f60a`; the three final fills below it, the tip SHA, the commit count and the
+full-suite row, are the remaining uncommitted diff).
 **Branch:** `scoring/feature-length-defects`, tip
-`e4a172a2b5d7c4926e5c085f1ec9214e918bc1a0`, **16 commits** on `main` @ `ad3f6fa7`.
+`13d64bb58af4123a7534b205489d7d96b6e688e1`, **17 commits** on `main` @ `ad3f6fa7`.
 **Sibling branch:** `scoring/feature-length-saturation-only`, tip
 `efd1a463014d2974931ebc6d5bf60f1eed447878`, 3 commits on `main` @ `ad3f6fa7`.
 Both pushed after every commit; `origin` matches both SHAs exactly.
@@ -142,6 +145,7 @@ c3d3b354 fix(p1): the summary paragraph may not contradict the five numbers
 b0a35cb7 docs(p1): the receipt, the doc and the owner note say what round 2 did       <- items 7, 7a, 8
 89a3c038 fix(gates): the unverified-gates report stops quoting a stale measurement    <- found by a gate
 e4a172a2 fix(p1): revert the clue-guard narrowing — it re-admitted four real names    <- item 3, corrected
+13d64bb5 docs(p1): the clue guard's header says which cause is fixed and which is not  <- comment-only
 ```
 
 The original formula commit `7a8af30c` is split into `6e914dea` (saturation) and
@@ -441,7 +445,7 @@ as a string by `tests/core/summary-honesty.test.ts`.
 | honesty | `npm run honesty-audit` | **0** |
 | brain | `npm run check-brain` — 99 notes, 331 links, fresh | **0** |
 | unverified gates | `npm run gates` | **0** |
-| **full suite** | `npm test`, once, on the final tree — FULL_TEST_RESULT | **FULL_TEST_EXIT** |
+| **full suite** | `npm test` on the final tree `13d64bb5` — **13,124 tests, 13,028 pass, 0 fail**, 91 skipped, 5 todo (the 2 new clue `todo`s, the 2 pre-existing discrimination craft pairs, and 1 informational latency report) | **0** |
 
 An earlier full `npm test` on the pre-revert tree read 13,124 tests / 1 fail, and
 that failure is the agency-signal catch described under item 3. It is reported
