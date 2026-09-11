@@ -611,7 +611,7 @@ function scarcityPenalty(sceneCount: number): number {
   //
   // WHAT IT COSTS, measured, all six floored public-benchmark statistics held:
   //   SHUFFLE_DROP    paired 0.8750 unchanged (28/4/0, 0 ties); all-pairs
-  //                   0.8306 -> 0.8291 (floor 0.8106, unchanged, NOT re-locked)
+  //                   0.8306 -> 0.8291 (floor re-locked DOWN, 0.8106 -> 0.8091)
   //   CLIMAX_RELOCATE paired 0.5469 / all-pairs 0.5151, both unchanged
   //   DIALOGUE_FLATTEN control 1.0000 / 1.0000 unchanged
   //   mean health gap under the drop  +2.11 -> +1.89

@@ -204,7 +204,7 @@ with its own PENDING receipt and its own re-locked floors.
    in the R5 stack addresses. Know two things before landing it: the mean health
    gap under the drop gets slightly WORSE on the public corpus (−1.93 → −2.15),
    because the saturation alone does not fix the deletion reward; and the staple
-   witness passes there at a margin of exactly **0.0** rather than 1.8, because
+   witness passes there at a margin of exactly **0.0** rather than 1.6, because
    without the steepness change the density term is pinned at its ceiling for
    both documents and the margin is carried entirely by a deduction that is
    often zero.
