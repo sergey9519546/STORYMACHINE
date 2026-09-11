@@ -48,6 +48,26 @@ producible" — has been built:
 | `claude/r5-verbosity-bias-pending-measurement` | `0f625c27` | pre-rebase | superseded by `scoring/r5-verbosity-bias`; kept, not deleted |
 | `claude/advice-rule-fixes-pending-measurement` | `68c64eca` | pre-rebase | superseded by `scoring/advice-rule-fixes`; kept, not deleted |
 
+#### Addendum — 2026-09-11: two more scoring branches, and one merged lane branch the proxy cannot delete
+
+Taken against `main` @ `76cdc363`. The order the owner measures in CHANGED
+on 2026-09-07 and is corrected in
+`docs/brain/Owner/Owner - R5 Measurement and Merge.md`: the stacked tree is
+no longer "the tree to measure" first.
+
+| Branch | Tip | Commits on main | Disposition |
+|---|---|---|---|
+| `scoring/feature-length-defects` | `bcc96f85` | 18 | **measure this one FIRST** — three review rounds to MERGE-READY-FOR-OWNER; receipt PENDING (`docs/audits/2026-09-07-innovation/scoring-review.md`) |
+| `scoring/feature-length-saturation-only` | `efd1a463` | 3 | second, only if AUC-24 rejects the first — the scarcity-saturation half alone, its own PENDING receipt |
+| `scoring/stacked-r5-plus-advice` | `408166ae` | 21 | third — an ALTERNATIVE to the feature-length branch on `densityPenalty`, not a layer under it |
+| `lane/exports-producer-tier` | `2deeb478` | 0 | **fully merged** (fast-forwarded into `main` on 2026-09-11); `git push origin --delete` is refused by the sandbox proxy, as tag pushes are — safe for the owner to delete |
+| `claude/dev-environment-setup-xnijw0` | `76cdc363` | 0 | re-synced to `main` on 2026-09-11; still safe to delete |
+
+Also on record: the sandbox was rebuilt on 2026-09-07 and erased every
+worktree, all local `audit/*` tags and one reviewed-but-unpushed lane, which
+is why `docs/LANE_STANDARD.md` §7 now requires every lane to push after
+every commit and every review to be committed before its merge.
+
 All three carry PENDING receipt entries and none may merge:
 `node scripts/check-scoring-receipt.mjs main..HEAD` exits 1 on each, by
 design, because it finds a PENDING entry and refuses it. Everything else is
@@ -213,6 +233,7 @@ git push origin --delete claude/dev-environment-setup-xnijw0
 git push origin --delete codex/quarantine-2026-08-08-prototypes
 git push origin --delete worktree-agent-a4074ed623bfade27
 git push origin --delete wip/phase-w-ui-checkpoint
+git push origin --delete lane/exports-producer-tier   # merged 2026-09-11 as 2deeb478
 ```
 
 ---

@@ -259,6 +259,25 @@ MIDPOINT_DROP **0.766** against the 0.80 shuffle-drop gate; act-swap still
 0.48→0.62 against its 0.70 gate; and CLIMAX_RELOCATE **0.523** is at chance.
 A met sub-condition does not exit P1 — the gate is a conjunction.
 
+**Update (2026-09-11) — P1 has an instrument, and the gate is still unmet.**
+`tests/core/public-benchmark.test.ts` is the first discrimination assertion
+that runs on EVERY CI run with no corpus and no owner step: a matched-pair
+degradation AUC over the 32 distributable screenplays in this repository
+(20 CC0 shorts + the 12 blind-pair fixtures), two measurement channels
+(shuffle-drop, climax-relocate), a positive control (dialogue-flatten reads
+1.000), a pre-registered split and a hash-locked manifest, floored in
+`scripts/lib/auc.ts` (`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md`).
+Read it for what it is: those 32 scripts are synthetic-original, not real
+drafts, and no blind labeling has occurred, so it does not satisfy the "real
+writing" or "blind-labeled" clauses of this gate; on `main` it reads chance
+on both measurement channels (0.5313 / 0.4219 paired). What it changed is
+that a scoring change can now be measured before it is proposed: the
+`scoring/feature-length-defects` branch reads 0.8750 paired shuffle-drop on
+it, with the calibration corpus untouched, and waits for the owner's
+`measure-real` on the private corpus (three review rounds, receipt PENDING;
+`docs/brain/Owner/Owner - R5 Measurement and Merge.md` gives the order). The
+exit gate below is unaffected and still unmet.
+
 **Decision: proceed to P2 while structural work continues.** The dialogue
 channel is solved — that's real discrimination on real writing. The
 structural gap is an analyzer-layer problem that doesn't block shipping a
@@ -372,6 +391,19 @@ exported artifact and drives `#verify` in a browser rather than trusting the
 in-process report object. The privacy page E4 added (`#privacy`) is the other
 half of the same trust story: what stays local, what the server holds, what
 leaves, and how to delete it.
+
+**Still true 2026-09-11, and closed offline.** A third party no longer needs
+the server that produced a report to verify it: `npm run verify-report --
+<report.html|letter.md|report.json> <script.fountain>` re-runs the doctor on
+the script and checks every claim the artifact carries, through the route's
+own zod schema and a body-versus-verify-block cross-check — the two shapes a
+forgery took past the first version of the tool, caught by its review. The
+exported report and letter now open with a one-page producer tier (logline
+gated on evidence, verdict, the things to fix first with page numbers that
+match the PDF, and the reference bounds the percentile is valid within), and
+the panel and every export derive their root causes from one shared pipeline,
+proven by a parity test across four surfaces
+(`docs/audits/2026-09-07-innovation/`).
 
 **Known limit:** counters are unauthenticated and client-reported, in-memory
 and process-local, and reset on restart. They are not durable, not

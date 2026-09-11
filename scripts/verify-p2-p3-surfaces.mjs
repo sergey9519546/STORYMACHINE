@@ -2285,20 +2285,49 @@ async function main() {
     noLocationCount > 0,
     `no-location notes=${noLocationCount}`,
   );
-  const noLocationDetail = noLocationCount > 0
-    ? await pageD.locator('[data-no-location]').first().evaluate((el) => ({
-        title: el.getAttribute('title'),
-        label: el.getAttribute('aria-label'),
-        tabindex: el.getAttribute('tabindex'),
-      }))
-    : { title: null, label: null, tabindex: null };
+  // Every note, not the first one: the reason must be in the screen reader's
+  // reading order on all of them (role="note" + aria-label), and the tab-stop
+  // split the component documents (`focusable` — 374 -> 29 on the fixture) must
+  // be real in the DOM: exactly the notes flagged focusable carry tabindex="0",
+  // and none of the others does. A single-element probe could not see either.
+  const noLocationCensus = await pageD.locator('[data-no-location]').evaluateAll((els) => {
+    let withReason = 0;
+    let focusable = 0;
+    let focusableWithoutTabstop = 0;
+    let unfocusableWithTabstop = 0;
+    let notNote = 0;
+    for (const el of els) {
+      const title = el.getAttribute('title') || '';
+      const label = el.getAttribute('aria-label');
+      if (/No location —/.test(title) && label === title) withReason += 1;
+      if (el.getAttribute('role') !== 'note') notNote += 1;
+      const isFocusable = el.hasAttribute('data-no-location-focusable');
+      const tabstop = el.getAttribute('tabindex') === '0';
+      if (isFocusable) {
+        focusable += 1;
+        if (!tabstop) focusableWithoutTabstop += 1;
+      } else if (tabstop) {
+        unfocusableWithTabstop += 1;
+      }
+    }
+    return { total: els.length, withReason, notNote, focusable, focusableWithoutTabstop, unfocusableWithTabstop };
+  });
   record(
     'P2-featurelen',
-    'that note carries the honest reason on hover/focus and is keyboard-reachable',
-    typeof noLocationDetail.title === 'string' && /No location —/.test(noLocationDetail.title)
-      && noLocationDetail.label === noLocationDetail.title
-      && noLocationDetail.tabindex === '0',
-    `title=${JSON.stringify((noLocationDetail.title || '').slice(0, 80))} tabindex=${noLocationDetail.tabindex}`,
+    'every "no location" note carries the honest reason in the reading order (role=note, aria-label = title)',
+    noLocationCensus.total > 0
+      && noLocationCensus.withReason === noLocationCensus.total
+      && noLocationCensus.notNote === 0,
+    `notes=${noLocationCensus.total} withReason=${noLocationCensus.withReason} notRoleNote=${noLocationCensus.notNote}`,
+  );
+  record(
+    'P2-featurelen',
+    'the act-on notes are keyboard-reachable and the rest are reading-order only (the documented tab-stop split holds in the DOM)',
+    noLocationCensus.focusable > 0
+      && noLocationCensus.focusableWithoutTabstop === 0
+      && noLocationCensus.unfocusableWithTabstop === 0
+      && noLocationCensus.focusable < noLocationCensus.total,
+    `focusable=${noLocationCensus.focusable} of ${noLocationCensus.total}; focusableWithoutTabstop=${noLocationCensus.focusableWithoutTabstop} unfocusableWithTabstop=${noLocationCensus.unfocusableWithTabstop}`,
   );
 
   // Expanding a root cause reveals its contributing rules — each of which now
