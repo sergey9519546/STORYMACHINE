@@ -365,7 +365,15 @@ export function findApparentGoal(fountain: string, protagonist: string): string 
  *  runoff's goes from the 140-character fragment above to "I'm going to need their
  *  discharge permit." — a want, from the same block, in one sentence.
  *  dead-frequency's goes from three sentences to "I want to know what you can see
- *  from here.", which is the sentence the detector fired on. */
+ *  from here.", which is the sentence the detector fired on.
+ *
+ *  WHAT IS STILL TRUE AFTER THIS, stated rather than implied: the MAX_CLAUSE_LEN
+ *  cap still applies, so a single sentence longer than 140 characters would still
+ *  be cut with an ellipsis. That is a cap on a quoted clause, not a paragraph
+ *  spliced into a logline, and it is the same degradation every other clause in
+ *  this file carries. MEASURED: the longest of the 7 goal sentences across the 32
+ *  committed scripts is 98 characters, so no committed script reaches the cap —
+ *  which is why the after-count is 0 and not "0 on this corpus". */
 function wantSentence(block: string): string | null {
   let earliest = -1;
   for (const re of WANT_PATTERNS) {
