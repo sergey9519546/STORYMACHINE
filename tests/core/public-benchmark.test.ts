@@ -77,6 +77,9 @@ import {
   measurePublicBenchmark,
   partitionFor,
   relockFloorSource,
+  blindPairOrdering,
+  pinnedScriptCount,
+  publicBenchmarkLimits,
   type ScriptRow,
 } from '../../scripts/lib/public-benchmark.ts';
 
@@ -590,5 +593,93 @@ describe('public benchmark — the numbers in the docs are the numbers the code 
       + 'rather than being filed next to the AUC-24 receipts.',
     );
     assert.match(receipts, /npm run benchmark:public/);
+  });
+});
+
+// ── The printed narrative may not contradict the printed table ──────────────
+// ROUND 2, item 5. An independent reviewer ran `npm run benchmark:public` on
+// this branch and found the caveats block printing FIVE numbers the same
+// output's own table contradicted forty lines above: shuffle-drop
+// "0.5313 / 0.5586" under a table reading 0.8750 / 0.8306, "ALL FOUR intervals
+// contain 0.5" when the shuffle-drop intervals no longer did, "Control:
+// 1.0000 / 0.9473" against 1.0000 / 1.0000, "Ten of the 32 scripts sit pinned
+// ... 11 of 32 pairs are EXACT ties" against 0 pinned and 1 tie, and "1 of 6"
+// blind pairs against 4 of 6. Nothing caught it: the block was a frozen string
+// and no test referenced it. `publicBenchmarkLimits` now renders it from the
+// BenchmarkResult, and these assertions are the guard that keeps it that way —
+// they parse the RENDERED TEXT and refuse any figure the run did not produce,
+// so a future hard-coded number fails here rather than shipping as a
+// contradiction.
+describe('public benchmark — the printed caveats agree with the printed measurement', () => {
+  const rendered = publicBenchmarkLimits(result);
+
+  it('every four-decimal figure in the caveats is a value this run produced', () => {
+    const allowed = new Set<string>(['0.5000']);
+    for (const d of result.degradations) {
+      for (const v of [d.aucPaired, d.aucAllPairs, d.ciPaired.lo, d.ciPaired.hi, d.ciAllPairs.lo, d.ciAllPairs.hi]) {
+        allowed.add(v.toFixed(4));
+      }
+    }
+    allowed.add(blindPairOrdering(result).meanGap.toFixed(4));
+    const found = [...rendered.matchAll(/\d\.\d{4}/g)].map((m) => m[0]);
+    assert.ok(found.length >= 10, `the caveats must still quote the measurement; found ${found.length} figures`);
+    const stale = [...new Set(found)].filter((v) => !allowed.has(v));
+    assert.deepEqual(
+      stale,
+      [],
+      `the caveats quote ${stale.join(', ')}, which this run did not produce. A caveat that contradicts the `
+      + 'number it qualifies is the defect round 2 item 5 closed — interpolate it from the result.',
+    );
+  });
+
+  it('the pinned-script and tie counts in the caveats are the measured ones', () => {
+    const pinned = pinnedScriptCount(result);
+    assert.match(
+      rendered,
+      new RegExp(`${pinned} of the ${result.scripts.length} scripts sit pinned`),
+      `the caveats must report the measured pinned count (${pinned})`,
+    );
+    assert.match(
+      rendered,
+      new RegExp(`${climaxRelocate.tied} of\\s+${climaxRelocate.n} pairs`),
+      `the caveats must report the measured tie count (${climaxRelocate.tied})`,
+    );
+    const movable = climaxRelocate.n - climaxRelocate.tied;
+    assert.match(rendered, new RegExp(`rests on ${movable} movable scripts`));
+  });
+
+  it('the blind-pairs count in the caveats is recomputed, not retyped', () => {
+    const blind = blindPairOrdering(result);
+    assert.equal(blind.of, 6, 'the corpus must still carry six blind pairs');
+    assert.match(rendered, new RegExp(`\\(${blind.ordered} of ${blind.of} ordered`));
+    // And it must agree with the dedicated craft test's own reading, which is
+    // the other place this number lives.
+    assert.ok(blind.ordered >= 0 && blind.ordered <= 6);
+  });
+
+  it('the interval verdict states which intervals contain 0.5, and is right', () => {
+    const measurement = result.degradations.filter((d) => d.role === 'measurement');
+    const intervals = measurement.flatMap((d) => [d.ciPaired, d.ciAllPairs]);
+    const crossing = intervals.filter((i) => i.lo <= 0.5 && i.hi >= 0.5).length;
+    if (crossing === intervals.length) {
+      assert.match(rendered, /ALL FOUR of the measurement intervals contain 0\.5/);
+    } else if (crossing === 0) {
+      assert.match(rendered, /NONE of the four measurement intervals contains 0\.5/);
+    } else {
+      assert.match(rendered, new RegExp(`${crossing} of the four measurement intervals still contain 0\\.5`));
+      // Named, not counted only — a reader has to be able to tell WHICH.
+      for (const [id, label] of [['SHUFFLE_DROP', 'shuffle-drop'], ['CLIMAX_RELOCATE', 'climax-relocate']] as const) {
+        const d = byId.get(id)!;
+        if (d.ciPaired.lo <= 0.5 && d.ciPaired.hi >= 0.5) {
+          assert.match(rendered, new RegExp(`${label} matched-pair`));
+        }
+      }
+    }
+  });
+
+  it('the caveats name the control with its measured sign counts and gap', () => {
+    const control = result.degradations.find((d) => d.role === 'control')!;
+    assert.match(rendered, new RegExp(`${control.ordered} of ${control.n} scripts with ${control.tied} ties`));
+    assert.match(rendered, new RegExp(`${control.meanGap.toFixed(2)} points`));
   });
 });
