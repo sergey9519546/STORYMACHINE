@@ -678,3 +678,62 @@ rather than a measurement. Nine of nine round-1 items are discharged, two of the
 better than asked. The measurement is sound: the owner's `measure-real` run on
 `scoring/feature-length-defects` (then `scoring/feature-length-saturation-only` if
 AUC-24 rejects it) is worth spending and should not wait on R2-1 to R2-4.
+
+---
+
+## Round 3
+
+**Object:** `scoring/feature-length-defects` @ **`bcc96f85`** — one commit
+("docs(p1): four one-line corrections from the round-2 review — none moves a
+number") on the round-2 tip `13d64bb5`, 18 commits on `main` @ `ad3f6fa7`.
+Worked from a `git archive bcc96f85` export plus one `git clone --shared`
+detached at that SHA; `/home/user/wt-flength` not entered, `/home/user/STORYMACHINE`
+unmodified except this file.
+
+### The four items
+
+| item | required | shipped at `bcc96f85` | verdict |
+|---|---|---|---|
+| **R2-1** | `doctor.ts:614` stop denying the re-lock | `// 0.8306 -> 0.8291 (floor re-locked DOWN, 0.8106 -> 0.8091)` — now agrees with `auc.ts:225` and `:241` (`= 0.8091`), the doc's §8.3/§12 and the receipt. `grep -rn "0\.8106"` over `server/` + `scripts/` leaves two hits and they no longer contradict each other | **FIXED** |
+| **R2-2** | receipt count, the round-2 tip named, `4643d590`'s status stated | "**eighteen** commits on `main` @ `ad3f6fa7` — the round-2 tip the reviewer re-checked is `13d64bb5` (seventeen commits: eight from round 1 after the rebase and split, nine from round 2), and the eighteenth is the correction commit that carries this sentence", with both prior miscounts and the mechanism recorded, and "The pre-rebase tip `4643d590` … is no longer an ancestor of either branch". **Every count checks:** `rev-list --count ad3f6fa7..bcc96f85` = **18**, `..13d64bb5` = **17**, `..4cdf5ee4` = **8**, `4cdf5ee4..13d64bb5` = **9**; `git merge-base --is-ancestor 4643d590 bcc96f85` **fails**, so the ancestry claim is true | **FIXED** |
+| **R2-3** | §9.3's fifth `0.1889` | `density 0.1568 (8.5 / 300^0.7)` at `:1023`; `grep -rn "0\.1889"` over the doc now returns **one** hit, §12's ledger row 4, which quotes it as the defect and records "a fifth instance of that quotient in §9.3's own correction table was found by the round-2 review and corrected the same day" | **FIXED** |
+| **R2-4** | owner note's witness margin | `:207` now reads "a margin of exactly **0.0** rather than 1.6" — the value `npm run test:metamorphic` prints on the lane branch (`−1.6`, `[n=14, min 76.8, max 80.2, range 3.4]`) | **FIXED** |
+
+### Nothing else moved
+
+* **Scope.** `git diff --stat 13d64bb5 bcc96f85`: four files, +16/−10 — three
+  under `docs/` and `server/nvm/analyze/doctor.ts`. No test, no fixture, no
+  `scripts/lib/auc.ts`, no floor constant, no manifest.
+* **doctor.ts is comment-only, proven not asserted.**
+  `diff <(git show 13d64bb5:…/doctor.ts | sed 's@//.*@@') <(git show bcc96f85:…/doctor.ts | sed 's@//.*@@')`
+  is **empty** — with `//` comments stripped the two files are identical.
+* **Behaviour byte-identical.** My own probe re-scored all 32 public-corpus
+  scripts four ways (intact, shuffle-drop, climax-relocate, dialogue-flatten =
+  128 `runScriptDoctor` calls) on the `bcc96f85` export; `cmp` against the same
+  probe's round-2 output on `13d64bb5` is **byte-equal**. So every one of the six
+  public-benchmark AUCs, all sign counts, the blind pairs, the calibration bands
+  and the staple witness are unchanged by construction and no rerun was needed.
+* **Gates.** `check-scoring-receipt ad3f6fa7..bcc96f85` exits **1**, naming
+  exactly **one** `PENDING ENTRY` — the 2026-09-07 one — and no missing field.
+  `check-docs` 0, `check-no-console` 0, `check-brain` 0, `honesty-audit` 0.
+
+### Standing caveats, unchanged and not blockers
+
+These were disclosed by the lane and verified by me in round 2; they are what the
+owner is deciding about, not defects to fix first: the four power-branch
+inversions (`transfer-window +8.9`, `room-12 +8.4`, `the-key-under-the-mat +1.6`,
+`quiet-season +0.1`) that no choice of steepness can reach; the sub-12-scene
+length residue, asserted as arithmetic; two of the clue guard's four shapes
+lexically undecidable and carried as `todo` fixtures with measured id lists
+behind a corpus-wide property I measured at 65-of-131 → 0-of-53; the
+pre-registered split still reported rather than used; and no AUC-24 number, which
+is the run itself.
+
+**VERDICT: MERGE-READY-FOR-OWNER.** All four round-2 items are fixed at the sites
+named, with every number in the new text independently checked; the commit is
+comment-and-documentation-only and the scorer's output over the whole public
+corpus is byte-identical to the tip I reviewed in round 2. Thirteen items across
+three rounds are now discharged and nothing on the branch is untrue. The owner's
+`measure-real` run on `scoring/feature-length-defects` — then
+`scoring/feature-length-saturation-only` @ `efd1a463` if AUC-24 rejects it, per
+the owner note's decision tree — is worth spending.
