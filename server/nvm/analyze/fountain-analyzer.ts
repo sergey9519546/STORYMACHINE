@@ -1727,10 +1727,19 @@ function tokenEvidenceByScene(text: string, token: string): ClueEvidence {
 //        taught `revolver` as a name word and the REVOLVER stopped being a
 //        clue, while the same body with the prop never cue-adjacent kept it.
 //
-// Both causes are fixed below — the learning pass now requires the
-// INTRODUCTION CONVENTION, and the title guard only excludes a token that
-// never occurs outside the title-page region — and all three shapes are
-// fixtures in clue-proper-noun-guard.test.ts, in both directions.
+// ONE of the two causes is fixed below and the other is not, and which is
+// which matters. The TITLE cause IS fixed: the guard now excludes a title token
+// only when it occurs nowhere outside the title-page region, so shapes (ii)a
+// and (ii)b are closed and are hard fixtures. The LEARNING-PASS cause is NOT:
+// narrowing it was tried, measured, and reverted because it re-admitted four
+// real character names on the 20 CC0 scripts — the full record, with the four
+// ids and their introduction lines, is above the pass itself, together with why
+// shapes (i) and (iii) are lexically undecidable here. Those two are `todo`
+// fixtures in clue-proper-noun-guard.test.ts carrying their measured id lists,
+// and a hard corpus-wide property in the same file asserts that no multi-word
+// seeded clue on any of the 20 scripts shares a word with a cue name — which is
+// what caught the four, and what will catch the next one at the guard instead
+// of in an unrelated locked table three files away.
 function buildProperNounGuard(
   scenes: SceneUnit[],
   titlePageText: string,
